@@ -294,15 +294,15 @@ jobs:
         run: kill $SERVER_PID 2>/dev/null || true
 
       # =======================================================================
-      # Artifacts — only blob reports for merge+deploy (no HTML/test-results)
+      # Artifacts — blob reports uploaded to S3 for merge+deploy
       # =======================================================================
-      - name: "Upload Blob Report"
+      - name: "Upload Blob Report to S3"
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v7
+        uses: ./.github/actions/s3-artifact
         with:
-          name: playwright-blob-${{ strategy.job-index }}
+          mode: upload
+          name: playwright-blobs/${{ strategy.job-index }}
           path: apps/web-e2e/blob-report/
-          retention-days: 1
           if-no-files-found: ignore
 
   # ===========================================================================
@@ -315,22 +315,32 @@ jobs:
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
     steps:
+      - name: "Checkout Repository"
+        uses: actions/checkout@v6
+        with:
+          sparse-checkout: .github/actions/s3-artifact
+          fetch-depth: 1
+
       - name: "Setup Node.js"
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
-      - name: "Download All Blob Reports"
-        uses: actions/download-artifact@v8
-        continue-on-error: true
+      - name: "Download All Blob Reports from S3"
+        uses: ./.github/actions/s3-artifact
         with:
-          pattern: playwright-blob-*
+          mode: download
+          name: playwright-blobs
           path: all-blob-reports
-          merge-multiple: true
 
       - name: "Merge Reports"
         id: merge
         run: |
+          # Flatten shard subdirectories (0/, 1/, etc.) into all-blob-reports/
+          if [ -d "all-blob-reports" ]; then
+            find all-blob-reports -mindepth 2 -type f -exec mv {} all-blob-reports/ \; 2>/dev/null || true
+            find all-blob-reports -mindepth 1 -type d -empty -delete 2>/dev/null || true
+          fi
           COUNT=$(find all-blob-reports -name '*.zip' -type f 2>/dev/null | wc -l)
           if [ "$COUNT" -gt 0 ]; then
             echo "has-report=true" >> $GITHUB_OUTPUT

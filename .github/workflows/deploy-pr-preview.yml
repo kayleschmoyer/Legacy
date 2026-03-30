@@ -54,8 +54,11 @@ env:
   PREVIEW_BASE_URL: https://bkrupa.github.io/legacy-sports-deploys
 
 jobs:
-  build-preview:
-    name: Build PR Preview
+  # LS-1963: Merged build + deploy into a single job to eliminate GitHub
+  # artifact upload/download, which was hitting storage quota limits.
+  # The CI web-build artifact is now fetched from S3 (uploaded by ci-pipeline).
+  build-and-deploy-preview:
+    name: Build & Deploy PR Preview
     # Only run on successful CI for pull_request events
     if: >-
       github.event_name == 'workflow_run' &&
@@ -68,6 +71,10 @@ jobs:
       pr_skip: ${{ steps.pr.outputs.skip }}
       head_sha: ${{ steps.pr.outputs.head_sha }}
       head_branch: ${{ steps.pr.outputs.head_branch }}
+    # Serialize pushes to the deploy repo to prevent race conditions
+    concurrency:
+      group: deploy-repo-gh-pages-push
+      cancel-in-progress: false
     env:
       NX_DAEMON: false
       NX_SKIP_NX_CACHE: false
@@ -89,24 +96,31 @@ jobs:
           echo "head_sha=${{ github.event.workflow_run.head_sha }}"           >> "$GITHUB_OUTPUT"
           echo "head_branch=${{ github.event.workflow_run.head_branch }}"     >> "$GITHUB_OUTPUT"
 
-      # ── Try to download the web-build artifact from the CI run ────────────
-      - name: Download CI Web Build Artifact
+      # ── Checkout for composite actions and fallback build ─────────────────
+      - name: Checkout Repository
+        if: steps.pr.outputs.skip != 'true'
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+
+      # ── Try to download the web-build artifact from S3 ───────────────────
+      - name: Download CI Web Build from S3
         if: steps.pr.outputs.skip != 'true'
         id: download
-        uses: actions/download-artifact@v8
+        uses: ./.github/actions/s3-artifact
         with:
-          name: web-build-${{ github.event.workflow_run.id }}
+          mode: download
+          name: web-build
           path: dist/apps/web
           run-id: ${{ github.event.workflow_run.id }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-        continue-on-error: true
 
       # ── Post-process the CI artifact for the preview subdirectory ─────────
       # The CI build uses base:"/" and localhost fallback URLs.  We rewrite:
-      #   • Asset paths in HTML/CSS:  /assets/ → /legacy-sports-deploys/pr-N/assets/
-      #   • Localhost API URLs in JS: replace with production secrets
+      #   - Asset paths in HTML/CSS:  /assets/ -> /legacy-sports-deploys/pr-N/assets/
+      #   - Localhost API URLs in JS: replace with production secrets
       - name: Rewrite Artifact for Preview
-        if: steps.pr.outputs.skip != 'true' && steps.download.outcome == 'success'
+        if: steps.pr.outputs.skip != 'true' && steps.download.outputs.success == 'true'
         id: rewrite
         env:
           VITE_OAUTH_PROXY_URL: ${{ secrets.VITE_OAUTH_PROXY_URL }}
@@ -147,19 +161,12 @@ jobs:
 
           # SPA fallback: GitHub Pages serves 404.html for unknown paths
           cp index.html 404.html
-          echo "✅ Artifact rewritten for preview at ${BASE_PATH}"
+          echo "Artifact rewritten for preview at ${BASE_PATH}"
           echo "success=true" >> "$GITHUB_OUTPUT"
 
-      # ── Fallback: full local build when the CI artifact is unavailable ────
-      - name: Checkout Repository (Fallback)
-        if: steps.pr.outputs.skip != 'true' && steps.download.outcome != 'success'
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
-          fetch-depth: 0
-
+      # ── Fallback: full local build when the S3 artifact is unavailable ────
       - name: Setup Workspace (Fallback)
-        if: steps.pr.outputs.skip != 'true' && steps.download.outcome != 'success'
+        if: steps.pr.outputs.skip != 'true' && steps.download.outputs.success != 'true'
         uses: ./.github/actions/setup
         with:
           node-version: 22
@@ -168,7 +175,7 @@ jobs:
           skip-system-deps: true
 
       - name: Build Web App (Fallback)
-        if: steps.pr.outputs.skip != 'true' && steps.download.outcome != 'success'
+        if: steps.pr.outputs.skip != 'true' && steps.download.outputs.success != 'true'
         env:
           VITE_BASE_PATH: /legacy-sports-deploys/pr-${{ steps.pr.outputs.number }}/
           VITE_OAUTH_PROXY_URL: ${{ secrets.VITE_OAUTH_PROXY_URL }}
@@ -190,37 +197,12 @@ jobs:
           pnpm exec nx build web --configuration=production
 
       - name: Add SPA Fallback (Fallback Build)
-        if: steps.pr.outputs.skip != 'true' && steps.download.outcome != 'success'
+        if: steps.pr.outputs.skip != 'true' && steps.download.outputs.success != 'true'
         run: cp ./dist/apps/web/index.html ./dist/apps/web/404.html
-
-      - name: Upload Preview Artifact
-        if: steps.pr.outputs.skip != 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: pr-preview-${{ steps.pr.outputs.number }}
-          path: dist/apps/web
-          retention-days: 1
-
-  deploy-preview:
-    name: Deploy PR Preview
-    needs: [build-preview]
-    if: needs.build-preview.outputs.pr_skip != 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    # Serialize pushes to the deploy repo to prevent race conditions
-    concurrency:
-      group: deploy-repo-gh-pages-push
-      cancel-in-progress: false
-
-    steps:
-      - name: Download Preview Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: pr-preview-${{ needs.build-preview.outputs.pr_number }}
-          path: dist/apps/web
 
       # ── Deploy to the preview repo ───────────────────────────────────────
       - name: Generate App Token
+        if: steps.pr.outputs.skip != 'true'
         id: app-token
         uses: actions/create-github-app-token@v3
         with:
@@ -230,27 +212,29 @@ jobs:
           repositories: legacy-sports-deploys
 
       - name: Deploy to Preview Repo
+        if: steps.pr.outputs.skip != 'true'
         uses: peaceiris/actions-gh-pages@v4
         with:
           personal_token: ${{ steps.app-token.outputs.token }}
           external_repository: bkrupa/legacy-sports-deploys
           publish_branch: gh-pages
           publish_dir: ./dist/apps/web
-          destination_dir: pr-${{ needs.build-preview.outputs.pr_number }}
+          destination_dir: pr-${{ steps.pr.outputs.number }}
 
       - name: Comment Preview URL
+        if: steps.pr.outputs.skip != 'true'
         uses: marocchino/sticky-pull-request-comment@v3
         with:
           header: pr-preview
-          number: ${{ needs.build-preview.outputs.pr_number }}
+          number: ${{ steps.pr.outputs.number }}
           message: |
             ## 🌐 PR Preview
 
             | | |
             |---|---|
-            | **URL** | [${{ env.PREVIEW_BASE_URL }}/pr-${{ needs.build-preview.outputs.pr_number }}/](${{ env.PREVIEW_BASE_URL }}/pr-${{ needs.build-preview.outputs.pr_number }}/) |
-            | **Branch** | `${{ needs.build-preview.outputs.head_branch }}` |
-            | **Commit** | `${{ needs.build-preview.outputs.head_sha }}` |
+            | **URL** | [${{ env.PREVIEW_BASE_URL }}/pr-${{ steps.pr.outputs.number }}/](${{ env.PREVIEW_BASE_URL }}/pr-${{ steps.pr.outputs.number }}/) |
+            | **Branch** | `${{ steps.pr.outputs.head_branch }}` |
+            | **Commit** | `${{ steps.pr.outputs.head_sha }}` |
 
   cleanup-preview:
     name: Cleanup PR Preview

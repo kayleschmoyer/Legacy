@@ -1,0 +1,114 @@
+name: "S3 Artifact"
+description: "Upload/download CI artifacts via S3 instead of GitHub Actions artifacts"
+
+inputs:
+  mode:
+    description: "upload or download"
+    required: true
+  name:
+    description: "Artifact name (used as S3 key prefix)"
+    required: true
+  path:
+    description: "Local path to upload from or download to"
+    required: true
+  run-id:
+    description: "Workflow run ID for namespacing (default: current run)"
+    required: false
+    default: ""
+  bucket:
+    description: "S3 bucket name"
+    required: false
+    default: "legacy-sports-dev-ci-artifacts"
+  if-no-files-found:
+    description: "Behavior when no files found: warn, error, ignore (upload only)"
+    required: false
+    default: "warn"
+  role-to-assume:
+    description: "AWS IAM role ARN for OIDC authentication"
+    required: false
+    default: "arn:aws:iam::176661590736:role/legacy-sports-dev-github-actions"
+  aws-region:
+    description: "AWS region"
+    required: false
+    default: "us-east-1"
+
+outputs:
+  success:
+    description: "Whether the operation succeeded"
+    value: ${{ steps.operation.outputs.success }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v6
+      with:
+        role-to-assume: ${{ inputs.role-to-assume }}
+        aws-region: ${{ inputs.aws-region }}
+
+    - name: S3 Artifact Operation
+      id: operation
+      shell: bash
+      env:
+        MODE: ${{ inputs.mode }}
+        NAME: ${{ inputs.name }}
+        LOCAL_PATH: ${{ inputs.path }}
+        RUN_ID: ${{ inputs.run-id || github.run_id }}
+        BUCKET: ${{ inputs.bucket }}
+        IF_NO_FILES: ${{ inputs.if-no-files-found }}
+      run: |
+        # Include run_attempt in the prefix so job retries get a clean artifact set
+        S3_PREFIX="s3://${BUCKET}/ci-artifacts/${RUN_ID}/${GITHUB_RUN_ATTEMPT}/${NAME}"
+
+        if [ "$MODE" = "upload" ]; then
+          # Check if there are files to upload
+          if [ ! -d "$LOCAL_PATH" ] || [ -z "$(ls -A "$LOCAL_PATH" 2>/dev/null)" ]; then
+            case "$IF_NO_FILES" in
+              error)
+                echo "::error::No files found at ${LOCAL_PATH}"
+                echo "success=false" >> "$GITHUB_OUTPUT"
+                exit 1
+                ;;
+              warn)
+                echo "::warning::No files found at ${LOCAL_PATH} — skipping upload"
+                echo "success=false" >> "$GITHUB_OUTPUT"
+                exit 0
+                ;;
+              ignore)
+                echo "success=false" >> "$GITHUB_OUTPUT"
+                exit 0
+                ;;
+            esac
+          fi
+
+          echo "Uploading ${LOCAL_PATH} to ${S3_PREFIX}..."
+          if aws s3 sync "$LOCAL_PATH" "$S3_PREFIX" --delete --quiet; then
+            echo "success=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::S3 upload failed for ${S3_PREFIX}"
+            echo "success=false" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+        elif [ "$MODE" = "download" ]; then
+          # Check if the S3 prefix exists
+          if ! aws s3 ls "$S3_PREFIX/" > /dev/null 2>&1; then
+            echo "::warning::No artifact found at ${S3_PREFIX}"
+            echo "success=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          mkdir -p "$LOCAL_PATH"
+          echo "Downloading ${S3_PREFIX} to ${LOCAL_PATH}..."
+          if aws s3 sync "$S3_PREFIX" "$LOCAL_PATH" --quiet; then
+            echo "success=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::S3 download failed for ${S3_PREFIX}"
+            echo "success=false" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+        else
+          echo "::error::Invalid mode '${MODE}' — must be 'upload' or 'download'"
+          exit 1
+        fi

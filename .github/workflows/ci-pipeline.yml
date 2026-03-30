@@ -241,16 +241,15 @@ jobs:
           execution-mode: "local"
           optimal-agents: "4"
 
-      # Upload web build so the e2e job can consume it without relying solely on Nx remote-cache.
-      # Skipped when web wasn't built (artifact won't exist); e2e falls back to cache in that case.
-      - name: "Upload Web Build Artifacts"
+      # Upload web build to S3 so the e2e job can consume it without relying solely on Nx remote-cache.
+      # Skipped when web wasn't built; e2e falls back to cache in that case.
+      - name: "Upload Web Build to S3"
         if: steps.build.outputs.web-result == 'success'
-        uses: actions/upload-artifact@v7
+        uses: ./.github/actions/s3-artifact
         with:
-          name: web-build-${{ github.run_id }}
+          mode: upload
+          name: web-build
           path: dist/apps/web
-          retention-days: 3
-          if-no-files-found: warn
 
   # ============================================================================
   # STAGE 3 — E2E tests (runs after BOTH quality gates AND build pass)
@@ -287,15 +286,16 @@ jobs:
           set-nx-shas: false
           include-optional-deps: false
 
-      # Download the pre-built web artifact from build-validation; skipped when
-      # web wasn't built (artifacts-ready=false) to avoid noisy "Artifact not found" errors.
-      - name: "Download Web Build Artifacts"
+      # Download the pre-built web artifact from S3; skipped when
+      # web wasn't built (artifacts-ready=false) to avoid noisy warnings.
+      - name: "Download Web Build from S3"
         if: needs.build-validation.outputs.artifacts-ready == 'true'
-        uses: actions/download-artifact@v8
+        id: download-web
+        uses: ./.github/actions/s3-artifact
         with:
-          name: web-build-${{ github.run_id }}
+          mode: download
+          name: web-build
           path: dist/apps/web
-        continue-on-error: true
 
       - name: "E2E Testing"
         id: e2e
@@ -306,13 +306,13 @@ jobs:
           test-patterns: ${{ inputs.e2e-test-patterns }}
           test-patterns-invert: ${{ inputs.e2e-exclude-patterns }}
 
-      - name: "Upload Blob Report"
+      - name: "Upload Blob Report to S3"
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v7
+        uses: ./.github/actions/s3-artifact
         with:
-          name: playwright-blob-${{ github.run_id }}-${{ strategy.job-index }}
+          mode: upload
+          name: playwright-blobs/${{ strategy.job-index }}
           path: apps/web-e2e/blob-report/
-          retention-days: 1
           if-no-files-found: warn
 
   # ============================================================================
@@ -336,16 +336,22 @@ jobs:
           set-nx-shas: false
           include-optional-deps: false
 
-      - name: "Download All Blob Reports"
-        uses: actions/download-artifact@v8
+      - name: "Download All Blob Reports from S3"
+        id: download-blobs
+        uses: ./.github/actions/s3-artifact
         with:
-          pattern: playwright-blob-${{ github.run_id }}-*
+          mode: download
+          name: playwright-blobs
           path: all-blob-reports
-          merge-multiple: true
 
       - name: "Check for Blob Reports"
         id: check-reports
         run: |
+          # S3 downloads may preserve shard subdirectories (0/, 1/, etc.) — flatten them
+          if [ -d "all-blob-reports" ]; then
+            find all-blob-reports -mindepth 2 -type f -exec mv {} all-blob-reports/ \; 2>/dev/null || true
+            find all-blob-reports -mindepth 1 -type d -empty -delete 2>/dev/null || true
+          fi
           COUNT=$(find all-blob-reports -name '*.zip' -type f 2>/dev/null | wc -l)
           if [ "$COUNT" -gt 0 ]; then
             echo "has-reports=true" >> $GITHUB_OUTPUT
