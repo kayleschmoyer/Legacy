@@ -57,35 +57,52 @@ Follow the full [worktree-workflow skill](../worktree-workflow/SKILL.md):
 
 #### Parent Mode (has children)
 
+Process children in iterative batches until the backlog is empty.
+
 1. **Transition parent to In Progress** (if not already):
 
    ```
    jira_transition(key: "LS-####", status: "In Progress")
    ```
 
-2. **List actionable children** — get To Do and In Progress children:
+2. **Iterative batch loop** — repeat until no unblocked To Do children remain:
 
    ```
-   jira_list_children(key: "LS-####")
+   all_worked = []      # cumulative across all batches
+   all_released = []    # cumulative across all batches
+
+   REPEAT:
+     a. List actionable children (To Do and In Progress):
+        jira_list_children(key: "LS-####")
+     b. Filter to unblocked To Do tickets (jira_check_blockers).
+        Prefer tickets without dependencies on other children.
+        Process in dependency order (blockers first).
+     c. Select batch: pick up to 5 unblocked To Do tickets.
+        → If none found → EXIT loop (no unblocked To Do tickets remain).
+          If remaining children are blocked, report them. If some are
+          already In Progress (e.g., being worked by another agent), skip
+          and report those keys.
+     d. Claim batch upfront: transition every selected ticket to "In Progress"
+        before starting work on any of them.
+     e. Work each child ticket via Leaf Mode (Step 2 above):
+        - Each child gets its own worktree + branch + PR (one ticket = one PR)
+        - After each child's PR is created, transition it to "In Review"
+        - Clean up the worktree before starting the next child
+     f. Release uncompleted: any claimed ticket that did not reach "In Review":
+        - If no PR exists → transition back to "To Do"
+        - If a PR/branch exists → keep "In Progress" and report for manual follow-up
+     g. Append results to all_worked / all_released.
+     → Loop back to step a.
    ```
 
-3. **Select a batch** — cap at **5 tickets per session**. If there are more unblocked children, select the top 5 and report the remaining count:
-   - Prefer unblocked tickets (check with `jira_check_blockers`)
-   - Prefer tickets without dependencies on other children
-   - Process tickets in dependency order (blockers first, then the tickets that are blocked by them)
-
-4. **For each child ticket**, run **Leaf Mode** (Step 2 above) with full worktree isolation:
-   - Each child gets its own worktree + branch + PR (one ticket = one PR)
-   - After each child's PR is created, transition it to "In Review"
-   - Clean up the worktree before starting the next child
-
-5. **Update parent status** after processing children:
+3. **Update parent status** after all batches complete:
 
    | Children state                                          | Parent status                                        |
    | ------------------------------------------------------- | ---------------------------------------------------- |
    | All children Done                                       | Transition parent to **Done**                        |
    | All children In Review or Done (none To Do/In Progress) | Transition parent to **In Review**                   |
-   | Some children still To Do                               | Keep parent **In Progress** — report remaining count |
+   | Some children still In Progress                         | Keep parent **In Progress** — report those keys      |
+   | Some children still To Do (all blocked)                 | Keep parent **In Progress** — report blocked tickets |
 
 ### Step 3: MCP gap audit
 
@@ -101,11 +118,13 @@ This is **mandatory** — it ensures we continuously improve the agentic environ
 
 ### Step 4: Report results
 
-After completing the batch (or the single ticket), summarize:
+After completing all batches (or the single ticket), summarize:
 
-- Tickets worked: list keys + PR links
-- Tickets skipped: list keys + reason (blocked, too many, etc.)
-- Parent status: current state and remaining children count (if applicable)
+- Tickets worked: list keys + PR links (cumulative across all batches)
+- Tickets released back to To Do: list keys + reasons
+- Tickets skipped: list keys + reason (blocked)
+- Parent status: current state and remaining blocked children (if applicable)
+- Total batches processed (Parent Mode only)
 - MCP gap audit: gaps found, tickets created
 
 ## Status Transition Rules

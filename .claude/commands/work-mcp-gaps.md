@@ -1,19 +1,38 @@
-You are a **batch ticket worker** for MCP tooling gaps. Pick up unworked tickets from the AI Workspace Improvements epic (LS-1455) and implement each one through the work-ticket flow.
+You are a **batch ticket worker** for MCP tooling gaps. Pick up unworked tickets from the AI Workspace Improvements epic (LS-1455) and implement each one through the work-ticket flow. **Keep looping** until the backlog is empty.
 
 !`cat .agents/skills/work-ticket/SKILL.md`
 
 !`cat .agents/skills/mcp-gaps/SKILL.md`
 
-Execute a **batch run** of LS-1455 child tickets:
+Execute an **iterative batch run** of LS-1455 child tickets. Process one batch at a time, then check for more work — repeat until no unblocked To Do tickets remain.
 
-1. **List children**: use `jira_list_children` (or `jira_search` with JQL `parent = LS-1455 AND status = "To Do" ORDER BY priority DESC, created ASC`) to find all unworked child tickets under LS-1455.
-2. **Filter**: skip tickets that are blocked (use `jira_check_blockers`). Prefer tickets tagged `missing-tool` or `missing-feature` over `missing-awareness` (doc-only fixes).
-3. **Select batch**: pick up to **5** unblocked To Do tickets for this session. If more remain, report the remaining count in the final summary.
-4. **Claim all tickets upfront**: transition **every** selected ticket to "In Progress" (`jira_transition(key: KEY, status: "In Progress")`) **before starting work on any of them**. This reserves the tickets so parallel agents working the same epic don't pick up the same ones. Track which tickets were claimed in a local list, along with their PR URL once created.
-5. **Work each ticket**: for each claimed ticket, run the **Leaf Mode** flow from the work-ticket skill — blocker check, worktree, implement, validate (`make pc`), self-review, commit, push, create PR (draft then ready), transition Jira to "In Review". One ticket = one worktree = one PR. If a ticket fails mid-work (errors, timeouts), release it back to "To Do" immediately before moving to the next.
-6. **Clean up**: after each ticket's PR is created, clean up its worktree before moving to the next.
-7. **Release uncompleted tickets**: after the batch loop ends, check each claimed ticket. Any ticket that was transitioned to "In Progress" but did **not** reach "In Review" **and** has no PR created must be transitioned back to "To Do" (`jira_transition(key: KEY, status: "To Do")`). This prevents tickets from being permanently stuck in "In Progress" when the agent hits errors, timeouts, or skips a ticket mid-batch.
-8. **MCP gap audit**: after all tickets are worked, run the Phase 1 audit for this session.
-9. **Report**: summarize tickets worked, PRs created, tickets released back to To Do (with reasons), and remaining To Do count under LS-1455.
+```
+all_worked = []      # cumulative across all batches
+all_released = []    # cumulative across all batches
+
+REPEAT:
+  1. List children: jira_list_children (or JQL parent = LS-1455 AND status = "To Do" ORDER BY priority DESC, created ASC)
+  2. Filter: skip blocked tickets (jira_check_blockers). Prefer missing-tool / missing-feature over missing-awareness (doc-only).
+  3. Select batch: pick up to 5 unblocked To Do tickets.
+     → If none found → EXIT loop (no unblocked To Do tickets remain)
+  4. Claim batch upfront: transition every selected ticket to "In Progress" before starting work.
+  5. Work each ticket: Leaf Mode flow (worktree → implement → validate → PR → Jira "In Review").
+  6. Clean up: after each ticket's PR is created, clean up its worktree.
+  7. Release uncompleted: any claimed ticket that did not reach "In Review":
+     - If no PR exists → transition back to "To Do"
+     - If a PR/branch exists → keep "In Progress" and report for manual follow-up
+  8. Append results to all_worked / all_released.
+  → Loop back to step 1.
+```
+
+After all batches complete (no more To Do tickets):
+
+1. **MCP gap audit**: run the Phase 1 audit for this session.
+2. **Final report** (cumulative across all batches):
+   - Tickets worked: list keys + PR links
+   - Tickets released back to To Do: list keys + reasons
+   - Remaining To Do count under LS-1455 (should be 0 or only blocked tickets)
+   - Total batches processed
+   - MCP gaps filed
 
 **Guardrails**: One ticket = one worktree = one PR. Always run `make pc` before pushing. Never stop at code changes — drive each ticket to PR creation and Jira "In Review". If a ticket's implementation is unclear or blocked, release it back to To Do and move to the next — don't burn time on ambiguous scope. Always release uncompleted tickets — never leave orphaned "In Progress" tickets.
