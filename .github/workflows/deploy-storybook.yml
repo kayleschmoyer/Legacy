@@ -58,11 +58,20 @@ jobs:
         with:
           runner-label: ${{ vars.CI_RUNNER_LABEL }}
 
-  build:
-    name: Build Storybook
+  # LS-1962: Merged build + deploy into a single job to eliminate GitHub
+  # artifact upload/download, which was hitting storage quota limits.
+  build-and-deploy:
+    name: Build & Deploy Storybook
     needs: [check-runner-access]
     runs-on: ${{ needs.check-runner-access.outputs.runner-label }}
     timeout-minutes: 15
+    # Serialize pushes to the deploy repo to prevent race conditions when
+    # multiple workflows (storybook, PR preview, cleanup) push to gh-pages.
+    # PR runs never deploy, so they get a unique group to avoid blocking on
+    # unrelated gh-pages pushes.
+    concurrency:
+      group: ${{ github.event_name == 'pull_request' && format('deploy-repo-gh-pages-push-pr-{0}', github.run_id) || 'deploy-repo-gh-pages-push' }}
+      cancel-in-progress: false
 
     steps:
       - name: Checkout Repository
@@ -90,13 +99,6 @@ jobs:
           echo "Storybook build output:"
           ls -la dist/storybook/
 
-      - name: Upload Storybook Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: storybook-build
-          path: dist/storybook
-          retention-days: 1
-
       # ── Sticky PR Comment (only on pull requests) ─────────────────────────
       - name: Comment Storybook URL
         if: always() && github.event_name == 'pull_request'
@@ -116,26 +118,9 @@ jobs:
 
             > Storybook is deployed to GitHub Pages on merge to `main`. This comment confirms the build status for this PR.
 
-  deploy:
-    name: Deploy Storybook
-    needs: [build]
-    if: github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    # Serialize pushes to the deploy repo to prevent race conditions when
-    # multiple workflows (storybook, PR preview, cleanup) push to gh-pages
-    concurrency:
-      group: deploy-repo-gh-pages-push
-      cancel-in-progress: false
-
-    steps:
-      - name: Download Storybook Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: storybook-build
-          path: dist/storybook
-
+      # ── Deploy to GitHub Pages (only on main push / manual dispatch) ──────
       - name: Generate App Token
+        if: github.event_name != 'pull_request'
         id: app-token
         uses: actions/create-github-app-token@v3
         with:
@@ -145,6 +130,7 @@ jobs:
           repositories: legacy-sports-deploys
 
       - name: Deploy Storybook
+        if: github.event_name != 'pull_request'
         uses: peaceiris/actions-gh-pages@v4
         with:
           personal_token: ${{ steps.app-token.outputs.token }}
