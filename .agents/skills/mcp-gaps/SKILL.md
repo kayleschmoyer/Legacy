@@ -32,11 +32,11 @@ This skill enforces the **MCP-first principle** from AGENTS.md: shell commands a
 
 1. **Collect** non-MCP Bash commands from the session (skip one-off investigative commands and commands already covered by MCP tools). **Include documented Bash exceptions** — patterns marked as "shell fallback" or "no Nx target equivalent" in AGENTS.md/skill docs are acknowledged gaps, not permanent exemptions
 2. **Classify** each as `missing-tool`, `missing-feature`, or `missing-awareness`. Documented exceptions should be classified as `missing-tool` or `missing-feature` as appropriate, with a note that they are currently documented
-3. **Filter** `missing-awareness` gaps — these are doc fixes, not tool gaps
+3. **File `missing-awareness` gaps as doc-fix tickets** — use summary prefix `docs(skills):`, type `Task`, and set parent epic to `LS-1455`. Without a ticket, the same awareness gap recurs across sessions
 4. **Check** for existing tickets under LS-1455 (`jira_list_children` or JQL `parent = LS-1455`)
 5. **Create** tickets for new gaps using the template in the reference doc
 6. **Audit overflows** — review MCP tool calls that exceeded token limits; classify as `agent-error`, `bad-default`, or `missing-parameter`
-   6b. **Audit failures** — review MCP tool calls that returned errors (403, path bugs, etc.); classify as `permission-gap`, `bug`, `config-issue`, or `expected-limitation`
+   6b. **Audit failures** — review MCP tool calls that returned errors (403, path bugs, timeouts, state loss, etc.); classify as `permission-gap`, `bug`, `config-issue`, or `expected-limitation`. **Do NOT dismiss failures as "environmental" or "known" without checking for an existing ticket first.**
 7. **Report** findings to the user
 
 ---

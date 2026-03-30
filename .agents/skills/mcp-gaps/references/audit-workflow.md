@@ -48,12 +48,16 @@ For each candidate command, determine:
 | **MCP server**      | Which existing MCP server should own this (or "new server needed")                                                                                  |
 | **Gap type**        | `missing-tool` (no tool exists), `missing-feature` (tool exists but lacks a flag/option), `missing-awareness` (tool exists but agent didn't use it) |
 
-### 3. Filter out `missing-awareness` gaps
+### 3. File `missing-awareness` gaps as doc-fix tickets
 
-If the gap type is `missing-awareness` — the MCP tool already exists and is fully capable — this is a **skill/documentation issue**, not a tooling gap. Instead of creating a ticket:
+If the gap type is `missing-awareness` — the MCP tool already exists and is fully capable — the fix is a **skill/documentation update**, not a code change. **Still create a ticket** so the fix is tracked:
 
-- Note which AGENTS.md or skill doc failed to guide the agent to the right tool
-- Consider whether a skill update or AGENTS.md clarification would fix it
+- **Summary**: `docs(skills): <description of the awareness gap>`
+- **Type**: `Task`
+- **Parent**: `LS-1455`
+- **Description**: Note which skill doc or AGENTS.md section failed to guide the agent, and propose the specific doc update
+
+Without a ticket, the same awareness gap recurs session after session because no one tracks or implements the doc fix. The ticket type is `Task` (not `Bug`) since the tool itself works correctly.
 
 ### 4. Check for existing tickets under LS-1455
 
@@ -192,10 +196,13 @@ Review the conversation history for MCP tool calls that returned errors — look
 
 - **403 / "Resource not accessible by integration"** — permission-scoped failures
 - **Path resolution errors** — `fatal: /`, `is outside repository`, `No worktree found`
-- **500 / timeout / connection errors** — infrastructure failures
+- **500 / timeout / connection errors** — infrastructure failures (including `ETIMEDOUT`, `spawnSync` timeouts)
+- **State loss** — tool succeeds but its side effects don't persist (e.g., `worktree_set` succeeds, then subsequent tools can't find the active worktree)
 - **Unexpected empty results** — tool returns success but data is missing or malformed
 
 These failures are distinct from overflows (Step 6) — the tool was invoked with correct parameters but failed at the server level. When tools fail silently, agents fall back to Bash commands, negating the MCP-first principle.
+
+> **Do NOT dismiss failures as "environmental" or "known".** Every failure must be triaged and ticketed with an appropriate fix type (`permission-gap`, `bug`, `config-issue`, or `expected-limitation`). Timeouts, state loss, and silent errors all deserve tickets. Even if the failure seems intermittent or platform-specific, another agent will hit the same issue — file a ticket so it gets investigated. Always check for an existing ticket before filing, but never skip filing because the failure "seems like a one-off."
 
 For each failure, record:
 
@@ -210,7 +217,9 @@ For each failure, record:
 #### Classification
 
 - **`permission-gap`**: Tool works but the token lacks required scopes (e.g., 403 on GraphQL fields that need elevated permissions). Create a ticket to either add the permission or add graceful degradation.
-- **`bug`**: Tool has a code defect that causes it to fail under certain conditions (e.g., path resolution generating `/` instead of the worktree path). Create a ticket with reproduction steps.
+- **`bug`**: Tool has a code defect that causes it to fail under certain conditions (e.g., path resolution generating `/` instead of the worktree path). Create a ticket with reproduction steps. Subtypes:
+  - **`bug/timeout`**: Tool hangs or times out under specific conditions (e.g., `spawnSync ETIMEDOUT` when cleaning worktrees with independent node_modules). The tool needs a longer timeout, graceful fallback, or actionable error message.
+  - **`bug/state-loss`**: Tool succeeds but its side effects don't persist (e.g., `worktree_set` reports success but subsequent tools can't find the active worktree). The state persistence mechanism is broken.
 - **`config-issue`**: Tool needs a different setup to work (e.g., missing env var, wrong token type). This is usually a doc fix — update AGENTS.md or the relevant skill doc to guide agents toward correct configuration.
 - **`expected-limitation`**: Tool correctly reports an unsupported operation (e.g., worktree tool refusing to push `main`). No ticket needed — the tool is working as designed.
 
@@ -218,13 +227,15 @@ For each failure, record:
 
 These are recurring failure modes observed across sessions. If you encounter them during an audit, check whether a fix has already been shipped before filing a new ticket.
 
-| Tool                     | Failure mode                                  | Fix type         | Notes                                                               |
-| ------------------------ | --------------------------------------------- | ---------------- | ------------------------------------------------------------------- |
-| `github_pr_scan`         | 403 on `mergeable`/`statusCheckRollup` fields | `permission-gap` | Fixed in LS-1903 — falls back to light query in degraded mode       |
-| `github_resolve_threads` | 403 on workflow dispatch (recheck)            | `permission-gap` | Fixed in LS-1906 — downgraded from error to note                    |
-| `worktree_unstage`       | Path resolution generates `/` instead of path | `bug`            | Fixed in LS-1904 — string-to-array normalization on `files` param   |
-| `worktree_stabilize`     | `make install` fails on junctioned worktrees  | `bug`            | Fixed in LS-1905 — skips install when junction detected             |
-| `github_manage_labels`   | Response serializes array param as string     | `bug`            | Fixed in LS-1907 — handles JSON-encoded array strings in preprocess |
+| Tool                     | Failure mode                                   | Fix type         | Notes                                                                                  |
+| ------------------------ | ---------------------------------------------- | ---------------- | -------------------------------------------------------------------------------------- |
+| `github_pr_scan`         | 403 on `mergeable`/`statusCheckRollup` fields  | `permission-gap` | Fixed in LS-1903 — falls back to light query in degraded mode                          |
+| `github_resolve_threads` | 403 on workflow dispatch (recheck)             | `permission-gap` | Fixed in LS-1906 — downgraded from error to note                                       |
+| `worktree_unstage`       | Path resolution generates `/` instead of path  | `bug`            | Fixed in LS-1904 — string-to-array normalization on `files` param                      |
+| `worktree_stabilize`     | `make install` fails on junctioned worktrees   | `bug`            | Fixed in LS-1905 — skips install when junction detected                                |
+| `github_manage_labels`   | Response serializes array param as string      | `bug`            | Fixed in LS-1907 — handles JSON-encoded array strings in preprocess                    |
+| `worktree_set`           | Active state silently drops between tool calls | `bug/state-loss` | LS-1946 — `worktree_set` succeeds but subsequent tools report "No active worktree set" |
+| `worktree_clean`         | Times out with `spawnSync ETIMEDOUT`           | `bug/timeout`    | LS-1947 — hangs when worktree has independent node_modules or file locks               |
 
 For `permission-gap` and `bug` types, follow Steps 4-5 to check for existing tickets and create new ones under LS-1455. Use this description template:
 
@@ -234,7 +245,7 @@ For `permission-gap` and `bug` types, follow Steps 4-5 to check for existing tic
 **MCP tool**: `<server> / <tool_name>`
 **Error observed**: `<error message>`
 **Impact**: <what the agent fell back to, how many Bash commands resulted>
-**Fix type**: permission-gap | bug
+**Fix type**: permission-gap | bug | bug/timeout | bug/state-loss | config-issue
 
 ## Root Cause
 
@@ -261,7 +272,8 @@ Summarize the audit results to the user:
 - MCP tool failures identified (with fix types)
 - Existing tickets found (with keys)
 - New tickets created (with keys)
-- Any `missing-awareness`, `agent-error`, or `config-issue` items noted (skill/doc fixes needed)
+- Any `missing-awareness` doc-fix tickets created (with keys)
+- Any `agent-error` or `config-issue` items noted (report-only for this audit; typically addressed via follow-up `docs(skills):` documentation updates rather than new LS-1455 gap tickets)
 
 ## Gotchas
 
