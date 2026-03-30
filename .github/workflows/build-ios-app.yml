@@ -220,7 +220,7 @@ jobs:
           path: |
             ${{ steps.artifacts.outputs.ipa_path }}
             ${{ steps.artifacts.outputs.latest_path }}
-          retention-days: 7
+          retention-days: 3
           if-no-files-found: error
 
       - name: Upload App Bundle as GitHub Artifact (Debug)
@@ -229,7 +229,7 @@ jobs:
         with:
           name: ${{ steps.version.outputs.artifact_name }}
           path: ${{ steps.artifacts.outputs.app_zip_path }}
-          retention-days: 7
+          retention-days: 3
           if-no-files-found: error
 
       - name: Create Release (Release builds only)
@@ -288,7 +288,7 @@ jobs:
 
           if [ "${{ steps.version.outputs.build_config }}" == "Release" ]; then
             echo "### 📥 IPA Download Options:" >> $GITHUB_STEP_SUMMARY
-            echo "1. **GitHub Artifacts:** Available in this workflow run for 90 days" >> $GITHUB_STEP_SUMMARY
+            echo "1. **GitHub Artifacts:** Available in this workflow run for 3 days" >> $GITHUB_STEP_SUMMARY
             echo "2. **GitHub Release:** Tagged release with permanent download link" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "### 📱 Installation Methods:" >> $GITHUB_STEP_SUMMARY
@@ -305,6 +305,6 @@ jobs:
             fi
           else
             echo "### 📥 Debug App Bundle:" >> $GITHUB_STEP_SUMMARY
-            echo "- **GitHub Artifacts:** Available in this workflow run for 30 days" >> $GITHUB_STEP_SUMMARY
+            echo "- **GitHub Artifacts:** Available in this workflow run for 3 days" >> $GITHUB_STEP_SUMMARY
             echo "- **Installation:** Use iOS Simulator or Xcode for device installation" >> $GITHUB_STEP_SUMMARY
           fi

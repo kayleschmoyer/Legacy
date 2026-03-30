@@ -262,8 +262,8 @@ jobs:
             PLAYWRIGHT_ARGS+=( "--headed" )
           fi
 
-          # Reporters: line for console, html for artifact, blob for potential merge
-          PLAYWRIGHT_ARGS+=( "--reporter=line,html,blob" )
+          # Reporters: line for console, blob for merge+deploy
+          PLAYWRIGHT_ARGS+=( "--reporter=line,blob" )
 
           # Run with test file as a safe positional arg after --
           if [ -n "$TEST_FILE" ]; then
@@ -280,114 +280,55 @@ jobs:
         run: kill $SERVER_PID 2>/dev/null || true
 
       # =======================================================================
-      # Artifacts
+      # Artifacts — only blob reports for merge+deploy (no HTML/test-results)
       # =======================================================================
-      - name: "Upload HTML Report"
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v7
-        with:
-          name: playwright-report-${{ strategy.job-index }}
-          path: apps/web-e2e/playwright-report/
-          retention-days: 7
-          if-no-files-found: ignore
-
       - name: "Upload Blob Report"
-        if: ${{ !cancelled() && inputs.shard-total != '1' }}
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           name: playwright-blob-${{ strategy.job-index }}
           path: apps/web-e2e/blob-report/
-          retention-days: 7
-          if-no-files-found: ignore
-
-      - name: "Upload Test Results"
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v7
-        with:
-          name: test-results-${{ strategy.job-index }}
-          path: apps/web-e2e/test-results/
-          retention-days: 7
+          retention-days: 1
           if-no-files-found: ignore
 
   # ===========================================================================
-  # Merge sharded reports into a single HTML report
+  # Merge shard reports and deploy directly to GitHub Pages
   # ===========================================================================
-  merge-reports:
-    name: "Merge Playwright Reports"
+  deploy-report:
+    name: "Deploy Playwright Report"
     needs: [run-tests]
-    if: ${{ !cancelled() && inputs.shard-total != '1' }}
+    if: ${{ !cancelled() && needs.run-tests.result != 'skipped' }}
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
     steps:
-      - name: "Checkout Repository"
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ inputs.ref || github.ref }}
-          fetch-depth: 1
-
       - name: "Setup Node.js"
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
           node-version: 22
 
       - name: "Download All Blob Reports"
         uses: actions/download-artifact@v8
+        continue-on-error: true
         with:
           pattern: playwright-blob-*
           path: all-blob-reports
           merge-multiple: true
 
       - name: "Merge Reports"
-        run: npx playwright@1.55.0 merge-reports --reporter html ./all-blob-reports
-
-      - name: "Upload Merged Report"
-        uses: actions/upload-artifact@v7
-        with:
-          name: playwright-report-merged
-          path: playwright-report/
-          retention-days: 7
-          if-no-files-found: ignore
-
-  # ===========================================================================
-  # Deploy report to GitHub Pages (legacy-sports-deploys)
-  # ===========================================================================
-  deploy-report:
-    name: "Deploy Playwright Report"
-    needs: [run-tests, merge-reports]
-    if: ${{ !cancelled() && needs.run-tests.result != 'skipped' }}
-    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 10
-    steps:
-      - name: "Download HTML Report (single shard)"
-        if: inputs.shard-total == '1'
-        uses: actions/download-artifact@v8
-        continue-on-error: true
-        with:
-          name: playwright-report-0
-          path: playwright-report
-
-      - name: "Download Merged Report (multi-shard)"
-        if: inputs.shard-total != '1' && needs.merge-reports.result == 'success'
-        uses: actions/download-artifact@v8
-        continue-on-error: true
-        with:
-          name: playwright-report-merged
-          path: playwright-report
-
-      - name: "Check for Report"
-        id: check-report
+        id: merge
         run: |
-          if [ -d "playwright-report" ] && [ "$(ls -A playwright-report 2>/dev/null)" ]; then
+          COUNT=$(find all-blob-reports -name '*.zip' -type f 2>/dev/null | wc -l)
+          if [ "$COUNT" -gt 0 ]; then
             echo "has-report=true" >> $GITHUB_OUTPUT
-            echo "Found report — proceeding with deploy"
+            npx playwright@1.55.0 merge-reports --reporter html ./all-blob-reports
           else
             echo "has-report=false" >> $GITHUB_OUTPUT
-            echo "No report found — skipping deploy"
+            echo "No blob reports found — skipping deploy"
           fi
 
       - name: "Generate App Token"
         id: app-token
-        if: steps.check-report.outputs.has-report == 'true'
+        if: steps.merge.outputs.has-report == 'true'
         uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ secrets.PREVIEW_APP_ID }}
@@ -396,7 +337,7 @@ jobs:
           repositories: legacy-sports-deploys
 
       - name: "Deploy Playwright Report"
-        if: steps.check-report.outputs.has-report == 'true'
+        if: steps.merge.outputs.has-report == 'true'
         uses: peaceiris/actions-gh-pages@v4
         with:
           personal_token: ${{ steps.app-token.outputs.token }}
@@ -406,7 +347,7 @@ jobs:
           destination_dir: playwright-report/manual-${{ github.run_number }}
 
       - name: "Print Report URL"
-        if: steps.check-report.outputs.has-report == 'true'
+        if: steps.merge.outputs.has-report == 'true'
         run: |
           echo "## 🎭 Playwright Report" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY

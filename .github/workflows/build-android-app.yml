@@ -138,7 +138,7 @@ jobs:
         with:
           name: android-apk-${{ steps.version.outputs.build_type }}
           path: apps/app/android/${{ steps.build.outputs.apk-path }}
-          retention-days: 7
+          retention-days: 3
 
   create-release:
     name: Create GitHub Release
