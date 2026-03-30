@@ -41,6 +41,11 @@ if [[ "$FILE_PATH" == *"legacy-sports.code-workspace" ]]; then
   exit 0
 fi
 
+# Allow edits to MCP server source files (development tooling)
+if [[ "$FILE_PATH" == "$MAIN_REPO/tools/mcp/"* ]]; then
+  exit 0
+fi
+
 # Check if worktrees exist
 WORKTREE_COUNT=$(git -C "$MAIN_REPO" worktree list --porcelain 2>/dev/null | grep -c "^worktree " || true)
 
