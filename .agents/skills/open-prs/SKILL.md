@@ -106,8 +106,8 @@ This skill delegates to specialized sub-skills for each operation category. Load
 - **One worktree per PR** — never mix fixes for different PRs in the same worktree
 - **All file edits happen in the worktree**, never in `D:\code\legacy-sports`
 - **Always `make pc` before pushing** — do not push broken code. **Every agent that modifies code must validate before pushing. Skipping saves 5 min but each CI failure costs 40-60 min in re-dispatch + CI queue time.**
-- **Dirty-tree guard before push** — after `make pc` passes, check `worktree_status` (or `git status --porcelain`). If the working tree is dirty (formatting auto-amend may leave changes on Windows), commit with `style: apply formatting` and re-run `make pc` before pushing.
-- **Always `--force-with-lease`** when pushing rebased branches
+- **Dirty-tree guard before push** — after `make pc` passes, check `worktree_status(worktree: "LS-####")`. If the working tree is dirty (formatting auto-amend may leave changes on Windows), commit with `worktree_commit(message: "style: apply formatting", worktree: "LS-####")` and re-run `make pc` before pushing.
+- **Always `--force-with-lease`** when pushing rebased branches — `worktree_push` uses this by default
 
 ### Cloud Agent Only
 
@@ -213,12 +213,14 @@ The MCP tool uses a user OAuth token (via `gh auth token`) for Copilot requests,
 For each PR in `$scan.conflicting`:
 
 1. Enter the worktree (Step 2)
-2. **Fetch latest remote state in the worktree**: `git -C $wt fetch origin` — worktrees have their own fetch state and may be stale even if the main repo fetched recently. Without this, `rebase origin/main` uses an outdated ref and GitHub will still show the PR as CONFLICTING.
-3. Rebase from the worktree: `git -C $wt rebase origin/main` (or `.\scripts\rebase-pr.ps1 -Branch $branch`)
-4. If conflicts arise → load `skills/rebase/SKILL.md` and `skills/resolve-merge-conflicts/SKILL.md`
+2. **Rebase via MCP**: `worktree_rebase(worktree: "LS-####")` — this fetches the latest remote state and rebases onto the parent branch in one operation. Worktrees have their own fetch state and may be stale even if the main repo fetched recently.
+3. If conflicts arise → load `skills/rebase/SKILL.md` and `skills/resolve-merge-conflicts/SKILL.md`
+4. **Post-rebase stabilization**: `worktree_stabilize(worktree: "LS-####")` — reinstalls deps, regenerates schema, and runs affected codegen so `make pc` does not fail on stale artifacts.
 5. After rebasing ALL PRs, batch-validate with parallel `make pc` (see Parallelization Strategy below)
-6. **Dirty-tree guard**: after `make pc` passes, run `git status --porcelain` in each worktree. If dirty (e.g., `tsconfig.base.json` reformatted), commit with `style: apply formatting after rebase` and re-run `make pc`.
-7. Push passing PRs: `git -C "$wtPath" push --force-with-lease origin HEAD`
+6. **Dirty-tree guard**: after `make pc` passes, run `worktree_status(worktree: "LS-####")`. If dirty (e.g., `tsconfig.base.json` reformatted), commit with `worktree_commit(message: "style: apply formatting after rebase", worktree: "LS-####")` and re-run `make pc`.
+7. Push passing PRs: `worktree_push(worktree: "LS-####")`
+
+> **Shell fallback** (only when MCP unavailable): `git -C "$wtPath" fetch origin && git -C "$wtPath" rebase origin/main`, then `git -C "$wtPath" push --force-with-lease origin HEAD`.
 
 > **Multiple PRs touching the same files**: When several PRs add code to the same location (e.g., tool registrations in `index.ts`), they conflict with each other — not just with main. After one merges, the next will conflict with the updated main. Rebase these sequentially, fetching whenever `main` changes (e.g., after each merge and before rebasing the next PR). Consider alphabetizing shared files (imports, registrations) so git can auto-merge concurrent additions.
 
@@ -547,6 +549,6 @@ For a full cloud sweep, run steps 1–8 in order. Unlike the local sweep, there 
 | -------------------------------------------- | ---------------------------------------------------------------------------- |
 | Rebase aborts repeatedly on same commit      | `git rebase --skip` if commit already applied; load `skills/rebase/SKILL.md` |
 | Copilot keeps re-reviewing with same comment | After 2 cycles on the same thread, resolve it and move on                    |
-| CI failure is flaky (passes on re-run)       | Re-trigger: `gh run rerun $runId --failed` — do not change code              |
+| CI failure is flaky (passes on re-run)       | Re-trigger: `ci_rerun(runId: <id>, failedOnly: true)` — do not change code   |
 | Too many PRs to process in one session       | Prioritize: conflicts → CI → reviews                                         |
 | `make pc` fails after rebase stabilization   | Load `skills/rebase/SKILL.md` for post-rebase steps                          |
