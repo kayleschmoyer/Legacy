@@ -136,6 +136,15 @@ jobs:
           UPDATE_COUNT=$(echo "$PARAMS" | jq 'length')
           echo "total_lambdas=$UPDATE_COUNT" >> $GITHUB_OUTPUT
 
+          # Capture a deterministic hash of the initial parameter values
+          # for race condition detection during the plan phase.
+          # Normalize: sort array by Name and reduce to a stable {Name: Value} map
+          # so the hash is independent of AWS CLI parameter ordering.
+          PARAMS_HASH=$(echo "$PARAMS" \
+            | jq -S 'sort_by(.Name) | map({key: .Name, value: .Value}) | from_entries' \
+            | md5sum | cut -d' ' -f1)
+          echo "params_hash=$PARAMS_HASH" >> $GITHUB_OUTPUT
+
           echo "## 📦 Pending Lambda Updates" >> $GITHUB_STEP_SUMMARY
           echo "$PARAMS" | jq -r '.[] | "- **\(.Name | split("/") | .[-2])**: `\(.Value)`"' >> $GITHUB_STEP_SUMMARY
 
@@ -249,21 +258,26 @@ jobs:
             --query 'Parameters[?contains(Name, `/version`)].{Name:Name,Value:Value}' \
             --output json)
 
-          # Compare with the snapshot from check-updates
-          PREVIOUS_HASH=$(echo '${{ steps.check-updates.outputs.total_lambdas }}' | md5sum | cut -d' ' -f1)
-          CURRENT_HASH=$(echo "$CURRENT_PARAMS" | jq -S '.' | md5sum | cut -d' ' -f1)
+          # Compare with the deterministic hash captured before planning
+          PREVIOUS_HASH='${{ steps.check-updates.outputs.params_hash }}'
+          CURRENT_HASH=$(echo "$CURRENT_PARAMS" \
+            | jq -S 'sort_by(.Name) | map({key: .Name, value: .Value}) | from_entries' \
+            | md5sum | cut -d' ' -f1)
 
-          # Simple version comparison: re-read and diff against plan log
-          CURRENT_VERSIONS=$(echo "$CURRENT_PARAMS" | jq -S '.')
           echo "Current SSM versions after plan:"
           echo "$CURRENT_PARAMS" | jq -r '.[] | "  \(.Name | split("/") | .[-2]): \(.Value)"'
 
           # Check if any versions were updated during the plan phase
-          # by looking for SSM parameters modified after the plan started
-          echo "versions_changed=false" >> $GITHUB_OUTPUT
-          echo "✅ SSM version re-check complete"
+          if [ "$PREVIOUS_HASH" != "$CURRENT_HASH" ]; then
+            echo "⚠️ SSM parameter versions changed during plan."
+            echo "versions_changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ℹ️ SSM parameter versions unchanged during plan."
+            echo "versions_changed=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Re-plan if Versions Changed
+        id: replan
         if: steps.recheck.outputs.versions_changed == 'true'
         working-directory: terraform
         env:
@@ -282,45 +296,25 @@ jobs:
           TF_VAR_github_app_webhook_secret: ${{ secrets.RUNNER_GITHUB_APP_WEBHOOK_SECRET }}
         run: |
           echo "⚠️ SSM versions changed during plan — re-planning with updated values..."
-          terraform plan -input=false -out=tfplan -lock-timeout=5m
-          echo "✅ Re-plan complete with latest Lambda versions"
-
-      - name: Post-Apply Version Verification
-        id: verify-versions
-        if: always() && steps.apply.outcome == 'success'
-        run: |
-          echo "🔍 Verifying deployed Lambda versions match SSM expectations..."
-
-          # Read expected versions from SSM
-          EXPECTED=$(aws ssm get-parameters-by-path \
-            --path "/legacy-sports/${AWS_STAGE}/lambda/" \
-            --recursive \
-            --region ${{ env.AWS_REGION }} \
-            --query 'Parameters[?contains(Name, `/version`)].{Name:Name,Value:Value}' \
-            --output json)
-
-          MISMATCH=false
-          while read -r NAME VALUE; do
-            LAMBDA_NAME=$(echo "$NAME" | awk -F'/' '{print $(NF-1)}')
-            FUNC_NAME="${LAMBDA_PREFIX}-${LAMBDA_NAME}"
-
-            # Get the actual deployed version tag (if available)
-            DEPLOYED_DESC=$(aws lambda get-function-configuration \
-              --function-name "$FUNC_NAME" \
-              --region ${{ env.AWS_REGION }} \
-              --query "Description" --output text 2>/dev/null || echo "unknown")
-
-            echo "  $LAMBDA_NAME: SSM=$VALUE, Deployed=$DEPLOYED_DESC"
-          done < <(echo "$EXPECTED" | jq -r '.[] | "\(.Name) \(.Value)"')
-
-          if [ "$MISMATCH" = "true" ]; then
-            echo "::warning::Version mismatch detected — a concurrent upload may need another apply"
-          else
-            echo "✅ All deployed versions consistent with SSM"
-          fi
+          EXIT_CODE=0
+          terraform plan -input=false -out=tfplan -lock-timeout=5m -detailed-exitcode || EXIT_CODE=$?
+          case "$EXIT_CODE" in
+            0)
+              echo "has_changes=false" >> "$GITHUB_OUTPUT"
+              echo "ℹ️ Re-plan found no changes"
+              ;;
+            2)
+              echo "has_changes=true" >> "$GITHUB_OUTPUT"
+              echo "✅ Re-plan complete with latest Lambda versions"
+              ;;
+            *)
+              echo "::error::Terraform re-plan failed (exit code $EXIT_CODE)"
+              exit 1
+              ;;
+          esac
 
       - name: "📡 Rollbar Deploy Started"
-        if: steps.plan.outputs.has_changes == 'true'
+        if: steps.plan.outputs.has_changes == 'true' && steps.replan.outputs.has_changes != 'false'
         uses: ./.github/actions/rollbar-deploy
         with:
           rollbar-access-token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
@@ -330,7 +324,7 @@ jobs:
 
       - name: Apply Infrastructure Changes
         id: apply
-        if: steps.plan.outputs.has_changes == 'true'
+        if: steps.plan.outputs.has_changes == 'true' && steps.replan.outputs.has_changes != 'false'
         working-directory: terraform
         env:
           TF_VAR_google_oauth_client_secret: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
@@ -353,6 +347,45 @@ jobs:
 
           echo "## ✅ Infrastructure Updated" >> $GITHUB_STEP_SUMMARY
           echo "Applied changes for ${{ steps.check-updates.outputs.total_lambdas }} Lambda function(s)" >> $GITHUB_STEP_SUMMARY
+
+      - name: Post-Apply Version Verification
+        id: verify-versions
+        if: always() && steps.apply.outcome == 'success'
+        run: |
+          echo "🔍 Verifying deployed Lambda versions match SSM expectations..."
+
+          # Read expected versions from SSM
+          EXPECTED=$(aws ssm get-parameters-by-path \
+            --path "/legacy-sports/${AWS_STAGE}/lambda/" \
+            --recursive \
+            --region ${{ env.AWS_REGION }} \
+            --query 'Parameters[?contains(Name, `/version`)].{Name:Name,Value:Value}' \
+            --output json)
+
+          MISMATCH=false
+          while IFS=$'\t' read -r NAME VALUE; do
+            LAMBDA_NAME=$(echo "$NAME" | awk -F'/' '{print $(NF-1)}')
+            FUNC_NAME="${LAMBDA_PREFIX}-${LAMBDA_NAME}"
+
+            # Get the actual deployed version tag (if available)
+            DEPLOYED_DESC=$(aws lambda get-function-configuration \
+              --function-name "$FUNC_NAME" \
+              --region ${{ env.AWS_REGION }} \
+              --query "Description" --output text 2>/dev/null || echo "unknown")
+
+            if [ "$VALUE" != "$DEPLOYED_DESC" ]; then
+              echo "  ❌ $LAMBDA_NAME: SSM=$VALUE, Deployed=$DEPLOYED_DESC"
+              MISMATCH=true
+            else
+              echo "  ✅ $LAMBDA_NAME: SSM=$VALUE, Deployed=$DEPLOYED_DESC"
+            fi
+          done < <(echo "$EXPECTED" | jq -r '.[] | [.Name, .Value] | @tsv')
+
+          if [ "$MISMATCH" = "true" ]; then
+            echo "::warning::Version mismatch detected — a concurrent upload may need another apply"
+          else
+            echo "✅ All deployed versions consistent with SSM"
+          fi
 
       - name: Release Lock on Apply Failure
         if: always() && steps.apply.outcome == 'failure'
@@ -427,7 +460,7 @@ jobs:
           commits: ${{ steps.deploy-changelog.outputs.commits }}
 
       - name: Verify Deployment
-        if: steps.plan.outputs.has_changes == 'true'
+        if: steps.plan.outputs.has_changes == 'true' && steps.replan.outputs.has_changes != 'false'
         run: |
           echo "🔍 Verifying Lambda deployments..."
 
