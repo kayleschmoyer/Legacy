@@ -235,16 +235,23 @@ export default function LeagueId(): React.JSX.Element {
   });
 
   // Invite/share handler
+  const inviteCode = league?.inviteCode ?? '';
+  const appBaseUrl =
+    process.env.EXPO_PUBLIC_APP_BASE_URL ?? 'https://legacysports.app';
+  const inviteUrl = inviteCode
+    ? `${appBaseUrl}/baseball/league/join/${inviteCode}`
+    : '';
+
   const handleInviteShare = useCallback(async () => {
     const leagueName = league?.name ?? 'Legacy Sports League';
-    const inviteCode = league?.inviteCode ?? '';
-    const message = inviteCode
-      ? `Join my league "${leagueName}" on Legacy Sports! Use invite code: ${inviteCode}`
+    const message = inviteUrl
+      ? `Join my league "${leagueName}" on Legacy Sports!\n\n${inviteUrl}`
       : `Join my league "${leagueName}" on Legacy Sports!`;
     try {
       const result = await Share.share({
         message,
         title: `Join ${leagueName}`,
+        url: inviteUrl || undefined,
       });
       if (result.action === Share.dismissedAction) {
         LOGGER.debug('Share dismissed by user');
@@ -255,7 +262,7 @@ export default function LeagueId(): React.JSX.Element {
         error instanceof Error ? error : new Error(String(error)),
       );
     }
-  }, [league?.name, league?.inviteCode]);
+  }, [league?.name, inviteUrl]);
 
   const handleStartDraft = useCallback(() => {
     if (!isCommissioner) {
@@ -383,24 +390,50 @@ export default function LeagueId(): React.JSX.Element {
             <YStack padding="$3" space="$3">
               {/* Invite/Share */}
               <Card backgroundColor="$blue2" borderColor="$blue6" padding="$3">
-                <XStack justifyContent="space-between" alignItems="center">
-                  <YStack flex={1}>
-                    <Text fontSize="$4" fontWeight="600">
-                      Invite Friends
-                    </Text>
-                    <Text fontSize="$2" color="$gray11">
-                      Share your league with friends
-                    </Text>
-                  </YStack>
-                  <Button
-                    size="$3"
-                    backgroundColor="$blue9"
-                    color="white"
-                    onPress={() => void handleInviteShare()}
-                  >
-                    Share
-                  </Button>
-                </XStack>
+                <YStack space="$3">
+                  <XStack justifyContent="space-between" alignItems="center">
+                    <YStack flex={1}>
+                      <Text fontSize="$4" fontWeight="600">
+                        Invite Friends
+                      </Text>
+                      <Text fontSize="$2" color="$gray11">
+                        Share your league with friends
+                      </Text>
+                    </YStack>
+                    <Button
+                      size="$3"
+                      backgroundColor="$blue9"
+                      color="white"
+                      onPress={() => void handleInviteShare()}
+                    >
+                      Share
+                    </Button>
+                  </XStack>
+
+                  {/* Invite Code Display */}
+                  {inviteCode ? (
+                    <YStack space="$2">
+                      <Text fontSize="$2" color="$gray10" fontWeight="600">
+                        INVITE CODE
+                      </Text>
+                      <Card
+                        backgroundColor="$gray2"
+                        padding="$3"
+                        bordered
+                        alignItems="center"
+                      >
+                        <Text
+                          fontSize="$6"
+                          fontWeight="800"
+                          letterSpacing={4}
+                          fontFamily="$mono"
+                        >
+                          {inviteCode}
+                        </Text>
+                      </Card>
+                    </YStack>
+                  ) : null}
+                </YStack>
               </Card>
 
               {/* League Dues Payment Status — visible to all members */}
