@@ -939,6 +939,12 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
             description:
               'Also run `twig worktree clean` to prune stale references (default: true)',
           },
+          force: {
+            type: 'boolean',
+            description:
+              'Fall back to `git worktree remove --force` if twig times out or fails. ' +
+              'Removes junctions first to avoid deleting through them. (default: false)',
+          },
         },
       },
     },
@@ -4087,9 +4093,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     // worktree_clean
     // -----------------------------------------------------------------------
     case 'worktree_clean': {
-      const { worktree: wtKey, prune = true } = args as {
+      const {
+        worktree: wtKey,
+        prune = true,
+        force = false,
+      } = args as {
         worktree?: string;
         prune?: boolean;
+        force?: boolean;
       };
 
       const target = resolveTargetDir(wtKey);
@@ -4126,7 +4137,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const branch = wt.branch;
       const results: string[] = [];
 
-      // Use twig worktree remove for junction-safe removal
+      // Use twig worktree remove for junction-safe removal (60s timeout).
+      let twigFailed = false;
+      let twigTimedOut = false;
       try {
         const removeOutput = execFileSync(
           'twig',
@@ -4134,7 +4147,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           {
             cwd: MAIN_REPO,
             encoding: 'utf-8',
-            timeout: 30_000,
+            timeout: 60_000,
             maxBuffer: 10 * 1024 * 1024,
           },
         );
@@ -4147,24 +4160,110 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           err instanceof Error
             ? (err as { stderr?: string }).stderr || err.message
             : String(err);
-        return {
-          content: [
+        twigTimedOut = msg.includes('ETIMEDOUT') || msg.includes('timed out');
+        twigFailed = true;
+
+        if (!force) {
+          const hint = twigTimedOut
+            ? 'Twig timed out — the worktree may have independent node_modules or file locks. On Windows, try `make kill-stale` to release locks. On other platforms, close any processes using the worktree directory. Then retry, or use force=true.'
+            : 'Retry with force=true to fall back to `git worktree remove --force`.';
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(
+                  {
+                    success: false,
+                    branch,
+                    path: targetPath,
+                    error: `twig worktree remove failed: ${msg.trim()}`,
+                    hint,
+                  },
+                  null,
+                  2,
+                ),
+              },
+            ],
+            isError: true,
+          };
+        }
+      }
+
+      // Force fallback: use git worktree remove --force when twig fails.
+      if (twigFailed && force) {
+        try {
+          // Remove junctions first to avoid git deleting through them.
+          for (const junctionName of [
+            'node_modules',
+            '.twig',
+            '.github/skills',
+          ]) {
+            const jPath = join(targetPath, junctionName);
+            try {
+              if (existsSync(jPath) && lstatSync(jPath).isSymbolicLink()) {
+                rmSync(jPath, { recursive: false });
+              }
+            } catch (linkErr) {
+              const linkMsg =
+                linkErr instanceof Error ? linkErr.message : String(linkErr);
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify(
+                      {
+                        success: false,
+                        branch,
+                        path: targetPath,
+                        error: `Failed to remove junction '${junctionName}' before force removal: ${linkMsg}. Aborting to avoid deleting through shared junction.`,
+                      },
+                      null,
+                      2,
+                    ),
+                  },
+                ],
+                isError: true,
+              };
+            }
+          }
+          execFileSync(
+            'git',
+            ['worktree', 'remove', '--force', '--', targetPath],
             {
-              type: 'text',
-              text: JSON.stringify(
-                {
-                  success: false,
-                  branch,
-                  path: targetPath,
-                  error: `twig worktree remove failed: ${msg.trim()}`,
-                },
-                null,
-                2,
-              ),
+              cwd: MAIN_REPO,
+              encoding: 'utf-8',
+              timeout: 60_000,
+              maxBuffer: 10 * 1024 * 1024,
             },
-          ],
-          isError: true,
-        };
+          );
+          results.push(
+            `Removed worktree via git (force fallback after twig ${twigTimedOut ? 'timeout' : 'failure'}): ${branch}`,
+          );
+        } catch (gitErr) {
+          const gitMsg =
+            gitErr instanceof Error
+              ? (gitErr as { stderr?: string }).stderr || gitErr.message
+              : String(gitErr);
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(
+                  {
+                    success: false,
+                    branch,
+                    path: targetPath,
+                    error: `Both twig and git worktree remove failed: ${gitMsg.trim()}`,
+                    hint: 'Manually delete the worktree directory and run `git worktree prune`.',
+                  },
+                  null,
+                  2,
+                ),
+              },
+            ],
+            isError: true,
+          };
+        }
       }
 
       // Clear active worktree if it was the one removed
