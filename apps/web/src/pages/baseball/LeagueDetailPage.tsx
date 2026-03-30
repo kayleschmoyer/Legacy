@@ -59,6 +59,7 @@ import {
   type SeasonStats,
 } from '@legacy-sports/scoring';
 import { LeagueScoringSummary } from '@legacy-sports/shared-components';
+import { MatchupNavigationControls } from '@legacy-sports/shared-components';
 import { PageMeta } from '../../components/PageMeta';
 import { LeagueActivityFeed } from '../../features/baseball/LeagueActivityFeed';
 import { LeagueScoringEditor } from '../../features/baseball/LeagueScoringEditor';
@@ -134,7 +135,6 @@ import {
 import { MatchupScoreboard } from '../../features/matchup/MatchupScoreboard';
 import { GamesRemaining } from '../../features/matchup/GamesRemaining';
 import { MatchupRosterComparison } from '../../features/matchup/MatchupRosterComparison';
-import { MatchupNavigationControls } from '@legacy-sports/shared-components';
 import { announcePolite } from '../../utils/a11y';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {

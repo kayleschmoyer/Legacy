@@ -15,12 +15,12 @@ import {
   DollarSign,
   X as XIcon,
 } from '@tamagui/lucide-icons';
+import { AlertTriangle } from '@tamagui/lucide-icons';
 import {
   useGetLeagueDuesStatusQuery,
   useMarkMemberPaidMutation,
   useMarkMemberUnpaidMutation,
 } from '../../api/db/graphql.generated';
-import { AlertTriangle } from '@tamagui/lucide-icons';
 import {
   BRAND_NAVY_LIGHT,
   GREEN,

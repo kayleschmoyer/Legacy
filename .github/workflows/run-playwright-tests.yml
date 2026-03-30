@@ -103,6 +103,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write # required for OIDC auth to AWS (S3 CI artifacts)
 
 jobs:
   # Compute the shard matrix in a tiny job so the expression stays under line-length limits.

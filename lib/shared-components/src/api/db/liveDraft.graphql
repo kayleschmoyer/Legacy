@@ -369,6 +369,7 @@ query GetDraftPitchingStats($limit: Int, $minGames: Int) {
     outsRecorded
     winPercentage
     hits
+    pitchingWAR
   }
 }
 

@@ -53,6 +53,7 @@ concurrency:
 # - issues: write         → Required for issue creation on failures (ci-reporting action)
 # - security-events: write → Required for SARIF uploads (security-scanning workflow)
 # - statuses: write       → Required for commit status updates (security-gate job)
+# - id-token: write       → Required for OIDC auth to AWS (S3 CI artifacts in ci-pipeline)
 #
 # Reducing these permissions causes startup_failure in called workflows (LS-106)
 permissions:
@@ -63,6 +64,7 @@ permissions:
   issues: write
   security-events: write
   statuses: write
+  id-token: write
 
 jobs:
   determine-scope:

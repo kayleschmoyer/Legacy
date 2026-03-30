@@ -65,6 +65,7 @@ permissions:
   pull-requests: write
   checks: read
   issues: write
+  id-token: write # Required for OIDC auth to AWS (S3 CI artifacts)
 
 env:
   NX_DAEMON: false

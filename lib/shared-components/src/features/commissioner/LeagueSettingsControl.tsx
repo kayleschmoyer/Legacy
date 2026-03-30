@@ -173,7 +173,7 @@ export function LeagueSettingsControl({
       poFormat: string,
       poMultiWeek: boolean,
       scEnabled: boolean = salaryCapEnabled,
-      sc: number | null = salaryCap,
+      sc: number | null = salaryCap ?? null,
     ) => {
       setHasChanges(
         games !== currentGamesPerMatchup ||
