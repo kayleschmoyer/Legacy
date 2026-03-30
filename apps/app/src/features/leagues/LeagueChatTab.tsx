@@ -1,5 +1,6 @@
 import React, { useCallback, useRef, useState } from 'react';
 import {
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -7,6 +8,7 @@ import {
   TextInput,
 } from 'react-native';
 import { Button, Spinner, Text, XStack, YStack } from 'tamagui';
+import { GifPicker } from '@legacy-sports/shared-components';
 import { useLeagueChat } from './hooks/useLeagueChat';
 import type { LegacySportsJwt } from '../../common/auth/AuthHooks';
 
@@ -14,10 +16,6 @@ import type { LegacySportsJwt } from '../../common/auth/AuthHooks';
 // Helpers
 // ---------------------------------------------------------------------------
 function formatTime(isoString: string): string {
-  // Defensively normalize to ISO 8601 UTC before parsing.  PostgreSQL
-  // TIMESTAMP strings may arrive without a timezone designator; appending 'Z'
-  // ensures the device treats the value as UTC and toLocaleTimeString() then
-  // converts it to the viewer's local timezone instead of displaying UTC.
   const normalized =
     isoString.includes('Z') || isoString.includes('+')
       ? isoString
@@ -43,16 +41,27 @@ export function LeagueChatTab({
 }: LeagueChatTabProps): React.JSX.Element {
   const { messages, loading, sending, sendMessage } = useLeagueChat(leagueId);
   const [inputText, setInputText] = useState('');
+  const [showGifPicker, setShowGifPicker] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
+
+  const giphyApiKey = process.env.EXPO_PUBLIC_GIPHY_API_KEY ?? '';
 
   const handleSend = useCallback(async () => {
     const text = inputText.trim();
     if (!text || sending) return;
     setInputText('');
     await sendMessage(text);
-    // Scroll to bottom after send
     scrollViewRef.current?.scrollToEnd({ animated: true });
   }, [inputText, sending, sendMessage]);
+
+  const handleSendGif = useCallback(
+    async (gifUrl: string) => {
+      setShowGifPicker(false);
+      await sendMessage('', gifUrl);
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    },
+    [sendMessage],
+  );
 
   if (loading) {
     return (
@@ -96,6 +105,7 @@ export function LeagueChatTab({
           ) : (
             messages.map((msg) => {
               const isMe = msg.userId === userInfo.id;
+              const isGif = msg.messageType === 'gif' && !!msg.gifUrl;
               return (
                 <YStack
                   key={msg.id}
@@ -110,22 +120,31 @@ export function LeagueChatTab({
                     </Text>
                   )}
 
-                  {/* Bubble */}
-                  <YStack
-                    backgroundColor={isMe ? '$blue9' : '$gray3'}
-                    borderRadius="$4"
-                    paddingHorizontal="$3"
-                    paddingVertical="$2"
-                    maxWidth="80%"
-                  >
-                    <Text
-                      color={isMe ? 'white' : '$gray12'}
-                      fontSize="$4"
-                      flexShrink={1}
+                  {/* GIF message */}
+                  {isGif ? (
+                    <Image
+                      source={{ uri: msg.gifUrl }}
+                      style={styles.gifImage}
+                      resizeMode="contain"
+                    />
+                  ) : (
+                    /* Text bubble */
+                    <YStack
+                      backgroundColor={isMe ? '$blue9' : '$gray3'}
+                      borderRadius="$4"
+                      paddingHorizontal="$3"
+                      paddingVertical="$2"
+                      maxWidth="80%"
                     >
-                      {msg.messageText}
-                    </Text>
-                  </YStack>
+                      <Text
+                        color={isMe ? 'white' : '$gray12'}
+                        fontSize="$4"
+                        flexShrink={1}
+                      >
+                        {msg.messageText}
+                      </Text>
+                    </YStack>
+                  )}
 
                   {/* Timestamp */}
                   <Text fontSize="$1" color="$gray9" marginTop="$1">
@@ -137,6 +156,15 @@ export function LeagueChatTab({
           )}
         </ScrollView>
 
+        {/* GIF Picker */}
+        {showGifPicker && giphyApiKey && (
+          <GifPicker
+            giphyApiKey={giphyApiKey}
+            onSelect={(url) => void handleSendGif(url)}
+            onClose={() => setShowGifPicker(false)}
+          />
+        )}
+
         {/* Input row */}
         <XStack
           paddingHorizontal="$3"
@@ -147,6 +175,17 @@ export function LeagueChatTab({
           alignItems="flex-end"
           space="$2"
         >
+          {giphyApiKey ? (
+            <Button
+              size="$3"
+              chromeless
+              onPress={() => setShowGifPicker(!showGifPicker)}
+              opacity={showGifPicker ? 1 : 0.6}
+              paddingHorizontal="$2"
+            >
+              GIF
+            </Button>
+          ) : null}
           <TextInput
             style={styles.input}
             value={inputText}
@@ -203,5 +242,10 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 15,
     color: '#F8FAFC',
+  },
+  gifImage: {
+    width: 200,
+    height: 150,
+    borderRadius: 8,
   },
 });

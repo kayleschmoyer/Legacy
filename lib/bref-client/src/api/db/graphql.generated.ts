@@ -1239,6 +1239,8 @@ export type Mutation = {
   sendDiscordScoreAlerts?: Maybe<SendDiscordScoreAlertsResult>;
   /** Post weekly recaps (results, standings, top scorer) to Discord for all active leagues. Triggered weekly by EventBridge after matchup advancement. */
   sendDiscordWeeklyRecaps?: Maybe<SendDiscordWeeklyRecapsResult>;
+  /** Check all leagues with dues reminders enabled and post reminders to league chat (and Discord if configured) for unpaid members. Only fires for leagues whose reminder day matches the current day of week. Triggered daily by EventBridge. */
+  sendDuesReminders?: Maybe<SendDuesRemindersResult>;
   sendLeagueMessage?: Maybe<LeagueChatMessage>;
   sendMatchupMessage?: Maybe<MatchupMessage>;
   /** Select up to 3 leagues to keep active after a subscription downgrade. Leagues not included in the list will be tier-frozen (read-only). Only callable on the free tier — all leagues are automatically active on premium. */
@@ -1647,6 +1649,10 @@ export type MutationSendDiscordScoreAlertsArgs = {
 };
 
 export type MutationSendDiscordWeeklyRecapsArgs = {
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type MutationSendDuesRemindersArgs = {
   leagueId?: InputMaybe<Scalars['Int']['input']>;
 };
 
@@ -3060,6 +3066,14 @@ export type SendDiscordWeeklyRecapsResult = {
   errors?: Maybe<Array<Scalars['String']['output']>>;
   leaguesChecked?: Maybe<Scalars['Int']['output']>;
   recapsSent?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Result of the scheduled dues reminder check across all active leagues */
+export type SendDuesRemindersResult = {
+  __typename?: 'SendDuesRemindersResult';
+  errors?: Maybe<Array<Scalars['String']['output']>>;
+  leaguesChecked?: Maybe<Scalars['Int']['output']>;
+  remindersSent?: Maybe<Scalars['Int']['output']>;
 };
 
 export type SetTeamLockInput = {

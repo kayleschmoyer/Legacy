@@ -19,6 +19,8 @@ export interface ChatMessage {
   userId: number;
   username: string;
   messageText: string;
+  messageType?: string;
+  gifUrl?: string;
   createdAt: string;
 }
 
@@ -33,6 +35,8 @@ function toMessage(
     userId: raw.sender?.id ?? raw.userId ?? 0,
     username: raw.sender?.username ?? '',
     messageText: raw.messageText ?? '',
+    messageType: raw.messageType ?? undefined,
+    gifUrl: raw.gifUrl ?? undefined,
     createdAt: raw.timestamp ?? '',
   };
 }
@@ -44,7 +48,7 @@ export function useLeagueChat(leagueId: number): {
   messages: ChatMessage[];
   loading: boolean;
   sending: boolean;
-  sendMessage: (text: string) => Promise<void>;
+  sendMessage: (text: string, gifUrl?: string) => Promise<void>;
 } {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const clientRef = useRef<WebSocketClient | null>(null);
@@ -77,11 +81,11 @@ export function useLeagueChat(leagueId: number): {
   const [sendMutation, { loading: sending }] = useSendLeagueMessageMutation();
 
   const sendMessage = useCallback(
-    async (text: string) => {
+    async (text: string, gifUrl?: string) => {
       const trimmed = text.trim();
-      if (!trimmed) return;
+      if (!trimmed && !gifUrl) return;
       await sendMutation({
-        variables: { leagueId, messageText: trimmed },
+        variables: { leagueId, messageText: trimmed || '', gifUrl },
         onCompleted: (data) => {
           if (!data.sendLeagueMessage) return;
           const sent: ChatMessage = {
@@ -92,6 +96,8 @@ export function useLeagueChat(leagueId: number): {
               0,
             username: data.sendLeagueMessage.sender?.username ?? '',
             messageText: data.sendLeagueMessage.messageText ?? '',
+            messageType: data.sendLeagueMessage.messageType ?? undefined,
+            gifUrl: data.sendLeagueMessage.gifUrl ?? undefined,
             createdAt: data.sendLeagueMessage.timestamp ?? '',
           };
           // Optimistically append; WS broadcast will be deduplicated
@@ -141,6 +147,8 @@ export function useLeagueChat(leagueId: number): {
                 userId: notification.senderId,
                 username: notification.senderUsername,
                 messageText: notification.messageText,
+                messageType: notification.messageType ?? 'text',
+                gifUrl: notification.gifUrl ?? undefined,
                 createdAt: notification.timestamp,
               },
             ];

@@ -303,6 +303,8 @@ export type CareerPitching = {
   losses?: Maybe<Scalars['Int']['output']>;
   outRate?: Maybe<Scalars['Int']['output']>;
   outsRecorded?: Maybe<Scalars['Int']['output']>;
+  /** Approximate pitching WAR computed from career counting stats. Uses FIP-based run estimation with season-specific cFIP constants, league ERA baseline, and replacement level (20 runs per 200 IP). */
+  pitchingWAR?: Maybe<Scalars['Float']['output']>;
   player?: Maybe<Player>;
   playerId?: Maybe<Scalars['Int']['output']>;
   positionsPlayed?: Maybe<Scalars['String']['output']>;
@@ -1237,6 +1239,8 @@ export type Mutation = {
   sendDiscordScoreAlerts?: Maybe<SendDiscordScoreAlertsResult>;
   /** Post weekly recaps (results, standings, top scorer) to Discord for all active leagues. Triggered weekly by EventBridge after matchup advancement. */
   sendDiscordWeeklyRecaps?: Maybe<SendDiscordWeeklyRecapsResult>;
+  /** Check all leagues with dues reminders enabled and post reminders to league chat (and Discord if configured) for unpaid members. Only fires for leagues whose reminder day matches the current day of week. Triggered daily by EventBridge. */
+  sendDuesReminders?: Maybe<SendDuesRemindersResult>;
   sendLeagueMessage?: Maybe<LeagueChatMessage>;
   sendMatchupMessage?: Maybe<MatchupMessage>;
   /** Select up to 3 leagues to keep active after a subscription downgrade. Leagues not included in the list will be tier-frozen (read-only). Only callable on the free tier — all leagues are automatically active on premium. */
@@ -1645,6 +1649,10 @@ export type MutationSendDiscordScoreAlertsArgs = {
 };
 
 export type MutationSendDiscordWeeklyRecapsArgs = {
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type MutationSendDuesRemindersArgs = {
   leagueId?: InputMaybe<Scalars['Int']['input']>;
 };
 
@@ -2872,9 +2880,10 @@ export type SeasonDraftGame = {
   status?: Maybe<SeasonDraftGameStatus>;
 };
 
-/** Game mode: season (player+year) or career_team (player+team career total) */
+/** Game mode: season (player+year), career_team (player+team career total), or most_teams (count of distinct teams) */
 export enum SeasonDraftGameMode {
   CareerTeam = 'career_team',
+  MostTeams = 'most_teams',
   Season = 'season',
 }
 
@@ -3057,6 +3066,14 @@ export type SendDiscordWeeklyRecapsResult = {
   errors?: Maybe<Array<Scalars['String']['output']>>;
   leaguesChecked?: Maybe<Scalars['Int']['output']>;
   recapsSent?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Result of the scheduled dues reminder check across all active leagues */
+export type SendDuesRemindersResult = {
+  __typename?: 'SendDuesRemindersResult';
+  errors?: Maybe<Array<Scalars['String']['output']>>;
+  leaguesChecked?: Maybe<Scalars['Int']['output']>;
+  remindersSent?: Maybe<Scalars['Int']['output']>;
 };
 
 export type SetTeamLockInput = {
