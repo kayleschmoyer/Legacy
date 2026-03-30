@@ -20,6 +20,13 @@ export const CSRF_HEADER = 'x-csrf-token';
 let inMemoryToken = '';
 
 /**
+ * Set to the stale localStorage value when setItem fails (e.g. QuotaExceededError).
+ * getCsrfToken() prefers the in-memory token when localStorage still holds this
+ * stale value, but recovers automatically when another code path writes a newer token.
+ */
+let staleStorageValue: string | null = null;
+
+/**
  * Store the CSRF token in localStorage so it persists across browser restarts
  * (matching the auth cookie lifetime). Falls back to an in-memory variable
  * when storage is unavailable.
@@ -29,9 +36,16 @@ export function storeCsrfToken(token: string): void {
   try {
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(CSRF_STORAGE_KEY, token);
+      staleStorageValue = null;
     }
   } catch {
-    // Storage full or disabled — in-memory fallback is already set
+    // Record the stale value left in localStorage so getCsrfToken can
+    // distinguish it from a newer value written by another code path.
+    try {
+      staleStorageValue = localStorage.getItem(CSRF_STORAGE_KEY);
+    } catch {
+      staleStorageValue = '';
+    }
   }
 }
 
@@ -40,6 +54,7 @@ export function storeCsrfToken(token: string): void {
  */
 export function clearCsrfToken(): void {
   inMemoryToken = '';
+  staleStorageValue = null;
   try {
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem(CSRF_STORAGE_KEY);
@@ -58,28 +73,42 @@ export function clearCsrfToken(): void {
 }
 
 /**
- * Read the CSRF token. Checks in-memory first, then localStorage
- * (works cross-origin), then falls back to `document.cookie` (same-origin only).
- * Returns an empty string if the token is not available.
+ * Read the CSRF token. Checks localStorage first (shared source of truth
+ * across all code paths), then in-memory fallback, then `document.cookie`.
+ *
+ * localStorage is checked before in-memory because multiple independent code
+ * paths update the CSRF token (Apollo error link and AuthService proactive
+ * refresh). Each has its own in-memory variable, but both write to the same
+ * localStorage key. Reading localStorage first ensures we always get the
+ * latest token, preventing stale in-memory values from causing CSRF mismatches
+ * after concurrent refresh races.
  */
 export function getCsrfToken(): string {
-  // 1. In-memory (always available, set during this page session)
-  if (inMemoryToken) return inMemoryToken;
-
-  // 2. localStorage (persists across browser restarts)
+  // 1. localStorage (single source of truth shared between all code paths).
   try {
     if (typeof localStorage !== 'undefined') {
       const stored = localStorage.getItem(CSRF_STORAGE_KEY);
       if (stored) {
+        if (staleStorageValue !== null && stored === staleStorageValue) {
+          // localStorage still holds the stale value from before the write
+          // failure — prefer the in-memory token which is newer.
+          if (inMemoryToken) return inMemoryToken;
+        }
+        // Either no write failure, or localStorage was updated by another code
+        // path (recovered) — use the stored value.
+        staleStorageValue = null;
         inMemoryToken = stored;
         return stored;
       }
     }
   } catch {
-    // localStorage not available
+    // localStorage not available — fall through to in-memory
   }
 
-  // Fallback: read from cookie (only works when API is same-origin)
+  // 2. In-memory fallback (when localStorage is unavailable or after write failure)
+  if (inMemoryToken) return inMemoryToken;
+
+  // 3. Cookie fallback (only works when API is same-origin)
   if (typeof document === 'undefined') return '';
 
   const match = document.cookie

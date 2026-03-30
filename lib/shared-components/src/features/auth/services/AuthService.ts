@@ -397,11 +397,14 @@ export class AuthService {
         localStorage.removeItem(USER_PROFILE_KEY);
         localStorage.removeItem(TOKEN_EXPIRY_KEY);
         localStorage.removeItem(ADMIN_PROFILE_KEY);
+        localStorage.removeItem('ls_csrf_token');
       }
       // Also clear the cross-origin CSRF token from sessionStorage
       if (typeof sessionStorage !== 'undefined') {
         sessionStorage.removeItem('ls_csrf_token');
       }
+      this.csrfTokenFallback = '';
+      this.csrfStaleStorageValue = null;
     } catch (error) {
       LOGGER.error('Failed to clear auth tokens:', String(error));
     }
@@ -689,35 +692,84 @@ export class AuthService {
   /** In-memory fallback when localStorage is unavailable */
   private csrfTokenFallback = '';
 
+  /** Stale localStorage value after a setItem failure; null when no failure pending */
+  private csrfStaleStorageValue: string | null = null;
+
   /**
-   * Read the CSRF double-submit token. Checks in-memory first, then
-   * localStorage (persists across browser restarts to match cookie lifetime),
-   * then falls back to document.cookie (same-origin only).
+   * Read the CSRF double-submit token. Checks localStorage first (shared
+   * source of truth across all code paths), then in-memory fallback, then
+   * document.cookie.
+   *
+   * localStorage is checked before in-memory because multiple independent
+   * code paths update the CSRF token (Apollo error link via csrf.ts and
+   * AuthService proactive refresh). Each has its own in-memory variable,
+   * but both write to the same localStorage key. Reading localStorage first
+   * ensures we always get the latest token, preventing stale in-memory values
+   * from causing CSRF mismatches after concurrent refresh races.
    */
   private getCsrfToken(): string {
-    // 1. In-memory
-    if (this.csrfTokenFallback) return this.csrfTokenFallback;
-
-    // 2. localStorage (persists across browser restarts)
+    // 1. localStorage (single source of truth shared between all code paths).
     try {
       if (typeof localStorage !== 'undefined') {
         const stored = localStorage.getItem('ls_csrf_token');
         if (stored) {
+          // If the backing cookie has been cleared (logout / expiry),
+          // the localStorage value is stale — discard it.
+          if (this.isCsrfCookieGone()) {
+            try {
+              localStorage.removeItem('ls_csrf_token');
+            } catch {
+              // best-effort cleanup
+            }
+            this.csrfTokenFallback = '';
+            this.csrfStaleStorageValue = null;
+            return '';
+          }
+
+          if (
+            this.csrfStaleStorageValue !== null &&
+            stored === this.csrfStaleStorageValue
+          ) {
+            // localStorage still holds the stale value — prefer in-memory.
+            if (this.csrfTokenFallback) return this.csrfTokenFallback;
+          }
+          // Either no write failure, or localStorage was updated by another
+          // code path (recovered) — use the stored value.
+          this.csrfStaleStorageValue = null;
           this.csrfTokenFallback = stored;
           return stored;
         }
       }
     } catch {
-      // localStorage not available
+      // localStorage not available — fall through to in-memory
     }
 
-    // Fallback: read from cookie (only works when API is same-origin)
+    // 2. In-memory fallback (when localStorage is unavailable or after write failure)
+    if (this.csrfTokenFallback) return this.csrfTokenFallback;
+
+    // 3. Cookie fallback (only works when API is same-origin)
     if (typeof document === 'undefined') return '';
     const match = document.cookie
       .split(';')
       .map((c) => c.trim())
       .find((c) => c.startsWith('ls_csrf='));
     return match ? match.substring('ls_csrf='.length) : '';
+  }
+
+  /**
+   * Check whether the ls_csrf cookie has been removed (e.g. after logout or
+   * server-side expiry). Returns true when we can confirm the cookie is absent;
+   * returns false (safe default) when cookie inspection is unavailable.
+   */
+  private isCsrfCookieGone(): boolean {
+    try {
+      if (typeof document === 'undefined') return false;
+      return !document.cookie
+        .split(';')
+        .some((c) => c.trim().startsWith('ls_csrf='));
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -729,9 +781,14 @@ export class AuthService {
     try {
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem('ls_csrf_token', token);
+        this.csrfStaleStorageValue = null;
       }
     } catch {
-      // Storage full or disabled
+      try {
+        this.csrfStaleStorageValue = localStorage.getItem('ls_csrf_token');
+      } catch {
+        this.csrfStaleStorageValue = '';
+      }
     }
   }
 }
