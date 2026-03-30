@@ -31,6 +31,7 @@ if [[ -z "${REPO:-}" ]]; then
     exit 1
   fi
 fi
+
 RULESET_FILE="${RULESET_FILE:-.github/ruleset.json}"
 RULESET_NAME="main-branch-protection"
 
@@ -39,8 +40,9 @@ if [[ ! -f "$RULESET_FILE" ]]; then
   exit 1
 fi
 
-# Strip _comment keys — the GitHub API does not accept them.
-payload=$(jq 'del(."$schema") | walk(if type == "object" then del(._comment) | (if .integration_id == null then del(.integration_id) else . end) else . end)' "$RULESET_FILE")
+# Strip UTF-8 BOM (if present) before piping to jq, then remove _comment keys,
+# $schema (not accepted by API), and null integration_id entries.
+payload=$(sed '1s/^\xEF\xBB\xBF//' "$RULESET_FILE" | jq 'del(."$schema") | walk(if type == "object" then del(._comment) | (if .integration_id == null then del(.integration_id) else . end) else . end)')
 
 echo "==> Looking for existing ruleset named '$RULESET_NAME'..."
 existing_id=$(gh api "repos/$REPO/rulesets" --jq ".[] | select(.name == \"$RULESET_NAME\") | .id" || true)
