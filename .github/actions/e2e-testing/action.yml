@@ -96,9 +96,13 @@ runs:
         echo "- **Test Patterns**: ${{ inputs.test-patterns }}"
         echo "- **Exclude Patterns**: ${{ inputs.test-patterns-invert }}"
 
-        # Install Playwright browsers if needed (cached)
+        # Install Playwright browsers if needed.
+        # Self-hosted runners have system deps + Chromium pre-baked in the AMI;
+        # --with-deps is only needed on GitHub-hosted runners.
         echo "🔧 Setting up Playwright browsers..."
-        if ! $PLAYWRIGHT_BIN install ${{ inputs.browser }} --with-deps >/dev/null 2>&1; then
+        if $PLAYWRIGHT_BIN install --dry-run ${{ inputs.browser }} 2>/dev/null | grep -q "already installed"; then
+          echo "✅ Playwright browser already installed (AMI)"
+        elif ! $PLAYWRIGHT_BIN install ${{ inputs.browser }} --with-deps >/dev/null 2>&1; then
           echo "⚠️ Playwright browser installation failed - attempting fallback"
           $PLAYWRIGHT_BIN install-deps ${{ inputs.browser }} || true
         fi

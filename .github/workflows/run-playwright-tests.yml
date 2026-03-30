@@ -158,6 +158,15 @@ jobs:
             "Mobile Safari") BROWSER_ENGINE="webkit" ;;
             *) BROWSER_ENGINE="$BROWSER" ;;
           esac
+          # Self-hosted AMI has Chromium pre-installed; only download if missing
+          # or if a non-default browser was requested.
+          if [ "$BROWSER_ENGINE" = "chromium" ]; then
+            echo "Checking for pre-installed Chromium..."
+            if pnpm exec playwright install --dry-run chromium 2>/dev/null | grep -q "already installed"; then
+              echo "✅ Chromium already installed (AMI)"
+              exit 0
+            fi
+          fi
           pnpm exec playwright install "$BROWSER_ENGINE" --with-deps
 
       # =======================================================================
@@ -181,7 +190,12 @@ jobs:
 
           if [ -d "dist/apps/web" ]; then
             echo "Serving pre-built web artifact..."
-            pnpm dlx serve@14.2.4 -s dist/apps/web -l 4200 --no-clipboard &
+            # Prefer globally-installed serve (baked into AMI), fall back to pnpm dlx
+            if command -v serve >/dev/null 2>&1; then
+              serve -s dist/apps/web -l 4200 --no-clipboard &
+            else
+              pnpm dlx serve@14.2.4 -s dist/apps/web -l 4200 --no-clipboard &
+            fi
           else
             echo "Falling back to nx serve..."
             pnpm exec nx serve web --port=4200 --host=localhost &
@@ -320,7 +334,7 @@ jobs:
           COUNT=$(find all-blob-reports -name '*.zip' -type f 2>/dev/null | wc -l)
           if [ "$COUNT" -gt 0 ]; then
             echo "has-report=true" >> $GITHUB_OUTPUT
-            npx playwright@1.55.0 merge-reports --reporter html ./all-blob-reports
+            npx playwright@1.58.2 merge-reports --reporter html ./all-blob-reports
           else
             echo "has-report=false" >> $GITHUB_OUTPUT
             echo "No blob reports found — skipping deploy"

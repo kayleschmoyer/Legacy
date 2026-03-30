@@ -211,6 +211,17 @@ jobs:
         if: github.event_name != 'pull_request' && steps.snyk-cache.outputs.cache-hit != 'true'
         timeout-minutes: 3
         run: |
+          # Skip download if Snyk is already baked into the AMI at the expected version
+          EXPECTED_SNYK_VERSION="1.1293.1"
+          if command -v snyk >/dev/null 2>&1; then
+            INSTALLED_VERSION=$(snyk --version 2>/dev/null || echo "unknown")
+            if [ "$INSTALLED_VERSION" = "$EXPECTED_SNYK_VERSION" ]; then
+              echo "✅ Snyk CLI already installed at expected version: $INSTALLED_VERSION"
+              exit 0
+            else
+              echo "⚠️ Snyk version mismatch: installed=$INSTALLED_VERSION expected=$EXPECTED_SNYK_VERSION — reinstalling"
+            fi
+          fi
           DOWNLOADED=false
           for attempt in 1 2 3; do
             if curl -sfSL --connect-timeout 10 --max-time 60 \

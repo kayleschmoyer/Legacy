@@ -17,9 +17,9 @@ runs:
   using: "composite"
   steps:
     - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v3
+      uses: hashicorp/setup-terraform@v4
       with:
-        terraform_version: "~1.13"
+        terraform_version: "~> 1.14"
 
     - name: Initialize Terraform
       shell: bash

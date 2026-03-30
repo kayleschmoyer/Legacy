@@ -27,6 +27,26 @@ variable "pnpm_version" {
   default = "9.12.1"
 }
 
+variable "playwright_version" {
+  type    = string
+  default = "1.55.0"
+}
+
+variable "terraform_version" {
+  type    = string
+  default = "1.14.0"
+}
+
+variable "serve_version" {
+  type    = string
+  default = "14.2.4"
+}
+
+variable "snyk_version" {
+  type    = string
+  default = "1.1293.1"
+}
+
 variable "instance_type" {
   type    = string
   default = "c7a.xlarge"
@@ -64,12 +84,14 @@ source "amazon-ebs" "runner" {
   associate_public_ip_address = true
 
   tags = {
-    Name          = "legacy-sports-runner"
-    Project       = "legacy-sports"
-    ManagedBy     = "packer"
-    NodeVersion   = var.node_version
-    PnpmVersion   = var.pnpm_version
-    RunnerVersion = var.runner_version
+    Name              = "legacy-sports-runner"
+    Project           = "legacy-sports"
+    ManagedBy         = "packer"
+    NodeVersion       = var.node_version
+    PnpmVersion       = var.pnpm_version
+    RunnerVersion     = var.runner_version
+    PlaywrightVersion = var.playwright_version
+    TerraformVersion  = var.terraform_version
   }
 }
 
@@ -104,10 +126,56 @@ build {
     ]
   }
 
-  # Playwright system dependencies
+  # Playwright: system dependencies + Chromium browser binary + global CLI
   provisioner "shell" {
     inline = [
-      "sudo npx --yes playwright@1.55.0 install-deps chromium",
+      "sudo npx --yes playwright@${var.playwright_version} install-deps chromium",
+      "export PLAYWRIGHT_BROWSERS_PATH=$HOME/.cache/playwright",
+      "npx --yes playwright@${var.playwright_version} install chromium",
+      "sudo npm install -g playwright@${var.playwright_version}",
+    ]
+  }
+
+  # Static file server (used by Playwright E2E shards)
+  provisioner "shell" {
+    inline = [
+      "sudo npm install -g serve@${var.serve_version}",
+    ]
+  }
+
+  # Terraform
+  provisioner "shell" {
+    inline = [
+      "curl -sL https://releases.hashicorp.com/terraform/${var.terraform_version}/terraform_${var.terraform_version}_linux_amd64.zip -o /tmp/terraform.zip",
+      "curl -sL https://releases.hashicorp.com/terraform/${var.terraform_version}/terraform_${var.terraform_version}_SHA256SUMS -o /tmp/terraform_SHA256SUMS",
+      "grep terraform_${var.terraform_version}_linux_amd64.zip /tmp/terraform_SHA256SUMS > /tmp/terraform_checksum",
+      "cd /tmp && sha256sum -c terraform_checksum",
+      "sudo unzip -q -o /tmp/terraform.zip -d /usr/local/bin",
+      "rm /tmp/terraform.zip /tmp/terraform_SHA256SUMS /tmp/terraform_checksum",
+      "terraform --version",
+    ]
+  }
+
+  # uv (Python package manager for skill linting)
+  provisioner "shell" {
+    inline = [
+      "curl -LsSf https://astral.sh/uv/install.sh -o /tmp/uv-install.sh",
+      "sudo env UV_INSTALL_DIR=/usr/local/bin sh /tmp/uv-install.sh",
+      "rm /tmp/uv-install.sh",
+      "uvx --version",
+    ]
+  }
+
+  # Snyk CLI (security scanning)
+  provisioner "shell" {
+    inline = [
+      "curl -sfSL https://static.snyk.io/cli/v${var.snyk_version}/snyk-linux -o /tmp/snyk",
+      "curl -sfSL https://static.snyk.io/cli/v${var.snyk_version}/snyk-linux.sha256 -o /tmp/snyk.sha256",
+      "cd /tmp && echo \"$(cat snyk.sha256)  snyk\" | sha256sum -c",
+      "sudo mv /tmp/snyk /usr/local/bin/snyk",
+      "sudo chmod +x /usr/local/bin/snyk",
+      "rm -f /tmp/snyk.sha256",
+      "snyk --version",
     ]
   }
 

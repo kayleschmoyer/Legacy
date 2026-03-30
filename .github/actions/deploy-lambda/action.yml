@@ -164,10 +164,22 @@ runs:
         echo "VERSION=$VERSION" >> $GITHUB_ENV
         echo "S3_BUCKET=$S3_BUCKET" >> $GITHUB_ENV
 
+    - name: Check for pre-installed Terraform
+      id: check-terraform
+      shell: bash
+      run: |
+        if command -v terraform >/dev/null 2>&1; then
+          echo "found=true" >> $GITHUB_OUTPUT
+          echo "Terraform already installed: $(terraform --version | head -1)"
+        else
+          echo "found=false" >> $GITHUB_OUTPUT
+        fi
+
     - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v3
+      if: steps.check-terraform.outputs.found != 'true'
+      uses: hashicorp/setup-terraform@v4
       with:
-        terraform_version: "~1.13"
+        terraform_version: "~> 1.14"
 
     - name: Initialize Terraform
       shell: bash
