@@ -14,7 +14,7 @@ import {
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { isAbsolute, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 
 // ---------------------------------------------------------------------------
@@ -224,9 +224,10 @@ function getWorktrees(): WorktreeInfo[] {
  * Look up a worktree by key, branch name, or directory name.
  *
  * Resolution order:
- * 1. Exact branch name match (e.g. "LS-1508/worktree-commit-secrets-tf")
- * 2. Exact directory name match (e.g. "LS-1508-worktree-commit-secrets-tf")
- * 3. Ticket key prefix match (e.g. "LS-1508" or "1508")
+ * 1. Absolute path (for ephemeral worktrees like `.claude/worktrees/agent-*`)
+ * 2. Exact branch name match (e.g. "LS-1508/worktree-commit-secrets-tf")
+ * 3. Exact directory name match (e.g. "LS-1508-worktree-commit-secrets-tf")
+ * 4. Ticket key prefix match (e.g. "LS-1508" or "1508")
  *    - If multiple worktrees share the same key, returns an error listing options
  */
 function resolveWorktreePath(
@@ -236,19 +237,41 @@ function resolveWorktreePath(
     return { error: 'Missing required key parameter.' };
   }
 
+  // 1. Absolute path — supports ephemeral worktrees (e.g. .claude/worktrees/)
+  //    that are not registered via `make worktree`
+  if (isAbsolute(key)) {
+    const normalized = resolve(key);
+    if (normalized === MAIN_REPO) {
+      return {
+        error:
+          'Absolute path resolves to the main repository root, which cannot be used as a worktree',
+      };
+    }
+    if (!existsSync(normalized)) {
+      return { error: `Absolute path does not exist: ${normalized}` };
+    }
+    // Validate it's a git worktree or repo (has .git file or directory)
+    if (!existsSync(join(normalized, '.git'))) {
+      return {
+        error: `Path exists but is not a git worktree: ${normalized}`,
+      };
+    }
+    return { path: normalized };
+  }
+
   const worktrees = getWorktrees();
 
-  // 1. Exact branch name match
+  // 2. Exact branch name match
   const branchMatch = worktrees.find((w) => w.branch === key);
   if (branchMatch) return { path: branchMatch.path };
 
-  // 2. Exact directory name match (last segment of path)
+  // 3. Exact directory name match (last segment of path)
   const dirMatch = worktrees.find((w) => w.path.split(/[\\/]/).pop() === key);
   if (dirMatch) return { path: dirMatch.path };
 
-  // 3. Ticket key prefix match
-  const normalised = key.startsWith('LS-') ? key : `LS-${key}`;
-  const keyMatches = worktrees.filter((w) => w.key === normalised);
+  // 4. Ticket key prefix match
+  const normalized = key.startsWith('LS-') ? key : `LS-${key}`;
+  const keyMatches = worktrees.filter((w) => w.key === normalized);
 
   if (keyMatches.length === 0) {
     return { error: `No worktree found for key '${key}'.` };
@@ -264,7 +287,7 @@ function resolveWorktreePath(
     .join('\n');
   return {
     error:
-      `Ambiguous: ${keyMatches.length} worktrees match key '${normalised}'.\n` +
+      `Ambiguous: ${keyMatches.length} worktrees match key '${normalized}'.\n` +
       `Specify the full branch name or directory name instead:\n${options}`,
   };
 }
@@ -404,7 +427,8 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
           ref: { type: 'string', description: 'Restore ref (default: HEAD)' },
           worktree: {
             type: 'string',
-            description: 'Ticket key (default: active)',
+            description:
+              'Ticket key, absolute path, or omit for active worktree',
           },
         },
         required: ['files'],
@@ -436,7 +460,8 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
           },
           worktree: {
             type: 'string',
-            description: 'Ticket key (default: active)',
+            description:
+              'Ticket key, absolute path, or omit for active worktree',
           },
         },
       },
@@ -461,7 +486,8 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
           },
           worktree: {
             type: 'string',
-            description: 'Ticket key (default: active)',
+            description:
+              'Ticket key, absolute path, or omit for active worktree',
           },
           amend: {
             type: 'boolean',
@@ -479,7 +505,8 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
         properties: {
           worktree: {
             type: 'string',
-            description: 'Ticket key (default: active)',
+            description:
+              'Ticket key, absolute path, or omit for active worktree',
           },
         },
       },
@@ -493,7 +520,8 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
         properties: {
           worktree: {
             type: 'string',
-            description: 'Ticket key (default: active)',
+            description:
+              'Ticket key, absolute path, or omit for active worktree',
           },
           base: {
             type: 'string',
@@ -534,7 +562,8 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
         properties: {
           worktree: {
             type: 'string',
-            description: 'Ticket key (default: active)',
+            description:
+              'Ticket key, absolute path, or omit for active worktree',
           },
           maxCount: {
             type: 'number',
@@ -562,7 +591,8 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
           },
           worktree: {
             type: 'string',
-            description: 'Ticket key (default: active)',
+            description:
+              'Ticket key, absolute path, or omit for active worktree',
           },
         },
         required: ['ref'],
@@ -576,7 +606,8 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
         properties: {
           worktree: {
             type: 'string',
-            description: 'Ticket key (default: active)',
+            description:
+              'Ticket key, absolute path, or omit for active worktree',
           },
           setUpstream: { type: 'boolean', description: 'Set upstream (-u)' },
         },
@@ -591,7 +622,8 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
         properties: {
           worktree: {
             type: 'string',
-            description: 'Ticket key (default: active)',
+            description:
+              'Ticket key, absolute path, or omit for active worktree',
           },
           abort: { type: 'boolean', description: 'Abort in-progress rebase' },
           skip: {
@@ -616,7 +648,8 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
           },
           worktree: {
             type: 'string',
-            description: 'Ticket key (default: active)',
+            description:
+              'Ticket key, absolute path, or omit for active worktree',
           },
         },
       },
@@ -631,7 +664,8 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
           command: { type: 'string', description: 'Shell command' },
           worktree: {
             type: 'string',
-            description: 'Ticket key (default: active)',
+            description:
+              'Ticket key, absolute path, or omit for active worktree',
           },
           allowMainRepo: { type: 'boolean', description: 'Allow main repo' },
         },
@@ -644,7 +678,11 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
       inputSchema: {
         type: 'object' as const,
         properties: {
-          key: { type: 'string', description: 'Ticket key or number' },
+          key: {
+            type: 'string',
+            description:
+              'Ticket key, number, branch name, directory name, or absolute path to a git worktree (including ephemeral .claude/worktrees/ paths)',
+          },
         },
         required: ['key'],
       },
@@ -659,7 +697,8 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
           sha: { type: 'string', description: 'Commit SHA or HEAD' },
           worktree: {
             type: 'string',
-            description: 'Ticket key (default: active)',
+            description:
+              'Ticket key, absolute path, or omit for active worktree',
           },
           path: { type: 'string', description: 'File path for filtered diff' },
         },
@@ -675,7 +714,8 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
         properties: {
           worktree: {
             type: 'string',
-            description: 'Ticket key (default: active)',
+            description:
+              'Ticket key, absolute path, or omit for active worktree',
           },
         },
       },
@@ -689,7 +729,8 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
         properties: {
           worktree: {
             type: 'string',
-            description: 'Ticket key (default: active)',
+            description:
+              'Ticket key, absolute path, or omit for active worktree',
           },
         },
       },
@@ -760,7 +801,8 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
         properties: {
           worktree: {
             type: 'string',
-            description: 'Ticket key (default: active)',
+            description:
+              'Ticket key, absolute path, or omit for active worktree',
           },
         },
       },
@@ -837,7 +879,8 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
         properties: {
           worktree: {
             type: 'string',
-            description: 'Ticket key (default: active)',
+            description:
+              'Ticket key, absolute path, or omit for active worktree',
           },
           agent: {
             type: 'string',
@@ -872,7 +915,8 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
         properties: {
           worktree: {
             type: 'string',
-            description: 'Ticket key (default: active)',
+            description:
+              'Ticket key, absolute path, or omit for active worktree',
           },
         },
       },
@@ -887,7 +931,8 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
         properties: {
           worktree: {
             type: 'string',
-            description: 'Ticket key (default: active)',
+            description:
+              'Ticket key, absolute path, or omit for active worktree',
           },
           prune: {
             type: 'boolean',
