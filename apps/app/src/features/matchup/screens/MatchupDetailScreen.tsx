@@ -1,15 +1,23 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { ScrollView } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Spinner, Tabs, Text, YStack } from 'tamagui';
 import {
   GamesRemaining,
+  MatchupNavigationControls,
   MatchupRecapPanel,
 } from '@legacy-sports/shared-components';
-import { MatchupStatus } from '../../../api/db/graphql.generated';
+import {
+  MatchupStatus,
+  useGetUserTeamIdQuery,
+} from '../../../api/db/graphql.generated';
 import { MatchupScoreboard } from '../components/MatchupScoreboard';
 import { StandingsTable } from '../components/StandingsTable';
-import { useMatchupById } from '../hooks/useMatchup';
+import {
+  useCurrentWeek,
+  useMatchupById,
+  useMatchupsForLeague,
+} from '../hooks/useMatchup';
 import { useStandings } from '../hooks/useStandings';
 
 /**
@@ -18,6 +26,7 @@ import { useStandings } from '../hooks/useStandings';
  */
 export default function MatchupDetailScreen() {
   const params = useLocalSearchParams();
+  const router = useRouter();
 
   const rawMatchupId = params.matchupId;
   const matchupId = rawMatchupId ? parseInt(rawMatchupId as string, 10) : null;
@@ -31,8 +40,27 @@ export default function MatchupDetailScreen() {
     error: matchupError,
   } = useMatchupById(matchupId);
   const { standings, loading: standingsLoading } = useStandings(leagueId);
+  const { currentWeek } = useCurrentWeek(leagueId);
+  const { matchups: allMatchups } = useMatchupsForLeague(leagueId);
+  const { data: userTeamData } = useGetUserTeamIdQuery({
+    variables: { leagueId: leagueId ?? 0 },
+    skip: !leagueId,
+  });
+  const userTeamId = userTeamData?.userTeamId ?? null;
 
   const [activeTab, setActiveTab] = useState('overview');
+
+  const handleMatchupChange = useCallback(
+    (newMatchupId: string) => {
+      const numericId = parseInt(newMatchupId, 10);
+      if (!isNaN(numericId) && leagueId) {
+        router.navigate(
+          `/baseball/matchup?matchupId=${numericId}&leagueId=${leagueId}`,
+        );
+      }
+    },
+    [router, leagueId],
+  );
 
   if (matchupLoading || standingsLoading) {
     return (
@@ -73,6 +101,18 @@ export default function MatchupDetailScreen() {
 
   return (
     <YStack flex={1} backgroundColor="$background">
+      {/* Week navigation — browse matchups across weeks */}
+      {leagueId && (
+        <MatchupNavigationControls
+          currentMatchup={matchup}
+          leagueId={leagueId}
+          allMatchups={allMatchups}
+          currentLeagueWeek={currentWeek ?? undefined}
+          userTeamId={userTeamId}
+          onMatchupChange={handleMatchupChange}
+        />
+      )}
+
       <Tabs
         value={activeTab}
         onValueChange={setActiveTab}
