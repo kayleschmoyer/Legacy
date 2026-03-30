@@ -102,12 +102,13 @@ build {
   provisioner "shell" {
     inline = [
       "export DEBIAN_FRONTEND=noninteractive",
+      "sudo rm -rf /var/lib/apt/lists/*",
       "sudo apt-get update -qq",
-      "sudo apt-get upgrade -y -qq",
+      "sudo apt-get upgrade -y -qq --fix-missing",
       # Refresh package index after upgrade — upgrade can invalidate the index,
       # causing "no installation candidate" for packages like zip/build-essential.
       "sudo apt-get update -qq",
-      "sudo apt-get install -y -qq curl jq zip unzip git build-essential libssl-dev",
+      "sudo apt-get install -y -qq --fix-missing curl jq zip unzip git build-essential libssl-dev",
       "echo 'umask 0022' | sudo tee -a /etc/profile",
       "sudo sed -i 's/^UMASK.*/UMASK\t\t022/' /etc/login.defs",
     ]
@@ -146,12 +147,12 @@ build {
   # Terraform
   provisioner "shell" {
     inline = [
-      "curl -sL https://releases.hashicorp.com/terraform/${var.terraform_version}/terraform_${var.terraform_version}_linux_amd64.zip -o /tmp/terraform.zip",
+      "curl -sL https://releases.hashicorp.com/terraform/${var.terraform_version}/terraform_${var.terraform_version}_linux_amd64.zip -o /tmp/terraform_${var.terraform_version}_linux_amd64.zip",
       "curl -sL https://releases.hashicorp.com/terraform/${var.terraform_version}/terraform_${var.terraform_version}_SHA256SUMS -o /tmp/terraform_SHA256SUMS",
       "grep terraform_${var.terraform_version}_linux_amd64.zip /tmp/terraform_SHA256SUMS > /tmp/terraform_checksum",
       "cd /tmp && sha256sum -c terraform_checksum",
-      "sudo unzip -q -o /tmp/terraform.zip -d /usr/local/bin",
-      "rm /tmp/terraform.zip /tmp/terraform_SHA256SUMS /tmp/terraform_checksum",
+      "sudo unzip -q -o /tmp/terraform_${var.terraform_version}_linux_amd64.zip -d /usr/local/bin",
+      "rm /tmp/terraform_${var.terraform_version}_linux_amd64.zip /tmp/terraform_SHA256SUMS /tmp/terraform_checksum",
       "terraform --version",
     ]
   }
@@ -169,12 +170,12 @@ build {
   # Snyk CLI (security scanning)
   provisioner "shell" {
     inline = [
-      "curl -sfSL https://static.snyk.io/cli/v${var.snyk_version}/snyk-linux -o /tmp/snyk",
-      "curl -sfSL https://static.snyk.io/cli/v${var.snyk_version}/snyk-linux.sha256 -o /tmp/snyk.sha256",
-      "cd /tmp && echo \"$(cat snyk.sha256)  snyk\" | sha256sum -c",
-      "sudo mv /tmp/snyk /usr/local/bin/snyk",
+      "curl -sfSL https://static.snyk.io/cli/v${var.snyk_version}/snyk-linux -o /tmp/snyk-linux",
+      "curl -sfSL https://static.snyk.io/cli/v${var.snyk_version}/snyk-linux.sha256 -o /tmp/snyk-linux.sha256",
+      "cd /tmp && sha256sum -c snyk-linux.sha256",
+      "sudo mv /tmp/snyk-linux /usr/local/bin/snyk",
       "sudo chmod +x /usr/local/bin/snyk",
-      "rm -f /tmp/snyk.sha256",
+      "rm -f /tmp/snyk-linux.sha256",
       "snyk --version",
     ]
   }
