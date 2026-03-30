@@ -3,10 +3,6 @@
     "ENABLE_TOOL_SEARCH": "true"
   },
   "permissions": {
-    "additionalDirectories": [
-      "D:\\code\\legacy-sports",
-      "D:\\code\\legacy-sports-worktrees"
-    ],
     "allow": [
       "mcp__82d0c0eb-ec68-497e-bef5-b0faa209ebbb__*",
       "mcp__legacy-sports-aws__aws_apigateway_inspect",
@@ -31,18 +27,17 @@
       "mcp__worktree__worktree_log",
       "mcp__worktree__worktree_ls_tree",
       "mcp__worktree__worktree_push",
-      "mcp__worktree__worktree_rebase",
       "mcp__worktree__worktree_rebase_continue",
+      "mcp__worktree__worktree_rebase",
       "mcp__worktree__worktree_resolve_conflict",
       "mcp__worktree__worktree_set",
-      "mcp__worktree__worktree_show",
       "mcp__worktree__worktree_show_file",
+      "mcp__worktree__worktree_show",
       "mcp__worktree__worktree_stabilize",
       "mcp__worktree__worktree_status",
       "mcp__worktree__worktree_unjunction",
       "mcp__worktree__worktree_unlock",
-      "mcp__worktree__worktree_unstage",
-      "Skill(update-config)"
+      "mcp__worktree__worktree_unstage"
     ]
   },
   "enabledMcpjsonServers": [
