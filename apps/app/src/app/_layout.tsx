@@ -3,7 +3,6 @@ import { useEffect } from 'react';
 import { TamaguiProvider } from 'tamagui';
 import Constants from 'expo-constants';
 import {
-  captureError,
   getRollbarConfigFromEnv,
   initRollbar,
 } from '@legacy-sports/rollbar/native';
@@ -150,7 +149,7 @@ function InnerLayout(): React.JSX.Element {
  */
 export default function Layout() {
   return (
-    <ErrorBoundary reportError={captureError}>
+    <ErrorBoundary>
       <TamaguiProvider
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         config={tamaguiConfig}

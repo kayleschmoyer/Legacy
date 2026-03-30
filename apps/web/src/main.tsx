@@ -91,7 +91,7 @@ LOGGER.info('Environment config:', env);
 try {
   root.render(
     <StrictMode>
-      <ErrorBoundary reportError={captureError}>
+      <ErrorBoundary>
         <ThemeProvider>
           <TamaguiProvider config={tamaguiConfig}>
             <AuthProvider

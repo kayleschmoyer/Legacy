@@ -22,14 +22,19 @@ class NodeRollbarImplementation implements RollbarInterface {
   /** In-memory breadcrumb log (Rollbar telemetry handles this internally but we keep compat). */
   private breadcrumbs: RollbarBreadcrumb[] = [];
   private rollbarDestination: RollbarOutputDestination | null = null;
+  /** Errors already reported to Rollbar — used by withRollbar to skip double-reporting. */
+  private reportedErrors = new WeakSet<Error>();
 
   init(config: RollbarConfig): void {
     try {
       this.rollbar = new Rollbar({
         accessToken: config.accessToken,
         environment: config.environment,
-        captureUncaught: config.captureUncaught ?? true,
-        captureUnhandledRejections: config.captureUnhandledRejections ?? true,
+        // Default to false: our global handlers in lib/logging/server.ts already forward
+        // uncaught errors via LOGGER.error → RollbarOutputDestination. Letting
+        // Rollbar's own hooks run too caused triple-reporting (LS-1948).
+        captureUncaught: config.captureUncaught ?? false,
+        captureUnhandledRejections: config.captureUnhandledRejections ?? false,
         verbose: config.verbose ?? false,
         maxItems: config.maxItems ?? 50,
         itemsPerMinute: config.itemsPerMinute ?? 25,
@@ -88,6 +93,7 @@ class NodeRollbarImplementation implements RollbarInterface {
         default:
           this.rollbar.error(error, payload);
       }
+      this.reportedErrors.add(error);
     } catch (captureError) {
       LOGGER.error('Failed to capture error in Rollbar', captureError as Error);
       LOGGER.error('Original error was:', error);
@@ -114,10 +120,23 @@ class NodeRollbarImplementation implements RollbarInterface {
         const result = await handler(...args);
         return result;
       } catch (error) {
-        this.captureError(error as Error, {
-          handler: handler.name,
-          args: args.length,
-        });
+        if (error instanceof Error) {
+          if (!this.reportedErrors.has(error)) {
+            this.captureError(error, {
+              handler: handler.name,
+              args: args.length,
+            });
+          }
+        } else {
+          LOGGER.error(
+            'withRollbar caught non-Error value',
+            new Error(String(error)),
+            {
+              handler: handler.name,
+              args: args.length,
+            },
+          );
+        }
         throw error;
       }
     };

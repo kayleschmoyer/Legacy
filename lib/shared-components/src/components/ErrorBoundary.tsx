@@ -6,11 +6,6 @@ interface Props {
   children: ReactNode;
   fallback?: ReactNode;
   onError?: (error: Error, errorInfo: ErrorInfo) => void;
-  /**
-   * Optional error reporter function (e.g., Rollbar captureError)
-   * If provided, will be called with error and context
-   */
-  reportError?: (error: Error, context: Record<string, unknown>) => void;
 }
 
 interface State {
@@ -50,19 +45,13 @@ export class ErrorBoundary extends Component<Props, State> {
   };
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    // Log the error with component stack as context so Rollbar captures one
-    // item with the real Error (not a synthetic "Error: Component stack:" item).
+    // Log the error with component stack as context. RollbarOutputDestination
+    // automatically forwards LOGGER.error() calls to Rollbar, so no explicit
+    // captureError() call is needed here (avoids double-reporting).
     LOGGER.error('Error Boundary caught an error', error, {
+      context: 'react-error-boundary',
       componentStack: errorInfo.componentStack,
     });
-
-    // Report to error tracking service (Rollbar)
-    if (this.props.reportError) {
-      this.props.reportError(error, {
-        context: 'react-error-boundary',
-        componentStack: errorInfo.componentStack ?? 'No component stack',
-      });
-    }
 
     // Call optional error handler
     if (this.props.onError) {

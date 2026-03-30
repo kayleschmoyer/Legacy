@@ -21,14 +21,19 @@ class WebRollbarImplementation implements RollbarInterface {
   private rollbar: Rollbar | null = null;
   private breadcrumbs: RollbarBreadcrumb[] = [];
   private rollbarDestination: RollbarOutputDestination | null = null;
+  /** Errors already reported to Rollbar — used by withRollbar to skip double-reporting. */
+  private reportedErrors = new WeakSet<Error>();
 
   init(config: RollbarConfig): void {
     try {
       this.rollbar = new Rollbar({
         accessToken: config.accessToken,
         environment: config.environment,
-        captureUncaught: config.captureUncaught ?? true,
-        captureUnhandledRejections: config.captureUnhandledRejections ?? true,
+        // Default to false: browser window.onerror / onunhandledrejection are already
+        // handled by React ErrorBoundary → LOGGER.error → RollbarOutputDestination.
+        // Letting Rollbar's own hooks run too caused double-reporting (LS-1948).
+        captureUncaught: config.captureUncaught ?? false,
+        captureUnhandledRejections: config.captureUnhandledRejections ?? false,
         verbose: config.verbose ?? false,
         maxItems: config.maxItems ?? 50,
         itemsPerMinute: config.itemsPerMinute ?? 25,
@@ -139,6 +144,7 @@ class WebRollbarImplementation implements RollbarInterface {
         default:
           this.rollbar.error(error, payload);
       }
+      this.reportedErrors.add(error);
     } catch (captureError) {
       LOGGER.error(
         'Failed to capture error in Rollbar',
@@ -170,10 +176,19 @@ class WebRollbarImplementation implements RollbarInterface {
         const result = await handler(...args);
         return result;
       } catch (error) {
-        this.captureError(error as Error, {
-          handler: handler.name,
-          args: args.length,
-        });
+        if (error instanceof Error) {
+          if (!this.reportedErrors.has(error)) {
+            this.captureError(error, {
+              handler: handler.name,
+              args: args.length,
+            });
+          }
+        } else {
+          this.captureError(new Error(String(error)), {
+            handler: handler.name,
+            args: args.length,
+          });
+        }
         throw error;
       }
     };

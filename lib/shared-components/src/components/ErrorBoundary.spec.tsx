@@ -104,24 +104,24 @@ describe('ErrorBoundary', () => {
     );
   });
 
-  it('calls the optional reportError callback with error and context', () => {
-    const reportError = jest.fn();
-    const testError = new Error('report test');
+  it('includes react-error-boundary context in LOGGER.error call', () => {
+    const testError = new Error('context test');
 
     render(
-      <ErrorBoundary reportError={reportError}>
+      <ErrorBoundary>
         <ThrowingComponent error={testError} />
       </ErrorBoundary>,
     );
 
-    expect(reportError).toHaveBeenCalledTimes(1);
-    expect(reportError).toHaveBeenCalledWith(
-      testError,
-      expect.objectContaining({
-        context: 'react-error-boundary',
-        componentStack: expect.any(String) as unknown,
-      }),
-    );
+    const [message, errorArg, contextArg] = mockLogger.error.mock.calls[0] as [
+      string,
+      Error,
+      Record<string, unknown>,
+    ];
+    expect(message).toBe('Error Boundary caught an error');
+    expect(errorArg).toBe(testError);
+    expect(contextArg).toHaveProperty('context', 'react-error-boundary');
+    expect(contextArg).toHaveProperty('componentStack');
   });
 
   it('renders the fallback UI when a child throws', () => {
