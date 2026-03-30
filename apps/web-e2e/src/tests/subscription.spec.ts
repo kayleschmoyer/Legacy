@@ -246,7 +246,7 @@ test.describe('SubscriptionPage — past due @regression', () => {
     await page.waitForLoadState('load');
 
     await expect(
-      page.getByText(/past due|payment failed|fix payment/i),
+      page.getByText(/past due|payment failed|fix payment/i).first(),
     ).toBeVisible();
   });
 });
@@ -265,7 +265,7 @@ test.describe('SubscriptionPage — canceled @regression', () => {
 
     // Should show either "Canceled" status or resubscribe CTA
     await expect(
-      page.getByText(/canceled|resubscribe|start new|upgrade/i),
+      page.getByText(/canceled|resubscribe|start new|upgrade/i).first(),
     ).toBeVisible();
   });
 });

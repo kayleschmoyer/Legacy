@@ -250,7 +250,7 @@ adminTest.describe('Admin Dashboard – JWT decoder @regression', () => {
     await jwtDecoderSectionToggle.click();
 
     // After expanding, the Decode button should be visible
-    const decodeButton = page.getByRole('button', { name: /decode/i });
+    const decodeButton = page.getByRole('button', { name: /decode/i }).first();
     await expect(decodeButton).toBeVisible();
   });
 });

@@ -517,9 +517,10 @@ test.describe('Season Progression — multi-phase UI @regression', () => {
         'Unexpected Application Error',
       );
 
-      // Standings data: 4 teams from mockStandings(4) — team names visible
-      await expect(page.getByText('Diamond Dogs').first()).toBeVisible();
-      await expect(page.getByText('The Sluggers').first()).toBeVisible();
+      // Standings data: 4 teams — team names from MOCK_TEAMS take precedence
+      // over standings mock names when LeagueStandings merges the data
+      await expect(page.getByText('Alpha Squad').first()).toBeVisible();
+      await expect(page.getByText('Beta Force').first()).toBeVisible();
     });
   });
 
@@ -536,8 +537,8 @@ test.describe('Season Progression — multi-phase UI @regression', () => {
         'Unexpected Application Error',
       );
 
-      // Standings teams should still be visible
-      await expect(page.getByText('Diamond Dogs').first()).toBeVisible();
+      // Standings teams — team names from MOCK_TEAMS take precedence
+      await expect(page.getByText('Alpha Squad').first()).toBeVisible();
     });
   });
 });
@@ -590,16 +591,17 @@ test.describe('Season Progression — state-machine walkthrough @regression', ()
     await expect(page.getByText('Alpha Squad').first()).toBeVisible();
 
     // Phase 7: Season complete — standings page
+    // Team names from MOCK_TEAMS take precedence over standings mock names
     phaseRef.current = 'season_complete';
     await page.goto(STANDINGS_URL);
     await page.waitForLoadState('load');
-    await expect(page.getByText('Diamond Dogs').first()).toBeVisible();
-    await expect(page.getByText('The Sluggers').first()).toBeVisible();
+    await expect(page.getByText('Alpha Squad').first()).toBeVisible();
+    await expect(page.getByText('Beta Force').first()).toBeVisible();
 
     // Phase 8: Playoffs — bracket renders
     phaseRef.current = 'playoffs';
     await page.goto(STANDINGS_URL);
     await page.waitForLoadState('load');
-    await expect(page.getByText('Diamond Dogs').first()).toBeVisible();
+    await expect(page.getByText('Alpha Squad').first()).toBeVisible();
   });
 });

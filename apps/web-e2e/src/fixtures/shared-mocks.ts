@@ -79,6 +79,10 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = {
       initializeDraft: mockDraft({ status: 'queued', leagueId: 1 }),
     },
   },
+  getdraftplayerstats: {
+    data: { careerBattingStats: { edges: [], totalCount: 0 } },
+  },
+  getdraftpitchingstats: { data: { careerPitchingStats: [] } },
 
   // ── Subscription ──────────────────────────────────────────────────
   getmysubscription: { data: { mySubscription: null } },
@@ -99,6 +103,10 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = {
 
   // ── Team / league members ─────────────────────────────────────────
   getteamleaguemembers: { data: { teamLeagueMembers: [] } },
+  getteambyid: { data: { teamById: null } },
+
+  // ── Matchups (week-based) ─────────────────────────────────────────
+  getmatchupsbyweek: { data: { getMatchupsByWeek: [] } },
 
   // ── Invite code ───────────────────────────────────────────────────
   validateinvitecode: { data: { validateInviteCode: null } },
@@ -113,7 +121,9 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = {
   getplayerswithstats: { data: { playersWithStats: [] } },
   searchplayers: { data: { searchPlayers: [] } },
   getallplayerseasonstats: { data: { allPlayerSeasonStats: null } },
-  getplayercareerarc: { data: { playerCareerArc: null } },
+  getplayercareerarc: {
+    data: { player: null, playerSeasonBatting: [], playerSeasonPitching: [] },
+  },
 
   // ── Waiver / trade (league pages) ──────────────────────────────
   getwaiverorder: { data: { waiverOrder: [] } },

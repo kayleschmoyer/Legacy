@@ -35,7 +35,7 @@ export class DraftPage {
     this.currentPick = page.getByTestId('current-pick');
 
     this.draftPlayerButton = page.getByRole('button', {
-      name: /draft.*player|pick.*player/i,
+      name: /draft.*now/i,
     });
     this.autoPick = page.getByRole('button', { name: /auto.?pick/i });
     this.undoButton = page.getByRole('button', { name: /undo/i });

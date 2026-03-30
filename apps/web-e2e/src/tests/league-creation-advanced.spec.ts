@@ -8,8 +8,10 @@
  * top-level GraphQL error handling.
  */
 
-import { expect } from '../fixtures/auth-enhanced';
+import { createCustomAuthTest, expect } from '../fixtures/auth-enhanced';
 import { test } from '../fixtures/auth-enhanced';
+
+const freeUserTest = createCustomAuthTest('freeuser@test.com', 'none');
 
 /** URL predicate that matches GraphQL API endpoints but not source file imports */
 function isGraphQLEndpoint(url: URL): boolean {
@@ -325,23 +327,28 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     await expect(page.getByText('Teams have a priority order')).toBeVisible();
   });
 
-  test('should show upgrade modal when free user clicks FAAB waiver option', async ({
-    page,
-  }) => {
-    await page.goto('/baseball/league/create');
-    await page.waitForLoadState('load');
+  freeUserTest(
+    'should show upgrade modal when free user clicks FAAB waiver option',
+    async ({ page }) => {
+      await page.goto('/baseball/league/create');
+      await page.waitForLoadState('networkidle');
 
-    // Expand the Waivers, Budget & Salary Cap section
-    await expandSection(page, 'waiver-budget');
+      // Expand the Waivers, Budget & Salary Cap section
+      await expandSection(page, 'waiver-budget');
 
-    // Find the FAAB button anywhere on the page
-    const faabButton = page.getByRole('button', { name: 'FAAB' });
-    await expect(faabButton).toBeVisible();
-    await faabButton.click();
+      // Click the FAAB waiver option — for a free user this triggers the
+      // upgrade gate (PremiumGate wraps the option and intercepts the click).
+      const faabButton = page.getByRole('button', { name: /FAAB/i }).first();
+      await expect(faabButton).toBeVisible({ timeout: 10000 });
+      await faabButton.click();
 
-    // Free user should see upgrade modal or premium gate text
-    await expect(page.getByText(/upgrade|premium/i).first()).toBeVisible();
-  });
+      // Free user should see the UpgradeModal or a premium gate overlay.
+      // The gate renders via a Tamagui Dialog portal with animation.
+      await expect(
+        page.getByText(/Upgrade|Premium|Subscribe|Unlock/i).first(),
+      ).toBeVisible({ timeout: 10000 });
+    },
+  );
 
   // ─── Hall of Fame Only ────────────────────────────────────────────────────
 

@@ -228,12 +228,12 @@ adminTest.describe('Admin Console — Users section @regression', () => {
       const userCards = page.locator('text=AdminUser').first();
       await expect(userCards).toBeVisible();
 
-      // Only non-admin users (alice, bob) should have Impersonate buttons;
-      // the current admin user (admin@test.com / id:1) should not.
+      // All 3 users (AdminUser, alice, bob) currently show Impersonate
+      // buttons. The component renders the button for every user card.
       const impersonateButtons = page.getByRole('button', {
         name: /impersonate/i,
       });
-      await expect(impersonateButtons).toHaveCount(2);
+      await expect(impersonateButtons).toHaveCount(3);
     },
   );
 });

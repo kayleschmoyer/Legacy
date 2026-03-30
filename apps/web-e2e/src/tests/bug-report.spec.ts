@@ -52,7 +52,12 @@ test.describe('Bug Report Button @smoke', () => {
     await expect(
       dialog.getByRole('button', { name: /submit report/i }),
     ).toBeVisible();
-    await expect(dialog.getByRole('button', { name: /cancel/i })).toBeVisible();
+    // Cancel is inside Dialog.Close asChild — use text-based locator
+    await expect(
+      dialog
+        .locator('button, [role="button"]')
+        .filter({ hasText: /^Cancel$/i }),
+    ).toBeVisible();
   });
 });
 
@@ -116,7 +121,15 @@ test.describe('Bug Report Dialog Interactions @regression', () => {
       postCalled = true;
     });
 
-    await page.getByRole('button', { name: /cancel/i }).click();
+    // The Cancel button is wrapped in Dialog.Close asChild which may alter
+    // the element role in Tamagui's web rendering.  Use a text-based locator
+    // scoped to the dialog instead of getByRole.
+    const cancelBtn = page
+      .getByRole('dialog')
+      .locator('button, [role="button"]')
+      .filter({ hasText: /^Cancel$/i });
+    await expect(cancelBtn).toBeVisible();
+    await cancelBtn.click();
 
     await expect(page.getByRole('dialog')).not.toBeVisible();
     expect(postCalled).toBe(false);
@@ -133,8 +146,13 @@ test.describe('Bug Report Dialog Interactions @regression', () => {
     const textarea = page.getByRole('textbox', { name: /bug description/i });
     await textarea.fill('Some text I typed.');
 
-    // Close via Cancel
-    await page.getByRole('button', { name: /cancel/i }).click();
+    // Close via Cancel (Dialog.Close asChild may alter the element role)
+    const cancelBtn = page
+      .getByRole('dialog')
+      .locator('button, [role="button"]')
+      .filter({ hasText: /^Cancel$/i });
+    await expect(cancelBtn).toBeVisible();
+    await cancelBtn.click();
     await expect(page.getByRole('dialog')).not.toBeVisible();
 
     // Reopen
@@ -265,7 +283,13 @@ test.describe('Bug Report Submission @regression', () => {
 
     await page.getByRole('button', { name: /submit report/i }).click();
 
-    await expect(page.getByText(/something went wrong/i)).toBeVisible();
+    // route.abort('failed') throws a TypeError("Failed to fetch") in
+    // Chromium.  The component's catch block renders err.message directly
+    // since it is an Error instance, so the toast shows "Failed to fetch"
+    // rather than the generic "Something went wrong" fallback.
+    await expect(
+      page.getByText(/something went wrong|failed to fetch/i),
+    ).toBeVisible();
 
     await expect(page.getByRole('dialog')).toBeVisible();
   });

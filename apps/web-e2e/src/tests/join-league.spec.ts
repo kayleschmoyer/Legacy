@@ -419,9 +419,30 @@ test.describe('Join League — keyboard submission @regression', () => {
     await expect(lp.joinButton).toBeEnabled({ timeout: 10000 });
 
     // Submit via keyboard — exercises the form onSubmit handler,
-    // not the button onPress handler
-    await lp.teamNameInput.press('Enter');
+    // not the button onPress handler.
+    // Use Promise.all to wait for the mutation response concurrently.
+    // Use requestSubmit() which triggers the React onSubmit handler.
+    // Tamagui Input may not propagate Enter into native form submission
+    // on all browsers.
+    await Promise.all([
+      page.waitForResponse(
+        (resp) =>
+          resp.url().includes('/graphql') &&
+          resp
+            .request()
+            .postData()
+            ?.toLowerCase()
+            .includes('joinleaguebycode') === true,
+        { timeout: 10000 },
+      ),
+      page.evaluate(() => {
+        const form = document.querySelector('form');
+        if (form) form.requestSubmit();
+      }),
+    ]);
 
-    await expect(page).toHaveURL(/\/baseball\/league\/55/);
+    await expect(page).toHaveURL(/\/baseball\/league\/55/, {
+      timeout: 15000,
+    });
   });
 });

@@ -282,10 +282,44 @@ test.describe('Team Detail Page – roster @regression', () => {
     await setupGraphQL(page, {
       teamMembers: [mockMember({ positionId: 5 })],
     });
+
+    // Override the positions query so positionId 5 maps to "SS" (Shortstop).
+    // Registered AFTER setupGraphQL so it runs first in Playwright's LIFO chain.
+    await page.route(
+      (url) =>
+        url.toString().includes('/graphql') &&
+        !url.toString().includes('/@fs/'),
+      async (route) => {
+        const postData = route.request().postData()?.toLowerCase() ?? '';
+        if (postData.includes('getpositionsforleague')) {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              data: {
+                leaguePositions: [
+                  {
+                    __typename: 'LeaguePosition',
+                    id: 5,
+                    leagueId: 1,
+                    positionType: 'SS',
+                  },
+                ],
+              },
+            }),
+          });
+        } else {
+          await route.fallback();
+        }
+      },
+    );
+
     await page.goto(TEAM_URL);
     await page.waitForLoadState('load');
 
-    await expect(page.getByText(/Position ID: 5/)).toBeVisible();
+    // The component renders the positionType from the positions query,
+    // not the raw positionId number
+    await expect(page.getByText('SS')).toBeVisible();
   });
 });
 

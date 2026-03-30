@@ -245,7 +245,7 @@ test.describe('Roster Management – layout @regression', () => {
   });
 
   test('shows "My Roster" heading', async ({ page }) => {
-    await expect(page.getByText('My Roster')).toBeVisible();
+    await expect(page.getByText('My Roster').first()).toBeVisible();
   });
 
   test('shows Lineup quickstat', async ({ page }) => {
@@ -326,7 +326,7 @@ test.describe('Roster Management — empty roster @regression', () => {
       'Unexpected Application Error',
     );
     // Roster heading should still appear
-    await expect(page.getByText('My Roster')).toBeVisible();
+    await expect(page.getByText('My Roster').first()).toBeVisible();
   });
 
   test('shows empty bench message when no bench players', async ({ page }) => {

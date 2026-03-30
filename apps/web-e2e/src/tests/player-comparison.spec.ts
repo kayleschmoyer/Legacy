@@ -11,7 +11,12 @@
  * All GraphQL responses are mocked so no live backend is required.
  */
 
-import { adminTest, expect, test } from '../fixtures/auth-enhanced';
+import {
+  adminTest,
+  createCustomAuthTest,
+  expect,
+  test,
+} from '../fixtures/auth-enhanced';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -372,9 +377,9 @@ adminTest.describe('Player Comparison – player search @regression', () => {
     await input.fill('Aa');
     await page.getByText('Aaron Judge').click();
 
-    // Add second player (retry click — dropdown re-renders during debounce)
-    await input.fill('Sh');
+    // Add second player (retry fill+click — dropdown can close from stale blur)
     await expect(async () => {
+      await input.fill('Sh');
       await page.getByText('Shohei Ohtani').click({ timeout: 2000 });
     }).toPass({ timeout: 15000 });
 
@@ -400,9 +405,9 @@ adminTest.describe('Player Comparison – comparison table @regression', () => {
     await expect(page.getByText('Aaron Judge')).toBeVisible();
     await page.getByText('Aaron Judge').click();
 
-    // Add second player (retry click — dropdown re-renders during debounce)
-    await input.fill('Sh');
+    // Add second player (retry fill+click — dropdown can close from stale blur)
     await expect(async () => {
+      await input.fill('Sh');
       await page.getByText('Shohei Ohtani').click({ timeout: 2000 });
     }).toPass({ timeout: 15000 });
   });
@@ -475,11 +480,12 @@ adminTest.describe('Player Comparison – remove player @regression', () => {
   adminTest(
     'minimum player hint reappears after removing second player',
     async ({ page }) => {
-      // Add a second player
+      // Add a second player (retry fill+click — dropdown can detach during re-render)
       const input = page.getByLabel('Search players to compare');
-      await input.fill('Sh');
-      await expect(page.getByText('Shohei Ohtani')).toBeVisible();
-      await page.getByText('Shohei Ohtani').click();
+      await expect(async () => {
+        await input.fill('Sh');
+        await page.getByText('Shohei Ohtani').click({ timeout: 2000 });
+      }).toPass({ timeout: 15000 });
 
       // Now remove one
       await page.getByRole('button', { name: /remove aaron judge/i }).click();
@@ -495,10 +501,13 @@ adminTest.describe('Player Comparison – remove player @regression', () => {
 // Tests: Premium gate for non-premium users @regression
 // ---------------------------------------------------------------------------
 
-test.describe('Player Comparison – premium gate @regression', () => {
-  test.beforeEach(async ({ page }) => {
-    // Default test fixture uses accessLevel 'none' with no premium subscription
-    // Mock getUserById to return non-premium user (no subscriptionTier 'premium')
+// Use a custom auth fixture with accessLevel 'none' so useIsPremium doesn't
+// short-circuit to true (the global-setup user may be an admin).
+const freeUserTest = createCustomAuthTest('freeuser@test.com', 'none');
+
+freeUserTest.describe('Player Comparison – premium gate @regression', () => {
+  freeUserTest.beforeEach(async ({ page }) => {
+    // Mock getUserById to return non-premium user (subscriptionTier 'free')
     await page.route(
       (url) => isGraphQLEndpoint(url),
       async (route) => {
@@ -512,14 +521,23 @@ test.describe('Player Comparison – premium gate @regression', () => {
                 user: {
                   __typename: 'User',
                   id: 1,
-                  email: 'user@test.com',
-                  username: 'testuser',
+                  email: 'freeuser@test.com',
+                  username: 'freeuser',
                   accessLevel: 'none',
                   subscriptionTier: 'free',
                   avatarUrl: null,
                 },
               },
             }),
+          });
+        } else if (
+          postData.includes('getmysubscription') ||
+          postData.includes('mysubscription')
+        ) {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ data: { mySubscription: null } }),
           });
         } else {
           await route.fulfill({
@@ -534,17 +552,28 @@ test.describe('Player Comparison – premium gate @regression', () => {
     await page.waitForLoadState('load');
   });
 
-  test('shows Premium Feature overlay for non-premium users', async ({
-    page,
-  }) => {
-    await expect(page.getByText(/premium feature/i)).toBeVisible();
-  });
+  freeUserTest(
+    'shows Premium Feature overlay for non-premium users',
+    async ({ page }) => {
+      await expect(page.getByText(/premium feature/i)).toBeVisible();
+    },
+  );
 
-  test('shows upgrade button in premium gate overlay', async ({ page }) => {
-    await expect(page.getByRole('button', { name: /upgrade/i })).toBeVisible();
-  });
+  freeUserTest(
+    'shows upgrade button in premium gate overlay',
+    async ({ page }) => {
+      await expect(
+        page.getByRole('button', { name: /upgrade/i }),
+      ).toBeVisible();
+    },
+  );
 
-  test('shows player comparison feature description', async ({ page }) => {
-    await expect(page.getByText(/compare up to 4 players/i)).toBeVisible();
-  });
+  freeUserTest(
+    'shows player comparison feature description',
+    async ({ page }) => {
+      await expect(
+        page.getByText(/compare up to 4 players/i).first(),
+      ).toBeVisible();
+    },
+  );
 });

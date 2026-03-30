@@ -196,9 +196,20 @@ test.describe('Screen Reader Announcements @regression', () => {
     // Ensure the aria-live region is in the DOM before navigating
     await expect(politeRegion).toBeAttached({ timeout: 5000 });
 
-    // Navigate to /help — the router should fire a polite announcement
-    await page.goto('/help');
-    await page.waitForLoadState('load');
+    // Use client-side navigation instead of page.goto() so the React
+    // router treats this as a subsequent route change.  The
+    // useRouteAnnouncer hook intentionally skips the very first render,
+    // and page.goto() triggers a full page reload (= first render).
+    //
+    // The Help nav button is a dropdown trigger, so instead click the
+    // first <a href="/help"> link inside the dropdown after opening it.
+    const helpDropdownBtn = page.getByRole('button', { name: 'Help' }).first();
+    await expect(helpDropdownBtn).toBeVisible({ timeout: 5000 });
+    await helpDropdownBtn.click();
+
+    const helpLink = page.locator('a[href="/help"]').first();
+    await expect(helpLink).toBeVisible({ timeout: 5000 });
+    await helpLink.click();
 
     // The announcement may take a moment after navigation completes
     await expect(politeRegion).toHaveText(/navigated to help/i, {
@@ -353,12 +364,14 @@ test.describe('Keyboard Navigation @regression', () => {
   });
 
   test('nav links are focusable on the About page', async ({ page }) => {
-    // Verify the About link can receive focus programmatically
-    const aboutLink = page.locator('a[href="/about"]').first();
-    await expect(aboutLink).toBeAttached();
-    await aboutLink.focus();
+    // The a[href="/about"] link lives inside the Help dropdown which is
+    // not rendered until the dropdown is opened.  Instead, verify that
+    // the logo link (always visible in the banner) can receive focus.
+    const navLink = page.locator('[role="banner"]').getByRole('link').first();
+    await expect(navLink).toBeAttached();
+    await navLink.focus();
 
-    const isFocused = await aboutLink.evaluate(
+    const isFocused = await navLink.evaluate(
       (el) => el === document.activeElement,
     );
     expect(isFocused).toBe(true);

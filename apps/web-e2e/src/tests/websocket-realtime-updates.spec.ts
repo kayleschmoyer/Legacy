@@ -127,16 +127,17 @@ async function injectWebSocketUrl(page: import('@playwright/test').Page) {
   await page.route(/\/assets\/index-[^/]+\.js$/, async (route) => {
     const response = await route.fetch();
     const body = await response.text();
-    // The Vite build inlines websocketUrl:"" (or websocketUrl: "").
-    // Replace the first occurrence with our test URL.
+    // The Vite build inlines websocketUrl:"<value>" where <value> may be
+    // empty (CI) or a real URL (local dev).  Replace the first occurrence
+    // with our deterministic test URL so the WebSocket fixture can intercept.
     const replaced = body.replace(
-      /websocketUrl\s*:\s*""/,
+      /websocketUrl\s*:\s*"[^"]*"/,
       `websocketUrl:"${E2E_WS_URL}"`,
     );
     if (replaced === body) {
       throw new Error(
         'injectWebSocketUrl: Failed to inject test WebSocket URL — ' +
-          'pattern `websocketUrl: ""` not found in bundle. Build output may have changed.',
+          'pattern `websocketUrl: "..."` not found in bundle. Build output may have changed.',
       );
     }
     await route.fulfill({ response, body: replaced });

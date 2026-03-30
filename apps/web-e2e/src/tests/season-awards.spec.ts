@@ -358,7 +358,7 @@ test.describe('Season Awards — accordion panel @regression', () => {
 
     // Tamagui H4 inside Card renders as <p>, not <h4> — use getByText
     await expect(
-      page.getByText('Season Awards', { exact: true }),
+      page.getByText('Season Awards', { exact: true }).first(),
     ).toBeVisible();
   });
 });
@@ -456,8 +456,9 @@ test.describe('Season Awards — existing award display @regression', () => {
     await expandSeasonAwards(page);
 
     // Delete/remove button should be visible for assigned award (Trash2 icon button)
+    // The aria-label is "Remove <award label>" e.g. "Remove Most Valuable Player"
     await expect(
-      page.getByRole('button', { name: /remove.*mvp|remove.*award|delete/i }),
+      page.getByRole('button', { name: /remove most valuable player/i }),
     ).toBeVisible();
   });
 });

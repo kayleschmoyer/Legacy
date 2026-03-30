@@ -207,6 +207,12 @@ async function mockTradesGraphQL(
         contentType: 'application/json',
         body: JSON.stringify({ data: { leagueTradeOffers: leagueOffers } }),
       });
+    } else if (postData.includes('getleagueteams')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { leagueTeams: MOCK_TEAMS } }),
+      });
     } else if (
       postData.includes('getleaguebyid') ||
       postData.includes('getleague')
@@ -215,12 +221,6 @@ async function mockTradesGraphQL(
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { league: MOCK_LEAGUE } }),
-      });
-    } else if (postData.includes('getleagueteams')) {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ data: { leagueTeams: MOCK_TEAMS } }),
       });
     } else if (postData.includes('getpositionsforleague')) {
       await route.fulfill({
@@ -393,7 +393,7 @@ test.describe('Trading Center — propose trade dialog @regression', () => {
   test('opens Propose Trade dialog when clicking Propose Trade', async ({
     page,
   }) => {
-    await page.getByText('Propose Trade').click();
+    await page.getByRole('button', { name: 'Propose Trade' }).click();
 
     await expect(
       page.getByRole('dialog', { name: 'Propose Trade' }),
@@ -401,7 +401,7 @@ test.describe('Trading Center — propose trade dialog @regression', () => {
   });
 
   test('dialog shows step 1 — team selection', async ({ page }) => {
-    await page.getByText('Propose Trade').click();
+    await page.getByRole('button', { name: 'Propose Trade' }).click();
 
     await expect(
       page.getByText('Select the team you want to trade with'),
@@ -409,9 +409,14 @@ test.describe('Trading Center — propose trade dialog @regression', () => {
   });
 
   test('dialog shows team names to trade with', async ({ page }) => {
-    await page.getByText('Propose Trade').click();
+    await page.getByRole('button', { name: 'Propose Trade' }).click();
+
+    // Wait for the dialog to appear and the GetLeagueTeams query to resolve
+    await expect(
+      page.getByText('Select the team you want to trade with'),
+    ).toBeVisible({ timeout: 5000 });
 
     // Beta Force is the other team (not my team)
-    await expect(page.getByText('Beta Force')).toBeVisible();
+    await expect(page.getByText('Beta Force')).toBeVisible({ timeout: 5000 });
   });
 });

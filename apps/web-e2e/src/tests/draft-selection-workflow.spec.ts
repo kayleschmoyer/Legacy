@@ -3,7 +3,6 @@ import {
   getAvailableDraftPlayersResponse,
   getCurrentDraftPickResponse,
   getDraftPicksResponse,
-  getDraftResponse,
   leagueByIdResponse,
   leaguePositionsResponse,
   leagueScoringProfileResponse,
@@ -144,17 +143,33 @@ async function setupDraftRoute(
       const op = body.operationName ?? '';
 
       // Draft queries — use exact operationName matching
+      // The live draft board uses GetLiveDraftLeagueDraft which calls
+      // the getLeagueDraft resolver — the response data key must be
+      // "getLeagueDraft", not "getDraft".
       if (
         op === 'GetDraft' ||
         op === 'GetLiveDraftLeagueDraft' ||
         op === 'GetLeagueDraft'
       ) {
+        const draft = {
+          __typename: 'Draft',
+          id: 1,
+          leagueId: TEST_LEAGUE_ID,
+          status: draftStatus,
+          currentRound: 1,
+          currentPick: 1,
+          totalRounds: 25,
+          draftMode: 'live',
+          draftOrder: 'snake',
+          selectionMethod: 'standard',
+          playerPool: 'all',
+          pickTimeLimitSeconds: 60,
+          scheduledAt: null,
+        };
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify(
-            getDraftResponse({ status: draftStatus, leagueId: TEST_LEAGUE_ID }),
-          ),
+          body: JSON.stringify({ data: { getLeagueDraft: draft } }),
         });
         return;
       }
@@ -386,6 +401,15 @@ async function setupDraftRoute(
         return;
       }
 
+      if (op === 'NudgeExpiredDraftPick') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { nudgeExpiredDraftPick: true } }),
+        });
+        return;
+      }
+
       // Fall through to the baseline _apiIsolation fixture for ambient
       // queries (getUnreadNotificationCount, getUserById, etc.)
       await route.fallback();
@@ -507,7 +531,7 @@ test.describe('Draft Selection Workflow @regression', () => {
     await draftPage.expectBoardVisible();
 
     // Assert pick history shows the previous pick
-    const pickHistoryText = page.getByText('Ohtani');
+    const pickHistoryText = page.getByText('Ohtani').first();
     await expect(pickHistoryText).toBeVisible({ timeout: 5000 });
   });
 

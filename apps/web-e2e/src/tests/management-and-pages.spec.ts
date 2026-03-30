@@ -78,8 +78,11 @@ test.describe('Management Page — delete all leagues dialogs @regression', () =
     await page.getByRole('button', { name: /delete all leagues/i }).click();
 
     await expect(page.getByRole('alertdialog')).toBeVisible();
+    // The dialog text varies by access level:
+    // - admin: "Are you sure you want to delete ALL leagues you are a member of?"
+    // - non-admin: "Are you sure you want to delete ALL leagues you own?"
     await expect(
-      page.getByText(/are you sure you want to delete all of your leagues/i),
+      page.getByText(/are you sure you want to delete all.*leagues/i),
     ).toBeVisible();
   });
 
@@ -89,8 +92,12 @@ test.describe('Management Page — delete all leagues dialogs @regression', () =
     const dialog = page.locator('div[role="alertdialog"]');
     await expect(dialog).toBeVisible();
 
-    // Key data items listed in the dialog
-    await expect(dialog.getByText(/all leagues you own/i)).toBeVisible();
+    // Key data items listed in the dialog (text varies by access level)
+    await expect(
+      dialog
+        .getByText(/all leagues you own|all leagues you are a member of/i)
+        .first(),
+    ).toBeVisible();
     await expect(dialog.getByText(/all teams in those leagues/i)).toBeVisible();
     await expect(dialog.getByText(/all roster data/i)).toBeVisible();
   });

@@ -25,7 +25,8 @@ interface GraphQLResponse {
 
 test.describe('Draft GraphQL Integration Tests @regression', () => {
   const testLeagueId = 1;
-  const leagueUrl = `/baseball/league/${testLeagueId}`;
+  // Navigate to the commissioner tab where the "Start Draft" button lives
+  const leagueUrl = `/baseball/league/${testLeagueId}/commissioner`;
 
   /**
    * Build a mock response for the given operation based on the POST body.
@@ -61,6 +62,7 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
             maxRosterSize: 25,
             draftStatus: 'not-started',
             currentMatchup: null,
+            currentWeekNumber: null,
             numberOfTeams: 10,
             playerPool: 'all',
             draftMode: 'live',
@@ -72,33 +74,41 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
             tradingEnabled: true,
             waiverEnabled: true,
             startDate: null,
+            logoUrl: null,
+            bannerUrl: null,
+            primaryColor: null,
+            secondaryColor: null,
+            inviteCode: 'TEST1234',
+            userMembership: {
+              __typename: 'LeagueMember',
+              leagueId: testLeagueId,
+              userId: 1,
+              teamId: 1,
+              permissionLevel: 'owner',
+              username: 'testuser',
+            },
+            gamesPerMatchup: 1,
+            totalMatchups: null,
+            playoffEnabled: false,
+            frozenAt: null,
           },
         },
       };
     }
 
-    if (op.includes('startdraft')) {
+    if (op.includes('startdraft') || op.includes('initializedraft')) {
       return {
         data: {
-          startDraft: {
-            __typename: 'League',
-            id: testLeagueId,
-            name: 'Test League',
-            draftStatus: 'queued',
-            owner: 1,
-            maxRosterSize: 25,
-            currentMatchup: null,
-            numberOfTeams: 10,
-            playerPool: 'all',
+          initializeDraft: {
+            __typename: 'Draft',
+            id: 1,
+            leagueId: testLeagueId,
+            status: 'queued',
+            currentRound: 1,
+            currentPick: 1,
+            totalRounds: 25,
             draftMode: 'live',
-            selectionMethod: 'standard',
             draftOrder: 'snake',
-            isPublic: false,
-            maxBatters: 14,
-            maxPitchers: 9,
-            tradingEnabled: true,
-            waiverEnabled: true,
-            startDate: null,
           },
         },
       };
@@ -146,6 +156,34 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
 
     if (op.includes('scoring')) {
       return { data: { leagueScoringProfile: null } };
+    }
+
+    if (op.includes('getleaguedraft') || op.includes('leaguedraft')) {
+      return { data: { getLeagueDraft: null } };
+    }
+
+    if (op.includes('getdraftteamorder') || op.includes('draftteamorder')) {
+      return { data: { getDraftTeamOrder: [] } };
+    }
+
+    if (
+      op.includes('getcurrentweek') ||
+      op.includes('currentweek') ||
+      op.includes('getmatchupsforleague') ||
+      op.includes('getleaguestandings') ||
+      op.includes('getleagueactivity') ||
+      op.includes('leagueactivity') ||
+      op.includes('getleaguechatmessages') ||
+      op.includes('getleaguemessages') ||
+      op.includes('getleagueannouncements') ||
+      op.includes('getteamwaiverclaims') ||
+      op.includes('getpendingtradeoffers')
+    ) {
+      return { data: {} };
+    }
+
+    if (op.includes('getuserleagues')) {
+      return { data: { userLeagues: [] } };
     }
 
     // Return null to signal the route handler should fall through to the
@@ -251,10 +289,11 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
   test('should send startDraft mutation and handle response correctly', async ({
     page,
   }) => {
-    let startDraftMutation: GraphQLRequest | null = null;
-    let startDraftResp: GraphQLResponse | null = null;
+    let draftMutation: GraphQLRequest | null = null;
+    let draftMutationResp: GraphQLResponse | null = null;
 
-    // Set up hermetic GraphQL route that captures startDraft mutation
+    // Set up hermetic GraphQL route that captures the InitializeDraft mutation
+    // (the "Start Draft" button triggers InitializeDraft, not StartDraft)
     await page.route(
       (url) => {
         const urlString = url.toString();
@@ -273,29 +312,26 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
           try {
             const body = JSON.parse(postData) as GraphQLRequest;
 
-            // Check if this is a startDraft mutation
+            // Check if this is the InitializeDraft mutation
             if (
-              body.query?.includes('startDraft') ||
-              body.operationName === 'StartDraft'
+              body.query?.includes('initializeDraft') ||
+              body.operationName === 'InitializeDraft'
             ) {
-              startDraftMutation = body;
-              console.log(
-                '🚀 StartDraft mutation intercepted:',
-                body.variables,
-              );
+              draftMutation = body;
             }
 
             const mockResponse = buildMockResponse(body);
 
+            if (mockResponse === null) {
+              await route.fallback();
+              return;
+            }
+
             if (
-              body.query?.includes('startDraft') ||
-              body.operationName === 'StartDraft'
+              body.query?.includes('initializeDraft') ||
+              body.operationName === 'InitializeDraft'
             ) {
-              startDraftResp = mockResponse;
-              console.log(
-                '✅ StartDraft response:',
-                mockResponse.data?.startDraft,
-              );
+              draftMutationResp = mockResponse;
             }
 
             await route.fulfill({
@@ -304,29 +340,15 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
               body: JSON.stringify(mockResponse),
             });
           } catch {
-            await route.fulfill({
-              status: 200,
-              contentType: 'application/json',
-              body: JSON.stringify({
-                errors: [{ message: '[E2E] Failed to parse GraphQL request' }],
-                data: null,
-              }),
-            });
+            await route.fallback();
           }
         } else {
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              errors: [{ message: '[E2E] GraphQL request missing POST body' }],
-              data: null,
-            }),
-          });
+          await route.fallback();
         }
       },
     );
 
-    // Navigate to league page
+    // Navigate to commissioner tab where the Start Draft button lives
     await page.goto(leagueUrl);
     await page.waitForLoadState('networkidle');
 
@@ -338,35 +360,44 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
 
     await startDraftButton.waitFor({ state: 'visible', timeout: 5000 });
 
-    // Click the button and wait for mutation
+    // Click the button — this opens a confirmation dialog
     await startDraftButton.click();
+
+    // The NextStepControl shows a Tamagui Dialog with Cancel / Confirm.
+    // The dialog portal animates in, so allow enough time (5 s).
+    const confirmButton = page
+      .locator('button')
+      .filter({ hasText: /^Confirm$/i })
+      .first();
+    const hasConfirm = await confirmButton
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
+    if (hasConfirm) {
+      await confirmButton.click();
+    }
 
     // Wait for GraphQL mutation to complete
     await page.waitForTimeout(3000);
 
     // Verify mutation was sent
-    expect(startDraftMutation).toBeTruthy();
-    const mutation = startDraftMutation as GraphQLRequest;
+    expect(draftMutation).toBeTruthy();
+    const mutation = draftMutation as GraphQLRequest;
     expect(mutation.variables).toHaveProperty('leagueId', testLeagueId);
-    // StartDraft only sends leagueId (and optional selectionMethod) — verify
-    // the query text contains the operation name rather than asserting on a
-    // variable that the mutation does not accept.
-    expect(mutation.query).toContain('startDraft');
+    expect(
+      mutation.query?.includes('initializeDraft') ||
+        mutation.operationName === 'InitializeDraft',
+    ).toBe(true);
 
     // Verify response was received and has correct structure
-    expect(startDraftResp).toBeTruthy();
-    const resp = startDraftResp as GraphQLResponse;
-    const startDraftData = resp.data?.startDraft as {
+    expect(draftMutationResp).toBeTruthy();
+    const resp = draftMutationResp as GraphQLResponse;
+    const draftData = resp.data?.initializeDraft as {
       id: number;
-      draftStatus: string;
+      status: string;
     };
-    expect(startDraftData).toHaveProperty('id');
-    expect(startDraftData).toHaveProperty('draftStatus');
-    expect(startDraftData.draftStatus).toBe('queued');
-
-    console.log('✅ StartDraft mutation completed successfully');
-    console.log(`   League ID: ${startDraftData.id}`);
-    console.log(`   Draft Status: ${startDraftData.draftStatus}`);
+    expect(draftData).toHaveProperty('id');
+    expect(draftData).toHaveProperty('status');
+    expect(draftData.status).toBe('queued');
   });
 
   test('should handle GraphQL errors gracefully in the UI', async ({
@@ -391,10 +422,10 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
           try {
             const body = JSON.parse(postData) as GraphQLRequest;
 
-            // If this is a startDraft mutation, return an error
+            // If this is the InitializeDraft mutation, return an error
             if (
-              body.query?.includes('startDraft') ||
-              body.operationName === 'StartDraft'
+              body.query?.includes('initializeDraft') ||
+              body.operationName === 'InitializeDraft'
             ) {
               await route.fulfill({
                 status: 200,
@@ -404,7 +435,7 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
                     {
                       message: 'Test error: Draft queue URL not configured',
                       locations: [{ line: 1, column: 1 }],
-                      path: ['startDraft'],
+                      path: ['initializeDraft'],
                     },
                   ],
                   data: null,
@@ -415,27 +446,20 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
 
             // All other operations get normal mock responses
             const mockResponse = buildMockResponse(body);
+            if (mockResponse === null) {
+              await route.fallback();
+              return;
+            }
             await route.fulfill({
               status: 200,
               contentType: 'application/json',
               body: JSON.stringify(mockResponse),
             });
           } catch {
-            await route.fulfill({
-              status: 200,
-              contentType: 'application/json',
-              body: JSON.stringify({
-                errors: [{ message: '[E2E] Failed to parse GraphQL request' }],
-                data: null,
-              }),
-            });
+            await route.fallback();
           }
         } else {
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ data: {} }),
-          });
+          await route.fallback();
         }
       },
     );
@@ -453,6 +477,18 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
 
     // Click button to trigger the mocked error
     await startDraftButton.click();
+
+    // The NextStepControl shows a Tamagui Dialog with Cancel / Confirm.
+    const confirmButton = page
+      .locator('button')
+      .filter({ hasText: /^Confirm$/i })
+      .first();
+    const hasConfirm = await confirmButton
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
+    if (hasConfirm) {
+      await confirmButton.click();
+    }
 
     // Wait for error handling
     await page.waitForTimeout(2000);
@@ -528,6 +564,12 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
             });
 
             const mockResponse = buildMockResponse(body);
+
+            if (mockResponse === null) {
+              await route.fallback();
+              return;
+            }
+
             graphqlOperations.push({
               type: 'response',
               operation: body.operationName || 'Unknown',
@@ -541,21 +583,10 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
               body: JSON.stringify(mockResponse),
             });
           } catch {
-            await route.fulfill({
-              status: 200,
-              contentType: 'application/json',
-              body: JSON.stringify({
-                errors: [{ message: '[E2E] Failed to parse GraphQL request' }],
-                data: null,
-              }),
-            });
+            await route.fallback();
           }
         } else {
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ data: {} }),
-          });
+          await route.fallback();
         }
       },
     );
@@ -577,8 +608,21 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
     // Record operations before mutation
     const operationsBeforeMutation = [...graphqlOperations];
 
-    // Execute mutation
+    // Execute mutation — click Start Draft button
     await startDraftButton.click();
+
+    // The NextStepControl shows a Tamagui Dialog with Cancel / Confirm.
+    const confirmButton = page
+      .locator('button')
+      .filter({ hasText: /^Confirm$/i })
+      .first();
+    const hasConfirm = await confirmButton
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
+    if (hasConfirm) {
+      await confirmButton.click();
+    }
+
     await page.waitForTimeout(3000);
 
     // Record operations after mutation
@@ -586,28 +630,28 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
       operationsBeforeMutation.length,
     );
 
-    // Look for startDraft mutation in operations
-    const startDraftOps = operationsAfterMutation.filter(
+    // Look for InitializeDraft mutation in operations
+    const draftOps = operationsAfterMutation.filter(
       (op) =>
-        op.operation === 'StartDraft' ||
+        op.operation === 'InitializeDraft' ||
         (op.type === 'request' &&
           op.variables &&
           typeof op.variables === 'object' &&
           'leagueId' in op.variables),
     );
 
-    expect(startDraftOps.length).toBeGreaterThan(0);
+    expect(draftOps.length).toBeGreaterThan(0);
 
     // Look for subsequent league queries (cache updates should minimize these)
     const subsequentLeagueQueries = operationsAfterMutation.filter(
       (op) =>
         op.type === 'request' &&
         (op.operation?.includes('League') || op.operation === 'GetLeague') &&
-        op.timestamp > (startDraftOps[0]?.timestamp || 0),
+        op.timestamp > (draftOps[0]?.timestamp || 0),
     );
 
-    console.log(`✅ Cache behavior analysis:`);
-    console.log(`   StartDraft operations: ${startDraftOps.length}`);
+    console.log(`Cache behavior analysis:`);
+    console.log(`   InitializeDraft operations: ${draftOps.length}`);
     console.log(
       `   Subsequent league queries: ${subsequentLeagueQueries.length}`,
     );
@@ -616,11 +660,11 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
     // since the mutation response should update the cache
     if (subsequentLeagueQueries.length === 0) {
       console.log(
-        '✅ Excellent: No subsequent league queries - cache working optimally',
+        'Excellent: No subsequent league queries - cache working optimally',
       );
     } else {
       console.log(
-        'ℹ️  Some subsequent queries found - this may be expected for real-time updates',
+        'Some subsequent queries found - this may be expected for real-time updates',
       );
     }
   });

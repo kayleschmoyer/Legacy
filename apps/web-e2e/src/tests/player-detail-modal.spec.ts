@@ -33,6 +33,8 @@ const SEASON_STATS_RESPONSE = {
     player: {
       __typename: 'Player',
       eligiblePositions: ['CF', 'OF'],
+      firstName: 'Mike',
+      lastName: 'Trout',
     },
     playerSeasonBatting: [
       {
@@ -104,6 +106,8 @@ const PITCHER_SEASON_STATS_RESPONSE = {
     player: {
       __typename: 'Player',
       eligiblePositions: ['SP', 'RP'],
+      firstName: 'Walker',
+      lastName: 'Buehler',
     },
     playerSeasonBatting: [],
     playerSeasonPitching: [
@@ -133,10 +137,117 @@ const PITCHER_SEASON_STATS_RESPONSE = {
   },
 };
 
+/** Career arc response for a batter — needed by GetPlayerCareerArc query. */
+const BATTER_CAREER_ARC_RESPONSE = {
+  data: {
+    player: {
+      __typename: 'Player',
+      firstName: 'Mike',
+      lastName: 'Trout',
+      eligiblePositions: ['CF', 'OF'],
+      careerAchievements: {
+        allStarSelections: 11,
+        goldGloves: 0,
+        silverSluggers: 9,
+        mvpAwards: 3,
+        cyYoungAwards: 0,
+        hallOfFame: false,
+        rookieOfTheYear: true,
+      },
+    },
+    playerSeasonBatting: [
+      {
+        season: 2024,
+        team: 'LAA',
+        games: 145,
+        hits: 165,
+        atBats: 550,
+        homeRuns: 28,
+        rbi: 85,
+        stolenBases: 12,
+        battingAverage: 0.3,
+        onBasePercentage: 0.37,
+        sluggingPercentage: 0.52,
+        onBasePlusSlugging: 0.89,
+        onBasePlusSluggingPlus: 142,
+        awardSummary: null,
+      },
+      {
+        season: 2023,
+        team: 'LAA',
+        games: 140,
+        hits: 155,
+        atBats: 520,
+        homeRuns: 25,
+        rbi: 80,
+        stolenBases: 10,
+        battingAverage: 0.298,
+        onBasePercentage: 0.365,
+        sluggingPercentage: 0.495,
+        onBasePlusSlugging: 0.86,
+        onBasePlusSluggingPlus: 135,
+        awardSummary: null,
+      },
+    ],
+    playerSeasonPitching: [],
+  },
+};
+
+/** Career arc response for a pitcher. */
+const PITCHER_CAREER_ARC_RESPONSE = {
+  data: {
+    player: {
+      __typename: 'Player',
+      firstName: 'Walker',
+      lastName: 'Buehler',
+      eligiblePositions: ['SP', 'RP'],
+      careerAchievements: {
+        allStarSelections: 1,
+        goldGloves: 0,
+        silverSluggers: 0,
+        mvpAwards: 0,
+        cyYoungAwards: 0,
+        hallOfFame: false,
+        rookieOfTheYear: false,
+      },
+    },
+    playerSeasonBatting: [],
+    playerSeasonPitching: [
+      {
+        season: 2024,
+        team: 'LAD',
+        games: 32,
+        wins: 15,
+        losses: 5,
+        earnedRunAverage: '2.14',
+        earnedRunAveragePlus: 175,
+        whip: 0.95,
+        strikeouts: 245,
+        inningsPitched: 210,
+        awardSummary: null,
+      },
+    ],
+  },
+};
+
+/** Empty career arc response. */
+const EMPTY_CAREER_ARC_RESPONSE = {
+  data: {
+    player: null,
+    playerSeasonBatting: [],
+    playerSeasonPitching: [],
+  },
+};
+
 /** Empty stats response — no seasons recorded. */
 const EMPTY_STATS_RESPONSE = {
   data: {
-    player: { __typename: 'Player', eligiblePositions: [] },
+    player: {
+      __typename: 'Player',
+      eligiblePositions: [],
+      firstName: 'Unknown',
+      lastName: 'Player',
+    },
     playerSeasonBatting: [],
     playerSeasonPitching: [],
     playerSeasonFielding: [],
@@ -154,6 +265,8 @@ type StatsBody =
 interface SetupOptions {
   /** Response body for GetAllPlayerSeasonStats queries (default: SEASON_STATS_RESPONSE). */
   seasonStatsBody?: StatsBody;
+  /** Response body for GetPlayerCareerArc queries (auto-derived from seasonStatsBody if omitted). */
+  careerArcBody?: object;
   /**
    * Optional delay in ms before fulfilling the season stats response.
    * Useful for testing loading states.
@@ -161,16 +274,41 @@ interface SetupOptions {
   seasonStatsDelay?: number;
 }
 
+/** Derive a career arc body based on the season stats body used. */
+function deriveCareerArcBody(seasonStatsBody: StatsBody): object {
+  if (seasonStatsBody === PITCHER_SEASON_STATS_RESPONSE) {
+    return PITCHER_CAREER_ARC_RESPONSE;
+  }
+  if (seasonStatsBody === EMPTY_STATS_RESPONSE) {
+    return EMPTY_CAREER_ARC_RESPONSE;
+  }
+  if ('errors' in seasonStatsBody) {
+    return EMPTY_CAREER_ARC_RESPONSE;
+  }
+  return BATTER_CAREER_ARC_RESPONSE;
+}
+
 async function setupPlayerDetailMocks(
   page: import('@playwright/test').Page,
   opts: SetupOptions = {},
 ) {
   const { seasonStatsBody = SEASON_STATS_RESPONSE, seasonStatsDelay } = opts;
+  const careerArcBody =
+    opts.careerArcBody ?? deriveCareerArcBody(seasonStatsBody);
 
   await page.route(isGraphQLEndpoint, async (route) => {
     const postData = route.request().postData()?.toLowerCase() ?? '';
 
-    if (postData.includes('getallplayerseasonsta')) {
+    if (
+      postData.includes('getplayercareerarc') ||
+      postData.includes('careerarcquery')
+    ) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(careerArcBody),
+      });
+    } else if (postData.includes('getallplayerseasonsta')) {
       if (seasonStatsDelay) {
         await new Promise<void>((resolve) =>
           setTimeout(resolve, seasonStatsDelay),
@@ -358,7 +496,12 @@ test.describe('Player Detail Modal @regression', () => {
 
     await expect(page.getByTestId('player-detail-loading')).not.toBeVisible();
 
-    // The batting tab should be active by default since the player has batting data
+    // Switch to the Batting tab (Career Arc is the default when arc data is available)
+    const battingTab = dialog.getByText('Batting', { exact: true }).first();
+    await expect(battingTab).toBeVisible();
+    await battingTab.click({ force: true });
+    await page.waitForTimeout(300);
+
     // Verify column headers in the batting table
     await expect(dialog.getByText('YEAR')).toBeVisible();
     await expect(dialog.getByText('G', { exact: true }).first()).toBeVisible();
@@ -390,7 +533,7 @@ test.describe('Player Detail Modal @regression', () => {
     await expect(page.getByTestId('player-detail-loading')).not.toBeVisible();
 
     // Click the Fielding tab
-    const fieldingTab = dialog.getByTestId('modal-tab-fielding');
+    const fieldingTab = dialog.getByText('Fielding', { exact: true }).first();
     await expect(fieldingTab).toBeVisible();
     await fieldingTab.click({ force: true });
     await page.waitForTimeout(300);
@@ -455,11 +598,11 @@ test.describe('Player Detail Modal – Pitcher @regression', () => {
     await expect(dialog.getByTestId('career-pitching-card')).toBeVisible();
 
     // Pitching hero chips
-    await expect(dialog.getByText('W-L')).toBeVisible();
+    await expect(dialog.getByText('W-L').first()).toBeVisible();
     await expect(dialog.getByText('SO').first()).toBeVisible();
 
     // Click the Pitching tab to show season-by-season table
-    const pitchingTab = dialog.getByTestId('modal-tab-pitching');
+    const pitchingTab = dialog.getByText('Pitching', { exact: true }).first();
     await expect(pitchingTab).toBeVisible();
     await pitchingTab.click({ force: true });
     await page.waitForTimeout(300);
@@ -537,11 +680,13 @@ test.describe('Player Detail Modal — Edge Cases @regression', () => {
       name: /back to player statistics/i,
     });
     await expect(backButton).toBeVisible();
-    await backButton.click();
+    // dispatchEvent bypasses overlay interception from the open dialog
+    await backButton.dispatchEvent('click');
 
     await page.waitForURL('**/players/stats');
+    // The stats page heading is a styled div, not a semantic heading element
     await expect(
-      page.getByRole('heading', { name: /player statistics/i }),
+      page.getByText(/MLB Player Statistics/i).first(),
     ).toBeVisible();
   });
 
@@ -556,17 +701,25 @@ test.describe('Player Detail Modal — Edge Cases @regression', () => {
     await expect(page.getByTestId('player-detail-loading')).not.toBeVisible();
 
     // Switch to Fielding
-    await dialog.getByTestId('modal-tab-fielding').click({ force: true });
+    await dialog
+      .getByText('Fielding', { exact: true })
+      .first()
+      .click({ force: true });
     await page.waitForTimeout(300);
-    await expect(dialog.getByText('POS')).toBeVisible();
+    await expect(dialog.getByText('POS').first()).toBeVisible();
 
     // Switch back to Batting
-    await dialog.getByTestId('modal-tab-batting').click({ force: true });
+    await dialog
+      .getByText('Batting', { exact: true })
+      .first()
+      .click({ force: true });
     await page.waitForTimeout(300);
 
     // Batting table headers should reappear
     await expect(dialog.getByText('YEAR')).toBeVisible();
-    await expect(dialog.getByText('AVG', { exact: true })).toBeVisible();
+    await expect(
+      dialog.getByText('AVG', { exact: true }).first(),
+    ).toBeVisible();
   });
 
   test('season data rows contain expected year values', async ({ page }) => {
@@ -581,6 +734,12 @@ test.describe('Player Detail Modal — Edge Cases @regression', () => {
 
     // Season subtitle says "2 seasons"
     await expect(dialog.getByText(/2 season/i)).toBeVisible();
+
+    // Switch to Batting tab to verify season rows
+    const battingTab = dialog.getByText('Batting', { exact: true }).first();
+    await expect(battingTab).toBeVisible();
+    await battingTab.click({ force: true });
+    await page.waitForTimeout(300);
 
     // Both season years are in the batting table
     await expect(dialog.getByText('2024', { exact: true })).toBeVisible();

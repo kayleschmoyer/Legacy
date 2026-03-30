@@ -40,6 +40,8 @@ test.describe('ApolloErrorToast @regression', () => {
     // /about renders without GraphQL — stable base page
     await page.goto('/about');
     await page.waitForLoadState('load');
+    // Wait for React to hydrate and mount the ApolloErrorToast listener
+    await page.waitForTimeout(1000);
   });
 
   test('appears when apollo:error event is dispatched @smoke', async ({
@@ -52,7 +54,11 @@ test.describe('ApolloErrorToast @regression', () => {
   test('displays the error message content @regression', async ({ page }) => {
     const msg = 'Failed to load player data.';
     await dispatchApolloError(page, msg);
-    await expect(page.getByRole('alert')).toContainText(msg);
+    const alert = page.getByRole('alert');
+    // Wait for the alert to appear first, then check content.
+    // The toast auto-dismisses after 5 s so we use a shorter visibility timeout.
+    await expect(alert).toBeVisible({ timeout: 3000 });
+    await expect(alert).toContainText(msg);
   });
 
   test('has accessible live region role=alert @regression', async ({

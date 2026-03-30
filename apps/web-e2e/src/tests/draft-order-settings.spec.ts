@@ -252,11 +252,15 @@ test.describe('Draft Order Control @regression', () => {
   });
 
   test('shows Draft Pick Order heading @smoke', async ({ page }) => {
-    // Target the heading inside the expanded card, not the accordion trigger button
+    // Verify the accordion trigger button has aria-expanded="true" (expanded)
+    // and the content region is visible
+    const trigger = page.getByRole('button', {
+      name: 'Draft Pick Order',
+      exact: true,
+    });
+    await expect(trigger).toHaveAttribute('aria-expanded', 'true');
     await expect(
-      page
-        .locator('[data-state="open"]')
-        .getByText('Draft Pick Order', { exact: true }),
+      page.getByRole('region', { name: 'Draft Pick Order' }),
     ).toBeVisible();
   });
 
@@ -302,11 +306,15 @@ test.describe('Draft Settings Control @regression', () => {
   });
 
   test('shows Draft Settings heading @smoke', async ({ page }) => {
-    // Target the heading inside the expanded card, not the accordion trigger button
+    // Verify the accordion trigger button has aria-expanded="true" (expanded)
+    // and the content region is visible
+    const trigger = page.getByRole('button', {
+      name: 'Draft Settings',
+      exact: true,
+    });
+    await expect(trigger).toHaveAttribute('aria-expanded', 'true');
     await expect(
-      page
-        .locator('[data-state="open"]')
-        .getByText('Draft Settings', { exact: true }),
+      page.getByRole('region', { name: 'Draft Settings' }),
     ).toBeVisible();
   });
 

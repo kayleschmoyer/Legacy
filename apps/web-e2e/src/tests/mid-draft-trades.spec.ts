@@ -440,23 +440,19 @@ test.describe('Mid-draft trade proposals — draft board shows trade button @reg
       'Unexpected Application Error',
     );
 
-    // Draft is in-progress — verify the page loaded the draft context
-    // Look for draft-related content (pick number, team names, or status)
-    const draftContent = page.locator('body');
-    await expect(draftContent).toBeVisible();
+    // Wait for React to render the draft board — GraphQL mock responses
+    // resolve asynchronously so the initial DOM may only contain the shell.
+    await page.waitForLoadState('networkidle');
 
-    // The league name or draft status should be visible
-    const hasLeagueName = await page
-      .getByText('Test Draft League')
-      .isVisible()
-      .catch(() => false);
-    const hasDraftIndicator = await page
-      .getByText(/round|pick|draft/i)
-      .first()
-      .isVisible()
-      .catch(() => false);
+    // Draft is in-progress — verify the page loaded the draft context.
+    // Look for draft-related content (pick number, team names, or status).
+    // Use Playwright auto-waiting to give the UI time to hydrate.
+    const leagueName = page.getByText('Test Draft League');
+    const draftIndicator = page.getByText(/round|pick|draft/i).first();
 
-    expect(hasLeagueName || hasDraftIndicator).toBe(true);
+    await expect(leagueName.or(draftIndicator)).toBeVisible({
+      timeout: 10000,
+    });
   });
 });
 
@@ -464,7 +460,7 @@ test.describe('Mid-draft trade proposals — AI suggestions panel @regression', 
   test('AI suggestions panel displays recommended picks', async ({ page }) => {
     await mockDraftGraphQL(page, { includeAIRecommendations: true });
     await page.goto(DRAFT_URL);
-    await page.waitForLoadState('load');
+    await page.waitForLoadState('networkidle');
 
     // Verify no crash
     await expect(page.locator('body')).not.toContainText(
@@ -505,12 +501,19 @@ test.describe('Mid-draft trade proposals — trade proposal form @regression', (
   test('trade proposal form opens with player selection', async ({ page }) => {
     await mockDraftGraphQL(page, { includeTradeProposals: true });
     await page.goto(DRAFT_URL);
-    await page.waitForLoadState('load');
+    await page.waitForLoadState('networkidle');
 
     // Verify no crash
     await expect(page.locator('body')).not.toContainText(
       'Unexpected Application Error',
     );
+
+    // Wait for draft board to hydrate
+    const leagueName = page.getByText('Test Draft League');
+    const draftIndicator = page.getByText(/round|pick|draft/i).first();
+    await expect(leagueName.or(draftIndicator)).toBeVisible({
+      timeout: 10000,
+    });
 
     // Look for trade-related buttons or links on the draft board
     const tradeButton = page
@@ -570,12 +573,19 @@ test.describe('Mid-draft trade proposals — confirmation shows involved players
   }) => {
     await mockDraftGraphQL(page, { includeTradeProposals: true });
     await page.goto(DRAFT_URL);
-    await page.waitForLoadState('load');
+    await page.waitForLoadState('networkidle');
 
     // Verify no crash
     await expect(page.locator('body')).not.toContainText(
       'Unexpected Application Error',
     );
+
+    // Wait for the draft board to hydrate before probing tabs/links
+    const leagueName = page.getByText('Test Draft League');
+    const draftIndicator = page.getByText(/round|pick|draft/i).first();
+    await expect(leagueName.or(draftIndicator)).toBeVisible({
+      timeout: 10000,
+    });
 
     // Navigate to trades tab if there is a link/tab for it
     const tradesTab = page
@@ -589,10 +599,10 @@ test.describe('Mid-draft trade proposals — confirmation shows involved players
 
     if (hasTradesTab) {
       await tradesTab.click();
-      await page.waitForLoadState('load');
+      await page.waitForLoadState('networkidle');
     } else if (hasTradesLink) {
       await tradesLink.click();
-      await page.waitForLoadState('load');
+      await page.waitForLoadState('networkidle');
     }
 
     // Look for player names from our mock trade proposal
@@ -623,12 +633,9 @@ test.describe('Mid-draft trade proposals — confirmation shows involved players
       // The draft board may show trade proposals in a different section or
       // the mid-draft trade UI is not yet fully integrated. Verify the draft
       // board loaded correctly by checking for draft-related content.
-      const hasDraftContent = await page
-        .getByText(/round|pick|draft/i)
-        .first()
-        .isVisible()
-        .catch(() => false);
-      expect(hasDraftContent).toBe(true);
+      await expect(page.getByText(/round|pick|draft/i).first()).toBeVisible({
+        timeout: 5000,
+      });
     }
   });
 });

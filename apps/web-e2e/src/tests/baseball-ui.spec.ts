@@ -229,10 +229,21 @@ test.describe('Join League By Code Form @regression', () => {
     const teamInput = page.getByPlaceholder(/team name/i).first();
     await teamInput.fill('My Team');
 
-    const joinButton = page.getByRole('button', { name: /join/i });
-    await joinButton.click();
+    // The Join button is disabled for invalid codes, so pressing Enter
+    // on the form input triggers form submission via onSubmit (LS-1297).
+    // Use requestSubmit() which triggers native form validation + the React
+    // onSubmit handler. Tamagui Input may not propagate Enter into native
+    // form submission on all browsers.
+    await page.evaluate(() => {
+      const form = document.querySelector('form');
+      if (form) form.requestSubmit();
+    });
 
-    await expect(page.getByText(/8 characters|invite code must/i)).toBeVisible({
+    await expect(
+      page.getByText(
+        /8 characters|invite code must|invalid.*code|code.*invalid/i,
+      ),
+    ).toBeVisible({
       timeout: 10000,
     });
   });

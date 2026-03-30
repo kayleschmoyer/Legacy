@@ -223,13 +223,18 @@ test.describe('Matchup Detail – scoreboard @regression', () => {
 test.describe('Matchup Detail – loading state @regression', () => {
   test('shows loading spinner while data is pending', async ({ page }) => {
     // Intercept the matchup query with a long delay so the loading state
-    // is reliably visible. Register this *before* the catch-all mock so
-    // Playwright evaluates it first.
+    // is reliably visible. Register the catch-all first, then the delay
+    // route — Playwright evaluates routes in LIFO order (last registered
+    // wins), so the delay route takes priority for the matchup query.
     let resolveMatchup: (() => void) | undefined;
     const matchupGate = new Promise<void>((r) => {
       resolveMatchup = r;
     });
 
+    // Catch-all for every other GraphQL operation (lower priority)
+    await mockMatchupGraphQL(page);
+
+    // Delay route for the matchup query (higher priority — registered last)
     await page.route(
       (url) => isGraphQLEndpoint(url),
       async (route) => {
@@ -250,9 +255,6 @@ test.describe('Matchup Detail – loading state @regression', () => {
         }
       },
     );
-
-    // Catch-all for every other GraphQL operation
-    await mockMatchupGraphQL(page);
 
     await page.goto(MATCHUP_URL, { waitUntil: 'commit' });
 

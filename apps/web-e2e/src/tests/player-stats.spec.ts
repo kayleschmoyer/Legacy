@@ -1,7 +1,154 @@
 ﻿import { expect, test } from '../fixtures/auth-enhanced';
 
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+function isGraphQLEndpoint(url: URL): boolean {
+  const s = url.toString();
+  return (
+    s.includes('/graphql') &&
+    !s.includes('/@fs/') &&
+    !s.includes('.ts') &&
+    !s.includes('.js')
+  );
+}
+
+// ── Mock Data ───────────────────────────────────────────────────────────────
+
+const MOCK_CAREER_BATTING_RESPONSE = {
+  data: {
+    careerBattingStats: {
+      __typename: 'CareerBattingConnection',
+      totalCount: 2,
+      edges: [
+        {
+          __typename: 'CareerBattingEdge',
+          node: {
+            __typename: 'CareerBatting',
+            playerId: 1,
+            primaryPosition: 'CF',
+            positionsPlayed: null,
+            games: 1131,
+            plateAppearances: 5101,
+            atBats: 4289,
+            runs: 894,
+            hits: 1559,
+            doubles: 315,
+            triples: 48,
+            homeRuns: 368,
+            rbi: 817,
+            stolenBases: 211,
+            caughtStealing: 57,
+            baseOnBalls: 774,
+            strikeouts: 1034,
+            totalBases: 2988,
+            groundedIntoDoublePlays: 76,
+            hitByPitch: 35,
+            sacrificeHits: 3,
+            intentionalBaseOnBalls: 231,
+            battingAverage: 0.304,
+            onBasePercentage: 0.41,
+            sluggingPercentage: 0.582,
+            offensiveWAR: 72.9,
+            player: {
+              __typename: 'Player',
+              id: 1,
+              firstName: 'Mike',
+              lastName: 'Trout',
+              brefId: 'troutmi01',
+            },
+          },
+        },
+        {
+          __typename: 'CareerBattingEdge',
+          node: {
+            __typename: 'CareerBatting',
+            playerId: 2,
+            primaryPosition: 'DH',
+            positionsPlayed: null,
+            games: 1200,
+            plateAppearances: 4800,
+            atBats: 4100,
+            runs: 900,
+            hits: 1300,
+            doubles: 250,
+            triples: 20,
+            homeRuns: 250,
+            rbi: 700,
+            stolenBases: 100,
+            caughtStealing: 30,
+            baseOnBalls: 600,
+            strikeouts: 1100,
+            totalBases: 2500,
+            groundedIntoDoublePlays: 50,
+            hitByPitch: 20,
+            sacrificeHits: 5,
+            intentionalBaseOnBalls: 50,
+            battingAverage: 0.286,
+            onBasePercentage: 0.37,
+            sluggingPercentage: 0.55,
+            offensiveWAR: 55.0,
+            player: {
+              __typename: 'Player',
+              id: 2,
+              firstName: 'Shohei',
+              lastName: 'Ohtani',
+              brefId: 'ohtansh01',
+            },
+          },
+        },
+      ],
+      pageInfo: {
+        __typename: 'PageInfo',
+        hasNextPage: false,
+        hasPreviousPage: false,
+        startCursor: null,
+        endCursor: null,
+      },
+    },
+    players: [
+      {
+        __typename: 'Player',
+        id: 1,
+        firstName: 'Mike',
+        lastName: 'Trout',
+        brefId: 'troutmi01',
+        statsLastFetchedAt: null,
+      },
+      {
+        __typename: 'Player',
+        id: 2,
+        firstName: 'Shohei',
+        lastName: 'Ohtani',
+        brefId: 'ohtansh01',
+        statsLastFetchedAt: null,
+      },
+    ],
+  },
+};
+
+// ── Tests ───────────────────────────────────────────────────────────────────
+
 test.describe('Player Statistics Page @regression', () => {
   test.beforeEach(async ({ page }) => {
+    // Mock GraphQL endpoints with player data so the stats page has data to render
+    await page.route(isGraphQLEndpoint, async (route) => {
+      const postData = route.request().postData()?.toLowerCase() ?? '';
+
+      if (
+        postData.includes('getcareerbattingsta') ||
+        postData.includes('getallplayers') ||
+        postData.includes('getplayerswithstat')
+      ) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(MOCK_CAREER_BATTING_RESPONSE),
+        });
+      } else {
+        await route.fallback();
+      }
+    });
+
     // Navigate to the player stats page (BrowserRouter — no hash)
     await page.goto('/players/stats');
     await page.waitForLoadState('networkidle');
@@ -46,9 +193,9 @@ test.describe('Player Statistics Page @regression', () => {
     // Verify the page is still functional after search
     await expect(searchInput).toHaveValue('Trout');
 
-    // Verify search results contain a row with "Trout"
-    const troutRow = page.getByRole('row', { name: /Trout/i });
-    await expect(troutRow.first()).toBeVisible();
+    // Verify search results contain a player with "Trout"
+    // The data grid uses XStack (div), not <tr>, so use text locator
+    await expect(page.getByText(/Trout/i).first()).toBeVisible();
 
     // Clear search
     await searchInput.clear();
@@ -136,13 +283,12 @@ test.describe('Player Statistics Page @regression', () => {
   });
 
   test('should handle player selection and navigation', async ({ page }) => {
-    // In mocked/static mode without real player data, verify page loads
-    // and the stats heading is visible
+    // Verify the stats page loaded with player data
     await expect(
       page.getByText(/MLB Player Statistics/i).first(),
     ).toBeVisible();
 
-    // Verify the "0 Players" state renders without errors
+    // Verify the page renders without errors
     await expect(page.locator('body')).not.toContainText(
       'Unexpected Application Error',
     );

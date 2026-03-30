@@ -540,8 +540,8 @@ test.describe('Season Draft Game – completed @regression', () => {
 
     await expect(page.getByText('Scoreboard')).toBeVisible();
     // TestUser: 108, Opponent: 95
-    await expect(page.getByText(/108/)).toBeVisible();
-    await expect(page.getByText(/95/)).toBeVisible();
+    await expect(page.getByText(/108/).first()).toBeVisible();
+    await expect(page.getByText(/95/).first()).toBeVisible();
   });
 
   test('shows filled roster slots with player names and stats', async ({
@@ -553,7 +553,7 @@ test.describe('Season Draft Game – completed @regression', () => {
     await expect(page.getByText('Rosters')).toBeVisible();
     // Aaron Judge (2022) 62 HR
     await expect(page.getByText('Aaron Judge').first()).toBeVisible();
-    await expect(page.getByText(/62/)).toBeVisible();
+    await expect(page.getByText(/62/).first()).toBeVisible();
     // Pete Alonso (2019) 46 HR
     await expect(page.getByText('Pete Alonso').first()).toBeVisible();
     await expect(page.getByText(/46/).first()).toBeVisible();

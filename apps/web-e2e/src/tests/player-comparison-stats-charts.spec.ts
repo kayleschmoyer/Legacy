@@ -557,9 +557,13 @@ async function addPlayer(
   fullName: string,
 ) {
   const input = page.getByLabel('Search players to compare');
-  await input.fill(searchTerm);
   await expect(async () => {
-    await page.getByText(fullName).click({ timeout: 2000 });
+    // Clear, focus, and fill — keeps the dropdown open after typing
+    await input.clear();
+    await input.focus();
+    await input.fill(searchTerm);
+    await page.waitForTimeout(300);
+    await page.getByText(fullName).click({ timeout: 5000 });
   }).toPass({ timeout: 15000 });
 }
 
@@ -785,6 +789,9 @@ adminTest.describe(
 // ---------------------------------------------------------------------------
 
 adminTest.describe('Player Comparison – max players (4/4) @regression', () => {
+  // Adding 4 players sequentially requires more time than the default 20s
+  adminTest.setTimeout(60000);
+
   adminTest.beforeEach(async ({ page }) => {
     await mockGraphQL(page);
     await page.goto('/players/compare');
