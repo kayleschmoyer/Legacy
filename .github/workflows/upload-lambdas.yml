@@ -43,6 +43,7 @@ permissions:
   actions: read
   id-token: write
   contents: read
+  pull-requests: read # Required for listPullRequestsAssociatedWithCommit in verify-ci
 
 # ---------------------------------------------------------------------------
 # Job 0 — Verify CI pipeline passed for this commit
@@ -52,16 +53,34 @@ jobs:
     name: Verify CI Status
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     if: >-
-      !(github.event_name == 'workflow_dispatch' &&
-        github.event.inputs.skip-ci-check == 'true')
+      github.event_name != 'workflow_dispatch' ||
+      github.event.inputs.skip-ci-check != 'true'
     timeout-minutes: 5
     steps:
       - name: Check CI Pipeline Status
         uses: actions/github-script@v8
         with:
           script: |
-            const sha = context.sha;
+            let sha = context.sha;
             core.info(`Checking CI status for commit ${sha}`);
+
+            // For push events (squash merges), CI ran on the PR head SHA, not
+            // the post-merge commit. Resolve the associated PR to find the
+            // correct SHA to check.
+            if (context.eventName === 'push') {
+              const { data: associatedPRs } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                commit_sha: sha,
+              });
+              const mergedPR = associatedPRs.find(pr => pr.merged_at);
+              if (mergedPR) {
+                sha = mergedPR.head.sha;
+                core.info(`Push event: resolved merged PR #${mergedPR.number}, using PR head SHA ${sha}`);
+              } else {
+                core.info(`Push event: no merged PR found, using commit SHA ${sha}`);
+              }
+            }
 
             const { data: workflowRuns } = await github.rest.actions.listWorkflowRunsForRepo({
               owner: context.repo.owner,
