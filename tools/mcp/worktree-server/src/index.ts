@@ -2522,22 +2522,20 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               };
             };
 
-            // rerere + staging may have already completed the rebase
-            if (!isRebaseInProgress()) {
-              return rebaseCompleteResponse(
-                'Rebase already completed (rerere resolved all conflicts).',
-              );
-            }
-
-            // Auto-continue loop using shared helper
+            // Auto-continue loop using shared helper.
+            // Always enter the loop — staging files alone doesn't complete
+            // a rebase; `git rebase --continue` must be called.
             const maxIterations = 50; // Safety limit
             let iterations = 0;
 
             while (iterations < maxIterations) {
               iterations++;
 
-              // Check if rebase completed between iterations
-              if (!isRebaseInProgress()) {
+              // Check if rebase completed between iterations (skip on first
+              // iteration — we must call rebaseContinueStep at least once so
+              // that `git rebase --continue` actually runs; a filesystem check
+              // alone can false-negative).
+              if (iterations > 1 && !isRebaseInProgress()) {
                 return rebaseCompleteResponse(
                   `Rebase completed after ${iterations - 1} auto-continue step(s).`,
                 );
@@ -2587,31 +2585,48 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                   .filter(Boolean)
                   .join('\n');
 
-                // Check if this step has new unresolvable conflicts
-                try {
-                  const remainingConflicts = run(
-                    'git diff --name-only --diff-filter=U',
-                    cwd,
-                  )
-                    .trim()
-                    .split('\n')
-                    .filter(Boolean);
-                  if (remainingConflicts.length > 0) {
+                // Only attempt auto-continue when the error indicates a
+                // merge conflict.  Non-conflict failures (e.g. permission
+                // errors, corrupt index) should surface immediately.
+                const isConflictError =
+                  /conflict|merge|CONFLICT|could not apply/i.test(
+                    continueOutput,
+                  );
+
+                if (isConflictError) {
+                  // rerere may have resolved this step's conflicts in the
+                  // working tree without staging.  Stage first, then check.
+                  try {
+                    runGit(['add', '-u'], cwd);
+                    const remainingConflicts = run(
+                      'git diff --name-only --diff-filter=U',
+                      cwd,
+                    )
+                      .trim()
+                      .split('\n')
+                      .filter(Boolean);
+                    if (remainingConflicts.length > 0) {
+                      log.push(
+                        `Step ${iterations}: new conflicts encountered:`,
+                        remainingConflicts.join('\n'),
+                        '',
+                        'Rebase paused. Resolve remaining conflicts, then:',
+                        '  worktree_rebase_continue',
+                        'Or: worktree_rebase(abort: true) to abort.',
+                      );
+                      return {
+                        content: [{ type: 'text', text: log.join('\n') }],
+                        isError: true,
+                      };
+                    }
+                    // rerere resolved this step too — continue the loop
                     log.push(
-                      `Step ${iterations}: new conflicts encountered:`,
-                      remainingConflicts.join('\n'),
-                      '',
-                      'Rebase paused. Resolve remaining conflicts, then:',
-                      '  worktree_rebase_continue',
-                      'Or: worktree_rebase(abort: true) to abort.',
+                      `Step ${iterations}: auto-continued (rerere resolved after conflict)`,
                     );
-                    return {
-                      content: [{ type: 'text', text: log.join('\n') }],
-                      isError: true,
-                    };
+                    continue;
+                  } catch {
+                    // Fall through to generic error
                   }
-                } catch {
-                  // Fall through
                 }
 
                 log.push(
