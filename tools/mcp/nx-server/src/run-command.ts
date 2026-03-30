@@ -43,6 +43,7 @@ export function runCommand(
   args: string[],
   cwd: string,
   timeoutMs = COMMAND_TIMEOUT,
+  env?: Record<string, string>,
 ): Promise<string> {
   const isWindows = process.platform === 'win32';
   const needsShell = isWindows && NPM_WRAPPER_COMMANDS.has(command);
@@ -55,6 +56,18 @@ export function runCommand(
         timeout: timeoutMs,
         maxBuffer: 10 * 1024 * 1024,
         shell: needsShell,
+        ...(env
+          ? {
+              env: {
+                ...process.env,
+                ...env,
+                // Preserve the host PATH so spawned processes can find binaries
+                // even if the caller-supplied env includes a PATH/Path key.
+                ...(process.env.PATH ? { PATH: process.env.PATH } : {}),
+                ...(process.env.Path ? { Path: process.env.Path } : {}),
+              },
+            }
+          : {}),
       },
       (err, stdout, stderr) => {
         if (err) {
@@ -76,15 +89,21 @@ export function runPnpm(
   args: string[],
   cwd: string,
   timeoutMs = COMMAND_TIMEOUT,
+  env?: Record<string, string>,
 ): Promise<string> {
-  return runCommand('pnpm', args, cwd, timeoutMs);
+  return runCommand('pnpm', args, cwd, timeoutMs, env);
 }
 
 /** Run an Nx command via pnpm exec. */
 export function runNx(
   args: string[],
   cwd: string,
-  timeoutMs = COMMAND_TIMEOUT,
+  opts?: { timeoutMs?: number; env?: Record<string, string> },
 ): Promise<string> {
-  return runPnpm(['exec', 'nx', ...args], cwd, timeoutMs);
+  return runPnpm(
+    ['exec', 'nx', ...args],
+    cwd,
+    opts?.timeoutMs ?? COMMAND_TIMEOUT,
+    opts?.env,
+  );
 }

@@ -117,6 +117,12 @@ server.tool(
       .describe(
         'Extra flags after "--" (e.g. ["-u"] for snapshots). Array preferred; string split on whitespace.',
       ),
+    env: z
+      .record(z.string(), z.string())
+      .optional()
+      .describe(
+        'Environment variables to set for the command (e.g. { "PLAYWRIGHT_GREP": "@regression" }).',
+      ),
     worktreePath: z
       .string()
       .optional()

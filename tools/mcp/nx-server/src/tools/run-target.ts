@@ -33,6 +33,7 @@ interface RunTargetParams {
   configuration?: string;
   noCache?: boolean;
   args?: string | string[];
+  env?: Record<string, string>;
   worktreePath?: string;
 }
 
@@ -102,7 +103,7 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
       nxArgs.push('--', ...translated);
     }
 
-    const output = await runNx(nxArgs, cwd);
+    const output = await runNx(nxArgs, cwd, { env: params.env });
 
     return {
       content: [
