@@ -178,6 +178,9 @@ describe('DeviceFlow', () => {
         avatarUrl: null,
         privacyPolicyAcceptedAt: null,
         subscriptionTier: 'free' as const,
+        discordId: null,
+        discordUsername: null,
+        discordAvatar: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -232,6 +235,9 @@ describe('DeviceFlow', () => {
         avatarUrl: null,
         privacyPolicyAcceptedAt: null,
         subscriptionTier: 'free' as const,
+        discordId: null,
+        discordUsername: null,
+        discordAvatar: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -275,6 +281,9 @@ describe('DeviceFlow', () => {
         avatarUrl: null,
         privacyPolicyAcceptedAt: null,
         subscriptionTier: 'free' as const,
+        discordId: null,
+        discordUsername: null,
+        discordAvatar: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       });

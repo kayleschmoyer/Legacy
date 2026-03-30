@@ -635,17 +635,76 @@ function getDeviceSuccessHtml(email: string): string {
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Authentication Successful</title>
+    <title>Legacy Sports - Authentication Successful</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- System fonts only — no third-party font CDN on auth surfaces -->
     <style>
-        body { font-family: Arial, sans-serif; max-width: 400px; margin: 100px auto; padding: 20px; text-align: center; background-color: #f5f5f5; }
-        .container { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .success { color: #16a34a; font-size: 24px; margin: 20px 0; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background-color: #0A0F1A;
+            background-image:
+                radial-gradient(ellipse at 50% 0%, rgba(27, 58, 92, 0.4) 0%, transparent 60%),
+                radial-gradient(ellipse at 80% 100%, rgba(196, 30, 58, 0.08) 0%, transparent 50%);
+            color: #F8FAFC;
+        }
+        .container {
+            background: #16223A;
+            padding: 40px 36px;
+            border-radius: 12px;
+            border: 1px solid #1F2D48;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            max-width: 420px;
+            width: 100%;
+            text-align: center;
+        }
+        .logo {
+            font-family: Georgia, 'Times New Roman', serif;
+            font-size: 22px;
+            font-weight: 700;
+            color: #C5A55A;
+            letter-spacing: 0.5px;
+            margin-bottom: 28px;
+        }
+        .logo span { color: #F8FAFC; }
+        .success-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: rgba(34, 197, 94, 0.15);
+            border: 2px solid #22C55E;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 16px;
+            font-size: 28px;
+        }
+        .success-title {
+            font-family: Georgia, 'Times New Roman', serif;
+            font-size: 20px;
+            font-weight: 700;
+            color: #22C55E;
+            margin-bottom: 16px;
+        }
+        p {
+            color: #9CAAC5;
+            font-size: 14px;
+            line-height: 1.6;
+            margin-bottom: 8px;
+        }
+        p strong { color: #F8FAFC; font-weight: 600; }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="success">&#x2705; Authentication Successful!</div>
+        <div class="logo">Legacy <span>Sports</span></div>
+        <div class="success-icon">&#x2714;</div>
+        <div class="success-title">Authentication Successful</div>
         <p>You can now close this browser window and return to your CLI.</p>
         <p>Authenticated as: <strong>${email}</strong></p>
     </div>
@@ -671,84 +730,168 @@ function getVerificationHtml(error?: string): string {
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Legacy Sports CLI - Device Verification</title>
+    <title>Legacy Sports - Device Verification</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- System fonts only — no third-party font CDN on auth surfaces -->
     <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            font-family: Arial, sans-serif;
-            max-width: 400px;
-            margin: 100px auto;
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             padding: 20px;
-            text-align: center;
-            background-color: #f5f5f5;
+            background-color: #0A0F1A;
+            background-image:
+                radial-gradient(ellipse at 50% 0%, rgba(27, 58, 92, 0.4) 0%, transparent 60%),
+                radial-gradient(ellipse at 80% 100%, rgba(196, 30, 58, 0.08) 0%, transparent 50%);
+            color: #F8FAFC;
         }
         .container {
-            background: white;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            background: #16223A;
+            padding: 40px 36px;
+            border-radius: 12px;
+            border: 1px solid #1F2D48;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            max-width: 420px;
+            width: 100%;
+            text-align: center;
         }
         .logo {
-            color: #2563eb;
-            font-size: 24px;
-            font-weight: bold;
+            font-family: Georgia, 'Times New Roman', serif;
+            font-size: 22px;
+            font-weight: 700;
+            color: #C5A55A;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+        .logo span { color: #F8FAFC; }
+        h2 {
+            font-family: Georgia, 'Times New Roman', serif;
+            font-size: 18px;
+            font-weight: 700;
+            color: #F8FAFC;
             margin-bottom: 20px;
         }
-        input[type="text"] {
-            padding: 12px;
-            font-size: 18px;
-            border: 2px solid #ddd;
-            border-radius: 4px;
-            margin: 10px;
-            text-align: center;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            width: 150px;
-        }
-        button {
-            padding: 12px 24px;
-            font-size: 16px;
-            background-color: #2563eb;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            margin-top: 10px;
-        }
-        button:hover {
-            background-color: #1d4ed8;
-        }
         .error {
-            color: #dc2626;
-            margin: 10px 0;
-        }
-        .success {
-            color: #16a34a;
-            margin: 10px 0;
+            background: rgba(196, 30, 58, 0.12);
+            border: 1px solid rgba(196, 30, 58, 0.3);
+            color: #E63950;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-bottom: 16px;
         }
         .instructions {
-            color: #666;
-            margin: 20px 0;
-            line-height: 1.5;
+            color: #9CAAC5;
+            font-size: 14px;
+            line-height: 1.6;
+            margin: 16px 0;
+        }
+        .instructions strong { color: #F8FAFC; }
+        input[type="text"] {
+            padding: 14px;
+            font-size: 20px;
+            font-family: 'Inter', monospace;
+            font-weight: 600;
+            background: #0D1526;
+            border: 2px solid #1F2D48;
+            border-radius: 8px;
+            color: #F8FAFC;
+            text-align: center;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            width: 180px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        input[type="text"]:focus {
+            border-color: #C5A55A;
+        }
+        input[type="text"]::placeholder {
+            color: #4A5568;
+            letter-spacing: 4px;
+        }
+        .btn-primary {
+            display: inline-block;
+            padding: 12px 32px;
+            font-family: 'Inter', sans-serif;
+            font-size: 15px;
+            font-weight: 600;
+            background: linear-gradient(135deg, #1B3A5C, #2C4A7C);
+            color: #F8FAFC;
+            border: 1px solid rgba(197, 165, 90, 0.3);
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 14px;
+            transition: all 0.2s;
+        }
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #2C4A7C, #3B5A9C);
+            border-color: rgba(197, 165, 90, 0.5);
+            box-shadow: 0 4px 12px rgba(27, 58, 92, 0.4);
+        }
+        .btn-secondary {
+            display: inline-block;
+            padding: 10px 24px;
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            background: rgba(197, 165, 90, 0.12);
+            color: #C5A55A;
+            border: 1px solid rgba(197, 165, 90, 0.25);
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: all 0.2s;
+        }
+        .btn-secondary:hover {
+            background: rgba(197, 165, 90, 0.2);
+            border-color: rgba(197, 165, 90, 0.4);
+        }
+        .divider {
+            border: none;
+            border-top: 1px solid #1F2D48;
+            margin: 24px 0;
+        }
+        .local-input {
+            padding: 10px 14px;
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            background: #0D1526;
+            border: 2px solid #1F2D48;
+            border-radius: 8px;
+            color: #F8FAFC;
+            width: 220px;
+            margin: 5px 0;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .local-input:focus {
+            border-color: #C5A55A;
+        }
+        .local-input::placeholder {
+            color: #4A5568;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="logo">🏈 Legacy Sports CLI</div>
-        
+        <div class="logo">Legacy <span>Sports</span></div>
+
         <h2>Device Authorization</h2>
-        
+
         ${error ? `<div class="error">${error}</div>` : ''}
-        
+
         <div class="instructions">
             Enter the 6-character code displayed in your CLI:
         </div>
-        
+
         <form method="get">
-            <input 
-                type="text" 
-                name="user_code" 
+            <input
+                type="text"
+                name="user_code"
                 placeholder="ABC123"
                 maxlength="6"
                 autocomplete="off"
@@ -756,15 +899,15 @@ function getVerificationHtml(error?: string): string {
                 required
             />
             <br>
-            <button type="submit">Continue</button>
+            <button type="submit" class="btn-primary">Continue</button>
         </form>
-        
+
         <div class="instructions">
             After clicking Continue, you'll be redirected to complete<br>
             the OAuth authentication with your Google account.
         </div>
 
-        <hr style="margin: 24px 0; border: none; border-top: 1px solid #ddd;">
+        <hr class="divider">
 
         <div class="instructions"><strong>Or log in with a local account:</strong></div>
 
@@ -774,20 +917,20 @@ function getVerificationHtml(error?: string): string {
                 type="email"
                 name="email"
                 placeholder="Email"
-                style="padding: 10px; font-size: 14px; border: 2px solid #ddd; border-radius: 4px; width: 200px; margin: 4px;"
+                class="local-input"
                 required
             /><br>
             <input
                 type="password"
                 name="password"
                 placeholder="Password"
-                style="padding: 10px; font-size: 14px; border: 2px solid #ddd; border-radius: 4px; width: 200px; margin: 4px;"
+                class="local-input"
                 required
             /><br>
-            <button type="submit" style="background-color: #059669;">Log In Locally</button>
+            <button type="submit" class="btn-secondary">Log In Locally</button>
         </form>
     </div>
-    
+
     <script>
         // Auto-format user code input
         const input = document.querySelector('input[name="user_code"]');
