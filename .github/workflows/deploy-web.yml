@@ -25,6 +25,7 @@ permissions:
   pages: write
   id-token: write
   actions: read
+  pull-requests: read # Required for listPullRequestsAssociatedWithCommit in verify-ci
 
 env:
   NX_DAEMON: false
@@ -47,8 +48,26 @@ jobs:
         uses: actions/github-script@v8
         with:
           script: |
-            const sha = context.sha;
+            let sha = context.sha;
             core.info(`Checking CI status for commit ${sha}`);
+
+            // For push events (squash merges), CI ran on the PR head SHA, not
+            // the post-merge commit. Resolve the associated PR to find the
+            // correct SHA to check.
+            if (context.eventName === 'push') {
+              const { data: associatedPRs } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                commit_sha: sha,
+              });
+              const mergedPR = associatedPRs.find(pr => pr.merged_at);
+              if (mergedPR) {
+                sha = mergedPR.head.sha;
+                core.info(`Push event: resolved merged PR #${mergedPR.number}, using PR head SHA ${sha}`);
+              } else {
+                core.info(`Push event: no merged PR found, using commit SHA ${sha}`);
+              }
+            }
 
             // Query completed workflow runs for this commit
             const { data: workflowRuns } = await github.rest.actions.listWorkflowRunsForRepo({
