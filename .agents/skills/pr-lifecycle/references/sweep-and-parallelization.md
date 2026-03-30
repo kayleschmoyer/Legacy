@@ -2,7 +2,7 @@
 
 ## Full Sweep: Outer Loop
 
-For a full sweep, run passes in a loop until every PR is **settled** (clean, labeled `requires-human-review`, or with CI pending after the final pass):
+For a full sweep, run passes in a loop until every PR is **settled** (clean, labeled `requires-human-review` for blockers outside agent reach, or with CI pending after the final pass):
 
 ```
 settled = {}  # PR numbers that have reached a terminal state
@@ -14,11 +14,11 @@ REPEAT (max 10 passes):
   IF unsettled is empty → EXIT (all settled)
 
   Pass 1: Rebase unsettled conflicting PRs
-    - On irrecoverable failure → label requires-human-review → add to settled
+    - On irrecoverable failure → comment blocker on PR, label requires-human-review only if outside agent reach → add to settled
   Pass 2: Fix unsettled PRs with unresolved reviews
-    - On unfixable review → label requires-human-review → add to settled
+    - On unfixable review → comment blocker on PR, label requires-human-review only if outside agent reach → add to settled
   Pass 3: Fix unsettled PRs with failing CI
-    - On unfixable CI failure → label requires-human-review → add to settled
+    - On unfixable CI failure → comment blocker on PR, label requires-human-review only if outside agent reach → add to settled
   Validate changed PRs: make pc in each worktree
   Push passing PRs
 
@@ -29,8 +29,9 @@ REPEAT (max 10 passes):
   IF all PRs in settled → EXIT
 
 IF unsettled PRs remain after max passes:
-  Label all remaining unsettled PRs requires-human-review
-  Comment: "Agent reached max pass limit without resolving this PR"
+  Comment on each: "Agent reached max pass limit without resolving this PR"
+  Add each to settled (as "Unresolved")
+  Report all remaining PRs in the final summary
 ```
 
 **Why loop?** Fixing one category often creates issues in another:
@@ -66,7 +67,7 @@ Review fixes (Pass 2) and CI code fixes (Pass 3) operate on independent PRs in s
    > Fix review comments on PR #\<number\> in worktree \<path\>.
    > Read unresolved threads, apply fixes, run make pc, commit, push.
    > Resolve all fixed threads in one call via github_resolve_threads(threadIds: [...]).
-   > If unfixable, label requires-human-review and comment with the reason.
+   > If unfixable, comment on the PR with the diagnosed blocker and move on.
    >
    > Tool preferences:
    >
@@ -77,11 +78,11 @@ Review fixes (Pass 2) and CI code fixes (Pass 3) operate on independent PRs in s
    > - Use worktree_commit/worktree_push for commits and pushes
 
 3. Wait for all agents in the batch to complete before spawning the next batch
-4. Collect results from each agent — verify PR state (fixed, labeled, or failed)
+4. Collect results from each agent — verify PR state (fixed, blocker commented, or failed)
 
 **Concurrency limit**: max 3 concurrent sub-agents. Each agent runs `make pc` in its own worktree, and junctioned `node_modules` is read-only during validation. More than 3 saturates disk I/O and risks API rate limits.
 
-**Failure handling**: if a sub-agent fails (crashes, times out), the orchestrator labels the PR `requires-human-review` and continues with remaining PRs. Failed agents do not block the batch.
+**Failure handling**: if a sub-agent fails (crashes, times out), the orchestrator comments the failure on the PR and continues with remaining PRs. Do not label `requires-human-review` for transient agent failures — the issue may succeed on retry. Failed agents do not block the batch.
 
 **When to fall back to sequential**:
 

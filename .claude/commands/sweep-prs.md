@@ -10,6 +10,6 @@ Execute the **Full Sweep: Outer Loop** strategy:
 4. **Pass 2**: Fix unresolved review comments
 5. **Pass 3**: Fix CI failures (load `debug-ci-failure` skill)
 6. Validate changed PRs with `make pc`, push passing ones
-7. Loop until every PR is **settled** (clean, CI-pending, or labeled `requires-human-review`)
+7. Loop until every PR is **settled** (clean, CI-pending, or labeled `requires-human-review` for blockers outside agent reach)
 
-**Guardrails**: Loop until every PR is settled, or you have completed 10 full-sweep passes — whichever comes first. If unsettled PRs remain after the 10th pass, stop the sweep, label those PRs `requires-human-review`, and summarize the remaining blockers. Label `requires-human-review` on irrecoverable failures — don't block the sweep. Rebase sequentially, never in parallel. Use early CI failure detection (poll per-job status) to save time.
+**Guardrails**: Loop until every PR is settled, or you have completed 10 full-sweep passes — whichever comes first. If unsettled PRs remain after the 10th pass, stop the sweep, comment the blocker on each PR, and summarize them in the report — but do NOT auto-label them `requires-human-review` just because the cap was hit. Only label `requires-human-review` when the blocker is genuinely outside any agent's reach: missing credentials, product/design decisions, external system dependencies. **Never label for**: CI failures, review comments, dependency bumps, rebase conflicts, complexity, or multiple failed attempts — these are all agent-fixable. Rebase sequentially, never in parallel. Use early CI failure detection (poll per-job status) to save time.

@@ -1,6 +1,6 @@
 ---
 name: open-prs
-description: 'Orchestrate PR maintenance across all open PRs: scan for conflicts/reviews/CI failures, rebase conflicting branches, fix review comments, debug CI failures, label clean PRs merge-when-ready, and report results. Burns through every open PR until each reaches a settled state (clean or labeled requires-human-review). Supports full overnight sweep (loop until all settled) or individual operations (rebase only, reviews only, label only). Works in both local (worktree) and cloud agent (read-only) modes. Use when asked to clean up PRs, sweep open PRs, fix all PR issues, rebase all PRs, label clean PRs, or get PRs ready to merge.'
+description: 'Orchestrate PR maintenance across all open PRs: scan for conflicts/reviews/CI failures, rebase conflicting branches, fix review comments, debug CI failures, label clean PRs merge-when-ready, and report results. Burns through every open PR until each reaches a settled state (clean or labeled requires-human-review for blockers outside agent reach). Supports full overnight sweep (loop until all settled) or individual operations (rebase only, reviews only, label only). Works in both local (worktree) and cloud agent (read-only) modes. Use when asked to clean up PRs, sweep open PRs, fix all PR issues, rebase all PRs, label clean PRs, or get PRs ready to merge.'
 ---
 
 # Skill: PR Operations
@@ -9,13 +9,13 @@ description: 'Orchestrate PR maintenance across all open PRs: scan for conflicts
 
 Orchestrate PR maintenance across all open PRs. This skill is a **coordinator** — it discovers problems, delegates to specialized sub-skills for the actual fixes, and manages the overall flow.
 
-The core principle is **burn through until settled**: every PR must reach a terminal state before the sweep ends. A PR is **settled** when it is either clean (no conflicts, CI passing, no unresolved threads) or explicitly labeled `requires-human-review` because the agent could not resolve its issues.
+The core principle is **burn through until settled**: every PR must reach a terminal state before the sweep ends. A PR is **settled** when it is either clean (no conflicts, CI passing, no unresolved threads) or labeled `requires-human-review` because the blocker is genuinely outside agent reach (see Critical Rules for valid/invalid reasons).
 
 Supports three modes:
 
 - **Full sweep** (local) — loop through all open PRs fixing conflicts, reviews, and CI until every PR is settled
 - **Targeted operation** — run a single operation (e.g., "rebase all conflicting PRs", "label clean PRs")
-- **Cloud agent sweep** — scan, triage, and take all API-only actions (label, re-run CI, resolve threads, request reviews); label unsettled PRs `requires-human-review` and report
+- **Cloud agent sweep** — scan, triage, and take all API-only actions (label, re-run CI, resolve threads, request reviews); label `requires-human-review` only for blockers outside agent reach and report
 
 > **Scope note** — The batch PR triage tools (`github_pr_scan`, `github_pr_dashboard`, `github_pr_batch_status`, `github_resolve_threads`) are provided by the `legacy-sports-github` MCP server and are available to both local and cloud agents for API-only operations (scan, triage, label, resolve threads, request reviews). In this skill, "local-only" refers specifically to actions that require a git checkout/commit/push (e.g., rebases, code edits, CI-fix branches), which must be handled by a local agent or human developer.
 
@@ -98,8 +98,8 @@ This skill delegates to specialized sub-skills for each operation category. Load
 - **Resolve review threads after fixing** — leaving threads unresolved is incomplete work
 - **Proactively label clean PRs** — when a PR has no unresolved review threads, add `merge-when-ready` immediately via `github_manage_labels(number: <PR#>, add: ["merge-when-ready"])`. Failing CI will automatically remove the label, so there is no risk in labeling early. The `copilot-auto-approve` bot also adds this label, but the agent should not wait for it.
 - **Dashboard CI summary can be stale** — the dashboard reports `ciStatus` as `none`, `pass`, `fail`, or `pending`. Stale checks (e.g., Enhanced Merge Queue on an old SHA) can cause a PR to show `fail` or `pending` even when current-SHA checks all pass. Use `github_pr_batch_status` to inspect actual job-level results: if all CI Pipeline and Security Scanning jobs are SUCCESS/SKIPPED, the PR is clean regardless of dashboard `ciStatus`.
-- **Burn through until settled** — every PR must reach a terminal state. A PR is settled when it is clean OR labeled `requires-human-review`. Do not stop the sweep while unsettled PRs remain (subject to the max-passes safety cap).
-- **`requires-human-review` label — last resort only** — this label means "genuinely beyond agent capability", NOT "complex" or "I've been through several passes". Before applying it, ask: _"Could an agent with a worktree, the codebase, and shell access fix this?"_ If yes — even if it requires reading module source, understanding auth flows, investigating CI logs, or multiple fix attempts — **dispatch an agent instead**. Only label when the blocker is truly outside agent reach: missing credentials, product/design decisions, external system dependencies, or blocked on another team. Complexity, multiple failed attempts on the same approach, or "this is taking a while" are NOT valid reasons — try a different approach first. When the label is genuinely needed, add it via `github_manage_labels(number: <PR#>, add: ["requires-human-review"])` with a PR comment explaining the specific blocker that is outside agent capability.
+- **Burn through until settled** — every PR must reach a terminal state. A PR is settled when it is clean, has CI pending after the final pass, or labeled `requires-human-review` with a comment explaining the blocker. Do not stop the sweep while actionable PRs remain (subject to the max-passes safety cap).
+- **`requires-human-review` — only for blockers outside agent reach** — this label means the PR is blocked on something no agent can fix, no matter how many retries or approaches it tries. Valid reasons: missing credentials/secrets the agent cannot access, product or design decisions that require human judgment, blocked on an external team or system, or requires manual infrastructure access. **Invalid reasons (never label for these):** CI failures (rebase, fix the code, or re-run), review comments (read the code and fix them), dependabot/dependency bumps (rebase and regenerate lockfile), complexity or multiple failed attempts (try a different approach). Before labeling, the agent **must** have attempted at least one fix. When the label is genuinely needed, add it via `github_manage_labels(number: <PR#>, add: ["requires-human-review"])` with a PR comment explaining the specific blocker that is outside agent capability.
 
 ### Local Agent Only
 
@@ -246,7 +246,7 @@ For each PR in `$scan.conflicting`:
 
 > **Multiple PRs touching the same files**: When several PRs add code to the same location (e.g., tool registrations in `index.ts`), they conflict with each other — not just with main. After one merges, the next will conflict with the updated main. Rebase these sequentially, fetching whenever `main` changes (e.g., after each merge and before rebasing the next PR). Consider alphabetizing shared files (imports, registrations) so git can auto-merge concurrent additions.
 
-If a rebase fails irrecoverably: `git rebase --abort`, label the PR `requires-human-review` via `github_manage_labels(number: <PR#>, add: ["requires-human-review"])`, comment with the failure reason, and move on. The PR is now **settled**.
+If a rebase fails irrecoverably: `git rebase --abort`, comment on the PR with the failure reason, and move on. Only label `requires-human-review` if the conflict requires human judgment (e.g., schema design decisions) — routine merge conflicts should be retried in a future sweep. The PR is now **settled**.
 
 > **Full step-by-step rebase instructions** are in `skills/rebase/SKILL.md`. Do not duplicate them here — load the skill.
 
@@ -261,7 +261,7 @@ For each PR in `$scan.reviews` (in parallel batches of 3):
 1. Enter the worktree (Step 2)
 2. **Load `skills/pr-lifecycle/SKILL.md`** — it contains the full workflow: reading comments, applying fixes, validating, committing, resolving threads, and the common-patterns reference table
 3. After pushing, re-check for new threads (Copilot re-reviews on push)
-4. If a review fix sub-agent **cannot complete the task but runs successfully**, analyze why, and optionally do **one** orchestrator-driven retry with a different approach (e.g., read the module source, check related files for patterns, try an alternative implementation). If it still cannot resolve the comments, or the blocker is genuinely outside agent capability (needs credentials, product decisions, or external dependencies), label the PR `requires-human-review` and move on. If the sub-agent **execution itself fails** (crash, timeout, or tool error), do not retry — label the PR `requires-human-review` immediately and continue to the next PR.
+4. If a review fix sub-agent **cannot complete the task but runs successfully**, analyze why, and optionally do **one** orchestrator-driven retry with a different approach (e.g., read the module source, check related files for patterns, try an alternative implementation). If it still cannot resolve the comments, comment on the PR with the diagnosed blocker. Only label `requires-human-review` if the blocker is outside agent reach (needs credentials, product decisions, or external dependencies) — otherwise leave it unlabeled for a future sweep attempt. If the sub-agent **execution itself fails** (crash, timeout, or tool error), do not retry — comment on the PR with the failure details and continue to the next PR (do not label, as the failure may be transient).
 
 > **No manual labeling needed.** The `copilot-auto-approve` bot labels clean PRs automatically after Copilot re-reviews the pushed fixes.
 >
@@ -321,7 +321,7 @@ If automated classification returns `unknown` or the auto-fix doesn't resolve th
 3. Apply the fix based on error category
 4. Validate: `make pc`
 5. Commit and push
-6. If the fix attempt fails or the failure is beyond agent capability, label the PR `requires-human-review` via `github_manage_labels(number: <PR#>, add: ["requires-human-review"])` and comment with the diagnosed root cause and what was attempted. The PR is now **settled**.
+6. If the fix attempt fails, comment on the PR with the diagnosed root cause and what was attempted. Only label `requires-human-review` if the failure requires something outside agent reach — otherwise leave it unlabeled for a future sweep. The PR is now **settled**.
 
 ### Pending CI
 
@@ -345,15 +345,15 @@ This is safe to do even if CI is still running or pending — failing CI will au
 
 ## Full Sweep: Outer Loop
 
-For full sweeps, run passes 0–3 in a loop until every PR is **settled** — either clean or labeled `requires-human-review`. Fixing one category often creates issues in another (rebase → CI fail, fix → new review), so multiple passes are expected.
+For full sweeps, run passes 0–3 in a loop until every PR is **settled** — either clean, CI-pending, or labeled `requires-human-review` for a blocker outside agent reach. Fixing one category often creates issues in another (rebase → CI fail, fix → new review), so multiple passes are expected.
 
 **Settled states** — a PR is settled when it reaches any of these terminal states:
 
-| State                     | Meaning                                                 |
-| ------------------------- | ------------------------------------------------------- |
-| **Clean**                 | No conflicts, CI passing, no unresolved threads         |
-| **requires-human-review** | Agent attempted fix but could not resolve the issue     |
-| **CI pending (final)**    | CI is running after the last fix pass — settled on exit |
+| State                     | Meaning                                                               |
+| ------------------------- | --------------------------------------------------------------------- |
+| **Clean**                 | No conflicts, CI passing, no unresolved threads                       |
+| **requires-human-review** | Blocker is outside agent reach (see Critical Rules for valid reasons) |
+| **CI pending (final)**    | CI is running after the last fix pass — settled on exit               |
 
 **Algorithm:**
 
@@ -372,11 +372,11 @@ REPEAT (max 10 passes):
     - The repo ruleset auto-triggers for user-authored PRs; bot-authored PRs
       need this explicit request (uses user OAuth token via gh auth)
   Pass 1: Rebase unsettled conflicting PRs (SEQUENTIAL — cascade invalidation)
-    - On irrecoverable failure → label requires-human-review → add to settled
+    - On irrecoverable failure → comment blocker, label requires-human-review only if outside agent reach → add to settled
   Pass 2: Fix unsettled PRs with unresolved reviews (PARALLEL — batches of 3 sub-agents)
-    - On unfixable review → label requires-human-review → add to settled
+    - On unfixable review → comment blocker, label requires-human-review only if outside agent reach → add to settled
   Pass 3: Fix unsettled PRs with failing CI (PARALLEL — batches of 3 sub-agents)
-    - On unfixable CI failure → label requires-human-review → add to settled
+    - On unfixable CI failure → comment blocker, label requires-human-review only if outside agent reach → add to settled
   Each sub-agent runs make pc before pushing (NEVER skip — see callout below)
   Collect results from all sub-agents; verify passing PRs have their branches/PRs updated
 
@@ -393,7 +393,7 @@ REPEAT (max 10 passes):
 - PRs that are settled (clean or labeled) are **skipped** in subsequent passes — no wasted effort
 - The loop exits when all PRs are settled, not after a fixed number of passes
 - The max 10 pass cap is a safety net, not the expected exit condition
-- If the cap is hit with unsettled PRs remaining, label them all `requires-human-review` before exiting
+- If the cap is hit with unsettled PRs remaining, comment the blocker on each and report them in the summary — but do **not** auto-label them `requires-human-review` just because the cap was hit (the blocker may still be agent-fixable in a future sweep)
 
 > 📎 **Parallelization details**: see [references/sweep-and-parallelization.md](../pr-workflow/references/sweep-and-parallelization.md)
 
@@ -404,21 +404,22 @@ REPEAT (max 10 passes):
 After completion, print a summary table. Every PR must show a settled status — no PR should be left in an ambiguous state.
 
 ```
-| PR    | Title                        | Conflicts | Reviews | CI      | Label                  | Settled | Reason                          |
-|-------|------------------------------|-----------|---------|---------|------------------------|---------|---------------------------------|
-| #101  | feat(scoring): new algo      | Rebased   | Fixed 3 | —       | merge-when-ready       | ✅      | Clean                           |
-| #102  | fix(ui): button color        | —         | —       | Fixed   | merge-when-ready       | ✅      | Clean                           |
-| #103  | feat(db): add index          | Failed    | —       | —       | requires-human-review  | ✅      | Rebase conflict in schema.ts    |
-| #104  | chore(deps): bump lodash     | —         | Fixed 1 | Fixed   | merge-when-ready       | ✅      | Clean                           |
-| #105  | feat(ws): reconnect logic    | —         | —       | Pending | —                      | ✅      | CI running after final pass     |
-| #106  | feat(auth): token refresh    | —         | —       | Failed  | requires-human-review  | ✅      | Test failure in auth.spec.ts    |
+| PR    | Title                        | Conflicts | Reviews | CI      | Label                  | Settled | Reason                                  |
+|-------|------------------------------|-----------|---------|---------|------------------------|---------|-----------------------------------------|
+| #101  | feat(scoring): new algo      | Rebased   | Fixed 3 | —       | merge-when-ready       | ✅      | Clean                                   |
+| #102  | fix(ui): button color        | —         | —       | Fixed   | merge-when-ready       | ✅      | Clean                                   |
+| #103  | feat(db): add index          | Failed    | —       | —       | —                      | ⏳      | Rebase conflict — retryable next sweep  |
+| #104  | chore(deps): bump lodash     | —         | Fixed 1 | Fixed   | merge-when-ready       | ✅      | Clean                                   |
+| #105  | feat(ws): reconnect logic    | —         | —       | Pending | —                      | ✅      | CI running after final pass             |
+| #106  | feat(auth): token refresh    | —         | —       | Failed  | requires-human-review  | ✅      | Needs prod DB credentials (not in env)  |
 ```
 
 Report:
 
 - Total PRs processed
 - PRs settled as **clean** (count)
-- PRs settled as **requires-human-review** (count + PR numbers + reasons)
+- PRs settled as **requires-human-review** (count + PR numbers + reasons — must each cite a blocker outside agent reach)
+- PRs **unsettled** (count + PR numbers + reasons — agent-fixable issues to retry in next sweep)
 - PRs settled as **CI pending** (count — CI running after final pass)
 - Issues fixed per category (conflicts rebased, reviews fixed, CI fixed)
 - Number of passes required
@@ -472,12 +473,12 @@ ci_search_logs(runId: <runId>, pattern: "error|FAIL|Error:", context: 5)
 
 ### 3b. Decide: re-run or escalate
 
-| Log Evidence                                     | Action                                                                    |
-| ------------------------------------------------ | ------------------------------------------------------------------------- |
-| Flaky test (different test fails each run)       | Re-run: `ci_rerun(runId: <id>, failedOnly: true)`                         |
-| Timeout / infrastructure error                   | Re-run: `ci_rerun(runId: <id>, failedOnly: true)`                         |
-| Consistent lint/type/build/test error            | Label `requires-human-review` — requires code fix cloud agent cannot make |
-| Formatting failure (`nx format:write` would fix) | Label `requires-human-review` — requires code fix cloud agent cannot make |
+| Log Evidence                                     | Action                                                                |
+| ------------------------------------------------ | --------------------------------------------------------------------- |
+| Flaky test (different test fails each run)       | Re-run: `ci_rerun(runId: <id>, failedOnly: true)`                     |
+| Timeout / infrastructure error                   | Re-run: `ci_rerun(runId: <id>, failedOnly: true)`                     |
+| Consistent lint/type/build/test error            | Comment diagnosed root cause on PR — requires code fix by local agent |
+| Formatting failure (`nx format:write` would fix) | Comment diagnosed root cause on PR — requires code fix by local agent |
 
 ```
 ci_rerun(runId: <runId>, failedOnly: true)
@@ -511,7 +512,7 @@ For each thread, read the comment body. If the thread is a **process/meta commen
 github_resolve_thread(threadId: "<threadId>")
 ```
 
-**Do NOT resolve threads that request actual code changes** — those require a local agent. If a PR has unresolved threads that all require code changes, label it `requires-human-review` via `github_manage_labels(number: <PR#>, add: ["requires-human-review"])` and comment listing the unresolved threads. The PR is now **settled**.
+**Do NOT resolve threads that request actual code changes** — those require a local agent. If a PR has unresolved threads that all require code changes, comment on the PR listing the unresolved threads. The PR is now **settled** (needs local agent — do not label `requires-human-review` since a local agent can fix code).
 
 ## Cloud Step 6: Final Report
 
@@ -523,28 +524,31 @@ After completing all API-only actions, produce a summary report. This is the pri
 | PR    | Title                        | Mergeable   | CI        | Threads | Label                  | Cloud Action         | Settled | Reason                        |
 |-------|------------------------------|-------------|-----------|---------|------------------------|----------------------|---------|-------------------------------|
 | #101  | feat(scoring): new algo      | MERGEABLE   | pass      | 0       | merge-when-ready       | Verified clean       | ✅      | Clean                         |
-| #102  | fix(ui): button color        | CONFLICTING | —         | 0       | requires-human-review  | Diagnosed            | ✅      | Needs local rebase            |
+| #102  | fix(ui): button color        | CONFLICTING | —         | 0       | —                      | Diagnosed            | ⏳      | Needs local rebase            |
 | #103  | feat(db): add index          | MERGEABLE   | fail      | 2       | —                      | Re-ran CI            | ⏳      | CI re-running                 |
 | #104  | chore(deps): bump lodash     | MERGEABLE   | pass      | 1       | —                      | Resolved 1 thread    | ✅      | Clean                         |
-| #105  | feat(ws): reconnect logic    | MERGEABLE   | fail      | 0       | requires-human-review  | Diagnosed            | ✅      | Type error needs code fix     |
-| #106  | fix(auth): token refresh     | MERGEABLE   | pass      | 3       | requires-human-review  | Resolved 1 meta      | ✅      | 2 threads need code changes   |
+| #105  | feat(ws): reconnect logic    | MERGEABLE   | fail      | 0       | —                      | Diagnosed            | ⏳      | Type error needs local fix    |
+| #106  | fix(auth): token refresh     | MERGEABLE   | pass      | 3       | requires-human-review  | Resolved 1 meta      | ✅      | Needs prod DB creds (no env)  |
 ```
 
 ### Report Sections
 
 1. **Actions Taken** — list every API action performed:
    - PRs labeled `merge-when-ready` (count + PR numbers)
-   - PRs labeled `requires-human-review` (count + PR numbers + reasons)
+   - PRs labeled `requires-human-review` (count + PR numbers + reasons — must each cite a blocker outside agent reach)
    - CI runs re-triggered (count + PR numbers + run IDs)
    - Review threads resolved (count + PR numbers)
    - Copilot reviews requested (count + PR numbers)
 
-2. **Settled as requires-human-review** — PRs the agent could not fully resolve:
+2. **Needs local agent** — PRs that need code changes a cloud agent cannot make (blocker commented on each):
    - PRs with merge conflicts (need local rebase)
    - PRs with CI failures requiring code fixes (include the diagnosed root cause)
    - PRs with unresolved review threads requiring code changes (include thread summaries)
 
-3. **Pending** — items where status is not yet final:
+3. **Needs human** — PRs labeled `requires-human-review` (blockers outside any agent's reach):
+   - Missing credentials, product/design decisions, external dependencies
+
+4. **Pending** — items where status is not yet final:
    - PRs with CI still running or re-running
    - PRs where Copilot review was just requested (no results yet)
 
@@ -552,13 +556,13 @@ All PRs should appear in exactly one settled category. No PR should be left unac
 
 ## Cloud Full Sweep Algorithm
 
-For a full cloud sweep, run steps 1–8 in order. Unlike the local sweep, there is no outer loop because the cloud agent cannot fix code issues that cascade. Instead, the cloud agent settles every PR by either confirming it is clean or labeling it `requires-human-review`.
+For a full cloud sweep, run steps 1–8 in order. Unlike the local sweep, there is no outer loop because the cloud agent cannot fix code issues that cascade. The cloud agent settles every PR by confirming it is clean, commenting the blocker for issues a local agent can fix, or labeling `requires-human-review` only for blockers outside any agent's reach.
 
 1. Scan all open PRs (Cloud Step 1)
 2. Re-run flaky CI (Cloud Step 3) — do this early so CI has time to complete
 3. Request Copilot reviews on unreviewed PRs (Cloud Step 4) — triggers auto-approve for clean PRs
 4. Resolve process/meta review threads (Cloud Step 5)
-5. Label PRs with issues the cloud agent cannot fix (conflicts, code-level CI failures, code-level review threads) as `requires-human-review` — comment with the reason on each
+5. Comment on PRs with issues the cloud agent cannot fix — explain the blocker on each. Only label `requires-human-review` if the blocker is outside any agent's reach (not just "needs code changes")
 6. Wait ~3 minutes if any CI re-runs were triggered, then re-scan
 7. Verify clean PRs are labeled (Cloud Step 2)
 8. Produce final report (Cloud Step 6) — every PR must appear in a settled category

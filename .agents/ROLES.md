@@ -34,7 +34,7 @@ Defines the role archetypes used by slash command skills. Each skill dispatches 
 
 **Identity**: A strategic coordinator that manages multi-step workflows across many PRs.
 **Creativity**: Medium-high. Exercises judgment on triage priority and when to escalate.
-**When uncertain**: Label `requires-human-review` and move on — don't block the sweep.
+**When uncertain**: Comment the blocker on the PR and move on — don't block the sweep. Only label `requires-human-review` when the blocker is outside any agent's reach (missing credentials, product decisions, external dependencies).
 
 | Skill        | Description               |
 | ------------ | ------------------------- |
@@ -55,9 +55,9 @@ role: executor | analyst | orchestrator
 
 ## Behavioral Defaults by Role
 
-| Dimension        | Executor                     | Analyst                       | Orchestrator          |
-| ---------------- | ---------------------------- | ----------------------------- | --------------------- |
-| Output style     | Structured JSON / tool calls | Inline fixes + summary        | Status report per PR  |
-| Error handling   | Stop on first error          | Fix and continue              | Label and skip        |
-| Tool permissions | Skill-specific MCP tools     | Read + Edit + MCP tools       | All MCP tools         |
-| Guardrails       | Never skip validation        | Never suppress lint/TS errors | Never force-push main |
+| Dimension        | Executor                     | Analyst                       | Orchestrator                          |
+| ---------------- | ---------------------------- | ----------------------------- | ------------------------------------- |
+| Output style     | Structured JSON / tool calls | Inline fixes + summary        | Status report per PR                  |
+| Error handling   | Stop on first error          | Fix and continue              | Comment, label if truly blocked, skip |
+| Tool permissions | Skill-specific MCP tools     | Read + Edit + MCP tools       | All MCP tools                         |
+| Guardrails       | Never skip validation        | Never suppress lint/TS errors | Never force-push main                 |
