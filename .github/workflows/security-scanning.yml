@@ -11,6 +11,11 @@ on:
         required: false
         type: string
         default: "comprehensive"
+      runner-label:
+        description: "Optional runner label resolved by the orchestrator for LS-1652 runner restrictions; falls back to vars.CI_RUNNER_LABEL or 'ubuntu-latest' when not set"
+        required: false
+        type: string
+        default: ""
 
 permissions:
   actions: read
@@ -30,7 +35,7 @@ env:
 jobs:
   security-scan-plan:
     name: "Security Scan Planning"
-    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 3
 
     outputs:
@@ -130,7 +135,7 @@ jobs:
 
   dependency-scan:
     name: "Dependency Vulnerability Scan"
-    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
     needs: security-scan-plan
     if: needs.security-scan-plan.outputs.run-dependency-scan == 'true'
@@ -342,7 +347,7 @@ jobs:
 
   secret-detection:
     name: "Secret Detection Scan"
-    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 8
     needs: security-scan-plan
     if: needs.security-scan-plan.outputs.run-secret-scan == 'true'
@@ -477,7 +482,7 @@ jobs:
 
   sast-scan:
     name: "Static Application Security Testing"
-    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 20
     needs: security-scan-plan
     if: needs.security-scan-plan.outputs.run-sast-scan == 'true'
@@ -729,7 +734,7 @@ jobs:
 
   security-summary:
     name: "Security Scan Summary"
-    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
     needs: [security-scan-plan, dependency-scan, secret-detection, sast-scan]
     if: always()
@@ -836,7 +841,7 @@ jobs:
 
   security-gate:
     name: "Security Gate"
-    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
     needs: [security-scan-plan, dependency-scan, secret-detection, sast-scan]
     if: always()
@@ -847,7 +852,9 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const sha = context.sha || context.payload.pull_request?.head?.sha;
+            // Prefer the PR head SHA over context.sha (which may be the
+            // synthetic merge commit for PR runs).
+            const sha = context.payload?.pull_request?.head?.sha || context.sha;
             if (!sha) {
               core.warning('No SHA available - skipping commit status');
               return;
@@ -856,7 +863,11 @@ jobs:
             const owner = context.repo.owner;
             const repo = context.repo.repo;
 
-            // Collect scan results from upstream jobs
+            // Collect scan results from upstream jobs.
+            // NOTE: Upstream scan jobs use continue-on-error and || true, which
+            // means job results may be 'success' even when findings are detected.
+            // TODO: Add explicit outputs to scan jobs (e.g., vuln counts, leak
+            // status) and drive gate decisions off those outputs instead.
             const secretResult = '${{ needs.secret-detection.result }}';
             const depResult = '${{ needs.dependency-scan.result }}';
             const sastResult = '${{ needs.sast-scan.result }}';
@@ -865,22 +876,59 @@ jobs:
             core.info(`Dependency scan: ${depResult}`);
             core.info(`SAST scan: ${sastResult}`);
 
-            // Check for security-override label on the PR
+            // Check for security-override label on the PR.
+            // Collect PR numbers from different event shapes:
+            // - pull_request events: context.payload.pull_request.number
+            // - merge_group events: parse from merge_group.head_ref (format: refs/heads/gh-readonly-queue/<base>/pr-<num>-...)
+            // - push/other events with pull_requests array: context.payload.pull_requests[*].number
             let hasOverrideLabel = false;
-            const prNumber = context.payload?.pull_request?.number;
-            if (prNumber) {
-              try {
-                const { data: pr } = await github.rest.pulls.get({
-                  owner,
-                  repo,
-                  pull_number: prNumber,
-                });
-                hasOverrideLabel = pr.labels.some(l => l.name === 'security-override');
-                if (hasOverrideLabel) {
-                  core.info(`PR #${prNumber} has security-override label`);
+            const prNumbers = [];
+
+            const directPrNumber = context.payload?.pull_request?.number;
+            if (typeof directPrNumber === 'number') {
+              prNumbers.push(directPrNumber);
+            }
+
+            // merge_group events don't include a pull_requests array; derive
+            // the PR number from the head_ref instead.
+            const mergeGroupHeadRef = context.payload?.merge_group?.head_ref;
+            if (typeof mergeGroupHeadRef === 'string') {
+              const prMatch = mergeGroupHeadRef.match(/\/pr-(\d+)-/);
+              if (prMatch) {
+                prNumbers.push(parseInt(prMatch[1], 10));
+              }
+            }
+
+            const relatedPullRequests = context.payload?.pull_requests;
+            if (Array.isArray(relatedPullRequests)) {
+              for (const pr of relatedPullRequests) {
+                if (pr && typeof pr.number === 'number') {
+                  prNumbers.push(pr.number);
                 }
-              } catch (e) {
-                core.warning(`Failed to fetch PR labels: ${e.message}`);
+              }
+            }
+
+            const uniquePrNumbers = [...new Set(prNumbers)];
+
+            if (uniquePrNumbers.length === 0) {
+              core.info('No associated pull requests found for security-override evaluation.');
+            } else {
+              for (const prNumber of uniquePrNumbers) {
+                try {
+                  const { data: pr } = await github.rest.pulls.get({
+                    owner,
+                    repo,
+                    pull_number: prNumber,
+                  });
+                  const prHasOverride = Array.isArray(pr.labels) && pr.labels.some(l => l && l.name === 'security-override');
+                  if (prHasOverride) {
+                    hasOverrideLabel = true;
+                    core.info(`PR #${prNumber} has security-override label`);
+                    break;
+                  }
+                } catch (e) {
+                  core.warning(`Failed to fetch PR #${prNumber} labels: ${e.message}`);
+                }
               }
             }
 
@@ -918,9 +966,19 @@ jobs:
               description = 'Security findings overridden via security-override label';
             }
 
+            // Cancelled scans are treated as failures — cancellation can bypass
+            // the merge gate and should not be counted as "skipped".
+            const anyCancelled = [secretResult, depResult, sastResult].some(
+              r => r === 'cancelled'
+            );
+            if (anyCancelled && state !== 'failure') {
+              state = 'failure';
+              description = 'Blocked: one or more security scans were cancelled';
+            }
+
             // Handle skipped scans - if all scans were skipped, still pass
             const allSkipped = [secretResult, depResult, sastResult].every(
-              r => r === 'skipped' || r === 'cancelled'
+              r => r === 'skipped'
             );
             if (allSkipped) {
               description = 'All security scans were skipped';

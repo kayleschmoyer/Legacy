@@ -215,6 +215,7 @@ jobs:
     with:
       # Scan type is determined by what changed: deps → dependency scan, code → SAST/secrets, both → comprehensive
       scan_type: ${{ github.event_name == 'workflow_dispatch' && inputs.scan_type || needs.determine-scope.outputs.security-scan-type }}
+      runner-label: ${{ needs.determine-scope.outputs.runner-label }}
     secrets: inherit
 
   # ============================================================================
