@@ -65,8 +65,16 @@ Review fixes (Pass 2) and CI code fixes (Pass 3) operate on independent PRs in s
 
    > Fix review comments on PR #\<number\> in worktree \<path\>.
    > Read unresolved threads, apply fixes, run make pc, commit, push.
-   > Resolve each fixed thread via github_resolve_thread.
+   > Resolve all fixed threads in one call via github_resolve_threads(threadIds: [...]).
    > If unfixable, label requires-human-review and comment with the reason.
+   >
+   > Tool preferences:
+   >
+   > - Use Glob (not find/ls) for file discovery
+   > - Use Grep (not grep/rg) for content search
+   > - Use Read (not cat/head/tail) for reading files
+   > - Use worktree_run for git commands (not git -C via Bash)
+   > - Use worktree_commit/worktree_push for commits and pushes
 
 3. Wait for all agents in the batch to complete before spawning the next batch
 4. Collect results from each agent — verify PR state (fixed, labeled, or failed)

@@ -62,6 +62,30 @@ This file provides guidance to AI coding agents working with code in this reposi
 | `cd $wt && make ...`            | `make -C $wt ...`                |
 | `cd terraform && terraform ...` | `terraform -chdir=terraform ...` |
 
+## Subagent Tool Preferences
+
+Subagents spawned via the `Agent` tool do **not** inherit AGENTS.md context. When spawning subagents (especially `Explore` type), **always include tool preference hints in the prompt**:
+
+```
+Agent(subagent_type: "Explore", prompt: """
+  <task description here>
+
+  Tool preferences:
+  - Use Glob (not find/ls) for file discovery
+  - Use Grep (not grep/rg) for content search
+  - Use Read (not cat/head/tail) for reading files
+""")
+```
+
+These three lines eliminate the most common subagent Bash anti-patterns (`find` 56x/session, `grep` 23x, `ls` 8x in production audits). Without them, subagents default to shell commands because they lack the project's MCP-first context.
+
+For subagents that perform git operations in worktrees, also include:
+
+```
+  - Use worktree_run for git commands (preferred over git -C via Bash; git -C is the shell fallback when MCP tools are unavailable)
+  - Use worktree_commit/worktree_push for commits and pushes
+```
+
 ## Commands
 
 ```bash
