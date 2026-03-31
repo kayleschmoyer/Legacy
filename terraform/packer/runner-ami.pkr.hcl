@@ -62,16 +62,17 @@ variable "android_ndk_version" {
   default = "27.1.12297006"
 }
 
-variable "android_cmdline_tools_version" {
-  type    = string
-  default = "13.0"
+variable "android_cmdline_tools_build" {
+  type        = string
+  description = "Build number in the cmdline-tools download URL: commandlinetools-linux-<build>_latest.zip. Find at https://developer.android.com/studio#command-tools"
+  default     = "14742923"
 }
 
 variable "android_cmdline_tools_sha256" {
   type        = string
-  description = "SHA-256 of commandlinetools-linux-<version>_latest.zip. Verify at https://developer.android.com/studio#command-tools"
-  # SHA-256 for commandlinetools-linux-13.0_latest.zip
-  default = "d3cbe3db2250ca0db5ef547cd32e9c1f8e1adb9fd7f56866a8a25fa5302b8a76"
+  description = "SHA-256 of commandlinetools-linux-<build>_latest.zip. Verify at https://developer.android.com/studio#command-tools"
+  # SHA-256 for commandlinetools-linux-14742923_latest.zip
+  default = "04453066b540409d975c676d781da1477479dde3761310f1a7eb92a1dfb15af7"
 }
 
 variable "docker_version" {
@@ -269,6 +270,14 @@ build {
     ]
   }
 
+  # Java 17 (required by sdkmanager — Android SDK command-line tools are JVM-based)
+  provisioner "shell" {
+    inline = [
+      "sudo apt-get install -y -qq openjdk-17-jre-headless",
+      "java -version",
+    ]
+  }
+
   # Android SDK (pre-installed so CI skips android-actions/setup-android)
   provisioner "shell" {
     environment_vars = [
@@ -276,7 +285,7 @@ build {
     ]
     inline = [
       "sudo mkdir -p $ANDROID_HOME/cmdline-tools",
-      "curl -fSL https://dl.google.com/android/repository/commandlinetools-linux-${var.android_cmdline_tools_version}_latest.zip -o /tmp/cmdline-tools.zip",
+      "curl -fSL https://dl.google.com/android/repository/commandlinetools-linux-${var.android_cmdline_tools_build}_latest.zip -o /tmp/cmdline-tools.zip",
       "echo '${var.android_cmdline_tools_sha256}  /tmp/cmdline-tools.zip' | sha256sum -c",
       "sudo unzip -q /tmp/cmdline-tools.zip -d $ANDROID_HOME/cmdline-tools",
       "sudo mv $ANDROID_HOME/cmdline-tools/cmdline-tools $ANDROID_HOME/cmdline-tools/latest",
