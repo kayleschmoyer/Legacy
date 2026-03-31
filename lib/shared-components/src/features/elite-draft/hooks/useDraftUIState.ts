@@ -13,7 +13,7 @@ export interface AnnouncementData {
 
 export interface ToastMessage {
   text: string;
-  type: 'error' | 'warning' | 'info';
+  type: 'error' | 'warning' | 'info' | 'success';
 }
 
 export function useDraftUIState() {
@@ -103,7 +103,10 @@ export function useDraftUIState() {
     undefined,
   );
   const showToast = useCallback(
-    (text: string, type: 'error' | 'warning' | 'info' = 'error') => {
+    (
+      text: string,
+      type: 'error' | 'warning' | 'info' | 'success' = 'error',
+    ) => {
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
       setToastMessage({ text, type });
       toastTimerRef.current = setTimeout(() => {

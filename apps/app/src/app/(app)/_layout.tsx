@@ -57,7 +57,7 @@ export type AppDrawerParamList = {
   'baseball/league/join': undefined;
   'baseball/matchup': { matchupId: string; leagueId: string };
   'football/index': undefined;
-  DraftBoardPage: undefined;
+  DraftBoardPage: { leagueId?: string } | undefined;
   'league-discovery': undefined;
   'season-draft/index': undefined;
   'season-draft/[gameId]': { gameId: string };

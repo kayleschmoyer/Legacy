@@ -40,7 +40,10 @@ interface UseDraftWebSocketParams {
     myPick: boolean,
     auto: boolean,
   ) => void;
-  showToast: (text: string, type?: 'error' | 'warning' | 'info') => void;
+  showToast: (
+    text: string,
+    type?: 'error' | 'warning' | 'info' | 'success',
+  ) => void;
   setDraftComplete: (v: boolean) => void;
   setDraftPaused: (v: boolean) => void;
   setPickDeadline: (v: Date | null) => void;
@@ -54,6 +57,8 @@ interface UseDraftWebSocketParams {
   refetchAvailablePlayers: () => unknown;
   refetchQueue: () => Promise<unknown>;
   websocketUrl: string;
+  /** Auth token for WebSocket authentication. */
+  token?: string;
 }
 
 export function useDraftWebSocket({
@@ -81,6 +86,7 @@ export function useDraftWebSocket({
   refetchAvailablePlayers,
   refetchQueue,
   websocketUrl,
+  token,
 }: UseDraftWebSocketParams) {
   const handleDraftStarted = useCallback(
     (notification: DraftStartedNotification) => {
@@ -292,6 +298,7 @@ export function useDraftWebSocket({
 
   const { connected: wsConnected } = useWebSocket({
     url: websocketUrl,
+    token,
     leagueId: leagueId ?? undefined,
     viewContext: 'league',
     autoConnect: !!leagueId && isAuthenticated && !isAuctionDraft,

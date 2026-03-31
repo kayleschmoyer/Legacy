@@ -6,7 +6,16 @@ import {
 } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { HeaderTitleProps } from '@react-navigation/elements';
-import { Button, Card, H3, Spinner, Text, XStack, YStack } from 'tamagui';
+import {
+  Button,
+  Card,
+  H3,
+  Separator,
+  Spinner,
+  Text,
+  XStack,
+  YStack,
+} from 'tamagui';
 import { Tabs } from '@tamagui/tabs';
 import { Alert, Platform, ScrollView, Share } from 'react-native';
 import { gql } from '@apollo/client';
@@ -605,6 +614,30 @@ export default function LeagueId(): React.JSX.Element {
                         minWidth={120}
                       >
                         {startDraftLoading ? 'Starting...' : 'Start Draft'}
+                      </Button>
+                    </XStack>
+                    <Separator />
+                    <XStack justifyContent="space-between" alignItems="center">
+                      <YStack flex={1}>
+                        <Text fontSize="$4" fontWeight="500">
+                          Live Draft
+                        </Text>
+                        <Text fontSize="$2" color="$gray10">
+                          Real-time snake or linear draft with pick timer
+                        </Text>
+                      </YStack>
+                      <Button
+                        backgroundColor="$green9"
+                        color="white"
+                        onPress={() =>
+                          router.navigate({
+                            pathname: '/DraftBoardPage' as never,
+                            params: { leagueId: String(numLeagueId) },
+                          } as never)
+                        }
+                        minWidth={120}
+                      >
+                        Live Draft
                       </Button>
                     </XStack>
                   </YStack>

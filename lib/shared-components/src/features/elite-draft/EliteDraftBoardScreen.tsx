@@ -34,6 +34,8 @@ export interface EliteDraftBoardScreenProps {
   onNavigate: (path: string) => void;
   /** WebSocket URL for live draft updates. */
   websocketUrl: string;
+  /** Auth token for WebSocket authentication. */
+  websocketToken?: string;
   /** Optional render prop for the chat overlay. If omitted, chat is disabled. */
   renderChat?: DraftChatRenderer;
 }

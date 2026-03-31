@@ -60,6 +60,12 @@
       }
     },
     {
+      "files": ["*.native.tsx"],
+      "rules": {
+        "jsx-a11y/accessible-emoji": "off"
+      }
+    },
+    {
       "files": ["codegen.ts", ".storybook/**/*.ts"],
       "rules": {
         "no-console": "off"
