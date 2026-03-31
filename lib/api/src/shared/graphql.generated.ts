@@ -76,6 +76,18 @@ export type AdvanceLeagueWeekResponse = {
   matchups?: Maybe<Array<Matchup>>;
 };
 
+/** An all-time record across all seasons in a league's history */
+export type AllTimeRecord = {
+  __typename?: 'AllTimeRecord';
+  details?: Maybe<Scalars['String']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  recordType?: Maybe<Scalars['String']['output']>;
+  seasonNumber?: Maybe<Scalars['Int']['output']>;
+  teamId?: Maybe<Scalars['Int']['output']>;
+  teamName?: Maybe<Scalars['String']['output']>;
+  value?: Maybe<Scalars['Float']['output']>;
+};
+
 export type AppleVerifyResult = {
   __typename?: 'AppleVerifyResult';
   status?: Maybe<Scalars['String']['output']>;
@@ -900,6 +912,23 @@ export type LeagueSeasonAward = {
   playerLastName?: Maybe<Scalars['String']['output']>;
   season?: Maybe<Scalars['Int']['output']>;
   updatedAt?: Maybe<Scalars['String']['output']>;
+};
+
+/** Summary of a single season in a league's history */
+export type LeagueSeasonSummary = {
+  __typename?: 'LeagueSeasonSummary';
+  championScore?: Maybe<Scalars['Float']['output']>;
+  championTeamId?: Maybe<Scalars['Int']['output']>;
+  championTeamName?: Maybe<Scalars['String']['output']>;
+  frozenAt?: Maybe<Scalars['String']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  leaguePhase?: Maybe<Scalars['String']['output']>;
+  name?: Maybe<Scalars['String']['output']>;
+  runnerUpScore?: Maybe<Scalars['Float']['output']>;
+  runnerUpTeamId?: Maybe<Scalars['Int']['output']>;
+  runnerUpTeamName?: Maybe<Scalars['String']['output']>;
+  seasonNumber?: Maybe<Scalars['Int']['output']>;
+  totalMatchups?: Maybe<Scalars['Int']['output']>;
 };
 
 /** A head-to-head matchup between two teams in a league */
@@ -2136,6 +2165,8 @@ export type Query = {
   /** Get a complete export of all personal data for the authenticated user */
   exportMyData?: Maybe<UserDataExport>;
   freeAgents?: Maybe<Array<Player>>;
+  /** Get all-time records across all seasons in a league's history (most wins, highest score, longest win streak, most points in a season). */
+  getAllTimeRecords?: Maybe<Array<AllTimeRecord>>;
   getAvailableDraftPlayers?: Maybe<Array<DraftPlayer>>;
   getChampionshipTrophies?: Maybe<Array<ChampionTrophy>>;
   getCurrentDraftPick?: Maybe<CurrentDraftPick>;
@@ -2152,6 +2183,8 @@ export type Query = {
   getLeagueAnalytics?: Maybe<LeagueAnalytics>;
   getLeagueAnnouncements?: Maybe<Array<LeagueChatMessage>>;
   getLeagueDraft?: Maybe<Draft>;
+  /** Get the full season history for a league by traversing the previousLeagueId lineage chain. Returns seasons in reverse chronological order (current first). */
+  getLeagueHistory?: Maybe<Array<LeagueSeasonSummary>>;
   getLeagueMessages?: Maybe<Array<LeagueChatMessage>>;
   getLeagueStandings?: Maybe<Array<TeamStanding>>;
   getMatchupById?: Maybe<Matchup>;
@@ -2319,6 +2352,10 @@ export type QueryFreeAgentsArgs = {
   leagueId: Scalars['Int']['input'];
 };
 
+export type QueryGetAllTimeRecordsArgs = {
+  leagueId: Scalars['Int']['input'];
+};
+
 export type QueryGetAvailableDraftPlayersArgs = {
   draftId: Scalars['Int']['input'];
   limit?: InputMaybe<Scalars['Int']['input']>;
@@ -2381,6 +2418,10 @@ export type QueryGetLeagueAnnouncementsArgs = {
 };
 
 export type QueryGetLeagueDraftArgs = {
+  leagueId: Scalars['Int']['input'];
+};
+
+export type QueryGetLeagueHistoryArgs = {
   leagueId: Scalars['Int']['input'];
 };
 

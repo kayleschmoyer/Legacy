@@ -125,6 +125,8 @@
     "@pothos/plugin-dataloader": "^4.4.3",
     "@pothos/plugin-relay": "^4.7.0",
     "@pothos/plugin-validation": "^4.2.0",
+    "@react-native-firebase/analytics": "^23.8.8",
+    "@react-native-firebase/app": "^23.8.8",
     "@react-native-google-signin/google-signin": "^16.1.2",
     "@react-native-picker/picker": "^2.11.4",
     "@react-navigation/drawer": "^7.9.4",

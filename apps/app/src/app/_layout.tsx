@@ -23,7 +23,7 @@ import type { OAuthConfig } from '@legacy-sports/shared-components';
 import { LOGGER } from '@legacy-sports/logging';
 import { DbClientContext } from '../common/ApolloClientContext';
 import { ThemeProvider, useThemeContext } from '../context/ThemeContext';
-import { setUserId, setUserProperties } from '../utils/analytics';
+import { setUserProperties } from '../utils/analytics';
 import { useGetUserByIdQuery } from '../api/db/graphql.generated';
 
 // Initialize Rollbar for mobile app
@@ -92,8 +92,7 @@ function AnalyticsIdentify({ userId }: { userId: number }): null {
   useEffect(() => {
     if (!data?.user) return;
     const tier = data.user.subscriptionTier === 'premium' ? 'premium' : 'free';
-    setUserId(userId);
-    setUserProperties({ userId, subscriptionTier: tier });
+    void setUserProperties({ userId, subscriptionTier: tier });
   }, [userId, data]);
 
   return null;
