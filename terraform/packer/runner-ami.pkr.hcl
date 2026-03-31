@@ -116,6 +116,17 @@ source "amazon-ebs" "runner" {
   subnet_id                   = var.subnet_id
   associate_public_ip_address = true
 
+  # The Ubuntu 22.04 source AMI ships with an 8 GB root volume — too small for
+  # the Android NDK (~8 GB uncompressed) plus Node.js, Playwright, Docker, etc.
+  # This resizes the Packer build instance disk only; the runner AMI inherits
+  # this size (runners also need the full SDK at runtime).
+  launch_block_device_mappings {
+    device_name           = "/dev/sda1"
+    volume_size           = 40
+    volume_type           = "gp3"
+    delete_on_termination = true
+  }
+
   tags = {
     Name              = "legacy-sports-runner"
     Project           = "legacy-sports"
