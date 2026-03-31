@@ -77,12 +77,12 @@ runs:
         # Create badge JSON using jq or echo
         if command -v jq >/dev/null 2>&1; then
           jq -n \
-            --arg label "${DEPLOYMENT_NAME}" \
+            --arg lbl "${DEPLOYMENT_NAME}" \
             --arg message "${MESSAGE}" \
             --arg color "${COLOR}" \
             '{
               schemaVersion: 1,
-              label: $label,
+              label: $lbl,
               message: $message,
               color: $color,
               namedLogo: "github",
@@ -91,8 +91,11 @@ runs:
               cacheSeconds: 300
             }' > "${FILENAME}.json"
         else
-          # Fallback: use echo
-          echo "{\"schemaVersion\":1,\"label\":\"${DEPLOYMENT_NAME}\",\"message\":\"${MESSAGE}\",\"color\":\"${COLOR}\",\"namedLogo\":\"github\",\"logoColor\":\"white\",\"style\":\"flat\",\"cacheSeconds\":300}" > "${FILENAME}.json"
+          # Fallback: use printf to build JSON
+          printf '{"schemaVersion":1,"label":"%s","message":"%s","color":"%s",' \
+            "${DEPLOYMENT_NAME}" "${MESSAGE}" "${COLOR}" > "${FILENAME}.json"
+          printf '"namedLogo":"github","logoColor":"white","style":"flat","cacheSeconds":300}' \
+            >> "${FILENAME}.json"
         fi
 
         echo "Generated badge file: ${FILENAME}.json"
