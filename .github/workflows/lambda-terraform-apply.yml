@@ -219,6 +219,8 @@ jobs:
           TF_VAR_discord_webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
           TF_VAR_discord_user_signup_webhook_url: ${{ secrets.DISCORD_USER_SIGNUP_WEBHOOK_URL }}
           TF_VAR_discord_stripe_webhook_url: ${{ secrets.DISCORD_STRIPE_WEBHOOK_URL }}
+          TF_VAR_ga_measurement_id: ${{ secrets.GA_MEASUREMENT_ID }}
+          TF_VAR_ga_api_secret: ${{ secrets.GA_API_SECRET }}
           TF_VAR_github_app_id: ${{ secrets.RUNNER_GITHUB_APP_ID }}
           TF_VAR_github_app_key_base64: ${{ secrets.RUNNER_GITHUB_APP_KEY_BASE64 }}
           TF_VAR_github_app_webhook_secret: ${{ secrets.RUNNER_GITHUB_APP_WEBHOOK_SECRET }}
@@ -309,6 +311,8 @@ jobs:
           TF_VAR_discord_webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
           TF_VAR_discord_user_signup_webhook_url: ${{ secrets.DISCORD_USER_SIGNUP_WEBHOOK_URL }}
           TF_VAR_discord_stripe_webhook_url: ${{ secrets.DISCORD_STRIPE_WEBHOOK_URL }}
+          TF_VAR_ga_measurement_id: ${{ secrets.GA_MEASUREMENT_ID }}
+          TF_VAR_ga_api_secret: ${{ secrets.GA_API_SECRET }}
           TF_VAR_github_app_id: ${{ secrets.RUNNER_GITHUB_APP_ID }}
           TF_VAR_github_app_key_base64: ${{ secrets.RUNNER_GITHUB_APP_KEY_BASE64 }}
           TF_VAR_github_app_webhook_secret: ${{ secrets.RUNNER_GITHUB_APP_WEBHOOK_SECRET }}
@@ -356,6 +360,8 @@ jobs:
           TF_VAR_discord_webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
           TF_VAR_discord_user_signup_webhook_url: ${{ secrets.DISCORD_USER_SIGNUP_WEBHOOK_URL }}
           TF_VAR_discord_stripe_webhook_url: ${{ secrets.DISCORD_STRIPE_WEBHOOK_URL }}
+          TF_VAR_ga_measurement_id: ${{ secrets.GA_MEASUREMENT_ID }}
+          TF_VAR_ga_api_secret: ${{ secrets.GA_API_SECRET }}
           TF_VAR_github_app_id: ${{ secrets.RUNNER_GITHUB_APP_ID }}
           TF_VAR_github_app_key_base64: ${{ secrets.RUNNER_GITHUB_APP_KEY_BASE64 }}
           TF_VAR_github_app_webhook_secret: ${{ secrets.RUNNER_GITHUB_APP_WEBHOOK_SECRET }}

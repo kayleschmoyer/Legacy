@@ -173,6 +173,10 @@ resource "aws_lambda_function" "stripe_webhook" {
 
       # Rollbar error tracking
       ROLLBAR_ACCESS_TOKEN = var.rollbar_access_token
+
+      # Google Analytics 4 Measurement Protocol (server-side events)
+      GA_MEASUREMENT_ID = var.ga_measurement_id
+      GA_API_SECRET     = var.ga_api_secret
     }
   }
 

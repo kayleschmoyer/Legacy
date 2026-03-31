@@ -34,6 +34,19 @@ variable "rollbar_access_token" {
   sensitive   = true
 }
 
+variable "ga_measurement_id" {
+  description = "GA4 measurement ID (e.g. G-XXXXXXXXXX) for server-side Measurement Protocol events"
+  type        = string
+  default     = ""
+}
+
+variable "ga_api_secret" {
+  description = "GA4 Measurement Protocol API secret for server-side event sending"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 variable "stripe_secret_key" {
   description = "Stripe API secret key for payment processing"
   type        = string
