@@ -4080,6 +4080,20 @@ export type GetMatchupHistoryQuery = {
   }> | null;
 };
 
+export type GetLeagueTeamsForDmQueryVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+}>;
+
+export type GetLeagueTeamsForDmQuery = {
+  __typename?: 'Query';
+  leagueTeams?: Array<{
+    __typename?: 'Team';
+    id?: number | null;
+    name?: string | null;
+    managerId?: number | null;
+  }> | null;
+};
+
 export type LeagueChatMessageFieldsFragment = {
   __typename?: 'LeagueChatMessage';
   id?: string | null;
@@ -7351,6 +7365,98 @@ export type GetMatchupHistorySuspenseQueryHookResult = ReturnType<
 export type GetMatchupHistoryQueryResult = Apollo.QueryResult<
   GetMatchupHistoryQuery,
   GetMatchupHistoryQueryVariables
+>;
+export const GetLeagueTeamsForDm = gql`
+  query GetLeagueTeamsForDM($leagueId: Int!) {
+    leagueTeams(leagueId: $leagueId) {
+      id
+      name
+      managerId
+    }
+  }
+`;
+
+/**
+ * __useGetLeagueTeamsForDmQuery__
+ *
+ * To run a query within a React component, call `useGetLeagueTeamsForDmQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetLeagueTeamsForDmQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetLeagueTeamsForDmQuery({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *   },
+ * });
+ */
+export function useGetLeagueTeamsForDmQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetLeagueTeamsForDmQuery,
+    GetLeagueTeamsForDmQueryVariables
+  > &
+    (
+      | { variables: GetLeagueTeamsForDmQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetLeagueTeamsForDmQuery,
+    GetLeagueTeamsForDmQueryVariables
+  >(GetLeagueTeamsForDm, options);
+}
+export function useGetLeagueTeamsForDmLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetLeagueTeamsForDmQuery,
+    GetLeagueTeamsForDmQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetLeagueTeamsForDmQuery,
+    GetLeagueTeamsForDmQueryVariables
+  >(GetLeagueTeamsForDm, options);
+}
+export function useGetLeagueTeamsForDmSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetLeagueTeamsForDmQuery,
+        GetLeagueTeamsForDmQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetLeagueTeamsForDmQuery,
+    GetLeagueTeamsForDmQueryVariables
+  >(
+    GetLeagueTeamsForDm,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetLeagueTeamsForDmQuery,
+          GetLeagueTeamsForDmQueryVariables
+        >,
+  );
+}
+export type GetLeagueTeamsForDmQueryHookResult = ReturnType<
+  typeof useGetLeagueTeamsForDmQuery
+>;
+export type GetLeagueTeamsForDmLazyQueryHookResult = ReturnType<
+  typeof useGetLeagueTeamsForDmLazyQuery
+>;
+export type GetLeagueTeamsForDmSuspenseQueryHookResult = ReturnType<
+  typeof useGetLeagueTeamsForDmSuspenseQuery
+>;
+export type GetLeagueTeamsForDmQueryResult = Apollo.QueryResult<
+  GetLeagueTeamsForDmQuery,
+  GetLeagueTeamsForDmQueryVariables
 >;
 export const GetLeagueMessages = gql`
   query GetLeagueMessages($leagueId: Int!, $limit: Int) {

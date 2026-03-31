@@ -327,6 +327,7 @@ const EXPECTED_DRAWER_ROUTES = [
   { route: 'season-draft/index', title: 'Season Draft Games' },
   { route: 'FreeAgents', title: 'Free Agents' },
   { route: 'TradeCenterPage', title: 'Trade Center' },
+  { route: 'DirectMessages', title: 'Messages' },
   { route: 'management', title: 'Management' },
   { route: 'baseball/league/join', title: 'Join League' },
   { route: 'league-discovery', title: 'Browse Leagues' },

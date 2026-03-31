@@ -1,0 +1,7 @@
+query GetLeagueTeamsForDM($leagueId: Int!) {
+  leagueTeams(leagueId: $leagueId) {
+    id
+    name
+    managerId
+  }
+}

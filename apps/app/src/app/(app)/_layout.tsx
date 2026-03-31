@@ -27,6 +27,7 @@ import MatchupDetail from './baseball/matchup';
 import Team, { TeamIdHeader } from './baseball/team/[teamId]';
 import FreeAgents from './FreeAgents';
 import TradeCenterPage from './TradeCenterPage';
+import DirectMessagesScreen from './DirectMessages';
 import ManagementScreen from './management';
 import AboutScreen from './about';
 import HelpScreen from './help';
@@ -64,6 +65,7 @@ export type AppDrawerParamList = {
   PlayerDetail: { playerId: string; playerName: string };
   'baseball/league/[leagueId]': { leagueId: string };
   'baseball/team/[teamId]': { teamId: string };
+  DirectMessages: undefined;
   management: undefined;
   about: undefined;
   help: undefined;
@@ -124,6 +126,10 @@ const ROUTES = Object.freeze<Route[]>([
   {
     route: 'TradeCenterPage',
     title: 'Trade Center',
+  },
+  {
+    route: 'DirectMessages',
+    title: 'Messages',
   },
   {
     route: 'management',
@@ -341,6 +347,11 @@ export default function Layout() {
             name="PlayerDetail"
             options={{ title: 'Player Details' }}
             component={PlayerDetail}
+          />
+          <Screen
+            name="DirectMessages"
+            options={{ title: 'Messages' }}
+            component={DirectMessagesScreen}
           />
           <Screen
             name="management"
