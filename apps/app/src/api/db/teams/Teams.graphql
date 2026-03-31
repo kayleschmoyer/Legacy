@@ -51,3 +51,31 @@ query GetLeagueTradeBlock($leagueId: Int!) {
     ...TeamMember
   }
 }
+
+# ── Waiver Claims ────────────────────────────────────────────────────────────
+
+query GetTeamWaiverClaims($teamId: Int!, $status: String) {
+  teamWaiverClaims(teamId: $teamId, status: $status) {
+    id
+    leagueId
+    teamId
+    playerId
+    dropPlayerId
+    faabBid
+    status
+    errorMessage
+    playerName
+    dropPlayerName
+    processedAt
+    createdAt
+  }
+}
+
+mutation CancelWaiverClaim($claimId: Int!) {
+  cancelWaiverClaim(claimId: $claimId) {
+    id
+    status
+    errorMessage
+    processedAt
+  }
+}

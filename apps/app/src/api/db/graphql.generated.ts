@@ -5102,6 +5102,45 @@ export type GetLeagueTradeBlockQuery = {
   }> | null;
 };
 
+export type GetTeamWaiverClaimsQueryVariables = Exact<{
+  teamId: Scalars['Int']['input'];
+  status?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+export type GetTeamWaiverClaimsQuery = {
+  __typename?: 'Query';
+  teamWaiverClaims?: Array<{
+    __typename?: 'WaiverClaim';
+    id?: number | null;
+    leagueId?: number | null;
+    teamId?: number | null;
+    playerId?: number | null;
+    dropPlayerId?: number | null;
+    faabBid?: number | null;
+    status?: string | null;
+    errorMessage?: string | null;
+    playerName?: string | null;
+    dropPlayerName?: string | null;
+    processedAt?: string | null;
+    createdAt?: string | null;
+  }> | null;
+};
+
+export type CancelWaiverClaimMutationVariables = Exact<{
+  claimId: Scalars['Int']['input'];
+}>;
+
+export type CancelWaiverClaimMutation = {
+  __typename?: 'Mutation';
+  cancelWaiverClaim?: {
+    __typename?: 'WaiverClaim';
+    id?: number | null;
+    status?: string | null;
+    errorMessage?: string | null;
+    processedAt?: string | null;
+  } | null;
+};
+
 export type UserFragment = {
   __typename?: 'User';
   id?: number | null;
@@ -9761,6 +9800,161 @@ export type GetLeagueTradeBlockSuspenseQueryHookResult = ReturnType<
 export type GetLeagueTradeBlockQueryResult = Apollo.QueryResult<
   GetLeagueTradeBlockQuery,
   GetLeagueTradeBlockQueryVariables
+>;
+export const GetTeamWaiverClaims = gql`
+  query GetTeamWaiverClaims($teamId: Int!, $status: String) {
+    teamWaiverClaims(teamId: $teamId, status: $status) {
+      id
+      leagueId
+      teamId
+      playerId
+      dropPlayerId
+      faabBid
+      status
+      errorMessage
+      playerName
+      dropPlayerName
+      processedAt
+      createdAt
+    }
+  }
+`;
+
+/**
+ * __useGetTeamWaiverClaimsQuery__
+ *
+ * To run a query within a React component, call `useGetTeamWaiverClaimsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetTeamWaiverClaimsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetTeamWaiverClaimsQuery({
+ *   variables: {
+ *      teamId: // value for 'teamId'
+ *      status: // value for 'status'
+ *   },
+ * });
+ */
+export function useGetTeamWaiverClaimsQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetTeamWaiverClaimsQuery,
+    GetTeamWaiverClaimsQueryVariables
+  > &
+    (
+      | { variables: GetTeamWaiverClaimsQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetTeamWaiverClaimsQuery,
+    GetTeamWaiverClaimsQueryVariables
+  >(GetTeamWaiverClaims, options);
+}
+export function useGetTeamWaiverClaimsLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetTeamWaiverClaimsQuery,
+    GetTeamWaiverClaimsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetTeamWaiverClaimsQuery,
+    GetTeamWaiverClaimsQueryVariables
+  >(GetTeamWaiverClaims, options);
+}
+export function useGetTeamWaiverClaimsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetTeamWaiverClaimsQuery,
+        GetTeamWaiverClaimsQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetTeamWaiverClaimsQuery,
+    GetTeamWaiverClaimsQueryVariables
+  >(
+    GetTeamWaiverClaims,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetTeamWaiverClaimsQuery,
+          GetTeamWaiverClaimsQueryVariables
+        >,
+  );
+}
+export type GetTeamWaiverClaimsQueryHookResult = ReturnType<
+  typeof useGetTeamWaiverClaimsQuery
+>;
+export type GetTeamWaiverClaimsLazyQueryHookResult = ReturnType<
+  typeof useGetTeamWaiverClaimsLazyQuery
+>;
+export type GetTeamWaiverClaimsSuspenseQueryHookResult = ReturnType<
+  typeof useGetTeamWaiverClaimsSuspenseQuery
+>;
+export type GetTeamWaiverClaimsQueryResult = Apollo.QueryResult<
+  GetTeamWaiverClaimsQuery,
+  GetTeamWaiverClaimsQueryVariables
+>;
+export const CancelWaiverClaim = gql`
+  mutation CancelWaiverClaim($claimId: Int!) {
+    cancelWaiverClaim(claimId: $claimId) {
+      id
+      status
+      errorMessage
+      processedAt
+    }
+  }
+`;
+export type CancelWaiverClaimMutationFn = MutationFunction<
+  CancelWaiverClaimMutation,
+  CancelWaiverClaimMutationVariables
+>;
+
+/**
+ * __useCancelWaiverClaimMutation__
+ *
+ * To run a mutation, you first call `useCancelWaiverClaimMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useCancelWaiverClaimMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [cancelWaiverClaimMutation, { data, loading, error }] = useCancelWaiverClaimMutation({
+ *   variables: {
+ *      claimId: // value for 'claimId'
+ *   },
+ * });
+ */
+export function useCancelWaiverClaimMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    CancelWaiverClaimMutation,
+    CancelWaiverClaimMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    CancelWaiverClaimMutation,
+    CancelWaiverClaimMutationVariables
+  >(CancelWaiverClaim, options);
+}
+export type CancelWaiverClaimMutationHookResult = ReturnType<
+  typeof useCancelWaiverClaimMutation
+>;
+export type CancelWaiverClaimMutationResult =
+  Apollo.MutationResult<CancelWaiverClaimMutation>;
+export type CancelWaiverClaimMutationOptions = BaseMutationOptions<
+  CancelWaiverClaimMutation,
+  CancelWaiverClaimMutationVariables
 >;
 export const GetUserByEmail = gql`
   query GetUserByEmail($email: String!) {

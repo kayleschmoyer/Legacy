@@ -22,6 +22,7 @@ import {
   LeagueTradeBlock,
   OnThisDayFeed,
   PendingTradeOffers,
+  PendingWaiverClaims,
   useWebSocket,
 } from '@legacy-sports/shared-components';
 import {
@@ -533,6 +534,8 @@ export default function LeagueId(): React.JSX.Element {
                   <PendingTradeOffers teamId={userTeamId} />
                 </YStack>
               )}
+
+              {userTeamId && <PendingWaiverClaims teamId={userTeamId} />}
             </YStack>
           </ScrollView>
         </Tabs.Content>

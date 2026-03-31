@@ -5,4 +5,5 @@ export * from './MatchupRecapPanel';
 export * from './LeagueTradeBlock';
 export * from './StandingsTable';
 export * from './PendingTradeOffers';
+export * from './PendingWaiverClaims';
 export * from './MatchupNavigationControls';
