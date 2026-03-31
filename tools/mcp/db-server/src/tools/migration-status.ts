@@ -73,16 +73,57 @@ export async function migrationStatus(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(info, null, 2),
+          text: JSON.stringify(
+            { available: true, reason: null, ...info },
+            null,
+            2,
+          ),
         },
       ],
     };
   } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+
+    // Classify DB connection failures and return structured "unavailable" responses
+    // so agents can distinguish "DB unreachable — skip/warn" from "migration failed — block".
+    const isSslError =
+      /ssl|certificate|cert_path|self.signed|unable to verify/i.test(msg);
+    const isConnectError =
+      /econnrefused|enotfound|etimedout|timeout|connection.*refused|connect.*failed/i.test(
+        msg,
+      );
+
+    if (isSslError || isConnectError) {
+      const reason = isSslError
+        ? 'SSL certificate error — DB_CERT_PATH may be missing or invalid in this worktree. Run make wt-setup to junction certs/ from the main repo.'
+        : 'DB connection unavailable — the database is unreachable (timeout or ECONNREFUSED). Check network connectivity and DB_HOST in .env.';
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                available: false,
+                reason,
+                applied: null,
+                pending: null,
+                needsMigration: null,
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+        isError: false,
+      };
+    }
+
     return {
       content: [
         {
           type: 'text',
-          text: `Failed to check migration status: ${error instanceof Error ? error.message : String(error)}`,
+          text: `Failed to check migration status: ${msg}`,
         },
       ],
       isError: true,
