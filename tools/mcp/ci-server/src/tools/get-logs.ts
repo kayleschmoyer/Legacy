@@ -20,6 +20,15 @@ const ERROR_PATTERNS =
 /** Nx "Failed tasks" summary section marker. */
 const NX_FAILED_SECTION = /^[\s>]*Failed tasks/i;
 
+/**
+ * GitHub Actions prints each shell command before running it as an ANSI-colored
+ * line (e.g. \x1b[36;1mecho "::error::..."\x1b[0m). These command-echo lines
+ * are not runtime output — they are script templates. Matching them as errors
+ * causes the errorSummary to fill up with duplicate script noise instead of
+ * actual failures.
+ */
+const ANSI_ESCAPE_PREFIX = /^\x1b\[/;
+
 function extractErrorSummary(allLines: string[]): string[] {
   const result: string[] = [];
   const contextLines = 2;
@@ -43,6 +52,7 @@ function extractErrorSummary(allLines: string[]): string[] {
 
     if (
       ERROR_PATTERNS.test(line) &&
+      !ANSI_ESCAPE_PREFIX.test(line) &&
       !/node_modules/.test(line) &&
       !/^\s*at\s/.test(line)
     ) {
