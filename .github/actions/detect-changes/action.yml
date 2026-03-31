@@ -102,10 +102,13 @@ runs:
             fi
           fi
         elif [ "${{ github.event_name }}" = "schedule" ]; then
-          # For scheduled builds, force full build by using empty tree
-          # This ensures comprehensive testing on schedule
-          BASE_REF="4b825dc642cb6eb9a060e54bf8d69288fbee4904"
-          echo "Using empty tree for scheduled full build"
+          # For scheduled builds, use HEAD~1 as base ref.
+          # The analyze step forces all components to "true" for scheduled runs,
+          # so paths-filter results are irrelevant — we just need a valid commit
+          # that paths-filter can process. The empty tree hash (4b825dc...) is a
+          # tree object, not a commit, and dorny/paths-filter@v4 rejects it.
+          BASE_REF=$(git rev-parse HEAD~1 2>/dev/null || git rev-parse HEAD)
+          echo "Using HEAD~1 for scheduled build: $BASE_REF"
         else
           # For other events (workflow_dispatch, etc)
           if [ -n "${{ inputs.base-ref }}" ]; then
@@ -136,10 +139,17 @@ runs:
           fi
         fi
 
-        # Final validation - ensure the base reference exists and resolve to SHA
-        if ! git rev-parse --verify "$BASE_REF" >/dev/null 2>&1; then
-          echo "Warning: BASE_REF '$BASE_REF' not found, using empty tree as fallback"
-          BASE_REF="4b825dc642cb6eb9a060e54bf8d69288fbee4904"  # Empty tree SHA
+        # Final validation - ensure the base reference is a valid commit object
+        if ! git rev-parse --verify "$BASE_REF^{commit}" >/dev/null 2>&1; then
+          echo "Warning: BASE_REF '$BASE_REF' is not a valid commit, falling back to full-repository comparison"
+          ROOT_COMMIT=$(git rev-list --max-parents=0 HEAD 2>/dev/null | tail -n 1)
+          if [ -n "$ROOT_COMMIT" ]; then
+            BASE_REF="$ROOT_COMMIT"
+            echo "Using repository root commit as BASE_REF for full diff: $BASE_REF"
+          else
+            echo "Warning: Unable to determine repository root commit, falling back to HEAD"
+            BASE_REF=$(git rev-parse HEAD)
+          fi
         else
           # Resolve to full SHA for consistency
           if [[ ! "$BASE_REF" =~ ^[a-f0-9]{40}$ ]]; then

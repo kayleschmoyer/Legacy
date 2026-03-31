@@ -280,7 +280,7 @@ jobs:
     name: "🔔 Nightly Start"
     needs: [determine-scope]
     if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 3 * * *'
-    runs-on: ubuntu-latest
+    runs-on: ${{ needs.determine-scope.outputs.runner-label }}
     timeout-minutes: 3
     outputs:
       thread-id: ${{ steps.notify.outputs.thread-id }}
@@ -300,9 +300,9 @@ jobs:
 
   notify-nightly-finish:
     name: "🔔 Nightly Results"
-    needs: [ci-pipeline, notify-nightly-start]
+    needs: [determine-scope, ci-pipeline, notify-nightly-start]
     if: always() && (github.event_name == 'workflow_dispatch' || github.event.schedule == '0 3 * * *')
-    runs-on: ubuntu-latest
+    runs-on: ${{ needs.determine-scope.outputs.runner-label }}
     timeout-minutes: 3
     steps:
       - name: "Checkout Repository"

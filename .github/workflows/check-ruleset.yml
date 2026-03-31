@@ -16,7 +16,7 @@ permissions:
 jobs:
   check-drift:
     name: "Ruleset Drift Detection"
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     permissions:
       contents: read
     steps:

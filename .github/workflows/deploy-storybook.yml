@@ -118,7 +118,25 @@ jobs:
 
             > Storybook is deployed to GitHub Pages on merge to `main`. This comment confirms the build status for this PR.
 
-      # ── Deploy to GitHub Pages (only on main push / manual dispatch) ──────
+  deploy:
+    name: Deploy Storybook
+    needs: [build]
+    if: github.event_name != 'pull_request'
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    # Serialize pushes to the deploy repo to prevent race conditions when
+    # multiple workflows (storybook, PR preview, cleanup) push to gh-pages
+    concurrency:
+      group: deploy-repo-gh-pages-push
+      cancel-in-progress: false
+
+    steps:
+      - name: Download Storybook Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: storybook-build
+          path: dist/storybook
+
       - name: Generate App Token
         if: github.event_name != 'pull_request'
         id: app-token
