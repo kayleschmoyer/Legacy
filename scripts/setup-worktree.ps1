@@ -1,11 +1,12 @@
 # setup-worktree.ps1 - Smart worktree dependency setup
 #
-# Automates the five manual steps every worktree needs:
+# Automates the six manual steps every worktree needs:
 #   1. node_modules             - junction to main repo when lockfiles match; full pnpm install otherwise
 #   2. .env                     - copy from main repo
 #   3. terraform/secrets.auto.tfvars - copy from main repo (prevents interactive terraform prompts)
 #   4. .twig                    - junction to main repo (shared branch-dependency state)
 #   5. .github/skills           - junction to .agents/skills (backward-compat for old skill paths)
+#   6. certs/                   - junction to main repo (RDS SSL certificate for DB connections)
 #
 # Usage (from any directory):
 #   .\scripts\setup-worktree.ps1 -WorktreePath <path>
@@ -449,6 +450,43 @@ elseif (Test-Path $wtGithubSkills) {
 else {
     cmd /c "mklink /J `"$wtGithubSkills`" `"$wtAgentsSkills`"" | Out-Null
     Write-Ok ".github/skills junctioned -> .agents/skills"
+}
+
+# ---------------------------------------------------------------------------
+# 6. certs/ junction (RDS SSL certificate)
+# ---------------------------------------------------------------------------
+# certs/us-east-1-bundle.pem is referenced by DB_CERT_PATH in .env.
+# Without it, lib/db-client falls back to built-in CAs with rejectUnauthorized:true,
+# causing SSL failures against the VPC-internal RDS. A junction is preferred over
+# a copy so cert updates in the main repo propagate automatically.
+
+Write-Step "certs/"
+
+$mainCerts = Join-Path $MainRepoPath "certs"
+$wtCerts   = Join-Path $WorktreePath "certs"
+
+if (-not (Test-Path $mainCerts)) {
+    Write-Warn "No certs/ in main repo -- skipping. To create it: mkdir certs in the main repo and save the AWS RDS us-east-1 certificate bundle as certs/us-east-1-bundle.pem, then re-run wt-setup."
+}
+elseif (Test-IsJunction $wtCerts) {
+    Write-Ok "certs/ junction already exists"
+}
+else {
+    if (Test-Path $wtCerts) {
+        Write-Warn "certs/ exists but is not a junction -- replacing with junction"
+        cmd /c "rmdir `"$wtCerts`"" 2>$null
+        Remove-Item $wtCerts -Recurse -Force -ErrorAction SilentlyContinue
+        if (Test-Path $wtCerts) {
+            Write-Error "Failed to remove existing certs/ at $wtCerts before creating junction"
+            throw "setup-worktree: unable to replace existing certs/ with junction"
+        }
+    }
+    cmd /c "mklink /J `"$wtCerts`" `"$mainCerts`"" | Out-Null
+    if ($LASTEXITCODE -ne 0 -or -not (Test-IsJunction $wtCerts)) {
+        Write-Error "Failed to create certs/ junction from $wtCerts to $mainCerts"
+        throw "setup-worktree: certs/ junction creation failed"
+    }
+    Write-Ok "certs/ junctioned -> main repo"
 }
 
 # ---------------------------------------------------------------------------
