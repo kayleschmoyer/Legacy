@@ -222,6 +222,7 @@ jobs:
           TF_VAR_github_app_id: ${{ secrets.RUNNER_GITHUB_APP_ID }}
           TF_VAR_github_app_key_base64: ${{ secrets.RUNNER_GITHUB_APP_KEY_BASE64 }}
           TF_VAR_github_app_webhook_secret: ${{ secrets.RUNNER_GITHUB_APP_WEBHOOK_SECRET }}
+          TF_VAR_mlb_data_api_key: ${{ secrets.MLB_DATA_API_KEY }}
         run: |
           set -o pipefail
           echo "📋 Planning Terraform changes..."
@@ -311,6 +312,7 @@ jobs:
           TF_VAR_github_app_id: ${{ secrets.RUNNER_GITHUB_APP_ID }}
           TF_VAR_github_app_key_base64: ${{ secrets.RUNNER_GITHUB_APP_KEY_BASE64 }}
           TF_VAR_github_app_webhook_secret: ${{ secrets.RUNNER_GITHUB_APP_WEBHOOK_SECRET }}
+          TF_VAR_mlb_data_api_key: ${{ secrets.MLB_DATA_API_KEY }}
         run: |
           echo "⚠️ SSM versions changed during plan — re-planning with updated values..."
           EXIT_CODE=0
@@ -357,6 +359,7 @@ jobs:
           TF_VAR_github_app_id: ${{ secrets.RUNNER_GITHUB_APP_ID }}
           TF_VAR_github_app_key_base64: ${{ secrets.RUNNER_GITHUB_APP_KEY_BASE64 }}
           TF_VAR_github_app_webhook_secret: ${{ secrets.RUNNER_GITHUB_APP_WEBHOOK_SECRET }}
+          TF_VAR_mlb_data_api_key: ${{ secrets.MLB_DATA_API_KEY }}
         run: |
           echo "🚀 Applying Terraform changes..."
 

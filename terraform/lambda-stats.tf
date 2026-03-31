@@ -44,9 +44,12 @@ resource "aws_iam_policy" "stats_lambda_secrets" {
           "secretsmanager:GetSecretValue",
           "secretsmanager:DescribeSecret"
         ]
-        Resource = [
-          aws_secretsmanager_secret.database_credentials.arn
-        ]
+        Resource = concat(
+          [
+            aws_secretsmanager_secret.database_credentials.arn
+          ],
+          var.mlb_data_api_key != "" ? [aws_secretsmanager_secret.mlb_data_api_key[0].arn] : []
+        )
       }
     ]
   })
@@ -195,6 +198,10 @@ resource "aws_lambda_function" "stats" {
 
       # Rollbar error tracking
       ROLLBAR_ACCESS_TOKEN = var.rollbar_access_token
+
+      # MLB data provider configuration
+      MLB_DATA_PROVIDER            = var.mlb_data_provider
+      MLB_DATA_API_KEY_SECRET_NAME = var.mlb_data_api_key != "" ? aws_secretsmanager_secret.mlb_data_api_key[0].name : ""
     }
   }
 

@@ -258,6 +258,21 @@ resource "aws_secretsmanager_secret_version" "discord_client_secret" {
   secret_id     = aws_secretsmanager_secret.discord_client_secret[0].id
   secret_string = var.discord_client_secret
 }
+
+resource "aws_secretsmanager_secret" "mlb_data_api_key" {
+  count       = var.mlb_data_api_key != "" ? 1 : 0
+  name        = "${var.environment}/mlb-data-api-key"
+  description = "API key for the licensed MLB data provider (balldontlie, rolling-insights, etc.)"
+
+  tags = local.common_tags
+}
+
+resource "aws_secretsmanager_secret_version" "mlb_data_api_key" {
+  count         = var.mlb_data_api_key != "" ? 1 : 0
+  secret_id     = aws_secretsmanager_secret.mlb_data_api_key[0].id
+  secret_string = var.mlb_data_api_key
+}
+
 # Discord webhook URL for the Rollbar Discord notification Lambda
 resource "aws_secretsmanager_secret" "discord_webhook_url" {
   name        = "${var.environment}/discord-webhook-url"

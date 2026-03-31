@@ -52,12 +52,15 @@ resource "aws_iam_policy" "graphql_lambda_secrets" {
           "secretsmanager:DescribeSecret",
           "secretsmanager:ListSecretVersionIds"
         ]
-        Resource = [
-          aws_secretsmanager_secret.database_credentials.arn,
-          aws_secretsmanager_secret.jwt_secret.arn,
-          aws_secretsmanager_secret.stripe_secret_key.arn,
-          aws_secretsmanager_secret.stripe_webhook_secret.arn
-        ]
+        Resource = concat(
+          [
+            aws_secretsmanager_secret.database_credentials.arn,
+            aws_secretsmanager_secret.jwt_secret.arn,
+            aws_secretsmanager_secret.stripe_secret_key.arn,
+            aws_secretsmanager_secret.stripe_webhook_secret.arn
+          ],
+          var.mlb_data_api_key != "" ? [aws_secretsmanager_secret.mlb_data_api_key[0].arn] : []
+        )
       }
     ]
   })
@@ -232,6 +235,10 @@ resource "aws_lambda_function" "graphql" {
       # origin-reflection guard in handler.ts.
       # Falls back to the handler's built-in default when domain_name is empty.
       CORS_ALLOWED_ORIGINS = var.domain_name != "" ? "https://${var.domain_name}" : "https://legacy-fantasy.com"
+
+      # MLB data provider configuration
+      MLB_DATA_PROVIDER            = var.mlb_data_provider
+      MLB_DATA_API_KEY_SECRET_NAME = var.mlb_data_api_key != "" ? aws_secretsmanager_secret.mlb_data_api_key[0].name : ""
     }
   }
 

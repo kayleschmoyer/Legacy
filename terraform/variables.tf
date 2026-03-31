@@ -226,3 +226,29 @@ variable "github_app_webhook_secret" {
   sensitive   = true
   default     = ""
 }
+
+# IMPORTANT: mlb-statsapi is NOT licensed for commercial/production use.
+# Production must use a licensed provider (balldontlie, rolling-insights, etc.)
+# Production deploys with "mlb-statsapi" are blocked by the CI deploy gate (LS-1868).
+variable "mlb_data_provider" {
+  description = "MLB data provider to use. Dev default is mlb-statsapi (free, unlicensed). Production must use a licensed provider."
+  type        = string
+  default     = "mlb-statsapi"
+
+  validation {
+    condition     = contains(["mlb-statsapi", "balldontlie", "rolling-insights"], var.mlb_data_provider)
+    error_message = "mlb_data_provider must be one of: mlb-statsapi, balldontlie, rolling-insights."
+  }
+}
+
+variable "mlb_data_api_key" {
+  description = "API key for the MLB data provider. Leave empty for mlb-statsapi (no key required). Required for balldontlie and rolling-insights in production."
+  type        = string
+  sensitive   = true
+  default     = ""
+
+  validation {
+    condition     = var.mlb_data_provider == "mlb-statsapi" || length(var.mlb_data_api_key) > 0
+    error_message = "mlb_data_api_key must be non-empty when mlb_data_provider is not mlb-statsapi."
+  }
+}
