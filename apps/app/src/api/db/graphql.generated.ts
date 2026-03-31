@@ -3595,6 +3595,8 @@ export type LeagueFragment = {
   draftStatus?: string | null;
   leaguePhase?: string | null;
   inviteCode?: string | null;
+  lmNotes?: string | null;
+  playerPool?: string | null;
   userMembership?: {
     __typename?: 'LeagueMember';
     leagueId?: number | null;
@@ -3639,6 +3641,8 @@ export type GetLeagueByIdQuery = {
     draftStatus?: string | null;
     leaguePhase?: string | null;
     inviteCode?: string | null;
+    lmNotes?: string | null;
+    playerPool?: string | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -3671,6 +3675,8 @@ export type CreateLeagueMutation = {
       draftStatus?: string | null;
       leaguePhase?: string | null;
       inviteCode?: string | null;
+      lmNotes?: string | null;
+      playerPool?: string | null;
       userMembership?: {
         __typename?: 'LeagueMember';
         leagueId?: number | null;
@@ -3711,6 +3717,8 @@ export type GetUserLeaguesQuery = {
     draftStatus?: string | null;
     leaguePhase?: string | null;
     inviteCode?: string | null;
+    lmNotes?: string | null;
+    playerPool?: string | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -3746,6 +3754,8 @@ export type StartDraftMutation = {
     draftStatus?: string | null;
     leaguePhase?: string | null;
     inviteCode?: string | null;
+    lmNotes?: string | null;
+    playerPool?: string | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -5083,6 +5093,8 @@ export const LeagueFragmentDoc = gql`
     draftStatus
     leaguePhase
     inviteCode
+    lmNotes
+    playerPool
     userMembership {
       ...LeagueMember
     }

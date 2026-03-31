@@ -1,147 +1,324 @@
-import React, { useState } from 'react';
-import { Alert } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { Alert, ScrollView } from 'react-native';
 import {
   Button,
   Card,
-  H3,
-  H4,
   Separator,
   Spinner,
   Text,
   XStack,
   YStack,
 } from 'tamagui';
-import { useDeleteAllLeaguesMutation } from '../../api/db/graphql.generated';
+import {
+  AlertTriangle,
+  ChevronLeft,
+  Settings,
+  Shield,
+} from '@tamagui/lucide-icons';
+import {
+  CommissionerAuditLog,
+  CommissionerNoteControl,
+  DeleteLeagueControl,
+  DraftOrderControl,
+  DraftSettingsControl,
+} from '@legacy-sports/shared-components';
+import { LOGGER } from '@legacy-sports/logging';
 
-export const LeagueManagement: React.FC = () => {
-  const [isDeleting, setIsDeleting] = useState(false);
+import {
+  useGetLeagueByIdQuery,
+  useGetUserLeaguesQuery,
+} from '../../api/db/graphql.generated';
+import { useAuthorizedUserInfo } from '../../common/auth/AuthorizedUserContext';
 
-  const [deleteAllLeagues, { loading, error }] = useDeleteAllLeaguesMutation({
-    onCompleted: (data) => {
-      setIsDeleting(false);
-      Alert.alert(
-        'Success',
-        data.deleteAllLeagues || 'All leagues have been deleted successfully',
-        [{ text: 'OK' }],
-      );
-    },
-    onError: (error) => {
-      setIsDeleting(false);
-      Alert.alert('Error', `Failed to delete leagues: ${error.message}`, [
-        { text: 'OK' },
-      ]);
-    },
+function LeagueCommissionerTools({
+  leagueId,
+  leagueName,
+  onBack,
+}: {
+  leagueId: number;
+  leagueName: string;
+  onBack: () => void;
+}) {
+  const userInfo = useAuthorizedUserInfo();
+
+  const {
+    data: leagueData,
+    loading,
+    error,
+  } = useGetLeagueByIdQuery({
+    variables: { id: leagueId },
   });
 
-  const handleDeleteAllLeagues = () => {
-    Alert.alert(
-      'Delete All Leagues',
-      'Are you sure you want to delete ALL of your leagues? This action cannot be undone and will remove:\n\n• All leagues you own\n• All teams in those leagues\n• All roster data\n• All league positions\n• All league members',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Delete All',
-          style: 'destructive',
-          onPress: () => {
-            Alert.alert(
-              'Final Confirmation',
-              'This is your last chance to cancel. Are you absolutely sure you want to delete ALL your leagues?',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'Yes, Delete Everything',
-                  style: 'destructive',
-                  onPress: () => {
-                    setIsDeleting(true);
-                    void deleteAllLeagues();
-                  },
-                },
-              ],
-            );
-          },
-        },
-      ],
+  const league = leagueData?.league;
+  const isCommissioner = useMemo(() => {
+    if (!league || !userInfo) return false;
+    return league.owner === userInfo.id || userInfo.isAdmin;
+  }, [league, userInfo]);
+
+  if (loading) {
+    return (
+      <YStack flex={1} alignItems="center" justifyContent="center" padding="$4">
+        <Spinner size="large" color="$color" />
+      </YStack>
     );
+  }
+
+  if (error || !league) {
+    return (
+      <YStack
+        flex={1}
+        alignItems="center"
+        justifyContent="center"
+        padding="$4"
+        gap="$3"
+      >
+        <Text color="$red10" fontSize="$4" textAlign="center">
+          {error ? 'Failed to load league data.' : 'League not found.'}
+        </Text>
+        <Text
+          onPress={onBack}
+          color="$blue10"
+          fontSize="$4"
+          pressStyle={{ opacity: 0.7 }}
+        >
+          Go back
+        </Text>
+      </YStack>
+    );
+  }
+
+  const handleSuccess = (message: string) => {
+    Alert.alert('Success', message);
+  };
+
+  const handleError = (error: Error) => {
+    LOGGER.error('Commissioner action failed:', error);
+    Alert.alert('Error', error.message);
   };
 
   return (
-    <YStack flex={1} padding="$4" space="$4">
-      <YStack space="$2">
-        <H3>League Management</H3>
-        <Text color="$gray10" fontSize="$3">
-          Manage your leagues and data
-        </Text>
+    <ScrollView contentContainerStyle={{ flexGrow: 1, padding: 16 }}>
+      <YStack gap="$4">
+        <XStack alignItems="center" gap="$2">
+          <Text
+            onPress={onBack}
+            color="$blue10"
+            fontSize="$4"
+            pressStyle={{ opacity: 0.7 }}
+          >
+            <ChevronLeft size={16} color="$blue10" /> {leagueName}
+          </Text>
+        </XStack>
+
+        {!isCommissioner && (
+          <Card
+            backgroundColor="$yellow3"
+            borderColor="$yellow7"
+            borderWidth={1}
+            borderRadius="$5"
+            padding="$4"
+          >
+            <XStack alignItems="center" gap="$2">
+              <Shield size={16} color="$yellow10" />
+              <Text color="$yellow11" fontSize="$3">
+                You are not the commissioner of this league. Some actions may be
+                restricted.
+              </Text>
+            </XStack>
+          </Card>
+        )}
+
+        {/* Audit Log (visible to all members) */}
+        <CommissionerAuditLog leagueId={leagueId} limit={20} />
+
+        {isCommissioner && (
+          <>
+            <Separator />
+
+            {/* Commissioner Notes */}
+            <CommissionerNoteControl
+              leagueId={leagueId}
+              currentNote={league.lmNotes}
+              onSuccess={handleSuccess}
+              onError={handleError}
+            />
+
+            <Separator />
+
+            {/* Draft Order */}
+            <DraftOrderControl
+              leagueId={leagueId}
+              draftStatus={league.draftStatus}
+              onSuccess={handleSuccess}
+              onError={handleError}
+            />
+
+            <Separator />
+
+            {/* Draft Settings */}
+            <DraftSettingsControl
+              leagueId={leagueId}
+              draftStatus={league.draftStatus}
+              playerPool={league.playerPool}
+              onSuccess={handleSuccess}
+              onError={handleError}
+            />
+
+            <Separator />
+
+            {/* Delete League */}
+            <DeleteLeagueControl
+              leagueId={leagueId}
+              leagueName={leagueName}
+              onDeleted={onBack}
+              onError={handleError}
+            />
+          </>
+        )}
       </YStack>
+    </ScrollView>
+  );
+}
 
-      <Separator />
+export const LeagueManagement: React.FC = () => {
+  const userInfo = useAuthorizedUserInfo();
+  const [selectedLeague, setSelectedLeague] = useState<{
+    id: number;
+    name: string;
+  } | null>(null);
 
-      <Card padding="$4" backgroundColor="$red1" borderColor="$red6">
-        <YStack space="$4">
-          <YStack space="$2">
-            <H4 color="$red11">Danger Zone</H4>
-            <Text color="$red10" fontSize="$3">
-              Destructive actions that cannot be undone
+  const { data, loading, error, refetch } = useGetUserLeaguesQuery({
+    skip: !userInfo?.id,
+  });
+
+  if (selectedLeague != null) {
+    return (
+      <LeagueCommissionerTools
+        leagueId={selectedLeague.id}
+        leagueName={selectedLeague.name}
+        onBack={() => setSelectedLeague(null)}
+      />
+    );
+  }
+
+  const leagues = data?.userLeagues ?? [];
+
+  return (
+    <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+      <YStack flex={1} padding="$4" gap="$4">
+        <XStack alignItems="center" gap="$2">
+          <Settings size={20} color="$color" />
+          <Text fontSize="$6" fontWeight="700" color="$color">
+            League Management
+          </Text>
+        </XStack>
+
+        <Text color="$textMuted" fontSize="$3">
+          Select a league to manage settings and commissioner tools.
+        </Text>
+
+        {loading && (
+          <YStack alignItems="center" padding="$6">
+            <Spinner size="large" color="$color" />
+          </YStack>
+        )}
+
+        {!loading && error != null && (
+          <YStack alignItems="center" justifyContent="center" flex={1} gap="$3">
+            <AlertTriangle size={32} color="$red10" />
+            <Text color="$red10" fontSize="$4" textAlign="center">
+              Failed to load leagues.
+            </Text>
+            <Text color="$textMuted" fontSize="$3" textAlign="center">
+              {error.message}
+            </Text>
+            <Button
+              size="$3"
+              theme="active"
+              onPress={() => {
+                refetch().catch(() => {
+                  /* refetch error is captured by the hook */
+                });
+              }}
+            >
+              Retry
+            </Button>
+          </YStack>
+        )}
+
+        {!loading && error == null && leagues.length === 0 && (
+          <YStack alignItems="center" justifyContent="center" flex={1} gap="$3">
+            <Settings size={32} color="$textMuted" />
+            <Text color="$textMuted" fontSize="$4" textAlign="center">
+              No leagues found.
+            </Text>
+            <Text color="$textMuted" fontSize="$3" textAlign="center">
+              Join or create a league to manage it.
             </Text>
           </YStack>
+        )}
 
-          <Separator borderColor="$red6" />
+        {leagues.map((league) => {
+          const leagueId = league.id;
+          if (leagueId == null) return null;
 
-          <YStack space="$3">
-            <YStack space="$2">
-              <Text fontWeight="600" color="$red11">
-                Delete All Leagues
-              </Text>
-              <Text fontSize="$2" color="$gray10">
-                Permanently delete all leagues you own, including all teams,
-                roster data, positions, and member information. This action
-                cannot be undone.
-              </Text>
-            </YStack>
+          const isCommissioner =
+            league.owner === userInfo?.id || userInfo?.isAdmin === true;
 
-            <XStack justifyContent="flex-end">
-              <Button
-                theme="red"
-                size="$3"
-                disabled={isDeleting || loading}
-                onPress={handleDeleteAllLeagues}
-                icon={
-                  isDeleting || loading ? <Spinner size="small" /> : undefined
-                }
-              >
-                {isDeleting || loading ? 'Deleting...' : 'Delete All Leagues'}
-              </Button>
-            </XStack>
-          </YStack>
-
-          {error && (
-            <Card padding="$3" backgroundColor="$red3" borderColor="$red7">
-              <Text color="$red11" fontSize="$2">
-                Error: {error.message}
-              </Text>
+          return (
+            <Card
+              key={leagueId}
+              backgroundColor="$surfacePanel"
+              borderColor="$surfacePanelBorder"
+              borderWidth={1}
+              borderRadius="$5"
+              padding="$4"
+              pressStyle={{ opacity: 0.8, scale: 0.98 }}
+              onPress={() =>
+                setSelectedLeague({
+                  id: leagueId,
+                  name: league.name ?? 'League',
+                })
+              }
+            >
+              <XStack alignItems="center" justifyContent="space-between">
+                <XStack alignItems="center" gap="$3" flex={1}>
+                  <YStack
+                    width={40}
+                    height={40}
+                    borderRadius={20}
+                    backgroundColor={
+                      isCommissioner ? '$blue3' : '$surfaceSubtle'
+                    }
+                    alignItems="center"
+                    justifyContent="center"
+                  >
+                    {isCommissioner ? (
+                      <Shield size={18} color="$blue10" />
+                    ) : (
+                      <Settings size={18} color="$color" />
+                    )}
+                  </YStack>
+                  <YStack flex={1}>
+                    <Text
+                      fontSize="$4"
+                      fontWeight="600"
+                      color="$color"
+                      numberOfLines={1}
+                    >
+                      {league.name ?? 'League'}
+                    </Text>
+                    <Text fontSize="$2" color="$textMuted">
+                      {isCommissioner ? 'Commissioner' : 'Member'}
+                    </Text>
+                  </YStack>
+                </XStack>
+              </XStack>
             </Card>
-          )}
-        </YStack>
-      </Card>
-
-      <Card padding="$4" backgroundColor="$blue1" borderColor="$blue6">
-        <YStack space="$3">
-          <H4 color="$blue11">Information</H4>
-          <Text fontSize="$3" color="$gray10">
-            • Only leagues you own will be deleted
-          </Text>
-          <Text fontSize="$3" color="$gray10">
-            • Leagues where you're a member (but not the owner) will not be
-            affected
-          </Text>
-          <Text fontSize="$3" color="$gray10">
-            • You can create new leagues after deletion
-          </Text>
-        </YStack>
-      </Card>
-    </YStack>
+          );
+        })}
+      </YStack>
+    </ScrollView>
   );
 };
 

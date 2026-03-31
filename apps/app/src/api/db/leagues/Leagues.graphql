@@ -8,6 +8,8 @@ fragment League on League {
   draftStatus
   leaguePhase
   inviteCode
+  lmNotes
+  playerPool
   userMembership {
     ...LeagueMember
   }
