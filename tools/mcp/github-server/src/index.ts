@@ -414,7 +414,7 @@ server.tool(
 // --- github_list_prs ---
 server.tool(
   'github_list_prs',
-  'List PRs with optional filters.',
+  'List PRs with optional filters. Auto-paginates to return all matching PRs (up to limit). Response includes total and hasMore fields.',
   {
     state: z
       .enum(['open', 'closed', 'merged', 'all'])
@@ -428,9 +428,11 @@ server.tool(
       .number()
       .int()
       .positive()
-      .max(100)
-      .default(20)
-      .describe('Max results (default: 20)'),
+      .max(500)
+      .default(500)
+      .describe(
+        'Max total results across all pages (default: 500, auto-paginates)',
+      ),
   },
   async (params) => listPRs(params),
 );
