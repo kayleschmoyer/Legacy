@@ -45,8 +45,10 @@ module "github_runners" {
   # idle runners pick up jobs before launching new instances, but with ephemeral
   # runners there are never idle runners — so 30s is pure dead time per job start.
   # At ~5 sequential stages per pipeline, this saves ~100s per CI run.
-  delay_webhook_event     = 10
-  enable_job_queued_check = true # verify job is still queued before launching instance (mitigates reduced delay)
+  delay_webhook_event = 10
+  # TODO: re-enable after adding `actions: read` to the GitHub App permissions.
+  # The app currently lacks this scope, causing 403s on the queued-job check.
+  enable_job_queued_check = false
 
   # Spot instances with fleet diversification across types and AZs.
   # capacity-optimized-prioritized picks from the pools with the most
@@ -188,32 +190,38 @@ module "github_runners" {
 }
 
 # =============================================================================
-# Runner IAM Permissions Boundary (LS-1653)
+# Module IAM Permissions Boundary (LS-1653)
 # =============================================================================
-# Limits what the runner EC2 instances can do, even if the module grants broader
-# permissions. Runners only need:
-#   - SSM core (for module health checks and debugging via Session Manager)
-#   - CloudWatch Logs (for future log shipping — LS-1667)
-#   - S3 read (for runner binary bucket managed by the module)
-#   - EC2 Describe (e.g. DescribeInstances, DescribeTags) for runner lifecycle
-#     and tagging logic used by the module (read-only, no EC2 mutations)
-#   - EC2 instance metadata (retrieved via IMDS; does not require IAM)
+# Applied to ALL IAM roles created by the github-aws-runners module: EC2 runner
+# instances AND Lambda functions (webhook, scale-up, scale-down, syncer).
+# Limits the maximum permissions any module-created role can assume, regardless
+# of the policies the module attaches.
 #
-# Runners do NOT run AWS CLI commands for deployments — that's handled by the
-# GitHub Actions OIDC role (github-actions-oidc.tf). This boundary ensures a
-# compromised runner cannot escalate to infrastructure-level operations.
+# Threat model: a compromised runner or Lambda cannot escalate beyond these
+# actions. The boundary covers:
+#   - SSM (Session Manager for EC2, Parameter Store for Lambda config/secrets)
+#   - CloudWatch Logs (Lambda execution logs + future runner log shipping)
+#   - S3 read (runner binary bucket managed by the module)
+#   - SQS + EventBridge (inter-Lambda messaging for scale-up pipeline)
+#   - EC2 fleet + describe (scale-up Lambda launches spot instances)
+#   - IAM PassRole (scale-up Lambda passes runner profile to EC2, constrained
+#     to ec2.amazonaws.com via PassedToService condition)
+#   - EC2 self-terminate (ephemeral runners clean up after job completion)
+#
+# Runners do NOT run AWS CLI commands for deployments — that is handled by the
+# GitHub Actions OIDC role (github-actions-oidc.tf).
 # =============================================================================
 resource "aws_iam_policy" "runner_permissions_boundary" {
   count       = var.enable_github_runners ? 1 : 0
   name        = "${local.name_prefix}-runner-permissions-boundary"
-  description = "Permissions boundary for self-hosted GitHub Actions runner instances"
+  description = "Permissions boundary for all IAM roles created by the github-runners module (EC2 runner instances and Lambda functions). Limits the maximum permissions any module-created role can assume, regardless of attached policies."
 
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
-      # SSM core — required by the module for instance registration and health
+      # SSM Session Manager — EC2 runner health checks and debugging.
       {
-        Sid    = "SSMCore"
+        Sid    = "SSMSessionManager"
         Effect = "Allow"
         Action = [
           "ssm:UpdateInstanceInformation",
@@ -230,7 +238,34 @@ resource "aws_iam_policy" "runner_permissions_boundary" {
         ]
         Resource = "*"
       },
-      # CloudWatch Logs — for runner log shipping (LS-1667)
+      # SSM Parameter Store — scoped to runner-prefixed parameters.
+      # Lambdas read config/secrets; EC2 runners write registration tokens.
+      {
+        Sid    = "SSMParameterStore"
+        Effect = "Allow"
+        Action = [
+          "ssm:GetParameter",
+          "ssm:GetParameters",
+          "ssm:GetParametersByPath",
+          "ssm:PutParameter",
+          "ssm:DeleteParameter",
+          "ssm:AddTagsToResource",
+          "ssm:RemoveTagsFromResource",
+          "ssm:ListTagsForResource"
+        ]
+        Resource = "arn:aws:ssm:${local.region}:${local.account_id}:parameter/${local.name_prefix}-runner*"
+      },
+      # SSM DescribeParameters — does not support resource-level scoping.
+      {
+        Sid    = "SSMDescribeParameters"
+        Effect = "Allow"
+        Action = [
+          "ssm:DescribeParameters"
+        ]
+        Resource = "*"
+      },
+      # CloudWatch Logs — module Lambdas log to /aws/lambda/... paths, not
+      # /github-runners/. Must allow both for Lambdas and future runner logs.
       {
         Sid    = "CloudWatchLogs"
         Effect = "Allow"
@@ -243,7 +278,9 @@ resource "aws_iam_policy" "runner_permissions_boundary" {
         ]
         Resource = [
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/github-runners/*",
-          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/github-runners/*:*"
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/github-runners/*:*",
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/lambda/${local.name_prefix}-runner-*",
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/lambda/${local.name_prefix}-runner-*:*"
         ]
       },
       # S3 read — runner binary bucket (managed by the module)
@@ -260,6 +297,43 @@ resource "aws_iam_policy" "runner_permissions_boundary" {
           "arn:aws:s3:::${local.name_prefix}-runner-*/*"
         ]
       },
+      # SQS — scale-up Lambda reads from the queued-builds queue, webhook
+      # Lambda sends to EventBridge which routes to SQS
+      {
+        Sid    = "SQS"
+        Effect = "Allow"
+        Action = [
+          "sqs:SendMessage",
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes",
+          "sqs:ChangeMessageVisibility"
+        ]
+        Resource = "arn:aws:sqs:${local.region}:${local.account_id}:${local.name_prefix}-runner-*"
+      },
+      # EventBridge — webhook Lambda publishes events to the runner event bus
+      {
+        Sid    = "EventBridge"
+        Effect = "Allow"
+        Action = [
+          "events:PutEvents"
+        ]
+        Resource = "arn:aws:events:${local.region}:${local.account_id}:event-bus/${local.name_prefix}-runner-*"
+      },
+      # EC2 fleet — scale-up Lambda launches spot instances
+      {
+        Sid    = "EC2Fleet"
+        Effect = "Allow"
+        Action = [
+          "ec2:CreateFleet",
+          "ec2:RunInstances",
+          "ec2:CreateTags"
+        ]
+        Resource = [
+          "arn:aws:ec2:${local.region}:${local.account_id}:*",
+          "arn:aws:ec2:${local.region}::image/*"
+        ]
+      },
       # EC2 describe — needed for instance metadata and spot interruption checks
       {
         Sid    = "EC2Describe"
@@ -269,6 +343,38 @@ resource "aws_iam_policy" "runner_permissions_boundary" {
           "ec2:DescribeTags"
         ]
         Resource = "*"
+      },
+      # IAM PassRole — scale-up Lambda passes the runner instance profile role
+      # to EC2 instances it launches. Constrained to ec2.amazonaws.com to
+      # prevent passing roles to other services.
+      {
+        Sid    = "IAMPassRole"
+        Effect = "Allow"
+        Action = [
+          "iam:PassRole"
+        ]
+        Resource = "arn:aws:iam::${local.account_id}:role/${local.name_prefix}-runner*"
+        Condition = {
+          StringEquals = {
+            "iam:PassedToService" = "ec2.amazonaws.com"
+          }
+        }
+      },
+      # EC2 self-terminate — ephemeral runners terminate themselves after job
+      # completion. Without this, completed runners become zombies that block
+      # scale-up (the scale-up Lambda counts them toward maximumRunners).
+      {
+        Sid    = "EC2SelfTerminate"
+        Effect = "Allow"
+        Action = [
+          "ec2:TerminateInstances"
+        ]
+        Resource = "arn:aws:ec2:${local.region}:${local.account_id}:instance/*"
+        Condition = {
+          StringEquals = {
+            "ec2:ResourceTag/ghr:environment" = "${local.name_prefix}-runner"
+          }
+        }
       }
     ]
   })

@@ -48,18 +48,55 @@ resource "aws_vpc_endpoint" "secretsmanager" {
 
   private_dns_enabled = true
 
-  # Endpoint policy to allow all Secrets Manager actions (can be restricted later)
+  # Endpoint policy: scoped to secrets this stack manages.
+  # private_dns_enabled routes ALL Secrets Manager API calls through this
+  # endpoint, including from self-hosted runners in public subnets.
+  #
+  # Statement 1: Runtime reads — any principal can read stack-scoped secrets.
+  # Statement 2: Write/policy mutations — restricted to Terraform/CI roles
+  #   via aws:PrincipalArn condition (Terraform's aws_secretsmanager_secret
+  #   resource refresh calls GetResourcePolicy; apply calls
+  #   PutResourcePolicy/DeleteResourcePolicy).
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
+        Sid       = "RuntimeReads"
         Effect    = "Allow"
         Principal = "*"
         Action = [
           "secretsmanager:GetSecretValue",
-          "secretsmanager:DescribeSecret"
+          "secretsmanager:DescribeSecret",
+          "secretsmanager:GetResourcePolicy",
+          "secretsmanager:ListSecretVersionIds",
         ]
-        Resource = "*"
+        Resource = "arn:aws:secretsmanager:*:*:secret:${local.name_prefix}-*"
+      },
+      {
+        Sid       = "TerraformWriteAndPolicy"
+        Effect    = "Allow"
+        Principal = "*"
+        Action = [
+          "secretsmanager:CreateSecret",
+          "secretsmanager:PutSecretValue",
+          "secretsmanager:UpdateSecret",
+          "secretsmanager:DeleteSecret",
+          "secretsmanager:TagResource",
+          "secretsmanager:UntagResource",
+          "secretsmanager:RestoreSecret",
+          "secretsmanager:UpdateSecretVersionStage",
+          "secretsmanager:PutResourcePolicy",
+          "secretsmanager:DeleteResourcePolicy",
+        ]
+        Resource = "arn:aws:secretsmanager:*:*:secret:${local.name_prefix}-*"
+        Condition = {
+          ArnLike = {
+            "aws:PrincipalArn" = [
+              "arn:aws:iam::${local.account_id}:role/${local.name_prefix}-runner*",
+              "arn:aws:iam::${local.account_id}:role/github-actions-oidc-*",
+            ]
+          }
+        }
       }
     ]
   })
