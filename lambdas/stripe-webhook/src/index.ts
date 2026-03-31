@@ -20,6 +20,7 @@ import {
   withRollbar,
 } from '@legacy-sports/rollbar';
 import { notifyStripeEvent } from './discord';
+import { sendGa4ServerEvent } from './ga4';
 
 // Initialize Rollbar on cold start
 const rollbarConfig = getRollbarConfigFromEnv();
@@ -328,6 +329,11 @@ async function handleCheckoutSessionCompleted(
     stripeCustomerId,
     stripeSubscriptionId,
     status: subscription.status,
+  });
+
+  await sendGa4ServerEvent(userId, 'subscription_started', {
+    tier: 'premium',
+    source: 'stripe',
   });
 
   return userId;
@@ -767,6 +773,12 @@ const baseStripeWebhookHandler = async (
         subscriptionId = sub.id;
         customerId = typeof sub.customer === 'string' ? sub.customer : null;
         subscriptionStatus = 'canceled';
+        if (userId !== null) {
+          await sendGa4ServerEvent(userId, 'subscription_cancelled', {
+            tier: 'premium',
+            source: 'stripe',
+          });
+        }
         break;
       }
 
@@ -783,6 +795,17 @@ const baseStripeWebhookHandler = async (
           typeof invoice.customer === 'string' ? invoice.customer : null;
         invoiceAmount = invoice.amount_paid ?? null;
         invoiceCurrency = invoice.currency ?? null;
+        // Fire subscription_renewed for recurring payments only — the initial
+        // payment is already covered by checkout.session.completed.
+        if (
+          userId !== null &&
+          invoice.billing_reason === 'subscription_cycle'
+        ) {
+          await sendGa4ServerEvent(userId, 'subscription_renewed', {
+            tier: 'premium',
+            source: 'stripe',
+          });
+        }
         break;
       }
 

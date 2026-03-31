@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   H1,
   Paragraph,
@@ -14,7 +14,9 @@ import {
   RefreshCw,
   Zap,
 } from '@tamagui/lucide-icons';
+import { useSearchParams } from 'react-router-dom';
 import { PageMeta } from '../../components/PageMeta';
+import { trackSubscriptionStarted } from '../../utils/analytics';
 import {
   useCreateBillingPortalSessionMutation,
   useCreateCheckoutSessionMutation,
@@ -516,12 +518,21 @@ const SubscriptionPage: React.FC = () => {
   const [createBillingPortalSession, { loading: portalLoading }] =
     useCreateBillingPortalSessionMutation();
 
+  const [searchParams] = useSearchParams();
+
   const isPremium =
     subscription?.status === 'active' || subscription?.status === 'trialing';
   const isPastDue = subscription?.status === 'past_due';
   const isCanceled = subscription?.status === 'canceled';
   const isFree = !subscription || subscription.status === null;
   const cancelAtPeriodEnd = subscription?.cancelAtPeriodEnd ?? false;
+
+  // Fire subscription_started when Stripe redirects back with ?checkout=success.
+  useEffect(() => {
+    if (searchParams.get('checkout') === 'success') {
+      trackSubscriptionStarted('premium');
+    }
+  }, [searchParams]);
 
   const handleUpgrade = async () => {
     const priceId =

@@ -28,6 +28,7 @@ import {
   withRollbar,
 } from '@legacy-sports/rollbar';
 import { decodeAndVerifyJws } from './jws';
+import { sendGa4ServerEvent } from './ga4';
 import type { AppStoreNotification, NotificationType } from './types';
 
 const rollbarConfig = getRollbarConfigFromEnv();
@@ -282,6 +283,33 @@ async function handleNotification(
     status,
     tier,
   });
+
+  // Fire GA4 Measurement Protocol events for subscription lifecycle changes.
+  switch (notificationType) {
+    case 'SUBSCRIBED':
+    case 'OFFER_REDEEMED':
+      await sendGa4ServerEvent(userId, 'subscription_started', {
+        tier: 'premium',
+        source: 'apple_iap',
+      });
+      break;
+    case 'DID_RENEW':
+    case 'DID_RECOVER':
+      await sendGa4ServerEvent(userId, 'subscription_renewed', {
+        tier: 'premium',
+        source: 'apple_iap',
+      });
+      break;
+    case 'EXPIRED':
+    case 'GRACE_PERIOD_EXPIRED':
+    case 'REFUND':
+    case 'REVOKE':
+      await sendGa4ServerEvent(userId, 'subscription_cancelled', {
+        tier: 'premium',
+        source: 'apple_iap',
+      });
+      break;
+  }
 
   return userId;
 }
