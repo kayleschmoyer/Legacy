@@ -109,6 +109,23 @@ jobs:
           role-to-assume: arn:aws:iam::176661590736:role/legacy-sports-dev-github-actions
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Block unlicensed MLB data provider in production
+        # Defense-in-depth gate alongside the Terraform validation and runtime guard.
+        # The free MLB Stats API (mlb-statsapi) is for development only — its terms
+        # restrict commercial use of the API. Player statistics are public domain per
+        # CBC Distribution v. MLBAM (8th Cir. 2007, cert denied 2008), but any
+        # commercial deployment requires a licensed data redistribution provider
+        # since we operate commercially with premium subscriptions.
+        env:
+          TF_VAR_mlb_data_provider: ${{ secrets.MLB_DATA_PROVIDER || vars.MLB_DATA_PROVIDER }}
+        run: |
+          if [ "$TF_VAR_mlb_data_provider" = "mlb-statsapi" ] || [ -z "$TF_VAR_mlb_data_provider" ]; then
+            echo "::error::Cannot deploy with MLB Stats API — not licensed for commercial use."
+            echo "::error::Set MLB_DATA_PROVIDER to a licensed provider. See repository secrets documentation."
+            exit 1
+          fi
+          echo "MLB data provider configured"
+
       - name: Debounce Multiple Triggers
         if: ${{ github.event_name != 'workflow_dispatch' || !inputs.skip-debounce }}
         run: |
