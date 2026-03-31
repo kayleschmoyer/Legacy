@@ -62,6 +62,7 @@ import { LeagueScoringSummary } from '@legacy-sports/shared-components';
 import { MatchupNavigationControls } from '@legacy-sports/shared-components';
 import { PageMeta } from '../../components/PageMeta';
 import { LeagueActivityFeed } from '../../features/baseball/LeagueActivityFeed';
+import { LeagueHistory } from '../../features/baseball/LeagueHistory';
 import { LeagueScoringEditor } from '../../features/baseball/LeagueScoringEditor';
 import { LeagueTradeBlock } from '../../features/baseball/LeagueTradeBlock';
 import { TradingCenter } from '../../features/baseball/TradingCenter';
@@ -352,6 +353,7 @@ type TabId =
   | 'roster'
   | 'free-agents'
   | 'standings'
+  | 'history'
   | 'matchup'
   | 'trades'
   | 'team-settings'
@@ -369,6 +371,7 @@ const TABS: TabDef[] = [
   { id: 'roster', label: 'My Roster', icon: <ClipboardList size={16} /> },
   { id: 'free-agents', label: 'Free Agents', icon: <UserPlus size={16} /> },
   { id: 'standings', label: 'Standings', icon: <Trophy size={16} /> },
+  { id: 'history', label: 'History', icon: <Clock size={16} /> },
   { id: 'matchup', label: 'Matchup', icon: <Swords size={16} /> },
   { id: 'trades', label: 'Trades', icon: <ArrowLeftRight size={16} /> },
   { id: 'team-settings', label: 'My Team', icon: <Edit3 size={16} /> },
@@ -387,6 +390,7 @@ const TAB_ALIASES: Record<string, TabId> = {
   roster: 'roster',
   'free-agents': 'free-agents',
   standings: 'standings',
+  history: 'history',
   matchup: 'matchup',
   trades: 'trades',
   'team-settings': 'team-settings',
@@ -3866,6 +3870,16 @@ export function LeagueDetailPage(): React.JSX.Element {
                   ) : null}
                 </>
               )}
+            </YStack>
+          )}
+          {activeTab === 'history' && (
+            <YStack
+              role="tabpanel"
+              id="panel-history"
+              aria-labelledby="tab-history"
+              gap="$4"
+            >
+              <LeagueHistory leagueId={leagueId} />
             </YStack>
           )}
           {activeTab === 'matchup' && (

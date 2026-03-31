@@ -5,6 +5,7 @@ export * from './lib/client/Helpers';
 export * from './lib/client/abstract/PgDbConnection';
 export * from './lib/client/abstract/DbClient';
 export * from './lib/client/matchup-history';
+export * from './lib/client/league-history';
 
 // Service layer
 export * from './lib/services';

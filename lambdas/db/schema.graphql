@@ -53,6 +53,19 @@ type AdvanceLeagueWeekResponse {
   matchups: [Matchup!]
 }
 
+"""
+An all-time record across all seasons in a league's history
+"""
+type AllTimeRecord {
+  details: String
+  leagueId: Int
+  recordType: String
+  seasonNumber: Int
+  teamId: Int
+  teamName: String
+  value: Float
+}
+
 type AppleVerifyResult {
   status: String
   success: Boolean
@@ -992,6 +1005,24 @@ type LeagueSeasonAward {
   playerLastName: String
   season: Int
   updatedAt: String
+}
+
+"""
+Summary of a single season in a league's history
+"""
+type LeagueSeasonSummary {
+  championScore: Float
+  championTeamId: Int
+  championTeamName: String
+  frozenAt: String
+  leagueId: Int
+  leaguePhase: String
+  name: String
+  runnerUpScore: Float
+  runnerUpTeamId: Int
+  runnerUpTeamName: String
+  seasonNumber: Int
+  totalMatchups: Int
 }
 
 """
@@ -2200,6 +2231,11 @@ type Query {
   """
   exportMyData: UserDataExport
   freeAgents(leagueId: Int!): [Player!]
+
+  """
+  Get all-time records across all seasons in a league's history (most wins, highest score, longest win streak, most points in a season).
+  """
+  getAllTimeRecords(leagueId: Int!): [AllTimeRecord!]
   getAvailableDraftPlayers(
     draftId: Int!
     limit: Int
@@ -2233,6 +2269,11 @@ type Query {
   getLeagueAnalytics(leagueId: Int!): LeagueAnalytics
   getLeagueAnnouncements(leagueId: Int!): [LeagueChatMessage!]
   getLeagueDraft(leagueId: Int!): Draft
+
+  """
+  Get the full season history for a league by traversing the previousLeagueId lineage chain. Returns seasons in reverse chronological order (current first).
+  """
+  getLeagueHistory(leagueId: Int!): [LeagueSeasonSummary!]
   getLeagueMessages(leagueId: Int!, limit: Int): [LeagueChatMessage!]
   getLeagueStandings(leagueId: Int!, season: Int): [TeamStanding!]
   getMatchupById(id: Int!): Matchup

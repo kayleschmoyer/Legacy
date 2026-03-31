@@ -23,6 +23,7 @@ import './on-this-day';
 import './activity-log';
 import './season-draft-game';
 import './season-awards';
+import './league-history';
 import './dues';
 import './analytics';
 import './subscriptions';

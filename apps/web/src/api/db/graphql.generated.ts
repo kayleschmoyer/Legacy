@@ -76,6 +76,18 @@ export type AdvanceLeagueWeekResponse = {
   matchups?: Maybe<Array<Matchup>>;
 };
 
+/** An all-time record across all seasons in a league's history */
+export type AllTimeRecord = {
+  __typename?: 'AllTimeRecord';
+  details?: Maybe<Scalars['String']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  recordType?: Maybe<Scalars['String']['output']>;
+  seasonNumber?: Maybe<Scalars['Int']['output']>;
+  teamId?: Maybe<Scalars['Int']['output']>;
+  teamName?: Maybe<Scalars['String']['output']>;
+  value?: Maybe<Scalars['Float']['output']>;
+};
+
 export type AppleVerifyResult = {
   __typename?: 'AppleVerifyResult';
   status?: Maybe<Scalars['String']['output']>;
@@ -900,6 +912,23 @@ export type LeagueSeasonAward = {
   playerLastName?: Maybe<Scalars['String']['output']>;
   season?: Maybe<Scalars['Int']['output']>;
   updatedAt?: Maybe<Scalars['String']['output']>;
+};
+
+/** Summary of a single season in a league's history */
+export type LeagueSeasonSummary = {
+  __typename?: 'LeagueSeasonSummary';
+  championScore?: Maybe<Scalars['Float']['output']>;
+  championTeamId?: Maybe<Scalars['Int']['output']>;
+  championTeamName?: Maybe<Scalars['String']['output']>;
+  frozenAt?: Maybe<Scalars['String']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  leaguePhase?: Maybe<Scalars['String']['output']>;
+  name?: Maybe<Scalars['String']['output']>;
+  runnerUpScore?: Maybe<Scalars['Float']['output']>;
+  runnerUpTeamId?: Maybe<Scalars['Int']['output']>;
+  runnerUpTeamName?: Maybe<Scalars['String']['output']>;
+  seasonNumber?: Maybe<Scalars['Int']['output']>;
+  totalMatchups?: Maybe<Scalars['Int']['output']>;
 };
 
 /** A head-to-head matchup between two teams in a league */
@@ -2136,6 +2165,8 @@ export type Query = {
   /** Get a complete export of all personal data for the authenticated user */
   exportMyData?: Maybe<UserDataExport>;
   freeAgents?: Maybe<Array<Player>>;
+  /** Get all-time records across all seasons in a league's history (most wins, highest score, longest win streak, most points in a season). */
+  getAllTimeRecords?: Maybe<Array<AllTimeRecord>>;
   getAvailableDraftPlayers?: Maybe<Array<DraftPlayer>>;
   getChampionshipTrophies?: Maybe<Array<ChampionTrophy>>;
   getCurrentDraftPick?: Maybe<CurrentDraftPick>;
@@ -2152,6 +2183,8 @@ export type Query = {
   getLeagueAnalytics?: Maybe<LeagueAnalytics>;
   getLeagueAnnouncements?: Maybe<Array<LeagueChatMessage>>;
   getLeagueDraft?: Maybe<Draft>;
+  /** Get the full season history for a league by traversing the previousLeagueId lineage chain. Returns seasons in reverse chronological order (current first). */
+  getLeagueHistory?: Maybe<Array<LeagueSeasonSummary>>;
   getLeagueMessages?: Maybe<Array<LeagueChatMessage>>;
   getLeagueStandings?: Maybe<Array<TeamStanding>>;
   getMatchupById?: Maybe<Matchup>;
@@ -2317,6 +2350,10 @@ export type QueryFreeAgentsArgs = {
   leagueId: Scalars['Int']['input'];
 };
 
+export type QueryGetAllTimeRecordsArgs = {
+  leagueId: Scalars['Int']['input'];
+};
+
 export type QueryGetAvailableDraftPlayersArgs = {
   draftId: Scalars['Int']['input'];
   limit?: InputMaybe<Scalars['Int']['input']>;
@@ -2379,6 +2416,10 @@ export type QueryGetLeagueAnnouncementsArgs = {
 };
 
 export type QueryGetLeagueDraftArgs = {
+  leagueId: Scalars['Int']['input'];
+};
+
+export type QueryGetLeagueHistoryArgs = {
   leagueId: Scalars['Int']['input'];
 };
 
@@ -3932,6 +3973,47 @@ export type SearchUsersForDraftQuery = {
     id?: number | null;
     username?: string | null;
     avatarUrl?: string | null;
+  }> | null;
+};
+
+export type GetLeagueHistoryQueryVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+}>;
+
+export type GetLeagueHistoryQuery = {
+  __typename?: 'Query';
+  getLeagueHistory?: Array<{
+    __typename?: 'LeagueSeasonSummary';
+    leagueId?: number | null;
+    seasonNumber?: number | null;
+    name?: string | null;
+    frozenAt?: string | null;
+    leaguePhase?: string | null;
+    totalMatchups?: number | null;
+    championTeamId?: number | null;
+    championTeamName?: string | null;
+    runnerUpTeamId?: number | null;
+    runnerUpTeamName?: string | null;
+    championScore?: number | null;
+    runnerUpScore?: number | null;
+  }> | null;
+};
+
+export type GetAllTimeRecordsQueryVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+}>;
+
+export type GetAllTimeRecordsQuery = {
+  __typename?: 'Query';
+  getAllTimeRecords?: Array<{
+    __typename?: 'AllTimeRecord';
+    recordType?: string | null;
+    value?: number | null;
+    teamName?: string | null;
+    teamId?: number | null;
+    seasonNumber?: number | null;
+    leagueId?: number | null;
+    details?: string | null;
   }> | null;
 };
 
@@ -10346,6 +10428,203 @@ export type SearchUsersForDraftSuspenseQueryHookResult = ReturnType<
 export type SearchUsersForDraftQueryResult = Apollo.QueryResult<
   SearchUsersForDraftQuery,
   SearchUsersForDraftQueryVariables
+>;
+export const GetLeagueHistory = gql`
+  query GetLeagueHistory($leagueId: Int!) {
+    getLeagueHistory(leagueId: $leagueId) {
+      leagueId
+      seasonNumber
+      name
+      frozenAt
+      leaguePhase
+      totalMatchups
+      championTeamId
+      championTeamName
+      runnerUpTeamId
+      runnerUpTeamName
+      championScore
+      runnerUpScore
+    }
+  }
+`;
+
+/**
+ * __useGetLeagueHistoryQuery__
+ *
+ * To run a query within a React component, call `useGetLeagueHistoryQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetLeagueHistoryQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetLeagueHistoryQuery({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *   },
+ * });
+ */
+export function useGetLeagueHistoryQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetLeagueHistoryQuery,
+    GetLeagueHistoryQueryVariables
+  > &
+    (
+      | { variables: GetLeagueHistoryQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<GetLeagueHistoryQuery, GetLeagueHistoryQueryVariables>(
+    GetLeagueHistory,
+    options,
+  );
+}
+export function useGetLeagueHistoryLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetLeagueHistoryQuery,
+    GetLeagueHistoryQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetLeagueHistoryQuery,
+    GetLeagueHistoryQueryVariables
+  >(GetLeagueHistory, options);
+}
+export function useGetLeagueHistorySuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetLeagueHistoryQuery,
+        GetLeagueHistoryQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetLeagueHistoryQuery,
+    GetLeagueHistoryQueryVariables
+  >(
+    GetLeagueHistory,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetLeagueHistoryQuery,
+          GetLeagueHistoryQueryVariables
+        >,
+  );
+}
+export type GetLeagueHistoryQueryHookResult = ReturnType<
+  typeof useGetLeagueHistoryQuery
+>;
+export type GetLeagueHistoryLazyQueryHookResult = ReturnType<
+  typeof useGetLeagueHistoryLazyQuery
+>;
+export type GetLeagueHistorySuspenseQueryHookResult = ReturnType<
+  typeof useGetLeagueHistorySuspenseQuery
+>;
+export type GetLeagueHistoryQueryResult = Apollo.QueryResult<
+  GetLeagueHistoryQuery,
+  GetLeagueHistoryQueryVariables
+>;
+export const GetAllTimeRecords = gql`
+  query GetAllTimeRecords($leagueId: Int!) {
+    getAllTimeRecords(leagueId: $leagueId) {
+      recordType
+      value
+      teamName
+      teamId
+      seasonNumber
+      leagueId
+      details
+    }
+  }
+`;
+
+/**
+ * __useGetAllTimeRecordsQuery__
+ *
+ * To run a query within a React component, call `useGetAllTimeRecordsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetAllTimeRecordsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetAllTimeRecordsQuery({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *   },
+ * });
+ */
+export function useGetAllTimeRecordsQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetAllTimeRecordsQuery,
+    GetAllTimeRecordsQueryVariables
+  > &
+    (
+      | { variables: GetAllTimeRecordsQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetAllTimeRecordsQuery,
+    GetAllTimeRecordsQueryVariables
+  >(GetAllTimeRecords, options);
+}
+export function useGetAllTimeRecordsLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetAllTimeRecordsQuery,
+    GetAllTimeRecordsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetAllTimeRecordsQuery,
+    GetAllTimeRecordsQueryVariables
+  >(GetAllTimeRecords, options);
+}
+export function useGetAllTimeRecordsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetAllTimeRecordsQuery,
+        GetAllTimeRecordsQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetAllTimeRecordsQuery,
+    GetAllTimeRecordsQueryVariables
+  >(
+    GetAllTimeRecords,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetAllTimeRecordsQuery,
+          GetAllTimeRecordsQueryVariables
+        >,
+  );
+}
+export type GetAllTimeRecordsQueryHookResult = ReturnType<
+  typeof useGetAllTimeRecordsQuery
+>;
+export type GetAllTimeRecordsLazyQueryHookResult = ReturnType<
+  typeof useGetAllTimeRecordsLazyQuery
+>;
+export type GetAllTimeRecordsSuspenseQueryHookResult = ReturnType<
+  typeof useGetAllTimeRecordsSuspenseQuery
+>;
+export type GetAllTimeRecordsQueryResult = Apollo.QueryResult<
+  GetAllTimeRecordsQuery,
+  GetAllTimeRecordsQueryVariables
 >;
 export const GetOnThisDay = gql`
   query GetOnThisDay($month: Int!, $day: Int!, $limit: Int) {
