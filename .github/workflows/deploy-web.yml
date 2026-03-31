@@ -78,7 +78,7 @@ jobs:
             });
 
             const ciRun = workflowRuns.workflow_runs.find(run =>
-              run.name === '🧠 Legacy Sports CI Orchestrator' ||
+              run.name === 'Legacy Sports CI Orchestrator' ||
               run.name === 'Legacy Sports CI Pipeline'
             );
 
@@ -91,7 +91,7 @@ jobs:
               });
 
               const pendingCi = allRuns.workflow_runs.find(run =>
-                (run.name === '🧠 Legacy Sports CI Orchestrator' ||
+                (run.name === 'Legacy Sports CI Orchestrator' ||
                  run.name === 'Legacy Sports CI Pipeline') &&
                 run.status !== 'completed'
               );

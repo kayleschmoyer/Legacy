@@ -24,7 +24,7 @@ on:
   # Deploy after CI pipeline completes (replaces the previous pull_request trigger)
   # Only trigger for pull_request CI runs — push-to-main completions are irrelevant
   workflow_run:
-    workflows: ["🧠 Legacy Sports CI Orchestrator"]
+    workflows: ["Legacy Sports CI Orchestrator"]
     types: [completed]
     branches-ignore:
       - main

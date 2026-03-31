@@ -1,4 +1,4 @@
-name: "🔍 Jira Status Audit"
+name: "Jira Status Audit"
 
 # Detects mismatches between Jira ticket statuses and GitHub PR states.
 # Jira sync is one-directional (GitHub → Jira). If someone manually changes

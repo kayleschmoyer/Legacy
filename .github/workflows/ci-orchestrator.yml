@@ -1,4 +1,4 @@
-name: "🧠 Legacy Sports CI Orchestrator"
+name: "Legacy Sports CI Orchestrator"
 
 # Central orchestrator for pull requests, integration branches, and scheduled
 # health checks. Determines which pipelines need to

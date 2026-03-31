@@ -27,7 +27,7 @@ on:
     types: [submitted] # When someone approves/requests changes
   # Trigger when CI Orchestrator workflow completes for PR branches (not push-to-main)
   workflow_run:
-    workflows: ["🧠 Legacy Sports CI Orchestrator"]
+    workflows: ["Legacy Sports CI Orchestrator"]
     types: [completed]
     branches-ignore:
       - main

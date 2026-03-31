@@ -1,4 +1,4 @@
-name: "🎯 Jira Branch Sync"
+name: "Jira Branch Sync"
 
 # Keeps Jira ticket statuses in sync with branch/PR activity.
 # Only runs when there is actual activity on LS-* branches or their PRs —
