@@ -294,6 +294,10 @@ jest.mock('./league-discovery', () => ({
   __esModule: true,
   default: () => 'LeagueDiscoveryScreen',
 }));
+jest.mock('./TradeCenterPage', () => ({
+  __esModule: true,
+  default: () => 'TradeCenterPage',
+}));
 jest.mock('./baseball/matchup', () => ({
   __esModule: true,
   default: () => 'MatchupDetail',
@@ -322,6 +326,7 @@ const EXPECTED_DRAWER_ROUTES = [
   { route: 'DraftBoardPage', title: 'Draft Board' },
   { route: 'season-draft/index', title: 'Season Draft Games' },
   { route: 'FreeAgents', title: 'Free Agents' },
+  { route: 'TradeCenterPage', title: 'Trade Center' },
   { route: 'management', title: 'Management' },
   { route: 'baseball/league/join', title: 'Join League' },
   { route: 'league-discovery', title: 'Browse Leagues' },
@@ -352,7 +357,7 @@ describe('App Drawer Layout', () => {
       }
     });
 
-    it('renders exactly 18 navigation items plus Logout', () => {
+    it('renders exactly 19 navigation items plus Logout', () => {
       render(<Layout />);
 
       for (const { title } of EXPECTED_DRAWER_ROUTES) {
@@ -543,7 +548,7 @@ describe('App Drawer Layout', () => {
   });
 
   describe('screen registration', () => {
-    it('registers all 25 screens in the drawer navigator', () => {
+    it('registers all 26 screens in the drawer navigator', () => {
       render(<Layout />);
 
       const expectedScreenNames = [
@@ -560,6 +565,7 @@ describe('App Drawer Layout', () => {
         'season-draft/[gameId]',
         'season-draft/create',
         'FreeAgents',
+        'TradeCenterPage',
         'PlayerStats',
         'PlayerDetail',
         'management',

@@ -26,6 +26,7 @@ import JoinLeagueByCode from './baseball/league/join';
 import MatchupDetail from './baseball/matchup';
 import Team, { TeamIdHeader } from './baseball/team/[teamId]';
 import FreeAgents from './FreeAgents';
+import TradeCenterPage from './TradeCenterPage';
 import ManagementScreen from './management';
 import AboutScreen from './about';
 import HelpScreen from './help';
@@ -57,6 +58,7 @@ export type AppDrawerParamList = {
   'season-draft/index': undefined;
   'season-draft/[gameId]': { gameId: string };
   'season-draft/create': undefined;
+  TradeCenterPage: undefined;
   FreeAgents: undefined;
   PlayerStats: undefined;
   PlayerDetail: { playerId: string; playerName: string };
@@ -118,6 +120,10 @@ const ROUTES = Object.freeze<Route[]>([
   {
     route: 'FreeAgents',
     title: 'Free Agents',
+  },
+  {
+    route: 'TradeCenterPage',
+    title: 'Trade Center',
   },
   {
     route: 'management',
@@ -320,6 +326,11 @@ export default function Layout() {
             name="FreeAgents"
             options={{ title: 'Free Agents' }}
             component={FreeAgents}
+          />
+          <Screen
+            name="TradeCenterPage"
+            options={{ title: 'Trade Center' }}
+            component={TradeCenterPage}
           />
           <Screen
             name="PlayerStats"
