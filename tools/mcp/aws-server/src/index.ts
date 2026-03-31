@@ -6,6 +6,7 @@ import { lambdaStatus } from './tools/lambda-status.js';
 import { LAMBDA_FUNCTIONS, logsTail } from './tools/logs-tail.js';
 import { ssmGet } from './tools/ssm-get.js';
 import { ssoStatus } from './tools/sso-status.js';
+import { terraformOutput } from './tools/terraform-output.js';
 
 const server = new McpServer({
   name: 'legacy-sports-aws',
@@ -98,6 +99,27 @@ server.tool(
   'Check AWS SSO session authentication. Returns caller identity or error with remedy.',
   {},
   async () => ssoStatus(),
+);
+
+// --- aws_terraform_output ---
+server.tool(
+  'aws_terraform_output',
+  'Query Terraform state outputs. Runs `terraform output -json` and returns unwrapped values. Use instead of `cd terraform && terraform output -json | python -c ...`.',
+  {
+    keys: z
+      .array(z.string())
+      .optional()
+      .describe(
+        'Specific output keys to return (e.g. ["vpc_id", "private_subnet_ids"]). Omit to return all outputs.',
+      ),
+    chdir: z
+      .string()
+      .optional()
+      .describe(
+        'Terraform directory relative to repo root (default: "terraform").',
+      ),
+  },
+  async (params) => terraformOutput(params),
 );
 
 // Start the server
