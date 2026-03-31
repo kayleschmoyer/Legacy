@@ -8,13 +8,14 @@ import { execFile, execFileSync, execSync } from 'node:child_process';
 import {
   existsSync,
   lstatSync,
+  mkdirSync,
   readFileSync,
   readlinkSync,
   rmSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { isAbsolute, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 
 // ---------------------------------------------------------------------------
@@ -39,6 +40,64 @@ const MAIN_REPO = getMainRepoPath();
 
 /** Session-scoped active worktree (set via worktree_set). */
 let activeWorktree: string | null = null;
+
+/**
+ * File-based persistence for the active worktree so it survives MCP server
+ * restarts between tool calls.  Written on worktree_set, read when the
+ * in-memory value is null.
+ */
+const ACTIVE_WORKTREE_STATE_FILE = join(
+  MAIN_REPO,
+  '.twig',
+  'mcp-active-worktree',
+);
+
+function persistActiveWorktree(path: string | null): void {
+  try {
+    if (path) {
+      mkdirSync(dirname(ACTIVE_WORKTREE_STATE_FILE), { recursive: true });
+      writeFileSync(ACTIVE_WORKTREE_STATE_FILE, path, 'utf-8');
+    } else if (existsSync(ACTIVE_WORKTREE_STATE_FILE)) {
+      unlinkSync(ACTIVE_WORKTREE_STATE_FILE);
+    }
+  } catch {
+    // Best-effort — don't fail tool calls over state persistence.
+  }
+}
+
+function restoreActiveWorktree(): string | null {
+  try {
+    if (!existsSync(ACTIVE_WORKTREE_STATE_FILE)) return null;
+    const saved = readFileSync(ACTIVE_WORKTREE_STATE_FILE, 'utf-8').trim();
+    if (!saved || !existsSync(saved)) {
+      // Stale path — clean up.
+      unlinkSync(ACTIVE_WORKTREE_STATE_FILE);
+      return null;
+    }
+    // Validate that the saved path is a known git worktree.
+    try {
+      const porcelain = execSync('git worktree list --porcelain', {
+        cwd: MAIN_REPO,
+        encoding: 'utf-8',
+        timeout: 5_000,
+      });
+      const knownPaths = porcelain
+        .split('\n')
+        .filter((l) => l.startsWith('worktree '))
+        .map((l) => resolve(l.slice('worktree '.length).trim()));
+      if (!knownPaths.includes(resolve(saved))) {
+        unlinkSync(ACTIVE_WORKTREE_STATE_FILE);
+        return null;
+      }
+    } catch {
+      // If git worktree list fails, fall back to path-exists check (already passed above).
+    }
+    return saved;
+  } catch {
+    // Best-effort.
+  }
+  return null;
+}
 
 // ---------------------------------------------------------------------------
 // Worktree locking — file-based coordination for multi-agent workflows
@@ -303,6 +362,12 @@ function resolveTargetDir(
     return resolveWorktreePath(worktreeKey);
   }
   if (activeWorktree) return { path: activeWorktree };
+  // Try restoring from file (survives server restarts).
+  const restored = restoreActiveWorktree();
+  if (restored) {
+    activeWorktree = restored;
+    return { path: restored };
+  }
   return {
     error:
       'No active worktree set. Use worktree_set first or pass the worktree parameter.',
@@ -973,6 +1038,9 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
+
+  // Restore persisted active worktree on first tool call after server restart.
+  activeWorktree ??= restoreActiveWorktree();
 
   switch (name) {
     // -----------------------------------------------------------------------
@@ -2950,6 +3018,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       activeWorktree = resolved.path;
+      persistActiveWorktree(resolved.path);
       return {
         content: [
           { type: 'text', text: `Active worktree set to: ${resolved.path}` },
@@ -4449,7 +4518,24 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       // Clear active worktree if it was the one removed
       if (activeWorktree && resolve(activeWorktree) === resolve(targetPath)) {
         activeWorktree = null;
+        persistActiveWorktree(null);
         results.push('Cleared active worktree.');
+      } else if (!activeWorktree) {
+        // Also check persisted state file in case server restarted.
+        try {
+          if (existsSync(ACTIVE_WORKTREE_STATE_FILE)) {
+            const persisted = readFileSync(
+              ACTIVE_WORKTREE_STATE_FILE,
+              'utf-8',
+            ).trim();
+            if (persisted && resolve(persisted) === resolve(targetPath)) {
+              unlinkSync(ACTIVE_WORKTREE_STATE_FILE);
+              results.push('Cleared persisted active worktree state.');
+            }
+          }
+        } catch {
+          // Best-effort.
+        }
       }
 
       // Optionally prune stale references
