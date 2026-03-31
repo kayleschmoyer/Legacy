@@ -179,5 +179,9 @@ async function doGraphQL<T>(
     );
   }
 
+  if (result.data == null) {
+    throw new Error('GitHub GraphQL returned no data and no errors');
+  }
+
   return { data: result.data };
 }

@@ -48,7 +48,7 @@ interface PRGraphQLResponse {
           commit: {
             statusCheckRollup: {
               contexts: {
-                nodes: StatusCheckNode[];
+                nodes: Array<StatusCheckNode | null>;
               };
             } | null;
           };
@@ -126,27 +126,29 @@ query($owner: String!, $repo: String!, $number: Int!) {
   }
 }`;
 
-function normalizeChecks(nodes: StatusCheckNode[]): CICheck[] {
-  return nodes.map((node) => {
-    if (node.__typename === 'CheckRun') {
+function normalizeChecks(nodes: (StatusCheckNode | null)[]): CICheck[] {
+  return nodes
+    .filter((node): node is StatusCheckNode => node != null)
+    .map((node) => {
+      if (node.__typename === 'CheckRun') {
+        return {
+          name: node.name,
+          status: node.status,
+          conclusion: node.conclusion,
+        };
+      }
+      // StatusContext
       return {
-        name: node.name,
-        status: node.status,
-        conclusion: node.conclusion,
+        name: node.context,
+        status: node.state,
+        conclusion:
+          node.state === 'SUCCESS'
+            ? 'SUCCESS'
+            : node.state === 'PENDING'
+              ? null
+              : node.state,
       };
-    }
-    // StatusContext
-    return {
-      name: node.context,
-      status: node.state,
-      conclusion:
-        node.state === 'SUCCESS'
-          ? 'SUCCESS'
-          : node.state === 'PENDING'
-            ? null
-            : node.state,
-    };
-  });
+    });
 }
 
 export async function viewPR(params: ViewPRParams): Promise<ToolResult> {
