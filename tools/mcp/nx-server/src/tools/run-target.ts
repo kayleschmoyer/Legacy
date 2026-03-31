@@ -87,6 +87,52 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
             : t,
       );
 
+      // On Windows, multiple space-separated values after --testPathPatterns break
+      // the cmd.exe invocation. Coalesce them into a single pipe-separated regex
+      // (Jest OR alternation) so the value arrives as one shell token.
+      // e.g. ["--testPathPatterns", "FileA", "FileB"] → ["--testPathPatterns", "FileA|FileB"]
+      // e.g. ["--testPathPatterns=FileA", "FileB"] → ["--testPathPatterns=FileA|FileB"]
+      if (process.platform === 'win32') {
+        const patternsIdx = translated.findIndex(
+          (t) => t === '--testPathPatterns',
+        );
+        if (patternsIdx !== -1 && patternsIdx + 2 < translated.length) {
+          const valueTokens: string[] = [];
+          let i = patternsIdx + 1;
+          while (i < translated.length && !translated[i].startsWith('-')) {
+            valueTokens.push(translated[i]);
+            i++;
+          }
+          if (valueTokens.length > 1) {
+            translated.splice(
+              patternsIdx + 1,
+              valueTokens.length,
+              valueTokens.join('|'),
+            );
+          }
+        }
+        // Handle equals form: --testPathPatterns=FileA with FileB as next token
+        const eqIdx = translated.findIndex((t) =>
+          t.startsWith('--testPathPatterns='),
+        );
+        if (eqIdx !== -1) {
+          const valueTokens: string[] = [];
+          let i = eqIdx + 1;
+          while (i < translated.length && !translated[i].startsWith('-')) {
+            valueTokens.push(translated[i]);
+            i++;
+          }
+          if (valueTokens.length > 0) {
+            const base = translated[eqIdx];
+            translated.splice(
+              eqIdx,
+              1 + valueTokens.length,
+              `${base}|${valueTokens.join('|')}`,
+            );
+          }
+        }
+      }
+
       // When running specific tests via --testPathPatterns, automatically add
       // --all to override --onlyChanged baked into package.json test scripts.
       // Without this, jest's --onlyChanged filters out files that haven't been

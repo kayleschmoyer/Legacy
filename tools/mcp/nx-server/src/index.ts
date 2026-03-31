@@ -115,7 +115,9 @@ server.tool(
       .union([z.string(), z.array(z.string())])
       .optional()
       .describe(
-        'Extra flags after "--" (e.g. ["-u"] for snapshots). Array preferred; string split on whitespace.',
+        'Extra flags after "--" (e.g. ["-u"] for snapshots). Array preferred; string split on whitespace. ' +
+          'For multiple test patterns, pipe is preferred: ["--testPathPatterns", "FileA|FileB"]. ' +
+          'Separate array elements also work: ["--testPathPatterns", "FileA", "FileB"] — on Windows these are automatically coalesced into a single pipe-separated token.',
       ),
     env: z
       .record(z.string(), z.string())
