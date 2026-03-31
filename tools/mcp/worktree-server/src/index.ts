@@ -1426,6 +1426,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const safeExtensions =
         /\.(tf|ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|rb|sh)$/i;
 
+      // .example files are templates with placeholder values (e.g. .env.example,
+      // terraform/secrets.auto.tfvars.example) — safe to commit by convention
+      const isExampleTemplate = (f: string) => /\.example$/i.test(f);
+
       // Distinguish files=undefined (stage all) from files=[] (error: nothing specified)
       const stageAll = files === undefined;
       if (!stageAll && files.length === 0) {
@@ -1441,8 +1445,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       const isDangerous = (f: string) =>
-        alwaysBlockPatterns.some((p) => p.test(f)) ||
-        (nameBasedPatterns.some((p) => p.test(f)) && !safeExtensions.test(f));
+        !isExampleTemplate(f) &&
+        (alwaysBlockPatterns.some((p) => p.test(f)) ||
+          (nameBasedPatterns.some((p) => p.test(f)) &&
+            !safeExtensions.test(f)));
 
       if (!stageAll) {
         for (const f of files) {
