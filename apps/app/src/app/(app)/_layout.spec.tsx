@@ -134,7 +134,14 @@ jest.mock('@legacy-sports/shared-components', () => {
 // Mock tamagui
 jest.mock('tamagui', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { View, Text: RNText } = require('react-native') as RNComponents;
+  const RN = require('react-native') as RNComponents & {
+    Pressable: React.ComponentType<{
+      onPress?: () => void;
+      children: React.ReactNode;
+      testID?: string;
+    }>;
+  };
+  const { View, Text: RNText, Pressable } = RN;
   return {
     Text: ({
       children,
@@ -163,14 +170,40 @@ jest.mock('tamagui', () => {
       backgroundColor?: string;
       padding?: string;
     }) => <View {...rest}>{children}</View>,
+    XStack: ({
+      children,
+      onPress,
+      pressStyle: _pressStyle,
+      ...rest
+    }: {
+      children: React.ReactNode;
+      onPress?: () => void;
+      testID?: string;
+      padding?: string;
+      alignItems?: string;
+      justifyContent?: string;
+      pressStyle?: Record<string, unknown>;
+    }) =>
+      onPress ? (
+        <Pressable onPress={onPress} {...rest}>
+          {children}
+        </Pressable>
+      ) : (
+        <View {...rest}>{children}</View>
+      ),
     Separator: () => <View testID="separator" />,
   };
 });
 
-// Mock the GraphQL mutation
+// Mock the GraphQL mutation and notification count query
 const mockDisableDeviceToken = jest.fn().mockResolvedValue({});
+const mockUseGetUnreadNotificationCountQuery = jest.fn(() => ({
+  data: null,
+}));
 jest.mock('../../api/db/graphql.generated', () => ({
   useDisableDeviceTokenMutation: () => [mockDisableDeviceToken],
+  useGetUnreadNotificationCountQuery: (...args: unknown[]) =>
+    mockUseGetUnreadNotificationCountQuery(...args),
 }));
 
 // Mock auth hooks
@@ -366,12 +399,11 @@ describe('App Drawer Layout', () => {
       }
       expect(screen.getByText('Logout')).toBeTruthy();
 
-      // Verify exact count: all pressable text elements (onPress) in the drawer
-      const allTextElements = screen.queryAllByText(/.+/);
-      const pressableItems = allTextElements.filter(
-        (el) => typeof el.props.onPress === 'function',
+      // Verify exact count: each drawer route has a testID
+      const drawerItems = EXPECTED_DRAWER_ROUTES.map((r) =>
+        screen.getByTestId(`drawer-item-${r.route.replace(/\//g, '-')}`),
       );
-      expect(pressableItems).toHaveLength(EXPECTED_DRAWER_ROUTES.length + 1);
+      expect(drawerItems).toHaveLength(EXPECTED_DRAWER_ROUTES.length);
     });
 
     it('renders the Logout button', () => {
@@ -383,7 +415,7 @@ describe('App Drawer Layout', () => {
   describe('drawer item navigation', () => {
     it('navigates to Home when Home item is pressed', () => {
       render(<Layout />);
-      fireEvent.press(screen.getByText('Home'));
+      fireEvent.press(screen.getByTestId('drawer-item-index'));
 
       expect(mockNavigate).toHaveBeenCalledWith('index');
       expect(mockCloseDrawer).toHaveBeenCalled();
@@ -391,7 +423,7 @@ describe('App Drawer Layout', () => {
 
     it('navigates to Baseball when Baseball item is pressed', () => {
       render(<Layout />);
-      fireEvent.press(screen.getByText('Baseball'));
+      fireEvent.press(screen.getByTestId('drawer-item-baseball-index'));
 
       expect(mockNavigate).toHaveBeenCalledWith('baseball/index');
       expect(mockCloseDrawer).toHaveBeenCalled();
@@ -399,7 +431,7 @@ describe('App Drawer Layout', () => {
 
     it('navigates to Football when Football item is pressed', () => {
       render(<Layout />);
-      fireEvent.press(screen.getByText('Football'));
+      fireEvent.press(screen.getByTestId('drawer-item-football-index'));
 
       expect(mockNavigate).toHaveBeenCalledWith('football/index');
       expect(mockCloseDrawer).toHaveBeenCalled();
@@ -407,7 +439,7 @@ describe('App Drawer Layout', () => {
 
     it('navigates to Draft Board when Draft Board item is pressed', () => {
       render(<Layout />);
-      fireEvent.press(screen.getByText('Draft Board'));
+      fireEvent.press(screen.getByTestId('drawer-item-DraftBoardPage'));
 
       expect(mockNavigate).toHaveBeenCalledWith('DraftBoardPage');
       expect(mockCloseDrawer).toHaveBeenCalled();
@@ -415,7 +447,7 @@ describe('App Drawer Layout', () => {
 
     it('navigates to Free Agents when Free Agents item is pressed', () => {
       render(<Layout />);
-      fireEvent.press(screen.getByText('Free Agents'));
+      fireEvent.press(screen.getByTestId('drawer-item-FreeAgents'));
 
       expect(mockNavigate).toHaveBeenCalledWith('FreeAgents');
       expect(mockCloseDrawer).toHaveBeenCalled();
@@ -423,7 +455,7 @@ describe('App Drawer Layout', () => {
 
     it('navigates to Notifications when Notifications item is pressed', () => {
       render(<Layout />);
-      fireEvent.press(screen.getByText('Notifications'));
+      fireEvent.press(screen.getByTestId('drawer-item-notifications'));
 
       expect(mockNavigate).toHaveBeenCalledWith('notifications');
       expect(mockCloseDrawer).toHaveBeenCalled();
@@ -431,7 +463,7 @@ describe('App Drawer Layout', () => {
 
     it('navigates to Preferences when Preferences item is pressed', () => {
       render(<Layout />);
-      fireEvent.press(screen.getByText('Preferences'));
+      fireEvent.press(screen.getByTestId('drawer-item-preferences'));
 
       expect(mockNavigate).toHaveBeenCalledWith('preferences');
       expect(mockCloseDrawer).toHaveBeenCalled();
@@ -439,7 +471,7 @@ describe('App Drawer Layout', () => {
 
     it('navigates to Profile Settings when pressed', () => {
       render(<Layout />);
-      fireEvent.press(screen.getByText('Profile Settings'));
+      fireEvent.press(screen.getByTestId('drawer-item-profile-settings'));
 
       expect(mockNavigate).toHaveBeenCalledWith('profile-settings');
       expect(mockCloseDrawer).toHaveBeenCalled();
@@ -447,7 +479,7 @@ describe('App Drawer Layout', () => {
 
     it('navigates to Help when Help item is pressed', () => {
       render(<Layout />);
-      fireEvent.press(screen.getByText('Help'));
+      fireEvent.press(screen.getByTestId('drawer-item-help'));
 
       expect(mockNavigate).toHaveBeenCalledWith('help');
       expect(mockCloseDrawer).toHaveBeenCalled();
@@ -455,7 +487,7 @@ describe('App Drawer Layout', () => {
 
     it('navigates to About when About item is pressed', () => {
       render(<Layout />);
-      fireEvent.press(screen.getByText('About'));
+      fireEvent.press(screen.getByTestId('drawer-item-about'));
 
       expect(mockNavigate).toHaveBeenCalledWith('about');
       expect(mockCloseDrawer).toHaveBeenCalled();
@@ -463,7 +495,7 @@ describe('App Drawer Layout', () => {
 
     it('navigates to Management when Management item is pressed', () => {
       render(<Layout />);
-      fireEvent.press(screen.getByText('Management'));
+      fireEvent.press(screen.getByTestId('drawer-item-management'));
 
       expect(mockNavigate).toHaveBeenCalledWith('management');
       expect(mockCloseDrawer).toHaveBeenCalled();
@@ -471,7 +503,7 @@ describe('App Drawer Layout', () => {
 
     it('navigates to Season Draft Games when pressed', () => {
       render(<Layout />);
-      fireEvent.press(screen.getByText('Season Draft Games'));
+      fireEvent.press(screen.getByTestId('drawer-item-season-draft-index'));
 
       expect(mockNavigate).toHaveBeenCalledWith('season-draft/index');
       expect(mockCloseDrawer).toHaveBeenCalled();
@@ -479,7 +511,7 @@ describe('App Drawer Layout', () => {
 
     it('navigates to Player Statistics when pressed', () => {
       render(<Layout />);
-      fireEvent.press(screen.getByText('Player Statistics'));
+      fireEvent.press(screen.getByTestId('drawer-item-PlayerStats'));
 
       expect(mockNavigate).toHaveBeenCalledWith('PlayerStats');
       expect(mockCloseDrawer).toHaveBeenCalled();
@@ -487,7 +519,7 @@ describe('App Drawer Layout', () => {
 
     it('navigates to View Game Logs when pressed', () => {
       render(<Layout />);
-      fireEvent.press(screen.getByText('View Game Logs'));
+      fireEvent.press(screen.getByTestId('drawer-item-view_game_logs'));
 
       expect(mockNavigate).toHaveBeenCalledWith('view_game_logs');
       expect(mockCloseDrawer).toHaveBeenCalled();
@@ -495,7 +527,7 @@ describe('App Drawer Layout', () => {
 
     it('navigates to View Career Stats when pressed', () => {
       render(<Layout />);
-      fireEvent.press(screen.getByText('View Career Stats'));
+      fireEvent.press(screen.getByTestId('drawer-item-view_career_stats'));
 
       expect(mockNavigate).toHaveBeenCalledWith('view_career_stats');
       expect(mockCloseDrawer).toHaveBeenCalled();
@@ -503,7 +535,7 @@ describe('App Drawer Layout', () => {
 
     it('navigates to Create League when pressed', () => {
       render(<Layout />);
-      fireEvent.press(screen.getByText('Create League'));
+      fireEvent.press(screen.getByTestId('drawer-item-baseball-league-create'));
 
       expect(mockNavigate).toHaveBeenCalledWith('baseball/league/create');
       expect(mockCloseDrawer).toHaveBeenCalled();
@@ -511,7 +543,7 @@ describe('App Drawer Layout', () => {
 
     it('navigates to Join League when pressed', () => {
       render(<Layout />);
-      fireEvent.press(screen.getByText('Join League'));
+      fireEvent.press(screen.getByTestId('drawer-item-baseball-league-join'));
 
       expect(mockNavigate).toHaveBeenCalledWith('baseball/league/join');
       expect(mockCloseDrawer).toHaveBeenCalled();
@@ -520,10 +552,10 @@ describe('App Drawer Layout', () => {
     it('closes drawer after each navigation', () => {
       render(<Layout />);
 
-      fireEvent.press(screen.getByText('Home'));
+      fireEvent.press(screen.getByTestId('drawer-item-index'));
       expect(mockCloseDrawer).toHaveBeenCalledTimes(1);
 
-      fireEvent.press(screen.getByText('About'));
+      fireEvent.press(screen.getByTestId('drawer-item-about'));
       expect(mockCloseDrawer).toHaveBeenCalledTimes(2);
     });
   });
@@ -611,6 +643,52 @@ describe('App Drawer Layout', () => {
     it('wraps content with AuthorizedUserContextProvider', () => {
       render(<Layout />);
       expect(screen.getByTestId('auth-context')).toBeTruthy();
+    });
+  });
+
+  describe('notification unread badge', () => {
+    it('shows badge with correct count when unread count is positive', () => {
+      mockUseGetUnreadNotificationCountQuery.mockReturnValue({
+        data: { getUnreadNotificationCount: 5 },
+      });
+
+      render(<Layout />);
+
+      expect(screen.getByText('5')).toBeTruthy();
+    });
+
+    it('shows "99+" when unread count exceeds 99', () => {
+      mockUseGetUnreadNotificationCountQuery.mockReturnValue({
+        data: { getUnreadNotificationCount: 150 },
+      });
+
+      render(<Layout />);
+
+      expect(screen.getByText('99+')).toBeTruthy();
+    });
+
+    it('does not show badge when unread count is zero', () => {
+      mockUseGetUnreadNotificationCountQuery.mockReturnValue({
+        data: { getUnreadNotificationCount: 0 },
+      });
+
+      render(<Layout />);
+
+      expect(screen.queryByText('99+')).toBeNull();
+      // The count text should not appear as a standalone element
+      expect(screen.queryByText('0')).toBeNull();
+    });
+
+    it('does not show badge on non-notification drawer items', () => {
+      mockUseGetUnreadNotificationCountQuery.mockReturnValue({
+        data: { getUnreadNotificationCount: 5 },
+      });
+
+      render(<Layout />);
+
+      // Badge count "5" should appear exactly once (only on Notifications item)
+      const badges = screen.getAllByText('5');
+      expect(badges).toHaveLength(1);
     });
   });
 

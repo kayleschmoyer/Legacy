@@ -4,7 +4,7 @@ import {
   DrawerContentComponentProps,
 } from '@react-navigation/drawer';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { Separator, Text, YStack } from 'tamagui';
+import { Separator, Text, XStack, YStack } from 'tamagui';
 import { getExpoPushTokenAsync } from 'expo-notifications';
 import { LOGGER } from '@legacy-sports/logging';
 import { UnifiedLoadingPanel } from '@legacy-sports/shared-components';
@@ -35,7 +35,10 @@ import ProfileSettingsScreen from './profile-settings';
 import PreferencesScreen from './preferences';
 import NotificationsScreen from './notifications';
 import SubscriptionSettingsScreen from './subscription-settings';
-import { useDisableDeviceTokenMutation } from '../../api/db/graphql.generated';
+import {
+  useDisableDeviceTokenMutation,
+  useGetUnreadNotificationCountQuery,
+} from '../../api/db/graphql.generated';
 import { AuthorizedUserContextProvider } from '../../common/auth/AuthorizedUserContext';
 import {
   useAuthHandlers,
@@ -171,6 +174,8 @@ function CustomDrawerContent(
   const router = useRouter();
   const { logout } = useAuthHandlers();
   const [disableDeviceToken] = useDisableDeviceTokenMutation();
+  const { data: unreadData } = useGetUnreadNotificationCountQuery();
+  const unreadCount = unreadData?.getUnreadNotificationCount ?? 0;
 
   const doLogout = async () => {
     // Best-effort: deactivate push token before clearing credentials
@@ -205,16 +210,37 @@ function CustomDrawerContent(
       padding="$4"
     >
       {ROUTES.map((r) => (
-        <Text
+        <XStack
           testID={`drawer-item-${r.route.replace(/\//g, '-')}`}
           key={r.route}
           padding="$3"
-          fontSize="$5"
+          alignItems="center"
+          justifyContent="space-between"
           onPress={() => onItemSelect(r.route)}
           pressStyle={{ backgroundColor: '$gray3' }}
         >
-          {r.title}
-        </Text>
+          <Text fontSize="$5">{r.title}</Text>
+          {r.route === 'notifications' && unreadCount > 0 && (
+            <XStack
+              backgroundColor="$red10"
+              borderRadius="$10"
+              paddingHorizontal="$2"
+              paddingVertical="$0.5"
+              minWidth={22}
+              alignItems="center"
+              justifyContent="center"
+            >
+              <Text
+                fontSize="$1"
+                fontWeight="700"
+                color="white"
+                textAlign="center"
+              >
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </Text>
+            </XStack>
+          )}
+        </XStack>
       ))}
       <Separator marginVertical="$3" />
       <Text

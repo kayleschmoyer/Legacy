@@ -10,6 +10,8 @@ export interface NotificationListProps {
   onMarkAsRead?: (notificationId: number) => Promise<void>;
   onMarkAllRead?: () => Promise<void>;
   loading?: boolean;
+  ListHeaderComponent?: React.ReactElement | null;
+  ListFooterComponent?: React.ReactElement | null;
 }
 
 /**
@@ -22,6 +24,8 @@ export function NotificationList({
   onMarkAsRead,
   onMarkAllRead,
   loading = false,
+  ListHeaderComponent,
+  ListFooterComponent,
 }: NotificationListProps) {
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -91,20 +95,29 @@ export function NotificationList({
 
   if (notifications.length === 0) {
     return (
-      <YStack
-        padding="$4"
-        alignItems="center"
-        justifyContent="center"
-        space="$2"
-      >
-        <Bell size="$4" color="$gray10" />
-        <Text fontSize="$4" color="$gray11">
-          No notifications
-        </Text>
-        <Text fontSize="$2" color="$gray10" textAlign="center">
-          You'll see notifications here when you receive them
-        </Text>
-      </YStack>
+      <FlatList
+        data={[]}
+        renderItem={renderNotification}
+        keyExtractor={() => ''}
+        ListHeaderComponent={ListHeaderComponent}
+        ListFooterComponent={ListFooterComponent}
+        ListEmptyComponent={
+          <YStack
+            padding="$4"
+            alignItems="center"
+            justifyContent="center"
+            space="$2"
+          >
+            <Bell size="$4" color="$gray10" />
+            <Text fontSize="$4" color="$gray11">
+              No notifications
+            </Text>
+            <Text fontSize="$2" color="$gray10" textAlign="center">
+              You'll see notifications here when you receive them
+            </Text>
+          </YStack>
+        }
+      />
     );
   }
 
@@ -136,6 +149,8 @@ export function NotificationList({
         renderItem={renderNotification}
         keyExtractor={(item) => item.id?.toString() ?? ''}
         contentContainerStyle={{ paddingVertical: 8 }}
+        ListHeaderComponent={ListHeaderComponent}
+        ListFooterComponent={ListFooterComponent}
       />
     </YStack>
   );
