@@ -131,7 +131,7 @@ module "github_runners" {
       security_groups  = null
       self             = false
       to_port          = 443
-      description      = "HTTPS — GitHub API, npm registry, S3, VPC endpoints"
+      description      = "HTTPS - GitHub API, npm registry, S3, VPC endpoints"
     },
     {
       cidr_blocks      = [var.vpc_cidr]
@@ -142,7 +142,7 @@ module "github_runners" {
       security_groups  = null
       self             = false
       to_port          = 53
-      description      = "DNS (UDP) — VPC DNS resolver"
+      description      = "DNS (UDP) - VPC DNS resolver"
     },
     {
       cidr_blocks      = [var.vpc_cidr]
@@ -153,7 +153,7 @@ module "github_runners" {
       security_groups  = null
       self             = false
       to_port          = 53
-      description      = "DNS (TCP) — VPC DNS resolver"
+      description      = "DNS (TCP) - VPC DNS resolver"
     },
     {
       cidr_blocks      = aws_subnet.private_database[*].cidr_block
@@ -164,7 +164,7 @@ module "github_runners" {
       security_groups  = null
       self             = false
       to_port          = 5432
-      description      = "PostgreSQL — RDS in database subnets (migration checks)"
+      description      = "PostgreSQL - RDS in database subnets (migration checks)"
     },
     {
       cidr_blocks      = ["169.254.169.254/32"]
@@ -175,7 +175,7 @@ module "github_runners" {
       security_groups  = null
       self             = false
       to_port          = 80
-      description      = "EC2 instance metadata — spot interruption notices and IMDSv2 token service"
+      description      = "EC2 instance metadata - spot interruption notices and IMDSv2 token service"
     },
   ]
 

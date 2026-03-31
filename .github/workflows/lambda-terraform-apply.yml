@@ -78,7 +78,7 @@ jobs:
           echo "✅ All required secrets are configured"
 
           # Runner secrets are only required when runners are enabled in tfvars
-          if grep -q 'enable_github_runners\s*=\s*true' terraform/runners.auto.tfvars 2>/dev/null; then
+          if grep -q 'enable_github_runners\s*=\s*true' terraform/infra.auto.tfvars 2>/dev/null; then
             RUNNER_MISSING=()
             if [ -z "${{ secrets.RUNNER_GITHUB_APP_ID }}" ]; then
               RUNNER_MISSING+=("RUNNER_GITHUB_APP_ID")

@@ -14,8 +14,8 @@ build/
 terraform.tfvars
 secrets.auto.tfvars
 
-# Non-sensitive runner config — checked in for CI reproducibility (LS-1665)
-!runners.auto.tfvars
+# Non-sensitive infra feature flags — checked in for CI reproducibility (LS-1665)
+!infra.auto.tfvars
 *.pem
 *.key
 
