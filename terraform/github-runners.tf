@@ -41,6 +41,13 @@ module "github_runners" {
   enable_ephemeral_runners    = true  # one job per instance, then terminate
   enable_jit_config           = false # Disable JIT — let instance register on boot (JIT tokens expire before boot completes)
 
+  # Reduce webhook event delay from default 30s to 10s. The delay exists to let
+  # idle runners pick up jobs before launching new instances, but with ephemeral
+  # runners there are never idle runners — so 30s is pure dead time per job start.
+  # At ~5 sequential stages per pipeline, this saves ~100s per CI run.
+  delay_webhook_event     = 10
+  enable_job_queued_check = true # verify job is still queued before launching instance (mitigates reduced delay)
+
   # Spot instances with fleet diversification across types and AZs.
   # capacity-optimized-prioritized picks from the pools with the most
   # available capacity (fewest reclamations) while respecting the type
@@ -52,6 +59,13 @@ module "github_runners" {
   # Scale-to-zero: check every 5 minutes for idle runners
   scale_down_schedule_expression = "cron(*/5 * * * ? *)"
   runners_maximum_count          = var.github_runners_max_count
+
+  # Allow 5 concurrent scale-up Lambda invocations (default: 1). The default
+  # serializes all scale-up decisions, bottlenecking burst throughput — observed
+  # peak of only 10 runners despite max 20 during a 7-PR burst. Each invocation
+  # still checks runners_maximum_count before launching, so this cannot
+  # over-provision beyond the configured max.
+  scale_up_reserved_concurrent_executions = 5
 
   # Runner OS and labels
   runner_os           = "linux"
