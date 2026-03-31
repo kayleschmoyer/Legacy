@@ -2447,6 +2447,16 @@ type Query {
     playerPool: String
     search: String
   ): [PublicLeagueInfo!]!
+
+  """
+  Live MLB scoreboard for the given date (defaults to today). Resolver stub — full implementation added in LS-1865 via MlbDataProvider.
+  """
+  scoreboard(
+    """
+    Date in YYYY-MM-DD format. Defaults to today in the US/Eastern timezone.
+    """
+    date: String
+  ): Scoreboard
   scoringDefinitions: [ScoringStatDefinition!]
   searchPlayers(limit: Int, searchTerm: String!): [Player!]
   searchUsers(limit: Int, searchTerm: String!): [User!]
@@ -2566,6 +2576,106 @@ input RecordConsentInput {
   consentType: ConsentType!
   ipAddress: String
   userAgent: String
+}
+
+"""
+Live MLB scoreboard data for a single date
+"""
+type Scoreboard {
+  """
+  Date of the games (YYYY-MM-DD)
+  """
+  date: String
+
+  """
+  All games scheduled for this date
+  """
+  games: [ScoreboardGame!]
+
+  """
+  ISO 8601 timestamp of the last data refresh
+  """
+  lastUpdated: String
+}
+
+"""
+A single MLB game on the scoreboard
+"""
+type ScoreboardGame {
+  """
+  Away team score and linescore
+  """
+  awayTeam: ScoreboardTeam!
+
+  """
+  MLB primary key for the game
+  """
+  gamePk: Int!
+
+  """
+  Home team score and linescore
+  """
+  homeTeam: ScoreboardTeam!
+
+  """
+  Current inning number (null for Preview/Final)
+  """
+  inning: Int
+
+  """
+  "Top" or "Bot" — null for Preview/Final
+  """
+  inningHalf: String
+
+  """
+  Current number of outs (null for Preview/Final)
+  """
+  outs: Int
+
+  """
+  Scheduled start time (ISO 8601)
+  """
+  startTime: String
+
+  """
+  Game status: "Preview", "Live", or "Final"
+  """
+  status: String!
+}
+
+"""
+Team score and linescore data for a single game
+"""
+type ScoreboardTeam {
+  """
+  Three-letter team abbreviation (e.g. NYY, BOS)
+  """
+  abbreviation: String!
+
+  """
+  Total errors
+  """
+  errors: Int!
+
+  """
+  Total hits
+  """
+  hits: Int!
+
+  """
+  Runs scored per inning (index 0 = inning 1)
+  """
+  linescoreInnings: [Int!]
+
+  """
+  Total runs scored
+  """
+  runs: Int!
+
+  """
+  Full team name
+  """
+  teamName: String!
 }
 
 type ScoringConfig {

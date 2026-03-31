@@ -28,6 +28,7 @@ import './dues';
 import './analytics';
 import './subscriptions';
 import './account-merge';
+import './scoreboard';
 
 // Export the final schema
 export const schema = builder.toSchema();

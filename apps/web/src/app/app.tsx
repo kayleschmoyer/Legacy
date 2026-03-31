@@ -114,6 +114,11 @@ const PreferencesPage = React.lazy(
 const NotificationsPage = React.lazy(
   () => import('../pages/notifications/NotificationsPage'),
 );
+const ScoreboardPage = React.lazy(() =>
+  import('../pages/scoreboard/ScoreboardPage').then((m) => ({
+    default: m.ScoreboardPage,
+  })),
+);
 
 /* ────────────────────────────────────────────────────────
  * Modern Header – styled components
@@ -614,6 +619,7 @@ function App() {
             />
             <Route path="/preferences" element={<PreferencesPage />} />
             <Route path="/notifications" element={<NotificationsPage />} />
+            <Route path="/scoreboard" element={<ScoreboardPage />} />
             <Route
               path="/games/season-draft"
               element={<SeasonDraftGamesPage />}

@@ -2251,6 +2251,8 @@ export type Query = {
   /** Check if the authenticated user has accepted the privacy policy */
   privacyPolicyStatus?: Maybe<PrivacyPolicyStatus>;
   publicLeagues: Array<PublicLeagueInfo>;
+  /** Live MLB scoreboard for the given date (defaults to today). Resolver stub — full implementation added in LS-1865 via MlbDataProvider. */
+  scoreboard?: Maybe<Scoreboard>;
   scoringDefinitions?: Maybe<Array<ScoringStatDefinition>>;
   searchPlayers?: Maybe<Array<Player>>;
   searchUsers?: Maybe<Array<User>>;
@@ -2654,6 +2656,10 @@ export type QueryPublicLeaguesArgs = {
   search?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type QueryScoreboardArgs = {
+  date?: InputMaybe<Scalars['String']['input']>;
+};
+
 export type QuerySearchPlayersArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
   searchTerm: Scalars['String']['input'];
@@ -2798,6 +2804,55 @@ export type RecordConsentInput = {
   consentType: ConsentType;
   ipAddress?: InputMaybe<Scalars['String']['input']>;
   userAgent?: InputMaybe<Scalars['String']['input']>;
+};
+
+/** Live MLB scoreboard data for a single date */
+export type Scoreboard = {
+  __typename?: 'Scoreboard';
+  /** Date of the games (YYYY-MM-DD) */
+  date?: Maybe<Scalars['String']['output']>;
+  /** All games scheduled for this date */
+  games?: Maybe<Array<ScoreboardGame>>;
+  /** ISO 8601 timestamp of the last data refresh */
+  lastUpdated?: Maybe<Scalars['String']['output']>;
+};
+
+/** A single MLB game on the scoreboard */
+export type ScoreboardGame = {
+  __typename?: 'ScoreboardGame';
+  /** Away team score and linescore */
+  awayTeam: ScoreboardTeam;
+  /** MLB primary key for the game */
+  gamePk: Scalars['Int']['output'];
+  /** Home team score and linescore */
+  homeTeam: ScoreboardTeam;
+  /** Current inning number (null for Preview/Final) */
+  inning?: Maybe<Scalars['Int']['output']>;
+  /** "Top" or "Bot" — null for Preview/Final */
+  inningHalf?: Maybe<Scalars['String']['output']>;
+  /** Current number of outs (null for Preview/Final) */
+  outs?: Maybe<Scalars['Int']['output']>;
+  /** Scheduled start time (ISO 8601) */
+  startTime?: Maybe<Scalars['String']['output']>;
+  /** Game status: "Preview", "Live", or "Final" */
+  status: Scalars['String']['output'];
+};
+
+/** Team score and linescore data for a single game */
+export type ScoreboardTeam = {
+  __typename?: 'ScoreboardTeam';
+  /** Three-letter team abbreviation (e.g. NYY, BOS) */
+  abbreviation: Scalars['String']['output'];
+  /** Total errors */
+  errors: Scalars['Int']['output'];
+  /** Total hits */
+  hits: Scalars['Int']['output'];
+  /** Runs scored per inning (index 0 = inning 1) */
+  linescoreInnings?: Maybe<Array<Scalars['Int']['output']>>;
+  /** Total runs scored */
+  runs: Scalars['Int']['output'];
+  /** Full team name */
+  teamName: Scalars['String']['output'];
 };
 
 export type ScoringConfig = {

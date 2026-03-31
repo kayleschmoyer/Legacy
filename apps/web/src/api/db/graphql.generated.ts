@@ -2251,6 +2251,8 @@ export type Query = {
   /** Check if the authenticated user has accepted the privacy policy */
   privacyPolicyStatus?: Maybe<PrivacyPolicyStatus>;
   publicLeagues: Array<PublicLeagueInfo>;
+  /** Live MLB scoreboard for the given date (defaults to today). Resolver stub — full implementation added in LS-1865 via MlbDataProvider. */
+  scoreboard?: Maybe<Scoreboard>;
   scoringDefinitions?: Maybe<Array<ScoringStatDefinition>>;
   searchPlayers?: Maybe<Array<Player>>;
   searchUsers?: Maybe<Array<User>>;
@@ -2654,6 +2656,10 @@ export type QueryPublicLeaguesArgs = {
   search?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type QueryScoreboardArgs = {
+  date?: InputMaybe<Scalars['String']['input']>;
+};
+
 export type QuerySearchPlayersArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
   searchTerm: Scalars['String']['input'];
@@ -2798,6 +2804,55 @@ export type RecordConsentInput = {
   consentType: ConsentType;
   ipAddress?: InputMaybe<Scalars['String']['input']>;
   userAgent?: InputMaybe<Scalars['String']['input']>;
+};
+
+/** Live MLB scoreboard data for a single date */
+export type Scoreboard = {
+  __typename?: 'Scoreboard';
+  /** Date of the games (YYYY-MM-DD) */
+  date?: Maybe<Scalars['String']['output']>;
+  /** All games scheduled for this date */
+  games?: Maybe<Array<ScoreboardGame>>;
+  /** ISO 8601 timestamp of the last data refresh */
+  lastUpdated?: Maybe<Scalars['String']['output']>;
+};
+
+/** A single MLB game on the scoreboard */
+export type ScoreboardGame = {
+  __typename?: 'ScoreboardGame';
+  /** Away team score and linescore */
+  awayTeam: ScoreboardTeam;
+  /** MLB primary key for the game */
+  gamePk: Scalars['Int']['output'];
+  /** Home team score and linescore */
+  homeTeam: ScoreboardTeam;
+  /** Current inning number (null for Preview/Final) */
+  inning?: Maybe<Scalars['Int']['output']>;
+  /** "Top" or "Bot" — null for Preview/Final */
+  inningHalf?: Maybe<Scalars['String']['output']>;
+  /** Current number of outs (null for Preview/Final) */
+  outs?: Maybe<Scalars['Int']['output']>;
+  /** Scheduled start time (ISO 8601) */
+  startTime?: Maybe<Scalars['String']['output']>;
+  /** Game status: "Preview", "Live", or "Final" */
+  status: Scalars['String']['output'];
+};
+
+/** Team score and linescore data for a single game */
+export type ScoreboardTeam = {
+  __typename?: 'ScoreboardTeam';
+  /** Three-letter team abbreviation (e.g. NYY, BOS) */
+  abbreviation: Scalars['String']['output'];
+  /** Total errors */
+  errors: Scalars['Int']['output'];
+  /** Total hits */
+  hits: Scalars['Int']['output'];
+  /** Runs scored per inning (index 0 = inning 1) */
+  linescoreInnings?: Maybe<Array<Scalars['Int']['output']>>;
+  /** Total runs scored */
+  runs: Scalars['Int']['output'];
+  /** Full team name */
+  teamName: Scalars['String']['output'];
 };
 
 export type ScoringConfig = {
@@ -7325,6 +7380,46 @@ export type GetPlayoffSeedsQuery = {
       name?: string | null;
     } | null;
   }> | null;
+};
+
+export type GetScoreboardQueryVariables = Exact<{
+  date?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+export type GetScoreboardQuery = {
+  __typename?: 'Query';
+  scoreboard?: {
+    __typename?: 'Scoreboard';
+    date?: string | null;
+    lastUpdated?: string | null;
+    games?: Array<{
+      __typename?: 'ScoreboardGame';
+      gamePk: number;
+      status: string;
+      startTime?: string | null;
+      inning?: number | null;
+      inningHalf?: string | null;
+      outs?: number | null;
+      homeTeam: {
+        __typename?: 'ScoreboardTeam';
+        teamName: string;
+        abbreviation: string;
+        runs: number;
+        hits: number;
+        errors: number;
+        linescoreInnings?: Array<number> | null;
+      };
+      awayTeam: {
+        __typename?: 'ScoreboardTeam';
+        teamName: string;
+        abbreviation: string;
+        runs: number;
+        hits: number;
+        errors: number;
+        linescoreInnings?: Array<number> | null;
+      };
+    }> | null;
+  } | null;
 };
 
 export type GetLeagueScoringProfileQueryVariables = Exact<{
@@ -17670,6 +17765,117 @@ export type GetPlayoffSeedsSuspenseQueryHookResult = ReturnType<
 export type GetPlayoffSeedsQueryResult = Apollo.QueryResult<
   GetPlayoffSeedsQuery,
   GetPlayoffSeedsQueryVariables
+>;
+export const GetScoreboard = gql`
+  query GetScoreboard($date: String) {
+    scoreboard(date: $date) {
+      date
+      lastUpdated
+      games {
+        gamePk
+        status
+        startTime
+        inning
+        inningHalf
+        outs
+        homeTeam {
+          teamName
+          abbreviation
+          runs
+          hits
+          errors
+          linescoreInnings
+        }
+        awayTeam {
+          teamName
+          abbreviation
+          runs
+          hits
+          errors
+          linescoreInnings
+        }
+      }
+    }
+  }
+`;
+
+/**
+ * __useGetScoreboardQuery__
+ *
+ * To run a query within a React component, call `useGetScoreboardQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetScoreboardQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetScoreboardQuery({
+ *   variables: {
+ *      date: // value for 'date'
+ *   },
+ * });
+ */
+export function useGetScoreboardQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    GetScoreboardQuery,
+    GetScoreboardQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<GetScoreboardQuery, GetScoreboardQueryVariables>(
+    GetScoreboard,
+    options,
+  );
+}
+export function useGetScoreboardLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetScoreboardQuery,
+    GetScoreboardQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<GetScoreboardQuery, GetScoreboardQueryVariables>(
+    GetScoreboard,
+    options,
+  );
+}
+export function useGetScoreboardSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetScoreboardQuery,
+        GetScoreboardQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetScoreboardQuery,
+    GetScoreboardQueryVariables
+  >(
+    GetScoreboard,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetScoreboardQuery,
+          GetScoreboardQueryVariables
+        >,
+  );
+}
+export type GetScoreboardQueryHookResult = ReturnType<
+  typeof useGetScoreboardQuery
+>;
+export type GetScoreboardLazyQueryHookResult = ReturnType<
+  typeof useGetScoreboardLazyQuery
+>;
+export type GetScoreboardSuspenseQueryHookResult = ReturnType<
+  typeof useGetScoreboardSuspenseQuery
+>;
+export type GetScoreboardQueryResult = Apollo.QueryResult<
+  GetScoreboardQuery,
+  GetScoreboardQueryVariables
 >;
 export const GetLeagueScoringProfile = gql`
   query GetLeagueScoringProfile($leagueId: Int!) {
