@@ -3958,6 +3958,99 @@ export type GetLeagueStandingsQuery = {
   }> | null;
 };
 
+export type MatchupPlayerFragment = {
+  __typename?: 'MatchupPlayer';
+  id?: string | null;
+  matchupId?: number | null;
+  playerId?: number | null;
+  teamId?: number | null;
+  positionId?: number | null;
+  season?: number | null;
+  player?: {
+    __typename?: 'Player';
+    id?: number | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    eligiblePositions?: Array<string> | null;
+  } | null;
+};
+
+export type GetMatchupPlayersQueryVariables = Exact<{
+  matchupId: Scalars['Int']['input'];
+}>;
+
+export type GetMatchupPlayersQuery = {
+  __typename?: 'Query';
+  getMatchupPlayers?: Array<{
+    __typename?: 'MatchupPlayer';
+    id?: string | null;
+    matchupId?: number | null;
+    playerId?: number | null;
+    teamId?: number | null;
+    positionId?: number | null;
+    season?: number | null;
+    player?: {
+      __typename?: 'Player';
+      id?: number | null;
+      firstName?: string | null;
+      lastName?: string | null;
+      eligiblePositions?: Array<string> | null;
+    } | null;
+  }> | null;
+};
+
+export type UpdateMatchupPlayerPositionMutationVariables = Exact<{
+  matchupPlayerId: Scalars['Int']['input'];
+  positionId?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type UpdateMatchupPlayerPositionMutation = {
+  __typename?: 'Mutation';
+  updateMatchupPlayerPosition?: {
+    __typename?: 'MatchupPlayer';
+    id?: string | null;
+    matchupId?: number | null;
+    playerId?: number | null;
+    teamId?: number | null;
+    positionId?: number | null;
+    season?: number | null;
+    player?: {
+      __typename?: 'Player';
+      id?: number | null;
+      firstName?: string | null;
+      lastName?: string | null;
+      eligiblePositions?: Array<string> | null;
+    } | null;
+  } | null;
+};
+
+export type SwapMatchupPlayerPositionsMutationVariables = Exact<{
+  matchupPlayerIdA: Scalars['Int']['input'];
+  positionIdA?: InputMaybe<Scalars['Int']['input']>;
+  matchupPlayerIdB: Scalars['Int']['input'];
+  positionIdB?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type SwapMatchupPlayerPositionsMutation = {
+  __typename?: 'Mutation';
+  swapMatchupPlayerPositions?: Array<{
+    __typename?: 'MatchupPlayer';
+    id?: string | null;
+    matchupId?: number | null;
+    playerId?: number | null;
+    teamId?: number | null;
+    positionId?: number | null;
+    season?: number | null;
+    player?: {
+      __typename?: 'Player';
+      id?: number | null;
+      firstName?: string | null;
+      lastName?: string | null;
+      eligiblePositions?: Array<string> | null;
+    } | null;
+  }> | null;
+};
+
 export type GetMatchupHistoryQueryVariables = Exact<{
   leagueId: Scalars['Int']['input'];
   season?: InputMaybe<Scalars['Int']['input']>;
@@ -5124,6 +5217,22 @@ export const MatchupFragmentDoc = gql`
     selectedGamesCount
     startTime
     endTime
+  }
+`;
+export const MatchupPlayerFragmentDoc = gql`
+  fragment MatchupPlayer on MatchupPlayer {
+    id
+    matchupId
+    playerId
+    teamId
+    positionId
+    season
+    player {
+      id
+      firstName
+      lastName
+      eligiblePositions
+    }
   }
 `;
 export const LeagueChatMessageFieldsFragmentDoc = gql`
@@ -6922,6 +7031,219 @@ export type GetLeagueStandingsSuspenseQueryHookResult = ReturnType<
 export type GetLeagueStandingsQueryResult = Apollo.QueryResult<
   GetLeagueStandingsQuery,
   GetLeagueStandingsQueryVariables
+>;
+export const GetMatchupPlayers = gql`
+  query GetMatchupPlayers($matchupId: Int!) {
+    getMatchupPlayers(matchupId: $matchupId) {
+      ...MatchupPlayer
+    }
+  }
+  ${MatchupPlayerFragmentDoc}
+`;
+
+/**
+ * __useGetMatchupPlayersQuery__
+ *
+ * To run a query within a React component, call `useGetMatchupPlayersQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetMatchupPlayersQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetMatchupPlayersQuery({
+ *   variables: {
+ *      matchupId: // value for 'matchupId'
+ *   },
+ * });
+ */
+export function useGetMatchupPlayersQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetMatchupPlayersQuery,
+    GetMatchupPlayersQueryVariables
+  > &
+    (
+      | { variables: GetMatchupPlayersQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetMatchupPlayersQuery,
+    GetMatchupPlayersQueryVariables
+  >(GetMatchupPlayers, options);
+}
+export function useGetMatchupPlayersLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetMatchupPlayersQuery,
+    GetMatchupPlayersQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetMatchupPlayersQuery,
+    GetMatchupPlayersQueryVariables
+  >(GetMatchupPlayers, options);
+}
+export function useGetMatchupPlayersSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetMatchupPlayersQuery,
+        GetMatchupPlayersQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetMatchupPlayersQuery,
+    GetMatchupPlayersQueryVariables
+  >(
+    GetMatchupPlayers,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetMatchupPlayersQuery,
+          GetMatchupPlayersQueryVariables
+        >,
+  );
+}
+export type GetMatchupPlayersQueryHookResult = ReturnType<
+  typeof useGetMatchupPlayersQuery
+>;
+export type GetMatchupPlayersLazyQueryHookResult = ReturnType<
+  typeof useGetMatchupPlayersLazyQuery
+>;
+export type GetMatchupPlayersSuspenseQueryHookResult = ReturnType<
+  typeof useGetMatchupPlayersSuspenseQuery
+>;
+export type GetMatchupPlayersQueryResult = Apollo.QueryResult<
+  GetMatchupPlayersQuery,
+  GetMatchupPlayersQueryVariables
+>;
+export const UpdateMatchupPlayerPosition = gql`
+  mutation UpdateMatchupPlayerPosition(
+    $matchupPlayerId: Int!
+    $positionId: Int
+  ) {
+    updateMatchupPlayerPosition(
+      matchupPlayerId: $matchupPlayerId
+      positionId: $positionId
+    ) {
+      ...MatchupPlayer
+    }
+  }
+  ${MatchupPlayerFragmentDoc}
+`;
+export type UpdateMatchupPlayerPositionMutationFn = MutationFunction<
+  UpdateMatchupPlayerPositionMutation,
+  UpdateMatchupPlayerPositionMutationVariables
+>;
+
+/**
+ * __useUpdateMatchupPlayerPositionMutation__
+ *
+ * To run a mutation, you first call `useUpdateMatchupPlayerPositionMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateMatchupPlayerPositionMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateMatchupPlayerPositionMutation, { data, loading, error }] = useUpdateMatchupPlayerPositionMutation({
+ *   variables: {
+ *      matchupPlayerId: // value for 'matchupPlayerId'
+ *      positionId: // value for 'positionId'
+ *   },
+ * });
+ */
+export function useUpdateMatchupPlayerPositionMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    UpdateMatchupPlayerPositionMutation,
+    UpdateMatchupPlayerPositionMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    UpdateMatchupPlayerPositionMutation,
+    UpdateMatchupPlayerPositionMutationVariables
+  >(UpdateMatchupPlayerPosition, options);
+}
+export type UpdateMatchupPlayerPositionMutationHookResult = ReturnType<
+  typeof useUpdateMatchupPlayerPositionMutation
+>;
+export type UpdateMatchupPlayerPositionMutationResult =
+  Apollo.MutationResult<UpdateMatchupPlayerPositionMutation>;
+export type UpdateMatchupPlayerPositionMutationOptions = BaseMutationOptions<
+  UpdateMatchupPlayerPositionMutation,
+  UpdateMatchupPlayerPositionMutationVariables
+>;
+export const SwapMatchupPlayerPositions = gql`
+  mutation SwapMatchupPlayerPositions(
+    $matchupPlayerIdA: Int!
+    $positionIdA: Int
+    $matchupPlayerIdB: Int!
+    $positionIdB: Int
+  ) {
+    swapMatchupPlayerPositions(
+      matchupPlayerIdA: $matchupPlayerIdA
+      positionIdA: $positionIdA
+      matchupPlayerIdB: $matchupPlayerIdB
+      positionIdB: $positionIdB
+    ) {
+      ...MatchupPlayer
+    }
+  }
+  ${MatchupPlayerFragmentDoc}
+`;
+export type SwapMatchupPlayerPositionsMutationFn = MutationFunction<
+  SwapMatchupPlayerPositionsMutation,
+  SwapMatchupPlayerPositionsMutationVariables
+>;
+
+/**
+ * __useSwapMatchupPlayerPositionsMutation__
+ *
+ * To run a mutation, you first call `useSwapMatchupPlayerPositionsMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useSwapMatchupPlayerPositionsMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [swapMatchupPlayerPositionsMutation, { data, loading, error }] = useSwapMatchupPlayerPositionsMutation({
+ *   variables: {
+ *      matchupPlayerIdA: // value for 'matchupPlayerIdA'
+ *      positionIdA: // value for 'positionIdA'
+ *      matchupPlayerIdB: // value for 'matchupPlayerIdB'
+ *      positionIdB: // value for 'positionIdB'
+ *   },
+ * });
+ */
+export function useSwapMatchupPlayerPositionsMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    SwapMatchupPlayerPositionsMutation,
+    SwapMatchupPlayerPositionsMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    SwapMatchupPlayerPositionsMutation,
+    SwapMatchupPlayerPositionsMutationVariables
+  >(SwapMatchupPlayerPositions, options);
+}
+export type SwapMatchupPlayerPositionsMutationHookResult = ReturnType<
+  typeof useSwapMatchupPlayerPositionsMutation
+>;
+export type SwapMatchupPlayerPositionsMutationResult =
+  Apollo.MutationResult<SwapMatchupPlayerPositionsMutation>;
+export type SwapMatchupPlayerPositionsMutationOptions = BaseMutationOptions<
+  SwapMatchupPlayerPositionsMutation,
+  SwapMatchupPlayerPositionsMutationVariables
 >;
 export const GetMatchupHistory = gql`
   query GetMatchupHistory(

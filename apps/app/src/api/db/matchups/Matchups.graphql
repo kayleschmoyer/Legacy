@@ -54,6 +54,56 @@ query GetLeagueStandings($leagueId: Int!) {
   }
 }
 
+# ── Matchup Players & Lineup Editing ─────────────────────────────────────────
+
+fragment MatchupPlayer on MatchupPlayer {
+  id
+  matchupId
+  playerId
+  teamId
+  positionId
+  season
+  player {
+    id
+    firstName
+    lastName
+    eligiblePositions
+  }
+}
+
+query GetMatchupPlayers($matchupId: Int!) {
+  getMatchupPlayers(matchupId: $matchupId) {
+    ...MatchupPlayer
+  }
+}
+
+mutation UpdateMatchupPlayerPosition($matchupPlayerId: Int!, $positionId: Int) {
+  updateMatchupPlayerPosition(
+    matchupPlayerId: $matchupPlayerId
+    positionId: $positionId
+  ) {
+    ...MatchupPlayer
+  }
+}
+
+mutation SwapMatchupPlayerPositions(
+  $matchupPlayerIdA: Int!
+  $positionIdA: Int
+  $matchupPlayerIdB: Int!
+  $positionIdB: Int
+) {
+  swapMatchupPlayerPositions(
+    matchupPlayerIdA: $matchupPlayerIdA
+    positionIdA: $positionIdA
+    matchupPlayerIdB: $matchupPlayerIdB
+    positionIdB: $positionIdB
+  ) {
+    ...MatchupPlayer
+  }
+}
+
+# ── Matchup History ──────────────────────────────────────────────────────────
+
 query GetMatchupHistory(
   $leagueId: Int!
   $season: Int

@@ -12,6 +12,7 @@ import {
   MatchupStatus,
   useGetUserTeamIdQuery,
 } from '../../../api/db/graphql.generated';
+import { MatchupRosterEditor } from '../components/MatchupRosterEditor';
 import { MatchupScoreboard } from '../components/MatchupScoreboard';
 import { StandingsTable } from '../components/StandingsTable';
 import {
@@ -132,6 +133,9 @@ export default function MatchupDetailScreen() {
           <Tabs.Tab value="rosters" flex={1}>
             <Text>Rosters</Text>
           </Tabs.Tab>
+          <Tabs.Tab value="lineup" flex={1}>
+            <Text>Lineup</Text>
+          </Tabs.Tab>
           <Tabs.Tab value="standings" flex={1}>
             <Text>Standings</Text>
           </Tabs.Tab>
@@ -166,6 +170,34 @@ export default function MatchupDetailScreen() {
         <Tabs.Content value="rosters" padding="$2">
           <ScrollView>
             <MatchupRosterComparison matchup={matchup} />
+          </ScrollView>
+        </Tabs.Content>
+
+        <Tabs.Content value="lineup" padding="$2">
+          <ScrollView>
+            {matchupId &&
+            leagueId &&
+            userTeamId &&
+            (matchup.team1Id === userTeamId ||
+              matchup.team2Id === userTeamId) ? (
+              <MatchupRosterEditor
+                matchupId={matchupId}
+                leagueId={leagueId}
+                userTeamId={userTeamId}
+                matchupStatus={matchup.status ?? MatchupStatus.Completed}
+                locked={matchup.status === MatchupStatus.InProgress}
+              />
+            ) : (
+              <YStack padding="$4" alignItems="center">
+                <Text color="$gray10">
+                  {userTeamId &&
+                  matchup.team1Id !== userTeamId &&
+                  matchup.team2Id !== userTeamId
+                    ? 'You are not part of this matchup.'
+                    : 'Unable to load lineup editor.'}
+                </Text>
+              </YStack>
+            )}
           </ScrollView>
         </Tabs.Content>
 
