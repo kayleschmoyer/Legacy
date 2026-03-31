@@ -74,6 +74,11 @@ variable "android_cmdline_tools_sha256" {
   default = "d3cbe3db2250ca0db5ef547cd32e9c1f8e1adb9fd7f56866a8a25fa5302b8a76"
 }
 
+variable "docker_version" {
+  type    = string
+  default = "28.1.1"
+}
+
 variable "instance_type" {
   type    = string
   default = "c7a.xlarge"
@@ -121,6 +126,7 @@ source "amazon-ebs" "runner" {
     TerraformVersion  = var.terraform_version
     AndroidApiLevel   = var.android_api_level
     AndroidNdkVersion = var.android_ndk_version
+    DockerInstalled   = "true"
   }
 }
 
@@ -206,6 +212,24 @@ build {
       "sudo chmod +x /usr/local/bin/snyk",
       "rm -f /tmp/snyk-linux.sha256",
       "snyk --version",
+    ]
+  }
+
+  # Docker Engine (required by container-based GitHub Actions like osv-scanner-action)
+  # Uses the official Docker APT repo with a pinned version for deterministic builds.
+  provisioner "shell" {
+    inline = [
+      "export DEBIAN_FRONTEND=noninteractive",
+      "sudo apt-get install -y -qq ca-certificates gnupg",
+      "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg",
+      "echo 'deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu jammy stable' | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null",
+      "sudo apt-get update -qq",
+      "sudo apt-get install -y -qq docker-ce=5:${var.docker_version}-1~ubuntu.22.04~jammy docker-ce-cli=5:${var.docker_version}-1~ubuntu.22.04~jammy containerd.io docker-buildx-plugin docker-compose-plugin",
+      "sudo usermod -aG docker ubuntu",
+      "sudo systemctl enable docker",
+      "sudo systemctl start docker",
+      "sudo systemctl is-active --quiet docker",
+      "sudo docker info",
     ]
   }
 
