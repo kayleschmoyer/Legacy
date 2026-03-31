@@ -80,7 +80,9 @@ resource "aws_vpc_endpoint" "logs" {
 
   private_dns_enabled = true
 
-  # Endpoint policy to allow all CloudWatch Logs actions
+  # Endpoint policy: Lambda runtime + Terraform refresh actions.
+  # private_dns_enabled routes ALL CW Logs API calls through this endpoint,
+  # including from self-hosted runners in public subnets.
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -92,7 +94,12 @@ resource "aws_vpc_endpoint" "logs" {
           "logs:CreateLogStream",
           "logs:PutLogEvents",
           "logs:DescribeLogGroups",
-          "logs:DescribeLogStreams"
+          "logs:DescribeLogStreams",
+          "logs:ListTagsForResource",
+          "logs:ListTagsLogGroup",
+          "logs:GetLogEvents",
+          "logs:FilterLogEvents",
+          "logs:TagResource",
         ]
         Resource = "*"
       }

@@ -378,6 +378,11 @@ resource "aws_api_gateway_gateway_response" "cors" {
     "gatewayresponse.header.Access-Control-Allow-Methods"     = "'GET,POST,OPTIONS'"
     "gatewayresponse.header.Access-Control-Allow-Credentials" = "'true'"
   }
+
+  # Return the API Gateway error message so clients can diagnose failures.
+  response_templates = {
+    "application/json" = "{\"message\":$context.error.messageString}"
+  }
 }
 
 # ─── Custom domain: api.<domain> ───────────────────────────────────────────────

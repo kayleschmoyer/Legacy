@@ -180,6 +180,19 @@ build {
     ]
   }
 
+  # GitHub CLI (used by CI workflows for PR operations, artifact management, etc.)
+  provisioner "shell" {
+    inline = [
+      "curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg -o /tmp/githubcli-archive-keyring.gpg",
+      "sudo install -m 644 /tmp/githubcli-archive-keyring.gpg /usr/share/keyrings/githubcli-archive-keyring.gpg",
+      "rm -f /tmp/githubcli-archive-keyring.gpg",
+      "echo 'deb [arch=amd64 signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main' | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null",
+      "sudo apt-get update -qq",
+      "sudo apt-get install -y -qq gh",
+      "gh --version",
+    ]
+  }
+
   # GitHub Actions runner dependencies (not the agent itself — the module installs that)
   provisioner "shell" {
     inline = [
