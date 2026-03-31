@@ -217,7 +217,7 @@ module "github_runners" {
       description      = "DNS (TCP) - VPC DNS resolver"
     },
     {
-      cidr_blocks      = aws_subnet.private_database[*].cidr_block
+      cidr_blocks      = aws_subnet.public[*].cidr_block
       ipv6_cidr_blocks = []
       prefix_list_ids  = null
       from_port        = 5432
@@ -225,7 +225,7 @@ module "github_runners" {
       security_groups  = null
       self             = false
       to_port          = 5432
-      description      = "PostgreSQL - RDS in database subnets (migration checks)"
+      description      = "PostgreSQL - RDS in public subnets (historical placement, migration checks)"
     },
     {
       cidr_blocks      = ["169.254.169.254/32"]
