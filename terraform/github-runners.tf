@@ -6,8 +6,8 @@
 # module for robust, battle-tested self-hosted runner infrastructure.
 #
 # Architecture:
-#   GitHub webhook (workflow_job) → API Gateway → Lambda → EC2 spot (ephemeral)
-#   Runner picks up one job → completes → terminates → ASG scales down
+#   GitHub webhook (workflow_job) → API Gateway → Lambda → EC2 spot (non-ephemeral)
+#   Runner boots once, processes jobs from queue, scale-down Lambda terminates after idle timeout
 #
 # Cost: ~$48/month (scale-to-zero, spot instances) vs ~$1,370/month on
 #        GitHub-hosted runners (~96% savings).
@@ -38,13 +38,13 @@ module "github_runners" {
 
   # ── Runner configuration ────────────────────────────────────────────────────
   enable_organization_runners = false # repo-level runners
-  enable_ephemeral_runners    = true  # one job per instance, then terminate
-  enable_jit_config           = false # Disable JIT — let instance register on boot (JIT tokens expire before boot completes)
+  enable_ephemeral_runners    = false # non-ephemeral: instance processes multiple sequential jobs
+  enable_jit_config           = false # JIT is ephemeral-only; keep disabled for non-ephemeral mode
 
-  # Reduce webhook event delay from default 30s to 10s. The delay exists to let
-  # idle runners pick up jobs before launching new instances, but with ephemeral
-  # runners there are never idle runners — so 30s is pure dead time per job start.
-  # At ~5 sequential stages per pipeline, this saves ~100s per CI run.
+  # Reduce webhook event delay from default 30s to 10s. With non-ephemeral runners,
+  # idle runners CAN pick up queued jobs — this delay gives them a chance to do so
+  # before the scale-up Lambda launches a new instance. 10s is low enough to avoid
+  # perceptible queue time while still enabling job reuse on warm runners.
   delay_webhook_event = 10
   # TODO: re-enable after adding `actions: read` to the GitHub App permissions.
   # The app currently lacks this scope, causing 403s on the queued-job check.
@@ -58,9 +58,21 @@ module "github_runners" {
   instance_allocation_strategy  = "capacity-optimized-prioritized"
   instance_types                = var.github_runners_instance_types
 
-  # Scale-to-zero: check every 5 minutes for idle runners
-  scale_down_schedule_expression = "cron(*/5 * * * ? *)"
+  # Check every minute for idle runners. Non-ephemeral runners stay alive between
+  # jobs so we need frequent polling to reclaim instances quickly once they go idle.
+  scale_down_schedule_expression = "cron(* * * * ? *)"
   runners_maximum_count          = var.github_runners_max_count
+
+  # Keep 1 warm runner during business hours (Mon–Fri 12pm–7:59pm ET) so the first
+  # job of a burst doesn't incur a cold-boot penalty.
+  idle_config = [
+    {
+      cron             = "* 12-19 * * 1-5"
+      timeZone         = "America/New_York"
+      idleCount        = 1
+      evictionStrategy = "oldest_first"
+    }
+  ]
 
   # Allow 5 concurrent scale-up Lambda invocations (default: 1). The default
   # serializes all scale-up decisions, bottlenecking burst throughput — observed
@@ -79,13 +91,15 @@ module "github_runners" {
   # that causes startup failure. Enable later with custom config (LS-1667).
   enable_cloudwatch_agent = false
 
-  # Boot time includes userdata_pre_install (~1 min with pre-baked AMI)
-  # plus job execution time. The scale-down Lambda won't terminate runners
-  # younger than this, even if they appear idle between job phases.
-  runner_boot_time_in_minutes = 15
+  # Time for the instance to boot and register as a runner (~30s with pre-baked AMI
+  # plus userdata_pre_install). Scale-down Lambda won't terminate instances younger
+  # than this even if they appear idle.
+  runner_boot_time_in_minutes = 10
 
-  # Minimum time a runner stays alive (prevents termination during job execution)
-  minimum_running_time_in_minutes = 20
+  # Minimum runtime before the scale-down Lambda considers a runner eligible for
+  # termination. 15 minutes gives non-ephemeral runners enough idle time to pick
+  # up follow-on jobs in a burst before being reclaimed.
+  minimum_running_time_in_minutes = 15
 
   # ── AMI (pre-baked via Packer — see terraform/packer/runner-ami.pkr.hcl) ──
   # Ubuntu 22.04 with Node.js 22, pnpm, Playwright deps, runner deps pre-installed.
@@ -117,6 +131,51 @@ module "github_runners" {
   # Pre-install is minimal — tools are pre-baked in the Packer AMI
   userdata_pre_install = <<-EOT
     echo "Using pre-baked Ubuntu AMI - Node.js, pnpm, Playwright already installed"
+  EOT
+
+  # ── Inter-job cleanup hook (non-ephemeral isolation) ───────────────────────
+  # Runs after each job completes via ACTIONS_RUNNER_HOOK_JOB_COMPLETED.
+  # Removes workspace and temp artifacts to prevent cross-job data leakage.
+  # pnpm store and Nx cache are intentionally preserved for performance.
+  runner_hook_job_completed = <<-EOT
+    #!/bin/bash
+    set -euo pipefail
+
+    echo "[cleanup] Post-job cleanup started at $(date -u)"
+
+    # Derive the runner workspace root from the environment, falling back to the
+    # default GitHub Actions runner path if RUNNER_WORKSPACE is not set.
+    WORKSPACE_ROOT="$${RUNNER_WORKSPACE:-/opt/actions-runner/_work}"
+
+    # Remove the job workspace (prevents stale files and secrets from leaking
+    # to the next job). The runner re-creates this directory per job.
+    if [[ -n "$${GITHUB_WORKSPACE:-}" ]]; then
+      echo "[cleanup] Removing GITHUB_WORKSPACE: $GITHUB_WORKSPACE"
+      rm -rf "$GITHUB_WORKSPACE"
+    else
+      echo "[cleanup] GITHUB_WORKSPACE not set; skipping workspace deletion"
+    fi
+
+    # Clear the runner's temp directory and cached action code (action outputs,
+    # tool caches for this job, and downloaded marketplace actions).
+    # _actions is removed to prevent a compromised job from tampering with
+    # cached action code that would run in subsequent jobs.
+    rm -rf "$WORKSPACE_ROOT/_temp/"
+    rm -rf "$WORKSPACE_ROOT/_actions/"
+
+    # Remove temp files written by npm/pnpm/Nx during the job
+    rm -rf /tmp/npm-* /tmp/pnpm-* /tmp/nx-*
+
+    # Remove any git credential helpers written by actions/checkout
+    find "$WORKSPACE_ROOT" -name "git-credentials-*" -delete 2>/dev/null || true
+
+    # Remove per-job .npmrc files that may contain registry auth tokens.
+    # Restricted to the job workspace (not _actions) to avoid mutating action checkouts.
+    if [[ -n "$${GITHUB_WORKSPACE:-}" ]]; then
+      find "$GITHUB_WORKSPACE" -name ".npmrc" -delete 2>/dev/null || true
+    fi
+
+    echo "[cleanup] Post-job cleanup completed at $(date -u)"
   EOT
 
   # ── VPC egress restrictions (LS-1654) ──────────────────────────────────────
@@ -360,9 +419,9 @@ resource "aws_iam_policy" "runner_permissions_boundary" {
           }
         }
       },
-      # EC2 self-terminate — ephemeral runners terminate themselves after job
-      # completion. Without this, completed runners become zombies that block
-      # scale-up (the scale-up Lambda counts them toward maximumRunners).
+      # EC2 terminate — used by the scale-down Lambda to reclaim idle runners.
+      # Scoped to instances tagged with the runner environment prefix so the Lambda
+      # cannot terminate unrelated EC2 instances in the account.
       {
         Sid    = "EC2SelfTerminate"
         Effect = "Allow"
