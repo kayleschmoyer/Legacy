@@ -4541,6 +4541,20 @@ export type GetMatchupsByWeekQuery = {
   }> | null;
 };
 
+export type GetPositionsForLeagueQueryVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+}>;
+
+export type GetPositionsForLeagueQuery = {
+  __typename?: 'Query';
+  leaguePositions?: Array<{
+    __typename?: 'LeaguePosition';
+    id?: number | null;
+    leagueId?: number | null;
+    positionType?: string | null;
+  }> | null;
+};
+
 export type GetSeasonDraftGameQueryVariables = Exact<{
   gameId: Scalars['Int']['input'];
 }>;
@@ -9477,6 +9491,98 @@ export type GetMatchupsByWeekSuspenseQueryHookResult = ReturnType<
 export type GetMatchupsByWeekQueryResult = Apollo.QueryResult<
   GetMatchupsByWeekQuery,
   GetMatchupsByWeekQueryVariables
+>;
+export const GetPositionsForLeague = gql`
+  query GetPositionsForLeague($leagueId: Int!) {
+    leaguePositions(leagueId: $leagueId) {
+      id
+      leagueId
+      positionType
+    }
+  }
+`;
+
+/**
+ * __useGetPositionsForLeagueQuery__
+ *
+ * To run a query within a React component, call `useGetPositionsForLeagueQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetPositionsForLeagueQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetPositionsForLeagueQuery({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *   },
+ * });
+ */
+export function useGetPositionsForLeagueQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetPositionsForLeagueQuery,
+    GetPositionsForLeagueQueryVariables
+  > &
+    (
+      | { variables: GetPositionsForLeagueQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetPositionsForLeagueQuery,
+    GetPositionsForLeagueQueryVariables
+  >(GetPositionsForLeague, options);
+}
+export function useGetPositionsForLeagueLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetPositionsForLeagueQuery,
+    GetPositionsForLeagueQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetPositionsForLeagueQuery,
+    GetPositionsForLeagueQueryVariables
+  >(GetPositionsForLeague, options);
+}
+export function useGetPositionsForLeagueSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetPositionsForLeagueQuery,
+        GetPositionsForLeagueQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetPositionsForLeagueQuery,
+    GetPositionsForLeagueQueryVariables
+  >(
+    GetPositionsForLeague,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetPositionsForLeagueQuery,
+          GetPositionsForLeagueQueryVariables
+        >,
+  );
+}
+export type GetPositionsForLeagueQueryHookResult = ReturnType<
+  typeof useGetPositionsForLeagueQuery
+>;
+export type GetPositionsForLeagueLazyQueryHookResult = ReturnType<
+  typeof useGetPositionsForLeagueLazyQuery
+>;
+export type GetPositionsForLeagueSuspenseQueryHookResult = ReturnType<
+  typeof useGetPositionsForLeagueSuspenseQuery
+>;
+export type GetPositionsForLeagueQueryResult = Apollo.QueryResult<
+  GetPositionsForLeagueQuery,
+  GetPositionsForLeagueQueryVariables
 >;
 export const GetSeasonDraftGame = gql`
   query GetSeasonDraftGame($gameId: Int!) {

@@ -6,6 +6,7 @@ import {
   GamesRemaining,
   MatchupNavigationControls,
   MatchupRecapPanel,
+  MatchupRosterComparison,
 } from '@legacy-sports/shared-components';
 import {
   MatchupStatus,
@@ -128,6 +129,9 @@ export default function MatchupDetailScreen() {
           <Tabs.Tab value="overview" flex={1}>
             <Text>Overview</Text>
           </Tabs.Tab>
+          <Tabs.Tab value="rosters" flex={1}>
+            <Text>Rosters</Text>
+          </Tabs.Tab>
           <Tabs.Tab value="standings" flex={1}>
             <Text>Standings</Text>
           </Tabs.Tab>
@@ -156,6 +160,12 @@ export default function MatchupDetailScreen() {
                 <MatchupRecapPanel matchupId={matchupId} />
               )}
             </YStack>
+          </ScrollView>
+        </Tabs.Content>
+
+        <Tabs.Content value="rosters" padding="$2">
+          <ScrollView>
+            <MatchupRosterComparison matchup={matchup} />
           </ScrollView>
         </Tabs.Content>
 
