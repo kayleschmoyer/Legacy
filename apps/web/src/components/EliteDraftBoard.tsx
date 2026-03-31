@@ -10,6 +10,7 @@ import { EliteDraftBoardScreen } from '@legacy-sports/shared-components';
 import type { DraftChatProps } from '@legacy-sports/shared-components';
 import { LeagueChatTab } from '../features/baseball/LeagueChatTab';
 import { env } from '../config/environment';
+import { trackPlayerSelected } from '../utils/analytics';
 
 function renderChat({ leagueId, userId, mentionableTeams }: DraftChatProps) {
   return (
@@ -32,6 +33,7 @@ export function EliteDraftBoardScreenWrapper(): React.JSX.Element {
       onNavigate={(path) => navigate(path)}
       websocketUrl={env.websocketUrl}
       renderChat={renderChat}
+      onPlayerDrafted={trackPlayerSelected}
     />
   );
 }

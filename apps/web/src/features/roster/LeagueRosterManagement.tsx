@@ -40,6 +40,7 @@ import {
   CONTENT_STICKY_Z_INDEX,
   NAV_HEIGHT_PX,
 } from '../../constants/dimensions';
+import { trackRosterAction } from '../../utils/analytics';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -1325,6 +1326,8 @@ export interface LeagueRosterManagementProps {
   minCareerSeasons?: number;
   /** Callback to set or clear a player nickname. (LS-1813) */
   onSetNickname?: (teamMemberId: number, nickname: string | null) => void;
+  /** League ID for analytics. */
+  leagueId?: number;
 }
 
 export function LeagueRosterManagement({
@@ -1341,6 +1344,7 @@ export function LeagueRosterManagement({
   minCareerGames,
   minCareerSeasons,
   onSetNickname,
+  leagueId,
 }: LeagueRosterManagementProps): React.JSX.Element {
   const [selectedPlayer, setSelectedPlayer] =
     useState<TeamMemberFragment | null>(null);
@@ -1441,10 +1445,17 @@ export function LeagueRosterManagement({
     (player: TeamMemberFragment, position: LeaguePositionFragment) => {
       if (readOnly) return;
       onPlayerAssign(player, position);
+      if (leagueId) {
+        trackRosterAction('position_change', {
+          leagueId,
+          playerId: player.playerId ?? undefined,
+          toPosition: position.positionType ?? undefined,
+        });
+      }
       setSelectedPlayer(null);
       flashIds(player.id, position.id);
     },
-    [readOnly, onPlayerAssign, flashIds],
+    [readOnly, onPlayerAssign, flashIds, leagueId],
   );
 
   const handlePlayerSwap = useCallback(
@@ -1455,10 +1466,17 @@ export function LeagueRosterManagement({
     ) => {
       if (readOnly) return;
       onPlayerSwap(incomingPlayer, targetPosition, displacedPlayer);
+      if (leagueId) {
+        trackRosterAction('position_change', {
+          leagueId,
+          playerId: incomingPlayer.playerId ?? undefined,
+          toPosition: targetPosition.positionType ?? undefined,
+        });
+      }
       setSelectedPlayer(null);
       flashIds(incomingPlayer.id, displacedPlayer.id, targetPosition.id);
     },
-    [readOnly, onPlayerSwap, flashIds],
+    [readOnly, onPlayerSwap, flashIds, leagueId],
   );
 
   const handleBenchPlayer = useCallback(
@@ -1466,12 +1484,19 @@ export function LeagueRosterManagement({
       if (readOnly) return;
       const pos = positions.find((p) => p.id === player.positionId);
       if (pos) {
+        if (leagueId) {
+          trackRosterAction('position_change', {
+            leagueId,
+            playerId: player.playerId ?? undefined,
+            fromPosition: pos.positionType ?? undefined,
+          });
+        }
         onPlayerRemove(pos);
         setSelectedPlayer(null);
         flashIds(player.id);
       }
     },
-    [readOnly, positions, onPlayerRemove, flashIds],
+    [readOnly, positions, onPlayerRemove, flashIds, leagueId],
   );
 
   // ── Computed stats ───────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   Button,
@@ -30,6 +30,7 @@ import {
   BRAND_SEAM_RED,
   withAlpha,
 } from '../../constants/colors';
+import { trackTeamViewed } from '../../utils/analytics';
 
 /**
  * TeamDetailPage - Display team roster and allow editing for General Managers.
@@ -115,6 +116,12 @@ export function TeamDetailPage() {
     });
     return map;
   }, [positionsData]);
+
+  useEffect(() => {
+    if (teamIdNum && leagueId) {
+      trackTeamViewed(teamIdNum, leagueId);
+    }
+  }, [teamIdNum, leagueId]);
 
   const [updateTeamBranding, { loading: brandingLoading }] =
     useUpdateTeamBrandingMutation();

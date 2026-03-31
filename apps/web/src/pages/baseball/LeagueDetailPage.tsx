@@ -2704,6 +2704,7 @@ export function LeagueDetailPage(): React.JSX.Element {
               ? undefined
               : (id, nick) => void handleSetNickname(id, nick)
           }
+          leagueId={leagueId}
         />
       </YStack>
     );

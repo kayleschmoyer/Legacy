@@ -22,6 +22,7 @@ import {
   RED,
   withAlpha,
 } from '../../constants/colors';
+import { trackRosterAction } from '../../utils/analytics';
 
 const pitchingPositions = PITCHING_POSITIONS;
 const infieldPositions = new Set(['C', '1B', '2B', '3B', 'SS']);
@@ -595,6 +596,7 @@ export interface LeagueRosterManagementProps {
   team?: Pick<TeamFragment, 'totalPayroll' | 'capSpace'> | null;
   salaryCapEnabled?: boolean | null;
   salaryCap?: number | null;
+  leagueId?: number;
   onPlayerAssign: (
     player: TeamMemberFragment,
     position: LeaguePositionFragment,
@@ -609,6 +611,7 @@ export function LeagueRosterManagement({
   team,
   salaryCapEnabled,
   salaryCap,
+  leagueId,
   onPlayerAssign,
   onPlayerRemove,
   loading = false,
@@ -650,16 +653,33 @@ export function LeagueRosterManagement({
   const handlePlayerAssign = useCallback(
     (player: TeamMemberFragment, position: LeaguePositionFragment) => {
       onPlayerAssign(player, position);
+      if (leagueId) {
+        trackRosterAction('position_change', {
+          leagueId,
+          playerId: player.playerId ?? undefined,
+          toPosition: position.positionType ?? undefined,
+        });
+      }
       setSelectedPlayer(null);
     },
-    [onPlayerAssign],
+    [onPlayerAssign, leagueId],
   );
 
   const handlePlayerRemove = useCallback(
     (position: LeaguePositionFragment) => {
+      if (leagueId) {
+        const assignedPlayer = getAssignedPlayer(position);
+        if (assignedPlayer) {
+          trackRosterAction('position_change', {
+            leagueId,
+            playerId: assignedPlayer.playerId ?? undefined,
+            fromPosition: position.positionType ?? undefined,
+          });
+        }
+      }
       onPlayerRemove(position);
     },
-    [onPlayerRemove],
+    [onPlayerRemove, getAssignedPlayer, leagueId],
   );
 
   if (loading) {

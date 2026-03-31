@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button, H2, Spinner, Text, XStack, YStack } from 'tamagui';
 import { MatchupRecapPanel } from '@legacy-sports/shared-components';
@@ -25,6 +25,7 @@ import {
   BRAND_NAVY_DARK,
   BRAND_NAVY_LIGHT,
 } from '../../constants/colors';
+import { trackMatchupViewed } from '../../utils/analytics';
 
 /**
  * MatchupDetailPage - Full matchup breakdown page
@@ -67,6 +68,19 @@ export function MatchupDetailPage() {
   }, [currentWeek, userTeamId, allLeagueMatchups]);
 
   const isPremium = useIsPremium();
+
+  const lastTrackedMatchupViewKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!matchup || !matchupIdNum || !leagueIdNum || currentWeek == null) {
+      return;
+    }
+    const key = `${leagueIdNum}-${matchupIdNum}-${currentWeek}`;
+    if (lastTrackedMatchupViewKeyRef.current === key) {
+      return;
+    }
+    trackMatchupViewed(matchupIdNum, leagueIdNum, currentWeek);
+    lastTrackedMatchupViewKeyRef.current = key;
+  }, [matchup, matchupIdNum, leagueIdNum, currentWeek]);
 
   if (loading) {
     return (

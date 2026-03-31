@@ -59,6 +59,8 @@ interface UseDraftWebSocketParams {
   websocketUrl: string;
   /** Auth token for WebSocket authentication. */
   token?: string;
+  /** Optional callback fired when a pick is made (for analytics). */
+  onPlayerDrafted?: (playerId: number, position: string) => void;
 }
 
 export function useDraftWebSocket({
@@ -87,6 +89,7 @@ export function useDraftWebSocket({
   refetchQueue,
   websocketUrl,
   token,
+  onPlayerDrafted,
 }: UseDraftWebSocketParams) {
   const handleDraftStarted = useCallback(
     (notification: DraftStartedNotification) => {
@@ -135,6 +138,10 @@ export function useDraftWebSocket({
             notification.pickNumber,
             isMyTeamPick,
             false,
+          );
+          onPlayerDrafted?.(
+            notification.playerId,
+            pickedPlayer.position ?? '??',
           );
         }
 
@@ -188,6 +195,7 @@ export function useDraftWebSocket({
       refetchPickHistory,
       refetchAvailablePlayers,
       refetchQueue,
+      onPlayerDrafted,
     ],
   );
 

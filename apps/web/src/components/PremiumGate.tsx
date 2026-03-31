@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button, Text, YStack } from 'tamagui';
 import { Lock } from '@tamagui/lucide-icons';
 import { UpgradeModal } from './UpgradeModal';
-import { trackPremiumFeatureClick } from '../utils/analytics';
+import {
+  trackPremiumFeatureBlocked,
+  trackPremiumFeatureClick,
+} from '../utils/analytics';
 import {
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,
@@ -52,6 +55,12 @@ export function PremiumGate({
   children,
 }: PremiumGateProps) {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+
+  useEffect(() => {
+    if (!isPremium) {
+      trackPremiumFeatureBlocked(featureName);
+    }
+  }, [featureName, isPremium]);
 
   if (isPremium) {
     return <>{children}</>;

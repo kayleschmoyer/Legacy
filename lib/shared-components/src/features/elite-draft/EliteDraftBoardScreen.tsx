@@ -38,6 +38,8 @@ export interface EliteDraftBoardScreenProps {
   websocketToken?: string;
   /** Optional render prop for the chat overlay. If omitted, chat is disabled. */
   renderChat?: DraftChatRenderer;
+  /** Optional callback fired when a player is drafted (for analytics). */
+  onPlayerDrafted?: (playerId: number, position: string) => void;
 }
 
 export function EliteDraftBoardScreen({
@@ -45,6 +47,7 @@ export function EliteDraftBoardScreen({
   onNavigate,
   websocketUrl,
   renderChat,
+  onPlayerDrafted,
 }: EliteDraftBoardScreenProps): React.JSX.Element {
   const { user } = useAuth();
   const userId = user?.id ?? 0;
@@ -129,6 +132,7 @@ export function EliteDraftBoardScreen({
     refetchAvailablePlayers: queries.refetchAvailablePlayers,
     refetchQueue: queries.refetchQueue,
     websocketUrl,
+    onPlayerDrafted,
   });
 
   const { timeRemaining } = useDraftTimer({
