@@ -3,6 +3,7 @@ import type { ToolResult } from '../types.js';
 
 /** Available Lambda function short names supported by this tool. */
 export const LAMBDA_FUNCTIONS = [
+  // App Lambdas
   'graphql',
   'db',
   'oauth-proxy',
@@ -15,6 +16,13 @@ export const LAMBDA_FUNCTIONS = [
   'apple-iap',
   'stripe-webhook',
   'rollbar-discord',
+  // Runner infrastructure Lambdas (github-aws-runners module)
+  'runner-scale-up',
+  'runner-scale-down',
+  'runner-webhook',
+  'runner-dispatch-to-runner',
+  'runner-ssm-housekeeper',
+  'runner-syncer',
 ] as const;
 
 export type LambdaFunction = (typeof LAMBDA_FUNCTIONS)[number];

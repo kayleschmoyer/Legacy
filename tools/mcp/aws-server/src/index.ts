@@ -34,7 +34,7 @@ server.tool(
 // --- aws_logs_tail ---
 server.tool(
   'aws_logs_tail',
-  'Fetch recent CloudWatch logs for a Lambda function.',
+  'Fetch recent CloudWatch logs for a Lambda function (app or runner infrastructure).',
   {
     function: z.enum(LAMBDA_FUNCTIONS).describe('Lambda function short name'),
     since: z
