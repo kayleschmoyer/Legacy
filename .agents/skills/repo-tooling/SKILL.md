@@ -75,6 +75,7 @@ Consolidated skill for running and fixing ESLint, TypeScript type checking, buil
 - **If `make pc` reformats files**, commit them and re-run `make pc`
 - **Always use `make` targets** over raw `pnpm exec nx` commands
 - **Always use `-w` flag** when installing packages (`pnpm add -w`)
+- **Avoid `node -e` on Windows for multi-line scripts** — complex quoting (backslashes, embedded quotes, `$`-expansion) is fragile in PowerShell. For any Node script longer than a trivial expression, write it to `scratch/<name>.js` and run `node scratch/<name>.js` instead
 - **Run `print-schema` before codegen** when Pothos resolvers have changed
 - **Check migration status before `make pc`** -- pending migrations cause failures
 

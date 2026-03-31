@@ -122,7 +122,7 @@ make ami-build VPC_ID=vpc-xxx SUBNET_ID=subnet-xxx  # build new AMI with Packer
 make ami-list                                        # list existing runner AMIs
 ```
 
-**`scratch/` directory**: use `scratch/` for ad-hoc output files (lint results, CI logs, debug dumps, Playwright output). Everything in `scratch/` is gitignored. Each worktree has its own isolated `scratch/` directory.
+**`scratch/` directory**: use `scratch/` for ad-hoc output files (lint results, CI logs, debug dumps, Playwright output). Everything in `scratch/` is gitignored. Each worktree has its own isolated `scratch/` directory. **On Windows, avoid `node -e "..."` for multi-line scripts** — complex quoting and interpolation inside `node -e` args is fragile in PowerShell (backslash escapes, embedded quotes, and `$`-expansion all behave differently than in bash). Instead, write the script to `scratch/<name>.js` and run `node scratch/<name>.js`; this avoids all quoting issues and is more debuggable.
 
 ## Architecture
 
