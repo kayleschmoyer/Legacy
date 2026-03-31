@@ -47,6 +47,33 @@ variable "snyk_version" {
   default = "1.1293.1"
 }
 
+variable "android_api_level" {
+  type    = string
+  default = "35"
+}
+
+variable "android_build_tools_version" {
+  type    = string
+  default = "35.0.0"
+}
+
+variable "android_ndk_version" {
+  type    = string
+  default = "27.1.12297006"
+}
+
+variable "android_cmdline_tools_version" {
+  type    = string
+  default = "13.0"
+}
+
+variable "android_cmdline_tools_sha256" {
+  type        = string
+  description = "SHA-256 of commandlinetools-linux-<version>_latest.zip. Verify at https://developer.android.com/studio#command-tools"
+  # SHA-256 for commandlinetools-linux-13.0_latest.zip
+  default = "d3cbe3db2250ca0db5ef547cd32e9c1f8e1adb9fd7f56866a8a25fa5302b8a76"
+}
+
 variable "instance_type" {
   type    = string
   default = "c7a.xlarge"
@@ -92,6 +119,8 @@ source "amazon-ebs" "runner" {
     RunnerVersion     = var.runner_version
     PlaywrightVersion = var.playwright_version
     TerraformVersion  = var.terraform_version
+    AndroidApiLevel   = var.android_api_level
+    AndroidNdkVersion = var.android_ndk_version
   }
 }
 
@@ -213,6 +242,31 @@ build {
       "sudo /tmp/aws/install",
       "rm -rf /tmp/awscliv2.zip /tmp/aws",
       "aws --version",
+    ]
+  }
+
+  # Android SDK (pre-installed so CI skips android-actions/setup-android)
+  provisioner "shell" {
+    environment_vars = [
+      "ANDROID_HOME=/opt/android-sdk",
+    ]
+    inline = [
+      "sudo mkdir -p $ANDROID_HOME/cmdline-tools",
+      "curl -fSL https://dl.google.com/android/repository/commandlinetools-linux-${var.android_cmdline_tools_version}_latest.zip -o /tmp/cmdline-tools.zip",
+      "echo '${var.android_cmdline_tools_sha256}  /tmp/cmdline-tools.zip' | sha256sum -c",
+      "sudo unzip -q /tmp/cmdline-tools.zip -d $ANDROID_HOME/cmdline-tools",
+      "sudo mv $ANDROID_HOME/cmdline-tools/cmdline-tools $ANDROID_HOME/cmdline-tools/latest",
+      "rm /tmp/cmdline-tools.zip",
+      "yes | sudo $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1",
+      "sudo $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager 'platform-tools' 'platforms;android-${var.android_api_level}' 'build-tools;${var.android_build_tools_version}' 'ndk;${var.android_ndk_version}'",
+      "sudo chmod -R a+rX $ANDROID_HOME",
+      # Set ANDROID_HOME globally so login shells and Gradle pick it up
+      "echo 'export ANDROID_HOME=/opt/android-sdk' | sudo tee /etc/profile.d/android-sdk.sh",
+      "echo 'export PATH=$PATH:/opt/android-sdk/cmdline-tools/latest/bin:/opt/android-sdk/platform-tools' | sudo tee -a /etc/profile.d/android-sdk.sh",
+      # Also export to the runner process env so non-login GitHub Actions shells get ANDROID_HOME
+      "if [ -d /opt/actions-runner ]; then echo 'ANDROID_HOME=/opt/android-sdk' | sudo tee -a /opt/actions-runner/.env; fi",
+      "if [ -d /opt/actions-runner ]; then echo 'ANDROID_SDK_ROOT=/opt/android-sdk' | sudo tee -a /opt/actions-runner/.env; fi",
+      "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --list_installed",
     ]
   }
 
