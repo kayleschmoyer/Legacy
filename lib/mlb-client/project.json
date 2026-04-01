@@ -1,0 +1,10 @@
+{
+  "name": "mlb-client",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "lib/mlb-client/src",
+  "projectType": "library",
+  "tags": ["platform:node", "scope:lib", "type:util"],
+  "targets": {
+    "typecheck": {}
+  }
+}
