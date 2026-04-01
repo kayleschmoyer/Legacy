@@ -275,9 +275,12 @@ resource "aws_iam_role_policy" "github_actions_additional" {
         ]
       },
       # S3 bucket-admin write permissions for Terraform apply (encryption, public access block, lifecycle)
+      # CreateBucket/DeleteBucket included as safety net in case the bucket drops from remote state
       {
         Effect = "Allow"
         Action = [
+          "s3:CreateBucket",
+          "s3:DeleteBucket",
           "s3:PutEncryptionConfiguration",
           "s3:PutBucketPublicAccessBlock",
           "s3:PutLifecycleConfiguration"

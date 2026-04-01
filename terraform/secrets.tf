@@ -253,8 +253,15 @@ resource "aws_secretsmanager_secret" "rollbar_webhook_secret" {
 }
 
 resource "aws_secretsmanager_secret_version" "rollbar_webhook_secret" {
+  count         = var.rollbar_webhook_secret != "" ? 1 : 0
   secret_id     = aws_secretsmanager_secret.rollbar_webhook_secret.id
   secret_string = var.rollbar_webhook_secret
+}
+
+# Preserve state address when count guard was added; no-op if [0] already exists.
+moved {
+  from = aws_secretsmanager_secret_version.rollbar_webhook_secret
+  to   = aws_secretsmanager_secret_version.rollbar_webhook_secret[0]
 }
 
 # Discord OAuth client secret for Discord login/account linking
