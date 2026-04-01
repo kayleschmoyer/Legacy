@@ -775,19 +775,10 @@ jobs:
             core.setOutput('state', state);
             core.info(`Current bot-review state: ${state}`);
 
-      - name: Generate bot token for dispatch
-        if: steps.check.outputs.state == 'pending'
-        id: bot-token
-        uses: actions/create-github-app-token@v3
-        with:
-          app-id: 3142924
-          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
-
       - name: Dispatch recheck
         if: steps.check.outputs.state == 'pending'
         uses: actions/github-script@v8
         with:
-          github-token: ${{ steps.bot-token.outputs.token }}
           script: |
             const prNumber = context.payload.pull_request.number;
             await github.rest.actions.createWorkflowDispatch({
