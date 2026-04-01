@@ -620,7 +620,8 @@ resource "aws_iam_policy" "github_actions_supplemental" {
           "budgets:ViewBudget",
           "budgets:ModifyBudget",
           "budgets:CreateBudget",
-          "budgets:DeleteBudget"
+          "budgets:DeleteBudget",
+          "budgets:ListTagsForResource"
         ]
         Resource = [
           "arn:aws:budgets::${local.account_id}:budget/${local.name_prefix}-*"
