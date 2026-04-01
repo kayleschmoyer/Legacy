@@ -103,12 +103,13 @@ If either returns `configured: false`, **stop and prompt the user** before proce
 ### Both Environments
 
 - **Skip draft PRs** — draft PRs are still being worked on by their creating agent. The `github_pr_scan` and `github_pr_dashboard` tools exclude drafts by default (`excludeDrafts: true`). Never fix, rebase, label, or review a draft PR — wait for the creating agent to mark it ready via `github_mark_pr_ready`.
+- **Dependabot PRs — comment-only** — never make local code changes to Dependabot-authored PRs. Identify them by author (`dependabot[bot]`) or branch prefix (`dependabot/`). Route them **only** to Pass 0.5 (below) and **exclude them from all other passes** (0, 1, 2, 3). All interactions use Dependabot comment commands: `@dependabot rebase` for conflicts or stale CI, `merge-when-ready` label for clean PRs. Dependabot owns its branches — local rebases, lockfile regeneration, and code edits are invalid on these PRs.
 - **Remove `@me` filter** — use `--limit 200` to catch all open PRs, not just yours
 - **Resolve review threads after fixing** — leaving threads unresolved is incomplete work
 - **Proactively label clean PRs** — when a PR has no unresolved review threads, add `merge-when-ready` immediately via `github_manage_labels(number: <PR#>, add: ["merge-when-ready"])`. Failing CI will automatically remove the label, so there is no risk in labeling early. The `copilot-auto-approve` bot also adds this label, but the agent should not wait for it.
 - **Dashboard CI summary can be stale** — the dashboard reports `ciStatus` as `none`, `pass`, `fail`, or `pending`. Stale checks (e.g., Enhanced Merge Queue on an old SHA) can cause a PR to show `fail` or `pending` even when current-SHA checks all pass. Use `github_pr_batch_status` to inspect actual job-level results: if all CI Pipeline and Security Scanning jobs are SUCCESS/SKIPPED, the PR is clean regardless of dashboard `ciStatus`.
 - **Burn through until settled** — every PR must reach a terminal state. A PR is settled when it is clean, has CI pending after the final pass, or labeled `requires-human-review` with a comment explaining the blocker. Do not stop the sweep while actionable PRs remain (subject to the max-passes safety cap).
-- **`requires-human-review` — only for blockers outside agent reach** — this label means the PR is blocked on something no agent can fix, no matter how many retries or approaches it tries. Valid reasons: missing credentials/secrets the agent cannot access, product or design decisions that require human judgment, blocked on an external team or system, or requires manual infrastructure access. **Invalid reasons (never label for these):** CI failures (rebase, fix the code, or re-run), review comments (read the code and fix them), dependabot/dependency bumps (rebase and regenerate lockfile), complexity or multiple failed attempts (try a different approach). Before labeling, the agent **must** have attempted at least one fix. When the label is genuinely needed, add it via `github_manage_labels(number: <PR#>, add: ["requires-human-review"])` with a PR comment explaining the specific blocker that is outside agent capability.
+- **`requires-human-review` — only for blockers outside agent reach** — this label means the PR is blocked on something no agent can fix, no matter how many retries or approaches it tries. Valid reasons: missing credentials/secrets the agent cannot access, product or design decisions that require human judgment, blocked on an external team or system, or requires manual infrastructure access. **Invalid reasons (never label for these):** CI failures (rebase, fix the code, or re-run), review comments (read the code and fix them), Dependabot PRs with conflicts or stale CI (use `@dependabot rebase` comment — see Pass 0.5), complexity or multiple failed attempts (try a different approach). Before labeling, the agent **must** have attempted at least one fix. When the label is genuinely needed, add it via `github_manage_labels(number: <PR#>, add: ["requires-human-review"])` with a PR comment explaining the specific blocker that is outside agent capability.
 
 ### Local Agent Only
 
@@ -251,6 +252,34 @@ github_request_review(number: <PR#>)
 The MCP tool uses a user OAuth token (via `gh auth token`) for Copilot requests, bypassing the default app token that would silently fail.
 
 > **Also treat stale `COMMENTED` reviews as missing**: if a bot-authored PR has a Copilot review in `COMMENTED` state with **0 unresolved threads**, re-request a Copilot review. Copilot does not re-review automatically when threads are resolved externally — leaving `reviewDecision` as `null` and `auto-approve` permanently SKIPPED. Detect this using the actual tool fields: latest Copilot review `state === "COMMENTED"` from `github_pr_batch_status`/`view_pr`, plus no open threads (`threadCount === 0` in `github_pr_scan` or `unresolvedThreads === 0` where available).
+
+---
+
+## Pass 0.5: Handle Dependabot PRs
+
+Before the local git passes, identify all Dependabot PRs in the scan results and handle them via comments only. When using `github_pr_scan` results (which do not include `author`), treat a PR as Dependabot if its `headRefName`/branch starts with `dependabot/`. When using richer data from `github_pr_dashboard` or `github_pr_batch_status`, you may additionally check `author.login == "dependabot[bot]"`.
+
+For each Dependabot PR, apply exactly one action based on its state:
+
+| PR State                         | Action                                                                                                    |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Conflicting or stale/failing CI  | Post PR comment: `@dependabot rebase`                                                                     |
+| Clean (no conflicts, CI passing) | Label `merge-when-ready` via `github_manage_labels`                                                       |
+| Has unresolved review threads    | Label `requires-human-review` — note: Dependabot PR has unresolved human review threads; do not auto-edit |
+
+Dependabot PRs are only considered **settled** when they are either clean (labeled `merge-when-ready`) or labeled `requires-human-review`. After posting `@dependabot rebase`, the PR is settled for the current pass — Dependabot handles the rebase asynchronously and the updated branch will appear in the next sweep.
+
+Post a Dependabot command comment using the `gh` CLI:
+
+```bash
+gh pr comment <PR#> --body "@dependabot rebase"
+```
+
+> **MCP vs. `gh` note** — There is currently no MCP tool for posting a generic PR comment that Dependabot will interpret as a command. This is a deliberate exception to the "prefer MCP tools over raw `gh` commands" rule. Ensure `gh` is authenticated with an account that has write access to the repository so Dependabot commands are accepted.
+
+After posting a rebase command, the PR enters a "commanded" state. Dependabot handles the rebase asynchronously — the updated branch will appear in the next sweep with fresh status. Mark the PR as settled for the current pass.
+
+**Remove Dependabot PRs from all subsequent passes (1, 2, 3)** — never enter their worktrees, modify their branches, or attempt code fixes.
 
 ---
 
@@ -421,23 +450,40 @@ REPEAT (max 10 passes):
 
   IF workable is empty → EXIT (all settled or held by other agents)
 
-  Pass 0: Request Copilot reviews on workable PRs that have none
+  # Partition into Dependabot PRs (comment-only) and regular PRs (local git ops)
+  # github_pr_scan results include headRefName but not author; use branch prefix to identify Dependabot PRs.
+  # If author.login is available (e.g., from github_pr_batch_status), you may also check == "dependabot[bot]".
+  dependabot_prs = [pr for pr in workable if pr.headRefName.startswith("dependabot/")]
+  regular_prs    = [pr for pr in workable if pr not in dependabot_prs]
+
+  Pass 0: Request Copilot reviews on regular (non-Dependabot) workable PRs that have none
     - Claim PR → github_request_review() → release claim
     - The repo ruleset auto-triggers for user-authored PRs; bot-authored PRs
       need this explicit request (uses user OAuth token via gh auth)
+    - Note: Dependabot PRs are intentionally excluded from Pass 0 — Copilot review
+      is not needed on dependency bumps and they are handled separately in Pass 0.5
 
-  Pass 1: Rebase workable conflicting PRs (SEQUENTIAL — cascade invalidation)
+  Pass 0.5: Handle Dependabot PRs (comment-only, no worktree needed)
+    - For each pr in dependabot_prs:
+        - Claim PR via github_manage_labels(add: ["sweep-claimed"]) before acting
+        - IF pr is conflicting or has failing/stale CI → gh pr comment <pr.number> --body "@dependabot rebase"
+        - IF pr is clean (no conflicts, CI passing)   → github_manage_labels(number: <pr.number>, add: ["merge-when-ready"])
+        - IF pr has unresolved review threads         → github_manage_labels(number: <pr.number>, add: ["requires-human-review"])
+        - Release claim via github_manage_labels(remove: ["sweep-claimed"]) after acting
+    - After acting, add pr to settled (Dependabot handles rebase asynchronously)
+
+  Pass 1: Rebase regular conflicting PRs (SEQUENTIAL — cascade invalidation)
     - Claim ONE PR immediately before rebasing — do NOT bulk-claim
     - Release claim after push (success) or after commenting blocker (failure)
     - On irrecoverable failure → comment blocker, label requires-human-review only if outside agent reach → add to settled
 
-  Pass 2: Fix workable PRs with unresolved reviews (PARALLEL — batches of 3 sub-agents)
+  Pass 2: Fix regular PRs with unresolved reviews (PARALLEL — batches of 3 sub-agents)
     - Claim each PR in the batch before spawning its sub-agent
     - Sub-agent prompt must include: "release sweep-claimed on exit regardless of outcome"
     - Orchestrator releases any claims sub-agents failed to clean up
     - On unfixable review → comment blocker, label requires-human-review only if outside agent reach → add to settled
 
-  Pass 3: Fix workable PRs with failing CI (PARALLEL — batches of 3 sub-agents)
+  Pass 3: Fix regular PRs with failing CI (PARALLEL — batches of 3 sub-agents)
     - Same claim/release pattern as Pass 2
     - On unfixable CI failure → comment blocker, label requires-human-review only if outside agent reach → add to settled
 
