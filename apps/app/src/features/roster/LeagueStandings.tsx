@@ -87,7 +87,11 @@ export function LeagueStandings({
         {teams.map((team, index) => {
           const isUserTeam = userTeamId === team.id;
           return (
-            <Pressable key={team.id} onPress={() => handleTeamPress(team.id)}>
+            <Pressable
+              key={team.id}
+              onPress={() => handleTeamPress(team.id)}
+              testID={`team-row-${team.id}`}
+            >
               <Card
                 padding="$3"
                 borderWidth={1}

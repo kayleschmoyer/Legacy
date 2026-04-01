@@ -64,6 +64,7 @@ export function MatchupCard({
       onPress={onPress}
       animation="bouncy"
       margin="$2"
+      testID="matchup-card"
     >
       <Card.Header padded>
         <XStack justifyContent="space-between" alignItems="center">
