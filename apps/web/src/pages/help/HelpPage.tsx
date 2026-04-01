@@ -7,7 +7,7 @@ import {
   Separator,
   XStack,
   YStack,
-} from '@legacy-sports/shared-components';
+} from '@legacy-sports/shared-components/ui';
 import { ScrollView, styled } from 'tamagui';
 import {
   HELP_CONTACT_ITEMS,

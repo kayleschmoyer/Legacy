@@ -2,12 +2,14 @@ import React, { useCallback, useMemo, useState } from 'react';
 import {
   Button,
   Card,
-  getPlayerName,
   Separator,
   XStack,
   YStack,
-} from '@legacy-sports/shared-components';
-import { PITCHING_POSITIONS } from '@legacy-sports/shared-components';
+} from '@legacy-sports/shared-components/ui';
+import {
+  getPlayerName,
+  PITCHING_POSITIONS,
+} from '@legacy-sports/shared-components/utils';
 import { H4, H5, Text } from 'tamagui';
 import {
   LeaguePositionFragment,

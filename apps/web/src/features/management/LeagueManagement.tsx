@@ -11,7 +11,7 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { useAuth } from '@legacy-sports/shared-components';
+import { useAuth } from '@legacy-sports/shared-components/auth';
 import { useDeleteAllLeaguesMutation } from '../../api/db/graphql.generated';
 import {
   BRAND_GOLD_LIGHT,

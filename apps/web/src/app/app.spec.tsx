@@ -78,6 +78,71 @@ jest.mock('@legacy-sports/shared-components', () => {
   };
 });
 
+// Mock subpath entry points — app.tsx now imports from feature-specific subpaths
+jest.mock('@legacy-sports/shared-components/ui', () => ({
+  Button: ({
+    children,
+    ...props
+  }: {
+    children: React.ReactNode;
+    [key: string]: unknown;
+  }) => (
+    <button {...(props as React.ButtonHTMLAttributes<HTMLButtonElement>)}>
+      {children}
+    </button>
+  ),
+  XStack: ({
+    children,
+    ...props
+  }: {
+    children: React.ReactNode;
+    [key: string]: unknown;
+  }) => (
+    <div {...(props as React.HTMLAttributes<HTMLDivElement>)}>{children}</div>
+  ),
+  YStack: ({
+    children,
+    ...props
+  }: {
+    children: React.ReactNode;
+    [key: string]: unknown;
+  }) => (
+    <div {...(props as React.HTMLAttributes<HTMLDivElement>)}>{children}</div>
+  ),
+  Paragraph: ({
+    children,
+    ...props
+  }: {
+    children: React.ReactNode;
+    [key: string]: unknown;
+  }) => (
+    <p {...(props as React.HTMLAttributes<HTMLParagraphElement>)}>{children}</p>
+  ),
+  Separator: () => <hr />,
+}));
+
+jest.mock('@legacy-sports/shared-components/sports', () => ({
+  FootballScreen: () => <div>Football Screen</div>,
+}));
+
+jest.mock('@legacy-sports/shared-components/players', () => ({
+  PlayersScreen: () => <div>Players Screen</div>,
+}));
+
+jest.mock('@legacy-sports/shared-components/auth', () => ({
+  useAuth: () => ({
+    isAuthenticated: true,
+    isLoading: false,
+    isImpersonating: false,
+    user: {
+      id: 'test-user-id',
+      username: 'testuser',
+      email: 'test@example.com',
+    },
+    logout: jest.fn(),
+  }),
+}));
+
 // Mock analytics identify hook (requires ApolloProvider not present in tests)
 jest.mock('../hooks/useAnalyticsIdentify', () => ({
   useAnalyticsIdentify: () => undefined,

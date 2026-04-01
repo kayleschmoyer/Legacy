@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { XStack, YStack } from '@legacy-sports/shared-components';
+import { XStack, YStack } from '@legacy-sports/shared-components/ui';
 import { Card, H3, H4, Spinner, styled, Text } from 'tamagui';
 import {
   Award,

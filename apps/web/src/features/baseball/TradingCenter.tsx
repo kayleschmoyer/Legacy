@@ -6,7 +6,7 @@ import React, { useCallback, useRef } from 'react';
 import {
   TradingCenter as SharedTradingCenter,
   type TradingCenterProps as SharedTradingCenterProps,
-} from '@legacy-sports/shared-components';
+} from '@legacy-sports/shared-components/leagues';
 import { useLeagueWebSocket } from '../../hooks/useLeagueWebSocket';
 
 export type TradingCenterProps = Omit<

@@ -4,7 +4,7 @@ import {
   Paragraph,
   XStack,
   YStack,
-} from '@legacy-sports/shared-components';
+} from '@legacy-sports/shared-components/ui';
 import { Button, ScrollView, Separator, styled } from 'tamagui';
 import {
   AlertTriangle,

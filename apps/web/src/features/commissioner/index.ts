@@ -2,5 +2,5 @@ export { MatchupControl } from './MatchupControl';
 export { GameSelectionControl } from './GameSelectionControl';
 export { DeleteLeagueControl } from './DeleteLeagueControl';
 export { NextStepControl } from './NextStepControl';
-export { DraftSettingsControl } from '@legacy-sports/shared-components';
-export { DraftOrderControl } from '@legacy-sports/shared-components';
+export { DraftSettingsControl } from '@legacy-sports/shared-components/commissioner';
+export { DraftOrderControl } from '@legacy-sports/shared-components/commissioner';

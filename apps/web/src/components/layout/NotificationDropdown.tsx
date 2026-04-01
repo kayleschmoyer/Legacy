@@ -1,12 +1,8 @@
 import type { GestureResponderEvent } from 'react-native';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  Paragraph,
-  useAuth,
-  XStack,
-  YStack,
-} from '@legacy-sports/shared-components';
+import { Paragraph, XStack, YStack } from '@legacy-sports/shared-components/ui';
+import { useAuth } from '@legacy-sports/shared-components/auth';
 import { Button, Spinner, styled } from 'tamagui';
 import { Bell, CheckCheck, Eye } from '@tamagui/lucide-icons';
 import {

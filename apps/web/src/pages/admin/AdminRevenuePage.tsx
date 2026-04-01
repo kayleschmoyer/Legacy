@@ -4,11 +4,11 @@ import {
   Separator,
   XStack,
   YStack,
-} from '@legacy-sports/shared-components';
+} from '@legacy-sports/shared-components/ui';
 import { Card, Spinner, Text } from 'tamagui';
 import { Navigate } from 'react-router-dom';
 import { styled } from 'tamagui';
-import { useAuth } from '@legacy-sports/shared-components';
+import { useAuth } from '@legacy-sports/shared-components/auth';
 import {
   Area,
   AreaChart,

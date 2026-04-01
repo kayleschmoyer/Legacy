@@ -2,10 +2,10 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   OAuthProvider,
-  useAuth,
   XStack,
   YStack,
-} from '@legacy-sports/shared-components';
+} from '@legacy-sports/shared-components/ui';
+import { useAuth } from '@legacy-sports/shared-components/auth';
 import { ScrollView, Spinner, styled, Text } from 'tamagui';
 import {
   BrandIcon,

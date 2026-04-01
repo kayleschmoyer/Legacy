@@ -12,7 +12,7 @@ import {
   getPositionColors,
   isPitcherPositionType,
   POSITION_SLOT_ORDER,
-} from '@legacy-sports/shared-components';
+} from '@legacy-sports/shared-components/roster';
 import { PlayerSeasonStatsModal } from './PlayerSeasonStatsModal';
 import { PlayerMatchupStatsModal } from './PlayerMatchupStatsModal';
 import {

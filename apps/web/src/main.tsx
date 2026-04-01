@@ -19,13 +19,15 @@ import {
 } from '@legacy-sports/rollbar/web';
 import {
   AppProvider,
+  ErrorBoundary,
+} from '@legacy-sports/shared-components/ui';
+import {
   AuthProvider,
   EnhancedAuthGuard,
-  ErrorBoundary,
-} from '@legacy-sports/shared-components';
+} from '@legacy-sports/shared-components/auth';
+import type { OAuthConfig } from '@legacy-sports/shared-components/auth';
 import { TamaguiProvider } from 'tamagui';
 import { tamaguiConfig } from '@legacy-sports/tamagui-config';
-import type { OAuthConfig } from '@legacy-sports/shared-components';
 import { LOGGER } from '@legacy-sports/logging';
 import { env } from './config/environment';
 import { apolloClient } from './lib/apollo-client';

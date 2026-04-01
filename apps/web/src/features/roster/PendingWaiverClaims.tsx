@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { Button, XStack, YStack } from '@legacy-sports/shared-components';
+import { Button, XStack, YStack } from '@legacy-sports/shared-components/ui';
 import { Card, Separator, Spinner, Text } from 'tamagui';
 import { AlertTriangle, Clock, Trash2, X } from '@tamagui/lucide-icons';
 import { LOGGER } from '@legacy-sports/logging';

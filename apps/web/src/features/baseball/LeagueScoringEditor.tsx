@@ -4,7 +4,7 @@ import {
   Separator,
   XStack,
   YStack,
-} from '@legacy-sports/shared-components';
+} from '@legacy-sports/shared-components/ui';
 import {
   ChevronDown,
   ChevronUp,

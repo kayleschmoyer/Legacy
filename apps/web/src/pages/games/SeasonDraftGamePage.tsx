@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useAuth } from '@legacy-sports/shared-components';
-import { SeasonDraftGame } from '@legacy-sports/shared-components';
+import { useAuth } from '@legacy-sports/shared-components/auth';
+import { SeasonDraftGame } from '@legacy-sports/shared-components/season-draft';
 import { PageMeta } from '../../components/PageMeta';
 
 /**

@@ -5,11 +5,11 @@ import {
   Paragraph,
   XStack,
   YStack,
-} from '@legacy-sports/shared-components';
+} from '@legacy-sports/shared-components/ui';
+import { useAuth } from '@legacy-sports/shared-components/auth';
 import { Text } from '@legacy-sports/ui-abstractions';
 import { styled } from 'tamagui';
 import { ChevronDown, ChevronUp, Trophy } from '@tamagui/lucide-icons';
-import { useAuth } from '@legacy-sports/shared-components';
 import { useGetUserLeaguesQuery } from '../../api/db/graphql.generated';
 
 const DropdownButton = styled(Button, {

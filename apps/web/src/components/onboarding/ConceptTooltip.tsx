@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import ReactDOM from 'react-dom';
-import { Paragraph, XStack, YStack } from '@legacy-sports/shared-components';
+import { Paragraph, XStack, YStack } from '@legacy-sports/shared-components/ui';
 import {
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,

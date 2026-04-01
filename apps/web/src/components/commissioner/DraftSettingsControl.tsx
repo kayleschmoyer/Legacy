@@ -1,2 +1,2 @@
-export { DraftSettingsControl } from '@legacy-sports/shared-components';
-export type { DraftSettingsControlProps } from '@legacy-sports/shared-components';
+export { DraftSettingsControl } from '@legacy-sports/shared-components/commissioner';
+export type { DraftSettingsControlProps } from '@legacy-sports/shared-components/commissioner';

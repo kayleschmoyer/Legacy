@@ -8,12 +8,8 @@ import React, {
 } from 'react';
 import { LOGGER } from '@legacy-sports/logging';
 import { useNavigate, useParams } from 'react-router-dom';
-import {
-  Button,
-  useAuth,
-  XStack,
-  YStack,
-} from '@legacy-sports/shared-components';
+import { Button, XStack, YStack } from '@legacy-sports/shared-components/ui';
+import { useAuth } from '@legacy-sports/shared-components/auth';
 import {
   Card,
   H1,
@@ -58,8 +54,8 @@ import {
   computeScoring,
   type SeasonStats,
 } from '@legacy-sports/scoring';
-import { LeagueScoringSummary } from '@legacy-sports/shared-components';
-import { MatchupNavigationControls } from '@legacy-sports/shared-components';
+import { LeagueScoringSummary } from '@legacy-sports/shared-components/leagues';
+import { MatchupNavigationControls } from '@legacy-sports/shared-components/matchup';
 import { PageMeta } from '../../components/PageMeta';
 import { LeagueActivityFeed } from '../../features/baseball/LeagueActivityFeed';
 import { LeagueHistory } from '../../features/baseball/LeagueHistory';

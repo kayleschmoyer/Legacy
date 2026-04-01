@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { useAuth } from '@legacy-sports/shared-components';
+import { useAuth } from '@legacy-sports/shared-components/auth';
 import { LOGGER } from '@legacy-sports/logging';
 import { useRegisterDeviceTokenMutation } from '../api/db/graphql.generated';
 import { env } from '../config/environment';

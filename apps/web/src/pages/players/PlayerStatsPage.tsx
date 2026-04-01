@@ -3,11 +3,11 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   type PlayerStatsViewMode,
   PlayerStatsPage as SharedPlayerStatsPage,
-} from '@legacy-sports/shared-components';
+} from '@legacy-sports/shared-components/players';
 import type {
   PlayerStatsFilters,
   PlayerWithStats,
-} from '@legacy-sports/shared-components';
+} from '@legacy-sports/shared-components/players';
 import { LOGGER } from '@legacy-sports/logging';
 import { PageMeta } from '../../components/PageMeta';
 import {

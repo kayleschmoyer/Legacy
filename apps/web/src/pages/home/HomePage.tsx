@@ -7,10 +7,10 @@ import {
   H2,
   H3,
   Paragraph,
-  useAuth,
   XStack,
   YStack,
-} from '@legacy-sports/shared-components';
+} from '@legacy-sports/shared-components/ui';
+import { useAuth } from '@legacy-sports/shared-components/auth';
 import {
   ScrollView,
   Separator,
@@ -19,7 +19,7 @@ import {
   Text,
   H2 as TH2,
 } from 'tamagui';
-import { OnThisDayFeed } from '@legacy-sports/shared-components';
+import { OnThisDayFeed } from '@legacy-sports/shared-components/leagues';
 import { formatDisplayName } from '../../lib/formatDisplayName';
 import { OnboardingTutorial } from '../../components/onboarding';
 import {

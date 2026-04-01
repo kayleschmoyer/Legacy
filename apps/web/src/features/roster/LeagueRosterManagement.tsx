@@ -6,13 +6,15 @@ import React, {
   useState,
 } from 'react';
 import {
-  ALLOWED_POSITIONS,
   Button,
-  PITCHING_POSITIONS,
   Separator,
   XStack,
   YStack,
-} from '@legacy-sports/shared-components';
+} from '@legacy-sports/shared-components/ui';
+import {
+  ALLOWED_POSITIONS,
+  PITCHING_POSITIONS,
+} from '@legacy-sports/shared-components/utils';
 import { H4, styled, Text } from 'tamagui';
 import { AlertTriangle, Edit3, Info, Lock } from '@tamagui/lucide-icons';
 import {

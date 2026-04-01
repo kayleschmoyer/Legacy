@@ -5,13 +5,13 @@ import {
   Separator,
   XStack,
   YStack,
-} from '@legacy-sports/shared-components';
+} from '@legacy-sports/shared-components/ui';
 import { LOGGER } from '@legacy-sports/logging';
 import { Input, Spinner, Text, TextArea } from 'tamagui';
 import { Link } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
 import { styled } from 'tamagui';
-import { useAuth } from '@legacy-sports/shared-components';
+import { useAuth } from '@legacy-sports/shared-components/auth';
 import { PageMeta } from '../../components/PageMeta';
 import {
   BRAND_GOLD_LIGHT,

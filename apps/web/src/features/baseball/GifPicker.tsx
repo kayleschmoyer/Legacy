@@ -5,7 +5,7 @@ import React from 'react';
 import {
   GifPicker as SharedGifPicker,
   type GifPickerProps as SharedGifPickerProps,
-} from '@legacy-sports/shared-components';
+} from '@legacy-sports/shared-components/chat';
 
 const GIPHY_API_KEY = (import.meta.env['VITE_GIPHY_API_KEY'] as string) ?? '';
 

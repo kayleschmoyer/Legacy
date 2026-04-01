@@ -12,7 +12,7 @@ import {
   YStack,
 } from 'tamagui';
 import { ChevronDown } from '@tamagui/lucide-icons';
-import { Button, DateTimePicker } from '@legacy-sports/shared-components';
+import { Button, DateTimePicker } from '@legacy-sports/shared-components/ui';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   DEFAULT_NUM_DIVISIONS,

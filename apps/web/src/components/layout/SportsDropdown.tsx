@@ -5,7 +5,7 @@ import {
   Paragraph,
   XStack,
   YStack,
-} from '@legacy-sports/shared-components';
+} from '@legacy-sports/shared-components/ui';
 import { Text } from '@legacy-sports/ui-abstractions';
 import { styled } from 'tamagui';
 import {

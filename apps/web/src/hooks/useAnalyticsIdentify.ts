@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useAuth } from '@legacy-sports/shared-components';
+import { useAuth } from '@legacy-sports/shared-components/auth';
 import { useGetUserByIdQuery } from '../api/db/graphql.generated';
 import { setUserId, setUserProperties } from '../utils/analytics';
 

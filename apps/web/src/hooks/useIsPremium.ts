@@ -1,4 +1,4 @@
-import { useAuth } from '@legacy-sports/shared-components';
+import { useAuth } from '@legacy-sports/shared-components/auth';
 import { useGetUserByIdQuery } from '../api/db/graphql.generated';
 
 /**

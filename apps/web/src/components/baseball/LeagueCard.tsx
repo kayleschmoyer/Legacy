@@ -1,16 +1,18 @@
 import React from 'react';
 import {
   Button,
-  formatDraftStatusForCard,
-  getDraftNextActionCopy,
-  getDraftStatusColors,
-  getDraftStatusDescription,
   H3,
   HolographicCard,
   Paragraph,
   XStack,
   YStack,
-} from '@legacy-sports/shared-components';
+} from '@legacy-sports/shared-components/ui';
+import {
+  formatDraftStatusForCard,
+  getDraftNextActionCopy,
+  getDraftStatusColors,
+  getDraftStatusDescription,
+} from '@legacy-sports/shared-components/utils';
 import { Text } from 'tamagui';
 import {
   BLUE,

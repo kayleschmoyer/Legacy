@@ -8,7 +8,7 @@ import {
   Paragraph,
   XStack,
   YStack,
-} from '@legacy-sports/shared-components';
+} from '@legacy-sports/shared-components/ui';
 import { ScrollView } from 'tamagui';
 import { LOGGER } from '@legacy-sports/logging';
 

@@ -56,6 +56,20 @@ jest.mock('@legacy-sports/shared-components', () => ({
   YStack: ({ children }: any) => <div>{children}</div>,
 }));
 
+// Mock subpath entry point — JoinLeagueByCodePage now imports from /ui
+jest.mock('@legacy-sports/shared-components/ui', () => ({
+  Button: ({ children, onPress, disabled }: any) => (
+    <button onClick={onPress} disabled={disabled}>
+      {children}
+    </button>
+  ),
+  Card: ({ children, ...rest }: any) => (
+    <div data-testid={rest['data-testid']}>{children}</div>
+  ),
+  XStack: ({ children }: any) => <div>{children}</div>,
+  YStack: ({ children }: any) => <div>{children}</div>,
+}));
+
 jest.mock('tamagui', () => ({
   H1: ({ children }: any) => <h1>{children}</h1>,
   H2: ({ children }: any) => <h2>{children}</h2>,

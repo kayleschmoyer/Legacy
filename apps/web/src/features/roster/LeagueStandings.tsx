@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { XStack, YStack } from '@legacy-sports/shared-components';
+import { XStack, YStack } from '@legacy-sports/shared-components/ui';
 import { Button, Card, Separator, Spinner, styled, Text } from 'tamagui';
 import { AlertTriangle, Trophy } from '@tamagui/lucide-icons';
 import { useStandings } from '../../hooks/useStandings';

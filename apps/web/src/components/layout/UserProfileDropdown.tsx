@@ -5,8 +5,8 @@ import {
   Separator,
   XStack,
   YStack,
-} from '@legacy-sports/shared-components';
-import { useAuth } from '@legacy-sports/shared-components';
+} from '@legacy-sports/shared-components/ui';
+import { useAuth } from '@legacy-sports/shared-components/auth';
 import { useNavigate } from 'react-router-dom';
 import { styled } from 'tamagui';
 import { LOGGER } from '@legacy-sports/logging';

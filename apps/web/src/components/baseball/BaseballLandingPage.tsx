@@ -6,10 +6,10 @@ import {
   H2,
   H3,
   Paragraph,
-  useAuth,
   XStack,
   YStack,
-} from '@legacy-sports/shared-components';
+} from '@legacy-sports/shared-components/ui';
+import { useAuth } from '@legacy-sports/shared-components/auth';
 import { AlertTriangle } from '@tamagui/lucide-icons';
 import {
   Dialog,

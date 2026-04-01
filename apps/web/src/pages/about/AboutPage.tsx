@@ -5,7 +5,7 @@ import {
   H3,
   XStack,
   YStack,
-} from '@legacy-sports/shared-components';
+} from '@legacy-sports/shared-components/ui';
 import { styled, Text } from 'tamagui';
 import { PageMeta } from '../../components/PageMeta';
 import { env } from '../../config/environment';

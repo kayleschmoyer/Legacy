@@ -9,10 +9,10 @@ import {
   H1,
   Paragraph,
   Separator,
-  useAuth,
   XStack,
   YStack,
-} from '@legacy-sports/shared-components';
+} from '@legacy-sports/shared-components/ui';
+import { useAuth } from '@legacy-sports/shared-components/auth';
 import { ScrollView, Spinner, styled } from 'tamagui';
 import { PageMeta } from '../../components/PageMeta';
 import {

@@ -96,6 +96,28 @@ jest.mock('tamagui', () => {
   };
 });
 
+// Mock subpath entry points — BaseballLandingPage now imports from feature-specific subpaths
+jest.mock('@legacy-sports/shared-components/ui', () => ({
+  Button: ({ children, onPress, ...rest }: any) => (
+    <button onClick={onPress} {...rest}>
+      {children}
+    </button>
+  ),
+  H1: ({ children, ...rest }: any) => <h1 {...rest}>{children}</h1>,
+  H2: ({ children, ...rest }: any) => <h2 {...rest}>{children}</h2>,
+  H3: ({ children, ...rest }: any) => <h3 {...rest}>{children}</h3>,
+  Paragraph: ({ children, ...rest }: any) => <p {...rest}>{children}</p>,
+  XStack: ({ children, ...rest }: any) => <div {...rest}>{children}</div>,
+  YStack: ({ children, ...rest }: any) => <div {...rest}>{children}</div>,
+  HolographicCard: ({ children, ...rest }: any) => (
+    <div {...rest}>{children}</div>
+  ),
+}));
+
+jest.mock('@legacy-sports/shared-components/auth', () => ({
+  useAuth: () => mockUseAuth(),
+}));
+
 // Mock LeagueCard to a simple div for predictability
 jest.mock('./LeagueCard', () => ({
   LeagueCard: ({ league }: any) => (

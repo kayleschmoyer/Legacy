@@ -4,7 +4,7 @@ import {
   type MatchupPlayerData,
   MatchupRosterEditorView,
   POSITION_SLOT_ORDER,
-} from '@legacy-sports/shared-components';
+} from '@legacy-sports/shared-components/roster';
 import { BRAND_NAVY_LIGHT } from '../../constants/colors';
 import {
   type MatchupFragment,

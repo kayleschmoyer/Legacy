@@ -6,7 +6,7 @@
  * the list refreshes in real time without a manual page reload.
  */
 import React, { useCallback } from 'react';
-import { Button, XStack, YStack } from '@legacy-sports/shared-components';
+import { Button, XStack, YStack } from '@legacy-sports/shared-components/ui';
 import { Card, Separator, Spinner, Text } from 'tamagui';
 import {
   AlertTriangle,

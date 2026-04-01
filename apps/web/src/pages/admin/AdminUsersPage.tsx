@@ -1,10 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import {
-  Button,
-  useAuth,
-  XStack,
-  YStack,
-} from '@legacy-sports/shared-components';
+import { Button, XStack, YStack } from '@legacy-sports/shared-components/ui';
+import { useAuth } from '@legacy-sports/shared-components/auth';
 import { Card, H1, Input, Paragraph, Spinner, Text } from 'tamagui';
 import { Navigate } from 'react-router-dom';
 import {

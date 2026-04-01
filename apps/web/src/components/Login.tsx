@@ -1,12 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import {
-  LoginPage,
-  Paragraph,
-  useAuth,
-  YStack,
-} from '@legacy-sports/shared-components';
-import type { UseAuthResult } from '@legacy-sports/shared-components';
+import { LoginPage, useAuth } from '@legacy-sports/shared-components/auth';
+import type { UseAuthResult } from '@legacy-sports/shared-components/auth';
+import { Paragraph, YStack } from '@legacy-sports/shared-components/ui';
 import { LOGGER } from '@legacy-sports/logging';
 
 interface LocationState {

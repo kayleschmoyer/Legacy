@@ -3,7 +3,7 @@ import { YStack } from 'tamagui';
 import {
   TiebreakerConfig as SharedTiebreakerConfig,
   TiebreakerHistory,
-} from '@legacy-sports/shared-components';
+} from '@legacy-sports/shared-components/commissioner';
 
 export interface TiebreakerConfigPageProps {
   leagueId: number;

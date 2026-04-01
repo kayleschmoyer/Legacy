@@ -10,9 +10,9 @@ export {
   ALL_BRAND_ICON_NAMES,
   BrandIcon,
   BrandIconBadge,
-} from '@legacy-sports/shared-components';
+} from '@legacy-sports/shared-components/icons';
 export type {
   BrandIconName,
   BrandIconProps,
   BrandIconBadgeProps,
-} from '@legacy-sports/shared-components';
+} from '@legacy-sports/shared-components/icons';

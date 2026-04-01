@@ -1,6 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Card, XStack, YStack } from '@legacy-sports/shared-components';
+import {
+  Button,
+  Card,
+  XStack,
+  YStack,
+} from '@legacy-sports/shared-components/ui';
 import { H1, H2, Input, Spinner, Text } from 'tamagui';
 import { PageMeta } from '../../components/PageMeta';
 import {

@@ -6,8 +6,8 @@
  */
 import React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { EliteDraftBoardScreen } from '@legacy-sports/shared-components';
-import type { DraftChatProps } from '@legacy-sports/shared-components';
+import { EliteDraftBoardScreen } from '@legacy-sports/shared-components/elite-draft';
+import type { DraftChatProps } from '@legacy-sports/shared-components/elite-draft';
 import { LeagueChatTab } from '../features/baseball/LeagueChatTab';
 import { env } from '../config/environment';
 import { trackPlayerSelected } from '../utils/analytics';

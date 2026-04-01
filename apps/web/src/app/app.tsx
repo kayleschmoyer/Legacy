@@ -11,12 +11,10 @@ import {
   Paragraph,
   XStack,
   YStack,
-} from '@legacy-sports/shared-components';
+} from '@legacy-sports/shared-components/ui';
+import { FootballScreen } from '@legacy-sports/shared-components/sports';
+import { PlayersScreen } from '@legacy-sports/shared-components/players';
 import { styled } from 'tamagui';
-import {
-  FootballScreen,
-  PlayersScreen,
-} from '@legacy-sports/shared-components';
 import {
   Activity,
   BarChart2,

@@ -6,7 +6,7 @@ import {
   Paragraph,
   XStack,
   YStack,
-} from '@legacy-sports/shared-components';
+} from '@legacy-sports/shared-components/ui';
 import { ConceptTooltip } from './ConceptTooltip';
 import {
   BG_DARK,

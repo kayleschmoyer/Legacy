@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Paragraph, XStack } from '@legacy-sports/shared-components';
-import { useAuth } from '@legacy-sports/shared-components';
+import { Button, Paragraph, XStack } from '@legacy-sports/shared-components/ui';
+import { useAuth } from '@legacy-sports/shared-components/auth';
 import {
   BRAND_GOLD_LIGHT,
   BRAND_NAVY_DARK,

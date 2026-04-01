@@ -1,7 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { CombinedGraphQLErrors } from '@apollo/client';
-import { Button, Card, XStack, YStack } from '@legacy-sports/shared-components';
+import {
+  Button,
+  Card,
+  XStack,
+  YStack,
+} from '@legacy-sports/shared-components/ui';
 import { H1, H2, Input, Spinner, Text } from 'tamagui';
 import { LOGGER } from '@legacy-sports/logging';
 import { PageMeta } from '../../components/PageMeta';

@@ -1,7 +1,8 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { Paragraph, useAuth, YStack } from '@legacy-sports/shared-components';
-import type { UseAuthResult } from '@legacy-sports/shared-components';
+import { Paragraph, YStack } from '@legacy-sports/shared-components/ui';
+import { useAuth } from '@legacy-sports/shared-components/auth';
+import type { UseAuthResult } from '@legacy-sports/shared-components/auth';
 import { LOGGER } from '@legacy-sports/logging';
 
 interface ProtectedRouteProps {

@@ -37,6 +37,54 @@
       "@legacy-sports/shared-components": [
         "lib/shared-components/src/index.ts"
       ],
+      "@legacy-sports/shared-components/auth": [
+        "lib/shared-components/src/entry/auth.ts"
+      ],
+      "@legacy-sports/shared-components/chat": [
+        "lib/shared-components/src/entry/chat.ts"
+      ],
+      "@legacy-sports/shared-components/commissioner": [
+        "lib/shared-components/src/entry/commissioner.ts"
+      ],
+      "@legacy-sports/shared-components/draft": [
+        "lib/shared-components/src/entry/draft.ts"
+      ],
+      "@legacy-sports/shared-components/elite-draft": [
+        "lib/shared-components/src/entry/elite-draft.ts"
+      ],
+      "@legacy-sports/shared-components/icons": [
+        "lib/shared-components/src/entry/icons.ts"
+      ],
+      "@legacy-sports/shared-components/leagues": [
+        "lib/shared-components/src/entry/leagues.ts"
+      ],
+      "@legacy-sports/shared-components/matchup": [
+        "lib/shared-components/src/entry/matchup.ts"
+      ],
+      "@legacy-sports/shared-components/navigation": [
+        "lib/shared-components/src/entry/navigation.ts"
+      ],
+      "@legacy-sports/shared-components/players": [
+        "lib/shared-components/src/entry/players.ts"
+      ],
+      "@legacy-sports/shared-components/roster": [
+        "lib/shared-components/src/entry/roster.ts"
+      ],
+      "@legacy-sports/shared-components/season-draft": [
+        "lib/shared-components/src/entry/season-draft.ts"
+      ],
+      "@legacy-sports/shared-components/sports": [
+        "lib/shared-components/src/entry/sports.ts"
+      ],
+      "@legacy-sports/shared-components/stats": [
+        "lib/shared-components/src/entry/stats.ts"
+      ],
+      "@legacy-sports/shared-components/ui": [
+        "lib/shared-components/src/entry/ui.ts"
+      ],
+      "@legacy-sports/shared-components/utils": [
+        "lib/shared-components/src/entry/utils.ts"
+      ],
       "@legacy-sports/tamagui-config": ["lib/tamagui-config/src/index.ts"],
       "@legacy-sports/test-fixtures": ["lib/test-fixtures/src/index.ts"],
       "@legacy-sports/ui-abstractions": ["lib/ui-abstractions/src/index.ts"],
