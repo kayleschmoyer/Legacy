@@ -29,40 +29,41 @@ export async function sendGa4ServerEvent(
   // GA4 Measurement Protocol requires a client_id. For server-side events we
   // use a synthetic ID scoped to the userId so events can be stitched together.
   const clientId = userId !== null ? `server.${userId}` : 'server.unknown';
-
   const payload = {
     client_id: clientId,
     ...(userId !== null && { user_id: String(userId) }),
     events: [{ name: eventName, params }],
   };
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 5000);
-
   try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-    });
-
-    if (response.ok) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
+    if (!response.ok) {
+      const bodyText = await response.text().catch(() => '');
+      LOGGER.warn('[GA4] Measurement Protocol event returned non-2xx', {
+        eventName,
+        statusCode: response.status,
+        statusText: response.statusText,
+        body: bodyText,
+        userId,
+      });
+    } else {
       LOGGER.info('[GA4] Measurement Protocol event sent', {
         eventName,
         statusCode: response.status,
         userId,
       });
-    } else {
-      LOGGER.warn(
-        '[GA4] Measurement Protocol event rejected by GA4 (non-fatal)',
-        {
-          eventName,
-          statusCode: response.status,
-          statusText: response.statusText,
-          userId,
-        },
-      );
     }
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') {
@@ -77,7 +78,5 @@ export async function sendGa4ServerEvent(
         userId,
       });
     }
-  } finally {
-    clearTimeout(timeout);
   }
 }

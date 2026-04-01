@@ -14,9 +14,8 @@ import {
   RefreshCw,
   Zap,
 } from '@tamagui/lucide-icons';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PageMeta } from '../../components/PageMeta';
-import { trackSubscriptionStarted } from '../../utils/analytics';
 import {
   useCreateBillingPortalSessionMutation,
   useCreateCheckoutSessionMutation,
@@ -40,8 +39,15 @@ import {
   ANNUAL_MONTHLY_EQUIVALENT,
   ANNUAL_PRICE_DISPLAY,
   ANNUAL_SAVINGS_PCT,
+  ANNUAL_TOTAL,
+  MONTHLY_PRICE,
   MONTHLY_PRICE_DISPLAY,
 } from '../../constants/pricing';
+import {
+  trackBeginCheckout,
+  trackPurchase,
+  trackSubscriptionStarted,
+} from '../../utils/analytics';
 
 const PREMIUM_FEATURES: { label: string; free: boolean; premium: boolean }[] = [
   { label: 'Join up to 3 leagues', free: true, premium: true },
@@ -509,6 +515,29 @@ const SubscriptionPage: React.FC = () => {
     'annual',
   );
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const checkoutStatus = searchParams.get('checkout');
+    if (checkoutStatus === 'success') {
+      const sessionId =
+        searchParams.get('session_id') ?? `client_${Date.now()}`;
+      const alreadyTracked =
+        sessionStorage.getItem('tracked_purchase_session_id') === sessionId;
+      if (!alreadyTracked) {
+        const storedCycle = (sessionStorage.getItem('upgrade_billing_cycle') ??
+          'monthly') as 'monthly' | 'annual';
+        const value = storedCycle === 'annual' ? ANNUAL_TOTAL : MONTHLY_PRICE;
+        trackPurchase(storedCycle, value, sessionId);
+        trackSubscriptionStarted('premium');
+        sessionStorage.setItem('tracked_purchase_session_id', sessionId);
+        sessionStorage.removeItem('upgrade_billing_cycle');
+      }
+      // Remove query params to prevent re-tracking on refresh/back/forward
+      navigate('/profile/subscription', { replace: true });
+    }
+  }, [searchParams, navigate]);
 
   const { data, loading } = useGetMySubscriptionQuery();
   const subscription = data?.mySubscription ?? null;
@@ -518,8 +547,6 @@ const SubscriptionPage: React.FC = () => {
   const [createBillingPortalSession, { loading: portalLoading }] =
     useCreateBillingPortalSessionMutation();
 
-  const [searchParams] = useSearchParams();
-
   const isPremium =
     subscription?.status === 'active' || subscription?.status === 'trialing';
   const isPastDue = subscription?.status === 'past_due';
@@ -527,24 +554,21 @@ const SubscriptionPage: React.FC = () => {
   const isFree = !subscription || subscription.status === null;
   const cancelAtPeriodEnd = subscription?.cancelAtPeriodEnd ?? false;
 
-  // Fire subscription_started when Stripe redirects back with ?checkout=success.
-  useEffect(() => {
-    if (searchParams.get('checkout') === 'success') {
-      trackSubscriptionStarted('premium');
-    }
-  }, [searchParams]);
-
   const handleUpgrade = async () => {
     const priceId =
       billingCycle === 'annual'
         ? env.stripeAnnualPriceId
         : env.stripeMonthlyPriceId;
 
+    const value = billingCycle === 'annual' ? ANNUAL_TOTAL : MONTHLY_PRICE;
+    trackBeginCheckout(billingCycle, value);
+    sessionStorage.setItem('upgrade_billing_cycle', billingCycle);
+
     const origin = window.location.origin;
     const result = await createCheckoutSession({
       variables: {
         priceId,
-        successUrl: `${origin}/profile/subscription?checkout=success`,
+        successUrl: `${origin}/profile/subscription?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
         cancelUrl: `${origin}/profile/subscription?checkout=canceled`,
       },
     });

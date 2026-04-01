@@ -456,3 +456,64 @@ export function trackSubscriptionRenewed(tier: 'premium'): void {
     category: 'monetization',
   });
 }
+
+/**
+ * Track checkout initiation — GA4 standard e-commerce event.
+ * Fire when the user clicks Upgrade and before redirecting to Stripe.
+ * @param billingCycle - 'monthly' | 'annual'
+ * @param value - Purchase value in USD
+ */
+export function trackBeginCheckout(
+  billingCycle: 'monthly' | 'annual',
+  value: number,
+): void {
+  const env = getEnvironmentConfig();
+  if (!window.gtag || !env.googleAnalyticsMeasurementId) return;
+  window.gtag('event', 'begin_checkout', {
+    currency: 'USD',
+    value,
+    items: [
+      {
+        item_id: `premium_${billingCycle}`,
+        item_name: 'Premium Subscription',
+        price: value,
+        quantity: 1,
+      },
+    ],
+  });
+  LOGGER.info('[Analytics] begin_checkout tracked:', billingCycle);
+}
+
+/**
+ * Track subscription purchase — GA4 standard e-commerce event.
+ * Fire on the post-checkout success page.
+ * @param billingCycle - 'monthly' | 'annual'
+ * @param value - Purchase value in USD
+ * @param transactionId - Stripe session ID or client-generated fallback
+ */
+export function trackPurchase(
+  billingCycle: 'monthly' | 'annual',
+  value: number,
+  transactionId: string,
+): void {
+  const env = getEnvironmentConfig();
+  if (!window.gtag || !env.googleAnalyticsMeasurementId) return;
+  window.gtag('event', 'purchase', {
+    transaction_id: transactionId,
+    currency: 'USD',
+    value,
+    items: [
+      {
+        item_id: `premium_${billingCycle}`,
+        item_name: 'Premium Subscription',
+        price: value,
+        quantity: 1,
+      },
+    ],
+  });
+  LOGGER.info('[Analytics] purchase tracked:', {
+    billingCycle,
+    transactionId,
+    value,
+  });
+}

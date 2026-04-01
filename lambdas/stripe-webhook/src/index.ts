@@ -825,6 +825,43 @@ const baseStripeWebhookHandler = async (
         break;
       }
 
+      case 'charge.refunded': {
+        const charge = stripeEvent.data.object;
+        const chargeCustomerId =
+          typeof charge.customer === 'string' ? charge.customer : null;
+        if (chargeCustomerId) {
+          const existing = await runWithInternalClient(
+            getDbOptions(),
+            async (db) => {
+              const rows = await db
+                .select({ userId: InternalSchema.subscriptions.userId })
+                .from(InternalSchema.subscriptions)
+                .where(
+                  eq(
+                    InternalSchema.subscriptions.stripeCustomerId,
+                    chargeCustomerId,
+                  ),
+                )
+                .limit(1);
+              return rows[0] ?? null;
+            },
+          );
+          if (existing) {
+            userId = existing.userId;
+            const transactionId =
+              typeof charge.payment_intent === 'string'
+                ? charge.payment_intent
+                : charge.id;
+            await sendGa4ServerEvent(userId, 'refund', {
+              transaction_id: transactionId,
+              value: (charge.amount_refunded ?? 0) / 100,
+              currency: (charge.currency ?? 'usd').toUpperCase(),
+            });
+          }
+        }
+        break;
+      }
+
       default:
         LOGGER.info('Unhandled Stripe event type — acknowledged', {
           eventType: stripeEvent.type,
