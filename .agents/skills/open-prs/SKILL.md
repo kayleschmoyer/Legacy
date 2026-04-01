@@ -237,6 +237,8 @@ github_request_review(number: <PR#>)
 
 The MCP tool uses a user OAuth token (via `gh auth token`) for Copilot requests, bypassing the default app token that would silently fail.
 
+> **Also treat stale `COMMENTED` reviews as missing**: if a bot-authored PR has a Copilot review in `COMMENTED` state with **0 unresolved threads**, re-request a Copilot review. Copilot does not re-review automatically when threads are resolved externally — leaving `reviewDecision` as `null` and `auto-approve` permanently SKIPPED. Detect this using the actual tool fields: latest Copilot review `state === "COMMENTED"` from `github_pr_batch_status`/`view_pr`, plus no open threads (`threadCount === 0` in `github_pr_scan` or `unresolvedThreads === 0` where available).
+
 ---
 
 ## Pass 1: Rebase Conflicting PRs
@@ -279,6 +281,8 @@ For each PR in `$scan.reviews` (in parallel batches of 3):
 2. **Load `skills/pr-lifecycle/SKILL.md`** — it contains the full workflow: reading comments, applying fixes, validating, committing, resolving threads, and the common-patterns reference table
 3. After pushing, re-check for new threads (Copilot re-reviews on push)
 4. If a review fix sub-agent **cannot complete the task but runs successfully**, analyze why, and optionally do **one** orchestrator-driven retry with a different approach (e.g., read the module source, check related files for patterns, try an alternative implementation). If it still cannot resolve the comments, comment on the PR with the diagnosed blocker. Only label `requires-human-review` if the blocker is outside agent reach (needs credentials, product decisions, or external dependencies) — otherwise leave it unlabeled for a future sweep attempt. If the sub-agent **execution itself fails** (crash, timeout, or tool error), do not retry — comment on the PR with the failure details and continue to the next PR (do not label, as the failure may be transient).
+
+> **Re-request Copilot review after resolving threads on bot-authored PRs**: for each bot-authored PR where review threads were resolved in this pass (either by code fix + push or by resolving meta threads), call `github_request_review(number: <PR#>)`. This only asks Copilot to review again; it does **not** itself emit a `pull_request_review` event. When Copilot actually submits a new review, GitHub emits `pull_request_review: submitted`, which triggers the `review-check` job; on successful completion, the `auto-approve` job (configured in `.github/workflows/copilot-auto-approve.yml` to run on `workflow_run`) can then approve and label the PR. If you skip the explicit re-request, Copilot never re-reviews, so no new `pull_request_review` event is fired and the auto-approve flow never runs, leaving approvals stuck.
 
 > **No manual labeling needed.** The `copilot-auto-approve` bot labels clean PRs automatically after Copilot re-reviews the pushed fixes.
 >
