@@ -586,9 +586,9 @@ server.tool(
       .number()
       .int()
       .positive()
-      .max(200)
-      .default(200)
-      .describe('Max PRs to scan (default: 200)'),
+      .max(100)
+      .default(100)
+      .describe('Max PRs to scan (default: 100, max: 100)'),
     applyLabels: z
       .boolean()
       .default(true)

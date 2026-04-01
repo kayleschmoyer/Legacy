@@ -349,7 +349,7 @@ interface ListOpenPRsResponse {
 export async function prScan(params: PRScanParams): Promise<ToolResult> {
   try {
     const repo = await getRepoOwnerName();
-    const limit = Math.min(params.limit ?? 100, 200);
+    const limit = Math.min(params.limit ?? 100, 100);
 
     let allPrs: PRNode[];
     let degraded = false;
