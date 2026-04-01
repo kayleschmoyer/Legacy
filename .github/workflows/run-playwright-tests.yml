@@ -144,12 +144,12 @@ jobs:
           fi
 
   # ---------------------------------------------------------------------------
-  # Nightly Discord notification — fires before tests start (schedule only)
+  # Discord notification — fires before tests start (schedule + manual dispatch)
   # ---------------------------------------------------------------------------
   notify-nightly-start:
     name: "Nightly Start"
     needs: [prepare]
-    if: github.event_name == 'schedule'
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 3
     outputs:
@@ -158,15 +158,31 @@ jobs:
       - name: "Checkout Repository"
         uses: actions/checkout@v6
 
-      - name: "Discord Nightly Starting"
+      - name: "Compute notification params"
+        id: params
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "title=Nightly Playwright Suite" >> "$GITHUB_OUTPUT"
+            # shellcheck disable=SC2129
+            echo "description=Integration tests (real server) + full E2E including @slow — 4 jobs started." >> "$GITHUB_OUTPUT"
+            echo "thread_name=Nightly Playwright — ${{ github.run_id }}" >> "$GITHUB_OUTPUT"
+          else
+            SUITE="${{ inputs['test-suite'] || 'all' }}"
+            echo "title=Manual Playwright Suite" >> "$GITHUB_OUTPUT"
+            echo "description=Manual run — suite: ${SUITE}" >> "$GITHUB_OUTPUT"
+            echo "thread_name=Manual Playwright — ${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: "Discord Playwright Starting"
         id: notify
         uses: ./.github/actions/discord-notify
         with:
           webhook-url: ${{ secrets.DISCORD_CI_WEBHOOK_URL }}
           status: running
-          title: "Nightly Playwright Suite"
-          description: "Integration tests (real server) + full E2E including @slow — 4 jobs started."
-          thread-name: "Nightly Playwright — ${{ github.run_id }}"
+          title: ${{ steps.params.outputs.title }}
+          description: ${{ steps.params.outputs.description }}
+          thread-name: ${{ steps.params.outputs.thread_name }}
 
   run-tests:
     name: "Playwright ${{ matrix.suite }} (${{ matrix.shard }})"
@@ -443,12 +459,12 @@ jobs:
           echo "**Run:** https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
 
   # ---------------------------------------------------------------------------
-  # Nightly Discord notification — fires after tests finish (schedule only)
+  # Discord notification — fires after tests finish (schedule + manual dispatch)
   # ---------------------------------------------------------------------------
   notify-nightly-finish:
     name: "Nightly Results"
     needs: [run-tests, deploy-report, notify-nightly-start]
-    if: always() && github.event_name == 'schedule'
+    if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 3
     steps:
@@ -478,18 +494,23 @@ jobs:
           HAS_REPORT="${{ needs.deploy-report.outputs.has-report }}"
           REPORT_BASE="https://bkrupa.github.io/legacy-sports-deploys"
           if [ "$HAS_REPORT" = "true" ]; then
-            REPORT_URL="${REPORT_BASE}/playwright-report/nightly-${{ github.run_id }}/"
+            if [ "${{ github.event_name }}" = "schedule" ]; then
+              DEST="nightly-${{ github.run_id }}"
+            else
+              DEST="manual-${{ github.run_number }}"
+            fi
+            REPORT_URL="${REPORT_BASE}/playwright-report/${DEST}/"
             echo "description=**[📊 Playwright Report](${REPORT_URL})**" >> "$GITHUB_OUTPUT"
           else
             echo "description=No test report available (no blob reports were uploaded)." >> "$GITHUB_OUTPUT"
           fi
 
-      - name: "Discord Nightly Results"
+      - name: "Discord Playwright Results"
         uses: ./.github/actions/discord-notify
         with:
           webhook-url: ${{ secrets.DISCORD_CI_WEBHOOK_URL }}
           status: ${{ steps.status.outputs.status }}
-          title: "Nightly Playwright Suite — Results"
+          title: "${{ github.event_name == 'schedule' && 'Nightly Playwright Suite — Results' || 'Manual Playwright Suite — Results' }}"
           description: ${{ steps.status.outputs.description }}
           content: ${{ steps.status.outputs.content }}
           thread-id: ${{ needs.notify-nightly-start.outputs.thread-id }}
