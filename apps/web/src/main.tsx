@@ -35,6 +35,7 @@ import { default as App } from './app/app';
 import { store } from './store/store';
 import { initializeAnalytics, trackLogin } from './utils/analytics';
 import { ThemeProvider, useThemeContext } from './context/ThemeContext';
+import { GrowthBookProvider } from './context/GrowthBookProvider';
 import { PublicLandingPage } from './pages/landing/PublicLandingPage';
 
 // Initialize Rollbar for web app
@@ -115,7 +116,9 @@ try {
                   LOGGER.error('Web app login failed:', error);
                 }}
               >
-                <ThemeAwareApp />
+                <GrowthBookProvider>
+                  <ThemeAwareApp />
+                </GrowthBookProvider>
               </EnhancedAuthGuard>
             </AuthProvider>
           </TamaguiProvider>

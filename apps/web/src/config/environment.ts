@@ -29,6 +29,8 @@ export interface EnvironmentConfig {
   readonly stripeAnnualPriceId: string;
   /** VAPID public key for Web Push subscription (base64url-encoded). */
   readonly vapidPublicKey: string;
+  /** GrowthBook SDK client key for feature flags and A/B tests. */
+  readonly growthbookClientKey?: string;
 }
 
 /**
@@ -76,6 +78,9 @@ export const getEnvironmentConfig = (): EnvironmentConfig => ({
   stripeAnnualPriceId:
     (import.meta.env.VITE_STRIPE_ANNUAL_PRICE_ID as string) || '',
   vapidPublicKey: (import.meta.env.VITE_VAPID_PUBLIC_KEY as string) || '',
+  growthbookClientKey: import.meta.env.VITE_GROWTHBOOK_CLIENT_KEY as
+    | string
+    | undefined,
 });
 
 /**
