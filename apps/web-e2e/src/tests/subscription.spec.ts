@@ -198,13 +198,9 @@ test.describe('SubscriptionPage — active premium @regression', () => {
     await routeGraphQL(page, {
       getmysubscription: myPremiumSubscriptionResponse(),
       mysubscription: myPremiumSubscriptionResponse(),
-      createbillingportalsession: (() => {
-        billingMutationCalled = true;
-        return createBillingPortalSessionResponse();
-      })(),
     });
 
-    // Also mock the portal session mutation at intercept time
+    // Mock the portal session mutation — flag is only set when the request actually fires
     await page.route(isGraphQLEndpoint, async (route) => {
       const op = route.request().postData()?.toLowerCase() ?? '';
       if (op.includes('createbillingportalsession')) {
@@ -228,9 +224,7 @@ test.describe('SubscriptionPage — active premium @regression', () => {
     await expect(manageBtn).toBeVisible();
     await manageBtn.click();
 
-    // Give the mutation a moment to fire
-    await page.waitForTimeout(500);
-    expect(billingMutationCalled).toBe(true);
+    await expect.poll(() => billingMutationCalled).toBe(true);
   });
 });
 
@@ -312,7 +306,6 @@ test.describe('Subscription upgrade flow @critical', () => {
     await expect(upgradeBtn).toBeVisible();
     await upgradeBtn.click();
 
-    await page.waitForTimeout(500);
-    expect(checkoutMutationCalled).toBe(true);
+    await expect.poll(() => checkoutMutationCalled).toBe(true);
   });
 });

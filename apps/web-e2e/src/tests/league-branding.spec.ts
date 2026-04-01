@@ -178,7 +178,9 @@ test.describe('League Branding @regression', () => {
     });
     if (await brandingHeader.isVisible()) {
       await brandingHeader.click();
-      await page.waitForTimeout(300);
+      await expect(
+        page.getByRole('heading', { name: /League Branding/i }),
+      ).toBeVisible();
     }
 
     const leaguePage = new LeaguePage(page);

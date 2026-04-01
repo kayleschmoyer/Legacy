@@ -501,7 +501,7 @@ test.describe('Player Detail Modal @regression', () => {
     const battingTab = dialog.getByText('Batting', { exact: true }).first();
     await expect(battingTab).toBeVisible();
     await battingTab.click({ force: true });
-    await page.waitForTimeout(300);
+    await expect(dialog.getByText('YEAR')).toBeVisible();
 
     // Verify column headers in the batting table
     await expect(dialog.getByText('YEAR')).toBeVisible();
@@ -537,7 +537,7 @@ test.describe('Player Detail Modal @regression', () => {
     const fieldingTab = dialog.getByText('Fielding', { exact: true }).first();
     await expect(fieldingTab).toBeVisible();
     await fieldingTab.click({ force: true });
-    await page.waitForTimeout(300);
+    await expect(dialog.getByText('POS').first()).toBeVisible();
 
     // Fielding table headers
     await expect(dialog.getByText('POS').first()).toBeVisible();
@@ -606,7 +606,7 @@ test.describe('Player Detail Modal – Pitcher @regression', () => {
     const pitchingTab = dialog.getByText('Pitching', { exact: true }).first();
     await expect(pitchingTab).toBeVisible();
     await pitchingTab.click({ force: true });
-    await page.waitForTimeout(300);
+    await expect(dialog.getByText('ERA').first()).toBeVisible();
 
     // Season-by-season pitching table headers
     await expect(dialog.getByText('ERA').first()).toBeVisible();
@@ -706,7 +706,6 @@ test.describe('Player Detail Modal — Edge Cases @regression', () => {
       .getByText('Fielding', { exact: true })
       .first()
       .click({ force: true });
-    await page.waitForTimeout(300);
     await expect(dialog.getByText('POS').first()).toBeVisible();
 
     // Switch back to Batting
@@ -714,7 +713,6 @@ test.describe('Player Detail Modal — Edge Cases @regression', () => {
       .getByText('Batting', { exact: true })
       .first()
       .click({ force: true });
-    await page.waitForTimeout(300);
 
     // Batting table headers should reappear
     await expect(dialog.getByText('YEAR')).toBeVisible();
@@ -740,7 +738,7 @@ test.describe('Player Detail Modal — Edge Cases @regression', () => {
     const battingTab = dialog.getByText('Batting', { exact: true }).first();
     await expect(battingTab).toBeVisible();
     await battingTab.click({ force: true });
-    await page.waitForTimeout(300);
+    await expect(dialog.getByText('2024', { exact: true })).toBeVisible();
 
     // Both season years are in the batting table
     await expect(dialog.getByText('2024', { exact: true })).toBeVisible();

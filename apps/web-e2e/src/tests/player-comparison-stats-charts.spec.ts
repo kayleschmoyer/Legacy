@@ -563,7 +563,7 @@ async function addPlayer(
     await input.clear();
     await input.focus();
     await input.fill(searchTerm);
-    await page.waitForTimeout(300);
+    await expect(page.getByText(fullName)).toBeVisible({ timeout: 5000 });
     await page.getByText(fullName).click({ timeout: 5000 });
   }).toPass({ timeout: 15000 });
 }

@@ -454,8 +454,7 @@ test.describe('Player Detail Modal – Career Arc tab @regression', () => {
     const arcTab = dialog.getByText('Career Arc', { exact: true });
     await expect(arcTab).toBeVisible();
     await arcTab.click({ force: true });
-    // Allow re-render after tab switch
-    await page.waitForTimeout(300);
+    await expect(dialog.getByText('Peak OPS')).toBeVisible();
     return dialog;
   }
 
@@ -518,7 +517,9 @@ test.describe('Player Detail Modal – two-way player Career Arc @regression', (
     const arcTab = dialog.getByText('Career Arc', { exact: true });
     await expect(arcTab).toBeVisible();
     await arcTab.click({ force: true });
-    await page.waitForTimeout(300);
+    // Wait for a Career Arc–specific metric to confirm the panel has rendered
+    // (avoids a no-op wait on 'Batting' which may already be visible from the tabs)
+    await expect(dialog.getByText('Peak OPS', { exact: true })).toBeVisible();
 
     // Two-way player should have both Batting and Pitching arc toggle buttons
     await expect(
@@ -560,7 +561,7 @@ test.describe('Player Detail Modal – two-way player Career Arc @regression', (
     const pitchingTab = dialog.getByText('Pitching', { exact: true }).first();
     await expect(pitchingTab).toBeVisible();
     await pitchingTab.click({ force: true });
-    await page.waitForTimeout(300);
+    await expect(dialog.getByText('2023', { exact: true })).toBeVisible();
 
     // 2023 pitching season row should be visible
     await expect(dialog.getByText('2023', { exact: true })).toBeVisible();
@@ -632,7 +633,7 @@ test.describe('Player Detail Modal – stat data values @regression', () => {
     const battingTab = dialog.getByText('Batting', { exact: true }).first();
     await expect(battingTab).toBeVisible();
     await battingTab.click({ force: true });
-    await page.waitForTimeout(300);
+    await expect(dialog.getByText('2024', { exact: true })).toBeVisible();
 
     // 2024 season: 145 G, 28 HR, 85 RBI
     await expect(dialog.getByText('2024', { exact: true })).toBeVisible();
