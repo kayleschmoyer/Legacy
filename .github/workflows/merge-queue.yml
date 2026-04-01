@@ -12,6 +12,10 @@ on:
         description: "Force check all PRs even if not labeled"
         type: boolean
         default: false
+      is_retry:
+        description: "Internal: set by self-dispatch when retrying after pending checks (prevents recursive retries)"
+        type: boolean
+        default: false
   # Trigger on pull request events for immediate response
   pull_request:
     types:
@@ -57,6 +61,7 @@ jobs:
       issues: write
       checks: read
       statuses: read
+      actions: write
 
     steps:
       - name: Generate GitHub App Token
@@ -185,6 +190,7 @@ jobs:
             const { owner, repo } = context.repo;
             const isDryRun = ${{ github.event.inputs.dry_run || false }};
             const forceCheck = ${{ github.event.inputs.force_check || false }};
+            const isRetry = ${{ github.event.inputs.is_retry || false }};
             const isTriggeredByWorkflow = context.eventName === 'workflow_run';
 
             console.log(`🔄 Starting merge queue processing (${isDryRun ? 'DRY RUN' : 'LIVE'})...`);
@@ -208,6 +214,8 @@ jobs:
                 );
 
             console.log(`📋 Found ${mergeReadyPRs.length} PRs with merge-when-ready label (from ${allPRs.length} open)`);
+
+            let hasPendingPRs = false;
 
             for (const pr of mergeReadyPRs) {
               console.log(`\n🔍 Processing PR #${pr.number}: ${pr.title}`);
@@ -246,6 +254,43 @@ jobs:
             }
 
             console.log(`\n🏁 Merge queue processing complete`);
+
+            // Self-dispatch a retry when PRs were skipped due to in-progress checks.
+            // CI has fully registered or completed its check runs — checks are still
+            // pending so merge is skipped. The workflow_run trigger fires only after CI
+            // *finishes* (types: [completed]), but in some edge cases (e.g., CI skipped,
+            // cancelled, or misconfigured) it may not fire, so without a retry the PR can
+            // get stuck until another external event fires. Only retries once (is_retry
+            // flag) to prevent cascading dispatches. Skipped for workflow_run triggers —
+            // CI just completed so checks should pass on the natural next trigger; and
+            // skipped in dry-run mode.
+            if (hasPendingPRs && !isDryRun && !isRetry && context.eventName !== 'workflow_run') {
+              console.log(`⏰ Pending checks detected — scheduling self-retry to re-evaluate after CI settles...`);
+              try {
+                // Use GITHUB_TOKEN (not the App token) for workflow dispatch — the job's
+                // `actions: write` permission covers GITHUB_TOKEN, not the App token.
+                await github.request(
+                  'POST /repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches',
+                  {
+                    owner,
+                    repo,
+                    workflow_id: 'merge-queue.yml',
+                    ref: 'main',
+                    inputs: {
+                      is_retry: 'true',
+                      dry_run: isDryRun ? 'true' : 'false',
+                      force_check: forceCheck ? 'true' : 'false'
+                    },
+                    headers: {
+                      authorization: `token ${process.env.GITHUB_TOKEN}`
+                    }
+                  }
+                );
+                console.log(`✅ Self-retry dispatched`);
+              } catch (retryError) {
+                console.warn(`⚠️ Could not dispatch self-retry: ${retryError.message}`);
+              }
+            }
 
             // Helper Functions
             async function validatePRForMerge(pr) {
@@ -399,19 +444,27 @@ jobs:
               const failingChecks = [];
               const pendingChecks = [];
               
+              // Checks that are excluded from merge-blocking evaluation.
+              // - process-merge-queue: skip to avoid circular dependency
+              // - delayed-recheck: housekeeping job that sleeps 3 min to rescue a stuck
+              //   bot-review status. The merge queue already evaluates bot-review as a
+              //   commit status independently, so blocking on delayed-recheck is redundant
+              //   and causes a 3-min window where merges can never proceed after fast CI runs.
+              const EXCLUDED_CHECKS = new Set(['process-merge-queue', 'delayed-recheck']);
+
               // Guard: if no check runs exist yet for this SHA, CI hasn't started.
               // Treat this as pending rather than all-passing to avoid premature merges.
               const relevantChecks = checks.data.check_runs.filter(
-                c => c.name !== 'process-merge-queue'
+                c => !EXCLUDED_CHECKS.has(c.name)
               );
               if (relevantChecks.length === 0) {
                 pendingChecks.push('CI checks not yet registered for this SHA');
               }
-              
+
               // Validate check runs
               for (const check of checks.data.check_runs) {
-                // Skip merge queue checks to avoid circular dependency
-                if (check.name === 'process-merge-queue') {
+                // Skip excluded checks (merge queue self-reference, housekeeping jobs)
+                if (EXCLUDED_CHECKS.has(check.name)) {
                   continue;
                 }
                 
@@ -561,6 +614,7 @@ jobs:
               // Don't report a blocker comment if checks are just pending
               if (validation.isPending) {
                 console.log(`⏳ Checks still in progress for PR #${pr.number}, will retry in next cycle`);
+                hasPendingPRs = true;
                 return; // Silently wait - no comment needed
               }
               
