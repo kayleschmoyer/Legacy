@@ -37,11 +37,33 @@ async function dispatchApolloError(page: Page, message: string) {
 
 test.describe('ApolloErrorToast @regression', () => {
   test.beforeEach(async ({ page }) => {
+    // Inject a script that sets a flag once the apollo:error listener is added.
+    // This must be installed before navigation so it captures the first listener.
+    await page.addInitScript(() => {
+      const _orig = window.addEventListener.bind(window);
+      window.addEventListener = (
+        type: string,
+        listener: EventListenerOrEventListenerObject,
+        options?: boolean | AddEventListenerOptions,
+      ) => {
+        _orig(type, listener, options);
+        if (type === 'apollo:error') {
+          (
+            window as Window & { __apolloErrorListenerReady?: boolean }
+          ).__apolloErrorListenerReady = true;
+        }
+      };
+    });
+
     // /about renders without GraphQL — stable base page
     await page.goto('/about');
     await page.waitForLoadState('load');
-    // Wait for React to hydrate and mount the ApolloErrorToast listener
-    await page.waitForTimeout(1000);
+    // Wait for the ApolloErrorToast useEffect to register its event listener.
+    await page.waitForFunction(
+      () =>
+        (window as Window & { __apolloErrorListenerReady?: boolean })
+          .__apolloErrorListenerReady === true,
+    );
   });
 
   test('appears when apollo:error event is dispatched @smoke', async ({

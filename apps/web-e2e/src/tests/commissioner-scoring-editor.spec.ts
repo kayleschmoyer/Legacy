@@ -641,11 +641,9 @@ test.describe('Commissioner Scoring Editor — Editing @critical', () => {
     // The collapse animates via CSS grid (`grid-template-rows: 0fr`) with a
     // 300 ms transition.  The component also sets `visibility: hidden` with a
     // matching 300 ms delay so Playwright reliably detects the hidden state.
-    // Wait for aria-expanded to flip (immediate), then let the transition and
-    // visibility delay complete.
+    // Wait for aria-expanded to flip, then let the 300 ms CSS transition and
+    // visibility delay complete — expect() polls until the element is hidden.
     await expect(battingHeader).toHaveAttribute('aria-expanded', 'false');
-    await page.waitForTimeout(500);
-
     await expect(
       scoringRegion.getByText('Home Runs', { exact: true }),
     ).not.toBeVisible();

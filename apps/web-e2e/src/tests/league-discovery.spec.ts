@@ -447,7 +447,6 @@ test.describe('League Discovery — filters @regression', () => {
     await lp.discoveryRefreshButton.click();
 
     // A new network call should have been made
-    await page.waitForTimeout(500);
-    expect(callCount).toBeGreaterThan(initialCount);
+    await expect.poll(() => callCount).toBeGreaterThan(initialCount);
   });
 });

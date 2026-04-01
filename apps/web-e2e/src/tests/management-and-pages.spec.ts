@@ -195,8 +195,7 @@ test.describe('Management Page — delete all leagues dialogs @regression', () =
       .click();
 
     // Mutation should have been called
-    await page.waitForTimeout(1000);
-    expect(mutationCalled).toBe(true);
+    await expect.poll(() => mutationCalled).toBe(true);
   });
 });
 

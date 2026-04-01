@@ -122,8 +122,6 @@ test.describe('Onboarding Tutorial — navigation @regression', () => {
     // Click "Next →" 5 times to reach step 6
     for (let i = 0; i < 5; i++) {
       await page.getByRole('button', { name: /next/i }).click();
-      // Small wait to let React re-render
-      await page.waitForTimeout(100);
     }
 
     await expect(page.getByText(/step 6 of 6/i)).toBeVisible({
@@ -136,7 +134,6 @@ test.describe('Onboarding Tutorial — navigation @regression', () => {
 
     for (let i = 0; i < 5; i++) {
       await page.getByRole('button', { name: /next/i }).click();
-      await page.waitForTimeout(100);
     }
 
     await expect(
@@ -189,7 +186,6 @@ test.describe('Onboarding Tutorial — skip and close @regression', () => {
 
     for (let i = 0; i < 5; i++) {
       await page.getByRole('button', { name: /next/i }).click();
-      await page.waitForTimeout(100);
     }
 
     await page.getByRole('button', { name: /get started/i }).click();
