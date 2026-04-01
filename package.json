@@ -170,7 +170,7 @@
     "graphile-build": "5.0.0-rc.4",
     "graphile-build-pg": "5.0.0-rc.5",
     "graphile-config": "1.0.0-rc.5",
-    "graphql": "^16.13.1",
+    "graphql": "^16.13.2",
     "humanize-string": "^3.0.0",
     "jsonwebtoken": "^9.0.2",
     "jwt-decode": "^4.0.0",
@@ -213,7 +213,7 @@
       "esbuild": "^0.25.10"
     },
     "axios": "1.13.6",
-    "graphql": "^16.13.1"
+    "graphql": "^16.13.2"
   },
   "optionalDependencies": {
     "@nx/storybook": "^21.5.2",
