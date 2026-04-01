@@ -291,27 +291,6 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "arn:aws:s3:::legacy-sports-terraform-state"
         ]
       },
-      # S3 bucket-level read for github-runners runner-dist bucket
-      {
-        Effect = "Allow"
-        Action = [
-          "s3:ListBucket"
-        ]
-        Resource = [
-          "arn:aws:s3:::${local.name_prefix}-runner-*"
-        ]
-      },
-      # S3 object-level read for github-runners runner-dist bucket
-      # (Terraform aws_s3_object refresh calls HeadObject, covered by s3:GetObject)
-      {
-        Effect = "Allow"
-        Action = [
-          "s3:GetObject"
-        ]
-        Resource = [
-          "arn:aws:s3:::${local.name_prefix}-runner-*/*"
-        ]
-      },
       # VPC, EC2, and networking read permissions
       {
         Effect = "Allow"
@@ -487,7 +466,7 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "arn:aws:apigateway:${local.region}::/account"
         ]
       },
-      # API Gateway tagging — scoped to PUT only (Terraform tag operations)
+      # API Gateway tagging - scoped to PUT only (Terraform tag operations)
       {
         Effect = "Allow"
         Action = [
@@ -530,21 +509,6 @@ resource "aws_iam_role_policy" "github_actions_additional" {
         ]
         Resource = [
           "arn:aws:events:${local.region}:${local.account_id}:rule/${local.name_prefix}-*"
-        ]
-      },
-      # EventBridge event bus permissions for github-runners module
-      {
-        Effect = "Allow"
-        Action = [
-          "events:DescribeEventBus",
-          "events:CreateEventBus",
-          "events:DeleteEventBus",
-          "events:TagResource",
-          "events:UntagResource",
-          "events:ListTagsForResource"
-        ]
-        Resource = [
-          "arn:aws:events:${local.region}:${local.account_id}:event-bus/${local.name_prefix}-*"
         ]
       },
       # Lambda event source mapping write permissions for Terraform apply
@@ -621,8 +585,35 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "acm:ListCertificates"
         ]
         Resource = "*"
-      },
-      # AWS Budgets permissions for Terraform plan/apply (aws_budgets_budget resource)
+      }
+    ]
+  })
+}
+
+# Supplemental managed policy for permissions that would push the inline policy over the 10 KB limit.
+# Covers: Budgets CRUD, EventBridge event bus CRUD, and S3 bucket- and object-level reads for the runner-dist bucket.
+#
+# Import: this policy was bootstrapped manually before the first apply to break the chicken-and-egg
+# dependency (the workflow needs the permissions to plan, but apply is needed to grant them).
+# The import block below tells Terraform to adopt the existing AWS resource rather than create a new one.
+import {
+  to = aws_iam_policy.github_actions_supplemental
+  id = "arn:aws:iam::${local.account_id}:policy/${local.name_prefix}-github-actions-supplemental"
+}
+
+import {
+  to = aws_iam_role_policy_attachment.github_actions_supplemental
+  id = "${local.name_prefix}-github-actions/arn:aws:iam::${local.account_id}:policy/${local.name_prefix}-github-actions-supplemental"
+}
+
+resource "aws_iam_policy" "github_actions_supplemental" {
+  name        = "${local.name_prefix}-github-actions-supplemental"
+  description = "Supplemental permissions for the GitHub Actions OIDC role (overflow from 10 KB inline policy limit)"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      # AWS Budgets - plan/apply needs ViewBudget to refresh aws_budgets_budget state
       {
         Effect = "Allow"
         Action = [
@@ -634,9 +625,50 @@ resource "aws_iam_role_policy" "github_actions_additional" {
         Resource = [
           "arn:aws:budgets::${local.account_id}:budget/${local.name_prefix}-*"
         ]
+      },
+      # EventBridge event bus - github-runners module manages an event bus resource
+      {
+        Effect = "Allow"
+        Action = [
+          "events:DescribeEventBus",
+          "events:CreateEventBus",
+          "events:DeleteEventBus",
+          "events:TagResource",
+          "events:UntagResource",
+          "events:ListTagsForResource"
+        ]
+        Resource = [
+          "arn:aws:events:${local.region}:${local.account_id}:event-bus/${local.name_prefix}-*"
+        ]
+      },
+      # S3 runner-dist bucket - ListBucket (bucket-level) + GetObject (object-level, HeadObject for aws_s3_object refresh)
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:ListBucket"
+        ]
+        Resource = [
+          "arn:aws:s3:::${local.name_prefix}-runner-*"
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject"
+        ]
+        Resource = [
+          "arn:aws:s3:::${local.name_prefix}-runner-*/*"
+        ]
       }
     ]
   })
+
+  tags = local.common_tags
+}
+
+resource "aws_iam_role_policy_attachment" "github_actions_supplemental" {
+  role       = aws_iam_role.github_actions.name
+  policy_arn = aws_iam_policy.github_actions_supplemental.arn
 }
 
 # Output the role ARN for GitHub Secrets
