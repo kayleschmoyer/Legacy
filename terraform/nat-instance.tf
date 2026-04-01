@@ -61,8 +61,10 @@ resource "aws_instance" "nat_instance" {
   associate_public_ip_address = true
   source_dest_check           = false # Required for NAT functionality
 
-  # User data to configure the instance as a NAT gateway
-  user_data = base64encode(<<-EOF
+  # The heredoc below is plaintext; we explicitly base64-encode it and provide
+  # the encoded value via user_data_base64 (instead of using user_data, which
+  # expects plaintext and handles encoding internally).
+  user_data_base64 = base64encode(<<-EOF
     #!/bin/bash
     yum update -y
     echo 1 > /proc/sys/net/ipv4/ip_forward
@@ -77,13 +79,6 @@ resource "aws_instance" "nat_instance" {
     Name    = "${local.name_prefix}-nat-instance"
     Purpose = "Cost-effective NAT for Google API access"
   })
-
-  lifecycle {
-    # public_ip and public_dns are reported by the provider as computed /
-    # known-after-apply when an EIP is attached. We use the EIP (aws_eip.nat_instance)
-    # as the stable address; ignoring these attributes avoids persistent phantom diffs.
-    ignore_changes = [public_ip, public_dns]
-  }
 }
 
 # Update route table to use NAT instance instead of NAT Gateway
