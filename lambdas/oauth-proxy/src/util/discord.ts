@@ -58,12 +58,12 @@ export async function notifyNewUserSignup(
     return;
   }
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5_000);
+
   try {
     const embed = formatNewUserEmbed(email, userId, signupMethod);
     const body = JSON.stringify({ embeds: [embed] });
-
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5_000);
 
     const response = await fetch(webhookUrl, {
       method: 'POST',
@@ -71,8 +71,6 @@ export async function notifyNewUserSignup(
       body,
       signal: controller.signal,
     });
-
-    clearTimeout(timeout);
 
     if (!response.ok) {
       const text = await response.text().catch(() => '');
@@ -85,6 +83,13 @@ export async function notifyNewUserSignup(
 
     LOGGER.info('Discord new-user signup notification sent', { userId });
   } catch (error) {
-    LOGGER.error('Failed to send Discord new-user notification', { error });
+    LOGGER.error('Failed to send Discord new-user notification', {
+      error:
+        error instanceof Error
+          ? { name: error.name, message: error.message, stack: error.stack }
+          : String(error),
+    });
+  } finally {
+    clearTimeout(timeout);
   }
 }
