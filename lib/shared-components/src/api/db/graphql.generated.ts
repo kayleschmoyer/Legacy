@@ -1244,6 +1244,8 @@ export type Mutation = {
   /** Propose a trade to another team. Provide the players you are offering and the players you want in return. */
   proposeTrade?: Maybe<TradeOffer>;
   randomizeDraftOrder?: Maybe<Draft>;
+  /** Commissioner: recalculate all matchup scores for a league (or a specific week) using the current scoring profile. */
+  recalculateLeagueMatchupScores?: Maybe<RecalculateMatchupScoresResult>;
   /** Record user consent for a specific data processing type */
   recordConsent?: Maybe<UserConsent>;
   registerDeviceToken?: Maybe<DeviceToken>;
@@ -1612,6 +1614,10 @@ export type MutationProposeTradeArgs = {
 
 export type MutationRandomizeDraftOrderArgs = {
   draftId: Scalars['Int']['input'];
+};
+
+export type MutationRecalculateLeagueMatchupScoresArgs = {
+  input: RecalculateMatchupScoresInput;
 };
 
 export type MutationRecordConsentArgs = {
@@ -2827,6 +2833,20 @@ export type QueryValidateInviteCodeArgs = {
   code: Scalars['String']['input'];
 };
 
+export type RecalculateMatchupScoresInput = {
+  leagueId: Scalars['Int']['input'];
+  weekNumber?: InputMaybe<Scalars['Int']['input']>;
+};
+
+/** Result of a bulk matchup score recalculation */
+export type RecalculateMatchupScoresResult = {
+  __typename?: 'RecalculateMatchupScoresResult';
+  matchupsFailed?: Maybe<Scalars['Int']['output']>;
+  matchupsRecalculated?: Maybe<Scalars['Int']['output']>;
+  message?: Maybe<Scalars['String']['output']>;
+  success?: Maybe<Scalars['Boolean']['output']>;
+};
+
 export type RecordConsentInput = {
   consentType: ConsentType;
   ipAddress?: InputMaybe<Scalars['String']['input']>;
@@ -3933,6 +3953,21 @@ export type BulkDropTeamPlayersMutation = {
     __typename?: 'CommissionerActionResult';
     success?: boolean | null;
     message?: string | null;
+  } | null;
+};
+
+export type RecalculateLeagueMatchupScoresMutationVariables = Exact<{
+  input: RecalculateMatchupScoresInput;
+}>;
+
+export type RecalculateLeagueMatchupScoresMutation = {
+  __typename?: 'Mutation';
+  recalculateLeagueMatchupScores?: {
+    __typename?: 'RecalculateMatchupScoresResult';
+    success?: boolean | null;
+    message?: string | null;
+    matchupsRecalculated?: number | null;
+    matchupsFailed?: number | null;
   } | null;
 };
 
@@ -7963,6 +7998,61 @@ export type BulkDropTeamPlayersMutationResult =
 export type BulkDropTeamPlayersMutationOptions = BaseMutationOptions<
   BulkDropTeamPlayersMutation,
   BulkDropTeamPlayersMutationVariables
+>;
+export const RecalculateLeagueMatchupScores = gql`
+  mutation RecalculateLeagueMatchupScores(
+    $input: RecalculateMatchupScoresInput!
+  ) {
+    recalculateLeagueMatchupScores(input: $input) {
+      success
+      message
+      matchupsRecalculated
+      matchupsFailed
+    }
+  }
+`;
+export type RecalculateLeagueMatchupScoresMutationFn = MutationFunction<
+  RecalculateLeagueMatchupScoresMutation,
+  RecalculateLeagueMatchupScoresMutationVariables
+>;
+
+/**
+ * __useRecalculateLeagueMatchupScoresMutation__
+ *
+ * To run a mutation, you first call `useRecalculateLeagueMatchupScoresMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useRecalculateLeagueMatchupScoresMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [recalculateLeagueMatchupScoresMutation, { data, loading, error }] = useRecalculateLeagueMatchupScoresMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useRecalculateLeagueMatchupScoresMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    RecalculateLeagueMatchupScoresMutation,
+    RecalculateLeagueMatchupScoresMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    RecalculateLeagueMatchupScoresMutation,
+    RecalculateLeagueMatchupScoresMutationVariables
+  >(RecalculateLeagueMatchupScores, options);
+}
+export type RecalculateLeagueMatchupScoresMutationHookResult = ReturnType<
+  typeof useRecalculateLeagueMatchupScoresMutation
+>;
+export type RecalculateLeagueMatchupScoresMutationResult =
+  Apollo.MutationResult<RecalculateLeagueMatchupScoresMutation>;
+export type RecalculateLeagueMatchupScoresMutationOptions = BaseMutationOptions<
+  RecalculateLeagueMatchupScoresMutation,
+  RecalculateLeagueMatchupScoresMutationVariables
 >;
 export const DeleteLeague = gql`
   mutation DeleteLeague($leagueId: Int!) {

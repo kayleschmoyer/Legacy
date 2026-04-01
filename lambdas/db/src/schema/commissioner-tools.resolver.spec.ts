@@ -31,6 +31,19 @@ describe('Commissioner Tools Resolver', () => {
       getDbOptions: jest.fn(() => ({})),
     }));
 
+    jest.doMock('@legacy-sports/scoring', () => ({
+      calculateMatchupScore: jest.fn(() => ({
+        team1Score: { totalScore: 150.5 },
+        team2Score: { totalScore: 120.75 },
+        gamesPerMatchup: 5,
+      })),
+      getDefaultScoringSettings: jest.fn(() => ({
+        batting: {},
+        pitching: {},
+        fielding: {},
+      })),
+    }));
+
     jest.doMock('@legacy-sports/db-client', () => ({
       createDatabaseService: jest.fn(),
       runWithPublicClient: jest.fn(
@@ -52,6 +65,16 @@ describe('Commissioner Tools Resolver', () => {
         awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
         awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
       })),
+      getMatchupPlayerGameStats: jest.fn().mockResolvedValue([]),
+      getScoringMultipliersForLeague: jest.fn().mockResolvedValue({
+        batting: { h: 1 },
+        pitching: { w: 5 },
+        fielding: { po: 0.1 },
+      }),
+      updateMatchupScore: jest.fn().mockResolvedValue({
+        team1Score: '150.50',
+        team2Score: '120.75',
+      }),
       PublicSchema: {
         commissionerAuditLog: {
           id: 'id',
@@ -500,6 +523,73 @@ describe('Commissioner Tools Resolver', () => {
 
       expect(result.success).toBe(true);
       expect(result.message).toContain('2 player');
+    });
+  });
+
+  // ── recalculateLeagueMatchupScores ─────────────────────────────────────────
+
+  describe('recalculateLeagueMatchupScores mutation', () => {
+    it('throws when unauthenticated', async () => {
+      const resolver = getMutation('recalculateLeagueMatchupScores');
+      await expect(
+        resolver({}, { input: { leagueId: 1 } }, unauthCtx, undefined as never),
+      ).rejects.toThrow('Authentication required');
+    });
+
+    it('returns zero when no matchups found', async () => {
+      // The mutation uses .where() without .limit() to fetch matchups
+      mockDb.where.mockResolvedValueOnce([]);
+
+      const resolver = getMutation('recalculateLeagueMatchupScores');
+      const result = (await resolver(
+        {},
+        { input: { leagueId: 1 } },
+        mockContext,
+        undefined as never,
+      )) as Record<string, unknown>;
+
+      expect(result.success).toBe(true);
+      expect(result.matchupsRecalculated).toBe(0);
+      expect(result.message).toContain('No matchups found');
+    });
+
+    it('recalculates all matchups for a league', async () => {
+      // .where() returns matchups list
+      mockDb.where.mockResolvedValueOnce([
+        { id: 1, team1Id: 10, team2Id: 20, gamesPerMatchup: 5, weekNumber: 1 },
+        { id: 2, team1Id: 30, team2Id: 40, gamesPerMatchup: 5, weekNumber: 2 },
+      ]);
+
+      const resolver = getMutation('recalculateLeagueMatchupScores');
+      const result = (await resolver(
+        {},
+        { input: { leagueId: 1 } },
+        mockContext,
+        undefined as never,
+      )) as Record<string, unknown>;
+
+      expect(result.success).toBe(true);
+      expect(result.matchupsRecalculated).toBe(2);
+      expect(result.matchupsFailed).toBe(0);
+      expect(result.message).toContain('2 matchups');
+    });
+
+    it('recalculates matchups for a specific week', async () => {
+      mockDb.where.mockResolvedValueOnce([
+        { id: 3, team1Id: 10, team2Id: 20, gamesPerMatchup: 5, weekNumber: 3 },
+      ]);
+
+      const resolver = getMutation('recalculateLeagueMatchupScores');
+      const result = (await resolver(
+        {},
+        { input: { leagueId: 1, weekNumber: 3 } },
+        mockContext,
+        undefined as never,
+      )) as Record<string, unknown>;
+
+      expect(result.success).toBe(true);
+      expect(result.matchupsRecalculated).toBe(1);
+      expect(result.message).toContain('week 3');
     });
   });
 

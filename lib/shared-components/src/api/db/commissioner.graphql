@@ -62,6 +62,17 @@ mutation BulkDropTeamPlayers($input: BulkDropPlayersInput!) {
   }
 }
 
+mutation RecalculateLeagueMatchupScores(
+  $input: RecalculateMatchupScoresInput!
+) {
+  recalculateLeagueMatchupScores(input: $input) {
+    success
+    message
+    matchupsRecalculated
+    matchupsFailed
+  }
+}
+
 mutation DeleteLeague($leagueId: Int!) {
   deleteLeague(leagueId: $leagueId)
 }

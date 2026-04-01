@@ -11,8 +11,18 @@
  *   - Query the commissioner audit log
  */
 
-import { PublicSchema } from '@legacy-sports/db-client';
+import {
+  getMatchupPlayerGameStats,
+  getScoringMultipliersForLeague,
+  PublicSchema,
+  updateMatchupScore,
+} from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
+import {
+  calculateMatchupScore,
+  type PlayerGameStats,
+  type ScoringSettings,
+} from '@legacy-sports/scoring';
 import { and, eq } from 'drizzle-orm';
 
 import { builder } from './builder';
@@ -118,6 +128,16 @@ const BulkDropPlayersInput = builder.inputType('BulkDropPlayersInput', {
   }),
 });
 
+const RecalculateMatchupScoresInput = builder.inputType(
+  'RecalculateMatchupScoresInput',
+  {
+    fields: (t) => ({
+      leagueId: t.int({ required: true }),
+      weekNumber: t.int({ required: false }),
+    }),
+  },
+);
+
 // ── Simple result type ─────────────────────────────────────────────────────
 
 const CommissionerActionResult = builder.objectRef<{
@@ -130,6 +150,23 @@ CommissionerActionResult.implement({
   fields: (t) => ({
     success: t.exposeBoolean('success'),
     message: t.exposeString('message'),
+  }),
+});
+
+const RecalculateMatchupScoresResult = builder.objectRef<{
+  success: boolean;
+  message: string;
+  matchupsRecalculated: number;
+  matchupsFailed: number;
+}>('RecalculateMatchupScoresResult');
+
+RecalculateMatchupScoresResult.implement({
+  description: 'Result of a bulk matchup score recalculation',
+  fields: (t) => ({
+    success: t.exposeBoolean('success'),
+    message: t.exposeString('message'),
+    matchupsRecalculated: t.exposeInt('matchupsRecalculated'),
+    matchupsFailed: t.exposeInt('matchupsFailed'),
   }),
 });
 
@@ -674,6 +711,228 @@ builder.mutationField('bulkDropTeamPlayers', (t) =>
       return {
         success: true,
         message: `Successfully dropped ${players.length} player${players.length === 1 ? '' : 's'} from the team.`,
+      };
+    },
+  }),
+);
+
+// 8. Recalculate matchup scores for a league
+builder.mutationField('recalculateLeagueMatchupScores', (t) =>
+  t.field({
+    type: RecalculateMatchupScoresResult,
+    description:
+      'Commissioner: recalculate all matchup scores for a league (or a specific week) using the current scoring profile.',
+    args: {
+      input: t.arg({
+        type: RecalculateMatchupScoresInput,
+        required: true,
+      }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) throw AuthenticationError();
+
+      const { leagueId, weekNumber } = args.input;
+
+      if (!context.user.isAdmin) {
+        await verifyCommissionerAccess(context.db, leagueId, context.user.id);
+      }
+
+      const db = context.db;
+
+      // 1. Fetch matchups for this league (optionally filtered by week)
+      const conditions = [eq(PublicSchema.matchups.leagueId, leagueId)];
+      if (weekNumber !== null && weekNumber !== undefined) {
+        conditions.push(eq(PublicSchema.matchups.weekNumber, weekNumber));
+      }
+
+      const matchups = await db
+        .select({
+          id: PublicSchema.matchups.id,
+          team1Id: PublicSchema.matchups.team1Id,
+          team2Id: PublicSchema.matchups.team2Id,
+          gamesPerMatchup: PublicSchema.matchups.gamesPerMatchup,
+          weekNumber: PublicSchema.matchups.weekNumber,
+        })
+        .from(PublicSchema.matchups)
+        .where(and(...conditions));
+
+      if (matchups.length === 0) {
+        return {
+          success: true,
+          message:
+            weekNumber != null
+              ? `No matchups found for week ${weekNumber}.`
+              : 'No matchups found for this league.',
+          matchupsRecalculated: 0,
+          matchupsFailed: 0,
+        };
+      }
+
+      // 2. Get the league's current scoring multipliers
+      const multipliers = await getScoringMultipliersForLeague(db, leagueId);
+      const scoringSettings: ScoringSettings = {
+        batting: multipliers.batting,
+        pitching: multipliers.pitching,
+        fielding: multipliers.fielding,
+      };
+
+      // 3. Recalculate each matchup
+      let recalculated = 0;
+      let failed = 0;
+
+      for (const matchup of matchups) {
+        try {
+          const playerGameStatsResult = await getMatchupPlayerGameStats(
+            db,
+            matchup.id,
+          );
+
+          // TODO: The stat-to-PlayerGameStats mapping below duplicates the same
+          // logic in lambdas/stats-lambda/src/scoring-utils.ts
+          // (calculateAndUpdateMatchupScores). Consider extracting a shared
+          // helper (e.g. mapStatRowsToPlayerGameStats) into lib/scoring or a
+          // new lib/scoring-utils package to eliminate the duplication.
+
+          // Organize stats by team
+          const team1PlayerStats = new Map<number, PlayerGameStats[]>();
+          const team2PlayerStats = new Map<number, PlayerGameStats[]>();
+
+          for (const stat of playerGameStatsResult) {
+            const playerGameStat: PlayerGameStats = {
+              playerId: stat.playerId,
+              season: stat.season,
+              gameNum: stat.gameNum,
+              batting: stat.battingStats
+                ? {
+                    pa: stat.battingStats.pa,
+                    ab: stat.battingStats.ab,
+                    r: stat.battingStats.r,
+                    h: stat.battingStats.h,
+                    doubles: stat.battingStats.doubles,
+                    triples: stat.battingStats.triples,
+                    hr: stat.battingStats.hr,
+                    rbi: stat.battingStats.rbi,
+                    sb: stat.battingStats.sb,
+                    cs: stat.battingStats.cs,
+                    bb: stat.battingStats.bb,
+                    so: stat.battingStats.so,
+                    gidp: stat.battingStats.gidp,
+                    hbp: stat.battingStats.hbp,
+                    sh: stat.battingStats.sh,
+                    sf: stat.battingStats.sf,
+                    ibb: stat.battingStats.ibb,
+                  }
+                : undefined,
+              pitching: stat.pitchingStats
+                ? {
+                    w: stat.pitchingStats.w,
+                    l: stat.pitchingStats.l,
+                    gs: stat.pitchingStats.gs,
+                    gf: stat.pitchingStats.gf,
+                    cg: stat.pitchingStats.cg,
+                    sho: stat.pitchingStats.sho,
+                    sv: stat.pitchingStats.sv,
+                    ip: stat.pitchingStats.ip,
+                    h: stat.pitchingStats.h,
+                    r: stat.pitchingStats.r,
+                    er: stat.pitchingStats.er,
+                    hr: stat.pitchingStats.hr,
+                    bb: stat.pitchingStats.bb,
+                    ibb: stat.pitchingStats.ibb,
+                    so: stat.pitchingStats.so,
+                    hbp: stat.pitchingStats.hbp,
+                    battersFaced: stat.pitchingStats.battersFaced,
+                    outsRecorded: stat.pitchingStats.outsRecorded,
+                  }
+                : undefined,
+              fielding: stat.fieldingStats
+                ? {
+                    innDef: stat.fieldingStats.innDef,
+                    chances: stat.fieldingStats.chances,
+                    po: stat.fieldingStats.po,
+                    a: stat.fieldingStats.a,
+                    eDef: stat.fieldingStats.eDef,
+                    dpDef: stat.fieldingStats.dpDef,
+                  }
+                : undefined,
+            };
+
+            if (stat.teamId === matchup.team1Id) {
+              const existing = team1PlayerStats.get(stat.playerId);
+              if (existing) {
+                existing.push(playerGameStat);
+              } else {
+                team1PlayerStats.set(stat.playerId, [playerGameStat]);
+              }
+            } else if (stat.teamId === matchup.team2Id) {
+              const existing = team2PlayerStats.get(stat.playerId);
+              if (existing) {
+                existing.push(playerGameStat);
+              } else {
+                team2PlayerStats.set(stat.playerId, [playerGameStat]);
+              }
+            }
+          }
+
+          // Calculate new scores
+          const matchupScore = calculateMatchupScore(
+            matchup.id,
+            matchup.team1Id,
+            matchup.team2Id,
+            team1PlayerStats,
+            team2PlayerStats,
+            matchup.gamesPerMatchup ?? 5,
+            scoringSettings,
+          );
+
+          // Update matchup with new scores
+          await updateMatchupScore(
+            db,
+            matchup.id,
+            matchupScore.team1Score?.totalScore ?? null,
+            matchupScore.team2Score?.totalScore ?? null,
+          );
+
+          recalculated++;
+        } catch (err) {
+          failed++;
+          LOGGER.error('Failed to recalculate matchup score', {
+            matchupId: matchup.id,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+
+      await writeAuditLog(db, {
+        leagueId,
+        userId: context.user.id,
+        action: 'recalculate_scores',
+        targetType: 'league',
+        targetId: leagueId,
+        details: {
+          weekNumber: weekNumber ?? 'all',
+          totalMatchups: matchups.length,
+          recalculated,
+          failed,
+        },
+      });
+
+      LOGGER.info('Commissioner: recalculated matchup scores', {
+        leagueId,
+        weekNumber: weekNumber ?? 'all',
+        recalculated,
+        failed,
+        commissionerId: context.user.id,
+      });
+
+      const weekLabel = weekNumber ? ` for week ${weekNumber}` : '';
+      const failMsg = failed > 0 ? ` (${failed} failed)` : '';
+
+      return {
+        success: failed === 0,
+        message: `Recalculated ${recalculated} matchup${recalculated === 1 ? '' : 's'}${weekLabel}${failMsg}.`,
+        matchupsRecalculated: recalculated,
+        matchupsFailed: failed,
       };
     },
   }),

@@ -1558,6 +1558,13 @@ type Mutation {
   randomizeDraftOrder(draftId: Int!): Draft
 
   """
+  Commissioner: recalculate all matchup scores for a league (or a specific week) using the current scoring profile.
+  """
+  recalculateLeagueMatchupScores(
+    input: RecalculateMatchupScoresInput!
+  ): RecalculateMatchupScoresResult
+
+  """
   Record user consent for a specific data processing type
   """
   recordConsent(input: RecordConsentInput!): UserConsent
@@ -2595,6 +2602,21 @@ type Query {
   Get version and deployment information for the GraphQL API
   """
   version: VersionInfo
+}
+
+input RecalculateMatchupScoresInput {
+  leagueId: Int!
+  weekNumber: Int
+}
+
+"""
+Result of a bulk matchup score recalculation
+"""
+type RecalculateMatchupScoresResult {
+  matchupsFailed: Int
+  matchupsRecalculated: Int
+  message: String
+  success: Boolean
 }
 
 input RecordConsentInput {

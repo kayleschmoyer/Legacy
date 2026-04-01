@@ -1238,6 +1238,8 @@ export type Mutation = {
   /** Propose a trade to another team. Provide the players you are offering and the players you want in return. */
   proposeTrade?: Maybe<TradeOffer>;
   randomizeDraftOrder?: Maybe<Draft>;
+  /** Commissioner: recalculate all matchup scores for a league (or a specific week) using the current scoring profile. */
+  recalculateLeagueMatchupScores?: Maybe<RecalculateMatchupScoresResult>;
   /** Record user consent for a specific data processing type */
   recordConsent?: Maybe<UserConsent>;
   registerDeviceToken?: Maybe<DeviceToken>;
@@ -1606,6 +1608,10 @@ export type MutationProposeTradeArgs = {
 
 export type MutationRandomizeDraftOrderArgs = {
   draftId: Scalars['Int']['input'];
+};
+
+export type MutationRecalculateLeagueMatchupScoresArgs = {
+  input: RecalculateMatchupScoresInput;
 };
 
 export type MutationRecordConsentArgs = {
@@ -2819,6 +2825,20 @@ export type QueryUsersCountArgs = {
 
 export type QueryValidateInviteCodeArgs = {
   code: Scalars['String']['input'];
+};
+
+export type RecalculateMatchupScoresInput = {
+  leagueId: Scalars['Int']['input'];
+  weekNumber?: InputMaybe<Scalars['Int']['input']>;
+};
+
+/** Result of a bulk matchup score recalculation */
+export type RecalculateMatchupScoresResult = {
+  __typename?: 'RecalculateMatchupScoresResult';
+  matchupsFailed?: Maybe<Scalars['Int']['output']>;
+  matchupsRecalculated?: Maybe<Scalars['Int']['output']>;
+  message?: Maybe<Scalars['String']['output']>;
+  success?: Maybe<Scalars['Boolean']['output']>;
 };
 
 export type RecordConsentInput = {

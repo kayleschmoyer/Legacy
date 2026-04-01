@@ -14,6 +14,7 @@ import {
 } from 'tamagui';
 import {
   AlertTriangle,
+  Calculator,
   Check,
   ClipboardList,
   FileText,
@@ -34,6 +35,7 @@ import {
   useGetLeagueTeamsQuery,
   useGetMatchupsForLeagueQuery,
   useGetTeamMembersQuery,
+  useRecalculateLeagueMatchupScoresMutation,
   useSetTeamLockMutation,
   useSwapMatchupTeamsMutation,
   useUpdateCommissionerNoteMutation,
@@ -935,6 +937,183 @@ function TeamManagementSection({
   );
 }
 
+// ── Sub-section: Recalculate Matchup Scores ──────────────────────────────────
+
+function RecalculateScoresSection({
+  leagueId,
+  onSuccess,
+  onError,
+}: {
+  leagueId: number;
+  onSuccess?: (msg: string) => void;
+  onError?: (err: Error) => void;
+}) {
+  const [weekFilter, setWeekFilter] = useState('all');
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  const { data: matchupsData, loading: matchupsLoading } =
+    useGetMatchupsForLeagueQuery({ variables: { leagueId } });
+
+  const [recalculate, { loading }] = useRecalculateLeagueMatchupScoresMutation({
+    refetchQueries: ['GetMatchupsForLeague', 'GetLeagueStandings'],
+  });
+
+  const matchups = matchupsData?.getMatchupsForLeague ?? [];
+
+  // Derive unique week numbers for the filter dropdown
+  const weekNumbers = [...new Set(matchups.map((m) => m.weekNumber))]
+    .filter((w): w is number => w != null)
+    .sort((a, b) => a - b);
+
+  const selectedWeek =
+    weekFilter === 'all' ? undefined : parseInt(weekFilter, 10);
+
+  const affectedCount = matchups.filter(
+    (m) => selectedWeek === undefined || m.weekNumber === selectedWeek,
+  ).length;
+
+  const handleRecalculate = async () => {
+    try {
+      const result = await recalculate({
+        variables: {
+          input: {
+            leagueId,
+            weekNumber: selectedWeek ?? null,
+          },
+        },
+      });
+      const data = result.data?.recalculateLeagueMatchupScores;
+      if (data?.success === true) {
+        onSuccess?.(data.message ?? 'Scores recalculated');
+      } else {
+        onError?.(new Error(data?.message ?? 'Recalculation failed'));
+      }
+      setShowConfirm(false);
+    } catch (err) {
+      onError?.(err instanceof Error ? err : new Error(String(err)));
+      setShowConfirm(false);
+    }
+  };
+
+  return (
+    <Card
+      padding="$4"
+      gap="$3"
+      backgroundColor="$surfacePanel"
+      borderColor="$surfacePanelBorder"
+    >
+      <SectionHeader
+        icon={<Calculator size={16} color="$blue10" />}
+        title="Recalculate Matchup Scores"
+        description="Retroactively recalculate all matchup scores using the league's current scoring settings. Useful after changing scoring multipliers."
+      />
+      {matchupsLoading ? (
+        <Spinner />
+      ) : matchups.length === 0 ? (
+        <Text color="$textMuted" fontSize="$2">
+          No matchups found for this league.
+        </Text>
+      ) : (
+        <YStack gap="$3">
+          <YStack gap="$1">
+            <Text fontSize="$1" color="$textMuted">
+              Scope
+            </Text>
+            <select
+              value={weekFilter}
+              onChange={(e) => {
+                setWeekFilter(e.target.value);
+                setShowConfirm(false);
+              }}
+              style={selectStyle}
+              aria-label="Select week to recalculate"
+            >
+              <option value="all">
+                All weeks ({matchups.length} matchup
+                {matchups.length === 1 ? '' : 's'})
+              </option>
+              {weekNumbers.map((w) => {
+                const count = matchups.filter((m) => m.weekNumber === w).length;
+                return (
+                  <option key={w} value={String(w)}>
+                    Week {w} ({count} matchup{count === 1 ? '' : 's'})
+                  </option>
+                );
+              })}
+            </select>
+          </YStack>
+
+          {!showConfirm ? (
+            <Button
+              size="$3"
+              onPress={() => setShowConfirm(true)}
+              disabled={affectedCount === 0}
+              icon={<Calculator size={14} />}
+              backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.85)}
+              borderColor={withAlpha(BRAND_NAVY_LIGHT, 1)}
+              color="white"
+              alignSelf="flex-start"
+            >
+              Recalculate Scores
+            </Button>
+          ) : (
+            <Card
+              padding="$3"
+              backgroundColor="$orange2"
+              borderColor="$orange6"
+              borderWidth={1}
+              borderRadius="$3"
+              gap="$2"
+            >
+              <XStack alignItems="center" gap="$2">
+                <AlertTriangle size={14} color="$orange9" />
+                <Text fontSize="$2" fontWeight="600" color="$orange11">
+                  Confirm Recalculation
+                </Text>
+              </XStack>
+              <Text fontSize="$2" color="$orange11">
+                This will recalculate{' '}
+                <Text fontWeight="700">
+                  {affectedCount} matchup{affectedCount === 1 ? '' : 's'}
+                </Text>{' '}
+                using the current scoring settings. Existing scores will be
+                overwritten.
+              </Text>
+              <XStack gap="$2">
+                <Button
+                  size="$3"
+                  onPress={() => void handleRecalculate()}
+                  disabled={loading}
+                  icon={
+                    loading ? (
+                      <Spinner size="small" />
+                    ) : (
+                      <Calculator size={14} />
+                    )
+                  }
+                  backgroundColor="$orange9"
+                  color="white"
+                >
+                  {loading ? 'Recalculating...' : 'Confirm Recalculate'}
+                </Button>
+                <Button
+                  size="$3"
+                  onPress={() => setShowConfirm(false)}
+                  disabled={loading}
+                  backgroundColor="$gray6"
+                  color="$color"
+                >
+                  Cancel
+                </Button>
+              </XStack>
+            </Card>
+          )}
+        </YStack>
+      )}
+    </Card>
+  );
+}
+
 // ── Sub-section: Audit Log ──────────────────────────────────────────────────
 
 const ACTION_LABELS: Record<string, string> = {
@@ -946,6 +1125,7 @@ const ACTION_LABELS: Record<string, string> = {
   lock_team: 'Lock Team',
   unlock_team: 'Unlock Team',
   bulk_drop_players: 'Bulk Drop',
+  recalculate_scores: 'Recalculate Scores',
 };
 
 function AuditLogSection({ leagueId }: { leagueId: number }) {
@@ -1099,6 +1279,12 @@ export function CommissionerToolsControl({
           <EditMatchupScoresSection
             leagueId={leagueId}
             teams={teams}
+            onSuccess={onSuccess}
+            onError={onError}
+          />
+
+          <RecalculateScoresSection
+            leagueId={leagueId}
             onSuccess={onSuccess}
             onError={onError}
           />

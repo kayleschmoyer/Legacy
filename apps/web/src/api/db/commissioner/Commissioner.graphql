@@ -65,3 +65,14 @@ mutation BulkDropTeamPlayers($input: BulkDropPlayersInput!) {
     ...CommissionerActionResult
   }
 }
+
+mutation RecalculateLeagueMatchupScores(
+  $input: RecalculateMatchupScoresInput!
+) {
+  recalculateLeagueMatchupScores(input: $input) {
+    success
+    message
+    matchupsRecalculated
+    matchupsFailed
+  }
+}
