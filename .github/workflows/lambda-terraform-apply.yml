@@ -116,6 +116,8 @@ jobs:
         # CBC Distribution v. MLBAM (8th Cir. 2007, cert denied 2008), but any
         # commercial deployment requires a licensed data redistribution provider
         # since we operate commercially with premium subscriptions.
+        # Skip this check for dev environments — mlb-statsapi is permitted for development.
+        if: env.AWS_STAGE != 'dev'
         env:
           TF_VAR_mlb_data_provider: ${{ secrets.MLB_DATA_PROVIDER || vars.MLB_DATA_PROVIDER }}
         run: |
