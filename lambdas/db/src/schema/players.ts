@@ -28,6 +28,7 @@ interface PlayerShape {
   firstName: string;
   lastName: string;
   brefId: string;
+  mlbPlayerId?: number | null;
   statsLastFetchedAt: Date | null;
   scoring?: PlayerCareerScore | null;
   // Career achievement fields (from DB columns)
@@ -142,6 +143,11 @@ PlayerRef.implement({
     firstName: t.exposeString('firstName'),
     lastName: t.exposeString('lastName'),
     brefId: t.exposeString('brefId'),
+    mlbPlayerId: t.exposeInt('mlbPlayerId', {
+      nullable: true,
+      description:
+        'MLB Stats API player ID for cross-referencing with the external data provider. Null for players without a known mapping.',
+    }),
     statsLastFetchedAt: t.string({
       nullable: true,
       resolve: (parent) =>
@@ -385,6 +391,41 @@ builder.queryField('searchPlayers', (t) =>
     },
     resolve: async (parent, args) => {
       return dbService.players.searchPlayers(args.searchTerm, args.limit || 10);
+    },
+  }),
+);
+
+// ─── MLB Stats Integration ────────────────────────────────────────────────────
+
+builder.queryField('playerByMlbId', (t) =>
+  t.field({
+    type: PlayerRef,
+    nullable: true,
+    description:
+      'Look up a player by their MLB Stats API player ID. Returns null if no mapping exists.',
+    args: {
+      mlbPlayerId: t.arg.int({ required: true }),
+    },
+    resolve: async (_parent, { mlbPlayerId }) => {
+      return dbService.players.getPlayerByMlbId(mlbPlayerId);
+    },
+  }),
+);
+
+builder.queryField('playerMlbStats', (t) =>
+  t.field({
+    type: 'String',
+    nullable: true,
+    description:
+      'Fetch MLB season stats for a player from the external data provider. ' +
+      'Stub resolver — full implementation added in LS-1864 via MlbDataProvider.',
+    args: {
+      mlbPlayerId: t.arg.int({ required: true }),
+      season: t.arg.int({ required: true }),
+    },
+    resolve: () => {
+      // Stub resolver — returns null until LS-1864 wires up MlbDataProvider.
+      return null;
     },
   }),
 );

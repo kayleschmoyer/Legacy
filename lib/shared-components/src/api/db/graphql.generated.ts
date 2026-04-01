@@ -2000,6 +2000,8 @@ export type Player = {
   firstName?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   lastName?: Maybe<Scalars['String']['output']>;
+  /** MLB Stats API player ID for cross-referencing with the external data provider. Null for players without a known mapping. */
+  mlbPlayerId?: Maybe<Scalars['Int']['output']>;
   /** The player's primary historical baseball era, derived from the midpoint of their MLB career. Values: Dead Ball Era | Golden Age | Expansion Era | Free Agency Era | Steroid Era | Modern Era */
   primaryEra?: Maybe<Scalars['String']['output']>;
   /** Fantasy scoring data (only populated when using scoring-based sort) */
@@ -2247,9 +2249,13 @@ export type Query = {
   onThisDayEvents?: Maybe<Array<OnThisDayEvent>>;
   player?: Maybe<Player>;
   playerByBrefId?: Maybe<Player>;
+  /** Look up a player by their MLB Stats API player ID. Returns null if no mapping exists. */
+  playerByMlbId?: Maybe<Player>;
   playerCareerBatting?: Maybe<CareerBatting>;
   playerCareerFielding?: Maybe<CareerFielding>;
   playerCareerPitching?: Maybe<CareerPitching>;
+  /** Fetch MLB season stats for a player from the external data provider. Stub resolver — full implementation added in LS-1864 via MlbDataProvider. */
+  playerMlbStats?: Maybe<Scalars['String']['output']>;
   playerSeasonBatting?: Maybe<Array<SeasonBatting>>;
   playerSeasonFielding?: Maybe<Array<SeasonFielding>>;
   playerSeasonPitching?: Maybe<Array<SeasonPitching>>;
@@ -2616,6 +2622,10 @@ export type QueryPlayerByBrefIdArgs = {
   brefId: Scalars['String']['input'];
 };
 
+export type QueryPlayerByMlbIdArgs = {
+  mlbPlayerId: Scalars['Int']['input'];
+};
+
 export type QueryPlayerCareerBattingArgs = {
   playerId: Scalars['Int']['input'];
 };
@@ -2626,6 +2636,11 @@ export type QueryPlayerCareerFieldingArgs = {
 
 export type QueryPlayerCareerPitchingArgs = {
   playerId: Scalars['Int']['input'];
+};
+
+export type QueryPlayerMlbStatsArgs = {
+  mlbPlayerId: Scalars['Int']['input'];
+  season: Scalars['Int']['input'];
 };
 
 export type QueryPlayerSeasonBattingArgs = {

@@ -26,6 +26,7 @@ jest.mock('@legacy-sports/utils/node', () => ({
 
 const mockGameHandler = jest.fn<Promise<SQSBatchResponse>, [SQSEvent]>();
 const mockCareerHandler = jest.fn<Promise<SQSBatchResponse>, [SQSEvent]>();
+const mockMlbStatsHandler = jest.fn<SQSBatchResponse, [SQSEvent]>();
 
 jest.mock('./load-game', () => ({
   handler: (...args: [SQSEvent]) => mockGameHandler(...args),
@@ -33,6 +34,13 @@ jest.mock('./load-game', () => ({
 
 jest.mock('./load-career', () => ({
   handler: (...args: [SQSEvent]) => mockCareerHandler(...args),
+}));
+
+jest.mock('./load-mlb-stats', () => ({
+  isMlbStatsMessage:
+    jest.requireActual<typeof import('./load-mlb-stats')>('./load-mlb-stats')
+      .isMlbStatsMessage,
+  handler: (...args: [SQSEvent]) => mockMlbStatsHandler(...args),
 }));
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -65,11 +73,27 @@ describe('stats-lambda router', () => {
     jest.clearAllMocks();
     mockGameHandler.mockResolvedValue({ batchItemFailures: [] });
     mockCareerHandler.mockResolvedValue({ batchItemFailures: [] });
+    mockMlbStatsHandler.mockReturnValue({ batchItemFailures: [] });
   });
 
   it('returns empty batchItemFailures for an empty event', async () => {
     const result = await handler(makeSqsEvent([]));
     expect(result.batchItemFailures).toEqual([]);
+    expect(mockGameHandler).not.toHaveBeenCalled();
+    expect(mockCareerHandler).not.toHaveBeenCalled();
+  });
+
+  it('routes mlb-player-stats messages to the mlb stats handler', async () => {
+    const body = JSON.stringify({
+      type: 'mlb-player-stats',
+      mlbPlayerId: 123,
+      season: 2024,
+    });
+    const event = makeSqsEvent([body]);
+
+    await handler(event);
+
+    expect(mockMlbStatsHandler).toHaveBeenCalledWith(event);
     expect(mockGameHandler).not.toHaveBeenCalled();
     expect(mockCareerHandler).not.toHaveBeenCalled();
   });

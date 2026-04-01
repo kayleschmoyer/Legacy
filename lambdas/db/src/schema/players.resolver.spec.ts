@@ -17,6 +17,7 @@ describe('players resolver', () => {
     getPlayers: jest.Mock;
     getPlayerById: jest.Mock;
     getPlayerByBrefId: jest.Mock;
+    getPlayerByMlbId: jest.Mock;
     searchPlayers: jest.Mock;
   };
   let mockDb: {
@@ -44,6 +45,7 @@ describe('players resolver', () => {
     firstName: 'Babe',
     lastName: 'Ruth',
     brefId: 'ruthba01',
+    mlbPlayerId: null,
     statsLastFetchedAt: null,
     scoring: null,
     allStarSelections: 0,
@@ -63,6 +65,7 @@ describe('players resolver', () => {
       getPlayers: jest.fn().mockResolvedValue([]),
       getPlayerById: jest.fn().mockResolvedValue(null),
       getPlayerByBrefId: jest.fn().mockResolvedValue(null),
+      getPlayerByMlbId: jest.fn().mockResolvedValue(null),
       searchPlayers: jest.fn().mockResolvedValue([]),
     };
 
@@ -405,5 +408,47 @@ describe('players resolver', () => {
     );
 
     expect(mockPlayersService.searchPlayers).toHaveBeenCalledWith('Ruth', 25);
+  });
+
+  // ── playerByMlbId ─────────────────────────────────────────────────────────
+
+  it('playerByMlbId: returns the player when found', async () => {
+    mockPlayersService.getPlayerByMlbId.mockResolvedValueOnce(MOCK_PLAYER);
+
+    const result = await getQueryResolver('playerByMlbId')(
+      {},
+      { mlbPlayerId: 543 },
+      mockContext,
+      undefined as never,
+    );
+
+    expect(result).toEqual(MOCK_PLAYER);
+    expect(mockPlayersService.getPlayerByMlbId).toHaveBeenCalledWith(543);
+  });
+
+  it('playerByMlbId: returns null when player is not found', async () => {
+    mockPlayersService.getPlayerByMlbId.mockResolvedValueOnce(null);
+
+    const result = await getQueryResolver('playerByMlbId')(
+      {},
+      { mlbPlayerId: 999 },
+      mockContext,
+      undefined as never,
+    );
+
+    expect(result).toBeNull();
+  });
+
+  // ── playerMlbStats ────────────────────────────────────────────────────────
+
+  it('playerMlbStats: returns null (stub resolver)', async () => {
+    const result = await getQueryResolver('playerMlbStats')(
+      {},
+      { mlbPlayerId: 543, season: 2024 },
+      mockContext,
+      undefined as never,
+    );
+
+    expect(result).toBeNull();
   });
 });

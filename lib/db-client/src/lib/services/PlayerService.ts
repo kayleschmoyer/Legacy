@@ -31,6 +31,7 @@ interface ScoringResultRow {
   world_series_rings: number | null;
   hall_of_fame: boolean | null;
   rookie_of_the_year: boolean | null;
+  mlb_player_id: number | null;
 }
 
 export interface PlayerFilters {
@@ -157,6 +158,21 @@ export class PlayerService {
         .select()
         .from(PublicSchema.players)
         .where(eq(PublicSchema.players.brefId, brefId))
+        .limit(1);
+
+      return results[0] || null;
+    });
+  }
+
+  /**
+   * Get a single player by MLB Stats API player ID
+   */
+  async getPlayerByMlbId(mlbPlayerId: number): Promise<Player | null> {
+    return runWithPublicClient(this.options, async (db) => {
+      const results = await db
+        .select()
+        .from(PublicSchema.players)
+        .where(eq(PublicSchema.players.mlbPlayerId, mlbPlayerId))
         .limit(1);
 
       return results[0] || null;
@@ -496,7 +512,7 @@ export class PlayerService {
             p.id, p.first_name, p.last_name, p.bref_id, p.stats_last_fetched_at,
             p.all_star_selections, p.gold_gloves, p.silver_sluggers,
             p.mvp_awards, p.cy_young_awards, p.world_series_rings,
-            p.hall_of_fame, p.rookie_of_the_year, p.total_games,
+            p.hall_of_fame, p.rookie_of_the_year, p.total_games, p.mlb_player_id,
             COALESCE(cs_league.batting_score, cs_default.batting_score, 0) AS batting_score,
             COALESCE(cs_league.pitching_score, cs_default.pitching_score, 0) AS pitching_score,
             COALESCE(cs_league.fielding_score, cs_default.fielding_score, 0) AS fielding_score,
@@ -549,6 +565,7 @@ export class PlayerService {
           hallOfFame: row.hall_of_fame ?? false,
           rookieOfTheYear: row.rookie_of_the_year ?? false,
           totalGames: row.total_games ?? 0,
+          mlbPlayerId: row.mlb_player_id ?? null,
           scoring: {
             playerId: row.id,
             battingScore: Number(row.batting_score) || 0,

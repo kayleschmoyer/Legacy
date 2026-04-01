@@ -1998,6 +1998,11 @@ type Player {
   lastName: String
 
   """
+  MLB Stats API player ID for cross-referencing with the external data provider. Null for players without a known mapping.
+  """
+  mlbPlayerId: Int
+
+  """
   The player's primary historical baseball era, derived from the midpoint of their MLB career. Values: Dead Ball Era | Golden Age | Expansion Era | Free Agency Era | Steroid Era | Modern Era
   """
   primaryEra: String
@@ -2415,9 +2420,19 @@ type Query {
   ): [OnThisDayEvent!]
   player(id: Int!): Player
   playerByBrefId(brefId: String!): Player
+
+  """
+  Look up a player by their MLB Stats API player ID. Returns null if no mapping exists.
+  """
+  playerByMlbId(mlbPlayerId: Int!): Player
   playerCareerBatting(playerId: Int!): CareerBatting
   playerCareerFielding(playerId: Int!): CareerFielding
   playerCareerPitching(playerId: Int!): CareerPitching
+
+  """
+  Fetch MLB season stats for a player from the external data provider. Stub resolver — full implementation added in LS-1864 via MlbDataProvider.
+  """
+  playerMlbStats(mlbPlayerId: Int!, season: Int!): String
   playerSeasonBatting(playerId: Int!, season: Int): [SeasonBatting!]
   playerSeasonFielding(playerId: Int!, season: Int): [SeasonFielding!]
   playerSeasonPitching(playerId: Int!, season: Int): [SeasonPitching!]

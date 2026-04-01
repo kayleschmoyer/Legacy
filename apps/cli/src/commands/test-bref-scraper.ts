@@ -45,6 +45,7 @@ async function main() {
     brefId: options.brefId,
     firstName: 'Test',
     lastName: 'Player',
+    mlbPlayerId: null,
     statsLastFetchedAt: null,
     allStarSelections: 0,
     goldGloves: 0,

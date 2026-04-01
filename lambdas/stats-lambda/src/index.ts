@@ -11,6 +11,10 @@ import {
 import { formatVersionInfo, getVersionInfo } from '@legacy-sports/utils/node';
 import { handler as careerHandler } from './load-career';
 import { handler as gameHandler } from './load-game';
+import {
+  isMlbStatsMessage,
+  handler as mlbStatsHandler,
+} from './load-mlb-stats';
 
 // Initialize Rollbar
 const rollbarConfig = getRollbarConfigFromEnv();
@@ -47,6 +51,12 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
     addBreadcrumb('Parsed message body', { bodyLength: body?.length });
 
     const firstMessage: unknown = JSON.parse(body);
+
+    // MLB provider stats messages have type: 'mlb-player-stats'
+    if (isMlbStatsMessage(firstMessage)) {
+      LOGGER.debug('Routing to MLB stats handler');
+      return mlbStatsHandler(event);
+    }
 
     // NEW: Matchup stats messages have matchupId and players array
     if (

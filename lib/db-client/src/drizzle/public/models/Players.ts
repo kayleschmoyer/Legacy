@@ -35,6 +35,9 @@ export const players = pgTable(
     // Precomputed sum of career batting + pitching games; maintained by the
     // data loader so eligibility filters can avoid correlated subqueries.
     totalGames: integer('total_games').notNull().default(0),
+    // MLB Stats API player ID for cross-referencing with the external data
+    // provider. Nullable — historical players may not have a mapping yet.
+    mlbPlayerId: integer('mlb_player_id'),
   },
   (table) => {
     return {
