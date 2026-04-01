@@ -5,7 +5,8 @@
 resource "aws_dynamodb_table" "websocket_connections" {
   name         = "${local.name_prefix}-websocket-connections"
   billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "connectionId"
+
+  hash_key = "connectionId"
 
   attribute {
     name = "connectionId"
@@ -29,14 +30,14 @@ resource "aws_dynamodb_table" "websocket_connections" {
 
   global_secondary_index {
     name            = "LeagueIdIndex"
-    hash_key        = "leagueId"
     projection_type = "ALL"
+    hash_key        = "leagueId"
   }
 
   global_secondary_index {
     name            = "MatchupIdIndex"
-    hash_key        = "matchupId"
     projection_type = "ALL"
+    hash_key        = "matchupId"
   }
 
   # UserIdIndex — enables efficient direct-message delivery:
@@ -44,8 +45,8 @@ resource "aws_dynamodb_table" "websocket_connections" {
   # connections belonging to a DM recipient.
   global_secondary_index {
     name            = "UserIdIndex"
-    hash_key        = "userId"
     projection_type = "KEYS_ONLY"
+    hash_key        = "userId"
   }
 
   ttl {

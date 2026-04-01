@@ -100,7 +100,8 @@ resource "aws_iam_role_policy_attachment" "oauth_proxy_lambda_rds" {
 resource "aws_dynamodb_table" "oauth_device_flows" {
   name         = "${local.name_prefix}-oauth-device-flows"
   billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "deviceCode"
+
+  hash_key = "deviceCode"
 
   attribute {
     name = "deviceCode"
@@ -114,8 +115,8 @@ resource "aws_dynamodb_table" "oauth_device_flows" {
 
   global_secondary_index {
     name            = "userCode-index"
-    hash_key        = "userCode"
     projection_type = "KEYS_ONLY"
+    hash_key        = "userCode"
   }
 
   ttl {
