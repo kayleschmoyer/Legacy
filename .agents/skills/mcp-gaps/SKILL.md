@@ -37,6 +37,14 @@ This skill enforces the **MCP-first principle** from AGENTS.md: shell commands a
 5. **Create** tickets for new gaps using the template in the reference doc
 6. **Audit overflows** — review MCP tool calls that exceeded token limits; classify as `agent-error`, `bad-default`, or `missing-parameter`
    6b. **Audit failures** — review MCP tool calls that returned errors (403, path bugs, timeouts, state loss, etc.); classify as `permission-gap`, `bug`, `config-issue`, or `expected-limitation`. **Do NOT dismiss failures as "environmental" or "known" without checking for an existing ticket first.**
+   6c. **Audit sweep logic gaps** (after any `sweep-prs` session) — review the sweep for incorrect assumptions or skipped verification steps that caused missed or incorrectly settled PRs:
+   - PRs that remained CONFLICTING after rebase — was mergeability actually checked (e.g., by locally merging the base branch into the PR branch and confirming no conflicts) or just assumed to be cache lag?
+   - Bot-authored PRs with Copilot `COMMENTED` reviews and 0 unresolved threads — was a fresh Copilot review re-requested?
+   - PRs where `statusCheckRollup` had < 3 entries — was a warning raised that CI may not have run on the current SHA?
+   - PRs labeled `merge-when-ready` but still showing `reviewDecision: null` — were they checked for the auto-approve chain?
+
+   For each gap found: check if a child ticket under LS-1455 already exists, file one if not (use gap type `missing-awareness` for doc-only fixes, `missing-feature` for behavioral fixes).
+
 7. **Report** findings to the user
 
 ---
