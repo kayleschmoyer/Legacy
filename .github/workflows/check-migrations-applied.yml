@@ -244,26 +244,37 @@ jobs:
             });
             const existingLabels = pr.labels.map(l => l.name);
 
-            if (checkResult === 'failure') {
-              if (!existingLabels.includes(label)) {
-                await github.rest.issues.addLabels({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: prNumber,
-                  labels: [label],
-                });
-                core.info(`Added label: ${label}`);
+            async function withRetry(fn, retries = 3) {
+              for (let i = 0; i < retries; i++) {
+                try { return await fn(); }
+                catch (e) {
+                  const isPrimaryRateLimit = e.status === 429;
+                  const isSecondaryRateLimit = e.status === 403 && /secondary rate limit/i.test(typeof e.message === 'string' ? e.message : '');
+                  if ((isPrimaryRateLimit || isSecondaryRateLimit) && i < retries - 1) {
+                    const delay = Math.pow(2, i) * 1000;
+                    core.warning(`Rate limited (${e.status}), retrying in ${delay}ms…`);
+                    await new Promise(r => setTimeout(r, delay));
+                  } else throw e;
+                }
               }
-            } else if (existingLabels.includes(label)) {
-              try {
-                await github.rest.issues.removeLabel({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: prNumber,
-                  name: label,
-                });
-                core.info(`Removed label: ${label}`);
-              } catch (e) {
-                // Label may have been removed already
-              }
+            }
+
+            const shouldHaveLabel = checkResult === 'failure';
+            const hasLabel = existingLabels.includes(label);
+            if (shouldHaveLabel && !hasLabel) {
+              await withRetry(() => github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                labels: [label],
+              }));
+              core.info(`Label added: ${label}`);
+            } else if (!shouldHaveLabel && hasLabel) {
+              await withRetry(() => github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                name: label,
+              }));
+              core.info(`Label removed: ${label}`);
             }
