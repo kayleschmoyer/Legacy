@@ -262,7 +262,19 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "secretsmanager:RestoreSecret"
         ]
         Resource = [
-          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${local.name_prefix}-*"
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${local.name_prefix}-*",
+          # Externally-managed secrets (one entry per secret in secrets.tf using ${var.environment}/ prefix).
+          # Secrets Manager appends a random 6-char suffix to all ARNs, hence the trailing wildcard.
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:dev/jwt-secret-key*",
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:dev/google-oauth-client-secret*",
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:dev/oauth-proxy/cookie-secret*",
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:dev/stripe-secret-key*",
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:dev/stripe-webhook-secret*",
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:dev/jira-credentials*",
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:dev/rollbar-webhook-secret*",
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:dev/discord-client-secret*",
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:dev/mlb-data-api-key*",
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:dev/discord-webhook-url*",
         ]
       },
       # S3 read permissions for Lambda deployment bucket
@@ -289,6 +301,18 @@ resource "aws_iam_role_policy" "github_actions_additional" {
         Resource = [
           "arn:aws:s3:::${local.name_prefix}-*",
           "arn:aws:s3:::legacy-sports-terraform-state"
+        ]
+      },
+      # S3 bucket-admin write permissions for Terraform apply (encryption, public access block, lifecycle)
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:PutEncryptionConfiguration",
+          "s3:PutBucketPublicAccessBlock",
+          "s3:PutLifecycleConfiguration"
+        ]
+        Resource = [
+          "arn:aws:s3:::${local.name_prefix}-ci-artifacts"
         ]
       },
       # VPC, EC2, and networking read permissions

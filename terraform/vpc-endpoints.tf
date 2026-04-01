@@ -71,8 +71,8 @@ resource "aws_vpc_endpoint" "secretsmanager" {
           "secretsmanager:ListSecretVersionIds",
         ]
         Resource = [
-          "arn:aws:secretsmanager:*:*:secret:${local.name_prefix}-*",
-          "arn:aws:secretsmanager:*:*:secret:dev/*",
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${local.name_prefix}-*",
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:dev/*",
         ]
       },
       {
@@ -91,12 +91,16 @@ resource "aws_vpc_endpoint" "secretsmanager" {
           "secretsmanager:PutResourcePolicy",
           "secretsmanager:DeleteResourcePolicy",
         ]
-        Resource = "arn:aws:secretsmanager:*:*:secret:${local.name_prefix}-*"
+        Resource = [
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${local.name_prefix}-*",
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:dev/*",
+        ]
         Condition = {
           ArnLike = {
             "aws:PrincipalArn" = [
               "arn:aws:iam::${local.account_id}:role/${local.name_prefix}-runner*",
               "arn:aws:iam::${local.account_id}:role/github-actions-oidc-*",
+              "arn:aws:iam::${local.account_id}:role/${local.name_prefix}-github-actions",
             ]
           }
         }
