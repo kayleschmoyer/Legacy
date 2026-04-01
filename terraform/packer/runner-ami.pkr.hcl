@@ -122,7 +122,7 @@ source "amazon-ebs" "runner" {
   # this size (runners also need the full SDK at runtime).
   launch_block_device_mappings {
     device_name           = "/dev/sda1"
-    volume_size           = 40
+    volume_size           = 60
     volume_type           = "gp3"
     delete_on_termination = true
   }
