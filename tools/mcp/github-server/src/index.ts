@@ -21,6 +21,7 @@ import { prScan } from './tools/pr-scan.js';
 import { rebasePR } from './tools/rebase-pr.js';
 import { replyToThread } from './tools/reply-to-thread.js';
 import { retriggerCheck } from './tools/retrigger-check.js';
+import { secretDelete } from './tools/secret-delete.js';
 import { secretList } from './tools/secret-list.js';
 import { setCommitStatus } from './tools/set-commit-status.js';
 import { secretSet } from './tools/secret-set.js';
@@ -724,6 +725,26 @@ server.tool(
   'List GitHub Actions secret names (not values) for the repository.',
   {},
   async () => secretList(),
+);
+
+// --- github_secret_delete ---
+server.tool(
+  'github_secret_delete',
+  'Delete a GitHub Actions secret from the repository.',
+  {
+    name: z
+      .string()
+      .trim()
+      .regex(
+        /^[A-Za-z_][A-Za-z0-9_]*$/,
+        'Secret name must start with a letter or underscore and contain only alphanumeric characters and underscores',
+      )
+      .refine((n) => !n.startsWith('GITHUB_'), {
+        message: 'Secret names cannot start with GITHUB_',
+      })
+      .describe('Secret name to delete'),
+  },
+  async (params) => secretDelete(params),
 );
 
 // --- github_secret_set ---
