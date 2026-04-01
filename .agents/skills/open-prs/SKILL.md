@@ -454,6 +454,38 @@ Report:
 
 ---
 
+## Final Validation Pass
+
+After all fix passes complete and before producing the final summary, run a single validation pass over every PR marked as "settled" this sweep. This is a lightweight re-scan — not a full pass — to catch cases where the sweep's own work invalidated an earlier settled state (e.g., a batch rebase took 30+ minutes during which new PRs merged to main).
+
+For each PR marked as settled in this sweep, verify:
+
+1. **If rebased this sweep**: confirm the branch is still based on the current base branch
+
+   ```
+   worktree_run({ command: "git fetch origin && git merge-base origin/<baseRefName> origin/<branch>" })
+   ```
+
+   Output must equal `git rev-parse origin/<baseRefName>`. If not → rebase again; update settled state.
+
+2. **If bot-authored with `merge-when-ready` label**: confirm `reviewDecision` is not `null`
+
+   ```
+   github_view_pr(number: <PR#>)
+   ```
+
+   If `reviewDecision` is `null` and, based on the latest `github_pr_dashboard` / `github_pr_batch_status` data, Copilot's last review is `COMMENTED` with 0 unresolved threads → re-request Copilot review via `github_request_review(number: <PR#>)`.
+
+3. **If CI appears not to have run** (e.g., `statusCheckRollup` is empty, has fewer than 3 entries, _or_ the dashboard-computed CI status / `summarizeCIStatus` reports `ciStatus === "none"`): flag as "CI may not have run", then:
+   - Use `ci_list_runs` to discover the latest run (if any) for the PR's branch.
+   - Dispatch the CI orchestrator via `ci_rerun(runId: <latest-run-id>, failedOnly: false)` as appropriate.
+
+4. **If stale CI failure labels exist** (any `CI:`-prefixed failure labels present: `CI: Lint Failure`, `CI: Type Error`, `CI: Test Failure`, `CI: Build Failure`, `CI: E2E Failure`, `CI: Schema Drift`, `CI: Migration`, `CI: Security`, `CI: Quality Gates`) but the corresponding check(s) now pass: compute the subset that are both currently applied and stale, then strip only those via `github_manage_labels(number: <PR#>, remove: [<stale-labels-only>])`.
+
+This pass runs **once at the end of the sweep**, not in the per-PR loop, to keep it lightweight. If any PR requires another rebase or re-review, update the final summary accordingly.
+
+---
+
 # Cloud Agent Mode
 
 Cloud agents (Copilot Coding Agent) cannot commit or push code. This section covers the full cloud-compatible workflow: scan, triage, take all API-only actions, and produce an actionable report for items that need a local agent.
