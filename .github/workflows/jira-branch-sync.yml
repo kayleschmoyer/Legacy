@@ -10,6 +10,17 @@ name: "Jira Branch Sync"
 #   PR closed + merged                   → Done
 #   PR closed without merging            → In Progress
 #
+# Ticket key extraction (from branch/title/body, combined and deduped):
+#   - Branch name — all LS-#### matches (e.g. LS-1234/description → LS-1234)
+#   - PR title — all LS-#### matches (PR events only)
+#   - PR body — all LS-#### matches (PR events only)
+#   All discovered keys are merged, normalized, sorted, and deduplicated
+#   before transitions are applied.
+#
+# Multi-ticket branches (e.g. claude/ls818-wvV62) are supported via branch
+# name and PR title/body parsing. Include all LS-#### keys in any of these
+# locations to ensure every associated ticket is transitioned automatically.
+#
 # Independently of whether the child ticket transition succeeded or was
 # skipped, the workflow also syncs the parent epic status (if any) based
 # on the aggregate state of all its children:
@@ -29,6 +40,7 @@ on:
     branches:
       - "LS-*/**"
       - "LS-*/*"
+      - "claude/**"
   pull_request:
     types: [opened, reopened, closed]
 
@@ -57,21 +69,36 @@ jobs:
           echo "Branch: $BRANCH"
 
       # -----------------------------------------------------------------------
-      # 2. Extract Jira ticket key (LS-####) from branch name
+      # 2. Extract Jira ticket keys (LS-####) from branch name and PR metadata
       # -----------------------------------------------------------------------
-      - name: Extract ticket key
+      - name: Extract ticket keys
         id: ticket
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
         run: |
           BRANCH="${{ steps.branch.outputs.name }}"
-          KEY=$(echo "$BRANCH" | grep -oP 'LS-\d+' | head -1)
 
-          if [[ -z "$KEY" ]]; then
-            echo "⏭️  No Jira ticket key found in branch '$BRANCH' — skipping."
+          # Extract all LS-#### keys from branch name
+          BRANCH_KEYS=$(echo "$BRANCH" | grep -oiP 'LS-\d+' | tr '[:lower:]' '[:upper:]' || true)
+
+          # For PR events, also extract from PR title and body
+          PR_KEYS=""
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            PR_KEYS=$(printf '%s\n%s' "$PR_TITLE" "$PR_BODY" | grep -oiP 'LS-\d+' | tr '[:lower:]' '[:upper:]' || true)
+          fi
+
+          # Combine and deduplicate all keys
+          ALL_KEYS=$(printf '%s\n%s' "$BRANCH_KEYS" "$PR_KEYS" \
+            | grep -E '^LS-[0-9]+$' | sort -u | tr '\n' ' ' | xargs)
+
+          if [[ -z "$ALL_KEYS" ]]; then
+            echo "⏭️  No Jira ticket keys found in branch '$BRANCH' or PR metadata — skipping."
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
-            echo "key=$KEY" >> "$GITHUB_OUTPUT"
+            echo "keys=$ALL_KEYS" >> "$GITHUB_OUTPUT"
             echo "skip=false" >> "$GITHUB_OUTPUT"
-            echo "Ticket: $KEY"
+            echo "Tickets: $ALL_KEYS"
           fi
 
       # -----------------------------------------------------------------------
@@ -286,124 +313,86 @@ jobs:
           echo "✅ Jira API retry helper defined"
 
       # -----------------------------------------------------------------------
-      # 5. Fetch available transitions and find the ID for our target
+      # 5. Transition all extracted ticket keys to the target status
       # -----------------------------------------------------------------------
-      - name: Get available transitions
-        id: transitions
-        if: steps.ticket.outputs.skip != 'true' && steps.guard.outputs.skip != 'true'
-        env:
-          TICKET: ${{ steps.ticket.outputs.key }}
-          TARGET: ${{ steps.target.outputs.transition }}
-        run: |
-          source /tmp/jira-api.sh
-
-          RESPONSE=$(jira_api GET "$JIRA_API_BASE/rest/api/3/issue/$TICKET/transitions") || {
-            echo "❌ Failed to fetch transitions for $TICKET"
-            exit 1
-          }
-
-          TRANSITION_ID=$(echo "$RESPONSE" | jq -r --arg t "$TARGET" \
-            '.transitions[] | select(.name == $t) | .id' | head -1)
-
-          if [[ -z "$TRANSITION_ID" ]]; then
-            echo "⚠️  Transition '$TARGET' is not available for $TICKET."
-            echo "Available: $(echo "$RESPONSE" | jq -r '[.transitions[].name] | join(", ")')"
-            echo "id=" >> "$GITHUB_OUTPUT"
-          else
-            echo "id=$TRANSITION_ID" >> "$GITHUB_OUTPUT"
-            echo "Found transition ID $TRANSITION_ID for '$TARGET'"
-          fi
-
-      # -----------------------------------------------------------------------
-      # 6. Apply the transition
-      # -----------------------------------------------------------------------
-      - name: Apply Jira transition
+      - name: Apply Jira transitions
         id: apply
-        if: steps.transitions.outputs.id != ''
+        if: steps.ticket.outputs.skip != 'true' && steps.guard.outputs.skip != 'true'
         env:
-          TICKET: ${{ steps.ticket.outputs.key }}
-          TRANSITION_ID: ${{ steps.transitions.outputs.id }}
+          KEYS: ${{ steps.ticket.outputs.keys }}
           TARGET: ${{ steps.target.outputs.transition }}
         run: |
           source /tmp/jira-api.sh
 
-          jira_api POST "$JIRA_API_BASE/rest/api/3/issue/$TICKET/transitions" \
-            "{\"transition\":{\"id\":\"$TRANSITION_ID\"}}" > /dev/null && {
-            echo "✅ $TICKET → $TARGET"
-            echo "success=true" >> "$GITHUB_OUTPUT"
-          } || {
-            echo "❌ Failed to transition $TICKET to '$TARGET' after retries"
+          FAILED_TICKETS=""
+          for TICKET in $KEYS; do
+            echo "--- $TICKET → $TARGET ---"
+
+            RESPONSE=$(jira_api GET "$JIRA_API_BASE/rest/api/3/issue/$TICKET/transitions") || {
+              echo "❌ Failed to fetch transitions for $TICKET"
+              FAILED_TICKETS="$FAILED_TICKETS $TICKET"
+              continue
+            }
+
+            TRANSITION_ID=$(echo "$RESPONSE" | jq -r --arg t "$TARGET" \
+              '.transitions[] | select(.name == $t) | .id' | head -1)
+
+            if [[ -z "$TRANSITION_ID" ]]; then
+              echo "⚠️  Transition '$TARGET' is not available for $TICKET."
+              echo "Available: $(echo "$RESPONSE" | jq -r '[.transitions[].name] | join(", ")')"
+              continue
+            fi
+
+            if jira_api POST "$JIRA_API_BASE/rest/api/3/issue/$TICKET/transitions" \
+              "{\"transition\":{\"id\":\"$TRANSITION_ID\"}}" > /dev/null; then
+              echo "✅ $TICKET → $TARGET"
+            else
+              echo "❌ Failed to transition $TICKET to '$TARGET' after retries"
+              FAILED_TICKETS="$FAILED_TICKETS $TICKET"
+            fi
+          done
+
+          if [[ -n "$FAILED_TICKETS" ]]; then
+            echo "❌ Some tickets failed to transition:$FAILED_TICKETS"
             exit 1
-          }
+          fi
 
       # -----------------------------------------------------------------------
-      # 7. Fetch parent epic (if any)
+      # 6. Sync parent epics for all transitioned tickets
       # -----------------------------------------------------------------------
-      - name: Fetch parent epic
-        id: epic
+      - name: Sync parent epics
         if: steps.ticket.outputs.skip != 'true' && steps.guard.outputs.skip != 'true'
         env:
-          TICKET: ${{ steps.ticket.outputs.key }}
+          KEYS: ${{ steps.ticket.outputs.keys }}
         run: |
           source /tmp/jira-api.sh
 
-          RESPONSE=$(jira_api GET "$JIRA_API_BASE/rest/api/3/issue/$TICKET?fields=parent") || {
-            echo "⚠️  Could not fetch ticket $TICKET details — skipping epic sync."
-            echo "skip=true" >> "$GITHUB_OUTPUT"
+          # Collect unique parent epic keys across all tickets
+          EPIC_KEYS=""
+          for TICKET in $KEYS; do
+            RESPONSE=$(jira_api GET "$JIRA_API_BASE/rest/api/3/issue/$TICKET?fields=parent") || {
+              echo "⚠️  Could not fetch ticket $TICKET details — skipping epic sync for this ticket."
+              continue
+            }
+
+            PARENT_KEY=$(echo "$RESPONSE" | jq -r '.fields.parent.key // empty')
+            PARENT_TYPE=$(echo "$RESPONSE" | jq -r '.fields.parent.fields.issuetype.name // empty')
+
+            if [[ -z "$PARENT_KEY" ]]; then
+              echo "ℹ️  $TICKET has no parent — skipping."
+            elif [[ "$PARENT_TYPE" != "Epic" ]]; then
+              echo "ℹ️  $TICKET parent ($PARENT_KEY) is type '$PARENT_TYPE', not Epic — skipping."
+            else
+              EPIC_KEYS=$(printf '%s\n%s' "$EPIC_KEYS" "$PARENT_KEY" | grep -v '^$' | sort -u)
+              echo "Parent epic for $TICKET: $PARENT_KEY"
+            fi
+          done
+
+          if [[ -z "$EPIC_KEYS" ]]; then
+            echo "ℹ️  No parent epics found — skipping epic sync."
             exit 0
-          }
-
-          PARENT_KEY=$(echo "$RESPONSE" | jq -r '.fields.parent.key // empty')
-          PARENT_TYPE=$(echo "$RESPONSE" | jq -r '.fields.parent.fields.issuetype.name // empty')
-
-          if [[ -z "$PARENT_KEY" ]]; then
-            echo "ℹ️  $TICKET has no parent — skipping epic sync."
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          elif [[ "$PARENT_TYPE" != "Epic" ]]; then
-            echo "ℹ️  $TICKET parent ($PARENT_KEY) is type '$PARENT_TYPE', not Epic — skipping."
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "key=$PARENT_KEY" >> "$GITHUB_OUTPUT"
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-            echo "Parent epic: $PARENT_KEY"
           fi
 
-      # -----------------------------------------------------------------------
-      # 7b. Check if epic has "pinned-status" label (skip sync if so)
-      # -----------------------------------------------------------------------
-      - name: Check epic pinned-status label
-        id: epic-pinned
-        if: steps.epic.outputs.skip == 'false'
-        env:
-          EPIC_KEY: ${{ steps.epic.outputs.key }}
-        run: |
-          source /tmp/jira-api.sh
-
-          RESPONSE=$(jira_api GET "$JIRA_API_BASE/rest/api/3/issue/$EPIC_KEY?fields=labels") || {
-            echo "⚠️  Could not fetch labels for $EPIC_KEY — proceeding with sync."
-            echo "pinned=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          }
-
-          LABELS=$(echo "$RESPONSE" | jq -r '.fields.labels[]? // empty')
-          echo "Epic $EPIC_KEY labels: $LABELS"
-
-          if echo "$LABELS" | grep -qx "pinned-status"; then
-            echo "🔒 Epic $EPIC_KEY has 'pinned-status' label — skipping auto-sync."
-            echo "pinned=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "pinned=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      # -----------------------------------------------------------------------
-      # 8. Determine correct epic status from all children
-      # -----------------------------------------------------------------------
-      - name: Determine epic target status
-        id: epic-status
-        if: steps.epic.outputs.skip == 'false' && steps.epic-pinned.outputs.pinned != 'true'
-        env:
-          EPIC_KEY: ${{ steps.epic.outputs.key }}
-        run: |
           # Debounce: when a parent PR merges, the merge queue retargets
           # dependent PRs to main. This fires new pull_request events,
           # triggering concurrent jira-branch-sync runs. Both the parent's
@@ -413,149 +402,125 @@ jobs:
           echo "⏳ Waiting 10s for concurrent ticket transitions to settle..."
           sleep 10
 
-          source /tmp/jira-api.sh
+          # Sync each unique parent epic
+          for EPIC_KEY in $EPIC_KEYS; do
+            echo "--- Syncing epic $EPIC_KEY ---"
 
-          # Fetch all children of the epic via JQL search (paginated)
-          ENCODED_JQL=$(echo -n "parent=$EPIC_KEY" | jq -sRr @uri)
-          ALL_STATUSES=""
-          START_AT=0
-          PAGE_SIZE=200
+            # Check for pinned-status label
+            LABEL_RESPONSE=$(jira_api GET "$JIRA_API_BASE/rest/api/3/issue/$EPIC_KEY?fields=labels") || {
+              echo "⚠️  Could not fetch labels for $EPIC_KEY — proceeding with sync."
+              LABEL_RESPONSE=""
+            }
+            LABELS=$(echo "$LABEL_RESPONSE" | jq -r '.fields.labels[]? // empty' 2>/dev/null || true)
 
-          while true; do
-            RESPONSE=$(jira_api GET "$JIRA_API_BASE/rest/api/3/search?jql=$ENCODED_JQL&fields=status&maxResults=$PAGE_SIZE&startAt=$START_AT") || {
-              echo "⚠️  Could not fetch children of $EPIC_KEY — skipping epic sync."
-              echo "skip=true" >> "$GITHUB_OUTPUT"
-              exit 0
+            if echo "$LABELS" | grep -qx "pinned-status"; then
+              echo "🔒 Epic $EPIC_KEY has 'pinned-status' label — skipping auto-sync."
+              continue
+            fi
+
+            # Fetch all children of the epic via JQL search (paginated)
+            ENCODED_JQL=$(echo -n "parent=$EPIC_KEY" | jq -sRr @uri)
+            ALL_STATUSES=""
+            START_AT=0
+            PAGE_SIZE=200
+            TOTAL=0
+
+            while true; do
+              CHILD_RESPONSE=$(jira_api GET "$JIRA_API_BASE/rest/api/3/search?jql=$ENCODED_JQL&fields=status&maxResults=$PAGE_SIZE&startAt=$START_AT") || {
+                echo "⚠️  Could not fetch children of $EPIC_KEY — skipping epic sync."
+                break
+              }
+
+              TOTAL=$(echo "$CHILD_RESPONSE" | jq -r '.total')
+              PAGE_STATUSES=$(echo "$CHILD_RESPONSE" | jq -r '.issues[].fields.status.name')
+              FETCHED=$(echo "$CHILD_RESPONSE" | jq -r '.issues | length')
+
+              ALL_STATUSES=$(printf '%s\n%s' "$ALL_STATUSES" "$PAGE_STATUSES" | grep -v '^$')
+
+              START_AT=$((START_AT + FETCHED))
+              if [[ "$START_AT" -ge "$TOTAL" ]]; then
+                break
+              fi
+            done
+
+            if [[ "$TOTAL" == "0" ]]; then
+              echo "ℹ️  Epic $EPIC_KEY has no children — skipping."
+              continue
+            fi
+
+            echo "Children ($TOTAL):"
+            echo "$ALL_STATUSES" | sort | uniq -c
+
+            # Classify aggregate status
+            ALL_DONE=true
+            ALL_REVIEW_OR_DONE=true
+            ANY_ACTIVE=false
+
+            while IFS= read -r STATUS; do
+              [[ -z "$STATUS" ]] && continue
+              case "$STATUS" in
+                "Done")
+                  ANY_ACTIVE=true
+                  ;;
+                "In Review")
+                  ANY_ACTIVE=true
+                  ALL_DONE=false
+                  ;;
+                "In Progress")
+                  ANY_ACTIVE=true
+                  ALL_DONE=false
+                  ALL_REVIEW_OR_DONE=false
+                  ;;
+                *)
+                  # Any other status (To Do, Backlog, etc.)
+                  ALL_DONE=false
+                  ALL_REVIEW_OR_DONE=false
+                  ;;
+              esac
+            done <<< "$ALL_STATUSES"
+
+            if [[ "$ALL_DONE" == "true" ]]; then
+              EPIC_TARGET="Done"
+            elif [[ "$ALL_REVIEW_OR_DONE" == "true" ]]; then
+              EPIC_TARGET="In Review"
+            elif [[ "$ANY_ACTIVE" == "true" ]]; then
+              EPIC_TARGET="In Progress"
+            else
+              echo "ℹ️  No children are active yet — epic $EPIC_KEY stays as-is."
+              continue
+            fi
+
+            # Skip if epic is already at the target status
+            CURRENT_RESPONSE=$(jira_api GET "$JIRA_API_BASE/rest/api/3/issue/$EPIC_KEY?fields=status") || {
+              echo "⚠️  Could not fetch epic $EPIC_KEY status — skipping."
+              continue
             }
 
-            TOTAL=$(echo "$RESPONSE" | jq -r '.total')
-            PAGE_STATUSES=$(echo "$RESPONSE" | jq -r '.issues[].fields.status.name')
-            FETCHED=$(echo "$RESPONSE" | jq -r '.issues | length')
+            CURRENT=$(echo "$CURRENT_RESPONSE" | jq -r '.fields.status.name')
+            echo "Epic $EPIC_KEY is currently: $CURRENT (target: $EPIC_TARGET)"
 
-            if [[ -n "$ALL_STATUSES" ]]; then
-              ALL_STATUSES=$(printf '%s\n%s' "$ALL_STATUSES" "$PAGE_STATUSES")
-            else
-              ALL_STATUSES="$PAGE_STATUSES"
+            if [[ "$CURRENT" == "$EPIC_TARGET" ]]; then
+              echo "ℹ️  Epic already at '$EPIC_TARGET' — no transition needed."
+              continue
             fi
 
-            START_AT=$((START_AT + FETCHED))
-            if [[ "$START_AT" -ge "$TOTAL" ]]; then
-              break
+            # Fetch available transitions and apply (non-fatal — epic sync is best-effort)
+            TRANS_RESPONSE=$(jira_api GET "$JIRA_API_BASE/rest/api/3/issue/$EPIC_KEY/transitions") || {
+              echo "⚠️  Could not fetch transitions for $EPIC_KEY — skipping."
+              continue
+            }
+
+            TRANSITION_ID=$(echo "$TRANS_RESPONSE" | jq -r --arg t "$EPIC_TARGET" \
+              '.transitions[] | select(.name == $t) | .id' | head -1)
+
+            if [[ -z "$TRANSITION_ID" ]]; then
+              echo "⚠️  Transition '$EPIC_TARGET' not available for epic $EPIC_KEY."
+              echo "Available: $(echo "$TRANS_RESPONSE" | jq -r '[.transitions[].name] | join(", ")')"
+              continue
             fi
+
+            jira_api POST "$JIRA_API_BASE/rest/api/3/issue/$EPIC_KEY/transitions" \
+              "{\"transition\":{\"id\":\"$TRANSITION_ID\"}}" > /dev/null && \
+              echo "✅ Epic $EPIC_KEY → $EPIC_TARGET" || \
+              echo "⚠️  Failed to transition epic $EPIC_KEY to '$EPIC_TARGET' after retries"
           done
-
-          if [[ "$TOTAL" == "0" ]]; then
-            echo "ℹ️  Epic $EPIC_KEY has no children — skipping."
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          # Extract all child statuses
-          STATUSES="$ALL_STATUSES"
-
-          echo "Children ($TOTAL):"
-          echo "$STATUSES" | sort | uniq -c
-
-          # Classify aggregate status
-          ALL_DONE=true
-          ALL_REVIEW_OR_DONE=true
-          ANY_ACTIVE=false
-
-          while IFS= read -r STATUS; do
-            case "$STATUS" in
-              "Done")
-                ANY_ACTIVE=true
-                ;;
-              "In Review")
-                ANY_ACTIVE=true
-                ALL_DONE=false
-                ;;
-              "In Progress")
-                ANY_ACTIVE=true
-                ALL_DONE=false
-                ALL_REVIEW_OR_DONE=false
-                ;;
-              *)
-                # Any other status (To Do, Backlog, etc.)
-                ALL_DONE=false
-                ALL_REVIEW_OR_DONE=false
-                ;;
-            esac
-          done <<< "$STATUSES"
-
-          if [[ "$ALL_DONE" == "true" ]]; then
-            echo "transition=Done" >> "$GITHUB_OUTPUT"
-          elif [[ "$ALL_REVIEW_OR_DONE" == "true" ]]; then
-            echo "transition=In Review" >> "$GITHUB_OUTPUT"
-          elif [[ "$ANY_ACTIVE" == "true" ]]; then
-            echo "transition=In Progress" >> "$GITHUB_OUTPUT"
-          else
-            echo "ℹ️  No children are active yet — epic stays as-is."
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          echo "skip=false" >> "$GITHUB_OUTPUT"
-          echo "Epic target: $(grep transition "$GITHUB_OUTPUT" | cut -d= -f2-)"
-
-      # -----------------------------------------------------------------------
-      # 9. Skip if epic is already at the target status
-      # -----------------------------------------------------------------------
-      - name: Check epic current status
-        id: epic-current
-        if: steps.epic-pinned.outputs.pinned != 'true' && steps.epic-status.outputs.skip == 'false'
-        env:
-          EPIC_KEY: ${{ steps.epic.outputs.key }}
-          TARGET: ${{ steps.epic-status.outputs.transition }}
-        run: |
-          source /tmp/jira-api.sh
-
-          RESPONSE=$(jira_api GET "$JIRA_API_BASE/rest/api/3/issue/$EPIC_KEY?fields=status") || {
-            echo "⚠️  Could not fetch epic $EPIC_KEY status — skipping."
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          }
-
-          CURRENT=$(echo "$RESPONSE" | jq -r '.fields.status.name')
-          echo "Epic $EPIC_KEY is currently: $CURRENT (target: $TARGET)"
-
-          if [[ "$CURRENT" == "$TARGET" ]]; then
-            echo "ℹ️  Epic already at '$TARGET' — no transition needed."
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      # -----------------------------------------------------------------------
-      # 10. Transition the epic (non-fatal — epic sync is best-effort)
-      # -----------------------------------------------------------------------
-      - name: Transition epic
-        if: steps.epic-pinned.outputs.pinned != 'true' && steps.epic-current.outputs.skip == 'false'
-        env:
-          EPIC_KEY: ${{ steps.epic.outputs.key }}
-          TARGET: ${{ steps.epic-status.outputs.transition }}
-        run: |
-          source /tmp/jira-api.sh
-
-          # Fetch available transitions for the epic
-          RESPONSE=$(jira_api GET "$JIRA_API_BASE/rest/api/3/issue/$EPIC_KEY/transitions") || {
-            echo "⚠️  Could not fetch transitions for $EPIC_KEY — skipping."
-            exit 0
-          }
-
-          TRANSITION_ID=$(echo "$RESPONSE" | jq -r --arg t "$TARGET" \
-            '.transitions[] | select(.name == $t) | .id' | head -1)
-
-          if [[ -z "$TRANSITION_ID" ]]; then
-            echo "⚠️  Transition '$TARGET' not available for epic $EPIC_KEY."
-            echo "Available: $(echo "$RESPONSE" | jq -r '[.transitions[].name] | join(", ")')"
-            exit 0
-          fi
-
-          jira_api POST "$JIRA_API_BASE/rest/api/3/issue/$EPIC_KEY/transitions" \
-            "{\"transition\":{\"id\":\"$TRANSITION_ID\"}}" > /dev/null && {
-            echo "✅ Epic $EPIC_KEY → $TARGET"
-          } || {
-            echo "⚠️  Failed to transition epic $EPIC_KEY to '$TARGET' after retries"
-            # Non-fatal: epic sync is best-effort and should not fail the workflow
-          }
