@@ -56,7 +56,7 @@ runs:
           --arg color  "${COLOR}" \
           '{
             schemaVersion: 1,
-            label:  $label,
+            "label":  $label,
             message: $msg,
             color:  $color,
             cacheSeconds: 300,
