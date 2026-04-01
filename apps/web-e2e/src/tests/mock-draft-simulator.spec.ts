@@ -7,6 +7,7 @@
  */
 
 import { expect, test } from '../fixtures/auth-enhanced';
+import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -155,7 +156,7 @@ async function setupGraphQL(page: import('@playwright/test').Page) {
         body: JSON.stringify({ data: { draftTeamOrder: [] } }),
       });
     } else {
-      await route.fallback();
+      await unmockedGraphQLFallback(route);
     }
   });
 }

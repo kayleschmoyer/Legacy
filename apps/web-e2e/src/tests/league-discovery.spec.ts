@@ -18,6 +18,7 @@
 
 import { expect } from '../fixtures/auth-enhanced';
 import { test } from '../fixtures/auth';
+import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 import { LeaguePage } from '../pages/league.page';
 import {
   joinPublicLeagueResponse,
@@ -51,7 +52,7 @@ async function routeGraphQL(
         return;
       }
     }
-    await route.fallback();
+    await unmockedGraphQLFallback(route);
   });
 }
 
@@ -435,7 +436,7 @@ test.describe('League Discovery — filters @regression', () => {
         });
         return;
       }
-      await route.fallback();
+      await unmockedGraphQLFallback(route);
     });
 
     const lp = new LeaguePage(page);

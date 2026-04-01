@@ -13,6 +13,7 @@
  */
 
 import { expect, test } from '../fixtures/auth-enhanced';
+import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -261,7 +262,7 @@ async function setupGraphQL(
       });
     } else {
       // Defer unknown GraphQL operations to baseline mocks so unmocked ops are detected reliably
-      await route.fallback();
+      await unmockedGraphQLFallback(route);
     }
   });
 }

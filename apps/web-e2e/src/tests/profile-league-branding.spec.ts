@@ -17,6 +17,7 @@
  */
 
 import { expect, test } from '../fixtures/auth-enhanced';
+import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 import { LeaguePage } from '../pages/league.page';
 import { updateLeagueBrandingResponse } from '../mocks/graphql/league.mocks';
 
@@ -426,7 +427,7 @@ test.describe('League Branding — Color Customization @regression', () => {
           ),
         });
       } else {
-        await route.fallback();
+        await unmockedGraphQLFallback(route);
       }
     });
 

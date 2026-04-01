@@ -11,6 +11,7 @@
 
 import { expect } from '../fixtures/auth-enhanced';
 import { test } from '../fixtures/auth';
+import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 
 /** URL predicate that matches GraphQL API endpoints but not source file imports */
 function isGraphQLEndpoint(url: URL): boolean {
@@ -116,7 +117,7 @@ test.describe('League Creation @critical', () => {
         });
       } else {
         // Let auth fixture handle other GraphQL queries
-        await route.fallback();
+        await unmockedGraphQLFallback(route);
       }
     });
 
@@ -167,7 +168,7 @@ test.describe('League Creation @critical', () => {
         });
       } else {
         // Let auth fixture handle other GraphQL queries
-        await route.fallback();
+        await unmockedGraphQLFallback(route);
       }
     });
 
@@ -383,7 +384,7 @@ test.describe('League Creation @critical', () => {
         });
       } else {
         // Let auth fixture handle other GraphQL queries
-        await route.fallback();
+        await unmockedGraphQLFallback(route);
       }
     });
 

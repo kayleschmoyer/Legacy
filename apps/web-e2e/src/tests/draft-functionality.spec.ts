@@ -37,7 +37,7 @@ test.describe('Draft Status Web UI Tests @critical', () => {
 
     await page.route(
       (url) => url.toString().includes('/graphql'),
-      (route) => {
+      async (route) => {
         const postData = route.request().postData()?.toLowerCase() ?? '';
 
         if (postData.includes('initializedraft')) {
@@ -62,8 +62,8 @@ test.describe('Draft Status Web UI Tests @critical', () => {
             body: JSON.stringify(leagueByIdResponse({ draftStatus })),
           });
         } else {
-          // Let other operations fall through to baseline/auth fixtures
-          void route.fallback();
+          // Let other operations cascade to the auth fixture's baseline mocks
+          await route.fallback();
         }
       },
     );

@@ -18,6 +18,7 @@ import {
   createCustomAuthTest,
   expect,
 } from '../fixtures/auth-enhanced';
+import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -105,7 +106,7 @@ async function mockAdminGraphQL(page: import('@playwright/test').Page) {
       } else {
         // Fall through to the baseline _apiIsolation fixture for ambient
         // queries (getUnreadNotificationCount, getUserById, etc.)
-        await route.fallback();
+        await unmockedGraphQLFallback(route);
       }
     },
   );

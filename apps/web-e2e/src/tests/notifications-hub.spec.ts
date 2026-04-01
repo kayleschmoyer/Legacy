@@ -11,6 +11,7 @@
  */
 
 import { expect, test } from '../fixtures/auth-enhanced';
+import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 
 /** URL predicate for the GraphQL API endpoint */
 function isGraphQLEndpoint(url: URL): boolean {
@@ -178,7 +179,7 @@ async function mockNotificationsGraphQL(
         }),
       });
     } else {
-      await route.fallback();
+      await unmockedGraphQLFallback(route);
     }
   });
 }
@@ -303,7 +304,7 @@ test.describe('Notifications Hub – empty state @regression', () => {
           }),
         });
       } else {
-        await route.fallback();
+        await unmockedGraphQLFallback(route);
       }
     });
 
@@ -341,7 +342,7 @@ test.describe('Notifications Hub – mark as read @regression', () => {
           }),
         });
       } else {
-        await route.fallback();
+        await unmockedGraphQLFallback(route);
       }
     });
 
@@ -387,7 +388,7 @@ test.describe('Notifications Hub – mark as read @regression', () => {
           }),
         });
       } else {
-        await route.fallback();
+        await unmockedGraphQLFallback(route);
       }
     });
 

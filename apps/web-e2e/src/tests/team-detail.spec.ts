@@ -10,6 +10,7 @@
 
 import { expect } from '../fixtures/auth-enhanced';
 import { test } from '../fixtures/auth-enhanced';
+import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -178,7 +179,7 @@ async function setupGraphQL(
         body: JSON.stringify({ data: { teamAssistantSettings: null } }),
       });
     } else {
-      await route.fallback();
+      await unmockedGraphQLFallback(route);
     }
   });
 }
@@ -309,7 +310,7 @@ test.describe('Team Detail Page – roster @regression', () => {
             }),
           });
         } else {
-          await route.fallback();
+          await unmockedGraphQLFallback(route);
         }
       },
     );

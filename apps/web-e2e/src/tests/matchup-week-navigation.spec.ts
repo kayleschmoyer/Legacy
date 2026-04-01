@@ -10,6 +10,7 @@
  */
 
 import { createCustomAuthTest, expect, test } from '../fixtures/auth-enhanced';
+import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -399,7 +400,7 @@ async function mockMatchupGraphQL(
         });
       } else {
         // Let unknown operations fall back to the baseline mocks
-        await route.fallback();
+        await unmockedGraphQLFallback(route);
       }
     },
   );

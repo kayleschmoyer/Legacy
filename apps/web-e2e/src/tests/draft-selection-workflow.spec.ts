@@ -1,4 +1,5 @@
 import { expect, test } from '../fixtures/auth-enhanced';
+import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 import {
   getAvailableDraftPlayersResponse,
   getCurrentDraftPickResponse,
@@ -412,7 +413,7 @@ async function setupDraftRoute(
 
       // Fall through to the baseline _apiIsolation fixture for ambient
       // queries (getUnreadNotificationCount, getUserById, etc.)
-      await route.fallback();
+      await unmockedGraphQLFallback(route);
     },
   );
 
@@ -553,7 +554,7 @@ test.describe('Draft Selection Workflow @regression', () => {
       async (route) => {
         const postData = route.request().postData();
         if (!postData) {
-          await route.fallback();
+          await unmockedGraphQLFallback(route);
           return;
         }
 
@@ -574,7 +575,7 @@ test.describe('Draft Selection Workflow @regression', () => {
         }
 
         // For all other operations, delegate to the base route
-        await route.fallback();
+        await unmockedGraphQLFallback(route);
       },
     );
 

@@ -11,6 +11,7 @@
  */
 
 import { expect, test } from '../fixtures/auth-enhanced';
+import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -453,8 +454,8 @@ async function setupGraphQL(
       return;
     }
 
-    // ── Fallback — let baseline mocks handle it ──────────────────
-    await route.fallback();
+    // ── Fallback — surface any unmocked operation as a diagnostic error ──
+    await unmockedGraphQLFallback(route);
   });
 }
 

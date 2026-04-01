@@ -15,6 +15,7 @@
 
 import { expect } from '../fixtures/auth-enhanced';
 import { test } from '../fixtures/auth-enhanced';
+import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function isGraphQLEndpoint(url: URL): boolean {
@@ -214,7 +215,7 @@ async function setupCommissionerGraphQL(
       } else {
         // Fall through to the baseline _apiIsolation fixture for ambient
         // queries (getUnreadNotificationCount, getUserById, etc.)
-        await route.fallback();
+        await unmockedGraphQLFallback(route);
       }
     },
   );

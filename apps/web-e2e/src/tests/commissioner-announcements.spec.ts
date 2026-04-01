@@ -7,6 +7,7 @@
  */
 
 import { createCustomAuthTest, expect, test } from '../fixtures/auth-enhanced';
+import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 
 /**
  * Non-admin test fixture — the default `test` fixture may carry an admin JWT
@@ -355,7 +356,7 @@ async function setupGraphQL(
         body: JSON.stringify({ data: { pendingTradeOffers: [] } }),
       });
     } else {
-      await route.fallback();
+      await unmockedGraphQLFallback(route);
     }
   });
 }

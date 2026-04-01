@@ -13,6 +13,7 @@
 
 import { expect } from '../fixtures/auth-enhanced';
 import { test } from '../fixtures/auth-enhanced';
+import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -325,7 +326,7 @@ async function setupGraphQL(
       });
     } else {
       // default mock — pass unmatched queries to the next route handler
-      await route.fallback();
+      await unmockedGraphQLFallback(route);
     }
   });
 }

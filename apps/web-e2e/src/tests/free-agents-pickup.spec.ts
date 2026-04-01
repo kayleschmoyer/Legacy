@@ -305,7 +305,7 @@ async function setupGraphQL(
         });
       }
     } else {
-      // Let unmatched operations cascade to baseline mocks
+      // Let unmatched operations cascade to baseline mocks (layer 1 of the fixture stack)
       await route.fallback();
     }
   });
@@ -403,6 +403,7 @@ test.describe('Free Agents — search and filter @critical', () => {
           body: JSON.stringify({ data: { players: MOCK_PLAYERS } }),
         });
       } else {
+        // Let other operations cascade to the auth fixture's baseline mocks
         await route.fallback();
       }
     });

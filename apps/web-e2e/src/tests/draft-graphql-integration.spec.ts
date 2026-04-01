@@ -1,4 +1,5 @@
 import { expect, test } from '../fixtures/auth-enhanced';
+import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 
 interface GraphQLRequest {
   query: string;
@@ -221,7 +222,7 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
             if (mockResponse === null) {
               // Unknown operation — fall through to the baseline
               // _apiIsolation fixture for app shell queries
-              await route.fallback();
+              await unmockedGraphQLFallback(route);
               return;
             }
 
@@ -234,10 +235,10 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
               body: JSON.stringify(mockResponse),
             });
           } catch {
-            await route.fallback();
+            await unmockedGraphQLFallback(route);
           }
         } else {
-          await route.fallback();
+          await unmockedGraphQLFallback(route);
         }
       },
     );
@@ -323,7 +324,7 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
             const mockResponse = buildMockResponse(body);
 
             if (mockResponse === null) {
-              await route.fallback();
+              await unmockedGraphQLFallback(route);
               return;
             }
 
@@ -340,10 +341,10 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
               body: JSON.stringify(mockResponse),
             });
           } catch {
-            await route.fallback();
+            await unmockedGraphQLFallback(route);
           }
         } else {
-          await route.fallback();
+          await unmockedGraphQLFallback(route);
         }
       },
     );
@@ -447,7 +448,7 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
             // All other operations get normal mock responses
             const mockResponse = buildMockResponse(body);
             if (mockResponse === null) {
-              await route.fallback();
+              await unmockedGraphQLFallback(route);
               return;
             }
             await route.fulfill({
@@ -456,10 +457,10 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
               body: JSON.stringify(mockResponse),
             });
           } catch {
-            await route.fallback();
+            await unmockedGraphQLFallback(route);
           }
         } else {
-          await route.fallback();
+          await unmockedGraphQLFallback(route);
         }
       },
     );
@@ -566,7 +567,7 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
             const mockResponse = buildMockResponse(body);
 
             if (mockResponse === null) {
-              await route.fallback();
+              await unmockedGraphQLFallback(route);
               return;
             }
 
@@ -583,10 +584,10 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
               body: JSON.stringify(mockResponse),
             });
           } catch {
-            await route.fallback();
+            await unmockedGraphQLFallback(route);
           }
         } else {
-          await route.fallback();
+          await unmockedGraphQLFallback(route);
         }
       },
     );

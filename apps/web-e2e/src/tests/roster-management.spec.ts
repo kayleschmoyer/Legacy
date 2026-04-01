@@ -9,6 +9,7 @@
  */
 
 import { expect, test } from '../fixtures/auth-enhanced';
+import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 
 /** URL predicate for the GraphQL API endpoint */
 function isGraphQLEndpoint(url: URL): boolean {
@@ -219,7 +220,7 @@ async function mockRosterGraphQL(
         body: JSON.stringify({ data: { userLeagues: [MOCK_LEAGUE] } }),
       });
     } else {
-      await route.fallback();
+      await unmockedGraphQLFallback(route);
     }
   });
 }

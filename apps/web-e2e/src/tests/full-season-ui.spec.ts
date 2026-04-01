@@ -16,6 +16,7 @@
 import type { Page } from '@playwright/test';
 import { expect } from '../fixtures/auth-enhanced';
 import { test } from '../fixtures/auth-enhanced';
+import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -396,7 +397,7 @@ async function installGraphQLMocks(page: Page, cfg: MockConfig) {
         }),
       });
     } else {
-      await route.fallback();
+      await unmockedGraphQLFallback(route);
     }
   });
 }
@@ -444,7 +445,7 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
             }),
           });
         } else {
-          await route.fallback();
+          await unmockedGraphQLFallback(route);
         }
       });
 
@@ -492,7 +493,7 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
             }),
           });
         } else {
-          await route.fallback();
+          await unmockedGraphQLFallback(route);
         }
       });
 
@@ -678,7 +679,7 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
             body: JSON.stringify({ data: { userTeamId: TEAM_1.id } }),
           });
         } else {
-          await route.fallback();
+          await unmockedGraphQLFallback(route);
         }
       });
 

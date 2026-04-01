@@ -14,6 +14,7 @@
 
 import { expect } from '../fixtures/auth-enhanced';
 import { test } from '../fixtures/auth-enhanced';
+import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 import {
   createBillingPortalSessionResponse,
   createCheckoutSessionResponse,
@@ -52,7 +53,7 @@ async function routeGraphQL(
         return;
       }
     }
-    await route.fallback();
+    await unmockedGraphQLFallback(route);
   });
 }
 
@@ -299,7 +300,7 @@ test.describe('Subscription upgrade flow @critical', () => {
         });
         return;
       }
-      await route.fallback();
+      await unmockedGraphQLFallback(route);
     });
 
     await page.goto('/profile/subscription');

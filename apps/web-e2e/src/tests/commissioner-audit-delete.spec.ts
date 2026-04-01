@@ -13,6 +13,7 @@
  */
 
 import { expect, test } from '../fixtures/auth-enhanced';
+import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -318,7 +319,7 @@ async function setupGraphQL(
         body: JSON.stringify({ data: null }),
       });
     } else {
-      await route.fallback();
+      await unmockedGraphQLFallback(route);
     }
   });
 }
@@ -351,7 +352,7 @@ test.describe('Commissioner Audit Log — commissioner access @regression', () =
       if (postData.includes('getcommissionerauditlogs')) {
         auditQueryCalled = true;
       }
-      await route.fallback();
+      await unmockedGraphQLFallback(route);
     });
 
     await page.goto('/baseball/league/1/commissioner');

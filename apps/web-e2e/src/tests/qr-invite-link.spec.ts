@@ -11,7 +11,10 @@
  */
 
 import { expect, test } from '../fixtures/auth-enhanced';
-import { extractOperationName } from '../fixtures/shared-mocks';
+import {
+  extractOperationName,
+  unmockedGraphQLFallback,
+} from '../fixtures/shared-mocks';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -139,7 +142,7 @@ async function setupGraphQL(
         body: JSON.stringify({ data: { userLeagues: [league] } }),
       });
     } else {
-      await route.fallback();
+      await unmockedGraphQLFallback(route);
     }
   });
 }

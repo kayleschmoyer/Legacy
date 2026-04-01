@@ -15,6 +15,7 @@
 
 import { expect } from '../fixtures/auth-enhanced';
 import { test } from '../fixtures/auth';
+import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 import { LeaguePage } from '../pages/league.page';
 import {
   joinLeagueByCodeResponse,
@@ -31,7 +32,7 @@ function isGraphQLEndpoint(url: URL): boolean {
 // ── helpers ───────────────────────────────────────────────────────
 
 /** Route all GraphQL requests through a per-operation handler map.
- *  Unrecognised operations are forwarded to the next handler via fallback().
+ *  Unrecognised operations are fulfilled with a diagnostic error via unmockedGraphQLFallback().
  */
 async function routeGraphQL(
   page: import('@playwright/test').Page,
@@ -51,7 +52,7 @@ async function routeGraphQL(
       }
     }
 
-    await route.fallback();
+    await unmockedGraphQLFallback(route);
   });
 }
 
@@ -361,7 +362,7 @@ test.describe('Join League — error handling @regression', () => {
         await route.abort('failed');
         return;
       }
-      await route.fallback();
+      await unmockedGraphQLFallback(route);
     });
 
     const lp = new LeaguePage(page);

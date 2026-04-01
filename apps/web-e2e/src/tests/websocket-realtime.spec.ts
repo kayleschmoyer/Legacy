@@ -27,6 +27,7 @@
 import type { WebSocketRoute } from '@playwright/test';
 import { expect } from '../fixtures/auth-enhanced';
 import { test } from '../fixtures/auth-enhanced';
+import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -311,7 +312,7 @@ async function setupGraphQL(
         body: JSON.stringify({ data: { getLeagueAnnouncements: [] } }),
       });
     } else {
-      await route.fallback();
+      await unmockedGraphQLFallback(route);
     }
   });
 }

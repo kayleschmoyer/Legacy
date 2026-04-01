@@ -10,6 +10,7 @@
  */
 
 import { expect, test } from '../fixtures/auth-enhanced';
+import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -328,7 +329,7 @@ async function mockLeagueDetailGraphQL(
         body: JSON.stringify({ data: { pendingTradeOffers: [] } }),
       });
     } else {
-      await route.fallback();
+      await unmockedGraphQLFallback(route);
     }
   });
 }

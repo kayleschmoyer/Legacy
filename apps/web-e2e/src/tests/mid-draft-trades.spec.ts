@@ -8,7 +8,10 @@
  */
 
 import { expect, test } from '../fixtures/auth-enhanced';
-import { extractOperationName } from '../fixtures/shared-mocks';
+import {
+  extractOperationName,
+  unmockedGraphQLFallback,
+} from '../fixtures/shared-mocks';
 import {
   mockDraft,
   mockDraftPick,
@@ -416,7 +419,7 @@ async function mockDraftGraphQL(
       });
     } else {
       // Let the baseline fixture handle anything else
-      await route.fallback();
+      await unmockedGraphQLFallback(route);
     }
   });
 }

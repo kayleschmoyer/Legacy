@@ -16,6 +16,7 @@ import {
   expect,
   test,
 } from '../fixtures/auth-enhanced';
+import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 
 /** Non-admin user: global storageState JWT has accessLevel 'admin',
  *  so we need a custom fixture with accessLevel 'none' for redirect tests. */
@@ -119,7 +120,7 @@ async function mockAdminGraphQL(
         }),
       });
     } else {
-      await route.fallback();
+      await unmockedGraphQLFallback(route);
     }
   });
 }

@@ -1,4 +1,5 @@
 ﻿import { expect, test } from '../fixtures/auth-enhanced';
+import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -145,7 +146,7 @@ test.describe('Player Statistics Page @regression', () => {
           body: JSON.stringify(MOCK_CAREER_BATTING_RESPONSE),
         });
       } else {
-        await route.fallback();
+        await unmockedGraphQLFallback(route);
       }
     });
 

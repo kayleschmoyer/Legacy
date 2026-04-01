@@ -12,6 +12,7 @@
 
 import { expect } from '../fixtures/auth-enhanced';
 import { test } from '../fixtures/auth';
+import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 import { LeaguePage } from '../pages/league.page';
 import { updateLeagueBrandingResponse } from '../mocks/graphql/league.mocks';
 
@@ -164,7 +165,7 @@ test.describe('League Branding @regression', () => {
           ),
         });
       } else {
-        await route.fallback();
+        await unmockedGraphQLFallback(route);
       }
     });
 
@@ -234,7 +235,7 @@ test.describe('League Branding — non-commissioner @regression', () => {
           }),
         });
       } else {
-        await route.fallback();
+        await unmockedGraphQLFallback(route);
       }
     });
 

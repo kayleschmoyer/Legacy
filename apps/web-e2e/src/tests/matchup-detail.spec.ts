@@ -10,6 +10,7 @@
  */
 
 import { expect, test } from '../fixtures/auth-enhanced';
+import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -144,7 +145,7 @@ async function mockMatchupGraphQL(page: import('@playwright/test').Page) {
           body: JSON.stringify({ data: { leagueTeams: MOCK_TEAMS } }),
         });
       } else {
-        await route.fallback();
+        await unmockedGraphQLFallback(route);
       }
     },
   );
@@ -251,7 +252,7 @@ test.describe('Matchup Detail – loading state @regression', () => {
             body: JSON.stringify({ data: { getMatchupById: MOCK_MATCHUP } }),
           });
         } else {
-          await route.fallback();
+          await unmockedGraphQLFallback(route);
         }
       },
     );
@@ -289,7 +290,7 @@ test.describe('Matchup Detail – error state @regression', () => {
         });
       } else {
         // Stub all other operations so the test isolates the error path
-        await route.fallback();
+        await unmockedGraphQLFallback(route);
       }
     });
 

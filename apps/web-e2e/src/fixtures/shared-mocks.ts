@@ -139,6 +139,36 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = {
 // ---------------------------------------------------------------------------
 
 /**
+ * Fulfill a route with a diagnostic GraphQL error for unmocked operations.
+ *
+ * Use this inside GraphQL route handlers as the fallback for operations not
+ * explicitly mocked by the test. Unlike `route.fallback()`, this immediately
+ * surfaces missing mocks as a clear error rather than silently passing to the
+ * network (which has no backend in CI).
+ *
+ * @example
+ * await page.route(isGraphQLEndpoint, async (route) => {
+ *   const op = route.request().postData()?.toLowerCase() ?? '';
+ *   if (op.includes('getmyleague')) {
+ *     await route.fulfill({ ... });
+ *     return;
+ *   }
+ *   await unmockedGraphQLFallback(route);
+ * });
+ */
+export async function unmockedGraphQLFallback(route: Route): Promise<void> {
+  const opName = extractOperationName(route);
+  await route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      errors: [{ message: `[E2E] Unmocked GraphQL operation: ${opName}` }],
+      data: null,
+    }),
+  });
+}
+
+/**
  * Extract the GraphQL operationName from a Playwright Route's POST body.
  * Falls back to the `?ref=` query parameter, or returns `'unknown'`.
  */

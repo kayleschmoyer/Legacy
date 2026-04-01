@@ -12,6 +12,7 @@
  */
 
 import { expect, test } from '../fixtures/auth-enhanced';
+import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -234,7 +235,7 @@ async function mockGamesListPage(page: import('@playwright/test').Page) {
       });
       return;
     }
-    await route.fallback();
+    await unmockedGraphQLFallback(route);
   });
 }
 
@@ -257,7 +258,7 @@ async function mockGameDetailSetup(page: import('@playwright/test').Page) {
       });
       return;
     }
-    await route.fallback();
+    await unmockedGraphQLFallback(route);
   });
 }
 
@@ -280,7 +281,7 @@ async function mockGameDetailDrafting(page: import('@playwright/test').Page) {
       });
       return;
     }
-    await route.fallback();
+    await unmockedGraphQLFallback(route);
   });
 }
 
@@ -322,7 +323,7 @@ async function mockCreatePageGraphQL(page: import('@playwright/test').Page) {
       });
       return;
     }
-    await route.fallback();
+    await unmockedGraphQLFallback(route);
   });
 }
 

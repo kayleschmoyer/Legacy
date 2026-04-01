@@ -13,6 +13,7 @@
 
 import type { Page } from '@playwright/test';
 import { expect, test } from '../fixtures/auth-enhanced';
+import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -384,7 +385,7 @@ async function mockAuctionDraftGraphQL(
     }
 
     // Fall back to baseline / isolation layer for anything else
-    await route.fallback();
+    await unmockedGraphQLFallback(route);
   });
 }
 
@@ -512,7 +513,7 @@ test.describe('Auction Draft — budget tracking updates @regression', () => {
         return;
       }
 
-      await route.fallback();
+      await unmockedGraphQLFallback(route);
     });
 
     await page.goto(DRAFT_URL);

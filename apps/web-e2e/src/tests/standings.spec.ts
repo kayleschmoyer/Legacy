@@ -8,6 +8,7 @@
  */
 
 import { expect, test } from '../fixtures/auth-enhanced';
+import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 
 /** URL predicate for the GraphQL API endpoint */
 function isGraphQLEndpoint(url: URL): boolean {
@@ -202,7 +203,7 @@ async function mockLeagueDetailGraphQL(page: import('@playwright/test').Page) {
         body: JSON.stringify({ data: { userLeagues: [MOCK_LEAGUE] } }),
       });
     } else {
-      await route.fallback();
+      await unmockedGraphQLFallback(route);
     }
   });
 }
@@ -291,7 +292,7 @@ test.describe('Standings Tab — error state @regression', () => {
           body: JSON.stringify({ data: { userTeamId: 1 } }),
         });
       } else {
-        await route.fallback();
+        await unmockedGraphQLFallback(route);
       }
     });
 
@@ -344,7 +345,7 @@ test.describe('Standings Tab — empty state @regression', () => {
           body: JSON.stringify({ data: { userTeamId: 1 } }),
         });
       } else {
-        await route.fallback();
+        await unmockedGraphQLFallback(route);
       }
     });
 

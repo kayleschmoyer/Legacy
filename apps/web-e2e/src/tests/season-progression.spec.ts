@@ -23,6 +23,7 @@
 import type { Page } from '@playwright/test';
 
 import { expect, test } from '../fixtures/auth-enhanced';
+import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 import type { MockLeagueAtWeek } from '../mocks/graphql/league.mocks';
 import {
   mockLeagueAtWeek,
@@ -376,7 +377,7 @@ async function setupSeasonGraphQL(
         body: JSON.stringify({ data: { matchupPlayers: [] } }),
       });
     } else {
-      await route.fallback();
+      await unmockedGraphQLFallback(route);
     }
   });
 }

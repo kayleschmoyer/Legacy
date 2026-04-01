@@ -10,6 +10,7 @@
 
 import { createCustomAuthTest, expect } from '../fixtures/auth-enhanced';
 import { test } from '../fixtures/auth-enhanced';
+import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 
 const freeUserTest = createCustomAuthTest('freeuser@test.com', 'none');
 
@@ -56,7 +57,7 @@ async function mockCreateLeagueSuccess(page: import('@playwright/test').Page) {
         }),
       });
     } else {
-      await route.fallback();
+      await unmockedGraphQLFallback(route);
     }
   });
 }
@@ -565,7 +566,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
           }),
         });
       } else {
-        await route.fallback();
+        await unmockedGraphQLFallback(route);
       }
     });
 
@@ -590,7 +591,9 @@ test.describe('League Creation — Advanced Settings @regression', () => {
   test('should navigate to /baseball when Cancel is clicked', async ({
     page,
   }) => {
-    await page.route('**/graphql**', async (route) => route.fallback());
+    await page.route('**/graphql**', async (route) =>
+      unmockedGraphQLFallback(route),
+    );
     await page.goto('/baseball/league/create');
     await page.waitForLoadState('networkidle');
 
@@ -659,7 +662,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
           }),
         });
       } else {
-        await route.fallback();
+        await unmockedGraphQLFallback(route);
       }
     });
 

@@ -12,6 +12,7 @@
  */
 
 import { expect, test } from '../fixtures/auth-enhanced';
+import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -251,7 +252,7 @@ async function mockGraphQL(
     } else {
       // Fall back to the shared baseline mocks in the _apiIsolation fixture.
       // Do NOT use route.continue() — there is no backend in CI.
-      await route.fallback();
+      await unmockedGraphQLFallback(route);
     }
   });
 }

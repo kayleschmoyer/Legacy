@@ -12,6 +12,7 @@
 
 import { expect } from '../fixtures/auth-enhanced';
 import { test } from '../fixtures/auth-enhanced';
+import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function isGraphQLEndpoint(url: URL): boolean {
@@ -92,7 +93,7 @@ async function mockSeasonDraftGamesGraphQL(
       });
       return;
     }
-    await route.fallback();
+    await unmockedGraphQLFallback(route);
   });
 }
 
@@ -204,7 +205,7 @@ test.describe('Season Draft Game Create Page @critical', () => {
         });
         return;
       }
-      await route.fallback();
+      await unmockedGraphQLFallback(route);
     });
   }
 
@@ -220,7 +221,7 @@ test.describe('Season Draft Game Create Page @critical', () => {
         });
         return;
       }
-      await route.fallback();
+      await unmockedGraphQLFallback(route);
     });
   }
 
@@ -291,7 +292,7 @@ test.describe('Season Draft Game Create Page @critical', () => {
         });
         return;
       }
-      await route.fallback();
+      await unmockedGraphQLFallback(route);
     });
 
     await page.goto('/games/season-draft/create');
