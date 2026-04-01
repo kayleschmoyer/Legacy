@@ -248,35 +248,6 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:dev/*"
         ]
       },
-      # Secrets Manager write permissions for Terraform apply (creating/managing secrets)
-      {
-        Effect = "Allow"
-        Action = [
-          "secretsmanager:CreateSecret",
-          "secretsmanager:PutSecretValue",
-          "secretsmanager:UpdateSecret",
-          "secretsmanager:DeleteSecret",
-          "secretsmanager:UpdateSecretVersionStage",
-          "secretsmanager:TagResource",
-          "secretsmanager:UntagResource",
-          "secretsmanager:RestoreSecret"
-        ]
-        Resource = [
-          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${local.name_prefix}-*",
-          # Externally-managed secrets (one entry per secret in secrets.tf using ${var.environment}/ prefix).
-          # Secrets Manager appends a random 6-char suffix to all ARNs, hence the trailing wildcard.
-          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:dev/jwt-secret-key*",
-          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:dev/google-oauth-client-secret*",
-          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:dev/oauth-proxy/cookie-secret*",
-          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:dev/stripe-secret-key*",
-          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:dev/stripe-webhook-secret*",
-          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:dev/jira-credentials*",
-          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:dev/rollbar-webhook-secret*",
-          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:dev/discord-client-secret*",
-          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:dev/mlb-data-api-key*",
-          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:dev/discord-webhook-url*",
-        ]
-      },
       # S3 read permissions for Lambda deployment bucket
       {
         Effect = "Allow"
@@ -615,7 +586,8 @@ resource "aws_iam_role_policy" "github_actions_additional" {
 }
 
 # Supplemental managed policy for permissions that would push the inline policy over the 10 KB limit.
-# Covers: Budgets CRUD, EventBridge event bus CRUD, and S3 bucket- and object-level reads for the runner-dist bucket.
+# Covers: Budgets CRUD, EventBridge event bus CRUD, S3 bucket- and object-level reads for the runner-dist bucket,
+# and Secrets Manager write permissions for all Terraform-managed secrets.
 #
 # Import: this policy was bootstrapped manually before the first apply to break the chicken-and-egg
 # dependency (the workflow needs the permissions to plan, but apply is needed to grant them).
@@ -683,6 +655,36 @@ resource "aws_iam_policy" "github_actions_supplemental" {
         ]
         Resource = [
           "arn:aws:s3:::${local.name_prefix}-runner-*/*"
+        ]
+      },
+      # Secrets Manager write permissions — moved here from the inline policy to stay under the 10 KB limit.
+      # Secrets Manager appends a random 6-char suffix to all secret ARNs, hence the trailing wildcard on dev/* entries.
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:CreateSecret",
+          "secretsmanager:PutSecretValue",
+          "secretsmanager:UpdateSecret",
+          "secretsmanager:DeleteSecret",
+          "secretsmanager:UpdateSecretVersionStage",
+          "secretsmanager:TagResource",
+          "secretsmanager:UntagResource",
+          "secretsmanager:RestoreSecret"
+        ]
+        Resource = [
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${local.name_prefix}-*",
+          # Externally-managed secrets — one entry per secret in secrets.tf using the ${var.environment}/ prefix.
+          # Secrets Manager appends a random 6-char suffix to all secret ARNs, hence the trailing wildcard.
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/jwt-secret-key*",
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/google-oauth-client-secret*",
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/oauth-proxy/cookie-secret*",
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/stripe-secret-key*",
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/stripe-webhook-secret*",
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/jira-credentials*",
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/rollbar-webhook-secret*",
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/discord-client-secret*",
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/mlb-data-api-key*",
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/discord-webhook-url*",
         ]
       }
     ]

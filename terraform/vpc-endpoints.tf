@@ -72,7 +72,7 @@ resource "aws_vpc_endpoint" "secretsmanager" {
         ]
         Resource = [
           "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${local.name_prefix}-*",
-          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:dev/*",
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/*",
         ]
       },
       {
@@ -93,7 +93,7 @@ resource "aws_vpc_endpoint" "secretsmanager" {
         ]
         Resource = [
           "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${local.name_prefix}-*",
-          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:dev/*",
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/*",
         ]
         Condition = {
           ArnLike = {
