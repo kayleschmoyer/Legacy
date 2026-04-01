@@ -39,7 +39,7 @@ interface PRNode {
       commit: {
         statusCheckRollup: {
           contexts: {
-            nodes: StatusCheckNode[];
+            nodes: Array<StatusCheckNode | null>;
           };
         } | null;
       };
@@ -343,7 +343,7 @@ interface ListOpenPRsResponse {
     pullRequests: {
       nodes: PRNode[];
     };
-  };
+  } | null;
 }
 
 export async function prScan(params: PRScanParams): Promise<ToolResult> {
@@ -359,6 +359,12 @@ export async function prScan(params: PRScanParams): Promise<ToolResult> {
         LIST_OPEN_PRS_QUERY,
         { owner: repo.owner, repo: repo.name, first: limit },
       );
+      if (result.data.repository == null) {
+        const warningMsg = result.warnings?.map((w) => w.message).join('; ');
+        throw new Error(
+          `GraphQL returned null repository${warningMsg ? `: ${warningMsg}` : ''}`,
+        );
+      }
       allPrs = result.data.repository.pullRequests.nodes;
     } catch (fullQueryError) {
       const msg =
@@ -375,6 +381,14 @@ export async function prScan(params: PRScanParams): Promise<ToolResult> {
           LIST_OPEN_PRS_LIGHT_QUERY,
           { owner: repo.owner, repo: repo.name, first: limit },
         );
+        if (fallback.data.repository == null) {
+          const warningMsg = fallback.warnings
+            ?.map((w) => w.message)
+            .join('; ');
+          throw new Error(
+            `GraphQL returned null repository (light query)${warningMsg ? `: ${warningMsg}` : ''}`,
+          );
+        }
         allPrs = fallback.data.repository.pullRequests.nodes;
         degraded = true;
       } else {
@@ -413,8 +427,9 @@ export async function prScan(params: PRScanParams): Promise<ToolResult> {
 
       // In degraded mode, commits/statusCheckRollup may be null — skip CI classification.
       const commitNode = pr.commits?.nodes[0];
-      const checkNodes =
-        commitNode?.commit.statusCheckRollup?.contexts.nodes ?? [];
+      const checkNodes = (
+        commitNode?.commit.statusCheckRollup?.contexts.nodes ?? []
+      ).filter((n): n is StatusCheckNode => n != null);
 
       if (checkNodes.length === 0) {
         // In degraded mode with no check data, treat as unknown (not pending)

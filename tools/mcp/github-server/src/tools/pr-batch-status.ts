@@ -41,7 +41,7 @@ interface PRBatchNode {
       commit: {
         statusCheckRollup: {
           contexts: {
-            nodes: StatusCheckNode[];
+            nodes: Array<StatusCheckNode | null>;
           };
         } | null;
       };
@@ -62,9 +62,10 @@ interface PRBatchNode {
 }
 
 function normalizeChecks(
-  nodes: StatusCheckNode[],
+  nodes: (StatusCheckNode | null)[],
 ): Array<{ name: string; status: string; conclusion: string | null }> {
-  return nodes.map((node) => {
+  return nodes.flatMap((node) => {
+    if (node == null) return [];
     if (node.__typename === 'CheckRun') {
       return {
         name: node.name,
@@ -141,7 +142,7 @@ query($owner: String!, $repo: String!) {
 interface BatchGraphQLResponse {
   repository: {
     [alias: string]: PRBatchNode;
-  };
+  } | null;
 }
 
 export async function prBatchStatus(
@@ -165,7 +166,7 @@ export async function prBatchStatus(
       });
 
       for (const num of batch) {
-        const pr = result.data.repository[`pr_${num}`];
+        const pr = result.data.repository?.[`pr_${num}`];
         if (pr) allPRs.push(pr);
       }
     }
@@ -173,8 +174,9 @@ export async function prBatchStatus(
     // Build rows
     const rows = allPRs.map((pr) => {
       const commitNode = pr.commits.nodes[0];
-      const checkNodes =
-        commitNode?.commit.statusCheckRollup?.contexts.nodes ?? [];
+      const checkNodes = (
+        commitNode?.commit.statusCheckRollup?.contexts.nodes ?? []
+      ).filter((n): n is StatusCheckNode => n != null);
       const ciJobs = normalizeChecks(checkNodes);
       const ciSummary = summarizeCIStatus(ciJobs);
 

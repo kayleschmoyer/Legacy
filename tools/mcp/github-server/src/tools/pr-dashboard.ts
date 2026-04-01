@@ -45,7 +45,7 @@ interface PRNode {
       commit: {
         statusCheckRollup: {
           contexts: {
-            nodes: StatusCheckNode[];
+            nodes: Array<StatusCheckNode | null>;
           };
         } | null;
       };
@@ -89,8 +89,9 @@ function mapState(state: string): string {
   }
 }
 
-function normalizeChecks(nodes: StatusCheckNode[]): CICheck[] {
-  return nodes.map((node) => {
+function normalizeChecks(nodes: (StatusCheckNode | null)[]): CICheck[] {
+  return nodes.flatMap((node) => {
+    if (node == null) return [];
     if (node.__typename === 'CheckRun') {
       return {
         name: node.name,
@@ -282,12 +283,18 @@ query($owner: String!, $repo: String!, $first: Int!) {
   }
 }`;
       const result = await githubGraphQL<{
-        repository: { pullRequests: { nodes: PRNode[] } };
+        repository: { pullRequests: { nodes: PRNode[] } } | null;
       }>(query, {
         owner: repo.owner,
         repo: repo.name,
         first: limit,
       });
+      if (result.data.repository == null) {
+        const warningMsg = result.warnings?.map((w) => w.message).join('; ');
+        throw new Error(
+          `GraphQL returned null repository${warningMsg ? `: ${warningMsg}` : ''}`,
+        );
+      }
       prNodes = result.data.repository.pullRequests.nodes;
     }
 
@@ -342,8 +349,9 @@ query($owner: String!, $repo: String!, $first: Int!) {
     // Build dashboard rows
     const rows = prNodes.map((pr) => {
       const commitNode = pr.commits.nodes[0];
-      const checkNodes =
-        commitNode?.commit.statusCheckRollup?.contexts.nodes ?? [];
+      const checkNodes = (
+        commitNode?.commit.statusCheckRollup?.contexts.nodes ?? []
+      ).filter((n): n is StatusCheckNode => n != null);
       const rawChecks = normalizeChecks(checkNodes);
       const checks = deduplicateChecks(rawChecks);
       const hadStaleChecks = checks.length < rawChecks.length;
