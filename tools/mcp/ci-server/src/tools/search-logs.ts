@@ -2,7 +2,7 @@ import { fetchRunLogs } from '../logs.js';
 import type { ToolResult } from '../types.js';
 
 interface SearchLogsParams {
-  runId: number;
+  runId?: number;
   pattern: string;
   jobId?: number;
   failedOnly?: boolean;
@@ -40,6 +40,13 @@ function buildMatcher(params: SearchLogsParams): (line: string) => boolean {
 export async function searchLogs(
   params: SearchLogsParams,
 ): Promise<ToolResult> {
+  if (!params.runId && !params.jobId) {
+    return {
+      isError: true,
+      content: [{ type: 'text', text: 'Either runId or jobId is required.' }],
+    };
+  }
+
   const contextBefore = params.contextBefore ?? 3;
   const contextAfter = params.contextAfter ?? 3;
   const limitMatches = params.limitMatches ?? 10;
@@ -98,7 +105,7 @@ export async function searchLogs(
       content: [
         {
           type: 'text',
-          text: `Failed to search logs for workflow run ${params.runId}: ${error instanceof Error ? error.message : String(error)}`,
+          text: `Failed to search logs for ${params.jobId ? `job ${params.jobId}` : `workflow run ${params.runId}`}: ${error instanceof Error ? error.message : String(error)}`,
         },
       ],
     };

@@ -40,7 +40,12 @@ server.tool(
   'ci_get_logs',
   'Fetch CI logs for a run or job. Defaults to failed-step logs only.',
   {
-    runId: z.coerce.number().int().positive().describe('Run ID'),
+    runId: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Run ID (required when jobId is not provided)'),
     jobId: z.coerce.number().int().positive().optional().describe('Job ID'),
     failedOnly: z
       .boolean()
@@ -116,7 +121,12 @@ server.tool(
   'ci_search_logs',
   'Search CI logs by pattern with optional regex and context lines.',
   {
-    runId: z.coerce.number().int().positive().describe('Run ID'),
+    runId: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Run ID (required when jobId is not provided)'),
     pattern: z.string().describe('Search string or regex pattern'),
     jobId: z.coerce.number().int().positive().optional().describe('Job ID'),
     failedOnly: z

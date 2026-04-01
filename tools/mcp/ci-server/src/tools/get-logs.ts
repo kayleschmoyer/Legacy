@@ -2,7 +2,7 @@ import { fetchRunLogsRing } from '../logs.js';
 import type { ToolResult } from '../types.js';
 
 interface GetLogsParams {
-  runId: number;
+  runId?: number;
   jobId?: number;
   failedOnly?: boolean;
   attempt?: number;
@@ -86,6 +86,13 @@ function extractErrorSummary(allLines: string[]): string[] {
 }
 
 export async function getLogs(params: GetLogsParams): Promise<ToolResult> {
+  if (!params.runId && !params.jobId) {
+    return {
+      isError: true,
+      content: [{ type: 'text', text: 'Either runId or jobId is required.' }],
+    };
+  }
+
   const defaultLimit = params.errorSummary ? 10_000 : 500;
   const maxLines = params.maxLines ?? defaultLimit;
 
@@ -154,7 +161,7 @@ export async function getLogs(params: GetLogsParams): Promise<ToolResult> {
       content: [
         {
           type: 'text',
-          text: `Failed to fetch logs for workflow run ${params.runId}: ${error instanceof Error ? error.message : String(error)}`,
+          text: `Failed to fetch logs for ${params.jobId ? `job ${params.jobId}` : `workflow run ${params.runId}`}: ${error instanceof Error ? error.message : String(error)}`,
         },
       ],
     };

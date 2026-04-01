@@ -3,7 +3,7 @@ import { inflateRawSync } from 'node:zlib';
 import { githubGet, githubGetArrayBuffer } from './github-api.js';
 
 export interface FetchRunLogsParams {
-  runId: number;
+  runId?: number;
   jobId?: number;
   failedOnly?: boolean;
   attempt?: number;
@@ -173,6 +173,10 @@ export async function fetchRunLogs(
     return fetchJobLogs(params.jobId);
   }
 
+  if (!params.runId) {
+    throw new Error('runId is required when jobId is not provided');
+  }
+
   const attemptSuffix = params.attempt ? `/attempts/${params.attempt}` : '';
   const allJobs = await fetchAllJobs(params.runId, attemptSuffix);
 
@@ -209,6 +213,10 @@ export async function fetchRunLogsRing(
       lines: allLines.length <= maxLines ? allLines : allLines.slice(-maxLines),
       totalLines: allLines.length,
     };
+  }
+
+  if (!params.runId) {
+    throw new Error('runId is required when jobId is not provided');
   }
 
   const attemptSuffix = params.attempt ? `/attempts/${params.attempt}` : '';
