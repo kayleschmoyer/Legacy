@@ -146,7 +146,20 @@ When an MCP tool fails, **do not assume the entire server is down**. Different t
 
 # Local Agent Workflow
 
-> The following steps (Step 1 through Full Sweep) require a **local agent** with worktree access, git push, and `make pc`. For cloud agents, skip to [Cloud Agent Mode](#cloud-agent-mode) below.
+> The following steps (Step 0 through Full Sweep) require a **local agent** with worktree access, git push, and `make pc`. For cloud agents, skip to [Cloud Agent Mode](#cloud-agent-mode) below.
+
+## Step 0: Create and Start a Sweep Task
+
+Before scanning, create a task to track the sweep and mark it in progress. This ensures the sweep is accounted for even if the session is interrupted or context rolls over.
+
+```
+TaskCreate(subject: "Sweep all open PRs", activeForm: "Sweeping open PRs")
+TaskUpdate(taskId: <id>, status: "in_progress")
+```
+
+If a sweep task already exists from a previous session (check `TaskList`), mark it `in_progress` rather than creating a duplicate.
+
+Use the `taskId` returned by `TaskCreate` (or, if reusing an existing sweep task, the `taskId` found via `TaskList`) and persist/reuse that same id for all `TaskUpdate` calls in this sweep.
 
 ## Step 1: Scan All Open PRs
 
@@ -454,6 +467,14 @@ REPEAT (max 10 passes):
 ## Final Summary
 
 After completion, print a summary table. Every PR must show a settled status — no PR should be left in an ambiguous state.
+
+**Mark the sweep task complete** once the summary is printed — even if one or more PRs are waiting on external blockers (infrastructure, credentials, etc.) that are outside the sweep's scope. Those PRs are settled by definition (either labeled `requires-human-review` or noted as infrastructure-dependent). The sweep task tracks _the sweep work itself_, not the downstream merge of every PR.
+
+Use the same `taskId` captured in Step 0 — do not create a new task here.
+
+```
+TaskUpdate(taskId: <id>, status: "completed")
+```
 
 ```
 | PR    | Title                        | Conflicts | Reviews | CI      | Label                  | Settled | Reason                                  |
