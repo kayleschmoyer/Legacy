@@ -50,15 +50,16 @@ runs:
         FILENAME="Health-$(echo "${LAMBDA_NAME}" | sed 's/ /-/g').json"
 
         # Build the shields.io endpoint JSON
+        # Note: --arg lbl instead of --arg label to avoid jq reserved keyword conflict
         jq -n \
-          --arg label  "${LAMBDA_NAME}" \
+          --arg lbl    "${LAMBDA_NAME}" \
           --arg msg    "${MESSAGE}" \
           --arg color  "${COLOR}" \
           '{
             schemaVersion: 1,
-            "label":  $label,
+            label:   $lbl,
             message: $msg,
-            color:  $color,
+            color:   $color,
             cacheSeconds: 300,
             style: "flat"
           }' > "${FILENAME}"

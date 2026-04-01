@@ -291,6 +291,27 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "arn:aws:s3:::legacy-sports-terraform-state"
         ]
       },
+      # S3 bucket-level read for github-runners runner-dist bucket
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:ListBucket"
+        ]
+        Resource = [
+          "arn:aws:s3:::${local.name_prefix}-runner-*"
+        ]
+      },
+      # S3 object-level read for github-runners runner-dist bucket
+      # (Terraform aws_s3_object refresh calls HeadObject, covered by s3:GetObject)
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject"
+        ]
+        Resource = [
+          "arn:aws:s3:::${local.name_prefix}-runner-*/*"
+        ]
+      },
       # VPC, EC2, and networking read permissions
       {
         Effect = "Allow"
@@ -492,7 +513,7 @@ resource "aws_iam_role_policy" "github_actions_additional" {
         ]
         Resource = "*"
       },
-      # EventBridge permissions for Terraform state refresh and resource management
+      # EventBridge rule permissions for Terraform state refresh and resource management
       {
         Effect = "Allow"
         Action = [
@@ -509,6 +530,21 @@ resource "aws_iam_role_policy" "github_actions_additional" {
         ]
         Resource = [
           "arn:aws:events:${local.region}:${local.account_id}:rule/${local.name_prefix}-*"
+        ]
+      },
+      # EventBridge event bus permissions for github-runners module
+      {
+        Effect = "Allow"
+        Action = [
+          "events:DescribeEventBus",
+          "events:CreateEventBus",
+          "events:DeleteEventBus",
+          "events:TagResource",
+          "events:UntagResource",
+          "events:ListTagsForResource"
+        ]
+        Resource = [
+          "arn:aws:events:${local.region}:${local.account_id}:event-bus/${local.name_prefix}-*"
         ]
       },
       # Lambda event source mapping write permissions for Terraform apply
@@ -585,6 +621,19 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "acm:ListCertificates"
         ]
         Resource = "*"
+      },
+      # AWS Budgets permissions for Terraform plan/apply (aws_budgets_budget resource)
+      {
+        Effect = "Allow"
+        Action = [
+          "budgets:ViewBudget",
+          "budgets:ModifyBudget",
+          "budgets:CreateBudget",
+          "budgets:DeleteBudget"
+        ]
+        Resource = [
+          "arn:aws:budgets::${local.account_id}:budget/${local.name_prefix}-*"
+        ]
       }
     ]
   })

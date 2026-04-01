@@ -52,8 +52,8 @@ resource "aws_vpc_endpoint" "secretsmanager" {
   # private_dns_enabled routes ALL Secrets Manager API calls through this
   # endpoint, including from self-hosted runners in public subnets.
   #
-  # Statement 1: Runtime reads — any principal can read stack-scoped secrets.
-  # Statement 2: Write/policy mutations — restricted to Terraform/CI roles
+  # Statement 1: Runtime reads - any principal can read stack-scoped secrets.
+  # Statement 2: Write/policy mutations - restricted to Terraform/CI roles
   #   via aws:PrincipalArn condition (Terraform's aws_secretsmanager_secret
   #   resource refresh calls GetResourcePolicy; apply calls
   #   PutResourcePolicy/DeleteResourcePolicy).
@@ -70,7 +70,10 @@ resource "aws_vpc_endpoint" "secretsmanager" {
           "secretsmanager:GetResourcePolicy",
           "secretsmanager:ListSecretVersionIds",
         ]
-        Resource = "arn:aws:secretsmanager:*:*:secret:${local.name_prefix}-*"
+        Resource = [
+          "arn:aws:secretsmanager:*:*:secret:${local.name_prefix}-*",
+          "arn:aws:secretsmanager:*:*:secret:dev/*",
+        ]
       },
       {
         Sid       = "TerraformWriteAndPolicy"
