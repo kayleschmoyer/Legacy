@@ -305,12 +305,17 @@ The most common CI failure is **type errors from stale branches** — errors tha
 
 **Fix**: Rebase the branch onto main using `worktree_rebase`, then re-run CI. No code changes needed.
 
-### 3c. Stale CI Labels
+### 3c. Remove CI Failure Labels After a Successful Fix
 
-During triage, clean up stale `ci-failure-*` labels. The `github_pr_scan` tool already syncs these labels automatically (`applyLabels: true`), but if you spot stale labels during manual triage:
+**After every successful CI fix push**, remove the corresponding `ci-failure-*` label. The CI system re-adds labels automatically when CI fails again, so clearing them avoids stale labels misleading the next sweep pass.
 
-- If CI re-ran and passed after a previous failure, remove the failure label
-- Use `github_manage_labels(number: <PR#>, remove: ["ci-failure-lint"])` to clean up
+```
+github_manage_labels(number: <PR#>, remove: ["ci-failure-<type>"])
+```
+
+Remove only the label(s) matching the failure type(s) you fixed (e.g., `ci-failure-lint`, `ci-failure-typecheck`, `ci-failure-build`). Remove after push succeeds — not before — so a failed push doesn't prematurely clear the label.
+
+The `github_pr_scan` tool syncs these labels automatically (`applyLabels: true`) on each scan, but it only runs at pass boundaries. Removing labels inline after each fix keeps the scan snapshot accurate during a pass and prevents the orchestrator from re-queuing an already-fixed PR.
 
 ### 3d. Manual Debugging Fallback
 
@@ -321,7 +326,8 @@ If automated classification returns `unknown` or the auto-fix doesn't resolve th
 3. Apply the fix based on error category
 4. Validate: `make pc`
 5. Commit and push
-6. If the fix attempt fails, comment on the PR with the diagnosed root cause and what was attempted. Only label `requires-human-review` if the failure requires something outside agent reach — otherwise leave it unlabeled for a future sweep. The PR is now **settled**.
+6. **If the push succeeded**, remove the `ci-failure-*` label: `github_manage_labels(number: <PR#>, remove: ["ci-failure-<type>"])` — the CI system will re-add it if the fix didn't hold. **Do not remove the label if the push failed or if you end up in step 7 below.**
+7. If the fix attempt fails or is unfixable, comment on the PR with the diagnosed root cause and what was attempted. Only label `requires-human-review` if the failure requires something outside agent reach — otherwise leave it unlabeled for a future sweep. The PR is now **settled**.
 
 ### Pending CI
 

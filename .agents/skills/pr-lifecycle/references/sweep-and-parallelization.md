@@ -62,12 +62,30 @@ Review fixes (Pass 2) and CI code fixes (Pass 3) operate on independent PRs in s
 **How it works:**
 
 1. After the scan identifies PRs needing review fixes or CI fixes, group them into a batch (max 3 concurrent)
-2. Spawn one `Agent` per PR, each working in its own worktree. Example prompt:
+2. Spawn one `Agent` per PR, each working in its own worktree. Use the appropriate prompt template:
+
+   **Review fix sub-agent (Pass 2):**
 
    > Fix review comments on PR #\<number\> in worktree \<path\>.
    > Read unresolved threads, apply fixes, run make pc, commit, push.
    > Resolve all fixed threads in one call via github_resolve_threads(threadIds: [...]).
    > If unfixable, comment on the PR with the diagnosed blocker and move on.
+   >
+   > Tool preferences:
+   >
+   > - Use Glob (not find/ls) for file discovery
+   > - Use Grep (not grep/rg) for content search
+   > - Use Read (not cat/head/tail) for reading files
+   > - Use worktree_run for git commands (not git -C via Bash)
+   > - Use worktree_commit/worktree_push for commits and pushes
+
+   **CI fix sub-agent (Pass 3):**
+
+   > Fix the CI failure on PR #\<number\> in worktree \<path\>. The failing CI label is \<ci-failure-label\>; this is the label to remove once the failure is fixed (not a GitHub check name).
+   > Diagnose using ci_get_logs, apply the fix, run make pc, commit, push.
+   > After a successful push, remove this failing CI label using github_manage_labels(number: \<number\>, remove: ["\<ci-failure-label\>"]).
+   > The CI system will re-add the label if CI fails again after the push.
+   > If unfixable, comment on the PR with the diagnosed root cause and what was attempted — do not remove the label.
    >
    > Tool preferences:
    >
