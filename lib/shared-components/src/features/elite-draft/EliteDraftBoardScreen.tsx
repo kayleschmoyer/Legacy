@@ -34,8 +34,8 @@ export interface EliteDraftBoardScreenProps {
   onNavigate: (path: string) => void;
   /** WebSocket URL for live draft updates. */
   websocketUrl: string;
-  /** Auth token for WebSocket authentication. */
-  websocketToken?: string;
+  /** Optional auth token for the draft WebSocket. When omitted the socket defers until a token becomes available. */
+  token?: string;
   /** Optional render prop for the chat overlay. If omitted, chat is disabled. */
   renderChat?: DraftChatRenderer;
   /** Optional callback fired when a player is drafted (for analytics). */
@@ -46,6 +46,7 @@ export function EliteDraftBoardScreen({
   leagueId,
   onNavigate,
   websocketUrl,
+  token,
   renderChat,
   onPlayerDrafted,
 }: EliteDraftBoardScreenProps): React.JSX.Element {
@@ -132,6 +133,7 @@ export function EliteDraftBoardScreen({
     refetchAvailablePlayers: queries.refetchAvailablePlayers,
     refetchQueue: queries.refetchQueue,
     websocketUrl,
+    token,
     onPlayerDrafted,
   });
 
