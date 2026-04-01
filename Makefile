@@ -511,14 +511,18 @@ terraform-destroy: ## Destroy Terraform infrastructure
 	cd terraform && terraform destroy
 
 # Self-Hosted Runner AMI (see .agents/skills/infrastructure/references/ami-build.md)
+ifeq ($(strip $(VPC_ID)),)
+ami-build:
+	$(error VPC_ID is required. Usage: make ami-build VPC_ID=vpc-xxx SUBNET_ID=subnet-xxx)
+else ifeq ($(strip $(SUBNET_ID)),)
+ami-build:
+	$(error SUBNET_ID is required. Usage: make ami-build VPC_ID=vpc-xxx SUBNET_ID=subnet-xxx)
+else
 ami-build: ## Build self-hosted runner AMI with Packer (requires VPC_ID and SUBNET_ID)
-	@if [ -z "$(VPC_ID)" ] || [ -z "$(SUBNET_ID)" ]; then \
-		$(call echo_red,Error: VPC_ID and SUBNET_ID are required. Usage: make ami-build VPC_ID=vpc-xxx SUBNET_ID=subnet-xxx); \
-		exit 1; \
-	fi
 	@$(call echo_blue,Building self-hosted runner AMI...)
 	@$(call echo_yellow,This will create a new EC2 AMI. Typical build time: 5-10 minutes.)
 	cd terraform$(PATH_SEP)packer && packer init runner-ami.pkr.hcl && packer build -var "vpc_id=$(VPC_ID)" -var "subnet_id=$(SUBNET_ID)" runner-ami.pkr.hcl
+endif
 
 ami-list: ## List existing runner AMIs (most recent first)
 	@$(call echo_blue,Listing runner AMIs...)

@@ -165,6 +165,10 @@ const ALLOWED_TARGETS = new Set([
   // Composite
   'full-check',
   'dev-setup',
+
+  // Infrastructure
+  'ami-build',
+  'ami-list',
 ]);
 
 interface RunTargetParams {
@@ -223,6 +227,7 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
     'install-force',
     'full-check',
     'dev-setup',
+    'ami-build',
   ]);
   const timeoutMs = heavyTargets.has(target) ? 600_000 : 300_000;
 
