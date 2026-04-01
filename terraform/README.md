@@ -1,323 +1,185 @@
-# Infrastructure & Backend
+# Terraform — Infrastructure as Code
 
-AWS serverless infrastructure managed with Terraform and Lambda functions.
+AWS infrastructure for the legacy-sports platform, managed with Terraform.
 
-## 🏗️ Architecture Overview
-
-```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Frontend      │    │   API Gateway    │    │   Lambda        │
-│   (Web/Mobile)  │───▶│                  │───▶│   Functions     │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-                                │                        │
-                                ▼                        ▼
-                       ┌──────────────────┐    ┌─────────────────┐
-                       │   CloudWatch     │    │   PostgreSQL    │
-                       │   Logs           │    │   RDS           │
-                       └──────────────────┘    └─────────────────┘
-```
-
-## 🚀 Quick Setup
-
-### Prerequisites
-
-- **AWS CLI**: Configured with appropriate credentials
-- **Terraform**: v1.0+
-- **Node.js**: v18+ (for Lambda functions)
-
-### Infrastructure Deployment
-
-```bash
-# Navigate to terraform directory
-cd terraform
-
-# Initialize Terraform
-terraform init
-
-# Plan deployment
-terraform plan
-
-# Apply infrastructure
-terraform apply
-```
-
-## 🔧 Infrastructure Components
-
-### Custom Domain & DNS (Route 53)
-
-Manage your custom domain with Terraform:
-
-- **Domain**: Configurable via `domain_name` variable
-- **DNS Provider**: AWS Route 53
-- **Frontend**: Points to GitHub Pages deployment
-- **API**: Optional `api.yourdomain.com` subdomain
-- **SSL**: Automatic via Let's Encrypt (GitHub Pages)
-
-**Quick Start**: See [`docs/route53-setup-quickstart.md`](../docs/route53-setup-quickstart.md)
-
-**Full Guide**: [`docs/deployment/route53-github-pages-setup.md`](../docs/deployment/route53-github-pages-setup.md)
-
-**Cost**: ~$0.50/month (Route 53 hosted zone) + domain registration
-
-### API Gateway
-
-Central entry point for all API requests:
-
-- **Custom Domain**: `https://api.legacy-fantasy.com` (ACM cert + Route53 alias + API GW custom domain)
-- **Internal URL**: `https://bd1opa1yv7.execute-api.us-east-1.amazonaws.com/dev`
-- **Endpoints**:
-  - `/graphql` - GraphQL API
-  - `/oauth` - Authentication and user management
-  - `/stats` - Statistics processing
-  - `/games` - Game selection
-
-> **Note**: Legacy API Gateways (`u65oy98s9d`, `89vohxs7ta`) were decommissioned on September 26, 2025.
-
-### Lambda Functions
-
-| Function           | Purpose                   | Endpoint   | Status    |
-| ------------------ | ------------------------- | ---------- | --------- |
-| **GraphQL**        | Main API for data queries | `/graphql` | ✅ Active |
-| **OAuth Proxy**    | OAuth + user management   | `/oauth`   | ✅ Active |
-| **Stats Lambda**   | Statistics processing     | `/stats`   | ✅ Active |
-| **Game Selection** | Game data management      | `/games`   | ✅ Active |
-
-> **Legacy**: `legacy-sports-graphql-dev-graphql` Lambda was decommissioned on September 26, 2025.
-
-### Database
-
-- **Type**: PostgreSQL on AWS RDS
-- **Environment**: Development
-- **Access**: Via Lambda functions only (private subnets)
-
-### Networking
-
-- **VPC**: Custom VPC with public/private subnets
-- **Security Groups**: Restrictive access rules
-- **Subnets**: Separate for Lambda and RDS
-
-## 📦 Lambda Functions
-
-### GraphQL API (`lambdas/graphql/`)
-
-Main API serving GraphQL queries:
-
-- Player data queries
-- Statistics aggregation
-- Real-time data updates
-
-```bash
-# Deploy GraphQL Lambda
-pnpm run deploy:graphql
-```
-
-### OAuth Proxy (`lambdas/oauth-proxy/`)
-
-Handles Google OAuth authentication:
-
-- Login flow management
-- Token refresh
-- Session management
-
-```bash
-# Deploy OAuth Lambda
-pnpm run deploy:oauth
-```
-
-### Stats Lambda (`lambdas/stats-lambda/`)
-
-Background processing for statistics:
-
-- Data aggregation
-- Performance calculations
-- Historical data processing
-
-```bash
-# Deploy Stats Lambda
-pnpm run deploy:stats
-```
-
-## 🔧 Configuration
-
-### Environment Variables
-
-Set in Terraform and available to all Lambda functions:
-
-```hcl
-# terraform/variables.tf
-variable "environment" {
-  default = "dev"
-}
-
-variable "aws_region" {
-  default = "us-east-1"
-}
-```
-
-### Secrets Management
-
-Sensitive data stored in AWS Secrets Manager:
-
-- Database credentials
-- OAuth client secrets
-- JWT signing keys
-
-### Database Configuration
-
-PostgreSQL RDS instance with:
-
-- Automated backups
-- Multi-AZ for production
-- Security group restrictions
-
-## 🧪 Testing
-
-### Local Testing
-
-```bash
-# Test Lambda functions locally
-cd lambdas/graphql
-pnpm run test:local
-
-# Test with SAM CLI
-sam local start-api
-```
-
-### Integration Testing
-
-```bash
-# Test deployed endpoints
-pnpm run test:integration
-
-# Health check all endpoints
-pnpm run health:check
-```
-
-## 📊 Monitoring
-
-### CloudWatch
-
-All Lambda functions automatically log to CloudWatch:
-
-- Function execution logs
-- Performance metrics
-- Error tracking
-
-### Terraform Outputs
-
-View deployed resource information:
-
-```bash
-cd terraform
-terraform output
-```
-
-Key outputs:
-
-- `graphql_endpoint`: GraphQL API URL
-- `api_gateway_url`: Base API URL
-- Environment variables summary
-
-## 🔍 Troubleshooting
-
-### Common Issues
-
-**Terraform fails to apply**:
-
-- Check AWS credentials and permissions
-- Verify region configuration
-- Review state file for conflicts
-
-**Lambda deployment fails**:
-
-- Check function size limits
-- Verify IAM permissions
-- Review CloudWatch logs
-
-**Database connection issues**:
-
-- Check security group rules
-- Verify subnet configuration
-- Test from Lambda function
-
-### Debugging
-
-**CloudWatch Logs**:
-
-```bash
-# View recent logs
-aws logs tail /aws/lambda/legacy-sports-dev-graphql --follow
-
-# Search specific timeframe
-aws logs filter-log-events --log-group-name /aws/lambda/legacy-sports-dev-graphql --start-time 1609459200000
-```
-
-**Function Testing**:
-
-```bash
-# Invoke function directly
-aws lambda invoke --function-name legacy-sports-dev-graphql response.json
-```
-
-## 🚀 Deployment
-
-### CI/CD Pipeline
-
-GitHub Actions automatically deploy:
-
-- **Trigger**: Push to main branch
-- **Build**: Package Lambda functions
-- **Deploy**: Update infrastructure
-
-### Manual Deployment
-
-```bash
-# Deploy all infrastructure
-cd terraform
-terraform apply
-
-# Deploy specific Lambda
-pnpm run deploy:graphql
-
-# Update environment variables
-terraform apply -target=aws_lambda_function.graphql
-```
-
-### Environment Management
-
-- **Development**: Current setup
-- **Production**: Separate Terraform workspace
-- **Staging**: Optional environment
-
-## � Recent Changes
-
-### September 26, 2025 - Infrastructure Cleanup
-
-**Legacy Resource Decommissioning**: Removed unused AWS resources to optimize costs and simplify architecture.
-
-**Resources Removed**:
-
-- 2x Legacy API Gateway instances (`u65oy98s9d`, `89vohxs7ta`)
-- 1x Legacy Lambda function (`legacy-sports-graphql-dev-graphql`)
-- 1x Legacy S3 bucket (`legacy-sports-dev-lambdas-f3d4b778`)
-- Associated IAM roles and policies
-
-**Current Active Infrastructure**:
-
-- API Gateway: `dtx9mcsty1.execute-api.us-east-1.amazonaws.com/dev`
-- 4x Lambda functions (GraphQL, OAuth with user management, Stats, Games)
-- PostgreSQL RDS with VPC networking
-- S3 deployment bucket: `legacy-sports-dev-lambdas-cca20ad9`
-
-**Impact**: Cost reduction, simplified maintenance, no functional changes.
-
-## �📚 Resources
-
-- [AWS Lambda Documentation](https://docs.aws.amazon.com/lambda/)
-- [Terraform AWS Provider](https://registry.terraform.io/providers/hashicorp/aws/latest/docs)
-- [API Gateway Documentation](https://docs.aws.amazon.com/apigateway/)
-- [PostgreSQL on RDS](https://docs.aws.amazon.com/rds/latest/userguide/CHAP_PostgreSQL.html)
+> **Working locally?** See the [terraform-local-apply skill](../.agents/skills/terraform-local-apply/SKILL.md) for the full workflow, safety model, and troubleshooting guide.
 
 ---
 
-For infrastructure issues, check CloudWatch logs and Terraform state.
+## Architecture
+
+```
+GitHub Actions (OIDC)
+        │
+        ▼
+  API Gateway ──▶ Lambda Functions ──▶ RDS (PostgreSQL)
+        │                │                    │
+        │           Secrets Manager      RDS Proxy
+        │                │
+        ▼                ▼
+  CloudWatch Logs   VPC Endpoints
+                   (no NAT needed for AWS services)
+
+  NAT Instance ──▶ Google APIs / external services
+  (private subnets only)
+
+  Self-hosted Runners (EC2 Spot via github-aws-runners module)
+  webhook ──▶ API GW ──▶ Lambda ──▶ EC2 Spot fleet
+```
+
+---
+
+## What this config manages
+
+| Component                  | File(s)                  | Notes                                                                                                                |
+| -------------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| VPC, subnets, route tables | `vpc.tf`                 | Public + private Lambda + private DB subnets                                                                         |
+| API Gateway (REST)         | `api_gateway.tf`         | Custom domain `api.legacy-fantasy.com`                                                                               |
+| Lambda functions           | `lambda*.tf`             | GraphQL, OAuth proxy, stats, game-selection, draft-processor, websocket, jira-proxy, rollbar-discord, stripe-webhook |
+| RDS PostgreSQL             | `database.tf`            | Private subnets; RDS Proxy enabled                                                                                   |
+| Secrets Manager            | `secrets.tf`             | DB creds, OAuth secrets, webhook secrets                                                                             |
+| VPC Endpoints              | `vpc-endpoints.tf`       | Secrets Manager + CloudWatch Logs (Interface); S3 (Gateway) — eliminates NAT for AWS service calls                   |
+| NAT instance               | `nat-instance.tf`        | Lightweight EC2 NAT for Google API / external HTTPS from private subnets (~$4/month vs $45 for NAT GW)               |
+| GitHub Actions OIDC        | `github-actions-oidc.tf` | Keyless CI auth; inline + supplemental managed policy                                                                |
+| GitHub Actions IAM         | `github-actions-iam.tf`  | Additional IAM resources for CI                                                                                      |
+| Self-hosted runners        | `github-runners.tf`      | `enable_github_runners = false` locally — see Runner section below                                                   |
+| EventBridge rules          | `eventbridge.tf`         | Score alert and waiver claim processing                                                                              |
+| SQS queues                 | `sqs.tf`                 | Dead-letter queues for async Lambda processing                                                                       |
+| CloudWatch alarms          | `monitoring.tf`          | DLQ depth alarms → SNS → Discord                                                                                     |
+| Route 53                   | `route53.tf`             | DNS for `legacy-fantasy.com` and subdomains                                                                          |
+| ACM certificates           | `api_gateway.tf`         | TLS cert for `api.legacy-fantasy.com`                                                                                |
+| Budgets                    | `budgets.tf`             | Monthly cost alerts                                                                                                  |
+| CI artifact S3             | `ci-artifacts.tf`        | Narrow OIDC role for feature-branch artifact uploads                                                                 |
+
+---
+
+## Feature flags (`infra.auto.tfvars`)
+
+This file is **committed to the repo** and read by both local and CI applies.
+
+| Flag                            | Default             | Purpose                              |
+| ------------------------------- | ------------------- | ------------------------------------ |
+| `enable_rds_proxy`              | `true`              | RDS Proxy for Lambda DB connectivity |
+| `enable_github_runners`         | `false`             | See Runner section below             |
+| `github_runners_instance_types` | `[c7a.xlarge, ...]` | Spot fleet instance diversity        |
+| `github_runners_max_count`      | `20`                | Hard ceiling on runner fleet size    |
+
+---
+
+## Self-hosted runners — management model
+
+Runner infrastructure (autoscaling group, SGs, Lambdas, event bus, S3, IAM) is **intentionally excluded from the normal Terraform apply loop**:
+
+- `enable_github_runners = false` in `infra.auto.tfvars`
+- **CI does not override this flag** — `lambda-terraform-apply.yml` reads the file directly and never sets `TF_VAR_enable_github_runners=true`
+- Runner resources are **not in Terraform state** — removing them prevents phantom destroy plans on every apply
+
+### How runners actually scale
+
+Runners are fully self-managing once provisioned:
+
+```
+GitHub workflow_job webhook
+        │
+        ▼
+API Gateway (runner webhook endpoint)
+        │
+        ▼
+scale-up Lambda ──▶ EC2 Spot fleet (ASG)
+        │
+        └─▶ scale-down Lambda (cron, every minute) terminates idle runners
+```
+
+The EC2 instances register themselves with GitHub as self-hosted runners on boot and deregister on termination. No Terraform apply is needed for day-to-day scaling.
+
+### Making runner config changes
+
+If you need to change runner infrastructure (egress rules, instance types, IAM, module version):
+
+```bash
+# 1. Ensure runner secrets are in secrets.auto.tfvars:
+#    github_app_id, github_app_key_base64, github_app_webhook_secret
+
+# 2. Preview changes (never apply without reviewing first)
+terraform -chdir=terraform plan -var="enable_github_runners=true"
+
+# 3. Apply ONLY runner resources — never apply the full stack with runners enabled
+terraform -chdir=terraform apply -var="enable_github_runners=true" \
+  -target=module.github_runners
+```
+
+> ⚠️ Never run `terraform apply -var="enable_github_runners=true"` without `-target`. A full apply with runners enabled will plan to recreate all runner infrastructure and may disrupt the live fleet.
+
+See [LS-2057](https://bkrupa.atlassian.net/browse/LS-2057) for the work to restore full automated Terraform management of runner infrastructure.
+
+---
+
+## CI/CD apply loop
+
+The `lambda-terraform-apply.yml` workflow runs on every push to `main`:
+
+1. Validates required secrets are present
+2. Debounces 30 s to batch concurrent Lambda version SSM updates
+3. Runs `terraform init` + `terraform apply -auto-approve`
+4. Applies with `enable_github_runners = false` — **runner resources are never touched by CI**
+
+The apply primarily reconciles:
+
+- Lambda function configurations and aliases
+- IAM policies (GitHub Actions role, Lambda roles)
+- API Gateway deployments
+- Secrets Manager resource policies
+- VPC endpoint policies
+
+---
+
+## State management
+
+- **Backend**: S3 (`legacy-sports-terraform-state`) + DynamoDB (`terraform-state-locks`)
+- **Lock clearing**: `node scripts/terraform-unlock.js` — use before any local plan/apply
+- **Runner resources**: intentionally absent from state (see Runner section above)
+
+### Known intentional state omissions
+
+| Resource                          | Reason                                                                          |
+| --------------------------------- | ------------------------------------------------------------------------------- |
+| `module.github_runners` resources | Self-scaling fleet; managed separately with `-var="enable_github_runners=true"` |
+
+---
+
+## Sensitive variables (`secrets.auto.tfvars`)
+
+This file is **gitignored** and lives only in the main repo. Copy it to a worktree with:
+
+```bash
+make wt-setup WT=<worktree-path>
+```
+
+Required keys:
+
+| Variable                    | Source                               |
+| --------------------------- | ------------------------------------ |
+| `github_app_id`             | GitHub App for runner webhook        |
+| `github_app_key_base64`     | GitHub App private key (base64)      |
+| `github_app_webhook_secret` | GitHub App webhook HMAC secret       |
+| `jira_credentials`          | Jira API token for jira-proxy Lambda |
+
+---
+
+## Local development quickstart
+
+```bash
+# 1. Verify AWS credentials
+aws sts get-caller-identity
+
+# 2. Clear any stale state lock
+node scripts/terraform-unlock.js
+
+# 3. Plan (runners excluded by default)
+terraform -chdir=terraform plan
+
+# 4. Apply
+terraform -chdir=terraform apply
+```
+
+Full workflow, targeting guide, and troubleshooting: [terraform-local-apply skill](../.agents/skills/terraform-local-apply/SKILL.md).

@@ -77,6 +77,13 @@ resource "aws_instance" "nat_instance" {
     Name    = "${local.name_prefix}-nat-instance"
     Purpose = "Cost-effective NAT for Google API access"
   })
+
+  lifecycle {
+    # public_ip and public_dns are reported by the provider as computed /
+    # known-after-apply when an EIP is attached. We use the EIP (aws_eip.nat_instance)
+    # as the stable address; ignoring these attributes avoids persistent phantom diffs.
+    ignore_changes = [public_ip, public_dns]
+  }
 }
 
 # Update route table to use NAT instance instead of NAT Gateway

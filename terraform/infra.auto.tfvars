@@ -15,14 +15,20 @@
 enable_rds_proxy = true
 
 # ── Self-hosted GitHub Actions Runners ────────────────────────────────────────
-# ⚠️  INTENTIONALLY false — this is a safety guard against accidental local
-# terraform apply destroying live runner infrastructure (dozens of resources).
+# ⚠️  INTENTIONALLY false — this is a safety guard against accidental local or
+# CI terraform apply destroying live runner infrastructure (dozens of resources).
 #
-# CI sets TF_VAR_enable_github_runners=true alongside the required secrets
-# (RUNNER_GITHUB_APP_ID, RUNNER_GITHUB_APP_KEY_BASE64,
-# RUNNER_GITHUB_APP_WEBHOOK_SECRET). Local config keeps runners disabled, so
-# using this file with the same remote state will plan (and on apply, perform)
-# destroys of any existing runner infrastructure.
+# Runner infrastructure was provisioned once via a targeted apply with
+# enable_github_runners=true and the required secrets. It is currently NOT
+# continuously managed through this Terraform config — runner scaling is handled
+# by the autoscaling module itself (webhook → Lambda → EC2 spot).
+#
+# NOTE: CI does NOT override this flag. The lambda-terraform-apply workflow reads
+# this file directly and only validates runner secrets when the value is true.
+# This means runner resources (SGs, ASGs, Lambdas) are intentionally outside
+# the normal plan/apply loop.
+#
+# See LS-2057 for the work to restore full Terraform management of runner infra.
 #
 # To see an accurate plan that includes runner resources:
 #   terraform plan -var="enable_github_runners=true"

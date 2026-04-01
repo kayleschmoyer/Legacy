@@ -608,7 +608,7 @@ import {
 
 resource "aws_iam_policy" "github_actions_supplemental" {
   name        = "${local.name_prefix}-github-actions-supplemental"
-  description = "Supplemental permissions for the GitHub Actions OIDC role (overflow from 10 KB inline policy limit)"
+  description = "Supplemental permissions for GitHub Actions OIDC role (overflow from 10KB inline policy limit)"
 
   policy = jsonencode({
     Version = "2012-10-17"

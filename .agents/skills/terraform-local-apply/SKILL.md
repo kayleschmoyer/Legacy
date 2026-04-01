@@ -17,13 +17,33 @@ Run Terraform against the AWS dev environment from a local workstation or worktr
 enable_github_runners = false
 ```
 
-This is the safety guard that prevents local applies from destroying the self-hosted EC2 runner fleet. CI overrides it via `TF_VAR_enable_github_runners=true` alongside the required GitHub App secrets.
+This is an intentional safety guard. Runner infrastructure was provisioned once via a targeted apply and is **not** continuously managed through the Terraform apply loop. Runners are self-managing — a GitHub `workflow_job` webhook triggers a Lambda that scales the EC2 Spot fleet up, and a cron Lambda scales it down. No Terraform apply is needed for day-to-day runner scaling.
 
-**What this means for local applies:**
+**CI does NOT override this flag.** The `lambda-terraform-apply.yml` workflow reads `infra.auto.tfvars` directly and only validates runner secrets when the value is `true`. Runner resources (SGs, ASGs, Lambdas) are intentionally outside the normal plan/apply loop.
 
-- A plain `terraform plan` / `terraform apply` is safe — runners will not be touched
-- If you want an accurate plan that _includes_ runner resources, add `-var="enable_github_runners=true"` — but **do not apply** with this flag locally, it will destroy live runner infrastructure
-- Never override `enable_github_runners=true` in a local apply unless you are intentionally managing runner infrastructure and know the consequences
+**What this means for local and CI applies:**
+
+- A plain `terraform plan` / `terraform apply` (local or CI) is safe — runner resources are never in the diff
+- To see a plan that _includes_ runner resources, add `-var="enable_github_runners=true"` — but **do not apply without `-target`** (see Runner Config Changes below)
+- See [LS-2057](https://bkrupa.atlassian.net/browse/LS-2057) for the work to restore full automated Terraform management of runner infrastructure
+
+### Making Runner Config Changes
+
+If you need to change runner infrastructure (egress rules, instance types, IAM, module version):
+
+```powershell
+# 1. Ensure runner secrets are present in secrets.auto.tfvars:
+#    github_app_id, github_app_key_base64, github_app_webhook_secret
+
+# 2. Preview runner changes (always review before applying)
+terraform -chdir=terraform plan -var="enable_github_runners=true"
+
+# 3. Apply ONLY runner resources — never apply the full stack with runners enabled
+terraform -chdir=terraform apply -var="enable_github_runners=true" `
+  -target=module.github_runners
+```
+
+> ⚠️ Never run `terraform apply -var="enable_github_runners=true"` without `-target`. A full apply with runners enabled will plan to recreate all runner infrastructure and may disrupt the live fleet.
 
 ## Prerequisites
 

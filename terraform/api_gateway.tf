@@ -383,6 +383,12 @@ resource "aws_api_gateway_gateway_response" "cors" {
   response_templates = {
     "application/json" = "{\"message\":$context.error.messageString}"
   }
+
+  lifecycle {
+    # status_code is managed by AWS defaults per response type and is not set in
+    # this config. The provider reads it back on refresh causing a phantom diff.
+    ignore_changes = [status_code]
+  }
 }
 
 # ─── Custom domain: api.<domain> ───────────────────────────────────────────────

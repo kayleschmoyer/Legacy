@@ -96,8 +96,10 @@ resource "aws_db_proxy" "main" {
   name          = "${local.name_prefix}-gql-proxy"
   engine_family = "POSTGRESQL"
   auth {
-    auth_scheme = "SECRETS"
-    secret_arn  = aws_secretsmanager_secret.database_credentials.arn
+    auth_scheme               = "SECRETS"
+    iam_auth                  = "DISABLED"
+    client_password_auth_type = "POSTGRES_SCRAM_SHA_256"
+    secret_arn                = aws_secretsmanager_secret.database_credentials.arn
   }
 
   role_arn               = aws_iam_role.rds_proxy[0].arn

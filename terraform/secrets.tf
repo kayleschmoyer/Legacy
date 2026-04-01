@@ -233,7 +233,7 @@ resource "aws_secretsmanager_secret_version" "stripe_webhook_secret" {
 # Value is managed via TF_VAR_jira_credentials (GitHub Actions secret JIRA_CREDENTIALS)
 # Format: {"client_id":"...","client_secret":"...","cloud_id":"...","site_url":"https://<org>.atlassian.net"}
 resource "aws_secretsmanager_secret" "jira_credentials" {
-  name        = "${local.name_prefix}-jira-credentials"
+  name        = "${var.environment}/jira-credentials"
   description = "Jira OAuth 2.0 credentials (service account client credentials) for bug report proxy"
 
   tags = local.common_tags
