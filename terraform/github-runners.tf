@@ -299,6 +299,9 @@ resource "aws_iam_policy" "runner_permissions_boundary" {
       },
       # SSM Parameter Store — scoped to runner-prefixed parameters.
       # Lambdas read config/secrets; EC2 runners write registration tokens.
+      # Two resource paths are required: the module stores app secrets under
+      # the github-action-runners/ namespace, while runner tokens and config
+      # live under the top-level name_prefix path.
       {
         Sid    = "SSMParameterStore"
         Effect = "Allow"
@@ -312,7 +315,10 @@ resource "aws_iam_policy" "runner_permissions_boundary" {
           "ssm:RemoveTagsFromResource",
           "ssm:ListTagsForResource"
         ]
-        Resource = "arn:aws:ssm:${local.region}:${local.account_id}:parameter/${local.name_prefix}-runner*"
+        Resource = [
+          "arn:aws:ssm:${local.region}:${local.account_id}:parameter/${local.name_prefix}-runner*",
+          "arn:aws:ssm:${local.region}:${local.account_id}:parameter/github-action-runners/${local.name_prefix}-runner*",
+        ]
       },
       # SSM DescribeParameters — does not support resource-level scoping.
       {
@@ -342,14 +348,18 @@ resource "aws_iam_policy" "runner_permissions_boundary" {
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/lambda/${local.name_prefix}-runner-*:*"
         ]
       },
-      # S3 read — runner binary bucket (managed by the module)
+      # S3 — runner binary bucket (managed by the module).
+      # PutObject is required by the runner-binaries-syncer Lambda to upload
+      # new runner tarballs; GetObject/ListBucket are used by EC2 instances
+      # and scale-up Lambda to download the binary during provisioning.
       {
         Sid    = "S3RunnerBinaries"
         Effect = "Allow"
         Action = [
           "s3:GetObject",
           "s3:GetObjectVersion",
-          "s3:ListBucket"
+          "s3:ListBucket",
+          "s3:PutObject"
         ]
         Resource = [
           "arn:aws:s3:::${local.name_prefix}-runner-*",
