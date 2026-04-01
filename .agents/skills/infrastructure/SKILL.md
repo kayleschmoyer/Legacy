@@ -27,12 +27,13 @@ Covers all infrastructure operations: AWS authentication, Terraform changes, Lam
 
 ## Critical Rules
 
-1. **Always clear Terraform locks first** — run `node scripts/terraform-unlock.js` before any `terraform plan` or `terraform apply`
-2. **Always rebuild with `--skip-nx-cache` before deploy** — stale Nx cache has caused production incidents where new code was missing from the bundle
-3. **Plan before apply** — always `terraform plan` first, review changes, then `terraform apply`
-4. **Deploy infrastructure before code** — Terraform changes must be applied before Lambda code deployment
-5. **Never pipe `terraform apply` output** — truncating filters (e.g., `Select-Object -Last`) kill Terraform mid-operation, orphaning state locks
-6. **Never commit AWS credentials** — use SSO, IAM roles, or environment variables
+1. **Check AWS auth before any operation** — run `aws_sso_status()` (MCP) or `aws sts get-caller-identity` (shell) first. If credentials are expired, **stop immediately and prompt the user**: Your AWS SSO session has expired. Please run: aws sso login — let me know when you're done and I'll retry. Do not retry the failing command — SSO errors do not self-resolve.
+2. **Always clear Terraform locks first** — run `node scripts/terraform-unlock.js` before any `terraform plan` or `terraform apply`
+3. **Always rebuild with `--skip-nx-cache` before deploy** — stale Nx cache has caused production incidents where new code was missing from the bundle
+4. **Plan before apply** — always `terraform plan` first, review changes, then `terraform apply`
+5. **Deploy infrastructure before code** — Terraform changes must be applied before Lambda code deployment
+6. **Never pipe `terraform apply` output** — truncating filters (e.g., `Select-Object -Last`) kill Terraform mid-operation, orphaning state locks
+7. **Never commit AWS credentials** — use SSO, IAM roles, or environment variables
 
 ## Quick Reference
 

@@ -19,6 +19,14 @@ Run a structured review of all branch changes before committing/pushing. Catches
 
 ### Phase 2: Create PR with Jira Linkage
 
+Before creating a PR, verify GitHub auth is working:
+
+```
+github_auth_status()
+```
+
+If `configured: false`, **stop and prompt the user** — do not silently fall back to `gh` CLI. Tell them their GitHub credentials are missing or expired and direct them to set `GH_TOKEN` or `GITHUB_TOKEN`, run `gh auth login`, or configure `AGENT_AUTHOR_APP_PRIVATE_KEY`. Only fall back to `gh` CLI after the user confirms their auth is working or explicitly asks you to try the CLI fallback.
+
 Verify prerequisites (`make pc`, migrations, branch pushed), create the PR **as a draft** with standard template, mark it ready for review, then transition Jira to "In Review". The draft→ready flow prevents sweep/review agents from racing with the creating agent.
 
 > Details: [references/create-pr.md](references/create-pr.md)

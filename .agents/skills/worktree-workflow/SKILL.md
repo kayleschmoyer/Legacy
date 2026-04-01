@@ -97,7 +97,9 @@ worktree_unlock(worktree: "LS-1234")
 
 ## Complete Workflow
 
-> **🔔 Blocker check comes first** — always verify "blocked-by" dependencies before changing Jira status.
+> **🔑 Auth check comes first** — call `jira_auth_status()` before touching any Jira tool. If `configured: false`, **stop and prompt the user** (see AGENTS.md Critical Rules for the exact wording and env vars to check). Do not silently fall back to the Atlassian plugin.
+
+> **🔔 Blocker check comes next** — always verify "blocked-by" dependencies before changing Jira status.
 
 ### Step 0: Check for Parent Dependencies
 

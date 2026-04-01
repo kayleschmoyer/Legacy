@@ -20,6 +20,18 @@ Autonomously work a Jira ticket from To Do to In Review (or Done). Handles two m
 
 ## Steps
 
+### Step 0: Verify Jira auth
+
+```
+jira_auth_status()
+```
+
+If `configured: false` or the call fails, **stop immediately** and tell the user:
+
+> "Jira authentication is not configured or has expired. Please check your `JIRA_CLIENT_ID`, `JIRA_CLIENT_SECRET`, and `JIRA_CLOUD_ID` env vars. Let me know once it's fixed and I'll continue — or if you're on Claude Code on the web and want me to fall back to the Atlassian plugin, just say so."
+
+Do not proceed until auth is confirmed working or the user explicitly opts in to a fallback.
+
 ### Step 1: Inspect the ticket
 
 ```

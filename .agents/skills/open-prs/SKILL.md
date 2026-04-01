@@ -76,6 +76,15 @@ This skill delegates to specialized sub-skills for each operation category. Load
 
 ## Prerequisites
 
+**Before starting any sweep, verify auth is working:**
+
+```
+github_auth_status()
+jira_auth_status()   # Jira is needed for ticket transitions (In Review, Done) during the sweep
+```
+
+If either returns `configured: false`, **stop and prompt the user** before proceeding. For GitHub: direct them to set `GH_TOKEN` or `GITHUB_TOKEN`, or run `gh auth login`. For Jira: direct them to check `JIRA_CLIENT_ID`/`JIRA_CLIENT_SECRET`/`JIRA_CLOUD_ID`. Do not silently fall back to CLI tools — broken auth will cause partial, misleading sweep results.
+
 ### Local Agent
 
 - Running from the main repo directory (`D:\code\legacy-sports`)
