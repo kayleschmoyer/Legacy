@@ -825,14 +825,16 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
       description:
         'Read the contents of a file at a specific git ref (branch, tag, or SHA) ' +
         'without checking it out. Useful for inspecting files on remote branches ' +
-        'during CI triage. Runs `git show <ref>:<path>`.',
+        'during CI triage. Runs `git show <ref>:<path>`. ' +
+        'Defaults to HEAD when `ref` is omitted.',
       inputSchema: {
         type: 'object' as const,
         properties: {
           ref: {
             type: 'string',
             description:
-              'Git ref to read from (e.g. "origin/main", "origin/LS-1234/branch", "HEAD~1", a SHA).',
+              'Git ref to read from (e.g. "origin/main", "origin/LS-1234/branch", "HEAD~1", a SHA). ' +
+              'Defaults to "HEAD" when omitted.',
           },
           path: {
             type: 'string',
@@ -844,8 +846,20 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
             description:
               'Optional ticket key. Uses active worktree if omitted, falls back to main repo if no active worktree is set.',
           },
+          startLine: {
+            type: 'integer',
+            minimum: 1,
+            description:
+              'First line to return (1-based, inclusive). Omit to return the full file.',
+          },
+          endLine: {
+            type: 'integer',
+            minimum: 1,
+            description:
+              'Last line to return (1-based, inclusive). Requires startLine. Defaults to startLine when omitted.',
+          },
         },
-        required: ['ref', 'path'],
+        required: ['path'],
       },
     },
     {
@@ -3476,13 +3490,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     // -----------------------------------------------------------------------
     case 'worktree_show_file': {
       const {
-        ref,
+        ref: rawRef,
         path: filePath,
         worktree,
+        startLine: startLineArg,
+        endLine: endLineArg,
       } = args as {
-        ref: string;
+        ref?: string;
         path: string;
         worktree?: string;
+        startLine?: number;
+        endLine?: number;
       };
 
       let cwd: string;
@@ -3499,6 +3517,61 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         cwd = activeWorktree;
       } else {
         cwd = MAIN_REPO;
+      }
+
+      // Default ref to HEAD when omitted (common when worktree is specified)
+      const ref = rawRef ?? 'HEAD';
+
+      // Reject endLine without startLine
+      if (endLineArg !== undefined && startLineArg === undefined) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: '`endLine` requires `startLine` to be provided.',
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      // Validate line range if provided
+      if (startLineArg !== undefined) {
+        if (!Number.isInteger(startLineArg) || startLineArg < 1) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Invalid startLine: must be an integer >= 1, got ${startLineArg}.`,
+              },
+            ],
+            isError: true,
+          };
+        }
+        const end = endLineArg ?? startLineArg;
+        if (!Number.isInteger(end) || end < startLineArg) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Invalid endLine: must be an integer >= startLine (${startLineArg}), got ${end}.`,
+              },
+            ],
+            isError: true,
+          };
+        }
+        const MAX_LINE_RANGE = 1000;
+        if (end - startLineArg + 1 > MAX_LINE_RANGE) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Line range too large: ${end - startLineArg + 1} lines requested, max is ${MAX_LINE_RANGE}.`,
+              },
+            ],
+            isError: true,
+          };
+        }
       }
 
       // Validate ref (reject option-like values and only safe rev chars)
@@ -3544,17 +3617,32 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       try {
-        const content = runGit(['show', `${ref}:${filePath}`], cwd);
+        let content = runGit(['show', `${ref}:${filePath}`], cwd);
+
+        // Apply line range if provided
+        if (startLineArg !== undefined) {
+          const endLine = endLineArg ?? startLineArg;
+          const allLines = content.split('\n');
+          const sliced = allLines.slice(startLineArg - 1, endLine);
+          content = sliced
+            .map((line, i) => `${startLineArg + i}\t${line}`)
+            .join('\n');
+        }
 
         // Truncate large file contents to prevent exceeding MCP/stdio limits.
         // We use a character limit (not byte limit) to avoid splitting multi-byte
         // UTF-8 characters, and apply it after JSON.stringify so the final
         // serialized output respects the size budget.
         const MAX_OUTPUT_CHARS = 512_000; // ~512 KB for ASCII content
+        const lineRange =
+          startLineArg !== undefined
+            ? { startLine: startLineArg, endLine: endLineArg ?? startLineArg }
+            : {};
         const jsonPayload = JSON.stringify(
           {
             ref,
             path: filePath,
+            ...lineRange,
             content,
             truncated: false,
           },
@@ -3568,6 +3656,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               {
                 ref,
                 path: filePath,
+                ...lineRange,
                 content:
                   content.slice(0, MAX_OUTPUT_CHARS) +
                   `\n\n... [truncated — output exceeds ${MAX_OUTPUT_CHARS / 1000}KB. Consider reading a smaller file or a specific section.]`,
