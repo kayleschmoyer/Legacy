@@ -471,16 +471,18 @@ test.describe('Draft Selection Workflow @regression', () => {
       timeout: 5000,
     });
     await draftPage.draftPlayerButton.first().click();
-    await page.waitForTimeout(1000);
 
     // Verify the makeDraftPick mutation was captured
-    const pickMutations = capturedMutations.filter(
-      (m) =>
-        m.operationName?.toLowerCase().includes('makedraftpick') ||
-        m.query?.toLowerCase().includes('makedraftpick'),
-    );
-
-    expect(pickMutations.length).toBeGreaterThan(0);
+    await expect
+      .poll(
+        () =>
+          capturedMutations.filter(
+            (m) =>
+              m.operationName?.toLowerCase().includes('makedraftpick') ||
+              m.query?.toLowerCase().includes('makedraftpick'),
+          ).length,
+      )
+      .toBeGreaterThan(0);
   });
 
   test("should show correct turn indicator when it is not the user's turn", async ({
@@ -588,7 +590,6 @@ test.describe('Draft Selection Workflow @regression', () => {
       timeout: 5000,
     });
     await draftPage.draftPlayerButton.first().click();
-    await page.waitForTimeout(2000);
 
     // Look for error indication — either an alert or the page remains functional
     const errorAlert = page.locator('[role="alert"]').first();

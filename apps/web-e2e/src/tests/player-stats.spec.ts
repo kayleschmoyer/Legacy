@@ -188,9 +188,6 @@ test.describe('Player Statistics Page @regression', () => {
     // Type in a search query
     await searchInput.fill('Trout');
 
-    // Wait for search results to update
-    await page.waitForTimeout(1000); // Allow for debounced search
-
     // Verify the page is still functional after search
     await expect(searchInput).toHaveValue('Trout');
 
@@ -200,7 +197,7 @@ test.describe('Player Statistics Page @regression', () => {
 
     // Clear search
     await searchInput.clear();
-    await page.waitForTimeout(500);
+    await expect(searchInput).toHaveValue('');
   });
 
   test('should support view mode switching', async ({ page }) => {
@@ -210,16 +207,12 @@ test.describe('Player Statistics Page @regression', () => {
 
     if (await battingTab.isVisible()) {
       await battingTab.click();
-      await page.waitForTimeout(500);
-
       // Verify batting view is active
       await expect(battingTab).toHaveAttribute('data-state', 'active');
     }
 
     if (await pitchingTab.isVisible()) {
       await pitchingTab.click();
-      await page.waitForTimeout(500);
-
       // Verify pitching view is active
       await expect(pitchingTab).toHaveAttribute('data-state', 'active');
     }
@@ -234,13 +227,10 @@ test.describe('Player Statistics Page @regression', () => {
 
     // Click to sort — verify no crash
     await hrHeader.click();
-    await page.waitForTimeout(300);
+    await expect(hrHeader).toBeVisible();
 
     // Click again to reverse sort
     await hrHeader.click();
-    await page.waitForTimeout(300);
-
-    // Page should still be functional
     await expect(hrHeader).toBeVisible();
   });
 
@@ -266,18 +256,20 @@ test.describe('Player Statistics Page @regression', () => {
       const isNextEnabled = await paginationNext.isEnabled();
 
       if (isNextEnabled) {
-        // Click next
+        // Click next — wait for Previous to become enabled as a concrete sign
+        // that pagination changed (Previous is disabled on page 1)
         await paginationNext.click();
-        await page.waitForTimeout(1000);
+        await expect.poll(() => paginationPrev.isEnabled()).toBe(true);
 
-        // Verify previous button becomes available after navigating forward
         // Go back if previous button is available
         if (
           (await paginationPrev.isVisible()) &&
           (await paginationPrev.isEnabled())
         ) {
           await paginationPrev.click();
-          await page.waitForTimeout(1000);
+          // Wait for the page-change to settle: Previous should become disabled
+          // again once we're back on page 1 (or wait for Next to re-enable)
+          await expect.poll(() => paginationNext.isEnabled()).toBe(true);
         }
       }
     }

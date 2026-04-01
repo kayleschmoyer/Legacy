@@ -255,10 +255,18 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
     await page.goto(leagueUrl);
     await page.waitForLoadState('networkidle');
 
-    // Wait for initial GraphQL queries to complete
-    await page.waitForTimeout(2000);
-
     // Verify that league data was fetched
+    await expect
+      .poll(
+        () =>
+          graphqlRequests.filter(
+            (req) =>
+              req.query?.includes('league') ||
+              req.operationName?.includes('League'),
+          ).length,
+      )
+      .toBeGreaterThan(0);
+
     const leagueQueries = graphqlRequests.filter(
       (req) =>
         req.query?.includes('league') || req.operationName?.includes('League'),
@@ -378,7 +386,7 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
     }
 
     // Wait for GraphQL mutation to complete
-    await page.waitForTimeout(3000);
+    await expect.poll(() => draftMutation).toBeTruthy();
 
     // Verify mutation was sent
     expect(draftMutation).toBeTruthy();
@@ -491,9 +499,6 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
       await confirmButton.click();
     }
 
-    // Wait for error handling
-    await page.waitForTimeout(2000);
-
     // Look for error messages in the UI
     const errorElements = await page.locator('[role="alert"]').all();
     const alertMessages: string[] = [];
@@ -595,9 +600,6 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
     await page.goto(leagueUrl);
     await page.waitForLoadState('networkidle');
 
-    // Wait for initial queries
-    await page.waitForTimeout(2000);
-
     // Mocks guarantee the button is available
     const startDraftButton = page
       .locator('button')
@@ -624,21 +626,28 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
       await confirmButton.click();
     }
 
-    await page.waitForTimeout(3000);
+    // Wait for the InitializeDraft mutation specifically to appear in captured operations
+    // (narrow filter: only match by operation name to avoid false positives from
+    // common league queries that also carry leagueId in their variables)
+    await expect
+      .poll(() => {
+        const opsAfter = graphqlOperations.slice(
+          operationsBeforeMutation.length,
+        );
+        return opsAfter.filter((op) => op.operation === 'InitializeDraft')
+          .length;
+      })
+      .toBeGreaterThan(0);
 
     // Record operations after mutation
     const operationsAfterMutation = graphqlOperations.slice(
       operationsBeforeMutation.length,
     );
 
-    // Look for InitializeDraft mutation in operations
+    // Look for InitializeDraft mutation in operations (narrow to operation name
+    // to avoid false positives from league queries that also carry leagueId)
     const draftOps = operationsAfterMutation.filter(
-      (op) =>
-        op.operation === 'InitializeDraft' ||
-        (op.type === 'request' &&
-          op.variables &&
-          typeof op.variables === 'object' &&
-          'leagueId' in op.variables),
+      (op) => op.operation === 'InitializeDraft',
     );
 
     expect(draftOps.length).toBeGreaterThan(0);

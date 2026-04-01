@@ -131,15 +131,31 @@ test.describe('Draft Status Web UI Tests @critical', () => {
     await confirmButton.waitFor({ state: 'visible', timeout: 5000 });
     await confirmButton.click();
 
-    // Wait for the mutation to complete and UI to update
-    await page.waitForTimeout(1000);
-
     // Look for updated draft status or button text
     const updatedButton = page
       .locator('button')
       .filter({ hasText: /queued|progress|completed/i })
       .first();
     const draftStatusElement = page.getByTestId('draft-status').first();
+
+    // Wait for the mutation to complete and UI to show an updated status text
+    await expect
+      .poll(async () => {
+        if (await updatedButton.isVisible()) {
+          const buttonText = await updatedButton.textContent();
+          if (buttonText && /queued|progress|completed/i.test(buttonText)) {
+            return true;
+          }
+        }
+        if (await draftStatusElement.isVisible()) {
+          const statusText = await draftStatusElement.textContent();
+          if (statusText && /queued|progress|completed/i.test(statusText)) {
+            return true;
+          }
+        }
+        return false;
+      })
+      .toBe(true);
 
     // Verify the UI has been updated
     let statusUpdated = false;
@@ -188,7 +204,6 @@ test.describe('Draft Status Web UI Tests @critical', () => {
       .first();
     await confirmButton.waitFor({ state: 'visible', timeout: 5000 });
     await confirmButton.click();
-    await page.waitForTimeout(1000);
 
     // Capture the draft status after starting
     let preRefreshStatus = '';
@@ -198,6 +213,20 @@ test.describe('Draft Status Web UI Tests @critical', () => {
       .filter({ hasText: /draft|queued|progress/i })
       .first();
     const draftStatusElement = page.getByTestId('draft-status').first();
+
+    // Poll until a button or status element shows a post-mutation status text
+    await expect
+      .poll(async () => {
+        const texts: string[] = [];
+        if (await draftButton.isVisible()) {
+          texts.push((await draftButton.textContent()) || '');
+        }
+        if (await draftStatusElement.isVisible()) {
+          texts.push((await draftStatusElement.textContent()) || '');
+        }
+        return /queued|progress|completed/i.test(texts.join(' '));
+      })
+      .toBe(true);
 
     if (await draftButton.isVisible()) {
       preRefreshStatus = (await draftButton.textContent()) || '';
@@ -216,9 +245,6 @@ test.describe('Draft Status Web UI Tests @critical', () => {
     await page.waitForLoadState('networkidle');
     await page.getByTestId('league-title').waitFor({ timeout: 15000 });
 
-    // Wait a bit more for any GraphQL queries to complete
-    await page.waitForTimeout(2000);
-
     // Check the draft status after refresh
     let postRefreshStatus = '';
 
@@ -227,6 +253,20 @@ test.describe('Draft Status Web UI Tests @critical', () => {
       .filter({ hasText: /draft|queued|progress/i })
       .first();
     const refreshedStatusElement = page.getByTestId('draft-status').first();
+
+    // Poll until the refreshed UI shows a persisted post-mutation status text
+    await expect
+      .poll(async () => {
+        const texts: string[] = [];
+        if (await refreshedDraftButton.isVisible()) {
+          texts.push((await refreshedDraftButton.textContent()) || '');
+        }
+        if (await refreshedStatusElement.isVisible()) {
+          texts.push((await refreshedStatusElement.textContent()) || '');
+        }
+        return texts.join(' ').trim();
+      })
+      .toMatch(/queued|progress|completed/i);
 
     if (await refreshedDraftButton.isVisible()) {
       postRefreshStatus = (await refreshedDraftButton.textContent()) || '';
@@ -276,15 +316,12 @@ test.describe('Draft Status Web UI Tests @critical', () => {
     await confirmButton.waitFor({ state: 'visible', timeout: 5000 });
     await confirmButton.click();
 
-    // Wait for mutation and UI to settle
-    await page.waitForTimeout(1000);
-
     // Verify UI is in a consistent state (not broken by rapid interactions)
     const finalButton = page
       .locator('button')
       .filter({ hasText: /draft|queued|progress/i })
       .first();
-    expect(await finalButton.isVisible()).toBe(true);
+    await expect(finalButton).toBeVisible();
 
     console.log('✅ Rapid interaction test passed - UI remains consistent');
   });
@@ -320,9 +357,6 @@ test.describe('Draft Status Web UI Tests @critical', () => {
       if (await confirmButton.isVisible()) {
         await confirmButton.click();
       }
-
-      // Wait for any alerts to appear
-      await page.waitForTimeout(2000);
 
       // Check for success or error messages
       if (await errorAlert.isVisible()) {
