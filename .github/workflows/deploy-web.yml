@@ -341,11 +341,6 @@ jobs:
             - Production: https://legacy-fantasy.com
             - GitHub Pages: ${{ needs.build-and-deploy.outputs.deployment_url }}
 
-  # TODO: Mobile release notifications — the deleted discord-release-summary.yml
-  # also handled android-v* and ios-v* tags. build-android-app.yml and
-  # build-ios-app.yml do not currently have Discord release notifications.
-  # Add similar notify-release jobs to those workflows when mobile releases
-  # are published regularly.
   notify-release:
     name: Discord Release Summary
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}

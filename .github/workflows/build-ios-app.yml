@@ -49,6 +49,11 @@ jobs:
     name: Build iOS IPA
     runs-on: macos-latest
     timeout-minutes: 60
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      build_number: ${{ steps.version.outputs.build_number }}
+      commit_sha: ${{ steps.version.outputs.commit_sha }}
+      build_config: ${{ steps.version.outputs.build_config }}
 
     steps:
       - name: Checkout Repository
@@ -308,3 +313,62 @@ jobs:
             echo "- **GitHub Artifacts:** Available in this workflow run for 3 days" >> $GITHUB_STEP_SUMMARY
             echo "- **Installation:** Use iOS Simulator or Xcode for device installation" >> $GITHUB_STEP_SUMMARY
           fi
+
+  notify-release:
+    name: Discord Release Notification
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    needs: build-ios-ipa
+    # Mirror the create-release step condition: Release config on push to main, or manual dispatch with create_release=true
+    if: >-
+      !cancelled() &&
+      needs.build-ios-ipa.result == 'success' &&
+      needs.build-ios-ipa.outputs.build_config == 'Release' &&
+      (
+        (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true')
+      )
+
+    steps:
+      - name: Checkout (for commit history)
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Build commit changelog
+        id: changelog
+        shell: bash
+        env:
+          RELEASE_TAG: ios-v${{ needs.build-ios-ipa.outputs.version }}-${{ needs.build-ios-ipa.outputs.build_number }}
+        run: |
+          PREV_TAG=$(git tag --list 'ios-v*' --sort=-version:refname | { grep -v "^${RELEASE_TAG}$" || true; } | head -n 1)
+
+          if [ -n "$PREV_TAG" ]; then
+            echo "Commits since ${PREV_TAG}:"
+            COMMITS=$(git log "${PREV_TAG}..HEAD" --pretty=format:'[`%h`](https://github.com/${{ github.repository }}/commit/%H) %s' --no-merges | head -20)
+          else
+            echo "No previous iOS release tag found — showing last 20 commits"
+            COMMITS=$(git log --pretty=format:'[`%h`](https://github.com/${{ github.repository }}/commit/%H) %s' --no-merges -20)
+          fi
+
+          {
+            echo "commits<<CHANGELOG_EOF"
+            echo "$COMMITS"
+            echo "CHANGELOG_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Compute release tag
+        id: meta
+        run: |
+          TAG="ios-v${{ needs.build-ios-ipa.outputs.version }}-${{ needs.build-ios-ipa.outputs.build_number }}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "url=https://github.com/${{ github.repository }}/releases/tag/${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Post Release Summary
+        uses: ./.github/actions/discord-notify
+        with:
+          webhook-url: ${{ secrets.DISCORD_RELEASE_WEBHOOK_URL }}
+          status: success
+          title: "iOS Release ${{ steps.meta.outputs.tag }}"
+          description: "A new iOS release. [View on GitHub](${{ steps.meta.outputs.url }})"
+          commits: ${{ steps.changelog.outputs.commits }}

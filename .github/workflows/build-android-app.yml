@@ -196,6 +196,50 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Build commit changelog
+        id: changelog
+        if: needs.build-android.result == 'success' && needs.create-release.result == 'success'
+        shell: bash
+        env:
+          RELEASE_TAG: android-v${{ needs.build-android.outputs.version }}-${{ needs.build-android.outputs.build_number }}
+        run: |
+          PREV_TAG=$(git tag --list 'android-v*' --sort=-version:refname | { grep -v "^${RELEASE_TAG}$" || true; } | head -n 1)
+
+          if [ -n "$PREV_TAG" ]; then
+            echo "Commits since ${PREV_TAG}:"
+            COMMITS=$(git log "${PREV_TAG}..HEAD" --pretty=format:'[`%h`](https://github.com/${{ github.repository }}/commit/%H) %s' --no-merges | head -20)
+          else
+            echo "No previous Android release tag found — showing last 20 commits"
+            COMMITS=$(git log --pretty=format:'[`%h`](https://github.com/${{ github.repository }}/commit/%H) %s' --no-merges -20)
+          fi
+
+          {
+            echo "commits<<CHANGELOG_EOF"
+            echo "$COMMITS"
+            echo "CHANGELOG_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Compute release tag
+        id: meta
+        if: needs.build-android.result == 'success' && needs.create-release.result == 'success'
+        run: |
+          TAG="android-v${{ needs.build-android.outputs.version }}-${{ needs.build-android.outputs.build_number }}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "url=https://github.com/${{ github.repository }}/releases/tag/${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Discord Release Notification
+        if: needs.build-android.result == 'success' && needs.create-release.result == 'success'
+        uses: ./.github/actions/discord-notify
+        with:
+          webhook-url: ${{ secrets.DISCORD_RELEASE_WEBHOOK_URL }}
+          status: success
+          title: "Android Release ${{ steps.meta.outputs.tag }}"
+          description: "A new Android release. [View on GitHub](${{ steps.meta.outputs.url }})"
+          commits: ${{ steps.changelog.outputs.commits }}
 
       - name: Build Summary
         run: |
