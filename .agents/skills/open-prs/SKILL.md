@@ -374,6 +374,8 @@ This is safe to do even if CI is still running or pending — failing CI will au
 
 For full sweeps, run passes 0–3 in a loop until every PR is **settled** — either clean, CI-pending, or labeled `requires-human-review` for a blocker outside agent reach. Fixing one category often creates issues in another (rebase → CI fail, fix → new review), so multiple passes are expected.
 
+The outer loop uses `sweep-claimed` labels to coordinate across agents. This is always active — it's a no-op overhead when running solo (claims never contend) and automatically prevents duplicate work when multiple agents run simultaneously.
+
 **Settled states** — a PR is settled when it reaches any of these terminal states:
 
 | State                     | Meaning                                                               |
@@ -385,30 +387,52 @@ For full sweeps, run passes 0–3 in a loop until every PR is **settled** — ei
 **Algorithm:**
 
 ```
+# Startup: ensure coordination labels exist (gh CLI — safe to re-run)
+gh label list --search "sweep-" --json name | grep -q "sweep-claimed" \
+  || gh label create "sweep-claimed" --color "e4e669" --description "Sweep agent actively working on this PR"
+gh label list --search "sweep-" --json name | grep -q "sweep-stale-claim" \
+  || gh label create "sweep-stale-claim" --color "d93f0b" --description "sweep-claimed was not cleaned up — claiming agent may have crashed"
+
+# Optional: reclaim stale sweep-claimed labels before scanning (long sweeps >20 PRs)
+#   github_sweep_stale_claims(olderThanMinutes: 30)
+#   → for each stale PR: gh pr edit <n> --remove-label "sweep-claimed" --add-label "sweep-stale-claim"
+#                         gh pr edit <n> --remove-label "sweep-stale-claim" --add-label "sweep-claimed"
+
 settled = {}  # PR numbers that have reached a terminal state
 
 REPEAT (max 10 passes):
-  Scan all open PRs (Step 1)
+  Scan all open PRs, excluding already-claimed ones (Step 1):
+    github_pr_scan(excludeLabels: ["sweep-claimed"])
   all_prs = scan.conflicting + scan.reviews + scan.ciFailing + scan.ciPending + scan.clean
-  unsettled = [pr for pr in all_prs if pr.number not in settled]
+  workable = [pr for pr in all_prs if pr.number not in settled]
 
-  IF unsettled is empty → EXIT (all settled)
+  IF workable is empty → EXIT (all settled or held by other agents)
 
-  Pass 0: Request Copilot reviews on PRs that have none
-    - github_request_review(number: <PR#>) for each PR without a Copilot review
+  Pass 0: Request Copilot reviews on workable PRs that have none
+    - Claim PR → github_request_review() → release claim
     - The repo ruleset auto-triggers for user-authored PRs; bot-authored PRs
       need this explicit request (uses user OAuth token via gh auth)
-  Pass 1: Rebase unsettled conflicting PRs (SEQUENTIAL — cascade invalidation)
+
+  Pass 1: Rebase workable conflicting PRs (SEQUENTIAL — cascade invalidation)
+    - Claim ONE PR immediately before rebasing — do NOT bulk-claim
+    - Release claim after push (success) or after commenting blocker (failure)
     - On irrecoverable failure → comment blocker, label requires-human-review only if outside agent reach → add to settled
-  Pass 2: Fix unsettled PRs with unresolved reviews (PARALLEL — batches of 3 sub-agents)
+
+  Pass 2: Fix workable PRs with unresolved reviews (PARALLEL — batches of 3 sub-agents)
+    - Claim each PR in the batch before spawning its sub-agent
+    - Sub-agent prompt must include: "release sweep-claimed on exit regardless of outcome"
+    - Orchestrator releases any claims sub-agents failed to clean up
     - On unfixable review → comment blocker, label requires-human-review only if outside agent reach → add to settled
-  Pass 3: Fix unsettled PRs with failing CI (PARALLEL — batches of 3 sub-agents)
+
+  Pass 3: Fix workable PRs with failing CI (PARALLEL — batches of 3 sub-agents)
+    - Same claim/release pattern as Pass 2
     - On unfixable CI failure → comment blocker, label requires-human-review only if outside agent reach → add to settled
+
   Each sub-agent runs make pc before pushing (NEVER skip — see callout below)
   Collect results from all sub-agents; verify passing PRs have their branches/PRs updated
 
-  Mark clean PRs (no conflicts, CI pass, no threads) → add to settled
-  Mark PRs with only pending CI after final pass → add to settled
+  Mark clean PRs (no conflicts, CI pass, no threads) → release claim → add to settled
+  Mark PRs with only pending CI after final pass → release claim → add to settled
 
   IF all PRs in settled → EXIT
 ```
@@ -417,12 +441,13 @@ REPEAT (max 10 passes):
 
 **Key differences from a simple pass counter:**
 
-- PRs that are settled (clean or labeled) are **skipped** in subsequent passes — no wasted effort
+- PRs that are settled or claimed by another agent are **skipped** — no wasted effort or duplicate work
 - The loop exits when all PRs are settled, not after a fixed number of passes
 - The max 10 pass cap is a safety net, not the expected exit condition
 - If the cap is hit with unsettled PRs remaining, comment the blocker on each and report them in the summary — but do **not** auto-label them `requires-human-review` just because the cap was hit (the blocker may still be agent-fixable in a future sweep)
 
-> 📎 **Parallelization details**: see [references/sweep-and-parallelization.md](../pr-workflow/references/sweep-and-parallelization.md)
+> 📎 **Claim/release protocol, stale detection, race mitigation, and sub-agent prompt templates**: see [multi-agent-sweep-coordination.md](../pr-lifecycle/references/multi-agent-sweep-coordination.md)
+> 📎 **Parallelization details**: see [sweep-and-parallelization.md](../pr-lifecycle/references/sweep-and-parallelization.md)
 
 ---
 

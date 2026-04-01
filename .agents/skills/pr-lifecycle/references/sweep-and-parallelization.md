@@ -173,3 +173,13 @@ After pushing branch:
 - **Cascade invalidation**: Merging PR A changes `main`, invalidating PR B's rebase
 - **Context accumulation**: A single agent learns patterns across PRs (e.g., "AGENTS.md is always `--theirs`")
 - **Rate limits**: Parallel sub-agents multiply costs and hit API throttling
+
+---
+
+## Multi-Agent Coordination (Multiple Top-Level Agents)
+
+The parallelization strategy above applies to sub-agents spawned by a **single** top-level orchestrator. The outer loop also handles **multiple independent top-level agents** running simultaneously via the same mechanism: `sweep-claimed` GitHub labels. Every sweep run — solo or multi-agent — claims PRs before working on them and releases when done. When running solo the claims simply never contend.
+
+Each agent's inner parallelism (batches of 3 sub-agents for Passes 2 & 3) composes naturally with cross-agent coordination: the top-level agent claims a PR, spawns a sub-agent for it, and the sub-agent releases the claim on exit. Other top-level agents see the PR as claimed and skip it for the duration.
+
+> **Full claim/release protocol, label setup (gh CLI), stale detection, and sub-agent prompt templates**: see [multi-agent-sweep-coordination.md](multi-agent-sweep-coordination.md)
