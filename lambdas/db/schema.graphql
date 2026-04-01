@@ -2238,6 +2238,16 @@ type Query {
   freeAgents(leagueId: Int!): [Player!]
 
   """
+  Detailed state for a single MLB game by its primary key (gamePk). Returns null until LS-1864 delivers @legacy-sports/mlb-client.
+  """
+  game(
+    """
+    MLB primary key for the game
+    """
+    gamePk: Int!
+  ): ScoreboardGame
+
+  """
   Get all-time records across all seasons in a league's history (most wins, highest score, longest win streak, most points in a season).
   """
   getAllTimeRecords(leagueId: Int!): [AllTimeRecord!]
@@ -2464,7 +2474,7 @@ type Query {
   ): [PublicLeagueInfo!]!
 
   """
-  Live MLB scoreboard for the given date (defaults to today). Resolver stub — full implementation added in LS-1865 via MlbDataProvider.
+  Live MLB scoreboard for the given date (defaults to today). Returns null until LS-1864 delivers @legacy-sports/mlb-client.
   """
   scoreboard(
     """

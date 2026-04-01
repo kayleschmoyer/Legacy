@@ -2165,6 +2165,8 @@ export type Query = {
   /** Get a complete export of all personal data for the authenticated user */
   exportMyData?: Maybe<UserDataExport>;
   freeAgents?: Maybe<Array<Player>>;
+  /** Detailed state for a single MLB game by its primary key (gamePk). Returns null until LS-1864 delivers @legacy-sports/mlb-client. */
+  game?: Maybe<ScoreboardGame>;
   /** Get all-time records across all seasons in a league's history (most wins, highest score, longest win streak, most points in a season). */
   getAllTimeRecords?: Maybe<Array<AllTimeRecord>>;
   getAvailableDraftPlayers?: Maybe<Array<DraftPlayer>>;
@@ -2251,7 +2253,7 @@ export type Query = {
   /** Check if the authenticated user has accepted the privacy policy */
   privacyPolicyStatus?: Maybe<PrivacyPolicyStatus>;
   publicLeagues: Array<PublicLeagueInfo>;
-  /** Live MLB scoreboard for the given date (defaults to today). Resolver stub — full implementation added in LS-1865 via MlbDataProvider. */
+  /** Live MLB scoreboard for the given date (defaults to today). Returns null until LS-1864 delivers @legacy-sports/mlb-client. */
   scoreboard?: Maybe<Scoreboard>;
   scoringDefinitions?: Maybe<Array<ScoringStatDefinition>>;
   searchPlayers?: Maybe<Array<Player>>;
@@ -2350,6 +2352,10 @@ export type QueryCommissionerAuditLogsArgs = {
 
 export type QueryFreeAgentsArgs = {
   leagueId: Scalars['Int']['input'];
+};
+
+export type QueryGameArgs = {
+  gamePk: Scalars['Int']['input'];
 };
 
 export type QueryGetAllTimeRecordsArgs = {

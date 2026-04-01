@@ -1,19 +1,18 @@
 /**
- * MLB Live Scoreboard — GraphQL type definitions (schema contract).
+ * MLB Live Scoreboard — GraphQL schema and resolver stubs (LS-1865).
  *
- * Defines the types and query field for the live scoreboard.
- * The resolver stub returns null until LS-1865 wires up the actual
- * MlbDataProvider implementation.
+ * Defines the types and query fields for live MLB scoreboard data.
+ * Resolver bodies are stubs that return null until LS-1864 delivers
+ * the @legacy-sports/mlb-client library with createMlbDataProvider().
  *
  * Frontend component: apps/web/src/components/scoreboard/Scoreboard.tsx (LS-1867)
- * Resolver implementation: LS-1865
  * MLB client library: lib/mlb-client (LS-1864)
  */
 import { builder } from './builder';
 
 // ─── ScoreboardTeam ───────────────────────────────────────────────────────────
 
-interface ScoreboardTeamShape {
+export interface ScoreboardTeamShape {
   teamName: string;
   abbreviation: string;
   runs: number;
@@ -54,7 +53,7 @@ ScoreboardTeamRef.implement({
 
 // ─── ScoreboardGame ───────────────────────────────────────────────────────────
 
-interface ScoreboardGameShape {
+export interface ScoreboardGameShape {
   gamePk: number;
   status: string;
   startTime: string | null;
@@ -65,7 +64,7 @@ interface ScoreboardGameShape {
   awayTeam: ScoreboardTeamShape;
 }
 
-const ScoreboardGameRef =
+export const ScoreboardGameRef =
   builder.objectRef<ScoreboardGameShape>('ScoreboardGame');
 
 ScoreboardGameRef.implement({
@@ -134,7 +133,7 @@ ScoreboardRef.implement({
   }),
 });
 
-// ─── Query field ─────────────────────────────────────────────────────────────
+// ─── Query: scoreboard ───────────────────────────────────────────────────────
 
 builder.queryField('scoreboard', (t) =>
   t.field({
@@ -142,7 +141,7 @@ builder.queryField('scoreboard', (t) =>
     nullable: true,
     description:
       'Live MLB scoreboard for the given date (defaults to today). ' +
-      'Resolver stub — full implementation added in LS-1865 via MlbDataProvider.',
+      'Returns null until LS-1864 delivers @legacy-sports/mlb-client.',
     args: {
       date: t.arg.string({
         required: false,
@@ -150,9 +149,30 @@ builder.queryField('scoreboard', (t) =>
           'Date in YYYY-MM-DD format. Defaults to today in the US/Eastern timezone.',
       }),
     },
-    resolve: () => {
-      // Stub resolver — returns null until LS-1865 wires up MlbDataProvider.
-      // The frontend component (LS-1867) handles the null case gracefully.
+    resolve: (_root, _args) => {
+      // TODO(LS-1864): replace with createMlbDataProvider().getScoreboard(_args.date)
+      return null;
+    },
+  }),
+);
+
+// ─── Query: game ─────────────────────────────────────────────────────────────
+
+builder.queryField('game', (t) =>
+  t.field({
+    type: ScoreboardGameRef,
+    nullable: true,
+    description:
+      'Detailed state for a single MLB game by its primary key (gamePk). ' +
+      'Returns null until LS-1864 delivers @legacy-sports/mlb-client.',
+    args: {
+      gamePk: t.arg.int({
+        required: true,
+        description: 'MLB primary key for the game',
+      }),
+    },
+    resolve: (_root, _args) => {
+      // TODO(LS-1864): replace with createMlbDataProvider().getGame(_args.gamePk)
       return null;
     },
   }),
