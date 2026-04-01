@@ -250,6 +250,14 @@ For each PR in `$scan.conflicting`:
 5. After rebasing ALL PRs, batch-validate with parallel `make pc` (see Parallelization Strategy below)
 6. **Dirty-tree guard**: after `make pc` passes, run `worktree_status(worktree: "LS-####")`. If dirty (e.g., `tsconfig.base.json` reformatted), commit with `worktree_commit(message: "style: apply formatting after rebase", worktree: "LS-####")` and re-run `make pc`.
 7. Push passing PRs: `worktree_push(worktree: "LS-####")`
+8. **Verify mergeability after push** — do not assume CONFLICTING status clears automatically:
+   - GitHub's mergeability check typically updates within 2–3 minutes after a force-push
+   - If a PR still shows CONFLICTING more than **5 minutes** after the push, treat it as a **real conflict** — do not dismiss as cache lag
+   - Verify with: `worktree_run(worktree: "LS-####", command: "git fetch origin && git merge-base --is-ancestor origin/main HEAD")` — command must exit successfully (status 0)
+   - If the `merge-base --is-ancestor` check fails (non-zero exit status): new commits merged to main after the rebase — rebase again
+   - Only mark a PR as "resolved" after it shows MERGEABLE, or the `git merge-base --is-ancestor` check confirms the branch tip is based on current main
+
+> **"Cache lag" expiry**: the 2–3 minute window is the only safe assumption. After 5 minutes, always verify with `git merge-base --is-ancestor origin/main HEAD` — a failing check (non-zero exit status) plus persistent CONFLICTING status is almost certainly a real conflict. Batch sweeps are especially at risk: new PRs can merge to main between individual rebases in a long batch, creating fresh conflicts on already-pushed branches.
 
 > **Shell fallback** (only when MCP unavailable): `git -C "$wtPath" fetch origin && git -C "$wtPath" rebase origin/main`, then `git -C "$wtPath" push --force-with-lease origin HEAD`.
 
