@@ -30,6 +30,7 @@ import { requestReviewBatch } from './tools/request-review-batch.js';
 import { resolveThread } from './tools/resolve-thread.js';
 import { resolveThreads } from './tools/resolve-threads.js';
 import { secretsCheck } from './tools/secrets-check.js';
+import { sweepStaleClaims } from './tools/sweep-stale-claims.js';
 import { viewPR } from './tools/view-pr.js';
 
 /**
@@ -809,6 +810,23 @@ server.tool(
       .describe('Human-readable description'),
   },
   async (params) => setCommitStatus(params),
+);
+
+// --- github_sweep_stale_claims ---
+server.tool(
+  'github_sweep_stale_claims',
+  'Find PRs with a stale sweep-claimed label (agent claimed but did not release). Uses label event timestamps for accuracy — more reliable than PR updatedAt, which reflects the last PR activity rather than when the label was applied.',
+  {
+    olderThanMinutes: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(30)
+      .describe(
+        'Minimum age in minutes for a claim to be considered stale (default: 30)',
+      ),
+  },
+  async (params) => sweepStaleClaims(params),
 );
 
 // Start the server
