@@ -10,6 +10,8 @@ fragment League on League {
   inviteCode
   lmNotes
   playerPool
+  waiverEnabled
+  waiverType
   userMembership {
     ...LeagueMember
   }

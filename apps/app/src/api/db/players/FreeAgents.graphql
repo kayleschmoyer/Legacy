@@ -1,0 +1,38 @@
+query GetFreeAgentPlayers($leagueId: Int!) {
+  freeAgents(leagueId: $leagueId) {
+    id
+    firstName
+    lastName
+    eligiblePositions
+    scoring {
+      hitterAvgPointsPerGame
+      pitchingAvgPointsPerGame
+      avgPointsPerGame
+      careerGames
+    }
+  }
+}
+
+mutation ClaimFreeAgent(
+  $leagueId: Int!
+  $playerId: Int!
+  $dropPlayerId: Int
+  $faabBid: Int
+) {
+  claimFreeAgent(
+    leagueId: $leagueId
+    playerId: $playerId
+    dropPlayerId: $dropPlayerId
+    faabBid: $faabBid
+  ) {
+    id
+    leagueId
+    teamId
+    playerId
+    dropPlayerId
+    faabBid
+    status
+    errorMessage
+    createdAt
+  }
+}

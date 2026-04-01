@@ -3693,6 +3693,8 @@ export type LeagueFragment = {
   inviteCode?: string | null;
   lmNotes?: string | null;
   playerPool?: string | null;
+  waiverEnabled?: boolean | null;
+  waiverType?: string | null;
   userMembership?: {
     __typename?: 'LeagueMember';
     leagueId?: number | null;
@@ -3739,6 +3741,8 @@ export type GetLeagueByIdQuery = {
     inviteCode?: string | null;
     lmNotes?: string | null;
     playerPool?: string | null;
+    waiverEnabled?: boolean | null;
+    waiverType?: string | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -3773,6 +3777,8 @@ export type CreateLeagueMutation = {
       inviteCode?: string | null;
       lmNotes?: string | null;
       playerPool?: string | null;
+      waiverEnabled?: boolean | null;
+      waiverType?: string | null;
       userMembership?: {
         __typename?: 'LeagueMember';
         leagueId?: number | null;
@@ -3815,6 +3821,8 @@ export type GetUserLeaguesQuery = {
     inviteCode?: string | null;
     lmNotes?: string | null;
     playerPool?: string | null;
+    waiverEnabled?: boolean | null;
+    waiverType?: string | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -3852,6 +3860,8 @@ export type StartDraftMutation = {
     inviteCode?: string | null;
     lmNotes?: string | null;
     playerPool?: string | null;
+    waiverEnabled?: boolean | null;
+    waiverType?: string | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -4524,6 +4534,51 @@ export type MarkAllNotificationsAsReadMutationVariables = Exact<{
 export type MarkAllNotificationsAsReadMutation = {
   __typename?: 'Mutation';
   markAllNotificationsAsRead?: boolean | null;
+};
+
+export type GetFreeAgentPlayersQueryVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+}>;
+
+export type GetFreeAgentPlayersQuery = {
+  __typename?: 'Query';
+  freeAgents?: Array<{
+    __typename?: 'Player';
+    id?: number | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    eligiblePositions?: Array<string> | null;
+    scoring?: {
+      __typename?: 'PlayerScoring';
+      hitterAvgPointsPerGame?: number | null;
+      pitchingAvgPointsPerGame?: number | null;
+      avgPointsPerGame?: number | null;
+      careerGames?: number | null;
+    } | null;
+  }> | null;
+};
+
+export type ClaimFreeAgentMutationVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+  playerId: Scalars['Int']['input'];
+  dropPlayerId?: InputMaybe<Scalars['Int']['input']>;
+  faabBid?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type ClaimFreeAgentMutation = {
+  __typename?: 'Mutation';
+  claimFreeAgent?: {
+    __typename?: 'WaiverClaim';
+    id?: number | null;
+    leagueId?: number | null;
+    teamId?: number | null;
+    playerId?: number | null;
+    dropPlayerId?: number | null;
+    faabBid?: number | null;
+    status?: string | null;
+    errorMessage?: string | null;
+    createdAt?: string | null;
+  } | null;
 };
 
 export type PlayerFragment = {
@@ -5337,6 +5392,8 @@ export const LeagueFragmentDoc = gql`
     inviteCode
     lmNotes
     playerPool
+    waiverEnabled
+    waiverType
     userMembership {
       ...LeagueMember
     }
@@ -8486,6 +8543,176 @@ export type MarkAllNotificationsAsReadMutationResult =
 export type MarkAllNotificationsAsReadMutationOptions = BaseMutationOptions<
   MarkAllNotificationsAsReadMutation,
   MarkAllNotificationsAsReadMutationVariables
+>;
+export const GetFreeAgentPlayers = gql`
+  query GetFreeAgentPlayers($leagueId: Int!) {
+    freeAgents(leagueId: $leagueId) {
+      id
+      firstName
+      lastName
+      eligiblePositions
+      scoring {
+        hitterAvgPointsPerGame
+        pitchingAvgPointsPerGame
+        avgPointsPerGame
+        careerGames
+      }
+    }
+  }
+`;
+
+/**
+ * __useGetFreeAgentPlayersQuery__
+ *
+ * To run a query within a React component, call `useGetFreeAgentPlayersQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetFreeAgentPlayersQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetFreeAgentPlayersQuery({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *   },
+ * });
+ */
+export function useGetFreeAgentPlayersQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetFreeAgentPlayersQuery,
+    GetFreeAgentPlayersQueryVariables
+  > &
+    (
+      | { variables: GetFreeAgentPlayersQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetFreeAgentPlayersQuery,
+    GetFreeAgentPlayersQueryVariables
+  >(GetFreeAgentPlayers, options);
+}
+export function useGetFreeAgentPlayersLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetFreeAgentPlayersQuery,
+    GetFreeAgentPlayersQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetFreeAgentPlayersQuery,
+    GetFreeAgentPlayersQueryVariables
+  >(GetFreeAgentPlayers, options);
+}
+export function useGetFreeAgentPlayersSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetFreeAgentPlayersQuery,
+        GetFreeAgentPlayersQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetFreeAgentPlayersQuery,
+    GetFreeAgentPlayersQueryVariables
+  >(
+    GetFreeAgentPlayers,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetFreeAgentPlayersQuery,
+          GetFreeAgentPlayersQueryVariables
+        >,
+  );
+}
+export type GetFreeAgentPlayersQueryHookResult = ReturnType<
+  typeof useGetFreeAgentPlayersQuery
+>;
+export type GetFreeAgentPlayersLazyQueryHookResult = ReturnType<
+  typeof useGetFreeAgentPlayersLazyQuery
+>;
+export type GetFreeAgentPlayersSuspenseQueryHookResult = ReturnType<
+  typeof useGetFreeAgentPlayersSuspenseQuery
+>;
+export type GetFreeAgentPlayersQueryResult = Apollo.QueryResult<
+  GetFreeAgentPlayersQuery,
+  GetFreeAgentPlayersQueryVariables
+>;
+export const ClaimFreeAgent = gql`
+  mutation ClaimFreeAgent(
+    $leagueId: Int!
+    $playerId: Int!
+    $dropPlayerId: Int
+    $faabBid: Int
+  ) {
+    claimFreeAgent(
+      leagueId: $leagueId
+      playerId: $playerId
+      dropPlayerId: $dropPlayerId
+      faabBid: $faabBid
+    ) {
+      id
+      leagueId
+      teamId
+      playerId
+      dropPlayerId
+      faabBid
+      status
+      errorMessage
+      createdAt
+    }
+  }
+`;
+export type ClaimFreeAgentMutationFn = MutationFunction<
+  ClaimFreeAgentMutation,
+  ClaimFreeAgentMutationVariables
+>;
+
+/**
+ * __useClaimFreeAgentMutation__
+ *
+ * To run a mutation, you first call `useClaimFreeAgentMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useClaimFreeAgentMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [claimFreeAgentMutation, { data, loading, error }] = useClaimFreeAgentMutation({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *      playerId: // value for 'playerId'
+ *      dropPlayerId: // value for 'dropPlayerId'
+ *      faabBid: // value for 'faabBid'
+ *   },
+ * });
+ */
+export function useClaimFreeAgentMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    ClaimFreeAgentMutation,
+    ClaimFreeAgentMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    ClaimFreeAgentMutation,
+    ClaimFreeAgentMutationVariables
+  >(ClaimFreeAgent, options);
+}
+export type ClaimFreeAgentMutationHookResult = ReturnType<
+  typeof useClaimFreeAgentMutation
+>;
+export type ClaimFreeAgentMutationResult =
+  Apollo.MutationResult<ClaimFreeAgentMutation>;
+export type ClaimFreeAgentMutationOptions = BaseMutationOptions<
+  ClaimFreeAgentMutation,
+  ClaimFreeAgentMutationVariables
 >;
 export const GetLeagueScoringProfile = gql`
   query GetLeagueScoringProfile($leagueId: Int!) {
