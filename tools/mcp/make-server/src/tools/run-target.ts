@@ -236,21 +236,22 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
 
     if (STRUCTURED_TARGETS.has(target)) {
       const steps = parseSteps(output);
-      // The definitive success indicator is the "All pre-commit checks passed"
-      // marker at the end of output. Step-level regex matching can produce false
-      // positives (e.g., "error" in a URL or log line), so the final marker wins.
+      // Check for the "All pre-commit checks passed" marker. While this is the
+      // intended success signal, explicitly-failed steps always override it — the
+      // marker can appear in NX cached output from a prior run while the current
+      // run actually fails.
       const hasPassedMarker = /All pre-commit checks passed/i.test(output);
+      const failedCount = steps.filter((s) => s.status === 'failed').length;
+      const anyStepFailed = failedCount > 0;
       const allPassed =
-        hasPassedMarker ||
-        steps.length === 0 ||
-        steps.every((s) => s.status !== 'failed');
+        !anyStepFailed && (hasPassedMarker || steps.length === 0);
       const result: Record<string, unknown> = {
         success: allPassed,
         target,
         worktreePath: workDir,
         summary: allPassed
           ? `${target} passed${steps.length > 0 ? ` (${steps.length} steps)` : ''}`
-          : `${target} completed with failures`,
+          : `${target} failed${failedCount > 0 ? ` (${failedCount} ${failedCount === 1 ? 'step failed' : 'steps failed'})` : ''}`,
       };
       if (steps.length > 0) result.steps = steps;
       result.output = truncateOutput(output, MAX_OUTPUT_CHARS);
