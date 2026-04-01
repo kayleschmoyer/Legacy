@@ -374,6 +374,69 @@ function resolveTargetDir(
   };
 }
 
+/**
+ * Resolve the best available shell for `worktree_run` on Windows.
+ *
+ * Priority:
+ *  1. Git Bash (`bash.exe` bundled with Git for Windows) — full Unix semantics:
+ *     `&&`, `||`, `|`, `head`, `grep`, `sed`, `awk`, etc.
+ *  2. `cmd.exe` — supports `&&` and `|` but lacks Unix utilities.
+ *
+ * PowerShell 5 (`powershell.exe`) is intentionally avoided: it does not
+ * support `&&` as a command separator and lacks Unix utilities, causing
+ * frequent agent failures when running shell pipelines.
+ */
+let cachedWindowsShell: string | undefined;
+
+function resolveWindowsShell(): string {
+  if (cachedWindowsShell !== undefined) return cachedWindowsShell;
+
+  const programFiles = process.env['ProgramFiles'];
+  const programFilesX86 = process.env['ProgramFiles(x86)'];
+  const localAppData = process.env['LOCALAPPDATA'];
+
+  const gitBashCandidates: string[] = [
+    // Derive from environment variables when possible
+    ...(programFiles ? [join(programFiles, 'Git', 'bin', 'bash.exe')] : []),
+    ...(programFilesX86
+      ? [join(programFilesX86, 'Git', 'bin', 'bash.exe')]
+      : []),
+    ...(localAppData
+      ? [join(localAppData, 'Programs', 'Git', 'bin', 'bash.exe')]
+      : []),
+    // Backwards-compatible hardcoded defaults
+    'C:\\Program Files\\Git\\bin\\bash.exe',
+    'C:\\Program Files (x86)\\Git\\bin\\bash.exe',
+  ];
+
+  for (const candidate of gitBashCandidates) {
+    if (existsSync(candidate)) return (cachedWindowsShell = candidate);
+  }
+
+  // Fallback: try to locate bash.exe on PATH using where.exe
+  try {
+    const whereOutput = execSync('where bash', {
+      encoding: 'utf-8',
+      timeout: 3_000,
+    });
+    const lines = whereOutput
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+    for (const line of lines) {
+      const lower = line.toLowerCase();
+      // Exclude the WSL launcher (C:\Windows\System32\bash.exe): it does not behave
+      // like Git Bash and will fail when given Windows paths as cwd.
+      if (lower.includes('\\windows\\system32\\bash.exe')) continue;
+      if (existsSync(line)) return (cachedWindowsShell = line);
+    }
+  } catch {
+    // Ignore errors and fall back to cmd.exe below.
+  }
+
+  return (cachedWindowsShell = 'cmd.exe');
+}
+
 /** Run git with arguments array (no shell interpolation). Safe for user-provided values. */
 function runGit(
   args: string[],
@@ -2980,7 +3043,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       try {
         const shell =
-          process.platform === 'win32' ? 'powershell.exe' : '/bin/sh';
+          process.platform === 'win32' ? resolveWindowsShell() : '/bin/sh';
         const output = execSync(command, {
           cwd: targetDir,
           encoding: 'utf-8',
