@@ -1,15 +1,18 @@
 # =============================================================================
-# Run Playwright Tests (On-Demand)
+# Run Playwright Tests
 # =============================================================================
-# Manually trigger Playwright E2E or integration tests with full control over
-# which tests run, which browsers to use, and how many shards to parallelize.
+# Nightly schedule (03:00 UTC): integration suite (real server, 1 shard) and
+# full E2E suite including @slow tests (3 shards) — no grep filters.
 #
+# Manual dispatch: run any suite/browser/grep combination on demand.
 # Trigger: Actions → "Run Playwright Tests" → Run workflow → fill parameters
 # =============================================================================
 
 name: "Run Playwright Tests"
 
 on:
+  schedule:
+    - cron: "0 3 * * *" # Nightly: integration (real server) + full E2E with @slow
   workflow_dispatch:
     inputs:
       test-suite:
@@ -106,33 +109,74 @@ permissions:
   id-token: write # required for OIDC auth to AWS (S3 CI artifacts)
 
 jobs:
-  # Compute the shard matrix in a tiny job so the expression stays under line-length limits.
+  # ---------------------------------------------------------------------------
+  # Compute the test matrix.
+  # Nightly: integration (1 shard) + e2e (3 shards), all tests, no filters.
+  # Manual:  single suite, N shards, using workflow_dispatch inputs.
+  # ---------------------------------------------------------------------------
   prepare:
     name: "Prepare Matrix"
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 1
     outputs:
-      shards: ${{ steps.set.outputs.shards }}
+      matrix: ${{ steps.set.outputs.matrix }}
     steps:
       - id: set
         shell: bash
         run: |
-          case "${{ inputs.shard-total }}" in
-            1) echo 'shards=["1/1"]' >> "$GITHUB_OUTPUT" ;;
-            2) echo 'shards=["1/2","2/2"]' >> "$GITHUB_OUTPUT" ;;
-            3) echo 'shards=["1/3","2/3","3/3"]' >> "$GITHUB_OUTPUT" ;;
-            4) echo 'shards=["1/4","2/4","3/4","4/4"]' >> "$GITHUB_OUTPUT" ;;
-          esac
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            # Nightly: integration (1 shard) + e2e (3 shards), all tests, no filters
+            echo 'matrix=[{"suite":"integration","shard":"1/1"},{"suite":"e2e","shard":"1/3"},{"suite":"e2e","shard":"2/3"},{"suite":"e2e","shard":"3/3"}]' >> "$GITHUB_OUTPUT"
+          else
+            SUITE="${{ inputs.test-suite }}"
+            case "${{ inputs.shard-total }}" in
+              1) SHARDS=("1/1") ;;
+              2) SHARDS=("1/2" "2/2") ;;
+              3) SHARDS=("1/3" "2/3" "3/3") ;;
+              4) SHARDS=("1/4" "2/4" "3/4" "4/4") ;;
+            esac
+            MATRIX=$(
+              for SHARD in "${SHARDS[@]}"; do
+                jq -cn --arg suite "$SUITE" --arg shard "$SHARD" '{suite: $suite, shard: $shard}'
+              done | jq -sc '.'
+            )
+            echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Nightly Discord notification — fires before tests start (schedule only)
+  # ---------------------------------------------------------------------------
+  notify-nightly-start:
+    name: "Nightly Start"
+    needs: [prepare]
+    if: github.event_name == 'schedule'
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 3
+    outputs:
+      thread-id: ${{ steps.notify.outputs.thread-id }}
+    steps:
+      - name: "Checkout Repository"
+        uses: actions/checkout@v6
+
+      - name: "Discord Nightly Starting"
+        id: notify
+        uses: ./.github/actions/discord-notify
+        with:
+          webhook-url: ${{ secrets.DISCORD_CI_WEBHOOK_URL }}
+          status: running
+          title: "Nightly Playwright Suite"
+          description: "Integration tests (real server) + full E2E including @slow — 4 jobs started."
+          thread-name: "Nightly Playwright — ${{ github.run_id }}"
 
   run-tests:
-    name: "Playwright ${{ inputs.test-suite }} (${{ matrix.shard }})"
+    name: "Playwright ${{ matrix.suite }} (${{ matrix.shard }})"
     needs: [prepare]
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
-        shard: ${{ fromJSON(needs.prepare.outputs.shards) }}
+        include: ${{ fromJSON(needs.prepare.outputs.matrix) }}
 
     steps:
       - name: "Checkout Repository"
@@ -152,13 +196,17 @@ jobs:
       - name: "Install Playwright Browsers"
         shell: bash
         run: |
-          BROWSER="${{ inputs.browser }}"
-          # Map project names to browser engines for install
-          case "$BROWSER" in
-            "Mobile Chrome") BROWSER_ENGINE="chromium" ;;
-            "Mobile Safari") BROWSER_ENGINE="webkit" ;;
-            *) BROWSER_ENGINE="$BROWSER" ;;
-          esac
+          # Nightly always uses chromium; manual dispatch respects the browser input.
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            BROWSER_ENGINE="chromium"
+          else
+            BROWSER="${{ inputs.browser }}"
+            case "$BROWSER" in
+              "Mobile Chrome") BROWSER_ENGINE="chromium" ;;
+              "Mobile Safari") BROWSER_ENGINE="webkit" ;;
+              *) BROWSER_ENGINE="$BROWSER" ;;
+            esac
+          fi
           # Self-hosted AMI has Chromium pre-installed; only download if missing
           # or if a non-default browser was requested.
           if [ "$BROWSER_ENGINE" = "chromium" ]; then
@@ -174,7 +222,7 @@ jobs:
       # E2E suite: build web app and start a local server
       # =======================================================================
       - name: "Build Web Application"
-        if: inputs.test-suite == 'e2e'
+        if: matrix.suite == 'e2e'
         shell: bash
         env:
           VITE_JIRA_PROXY_URL: "https://e2e-placeholder.test/jira"
@@ -184,7 +232,7 @@ jobs:
           pnpm exec nx build web
 
       - name: "Start Dev Server"
-        if: inputs.test-suite == 'e2e'
+        if: matrix.suite == 'e2e'
         shell: bash
         run: |
           export NX_NO_CLOUD=true
@@ -233,9 +281,10 @@ jobs:
           JWT_SECRET: ${{ secrets.JWT_SECRET_KEY }}
           INTEGRATION_BASE_URL: ${{ secrets.INTEGRATION_BASE_URL }}
         run: |
-          SUITE="${{ inputs.test-suite }}"
+          SUITE="${{ matrix.suite }}"
+          IS_SCHEDULE="${{ github.event_name == 'schedule' }}"
 
-          if [ "$SUITE" == "integration" ]; then
+          if [ "$SUITE" = "integration" ]; then
             CONFIG="apps/web-e2e/playwright.integration.config.ts"
           else
             CONFIG="apps/web-e2e/playwright.config.ts"
@@ -246,34 +295,41 @@ jobs:
 
           # Browser / project (integration config has no named projects)
           if [ "$SUITE" != "integration" ]; then
-            PLAYWRIGHT_ARGS+=( "--project=${{ inputs.browser }}" )
+            if [ "$IS_SCHEDULE" = "true" ]; then
+              PLAYWRIGHT_ARGS+=( "--project=chromium" )
+            else
+              PLAYWRIGHT_ARGS+=( "--project=${{ inputs.browser }}" )
+            fi
           fi
 
-          # Grep patterns
-          if [ "${{ inputs.test-grep }}" != "(all)" ]; then
-            PLAYWRIGHT_ARGS+=( "--grep=${{ inputs.test-grep }}" )
-          fi
-          if [ "${{ inputs.test-grep-invert }}" != "(none)" ]; then
-            PLAYWRIGHT_ARGS+=( "--grep-invert=${{ inputs.test-grep-invert }}" )
+          # Grep patterns — nightly runs all tests (no filters, @slow included)
+          if [ "$IS_SCHEDULE" != "true" ]; then
+            if [ "${{ inputs.test-grep }}" != "(all)" ]; then
+              PLAYWRIGHT_ARGS+=( "--grep=${{ inputs.test-grep }}" )
+            fi
+            if [ "${{ inputs.test-grep-invert }}" != "(none)" ]; then
+              PLAYWRIGHT_ARGS+=( "--grep-invert=${{ inputs.test-grep-invert }}" )
+            fi
           fi
 
-          # Specific test file (passed as positional argument after --)
+          # Specific test file (manual dispatch only)
           TEST_FILE=""
-          if [ -n "${{ inputs.test-file }}" ]; then
+          if [ "$IS_SCHEDULE" != "true" ] && [ -n "${{ inputs.test-file }}" ]; then
             TEST_FILE="${{ inputs.test-file }}"
           fi
 
-          # Sharding
-          if [ "${{ inputs.shard-total }}" != "1" ]; then
-            PLAYWRIGHT_ARGS+=( "--shard=${{ matrix.shard }}" )
-          fi
+          # Sharding — always pass; 1/1 is valid and runs all tests in one shard
+          PLAYWRIGHT_ARGS+=( "--shard=${{ matrix.shard }}" )
 
           # Workers and retries
-          PLAYWRIGHT_ARGS+=( "--workers=${{ inputs.workers }}" )
-          PLAYWRIGHT_ARGS+=( "--retries=${{ inputs.retries }}" )
+          if [ "$IS_SCHEDULE" = "true" ]; then
+            PLAYWRIGHT_ARGS+=( "--workers=4" "--retries=2" )
+          else
+            PLAYWRIGHT_ARGS+=( "--workers=${{ inputs.workers }}" "--retries=${{ inputs.retries }}" )
+          fi
 
-          # Headed mode
-          if [ "${{ inputs.headed }}" == "true" ]; then
+          # Headed mode (manual dispatch only)
+          if [ "$IS_SCHEDULE" != "true" ] && [ "${{ inputs.headed }}" = "true" ]; then
             PLAYWRIGHT_ARGS+=( "--headed" )
           fi
 
@@ -290,7 +346,7 @@ jobs:
           fi
 
       - name: "Stop Dev Server"
-        if: always() && inputs.test-suite == 'e2e'
+        if: always() && matrix.suite == 'e2e'
         shell: bash
         run: kill $SERVER_PID 2>/dev/null || true
 
@@ -315,6 +371,8 @@ jobs:
     if: ${{ !cancelled() && needs.run-tests.result != 'skipped' }}
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
+    outputs:
+      has-report: ${{ steps.merge.outputs.has-report }}
     steps:
       - name: "Checkout Repository"
         uses: actions/checkout@v6
@@ -369,12 +427,69 @@ jobs:
           external_repository: bkrupa/legacy-sports-deploys
           publish_branch: gh-pages
           publish_dir: ./playwright-report
-          destination_dir: playwright-report/manual-${{ github.run_number }}
+          destination_dir: playwright-report/${{ github.event_name == 'schedule' && format('nightly-{0}', github.run_id) || format('manual-{0}', github.run_number) }}
 
       - name: "Print Report URL"
         if: steps.merge.outputs.has-report == 'true'
         run: |
-          echo "## 🎭 Playwright Report" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            DEST="nightly-${{ github.run_id }}"
+          else
+            DEST="manual-${{ github.run_number }}"
+          fi
+          echo "## Playwright Report" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Report:** https://bkrupa.github.io/legacy-sports-deploys/playwright-report/manual-${{ github.run_number }}/" >> $GITHUB_STEP_SUMMARY
+          echo "**Report:** https://bkrupa.github.io/legacy-sports-deploys/playwright-report/$DEST/" >> $GITHUB_STEP_SUMMARY
           echo "**Run:** https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
+
+  # ---------------------------------------------------------------------------
+  # Nightly Discord notification — fires after tests finish (schedule only)
+  # ---------------------------------------------------------------------------
+  notify-nightly-finish:
+    name: "Nightly Results"
+    needs: [run-tests, deploy-report, notify-nightly-start]
+    if: always() && github.event_name == 'schedule'
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 3
+    steps:
+      - name: "Checkout Repository"
+        uses: actions/checkout@v6
+
+      - name: "Resolve Status"
+        id: status
+        shell: bash
+        run: |
+          TESTS_RESULT="${{ needs.run-tests.result }}"
+
+          # Treat skipped/cancelled as failure — the nightly suite should always run
+          case "$TESTS_RESULT" in
+            success) STATUS="success" ;;
+            failure) STATUS="failure" ;;
+            *) STATUS="failure" ;;
+          esac
+
+          if [ "$STATUS" != "success" ]; then
+            echo "content=<@205483185893670912>" >> "$GITHUB_OUTPUT"
+          else
+            echo "content=" >> "$GITHUB_OUTPUT"
+          fi
+          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+
+          HAS_REPORT="${{ needs.deploy-report.outputs.has-report }}"
+          REPORT_BASE="https://bkrupa.github.io/legacy-sports-deploys"
+          if [ "$HAS_REPORT" = "true" ]; then
+            REPORT_URL="${REPORT_BASE}/playwright-report/nightly-${{ github.run_id }}/"
+            echo "description=**[📊 Playwright Report](${REPORT_URL})**" >> "$GITHUB_OUTPUT"
+          else
+            echo "description=No test report available (no blob reports were uploaded)." >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: "Discord Nightly Results"
+        uses: ./.github/actions/discord-notify
+        with:
+          webhook-url: ${{ secrets.DISCORD_CI_WEBHOOK_URL }}
+          status: ${{ steps.status.outputs.status }}
+          title: "Nightly Playwright Suite — Results"
+          description: ${{ steps.status.outputs.description }}
+          content: ${{ steps.status.outputs.content }}
+          thread-id: ${{ needs.notify-nightly-start.outputs.thread-id }}
