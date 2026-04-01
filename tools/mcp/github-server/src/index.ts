@@ -11,6 +11,7 @@ import { getRepoInfo } from './tools/get-repo-info.js';
 import { getReviewThreads } from './tools/get-review-threads.js';
 import { listPRs } from './tools/list-prs.js';
 import { listReviews } from './tools/list-reviews.js';
+import { clearCiFailureLabels } from './tools/clear-ci-failure-labels.js';
 import { manageLabels } from './tools/manage-labels.js';
 import { markPRReady } from './tools/mark-pr-ready.js';
 import { manageLabelsBatch } from './tools/manage-labels-batch.js';
@@ -474,6 +475,16 @@ server.tool(
       .describe('Markdown body of the reply comment'),
   },
   async (params) => replyToThread(params),
+);
+
+// --- github_clear_ci_failure_labels ---
+server.tool(
+  'github_clear_ci_failure_labels',
+  'Remove all ci-failure-* labels from a PR. Use after successfully fixing and pushing a CI fix — the CI system will re-add labels if the fix did not hold. No-ops if no ci-failure-* labels are present.',
+  {
+    number: z.coerce.number().int().positive().describe('PR number'),
+  },
+  async (params) => clearCiFailureLabels(params),
 );
 
 // --- github_manage_labels ---

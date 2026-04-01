@@ -81,11 +81,11 @@ Review fixes (Pass 2) and CI code fixes (Pass 3) operate on independent PRs in s
 
    **CI fix sub-agent (Pass 3):**
 
-   > Fix the CI failure on PR #\<number\> in worktree \<path\>. The failing CI label is \<ci-failure-label\>; this is the label to remove once the failure is fixed (not a GitHub check name).
+   > Fix the CI failure on PR #\<number\> in worktree \<path\>.
    > Diagnose using ci_get_logs, apply the fix, run make pc, commit, push.
-   > After a successful push, remove this failing CI label using github_manage_labels(number: \<number\>, remove: ["\<ci-failure-label\>"]).
-   > The CI system will re-add the label if CI fails again after the push.
-   > If unfixable, comment on the PR with the diagnosed root cause and what was attempted — do not remove the label.
+   > After a successful push, call github_clear_ci_failure_labels(number: \<number\>) to remove stale ci-failure-\* labels.
+   > The CI system will re-add labels if CI fails again after the push.
+   > If unfixable, comment on the PR with the diagnosed root cause and what was attempted — do not remove labels.
    >
    > Tool preferences:
    >

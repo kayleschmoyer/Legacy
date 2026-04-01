@@ -189,6 +189,7 @@ Call `jira_auth_status` at the start of any Jira workflow. If `configured: true`
 | `gh pr create`                    | `github_create_pr` (with `draft: true`)            |
 | `gh pr ready`                     | `github_mark_pr_ready`                             |
 | `gh pr edit --add-label`          | `github_manage_labels`                             |
+| Remove all `ci-failure-*` labels  | `github_clear_ci_failure_labels`                   |
 | `gh api graphql` (resolve thread) | `github_resolve_thread` / `github_resolve_threads` |
 | `gh api` (review threads)         | `github_get_review_threads`                        |
 | `gh api` (PR reviews)             | `github_list_reviews`                              |
