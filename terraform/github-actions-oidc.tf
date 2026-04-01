@@ -37,7 +37,7 @@ resource "aws_iam_role" "github_actions" {
           }
           StringLike = {
             "token.actions.githubusercontent.com:sub" = [
-              "repo:bkrupa/legacy-sports:ref:refs/heads/*",
+              "repo:bkrupa/legacy-sports:ref:refs/heads/main",
               "repo:bkrupa/legacy-sports:environment:production",
               "repo:bkrupa/legacy-sports:pull_request"
             ]
@@ -594,5 +594,48 @@ resource "aws_iam_role_policy" "github_actions_additional" {
 output "github_actions_role_arn" {
   description = "ARN of the IAM role for GitHub Actions"
   value       = aws_iam_role.github_actions.arn
+  sensitive   = false
+}
+
+# Narrow IAM Role for CI artifact S3 uploads (any branch, S3-only permissions)
+resource "aws_iam_role" "ci_artifacts" {
+  name        = "${local.name_prefix}-ci-artifacts"
+  description = "OIDC role for CI artifact S3 uploads - feature branches, S3 only"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Federated = aws_iam_openid_connect_provider.github_actions.arn
+        }
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Condition = {
+          StringEquals = {
+            "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
+          }
+          StringLike = {
+            "token.actions.githubusercontent.com:sub" = [
+              "repo:bkrupa/legacy-sports:ref:refs/heads/*",
+              "repo:bkrupa/legacy-sports:pull_request"
+            ]
+          }
+        }
+      }
+    ]
+  })
+
+  tags = local.common_tags
+}
+
+resource "aws_iam_role_policy_attachment" "ci_artifacts_s3" {
+  role       = aws_iam_role.ci_artifacts.name
+  policy_arn = aws_iam_policy.ci_artifacts.arn
+}
+
+output "ci_artifacts_role_arn" {
+  description = "ARN of the narrow CI artifacts IAM role (S3 read/write/delete for CI artifact upload and download)"
+  value       = aws_iam_role.ci_artifacts.arn
   sensitive   = false
 }

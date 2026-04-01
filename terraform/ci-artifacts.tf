@@ -59,13 +59,19 @@ resource "aws_iam_policy" "ci_artifacts" {
         Action = [
           "s3:GetObject",
           "s3:PutObject",
-          "s3:DeleteObject",
-          "s3:ListBucket"
+          "s3:DeleteObject"
         ]
-        Resource = [
-          aws_s3_bucket.ci_artifacts.arn,
-          "${aws_s3_bucket.ci_artifacts.arn}/*"
-        ]
+        Resource = "${aws_s3_bucket.ci_artifacts.arn}/ci-artifacts/*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["s3:ListBucket"]
+        Resource = aws_s3_bucket.ci_artifacts.arn
+        Condition = {
+          StringLike = {
+            "s3:prefix" = ["ci-artifacts/*"]
+          }
+        }
       }
     ]
   })
