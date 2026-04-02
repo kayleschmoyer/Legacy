@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       lambda:
-        description: "Specific lambda to build (blank = all)"
+        description: "Specific lambda to build (blank = all affected)"
         required: false
         type: choice
         options:
@@ -18,11 +18,17 @@ on:
           - stats-lambda
           - draft-processor
           - game-selection
+          - image-upload
           - jira-proxy
           - oauth-proxy
           - rollbar-discord
           - stripe-webhook
           - websocket
+      force-all:
+        description: "Force build and deploy all lambdas, bypassing nx affected detection"
+        required: false
+        default: false
+        type: boolean
       run-ci-first:
         description: "Trigger CI pipeline and wait for it to pass before deploying (use when no CI run exists for HEAD)"
         required: false
@@ -306,6 +312,12 @@ jobs:
               "distPath":"lambdas/stripe-webhook/dist", "rollbar":true
             },
             {
+              "project":"image-upload", "dir":"image-upload",
+              "s3Prefix":"image-upload", "ssmName":"image-upload",
+              "badgeName":"Upload Image Upload Lambda",
+              "distPath":"lambdas/image-upload/dist", "rollbar":true
+            },
+            {
               "project":"websocket", "dir":"websocket",
               "s3Prefix":"websocket", "ssmName":"websocket",
               "badgeName":"Upload WebSocket Lambda",
@@ -316,6 +328,9 @@ jobs:
           if [ -n "${{ inputs.lambda }}" ]; then
             echo "🔧 Manual dispatch: building ${{ inputs.lambda }}"
             MATRIX=$(echo "$REGISTRY" | jq -c "[.[] | select(.project == \"${{ inputs.lambda }}\")]")
+          elif [ "${{ inputs.force-all }}" = "true" ]; then
+            echo "🚀 Force-all: building every registered lambda"
+            MATRIX=$(echo "$REGISTRY" | jq -c '.')
           else
             echo "🔍 Detecting affected lambda projects..."
             AFFECTED_RAW=$(pnpm exec nx show projects --affected --type app 2>/dev/null || echo "")
