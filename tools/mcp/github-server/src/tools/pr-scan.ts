@@ -8,6 +8,7 @@ interface PRScanParams {
   applyLabels?: boolean;
   compact?: boolean;
   excludeDrafts?: boolean;
+  excludeLabels?: string[];
 }
 
 interface CheckRunNode {
@@ -299,7 +300,7 @@ query($owner: String!, $repo: String!, $first: Int!) {
         headRefName
         isDraft
         mergeable
-        labels(first: 20) { nodes { name } }
+        labels(first: 100) { nodes { name } }
         commits(last: 1) {
           nodes {
             commit {
@@ -332,7 +333,7 @@ query($owner: String!, $repo: String!, $first: Int!) {
         title
         headRefName
         isDraft
-        labels(first: 20) { nodes { name } }
+        labels(first: 100) { nodes { name } }
       }
     }
   }
@@ -402,6 +403,25 @@ export async function prScan(params: PRScanParams): Promise<ToolResult> {
       : 0;
     const prs = excludeDrafts ? allPrs.filter((pr) => !pr.isDraft) : allPrs;
 
+    const excludeLabelsSet = new Set(params.excludeLabels ?? []);
+    let labelsExcluded = 0;
+    const filteredPrs: typeof prs = [];
+
+    if (excludeLabelsSet.size > 0) {
+      for (const pr of prs) {
+        const hasExcludedLabel = pr.labels.nodes.some((l) =>
+          excludeLabelsSet.has(l.name),
+        );
+        if (hasExcludedLabel) {
+          labelsExcluded += 1;
+        } else {
+          filteredPrs.push(pr);
+        }
+      }
+    } else {
+      filteredPrs.push(...prs);
+    }
+
     type BasePR = { number: number; title: string; headRefName: string };
     type CIFailingPR = BasePR & { failedChecks: string[] };
     type ReviewPR = BasePR & {
@@ -414,7 +434,7 @@ export async function prScan(params: PRScanParams): Promise<ToolResult> {
     const ciPending: BasePR[] = [];
     const ciPassingNumbers = new Set<number>();
 
-    for (const pr of prs) {
+    for (const pr of filteredPrs) {
       const base: BasePR = {
         number: pr.number,
         title: pr.title,
@@ -460,17 +480,17 @@ export async function prScan(params: PRScanParams): Promise<ToolResult> {
       }
     }
 
-    // Fetch unresolved thread details for ALL PRs
+    // Fetch unresolved thread details for all scanned (filtered) PRs
     const threadMap = await fetchUnresolvedThreadDetails(
       repo.owner,
       repo.name,
-      prs.map((pr) => pr.number),
+      filteredPrs.map((pr) => pr.number),
     );
 
     const reviews: ReviewPR[] = [];
     const clean: BasePR[] = [];
 
-    for (const pr of prs) {
+    for (const pr of filteredPrs) {
       const fetchResult = threadMap.get(pr.number);
       const threads = fetchResult?.threads ?? [];
       const truncated = fetchResult?.truncated ?? false;
@@ -502,7 +522,10 @@ export async function prScan(params: PRScanParams): Promise<ToolResult> {
     let labelActions: LabelAction[] = [];
     if (params.applyLabels !== false) {
       const existingLabels = new Map<number, string[]>(
-        prs.map((pr) => [pr.number, pr.labels.nodes.map((l) => l.name)]),
+        filteredPrs.map((pr) => [
+          pr.number,
+          pr.labels.nodes.map((l) => l.name),
+        ]),
       );
       labelActions = await syncCILabels(
         repo.owner,
@@ -521,8 +544,9 @@ export async function prScan(params: PRScanParams): Promise<ToolResult> {
     if (params.compact) {
       const compactOutput = {
         scannedAt: new Date().toISOString(),
-        totalOpen: prs.length,
+        totalOpen: filteredPrs.length,
         ...(draftsExcluded > 0 ? { draftsExcluded } : {}),
+        ...(labelsExcluded > 0 ? { labelsExcluded } : {}),
         ...(degradedNote ? { degradedNote } : {}),
         conflicting: conflicting.map((p) => ({
           number: p.number,
@@ -556,8 +580,9 @@ export async function prScan(params: PRScanParams): Promise<ToolResult> {
 
     const output = {
       scannedAt: new Date().toISOString(),
-      totalOpen: prs.length,
+      totalOpen: filteredPrs.length,
       ...(draftsExcluded > 0 ? { draftsExcluded } : {}),
+      ...(labelsExcluded > 0 ? { labelsExcluded } : {}),
       ...(degradedNote ? { degradedNote } : {}),
       conflicting,
       reviews,

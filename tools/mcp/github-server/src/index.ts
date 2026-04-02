@@ -617,6 +617,11 @@ server.tool(
       .describe(
         'Exclude draft PRs from scan results (default: true). Draft PRs are being worked on by their creating agent and should not be swept.',
       ),
+    excludeLabels: labelList
+      .optional()
+      .describe(
+        'Exclude PRs that have any of these labels. Useful for filtering out sweep-claimed PRs. Default: no exclusions.',
+      ),
   },
   async (params) => prScan(params),
 );
