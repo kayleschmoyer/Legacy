@@ -69,6 +69,9 @@ runs:
         # Enables the GifPicker component (requires a non-empty key at build
         # time). The actual Giphy API call is mocked by Playwright.
         VITE_GIPHY_API_KEY: "e2e-placeholder-key"
+        # Required at build time so the TeamDetailPage module initialises without
+        # throwing. The actual upload endpoint is never called in E2E tests.
+        VITE_IMAGE_UPLOAD_URL: "https://e2e-placeholder.test/images"
       run: |
         echo "::group::📦 Web Application Build"
 

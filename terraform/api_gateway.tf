@@ -3,6 +3,10 @@ resource "aws_api_gateway_rest_api" "main" {
   name        = "${local.name_prefix}-api"
   description = "Legacy Sports API Gateway"
 
+  # binary_media_types allows API Gateway to pass image bytes through to Lambda
+  # without treating them as UTF-8 text. Lambda receives isBase64Encoded=true.
+  binary_media_types = ["image/png", "image/jpeg", "image/webp", "image/*"]
+
   endpoint_configuration {
     types = ["REGIONAL"]
   }
@@ -70,6 +74,17 @@ resource "aws_api_gateway_deployment" "main" {
       aws_api_gateway_method.rollbar_discord_any.id,
       aws_api_gateway_integration.rollbar_discord_root_any.id,
       aws_api_gateway_integration.rollbar_discord_any.id,
+      # Image Upload resources
+      aws_api_gateway_resource.image_upload.id,
+      aws_api_gateway_resource.image_upload_paths.id,
+      aws_api_gateway_method.image_upload_root_options.id,
+      aws_api_gateway_method.image_upload_root_post.id,
+      aws_api_gateway_method.image_upload_options.id,
+      aws_api_gateway_method.image_upload_post.id,
+      aws_api_gateway_integration.image_upload_root_options.id,
+      aws_api_gateway_integration.image_upload_root_post.id,
+      aws_api_gateway_integration.image_upload_options.id,
+      aws_api_gateway_integration.image_upload_post.id,
     ]))
   }
 
@@ -96,6 +111,14 @@ resource "aws_api_gateway_deployment" "main" {
     aws_api_gateway_method.rollbar_discord_any,
     aws_api_gateway_integration.rollbar_discord_root_any,
     aws_api_gateway_integration.rollbar_discord_any,
+    aws_api_gateway_method.image_upload_root_options,
+    aws_api_gateway_method.image_upload_root_post,
+    aws_api_gateway_method.image_upload_options,
+    aws_api_gateway_method.image_upload_post,
+    aws_api_gateway_integration.image_upload_root_options,
+    aws_api_gateway_integration.image_upload_root_post,
+    aws_api_gateway_integration.image_upload_options,
+    aws_api_gateway_integration.image_upload_post,
   ]
 }
 

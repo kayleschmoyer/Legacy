@@ -1,0 +1,77 @@
+{
+  "name": "image-upload",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "lambdas/image-upload",
+  "projectType": "application",
+  "tags": ["lambda", "platform:node", "scope:lambda", "type:upload"],
+  "targets": {
+    "test": {
+      "executor": "@nx/jest:jest",
+      "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+      "cache": true,
+      "options": {
+        "jestConfig": "lambdas/image-upload/jest.config.ts"
+      }
+    },
+    "typecheck": {
+      "options": {
+        "command": "tsc --noEmit -p tsconfig.app.json"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["production", "^production"],
+      "outputs": ["{projectRoot}/dist"],
+      "dependsOn": ["^build"],
+      "options": {
+        "command": "vite build",
+        "cwd": "lambdas/image-upload"
+      },
+      "configurations": {
+        "development": {
+          "command": "vite build --mode development"
+        },
+        "production": {
+          "command": "vite build --mode production"
+        }
+      }
+    },
+    "deploy": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build"],
+      "options": {
+        "command": "../../scripts/deploy-lambda.ps1 -FunctionName image-upload",
+        "cwd": "lambdas/image-upload"
+      }
+    },
+    "deploy:plan": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build"],
+      "options": {
+        "commands": [
+          "echo '🔍 Validating Terraform configuration for image-upload lambda...'",
+          "cd ../../terraform && terraform fmt -check || (echo '⚠️  Terraform formatting issues found' && terraform fmt)",
+          "cd ../../terraform && terraform validate || echo '⚠️  Terraform validation failed'",
+          "cd ../../terraform && (terraform plan -target=aws_lambda_function.image_upload 2>&1 || echo '⚠️  Terraform plan failed - expected without state/credentials')"
+        ],
+        "parallel": false,
+        "cwd": "lambdas/image-upload"
+      }
+    },
+    "deploy:apply": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "cd ../../terraform && terraform apply -target=aws_lambda_function.image_upload -auto-approve",
+        "cwd": "lambdas/image-upload"
+      }
+    },
+    "logs": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "aws logs tail \"/aws/lambda/legacy-sports-dev-image-upload\" --follow",
+        "cwd": "terraform"
+      }
+    }
+  }
+}

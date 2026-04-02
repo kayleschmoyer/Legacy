@@ -126,6 +126,22 @@ resource "aws_ssm_parameter" "rollbar_discord_lambda_version" {
   })
 }
 
+resource "aws_ssm_parameter" "image_upload_lambda_version" {
+  name        = "/legacy-sports/${var.environment}/lambda/image-upload/version"
+  description = "Current version of the Image Upload Lambda function"
+  type        = "String"
+  value       = "initial"
+
+  lifecycle {
+    ignore_changes = [value]
+  }
+
+  tags = merge(local.common_tags, {
+    Component = "lambda-versioning"
+    Function  = "image-upload"
+  })
+}
+
 # =============================================================================
 # CI INFRASTRUCTURE PARAMETERS
 # =============================================================================

@@ -5228,6 +5228,25 @@ export type SetTradeBlockMutation = {
   } | null;
 };
 
+export type GetTeamByIdQueryVariables = Exact<{
+  teamId: Scalars['Int']['input'];
+}>;
+
+export type GetTeamByIdQuery = {
+  __typename?: 'Query';
+  team?: {
+    __typename?: 'Team';
+    id?: number | null;
+    leagueId?: number | null;
+    name?: string | null;
+    logoUrl?: string | null;
+    primaryColor?: string | null;
+    secondaryColor?: string | null;
+    avatarUrl?: string | null;
+    bannerUrl?: string | null;
+  } | null;
+};
+
 export type GetLeagueTradeBlockQueryVariables = Exact<{
   leagueId: Scalars['Int']['input'];
 }>;
@@ -5289,6 +5308,28 @@ export type CancelWaiverClaimMutation = {
     status?: string | null;
     errorMessage?: string | null;
     processedAt?: string | null;
+  } | null;
+};
+
+export type UpdateTeamBrandingMutationVariables = Exact<{
+  teamId: Scalars['Int']['input'];
+  leagueId: Scalars['Int']['input'];
+  avatarUrl?: InputMaybe<Scalars['String']['input']>;
+  bannerUrl?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+export type UpdateTeamBrandingMutation = {
+  __typename?: 'Mutation';
+  updateTeamBranding?: {
+    __typename?: 'Team';
+    id?: number | null;
+    leagueId?: number | null;
+    name?: string | null;
+    logoUrl?: string | null;
+    primaryColor?: string | null;
+    secondaryColor?: string | null;
+    avatarUrl?: string | null;
+    bannerUrl?: string | null;
   } | null;
 };
 
@@ -10033,6 +10074,92 @@ export type SetTradeBlockMutationOptions = BaseMutationOptions<
   SetTradeBlockMutation,
   SetTradeBlockMutationVariables
 >;
+export const GetTeamById = gql`
+  query GetTeamById($teamId: Int!) {
+    team: teamById(teamId: $teamId) {
+      ...Team
+    }
+  }
+  ${TeamFragmentDoc}
+`;
+
+/**
+ * __useGetTeamByIdQuery__
+ *
+ * To run a query within a React component, call `useGetTeamByIdQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetTeamByIdQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetTeamByIdQuery({
+ *   variables: {
+ *      teamId: // value for 'teamId'
+ *   },
+ * });
+ */
+export function useGetTeamByIdQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetTeamByIdQuery,
+    GetTeamByIdQueryVariables
+  > &
+    (
+      | { variables: GetTeamByIdQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<GetTeamByIdQuery, GetTeamByIdQueryVariables>(
+    GetTeamById,
+    options,
+  );
+}
+export function useGetTeamByIdLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetTeamByIdQuery,
+    GetTeamByIdQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<GetTeamByIdQuery, GetTeamByIdQueryVariables>(
+    GetTeamById,
+    options,
+  );
+}
+export function useGetTeamByIdSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetTeamByIdQuery,
+        GetTeamByIdQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<GetTeamByIdQuery, GetTeamByIdQueryVariables>(
+    GetTeamById,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetTeamByIdQuery,
+          GetTeamByIdQueryVariables
+        >,
+  );
+}
+export type GetTeamByIdQueryHookResult = ReturnType<typeof useGetTeamByIdQuery>;
+export type GetTeamByIdLazyQueryHookResult = ReturnType<
+  typeof useGetTeamByIdLazyQuery
+>;
+export type GetTeamByIdSuspenseQueryHookResult = ReturnType<
+  typeof useGetTeamByIdSuspenseQuery
+>;
+export type GetTeamByIdQueryResult = Apollo.QueryResult<
+  GetTeamByIdQuery,
+  GetTeamByIdQueryVariables
+>;
 export const GetLeagueTradeBlock = gql`
   query GetLeagueTradeBlock($leagueId: Int!) {
     leagueTradeBlock(leagueId: $leagueId) {
@@ -10278,6 +10405,70 @@ export type CancelWaiverClaimMutationResult =
 export type CancelWaiverClaimMutationOptions = BaseMutationOptions<
   CancelWaiverClaimMutation,
   CancelWaiverClaimMutationVariables
+>;
+export const UpdateTeamBranding = gql`
+  mutation UpdateTeamBranding(
+    $teamId: Int!
+    $leagueId: Int!
+    $avatarUrl: String
+    $bannerUrl: String
+  ) {
+    updateTeamBranding(
+      teamId: $teamId
+      leagueId: $leagueId
+      avatarUrl: $avatarUrl
+      bannerUrl: $bannerUrl
+    ) {
+      ...Team
+    }
+  }
+  ${TeamFragmentDoc}
+`;
+export type UpdateTeamBrandingMutationFn = MutationFunction<
+  UpdateTeamBrandingMutation,
+  UpdateTeamBrandingMutationVariables
+>;
+
+/**
+ * __useUpdateTeamBrandingMutation__
+ *
+ * To run a mutation, you first call `useUpdateTeamBrandingMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateTeamBrandingMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateTeamBrandingMutation, { data, loading, error }] = useUpdateTeamBrandingMutation({
+ *   variables: {
+ *      teamId: // value for 'teamId'
+ *      leagueId: // value for 'leagueId'
+ *      avatarUrl: // value for 'avatarUrl'
+ *      bannerUrl: // value for 'bannerUrl'
+ *   },
+ * });
+ */
+export function useUpdateTeamBrandingMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    UpdateTeamBrandingMutation,
+    UpdateTeamBrandingMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    UpdateTeamBrandingMutation,
+    UpdateTeamBrandingMutationVariables
+  >(UpdateTeamBranding, options);
+}
+export type UpdateTeamBrandingMutationHookResult = ReturnType<
+  typeof useUpdateTeamBrandingMutation
+>;
+export type UpdateTeamBrandingMutationResult =
+  Apollo.MutationResult<UpdateTeamBrandingMutation>;
+export type UpdateTeamBrandingMutationOptions = BaseMutationOptions<
+  UpdateTeamBrandingMutation,
+  UpdateTeamBrandingMutationVariables
 >;
 export const GetUserByEmail = gql`
   query GetUserByEmail($email: String!) {

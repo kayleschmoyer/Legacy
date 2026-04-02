@@ -46,6 +46,12 @@ mutation SetTradeBlock($teamMemberId: Int!, $onTradeBlock: Boolean!) {
   }
 }
 
+query GetTeamById($teamId: Int!) {
+  team: teamById(teamId: $teamId) {
+    ...Team
+  }
+}
+
 query GetLeagueTradeBlock($leagueId: Int!) {
   leagueTradeBlock(leagueId: $leagueId) {
     ...TeamMember
@@ -77,5 +83,21 @@ mutation CancelWaiverClaim($claimId: Int!) {
     status
     errorMessage
     processedAt
+  }
+}
+
+mutation UpdateTeamBranding(
+  $teamId: Int!
+  $leagueId: Int!
+  $avatarUrl: String
+  $bannerUrl: String
+) {
+  updateTeamBranding(
+    teamId: $teamId
+    leagueId: $leagueId
+    avatarUrl: $avatarUrl
+    bannerUrl: $bannerUrl
+  ) {
+    ...Team
   }
 }

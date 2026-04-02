@@ -105,6 +105,20 @@ variable "rollbar_webhook_secret" {
   default     = ""
 }
 
+# Cloudflare Workers AI credentials for image NSFW classification
+variable "cloudflare_account_id" {
+  description = "Cloudflare account ID for Workers AI API calls"
+  type        = string
+  default     = ""
+}
+
+variable "cloudflare_ai_api_token" {
+  description = "Cloudflare API token with Workers AI read permissions for NSFW image classification"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 # =============================================================================
 # GENERATED SECRETS
 # =============================================================================

@@ -1,0 +1,31 @@
+{
+  "name": "@legacy-sports/image-upload",
+  "version": "0.0.1",
+  "main": "dist/index.js",
+  "private": true,
+  "scripts": {
+    "build": "vite build",
+    "test": "jest --onlyChanged",
+    "test:watch": "jest --watch --onlyChanged",
+    "test:all-files": "jest"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "*",
+    "@aws-sdk/client-secrets-manager": "*",
+    "@legacy-sports/aws-utils": "workspace:*",
+    "@legacy-sports/db-client": "workspace:*",
+    "@legacy-sports/logging": "workspace:*",
+    "@legacy-sports/utils": "workspace:*",
+    "aws-lambda": "*",
+    "drizzle-orm": "*",
+    "jsonwebtoken": "*"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "*",
+    "@types/jsonwebtoken": "*",
+    "@types/node": "*",
+    "jest": "*",
+    "typescript": "*",
+    "vite": "*"
+  }
+}

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   Button,
@@ -30,12 +30,21 @@ import {
   BRAND_SEAM_RED,
   withAlpha,
 } from '../../constants/colors';
+import { getCsrfToken } from '../../lib/csrf';
 import { trackTeamViewed } from '../../utils/analytics';
+
+const IMAGE_UPLOAD_BASE_URL = import.meta.env['VITE_IMAGE_UPLOAD_URL'] as
+  | string
+  | undefined;
+
+const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
+const MAX_IMAGE_BYTES = 2 * 1024 * 1024; // 2 MB
 
 /**
  * TeamDetailPage - Display team roster and allow editing for General Managers.
  *
  * LS-355: GMs can now set a team avatar (logo) and banner image via HTTPS URL.
+ * LS-1810: GMs can upload custom logo images, screened for NSFW content via Cloudflare AI.
  */
 export function TeamDetailPage() {
   const { teamId } = useParams<{ teamId: string }>();
@@ -50,6 +59,11 @@ export function TeamDetailPage() {
   const [brandingSuccess, setBrandingSuccess] = useState(false);
   const [avatarImgError, setAvatarImgError] = useState(false);
   const [bannerImgError, setBannerImgError] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [bannerUploading, setBannerUploading] = useState(false);
+
+  const avatarFileInputRef = useRef<HTMLInputElement>(null);
+  const bannerFileInputRef = useRef<HTMLInputElement>(null);
 
   // Get team members (which includes leagueId)
   const {
@@ -304,6 +318,88 @@ export function TeamDetailPage() {
     }
   };
 
+  // ── Upload handler ─────────────────────────────────────────────────────────
+
+  const handleFileUpload = async (
+    file: File,
+    imageType: 'avatar' | 'banner',
+  ) => {
+    if (!leagueId) return;
+
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      setBrandingError(
+        `Unsupported file type: ${file.type}. Please upload a PNG, JPEG, or WebP image.`,
+      );
+      return;
+    }
+
+    if (file.size > MAX_IMAGE_BYTES) {
+      const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
+      setBrandingError(
+        `Image is too large (${sizeMb} MB). Maximum allowed size is 2 MB.`,
+      );
+      return;
+    }
+
+    setBrandingError(null);
+    setBrandingSuccess(false);
+
+    if (imageType === 'avatar') setAvatarUploading(true);
+    else setBannerUploading(true);
+
+    try {
+      if (!IMAGE_UPLOAD_BASE_URL) {
+        throw new Error(
+          'Image uploads are not configured. Please set VITE_IMAGE_UPLOAD_URL.',
+        );
+      }
+      const uploadUrl = `${IMAGE_UPLOAD_BASE_URL}/images/upload?teamId=${teamIdNum}&imageType=${imageType}`;
+      const csrfToken = getCsrfToken();
+      const response = await fetch(uploadUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': file.type,
+          ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+        },
+        body: file,
+        credentials: 'include',
+      });
+
+      const json = (await response.json()) as { url?: string; error?: string };
+
+      if (!response.ok) {
+        throw new Error(json.error ?? `Upload failed (${response.status})`);
+      }
+
+      if (!json.url) {
+        throw new Error('Upload succeeded but no URL was returned');
+      }
+
+      await updateTeamBranding({
+        variables: {
+          teamId: teamIdNum,
+          leagueId,
+          ...(imageType === 'avatar'
+            ? { avatarUrl: json.url }
+            : { bannerUrl: json.url }),
+        },
+      });
+
+      await refetchTeams();
+      if (imageType === 'avatar') setAvatarImgError(false);
+      else setBannerImgError(false);
+      setBrandingSuccess(true);
+      setTimeout(() => setBrandingSuccess(false), 3000);
+    } catch (err: unknown) {
+      setBrandingError(
+        err instanceof Error ? err.message : 'Upload failed. Please try again.',
+      );
+    } finally {
+      if (imageType === 'avatar') setAvatarUploading(false);
+      else setBannerUploading(false);
+    }
+  };
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
@@ -453,9 +549,34 @@ export function TeamDetailPage() {
                 Team Branding
               </Text>
               <Text fontSize="$3" color="$gray11">
-                Personalise your team with a logo and banner. Provide public
-                HTTPS image URLs (e.g. from Imgur, Discord CDN, or similar).
+                Personalise your team with a logo and banner. Upload an image
+                (PNG, JPEG, or WebP, max 2 MB) or paste a public HTTPS URL.
+                Uploaded images are screened for inappropriate content.
               </Text>
+
+              {/* Hidden file inputs */}
+              <input
+                ref={avatarFileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void handleFileUpload(file, 'avatar');
+                  e.target.value = '';
+                }}
+              />
+              <input
+                ref={bannerFileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void handleFileUpload(file, 'banner');
+                  e.target.value = '';
+                }}
+              />
 
               <form
                 onSubmit={(e) => {
@@ -465,10 +586,10 @@ export function TeamDetailPage() {
                 }}
                 style={{ display: 'contents' }}
               >
-                {/* Avatar URL */}
+                {/* Avatar */}
                 <YStack gap="$2">
                   <Text fontSize="$3" fontWeight="500">
-                    Avatar URL{' '}
+                    Avatar{' '}
                     <Text fontSize="$2" color="$gray11">
                       (team logo / icon)
                     </Text>
@@ -488,26 +609,43 @@ export function TeamDetailPage() {
                         size="$2"
                         chromeless
                         onPress={handleClearAvatar}
-                        disabled={brandingLoading}
+                        disabled={brandingLoading || avatarUploading}
                         style={{ color: BRAND_SEAM_RED }}
                       >
                         Clear
                       </Button>
                     </XStack>
                   )}
-                  <Input
-                    value={avatarInput}
-                    onChangeText={setAvatarInput}
-                    placeholder="https://example.com/my-logo.png"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
+                  <XStack gap="$2" alignItems="center">
+                    <Input
+                      value={avatarInput}
+                      onChangeText={setAvatarInput}
+                      placeholder="https://example.com/my-logo.png"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      flex={1}
+                    />
+                    <Button
+                      size="$3"
+                      onPress={() => avatarFileInputRef.current?.click()}
+                      disabled={
+                        avatarUploading || bannerUploading || brandingLoading
+                      }
+                      style={{
+                        backgroundColor: BRAND_NAVY_LIGHT,
+                        color: 'white',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {avatarUploading ? 'Uploading…' : 'Upload'}
+                    </Button>
+                  </XStack>
                 </YStack>
 
-                {/* Banner URL */}
+                {/* Banner */}
                 <YStack gap="$2">
                   <Text fontSize="$3" fontWeight="500">
-                    Banner URL{' '}
+                    Banner{' '}
                     <Text fontSize="$2" color="$gray11">
                       (header image)
                     </Text>
@@ -527,20 +665,37 @@ export function TeamDetailPage() {
                         size="$2"
                         chromeless
                         onPress={handleClearBanner}
-                        disabled={brandingLoading}
+                        disabled={brandingLoading || bannerUploading}
                         style={{ color: BRAND_SEAM_RED }}
                       >
                         Clear
                       </Button>
                     </XStack>
                   )}
-                  <Input
-                    value={bannerInput}
-                    onChangeText={setBannerInput}
-                    placeholder="https://example.com/my-banner.jpg"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
+                  <XStack gap="$2" alignItems="center">
+                    <Input
+                      value={bannerInput}
+                      onChangeText={setBannerInput}
+                      placeholder="https://example.com/my-banner.jpg"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      flex={1}
+                    />
+                    <Button
+                      size="$3"
+                      onPress={() => bannerFileInputRef.current?.click()}
+                      disabled={
+                        avatarUploading || bannerUploading || brandingLoading
+                      }
+                      style={{
+                        backgroundColor: BRAND_NAVY_LIGHT,
+                        color: 'white',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {bannerUploading ? 'Uploading…' : 'Upload'}
+                    </Button>
+                  </XStack>
                 </YStack>
 
                 {/* Feedback */}
