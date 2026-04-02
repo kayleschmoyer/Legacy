@@ -155,11 +155,15 @@ export async function handleApiGatewayEvent(
 
   // Rollbar webhook
   if (method === 'POST' && path.endsWith('/webhook')) {
-    const token = event.queryStringParameters?.['auth'];
-    if (!token) {
+    const rawToken = event.queryStringParameters?.['auth'];
+    if (!rawToken) {
       LOGGER.warn('Rollbar webhook rejected — missing auth token');
       return jsonResponse(403, { error: 'Forbidden' });
     }
+    // API Gateway URL-decodes query parameters before passing them to Lambda,
+    // converting `+` → space. Re-encode spaces as `+` so base64 tokens with
+    // `+` characters are compared correctly against the stored secret.
+    const token = rawToken.replace(/ /g, '+');
     const secret = await getWebhookSecret();
     if (!verifyWebhookToken(token, secret)) {
       LOGGER.warn('Rollbar webhook rejected — invalid auth token');
