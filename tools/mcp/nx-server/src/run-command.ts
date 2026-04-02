@@ -37,6 +37,10 @@ export function getRepoRoot(): string {
  * All other commands use `shell: false` to avoid cmd.exe metacharacter risks
  * (`|`, `<`, `>`, `%`, etc.). Tool-level input validation
  * (SHELL_METACHAR_REGEX in run-target.ts) provides defence-in-depth.
+ *
+ * Pass `includeStderr: true` to append stderr to the returned string on success.
+ * Use this for commands like Jest that write test results to stderr — callers
+ * that parse stdout as JSON (e.g. nx show project --json) must NOT set this flag.
  */
 export function runCommand(
   command: string,
@@ -44,6 +48,7 @@ export function runCommand(
   cwd: string,
   timeoutMs = COMMAND_TIMEOUT,
   env?: Record<string, string>,
+  includeStderr = false,
 ): Promise<string> {
   const isWindows = process.platform === 'win32';
   const needsShell = isWindows && NPM_WRAPPER_COMMANDS.has(command);
@@ -78,7 +83,12 @@ export function runCommand(
           reject(new Error(msg));
           return;
         }
-        resolve(stdout.trim());
+        if (includeStderr) {
+          const parts = [stderr?.trim(), stdout?.trim()].filter(Boolean);
+          resolve(parts.join('\n'));
+        } else {
+          resolve(stdout.trim());
+        }
       },
     );
   });
@@ -90,20 +100,26 @@ export function runPnpm(
   cwd: string,
   timeoutMs = COMMAND_TIMEOUT,
   env?: Record<string, string>,
+  includeStderr = false,
 ): Promise<string> {
-  return runCommand('pnpm', args, cwd, timeoutMs, env);
+  return runCommand('pnpm', args, cwd, timeoutMs, env, includeStderr);
 }
 
 /** Run an Nx command via pnpm exec. */
 export function runNx(
   args: string[],
   cwd: string,
-  opts?: { timeoutMs?: number; env?: Record<string, string> },
+  opts?: {
+    timeoutMs?: number;
+    env?: Record<string, string>;
+    includeStderr?: boolean;
+  },
 ): Promise<string> {
   return runPnpm(
     ['exec', 'nx', ...args],
     cwd,
     opts?.timeoutMs ?? COMMAND_TIMEOUT,
     opts?.env,
+    opts?.includeStderr ?? false,
   );
 }

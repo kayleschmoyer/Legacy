@@ -149,7 +149,12 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
       nxArgs.push('--', ...translated);
     }
 
-    const output = await runNx(nxArgs, cwd, { env: params.env });
+    // Jest writes test names, pass/fail counts, and the summary to stderr.
+    // Capture stderr alongside stdout so agents can verify which tests ran.
+    const output = await runNx(nxArgs, cwd, {
+      env: params.env,
+      includeStderr: params.target === 'test',
+    });
 
     return {
       content: [
