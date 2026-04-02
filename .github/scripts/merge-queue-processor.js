@@ -9,6 +9,10 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
   const { owner, repo } = context.repo;
   const isTriggeredByWorkflow = context.eventName === 'workflow_run';
 
+  // Cache of required check names per base branch, populated lazily.
+  // null means branch protection is absent or has no required checks — fall back to evaluating all.
+  const requiredChecksCache = Object.create(null);
+
   console.log(
     `🔄 Starting merge queue processing (${isDryRun ? 'DRY RUN' : 'LIVE'})...`,
   );
@@ -186,7 +190,7 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
     }
 
     // Check status checks
-    const checksResult = await validateStatusChecks(pr.head.sha);
+    const checksResult = await validateStatusChecks(pr.head.sha, pr.base.ref);
     if (!checksResult.allPassing) {
       return {
         canMerge: false,
@@ -253,17 +257,59 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
     };
   }
 
-  async function validateStatusChecks(sha) {
-    const checks = await github.rest.checks.listForRef({
-      owner,
-      repo,
-      ref: sha,
-    });
-    const statuses = await github.rest.repos.listCommitStatusesForRef({
-      owner,
-      repo,
-      ref: sha,
-    });
+  async function getRequiredChecks(branch) {
+    if (branch in requiredChecksCache) return requiredChecksCache[branch];
+
+    try {
+      const bp = await github.rest.repos.getBranchProtection({
+        owner,
+        repo,
+        branch,
+      });
+      const rsc = bp.data.required_status_checks;
+      if (!rsc) {
+        requiredChecksCache[branch] = null;
+        return null;
+      }
+      const names = new Set([
+        ...(rsc.contexts || []),
+        ...(rsc.checks || []).map((c) => c.context),
+      ]);
+      requiredChecksCache[branch] = names.size > 0 ? names : null;
+    } catch (e) {
+      const status = e && typeof e === 'object' ? e.status : undefined;
+      if (status === 404) {
+        console.log(
+          `ℹ️ No branch protection found for '${branch}' (404) — evaluating all checks`,
+        );
+      } else {
+        console.log(
+          `⚠️ Failed to fetch branch protection for '${branch}' (${status ?? e?.message ?? 'unknown error'}) — treating as no required checks and evaluating all checks`,
+        );
+      }
+      requiredChecksCache[branch] = null;
+    }
+
+    return requiredChecksCache[branch];
+  }
+
+  async function validateStatusChecks(sha, baseBranch) {
+    // Only evaluate checks that branch protection actually requires.
+    // This prevents manually dispatched or nightly workflows that post check runs
+    // to the same SHA from blocking the merge queue when the PR's own CI passed.
+    // Falls back to evaluating all checks when branch protection is absent or
+    // has no required checks configured.
+    const requiredCheckNames = await getRequiredChecks(baseBranch);
+
+    const [checks, statuses] = await Promise.all([
+      github.rest.checks.listForRef({ owner, repo, ref: sha, per_page: 100 }),
+      github.rest.repos.listCommitStatusesForRef({
+        owner,
+        repo,
+        ref: sha,
+        per_page: 100,
+      }),
+    ]);
 
     const failingChecks = [];
     const pendingChecks = [];
@@ -272,17 +318,35 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
     // (housekeeping job that sleeps 3min; bot-review is evaluated independently as a commit status).
     const EXCLUDED_CHECKS = new Set(['process-merge-queue', 'delayed-recheck']);
 
-    // Guard: if no check runs exist yet for this SHA, CI hasn't started.
-    const relevantChecks = checks.data.check_runs.filter(
-      (c) => !EXCLUDED_CHECKS.has(c.name),
-    );
-    if (relevantChecks.length === 0) {
-      pendingChecks.push('CI checks not yet registered for this SHA');
+    // Build the set of check runs to evaluate:
+    // - always skip EXCLUDED_CHECKS
+    // - when branch protection specifies required checks, skip anything not in that set
+    const relevantChecks = checks.data.check_runs.filter((c) => {
+      if (EXCLUDED_CHECKS.has(c.name)) return false;
+      if (requiredCheckNames !== null && !requiredCheckNames.has(c.name))
+        return false;
+      return true;
+    });
+
+    if (requiredCheckNames !== null) {
+      // Detect required checks that haven't posted a run yet (CI not started).
+      const postedNames = new Set([
+        ...relevantChecks.map((c) => c.name),
+        ...statuses.data.map((s) => s.context),
+      ]);
+      for (const reqName of requiredCheckNames) {
+        if (!postedNames.has(reqName)) {
+          pendingChecks.push(`${reqName} (not yet registered)`);
+        }
+      }
+    } else {
+      // No branch protection — guard against CI not having started at all.
+      if (relevantChecks.length === 0) {
+        pendingChecks.push('CI checks not yet registered for this SHA');
+      }
     }
 
-    for (const check of checks.data.check_runs) {
-      if (EXCLUDED_CHECKS.has(check.name)) continue;
-
+    for (const check of relevantChecks) {
       if (check.status === 'completed' && check.conclusion !== 'success') {
         if (
           check.conclusion === 'failure' ||
@@ -310,6 +374,7 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
     }
 
     for (const [ctx, status] of Object.entries(statusesByContext)) {
+      if (requiredCheckNames !== null && !requiredCheckNames.has(ctx)) continue;
       if (status.state === 'failure' || status.state === 'error') {
         failingChecks.push(ctx + ' (' + status.state + ')');
       } else if (status.state === 'pending') {
