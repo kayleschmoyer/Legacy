@@ -126,7 +126,7 @@ if ($resolvedParent -ne "main" -and $resolvedParent -ne "none") {
     $lsRemoteExit = $LASTEXITCODE
     if ($lsRemoteExit -ne 0) {
         Write-Host "" -ForegroundColor Red
-        Write-Host "[ERROR] git ls-remote exited $lsRemoteExit — check network connectivity and Git credentials." -ForegroundColor Red
+        Write-Host "[ERROR] git ls-remote exited $lsRemoteExit  -  check network connectivity and Git credentials." -ForegroundColor Red
         exit 1
     }
     if (-not $remoteRef) {
