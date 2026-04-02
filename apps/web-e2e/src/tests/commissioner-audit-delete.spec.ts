@@ -352,7 +352,7 @@ test.describe('Commissioner Audit Log — commissioner access @regression', () =
       if (postData.includes('getcommissionerauditlogs')) {
         auditQueryCalled = true;
       }
-      await unmockedGraphQLFallback(route);
+      await route.fallback();
     });
 
     await page.goto('/baseball/league/1/commissioner');

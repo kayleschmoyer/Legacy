@@ -446,8 +446,12 @@ test.describe('Team Detail – branding form (GM) @regression', () => {
     await page.goto(TEAM_URL);
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Avatar URL')).toBeVisible();
-    await expect(page.getByText('Banner URL')).toBeVisible();
+    await expect(
+      page.getByPlaceholder('https://example.com/my-logo.png'),
+    ).toBeVisible();
+    await expect(
+      page.getByPlaceholder('https://example.com/my-banner.jpg'),
+    ).toBeVisible();
   });
 
   test('GM sees personalisation instructions text', async ({ page }) => {

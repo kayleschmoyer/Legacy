@@ -220,7 +220,9 @@ test.describe('Scoreboard — page structure @regression', () => {
   });
 
   test('shows Final status for completed game', async ({ page }) => {
-    await expect(page.getByText('Final')).toBeVisible();
+    await expect(
+      page.getByTestId('game-card-1002').getByText('Final'),
+    ).toBeVisible();
   });
 
   test('shows team abbreviations for final game', async ({ page }) => {

@@ -513,7 +513,7 @@ test.describe('Auction Draft — budget tracking updates @regression', () => {
         return;
       }
 
-      await unmockedGraphQLFallback(route);
+      await route.fallback();
     });
 
     await page.goto(DRAFT_URL);

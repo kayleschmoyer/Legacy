@@ -1058,7 +1058,7 @@ test.describe('Error handling — mutation failure @regression', () => {
           }),
         });
       } else {
-        await unmockedGraphQLFallback(route);
+        await route.fallback();
       }
     });
 
@@ -1112,7 +1112,7 @@ test.describe('Error handling — mutation failure @regression', () => {
           }),
         });
       } else {
-        await unmockedGraphQLFallback(route);
+        await route.fallback();
       }
     });
 
