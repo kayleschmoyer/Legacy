@@ -112,6 +112,35 @@ if ($LASTEXITCODE -ne 0) {
     Write-Host "[WARN] git fetch origin failed -- continuing with local refs" -ForegroundColor Yellow
 }
 
+# ---------------------------------------------------------------------------
+# Guard: if using a stacked parent, verify it exists on origin before creating
+# the worktree. A parent that only exists locally means the child branch will
+# silently start from the wrong base -- the resulting PR will have the wrong
+# diff and the stack will break.
+# ---------------------------------------------------------------------------
+if ($resolvedParent -ne "main" -and $resolvedParent -ne "none") {
+    $remoteRef = & {
+        $ErrorActionPreference = 'SilentlyContinue'
+        git ls-remote --heads origin -- $resolvedParent 2>$null
+    }
+    $lsRemoteExit = $LASTEXITCODE
+    if ($lsRemoteExit -ne 0) {
+        Write-Host "" -ForegroundColor Red
+        Write-Host "[ERROR] git ls-remote exited $lsRemoteExit — check network connectivity and Git credentials." -ForegroundColor Red
+        exit 1
+    }
+    if (-not $remoteRef) {
+        Write-Host "" -ForegroundColor Red
+        Write-Host "[ERROR] Parent branch '$resolvedParent' was not found on origin." -ForegroundColor Red
+        Write-Host "        Stacked worktrees must base off a branch that is already pushed." -ForegroundColor Red
+        Write-Host "        Push the parent PR first, then retry:" -ForegroundColor Yellow
+        Write-Host "          git -C <parent-worktree-path> push -u origin HEAD" -ForegroundColor Yellow
+        Write-Host "          OR: worktree_push() in the parent worktree" -ForegroundColor Yellow
+        Write-Host ""
+        exit 1
+    }
+}
+
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "  Worktree Create" -ForegroundColor Cyan

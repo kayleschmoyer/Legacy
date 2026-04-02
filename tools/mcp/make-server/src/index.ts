@@ -42,7 +42,9 @@ server.tool(
     'which creates the branch, worktree directory, and registers the parent dependency. ' +
     'After creation, run make_wt_setup to install dependencies. ' +
     'IMPORTANT: Use this instead of `make worktree` via Bash — it validates inputs ' +
-    'and provides structured output with next steps.',
+    'and provides structured output with next steps. ' +
+    'NOTE: When using a stacked parent (PARENT=...), the parent branch must already be ' +
+    'pushed to origin — the script will fail fast with a clear message if it is not.',
   {
     ticket: z
       .string()

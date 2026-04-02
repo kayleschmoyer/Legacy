@@ -164,6 +164,21 @@ twig worktree list
 > (`LS-XXXX` — auto-resolved to the matching local branch), or `none` (no dependency).
 > When omitted it defaults to `main`.
 
+> **⚠️ Parent branch must be pushed to origin before creating a stacked worktree.**
+> `make worktree` checks `git ls-remote --heads origin <parent>` after fetching and
+> **fails fast** if the parent only exists locally:
+>
+> ```
+> [ERROR] Parent branch 'LS-XXXX/parent-branch-name' was not found on origin.
+>         Stacked worktrees must base off a branch that is already pushed.
+>         Push the parent PR first, then retry:
+>           git -C <parent-worktree-path> push -u origin HEAD
+>           OR: worktree_push() in the parent worktree
+> ```
+>
+> A parent that only exists locally causes the child to silently base off the wrong
+> commit — the resulting PR will have an incorrect diff and the stack will break.
+
 > **⚠️ CRITICAL**: Do **NOT** use `twig switch LS-#### -p=...` before `twig worktree create`.
 > `twig switch` auto-generates a dash-format branch name from the Jira summary (e.g.,
 > `LS-490-fix-rollbar-init`), while `twig worktree create` uses your slash-format name
