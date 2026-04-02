@@ -298,6 +298,10 @@ node_modules/
 terraform/build/
 terraform/*.zip
 
+# Terraform plan files (contain credentials and sensitive resource details)
+tfplan
+*.tfplan
+
 # Terraform state files (contain sensitive data)
 *.tfstate
 *.tfstate.*
