@@ -179,15 +179,17 @@ runs:
             }]
           }')
 
+        # thread_name must be a top-level JSON body field for forum channels (not a query param).
+        # thread_id goes in the query string to target an existing thread.
+        if [ -n "$NOTIFY_THREAD_NAME" ]; then
+          PAYLOAD=$(echo "$PAYLOAD" | jq --arg tn "$NOTIFY_THREAD_NAME" '. + {thread_name: $tn}')
+        fi
+
         # Build webhook URL with query params
         # ?wait=true returns the message object so we can extract IDs
         WEBHOOK_URL="${DISCORD_WEBHOOK_URL}?wait=true"
         if [ -n "$NOTIFY_THREAD_ID" ]; then
           WEBHOOK_URL="${WEBHOOK_URL}&thread_id=${NOTIFY_THREAD_ID}"
-        fi
-        if [ -n "$NOTIFY_THREAD_NAME" ]; then
-          ENCODED_THREAD_NAME=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$NOTIFY_THREAD_NAME")
-          WEBHOOK_URL="${WEBHOOK_URL}&thread_name=${ENCODED_THREAD_NAME}"
         fi
 
         # Send to Discord
