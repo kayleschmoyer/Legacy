@@ -211,10 +211,10 @@ jobs:
 
           if [ -n "$PREV_TAG" ]; then
             echo "Commits since ${PREV_TAG}:"
-            COMMITS=$(git log "${PREV_TAG}..HEAD" --pretty=format:'[`%h`](https://github.com/${{ github.repository }}/commit/%H) %s' --no-merges | head -20)
+            COMMITS=$(git log "${PREV_TAG}..HEAD" --pretty=format:'[`%h`](https://github.com/${{ github.repository }}/commit/%H) %s' --first-parent -20)
           else
             echo "No previous Android release tag found — showing last 20 commits"
-            COMMITS=$(git log --pretty=format:'[`%h`](https://github.com/${{ github.repository }}/commit/%H) %s' --no-merges -20)
+            COMMITS=$(git log --pretty=format:'[`%h`](https://github.com/${{ github.repository }}/commit/%H) %s' --first-parent -20)
           fi
 
           {
