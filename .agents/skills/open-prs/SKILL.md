@@ -465,11 +465,11 @@ REPEAT (max 10 passes):
 
   Pass 0.5: Handle Dependabot PRs (comment-only, no worktree needed)
     - For each pr in dependabot_prs:
-        - Claim PR via github_manage_labels(add: ["sweep-claimed"]) before acting
+        - Claim PR via github_manage_labels(number: <pr.number>, add: ["sweep-claimed"]) before acting
         - IF pr is conflicting or has failing/stale CI → gh pr comment <pr.number> --body "@dependabot rebase"
         - IF pr is clean (no conflicts, CI passing)   → github_manage_labels(number: <pr.number>, add: ["merge-when-ready"])
         - IF pr has unresolved review threads         → github_manage_labels(number: <pr.number>, add: ["requires-human-review"])
-        - Release claim via github_manage_labels(remove: ["sweep-claimed"]) after acting
+        - Release claim via github_manage_labels(number: <pr.number>, remove: ["sweep-claimed"]) after acting
     - After acting, add pr to settled (Dependabot handles rebase asynchronously)
 
   Pass 1: Rebase regular conflicting PRs (SEQUENTIAL — cascade invalidation)
