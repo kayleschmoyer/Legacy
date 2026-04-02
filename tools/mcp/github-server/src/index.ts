@@ -502,15 +502,19 @@ server.tool(
 // --- github_manage_labels_batch ---
 server.tool(
   'github_manage_labels_batch',
-  'Add or remove labels on multiple PRs in one call.',
+  'Apply the same add/remove labels to multiple PRs in one call. ' +
+    'Pass PR numbers in `prs` (array of integers) and shared label lists in `add`/`remove`. ' +
+    'Example: prs=[1,2,3], add=["merge-when-ready"], remove=["ci-failure-lint"]',
   {
     prs: z
       .array(z.coerce.number().int().positive())
       .min(1)
       .max(100)
-      .describe('PR numbers'),
-    add: labelList.optional().describe('Labels to add'),
-    remove: labelList.optional().describe('Labels to remove'),
+      .describe('PR numbers to apply labels to'),
+    add: labelList.optional().describe('Labels to add to every PR in `prs`'),
+    remove: labelList
+      .optional()
+      .describe('Labels to remove from every PR in `prs`'),
   },
   async (params) => manageLabelsBatch(params),
 );
