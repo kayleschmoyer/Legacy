@@ -72,13 +72,23 @@ git -C $wt push --force-with-lease origin HEAD
 
 ## Bulk Rebase (All Conflicting PRs)
 
+**MCP (preferred):**
+
+```
+# List all open PRs with merge status — filter to CONFLICTING ones
+github_list_prs(state: "open", limit: 200)
+# Then filter results where mergeable == "CONFLICTING"
+```
+
+**Shell fallback:**
+
 ```powershell
 $raw = gh pr list --author "@me" --state open --limit 200 --json number,headRefName,mergeable,mergeStateStatus
 $conflicting = ($raw | ConvertFrom-Json) | Where-Object { $_.mergeable -eq "CONFLICTING" }
 $conflicting | Select-Object number, headRefName
 ```
 
-> Always use `--limit 200` -- the default 30 silently misses most open PRs.
+> Always fetch all PRs — the default limit silently misses most open PRs in large repos.
 
 ## Troubleshooting
 

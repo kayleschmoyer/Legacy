@@ -47,6 +47,14 @@ In practice the scan already filters out `sweep-claimed` PRs from the workable l
 
 ### Claim
 
+**MCP (preferred):**
+
+```
+github_manage_labels(prNumber: <number>, add: ["sweep-claimed"])
+```
+
+**Shell fallback:**
+
 ```bash
 gh pr edit <number> --add-label "sweep-claimed"
 ```
@@ -68,6 +76,14 @@ If another agent removed it in this window (extremely rare), skip the PR.
 
 After finishing — success, blocker, or abandoned:
 
+**MCP (preferred):**
+
+```
+github_manage_labels(prNumber: <number>, remove: ["sweep-claimed"])
+```
+
+**Shell fallback:**
+
 ```bash
 gh pr edit <number> --remove-label "sweep-claimed"
 ```
@@ -88,6 +104,17 @@ Returns `{ staleClaims: [{ number, title, claimedAt, minutesAgo }], totalClaimed
 
 For each PR in `staleClaims`:
 
+**MCP (preferred):**
+
+```
+# Mark as stale, then reclaim
+github_manage_labels(prNumber: <number>, remove: ["sweep-claimed"], add: ["sweep-stale-claim"])
+# (add a comment via gh pr comment — no MCP equivalent for PR comments)
+github_manage_labels(prNumber: <number>, remove: ["sweep-stale-claim"], add: ["sweep-claimed"])
+```
+
+**Shell fallback:**
+
 ```bash
 # Mark as stale, then reclaim
 gh pr edit <number> --remove-label "sweep-claimed" --add-label "sweep-stale-claim"
@@ -106,7 +133,7 @@ The orchestrating agent claims each PR before spawning a sub-agent. Sub-agents r
 > Read unresolved threads, apply fixes, run `make pc`, commit, push.
 > Resolve all fixed threads in one call: `github_resolve_threads(threadIds: [...])`.
 > If unfixable, comment the blocker on the PR and move on.
-> **Before exiting (success or failure), always release the claim: `gh pr edit <number> --remove-label "sweep-claimed"`**
+> **Before exiting (success or failure), always release the claim: `github_manage_labels(prNumber: <number>, remove: ["sweep-claimed"])`**
 >
 > Tool preferences:
 >
@@ -121,9 +148,9 @@ The orchestrating agent claims each PR before spawning a sub-agent. Sub-agents r
 > Fix the CI failure on PR #\<number\> in worktree \<path\>. The failing CI label is \<ci-failure-label\>.
 > **This PR is already claimed** — `sweep-claimed` was added by the orchestrator before spawning you.
 > Diagnose with `ci_get_logs`, apply the fix, run `make pc`, commit, push.
-> After a successful push, remove the CI failure label: `gh pr edit <number> --remove-label "<ci-failure-label>"`.
+> After a successful push, remove the CI failure label: `github_manage_labels(prNumber: <number>, remove: ["<ci-failure-label>"])`.
 > If unfixable, comment the root cause and what was attempted — do not remove the CI failure label.
-> **Before exiting (success or failure), always release the claim: `gh pr edit <number> --remove-label "sweep-claimed"`**
+> **Before exiting (success or failure), always release the claim: `github_manage_labels(prNumber: <number>, remove: ["sweep-claimed"])`**
 >
 > Tool preferences:
 >

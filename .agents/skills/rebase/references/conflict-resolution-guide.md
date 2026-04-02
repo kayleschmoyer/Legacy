@@ -133,7 +133,17 @@ git push --force-with-lease origin HEAD
 
 ## Bulk Rebase: Find All Conflicting Open PRs
 
-When asked to "rebase all conflicting PRs" or "fix all merge conflicts", use `--limit 200` to avoid missing PRs. This repo can have 100+ open PRs; the default limit of 30 silently misses most of them.
+When asked to "rebase all conflicting PRs" or "fix all merge conflicts", fetch all PRs to avoid missing any. This repo can have 100+ open PRs.
+
+**MCP (preferred):**
+
+```
+# Fetch all open PRs with merge status, then filter to CONFLICTING
+github_list_prs(state: "open", limit: 200)
+# Filter results where mergeable == "CONFLICTING"
+```
+
+**Shell fallback:**
 
 ```powershell
 $raw = gh pr list --author "@me" --state open --limit 200 --json number,headRefName,mergeable,mergeStateStatus

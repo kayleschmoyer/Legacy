@@ -4,6 +4,19 @@ Detailed batch workflow for fixing Copilot review comments across all open PRs.
 
 ## Step 0 — Discover PRs Reviewed by Copilot
 
+**MCP (preferred):**
+
+```
+# List open PRs
+github_list_prs(state: "open", limit: 100)
+
+# For each PR, check if Copilot left a review
+github_list_reviews(prNumber: <number>)
+# Filter results where reviewer login matches 'copilot'
+```
+
+**Shell fallback:**
+
 ```powershell
 # List open PRs reviewed by Copilot (JSON array)
 $prs = gh pr list --state open --json number,title,headRefName --limit 100 |
@@ -32,8 +45,12 @@ unresolved, non-outdated comments. PRs with no comments are skipped — the
 $toFix = @()   # collect { pr, threads } objects for Step 2
 
 foreach ($pr in $reviewed) {
-  # Use MCP tool (preferred): github_get_review_threads(number: $pr.number, unresolvedOnly: true)
-  # Or GraphQL fallback:
+  # MCP (preferred): fetch unresolved threads in one call
+  # github_get_review_threads(prNumber: $pr.number, unresolvedOnly: true)
+  # Returns threads with id, isResolved, isOutdated, comments (author.login, body, path, line)
+  # Filter to threads where any comment author.login matches 'copilot'
+
+  # Shell fallback — GraphQL:
   $repoInfo = gh repo view --json owner,name | ConvertFrom-Json
   $owner = $repoInfo.owner.login
   $repo = $repoInfo.name

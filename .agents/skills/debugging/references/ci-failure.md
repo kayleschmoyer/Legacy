@@ -12,7 +12,7 @@ Step-by-step playbook for triaging and fixing a failed CI run in the Legacy Spor
 ## When to Use
 
 - A GitHub Actions CI run failed on your PR or branch
-- `gh pr checks` shows a failing status
+- `github_pr_batch_status` shows a failing status
 - You need to understand **why** CI failed and how to fix it
 - A merge-queue run was rejected
 
@@ -41,6 +41,16 @@ If a search pattern returns no results, widen your search or save the full logs.
 
 Failures most commonly occur in **quality-gates** or **build-validation**.
 
+## `ci_get_logs` Parameter Reference
+
+| Parameter    | Type    | Description                                                  |
+| ------------ | ------- | ------------------------------------------------------------ |
+| `runId`      | number  | Run-level logs — fetches all jobs in the run                 |
+| `jobId`      | number  | Single-job logs — use when you know exactly which job failed |
+| `failedOnly` | boolean | `true` = only failed steps (fastest); `false` = all steps    |
+
+Use `runId` first. Switch to `jobId` when you need to isolate output from a single job (e.g. `quality-gates`). Never pass both.
+
 ## Steps
 
 > **Quick start (PR number known):** Steps 1 + 3 can be combined into a single script
@@ -57,6 +67,18 @@ Failures most commonly occur in **quality-gates** or **build-validation**.
 > steps below.
 
 ### 1. Find the failed run
+
+**MCP (preferred):**
+
+```
+# List recent runs on the current branch
+ci_list_runs(branch: "BRANCH_NAME", limit: 5)
+
+# Or check PR status (when you have a PR number)
+github_pr_batch_status(prNumbers: [PR_NUMBER])
+```
+
+**Shell fallback:**
 
 ```powershell
 # List recent runs on the current branch
@@ -97,7 +119,17 @@ Use the helper script when you have a PR number (preferred — auto-saves to scr
 # Prints a summary of failing steps and saves full log to scratch/pr-1234-ci.txt
 ```
 
-Or manually save by run ID:
+**MCP (preferred) — fetch by run ID:**
+
+```
+# Show only logs from failed steps (fastest)
+ci_get_logs(runId: RUN_ID, failedOnly: true)
+
+# If failedOnly returns empty or too short, fetch all logs
+ci_get_logs(runId: RUN_ID, failedOnly: false)
+```
+
+**Shell fallback:**
 
 ```powershell
 # Show only logs from failed steps (fastest)
@@ -105,11 +137,8 @@ gh run view RUN_ID --log-failed
 
 # Save to a file for easier searching
 gh run view RUN_ID --log-failed > scratch/pr-<N>-ci.txt
-```
 
-If `--log-failed` is empty or too short, fetch all logs:
-
-```powershell
+# If --log-failed is empty or too short, fetch all logs
 gh run view RUN_ID --log > ci-full.txt
 ```
 
@@ -122,6 +151,14 @@ gh run view RUN_ID --log > ci-full.txt
 > **IMPORTANT:** Each sub-step below has a search command AND an "Evidence you need" block. Run the search, then confirm you can see the specific error before jumping to the fix.
 
 #### 4a. Node / module-loading warnings (root cause)
+
+**MCP (preferred):**
+
+```
+ci_search_logs(runId: RUN_ID, pattern: "(node:\\d+) Warning|Failed to load|Cannot find module", context: 5)
+```
+
+**Shell fallback:**
 
 ```powershell
 gh run view RUN_ID --log-failed | Select-String "\(node:\d+\) Warning|Failed to load|Cannot find module" -Context 5
@@ -139,6 +176,14 @@ These usually mean a config file (`jest.config`, `tsconfig`, `package.json`) is 
 
 #### 4b. Formatting failure
 
+**MCP (preferred):**
+
+```
+ci_search_logs(runId: RUN_ID, pattern: "format:check|Formatting.*failed", context: 3)
+```
+
+**Shell fallback:**
+
 ```powershell
 gh run view RUN_ID --log-failed | Select-String "format:check|Formatting.*failed" -Context 3
 ```
@@ -153,7 +198,11 @@ The following files are not formatted:
   lib/utils/src/helpers.ts
 ```
 
-If no file list appears, widen the search: `Select-String "format" -Context 10`
+If no file list appears, widen the search:
+
+**MCP:** `ci_search_logs(runId: RUN_ID, pattern: "format", context: 10)`
+
+**Shell:** `Select-String "format" -Context 10`
 
 **Fix locally:**
 
@@ -162,6 +211,18 @@ pnpm exec nx format:write
 ```
 
 #### 4c. Lint errors
+
+**MCP (preferred):**
+
+```
+# Find the error summary
+ci_search_logs(runId: RUN_ID, pattern: "error  |✖ \\d+ problems", context: 3)
+
+# Get the SPECIFIC errors with file, line, and rule name
+ci_search_logs(runId: RUN_ID, pattern: "\\d+:\\d+\\s+error", context: 1)
+```
+
+**Shell fallback:**
 
 ```powershell
 # Find the error summary
@@ -192,6 +253,18 @@ Then manually resolve any errors that auto-fix cannot handle. See `.agents/skill
 
 #### 4d. TypeScript type errors
 
+**MCP (preferred):**
+
+```
+# Find the error code and message
+ci_search_logs(runId: RUN_ID, pattern: "error TS\\d+", context: 3)
+
+# Get file path and line number
+ci_search_logs(runId: RUN_ID, pattern: "\\.ts\\(\\d+,\\d+\\): error", context: 1)
+```
+
+**Shell fallback:**
+
 ```powershell
 # Find the error code and message
 gh run view RUN_ID --log-failed | Select-String "error TS\d+" -Context 3
@@ -217,6 +290,24 @@ pnpm exec nx affected -t typecheck
 See `.agents/skills/repo-tooling/SKILL.md` for common patterns.
 
 #### 4e. Unit test failures
+
+**MCP (preferred):**
+
+```
+# Step 1: FIRST check for Node warnings above the failure (root cause)
+ci_search_logs(runId: RUN_ID, pattern: "(node:\\d+) Warning|Failed to load", context: 5)
+
+# Step 2: Find which test suites failed
+ci_search_logs(runId: RUN_ID, pattern: "FAIL.*spec\\.ts|Failed tasks:", context: 5)
+
+# Step 3: Get the actual assertion or runtime error
+ci_search_logs(runId: RUN_ID, pattern: "Expected:|Received:|Error:|thrown:", context: 5)
+
+# Step 4: If the above is unclear, get the full test output
+ci_search_logs(runId: RUN_ID, pattern: "FAIL", context: 20)
+```
+
+**Shell fallback:**
 
 ```powershell
 # Step 1: FIRST check for Node warnings above the failure (root cause)
@@ -259,6 +350,18 @@ pnpm exec nx affected -t test
 
 #### 4f. Build failures
 
+**MCP (preferred):**
+
+```
+# Find which project(s) failed
+ci_search_logs(runId: RUN_ID, pattern: "Running target.*failed|Failed tasks:", context: 10)
+
+# Get the specific build error
+ci_search_logs(runId: RUN_ID, pattern: "ERROR|Error:|Module not found|Cannot find|BUILD FAILED", context: 5)
+```
+
+**Shell fallback:**
+
 ```powershell
 # Find which project(s) failed
 gh run view RUN_ID --log-failed | Select-String "Running target.*failed|Failed tasks:" -Context 10
@@ -295,6 +398,21 @@ pnpm exec nx affected -t build
 > DO NOT edit files in `D:\code\legacy-sports` (the main repo). Investigation (reading logs, running read-only AWS/git commands) is fine from anywhere, but the moment you are ready to apply a fix you must be in a proper worktree.
 
 If you do not already have an open branch for this fix:
+
+```
+# 1. Create a Jira ticket
+jira_create_ticket(summary: "Fix: <one-line description>", type: "Bug", sprint: "current")
+
+# 2. Create a worktree (MCP)
+make_worktree_create(ticket: "LS-####", description: "short-description")
+
+# 3. Set up the worktree
+make_wt_setup(worktreePath: "<path from make_worktree_create output>")
+
+# 4. All subsequent file edits and commands happen inside the worktree path
+```
+
+**Shell fallback:**
 
 ```powershell
 # 1. Create a Jira ticket
@@ -404,6 +522,14 @@ Some CI failures are not caused by your code:
 
 In these cases, rerun the failed jobs:
 
+**MCP (preferred):**
+
+```
+ci_rerun(runId: RUN_ID, onlyFailedJobs: true)
+```
+
+**Shell fallback:**
+
 ```powershell
 gh run rerun RUN_ID --failed
 ```
@@ -412,7 +538,25 @@ If flakiness persists, check [GitHub Status](https://www.githubstatus.com/) and 
 
 ### When search patterns return no results
 
-If the `Select-String` commands in step 4 don't match anything, **do not guess**. Escalate your search:
+If the search commands in step 4 don't match anything, **do not guess**. Escalate your search:
+
+**MCP (preferred):**
+
+```
+# 1. Fetch all logs (not just failed) and search
+ci_get_logs(runId: RUN_ID, failedOnly: false)
+
+# 2. Search for GitHub Actions error annotations
+ci_search_logs(runId: RUN_ID, pattern: "##\\[error\\]", context: 5)
+
+# 3. Search for any non-zero exit code
+ci_search_logs(runId: RUN_ID, pattern: "exit code [1-9]", context: 10)
+
+# 4. Search for generic Nx failure markers
+ci_search_logs(runId: RUN_ID, pattern: "❌|Failed tasks:|NX.*failed", context: 10)
+```
+
+**Shell fallback:**
 
 ```powershell
 # 1. Save full logs (not just failed) and open in VS Code
@@ -439,6 +583,14 @@ If you still cannot find a specific error, enable debug mode (below) and rerun.
 
 For extra-verbose CI logs, add the `ci-debug` label to your PR:
 
+**MCP (preferred):**
+
+```
+github_manage_labels(prNumber: PR_NUMBER, add: ["ci-debug"])
+```
+
+**Shell fallback:**
+
 ```powershell
 gh pr edit --add-label ci-debug
 ```
@@ -447,7 +599,23 @@ This turns on `NX_VERBOSE_LOGGING` and extended error context in all CI jobs.
 
 ## Quick Diagnostic Script
 
-Run this one-liner to classify the failure type automatically:
+**MCP (preferred) — find and classify the failure type:**
+
+```
+# 1. Find the latest failed run for the branch
+ci_list_runs(branch: "BRANCH_NAME", limit: 1)
+
+# 2. Search for each failure category (use runId from step 1)
+ci_search_logs(runId: RUN_ID, pattern: "Nx CLI not available|node_modules.*not found|workspace.*invalid")
+ci_search_logs(runId: RUN_ID, pattern: "Failed to load|Cannot find module|(node:\\d+) Warning")
+ci_search_logs(runId: RUN_ID, pattern: "format:check.*failed|Formatting.*failed|formatting issues detected")
+ci_search_logs(runId: RUN_ID, pattern: "error  .*@typescript-eslint|✖ \\d+ problems|ESLint.*failed")
+ci_search_logs(runId: RUN_ID, pattern: "error TS\\d+")
+ci_search_logs(runId: RUN_ID, pattern: "FAIL.*spec\\.ts|Test Suites:.*failed")
+ci_search_logs(runId: RUN_ID, pattern: "Running target.*failed|Failed tasks:|build failed")
+```
+
+**Shell fallback — PowerShell:**
 
 ```powershell
 $runId = (gh run list --branch (git branch --show-current) --limit 1 --json databaseId --jq '.[0].databaseId')
@@ -469,10 +637,10 @@ foreach ($p in $patterns) {
 
 ## Troubleshooting
 
-- **`gh run view` returns no output**: run may be in-progress or token lacks `actions:read`. Confirm with `gh run view RUN_ID`.
-- **Logs truncated**: save to file or open in browser (`gh run view RUN_ID --web`).
-- **detect-changes failure**: usually infrastructure — rerun with `gh run rerun RUN_ID --failed`.
-- **Merge-queue rejection**: find the merge-queue run: `gh run list --workflow ci-orchestrator.yml --limit 5`, then debug normally.
+- **No run found**: `ci_list_runs` returns empty — run may be in-progress or the branch name is wrong.
+- **Logs empty**: `ci_get_logs(failedOnly: true)` returned nothing — try `failedOnly: false`. Shell: `gh run view RUN_ID --log`.
+- **detect-changes failure**: usually infrastructure — rerun with `ci_rerun(runId: RUN_ID, onlyFailedJobs: true)`.
+- **Merge-queue rejection**: find the merge-queue run with `ci_list_runs(workflow: "merge-queue.yml", limit: 5)`, then debug normally.
 
 > **Advanced troubleshooting** (concurrency cancellations, skills lint, E2E failures, setup detection, Terraform locks, merge queue, build artifacts): see [ci-troubleshooting-advanced.md](ci-troubleshooting-advanced.md)
 

@@ -45,6 +45,18 @@ Deployment failures don't show in normal CI checks but block production releases
 
 Triggers on push to `main` (paths: `apps/web/**`, `lib/shared-components/**`). Deploys to GitHub Pages.
 
+**MCP (preferred):**
+
+```
+# Find deploy runs
+ci_list_runs(workflow: "deploy-web.yml", limit: 5)
+
+# Check for failures
+ci_search_logs(runId: RUN_ID, pattern: "build failed|deploy.*failed|Pages.*error", context: 5)
+```
+
+**Shell fallback:**
+
 ```powershell
 # Find deploy runs
 gh run list --workflow deploy-web.yml --limit 5
@@ -59,6 +71,18 @@ Common issues: missing `VITE_*` secrets, Sentry sourcemap upload failure, Pages 
 
 The consolidated upload workflow builds affected lambdas via matrix, packages and uploads to S3. Then `lambda-terraform-apply.yml` runs Terraform to update the Lambda function code.
 
+**MCP (preferred):**
+
+```
+# Find upload runs
+ci_list_runs(workflow: "upload-lambdas.yml", limit: 5)
+
+# Find terraform apply runs
+ci_list_runs(workflow: "lambda-terraform-apply.yml", limit: 5)
+```
+
+**Shell fallback:**
+
 ```powershell
 # Find upload runs
 gh run list --workflow upload-lambdas.yml --limit 5
@@ -72,6 +96,28 @@ gh run list --workflow lambda-terraform-apply.yml --limit 5
 ## Comprehensive Diagnostic Script
 
 Enhanced version of the quick diagnostic — classifies all failure types:
+
+**MCP (preferred) — classify failure type without a shell script:**
+
+```
+# 1. Find the latest run for the branch
+ci_list_runs(branch: "BRANCH_NAME", limit: 1)
+
+# 2. Run each category search (use runId from step 1)
+ci_search_logs(runId: RUN_ID, pattern: "Nx CLI not available|node_modules.*not found|workspace.*invalid|pnpm-lock.*not found")
+ci_search_logs(runId: RUN_ID, pattern: "Failed to load|Cannot find module|(node:\\d+) Warning")
+ci_search_logs(runId: RUN_ID, pattern: "format:check.*failed|Formatting.*failed|formatting issues detected")
+ci_search_logs(runId: RUN_ID, pattern: "error  .*@typescript-eslint|✖ \\d+ problems|ESLint.*failed")
+ci_search_logs(runId: RUN_ID, pattern: "error TS\\d+")
+ci_search_logs(runId: RUN_ID, pattern: "FAIL.*spec\\.ts|Test Suites:.*failed")
+ci_search_logs(runId: RUN_ID, pattern: "Running target.*failed|Failed tasks:|build failed")
+ci_search_logs(runId: RUN_ID, pattern: "server.*fail|server.*died|playwright.*error")
+ci_search_logs(runId: RUN_ID, pattern: "state lock|Lock Info")
+ci_search_logs(runId: RUN_ID, pattern: "operation was canceled|more recent commit")
+ci_search_logs(runId: RUN_ID, pattern: "not accessible by integration|403|Permission denied")
+```
+
+**Shell fallback — PowerShell:**
 
 ```powershell
 $runId = (gh run list --branch (git branch --show-current) --limit 1 --json databaseId --jq '.[0].databaseId')

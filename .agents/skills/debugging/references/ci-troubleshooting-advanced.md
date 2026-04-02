@@ -20,6 +20,14 @@ Or:
 
 **How to identify:**
 
+**MCP (preferred):**
+
+```
+ci_search_logs(runId: RUN_ID, pattern: "cancel|The operation was canceled")
+```
+
+**Shell fallback:**
+
 ```powershell
 gh run view RUN_ID | Select-String "cancel|The operation was canceled"
 ```
@@ -38,6 +46,14 @@ N skill(s) failed validation, M passed.
 ```
 
 **How to find:**
+
+**MCP (preferred):**
+
+```
+ci_search_logs(runId: RUN_ID, pattern: "skill.*failed validation|✖")
+```
+
+**Shell fallback:**
 
 ```powershell
 gh run view RUN_ID --log-failed | Select-String "skill.*failed validation|✖"
@@ -65,6 +81,18 @@ E2E failures have unique root causes beyond unit test failures — the dev serve
 ```
 
 **How to find:**
+
+**MCP (preferred):**
+
+```
+# Server-level failures
+ci_search_logs(runId: RUN_ID, pattern: "server.*fail|server.*died|server.*crash", context: 5)
+
+# Playwright test failures
+ci_search_logs(runId: RUN_ID, pattern: "FAIL.*e2e|playwright.*error", context: 5)
+```
+
+**Shell fallback:**
 
 ```powershell
 # Server-level failures
@@ -99,11 +127,27 @@ The `setup` composite action validates the Nx workspace after installing depende
 
 **How to find:**
 
+**MCP (preferred):**
+
+```
+ci_search_logs(runId: RUN_ID, pattern: "Nx CLI not available|node_modules.*not found|workspace.*invalid|nx binary.*not functional", context: 5)
+```
+
+**Shell fallback:**
+
 ```powershell
 gh run view RUN_ID --log-failed | Select-String "Nx CLI not available|node_modules.*not found|workspace.*invalid|nx binary.*not functional" -Context 5
 ```
 
 **Resolution:** Usually a transient runner issue or cache corruption. Rerun the job:
+
+**MCP (preferred):**
+
+```
+ci_rerun(runId: RUN_ID, onlyFailedJobs: true)
+```
+
+**Shell fallback:**
 
 ```powershell
 gh run rerun RUN_ID --failed
@@ -132,6 +176,18 @@ Lock Info:
 ```
 
 **How to find:**
+
+**MCP (preferred):**
+
+```
+# Find the deployment run
+ci_list_runs(workflow: "lambda-terraform-apply.yml", limit: 5)
+
+# Check for lock errors
+ci_search_logs(runId: RUN_ID, pattern: "state lock|Lock Info", context: 10)
+```
+
+**Shell fallback:**
 
 ```powershell
 # Find the deployment run
@@ -169,6 +225,18 @@ Branch is already up to date
 
 **How to find:**
 
+**MCP (preferred):**
+
+```
+# Find merge queue runs
+ci_list_runs(workflow: "merge-queue.yml", limit: 5)
+
+# Check for specific errors
+ci_search_logs(runId: RUN_ID, pattern: "HttpError|not accessible|No check runs", context: 5)
+```
+
+**Shell fallback:**
+
 ```powershell
 # Find merge queue runs
 gh run list --workflow merge-queue.yml --limit 5
@@ -183,6 +251,15 @@ gh run view RUN_ID --log-failed | Select-String "HttpError|not accessible|No che
 - **Checks not registered:** The merge queue waits — no action needed, it re-evaluates on next trigger
 - **Stuck PRs:** Remove and re-add the `merge-when-ready` label to re-trigger
 
+**MCP (preferred):**
+
+```
+github_manage_labels(prNumber: PR_NUMBER, remove: ["merge-when-ready"])
+github_manage_labels(prNumber: PR_NUMBER, add: ["merge-when-ready"])
+```
+
+**Shell fallback:**
+
 ```powershell
 gh pr edit PR_NUMBER --remove-label merge-when-ready
 gh pr edit PR_NUMBER --add-label merge-when-ready
@@ -193,6 +270,14 @@ gh pr edit PR_NUMBER --add-label merge-when-ready
 The E2E job downloads web build artifacts from the `build-validation` stage. If the artifact is missing, the download silently fails (`continue-on-error: true`), and E2E may run against stale content.
 
 **How to identify:**
+
+**MCP (preferred):**
+
+```
+ci_search_logs(runId: RUN_ID, pattern: "download-artifact|Unable to find.*artifact|Artifact not found", context: 3)
+```
+
+**Shell fallback:**
 
 ```powershell
 gh run view RUN_ID --log | Select-String "download-artifact|Unable to find.*artifact|Artifact not found" -Context 3
