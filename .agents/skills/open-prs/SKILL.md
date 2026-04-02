@@ -102,7 +102,7 @@ If either returns `configured: false`, **stop and prompt the user** before proce
 
 ### Both Environments
 
-- **Skip draft PRs** — draft PRs are still being worked on by their creating agent. The `github_pr_scan` and `github_pr_dashboard` tools exclude drafts by default (`excludeDrafts: true`). Never fix, rebase, label, or review a draft PR — wait for the creating agent to mark it ready via `github_mark_pr_ready`.
+- **Skip draft PRs — always** — draft PRs are owned by their creating agent and are actively being worked on. **Never edit, rebase, label, or resolve threads on a draft PR.** Always pass `excludeDrafts: true` explicitly to `github_pr_scan` and `github_pr_dashboard` — do not rely on the default. Exclude drafts on every pass and every re-scan within a sweep (not just at initial scan time): a PR that transitions from draft → ready _during_ a sweep pass should only be picked up on the _next_ full pass. Wait for the creating agent to mark it ready via `github_mark_pr_ready`. Log the number of drafts skipped in the sweep report.
 - **Dependabot PRs — comment-only** — never make local code changes to Dependabot-authored PRs. Identify them by author (`dependabot[bot]`) or branch prefix (`dependabot/`). Route them **only** to Pass 0.5 (below) and **exclude them from all other passes** (0, 1, 2, 3). All interactions use Dependabot comment commands: `@dependabot rebase` for conflicts or stale CI, `merge-when-ready` label for clean PRs. Dependabot owns its branches — local rebases, lockfile regeneration, and code edits are invalid on these PRs.
 - **Remove `@me` filter** — use `--limit 200` to catch all open PRs, not just yours
 - **Resolve review threads after fixing** — leaving threads unresolved is incomplete work
@@ -443,10 +443,15 @@ gh label list --search "sweep-" --json name | grep -q "sweep-stale-claim" \
 settled = {}  # PR numbers that have reached a terminal state
 
 REPEAT (max 10 passes):
-  Scan all open PRs, excluding already-claimed ones (Step 1):
-    github_pr_scan(excludeLabels: ["sweep-claimed"])
+  Scan all open PRs, excluding drafts (Step 1):
+    github_pr_scan(excludeDrafts: true)
+  # Note: github_pr_scan does NOT support an excludeLabels parameter.
+  # Label-based exclusion (e.g. "sweep-claimed") must be done via post-filtering,
+  # either here or using data from github_pr_batch_status / github_pr_dashboard.
   all_prs = scan.conflicting + scan.reviews + scan.ciFailing + scan.ciPending + scan.clean
-  workable = [pr for pr in all_prs if pr.number not in settled]
+  workable = [pr for pr in all_prs if pr.number not in settled
+                                   and "sweep-claimed" not in pr.labels]
+  # Note: draft count is in scan.draftsExcluded (field may be omitted when 0) — log it in the sweep summary
 
   IF workable is empty → EXIT (all settled or held by other agents)
 
@@ -536,6 +541,7 @@ TaskUpdate(taskId: <id>, status: "completed")
 Report:
 
 - Total PRs processed
+- **Draft PRs skipped** (count — excluded at every scan; owned by their creating agent)
 - PRs settled as **clean** (count)
 - PRs settled as **requires-human-review** (count + PR numbers + reasons — must each cite a blocker outside agent reach)
 - PRs **unsettled** (count + PR numbers + reasons — agent-fixable issues to retry in next sweep)
@@ -589,10 +595,10 @@ Cloud agents (Copilot Coding Agent) cannot commit or push code. This section cov
 Use the `github_pr_dashboard` MCP tool to get a full snapshot of all open PRs in a single call. It returns mergeable status, CI status, unresolved review threads, labels, and review decision for each PR.
 
 ```
-github_pr_dashboard(state: "open", limit: 100)
+github_pr_dashboard(state: "open", limit: 100, excludeDrafts: true)
 ```
 
-The response includes a `summary` object with counts (`total`, `conflicting`, `ciFailing`, `ciPending`, `ciPassing`, `withUnresolvedThreads`, `drafts`, `approved`) and a `prs` array with per-PR details.
+The response includes a `summary` object with counts (`total`, `conflicting`, `ciFailing`, `ciPending`, `ciPassing`, `withUnresolvedThreads`, `approved`) and a `prs` array with per-PR details. When drafts were skipped, the response also includes a top-level `draftsExcluded` field (omitted when 0) reflecting how many draft PRs were skipped — log this in the sweep report.
 
 For detailed inspection of specific PRs, use `github_pr_batch_status` with an array of PR numbers.
 
@@ -685,6 +691,7 @@ After completing all API-only actions, produce a summary report. This is the pri
 ### Report Sections
 
 1. **Actions Taken** — list every API action performed:
+   - **Draft PRs skipped** (count — excluded at scan; owned by their creating agent)
    - PRs labeled `merge-when-ready` (count + PR numbers)
    - PRs labeled `requires-human-review` (count + PR numbers + reasons — must each cite a blocker outside agent reach)
    - CI runs re-triggered (count + PR numbers + run IDs)
