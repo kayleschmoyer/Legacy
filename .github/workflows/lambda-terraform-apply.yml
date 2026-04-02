@@ -62,6 +62,9 @@ jobs:
           if [ -z "${{ secrets.ROLLBAR_ACCESS_TOKEN }}" ]; then
             MISSING+=("ROLLBAR_ACCESS_TOKEN")
           fi
+          if [ -z "${{ secrets.ROLLBAR_WEBHOOK_SECRET }}" ]; then
+            MISSING+=("ROLLBAR_WEBHOOK_SECRET")
+          fi
           if [ -z "${{ secrets.STRIPE_SECRET_KEY }}" ]; then
             MISSING+=("STRIPE_SECRET_KEY")
           fi
@@ -216,6 +219,7 @@ jobs:
           TF_VAR_oauth_proxy_cookie_secret: ${{ secrets.OAUTH_PROXY_COOKIE_SECRET }}
           TF_VAR_jira_credentials: ${{ secrets.JIRA_CREDENTIALS }}
           TF_VAR_rollbar_access_token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
+          TF_VAR_rollbar_webhook_secret: ${{ secrets.ROLLBAR_WEBHOOK_SECRET }}
           TF_VAR_stripe_secret_key: ${{ secrets.STRIPE_SECRET_KEY }}
           TF_VAR_stripe_webhook_secret: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
           TF_VAR_discord_webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
@@ -308,6 +312,7 @@ jobs:
           TF_VAR_oauth_proxy_cookie_secret: ${{ secrets.OAUTH_PROXY_COOKIE_SECRET }}
           TF_VAR_jira_credentials: ${{ secrets.JIRA_CREDENTIALS }}
           TF_VAR_rollbar_access_token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
+          TF_VAR_rollbar_webhook_secret: ${{ secrets.ROLLBAR_WEBHOOK_SECRET }}
           TF_VAR_stripe_secret_key: ${{ secrets.STRIPE_SECRET_KEY }}
           TF_VAR_stripe_webhook_secret: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
           TF_VAR_discord_webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
@@ -357,6 +362,7 @@ jobs:
           TF_VAR_oauth_proxy_cookie_secret: ${{ secrets.OAUTH_PROXY_COOKIE_SECRET }}
           TF_VAR_jira_credentials: ${{ secrets.JIRA_CREDENTIALS }}
           TF_VAR_rollbar_access_token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
+          TF_VAR_rollbar_webhook_secret: ${{ secrets.ROLLBAR_WEBHOOK_SECRET }}
           TF_VAR_stripe_secret_key: ${{ secrets.STRIPE_SECRET_KEY }}
           TF_VAR_stripe_webhook_secret: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
           TF_VAR_discord_webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}

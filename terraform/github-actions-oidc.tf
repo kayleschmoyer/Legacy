@@ -252,6 +252,7 @@ resource "aws_iam_role_policy" "github_actions_additional" {
       {
         Effect = "Allow"
         Action = [
+          "s3:ListBucket",
           "s3:GetBucketPolicy",
           "s3:GetBucketVersioning",
           "s3:GetBucketTagging",
