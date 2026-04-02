@@ -163,7 +163,6 @@ resource "aws_lambda_function" "image_upload" {
 
       # S3 storage for logo images
       LOGOS_BUCKET_NAME = aws_s3_bucket.team_logos.bucket
-      AWS_REGION        = var.aws_region
 
       AWS_NODEJS_CONNECTION_REUSE_ENABLED = "1"
     }
