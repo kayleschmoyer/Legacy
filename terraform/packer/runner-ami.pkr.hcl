@@ -29,7 +29,7 @@ variable "pnpm_version" {
 
 variable "playwright_version" {
   type    = string
-  default = "1.55.0"
+  default = "1.58.2"
 }
 
 variable "terraform_version" {
@@ -175,12 +175,27 @@ build {
   }
 
   # Playwright: system dependencies + Chromium browser binary + global CLI
+  #
+  # IMPORTANT: playwright_version must be kept in sync with the @playwright/test
+  # version declared in the root package.json.
+  # Playwright requires the browser binary version to exactly match the library
+  # version — a mismatch causes CI to re-download the browser on every run.
+  #
+  # Browsers are installed to /opt/playwright-browsers (world-readable, fixed
+  # path) so CI can detect them with a simple directory check rather than the
+  # unreliable `playwright install --dry-run` approach.
   provisioner "shell" {
     inline = [
       "sudo npx --yes playwright@${var.playwright_version} install-deps chromium",
-      "export PLAYWRIGHT_BROWSERS_PATH=$HOME/.cache/playwright",
-      "npx --yes playwright@${var.playwright_version} install chromium",
+      "sudo mkdir -p /opt/playwright-browsers",
+      "sudo chmod 755 /opt/playwright-browsers",
+      "sudo env PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers npx --yes playwright@${var.playwright_version} install chromium",
+      "sudo chmod -R a+rX /opt/playwright-browsers",
       "sudo npm install -g playwright@${var.playwright_version}",
+      # Export PLAYWRIGHT_BROWSERS_PATH for login shells
+      "echo 'export PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers' | sudo tee /etc/profile.d/playwright.sh",
+      # Export for GitHub Actions runner process (non-login shell) via /etc/environment
+      "echo 'PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers' | sudo tee -a /etc/environment",
     ]
   }
 

@@ -223,14 +223,15 @@ jobs:
               *) BROWSER_ENGINE="$BROWSER" ;;
             esac
           fi
-          # Self-hosted AMI has Chromium pre-installed; only download if missing
-          # or if a non-default browser was requested.
-          if [ "$BROWSER_ENGINE" = "chromium" ]; then
-            echo "Checking for pre-installed Chromium..."
-            if pnpm exec playwright install --dry-run chromium 2>/dev/null | grep -q "already installed"; then
-              echo "✅ Chromium already installed (AMI)"
-              exit 0
-            fi
+          # Self-hosted AMI pre-installs Chromium at /opt/playwright-browsers with
+          # PLAYWRIGHT_BROWSERS_PATH set in /opt/actions-runner/.env. Check for the
+          # browser directory directly — the old `--dry-run` approach was unreliable.
+          BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/playwright-browsers}"
+          if [ "$BROWSER_ENGINE" = "chromium" ] && compgen -G "${BROWSERS_PATH}/chromium-*" > /dev/null 2>&1; then
+            echo "✅ Chromium already installed at ${BROWSERS_PATH} (AMI cache)"
+            export PLAYWRIGHT_BROWSERS_PATH="$BROWSERS_PATH"
+            echo "PLAYWRIGHT_BROWSERS_PATH=$BROWSERS_PATH" >> "$GITHUB_ENV"
+            exit 0
           fi
           pnpm exec playwright install "$BROWSER_ENGINE" --with-deps
 
