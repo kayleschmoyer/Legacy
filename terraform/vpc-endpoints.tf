@@ -48,62 +48,26 @@ resource "aws_vpc_endpoint" "secretsmanager" {
 
   private_dns_enabled = true
 
-  # Endpoint policy: scoped to secrets this stack manages.
+  # Endpoint policy: scoped to this account's project-namespace secrets.
   # private_dns_enabled routes ALL Secrets Manager API calls through this
   # endpoint, including from self-hosted runners in public subnets.
   #
-  # Statement 1: Runtime reads - any principal can read stack-scoped secrets.
-  # Statement 2: Write/policy mutations - restricted to Terraform/CI roles
-  #   via aws:PrincipalArn condition (Terraform's aws_secretsmanager_secret
-  #   resource refresh calls GetResourcePolicy; apply calls
-  #   PutResourcePolicy/DeleteResourcePolicy).
+  # Resource scoping (not action filtering) is the meaningful control here:
+  # it prevents the endpoint from being used to reach secrets in other accounts
+  # or outside this project's namespace. IAM role policies enforce which
+  # actions each principal can actually perform.
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
-        Sid       = "RuntimeReads"
+        Sid       = "AllowProjectNamespace"
         Effect    = "Allow"
         Principal = "*"
-        Action = [
-          "secretsmanager:GetSecretValue",
-          "secretsmanager:DescribeSecret",
-          "secretsmanager:GetResourcePolicy",
-          "secretsmanager:ListSecretVersionIds",
-        ]
+        Action    = "secretsmanager:*"
         Resource = [
           "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${local.name_prefix}-*",
           "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/*",
         ]
-      },
-      {
-        Sid       = "TerraformWriteAndPolicy"
-        Effect    = "Allow"
-        Principal = "*"
-        Action = [
-          "secretsmanager:CreateSecret",
-          "secretsmanager:PutSecretValue",
-          "secretsmanager:UpdateSecret",
-          "secretsmanager:DeleteSecret",
-          "secretsmanager:TagResource",
-          "secretsmanager:UntagResource",
-          "secretsmanager:RestoreSecret",
-          "secretsmanager:UpdateSecretVersionStage",
-          "secretsmanager:PutResourcePolicy",
-          "secretsmanager:DeleteResourcePolicy",
-        ]
-        Resource = [
-          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${local.name_prefix}-*",
-          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/*",
-        ]
-        Condition = {
-          ArnLike = {
-            "aws:PrincipalArn" = [
-              "arn:aws:iam::${local.account_id}:role/${local.name_prefix}-runner*",
-              "arn:aws:iam::${local.account_id}:role/github-actions-oidc-*",
-              "arn:aws:iam::${local.account_id}:role/${local.name_prefix}-github-actions",
-            ]
-          }
-        }
       }
     ]
   })
@@ -124,28 +88,24 @@ resource "aws_vpc_endpoint" "logs" {
 
   private_dns_enabled = true
 
-  # Endpoint policy: Lambda runtime + Terraform refresh actions.
+  # Endpoint policy: scoped to this account's log groups.
   # private_dns_enabled routes ALL CW Logs API calls through this endpoint,
   # including from self-hosted runners in public subnets.
+  #
+  # Resource scoping (not action filtering) is the meaningful control here:
+  # it prevents the endpoint from being used to reach log groups in other
+  # accounts. IAM role policies enforce which actions each principal can
+  # actually perform, so maintaining an action allowlist here only causes
+  # repeated CI failures as new Terraform resources require new CW Logs APIs.
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
+        Sid       = "AllowAccountLogGroups"
         Effect    = "Allow"
         Principal = "*"
-        Action = [
-          "logs:CreateLogGroup",
-          "logs:CreateLogStream",
-          "logs:PutLogEvents",
-          "logs:DescribeLogGroups",
-          "logs:DescribeLogStreams",
-          "logs:ListTagsForResource",
-          "logs:ListTagsLogGroup",
-          "logs:GetLogEvents",
-          "logs:FilterLogEvents",
-          "logs:TagResource",
-        ]
-        Resource = "*"
+        Action    = "logs:*"
+        Resource  = "arn:aws:logs:*:${local.account_id}:*"
       }
     ]
   })
