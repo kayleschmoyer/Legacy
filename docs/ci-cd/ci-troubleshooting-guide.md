@@ -563,6 +563,33 @@ For CI failures blocking critical deployments:
 3. **Communication**: Update #incidents channel with status
 4. **Long-term**: Root cause analysis and prevention plan
 
+## Discord Notifications
+
+CI/CD workflows post status notifications to Discord via the `.github/actions/discord-notify` action. Each workflow uses a separate GitHub secret pointing to a different webhook/channel:
+
+| Secret                            | Used by                                                                                                                    |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `DISCORD_CI_WEBHOOK_URL`          | Playwright tests (`run-playwright-tests.yml`), CI pipeline (`ci-pipeline.yml`)                                             |
+| `DISCORD_DEPLOY_WEBHOOK_URL`      | Web deploys (`deploy-web.yml`), Lambda Terraform (`lambda-terraform-apply.yml`), rollbacks                                 |
+| `DISCORD_RELEASE_WEBHOOK_URL`     | Android app builds (`build-android-app.yml`), iOS app builds (`build-ios-app.yml`), web release summary (`deploy-web.yml`) |
+| `DISCORD_WEBHOOK_URL`             | Terraform variable — rollbar-discord Lambda (Rollbar + CloudWatch alarm/budget notifications)                              |
+| `DISCORD_USER_SIGNUP_WEBHOOK_URL` | Terraform variable — user signup events                                                                                    |
+| `DISCORD_STRIPE_WEBHOOK_URL`      | Terraform variable — Stripe events                                                                                         |
+
+To update a webhook (e.g. after recreating a channel): **Settings → Secrets and variables → Actions** in GitHub, then update the relevant secret.
+
+### Thread grouping (Playwright)
+
+The Playwright workflow groups the "starting" and "results" notifications into a single Discord thread per run using the `thread-name` input on the start notification and `thread-id` on the finish notification.
+
+**This requires a forum channel.** The `thread_name` webhook parameter is a Discord API forum-channel-only feature. If `DISCORD_CI_WEBHOOK_URL` points to a regular text channel:
+
+- The start notification posts successfully (to the channel root)
+- The `channel_id` captured from the response is the text channel's own ID — not a thread
+- The finish notification fails with `http=400, code 10003 ("Unknown Channel")` because Discord rejects that ID as a `thread_id`
+
+**Fix**: point `DISCORD_CI_WEBHOOK_URL` at a webhook for a **forum channel**. Create one in Discord Server Settings → Integrations → Webhooks, targeting your forum channel, then update the GitHub secret.
+
 ## 📚 Additional Resources
 
 ### Documentation Links
