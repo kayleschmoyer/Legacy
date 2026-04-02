@@ -34,6 +34,8 @@ Prefer the `nx_run` MCP tool (`nx_run(project: "<project-name>", target: "typech
 pnpm exec nx run <project-name>:typecheck
 ```
 
+> **Pattern B MCP servers use `mcp-` prefix**: MCP servers under `tools/mcp/` that are registered as Nx projects via `project.json` follow the `mcp-<server-directory-name>` convention (e.g., `mcp-nx-server`, not `nx-server`). If you're unsure of the project name, call `nx_show_projects()` first. See [create-mcp-server.md](../../create/references/create-mcp-server.md#nx-project-names-pattern-b) for the full table.
+
 ### Check all projects (not recommended for large repos)
 
 ```powershell

@@ -41,6 +41,30 @@ tools/mcp/
 
 > Full config templates for both patterns: [mcp-setup-patterns.md](mcp-setup-patterns.md)
 
+## Nx Project Names (Pattern B)
+
+MCP servers that use Pattern B are registered in Nx under the name `mcp-<server-directory-name>` — **not** the bare directory name. This is set by the `"name"` field in `project.json`.
+
+> **When running Nx targets against an MCP server**, always use the `mcp-` prefix, or run `nx_show_projects()` first to confirm the name.
+
+| Directory                   | Nx project name                | Pattern |
+| --------------------------- | ------------------------------ | ------- |
+| `tools/mcp/nx-server`       | `mcp-nx-server`                | B       |
+| `tools/mcp/jira-server`     | `mcp-jira-server`              | B       |
+| `tools/mcp/github-server`   | `mcp-github-server`            | B       |
+| `tools/mcp/ci-server`       | `mcp-ci-server`                | B       |
+| `tools/mcp/db-server`       | `mcp-db-server`                | B       |
+| `tools/mcp/make-server`     | `mcp-make-server`              | B       |
+| `tools/mcp/aws-server`      | `mcp-aws-server`               | B       |
+| `tools/mcp/worktree-server` | `mcp-worktree-server`          | B       |
+| `tools/mcp/browser-server`  | _(standalone — no Nx project)_ | A       |
+
+**Discovery tip**: if the project name is unknown or you're unsure whether a server uses Pattern A or B, run:
+
+```
+nx_show_projects()   # MCP tool — lists all registered Nx project names
+```
+
 ## Steps
 
 1. **Create directory**: `New-Item -ItemType Directory -Path "tools/mcp/<server-name>/src/tools" -Force`
