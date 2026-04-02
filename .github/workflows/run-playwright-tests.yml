@@ -375,7 +375,7 @@ jobs:
         with:
           mode: upload
           name: playwright-blobs/${{ strategy.job-index }}
-          path: apps/web-e2e/blob-report/
+          path: blob-report/
           if-no-files-found: ignore
 
   # ===========================================================================
