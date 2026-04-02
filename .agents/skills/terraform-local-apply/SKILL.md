@@ -74,17 +74,20 @@ node scripts/terraform-unlock.js
 ## Standard Workflow
 
 ```powershell
-# 1. Clear state lock
+# 1. Refresh secrets.auto.tfvars from env vars
+make gen-tfvars
+
+# 2. Clear state lock
 node scripts/terraform-unlock.js
 
-# 2. Format and validate
+# 3. Format and validate
 terraform -chdir=terraform fmt
 terraform -chdir=terraform validate
 
-# 3. Plan (always review before applying)
+# 4. Plan (always review before applying)
 terraform -chdir=terraform plan
 
-# 4. Apply after reviewing the plan
+# 5. Apply after reviewing the plan
 terraform -chdir=terraform apply
 ```
 
@@ -118,24 +121,16 @@ terraform -chdir=terraform apply -target=aws_lambda_function.graphql
 `terraform/secrets.auto.tfvars` is gitignored and lives only in the main repo. A fresh worktree will not have it, causing Terraform to prompt interactively for secret variables.
 
 ```powershell
-# Fix: re-run wt-setup (preferred — copies secrets automatically)
+# Fix: generate from env vars (works in any worktree)
+make gen-tfvars
+
+# Or re-run wt-setup (also copies secrets from main repo automatically)
 make wt-setup WT=<path-to-worktree>
-
-# Or copy manually:
-Copy-Item D:\code\legacy-sports\terraform\secrets.auto.tfvars `
-  <worktree>\terraform\secrets.auto.tfvars
-```
-
-`jira_credentials` can be set either in `secrets.auto.tfvars` (see `secrets.auto.tfvars.example`) or via env var if the file is unavailable:
-
-```powershell
-$env:TF_VAR_jira_credentials = aws secretsmanager get-secret-value `
-  --secret-id "legacy-sports-dev-jira-credentials" `
-  --query SecretString --output text
 ```
 
 ## Pre-Apply Checklist
 
+- [ ] `make gen-tfvars` ran — `secrets.auto.tfvars` is current with env vars
 - [ ] `aws sts get-caller-identity` succeeds
 - [ ] `node scripts/terraform-unlock.js` ran — no active lock
 - [ ] `terraform plan` reviewed — changes are expected and runner resources are NOT in the diff
@@ -146,7 +141,7 @@ $env:TF_VAR_jira_credentials = aws secretsmanager get-secret-value `
 | Symptom                                       | Fix                                                                           |
 | --------------------------------------------- | ----------------------------------------------------------------------------- |
 | "Error acquiring the state lock"              | `node scripts/terraform-unlock.js`                                            |
-| Prompts for secret variables interactively    | Copy `secrets.auto.tfvars` from main repo or run `make wt-setup`              |
+| Prompts for secret variables interactively    | Run `make gen-tfvars` (or copy `secrets.auto.tfvars` from main repo)          |
 | "No valid credential sources found"           | `aws sso login --profile <profile>`                                           |
 | Plan unexpectedly shows runner infrastructure | Check `infra.auto.tfvars` is present and sets `enable_github_runners = false` |
 | "Required version constraint"                 | Check `terraform/main.tf` and install matching `terraform` binary             |

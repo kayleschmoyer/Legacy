@@ -9,7 +9,7 @@
 	start dev dev-web dev-mobile dev-db dev-graphql dev-storybook graphiql docker-up \
 	android ios build-android build-ios \
 	db-migrate db-studio db-reset db-dump db-restore db-dump-dev db-restore-dev db-check-connections codegen \
-	deploy-lambdas deploy-infrastructure terraform-init terraform-plan terraform-apply terraform-apply-auto terraform-destroy \
+	deploy-lambdas deploy-infrastructure terraform-init terraform-plan terraform-apply terraform-apply-auto terraform-destroy gen-tfvars \
 	ami-build ami-list \
 	sync-env check-services graph affected list-projects workspace-lint pr \
 	ci ci-force ci-full release full-deploy full-check dev-setup \
@@ -487,6 +487,11 @@ ifeq ($(DETECTED_OS),Windows)
 else
 	cd terraform && ./deploy.sh
 endif
+
+gen-tfvars: ## Generate terraform/secrets.auto.tfvars from env vars (safe to re-run)
+	@$(call echo_blue,Generating terraform/secrets.auto.tfvars...)
+	node scripts/gen-tfvars.js
+	@$(call echo_green,Done — terraform/secrets.auto.tfvars updated)
 
 terraform-init: ## Initialize Terraform working directory
 	@$(call echo_blue,Initializing Terraform...)

@@ -87,6 +87,71 @@ server.tool(
   async (params) => wtSetup(params),
 );
 
+// --- terraform_gen_tfvars ---
+server.tool(
+  'terraform_gen_tfvars',
+  'Generate terraform/secrets.auto.tfvars from environment variables. ' +
+    'Reads GOOGLE_OAUTH_CLIENT_SECRET, JWT_SECRET_KEY, OAUTH_PROXY_COOKIE_SECRET, ' +
+    'JIRA_CLIENT_ID/SECRET/CLOUD_ID (or JIRA_CREDENTIALS), ROLLBAR_ACCESS_TOKEN, ' +
+    'STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, DISCORD_* and CLOUDFLARE_* vars. ' +
+    'Safe to re-run — always overwrites. Use checkOnly to validate without writing.',
+  {
+    worktreePath: z
+      .string()
+      .regex(ABSOLUTE_PATH_REGEX, 'worktreePath must be an absolute path')
+      .optional()
+      .describe('Repo or worktree root (default: repo root)'),
+    checkOnly: z
+      .boolean()
+      .default(false)
+      .describe('Report missing vars without writing the file'),
+    dryRun: z
+      .boolean()
+      .default(false)
+      .describe('Print the generated file contents without writing'),
+  },
+  async (params) => {
+    const baseDir = params.worktreePath || getRepoRoot();
+    const scriptPath = join(baseDir, 'scripts', 'gen-tfvars.js');
+
+    if (!existsSync(scriptPath)) {
+      return {
+        content: [{ type: 'text', text: `Script not found: ${scriptPath}` }],
+        isError: true,
+      };
+    }
+
+    const extraArgs: string[] = [];
+    if (params.checkOnly) extraArgs.push('--check');
+    if (params.dryRun) extraArgs.push('--dry-run');
+
+    try {
+      const output = await runCommand(
+        'node',
+        [scriptPath, ...extraArgs],
+        baseDir,
+        30_000,
+      );
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({ success: true, output }, null, 2),
+          },
+        ],
+      };
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      return {
+        content: [
+          { type: 'text', text: `terraform_gen_tfvars failed:\n${errorMsg}` },
+        ],
+        isError: true,
+      };
+    }
+  },
+);
+
 // --- terraform_fmt ---
 server.tool(
   'terraform_fmt',

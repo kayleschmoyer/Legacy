@@ -169,6 +169,7 @@ const ALLOWED_TARGETS = new Set([
   // Infrastructure
   'ami-build',
   'ami-list',
+  'gen-tfvars',
 ]);
 
 interface RunTargetParams {
