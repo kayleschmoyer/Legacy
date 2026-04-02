@@ -7,11 +7,7 @@ import {
 } from '@legacy-sports/shared-components/ui';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import { ScrollView, Spinner, styled, Text } from 'tamagui';
-import {
-  BrandIcon,
-  BrandIconBadge,
-  type BrandIconName,
-} from '../../components/icons';
+import { BrandIcon, type BrandIconName } from '../../components/icons';
 import { PageMeta } from '../../components/PageMeta';
 import {
   BG_DARK,
@@ -338,17 +334,16 @@ export function PublicLandingPage(): React.JSX.Element {
       >
         {/* Logo */}
         <XStack alignItems="center" gap="$2">
-          <BrandIconBadge
-            name="baseball"
-            size={34}
-            iconSize={18}
-            title="Legacy Sports baseball"
-            decorative={false}
+          <img
+            src={`${import.meta.env.BASE_URL}logo.png`}
+            alt=""
+            aria-hidden="true"
+            style={{ height: 38, width: 'auto', display: 'block' }}
           />
           <Text
             fontSize="$5"
             fontWeight="800"
-            color="$color"
+            color={BRAND_GOLD}
             letterSpacing={-0.5}
           >
             Legacy Sports
