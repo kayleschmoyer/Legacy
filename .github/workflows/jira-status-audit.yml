@@ -1,9 +1,15 @@
 name: "Jira Status Audit"
 
-# Detects mismatches between Jira ticket statuses and GitHub PR states.
+# Detects mismatches between Jira ticket statuses and GitHub PR states,
+# and audits epic statuses against their children's aggregate state.
+#
+# PR audit: checks open PRs against Jira ticket status, labels mismatches.
+# Epic audit: applies rollup logic (same as jira-branch-sync.yml) to all
+# non-Done epics — recalculates expected status from children and transitions.
+#
 # Jira sync is one-directional (GitHub → Jira). If someone manually changes
-# a ticket status in Jira, GitHub PRs remain unaware. This workflow catches
-# those divergences and posts PR comments + labels so they're visible.
+# a ticket status in Jira, GitHub PRs remain unaware. Similarly, epics can
+# drift out of sync when children are transitioned outside of PR activity.
 #
 # Authentication: Uses Atlassian OAuth 2.0 (client credentials grant).
 
@@ -70,60 +76,141 @@ jobs:
           echo "skip=false" >> "$GITHUB_OUTPUT"
           echo "✅ Jira authenticated"
 
+      # -------------------------------------------------------------------
+      # Define reusable retry wrapper for Jira API calls
+      # -------------------------------------------------------------------
+      - name: Define Jira API helper
+        if: steps.auth.outputs.skip != 'true'
+        run: |
+          cat > /tmp/jira-api.sh << 'FUNC_EOF'
+          jira_api() {
+            local METHOD="${1:-GET}"
+            local URL="$2"
+            local DATA="${3:-}"
+            local MAX_RETRIES=3
+            local RETRY_DELAY=2
+            local TMP_BODY
+            TMP_BODY=$(mktemp)
+            # shellcheck disable=SC2064
+            trap "rm -f '$TMP_BODY'" RETURN
+
+            for attempt in $(seq 1 $MAX_RETRIES); do
+              local CURL_ARGS=(
+                -sS -o "$TMP_BODY" -w '%{http_code}'
+                --header "Authorization: Bearer $JIRA_ACCESS_TOKEN"
+                --header "Accept: application/json"
+                --connect-timeout 10
+                --max-time 30
+              )
+
+              if [[ "$METHOD" == "POST" ]]; then
+                CURL_ARGS+=(--request POST --header "Content-Type: application/json")
+                if [[ -n "$DATA" ]]; then
+                  CURL_ARGS+=(--data "$DATA")
+                fi
+              fi
+
+              local HTTP_CODE
+              HTTP_CODE=$(curl "${CURL_ARGS[@]}" "$URL" 2>/dev/null) || {
+                echo "❌ curl transport error for $URL" >&2
+                sleep "$RETRY_DELAY"
+                RETRY_DELAY=$((RETRY_DELAY * 2))
+                continue
+              }
+
+              local BODY
+              BODY=$(cat "$TMP_BODY")
+
+              if [[ "$HTTP_CODE" =~ ^2[0-9][0-9]$ ]]; then
+                echo "$BODY"
+                return 0
+              fi
+
+              if [[ "$HTTP_CODE" == "401" || "$HTTP_CODE" == "403" ]]; then
+                echo "❌ Auth error (HTTP $HTTP_CODE) — not retrying" >&2
+                echo "$BODY" >&2
+                return 1
+              fi
+
+              if [[ "$HTTP_CODE" == "429" ]]; then
+                local WAIT=$RETRY_DELAY
+                local RETRY_AFTER
+                RETRY_AFTER=$(echo "$BODY" | jq -r '.retryAfter // empty' 2>/dev/null || true)
+                if [[ -n "$RETRY_AFTER" && "$RETRY_AFTER" =~ ^[0-9]+$ ]]; then
+                  WAIT=$RETRY_AFTER
+                fi
+                echo "⚠️  Rate limited (429). Retry $attempt/$MAX_RETRIES in ${WAIT}s..." >&2
+                sleep "$WAIT"
+                RETRY_DELAY=$((RETRY_DELAY * 2))
+                continue
+              fi
+
+              if [[ "$HTTP_CODE" =~ ^5[0-9][0-9]$ ]]; then
+                echo "⚠️  Server error (HTTP $HTTP_CODE). Retry $attempt/$MAX_RETRIES in ${RETRY_DELAY}s..." >&2
+                sleep "$RETRY_DELAY"
+                RETRY_DELAY=$((RETRY_DELAY * 2))
+                continue
+              fi
+
+              echo "❌ Unexpected HTTP $HTTP_CODE" >&2
+              echo "$BODY" >&2
+              return 1
+            done
+
+            echo "❌ All $MAX_RETRIES retries exhausted" >&2
+            return 1
+          }
+          FUNC_EOF
+          echo "✅ Jira API retry helper defined"
+
+      # -------------------------------------------------------------------
+      # Audit PR ↔ Jira Status
+      # -------------------------------------------------------------------
       - name: Audit PR ↔ Jira Status
+        id: pr-audit
         if: steps.auth.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          source /tmp/jira-api.sh
           echo "🔍 Fetching open PRs with LS-* branch pattern..."
 
-          # Get all open PRs
           PRS=$(gh pr list --state open --json number,headRefName,isDraft --limit 200)
           TOTAL=$(echo "$PRS" | jq 'length')
           echo "Found $TOTAL open PRs"
 
           MISMATCHES=0
           FIXED=0
-          SUMMARY=""
 
-          echo "$PRS" | jq -c '.[]' | while read -r PR; do
+          while read -r PR; do
             NUMBER=$(echo "$PR" | jq -r '.number')
             BRANCH=$(echo "$PR" | jq -r '.headRefName')
             IS_DRAFT=$(echo "$PR" | jq -r '.isDraft')
 
-            # Extract Jira key from branch
             KEY=$(echo "$BRANCH" | grep -oP 'LS-\d+' | head -1 || true)
             if [[ -z "$KEY" ]]; then
               continue
             fi
 
-            # Fetch Jira ticket status
-            JIRA_RESPONSE=$(curl -sf \
-              --header "Authorization: Bearer $JIRA_ACCESS_TOKEN" \
-              --header "Accept: application/json" \
-              "$JIRA_API_BASE/rest/api/3/issue/$KEY?fields=status" 2>/dev/null) || {
+            JIRA_RESPONSE=$(jira_api GET "$JIRA_API_BASE/rest/api/3/issue/$KEY?fields=status") || {
               echo "  ⚠️  Could not fetch $KEY — skipping"
               continue
             }
 
             JIRA_STATUS=$(echo "$JIRA_RESPONSE" | jq -r '.fields.status.name')
 
-            # Expected: open PR = "In Review" (or "In Progress" if draft)
             EXPECTED="In Review"
             if [[ "$IS_DRAFT" == "true" ]]; then
               EXPECTED="In Progress"
             fi
 
-            # Check for mismatch
             if [[ "$JIRA_STATUS" != "$EXPECTED" && "$JIRA_STATUS" != "In Progress" ]]; then
               echo "  ❌ PR #$NUMBER ($KEY): Jira='$JIRA_STATUS' but expected='$EXPECTED'"
               MISMATCHES=$((MISMATCHES + 1))
 
-              # Check if already labeled
-              HAS_LABEL=$(gh pr view "$NUMBER" --json labels --jq '.labels[].name' 2>/dev/null | grep -c 'jira-mismatch' || true)
+              HAS_LABEL=$(gh pr view "$NUMBER" --json labels --jq '.labels[].name' 2>/dev/null | grep -Fxc 'jira-mismatch' || true)
 
               if [[ "$HAS_LABEL" == "0" ]]; then
-                # Add label and comment
                 gh pr edit "$NUMBER" --add-label "jira-mismatch" 2>/dev/null || true
                 COMMENT_BODY=$(cat <<COMMENT_EOF
           ⚠️ **Jira Status Mismatch**
@@ -138,18 +225,17 @@ jobs:
                 gh pr comment "$NUMBER" --body "$COMMENT_BODY" 2>/dev/null || true
               fi
             else
-              # Check if previously mismatched but now correct — remove label
-              HAS_LABEL=$(gh pr view "$NUMBER" --json labels --jq '.labels[].name' 2>/dev/null | grep -c 'jira-mismatch' || true)
+              HAS_LABEL=$(gh pr view "$NUMBER" --json labels --jq '.labels[].name' 2>/dev/null | grep -Fxc 'jira-mismatch' || true)
               if [[ "$HAS_LABEL" != "0" ]]; then
                 gh pr edit "$NUMBER" --remove-label "jira-mismatch" 2>/dev/null || true
                 FIXED=$((FIXED + 1))
                 echo "  ✅ PR #$NUMBER ($KEY): mismatch resolved, label removed"
               fi
             fi
-          done
+          done < <(echo "$PRS" | jq -c '.[]')
 
           echo ""
-          echo "## 🔍 Jira Status Audit Results" >> $GITHUB_STEP_SUMMARY
+          echo "## 🔍 PR Status Audit" >> $GITHUB_STEP_SUMMARY
           echo "- **Open PRs scanned**: $TOTAL" >> $GITHUB_STEP_SUMMARY
           echo "- **Mismatches found**: $MISMATCHES" >> $GITHUB_STEP_SUMMARY
           echo "- **Previously mismatched, now fixed**: $FIXED" >> $GITHUB_STEP_SUMMARY
@@ -159,5 +245,212 @@ jobs:
             echo "⚠️ PRs with \`jira-mismatch\` label need attention." >> $GITHUB_STEP_SUMMARY
           else
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "✅ All Jira statuses match GitHub PR states." >> $GITHUB_STEP_SUMMARY
+            echo "✅ All PR ↔ Jira statuses match." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      # -------------------------------------------------------------------
+      # Audit Epic rollup status
+      #
+      # Applies the same rollup logic as jira-branch-sync.yml:
+      #   All children Done                         → Epic "Done"
+      #   All children In Review or Done             → Epic "In Review"
+      #   Any child In Progress / In Review / Done   → Epic "In Progress"
+      #   No children active (all To Do / Backlog)   → no change
+      #
+      # Epics with the "pinned-status" Jira label are excluded.
+      # -------------------------------------------------------------------
+      - name: Audit Epic Rollup Status
+        id: epic-audit
+        if: steps.auth.outputs.skip != 'true'
+        run: |
+          source /tmp/jira-api.sh
+          echo ""
+          echo "🔍 Auditing epic rollup statuses..."
+
+          # Fetch all non-Done epics in the LS project (paginated)
+          ENCODED_JQL=$(echo -n 'project = LS AND issuetype = Epic AND status != Done' | jq -sRr @uri)
+          ALL_EPICS="[]"
+          START_AT=0
+          PAGE_SIZE=100
+
+          while true; do
+            RESPONSE=$(jira_api GET "$JIRA_API_BASE/rest/api/3/search?jql=$ENCODED_JQL&fields=status,labels,summary&maxResults=$PAGE_SIZE&startAt=$START_AT") || {
+              echo "❌ Failed to fetch epics — skipping epic audit"
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "## 🏛️ Epic Rollup Audit" >> $GITHUB_STEP_SUMMARY
+              echo "❌ Failed to fetch epics from Jira." >> $GITHUB_STEP_SUMMARY
+              exit 0
+            }
+
+            TOTAL=$(echo "$RESPONSE" | jq -r '.total')
+            FETCHED=$(echo "$RESPONSE" | jq -r '.issues | length')
+            PAGE_ISSUES=$(echo "$RESPONSE" | jq -c '.issues')
+            ALL_EPICS=$(echo "$ALL_EPICS $PAGE_ISSUES" | jq -s '.[0] + .[1]')
+
+            START_AT=$((START_AT + FETCHED))
+            if [[ "$START_AT" -ge "$TOTAL" ]]; then
+              break
+            fi
+          done
+
+          EPIC_COUNT=$(echo "$ALL_EPICS" | jq 'length')
+          echo "Found $EPIC_COUNT non-Done epics"
+
+          TRANSITIONED=0
+          SKIPPED_PINNED=0
+          ALREADY_CORRECT=0
+          NO_ACTIVE_CHILDREN=0
+          ERRORS=0
+          TRANSITION_LOG=""
+
+          for i in $(seq 0 $((EPIC_COUNT - 1))); do
+            EPIC=$(echo "$ALL_EPICS" | jq -c ".[$i]")
+            EPIC_KEY=$(echo "$EPIC" | jq -r '.key')
+            EPIC_STATUS=$(echo "$EPIC" | jq -r '.fields.status.name')
+            EPIC_SUMMARY=$(echo "$EPIC" | jq -r '.fields.summary')
+            EPIC_LABELS=$(echo "$EPIC" | jq -r '.fields.labels[]?' 2>/dev/null || true)
+
+            # Skip pinned epics
+            if echo "$EPIC_LABELS" | grep -qx "pinned-status"; then
+              echo "  🔒 $EPIC_KEY: pinned — skipping"
+              SKIPPED_PINNED=$((SKIPPED_PINNED + 1))
+              continue
+            fi
+
+            # Fetch all children (paginated)
+            CHILD_JQL=$(echo -n "parent=$EPIC_KEY" | jq -sRr @uri)
+            ALL_STATUSES=""
+            CHILD_START=0
+            CHILD_TOTAL=0
+            CHILD_FETCH_FAILED=false
+
+            while true; do
+              CHILD_RESPONSE=$(jira_api GET "$JIRA_API_BASE/rest/api/3/search?jql=$CHILD_JQL&fields=status&maxResults=200&startAt=$CHILD_START") || {
+                echo "  ⚠️  $EPIC_KEY: could not fetch children — skipping"
+                ERRORS=$((ERRORS + 1))
+                CHILD_FETCH_FAILED=true
+                break
+              }
+
+              CHILD_TOTAL=$(echo "$CHILD_RESPONSE" | jq -r '.total')
+              PAGE_STATUSES=$(echo "$CHILD_RESPONSE" | jq -r '.issues[].fields.status.name')
+              CHILD_FETCHED=$(echo "$CHILD_RESPONSE" | jq -r '.issues | length')
+
+              if [[ -n "$ALL_STATUSES" && -n "$PAGE_STATUSES" ]]; then
+                ALL_STATUSES=$(printf '%s\n%s' "$ALL_STATUSES" "$PAGE_STATUSES")
+              elif [[ -n "$PAGE_STATUSES" ]]; then
+                ALL_STATUSES="$PAGE_STATUSES"
+              fi
+
+              CHILD_START=$((CHILD_START + CHILD_FETCHED))
+              if [[ "$CHILD_START" -ge "$CHILD_TOTAL" ]]; then
+                break
+              fi
+            done
+
+            # Skip epic if child fetch failed partway through pagination
+            if [[ "$CHILD_FETCH_FAILED" == "true" ]]; then
+              continue
+            fi
+
+            if [[ "$CHILD_TOTAL" == "0" || -z "$ALL_STATUSES" ]]; then
+              echo "  ℹ️  $EPIC_KEY: no children — skipping"
+              continue
+            fi
+
+            # Apply rollup logic (same as jira-branch-sync.yml)
+            ALL_DONE=true
+            ALL_REVIEW_OR_DONE=true
+            ANY_ACTIVE=false
+
+            while IFS= read -r STATUS; do
+              case "$STATUS" in
+                "Done")
+                  ANY_ACTIVE=true
+                  ;;
+                "In Review")
+                  ANY_ACTIVE=true
+                  ALL_DONE=false
+                  ;;
+                "In Progress")
+                  ANY_ACTIVE=true
+                  ALL_DONE=false
+                  ALL_REVIEW_OR_DONE=false
+                  ;;
+                *)
+                  ALL_DONE=false
+                  ALL_REVIEW_OR_DONE=false
+                  ;;
+              esac
+            done <<< "$ALL_STATUSES"
+
+            # Determine expected epic status
+            if [[ "$ALL_DONE" == "true" ]]; then
+              EXPECTED_STATUS="Done"
+            elif [[ "$ALL_REVIEW_OR_DONE" == "true" ]]; then
+              EXPECTED_STATUS="In Review"
+            elif [[ "$ANY_ACTIVE" == "true" ]]; then
+              EXPECTED_STATUS="In Progress"
+            else
+              echo "  ℹ️  $EPIC_KEY: no active children — skipping"
+              NO_ACTIVE_CHILDREN=$((NO_ACTIVE_CHILDREN + 1))
+              continue
+            fi
+
+            # Check if epic is already correct
+            if [[ "$EPIC_STATUS" == "$EXPECTED_STATUS" ]]; then
+              ALREADY_CORRECT=$((ALREADY_CORRECT + 1))
+              continue
+            fi
+
+            echo "  🔄 $EPIC_KEY: '$EPIC_STATUS' → '$EXPECTED_STATUS' ($EPIC_SUMMARY)"
+
+            # Fetch available transitions and apply
+            TRANS_RESPONSE=$(jira_api GET "$JIRA_API_BASE/rest/api/3/issue/$EPIC_KEY/transitions") || {
+              echo "  ⚠️  $EPIC_KEY: could not fetch transitions — skipping"
+              ERRORS=$((ERRORS + 1))
+              continue
+            }
+
+            TRANSITION_ID=$(echo "$TRANS_RESPONSE" | jq -r --arg t "$EXPECTED_STATUS" \
+              '.transitions[] | select(.name == $t) | .id' | head -1)
+
+            if [[ -z "$TRANSITION_ID" ]]; then
+              AVAILABLE=$(echo "$TRANS_RESPONSE" | jq -r '[.transitions[].name] | join(", ")')
+              echo "  ⚠️  $EPIC_KEY: transition '$EXPECTED_STATUS' not available (available: $AVAILABLE)"
+              ERRORS=$((ERRORS + 1))
+              continue
+            fi
+
+            jira_api POST "$JIRA_API_BASE/rest/api/3/issue/$EPIC_KEY/transitions" \
+              "{\"transition\":{\"id\":\"$TRANSITION_ID\"}}" > /dev/null && {
+              echo "  ✅ $EPIC_KEY → $EXPECTED_STATUS"
+              TRANSITIONED=$((TRANSITIONED + 1))
+              TRANSITION_LOG="${TRANSITION_LOG}"$'\n'"| $EPIC_KEY | $EPIC_SUMMARY | $EPIC_STATUS | $EXPECTED_STATUS |"
+            } || {
+              echo "  ⚠️  $EPIC_KEY: transition failed"
+              ERRORS=$((ERRORS + 1))
+            }
+          done
+
+          echo ""
+          echo "## 🏛️ Epic Rollup Audit" >> $GITHUB_STEP_SUMMARY
+          echo "- **Epics scanned**: $EPIC_COUNT" >> $GITHUB_STEP_SUMMARY
+          echo "- **Already correct**: $ALREADY_CORRECT" >> $GITHUB_STEP_SUMMARY
+          echo "- **Transitioned**: $TRANSITIONED" >> $GITHUB_STEP_SUMMARY
+          echo "- **Pinned (skipped)**: $SKIPPED_PINNED" >> $GITHUB_STEP_SUMMARY
+          echo "- **No active children**: $NO_ACTIVE_CHILDREN" >> $GITHUB_STEP_SUMMARY
+          if [[ "$ERRORS" -gt 0 ]]; then
+            echo "- **Errors**: $ERRORS" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [[ "$TRANSITIONED" -gt 0 ]]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Transitions applied" >> $GITHUB_STEP_SUMMARY
+            echo "| Epic | Summary | Was | Now |" >> $GITHUB_STEP_SUMMARY
+            echo "|------|---------|-----|-----|" >> $GITHUB_STEP_SUMMARY
+            printf '%s\n' "$TRANSITION_LOG" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "✅ All epic statuses match their children's aggregate state." >> $GITHUB_STEP_SUMMARY
           fi
