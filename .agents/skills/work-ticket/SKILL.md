@@ -94,14 +94,18 @@ Process children in iterative batches until the backlog is empty.
           If remaining children are blocked, report them. If some are
           already In Progress (e.g., being worked by another agent), skip
           and report those keys.
-     d. Claim batch upfront: transition every selected ticket to "In Progress"
-        before starting work on any of them.
+     d. Claim batch upfront: transition ALL selected tickets to "In Progress"
+        before starting work on any of them. Use a single bulk call:
+        jira_bulk_transition(keys: [...batch keys], status: "In Progress")
+        Do not call jira_transition per ticket — one bulk call saves N round-trips.
      e. Work each child ticket via Leaf Mode (Step 2 above):
         - Each child gets its own worktree + branch + PR (one ticket = one PR)
-        - After each child's PR is created, transition it to "In Review"
+        - After each child's PR is created, transition it to "In Review" (individual
+          jira_transition — this happens one child at a time as each PR ships)
         - Clean up the worktree before starting the next child
      f. Release uncompleted: any claimed ticket that did not reach "In Review":
-        - If no PR exists → transition back to "To Do"
+        - If no PR exists → transition back to "To Do" via individual jira_transition
+          (note: jira_bulk_transition does not support "To Do"; use single calls here)
         - If a PR/branch exists → keep "In Progress" and report for manual follow-up
      g. Append results to all_worked / all_released.
      → Loop back to step a.

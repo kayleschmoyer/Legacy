@@ -279,16 +279,17 @@ On **Claude Code on the web**, Claude's native Atlassian plugin (`mcp__claude_ai
 
 **Jira tool mapping** (native Atlassian plugin equivalents):
 
-| Custom MCP tool      | Native plugin equivalent                                             |
-| -------------------- | -------------------------------------------------------------------- |
-| `jira_view`          | `getJiraIssue`                                                       |
-| `jira_search`        | `searchJiraIssuesUsingJql`                                           |
-| `jira_create_ticket` | `createJiraIssue`                                                    |
-| `jira_edit_ticket`   | `editJiraIssue`                                                      |
-| `jira_transition`    | `transitionJiraIssue` (call `getTransitionsForJiraIssue` first)      |
-| `jira_get_comments`  | No direct equivalent — use `getJiraIssue` with `comment` field       |
-| `jira_link_issues`   | No native equivalent (use custom `legacy-sports-jira` MCP or `acli`) |
-| `jira_list_children` | `searchJiraIssuesUsingJql` with `parent = LS-####`                   |
+| Custom MCP tool        | Native plugin equivalent                                                                                                                                                                                                    |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `jira_view`            | `getJiraIssue`                                                                                                                                                                                                              |
+| `jira_search`          | `searchJiraIssuesUsingJql`                                                                                                                                                                                                  |
+| `jira_create_ticket`   | `createJiraIssue`                                                                                                                                                                                                           |
+| `jira_edit_ticket`     | `editJiraIssue`                                                                                                                                                                                                             |
+| `jira_transition`      | `transitionJiraIssue` (call `getTransitionsForJiraIssue` first)                                                                                                                                                             |
+| `jira_bulk_transition` | No native bulk equivalent — call `transitionJiraIssue` per key in parallel. Use for batch claim/release (e.g. claim 5 tickets In Progress at once). Supports: "In Progress", "In Review", "Done" — does not support "To Do" |
+| `jira_get_comments`    | No direct equivalent — use `getJiraIssue` with `comment` field                                                                                                                                                              |
+| `jira_link_issues`     | No native equivalent (use custom `legacy-sports-jira` MCP or `acli`)                                                                                                                                                        |
+| `jira_list_children`   | `searchJiraIssuesUsingJql` with `parent = LS-####`                                                                                                                                                                          |
 
 **Available MCP servers in cloud:**
 
