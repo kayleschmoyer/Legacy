@@ -1,4 +1,12 @@
 # =============================================================================
+# Locals
+# =============================================================================
+
+locals {
+  runner_log_group_base = "/github-runners/${local.name_prefix}-runner"
+}
+
+# =============================================================================
 # Self-Hosted GitHub Actions Runners (github-aws-runners module)
 # =============================================================================
 #
@@ -92,9 +100,38 @@ module "github_runners" {
   # the module's runner role also needs an attached policy (LS-1663).
   runner_iam_role_managed_policy_arns = [aws_iam_policy.runner_cache[0].arn]
 
-  # Disable CloudWatch agent — default config has invalid log_class property
-  # that causes startup failure. Enable later with custom config (LS-1667).
-  enable_cloudwatch_agent = false
+  # CloudWatch agent — custom config avoids the module default's invalid
+  # log_class property that causes the agent to fail on startup (LS-1667).
+  # Ships cloud-init (userdata) and syslog output to CloudWatch for debugging
+  # runner boot failures and spot interruption events.
+  enable_cloudwatch_agent = true
+  cloudwatch_config = jsonencode({
+    logs = {
+      force_flush_interval = 5
+      logs_collected = {
+        files = {
+          collect_list = [
+            {
+              # Runner boot output: userdata script, apt-get, runner registration.
+              # Useful for diagnosing why a runner failed to appear after scale-up.
+              file_path       = "/var/log/user-data.log"
+              log_group_name  = "${local.runner_log_group_base}/cloud-init"
+              log_stream_name = "{instance_id}"
+              timezone        = "UTC"
+            },
+            {
+              # System log: kernel messages, spot interruption notices (from
+              # spot-handler loop in runner-userdata.sh), and service events.
+              file_path       = "/var/log/syslog"
+              log_group_name  = "${local.runner_log_group_base}/syslog"
+              log_stream_name = "{instance_id}"
+              timezone        = "UTC"
+            },
+          ]
+        }
+      }
+    }
+  })
 
   # Time for the instance to boot and register as a runner (~30s with pre-baked AMI
   # plus userdata_pre_install). Scale-down Lambda won't terminate instances younger
@@ -287,6 +324,38 @@ module "github_runners" {
   # Permissions boundary prevents the runner role from exceeding least-privilege,
   # regardless of what the module's default policy grants.
   role_permissions_boundary = var.enable_github_runners ? aws_iam_policy.runner_permissions_boundary[0].arn : null
+
+  # Ensure log groups (with retention policy) exist before the module creates
+  # EC2 instances. Without this edge, Terraform may launch runners in parallel
+  # with log group creation, letting the CloudWatch agent create the group first
+  # with default "never expire" retention.
+  depends_on = [
+    aws_cloudwatch_log_group.runner_cloud_init,
+    aws_cloudwatch_log_group.runner_syslog,
+  ]
+
+  tags = local.common_tags
+}
+
+# =============================================================================
+# CloudWatch Log Groups for Runner Logs (LS-1667)
+# =============================================================================
+# Explicit log groups prevent the CloudWatch agent from creating them on first
+# boot with "Never expire" retention, which would cause unbounded log growth.
+# The agent ships cloud-init (userdata) and syslog to these groups.
+# =============================================================================
+resource "aws_cloudwatch_log_group" "runner_cloud_init" {
+  count             = var.enable_github_runners ? 1 : 0
+  name              = "${local.runner_log_group_base}/cloud-init"
+  retention_in_days = local.log_retention_days[var.environment]
+
+  tags = local.common_tags
+}
+
+resource "aws_cloudwatch_log_group" "runner_syslog" {
+  count             = var.enable_github_runners ? 1 : 0
+  name              = "${local.runner_log_group_base}/syslog"
+  retention_in_days = local.log_retention_days[var.environment]
 
   tags = local.common_tags
 }
