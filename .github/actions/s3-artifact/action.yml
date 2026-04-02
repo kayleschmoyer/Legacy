@@ -26,7 +26,7 @@ inputs:
   role-to-assume:
     description: "AWS IAM role ARN for OIDC authentication"
     required: false
-    default: "arn:aws:iam::176661590736:role/legacy-sports-dev-github-actions"
+    default: "arn:aws:iam::176661590736:role/legacy-sports-dev-ci-artifacts"
   aws-region:
     description: "AWS region"
     required: false
