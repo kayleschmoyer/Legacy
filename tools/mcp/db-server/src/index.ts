@@ -3,6 +3,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import { checkHealth } from './tools/check-health.js';
 import { codegen } from './tools/codegen.js';
+import { getUser } from './tools/get-user.js';
 import { migrate } from './tools/migrate.js';
 import { migrationStatus } from './tools/migration-status.js';
 import { printSchema } from './tools/print-schema.js';
@@ -81,6 +82,22 @@ server.tool(
       .describe('Worktree path (default: repo root)'),
   },
   async (params) => printSchema(params),
+);
+
+// --- db_get_user ---
+server.tool(
+  'db_get_user',
+  'Look up a user profile by id, email, or username. Returns id, email, username, avatarUrl, accessLevel, subscriptionTier, and Discord fields. Read-only.',
+  {
+    identifier: z
+      .string()
+      .describe('The value to look up (user id, email address, or username)'),
+    by: z
+      .enum(['id', 'email', 'username'])
+      .default('username')
+      .describe('Which field to match against (default: username)'),
+  },
+  async (params) => getUser(params),
 );
 
 // --- db_query ---
