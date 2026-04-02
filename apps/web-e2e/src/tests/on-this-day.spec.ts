@@ -14,7 +14,6 @@
  */
 
 import { expect, test } from '../fixtures/auth-enhanced';
-import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -138,7 +137,7 @@ async function mockOnThisDay(
           body: JSON.stringify({ data: { onThisDayEvents: events } }),
         });
       } else {
-        await unmockedGraphQLFallback(route);
+        await route.fallback();
       }
     },
   );

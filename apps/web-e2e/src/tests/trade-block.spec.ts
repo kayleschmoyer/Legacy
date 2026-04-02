@@ -411,7 +411,7 @@ test.describe('Trade Block Management @regression', () => {
         if (body.operationName === 'SetTradeBlock') {
           mutationCalls.push(body.variables ?? {});
         }
-        await unmockedGraphQLFallback(route);
+        await route.fallback();
       },
     );
 

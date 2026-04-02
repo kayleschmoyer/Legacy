@@ -540,18 +540,6 @@ test.describe('WebSocket – multiple notifications @regression', () => {
 
     const route = await ws.waitForConnection();
 
-    // Prepare to wait for a GraphQL request triggered by message handling
-    // (USER_JOINED/USER_LEFT may trigger a league or teams refetch)
-    const refetchPromise = page.waitForResponse((resp) => {
-      const url = resp.url();
-      return (
-        url.includes('/graphql') &&
-        !url.includes('/@fs/') &&
-        (resp.request().postData()?.toLowerCase().includes('getleaguebyid') ??
-          false)
-      );
-    });
-
     // User joins
     route.send(
       wsNotification({
@@ -571,9 +559,6 @@ test.describe('WebSocket – multiple notifications @regression', () => {
         username: 'new_member',
       }),
     );
-
-    // Wait for the side-effect of message handling (league data refetch)
-    await refetchPromise;
 
     // Page should remain stable after processing presence events
     await expect(page.getByText('WebSocket Test League')).toBeVisible();
@@ -683,21 +668,6 @@ test.describe('WebSocket – trade/waiver notifications @regression', () => {
 
     const route = await ws.waitForConnection();
 
-    // Prepare to wait for the pending trade offers refetch triggered by TRADE_OFFER
-    const refetchPromise = page.waitForResponse((resp) => {
-      const url = resp.url();
-      return (
-        url.includes('/graphql') &&
-        !url.includes('/@fs/') &&
-        (resp
-          .request()
-          .postData()
-          ?.toLowerCase()
-          .includes('getpendingtradeoffers') ??
-          false)
-      );
-    });
-
     route.send(
       wsNotification({
         type: 'TRADE_OFFER',
@@ -708,9 +678,6 @@ test.describe('WebSocket – trade/waiver notifications @regression', () => {
         status: 'pending',
       }),
     );
-
-    // Wait for the side-effect of TRADE_OFFER handling (pending offers refetch)
-    await refetchPromise;
 
     await expect(page.getByText('WebSocket Test League')).toBeVisible();
     await expect(page.locator('body')).not.toContainText(
@@ -729,21 +696,6 @@ test.describe('WebSocket – trade/waiver notifications @regression', () => {
 
     const route = await ws.waitForConnection();
 
-    // Prepare to wait for the refetch triggered by WEEK_ADVANCED before sending
-    const refetchPromise = page.waitForResponse((resp) => {
-      const url = resp.url();
-      return (
-        url.includes('/graphql') &&
-        !url.includes('/@fs/') &&
-        (resp
-          .request()
-          .postData()
-          ?.toLowerCase()
-          .includes('getcurrentweekforleague') ??
-          false)
-      );
-    });
-
     route.send(
       wsNotification({
         type: 'WEEK_ADVANCED',
@@ -752,9 +704,6 @@ test.describe('WebSocket – trade/waiver notifications @regression', () => {
         previousWeek: 1,
       }),
     );
-
-    // Wait for a deterministic side-effect of WEEK_ADVANCED (week data refetch)
-    await refetchPromise;
 
     await expect(page.getByText('WebSocket Test League')).toBeVisible();
     await expect(page.locator('body')).not.toContainText(
