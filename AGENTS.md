@@ -118,7 +118,8 @@ pnpm exec nx affected -t <target>
 # GraphQL codegen:
 make codegen
 
-# Self-hosted runner AMI (requires AWS SSO):
+# Self-hosted runner infrastructure (requires AWS SSO + runner secrets in secrets.auto.tfvars):
+make runner-apply                                    # targeted apply for runner infra only (intentionally excluded from normal loop)
 make ami-build VPC_ID=vpc-xxx SUBNET_ID=subnet-xxx  # build new AMI with Packer
 make ami-list                                        # list existing runner AMIs
 ```

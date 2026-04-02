@@ -10,7 +10,7 @@
 	android ios build-android build-ios \
 	db-migrate db-studio db-reset db-dump db-restore db-dump-dev db-restore-dev db-check-connections codegen \
 	deploy-lambdas deploy-infrastructure terraform-init terraform-plan terraform-apply terraform-apply-auto terraform-destroy gen-tfvars \
-	ami-build ami-list \
+	runner-apply ami-build ami-list \
 	sync-env check-services graph affected list-projects workspace-lint pr \
 	ci ci-force ci-full release full-deploy full-check dev-setup \
 	fix-windows-locks diagnose kill-stale \
@@ -514,6 +514,16 @@ terraform-apply-auto: ## Apply Terraform changes (auto-approve, use with caution
 terraform-destroy: ## Destroy Terraform infrastructure
 	@$(call echo_yellow,Destroying Terraform infrastructure...)
 	cd terraform && terraform destroy
+
+runner-apply: ## Apply runner infrastructure only (intentionally excluded from normal apply loop)
+	@$(call echo_blue,Applying self-hosted runner infrastructure...)
+	@$(call echo_yellow,Runner resources are intentionally outside the normal Terraform loop.)
+	@$(call echo_yellow,This apply targets module.github_runners only — never the full stack.)
+	@$(call echo_yellow,Ensure github_app_id / github_app_key_base64 / github_app_webhook_secret are in secrets.auto.tfvars.)
+	cd terraform && terraform plan -out=runner.plan -var="enable_github_runners=true" -target=module.github_runners
+	@$(call echo_blue,Review the plan above. Press Enter to apply or Ctrl+C to abort.)
+	@$(if $(filter Windows_NT,$(OS)),powershell -Command "Read-Host | Out-Null",read _confirm)
+	cd terraform && terraform apply runner.plan
 
 # Self-Hosted Runner AMI (see .agents/skills/infrastructure/references/ami-build.md)
 ifeq ($(strip $(VPC_ID)),)

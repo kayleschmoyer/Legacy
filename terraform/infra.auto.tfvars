@@ -28,7 +28,11 @@ enable_rds_proxy = true
 # This means runner resources (SGs, ASGs, Lambdas) are intentionally outside
 # the normal plan/apply loop.
 #
-# See LS-2057 for the work to restore full Terraform management of runner infra.
+# This is the INTENDED long-term strategy — not a temporary state or a bug.
+# Runner resources were explicitly removed from Terraform state (LS-2051/LS-2056)
+# to prevent phantom destroy plans on every apply. Runner config changes (egress
+# rules, instance types, IAM hardening) require a targeted one-off apply:
+#   make runner-apply
 #
 # To see an accurate plan that includes runner resources:
 #   terraform plan -var="enable_github_runners=true"

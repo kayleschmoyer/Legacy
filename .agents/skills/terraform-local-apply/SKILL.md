@@ -25,11 +25,18 @@ This is an intentional safety guard. Runner infrastructure was provisioned once 
 
 - A plain `terraform plan` / `terraform apply` (local or CI) is safe — runner resources are never in the diff
 - To see a plan that _includes_ runner resources, add `-var="enable_github_runners=true"` — but **do not apply without `-target`** (see Runner Config Changes below)
-- See [LS-2057](https://bkrupa.atlassian.net/browse/LS-2057) for the work to restore full automated Terraform management of runner infrastructure
+- **This exclusion is the intended long-term strategy** — not a temporary state or a bug. Runner resources were explicitly removed from state (LS-2051/LS-2056) to prevent phantom destroy plans on every apply.
 
 ### Making Runner Config Changes
 
-If you need to change runner infrastructure (egress rules, instance types, IAM, module version):
+If you need to change runner infrastructure (egress rules, instance types, IAM, module version), use the dedicated make target:
+
+```powershell
+# Preferred: use the make target (handles -target and -var automatically)
+make runner-apply
+```
+
+Or manually:
 
 ```powershell
 # 1. Ensure runner secrets are present in secrets.auto.tfvars:

@@ -110,7 +110,7 @@ terraform -chdir=terraform apply -var="enable_github_runners=true" \
 
 > ⚠️ Never run `terraform apply -var="enable_github_runners=true"` without `-target`. A full apply with runners enabled will plan to recreate all runner infrastructure and may disrupt the live fleet.
 
-See [LS-2057](https://bkrupa.atlassian.net/browse/LS-2057) for the work to restore full automated Terraform management of runner infrastructure.
+> **This is the intended long-term strategy, not a temporary state or a bug.** Runner resources were deliberately removed from Terraform state (LS-2051/LS-2056) to prevent phantom destroy plans on every apply. Runner config changes (egress rules, instance types, IAM hardening) should be applied via `make runner-apply` — never as part of a normal infra deploy.
 
 ---
 
