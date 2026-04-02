@@ -57,8 +57,9 @@ test.describe('Management Page — static elements @smoke', () => {
     // Tamagui H4 inside Card renders as <p>, not <h4> — use getByText (same as
     // LS-1174 fix for preferences/profile-settings)
     await expect(page.getByText('Information', { exact: true })).toBeVisible();
+    // Text varies by access level: admin sees "member of", non-admin sees "own"
     await expect(
-      page.getByText(/only leagues you own will be deleted/i),
+      page.getByText(/leagues? (you own|you are a member of) will be deleted/i),
     ).toBeVisible();
   });
 });
@@ -226,9 +227,8 @@ test.describe('Player Stats Page — static elements @smoke', () => {
   });
 
   test('shows the MLB Player Statistics heading', async ({ page }) => {
-    await expect(
-      page.getByRole('heading', { name: /player statistics/i }),
-    ).toBeVisible();
+    // Title is rendered as a styled <Text> (not a semantic heading element)
+    await expect(page.getByText(/player statistics/i).first()).toBeVisible();
   });
 
   test('shows the player search input', async ({ page }) => {

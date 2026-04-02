@@ -362,7 +362,8 @@ test.describe('Join League — error handling @regression', () => {
         await route.abort('failed');
         return;
       }
-      await unmockedGraphQLFallback(route);
+      // Pass to the earlier routeGraphQL handler (e.g. validateinvitecode)
+      await route.fallback();
     });
 
     const lp = new LeaguePage(page);

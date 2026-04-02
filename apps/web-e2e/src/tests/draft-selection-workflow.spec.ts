@@ -556,7 +556,7 @@ test.describe('Draft Selection Workflow @regression', () => {
       async (route) => {
         const postData = route.request().postData();
         if (!postData) {
-          await unmockedGraphQLFallback(route);
+          await route.fallback();
           return;
         }
 
@@ -576,8 +576,8 @@ test.describe('Draft Selection Workflow @regression', () => {
           return;
         }
 
-        // For all other operations, delegate to the base route
-        await unmockedGraphQLFallback(route);
+        // For all other operations, delegate to the base route (setupDraftRoute)
+        await route.fallback();
       },
     );
 

@@ -165,7 +165,8 @@ test.describe('League Branding @regression', () => {
           ),
         });
       } else {
-        await unmockedGraphQLFallback(route);
+        // Pass to underlying auth fixture handlers (getleaguebyid, etc.)
+        await route.fallback();
       }
     });
 
