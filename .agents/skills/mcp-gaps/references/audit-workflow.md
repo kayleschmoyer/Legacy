@@ -11,7 +11,17 @@ This workflow also catches two additional categories of MCP issues:
 
 ### 1. Collect non-MCP commands from the session
 
-Review the conversation history for all `Bash` tool invocations. Ignore:
+**Primary method — parse session transcript** (recommended, survives context compaction):
+
+```bash
+python scripts/audit-session-bash.py --include-mcp
+```
+
+This parses the current session's JSONL transcript file (parent + all subagents) and outputs every Bash command with timestamps. It auto-detects the current session by finding the most recently modified JSONL in the project's `~/.claude/projects/` directory. Use `--format json` for programmatic consumption, or `--session-id <uuid>` to target a specific session.
+
+**Fallback** — if the script is unavailable (e.g., cloud agent without the script in the repo), review the conversation history manually for all `Bash` tool invocations. Note that this only captures commands still in the context window — commands from before compaction will be missed.
+
+Once you have the command list (from either method), filter out noise. Ignore:
 
 - **Git commands** already covered by `worktree_*` MCP tools (e.g., `git -C $wt status` → `worktree_status`)
 - **One-off investigative commands** (e.g., `ls`, `cat` for quick orientation) — these are not worth tooling. **Exception**: commands used during CI failure triage that have **no MCP equivalent** (e.g., `git show origin/branch:path` for remote ref:path reads, `git ls-tree`) are almost always recurring patterns, not one-offs — do NOT dismiss them. Commands that _do_ have MCP equivalents (e.g., `git diff` → `worktree_diff`, `git log` → `worktree_log`, `git show` for local commits → `worktree_show`) should be classified as `missing-awareness` rather than ignored
@@ -41,7 +51,9 @@ These commands look "investigative" but represent repeatable workflows every age
 
 Subagent sessions contribute **more** Bash commands than parent sessions in practice (87 git/ls/find commands from subagents vs 82 from parents across 60 audited sessions). The main conversation audit (Step 1) only captures parent-level commands.
 
-**Where to look**: subagent transcripts live at `~/.claude/projects/<project-hash>/<sessionId>/subagents/*.jsonl`. Each JSONL line is a message object; Bash tool calls appear as:
+> **If you used `audit-session-bash.py` in Step 1**, subagent commands are already included in the output (grouped by subagent source file). Skip the manual collection below and proceed to filtering.
+
+**Manual fallback** — subagent transcripts live at `~/.claude/projects/<project-hash>/<sessionId>/subagents/*.jsonl`. Each JSONL line is a message object; Bash tool calls appear as:
 
 ```json
 {
@@ -145,7 +157,9 @@ Identified during agent session on <date>.
 
 ### 6. Audit MCP tool result overflows
 
-Review the conversation history for MCP tool calls that returned errors containing:
+> **If you used `audit-session-bash.py --include-mcp` in Step 1**, MCP overflows and failures are already included in the output. Use that data here instead of manually reviewing conversation history.
+
+Review the conversation history (or script output) for MCP tool calls that returned errors containing:
 
 - `exceeds maximum allowed tokens`
 - `Output has been saved to`

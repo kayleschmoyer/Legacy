@@ -30,7 +30,7 @@ This skill enforces the **MCP-first principle** from AGENTS.md: shell commands a
 
 > Full procedure: [`references/audit-workflow.md`](references/audit-workflow.md)
 
-1. **Collect** non-MCP Bash commands from the session (skip one-off investigative commands and commands already covered by MCP tools). **Include documented Bash exceptions** — patterns marked as "shell fallback" or "no Nx target equivalent" in AGENTS.md/skill docs are acknowledged gaps, not permanent exemptions
+1. **Collect** non-MCP Bash commands from the session by running `python scripts/audit-session-bash.py --include-mcp` (parses the full JSONL transcript — survives context compaction). Fallback: manually review conversation history. Skip one-off investigative commands and commands already covered by MCP tools. **Include documented Bash exceptions** — patterns marked as "shell fallback" or "no Nx target equivalent" in AGENTS.md/skill docs are acknowledged gaps, not permanent exemptions
 2. **Classify** each as `missing-tool`, `missing-feature`, or `missing-awareness`. Documented exceptions should be classified as `missing-tool` or `missing-feature` as appropriate, with a note that they are currently documented
 3. **File `missing-awareness` gaps as doc-fix tickets** — use summary prefix `docs(skills):`, type `Task`, and set parent epic to `LS-1455`. Without a ticket, the same awareness gap recurs across sessions
 4. **Check** for existing tickets under LS-1455 (`jira_list_children` or JQL `parent = LS-1455`)
