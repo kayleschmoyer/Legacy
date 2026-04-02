@@ -32,6 +32,12 @@ export {
 } from './SubscriptionDowngradeService';
 export { SeasonDraftGameService } from './SeasonDraftGameService';
 export { HITTER_STAT_KEYS, PITCHER_STAT_KEYS } from './SeasonDraftGameService';
+export {
+  DisclosureGameService,
+  MIN_FACT_COUNT,
+  TIER_SORT_ORDER,
+} from './DisclosureGameService';
+export type { PlayerFact, EligiblePlayer } from './DisclosureGameService';
 export type {
   HitterStatKey,
   PitcherStatKey,
