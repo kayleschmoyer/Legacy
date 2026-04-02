@@ -91,7 +91,7 @@ resource "aws_iam_role_policy_attachment" "image_upload_lambda_secrets" {
 
 # Cloudflare AI API token — stored in Secrets Manager
 resource "aws_secretsmanager_secret" "cloudflare_ai_api_token" {
-  name                    = "${local.name_prefix}/cloudflare-ai-api-token"
+  name                    = "${local.name_prefix}-cloudflare-ai-api-token"
   description             = "Cloudflare Workers AI API token for image NSFW classification"
   recovery_window_in_days = 7
 
@@ -101,6 +101,16 @@ resource "aws_secretsmanager_secret" "cloudflare_ai_api_token" {
 resource "aws_secretsmanager_secret_version" "cloudflare_ai_api_token" {
   secret_id     = aws_secretsmanager_secret.cloudflare_ai_api_token.id
   secret_string = var.cloudflare_ai_api_token
+}
+
+# One-time import: this block migrates an existing log group into Terraform state.
+# The log group was auto-created by AWS when the Lambda was first invoked; without
+# this import Terraform would fail with ResourceAlreadyExistsException on apply.
+# Remove this import block after the initial `terraform apply` succeeds so that
+# new environments can create the log group normally via the resource block below.
+import {
+  to = aws_cloudwatch_log_group.image_upload_lambda
+  id = "/aws/lambda/${local.name_prefix}-image-upload"
 }
 
 # CloudWatch Log Group

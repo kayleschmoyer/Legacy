@@ -21,7 +21,7 @@ resource "aws_iam_openid_connect_provider" "github_actions" {
 # Pull-request workflows must use github_actions_plan (read-only) instead.
 resource "aws_iam_role" "github_actions" {
   name                 = "${local.name_prefix}-github-actions"
-  description          = "OIDC role assumed by GitHub Actions for CI/CD deployments (apply — main branch only)"
+  description          = "OIDC role assumed by GitHub Actions for CI/CD deployments (apply - main branch only)"
   permissions_boundary = aws_iam_policy.github_actions_boundary.arn
 
   assume_role_policy = jsonencode({
@@ -278,7 +278,8 @@ resource "aws_iam_role_policy" "github_actions_additional" {
         ]
       },
       # S3 bucket-admin write permissions for Terraform apply (encryption, public access block, lifecycle)
-      # CreateBucket/DeleteBucket included as safety net in case the bucket drops from remote state
+      # CreateBucket/DeleteBucket included as safety net in case the bucket drops from remote state.
+      # Scoped to the project namespace (name_prefix-*) to cover all managed buckets (ci-artifacts, team-logos, etc.)
       {
         Effect = "Allow"
         Action = [
@@ -286,10 +287,15 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "s3:DeleteBucket",
           "s3:PutEncryptionConfiguration",
           "s3:PutBucketPublicAccessBlock",
-          "s3:PutLifecycleConfiguration"
+          "s3:PutLifecycleConfiguration",
+          "s3:PutBucketVersioning",
+          "s3:PutBucketPolicy",
+          "s3:DeleteBucketPolicy",
+          "s3:PutBucketCORS",
+          "s3:PutBucketTagging"
         ]
         Resource = [
-          "arn:aws:s3:::${local.name_prefix}-ci-artifacts"
+          "arn:aws:s3:::${local.name_prefix}-*"
         ]
       },
       # VPC, EC2, and networking read permissions
@@ -836,7 +842,7 @@ resource "aws_iam_policy" "github_actions_boundary" {
 # temporarily open port 5432 for GitHub-hosted runners).
 resource "aws_iam_role" "github_actions_plan" {
   name        = "${local.name_prefix}-github-actions-plan"
-  description = "OIDC role assumed by GitHub Actions PR workflows (read-only — no infrastructure write permissions)"
+  description = "OIDC role assumed by GitHub Actions PR workflows (read-only - no infrastructure write permissions)"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
