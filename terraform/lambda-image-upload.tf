@@ -111,15 +111,10 @@ resource "aws_cloudwatch_log_group" "image_upload_lambda" {
   tags = local.common_tags
 }
 
-# SSM version parameter — updated by CI/CD on each deploy
-data "aws_ssm_parameter" "image_upload_lambda_version" {
-  name = "/legacy-sports/${var.environment}/lambda/image-upload/version"
-}
-
 # Lambda Function
 resource "aws_lambda_function" "image_upload" {
   s3_bucket     = aws_s3_bucket.lambda_deployments.bucket
-  s3_key        = "image-upload/image-upload-${data.aws_ssm_parameter.image_upload_lambda_version.value}.zip"
+  s3_key        = "image-upload/image-upload-${aws_ssm_parameter.image_upload_lambda_version.value}.zip"
   function_name = "${local.name_prefix}-image-upload"
   role          = aws_iam_role.image_upload_lambda.arn
   handler       = "index.handler"
@@ -127,7 +122,7 @@ resource "aws_lambda_function" "image_upload" {
   timeout       = 30
   memory_size   = 512
 
-  source_code_hash = data.aws_ssm_parameter.image_upload_lambda_version.value
+  source_code_hash = aws_ssm_parameter.image_upload_lambda_version.value
 
   vpc_config {
     subnet_ids         = aws_subnet.private_lambda[*].id
