@@ -155,3 +155,142 @@ resource "aws_cloudwatch_metric_alarm" "lambda_errors" {
 
   tags = local.common_tags
 }
+
+# ─── Runner Lambda error alarms (LS-1655) ─────────────────────────────────────
+# The github-aws-runners module creates four Lambdas that are not in the
+# monitored_lambdas map above because they are module-managed resources with
+# no direct aws_lambda_function reference. Names are derived from the module's
+# ${prefix}-{function} convention where prefix = "${local.name_prefix}-runner".
+# All four alarms are gated on enable_github_runners so they are not created
+# in environments without self-hosted runners.
+
+locals {
+  # Runner Lambda function names as created by the github-aws-runners module.
+  # Format: ${prefix}-{webhook|scale-up|scale-down|binaries-syncer}
+  runner_lambda_names = var.enable_github_runners ? {
+    runner_webhook         = "${local.name_prefix}-runner-webhook"
+    runner_scale_up        = "${local.name_prefix}-runner-scale-up"
+    runner_scale_down      = "${local.name_prefix}-runner-scale-down"
+    runner_binaries_syncer = "${local.name_prefix}-runner-binaries-syncer"
+  } : {}
+}
+
+resource "aws_cloudwatch_metric_alarm" "runner_lambda_errors" {
+  for_each = local.runner_lambda_names
+
+  alarm_name          = "${local.name_prefix}-${each.key}-errors"
+  alarm_description   = "Runner Lambda ${each.value} error count met or exceeded ${var.lambda_error_alarm_threshold} in ${var.lambda_error_alarm_evaluation_periods}x${var.lambda_error_alarm_period}s. Errors in webhook/scale-up/scale-down Lambdas prevent new runners from launching."
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  threshold           = var.lambda_error_alarm_threshold
+  evaluation_periods  = var.lambda_error_alarm_evaluation_periods
+  period              = var.lambda_error_alarm_period
+
+  namespace   = "AWS/Lambda"
+  metric_name = "Errors"
+  dimensions = {
+    FunctionName = each.value
+  }
+
+  statistic = "Sum"
+
+  alarm_actions = [aws_sns_topic.ops_alerts.arn]
+  ok_actions    = [aws_sns_topic.ops_alerts.arn]
+
+  treat_missing_data = "notBreaching"
+
+  tags = local.common_tags
+}
+
+# ─── Runner scale-up queue depth alarm (LS-1655) ──────────────────────────────
+# The scale-up Lambda reads from a FIFO SQS queue populated by the webhook Lambda.
+# If messages sit in the queue for more than 5 consecutive minutes it means the
+# scale-up Lambda is failing or throttled and no new runners are being launched
+# despite queued jobs. Queue name follows the module convention: ${prefix}-queued-builds.fifo.
+
+resource "aws_cloudwatch_metric_alarm" "runner_queue_depth" {
+  count = var.enable_github_runners ? 1 : 0
+
+  alarm_name          = "${local.name_prefix}-runner-queue-depth"
+  alarm_description   = "Runner scale-up queue has visible messages for 5+ consecutive minutes — scale-up Lambda may be failing. New CI jobs will not get runners until resolved."
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  threshold           = 1
+  evaluation_periods  = 5 # 5 consecutive 1-minute periods = 5-minute sustained queue
+  period              = 60
+
+  namespace   = "AWS/SQS"
+  metric_name = "ApproximateNumberOfMessagesVisible"
+  dimensions = {
+    QueueName = "${local.name_prefix}-runner-queued-builds.fifo"
+  }
+
+  statistic = "Sum"
+
+  alarm_actions = [aws_sns_topic.ops_alerts.arn]
+  ok_actions    = [aws_sns_topic.ops_alerts.arn]
+
+  # Missing data means the queue does not exist yet (runners disabled) or has
+  # no messages — both are normal, not a reason to alarm.
+  treat_missing_data = "notBreaching"
+
+  tags = local.common_tags
+}
+
+# ─── Runner cost anomaly detection (LS-1655) ──────────────────────────────────
+# AWS Cost Anomaly Detection monitors runner EC2 spend filtered to the
+# ghr:environment tag applied by the github-aws-runners module to all instances.
+# Fires when the absolute anomaly impact exceeds $10 in a day, routing to the
+# ops_alerts SNS topic alongside budget and Lambda error alerts.
+
+resource "aws_ce_anomaly_monitor" "runner" {
+  count        = var.enable_github_runners ? 1 : 0
+  name         = "${local.name_prefix}-runner-cost-anomaly"
+  monitor_type = "CUSTOM"
+
+  # Filter to EC2 costs tagged with the runner environment tag so we only watch
+  # runner spend, not the whole account.
+  monitor_specification = jsonencode({
+    And = [
+      {
+        Dimensions = {
+          Key          = "SERVICE"
+          Values       = ["Amazon Elastic Compute Cloud - Compute"]
+          MatchOptions = ["EQUALS"]
+        }
+      },
+      {
+        Tags = {
+          Key          = "ghr:environment"
+          Values       = ["${local.name_prefix}-runner"]
+          MatchOptions = ["EQUALS"]
+        }
+      }
+    ]
+  })
+
+  tags = local.common_tags
+}
+
+resource "aws_ce_anomaly_subscription" "runner" {
+  count     = var.enable_github_runners ? 1 : 0
+  name      = "${local.name_prefix}-runner-cost-anomaly"
+  frequency = "DAILY"
+
+  monitor_arn_list = [aws_ce_anomaly_monitor.runner[0].arn]
+
+  subscriber {
+    type    = "SNS"
+    address = aws_sns_topic.ops_alerts.arn
+  }
+
+  # Alert when the detected anomaly's estimated dollar impact is ≥ $10.
+  # Spot runners are cheap (~$48/month total), so $10 is a meaningful spike.
+  threshold_expression {
+    dimension {
+      key           = "ANOMALY_TOTAL_IMPACT_ABSOLUTE"
+      match_options = ["GREATER_THAN_OR_EQUAL"]
+      values        = ["10"]
+    }
+  }
+
+  tags = local.common_tags
+}

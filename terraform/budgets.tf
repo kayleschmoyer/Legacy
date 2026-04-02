@@ -79,6 +79,19 @@ resource "aws_sns_topic_policy" "ops_alerts" {
           }
         }
       },
+      {
+        # Required for aws_ce_anomaly_subscription to deliver alerts to SNS.
+        Sid       = "AllowCostAnomalyPublish"
+        Effect    = "Allow"
+        Principal = { Service = "costalerts.amazonaws.com" }
+        Action    = "SNS:Publish"
+        Resource  = aws_sns_topic.ops_alerts.arn
+        Condition = {
+          StringEquals = {
+            "aws:SourceAccount" = data.aws_caller_identity.current.account_id
+          }
+        }
+      },
     ]
   })
 }
