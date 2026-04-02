@@ -3044,12 +3044,36 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       try {
         const shell =
           process.platform === 'win32' ? resolveWindowsShell() : '/bin/sh';
-        const output = execSync(command, {
-          cwd: targetDir,
-          encoding: 'utf-8',
-          timeout: 120_000,
-          shell,
-          maxBuffer: 10 * 1024 * 1024,
+        const isCmdShell =
+          process.platform === 'win32' &&
+          shell.toLowerCase().endsWith('cmd.exe');
+        const output = await new Promise<string>((resolve, reject) => {
+          const cb = (error: Error | null, stdout: string, stderr: string) => {
+            if (error) {
+              const e = error as Error & {
+                stdout?: string;
+                stderr?: string;
+              };
+              e.stdout = stdout;
+              e.stderr = stderr;
+              reject(e);
+            } else {
+              resolve(stdout);
+            }
+          };
+          const opts = {
+            cwd: targetDir,
+            encoding: 'utf-8' as const,
+            timeout: 120_000,
+            maxBuffer: 10 * 1024 * 1024,
+          };
+          if (isCmdShell) {
+            // Use execFile with explicit /d /s /c args so cmd.exe handling is
+            // consistent with the git-bash branch — no implicit shell wrapping.
+            execFile(shell, ['/d', '/s', '/c', command], opts, cb);
+          } else {
+            execFile(shell, ['-c', command], opts, cb);
+          }
         });
 
         return {
@@ -3064,7 +3088,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const e = err as {
           stdout?: string;
           stderr?: string;
-          status?: number;
+          code?: number | string | null;
+          signal?: string | null;
         };
         const output =
           [e.stdout, e.stderr].filter(Boolean).join('\n') ||
@@ -3073,7 +3098,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [
             {
               type: 'text',
-              text: `[cwd: ${targetDir}]\n$ ${command}\n\nExit code: ${e.status ?? 'unknown'}\n${output}`,
+              text: `[cwd: ${targetDir}]\n$ ${command}\n\nError code/signal: ${e.code ?? 'unknown'}${e.signal ? ` (signal: ${e.signal})` : ''}\n${output}`,
             },
           ],
           isError: true,
