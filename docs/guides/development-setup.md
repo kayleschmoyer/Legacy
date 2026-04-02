@@ -33,13 +33,14 @@ pnpm run dev
 
 ### **Required Software**
 
-| Tool           | Version | Purpose                                                    | Download Link                                        |
-| -------------- | ------- | ---------------------------------------------------------- | ---------------------------------------------------- |
-| **Node.js**    | 18+     | Runtime for all JavaScript/TypeScript code                 | [nodejs.org](https://nodejs.org)                     |
-| **pnpm**       | 9.12.1  | Workspace package manager (preferred; project uses 9.12.1) | [pnpm.io/installation](https://pnpm.io/installation) |
-| **npm**        | 9+      | Installed with Node.js (optional fallback)                 | Built-in                                             |
-| **Git**        | Latest  | Version control                                            | [git-scm.com](https://git-scm.com)                   |
-| **PowerShell** | 5.1+    | Required for environment sync scripts (Windows)            | Built-in on Windows                                  |
+| Tool           | Version | Purpose                                         | Download Link                                        |
+| -------------- | ------- | ----------------------------------------------- | ---------------------------------------------------- |
+| **Node.js**    | 18+     | Runtime for all JavaScript/TypeScript code      | [nodejs.org](https://nodejs.org)                     |
+| **pnpm**       | 9.12.1  | Workspace package manager — use this, not npm   | [pnpm.io/installation](https://pnpm.io/installation) |
+| **Git**        | Latest  | Version control                                 | [git-scm.com](https://git-scm.com)                   |
+| **PowerShell** | 5.1+    | Required for environment sync scripts (Windows) | Built-in on Windows                                  |
+
+> **Note:** Node.js ships with npm, but this project enforces pnpm via the `packageManager` field in `package.json` and a root `preinstall` guard (`scripts/preinstall-guard.js`) that blocks `npm install` (and other non-pnpm installs) based on `npm_config_user_agent`. Corepack is used to ensure the pinned pnpm version when you run `pnpm`.
 
 ### **Optional Tools**
 
@@ -253,6 +254,36 @@ pnpm exec nx run db:generate
 ## 🚨 Troubleshooting
 
 ### **Common Issues & Solutions**
+
+#### **pnpm Store or Hoist Issues**
+
+```
+ERR_PNPM_HOISTING_NOT_POSSIBLE / Cannot find module (unexpected package)
+```
+
+This project uses `node-linker=hoisted` and `public-hoist-pattern[]=*` (see `.npmrc`), which mirrors npm's flat `node_modules` layout. If you hit unexpected resolution errors:
+
+```powershell
+# Prune stale packages from the content-addressable store
+pnpm store prune
+
+# Reinstall from scratch (safe — pnpm restores from the local store)
+make install
+```
+
+On Windows with multiple worktrees, pnpm typically uses a shared content-addressable store (run `pnpm config get store-dir` to see the actual path on your machine). Treat this as a cache: prefer `pnpm store prune` to clean it, and only delete the store as a last-resort cache reset, understanding that pnpm will need to re-download all packages. If a worktree's `node_modules` is a junction (symlink), break it with `make wt-setup WT=<path>` rather than deleting it manually.
+
+#### **Stray `package-lock.json`?**
+
+If you have a stray `package-lock.json` (e.g., from before the preinstall guard existed or from another branch), remove it and reinstall:
+
+```powershell
+# Remove the lockfile and reinstall with pnpm
+Remove-Item package-lock.json
+make install
+```
+
+The root `preinstall` guard (`scripts/preinstall-guard.js`) blocks `npm install` locally, so this file should not appear under normal conditions. If it does appear, do not commit it — remove it before pushing.
 
 #### **"Module not found" Errors**
 
