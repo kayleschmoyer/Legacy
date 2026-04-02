@@ -186,7 +186,7 @@ twig worktree list
 > branch becomes an orphan. Use `make worktree` (or `scripts/worktree-create.ps1`)
 > which handles both steps correctly.
 
-> If `make worktree` fails, fall back to manual creation:
+> If `make worktree` fails (e.g. `twig` not found), fall back to manual creation:
 >
 > ```powershell
 > git fetch origin   # ensure branch is cut from latest origin/main
@@ -194,6 +194,29 @@ twig worktree list
 > twig branch depend LS-####/short-description main   # or the actual parent branch
 > twig worktree list
 > ```
+>
+> **Deep fallback — if the PowerShell script itself is broken** (e.g. a parse error in
+> `scripts/worktree-create.ps1`), bypass the script entirely with `git worktree add`:
+>
+> ```bash
+> git -C D:/code/legacy-sports fetch origin
+> git -C D:/code/legacy-sports worktree add \
+>   -b LS-####/short-description \
+>   D:/code/legacy-sports-worktrees/LS-####-short-description \
+>   origin/main    # or origin/<parent-branch>
+> ```
+>
+> Then run `make_wt_setup` (MCP) or `make wt-setup WT=<path>` as normal to junction
+> `node_modules`, copy `.env`, etc.
+>
+> Note: twig parent registration is skipped with this fallback. For tickets based off
+> `main`, `worktree_rebase` defaults to rebasing onto `origin/main`, which is correct.
+> For stacked tickets created with this fallback, either:
+>
+> - Once `twig` is available, register the dependency explicitly: `twig branch depend <child-branch> <parent-branch>`, so `worktree_rebase` knows the stack parent; or
+> - If you stay in plain git, remember that `worktree_rebase` will not rebase onto the stack parent; instead, manually run `git -C <worktree> rebase origin/<parent-branch>` when you need to sync with the parent.
+>
+> **Always file a bug under LS-1455** for the underlying script failure so it gets fixed.
 
 ### Step 2: Confirm Jira is In Progress
 
