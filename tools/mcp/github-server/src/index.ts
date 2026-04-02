@@ -35,6 +35,34 @@ import { sweepStaleClaims } from './tools/sweep-stale-claims.js';
 import { viewPR } from './tools/view-pr.js';
 
 /**
+ * Shared Zod schema for generic string arrays. Accepts a real array OR a
+ * JSON-encoded array string (MCP callers sometimes serialise arrays to strings).
+ * Falls back to wrapping a bare string in a single-element array.
+ * Size constraints (min/max element count) are applied inside the preprocess
+ * because ZodPipe does not expose ZodArray chainable methods.
+ */
+const stringList = (opts: { min?: number; max?: number } = {}) => {
+  let inner = z.array(z.string());
+  if (opts.min !== undefined) inner = inner.min(opts.min);
+  if (opts.max !== undefined) inner = inner.max(opts.max);
+  return z.preprocess((val) => {
+    if (Array.isArray(val)) return val;
+    if (typeof val === 'string') {
+      if (val.trimStart().startsWith('[')) {
+        try {
+          const parsed = JSON.parse(val);
+          if (Array.isArray(parsed)) return parsed;
+        } catch {
+          // Not valid JSON — treat as a single element
+        }
+      }
+      return [val];
+    }
+    return val;
+  }, inner);
+};
+
+/**
  * Shared Zod schema for label arrays. Accepts a single string or an array of
  * strings (MCP callers sometimes send a bare string instead of a one-element
  * array). Each label must be non-empty after trimming.
@@ -697,11 +725,9 @@ server.tool(
   'github_resolve_threads',
   'Batch-resolve review threads (groups of 50). If prNumber is provided, triggers bot-review recheck after resolving.',
   {
-    threadIds: z
-      .array(z.string())
-      .min(1)
-      .max(100)
-      .describe('Thread node IDs from github_get_review_threads'),
+    threadIds: stringList({ min: 1, max: 100 }).describe(
+      'Thread node IDs from github_get_review_threads',
+    ),
     prNumber: z.coerce
       .number()
       .int()
