@@ -13,6 +13,7 @@ import { setParent } from './tools/set-parent.js';
 import { transition, VALID_STATUSES } from './tools/transition.js';
 import { view } from './tools/view.js';
 import { bulkTransition } from './tools/bulk-transition.js';
+import { bulkCreate } from './tools/bulk-create.js';
 import { tryGetJiraCredentials } from './netrc.js';
 
 // Check credentials at startup — warn if missing but don't exit.
@@ -99,6 +100,35 @@ server.tool(
       .describe('"current" for active sprint, or numeric sprint ID'),
   },
   async (params) => createTicket(params),
+);
+
+// --- jira_bulk_create_tickets ---
+const ticketSchema = z.object({
+  summary: z.string().describe('Ticket summary / title'),
+  type: z
+    .enum(['Task', 'Bug', 'Story', 'Epic'])
+    .default('Task')
+    .describe('Issue type (default: Task)'),
+  description: z.string().optional().describe('Ticket description'),
+  parent: z.string().optional().describe('Parent epic key (e.g. "LS-1455")'),
+  sprint: z
+    .string()
+    .regex(/^(?:current|\d+)$/, 'Must be "current" or a numeric sprint ID')
+    .optional()
+    .describe('"current" for active sprint, or numeric sprint ID'),
+});
+
+server.tool(
+  'jira_bulk_create_tickets',
+  'Create up to 50 Jira tickets in one call. Returns per-ticket success/failure. Use when filing multiple tickets (e.g. MCP gap audits, E2E coverage gaps) to avoid N serial API round-trips.',
+  {
+    tickets: z
+      .array(ticketSchema)
+      .min(1)
+      .max(50)
+      .describe('List of tickets to create (max 50 per call)'),
+  },
+  async (params) => bulkCreate(params),
 );
 
 // --- jira_edit_ticket ---
