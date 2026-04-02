@@ -60,8 +60,8 @@ interface CreateLeagueFormData {
   auctionMinBid: number;
 }
 
-// Team count options
-const TEAM_COUNT_OPTIONS = [4, 6, 8, 10, 12, 14, 16];
+// Team count options (even and odd — odd counts allow one bye week per round)
+const TEAM_COUNT_OPTIONS = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16];
 
 // Roster size options
 const ROSTER_SIZE_OPTIONS = [20, 22, 25, 30, 35, 40];
@@ -92,8 +92,9 @@ const DRAFT_ORDER_OPTIONS = [
   { label: 'Linear', value: 'linear' },
 ] as const;
 
-// Division count options
-const DIVISION_COUNT_OPTIONS = [1, 2, 3, 4];
+// All valid division count options. When the team count is odd, only odd
+// values are shown so division sizes stay symmetric.
+const ALL_DIVISION_COUNT_OPTIONS = [1, 2, 3, 4];
 
 // Scheduling strategy options
 const SCHEDULING_STRATEGY_OPTIONS = [
@@ -320,6 +321,16 @@ export function LeagueCreatePage(): React.JSX.Element {
       if (field === 'draftMode' && value === 'automated') {
         next.selectionMethod = 'random';
       }
+      // When the team count changes to an odd value and the current division
+      // count is even (which would be invalid), reset divisions to 1.
+      if (
+        field === 'numberOfTeams' &&
+        typeof value === 'number' &&
+        value % 2 === 1 &&
+        next.numberOfDivisions % 2 === 0
+      ) {
+        next.numberOfDivisions = 1;
+      }
       return next;
     });
   };
@@ -343,6 +354,13 @@ export function LeagueCreatePage(): React.JSX.Element {
 
     if (formData.numberOfDivisions > formData.numberOfTeams) {
       return 'Number of divisions cannot exceed number of teams';
+    }
+
+    if (
+      formData.numberOfTeams % 2 === 1 &&
+      formData.numberOfDivisions % 2 === 0
+    ) {
+      return 'Leagues with an odd number of teams must have an odd number of divisions';
     }
 
     if (formData.maxRosterSize < 15 || formData.maxRosterSize > 50) {
@@ -623,7 +641,10 @@ export function LeagueCreatePage(): React.JSX.Element {
                     Number of Divisions
                   </Text>
                   <XStack space="$2" flexWrap="wrap">
-                    {DIVISION_COUNT_OPTIONS.map((count) => (
+                    {ALL_DIVISION_COUNT_OPTIONS.filter(
+                      (count) =>
+                        formData.numberOfTeams % 2 === 0 || count % 2 === 1,
+                    ).map((count) => (
                       <Button
                         key={count}
                         size="$3"

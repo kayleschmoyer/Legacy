@@ -263,6 +263,15 @@ builder.mutationField('createLeagueAndTeams', (t) =>
         );
       }
 
+      // For odd-team leagues, require an odd number of divisions to avoid
+      // uneven division sizes when teams are distributed (e.g. 7 teams / 2 divisions
+      // would force a 4+3 split). This keeps division sizes as symmetric as possible.
+      if (numberOfTeams % 2 === 1 && resolvedNumberOfDivisions % 2 === 0) {
+        throw UserInputError(
+          'Leagues with an odd number of teams must have an odd number of divisions',
+        );
+      }
+
       // ── Custom era year-range validation ────────────────────────────────
       if (inputEraFilter === 'custom') {
         if (inputCustomEraStartYear == null || inputCustomEraEndYear == null) {

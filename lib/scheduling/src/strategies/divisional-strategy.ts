@@ -5,6 +5,14 @@
  * Typical split: 60% divisional games, 40% inter-divisional games.
  *
  * Assumes teams have a `divisionId` field.
+ *
+ * Odd-team support: when the total number of teams is odd, exactly one team
+ * receives a bye each week.  The bye rotates deterministically across all
+ * teams (sorted by ID) so bye counts are distributed as evenly as possible
+ * (counts differ by at most 1 when `numberOfWeeks` is not a multiple of
+ * `teams.length`).  Leagues with an odd team count must use an odd number of
+ * divisions (enforced by the mutation layer) so that division sizes stay as
+ * symmetric as possible.
  */
 
 import { shuffleArray } from '@legacy-sports/utils';
@@ -31,6 +39,10 @@ export class DivisionalStrategy implements SchedulingStrategy {
       return [];
     }
 
+    const isOdd = teams.length % 2 === 1;
+    // Sort by ID once for stable, predictable bye rotation across the season.
+    const sortedTeams = isOdd ? [...teams].sort((a, b) => a.id - b.id) : teams;
+
     // Group teams by division
     const divisions = new Map<number, TeamInfo[]>();
     for (const team of teams) {
@@ -50,6 +62,7 @@ export class DivisionalStrategy implements SchedulingStrategy {
     }
 
     const pairings: MatchupPairing[] = [];
+    // For odd teams, floor(N/2) active games per week (one team has a bye).
     const totalGames = Math.floor((teams.length / 2) * numberOfWeeks);
     const divisionalGames = Math.floor(
       totalGames * this.config.divisionalGamePercentage,
@@ -61,7 +74,15 @@ export class DivisionalStrategy implements SchedulingStrategy {
     let currentWeek = 1;
 
     while (currentWeek <= numberOfWeeks) {
-      const teamsAvailableThisWeek = new Set(teams.map((t) => t.id));
+      // For odd-team leagues, rotate the bye team deterministically by week.
+      // The team at index (week-1) % N (sorted by ID) sits out this week.
+      const byeTeamId = isOdd
+        ? sortedTeams[(currentWeek - 1) % sortedTeams.length].id
+        : null;
+
+      const teamsAvailableThisWeek = new Set(
+        teams.filter((t) => t.id !== byeTeamId).map((t) => t.id),
+      );
 
       // Bug fix 1: Schedule divisional games — pair ALL available teams within
       // each division (not just shuffled[0] vs shuffled[1]).
@@ -144,15 +165,24 @@ export class DivisionalStrategy implements SchedulingStrategy {
     numberOfWeeks: number,
   ): MatchupPairing[] {
     const pairings: MatchupPairing[] = [];
+    const isOdd = teams.length % 2 === 1;
+    // Sort by ID for stable, predictable bye rotation.
+    const sortedTeams = isOdd ? [...teams].sort((a, b) => a.id - b.id) : teams;
     let week = 1;
 
     while (week <= numberOfWeeks) {
-      const shuffled = shuffleArray([...teams]);
+      // For odd-team leagues, rotate the bye team so bye counts differ by at most 1
+      // across all teams (exactly equal only when numberOfWeeks is a multiple of teams.length).
+      const byeTeamId = isOdd
+        ? sortedTeams[(week - 1) % sortedTeams.length].id
+        : null;
 
-      for (let i = 0; i < shuffled.length - 1; i += 2) {
+      const active = shuffleArray(teams.filter((t) => t.id !== byeTeamId));
+
+      for (let i = 0; i < active.length - 1; i += 2) {
         pairings.push({
-          team1Id: shuffled[i].id,
-          team2Id: shuffled[i + 1].id,
+          team1Id: active[i].id,
+          team2Id: active[i + 1].id,
           weekNumber: week,
           gamesPerMatchup: 0,
         });
