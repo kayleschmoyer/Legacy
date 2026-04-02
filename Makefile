@@ -10,7 +10,7 @@
 	android ios build-android build-ios \
 	db-migrate db-studio db-reset db-dump db-restore db-dump-dev db-restore-dev db-check-connections codegen \
 	deploy-lambdas deploy-infrastructure terraform-init terraform-plan terraform-apply terraform-apply-auto terraform-destroy gen-tfvars \
-	runner-apply ami-build ami-list runner-secrets-rotate \
+	runner-apply ami-build ami-list runner-secrets-rotate runner-lambdas-sync \
 	sync-env check-services graph affected list-projects workspace-lint pr \
 	ci ci-force ci-full release full-deploy full-check dev-setup \
 	fix-windows-locks diagnose kill-stale \
@@ -550,6 +550,10 @@ ifeq ($(DETECTED_OS),Windows)
 else
 	ENVIRONMENT=$(or $(ENVIRONMENT),prod) DRY_RUN=$(DRY_RUN) bash scripts$(PATH_SEP)rotate-runner-secrets.sh
 endif
+
+runner-lambdas-sync: ## Download Lambda zips matching the github-aws-runners version in terraform/github-runners.tf. Usage: make runner-lambdas-sync [VERSION=x.y.z]
+	@$(call echo_blue,Syncing runner Lambda zips...)
+	node scripts$(PATH_SEP)download-runner-lambdas.js $(VERSION)
 
 # Environment Management
 sync-env: ## Sync environment variables
