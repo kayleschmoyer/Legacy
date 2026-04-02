@@ -87,6 +87,11 @@ module "github_runners" {
   runner_extra_labels = ["ci-runner"]
   runner_run_as       = "ubuntu" # Packer AMI is Ubuntu, not Amazon Linux
 
+  # Attach S3 cache IAM policy so runner instances can read/write the pnpm
+  # store tarball. The permissions boundary already permits this bucket but
+  # the module's runner role also needs an attached policy (LS-1663).
+  runner_iam_role_managed_policy_arns = [aws_iam_policy.runner_cache[0].arn]
+
   # Disable CloudWatch agent — default config has invalid log_class property
   # that causes startup failure. Enable later with custom config (LS-1667).
   enable_cloudwatch_agent = false
@@ -128,9 +133,28 @@ module "github_runners" {
   # ── Custom userdata template (Ubuntu-based, replaces module's Amazon Linux default)
   userdata_template = "${path.module}/runner-userdata.sh"
 
-  # Pre-install is minimal — tools are pre-baked in the Packer AMI
+  # Pre-install: restore pnpm store from S3 cache so the first job on this
+  # instance finds a warm cache instead of downloading all packages fresh.
+  # Falls back silently if the cache object does not exist yet (first runner
+  # boot after deployment, or cache expired). Runs as root; ownership is fixed
+  # after extraction so the ubuntu runner user can access the store.
   userdata_pre_install = <<-EOT
     echo "Using pre-baked Ubuntu AMI - Node.js, pnpm, Playwright already installed"
+
+    CACHE_BUCKET="${local.name_prefix}-runner-cache"
+    PNPM_STORE="/home/ubuntu/.local/share/pnpm/store"
+
+    if aws s3api head-object --bucket "$CACHE_BUCKET" --key "pnpm-store/latest.tar.gz" >/dev/null 2>&1; then
+      echo "[cache] Restoring pnpm store from s3://$CACHE_BUCKET/pnpm-store/latest.tar.gz"
+      mkdir -p /home/ubuntu/.local/share/pnpm
+      aws s3 cp "s3://$CACHE_BUCKET/pnpm-store/latest.tar.gz" - 2>/dev/null \
+        | tar xzf - -C "$PNPM_STORE" --no-same-owner --no-same-permissions 2>/dev/null \
+        || echo "[cache] Restore failed — continuing without cache"
+      chown -R ubuntu:ubuntu /home/ubuntu/.local/share/pnpm 2>/dev/null || true
+      echo "[cache] pnpm store restored"
+    else
+      echo "[cache] No pnpm cache found — first boot will download packages fresh"
+    fi
   EOT
 
   # ── Inter-job cleanup hook (non-ephemeral isolation) ───────────────────────
@@ -176,6 +200,25 @@ module "github_runners" {
     fi
 
     echo "[cleanup] Post-job cleanup completed at $(date -u)"
+
+    # Sync pnpm store to S3 so the next new runner instance starts warm.
+    # Runs in background (nohup + disown) so it does not delay the runner
+    # from picking up the next queued job. A partial upload is harmless —
+    # the pnpm store is content-addressable, so the next sync will fill gaps.
+    PNPM_STORE="/home/ubuntu/.local/share/pnpm/store"
+    CACHE_BUCKET="${local.name_prefix}-runner-cache"
+    if [[ -d "$PNPM_STORE" ]]; then
+      (
+        nohup bash -c \
+          "tar czf - \"$PNPM_STORE\" 2>/dev/null \
+             | aws s3 cp - \"s3://$CACHE_BUCKET/pnpm-store/latest.tar.gz\" \
+           && echo '[cache] pnpm store sync complete' \
+           || echo '[cache] pnpm store sync failed'" \
+          >> /tmp/cache-sync.log 2>&1 &
+        disown
+      ) || true
+      echo "[cache] pnpm store sync started in background → /tmp/cache-sync.log"
+    fi
   EOT
 
   # ── VPC egress restrictions (LS-1654) ──────────────────────────────────────
