@@ -23,6 +23,11 @@ on:
           - rollbar-discord
           - stripe-webhook
           - websocket
+      run-ci-first:
+        description: "Trigger CI pipeline and wait for it to pass before deploying (use when no CI run exists for HEAD)"
+        required: false
+        default: false
+        type: boolean
       skip-ci-check:
         description: "Skip CI status verification (emergency deploys only)"
         required: false
@@ -46,15 +51,96 @@ permissions:
   pull-requests: read # Required for listPullRequestsAssociatedWithCommit in verify-ci
 
 # ---------------------------------------------------------------------------
-# Job 0 — Verify CI pipeline passed for this commit
+# Job 0a — Optionally trigger CI and wait for it to pass
 # ---------------------------------------------------------------------------
 jobs:
+  trigger-ci:
+    name: Trigger CI Pipeline
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    if: github.event.inputs.run-ci-first == 'true' && github.event.inputs.skip-ci-check != 'true'
+    timeout-minutes: 60
+    permissions:
+      actions: write # dispatch ci-orchestrator on demand
+    steps:
+      - name: Dispatch CI and wait
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const sha = context.sha;
+            const ref = context.ref;
+
+            core.info(`Dispatching CI Orchestrator on ref ${ref} (SHA ${sha})`);
+
+            const dispatchedAt = new Date();
+
+            await github.rest.actions.createWorkflowDispatch({
+              owner,
+              repo,
+              workflow_id: 'ci-orchestrator.yml',
+              ref,
+            });
+
+            core.info('Dispatch sent. Polling for run to appear and complete (timeout: 60 min)...');
+
+            const deadline = Date.now() + 60 * 60 * 1000;
+            let ciRun = null;
+
+            while (Date.now() < deadline) {
+              await new Promise(r => setTimeout(r, 30000));
+
+              const { data } = await github.rest.actions.listWorkflowRuns({
+                owner,
+                repo,
+                workflow_id: 'ci-orchestrator.yml',
+                head_sha: sha,
+                created: `>=${dispatchedAt.toISOString()}`,
+              });
+
+              const matchingRuns = data.workflow_runs
+                .filter(r => r.event === 'workflow_dispatch' && new Date(r.created_at) >= dispatchedAt)
+                .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+              const run = matchingRuns[0];
+              if (!run) {
+                core.info('No matching workflow_dispatch CI run visible yet, waiting...');
+                continue;
+              }
+
+              if (run.status !== 'completed') {
+                core.info(`CI run in progress (status: ${run.status}). Run: ${run.html_url}`);
+                continue;
+              }
+
+              ciRun = run;
+              break;
+            }
+
+            if (!ciRun) {
+              core.setFailed('Timed out waiting for CI pipeline to complete after 60 minutes.');
+              return;
+            }
+
+            core.info(`CI run completed with conclusion: ${ciRun.conclusion}. Run: ${ciRun.html_url}`);
+
+            if (ciRun.conclusion !== 'success') {
+              core.setFailed(
+                `CI pipeline failed (conclusion: ${ciRun.conclusion}). Fix CI before deploying. Run: ${ciRun.html_url}`
+              );
+            }
+
+  # ---------------------------------------------------------------------------
+  # Job 0b — Verify CI pipeline passed for this commit
+  # ---------------------------------------------------------------------------
   verify-ci:
     name: Verify CI Status
+    needs: [trigger-ci]
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     if: >-
-      github.event_name != 'workflow_dispatch' ||
-      github.event.inputs.skip-ci-check != 'true'
+      always() &&
+      (needs.trigger-ci.result == 'success' || needs.trigger-ci.result == 'skipped') &&
+      (github.event_name != 'workflow_dispatch' || github.event.inputs.skip-ci-check != 'true')
     timeout-minutes: 5
     steps:
       - name: Check CI Pipeline Status
