@@ -63,7 +63,8 @@ resource "aws_cloudwatch_log_group" "rollbar_discord_lambda" {
   name              = "/aws/lambda/${local.name_prefix}-rollbar-discord"
   retention_in_days = var.environment == "dev" ? 7 : 14
 
-  tags = local.common_tags
+  tags       = local.common_tags
+  depends_on = [aws_vpc_endpoint.logs]
 }
 
 # Data source to get the current Rollbar Discord Lambda version from SSM

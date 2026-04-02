@@ -259,7 +259,8 @@ resource "aws_cloudwatch_log_group" "websocket_lambda" {
   name              = "/aws/lambda/${aws_lambda_function.websocket.function_name}"
   retention_in_days = local.log_retention_days[var.environment]
 
-  tags = local.common_tags
+  tags       = local.common_tags
+  depends_on = [aws_vpc_endpoint.logs]
 }
 
 # Lambda permission for API Gateway to invoke

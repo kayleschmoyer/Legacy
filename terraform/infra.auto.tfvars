@@ -36,7 +36,7 @@ enable_rds_proxy = true
 #
 # To see an accurate plan that includes runner resources:
 #   terraform plan -var="enable_github_runners=true"
-enable_github_runners         = false
+enable_github_runners = false
 # Allow self-hosted CI runners (VPC public subnets) to reach RDS on port 5432.
 # Unlike the full runner fleet, this single SG rule is safe to keep in the normal
 # apply loop — it is idempotent and has no teardown risk. Decoupled from

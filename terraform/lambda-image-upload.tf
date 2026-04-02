@@ -127,7 +127,8 @@ resource "aws_cloudwatch_log_group" "image_upload_lambda" {
   name              = "/aws/lambda/${local.name_prefix}-image-upload"
   retention_in_days = local.log_retention_days[var.environment]
 
-  tags = local.common_tags
+  tags       = local.common_tags
+  depends_on = [aws_vpc_endpoint.logs]
 }
 
 # Lambda Function

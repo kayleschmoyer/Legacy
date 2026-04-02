@@ -133,7 +133,8 @@ resource "aws_cloudwatch_log_group" "stripe_webhook_lambda" {
   name              = "/aws/lambda/${local.name_prefix}-stripe-webhook"
   retention_in_days = local.log_retention_days[var.environment]
 
-  tags = local.common_tags
+  tags       = local.common_tags
+  depends_on = [aws_vpc_endpoint.logs]
 }
 
 # Lambda Function

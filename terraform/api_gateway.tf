@@ -127,7 +127,8 @@ resource "aws_cloudwatch_log_group" "api_gateway_access_logs" {
   name              = "/aws/apigateway/${local.name_prefix}-api/access-logs"
   retention_in_days = var.environment == "prod" ? 90 : 30
 
-  tags = local.common_tags
+  tags       = local.common_tags
+  depends_on = [aws_vpc_endpoint.logs]
 }
 
 # IAM role for API Gateway to write CloudWatch logs
