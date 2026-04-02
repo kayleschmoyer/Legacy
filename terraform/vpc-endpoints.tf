@@ -41,7 +41,7 @@ resource "aws_security_group" "vpc_endpoints" {
 # Required for Lambda functions to access database credentials
 resource "aws_vpc_endpoint" "secretsmanager" {
   vpc_id             = aws_vpc.main.id
-  service_name       = "com.amazonaws.${data.aws_region.current.name}.secretsmanager"
+  service_name       = "com.amazonaws.${data.aws_region.current.id}.secretsmanager"
   vpc_endpoint_type  = "Interface"
   subnet_ids         = aws_subnet.private_lambda[*].id
   security_group_ids = [aws_security_group.vpc_endpoints.id]
@@ -117,7 +117,7 @@ resource "aws_vpc_endpoint" "secretsmanager" {
 # CloudWatch Logs VPC Endpoint (optional but helpful for Lambda logging)
 resource "aws_vpc_endpoint" "logs" {
   vpc_id             = aws_vpc.main.id
-  service_name       = "com.amazonaws.${data.aws_region.current.name}.logs"
+  service_name       = "com.amazonaws.${data.aws_region.current.id}.logs"
   vpc_endpoint_type  = "Interface"
   subnet_ids         = aws_subnet.private_lambda[*].id
   security_group_ids = [aws_security_group.vpc_endpoints.id]
@@ -159,7 +159,7 @@ resource "aws_vpc_endpoint" "logs" {
 # S3 Gateway VPC Endpoint (required for Lambda deployment artifacts)
 resource "aws_vpc_endpoint" "s3" {
   vpc_id            = aws_vpc.main.id
-  service_name      = "com.amazonaws.${data.aws_region.current.name}.s3"
+  service_name      = "com.amazonaws.${data.aws_region.current.id}.s3"
   vpc_endpoint_type = "Gateway"
 
   # Associate with private route tables

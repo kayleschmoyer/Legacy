@@ -126,7 +126,7 @@ resource "aws_sqs_queue_policy" "load_game_stats" {
         Resource = aws_sqs_queue.load_game_stats.arn
         Condition = {
           StringEquals = {
-            "aws:RequestedRegion" = data.aws_region.current.name
+            "aws:RequestedRegion" = data.aws_region.current.id
           }
         }
       }
@@ -202,7 +202,7 @@ resource "aws_sqs_queue_policy" "select_game" {
         Resource = aws_sqs_queue.select_game.arn
         Condition = {
           StringEquals = {
-            "aws:RequestedRegion" = data.aws_region.current.name
+            "aws:RequestedRegion" = data.aws_region.current.id
           }
         }
       }
@@ -278,7 +278,7 @@ resource "aws_sqs_queue_policy" "automatic_drafts" {
         Resource = aws_sqs_queue.automatic_drafts.arn
         Condition = {
           StringEquals = {
-            "aws:RequestedRegion" = data.aws_region.current.name
+            "aws:RequestedRegion" = data.aws_region.current.id
           }
         }
       }

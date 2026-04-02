@@ -78,7 +78,7 @@ resource "aws_iam_policy" "stripe_webhook_lambda_rds" {
         Effect = "Allow"
         Action = ["rds-db:connect"]
         Resource = [
-          "arn:aws:rds-db:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:dbuser:${var.enable_rds_proxy ? aws_db_proxy.main[0].id : aws_db_instance.postgres.identifier}/${var.database_username}"
+          "arn:aws:rds-db:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:dbuser:${var.enable_rds_proxy ? aws_db_proxy.main[0].id : aws_db_instance.postgres.identifier}/${var.database_username}"
         ]
       }
     ]
@@ -162,7 +162,7 @@ resource "aws_lambda_function" "stripe_webhook" {
       STRIPE_SECRET_KEY_SECRET_NAME       = aws_secretsmanager_secret.stripe_secret_key.name
       STRIPE_WEBHOOK_SECRET_SECRET_NAME   = aws_secretsmanager_secret.stripe_webhook_secret.name
       CONNECTIONS_TABLE_NAME              = aws_dynamodb_table.websocket_connections.name
-      WEBSOCKET_ENDPOINT                  = "https://${aws_apigatewayv2_api.websocket.id}.execute-api.${data.aws_region.current.name}.amazonaws.com/${var.environment}"
+      WEBSOCKET_ENDPOINT                  = "https://${aws_apigatewayv2_api.websocket.id}.execute-api.${data.aws_region.current.id}.amazonaws.com/${var.environment}"
       STRIPE_GRACE_PERIOD_DAYS            = tostring(var.stripe_grace_period_days)
       DB_HOST                             = var.enable_rds_proxy ? aws_db_proxy.main[0].endpoint : aws_db_instance.postgres.endpoint
       DB_PORT                             = "5432"

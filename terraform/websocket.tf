@@ -399,7 +399,7 @@ output "websocket_url" {
 
 output "websocket_api_endpoint" {
   description = "WebSocket API endpoint for sending messages from lambdas"
-  value       = var.domain_name != "" ? "https://ws.${var.domain_name}" : "https://${aws_apigatewayv2_api.websocket.id}.execute-api.${data.aws_region.current.name}.amazonaws.com/${var.environment}"
+  value       = var.domain_name != "" ? "https://ws.${var.domain_name}" : "https://${aws_apigatewayv2_api.websocket.id}.execute-api.${data.aws_region.current.id}.amazonaws.com/${var.environment}"
 }
 
 output "connections_table_name" {

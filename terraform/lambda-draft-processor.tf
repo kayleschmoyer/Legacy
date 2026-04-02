@@ -210,7 +210,7 @@ resource "aws_lambda_function" "draft_processor" {
 
       # WebSocket configuration for notifications
       CONNECTIONS_TABLE_NAME = aws_dynamodb_table.websocket_connections.name
-      WEBSOCKET_ENDPOINT     = "https://${aws_apigatewayv2_api.websocket.id}.execute-api.${data.aws_region.current.name}.amazonaws.com/${var.environment}"
+      WEBSOCKET_ENDPOINT     = "https://${aws_apigatewayv2_api.websocket.id}.execute-api.${data.aws_region.current.id}.amazonaws.com/${var.environment}"
 
       # Rollbar error tracking
       ROLLBAR_ACCESS_TOKEN = var.rollbar_access_token
