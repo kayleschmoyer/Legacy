@@ -41,6 +41,16 @@ resource "aws_security_group" "nat_instance" {
     description = "HTTPS to external APIs (Google, Rollbar, Sentry, Stripe)"
   }
 
+  # RDS port-forward outbound — SSM port-forwarding establishes a TCP connection
+  # to RDS on 5432 through this instance; without this egress rule the tunnel is blocked.
+  egress {
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = [aws_vpc.main.cidr_block]
+    description = "PostgreSQL to RDS (SSM port-forwarding tunnel)"
+  }
+
   tags = merge(local.common_tags, {
     Name = "${local.name_prefix}-nat-instance-sg"
   })
@@ -48,6 +58,45 @@ resource "aws_security_group" "nat_instance" {
   lifecycle {
     create_before_destroy = true
   }
+}
+
+# IAM role for NAT instance — enables SSM Session Manager so developers can
+# port-forward to RDS locally without opening public SG rules.
+# Guarded by the same condition as aws_instance.nat_instance to avoid leaving
+# unused IAM resources when var.use_nat_instance is false.
+resource "aws_iam_role" "nat_instance" {
+  count = var.use_nat_instance ? 1 : 0
+
+  name = "${local.name_prefix}-nat-instance"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+      }
+    ]
+  })
+
+  tags = local.common_tags
+}
+
+resource "aws_iam_role_policy_attachment" "nat_instance_ssm" {
+  count = var.use_nat_instance ? 1 : 0
+
+  role       = aws_iam_role.nat_instance[0].name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+resource "aws_iam_instance_profile" "nat_instance" {
+  count = var.use_nat_instance ? 1 : 0
+
+  name = "${local.name_prefix}-nat-instance"
+  role = aws_iam_role.nat_instance[0].name
 }
 
 # NAT Instance (only create if cost optimization is enabled)
@@ -60,6 +109,7 @@ resource "aws_instance" "nat_instance" {
   vpc_security_group_ids      = [aws_security_group.nat_instance.id]
   associate_public_ip_address = true
   source_dest_check           = false # Required for NAT functionality
+  iam_instance_profile        = aws_iam_instance_profile.nat_instance[0].name
 
   # The heredoc below is plaintext; we explicitly base64-encode it and provide
   # the encoded value via user_data_base64 (instead of using user_data, which

@@ -8,7 +8,7 @@
 	build build-all build-web build-mobile build-lambdas build-libs \
 	start dev dev-web dev-mobile dev-db dev-graphql dev-storybook graphiql docker-up \
 	android ios build-android build-ios \
-	db-migrate db-studio db-reset db-dump db-restore db-dump-dev db-restore-dev db-check-connections codegen \
+	db-migrate db-studio db-reset db-tunnel db-dump db-restore db-dump-dev db-restore-dev db-check-connections codegen \
 	deploy-lambdas deploy-infrastructure terraform-init terraform-plan terraform-apply terraform-apply-auto terraform-destroy gen-tfvars \
 	runner-apply ami-build ami-list runner-secrets-rotate runner-lambdas-sync \
 	sync-env check-services graph affected list-projects workspace-lint pr \
@@ -420,6 +420,35 @@ db-studio: ## Open database studio
 db-reset: ## Reset database (WARNING: Drops all tables!)
 	@$(call echo_blue,Resetting database...)
 	cd lib$(PATH_SEP)db-client && pnpm run db:reset
+
+db-tunnel: ## Open SSM port-forward tunnel: localhost:$${LOCAL_PORT:-5432} → RDS via SSM-managed target. Env: LOCAL_PORT, DB_TUNNEL_TARGET, DB_TUNNEL_HOST, DB_TUNNEL_TARGET_SSM_PARAMETER, DB_TUNNEL_HOST_SSM_PARAMETER
+ifeq ($(DETECTED_OS),Windows)
+	@echo "db-tunnel requires bash. Run in WSL, Git Bash, or a Linux environment."
+else
+	@LOCAL_PORT="$${LOCAL_PORT:-5432}"; \
+	DB_TUNNEL_TARGET="$${DB_TUNNEL_TARGET:-}"; \
+	DB_TUNNEL_HOST="$${DB_TUNNEL_HOST:-}"; \
+	if [ -z "$$DB_TUNNEL_TARGET" ] && [ -n "$${DB_TUNNEL_TARGET_SSM_PARAMETER:-}" ]; then \
+		DB_TUNNEL_TARGET="$$(aws ssm get-parameter --name "$$DB_TUNNEL_TARGET_SSM_PARAMETER" --query 'Parameter.Value' --output text)"; \
+	fi; \
+	if [ -z "$$DB_TUNNEL_HOST" ] && [ -n "$${DB_TUNNEL_HOST_SSM_PARAMETER:-}" ]; then \
+		DB_TUNNEL_HOST="$$(aws ssm get-parameter --name "$$DB_TUNNEL_HOST_SSM_PARAMETER" --query 'Parameter.Value' --output text)"; \
+	fi; \
+	if [ -z "$$DB_TUNNEL_TARGET" ]; then \
+		echo "Error: Missing SSM tunnel target. Set DB_TUNNEL_TARGET or DB_TUNNEL_TARGET_SSM_PARAMETER." >&2; \
+		exit 1; \
+	fi; \
+	if [ -z "$$DB_TUNNEL_HOST" ]; then \
+		echo "Error: Missing database host. Set DB_TUNNEL_HOST or DB_TUNNEL_HOST_SSM_PARAMETER." >&2; \
+		exit 1; \
+	fi; \
+	echo "Opening SSM tunnel to RDS (localhost:$$LOCAL_PORT)..."; \
+	echo "Connect with: DB_HOST=localhost:$$LOCAL_PORT"; \
+	aws ssm start-session \
+		--target "$$DB_TUNNEL_TARGET" \
+		--document-name AWS-StartPortForwardingSessionToRemoteHost \
+		--parameters "{\"host\":[\"$$DB_TUNNEL_HOST\"],\"portNumber\":[\"5432\"],\"localPortNumber\":[\"$$LOCAL_PORT\"]}"
+endif
 
 db-dump: ## Dump RDS database to S3 (custom binary format, compressed)
 	@$(call echo_blue,Dumping RDS database to S3...)

@@ -9,11 +9,9 @@ name: "Check Migrations Applied"
 #
 # How it works:
 #   1. Resolves ci_readonly DB credentials from AWS Secrets Manager.
-#   2. If GitHub-hosted: temporarily opens port 5432 in the RDS SG for the runner IP.
-#      If self-hosted (VPC): uses static SG rule (rds_from_ci_runners) — no change needed.
-#   3. Connects as ci_readonly (SELECT-only on drizzle.__drizzle_migrations).
-#   4. Compares applied hashes against migration files on disk.
-#   5. If GitHub-hosted: revokes the temporary security group rule (always, even on failure).
+#   2. Connects as ci_readonly (SELECT-only on drizzle.__drizzle_migrations).
+#      Self-hosted runners reach RDS directly via static SG rule (rds_from_ci_runners).
+#   3. Compares applied hashes against migration files on disk.
 #
 # The ci_readonly PostgreSQL role is created by migration:
 #   lib/db-client/migrations/20260303_150000_add_ci_readonly_role.ts
@@ -32,7 +30,6 @@ env:
   AWS_REGION: us-east-1
   AWS_STAGE: dev
   # SSM parameter paths (values written by Terraform)
-  SSM_RDS_SG_PARAM: /legacy-sports/dev/rds/security-group-id
   SSM_CI_CREDS_SECRET_PARAM: /legacy-sports/dev/ci/readonly-db-creds-secret-name
 
 # One check per branch/PR at a time; the latest run wins.
@@ -72,6 +69,14 @@ jobs:
     timeout-minutes: 10
 
     steps:
+      - name: "Require self-hosted runner"
+        if: needs.check-runner-access.outputs.is-self-hosted != 'true'
+        run: |
+          echo "::error::This workflow requires a self-hosted runner with direct VPC access to RDS."
+          echo "::error::RDS is not publicly accessible (publicly_accessible=false)."
+          echo "::error::Ensure CI_RUNNER_LABEL is configured and the PR author has write permission."
+          exit 1
+
       - name: "Checkout Repository"
         uses: actions/checkout@v6
 
@@ -140,51 +145,6 @@ jobs:
           echo "::endgroup::"
 
       # -----------------------------------------------------------------------
-      # Temporarily allow the runner to reach port 5432 on the RDS instance.
-      # Self-hosted runners are in the VPC and use a static SG rule (Terraform:
-      # aws_security_group_rule.rds_from_ci_runners), so this step is skipped.
-      # GitHub-hosted runners need a temporary public-IP-based rule.
-      # -----------------------------------------------------------------------
-      - name: "Detect runner environment"
-        id: runner-env
-        run: |
-          if [ "${{ needs.check-runner-access.outputs.is-self-hosted }}" = "true" ]; then
-            echo "is_self_hosted=true" >> "$GITHUB_OUTPUT"
-            echo "ℹ️  Self-hosted runner — using VPC private network"
-          else
-            echo "is_self_hosted=false" >> "$GITHUB_OUTPUT"
-            echo "ℹ️  GitHub-hosted runner — will open temporary SG rule"
-          fi
-
-      - name: "Open RDS port 5432 for this runner"
-        id: open-sg
-        if: steps.runner-env.outputs.is_self_hosted == 'false'
-        run: |
-          echo "::group::Open RDS security group"
-
-          RUNNER_IP=$(curl -sf https://checkip.amazonaws.com)
-          echo "Runner public IP: $RUNNER_IP"
-          echo "runner_ip=$RUNNER_IP" >> "$GITHUB_OUTPUT"
-
-          RDS_SG_ID=$(aws ssm get-parameter \
-            --name "${{ env.SSM_RDS_SG_PARAM }}" \
-            --query "Parameter.Value" \
-            --output text)
-          echo "RDS security group: $RDS_SG_ID"
-          echo "sg_id=$RDS_SG_ID" >> "$GITHUB_OUTPUT"
-
-          aws ec2 authorize-security-group-ingress \
-            --group-id "$RDS_SG_ID" \
-            --protocol tcp \
-            --port 5432 \
-            --cidr "${RUNNER_IP}/32" \
-            --region "${{ env.AWS_REGION }}" \
-            2>&1 | { read -r msg; [[ "$msg" == *"already exists"* ]] && echo "Rule already present – skipping" || echo "$msg"; } || true
-
-          echo "✅ Ingress rule added for ${RUNNER_IP}/32"
-          echo "::endgroup::"
-
-      # -----------------------------------------------------------------------
       # Trust the AWS RDS certificate chain so Node.js can validate SSL certs
       # -----------------------------------------------------------------------
       - name: "Install AWS RDS CA bundle"
@@ -208,25 +168,6 @@ jobs:
           CI_READONLY_DB_SSL: "true"
           NODE_EXTRA_CA_CERTS: ${{ steps.rds-ca.outputs.ca_bundle }}
         run: node scripts/check-migrations-applied.js
-
-      # -----------------------------------------------------------------------
-      # Always revoke the temporary security group rule
-      # -----------------------------------------------------------------------
-      - name: "Close RDS port 5432 (cleanup)"
-        if: always() && steps.runner-env.outputs.is_self_hosted == 'false' && steps.open-sg.outputs.runner_ip != ''
-        run: |
-          echo "::group::Close RDS security group"
-
-          aws ec2 revoke-security-group-ingress \
-            --group-id "${{ steps.open-sg.outputs.sg_id }}" \
-            --protocol tcp \
-            --port 5432 \
-            --cidr "${{ steps.open-sg.outputs.runner_ip }}/32" \
-            --region "${{ env.AWS_REGION }}" \
-            2>&1 | { read -r msg; [[ "$msg" == *"does not exist"* ]] && echo "Rule already removed" || echo "$msg"; } || true
-
-          echo "✅ Ingress rule revoked for ${{ steps.open-sg.outputs.runner_ip }}/32"
-          echo "::endgroup::"
 
       - name: "Label PR on Migration Failure"
         if: always() && github.event.pull_request.number

@@ -31,15 +31,11 @@ resource "aws_db_instance" "postgres" {
   password = random_password.database_password.result
 
   # Network & Security
-  # Dev must be publicly_accessible so GitHub Actions runners (public internet)
-  # can reach the RDS instance for the "Check Migrations Applied" CI workflow.
-  # Access is still controlled by the security group — the CI workflow
-  # dynamically adds/revokes the runner's IP on each run.
-  # Non-dev environments stay private; move dev to private once CI checks run
-  # behind a bastion or VPN tunnel.
+  # All CI runners are self-hosted (inside VPC); developers access RDS via SSM
+  # tunnel through the NAT instance. No public endpoint needed.
   db_subnet_group_name   = aws_db_subnet_group.main.name
   vpc_security_group_ids = [aws_security_group.rds.id]
-  publicly_accessible    = var.environment == "dev"
+  publicly_accessible    = false
 
   # Backup & Maintenance - Optimized for dev
   backup_retention_period    = local.backup_retention_days[var.environment]
