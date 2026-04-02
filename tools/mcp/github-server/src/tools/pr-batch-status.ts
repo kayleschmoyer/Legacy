@@ -4,7 +4,7 @@ import { FAILED_CONCLUSIONS, summarizeCIStatus } from '../types.js';
 import type { ToolResult } from '../types.js';
 
 interface PRBatchStatusParams {
-  prNumbers: number[];
+  numbers: number[];
   compact?: boolean;
 }
 
@@ -86,8 +86,8 @@ function normalizeChecks(
   });
 }
 
-function buildBatchPRQuery(prNumbers: number[]): string {
-  const fragments = prNumbers.map(
+function buildBatchPRQuery(numbers: number[]): string {
+  const fragments = numbers.map(
     (num) => `
     pr_${num}: pullRequest(number: ${num}) {
       number
@@ -148,7 +148,7 @@ interface BatchGraphQLResponse {
 export async function prBatchStatus(
   params: PRBatchStatusParams,
 ): Promise<ToolResult> {
-  const uniquePrNumbers = [...new Set(params.prNumbers)];
+  const uniquePrNumbers = [...new Set(params.numbers)];
 
   try {
     const repo = await getRepoOwnerName();

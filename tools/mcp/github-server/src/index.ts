@@ -546,7 +546,7 @@ server.tool(
   'github_pr_batch_status',
   'Detailed status for specific PRs: mergeable, CI jobs, reviews, unresolved threads. Batched GraphQL.',
   {
-    prNumbers: z
+    numbers: z
       .array(z.coerce.number().int().positive())
       .min(1)
       .max(50)
