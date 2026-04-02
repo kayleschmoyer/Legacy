@@ -166,3 +166,26 @@ All work must go through PR review, even for documentation. **This is the #1 age
 2. Jira has been moved to "In Review"
 
 If you find yourself about to end your turn after `make pc`: **STOP and keep going.**
+
+### ❌ MISTAKE 5: Stale Tracking Tasks
+
+Agents create tasks via `TaskCreate` at the start of a ticket, then forget to mark them complete after shipping. This leaves the user's task list full of "in_progress" or "pending" tasks that are actually done.
+
+**Rule: mark each task complete immediately after Jira moves to "In Review" — before starting the next ticket.**
+
+```
+# Wrong — batching updates to end of session
+Work ticket A → PR → Jira "In Review"
+Work ticket B → PR → Jira "In Review"
+Work ticket C → PR → Jira "In Review"
+TaskUpdate(taskId: A, status: "completed")  # too late — tasks were stale all session
+TaskUpdate(taskId: B, status: "completed")
+TaskUpdate(taskId: C, status: "completed")
+
+# Right — update immediately after each ship
+Work ticket A → PR → Jira "In Review" → TaskUpdate(taskId: A, status: "completed")
+Work ticket B → PR → Jira "In Review" → TaskUpdate(taskId: B, status: "completed")
+Work ticket C → PR → Jira "In Review" → TaskUpdate(taskId: C, status: "completed")
+```
+
+In batch/parent mode, call `TaskList` at the end of a session to catch any tasks that were missed and update them.

@@ -64,8 +64,9 @@ Follow the full [worktree-workflow skill](../worktree-workflow/SKILL.md):
 6. **Self-review**: run the [self-review phase](../pr-lifecycle/references/self-review.md) to catch rule violations
 7. **Validate**: migrations (`db:status` + `db:up`), then `make pc`
 8. **Ship**: commit, push, [create PR](../pr-lifecycle/references/create-pr.md), transition Jira to "In Review"
+9. **Complete tracking tasks**: call `TaskUpdate(taskId: <id>, status: "completed")` for every task tracking this ticket — **immediately after Jira moves to "In Review"**, before starting any next ticket.
 
-> After shipping, if this ticket is a child of a parent being processed in Parent Mode, return to the parent loop.
+> After shipping, if this ticket is a child of a parent being processed in Parent Mode, mark tasks complete and then return to the parent loop.
 
 #### Parent Mode (has children)
 
@@ -102,6 +103,8 @@ Process children in iterative batches until the backlog is empty.
         - Each child gets its own worktree + branch + PR (one ticket = one PR)
         - After each child's PR is created, transition it to "In Review" (individual
           jira_transition — this happens one child at a time as each PR ships)
+        - Mark the child's tracking task completed (`TaskUpdate(taskId: <id>, status: "completed")`)
+          **before** starting the next child — never batch task updates to the end
         - Clean up the worktree before starting the next child
      f. Release uncompleted: any claimed ticket that did not reach "In Review":
         - If no PR exists → transition back to "To Do" via individual jira_transition
