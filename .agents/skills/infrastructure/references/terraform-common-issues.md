@@ -214,3 +214,77 @@ resource "aws_lambda_function" "my_lambda" {
 ```
 
 The full list of reserved keys is documented in the [AWS Lambda docs](https://docs.aws.amazon.com/lambda/latest/dg/configuration-envvars.html#configuration-envvars-runtime).
+
+---
+
+### Issue: AccessDeniedException on CloudWatch log group in same apply as VPC endpoint policy change
+
+**Symptom**:
+
+```
+AccessDeniedException: logs:PutRetentionPolicy is not allowed because no VPC endpoint policy allows the action
+```
+
+Observed immediately after `aws_vpc_endpoint.logs: Modifications complete after Xs`.
+
+**Cause**: Terraform applies `aws_vpc_endpoint.logs` and `aws_cloudwatch_log_group.*` in parallel by default. The endpoint policy update hasn't propagated to all AZs before the log group API call goes out.
+
+**Solution**: All `aws_cloudwatch_log_group` resources must declare `depends_on = [aws_vpc_endpoint.logs]` to serialize the apply order. If you see this error, it means a new log group was added without the `depends_on` — add it:
+
+```hcl
+resource "aws_cloudwatch_log_group" "my_lambda" {
+  name              = "/aws/lambda/${aws_lambda_function.my_lambda.function_name}"
+  retention_in_days = local.log_retention_days[var.environment]
+
+  tags = local.common_tags
+  depends_on = [aws_vpc_endpoint.logs]
+}
+```
+
+This is a one-time transient failure if `depends_on` is missing — the next apply (with the propagated policy) will succeed, but the `depends_on` prevents recurrence.
+
+---
+
+### Pattern: VPC endpoint policies — use resource scoping, not action allowlists
+
+**Background**: The CW Logs and Secrets Manager VPC endpoints use endpoint policies for cross-account isolation (preventing data exfiltration to external accounts), **not** for API-level access control (IAM role policies handle that).
+
+**Wrong pattern** (action allowlist + wildcard resource): Two separate problems compound here:
+
+1. **`Resource = "*"`** — the more serious issue. Without account-scoped ARNs, the endpoint policy allows access to _any_ account's CloudWatch Logs resources, defeating the cross-account isolation goal.
+2. **Action allowlist** — a maintenance problem: every new Lambda API call requires a policy change, causing repeated CI failures.
+
+```hcl
+# BAD — wildcard resource defeats cross-account isolation;
+#        action allowlist must be updated for every new API call
+policy = jsonencode({
+  Version = "2012-10-17"
+  Statement = [
+    {
+      Effect    = "Allow"
+      Principal = "*"
+      Action    = ["logs:CreateLogGroup", "logs:PutLogEvents", "logs:PutRetentionPolicy"]
+      Resource  = "*"
+    }
+  ]
+})
+```
+
+**Correct pattern** (resource scoping): Wildcard actions scoped to account-namespaced ARNs — new Lambda resources work without policy changes.
+
+```hcl
+# GOOD — any logs:* action on this account's CloudWatch Logs resources
+policy = jsonencode({
+  Version = "2012-10-17"
+  Statement = [
+    {
+      Effect    = "Allow"
+      Principal = "*"
+      Action    = "logs:*"
+      Resource  = "arn:aws:logs:*:${local.account_id}:*"
+    }
+  ]
+})
+```
+
+When adding a new Lambda or Terraform resource that writes to CloudWatch Logs or Secrets Manager: verify the relevant VPC endpoint policy uses the resource-scoping pattern. If it uses an action allowlist, recommend converting it to resource scoping instead of extending the allowlist.
