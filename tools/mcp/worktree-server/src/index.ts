@@ -617,6 +617,11 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
             description:
               'Ticket key, absolute path, or omit for active worktree',
           },
+          worktreeKey: {
+            type: 'string',
+            description:
+              'Alias for worktree. Ticket key, absolute path, or omit for active worktree',
+          },
           amend: {
             type: 'boolean',
             description: 'Amend previous commit (--no-edit)',
@@ -757,6 +762,11 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
             description:
               'Ticket key, absolute path, or omit for active worktree',
           },
+          worktreeKey: {
+            type: 'string',
+            description:
+              'Alias for worktree. Ticket key, absolute path, or omit for active worktree',
+          },
           setUpstream: { type: 'boolean', description: 'Set upstream (-u)' },
         },
       },
@@ -879,6 +889,11 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
             type: 'string',
             description:
               'Ticket key, absolute path, or omit for active worktree',
+          },
+          worktreeKey: {
+            type: 'string',
+            description:
+              'Alias for worktree. Ticket key, absolute path, or omit for active worktree',
           },
         },
       },
@@ -1365,14 +1380,84 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const {
         message,
         files: rawFiles,
-        worktree: wtKey,
+        worktree,
+        worktreeKey,
         amend,
       } = args as {
         message?: string;
         files?: unknown;
-        worktree?: string;
+        worktree?: unknown;
+        worktreeKey?: unknown;
         amend?: boolean;
       };
+      if (worktreeKey !== undefined && typeof worktreeKey !== 'string') {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Invalid worktreeKey: expected string, got ${typeof worktreeKey}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+      if (typeof worktreeKey === 'string' && worktreeKey.trim().length === 0) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Invalid worktreeKey: provided value is empty or whitespace-only. Omit the parameter to use the active worktree.',
+            },
+          ],
+          isError: true,
+        };
+      }
+      if (worktree !== undefined && typeof worktree !== 'string') {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Invalid worktree: expected string, got ${typeof worktree}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+      if (typeof worktree === 'string' && worktree.trim().length === 0) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Invalid worktree: provided value is empty or whitespace-only. Omit the parameter to use the active worktree.',
+            },
+          ],
+          isError: true,
+        };
+      }
+      const normalizedWorktreeKey =
+        typeof worktreeKey === 'string' && worktreeKey.trim().length > 0
+          ? worktreeKey.trim()
+          : undefined;
+      const normalizedWorktree =
+        typeof worktree === 'string' && worktree.trim().length > 0
+          ? worktree.trim()
+          : undefined;
+      if (
+        normalizedWorktreeKey &&
+        normalizedWorktree &&
+        normalizedWorktreeKey !== normalizedWorktree
+      ) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Conflicting parameters: worktreeKey and worktree were both provided with different non-empty values.',
+            },
+          ],
+          isError: true,
+        };
+      }
+      const wtKey = normalizedWorktreeKey ?? normalizedWorktree;
 
       // Normalize and validate files parameter
       const filesResult = normalizeFilesParam(rawFiles);
@@ -2306,10 +2391,79 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     // worktree_push
     // -----------------------------------------------------------------------
     case 'worktree_push': {
-      const { worktree: wtKey, setUpstream } = args as {
-        worktree?: string;
+      const { worktree, worktreeKey, setUpstream } = args as {
+        worktree?: unknown;
+        worktreeKey?: unknown;
         setUpstream?: boolean;
       };
+      if (worktreeKey !== undefined && typeof worktreeKey !== 'string') {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Invalid worktreeKey: expected string, got ${typeof worktreeKey}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+      if (typeof worktreeKey === 'string' && worktreeKey.trim().length === 0) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Invalid worktreeKey: provided value is empty or whitespace-only. Omit the parameter to use the active worktree.',
+            },
+          ],
+          isError: true,
+        };
+      }
+      if (worktree !== undefined && typeof worktree !== 'string') {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Invalid worktree: expected string, got ${typeof worktree}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+      if (typeof worktree === 'string' && worktree.trim().length === 0) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Invalid worktree: provided value is empty or whitespace-only. Omit the parameter to use the active worktree.',
+            },
+          ],
+          isError: true,
+        };
+      }
+      const normalizedWorktreeKey =
+        typeof worktreeKey === 'string' && worktreeKey.trim().length > 0
+          ? worktreeKey.trim()
+          : undefined;
+      const normalizedWorktree =
+        typeof worktree === 'string' && worktree.trim().length > 0
+          ? worktree.trim()
+          : undefined;
+      if (
+        normalizedWorktreeKey &&
+        normalizedWorktree &&
+        normalizedWorktreeKey !== normalizedWorktree
+      ) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Conflicting parameters: worktreeKey and worktree were both provided with different non-empty values.',
+            },
+          ],
+          isError: true,
+        };
+      }
+      const wtKey = normalizedWorktreeKey ?? normalizedWorktree;
 
       const target = resolveTargetDir(wtKey);
       if ('error' in target) {
@@ -3315,7 +3469,78 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     // worktree_status
     // -----------------------------------------------------------------------
     case 'worktree_status': {
-      const { worktree: wtKey } = args as { worktree?: string };
+      const { worktree, worktreeKey } = args as {
+        worktree?: unknown;
+        worktreeKey?: unknown;
+      };
+      if (worktreeKey !== undefined && typeof worktreeKey !== 'string') {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Invalid worktreeKey: expected string, got ${typeof worktreeKey}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+      if (typeof worktreeKey === 'string' && worktreeKey.trim().length === 0) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Invalid worktreeKey: provided value is empty or whitespace-only. Omit the parameter to use the active worktree.',
+            },
+          ],
+          isError: true,
+        };
+      }
+      if (worktree !== undefined && typeof worktree !== 'string') {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Invalid worktree: expected string, got ${typeof worktree}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+      if (typeof worktree === 'string' && worktree.trim().length === 0) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Invalid worktree: provided value is empty or whitespace-only. Omit the parameter to use the active worktree.',
+            },
+          ],
+          isError: true,
+        };
+      }
+      const normalizedWorktreeKey =
+        typeof worktreeKey === 'string' && worktreeKey.trim().length > 0
+          ? worktreeKey.trim()
+          : undefined;
+      const normalizedWorktree =
+        typeof worktree === 'string' && worktree.trim().length > 0
+          ? worktree.trim()
+          : undefined;
+      if (
+        normalizedWorktreeKey &&
+        normalizedWorktree &&
+        normalizedWorktreeKey !== normalizedWorktree
+      ) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Conflicting parameters: worktreeKey and worktree were both provided with different non-empty values.',
+            },
+          ],
+          isError: true,
+        };
+      }
+      const wtKey = normalizedWorktreeKey ?? normalizedWorktree;
 
       const target = resolveTargetDir(wtKey);
       if ('error' in target) {
