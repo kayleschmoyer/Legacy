@@ -19,6 +19,40 @@
 command -v git-lfs >/dev/null 2>&1 || { printf >&2 "\nThis repository is configured for Git LFS but 'git-lfs' was not found on your path. If you no longer wish to use Git LFS, remove this hook by deleting the 'pre-push' file in the hooks directory (set by 'core.hookspath'; usually '.git/hooks').\n\n"; exit 2; }
 git lfs pre-push "$@"
 
+# ---------------------------------------------------------------------------
+# Check 1: Stray lockfiles — reject if package-lock.json or yarn.lock is tracked
+# anywhere in the repo (including subdirectories).
+# This project uses pnpm exclusively; other lockfiles indicate an accidental
+# `npm install` or `yarn install` run.
+# Runs unconditionally — before node_modules / SKIP_PREPUSH_LINT early exits —
+# so it cannot be accidentally bypassed by a docs-only worktree setup.
+# ---------------------------------------------------------------------------
+printf "pre-push: checking for stray lockfiles...\n"
+pkg_lock_files=$(git ls-files | grep -E '(^|/)package-lock\.json$' 2>/dev/null || true)
+if [ -n "$pkg_lock_files" ]; then
+  printf "\nERROR: package-lock.json files are tracked. This project uses pnpm.\n"
+  printf "Offending files:\n"
+  printf "%s\n" "$pkg_lock_files" | sed 's/^/  /'
+  printf "\nFix:\n"
+  printf "%s\n" "$pkg_lock_files" | sed 's/^/  git rm -- "/' | sed 's/$/"/'
+  printf "  corepack enable && make install\n"
+  printf "Then commit the removal and push again.\n"
+  printf "To bypass: git push --no-verify\n"
+  exit 1
+fi
+yarn_lock_files=$(git ls-files | grep -E '(^|/)yarn\.lock$' 2>/dev/null || true)
+if [ -n "$yarn_lock_files" ]; then
+  printf "\nERROR: yarn.lock files are tracked. This project uses pnpm.\n"
+  printf "Offending files:\n"
+  printf "%s\n" "$yarn_lock_files" | sed 's/^/  /'
+  printf "\nFix:\n"
+  printf "%s\n" "$yarn_lock_files" | sed 's/^/  git rm -- "/' | sed 's/$/"/'
+  printf "  make install\n"
+  printf "Then commit the removal and push again.\n"
+  printf "To bypass: git push --no-verify\n"
+  exit 1
+fi
+
 # Skip formatting if node_modules is missing (docs-only worktree without dependencies)
 if [ ! -d "node_modules" ] && [ ! -L "node_modules" ]; then
   exit 0
@@ -31,7 +65,7 @@ if [ "${SKIP_PREPUSH_LINT:-0}" = "1" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Check 1: Conflict markers — reject if any tracked file contains <<<<<<<,
+# Check 2: Conflict markers — reject if any tracked file contains <<<<<<<,
 # =======, or >>>>>>> (7-char markers). Fast (<1s) and catches unresolved
 # conflicts from silent rerere failures that other tools might miss.
 # ---------------------------------------------------------------------------
@@ -46,7 +80,7 @@ if [ -n "$conflict_files" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Check 2: Terraform validate — when terraform files changed, run
+# Check 3: Terraform validate — when terraform files changed, run
 # terraform init -backend=false && terraform validate to catch undeclared
 # variables and syntax errors before CI (~5s).
 # ---------------------------------------------------------------------------

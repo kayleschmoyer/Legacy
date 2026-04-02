@@ -134,6 +134,42 @@ runs:
 
         echo "::endgroup::"
 
+    - name: "📦 Package Manager Enforcement"
+      shell: bash
+      run: |
+        echo "::group::📦 Package Manager Enforcement"
+
+        FAIL=0
+
+        # Find any tracked package-lock.json or yarn.lock files anywhere in the repo
+        LOCKFILES=$(git ls-files | grep -E '(^|/)package-lock\.json$|(^|/)yarn\.lock$' || true)
+
+        if [ -n "$LOCKFILES" ]; then
+          while IFS= read -r lockfile; do
+            if echo "$lockfile" | grep -q 'package-lock\.json$'; then
+              echo "::error::package-lock.json detected at '$lockfile'. This project uses pnpm exclusively."
+              echo "::error::Fix: remove '$lockfile' from git (e.g. 'git rm \"$lockfile\"' and commit), run 'corepack enable' and 'make install'."
+            elif echo "$lockfile" | grep -q 'yarn\.lock$'; then
+              echo "::error::yarn.lock detected at '$lockfile'. This project uses pnpm — remove '$lockfile' from git (e.g. 'git rm \"$lockfile\"' and commit) and use pnpm install."
+            fi
+            FAIL=1
+          done <<< "$LOCKFILES"
+        fi
+
+        if [ "$FAIL" -eq 1 ]; then
+          echo "::endgroup::"
+          exit 1
+        fi
+
+        if [ ! -f "pnpm-lock.yaml" ]; then
+          echo "::error::pnpm-lock.yaml not found. Run 'make install' to generate it."
+          echo "::endgroup::"
+          exit 1
+        fi
+
+        echo "✅ Package manager check passed (pnpm-lock.yaml present, no stray lockfiles)"
+        echo "::endgroup::"
+
     - name: "🔒 Migration Immutability Check"
       id: migration-immutability
       shell: bash
