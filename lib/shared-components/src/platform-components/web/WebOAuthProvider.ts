@@ -102,6 +102,34 @@ function isMobileBrowser(): boolean {
   );
 }
 
+/**
+ * Detect whether FedCM is the only supported One Tap mechanism in this browser.
+ * Returns true for:
+ * - All mobile browsers (FedCM is the only supported mechanism)
+ * - Desktop Chromium-based browsers (Chrome, Edge, Brave, Opera, etc.)
+ *   Chrome 120+ removed the legacy iframe-based One Tap prompt in favor of FedCM.
+ *   Retrying without FedCM on these browsers causes a silent failure — the prompt
+ *   callback fires with a notDisplayedReason and the user never sees One Tap.
+ */
+function isFedCmOnlyBrowser(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  if (isMobileBrowser()) return true;
+  // Chromium-based desktop browsers: match "Chrome/<major>" and gate on 120+
+  // (mobile already handled above). All major Chromium browsers (Chrome, Edge,
+  // Brave, Opera) report a Chrome version token in their UA string.
+  const chromeMatch = navigator.userAgent.match(/Chrome\/(\d+)/);
+  if (!chromeMatch || chromeMatch.length < 2) {
+    return false;
+  }
+
+  const chromeMajor = Number.parseInt(chromeMatch[1], 10);
+  if (Number.isNaN(chromeMajor)) {
+    return false;
+  }
+
+  return chromeMajor >= 120;
+}
+
 class OAuthErrorClass extends Error {
   constructor(
     public code: OAuthErrorCode,
@@ -216,14 +244,14 @@ export class WebOAuthProvider implements OAuthProvider {
     }
 
     // Determine whether to use FedCM: explicit parameter > previous failure > default.
-    // On mobile Chrome (Android), FedCM is the only supported mechanism for One Tap —
-    // the legacy iframe-based prompt does not work on mobile browsers. Always enable
-    // FedCM on mobile to prevent silent failures.
+    // Mobile browsers and desktop Chromium-based browsers (Chrome 120+) only support
+    // FedCM for One Tap — the legacy iframe-based prompt is not available in these
+    // environments. Always enable FedCM for them to prevent silent failures.
     const isLocalhost =
       window.location.hostname === 'localhost' ||
       window.location.hostname === '127.0.0.1';
-    const isMobile = isMobileBrowser();
-    const enableFedCm = isMobile
+    const isFedCmOnly = isFedCmOnlyBrowser();
+    const enableFedCm = isFedCmOnly
       ? true
       : useFedCm !== undefined
         ? useFedCm
@@ -271,17 +299,19 @@ export class WebOAuthProvider implements OAuthProvider {
           if (momentType === 'dismissed' && dismissedReason) {
             LOGGER.warn('One Tap dismissed:', dismissedReason);
 
-            // On mobile browsers, FedCM is the only supported mechanism for
-            // One Tap — retrying without it causes a silent failure (the
-            // iframe-based prompt is not available on mobile). Skip the
-            // FedCM fallback retry entirely on mobile.
+            // Mobile browsers and desktop Chromium-based browsers (Chrome 120+)
+            // only support FedCM for One Tap — the legacy iframe-based prompt
+            // is not available in these environments. Retrying without FedCM
+            // causes a silent failure (prompt callback fires with
+            // notDisplayedReason, user never sees One Tap). Skip the retry.
             //
-            // On desktop, retry without FedCM for any dismissal reason except
-            // 'credential_returned' (credential callback already fired) and
-            // 'user_cancel' (explicit user dismissal — retrying would be
-            // intrusive).
+            // For other desktop browsers (Firefox, Safari) that still support
+            // the iframe-based prompt, retry without FedCM for any dismissal
+            // reason except 'credential_returned' (credential callback already
+            // fired) and 'user_cancel' (explicit user dismissal — retrying
+            // would be intrusive).
             if (
-              !isMobile &&
+              !isFedCmOnly &&
               enableFedCm &&
               !this.fedcmFailed &&
               dismissedReason !== 'credential_returned' &&

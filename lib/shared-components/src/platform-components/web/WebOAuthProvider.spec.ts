@@ -40,14 +40,20 @@ function createMockGoogleAccounts() {
   };
 }
 
-const DESKTOP_USER_AGENT =
+const DESKTOP_CHROME_USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+const DESKTOP_FIREFOX_USER_AGENT =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0';
 
 const MOBILE_CHROME_USER_AGENT =
   'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36';
 
 const IPHONE_SAFARI_USER_AGENT =
   'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
+
+// Alias for clarity in tests that target generic desktop (non-Chromium) behaviour
+const DESKTOP_USER_AGENT = DESKTOP_FIREFOX_USER_AGENT;
 
 describe('WebOAuthProvider', () => {
   const originalUserAgent = navigator.userAgent;
@@ -138,20 +144,29 @@ describe('WebOAuthProvider', () => {
     });
 
     it('should enable FedCM on desktop Chrome (production)', async () => {
-      setUserAgent(DESKTOP_USER_AGENT);
+      setUserAgent(DESKTOP_CHROME_USER_AGENT);
       await configureProvider();
 
       expect(capturedGsiConfig).toBeDefined();
       expect(capturedGsiConfig?.use_fedcm_for_prompt).toBe(true);
     });
 
-    it('should disable FedCM on desktop localhost', async () => {
-      setUserAgent(DESKTOP_USER_AGENT);
+    it('should disable FedCM on desktop Firefox localhost', async () => {
+      setUserAgent(DESKTOP_FIREFOX_USER_AGENT);
       setLocation('localhost');
       await configureProvider();
 
       expect(capturedGsiConfig).toBeDefined();
       expect(capturedGsiConfig?.use_fedcm_for_prompt).toBe(false);
+    });
+
+    it('should still enable FedCM on desktop Chrome localhost (Chrome 120+ requires FedCM regardless)', async () => {
+      setUserAgent(DESKTOP_CHROME_USER_AGENT);
+      setLocation('localhost');
+      await configureProvider();
+
+      expect(capturedGsiConfig).toBeDefined();
+      expect(capturedGsiConfig?.use_fedcm_for_prompt).toBe(true);
     });
 
     it('should still enable FedCM on mobile even on localhost', async () => {
@@ -195,20 +210,40 @@ describe('WebOAuthProvider', () => {
       expect(initializeMock.mock.calls.length).toBe(callCountBeforeDismiss);
     });
 
-    it('should retry without FedCM on desktop when dismissed with cancel_called', async () => {
-      setUserAgent(DESKTOP_USER_AGENT);
+    it('should NOT retry without FedCM on desktop Chrome when dismissed (Chrome 120+ dropped iframe prompt)', async () => {
+      setUserAgent(DESKTOP_CHROME_USER_AGENT);
       await configureProvider();
 
       const initializeMock = window.google?.accounts.id.initialize as jest.Mock;
       const callCountBeforeDismiss = initializeMock.mock.calls.length;
 
-      // Simulate a FedCM dismiss
+      // Simulate a FedCM dismiss that previously triggered a non-FedCM retry
       promptCallback?.({
         getMomentType: () => 'dismissed',
         getDismissedReason: () => 'cancel_called',
       });
 
-      // Should have re-initialized with FedCM disabled
+      // Should NOT have re-initialized — Chrome 120+ does not support the
+      // legacy iframe-based prompt, so retrying without FedCM would silently
+      // fail and the user would never see One Tap.
+      expect(initializeMock.mock.calls.length).toBe(callCountBeforeDismiss);
+    });
+
+    it('should retry without FedCM on desktop Firefox when dismissed with cancel_called', async () => {
+      setUserAgent(DESKTOP_FIREFOX_USER_AGENT);
+      await configureProvider();
+
+      const initializeMock = window.google?.accounts.id.initialize as jest.Mock;
+      const callCountBeforeDismiss = initializeMock.mock.calls.length;
+
+      // Simulate a FedCM dismiss on Firefox (still supports iframe-based prompt)
+      promptCallback?.({
+        getMomentType: () => 'dismissed',
+        getDismissedReason: () => 'cancel_called',
+      });
+
+      // Should have re-initialized with FedCM disabled — Firefox supports the
+      // legacy iframe-based One Tap prompt as a fallback.
       expect(initializeMock.mock.calls.length).toBe(callCountBeforeDismiss + 1);
       const lastCallArgs = initializeMock.mock.calls[
         initializeMock.mock.calls.length - 1
