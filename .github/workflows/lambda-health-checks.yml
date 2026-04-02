@@ -34,7 +34,9 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v6
         with:
-          role-to-assume: arn:aws:iam::176661590736:role/legacy-sports-dev-github-actions
+          # Read-only plan role — health checks only call lambda:GetFunctionConfiguration,
+          # no infrastructure write permissions needed.
+          role-to-assume: arn:aws:iam::176661590736:role/legacy-sports-dev-github-actions-plan
           aws-region: ${{ env.AWS_REGION }}
 
       # -----------------------------------------------------------------------

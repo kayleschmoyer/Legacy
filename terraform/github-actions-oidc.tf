@@ -17,10 +17,12 @@ resource "aws_iam_openid_connect_provider" "github_actions" {
   tags = local.common_tags
 }
 
-# IAM Role for GitHub Actions to assume
+# IAM Role for GitHub Actions apply jobs (post-merge main branch only).
+# Pull-request workflows must use github_actions_plan (read-only) instead.
 resource "aws_iam_role" "github_actions" {
-  name        = "${local.name_prefix}-github-actions"
-  description = "OIDC role assumed by GitHub Actions for CI/CD deployments"
+  name                 = "${local.name_prefix}-github-actions"
+  description          = "OIDC role assumed by GitHub Actions for CI/CD deployments (apply — main branch only)"
+  permissions_boundary = aws_iam_policy.github_actions_boundary.arn
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -36,10 +38,10 @@ resource "aws_iam_role" "github_actions" {
             "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
           }
           StringLike = {
+            # pull_request removed — PR workflows use github_actions_plan (read-only)
             "token.actions.githubusercontent.com:sub" = [
               "repo:bkrupa/legacy-sports:ref:refs/heads/main",
-              "repo:bkrupa/legacy-sports:environment:production",
-              "repo:bkrupa/legacy-sports:pull_request"
+              "repo:bkrupa/legacy-sports:environment:production"
             ]
           }
         }
@@ -702,10 +704,470 @@ resource "aws_iam_role_policy_attachment" "github_actions_supplemental" {
   policy_arn = aws_iam_policy.github_actions_supplemental.arn
 }
 
-# Output the role ARN for GitHub Secrets
+# Output the apply role ARN for GitHub Secrets
 output "github_actions_role_arn" {
-  description = "ARN of the IAM role for GitHub Actions"
+  description = "ARN of the GitHub Actions apply IAM role (main branch only)"
   value       = aws_iam_role.github_actions.arn
+  sensitive   = false
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Permission boundary for the apply role
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# Caps the maximum permissions any policy attached to this role can grant,
+# eliminating the IAM privilege-escalation path where the role could create a
+# legacy-sports-dev-* policy with overly broad permissions and attach it to
+# itself (both iam:CreatePolicy and iam:AttachRolePolicy are scoped only to the
+# name_prefix namespace, so without a boundary the role could craft a
+# legacy-sports-dev-evil policy granting unrestricted IAM or other actions).
+#
+# How it works:
+#   Effective permissions = role policies ∩ boundary
+#   The boundary grants Allow *, then adds explicit Deny statements for the
+#   specific escalation vectors. Deny always wins over Allow in AWS IAM, so
+#   even if an attached policy grants a broader action, the Deny in the
+#   boundary takes precedence.
+resource "aws_iam_policy" "github_actions_boundary" {
+  name        = "${local.name_prefix}-github-actions-boundary"
+  description = "Permission boundary for the GitHub Actions apply role — prevents IAM privilege escalation beyond the project namespace"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      # Broad allow — effective permissions are still bounded by the role's own
+      # inline/attached policies AND by the explicit Deny statements below.
+      {
+        Sid      = "AllowAll"
+        Effect   = "Allow"
+        Action   = "*"
+        Resource = "*"
+      },
+      # Block creating IAM policies outside the project namespace.
+      # Without this, the role could create legacy-sports-dev-evil with
+      # Action: ["iam:*"] Resource: "*" and then attach it to itself.
+      {
+        Sid    = "DenyCreatePolicyOutsideNamespace"
+        Effect = "Deny"
+        Action = [
+          "iam:CreatePolicy",
+          "iam:CreatePolicyVersion"
+        ]
+        NotResource = [
+          "arn:aws:iam::${local.account_id}:policy/${local.name_prefix}-*"
+        ]
+      },
+      # Block attaching policies that are not from the project namespace or AWS managed.
+      # Prevents attaching AdministratorAccess or arbitrary customer-managed policies.
+      {
+        Sid    = "DenyAttachPolicyOutsideNamespace"
+        Effect = "Deny"
+        Action = ["iam:AttachRolePolicy"]
+        Resource = [
+          "arn:aws:iam::${local.account_id}:role/${local.name_prefix}-*"
+        ]
+        Condition = {
+          ArnNotLike = {
+            "iam:PolicyARN" = [
+              "arn:aws:iam::${local.account_id}:policy/${local.name_prefix}-*",
+              "arn:aws:iam::aws:policy/*"
+            ]
+          }
+        }
+      },
+      # Block creating or modifying IAM roles outside the project namespace.
+      {
+        Sid    = "DenyCreateRoleOutsideNamespace"
+        Effect = "Deny"
+        Action = [
+          "iam:CreateRole",
+          "iam:UpdateRole",
+          "iam:DeleteRole"
+        ]
+        NotResource = [
+          "arn:aws:iam::${local.account_id}:role/${local.name_prefix}-*"
+        ]
+      },
+      # Block IAM user and group management entirely — CI should never manage human identities.
+      {
+        Sid    = "DenyUserAndGroupManagement"
+        Effect = "Deny"
+        Action = [
+          "iam:CreateUser",
+          "iam:DeleteUser",
+          "iam:UpdateUser",
+          "iam:AttachUserPolicy",
+          "iam:PutUserPolicy",
+          "iam:DetachUserPolicy",
+          "iam:CreateGroup",
+          "iam:DeleteGroup",
+          "iam:AttachGroupPolicy",
+          "iam:DetachGroupPolicy",
+          "iam:PutGroupPolicy",
+          "iam:CreateAccessKey",
+          "iam:DeleteAccessKey",
+          "iam:UpdateAccessKey"
+        ]
+        Resource = "*"
+      },
+      # Block AWS Organization and account-level actions.
+      {
+        Sid      = "DenyOrganizationActions"
+        Effect   = "Deny"
+        Action   = ["organizations:*", "account:*"]
+        Resource = "*"
+      }
+    ]
+  })
+
+  tags = local.common_tags
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Plan role — read-only, assumed by pull-request workflows
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# Workflows triggered on pull_request (e.g. check-migrations-applied,
+# lambda-health-checks) assume this role instead of the apply role.
+# It cannot modify Lambda functions, secrets, IAM resources, or any other
+# infrastructure write surface. The only write permission granted is the
+# DynamoDB state lock (required by terraform plan) and EC2 security group
+# ingress modification (required by check-migrations-applied.yml to
+# temporarily open port 5432 for GitHub-hosted runners).
+resource "aws_iam_role" "github_actions_plan" {
+  name        = "${local.name_prefix}-github-actions-plan"
+  description = "OIDC role assumed by GitHub Actions PR workflows (read-only — no infrastructure write permissions)"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Federated = aws_iam_openid_connect_provider.github_actions.arn
+        }
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Condition = {
+          StringEquals = {
+            "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
+          }
+          StringLike = {
+            # pull_request: PR workflows (primary use case — no infra write access)
+            # ref:refs/heads/main: workflow_dispatch manual runs on main (e.g. lambda-health-checks,
+            #   check-migrations-applied ad-hoc checks). The plan role is still read-only for
+            #   infrastructure; the main-branch trust only allows health/check workflows to assume it.
+            "token.actions.githubusercontent.com:sub" = [
+              "repo:bkrupa/legacy-sports:pull_request",
+              "repo:bkrupa/legacy-sports:ref:refs/heads/main"
+            ]
+          }
+        }
+      }
+    ]
+  })
+
+  tags = local.common_tags
+}
+
+resource "aws_iam_role_policy" "github_actions_plan_policy" {
+  name = "${local.name_prefix}-github-actions-plan"
+  role = aws_iam_role.github_actions_plan.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      # Terraform state read (plan reads current state from S3)
+      {
+        Sid    = "TerraformStateRead"
+        Effect = "Allow"
+        Action = ["s3:GetObject", "s3:ListBucket"]
+        Resource = [
+          "arn:aws:s3:::legacy-sports-terraform-state",
+          "arn:aws:s3:::legacy-sports-terraform-state/*",
+          "arn:aws:s3:::terraform-state-*",
+          "arn:aws:s3:::terraform-state-*/*"
+        ]
+      },
+      # Terraform state lock (plan acquires a DynamoDB lock to prevent concurrent runs)
+      {
+        Sid    = "TerraformStateLock"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:PutItem",
+          "dynamodb:GetItem",
+          "dynamodb:DeleteItem",
+          "dynamodb:DescribeTable"
+        ]
+        Resource = [
+          "arn:aws:dynamodb:${local.region}:${local.account_id}:table/terraform-state-locks"
+        ]
+      },
+      # IAM read (terraform plan reads role/policy definitions to diff against desired state)
+      {
+        Sid    = "IamRead"
+        Effect = "Allow"
+        Action = [
+          "iam:GetRole",
+          "iam:GetRolePolicy",
+          "iam:GetPolicy",
+          "iam:GetPolicyVersion",
+          "iam:ListRolePolicies",
+          "iam:ListAttachedRolePolicies",
+          "iam:ListPolicyVersions",
+          "iam:ListInstanceProfilesForRole",
+          "iam:GetInstanceProfile",
+          "iam:GetOpenIDConnectProvider"
+        ]
+        Resource = [
+          "arn:aws:iam::${local.account_id}:role/${local.name_prefix}-*",
+          "arn:aws:iam::${local.account_id}:policy/${local.name_prefix}-*",
+          "arn:aws:iam::${local.account_id}:instance-profile/${local.name_prefix}-*",
+          "arn:aws:iam::${local.account_id}:oidc-provider/token.actions.githubusercontent.com"
+        ]
+      },
+      # Lambda read
+      {
+        Sid    = "LambdaRead"
+        Effect = "Allow"
+        Action = [
+          "lambda:GetFunction",
+          "lambda:GetFunctionConfiguration",
+          "lambda:GetFunctionCodeSigningConfig",
+          "lambda:GetPolicy",
+          "lambda:ListTags",
+          "lambda:ListVersionsByFunction",
+          "lambda:GetEventSourceMapping",
+          "lambda:ListEventSourceMappings",
+          "lambda:ListFunctions"
+        ]
+        Resource = "*"
+      },
+      # SSM read (for terraform plan var resolution and check-migrations-applied)
+      {
+        Sid    = "SsmRead"
+        Effect = "Allow"
+        Action = [
+          "ssm:GetParameter",
+          "ssm:GetParameters",
+          "ssm:GetParametersByPath",
+          "ssm:ListTagsForResource"
+        ]
+        Resource = [
+          "arn:aws:ssm:${local.region}:${local.account_id}:parameter/${local.name_prefix}/*",
+          "arn:aws:ssm:${local.region}:${local.account_id}:parameter/legacy-sports/${var.environment}/*",
+          "arn:aws:ssm:${local.region}:${local.account_id}:parameter/github-action-runners/${local.name_prefix}-*"
+        ]
+      },
+      {
+        Sid      = "SsmDescribeParameters"
+        Effect   = "Allow"
+        Action   = ["ssm:DescribeParameters"]
+        Resource = "*"
+      },
+      # Secrets Manager read (for terraform plan and check-migrations-applied DB credentials)
+      {
+        Sid    = "SecretsManagerRead"
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret",
+          "secretsmanager:ListSecretVersionIds",
+          "secretsmanager:GetResourcePolicy"
+        ]
+        Resource = [
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${local.name_prefix}-*",
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:dev/*",
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:legacy-sports-dev-db-creds-*"
+        ]
+      },
+      # CloudWatch Logs read
+      {
+        Sid    = "CloudWatchLogsRead"
+        Effect = "Allow"
+        Action = [
+          "logs:DescribeLogGroups",
+          "logs:DescribeLogStreams",
+          "logs:ListTagsLogGroup",
+          "logs:ListTagsForResource"
+        ]
+        Resource = [
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/lambda/${local.name_prefix}-*",
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/lambda/${local.name_prefix}-*:*",
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/apigateway/${local.name_prefix}-*",
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/apigateway/${local.name_prefix}-*:*",
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group::log-stream:"
+        ]
+      },
+      # EC2 read
+      {
+        Sid      = "Ec2Read"
+        Effect   = "Allow"
+        Action   = ["ec2:Describe*"]
+        Resource = "*"
+      },
+      # EC2 security group ingress — check-migrations-applied.yml temporarily opens/closes
+      # port 5432 on the RDS security group to allow GitHub-hosted runners to reach the DB.
+      {
+        Sid    = "Ec2SgIngressForMigrationCheck"
+        Effect = "Allow"
+        Action = [
+          "ec2:AuthorizeSecurityGroupIngress",
+          "ec2:RevokeSecurityGroupIngress"
+        ]
+        Resource = [
+          "arn:aws:ec2:${local.region}:${local.account_id}:security-group/*"
+        ]
+      },
+      # RDS read
+      {
+        Sid    = "RdsRead"
+        Effect = "Allow"
+        Action = [
+          "rds:DescribeDBInstances",
+          "rds:DescribeDBProxies",
+          "rds:DescribeDBProxyTargetGroups",
+          "rds:DescribeDBProxyTargets",
+          "rds:DescribeDBSubnetGroups",
+          "rds:ListTagsForResource"
+        ]
+        Resource = "*"
+      },
+      # SQS read
+      {
+        Sid    = "SqsRead"
+        Effect = "Allow"
+        Action = ["sqs:GetQueueAttributes", "sqs:ListQueueTags"]
+        Resource = [
+          "arn:aws:sqs:${local.region}:${local.account_id}:${local.name_prefix}-*"
+        ]
+      },
+      # Route53 read
+      {
+        Sid    = "Route53Read"
+        Effect = "Allow"
+        Action = [
+          "route53:GetHostedZone",
+          "route53:ListTagsForResource",
+          "route53:ListResourceRecordSets",
+          "route53:GetChange"
+        ]
+        Resource = "*"
+      },
+      # API Gateway read
+      {
+        Sid    = "ApiGatewayRead"
+        Effect = "Allow"
+        Action = ["apigateway:GET"]
+        Resource = [
+          "arn:aws:apigateway:${local.region}::/restapis",
+          "arn:aws:apigateway:${local.region}::/restapis/*",
+          "arn:aws:apigateway:${local.region}::/apis",
+          "arn:aws:apigateway:${local.region}::/apis/*",
+          "arn:aws:apigateway:${local.region}::/domainnames",
+          "arn:aws:apigateway:${local.region}::/domainnames/*",
+          "arn:aws:apigateway:${local.region}::/account"
+        ]
+      },
+      # DynamoDB read (project tables, not the state-lock table)
+      {
+        Sid    = "DynamoDbRead"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:DescribeTable",
+          "dynamodb:DescribeContinuousBackups",
+          "dynamodb:DescribeTimeToLive",
+          "dynamodb:ListTagsOfResource"
+        ]
+        Resource = [
+          "arn:aws:dynamodb:${local.region}:${local.account_id}:table/${local.name_prefix}-*"
+        ]
+      },
+      # ACM read
+      {
+        Sid      = "AcmRead"
+        Effect   = "Allow"
+        Action   = ["acm:DescribeCertificate", "acm:ListTagsForCertificate", "acm:GetCertificate", "acm:ListCertificates"]
+        Resource = "*"
+      },
+      # CloudWatch alarms read
+      {
+        Sid    = "CloudWatchAlarmsRead"
+        Effect = "Allow"
+        Action = ["cloudwatch:DescribeAlarms", "cloudwatch:ListTagsForResource"]
+        Resource = [
+          "arn:aws:cloudwatch:${local.region}:${local.account_id}:alarm:${local.name_prefix}-*"
+        ]
+      },
+      # SNS read
+      {
+        Sid    = "SnsRead"
+        Effect = "Allow"
+        Action = ["sns:GetTopicAttributes", "sns:ListTagsForResource", "sns:GetSubscriptionAttributes"]
+        Resource = [
+          "arn:aws:sns:${local.region}:${local.account_id}:${local.name_prefix}-*"
+        ]
+      },
+      # EventBridge read
+      {
+        Sid    = "EventBridgeRead"
+        Effect = "Allow"
+        Action = [
+          "events:DescribeRule",
+          "events:DescribeEventBus",
+          "events:ListTargetsByRule",
+          "events:ListRules",
+          "events:ListTagsForResource"
+        ]
+        Resource = [
+          "arn:aws:events:${local.region}:${local.account_id}:rule/${local.name_prefix}-*",
+          "arn:aws:events:${local.region}:${local.account_id}:event-bus/${local.name_prefix}-*"
+        ]
+      },
+      # Budgets read
+      {
+        Sid    = "BudgetsRead"
+        Effect = "Allow"
+        Action = ["budgets:ViewBudget", "budgets:ListTagsForResource"]
+        Resource = [
+          "arn:aws:budgets::${local.account_id}:budget/${local.name_prefix}-*"
+        ]
+      },
+      # S3 read (project buckets including runner-dist)
+      {
+        Sid    = "S3Read"
+        Effect = "Allow"
+        Action = [
+          "s3:ListBucket",
+          "s3:GetBucketPolicy",
+          "s3:GetBucketVersioning",
+          "s3:GetBucketTagging",
+          "s3:GetBucketPublicAccessBlock",
+          "s3:GetBucketAcl",
+          "s3:GetBucketCORS",
+          "s3:GetBucketWebsite",
+          "s3:GetAccelerateConfiguration",
+          "s3:GetBucketRequestPayment",
+          "s3:GetEncryptionConfiguration",
+          "s3:GetLifecycleConfiguration",
+          "s3:GetBucketLogging",
+          "s3:GetReplicationConfiguration",
+          "s3:GetBucketObjectLockConfiguration",
+          "s3:GetBucketOwnershipControls",
+          "s3:GetBucketNotification",
+          "s3:GetObject"
+        ]
+        Resource = [
+          "arn:aws:s3:::${local.name_prefix}-*",
+          "arn:aws:s3:::${local.name_prefix}-*/*"
+        ]
+      }
+    ]
+  })
+}
+
+output "github_actions_plan_role_arn" {
+  description = "ARN of the read-only IAM role for GitHub Actions PR workflows (plan/check jobs)"
+  value       = aws_iam_role.github_actions_plan.arn
   sensitive   = false
 }
 
