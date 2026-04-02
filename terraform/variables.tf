@@ -195,6 +195,12 @@ variable "enable_github_runners" {
   default     = false
 }
 
+variable "enable_ci_runner_db_access" {
+  description = "Create an ingress SG rule allowing self-hosted CI runner subnets (VPC public CIDRs) to reach RDS on port 5432. Decoupled from enable_github_runners so it is managed by the normal Terraform apply loop. Set this to true in addition to enable_github_runners whenever self-hosted runners require DB connectivity."
+  type        = bool
+  default     = false
+}
+
 variable "github_runners_instance_types" {
   description = "EC2 instance types for runners, in priority order (spot fleet diversification)"
   type        = list(string)

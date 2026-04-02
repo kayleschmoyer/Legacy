@@ -90,7 +90,7 @@ resource "aws_security_group_rule" "rds_from_proxy" {
 
 # Self-Hosted CI Runner Access - runners are in the same VPC and connect via private IP
 resource "aws_security_group_rule" "rds_from_ci_runners" {
-  count = var.enable_github_runners ? 1 : 0
+  count = var.enable_ci_runner_db_access ? 1 : 0
 
   type              = "ingress"
   from_port         = 5432
