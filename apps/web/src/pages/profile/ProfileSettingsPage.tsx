@@ -649,8 +649,21 @@ const ProfileSettingsPage: React.FC = () => {
                   </Paragraph>
                 </YStack>
                 <SignOutButton
+                  role="button"
+                  tabIndex={0}
                   onPress={() => {
                     void auth.logout?.();
+                  }}
+                  onKeyDown={(e: React.KeyboardEvent<HTMLDivElement>) => {
+                    if (e.repeat) {
+                      return;
+                    }
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      if (e.key === ' ') {
+                        e.preventDefault();
+                      }
+                      void auth.logout?.();
+                    }
                   }}
                 >
                   <Paragraph

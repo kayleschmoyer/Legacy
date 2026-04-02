@@ -438,12 +438,10 @@ test.describe('League Branding — Color Customization @regression', () => {
     const brandingHeader = page.getByRole('button', {
       name: /League Branding/i,
     });
-    if (await brandingHeader.isVisible()) {
-      await brandingHeader.click();
-      await expect(
-        page.getByRole('heading', { name: /League Branding/i }),
-      ).toBeVisible();
-    }
+    await brandingHeader.click();
+    await expect(
+      page.getByRole('heading', { name: /League Branding/i }),
+    ).toBeVisible({ timeout: 5000 });
 
     const leaguePage = new LeaguePage(page);
     await expect(leaguePage.primaryColorInput).toBeVisible();

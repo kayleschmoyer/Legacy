@@ -4,7 +4,7 @@
  * Covers the Profile Settings page at /profile/settings:
  *   - Page loads and displays heading
  *   - Profile section: username, email, access level, user id fields
- *   - Info banner: "Profile details are managed through your Google account"
+ *   - Info banner includes text: "Email and profile photo are managed through your Google account"
  *   - App Avatar section present
  *   - Account & Security section: sign-in method, session status
  *   - Session/Danger zone: Sign Out button present
@@ -116,7 +116,7 @@ test.describe('Profile Settings Page @smoke', () => {
     await setupProfileGraphQL(page);
     await page.goto('/profile/settings');
 
-    const usernameLabel = page.getByText('Username');
+    const usernameLabel = page.getByText('Username', { exact: true });
     await expect(usernameLabel).toBeVisible();
   });
 
@@ -124,7 +124,7 @@ test.describe('Profile Settings Page @smoke', () => {
     await setupProfileGraphQL(page);
     await page.goto('/profile/settings');
 
-    const emailLabel = page.getByText('Email');
+    const emailLabel = page.getByText('Email', { exact: true });
     await expect(emailLabel).toBeVisible();
   });
 
@@ -143,7 +143,9 @@ test.describe('Profile Settings Page @smoke', () => {
     await page.goto('/profile/settings');
 
     await expect(
-      page.getByText(/Profile details are managed through your Google account/),
+      page.getByText(
+        /Email and profile photo are managed through your Google account/,
+      ),
     ).toBeVisible();
   });
 
@@ -182,7 +184,7 @@ test.describe('Profile Settings Page @smoke', () => {
     await setupProfileGraphQL(page);
     await page.goto('/profile/settings');
 
-    const signOutButton = page.getByRole('button', { name: 'Sign Out' });
+    const signOutButton = page.getByRole('button', { name: /sign out/i });
     await expect(signOutButton).toBeVisible();
   });
 
