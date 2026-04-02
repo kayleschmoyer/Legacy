@@ -160,3 +160,57 @@ terraform apply -auto-approve
 ```
 
 **Note**: The db Lambda deployment script uploads to `db/` prefix but Terraform expects `graphql/` prefix. Always verify after deploying db Lambda.
+
+---
+
+### Issue: Lambda reserved environment variable in Terraform config
+
+**Symptom**: `InvalidParameterValueException: Lambda was unable to configure your environment variables because the environment variables you have provided contains reserved keys`
+**Cause**: Lambda automatically injects certain variables at runtime. Setting them in the Terraform `environment { variables = {} }` block causes an API error.
+
+**Reserved keys (never set these in Terraform)**:
+
+```
+AWS_REGION
+AWS_DEFAULT_REGION
+AWS_ACCESS_KEY_ID
+AWS_SECRET_ACCESS_KEY
+AWS_SESSION_TOKEN
+AWS_LAMBDA_FUNCTION_NAME
+AWS_LAMBDA_FUNCTION_VERSION
+AWS_LAMBDA_FUNCTION_MEMORY_SIZE
+AWS_LAMBDA_LOG_GROUP_NAME
+AWS_LAMBDA_LOG_STREAM_NAME
+AWS_LAMBDA_RUNTIME_API
+AWS_EXECUTION_ENV
+LAMBDA_TASK_ROOT
+LAMBDA_RUNTIME_DIR
+_HANDLER
+_X_AMZN_TRACE_ID
+TZ
+```
+
+**Fix**: Remove the reserved variable from the `variables` block — Lambda provides it automatically at runtime.
+
+```hcl
+# BAD — causes InvalidParameterValueException:
+resource "aws_lambda_function" "my_lambda" {
+  environment {
+    variables = {
+      AWS_REGION   = var.aws_region   # reserved — remove this
+      MY_CUSTOM_VAR = "value"
+    }
+  }
+}
+
+# GOOD — only set custom variables:
+resource "aws_lambda_function" "my_lambda" {
+  environment {
+    variables = {
+      MY_CUSTOM_VAR = "value"
+    }
+  }
+}
+```
+
+The full list of reserved keys is documented in the [AWS Lambda docs](https://docs.aws.amazon.com/lambda/latest/dg/configuration-envvars.html#configuration-envvars-runtime).
