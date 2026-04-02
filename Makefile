@@ -10,7 +10,7 @@
 	android ios build-android build-ios \
 	db-migrate db-studio db-reset db-dump db-restore db-dump-dev db-restore-dev db-check-connections codegen \
 	deploy-lambdas deploy-infrastructure terraform-init terraform-plan terraform-apply terraform-apply-auto terraform-destroy gen-tfvars \
-	runner-apply ami-build ami-list \
+	runner-apply ami-build ami-list runner-secrets-rotate \
 	sync-env check-services graph affected list-projects workspace-lint pr \
 	ci ci-force ci-full release full-deploy full-check dev-setup \
 	fix-windows-locks diagnose kill-stale \
@@ -542,6 +542,14 @@ endif
 ami-list: ## List existing runner AMIs (most recent first)
 	@$(call echo_blue,Listing runner AMIs...)
 	aws ec2 describe-images --owners self --filters "Name=name,Values=legacy-sports-runner-*" --query "Images | sort_by(@, &CreationDate) | reverse(@) | [*].{Name:Name,ImageId:ImageId,Created:CreationDate}" --output table
+
+runner-secrets-rotate: ## Rotate GitHub App webhook secret and walk through private key rotation. Usage: make runner-secrets-rotate [ENVIRONMENT=prod] [DRY_RUN=1]
+	@$(call echo_blue,Rotating runner GitHub App credentials...)
+ifeq ($(DETECTED_OS),Windows)
+	@powershell -NoProfile -ExecutionPolicy Bypass -Command "$$env:ENVIRONMENT = '$(or $(ENVIRONMENT),prod)'; $$env:DRY_RUN = '$(DRY_RUN)'; bash scripts$(PATH_SEP)rotate-runner-secrets.sh"
+else
+	ENVIRONMENT=$(or $(ENVIRONMENT),prod) DRY_RUN=$(DRY_RUN) bash scripts$(PATH_SEP)rotate-runner-secrets.sh
+endif
 
 # Environment Management
 sync-env: ## Sync environment variables

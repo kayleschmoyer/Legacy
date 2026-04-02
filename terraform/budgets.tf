@@ -92,6 +92,21 @@ resource "aws_sns_topic_policy" "ops_alerts" {
           }
         }
       },
+      {
+        # Required for EventBridge rules that target the ops_alerts SNS topic
+        # (e.g., the runner secret rotation reminder).
+        Sid       = "AllowEventBridgePublish"
+        Effect    = "Allow"
+        Principal = { Service = "events.amazonaws.com" }
+        Action    = "SNS:Publish"
+        Resource  = aws_sns_topic.ops_alerts.arn
+        Condition = {
+          StringEquals = {
+            "aws:SourceAccount" = data.aws_caller_identity.current.account_id
+            "aws:SourceArn"     = one(aws_cloudwatch_event_rule.runner_secret_rotation_reminder[*].arn)
+          }
+        }
+      },
     ]
   })
 }
