@@ -408,6 +408,9 @@ jobs:
           name: playwright-blobs
           path: all-blob-reports
 
+      - name: "Enable corepack"
+        run: corepack enable && corepack prepare pnpm@9.12.1 --activate
+
       - name: "Merge Reports"
         id: merge
         run: |
@@ -419,7 +422,7 @@ jobs:
           COUNT=$(find all-blob-reports -name '*.zip' -type f 2>/dev/null | wc -l)
           if [ "$COUNT" -gt 0 ]; then
             echo "has-report=true" >> $GITHUB_OUTPUT
-            npx playwright@1.58.2 merge-reports --reporter html ./all-blob-reports
+            pnpm dlx playwright@1.58.2 merge-reports --reporter html ./all-blob-reports
           else
             echo "has-report=false" >> $GITHUB_OUTPUT
             echo "No blob reports found — skipping deploy"

@@ -87,8 +87,6 @@ runs:
             NX_CMD="pnpm exec nx"
           elif [ -f "node_modules/.bin/nx" ] && node_modules/.bin/nx --version >/dev/null 2>&1; then
             NX_CMD="node_modules/.bin/nx"
-          elif npm exec nx -- --version >/dev/null 2>&1; then
-            NX_CMD="npm exec nx --"
           else
             echo "❌ Nx CLI not available through any method"
             echo "::error::Nx not found. Check dependency installation."
