@@ -49,64 +49,69 @@ resource "aws_sns_topic_policy" "ops_alerts" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
-      {
-        Sid       = "DefaultOwnerAccess"
-        Effect    = "Allow"
-        Principal = { AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root" }
-        Action = [
-          "SNS:Publish",
-          "SNS:Subscribe",
-          "SNS:Receive",
-          "SNS:GetTopicAttributes",
-          "SNS:SetTopicAttributes",
-          "SNS:ListSubscriptionsByTopic",
-          "SNS:AddPermission",
-          "SNS:RemovePermission",
-          "SNS:DeleteTopic",
-        ]
-        Resource = aws_sns_topic.ops_alerts.arn
-      },
-      {
-        Sid       = "AllowBudgetsPublish"
-        Effect    = "Allow"
-        Principal = { Service = "budgets.amazonaws.com" }
-        Action    = "SNS:Publish"
-        Resource  = aws_sns_topic.ops_alerts.arn
-        Condition = {
-          StringEquals = {
-            "aws:SourceAccount" = data.aws_caller_identity.current.account_id
+    Statement = concat(
+      [
+        {
+          Sid       = "DefaultOwnerAccess"
+          Effect    = "Allow"
+          Principal = { AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root" }
+          Action = [
+            "SNS:Publish",
+            "SNS:Subscribe",
+            "SNS:Receive",
+            "SNS:GetTopicAttributes",
+            "SNS:SetTopicAttributes",
+            "SNS:ListSubscriptionsByTopic",
+            "SNS:AddPermission",
+            "SNS:RemovePermission",
+            "SNS:DeleteTopic",
+          ]
+          Resource = aws_sns_topic.ops_alerts.arn
+        },
+        {
+          Sid       = "AllowBudgetsPublish"
+          Effect    = "Allow"
+          Principal = { Service = "budgets.amazonaws.com" }
+          Action    = "SNS:Publish"
+          Resource  = aws_sns_topic.ops_alerts.arn
+          Condition = {
+            StringEquals = {
+              "aws:SourceAccount" = data.aws_caller_identity.current.account_id
+            }
           }
-        }
-      },
-      {
-        # Required for aws_ce_anomaly_subscription to deliver alerts to SNS.
-        Sid       = "AllowCostAnomalyPublish"
-        Effect    = "Allow"
-        Principal = { Service = "costalerts.amazonaws.com" }
-        Action    = "SNS:Publish"
-        Resource  = aws_sns_topic.ops_alerts.arn
-        Condition = {
-          StringEquals = {
-            "aws:SourceAccount" = data.aws_caller_identity.current.account_id
+        },
+        {
+          # Required for aws_ce_anomaly_subscription to deliver alerts to SNS.
+          Sid       = "AllowCostAnomalyPublish"
+          Effect    = "Allow"
+          Principal = { Service = "costalerts.amazonaws.com" }
+          Action    = "SNS:Publish"
+          Resource  = aws_sns_topic.ops_alerts.arn
+          Condition = {
+            StringEquals = {
+              "aws:SourceAccount" = data.aws_caller_identity.current.account_id
+            }
           }
-        }
-      },
-      {
-        # Required for EventBridge rules that target the ops_alerts SNS topic
-        # (e.g., the runner secret rotation reminder).
-        Sid       = "AllowEventBridgePublish"
-        Effect    = "Allow"
-        Principal = { Service = "events.amazonaws.com" }
-        Action    = "SNS:Publish"
-        Resource  = aws_sns_topic.ops_alerts.arn
-        Condition = {
-          StringEquals = {
-            "aws:SourceAccount" = data.aws_caller_identity.current.account_id
-            "aws:SourceArn"     = one(aws_cloudwatch_event_rule.runner_secret_rotation_reminder[*].arn)
+        },
+      ],
+      # Only include the EventBridge statement when runners are enabled — the
+      # rotation reminder EventBridge rule only exists in that case, and
+      # one([]) returns null which produces an invalid SNS policy.
+      var.enable_github_runners ? [
+        {
+          Sid       = "AllowEventBridgePublish"
+          Effect    = "Allow"
+          Principal = { Service = "events.amazonaws.com" }
+          Action    = "SNS:Publish"
+          Resource  = aws_sns_topic.ops_alerts.arn
+          Condition = {
+            StringEquals = {
+              "aws:SourceAccount" = data.aws_caller_identity.current.account_id
+              "aws:SourceArn"     = one(aws_cloudwatch_event_rule.runner_secret_rotation_reminder[*].arn)
+            }
           }
-        }
-      },
-    ]
+        },
+      ] : []
+    )
   })
 }

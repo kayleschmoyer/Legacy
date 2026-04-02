@@ -101,6 +101,15 @@ resource "aws_secretsmanager_secret" "cloudflare_ai_api_token" {
 resource "aws_secretsmanager_secret_version" "cloudflare_ai_api_token" {
   secret_id     = aws_secretsmanager_secret.cloudflare_ai_api_token.id
   secret_string = var.cloudflare_ai_api_token
+
+  # secret_string defaults to "" in CI (not stored in GitHub Secrets). The value
+  # is initially seeded from secrets.auto.tfvars, but with ignore_changes set,
+  # Terraform will ignore all future updates (including local applies). Rotate or
+  # update this secret out-of-band (or by temporarily tainting/removing this
+  # resource) to change the stored token.
+  lifecycle {
+    ignore_changes = [secret_string]
+  }
 }
 
 # One-time import: this block migrates an existing log group into Terraform state.
