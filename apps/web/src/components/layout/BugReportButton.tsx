@@ -428,18 +428,17 @@ export const BugReportButton: React.FC = () => {
                 </YStack>
 
                 {/* Search for similar bugs */}
-                {description.trim().length >= SEARCH_MIN_LENGTH && (
-                  <Button
-                    size="$2"
-                    onPress={handleSearchSimilar}
-                    disabled={searchLoading}
-                    alignSelf="flex-start"
-                  >
-                    {searchLoading
-                      ? 'Searching…'
-                      : 'Search for similar reports'}
-                  </Button>
-                )}
+                <Button
+                  size="$2"
+                  onPress={handleSearchSimilar}
+                  disabled={
+                    searchLoading ||
+                    description.trim().length < SEARCH_MIN_LENGTH
+                  }
+                  alignSelf="flex-start"
+                >
+                  {searchLoading ? 'Searching…' : 'Search for similar reports'}
+                </Button>
 
                 {/* Similar existing bugs */}
                 {similarBugs.length > 0 &&
