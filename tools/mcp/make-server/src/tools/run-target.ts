@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { runMake, getRepoRoot } from '../run-command.js';
 import type { ToolResult } from '../types.js';
 
@@ -82,6 +83,36 @@ function extractErrors(output: string): string[] {
 
   // Deduplicate and limit
   return [...new Set(errorLines)].slice(0, 50);
+}
+
+/**
+ * Parse the list of files rewritten by the formatter from a make pc error message.
+ * Returns the file paths if this is the "formatter rewrote files alongside uncommitted
+ * changes" failure, or null if the output does not match that pattern.
+ */
+function parseFormatterRewrittenFiles(output: string): string[] | null {
+  const marker = 'ERROR: Formatting rewrote the following files:';
+  const markerIdx = output.indexOf(marker);
+  if (markerIdx === -1) return null;
+  if (
+    !output.includes(
+      'You have other uncommitted changes alongside the format fixes',
+    )
+  )
+    return null;
+
+  const afterMarker = output.slice(markerIdx + marker.length);
+  const files: string[] = [];
+  for (const line of afterMarker.split('\n')) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('You have other')) break;
+    if (!trimmed) {
+      if (files.length === 0) continue; // skip leading blank lines before file list
+      break; // blank line after file list — stop
+    }
+    files.push(trimmed);
+  }
+  return files.length > 0 ? files : null;
 }
 
 /**
@@ -282,6 +313,154 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
     const errorMsg = error instanceof Error ? error.message : String(error);
 
     if (STRUCTURED_TARGETS.has(target)) {
+      // Auto-recovery: formatter rewrote files alongside uncommitted changes.
+      // Commit just the formatter-rewritten files so the next make pc run sees
+      // a clean formatter state and can proceed to validate the code.
+      const rewrittenFiles = parseFormatterRewrittenFiles(errorMsg);
+      if (rewrittenFiles && rewrittenFiles.length > 0) {
+        try {
+          // Guard: if the index already has staged changes, --only would sweep
+          // them into the formatter commit.  Bail out with a clear error instead.
+          try {
+            execFileSync(
+              'git',
+              ['-C', workDir, 'diff', '--cached', '--quiet'],
+              {
+                encoding: 'utf8',
+              },
+            );
+          } catch {
+            // Non-zero exit means staged changes exist.
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(
+                    {
+                      success: false,
+                      target,
+                      worktreePath: workDir,
+                      autoFormatterCommit: false,
+                      error:
+                        'Auto-recovery aborted: the git index has staged changes that would be swept into the formatter commit. ' +
+                        'Please commit or unstage your staged changes, then re-run make pc.',
+                    },
+                    null,
+                    2,
+                  ),
+                },
+              ],
+              isError: true,
+            };
+          }
+          execFileSync('git', ['-C', workDir, 'add', '--', ...rewrittenFiles], {
+            encoding: 'utf8',
+          });
+          execFileSync(
+            'git',
+            [
+              '-C',
+              workDir,
+              'commit',
+              '--only',
+              '-m',
+              'style: apply formatting',
+              '--',
+              ...rewrittenFiles,
+            ],
+            { encoding: 'utf8' },
+          );
+          // Retry make pc now that formatter output is committed.
+          try {
+            const retryOutput = await runMake(args, workDir, timeoutMs);
+            const retrySteps = parseSteps(retryOutput);
+            const hasPassedMarker = /All pre-commit checks passed/i.test(
+              retryOutput,
+            );
+            const allPassed =
+              retrySteps.every((s) => s.status !== 'failed') &&
+              (hasPassedMarker || retrySteps.length === 0);
+            const retryResult: Record<string, unknown> = {
+              success: allPassed,
+              target,
+              worktreePath: workDir,
+              autoFormatterCommit: true,
+              summary: allPassed
+                ? `${target} passed (formatter output auto-committed)`
+                : `${target} failed after auto-committing formatter output`,
+            };
+            if (retrySteps.length > 0) retryResult.steps = retrySteps;
+            retryResult.output = truncateOutput(retryOutput, MAX_OUTPUT_CHARS);
+            return {
+              content: [
+                { type: 'text', text: JSON.stringify(retryResult, null, 2) },
+              ],
+              isError: !allPassed,
+            };
+          } catch (retryError) {
+            // Retry also failed — report real errors but flag that formatter was committed.
+            const retryMsg =
+              retryError instanceof Error
+                ? retryError.message
+                : String(retryError);
+            const retrySteps = parseSteps(retryMsg);
+            const retryErrors = extractErrors(retryMsg);
+            const retryResult: Record<string, unknown> = {
+              success: false,
+              target,
+              worktreePath: workDir,
+              autoFormatterCommit: true,
+              summary: `${target} failed (formatter output was auto-committed; fix remaining errors)`,
+            };
+            if (retrySteps.length > 0) retryResult.steps = retrySteps;
+            if (retryErrors.length > 0) retryResult.errors = retryErrors;
+            retryResult.output = truncateOutput(retryMsg, MAX_OUTPUT_CHARS);
+            return {
+              content: [
+                { type: 'text', text: JSON.stringify(retryResult, null, 2) },
+              ],
+              isError: true,
+            };
+          }
+        } catch (gitError) {
+          // Git operations failed — unstage any staged files (best-effort cleanup)
+          // then return a structured error that surfaces the recovery attempt and
+          // git failure reason, so the agent is not misled by the original make pc error.
+          try {
+            execFileSync(
+              'git',
+              ['-C', workDir, 'reset', 'HEAD', '--', ...rewrittenFiles],
+              { encoding: 'utf8' },
+            );
+          } catch {
+            // Ignore — best-effort cleanup only.
+          }
+          const gitErrMsg =
+            gitError instanceof Error
+              ? (gitError as Error & { stderr?: string }).stderr?.trim() ||
+                gitError.message
+              : String(gitError);
+          const gitSteps = parseSteps(errorMsg);
+          const gitErrors = extractErrors(errorMsg);
+          const gitResult: Record<string, unknown> = {
+            success: false,
+            target,
+            worktreePath: workDir,
+            autoFormatterFailed: true,
+            summary: `${target} failed (formatter auto-recovery failed: ${gitErrMsg})`,
+          };
+          if (gitSteps.length > 0) gitResult.steps = gitSteps;
+          if (gitErrors.length > 0) gitResult.errors = gitErrors;
+          gitResult.output = truncateOutput(errorMsg, MAX_OUTPUT_CHARS);
+          return {
+            content: [
+              { type: 'text', text: JSON.stringify(gitResult, null, 2) },
+            ],
+            isError: true,
+          };
+        }
+      }
+
       const steps = parseSteps(errorMsg);
       const errors = extractErrors(errorMsg);
       const result: Record<string, unknown> = {
