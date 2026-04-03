@@ -1,13 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import {
-  Button,
-  Paragraph,
-  XStack,
-  YStack,
-} from '@legacy-sports/shared-components/ui';
+import { Paragraph, XStack, YStack } from '@legacy-sports/shared-components/ui';
 import { Text } from '@legacy-sports/ui-abstractions';
-import { styled } from 'tamagui';
+import { Button, styled } from 'tamagui';
 import {
   ChevronDown,
   ChevronUp,
@@ -16,7 +11,11 @@ import {
   Tag,
 } from '@tamagui/lucide-icons';
 import { BRAND_NAVY_LIGHT } from '../../constants/colors';
-import { NAV_BUTTON_MIN_WIDTH } from '../../constants/dimensions';
+import { NAV_BUTTON_MIN_WIDTH, NAV_Z_INDEX } from '../../constants/dimensions';
+
+// NAV_DROPDOWN_Z_INDEX sits just below the nav bar so it renders above page
+// content (CONTENT_STICKY_Z_INDEX = 100) but does not overlap the nav (200).
+const NAV_DROPDOWN_Z_INDEX = NAV_Z_INDEX - 1;
 
 const DropdownButton = styled(Button, {
   size: '$3',
@@ -58,15 +57,18 @@ const DropdownContent = styled(YStack, {
   elevation: 12,
 });
 
-const MenuItem = styled(Button, {
+/**
+ * MenuItem renders as a styled div — the parent <Link> (anchor) is the
+ * interactive element, so we must not nest a <button> inside it.
+ */
+const MenuItem = styled(YStack, {
   justifyContent: 'flex-start',
-  backgroundColor: 'transparent',
-  borderWidth: 0,
   paddingHorizontal: '$3',
   paddingVertical: '$3',
   borderRadius: '$4',
   width: '100%',
   gap: '$3',
+  cursor: 'pointer',
   hoverStyle: {
     backgroundColor: '$color3',
   },
@@ -184,17 +186,18 @@ export const HelpDropdown: React.FC = () => {
           top="100%"
           left={0}
           marginTop="$2"
-          zIndex={100}
+          zIndex={NAV_DROPDOWN_Z_INDEX}
           role="menu"
           id={menuId}
           aria-labelledby={buttonId}
         >
-          <Link to="/about" style={{ textDecoration: 'none' }}>
-            <MenuItem
-              onPress={() => setIsOpen(false)}
-              role="menuitem"
-              active={location.pathname === '/about'}
-            >
+          <Link
+            to="/about"
+            style={{ textDecoration: 'none', display: 'block' }}
+            onClick={() => setIsOpen(false)}
+            role="menuitem"
+          >
+            <MenuItem active={location.pathname === '/about'}>
               <XStack alignItems="center" gap="$3" flex={1}>
                 <MenuIconBox>
                   <Info size={20} color="$color" />
@@ -219,12 +222,13 @@ export const HelpDropdown: React.FC = () => {
             </MenuItem>
           </Link>
 
-          <Link to="/help" style={{ textDecoration: 'none' }}>
-            <MenuItem
-              onPress={() => setIsOpen(false)}
-              role="menuitem"
-              active={location.pathname === '/help'}
-            >
+          <Link
+            to="/help"
+            style={{ textDecoration: 'none', display: 'block' }}
+            onClick={() => setIsOpen(false)}
+            role="menuitem"
+          >
+            <MenuItem active={location.pathname === '/help'}>
               <XStack alignItems="center" gap="$3" flex={1}>
                 <MenuIconBox>
                   <HelpCircle size={20} color="$color" />
@@ -249,12 +253,13 @@ export const HelpDropdown: React.FC = () => {
             </MenuItem>
           </Link>
 
-          <Link to="/pricing" style={{ textDecoration: 'none' }}>
-            <MenuItem
-              onPress={() => setIsOpen(false)}
-              role="menuitem"
-              active={location.pathname === '/pricing'}
-            >
+          <Link
+            to="/pricing"
+            style={{ textDecoration: 'none', display: 'block' }}
+            onClick={() => setIsOpen(false)}
+            role="menuitem"
+          >
+            <MenuItem active={location.pathname === '/pricing'}>
               <XStack alignItems="center" gap="$3" flex={1}>
                 <MenuIconBox>
                   <Tag size={20} color="$color" />
