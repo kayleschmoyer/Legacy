@@ -692,6 +692,122 @@ describe('PlayerStatsDataGrid - Error Handling', () => {
       ).not.toBeInTheDocument();
     });
   });
+
+  test('clicking AVG column header dispatches orderBy battingAverage (LS-1920)', async () => {
+    // Mock for initial load (default homeRuns sort)
+    const initialMock: MockedResponse = {
+      request: {
+        query: CAREER_BATTING_STATS_QUERY,
+        variables: {
+          first: 25,
+          after: undefined,
+          orderBy: 'homeRuns',
+          orderDirection: 'desc',
+          minGames: 0,
+          minHomeRuns: 0,
+          minRBI: 0,
+          minBattingAvg: 0,
+          searchTerm: '',
+        },
+      },
+      result: {
+        data: {
+          careerBattingStats: {
+            __typename: 'CareerBattingConnection',
+            edges: mockPlayerData.slice(0, 1).map((player, index) => ({
+              __typename: 'CareerBattingEdge',
+              node: player,
+              cursor: `cursor-${index}`,
+            })),
+            pageInfo: {
+              __typename: 'PageInfo',
+              hasNextPage: false,
+              hasPreviousPage: false,
+              startCursor: 'cursor-0',
+              endCursor: 'cursor-0',
+            },
+            totalCount: 1,
+          },
+        },
+      },
+    };
+
+    // Mock for after clicking AVG (battingAverage sort, desc) — returns a different player
+    // so the test can assert that the new query was actually executed.
+    const avgSortedPlayer: CareerBattingStatsRaw = {
+      ...mockPlayerData[1],
+      playerId: 9999,
+      player: {
+        __typename: 'Player',
+        id: 9999,
+        firstName: 'AvgSorted',
+        lastName: 'Leader',
+        brefId: 'avgsortedleader',
+      },
+      battingAverage: 0.425,
+    };
+    const avgSortMock: MockedResponse = {
+      request: {
+        query: CAREER_BATTING_STATS_QUERY,
+        variables: {
+          first: 25,
+          after: undefined,
+          orderBy: 'battingAverage',
+          orderDirection: 'desc',
+          minGames: 0,
+          minHomeRuns: 0,
+          minRBI: 0,
+          minBattingAvg: 0,
+          searchTerm: '',
+        },
+      },
+      result: {
+        data: {
+          careerBattingStats: {
+            __typename: 'CareerBattingConnection',
+            edges: [
+              {
+                __typename: 'CareerBattingEdge',
+                node: avgSortedPlayer,
+                cursor: 'cursor-0',
+              },
+            ],
+            pageInfo: {
+              __typename: 'PageInfo',
+              hasNextPage: false,
+              hasPreviousPage: false,
+              startCursor: 'cursor-0',
+              endCursor: 'cursor-0',
+            },
+            totalCount: 1,
+          },
+        },
+      },
+    };
+
+    render(
+      <TestWrapper mocks={[initialMock, avgSortMock, playersQueryMock]}>
+        <PlayerStatsDataGrid {...defaultProps} />
+      </TestWrapper>,
+    );
+
+    // Wait for initial data to load
+    await waitFor(() => {
+      expect(screen.getByText('Player 1486')).toBeInTheDocument();
+    });
+
+    // Click the AVG column header to trigger battingAverage sort
+    const avgHeader = screen.getByText('AVG');
+    fireEvent.click(avgHeader);
+
+    // Assert that the sort mock was consumed: the distinct player from the sort
+    // response should appear in the DOM, proving a new query with
+    // orderBy: 'battingAverage' was actually fired.
+    await waitFor(() => {
+      expect(screen.getByText('AvgSorted Leader')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Player 1486')).not.toBeInTheDocument();
+  });
 });
 
 // =============================================================================

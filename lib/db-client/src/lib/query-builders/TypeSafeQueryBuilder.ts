@@ -141,6 +141,11 @@ export class CareerBattingQueryBuilder {
         gte(PublicSchema.careerBatting.rbi, filters.minRBI),
       );
     }
+    if (filters.minBattingAvg !== undefined) {
+      battingConditions.push(
+        sql`${PublicSchema.careerBatting.ab} > 0 AND (${PublicSchema.careerBatting.h}::numeric / ${PublicSchema.careerBatting.ab}::numeric) >= ${filters.minBattingAvg}`,
+      );
+    }
 
     // Determine ordering clause
     const orderByClause = this.getOrderByClause(options);
@@ -499,6 +504,11 @@ export class CareerBattingQueryBuilder {
         gte(PublicSchema.careerBatting.rbi, filters.minRBI),
       );
     }
+    if (filters.minBattingAvg !== undefined) {
+      battingConditions.push(
+        sql`${PublicSchema.careerBatting.ab} > 0 AND (${PublicSchema.careerBatting.h}::numeric / ${PublicSchema.careerBatting.ab}::numeric) >= ${filters.minBattingAvg}`,
+      );
+    }
 
     // Add search condition if provided
     const allConditions = [...battingConditions];
@@ -557,6 +567,11 @@ export class CareerBattingQueryBuilder {
     if (filters.minRBI !== undefined) {
       conditions.push(gte(PublicSchema.careerBatting.rbi, filters.minRBI));
     }
+    if (filters.minBattingAvg !== undefined) {
+      conditions.push(
+        sql`${PublicSchema.careerBatting.ab} > 0 AND (${PublicSchema.careerBatting.h}::numeric / ${PublicSchema.careerBatting.ab}::numeric) >= ${filters.minBattingAvg}`,
+      );
+    }
 
     // Build query using function-based approach
     const baseQuery = () =>
@@ -596,6 +611,11 @@ export class CareerBattingQueryBuilder {
     }
     if (filters.minRBI !== undefined) {
       conditions.push(gte(PublicSchema.careerBatting.rbi, filters.minRBI));
+    }
+    if (filters.minBattingAvg !== undefined) {
+      conditions.push(
+        sql`${PublicSchema.careerBatting.ab} > 0 AND (${PublicSchema.careerBatting.h}::numeric / ${PublicSchema.careerBatting.ab}::numeric) >= ${filters.minBattingAvg}`,
+      );
     }
     if (filters.position) {
       conditions.push(
@@ -649,6 +669,11 @@ export class CareerBattingQueryBuilder {
     }
     if (filters.minRBI !== undefined) {
       conditions.push(gte(PublicSchema.careerBatting.rbi, filters.minRBI));
+    }
+    if (filters.minBattingAvg !== undefined) {
+      conditions.push(
+        sql`${PublicSchema.careerBatting.ab} > 0 AND (${PublicSchema.careerBatting.h}::numeric / ${PublicSchema.careerBatting.ab}::numeric) >= ${filters.minBattingAvg}`,
+      );
     }
     if (filters.position) {
       conditions.push(

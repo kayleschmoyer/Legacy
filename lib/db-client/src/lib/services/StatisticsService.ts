@@ -153,6 +153,7 @@ export class StatisticsService {
       minGames: queryOptions.filters?.minGames,
       minHomeRuns: queryOptions.filters?.minHomeRuns,
       minRBI: queryOptions.filters?.minRBI,
+      minBattingAvg: queryOptions.filters?.minBattingAvg,
       minWins: queryOptions.filters?.minWins,
       minStrikeouts: queryOptions.filters?.minStrikeouts,
       searchTerm: queryOptions.filters?.searchTerm,
