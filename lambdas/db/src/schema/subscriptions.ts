@@ -6,7 +6,7 @@ import {
   runWithInternalClient,
 } from '@legacy-sports/db-client';
 import { and, eq, gte, sql } from 'drizzle-orm';
-import type Stripe from 'stripe';
+import Stripe from 'stripe';
 import { getDbOptions } from '@legacy-sports/utils/node';
 import { LOGGER } from '@legacy-sports/logging';
 import { builder } from './builder';
@@ -26,6 +26,15 @@ import { getStripeClient } from '../server/stripe';
 const STRIPE_TRIAL_PERIOD_DAYS = process.env['STRIPE_TRIAL_PERIOD_DAYS']
   ? parseInt(process.env['STRIPE_TRIAL_PERIOD_DAYS'], 10)
   : undefined;
+
+// Allowlist of valid Stripe Price IDs for subscription plans.
+// When populated, only these IDs are accepted in createCheckoutSession.
+const STRIPE_ALLOWED_PRICE_IDS: ReadonlySet<string> = new Set(
+  [
+    process.env['STRIPE_MONTHLY_PRICE_ID'],
+    process.env['STRIPE_ANNUAL_PRICE_ID'],
+  ].filter((id): id is string => Boolean(id)),
+);
 
 // ─── Object Types ────────────────────────────────────────────────────────────
 
@@ -261,6 +270,21 @@ builder.mutationField('createCheckoutSession', (t) =>
       if (!context.user) throw AuthenticationError();
       requireNotImpersonating(context);
 
+      if (!args.priceId || !args.priceId.startsWith('price_')) {
+        throw UserInputError(
+          'Invalid or missing Stripe price ID. Please contact support if this issue persists.',
+        );
+      }
+
+      if (
+        STRIPE_ALLOWED_PRICE_IDS.size > 0 &&
+        !STRIPE_ALLOWED_PRICE_IDS.has(args.priceId)
+      ) {
+        throw UserInputError(
+          'The provided price ID is not a recognized subscription plan. Please contact support if this issue persists.',
+        );
+      }
+
       const { id: userId, email } = context.user;
       const stripe = await getStripeClient();
 
@@ -288,23 +312,38 @@ builder.mutationField('createCheckoutSession', (t) =>
         email ?? '',
       );
 
-      const session = await stripe.checkout.sessions.create({
-        customer: customer.id,
-        mode: 'subscription',
-        line_items: [{ price: args.priceId, quantity: 1 }],
-        success_url: args.successUrl,
-        cancel_url: args.cancelUrl,
-        metadata: { userId: String(userId) },
-        subscription_data: {
-          // Always propagate userId so trial_will_end and other subscription
-          // events can correlate back to our user record without a DB lookup.
+      let session: Awaited<ReturnType<typeof stripe.checkout.sessions.create>>;
+      try {
+        session = await stripe.checkout.sessions.create({
+          customer: customer.id,
+          mode: 'subscription',
+          line_items: [{ price: args.priceId, quantity: 1 }],
+          success_url: args.successUrl,
+          cancel_url: args.cancelUrl,
           metadata: { userId: String(userId) },
-          ...(typeof STRIPE_TRIAL_PERIOD_DAYS === 'number' &&
-          STRIPE_TRIAL_PERIOD_DAYS > 0
-            ? { trial_period_days: STRIPE_TRIAL_PERIOD_DAYS }
-            : {}),
-        },
-      });
+          subscription_data: {
+            // Always propagate userId so trial_will_end and other subscription
+            // events can correlate back to our user record without a DB lookup.
+            metadata: { userId: String(userId) },
+            ...(typeof STRIPE_TRIAL_PERIOD_DAYS === 'number' &&
+            STRIPE_TRIAL_PERIOD_DAYS > 0
+              ? { trial_period_days: STRIPE_TRIAL_PERIOD_DAYS }
+              : {}),
+          },
+        });
+      } catch (err) {
+        if (err instanceof Stripe.errors.StripeInvalidRequestError) {
+          LOGGER.warn('Stripe rejected checkout session creation', {
+            userId,
+            priceId: args.priceId,
+            message: err.message,
+          });
+          throw UserInputError(
+            'The selected plan could not be processed. Please contact support if this issue persists.',
+          );
+        }
+        throw err;
+      }
 
       if (!session.url) {
         throw new Error('Stripe checkout session was created without a URL');

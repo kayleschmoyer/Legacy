@@ -560,6 +560,13 @@ const SubscriptionPage: React.FC = () => {
         ? env.stripeAnnualPriceId
         : env.stripeMonthlyPriceId;
 
+    if (!priceId || !priceId.startsWith('price_')) {
+      alert(
+        'Upgrade is temporarily unavailable. Please try again later or contact support.',
+      );
+      return;
+    }
+
     const value = billingCycle === 'annual' ? ANNUAL_TOTAL : MONTHLY_PRICE;
     trackBeginCheckout(billingCycle, value);
     sessionStorage.setItem('upgrade_billing_cycle', billingCycle);
