@@ -270,6 +270,84 @@ const TWO_WAY_CAREER_ARC = {
   },
 };
 
+/**
+ * Career Arc data with two rows for the same season (1939) — simulates a
+ * mid-season trade where the player has one row per team. Deduplication should
+ * collapse these into a single data point, keeping the row with more games.
+ */
+const DUPLICATE_SEASON_CAREER_ARC = {
+  data: {
+    player: {
+      __typename: 'Player',
+      firstName: 'Bud',
+      lastName: 'Hafey',
+      eligiblePositions: ['OF'],
+      careerAchievements: {
+        allStarSelections: 0,
+        goldGloves: 0,
+        silverSluggers: 0,
+        mvpAwards: 0,
+        cyYoungAwards: 0,
+        hallOfFame: false,
+        rookieOfTheYear: false,
+      },
+    },
+    playerSeasonBatting: [
+      {
+        // First team in 1939 (fewer games — should be dropped by deduplication)
+        season: 1939,
+        team: 'CIN',
+        games: 20,
+        hits: 15,
+        atBats: 55,
+        homeRuns: 1,
+        rbi: 8,
+        stolenBases: 0,
+        battingAverage: 0.273,
+        onBasePercentage: 0.31,
+        sluggingPercentage: 0.345,
+        onBasePlusSlugging: 0.655,
+        onBasePlusSluggingPlus: 88,
+        awardSummary: null,
+      },
+      {
+        // Second team in 1939 (more games — should be kept by deduplication)
+        season: 1939,
+        team: 'STL',
+        games: 75,
+        hits: 52,
+        atBats: 190,
+        homeRuns: 4,
+        rbi: 28,
+        stolenBases: 2,
+        battingAverage: 0.274,
+        onBasePercentage: 0.32,
+        sluggingPercentage: 0.395,
+        onBasePlusSlugging: 0.715,
+        onBasePlusSluggingPlus: 95,
+        awardSummary: null,
+      },
+      {
+        season: 1938,
+        team: 'CIN',
+        games: 110,
+        hits: 88,
+        atBats: 320,
+        homeRuns: 6,
+        rbi: 42,
+        stolenBases: 3,
+        battingAverage: 0.275,
+        onBasePercentage: 0.33,
+        sluggingPercentage: 0.41,
+        onBasePlusSlugging: 0.74,
+        onBasePlusSluggingPlus: 98,
+        awardSummary: null,
+      },
+    ],
+    playerSeasonPitching: [],
+  },
+};
+
 /** Minimal player list for the stats table (one player row). */
 const STATS_TABLE_RESPONSE = {
   data: {
@@ -638,6 +716,51 @@ test.describe('Player Detail Modal – stat data values @regression', () => {
     // 2024 season: 145 G, 28 HR, 85 RBI
     await expect(dialog.getByText('2024', { exact: true })).toBeVisible();
     await expect(dialog.getByText('145').first()).toBeVisible();
+  });
+});
+
+// ── Tests: Duplicate-season deduplication ───────────────────────────────────
+
+test.describe('Player Detail Modal – duplicate season deduplication @regression', () => {
+  test('two rows for the same season collapse to one data point (Seasons = 2, not 3)', async ({
+    page,
+  }) => {
+    await setupMocks(page, { careerArcBody: DUPLICATE_SEASON_CAREER_ARC });
+    await page.goto('/players/1');
+    await page.waitForLoadState('networkidle');
+
+    const dialog = page.locator('div[role="dialog"]');
+    await expect(dialog).toBeVisible();
+    await expect(page.getByTestId('player-detail-loading')).not.toBeVisible();
+
+    const arcTab = dialog.getByText('Career Arc', { exact: true });
+    await expect(arcTab).toBeVisible();
+    await arcTab.click({ force: true });
+    await expect(dialog.getByText('Peak OPS')).toBeVisible();
+
+    // The career arc header should show "2" seasons (1938 + 1939), not "3"
+    // because the two 1939 rows (CIN + STL) should be deduplicated into one.
+    await expect(dialog.getByText('Seasons').first()).toBeVisible();
+    await expect(dialog.getByText('2').first()).toBeVisible();
+  });
+
+  test('deduplication keeps the row with more games (STL 1939, OPS 0.715)', async ({
+    page,
+  }) => {
+    await setupMocks(page, { careerArcBody: DUPLICATE_SEASON_CAREER_ARC });
+    await page.goto('/players/1');
+    await page.waitForLoadState('networkidle');
+
+    const dialog = page.locator('div[role="dialog"]');
+    await expect(dialog).toBeVisible();
+    await expect(page.getByTestId('player-detail-loading')).not.toBeVisible();
+
+    const arcTab = dialog.getByText('Career Arc', { exact: true });
+    await expect(arcTab).toBeVisible();
+    await arcTab.click({ force: true });
+    // Peak OPS should be from 1938 season (0.740 > 0.715)
+    await expect(dialog.getByText('Peak OPS')).toBeVisible();
+    await expect(dialog.getByText('0.740')).toBeVisible();
   });
 });
 

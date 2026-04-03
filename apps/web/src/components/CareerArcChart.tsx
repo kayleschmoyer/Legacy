@@ -105,46 +105,74 @@ function getAwardMarkers(dataPoints: ChartDataPoint[]): MilestoneMarker[] {
 
 // ─── Data transformation ────────────────────────────────────────────────────
 
+function shouldReplaceSeasonPoint(
+  candidate: ChartDataPoint,
+  existing: ChartDataPoint,
+): boolean {
+  if (candidate.games !== existing.games) {
+    return candidate.games > existing.games;
+  }
+
+  if (candidate.value !== existing.value) {
+    return candidate.value > existing.value;
+  }
+
+  return candidate.team.localeCompare(existing.team) < 0;
+}
+
+function deduplicateBySeason(points: ChartDataPoint[]): ChartDataPoint[] {
+  const bySeasonMap = new Map<number, ChartDataPoint>();
+  for (const point of points) {
+    const existing = bySeasonMap.get(point.season);
+    if (!existing || shouldReplaceSeasonPoint(point, existing)) {
+      bySeasonMap.set(point.season, point);
+    }
+  }
+  return Array.from(bySeasonMap.values());
+}
+
 function buildBattingData(seasons: BattingSeason[]): ChartDataPoint[] {
-  return seasons
-    .filter(
-      (s) =>
-        s.season != null &&
-        s.games != null &&
-        s.games > 0 &&
-        s.onBasePlusSlugging != null,
-    )
-    .map((s) => ({
-      season: s.season as number,
-      value: s.onBasePlusSlugging as number,
-      secondary: s.homeRuns ?? 0,
-      team: s.team ?? '',
-      awards: s.awardSummary ?? null,
-      isPeak: false,
-      games: s.games ?? 0,
-    }))
-    .sort((a, b) => a.season - b.season);
+  return deduplicateBySeason(
+    seasons
+      .filter(
+        (s) =>
+          s.season != null &&
+          s.games != null &&
+          s.games > 0 &&
+          s.onBasePlusSlugging != null,
+      )
+      .map((s) => ({
+        season: s.season as number,
+        value: s.onBasePlusSlugging as number,
+        secondary: s.homeRuns ?? 0,
+        team: s.team ?? '',
+        awards: s.awardSummary ?? null,
+        isPeak: false,
+        games: s.games ?? 0,
+      })),
+  ).sort((a, b) => a.season - b.season);
 }
 
 function buildPitchingData(seasons: PitchingSeason[]): ChartDataPoint[] {
-  return seasons
-    .filter(
-      (s) =>
-        s.season != null &&
-        s.games != null &&
-        s.games > 0 &&
-        s.earnedRunAveragePlus != null,
-    )
-    .map((s) => ({
-      season: s.season as number,
-      value: s.earnedRunAveragePlus as number,
-      secondary: s.strikeouts ?? 0,
-      team: s.team ?? '',
-      awards: s.awardSummary ?? null,
-      isPeak: false,
-      games: s.games ?? 0,
-    }))
-    .sort((a, b) => a.season - b.season);
+  return deduplicateBySeason(
+    seasons
+      .filter(
+        (s) =>
+          s.season != null &&
+          s.games != null &&
+          s.games > 0 &&
+          s.earnedRunAveragePlus != null,
+      )
+      .map((s) => ({
+        season: s.season as number,
+        value: s.earnedRunAveragePlus as number,
+        secondary: s.strikeouts ?? 0,
+        team: s.team ?? '',
+        awards: s.awardSummary ?? null,
+        isPeak: false,
+        games: s.games ?? 0,
+      })),
+  ).sort((a, b) => a.season - b.season);
 }
 
 function markPeakSeasons(data: ChartDataPoint[], topN = 3): ChartDataPoint[] {
