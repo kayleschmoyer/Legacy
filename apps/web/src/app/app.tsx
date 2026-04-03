@@ -56,7 +56,7 @@ import { useWebPushRegistration } from '../hooks/useWebPushRegistration';
 import { ImpersonationBanner } from '../components/ImpersonationBanner';
 import { ApolloErrorToast } from '../components/layout/ApolloErrorToast';
 import { BRAND_GOLD } from '../constants/colors';
-import { NAV_Z_INDEX } from '../constants/dimensions';
+import { NAV_BUTTON_MIN_WIDTH, NAV_Z_INDEX } from '../constants/dimensions';
 
 /* ────────────────────────────────────────────────────────
  * Lazy-loaded routes — these pages are split into separate
@@ -171,6 +171,7 @@ const NavLinkButton = styled(Button, {
   paddingHorizontal: '$4',
   gap: '$2',
   flexShrink: 0,
+  minWidth: NAV_BUTTON_MIN_WIDTH,
   hoverStyle: {
     backgroundColor: '$color3',
   },

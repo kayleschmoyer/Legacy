@@ -16,6 +16,7 @@ import {
   Tag,
 } from '@tamagui/lucide-icons';
 import { BRAND_NAVY_LIGHT } from '../../constants/colors';
+import { NAV_BUTTON_MIN_WIDTH } from '../../constants/dimensions';
 
 const DropdownButton = styled(Button, {
   size: '$3',
@@ -24,6 +25,7 @@ const DropdownButton = styled(Button, {
   borderWidth: 0,
   borderRadius: '$10',
   paddingHorizontal: '$4',
+  minWidth: NAV_BUTTON_MIN_WIDTH,
   hoverStyle: {
     backgroundColor: '$color3',
   },

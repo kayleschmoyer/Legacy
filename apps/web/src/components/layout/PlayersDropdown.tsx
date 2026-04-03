@@ -24,6 +24,7 @@ const DropdownButton = styled(Button, {
   borderWidth: 0,
   borderRadius: '$10',
   paddingHorizontal: '$4',
+  minWidth: 100,
   hoverStyle: {
     backgroundColor: '$color3',
   },

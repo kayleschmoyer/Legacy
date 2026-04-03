@@ -11,6 +11,7 @@ import { Text } from '@legacy-sports/ui-abstractions';
 import { styled } from 'tamagui';
 import { ChevronDown, ChevronUp, Trophy } from '@tamagui/lucide-icons';
 import { useGetUserLeaguesQuery } from '../../api/db/graphql.generated';
+import { NAV_BUTTON_MIN_WIDTH } from '../../constants/dimensions';
 
 const DropdownButton = styled(Button, {
   size: '$3',
@@ -19,6 +20,7 @@ const DropdownButton = styled(Button, {
   borderWidth: 0,
   borderRadius: '$10',
   paddingHorizontal: '$4',
+  minWidth: NAV_BUTTON_MIN_WIDTH,
   hoverStyle: {
     backgroundColor: '$color3',
   },

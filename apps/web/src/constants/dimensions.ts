@@ -34,3 +34,13 @@ export const NAV_Z_INDEX = 200;
  * (e.g. the roster management header).  Must be lower than NAV_Z_INDEX.
  */
 export const CONTENT_STICKY_Z_INDEX = 100;
+
+/**
+ * Minimum width (px) applied to every desktop nav button — both NavLinkButton
+ * in app.tsx and DropdownButton components (MyLeaguesDropdown, HelpDropdown).
+ *
+ * Sized to the widest label ("My Leagues" + trophy icon + chevron) so all
+ * buttons share a consistent width and do not shift when the active font-weight
+ * changes.
+ */
+export const NAV_BUTTON_MIN_WIDTH = 120;
