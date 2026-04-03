@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { autoFix } from './tools/auto-fix.js';
 import { dispatchWorkflow } from './tools/dispatch-workflow.js';
 import { getLogs } from './tools/get-logs.js';
+import { getPlaywrightReport } from './tools/get-playwright-report.js';
 import { listRuns } from './tools/list-runs.js';
 import { rerun } from './tools/rerun.js';
 import { searchLogs } from './tools/search-logs.js';
@@ -222,6 +223,23 @@ server.tool(
       ),
   },
   async (params) => dispatchWorkflow(params),
+);
+
+server.tool(
+  'ci_get_playwright_report',
+  'Read a Playwright E2E test report deployed to legacy-sports-deploys. ' +
+    'Returns overall stats (total/passed/failed/skipped/flaky), per-file breakdowns, ' +
+    'and lists of failed/flaky test titles. ' +
+    'Report names follow the pattern "pr-{number}" (for PRs) or "{run_id}" (for push/nightly runs). ' +
+    'Example: ci_get_playwright_report({ reportName: "pr-2173" })',
+  {
+    reportName: z
+      .string()
+      .describe(
+        'Report name as deployed (e.g. "pr-2173" for PR #2173, or the GitHub run ID for push/nightly)',
+      ),
+  },
+  async (params) => getPlaywrightReport(params),
 );
 
 const transport = new StdioServerTransport();

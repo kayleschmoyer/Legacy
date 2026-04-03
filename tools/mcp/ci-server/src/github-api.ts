@@ -29,7 +29,7 @@ export function getRepoRoot(): string {
 }
 
 /** Resolve the GitHub token from env or fall back to `gh auth token`. */
-async function getToken(): Promise<string> {
+export async function getToken(): Promise<string> {
   const envToken = process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN;
   if (envToken) return envToken;
 
@@ -90,7 +90,7 @@ async function ensureAuth(): Promise<{ token: string; slug: string }> {
   return { token: cachedToken, slug: cachedSlug };
 }
 
-function buildHeaders(token: string): Record<string, string> {
+export function buildHeaders(token: string): Record<string, string> {
   return {
     Authorization: `Bearer ${token}`,
     Accept: 'application/vnd.github+json',
