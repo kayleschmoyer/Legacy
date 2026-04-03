@@ -296,6 +296,21 @@ build {
     ]
   }
 
+  # Amazon CloudWatch Agent (required by the github-aws-runners module when
+  # enable_cloudwatch_agent = true). The module's start_runner.sh reads the
+  # enable_cloudwatch SSM parameter and calls amazon-cloudwatch-agent-ctl to
+  # apply the agent config. Without the agent pre-baked, the command exits 127
+  # (command not found) and the runner-start-failed error handler aborts the
+  # cloud-init script before config.sh ever registers the runner with GitHub.
+  provisioner "shell" {
+    inline = [
+      "curl -sL https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb -o /tmp/amazon-cloudwatch-agent.deb",
+      "sudo dpkg -i -E /tmp/amazon-cloudwatch-agent.deb",
+      "rm -f /tmp/amazon-cloudwatch-agent.deb",
+      "amazon-cloudwatch-agent-ctl -a status || true",
+    ]
+  }
+
   # Java 17 (required by sdkmanager — Android SDK command-line tools are JVM-based)
   provisioner "shell" {
     inline = [
