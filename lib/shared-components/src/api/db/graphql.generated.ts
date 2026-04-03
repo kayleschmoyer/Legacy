@@ -4929,6 +4929,18 @@ export type GetTeamMembersQuery = {
   }> | null;
 };
 
+export type GiveUpDisclosureGameMutationVariables = Exact<{
+  sessionId: Scalars['Int']['input'];
+}>;
+
+export type GiveUpDisclosureGameMutation = {
+  __typename?: 'Mutation';
+  giveUpDisclosureGame?: {
+    __typename?: 'GiveUpDisclosureGameResult';
+    correctPlayerId?: number | null;
+  } | null;
+};
+
 export type LeagueMemberFragment = {
   __typename?: 'LeagueMember';
   leagueId?: number | null;
@@ -5783,6 +5795,22 @@ export type MatchupRecapFragmentFragment = {
   winnerId?: number | null;
 };
 
+export type NextClueMutationVariables = Exact<{
+  sessionId: Scalars['Int']['input'];
+}>;
+
+export type NextClueMutation = {
+  __typename?: 'Mutation';
+  nextClue?: {
+    __typename?: 'DisclosureClue';
+    clueText?: string | null;
+    difficultyTier?: string | null;
+    clueIndex?: number | null;
+    totalClues?: number | null;
+    isLastClue?: boolean | null;
+  } | null;
+};
+
 export type NotificationPreferenceFragment = {
   __typename?: 'NotificationPreference';
   id?: number | null;
@@ -6172,6 +6200,21 @@ export type UpdateLeagueScoringProfileMutation = {
   } | null;
 };
 
+export type SearchPlayersForDisclosureQueryVariables = Exact<{
+  searchTerm: Scalars['String']['input'];
+  limit?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type SearchPlayersForDisclosureQuery = {
+  __typename?: 'Query';
+  searchPlayers?: Array<{
+    __typename?: 'Player';
+    id?: number | null;
+    firstName?: string | null;
+    lastName?: string | null;
+  }> | null;
+};
+
 export type SearchPlayersForDraftQueryVariables = Exact<{
   search: Scalars['String']['input'];
   limit?: InputMaybe<Scalars['Int']['input']>;
@@ -6297,6 +6340,19 @@ export type SetTradeBlockMutation = {
   } | null;
 };
 
+export type StartDisclosureGameMutationVariables = Exact<{
+  [key: string]: never;
+}>;
+
+export type StartDisclosureGameMutation = {
+  __typename?: 'Mutation';
+  startDisclosureGame?: {
+    __typename?: 'StartDisclosureGameResult';
+    sessionId?: number | null;
+    totalClues?: number | null;
+  } | null;
+};
+
 export type StartSeasonDraftGameMutationVariables = Exact<{
   gameId: Scalars['Int']['input'];
 }>;
@@ -6304,6 +6360,22 @@ export type StartSeasonDraftGameMutationVariables = Exact<{
 export type StartSeasonDraftGameMutation = {
   __typename?: 'Mutation';
   startSeasonDraftGame?: boolean | null;
+};
+
+export type SubmitGuessMutationVariables = Exact<{
+  sessionId: Scalars['Int']['input'];
+  guessedPlayerId: Scalars['Int']['input'];
+}>;
+
+export type SubmitGuessMutation = {
+  __typename?: 'Mutation';
+  submitGuess?: {
+    __typename?: 'DisclosureGuessResult';
+    correct?: boolean | null;
+    score?: number | null;
+    correctPlayerId?: number | null;
+    cluesUsed?: number | null;
+  } | null;
 };
 
 export type TeamMemberFragment = {
@@ -10423,6 +10495,56 @@ export type GetTeamMembersQueryResult = Apollo.QueryResult<
   GetTeamMembersQuery,
   GetTeamMembersQueryVariables
 >;
+export const GiveUpDisclosureGame = gql`
+  mutation GiveUpDisclosureGame($sessionId: Int!) {
+    giveUpDisclosureGame(sessionId: $sessionId) {
+      correctPlayerId
+    }
+  }
+`;
+export type GiveUpDisclosureGameMutationFn = MutationFunction<
+  GiveUpDisclosureGameMutation,
+  GiveUpDisclosureGameMutationVariables
+>;
+
+/**
+ * __useGiveUpDisclosureGameMutation__
+ *
+ * To run a mutation, you first call `useGiveUpDisclosureGameMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useGiveUpDisclosureGameMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [giveUpDisclosureGameMutation, { data, loading, error }] = useGiveUpDisclosureGameMutation({
+ *   variables: {
+ *      sessionId: // value for 'sessionId'
+ *   },
+ * });
+ */
+export function useGiveUpDisclosureGameMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    GiveUpDisclosureGameMutation,
+    GiveUpDisclosureGameMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    GiveUpDisclosureGameMutation,
+    GiveUpDisclosureGameMutationVariables
+  >(GiveUpDisclosureGame, options);
+}
+export type GiveUpDisclosureGameMutationHookResult = ReturnType<
+  typeof useGiveUpDisclosureGameMutation
+>;
+export type GiveUpDisclosureGameMutationResult =
+  Apollo.MutationResult<GiveUpDisclosureGameMutation>;
+export type GiveUpDisclosureGameMutationOptions = BaseMutationOptions<
+  GiveUpDisclosureGameMutation,
+  GiveUpDisclosureGameMutationVariables
+>;
 export const GetLeagueActivity = gql`
   query GetLeagueActivity(
     $leagueId: Int!
@@ -12794,6 +12916,57 @@ export type MakeSeasonDraftPickMutationOptions = BaseMutationOptions<
   MakeSeasonDraftPickMutation,
   MakeSeasonDraftPickMutationVariables
 >;
+export const NextClue = gql`
+  mutation NextClue($sessionId: Int!) {
+    nextClue(sessionId: $sessionId) {
+      clueText
+      difficultyTier
+      clueIndex
+      totalClues
+      isLastClue
+    }
+  }
+`;
+export type NextClueMutationFn = MutationFunction<
+  NextClueMutation,
+  NextClueMutationVariables
+>;
+
+/**
+ * __useNextClueMutation__
+ *
+ * To run a mutation, you first call `useNextClueMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useNextClueMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [nextClueMutation, { data, loading, error }] = useNextClueMutation({
+ *   variables: {
+ *      sessionId: // value for 'sessionId'
+ *   },
+ * });
+ */
+export function useNextClueMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    NextClueMutation,
+    NextClueMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<NextClueMutation, NextClueMutationVariables>(
+    NextClue,
+    options,
+  );
+}
+export type NextClueMutationHookResult = ReturnType<typeof useNextClueMutation>;
+export type NextClueMutationResult = Apollo.MutationResult<NextClueMutation>;
+export type NextClueMutationOptions = BaseMutationOptions<
+  NextClueMutation,
+  NextClueMutationVariables
+>;
 export const GetUserNotificationPreferences = gql`
   query GetUserNotificationPreferences {
     getUserNotificationPreferences {
@@ -13908,6 +14081,99 @@ export type UpdateLeagueScoringProfileMutationOptions = BaseMutationOptions<
   UpdateLeagueScoringProfileMutation,
   UpdateLeagueScoringProfileMutationVariables
 >;
+export const SearchPlayersForDisclosure = gql`
+  query SearchPlayersForDisclosure($searchTerm: String!, $limit: Int) {
+    searchPlayers(searchTerm: $searchTerm, limit: $limit) {
+      id
+      firstName
+      lastName
+    }
+  }
+`;
+
+/**
+ * __useSearchPlayersForDisclosureQuery__
+ *
+ * To run a query within a React component, call `useSearchPlayersForDisclosureQuery` and pass it any options that fit your needs.
+ * When your component renders, `useSearchPlayersForDisclosureQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useSearchPlayersForDisclosureQuery({
+ *   variables: {
+ *      searchTerm: // value for 'searchTerm'
+ *      limit: // value for 'limit'
+ *   },
+ * });
+ */
+export function useSearchPlayersForDisclosureQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    SearchPlayersForDisclosureQuery,
+    SearchPlayersForDisclosureQueryVariables
+  > &
+    (
+      | { variables: SearchPlayersForDisclosureQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    SearchPlayersForDisclosureQuery,
+    SearchPlayersForDisclosureQueryVariables
+  >(SearchPlayersForDisclosure, options);
+}
+export function useSearchPlayersForDisclosureLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    SearchPlayersForDisclosureQuery,
+    SearchPlayersForDisclosureQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    SearchPlayersForDisclosureQuery,
+    SearchPlayersForDisclosureQueryVariables
+  >(SearchPlayersForDisclosure, options);
+}
+export function useSearchPlayersForDisclosureSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        SearchPlayersForDisclosureQuery,
+        SearchPlayersForDisclosureQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    SearchPlayersForDisclosureQuery,
+    SearchPlayersForDisclosureQueryVariables
+  >(
+    SearchPlayersForDisclosure,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          SearchPlayersForDisclosureQuery,
+          SearchPlayersForDisclosureQueryVariables
+        >,
+  );
+}
+export type SearchPlayersForDisclosureQueryHookResult = ReturnType<
+  typeof useSearchPlayersForDisclosureQuery
+>;
+export type SearchPlayersForDisclosureLazyQueryHookResult = ReturnType<
+  typeof useSearchPlayersForDisclosureLazyQuery
+>;
+export type SearchPlayersForDisclosureSuspenseQueryHookResult = ReturnType<
+  typeof useSearchPlayersForDisclosureSuspenseQuery
+>;
+export type SearchPlayersForDisclosureQueryResult = Apollo.QueryResult<
+  SearchPlayersForDisclosureQuery,
+  SearchPlayersForDisclosureQueryVariables
+>;
 export const SearchPlayersForDraft = gql`
   query SearchPlayersForDraft($search: String!, $limit: Int) {
     players(search: $search, limit: $limit) {
@@ -14154,6 +14420,56 @@ export type SetTradeBlockMutationOptions = BaseMutationOptions<
   SetTradeBlockMutation,
   SetTradeBlockMutationVariables
 >;
+export const StartDisclosureGame = gql`
+  mutation StartDisclosureGame {
+    startDisclosureGame {
+      sessionId
+      totalClues
+    }
+  }
+`;
+export type StartDisclosureGameMutationFn = MutationFunction<
+  StartDisclosureGameMutation,
+  StartDisclosureGameMutationVariables
+>;
+
+/**
+ * __useStartDisclosureGameMutation__
+ *
+ * To run a mutation, you first call `useStartDisclosureGameMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useStartDisclosureGameMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [startDisclosureGameMutation, { data, loading, error }] = useStartDisclosureGameMutation({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useStartDisclosureGameMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    StartDisclosureGameMutation,
+    StartDisclosureGameMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    StartDisclosureGameMutation,
+    StartDisclosureGameMutationVariables
+  >(StartDisclosureGame, options);
+}
+export type StartDisclosureGameMutationHookResult = ReturnType<
+  typeof useStartDisclosureGameMutation
+>;
+export type StartDisclosureGameMutationResult =
+  Apollo.MutationResult<StartDisclosureGameMutation>;
+export type StartDisclosureGameMutationOptions = BaseMutationOptions<
+  StartDisclosureGameMutation,
+  StartDisclosureGameMutationVariables
+>;
 export const StartSeasonDraftGame = gql`
   mutation StartSeasonDraftGame($gameId: Int!) {
     startSeasonDraftGame(gameId: $gameId)
@@ -14201,6 +14517,60 @@ export type StartSeasonDraftGameMutationResult =
 export type StartSeasonDraftGameMutationOptions = BaseMutationOptions<
   StartSeasonDraftGameMutation,
   StartSeasonDraftGameMutationVariables
+>;
+export const SubmitGuess = gql`
+  mutation SubmitGuess($sessionId: Int!, $guessedPlayerId: Int!) {
+    submitGuess(sessionId: $sessionId, guessedPlayerId: $guessedPlayerId) {
+      correct
+      score
+      correctPlayerId
+      cluesUsed
+    }
+  }
+`;
+export type SubmitGuessMutationFn = MutationFunction<
+  SubmitGuessMutation,
+  SubmitGuessMutationVariables
+>;
+
+/**
+ * __useSubmitGuessMutation__
+ *
+ * To run a mutation, you first call `useSubmitGuessMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useSubmitGuessMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [submitGuessMutation, { data, loading, error }] = useSubmitGuessMutation({
+ *   variables: {
+ *      sessionId: // value for 'sessionId'
+ *      guessedPlayerId: // value for 'guessedPlayerId'
+ *   },
+ * });
+ */
+export function useSubmitGuessMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    SubmitGuessMutation,
+    SubmitGuessMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<SubmitGuessMutation, SubmitGuessMutationVariables>(
+    SubmitGuess,
+    options,
+  );
+}
+export type SubmitGuessMutationHookResult = ReturnType<
+  typeof useSubmitGuessMutation
+>;
+export type SubmitGuessMutationResult =
+  Apollo.MutationResult<SubmitGuessMutation>;
+export type SubmitGuessMutationOptions = BaseMutationOptions<
+  SubmitGuessMutation,
+  SubmitGuessMutationVariables
 >;
 export const GetTiebreakerRules = gql`
   query GetTiebreakerRules($leagueId: Int!) {

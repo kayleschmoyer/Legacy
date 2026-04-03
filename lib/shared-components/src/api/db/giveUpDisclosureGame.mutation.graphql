@@ -1,0 +1,5 @@
+mutation GiveUpDisclosureGame($sessionId: Int!) {
+  giveUpDisclosureGame(sessionId: $sessionId) {
+    correctPlayerId
+  }
+}

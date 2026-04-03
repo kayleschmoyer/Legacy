@@ -1,0 +1,8 @@
+mutation SubmitGuess($sessionId: Int!, $guessedPlayerId: Int!) {
+  submitGuess(sessionId: $sessionId, guessedPlayerId: $guessedPlayerId) {
+    correct
+    score
+    correctPlayerId
+    cluesUsed
+  }
+}

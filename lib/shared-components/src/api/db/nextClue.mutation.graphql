@@ -1,0 +1,9 @@
+mutation NextClue($sessionId: Int!) {
+  nextClue(sessionId: $sessionId) {
+    clueText
+    difficultyTier
+    clueIndex
+    totalClues
+    isLastClue
+  }
+}

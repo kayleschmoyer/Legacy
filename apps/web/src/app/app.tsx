@@ -87,6 +87,9 @@ const SeasonDraftGamesPage = React.lazy(
 const SeasonDraftGameCreatePage = React.lazy(
   () => import('../pages/games/SeasonDraftGameCreatePage'),
 );
+const DisclosureGamePage = React.lazy(
+  () => import('../pages/games/DisclosureGamePage'),
+);
 const EliteDraftBoardScreen = React.lazy(() =>
   import('../components/EliteDraftBoard').then((m) => ({
     default: m.EliteDraftBoardScreen,
@@ -630,6 +633,7 @@ function App() {
               path="/games/season-draft/:gameId"
               element={<SeasonDraftGamePage />}
             />
+            <Route path="/games/disclosure" element={<DisclosureGamePage />} />
           </Routes>
         </Suspense>
       </YStack>

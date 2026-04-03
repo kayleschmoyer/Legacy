@@ -71,6 +71,9 @@ export * from './features/draft/ChatPanel';
 // Season Draft Game
 export * from './features/season-draft';
 
+// Progressive Disclosure Minigame
+export * from './features/disclosure-game';
+
 // Player components
 export * from './features/players';
 

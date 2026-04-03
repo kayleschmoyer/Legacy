@@ -1,0 +1,7 @@
+query SearchPlayersForDisclosure($searchTerm: String!, $limit: Int) {
+  searchPlayers(searchTerm: $searchTerm, limit: $limit) {
+    id
+    firstName
+    lastName
+  }
+}
