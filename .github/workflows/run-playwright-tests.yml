@@ -456,7 +456,13 @@ jobs:
           COUNT=$(find all-blob-reports -name '*.zip' -type f 2>/dev/null | wc -l)
           if [ "$COUNT" -gt 0 ]; then
             echo "has-report=true" >> $GITHUB_OUTPUT
-            pnpm dlx playwright@1.58.2 merge-reports --reporter html ./all-blob-reports
+            # When merging e2e + integration blobs, playwright rejects blobs recorded
+            # with different testDirs (src/tests vs src/integration/tests). Provide a
+            # merge config pointing to the common parent directory.
+            cat <<'EOF' > playwright.merge.config.js
+            module.exports = { testDir: "apps/web-e2e/src" };
+            EOF
+            pnpm dlx playwright@1.58.2 merge-reports --reporter html -c playwright.merge.config.js ./all-blob-reports
           else
             echo "has-report=false" >> $GITHUB_OUTPUT
             echo "No blob reports found — skipping deploy"
