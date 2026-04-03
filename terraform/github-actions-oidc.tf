@@ -569,37 +569,6 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "arn:aws:cloudwatch:${local.region}:${local.account_id}:alarm:${local.name_prefix}-*"
         ]
       },
-      # ACM permissions for API Gateway custom domain certificate
-      {
-        Effect = "Allow"
-        Action = [
-          "acm:DescribeCertificate",
-          "acm:ListTagsForCertificate",
-          "acm:GetCertificate"
-        ]
-        Resource = [
-          "arn:aws:acm:${local.region}:${local.account_id}:certificate/*"
-        ]
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "acm:RequestCertificate",
-          "acm:DeleteCertificate",
-          "acm:AddTagsToCertificate",
-          "acm:RemoveTagsFromCertificate"
-        ]
-        Resource = [
-          "arn:aws:acm:${local.region}:${local.account_id}:certificate/*"
-        ]
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "acm:ListCertificates"
-        ]
-        Resource = "*"
-      }
     ]
   })
 }
@@ -675,6 +644,29 @@ resource "aws_iam_policy" "github_actions_supplemental" {
         Resource = [
           "arn:aws:s3:::${local.name_prefix}-runner-*/*"
         ]
+      },
+      # ACM permissions — moved here from the inline policy to stay under the 10 KB limit.
+      {
+        Effect = "Allow"
+        Action = [
+          "acm:DescribeCertificate",
+          "acm:ListTagsForCertificate",
+          "acm:GetCertificate",
+          "acm:RequestCertificate",
+          "acm:DeleteCertificate",
+          "acm:AddTagsToCertificate",
+          "acm:RemoveTagsFromCertificate"
+        ]
+        Resource = [
+          "arn:aws:acm:${local.region}:${local.account_id}:certificate/*"
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "acm:ListCertificates"
+        ]
+        Resource = "*"
       },
       # Secrets Manager write permissions — moved here from the inline policy to stay under the 10 KB limit.
       # Secrets Manager appends a random 6-char suffix to all secret ARNs, hence the trailing wildcard on dev/* entries.
