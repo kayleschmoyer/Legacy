@@ -18,6 +18,11 @@ resource "aws_s3_bucket" "runner_cache" {
   count  = var.enable_github_runners ? 1 : 0
   bucket = "${local.name_prefix}-runner-cache"
   tags   = local.common_tags
+
+  # Ensure the GitHub Actions apply role's IAM policies are updated before
+  # creating the bucket to prevent AccessDenied races when s3:CreateBucket
+  # permission is added in the same apply as this resource is first created.
+  depends_on = [aws_iam_role_policy.github_actions_additional]
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "runner_cache" {
@@ -97,4 +102,9 @@ resource "aws_iam_policy" "runner_cache" {
   })
 
   tags = local.common_tags
+
+  # Ensure the GitHub Actions apply role's IAM policies are updated before
+  # creating this policy to prevent AccessDenied races when iam:CreatePolicy
+  # permission is added in the same apply as this resource is first created.
+  depends_on = [aws_iam_role_policy.github_actions_additional]
 }

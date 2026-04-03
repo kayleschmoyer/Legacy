@@ -329,9 +329,14 @@ module "github_runners" {
   # EC2 instances. Without this edge, Terraform may launch runners in parallel
   # with log group creation, letting the CloudWatch agent create the group first
   # with default "never expire" retention.
+  # Also ensure the GitHub Actions apply role's IAM policies are fully updated
+  # before the module creates its Lambda functions and EC2 runner roles, to
+  # prevent AccessDenied races when permissions are added in the same apply.
   depends_on = [
     aws_cloudwatch_log_group.runner_cloud_init,
     aws_cloudwatch_log_group.runner_syslog,
+    aws_iam_role_policy.github_actions_additional,
+    aws_iam_policy.github_actions_supplemental,
   ]
 
   tags = local.common_tags
@@ -563,4 +568,9 @@ resource "aws_iam_policy" "runner_permissions_boundary" {
   })
 
   tags = local.common_tags
+
+  # Ensure the GitHub Actions apply role's IAM policies are updated before
+  # creating this permissions boundary policy to prevent AccessDenied races
+  # when iam:CreatePolicy is added in the same apply as this resource.
+  depends_on = [aws_iam_role_policy.github_actions_additional]
 }

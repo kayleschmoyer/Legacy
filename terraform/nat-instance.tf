@@ -97,6 +97,12 @@ resource "aws_iam_instance_profile" "nat_instance" {
 
   name = "${local.name_prefix}-nat-instance"
   role = aws_iam_role.nat_instance[0].name
+
+  # The GitHub Actions apply role needs iam:CreateInstanceProfile, which is
+  # granted by github_actions_additional. Without this dependency, Terraform
+  # creates the instance profile in parallel with updating the policy, causing
+  # an AccessDenied race on the first apply after the permission was added.
+  depends_on = [aws_iam_role_policy.github_actions_additional]
 }
 
 # NAT Instance (only create if cost optimization is enabled)

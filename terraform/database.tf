@@ -108,6 +108,15 @@ resource "aws_db_proxy" "main" {
   tags = merge(local.common_tags, {
     Name = "${local.name_prefix}-gql-proxy"
   })
+
+  # Ensure the GitHub Actions apply role's IAM policies are fully updated before
+  # creating the proxy. Without this, Terraform may attempt proxy creation in
+  # parallel with a policy update that adds rds:CreateDBProxy or iam:PassRole,
+  # causing an AccessDenied race on the first apply after such a change.
+  depends_on = [
+    aws_iam_role_policy.github_actions_additional,
+    aws_iam_policy.github_actions_supplemental,
+  ]
 }
 
 resource "aws_db_proxy_default_target_group" "main" {
