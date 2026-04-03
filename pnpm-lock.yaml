@@ -860,6 +860,9 @@ importers:
       '@legacy-sports/logging':
         specifier: workspace:*
         version: link:../../lib/logging
+      '@legacy-sports/mlb-client':
+        specifier: workspace:*
+        version: link:../../lib/mlb-client
       '@legacy-sports/narrative':
         specifier: workspace:*
         version: link:../../lib/narrative

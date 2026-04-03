@@ -2354,7 +2354,7 @@ export type Query = {
   /** Check if the authenticated user has accepted the privacy policy */
   privacyPolicyStatus?: Maybe<PrivacyPolicyStatus>;
   publicLeagues: Array<PublicLeagueInfo>;
-  /** Live MLB scoreboard for the given date (defaults to today). Returns null until LS-1864 delivers @legacy-sports/mlb-client. */
+  /** Live MLB scoreboard for the given date (defaults to today). Uses the provider configured via MLB_DATA_PROVIDER (defaults to mlb-statsapi in dev). */
   scoreboard?: Maybe<Scoreboard>;
   scoringDefinitions?: Maybe<Array<ScoringStatDefinition>>;
   searchPlayers?: Maybe<Array<Player>>;

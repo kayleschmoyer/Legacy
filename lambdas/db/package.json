@@ -15,6 +15,7 @@
     "@apollo/server": "*",
     "@as-integrations/aws-lambda": "*",
     "@legacy-sports/db-client": "workspace:*",
+    "@legacy-sports/mlb-client": "workspace:*",
     "@legacy-sports/scoring": "workspace:*",
     "@legacy-sports/env-utilities": "workspace:*",
     "@legacy-sports/logging": "workspace:*",

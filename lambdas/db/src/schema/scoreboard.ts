@@ -1,14 +1,19 @@
 /**
- * MLB Live Scoreboard — GraphQL schema and resolver stubs (LS-1865).
+ * MLB Live Scoreboard — GraphQL schema and resolvers (LS-1865, LS-2326).
  *
  * Defines the types and query fields for live MLB scoreboard data.
- * Resolver bodies are stubs that return null until LS-1864 delivers
- * the @legacy-sports/mlb-client library with createMlbDataProvider().
  *
  * Frontend component: apps/web/src/components/scoreboard/Scoreboard.tsx (LS-1867)
  * MLB client library: lib/mlb-client (LS-1864)
  */
+import { createMlbDataProvider } from '@legacy-sports/mlb-client';
+import { LOGGER } from '@legacy-sports/logging';
 import { builder } from './builder';
+import { UserInputError } from './graphql-errors';
+
+// Singleton provider — hoisted at module scope so per-instance caches and
+// rate-limiting queues are shared across all resolver invocations.
+const mlbProvider = createMlbDataProvider();
 
 // ─── ScoreboardTeam ───────────────────────────────────────────────────────────
 
@@ -141,7 +146,7 @@ builder.queryField('scoreboard', (t) =>
     nullable: true,
     description:
       'Live MLB scoreboard for the given date (defaults to today). ' +
-      'Returns null until LS-1864 delivers @legacy-sports/mlb-client.',
+      'Uses the provider configured via MLB_DATA_PROVIDER (defaults to mlb-statsapi in dev).',
     args: {
       date: t.arg.string({
         required: false,
@@ -149,9 +154,28 @@ builder.queryField('scoreboard', (t) =>
           'Date in YYYY-MM-DD format. Defaults to today in the US/Eastern timezone.',
       }),
     },
-    resolve: (_root, _args) => {
-      // TODO(LS-1864): replace with createMlbDataProvider().getScoreboard(_args.date)
-      return null;
+    resolve: async (_root, _args) => {
+      const date =
+        _args.date ??
+        new Date().toLocaleDateString('en-CA', {
+          timeZone: 'America/New_York',
+        });
+
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        throw UserInputError(
+          `Invalid date format "${date}". Expected YYYY-MM-DD (e.g. 2024-07-04).`,
+        );
+      }
+
+      try {
+        return await mlbProvider.getScoreboard(date);
+      } catch (err) {
+        LOGGER.error('Scoreboard provider error', {
+          date,
+          err: err instanceof Error ? err.message : String(err),
+        });
+        throw new Error('Failed to fetch scoreboard data. Please try again.');
+      }
     },
   }),
 );
