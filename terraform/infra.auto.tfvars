@@ -44,3 +44,23 @@ enable_github_runners = false
 enable_ci_runner_db_access    = true
 github_runners_instance_types = ["c7a.xlarge", "c6a.xlarge", "c7i.xlarge", "m7a.xlarge"]
 github_runners_max_count      = 20
+
+# ── MLB Data Provider ─────────────────────────────────────────────────────────
+# The free MLB Stats API (mlb-statsapi) is NOT licensed for commercial use.
+# All non-dev environments must use a licensed provider.
+#
+# This value is non-sensitive and safe to check in. The API key itself is
+# sensitive and is supplied separately:
+#   - Locally:  set mlb_data_api_key in terraform/secrets.auto.tfvars
+#   - CI/prod:  set MLB_DATA_API_KEY in GitHub repository secrets
+#               (TF_VAR_mlb_data_api_key is injected by lambda-terraform-apply.yml)
+#
+# Provider options: "balldontlie" | "rolling-insights"
+# Recommendation (LS-1869 spike): Rolling Insights for real-time live data.
+# balldontlie is the implemented fallback if Rolling Insights pricing is prohibitive.
+#
+# NOTE: This value applies to ALL terraform runs including local dev. Developers
+# running terraform locally will also need mlb_data_api_key in secrets.auto.tfvars.
+# To use the free mlb-statsapi for local dev only, override this value in your
+# local secrets.auto.tfvars: mlb_data_provider = "mlb-statsapi"
+mlb_data_provider = "balldontlie"

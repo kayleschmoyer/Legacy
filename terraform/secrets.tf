@@ -18,6 +18,16 @@
 #   aws secretsmanager put-secret-value --secret-id dev/jira-credentials --secret-string <value>
 #   aws secretsmanager put-secret-value --secret-id dev/rollbar-webhook-secret --secret-string <value>
 #   aws secretsmanager put-secret-value --secret-id dev/discord-webhook-url --secret-string <value>
+#
+# MLB data provider key (only required when mlb_data_provider != "mlb-statsapi"):
+#   Unlike the above, this secret is managed by Terraform only when
+#   mlb_data_api_key is provided via secrets.auto.tfvars (local) or the
+#   MLB_DATA_API_KEY GitHub secret (CI). In that case Terraform creates and
+#   populates the <env>/mlb-data-api-key Secrets Manager secret automatically.
+#   If mlb_data_api_key is empty, Terraform does not create/populate that secret.
+#   Non-statsapi providers require mlb_data_api_key via variable validation.
+#   The Stats Lambda receives MLB_DATA_API_KEY_SECRET_NAME pointing to the
+#   secret and fetches the value at cold-start.
 # =============================================================================
 
 variable "rollbar_access_token" {
