@@ -314,7 +314,7 @@ export function PlayerDetailPage() {
           if (!open) navigate('/players/stats');
         }}
         playerId={playerId}
-        playerName={`Player #${playerId ?? '?'}`}
+        playerName="Player details"
       />
     </div>
   );
