@@ -67,9 +67,7 @@ export const SeasonDraftGameLobby: React.FC<SeasonDraftGameLobbyProps> = ({
   onCreateGame,
   onBack,
 }) => {
-  const { data, loading, refetch } = useGetSeasonDraftGamesQuery({
-    pollInterval: 10000,
-  });
+  const { data, loading, refetch } = useGetSeasonDraftGamesQuery();
   const games = (data?.seasonDraftGames ?? []) as GameSummary[];
 
   const activeGames = games.filter(
