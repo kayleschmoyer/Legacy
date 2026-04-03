@@ -87,6 +87,19 @@ const labelList = z.preprocess(
   z.array(z.string().trim().min(1, 'Label name must be non-empty')),
 );
 
+/**
+ * Shared Zod schema for boolean parameters. Accepts a real boolean OR a
+ * string "true"/"false"/"1"/"0" (MCP callers sometimes serialise booleans to
+ * strings). Use in place of z.boolean() for all tool schema parameters.
+ */
+const coercedBoolean = z.preprocess((val) => {
+  if (typeof val === 'string') {
+    if (val === 'true' || val === '1') return true;
+    if (val === 'false' || val === '0') return false;
+  }
+  return val;
+}, z.boolean());
+
 const GH_AUTH_TOKEN_TIMEOUT_MS = 5_000;
 
 /**
@@ -408,7 +421,7 @@ server.tool(
     title: z.string().describe('PR title with Jira key'),
     body: z.string().describe('PR body (markdown)'),
     base: z.string().default('main').describe('Base branch (default: main)'),
-    draft: z.boolean().default(false).describe('Create as draft'),
+    draft: coercedBoolean.default(false).describe('Create as draft'),
     worktreePath: z
       .string()
       .refine((p) => !p || /^([A-Za-z]:[/\\]|\/)/.test(p), {
@@ -434,8 +447,7 @@ server.tool(
   'Fetch review threads on a PR via GraphQL.',
   {
     number: z.coerce.number().int().positive().describe('PR number'),
-    unresolvedOnly: z
-      .boolean()
+    unresolvedOnly: coercedBoolean
       .default(false)
       .describe('Only unresolved threads'),
   },
@@ -583,8 +595,7 @@ server.tool(
       .min(1)
       .max(50)
       .describe('PR numbers'),
-    compact: z
-      .boolean()
+    compact: coercedBoolean
       .default(false)
       .describe(
         'Return only essential fields (number, branch, mergeable, ciSummary, failedJobs, unresolvedThreads) to reduce token usage',
@@ -611,8 +622,7 @@ server.tool(
       .max(100)
       .default(30)
       .describe('Max results (default: 30)'),
-    excludeDrafts: z
-      .boolean()
+    excludeDrafts: coercedBoolean
       .default(true)
       .describe(
         'Exclude draft PRs from dashboard results (default: true). Draft PRs are being worked on by their creating agent.',
@@ -633,18 +643,15 @@ server.tool(
       .max(100)
       .default(100)
       .describe('Max PRs to scan (default: 100, max: 100)'),
-    applyLabels: z
-      .boolean()
+    applyLabels: coercedBoolean
       .default(true)
       .describe('Sync CI failure labels (default: true)'),
-    compact: z
-      .boolean()
+    compact: coercedBoolean
       .default(false)
       .describe(
         'Return a compact view with essential fields (number, branch, failedChecks, threadCount), plus threadsTruncated for review buckets and labelActions when labels are applied, to reduce token usage',
       ),
-    excludeDrafts: z
-      .boolean()
+    excludeDrafts: coercedBoolean
       .default(true)
       .describe(
         'Exclude draft PRs from scan results (default: true). Draft PRs are being worked on by their creating agent and should not be swept.',
@@ -678,8 +685,7 @@ server.tool(
       .array(z.string())
       .optional()
       .describe('Human reviewer usernames'),
-    copilot: z
-      .boolean()
+    copilot: coercedBoolean
       .default(true)
       .describe('Request Copilot review (default: true)'),
   },
@@ -700,8 +706,7 @@ server.tool(
       .array(z.string())
       .optional()
       .describe('Human reviewer usernames'),
-    copilot: z
-      .boolean()
+    copilot: coercedBoolean
       .default(true)
       .describe('Request Copilot review (default: true)'),
   },
@@ -825,8 +830,7 @@ server.tool(
       .min(1)
       .optional()
       .describe('Specific check name to re-request (retriggers all matching)'),
-    allFailed: z
-      .boolean()
+    allFailed: coercedBoolean
       .default(false)
       .describe(
         'When true, retrigger all failed checks. When false (default), retrigger only the named check or all failed checks if no checkName given.',
