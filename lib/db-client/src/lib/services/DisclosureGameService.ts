@@ -1,4 +1,4 @@
-import { and, count, eq, gte, inArray, sql } from 'drizzle-orm';
+import { and, count, desc, eq, gte, inArray, sql } from 'drizzle-orm';
 import { LOGGER } from '@legacy-sports/logging';
 import * as PublicSchema from '../../drizzle/public/schema';
 import type { PublicDb } from '../client/PublicDbClient';
@@ -670,5 +670,401 @@ export class DisclosureGameService {
       .groupBy(PublicSchema.playerFacts.playerId);
 
     return new Map(rows.map((r) => [r.playerId, Number(r.factCount)]));
+  }
+
+  // ── Session management ────────────────────────────────────────
+
+  /**
+   * Calculate score for a session based on how many clues were revealed.
+   *
+   * Scoring: 1000 points for the first clue, scaling linearly down to a
+   * minimum of 100 points on the last clue.
+   *
+   * score = max(100, round(1000 - (cluesRevealed - 1) * (900 / (totalClues - 1))))
+   *
+   * When totalClues <= 1, the full 1000 points is always awarded.
+   */
+  static calculateScore(cluesRevealed: number, totalClues: number): number {
+    if (totalClues <= 1 || cluesRevealed <= 1) return 1000;
+    const penalty = Math.round((900 * (cluesRevealed - 1)) / (totalClues - 1));
+    return Math.max(100, 1000 - penalty);
+  }
+
+  /**
+   * Start a new disclosure game session for the given user.
+   *
+   * Selects a random eligible player, loads their facts ordered by difficulty
+   * tier (with intra-tier shuffling), persists the session, and returns the
+   * session ID plus the total number of available clues.
+   */
+  async startSession(userId: number): Promise<{
+    sessionId: number;
+    totalClues: number;
+  }> {
+    const playerId = await this.getRandomEligiblePlayerId();
+    if (playerId === null) {
+      throw new Error(
+        'No eligible players found. Run seedPlayerFacts() first.',
+      );
+    }
+
+    // Load facts ordered by tier (vague → moderate → identifying),
+    // with Fisher-Yates shuffle within each tier for freshness.
+    const facts = await this.getPlayerFacts(playerId);
+
+    // Group by tier, shuffle each group, then flatten
+    const byTier: Record<string, typeof facts> = {
+      vague: [],
+      moderate: [],
+      identifying: [],
+    };
+    for (const f of facts) {
+      byTier[f.difficultyTier]?.push(f);
+    }
+
+    const shuffled: typeof facts = [];
+    for (const tier of ['vague', 'moderate', 'identifying'] as const) {
+      const group = byTier[tier] ?? [];
+      // Fisher-Yates in place
+      for (let i = group.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [group[i], group[j]] = [group[j], group[i]];
+      }
+      shuffled.push(...group);
+    }
+
+    const orderedFactIds = shuffled.map((f) => f.id);
+    const now = new Date().toISOString();
+
+    const [session] = await this.db
+      .insert(PublicSchema.disclosureGameSessions)
+      .values({
+        userId,
+        playerId,
+        status: 'active',
+        cluesRevealed: 0,
+        orderedFactIds,
+        score: null,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning({ id: PublicSchema.disclosureGameSessions.id });
+
+    LOGGER.info(
+      `DisclosureGameService.startSession: created session ${session.id} for user ${userId}, player ${playerId}, ${orderedFactIds.length} clues`,
+    );
+
+    return { sessionId: session.id, totalClues: orderedFactIds.length };
+  }
+
+  /**
+   * Advance the session to the next clue and return its text.
+   *
+   * Throws if:
+   *  - Session not found or not owned by userId
+   *  - Session is not active
+   *  - All clues have already been revealed (marks session 'lost' first, then throws)
+   */
+  async nextClue(
+    sessionId: number,
+    userId: number,
+  ): Promise<{
+    clueText: string;
+    difficultyTier: string;
+    clueIndex: number; // 1-based position of this clue
+    totalClues: number;
+    isLastClue: boolean;
+  }> {
+    const [session] = await this.db
+      .select()
+      .from(PublicSchema.disclosureGameSessions)
+      .where(eq(PublicSchema.disclosureGameSessions.id, sessionId))
+      .limit(1);
+
+    if (!session || session.userId !== userId) {
+      throw new Error('Session not found');
+    }
+    if (session.status !== 'active') {
+      throw new Error(`Session is already ${session.status}`);
+    }
+
+    const orderedFactIds = session.orderedFactIds;
+    const nextIndex = session.cluesRevealed; // 0-based index of the next fact to reveal
+
+    if (nextIndex >= orderedFactIds.length) {
+      // All clues exhausted — mark as lost
+      await this.db
+        .update(PublicSchema.disclosureGameSessions)
+        .set({
+          status: 'lost',
+          score: 0,
+          completedAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        })
+        .where(eq(PublicSchema.disclosureGameSessions.id, sessionId));
+      throw new Error('No more clues available — session ended as lost');
+    }
+
+    const factId = orderedFactIds[nextIndex];
+    const [fact] = await this.db
+      .select({
+        clueText: PublicSchema.playerFacts.clueText,
+        difficultyTier: PublicSchema.playerFacts.difficultyTier,
+      })
+      .from(PublicSchema.playerFacts)
+      .where(eq(PublicSchema.playerFacts.id, factId))
+      .limit(1);
+
+    if (!fact) {
+      throw new Error(`Fact ${factId} not found`);
+    }
+
+    const newCluesRevealed = session.cluesRevealed + 1;
+    const isLastClue = newCluesRevealed >= orderedFactIds.length;
+
+    // Atomic conditional UPDATE: only succeeds when clues_revealed hasn't changed
+    // since we read it, preventing concurrent calls from returning the same clue.
+    const updated = await this.db
+      .update(PublicSchema.disclosureGameSessions)
+      .set({
+        cluesRevealed: newCluesRevealed,
+        updatedAt: new Date().toISOString(),
+      })
+      .where(
+        and(
+          eq(PublicSchema.disclosureGameSessions.id, sessionId),
+          eq(PublicSchema.disclosureGameSessions.status, 'active'),
+          eq(
+            PublicSchema.disclosureGameSessions.cluesRevealed,
+            session.cluesRevealed,
+          ),
+        ),
+      )
+      .returning({ id: PublicSchema.disclosureGameSessions.id });
+
+    if (updated.length === 0) {
+      throw new Error('Concurrent nextClue call detected — please retry');
+    }
+
+    return {
+      clueText: fact.clueText,
+      difficultyTier: fact.difficultyTier,
+      clueIndex: newCluesRevealed,
+      totalClues: orderedFactIds.length,
+      isLastClue,
+    };
+  }
+
+  /**
+   * Submit a player ID as a guess for the given session.
+   *
+   * Returns:
+   *  - correct: boolean
+   *  - score: number (only meaningful when correct === true)
+   *  - correctPlayerId: number (only returned when correct === false, so the caller can reveal it)
+   *
+   * Session must be active and owned by userId.
+   * A wrong guess when clues remain does NOT end the session — the user may request more clues
+   * and try again. A wrong guess when all clues are exhausted transitions the session to 'lost'
+   * (score=0, completedAt set) and returns correctPlayerId.
+   */
+  async submitGuess(
+    sessionId: number,
+    userId: number,
+    guessedPlayerId: number,
+  ): Promise<{
+    correct: boolean;
+    score: number;
+    correctPlayerId: number | null;
+    cluesUsed: number;
+  }> {
+    const [session] = await this.db
+      .select()
+      .from(PublicSchema.disclosureGameSessions)
+      .where(eq(PublicSchema.disclosureGameSessions.id, sessionId))
+      .limit(1);
+
+    if (!session || session.userId !== userId) {
+      throw new Error('Session not found');
+    }
+    if (session.status !== 'active') {
+      throw new Error(`Session is already ${session.status}`);
+    }
+
+    const orderedFactIds = session.orderedFactIds;
+    const correct = guessedPlayerId === session.playerId;
+
+    if (correct) {
+      const score = DisclosureGameService.calculateScore(
+        session.cluesRevealed,
+        orderedFactIds.length,
+      );
+      await this.db
+        .update(PublicSchema.disclosureGameSessions)
+        .set({
+          status: 'won',
+          score,
+          completedAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        })
+        .where(eq(PublicSchema.disclosureGameSessions.id, sessionId));
+
+      LOGGER.info(
+        `DisclosureGameService.submitGuess: session ${sessionId} won with score ${score} (${session.cluesRevealed} clues used)`,
+      );
+
+      return {
+        correct: true,
+        score,
+        correctPlayerId: null,
+        cluesUsed: session.cluesRevealed,
+      };
+    }
+
+    // Wrong guess — check if all clues are exhausted
+    if (session.cluesRevealed >= orderedFactIds.length) {
+      // No more clues to reveal — end the session as lost
+      await this.db
+        .update(PublicSchema.disclosureGameSessions)
+        .set({
+          status: 'lost',
+          score: 0,
+          completedAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        })
+        .where(eq(PublicSchema.disclosureGameSessions.id, sessionId));
+
+      LOGGER.info(
+        `DisclosureGameService.submitGuess: session ${sessionId} lost after last clue — wrong guess`,
+      );
+
+      return {
+        correct: false,
+        score: 0,
+        correctPlayerId: session.playerId,
+        cluesUsed: session.cluesRevealed,
+      };
+    }
+
+    // Clues still available — session remains active, no state change
+    return {
+      correct: false,
+      score: 0,
+      correctPlayerId: null,
+      cluesUsed: session.cluesRevealed,
+    };
+  }
+
+  /**
+   * Give up on the current session — reveals the answer without awarding points.
+   */
+  async giveUp(
+    sessionId: number,
+    userId: number,
+  ): Promise<{ correctPlayerId: number }> {
+    const [session] = await this.db
+      .select()
+      .from(PublicSchema.disclosureGameSessions)
+      .where(eq(PublicSchema.disclosureGameSessions.id, sessionId))
+      .limit(1);
+
+    if (!session || session.userId !== userId) {
+      throw new Error('Session not found');
+    }
+    if (session.status !== 'active') {
+      throw new Error(`Session is already ${session.status}`);
+    }
+
+    await this.db
+      .update(PublicSchema.disclosureGameSessions)
+      .set({
+        status: 'given_up',
+        score: 0,
+        completedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(PublicSchema.disclosureGameSessions.id, sessionId));
+
+    return { correctPlayerId: session.playerId };
+  }
+
+  /**
+   * Fetch session state (for the disclosureGameSession query).
+   * Returns null when the session doesn't exist or doesn't belong to userId.
+   */
+  async getSession(
+    sessionId: number,
+    userId: number,
+  ): Promise<{
+    id: number;
+    status: 'active' | 'won' | 'lost' | 'given_up';
+    cluesRevealed: number;
+    totalClues: number;
+    score: number | null;
+    correctPlayerId: number | null;
+    createdAt: string;
+    completedAt: string | null;
+  } | null> {
+    const [session] = await this.db
+      .select()
+      .from(PublicSchema.disclosureGameSessions)
+      .where(eq(PublicSchema.disclosureGameSessions.id, sessionId))
+      .limit(1);
+
+    if (!session || session.userId !== userId) return null;
+
+    const orderedFactIds = session.orderedFactIds;
+
+    return {
+      id: session.id,
+      status: session.status,
+      cluesRevealed: session.cluesRevealed,
+      totalClues: orderedFactIds.length,
+      score: session.score ?? null,
+      // Reveal the correct player only after the session ends
+      correctPlayerId: session.status !== 'active' ? session.playerId : null,
+      createdAt: session.createdAt,
+      completedAt: session.completedAt ?? null,
+    };
+  }
+
+  /**
+   * Return the most recent sessions for a user (for history/leaderboard).
+   */
+  async getRecentSessions(
+    userId: number,
+    limit = 10,
+  ): Promise<
+    Array<{
+      id: number;
+      status: string;
+      cluesRevealed: number;
+      score: number | null;
+      createdAt: string;
+      completedAt: string | null;
+    }>
+  > {
+    const rows = await this.db
+      .select({
+        id: PublicSchema.disclosureGameSessions.id,
+        status: PublicSchema.disclosureGameSessions.status,
+        cluesRevealed: PublicSchema.disclosureGameSessions.cluesRevealed,
+        score: PublicSchema.disclosureGameSessions.score,
+        createdAt: PublicSchema.disclosureGameSessions.createdAt,
+        completedAt: PublicSchema.disclosureGameSessions.completedAt,
+      })
+      .from(PublicSchema.disclosureGameSessions)
+      .where(eq(PublicSchema.disclosureGameSessions.userId, userId))
+      .orderBy(desc(PublicSchema.disclosureGameSessions.createdAt))
+      .limit(limit);
+
+    return rows.map((r) => ({
+      id: r.id,
+      status: r.status,
+      cluesRevealed: r.cluesRevealed,
+      score: r.score ?? null,
+      createdAt: r.createdAt,
+      completedAt: r.completedAt ?? null,
+    }));
   }
 }

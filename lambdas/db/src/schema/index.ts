@@ -29,6 +29,7 @@ import './analytics';
 import './subscriptions';
 import './account-merge';
 import './scoreboard';
+import './disclosure-game';
 
 // Export the final schema
 export const schema = builder.toSchema();

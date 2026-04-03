@@ -107,10 +107,6 @@ server.tool(
       .boolean()
       .default(false)
       .describe('Report missing vars without writing the file'),
-    dryRun: z
-      .boolean()
-      .default(false)
-      .describe('Print the generated file contents without writing'),
   },
   async (params) => {
     const baseDir = params.worktreePath || getRepoRoot();
@@ -125,7 +121,8 @@ server.tool(
 
     const extraArgs: string[] = [];
     if (params.checkOnly) extraArgs.push('--check');
-    if (params.dryRun) extraArgs.push('--dry-run');
+    // dryRun is intentionally not exposed via MCP — it would print secret values
+    // into tool output. Use checkOnly to validate vars without leaking values.
 
     try {
       const output = await runCommand(

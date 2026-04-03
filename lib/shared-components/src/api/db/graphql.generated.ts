@@ -497,6 +497,59 @@ export type DirectMessage = {
   updatedAt?: Maybe<Scalars['String']['output']>;
 };
 
+/** A single clue revealed during a disclosure game session */
+export type DisclosureClue = {
+  __typename?: 'DisclosureClue';
+  /** 1-based position of this clue in the session */
+  clueIndex?: Maybe<Scalars['Int']['output']>;
+  /** Human-readable fact about the mystery player */
+  clueText?: Maybe<Scalars['String']['output']>;
+  /** Difficulty tier of this clue (vague | moderate | identifying) */
+  difficultyTier?: Maybe<Scalars['String']['output']>;
+  /** True when this is the final clue — calling nextClue again will end the session */
+  isLastClue?: Maybe<Scalars['Boolean']['output']>;
+  /** Total number of clues available for this session */
+  totalClues?: Maybe<Scalars['Int']['output']>;
+};
+
+/** State of a disclosure game session */
+export type DisclosureGameSession = {
+  __typename?: 'DisclosureGameSession';
+  /** Number of clues revealed so far */
+  cluesRevealed?: Maybe<Scalars['Int']['output']>;
+  completedAt?: Maybe<Scalars['String']['output']>;
+  /** The correct player ID — only revealed after the session ends */
+  correctPlayerId?: Maybe<Scalars['Int']['output']>;
+  createdAt?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  /** Final score — null while session is active */
+  score?: Maybe<Scalars['Int']['output']>;
+  /** Session status */
+  status?: Maybe<DisclosureSessionStatus>;
+  /** Total clues available for this session */
+  totalClues?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Result of a guess submission */
+export type DisclosureGuessResult = {
+  __typename?: 'DisclosureGuessResult';
+  /** Number of clues revealed before this guess */
+  cluesUsed?: Maybe<Scalars['Int']['output']>;
+  correct?: Maybe<Scalars['Boolean']['output']>;
+  /** Correct player ID — only returned after a wrong guess when all clues are exhausted */
+  correctPlayerId?: Maybe<Scalars['Int']['output']>;
+  /** Points earned — only meaningful when correct is true */
+  score?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Current status of a disclosure game session */
+export enum DisclosureSessionStatus {
+  Active = 'active',
+  GivenUp = 'given_up',
+  Lost = 'lost',
+  Won = 'won',
+}
+
 /** A draft event for a league */
 export type Draft = {
   __typename?: 'Draft';
@@ -697,6 +750,13 @@ export type GamePitching = {
   shutouts?: Maybe<Scalars['Int']['output']>;
   strikeouts?: Maybe<Scalars['Int']['output']>;
   wins?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Result of giving up a disclosure game session */
+export type GiveUpDisclosureGameResult = {
+  __typename?: 'GiveUpDisclosureGameResult';
+  /** The correct player ID revealed after forfeiting */
+  correctPlayerId?: Maybe<Scalars['Int']['output']>;
 };
 
 export type GoogleVerifyResult = {
@@ -1216,6 +1276,8 @@ export type Mutation = {
   forceAddPlayer?: Maybe<CommissionerActionResult>;
   /** Commissioner: force-drop a player from a team. */
   forceDropPlayer?: Maybe<CommissionerActionResult>;
+  /** Give up the current session. Reveals the correct player without awarding points. */
+  giveUpDisclosureGame?: Maybe<GiveUpDisclosureGameResult>;
   /** Admin only: generate a JWT that authenticates as the specified user for debugging purposes. */
   impersonateUser?: Maybe<ImpersonateUserResult>;
   initializeDraft?: Maybe<Draft>;
@@ -1236,6 +1298,8 @@ export type Mutation = {
   markNotificationAsRead?: Maybe<Scalars['Boolean']['output']>;
   /** Merge a source user account into the authenticated (target) user account. Transfers all leagues, rosters, messages, and settings. The source account is deactivated. Requires admin access. */
   mergeAccounts?: Maybe<MergeAccountsResult>;
+  /** Reveal the next clue for the given session. Increments clues-revealed counter. */
+  nextClue?: Maybe<DisclosureClue>;
   nominatePlayer?: Maybe<AuctionState>;
   pauseDraft?: Maybe<Draft>;
   placeBid?: Maybe<AuctionState>;
@@ -1291,10 +1355,14 @@ export type Mutation = {
   setTeamLock?: Maybe<CommissionerActionResult>;
   /** Mark or unmark a roster player as available for trade. Only the team owner (GM or assistant manager) may call this. */
   setTradeBlock?: Maybe<TeamMember>;
+  /** Start a new progressive disclosure game session. Returns session ID and total clue count. */
+  startDisclosureGame?: Maybe<StartDisclosureGameResult>;
   startDraft?: Maybe<League>;
   startSeason?: Maybe<League>;
   /** Start a Season Draft Game (move from setup to drafting) */
   startSeasonDraftGame?: Maybe<Scalars['Boolean']['output']>;
+  /** Submit a player ID as a guess. Returns correct/incorrect and score (if correct). */
+  submitGuess?: Maybe<DisclosureGuessResult>;
   swapMatchupPlayerPositions?: Maybe<Array<MatchupPlayer>>;
   /** Commissioner: swap the team assignments between two matchups in the same league. */
   swapMatchupTeams?: Maybe<CommissionerActionResult>;
@@ -1510,6 +1578,10 @@ export type MutationForceDropPlayerArgs = {
   input: ForceDropPlayerInput;
 };
 
+export type MutationGiveUpDisclosureGameArgs = {
+  sessionId: Scalars['Int']['input'];
+};
+
 export type MutationImpersonateUserArgs = {
   userId: Scalars['Int']['input'];
 };
@@ -1578,6 +1650,10 @@ export type MutationMarkNotificationAsReadArgs = {
 
 export type MutationMergeAccountsArgs = {
   sourceUserId: Scalars['Int']['input'];
+};
+
+export type MutationNextClueArgs = {
+  sessionId: Scalars['Int']['input'];
 };
 
 export type MutationNominatePlayerArgs = {
@@ -1752,6 +1828,11 @@ export type MutationStartSeasonArgs = {
 
 export type MutationStartSeasonDraftGameArgs = {
   gameId: Scalars['Int']['input'];
+};
+
+export type MutationSubmitGuessArgs = {
+  guessedPlayerId: Scalars['Int']['input'];
+  sessionId: Scalars['Int']['input'];
 };
 
 export type MutationSwapMatchupPlayerPositionsArgs = {
@@ -2176,6 +2257,8 @@ export type Query = {
   /** Commissioner: fetch the audit log for all commissioner actions in a league. */
   commissionerAuditLogs?: Maybe<Array<CommissionerAuditLog>>;
   defaultScoringProfile?: Maybe<ScoringConfig>;
+  /** Fetch the current state of a disclosure game session */
+  disclosureGameSession?: Maybe<DisclosureGameSession>;
   /** Get a complete export of all personal data for the authenticated user */
   exportMyData?: Maybe<UserDataExport>;
   freeAgents?: Maybe<Array<Player>>;
@@ -2366,6 +2449,10 @@ export type QueryCareerPitchingStatsCountArgs = {
 export type QueryCommissionerAuditLogsArgs = {
   leagueId: Scalars['Int']['input'];
   limit?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type QueryDisclosureGameSessionArgs = {
+  sessionId: Scalars['Int']['input'];
 };
 
 export type QueryFreeAgentsArgs = {
@@ -3224,6 +3311,14 @@ export type SetTeamLockInput = {
   locked: Scalars['Boolean']['input'];
   reason?: InputMaybe<Scalars['String']['input']>;
   teamId: Scalars['Int']['input'];
+};
+
+/** Result of starting a new disclosure game session */
+export type StartDisclosureGameResult = {
+  __typename?: 'StartDisclosureGameResult';
+  sessionId?: Maybe<Scalars['Int']['output']>;
+  /** Total number of clues available in this session */
+  totalClues?: Maybe<Scalars['Int']['output']>;
 };
 
 export enum StatsLoadingStatus {

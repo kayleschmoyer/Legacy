@@ -530,6 +530,100 @@ type DirectMessage {
 }
 
 """
+A single clue revealed during a disclosure game session
+"""
+type DisclosureClue {
+  """
+  1-based position of this clue in the session
+  """
+  clueIndex: Int
+
+  """
+  Human-readable fact about the mystery player
+  """
+  clueText: String
+
+  """
+  Difficulty tier of this clue (vague | moderate | identifying)
+  """
+  difficultyTier: String
+
+  """
+  True when this is the final clue — calling nextClue again will end the session
+  """
+  isLastClue: Boolean
+
+  """
+  Total number of clues available for this session
+  """
+  totalClues: Int
+}
+
+"""
+State of a disclosure game session
+"""
+type DisclosureGameSession {
+  """
+  Number of clues revealed so far
+  """
+  cluesRevealed: Int
+  completedAt: String
+
+  """
+  The correct player ID — only revealed after the session ends
+  """
+  correctPlayerId: Int
+  createdAt: String
+  id: Int
+
+  """
+  Final score — null while session is active
+  """
+  score: Int
+
+  """
+  Session status
+  """
+  status: DisclosureSessionStatus
+
+  """
+  Total clues available for this session
+  """
+  totalClues: Int
+}
+
+"""
+Result of a guess submission
+"""
+type DisclosureGuessResult {
+  """
+  Number of clues revealed before this guess
+  """
+  cluesUsed: Int
+  correct: Boolean
+
+  """
+  Correct player ID — only returned after a wrong guess when all clues are exhausted
+  """
+  correctPlayerId: Int
+
+  """
+  Points earned — only meaningful when correct is true
+  """
+  score: Int
+}
+
+"""
+Current status of a disclosure game session
+"""
+enum DisclosureSessionStatus {
+  active
+  given_up
+  lost
+  won
+}
+
+"""
 A draft event for a league
 """
 type Draft {
@@ -760,6 +854,16 @@ type GamePitching {
   shutouts: Int
   strikeouts: Int
   wins: Int
+}
+
+"""
+Result of giving up a disclosure game session
+"""
+type GiveUpDisclosureGameResult {
+  """
+  The correct player ID revealed after forfeiting
+  """
+  correctPlayerId: Int
 }
 
 type GoogleVerifyResult {
@@ -1467,6 +1571,11 @@ type Mutation {
   forceDropPlayer(input: ForceDropPlayerInput!): CommissionerActionResult
 
   """
+  Give up the current session. Reveals the correct player without awarding points.
+  """
+  giveUpDisclosureGame(sessionId: Int!): GiveUpDisclosureGameResult
+
+  """
   Admin only: generate a JWT that authenticates as the specified user for debugging purposes.
   """
   impersonateUser(userId: Int!): ImpersonateUserResult
@@ -1535,6 +1644,11 @@ type Mutation {
   Merge a source user account into the authenticated (target) user account. Transfers all leagues, rosters, messages, and settings. The source account is deactivated. Requires admin access.
   """
   mergeAccounts(sourceUserId: Int!): MergeAccountsResult
+
+  """
+  Reveal the next clue for the given session. Increments clues-revealed counter.
+  """
+  nextClue(sessionId: Int!): DisclosureClue
   nominatePlayer(draftId: Int!, playerId: Int!): AuctionState
   pauseDraft(leagueId: Int!): Draft
   placeBid(amount: Int!, draftId: Int!): AuctionState
@@ -1699,6 +1813,11 @@ type Mutation {
     onTradeBlock: Boolean!
     teamMemberId: Int!
   ): TeamMember
+
+  """
+  Start a new progressive disclosure game session. Returns session ID and total clue count.
+  """
+  startDisclosureGame: StartDisclosureGameResult
   startDraft(
     draftMode: String
     draftOrder: String
@@ -1711,6 +1830,11 @@ type Mutation {
   Start a Season Draft Game (move from setup to drafting)
   """
   startSeasonDraftGame(gameId: Int!): Boolean
+
+  """
+  Submit a player ID as a guess. Returns correct/incorrect and score (if correct).
+  """
+  submitGuess(guessedPlayerId: Int!, sessionId: Int!): DisclosureGuessResult
   swapMatchupPlayerPositions(
     matchupPlayerIdA: Int!
     matchupPlayerIdB: Int!
@@ -2237,6 +2361,11 @@ type Query {
     limit: Int = 50
   ): [CommissionerAuditLog!]
   defaultScoringProfile: ScoringConfig
+
+  """
+  Fetch the current state of a disclosure game session
+  """
+  disclosureGameSession(sessionId: Int!): DisclosureGameSession
 
   """
   Get a complete export of all personal data for the authenticated user
@@ -3061,6 +3190,18 @@ input SetTeamLockInput {
   locked: Boolean!
   reason: String
   teamId: Int!
+}
+
+"""
+Result of starting a new disclosure game session
+"""
+type StartDisclosureGameResult {
+  sessionId: Int
+
+  """
+  Total number of clues available in this session
+  """
+  totalClues: Int
 }
 
 enum StatsLoadingStatus {

@@ -9,6 +9,8 @@ import {
   index,
   unique,
   pgEnum,
+  jsonb,
+  timestamp,
 } from 'drizzle-orm/pg-core';
 import { players } from './Players';
 
@@ -22,6 +24,7 @@ import { players } from './Players';
  *  - playerFactCategory  (enum)   — category of fact (career_stat, award, team_history, …)
  *  - difficultyTier      (enum)   — vague / moderate / identifying
  *  - playerFacts               — the fact pool seeded from existing stats/player data
+ *  - disclosureGameSessions    — active/completed game sessions
  */
 
 // ──────────────────────────────────────────────────────────────
@@ -90,5 +93,61 @@ export const playerFacts = pgTable(
       table.playerId,
       table.clueText,
     ),
+  }),
+);
+
+// ──────────────────────────────────────────────────────────────
+// disclosure_game_sessions — one row per played game
+// ──────────────────────────────────────────────────────────────
+
+export const disclosureSessionStatus = pgEnum('disclosure_session_status', [
+  'active', // Game in progress — user may request clues or guess
+  'won', // User guessed correctly
+  'lost', // All clues exhausted without a correct guess
+  'given_up', // User explicitly gave up (answer revealed, no score awarded)
+]);
+
+export const disclosureGameSessions = pgTable(
+  'disclosure_game_sessions',
+  {
+    id: serial('id').primaryKey().notNull(),
+    userId: integer('user_id').notNull(),
+    playerId: integer('player_id').notNull(), // The baseball player being guessed
+
+    status: disclosureSessionStatus('status').notNull().default('active'),
+
+    // Count of clues that have been revealed so far (starts at 0).
+    // Incremented by each nextClue call before returning the clue.
+    cluesRevealed: integer('clues_revealed').notNull().default(0),
+
+    // JSON array of player_fact IDs in the order they will be revealed.
+    // Ordered by difficulty tier (vague first) with intra-tier randomisation.
+    // Generated once at session start; immutable thereafter.
+    orderedFactIds: jsonb('ordered_fact_ids').notNull().$type<number[]>(),
+
+    // Points scored — null until the session ends (won or given_up).
+    // Lost sessions always score 0.
+    score: integer('score'),
+
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull(),
+    completedAt: timestamp('completed_at', {
+      withTimezone: true,
+      mode: 'string',
+    }),
+  },
+  (table) => ({
+    disclosureSessionPlayerFk: foreignKey({
+      columns: [table.playerId],
+      foreignColumns: [players.id],
+      name: 'disclosure_game_sessions_player_fk',
+    }),
+
+    userIdIdx: index('disclosure_game_sessions_user_id_idx').on(table.userId),
+    statusIdx: index('disclosure_game_sessions_status_idx').on(table.status),
   }),
 );

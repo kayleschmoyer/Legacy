@@ -93,7 +93,7 @@ jobs:
           # Read-only plan role — this workflow runs on pull_request and does not apply
           # any Terraform changes. Needs SSM reads, Secrets Manager DB credentials, and
           # the temporary RDS SG ingress rule for GitHub-hosted runners.
-          role-to-assume: arn:aws:iam::176661590736:role/legacy-sports-dev-github-actions-plan
+          role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME || 'arn:aws:iam::176661590736:role/legacy-sports-dev-github-actions-plan' }}
           aws-region: ${{ env.AWS_REGION }}
 
       # -----------------------------------------------------------------------

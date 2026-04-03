@@ -1,4 +1,8 @@
-import { MIN_FACT_COUNT, TIER_SORT_ORDER } from './DisclosureGameService';
+import {
+  DisclosureGameService,
+  MIN_FACT_COUNT,
+  TIER_SORT_ORDER,
+} from './DisclosureGameService';
 
 /**
  * Unit tests for DisclosureGameService pure/static logic.
@@ -42,6 +46,54 @@ describe('DisclosureGameService', () => {
     it('identifying sort order is the highest value', () => {
       const values = Object.values(TIER_SORT_ORDER);
       expect(TIER_SORT_ORDER.identifying).toBe(Math.max(...values));
+    });
+  });
+
+  describe('calculateScore', () => {
+    it('returns 1000 for first clue (cluesRevealed=1)', () => {
+      expect(DisclosureGameService.calculateScore(1, 10)).toBe(1000);
+    });
+
+    it('returns 1000 when only one clue exists', () => {
+      expect(DisclosureGameService.calculateScore(1, 1)).toBe(1000);
+    });
+
+    it('returns 1000 when cluesRevealed is 0', () => {
+      expect(DisclosureGameService.calculateScore(0, 10)).toBe(1000);
+    });
+
+    it('returns 100 for the last clue (cluesRevealed = totalClues)', () => {
+      expect(DisclosureGameService.calculateScore(10, 10)).toBe(100);
+    });
+
+    it('returns a value between 100 and 1000 for middle clues', () => {
+      const score = DisclosureGameService.calculateScore(5, 10);
+      expect(score).toBeGreaterThanOrEqual(100);
+      expect(score).toBeLessThanOrEqual(1000);
+    });
+
+    it('is monotonically non-increasing as more clues are revealed', () => {
+      const totalClues = 10;
+      let prev = Infinity;
+      for (let i = 1; i <= totalClues; i++) {
+        const score = DisclosureGameService.calculateScore(i, totalClues);
+        expect(score).toBeLessThanOrEqual(prev);
+        prev = score;
+      }
+    });
+
+    it('never goes below 100', () => {
+      for (let i = 1; i <= 20; i++) {
+        expect(
+          DisclosureGameService.calculateScore(i, 20),
+        ).toBeGreaterThanOrEqual(100);
+      }
+    });
+
+    it('is deterministic for the same inputs', () => {
+      expect(DisclosureGameService.calculateScore(5, 10)).toBe(
+        DisclosureGameService.calculateScore(5, 10),
+      );
     });
   });
 });
