@@ -223,20 +223,28 @@ export function PlayerDetailModal({
   const [arcMode, setArcMode] = useState<CareerArcMode>('batting');
 
   // ------ Data fetching ------
-  const { data, loading, error } = useGetAllPlayerSeasonStatsQuery({
-    variables: { playerId: playerId ?? 0 },
-    skip: !playerId || !open,
-  });
+  const { data, previousData, loading, error } =
+    useGetAllPlayerSeasonStatsQuery({
+      variables: { playerId: playerId ?? 0 },
+      skip: !playerId || !open,
+    });
+
+  // Prefer fresh data; fall back to previousData so the modal never shows a
+  // spinner when the query is refetching a player whose data is already cached
+  // or was previously displayed (fixes the LS-2308 loading flicker).
+  const displayData = data ?? previousData;
 
   const { data: arcData } = useGetPlayerCareerArcQuery({
     variables: { playerId: playerId ?? 0 },
     skip: !playerId || !open,
   });
 
-  const eligiblePositions = data?.player?.eligiblePositions ?? [];
+  const eligiblePositions = displayData?.player?.eligiblePositions ?? [];
 
-  // Use fetched name when available (handles direct URL navigation where caller
-  // may only have the player ID, not the name)
+  // Use the current query's fresh data for the modal title so the header
+  // always reflects the requested player. Falling back to `playerName` prop
+  // (not to `previousData`) prevents the header from briefly showing the
+  // prior player's name while a new player's data is in-flight.
   const firstName = data?.player?.firstName;
   const lastName = data?.player?.lastName;
   const resolvedPlayerName =
@@ -244,12 +252,12 @@ export function PlayerDetailModal({
 
   // ------ Transform to season rows ------
   const seasonRows = useMemo((): SeasonRow[] => {
-    if (!data) return [];
+    if (!displayData) return [];
 
     const seasons = new Map<number, SeasonRow>();
 
     // Batting
-    data.playerSeasonBatting?.forEach(
+    displayData.playerSeasonBatting?.forEach(
       (b: {
         season?: number | null;
         games?: number | null;
@@ -289,7 +297,7 @@ export function PlayerDetailModal({
     );
 
     // Pitching
-    data.playerSeasonPitching?.forEach(
+    displayData.playerSeasonPitching?.forEach(
       (p: {
         season?: number | null;
         games?: number | null;
@@ -322,7 +330,7 @@ export function PlayerDetailModal({
     );
 
     // Fielding (aggregate positions per season)
-    data.playerSeasonFielding?.forEach(
+    displayData.playerSeasonFielding?.forEach(
       (f: {
         season?: number | null;
         games?: number | null;
@@ -360,7 +368,7 @@ export function PlayerDetailModal({
     );
 
     return Array.from(seasons.values()).sort((a, b) => b.season - a.season);
-  }, [data]);
+  }, [displayData]);
 
   // ------ Career totals ------
   const careerTotals = useMemo(() => {
@@ -541,7 +549,7 @@ export function PlayerDetailModal({
       <ScrollView maxHeight="calc(88vh - 100px)">
         <YStack padding="$4" gap="$4">
           {/* ── Loading ── */}
-          {loading && (
+          {loading && !displayData && (
             <YStack
               alignItems="center"
               paddingVertical="$8"
@@ -578,7 +586,7 @@ export function PlayerDetailModal({
           )}
 
           {/* ── Empty state ── */}
-          {!loading && !error && seasonRows.length === 0 && (
+          {!!displayData && !error && seasonRows.length === 0 && (
             <YStack
               alignItems="center"
               paddingVertical="$8"
@@ -593,7 +601,7 @@ export function PlayerDetailModal({
           )}
 
           {/* ── Eligible positions ── */}
-          {!loading && !error && eligiblePositions.length > 0 && (
+          {!!displayData && !error && eligiblePositions.length > 0 && (
             <XStack
               gap="$2"
               alignItems="center"
@@ -612,7 +620,7 @@ export function PlayerDetailModal({
           )}
 
           {/* ── Hero stats + position avatar ── */}
-          {!loading && !error && careerTotals && (
+          {!!displayData && !error && careerTotals && (
             <>
               <XStack gap="$3" alignItems="center" flexWrap="wrap">
                 {position && <PositionAvatar position={position} />}
@@ -641,7 +649,7 @@ export function PlayerDetailModal({
           )}
 
           {/* ── Career summary cards ── */}
-          {!loading && !error && careerTotals && (
+          {!!displayData && !error && careerTotals && (
             <XStack gap="$3" flexWrap="wrap" alignItems="flex-start">
               {battingCardRows.length > 0 && (
                 <YStack
@@ -665,7 +673,7 @@ export function PlayerDetailModal({
           )}
 
           {/* ── Season-by-season tabs ── */}
-          {!loading && !error && availableTabs.length > 0 && (
+          {!!displayData && !error && availableTabs.length > 0 && (
             <>
               <Separator borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.18)} />
 
