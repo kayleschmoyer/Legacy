@@ -356,8 +356,8 @@ export function PlayerStatsPage({
                     transition: 'filter 0.22s ease',
                   }}
                 >
-                  <span role="img" aria-label="Baseball">
-                    ⚾
+                  <span role="img" aria-label="Pitching target">
+                    🎯
                   </span>
                 </Text>
                 <Text
