@@ -70,6 +70,8 @@ export function StatTable({ title, headers, rows }: StatTableProps) {
             <Text
               key={h}
               flex={h === 'YEAR' ? 1.2 : 1}
+              minWidth={0}
+              numberOfLines={1}
               fontSize="$2"
               fontWeight="bold"
               color={BRAND_GOLD_LIGHT}
@@ -96,6 +98,8 @@ export function StatTable({ title, headers, rows }: StatTableProps) {
               <Text
                 key={`${cells[0]}-${headers[ci]}`}
                 flex={ci === 0 ? 1.2 : 1}
+                minWidth={0}
+                numberOfLines={1}
                 fontSize="$2"
                 fontWeight={ci === 0 ? '600' : '400'}
                 color={ci === 0 ? BRAND_GOLD_LIGHT : WHITE}
