@@ -33,6 +33,38 @@ inputs:
     description: "Playwright shard in 'X/Y' format (e.g. '1/3'). Empty string runs all tests on this runner."
     required: false
     default: ""
+  e2e-commissioner-email:
+    description: "Email for the integration-test commissioner account (managed via GitHub secret E2E_COMMISSIONER_EMAIL)."
+    required: false
+    default: ""
+  e2e-commissioner-password:
+    description: "Password for the integration-test commissioner account (managed via GitHub secret E2E_COMMISSIONER_PASSWORD)."
+    required: false
+    default: ""
+  e2e-manager-1-email:
+    description: "Email for integration-test manager-1 account (managed via GitHub secret E2E_MANAGER_1_EMAIL)."
+    required: false
+    default: ""
+  e2e-manager-1-password:
+    description: "Password for integration-test manager-1 account (managed via GitHub secret E2E_MANAGER_1_PASSWORD)."
+    required: false
+    default: ""
+  e2e-manager-2-email:
+    description: "Email for integration-test manager-2 account (managed via GitHub secret E2E_MANAGER_2_EMAIL)."
+    required: false
+    default: ""
+  e2e-manager-2-password:
+    description: "Password for integration-test manager-2 account (managed via GitHub secret E2E_MANAGER_2_PASSWORD)."
+    required: false
+    default: ""
+  e2e-manager-3-email:
+    description: "Email for integration-test manager-3 account (managed via GitHub secret E2E_MANAGER_3_EMAIL)."
+    required: false
+    default: ""
+  e2e-manager-3-password:
+    description: "Password for integration-test manager-3 account (managed via GitHub secret E2E_MANAGER_3_PASSWORD)."
+    required: false
+    default: ""
 
 outputs:
   result:
@@ -86,6 +118,17 @@ runs:
 
         # Configure Playwright for CI
         export CI=true
+
+        # Integration test user credentials — passed in from GitHub secrets so
+        # they are not committed to source control (see test-user-auth.ts).
+        [[ -n "${{ inputs.e2e-commissioner-email }}" ]] && export E2E_COMMISSIONER_EMAIL="${{ inputs.e2e-commissioner-email }}"
+        [[ -n "${{ inputs.e2e-commissioner-password }}" ]] && export E2E_COMMISSIONER_PASSWORD="${{ inputs.e2e-commissioner-password }}"
+        [[ -n "${{ inputs.e2e-manager-1-email }}" ]] && export E2E_MANAGER_1_EMAIL="${{ inputs.e2e-manager-1-email }}"
+        [[ -n "${{ inputs.e2e-manager-1-password }}" ]] && export E2E_MANAGER_1_PASSWORD="${{ inputs.e2e-manager-1-password }}"
+        [[ -n "${{ inputs.e2e-manager-2-email }}" ]] && export E2E_MANAGER_2_EMAIL="${{ inputs.e2e-manager-2-email }}"
+        [[ -n "${{ inputs.e2e-manager-2-password }}" ]] && export E2E_MANAGER_2_PASSWORD="${{ inputs.e2e-manager-2-password }}"
+        [[ -n "${{ inputs.e2e-manager-3-email }}" ]] && export E2E_MANAGER_3_EMAIL="${{ inputs.e2e-manager-3-email }}"
+        [[ -n "${{ inputs.e2e-manager-3-password }}" ]] && export E2E_MANAGER_3_PASSWORD="${{ inputs.e2e-manager-3-password }}"
 
         PLAYWRIGHT_BIN="pnpm exec playwright"
 

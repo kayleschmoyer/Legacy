@@ -4,6 +4,8 @@ import { resolve } from 'path';
 
 // Load root .env so JWT_SECRET and other vars are available to test helpers
 config({ path: resolve(__dirname, '../../.env') });
+// Load .env.e2e for local integration test credentials (gitignored)
+config({ path: resolve(__dirname, '../../.env.e2e'), override: false });
 
 export default defineConfig({
   testDir: './src/integration/tests',

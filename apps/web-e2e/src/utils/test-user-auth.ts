@@ -10,23 +10,32 @@
  *   const jwt = await getTestUserJwt({ email: 'mgr1@test.ls', password: 'test-pass-1' });
  */
 
-/** Predefined test users for integration tests. */
+/**
+ * Predefined test users for integration tests.
+ *
+ * Credentials are read from environment variables so they can be managed as
+ * GitHub Actions secrets (E2E_COMMISSIONER_EMAIL, E2E_COMMISSIONER_PASSWORD,
+ * etc.) rather than being committed to source control.  There are no fallback
+ * values — the environment variables must be set before running integration
+ * tests (locally via a `.env.e2e` file loaded by Playwright's `envFile` config
+ * option, or in CI via repository secrets).
+ */
 export const TEST_USERS = {
   COMMISSIONER: {
-    email: 'integration-commissioner@test.legacysports.dev',
-    password: 'ls-integration-test-c0mm!ss',
+    email: process.env['E2E_COMMISSIONER_EMAIL'] ?? '',
+    password: process.env['E2E_COMMISSIONER_PASSWORD'] ?? '',
   },
   MANAGER_1: {
-    email: 'integration-manager-1@test.legacysports.dev',
-    password: 'ls-integration-test-mgr1!',
+    email: process.env['E2E_MANAGER_1_EMAIL'] ?? '',
+    password: process.env['E2E_MANAGER_1_PASSWORD'] ?? '',
   },
   MANAGER_2: {
-    email: 'integration-manager-2@test.legacysports.dev',
-    password: 'ls-integration-test-mgr2!',
+    email: process.env['E2E_MANAGER_2_EMAIL'] ?? '',
+    password: process.env['E2E_MANAGER_2_PASSWORD'] ?? '',
   },
   MANAGER_3: {
-    email: 'integration-manager-3@test.legacysports.dev',
-    password: 'ls-integration-test-mgr3!',
+    email: process.env['E2E_MANAGER_3_EMAIL'] ?? '',
+    password: process.env['E2E_MANAGER_3_PASSWORD'] ?? '',
   },
 } as const;
 

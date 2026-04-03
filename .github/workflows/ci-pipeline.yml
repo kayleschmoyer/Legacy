@@ -307,6 +307,14 @@ jobs:
           shard: ${{ matrix.shard }}
           test-patterns: ${{ inputs.e2e-test-patterns }}
           test-patterns-invert: ${{ inputs.e2e-exclude-patterns }}
+          e2e-commissioner-email: ${{ secrets.E2E_COMMISSIONER_EMAIL }}
+          e2e-commissioner-password: ${{ secrets.E2E_COMMISSIONER_PASSWORD }}
+          e2e-manager-1-email: ${{ secrets.E2E_MANAGER_1_EMAIL }}
+          e2e-manager-1-password: ${{ secrets.E2E_MANAGER_1_PASSWORD }}
+          e2e-manager-2-email: ${{ secrets.E2E_MANAGER_2_EMAIL }}
+          e2e-manager-2-password: ${{ secrets.E2E_MANAGER_2_PASSWORD }}
+          e2e-manager-3-email: ${{ secrets.E2E_MANAGER_3_EMAIL }}
+          e2e-manager-3-password: ${{ secrets.E2E_MANAGER_3_PASSWORD }}
 
       - name: "Upload Blob Report to S3"
         if: ${{ !cancelled() }}
