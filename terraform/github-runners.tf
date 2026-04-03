@@ -104,6 +104,7 @@ module "github_runners" {
   # log_class property that causes the agent to fail on startup (LS-1667).
   # Ships cloud-init (userdata) and syslog output to CloudWatch for debugging
   # runner boot failures and spot interruption events.
+  # amazon-cloudwatch-agent is now baked into the AMI (LS-2247/LS-2301).
   enable_cloudwatch_agent = true
   cloudwatch_config = jsonencode({
     logs = {
@@ -177,6 +178,16 @@ module "github_runners" {
   # after extraction so the ubuntu runner user can access the store.
   userdata_pre_install = <<-EOT
     echo "Using pre-baked Ubuntu AMI - Node.js, pnpm, Playwright already installed"
+
+    # Convert Ubuntu apt sources from HTTP to HTTPS so apt-get update works under
+    # the runner SG egress policy (port 443 open, port 80 limited to 169.254.169.254).
+    # The GitHub Actions runner's installdependencies.sh runs apt-get update and
+    # fails if it can't reach HTTP mirrors. HTTPS mirrors are fully equivalent and
+    # supported by apt-transport-https (pre-installed on Ubuntu 22.04).
+    sed -i 's|http://us-east-1.ec2.archive.ubuntu.com|https://archive.ubuntu.com|g' /etc/apt/sources.list
+    sed -i 's|http://security.ubuntu.com|https://security.ubuntu.com|g' /etc/apt/sources.list
+    # Prefer IPv4 to skip IPv6 timeout delays (VPC has no IPv6 internet route).
+    echo 'Acquire::ForceIPv4 "true";' > /etc/apt/apt.conf.d/99force-ipv4
 
     CACHE_BUCKET="${local.name_prefix}-runner-cache"
     PNPM_STORE="/home/ubuntu/.local/share/pnpm/store"
@@ -469,8 +480,10 @@ resource "aws_iam_policy" "runner_permissions_boundary" {
       },
       # S3 — runner binary bucket (managed by the module).
       # PutObject is required by the runner-binaries-syncer Lambda to upload
-      # new runner tarballs; GetObject/ListBucket are used by EC2 instances
-      # and scale-up Lambda to download the binary during provisioning.
+      # new runner tarballs; PutObjectTagging is required by the syncer to tag
+      # uploaded objects (the module uses tags to track the current version);
+      # GetObject/ListBucket are used by EC2 instances and scale-up Lambda to
+      # download the binary during provisioning.
       {
         Sid    = "S3RunnerBinaries"
         Effect = "Allow"
@@ -478,12 +491,34 @@ resource "aws_iam_policy" "runner_permissions_boundary" {
           "s3:GetObject",
           "s3:GetObjectVersion",
           "s3:ListBucket",
-          "s3:PutObject"
+          "s3:PutObject",
+          "s3:PutObjectTagging"
         ]
         Resource = [
           "arn:aws:s3:::${local.name_prefix}-runner-*",
           "arn:aws:s3:::${local.name_prefix}-runner-*/*"
         ]
+      },
+      # KMS — SSM SecureString registration tokens are encrypted with the
+      # AWS-managed aws/ssm key. When an EC2 instance calls
+      # ssm:GetParameter --with-decryption, IAM evaluates the caller's
+      # kms:Decrypt against the boundary. Without this grant the boundary
+      # blocks the decrypt even though the identity policy allows it, and
+      # config.sh silently fails to obtain the GitHub registration token.
+      # ViaService condition scopes the grant to SSM-initiated KMS calls only.
+      {
+        Sid    = "KMSSSMDecrypt"
+        Effect = "Allow"
+        Action = [
+          "kms:Decrypt",
+          "kms:GenerateDataKey"
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "kms:ViaService" = "ssm.${local.region}.amazonaws.com"
+          }
+        }
       },
       # SQS — scale-up Lambda reads from the queued-builds queue, webhook
       # Lambda sends to EventBridge which routes to SQS
