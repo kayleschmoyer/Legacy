@@ -563,6 +563,10 @@ jobs:
               echo "$SUMMARY_LINE1"
               echo "$SUMMARY_LINE2"
               echo "$SUMMARY_LINE3"
+              if [ "$STATUS" != "success" ]; then
+                echo ""
+                echo "**Debug:** \`/read-playwright-report ${DEST}\` in Claude Code"
+              fi
               echo 'EOF_PLAYWRIGHT_NOTIFY'
             } >> "$GITHUB_OUTPUT"
           else
