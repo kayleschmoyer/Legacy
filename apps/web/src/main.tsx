@@ -50,6 +50,7 @@ initializeAnalytics();
 // Create secure OAuth configuration (single-lambda architecture)
 const authConfig: OAuthConfig = {
   googleClientId: env.googleClientId,
+  discordClientId: env.discordClientId,
   oauthProxyUrl: env.oauthProxyUrl,
   additionalScopes: ['openid', 'profile', 'email'],
   offlineAccess: true,

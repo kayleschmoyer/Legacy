@@ -158,6 +158,69 @@ export class AuthService {
   }
 
   /**
+   * Authenticate user with Discord authorization code.
+   * POSTs the code to the `/discord` endpoint; the lambda exchanges it
+   * for a Discord access token and returns a JWT on success.
+   */
+  async authenticateWithDiscord(code: string): Promise<User> {
+    try {
+      const response = await fetch(`${this.oauthProxyUrl}/discord`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ code }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        let message = `Discord OAuth failed: ${response.status}`;
+        try {
+          const errorData = JSON.parse(errorText) as {
+            message?: string;
+            error?: string;
+          };
+          if (errorData.message || errorData.error) {
+            message = errorData.message ?? errorData.error ?? message;
+          }
+        } catch {
+          // keep default message
+        }
+        throw new Error(message);
+      }
+
+      const result = (await response.json()) as {
+        jwt: string;
+        csrfToken?: string;
+        user?: {
+          id: number;
+          email: string;
+          username: string;
+          accessLevel: 'none' | 'user' | 'admin';
+        };
+      };
+
+      if (!result.jwt) {
+        throw new Error('Discord OAuth did not return JWT');
+      }
+
+      this.storeTokens({ jwt: result.jwt });
+      if (result.csrfToken) {
+        this.storeCsrfToken(result.csrfToken);
+      }
+
+      return result.user ?? this.getUserFromToken(result.jwt);
+    } catch (error) {
+      LOGGER.error(
+        'AuthService: Discord authentication failed:',
+        String(error),
+      );
+      throw error instanceof Error
+        ? error
+        : new Error('Discord authentication failed');
+    }
+  }
+
+  /**
    * Authenticate user with email/password through local authentication
    */
   async authenticateWithEmail(email: string, password: string): Promise<User> {

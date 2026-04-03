@@ -18,6 +18,8 @@ export interface GSIConfig {
 export interface OAuthConfig {
   /** Google OAuth Client ID */
   googleClientId: string;
+  /** Discord OAuth Application Client ID (optional — enables Discord login button) */
+  discordClientId?: string;
   /** OAuth Proxy Lambda URL (optional - will auto-detect from environment if not provided) */
   oauthProxyUrl?: string;
   /** Additional configuration options */

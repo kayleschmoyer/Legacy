@@ -9,6 +9,8 @@
 export interface EnvironmentConfig {
   readonly oauthProxyUrl: string;
   readonly googleClientId: string;
+  /** Discord OAuth Application Client ID (optional — enables Discord login button) */
+  readonly discordClientId?: string;
   readonly graphqlUrl: string;
   readonly websocketUrl: string;
   readonly isDev: boolean;
@@ -81,6 +83,8 @@ export const getEnvironmentConfig = (): EnvironmentConfig => ({
   growthbookClientKey: import.meta.env.VITE_GROWTHBOOK_CLIENT_KEY as
     | string
     | undefined,
+  discordClientId:
+    (import.meta.env.VITE_DISCORD_CLIENT_ID as string) || undefined,
 });
 
 /**

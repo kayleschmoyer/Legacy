@@ -159,6 +159,13 @@ export const OVERLAY_BLACK_40 = 'rgba(0, 0, 0, 0.4)';
 export const OVERLAY_WHITE_05 = 'rgba(255, 255, 255, 0.05)';
 export const OVERLAY_WHITE_10 = 'rgba(255, 255, 255, 0.1)';
 
+// ─── Brand Partner Colors ──────────────────────────────────
+
+/** Discord brand color (Blurple). */
+export const DISCORD_BLURPLE = '#5865F2';
+/** Discord brand hover color (darker Blurple). */
+export const DISCORD_BLURPLE_DARK = '#4752C4';
+
 // ─── Injury / Status Border Colors ────────────────────────
 
 export const INJURY_HEALTHY = '#22C55E';

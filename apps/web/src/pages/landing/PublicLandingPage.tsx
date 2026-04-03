@@ -17,6 +17,8 @@ import {
   BRAND_NAVY_DARK,
   BRAND_NAVY_LIGHT,
   BRAND_SEAM_RED,
+  DISCORD_BLURPLE,
+  DISCORD_BLURPLE_DARK,
   withAlpha,
 } from '../../constants/colors';
 
@@ -263,11 +265,166 @@ const SPORTS = [
 
 /* ─── Component ─── */
 
+/** Build the Discord OAuth2 authorization URL. */
+function buildDiscordAuthUrl(
+  clientId: string,
+  redirectUri: string,
+  state: string,
+): string {
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    response_type: 'code',
+    scope: 'identify email',
+    state,
+  });
+  return `https://discord.com/api/oauth2/authorize?${params.toString()}`;
+}
+
+const DISCORD_LOGIN_STATE_KEY = 'discord_oauth_login_state';
+
 export function PublicLandingPage(): React.JSX.Element {
   const { config, loginWithOAuth } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [isDiscordLoading, setIsDiscordLoading] = useState(false);
   const [isConfigured, setIsConfigured] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+
+  // Handle Discord OAuth callback: automatically exchange the code when the
+  // page loads on the /auth/discord/callback path.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!window.location.pathname.endsWith('/auth/discord/callback')) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    const state = params.get('state');
+    const error = params.get('error');
+
+    if (error) {
+      setErrorMessage(`Discord sign-in was cancelled or denied.`);
+      return;
+    }
+
+    // Validate state to prevent CSRF / authorization-code injection
+    let storedState: string | null = null;
+    try {
+      if (typeof sessionStorage !== 'undefined') {
+        storedState = sessionStorage.getItem(DISCORD_LOGIN_STATE_KEY);
+        sessionStorage.removeItem(DISCORD_LOGIN_STATE_KEY);
+      }
+    } catch {
+      // sessionStorage unavailable
+    }
+
+    if (!code || !state || state !== storedState) {
+      setErrorMessage(
+        'Discord sign-in failed: invalid state. Please try again.',
+      );
+      return;
+    }
+
+    setIsDiscordLoading(true);
+    setErrorMessage('');
+
+    const oauthProxyUrl = config.oauthProxyUrl ?? 'http://localhost:5001';
+
+    const exchangeCode = async () => {
+      try {
+        const response = await fetch(`${oauthProxyUrl}/discord`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ code }),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          let message = `Discord sign-in failed (${response.status})`;
+          try {
+            const errorData = JSON.parse(errorText) as {
+              message?: string;
+              error?: string;
+            };
+            if (errorData.message ?? errorData.error) {
+              message = (errorData.message ?? errorData.error) as string;
+            }
+          } catch {
+            // keep default
+          }
+          throw new Error(message);
+        }
+
+        const result = (await response.json()) as {
+          jwt: string;
+          csrfToken?: string;
+        };
+
+        if (!result.jwt)
+          throw new Error('Discord sign-in did not return a token');
+
+        // Persist CSRF token so subsequent API requests include it.
+        if (result.csrfToken && typeof localStorage !== 'undefined') {
+          localStorage.setItem('ls_csrf_token', result.csrfToken);
+        }
+
+        // Decode user and expiry from the JWT so AuthProvider can restore
+        // the session immediately on the next page load (no loading flash).
+        try {
+          const parts = result.jwt.split('.');
+          if (parts.length === 3) {
+            const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+            const paddedB64 = b64.padEnd(
+              b64.length + ((4 - (b64.length % 4)) % 4),
+              '=',
+            );
+            const payload = JSON.parse(atob(paddedB64)) as {
+              id?: number;
+              email?: string;
+              username?: string;
+              name?: string;
+              picture?: string;
+              accessLevel?: string;
+              exp?: number;
+            };
+            const userProfile = {
+              id: payload.id ?? 0,
+              email: payload.email ?? '',
+              username: payload.username ?? payload.name ?? 'Unknown',
+              picture: payload.picture,
+              accessLevel: payload.accessLevel ?? 'user',
+            };
+            if (typeof localStorage !== 'undefined') {
+              localStorage.setItem(
+                'ls_user_profile',
+                JSON.stringify(userProfile),
+              );
+              if (payload.exp) {
+                localStorage.setItem('ls_token_expiry', String(payload.exp));
+              }
+            }
+          }
+        } catch {
+          // Best-effort — AuthProvider will refresh on next load
+        }
+
+        // Navigate to home; AuthProvider will restore the session from cache
+        // and the HttpOnly JWT cookie will authenticate API requests.
+        window.location.replace('/');
+      } catch (err) {
+        LOGGER.error('Discord callback exchange failed:', String(err));
+        setErrorMessage(
+          err instanceof Error
+            ? err.message
+            : 'Discord sign-in failed. Please try again.',
+        );
+      } finally {
+        setIsDiscordLoading(false);
+      }
+    };
+
+    void exchangeCode();
+  }, [config.oauthProxyUrl]);
 
   // Configure OAuth on mount
   useEffect(() => {
@@ -336,6 +493,33 @@ export function PublicLandingPage(): React.JSX.Element {
       setIsLoading(false);
     }
   }, [isConfigured, isLoading, loginWithOAuth]);
+
+  const handleDiscordSignIn = useCallback(() => {
+    const clientId = config.discordClientId;
+    if (!clientId) return;
+
+    // Generate a cryptographically random state to prevent CSRF / code injection
+    const stateBytes = new Uint8Array(16);
+    window.crypto.getRandomValues(stateBytes);
+    const state = Array.from(stateBytes, (b) =>
+      b.toString(16).padStart(2, '0'),
+    ).join('');
+    try {
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.setItem(DISCORD_LOGIN_STATE_KEY, state);
+      }
+    } catch {
+      // sessionStorage unavailable — state won't survive redirect, abort
+      return;
+    }
+
+    const appBaseUrl = new URL(
+      import.meta.env.BASE_URL,
+      window.location.origin,
+    );
+    const redirectUri = new URL('auth/discord/callback', appBaseUrl).toString();
+    window.location.href = buildDiscordAuthUrl(clientId, redirectUri, state);
+  }, [config.discordClientId]);
 
   const navGlassStyle = useMemo<React.CSSProperties>(
     () => ({
@@ -468,6 +652,36 @@ export function PublicLandingPage(): React.JSX.Element {
                   )}
                 </XStack>
               </SignInButton>
+              {config.discordClientId ? (
+                <SignInButton
+                  onPress={handleDiscordSignIn}
+                  role="button"
+                  aria-label="Get started with Discord"
+                  backgroundColor={DISCORD_BLURPLE}
+                  hoverStyle={{
+                    backgroundColor: DISCORD_BLURPLE_DARK,
+                    transform: 'translateY(-2px)',
+                  }}
+                >
+                  <XStack
+                    alignItems="center"
+                    gap="$2.5"
+                    minWidth={200}
+                    justifyContent="center"
+                  >
+                    {isDiscordLoading ? (
+                      <Spinner size="small" color="$color1" />
+                    ) : (
+                      <>
+                        <BrandIcon name="discord" size={18} />
+                        <Text fontSize="$4" color="$color1" fontWeight="700">
+                          Continue with Discord
+                        </Text>
+                      </>
+                    )}
+                  </XStack>
+                </SignInButton>
+              ) : null}
             </XStack>
 
             {errorMessage ? (
@@ -666,28 +880,57 @@ export function PublicLandingPage(): React.JSX.Element {
             </Text>
           </YStack>
 
-          <SignInButton
-            onPress={() => {
-              void handleSignIn();
-            }}
-            role="button"
-            aria-label="Get started"
-          >
-            <XStack
-              alignItems="center"
-              gap="$2.5"
-              minWidth={200}
-              justifyContent="center"
+          <XStack gap="$3" flexWrap="wrap" justifyContent="center">
+            <SignInButton
+              onPress={() => {
+                void handleSignIn();
+              }}
+              role="button"
+              aria-label="Get started"
             >
-              {isLoading ? (
-                <Spinner size="small" color="$color1" />
-              ) : (
-                <Text fontSize="$4" color="$color1" fontWeight="700">
-                  Get Started Free
-                </Text>
-              )}
-            </XStack>
-          </SignInButton>
+              <XStack
+                alignItems="center"
+                gap="$2.5"
+                minWidth={180}
+                justifyContent="center"
+              >
+                {isLoading ? (
+                  <Spinner size="small" color="$color1" />
+                ) : (
+                  <Text fontSize="$4" color="$color1" fontWeight="700">
+                    Get Started Free
+                  </Text>
+                )}
+              </XStack>
+            </SignInButton>
+            {config.discordClientId ? (
+              <SignInButton
+                onPress={handleDiscordSignIn}
+                role="button"
+                aria-label="Get started with Discord"
+                style={{ backgroundColor: DISCORD_BLURPLE }}
+                hoverStyle={{ backgroundColor: DISCORD_BLURPLE_DARK }}
+              >
+                <XStack
+                  alignItems="center"
+                  gap="$2.5"
+                  minWidth={180}
+                  justifyContent="center"
+                >
+                  {isDiscordLoading ? (
+                    <Spinner size="small" color="$color1" />
+                  ) : (
+                    <>
+                      <BrandIcon name="discord" size={18} />
+                      <Text fontSize="$4" color="$color1" fontWeight="700">
+                        Continue with Discord
+                      </Text>
+                    </>
+                  )}
+                </XStack>
+              </SignInButton>
+            ) : null}
+          </XStack>
 
           {errorMessage ? (
             <Text fontSize="$3" color="$red9" textAlign="center">
