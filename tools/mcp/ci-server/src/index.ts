@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
+import { auditSessionBash } from './tools/audit-session-bash.js';
 import { autoFix } from './tools/auto-fix.js';
 import { dispatchWorkflow } from './tools/dispatch-workflow.js';
 import { getLogs } from './tools/get-logs.js';
@@ -240,6 +241,42 @@ server.tool(
       ),
   },
   async (params) => getPlaywrightReport(params),
+);
+
+server.tool(
+  'ci_audit_session_bash',
+  'Extract Bash tool_use calls (and optionally MCP overflows/failures) from the current Claude Code session transcript. ' +
+    'Reads JSONL session files from ~/.claude/projects/ and returns a structured JSON report with every Bash command executed ' +
+    'during the session — including subagent transcripts. Designed for the MCP gap audit (Phase 1) to produce a complete ' +
+    'Bash command inventory that survives context-window compaction. ' +
+    'Auto-detects the current session and project when no parameters are provided.',
+  {
+    sessionId: z
+      .string()
+      .optional()
+      .describe(
+        'Session UUID. Defaults to the most recently modified JSONL in the project directory.',
+      ),
+    project: z
+      .string()
+      .optional()
+      .describe(
+        'Project slug (e.g. "D--code-legacy-sports"). Auto-detected from CWD if omitted.',
+      ),
+    includeMcp: z
+      .boolean()
+      .default(false)
+      .describe(
+        'Include MCP tool overflows and failures in the report (default: false).',
+      ),
+    pid: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Process ID to look up session ID from ~/.claude/sessions/.'),
+  },
+  async (params) => auditSessionBash(params),
 );
 
 const transport = new StdioServerTransport();
