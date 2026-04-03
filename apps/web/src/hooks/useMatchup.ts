@@ -15,13 +15,19 @@ import {
  * Hook for fetching a single matchup by ID
  */
 export function useMatchupById(matchupId: number | null | undefined) {
-  const { data, loading, error, refetch } = useGetMatchupByIdQuery({
-    variables: { id: matchupId ?? 0 },
-    skip: !matchupId,
-  });
+  const { data, previousData, loading, error, refetch } =
+    useGetMatchupByIdQuery({
+      variables: { id: matchupId ?? 0 },
+      skip: !matchupId,
+    });
+
+  // Only fall back to previousData when a valid matchupId is present (i.e.,
+  // the query is not skipped). Without this guard, previousData would surface
+  // stale matchup content whenever the caller clears matchupId (skip: true).
+  const resolvedData = matchupId ? (data ?? previousData) : data;
 
   return {
-    matchup: data?.getMatchupById ?? null,
+    matchup: resolvedData?.getMatchupById ?? null,
     loading,
     error,
     refetch,
