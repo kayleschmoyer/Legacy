@@ -23,6 +23,7 @@ on:
         options:
           - e2e
           - integration
+          - all
       test-grep:
         description: "Filter tests by tag (Playwright --grep)"
         required: false
@@ -124,8 +125,8 @@ jobs:
       - id: set
         shell: bash
         run: |
-          if [ "${{ github.event_name }}" = "schedule" ]; then
-            # Nightly: integration (1 shard) + e2e (3 shards), all tests, no filters
+          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ inputs.test-suite }}" = "all" ]; then
+            # Nightly or manual "all": integration (1 shard) + e2e (3 shards), all tests, no filters
             echo 'matrix=[{"suite":"integration","shard":"1/1"},{"suite":"e2e","shard":"1/3"},{"suite":"e2e","shard":"2/3"},{"suite":"e2e","shard":"3/3"}]' >> "$GITHUB_OUTPUT"
           else
             SUITE="${{ inputs.test-suite }}"
@@ -172,6 +173,16 @@ jobs:
               echo 'EOF_PLAYWRIGHT_NOTIFY'
             } >> "$GITHUB_OUTPUT"
             echo "thread_name=Nightly Playwright — ${{ github.run_id }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ inputs['test-suite'] }}" = "all" ]; then
+            echo "title=Manual Playwright Suite (All)" >> "$GITHUB_OUTPUT"
+            {
+              echo 'description<<EOF_PLAYWRIGHT_NOTIFY'
+              echo '**Suite:** Integration (1 shard, real server) + E2E (3 shards)'
+              echo '**Browser:** chromium · **Workers:** 4 · **Retries:** 2'
+              echo '**Filters:** none — all tests including @slow'
+              echo 'EOF_PLAYWRIGHT_NOTIFY'
+            } >> "$GITHUB_OUTPUT"
+            echo "thread_name=Manual Playwright (All) — ${{ github.run_number }}" >> "$GITHUB_OUTPUT"
           else
             SUITE="${{ inputs['test-suite'] || 'e2e' }}"
             BROWSER="${{ inputs.browser || 'chromium' }}"
@@ -230,8 +241,8 @@ jobs:
       - name: "Install Playwright Browsers"
         shell: bash
         run: |
-          # Nightly always uses chromium; manual dispatch respects the browser input.
-          if [ "${{ github.event_name }}" = "schedule" ]; then
+          # Nightly-like runs always use chromium; manual dispatch respects the browser input.
+          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ inputs['test-suite'] }}" = "all" ]; then
             BROWSER_ENGINE="chromium"
           else
             BROWSER="${{ inputs.browser }}"
@@ -318,6 +329,10 @@ jobs:
         run: |
           SUITE="${{ matrix.suite }}"
           IS_SCHEDULE="${{ github.event_name == 'schedule' }}"
+          IS_NIGHTLY_LIKE="false"
+          if [ "$IS_SCHEDULE" = "true" ] || [ "${{ inputs['test-suite'] }}" = "all" ]; then
+            IS_NIGHTLY_LIKE="true"
+          fi
 
           if [ "$SUITE" = "integration" ]; then
             CONFIG="apps/web-e2e/playwright.integration.config.ts"
@@ -330,15 +345,15 @@ jobs:
 
           # Browser / project (integration config has no named projects)
           if [ "$SUITE" != "integration" ]; then
-            if [ "$IS_SCHEDULE" = "true" ]; then
+            if [ "$IS_NIGHTLY_LIKE" = "true" ]; then
               PLAYWRIGHT_ARGS+=( "--project=chromium" )
             else
               PLAYWRIGHT_ARGS+=( "--project=${{ inputs.browser }}" )
             fi
           fi
 
-          # Grep patterns — nightly runs all tests (no filters, @slow included)
-          if [ "$IS_SCHEDULE" != "true" ]; then
+          # Grep patterns — nightly-like runs all tests (no filters, @slow included)
+          if [ "$IS_NIGHTLY_LIKE" != "true" ]; then
             if [ "${{ inputs.test-grep }}" != "(all)" ]; then
               PLAYWRIGHT_ARGS+=( "--grep=${{ inputs.test-grep }}" )
             fi
@@ -349,7 +364,7 @@ jobs:
 
           # Specific test file (manual dispatch only)
           TEST_FILE=""
-          if [ "$IS_SCHEDULE" != "true" ] && [ -n "${{ inputs.test-file }}" ]; then
+          if [ "$IS_NIGHTLY_LIKE" != "true" ] && [ -n "${{ inputs.test-file }}" ]; then
             TEST_FILE="${{ inputs.test-file }}"
           fi
 
@@ -357,14 +372,14 @@ jobs:
           PLAYWRIGHT_ARGS+=( "--shard=${{ matrix.shard }}" )
 
           # Workers and retries
-          if [ "$IS_SCHEDULE" = "true" ]; then
+          if [ "$IS_NIGHTLY_LIKE" = "true" ]; then
             PLAYWRIGHT_ARGS+=( "--workers=4" "--retries=2" )
           else
             PLAYWRIGHT_ARGS+=( "--workers=${{ inputs.workers }}" "--retries=${{ inputs.retries }}" )
           fi
 
           # Headed mode (manual dispatch only)
-          if [ "$IS_SCHEDULE" != "true" ] && [ "${{ inputs.headed }}" = "true" ]; then
+          if [ "$IS_NIGHTLY_LIKE" != "true" ] && [ "${{ inputs.headed }}" = "true" ]; then
             PLAYWRIGHT_ARGS+=( "--headed" )
           fi
 
@@ -514,7 +529,7 @@ jobs:
           echo "status=$STATUS" >> "$GITHUB_OUTPUT"
 
           # Build test run summary
-          if [ "${{ github.event_name }}" = "schedule" ]; then
+          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ inputs['test-suite'] }}" = "all" ]; then
             SUMMARY_LINE1="**Suite:** Integration (1 shard, real server) + E2E (3 shards)"
             SUMMARY_LINE2="**Browser:** chromium · **Workers:** 4 · **Retries:** 2"
             SUMMARY_LINE3="**Filters:** none — all tests including @slow"
