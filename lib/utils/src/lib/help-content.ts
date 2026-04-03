@@ -130,6 +130,9 @@ export const HELP_GETTING_STARTED_STEPS: HelpGettingStartedStep[] = [
 
 /* ─── Contact / support options ─── */
 
+/** Canonical Discord invite URL — single source of truth for all help UI. */
+export const DISCORD_URL = 'https://discord.gg/legacy-sports';
+
 export const HELP_CONTACT_ITEMS: HelpContactItem[] = [
   {
     icon: '🐛',
@@ -151,5 +154,12 @@ export const HELP_CONTACT_ITEMS: HelpContactItem[] = [
     description:
       'Chat with other managers, share tips, and get advice from the community.',
     url: 'https://github.com/bbarclay/legacy-sports/discussions',
+  },
+  {
+    icon: '🎮',
+    title: 'Join our Discord',
+    description:
+      'Get real-time help, chat with the community, and reach the team faster.',
+    url: DISCORD_URL,
   },
 ];

@@ -322,4 +322,29 @@ test.describe('Help Page — contact and support @regression', () => {
     await expect(popup).toHaveURL(/github\.com.*discussions/i);
     await popup.close();
   });
+
+  test('shows Join our Discord contact option', async ({ page }) => {
+    await expect(page.getByText('Join our Discord')).toBeVisible();
+  });
+
+  test('Join our Discord option links to discord.gg/legacy-sports', async ({
+    page,
+  }) => {
+    const link = page.getByRole('link', { name: /join our discord/i });
+    await expect(link).toBeVisible();
+    await expect(link).toHaveAttribute('href', /discord\.gg\/legacy-sports/i);
+  });
+
+  test('urgent account issues callout links to Discord #urgent-support', async ({
+    page,
+  }) => {
+    await expect(page.getByText(/urgent account issues/i)).toBeVisible();
+    const discordLink = page.getByRole('link', { name: /discord server/i });
+    await expect(discordLink).toBeVisible();
+    await expect(discordLink).toHaveAttribute(
+      'href',
+      /discord\.gg\/legacy-sports/i,
+    );
+    await expect(page.getByText(/#urgent-support/i)).toBeVisible();
+  });
 });

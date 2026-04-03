@@ -10,6 +10,7 @@ import {
 } from '@legacy-sports/shared-components/ui';
 import { ScrollView, styled } from 'tamagui';
 import {
+  DISCORD_URL,
   HELP_CONTACT_ITEMS,
   HELP_FAQ_ITEMS,
   HELP_GETTING_STARTED_STEPS,
@@ -583,15 +584,16 @@ export default function HelpPage() {
                   </Paragraph>
                   <Paragraph color="$colorPress" fontSize="$3" lineHeight={20}>
                     For account access problems or missed draft notifications,
-                    open a GitHub issue tagged{' '}
-                    <Paragraph
-                      tag="span"
-                      fontFamily="$mono"
-                      color={BRAND_GOLD_LIGHT}
+                    join our{' '}
+                    <a
+                      href={DISCORD_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: BRAND_GOLD_LIGHT, fontWeight: 600 }}
                     >
-                      urgent
-                    </Paragraph>{' '}
-                    and we'll respond as soon as possible.
+                      Discord server
+                    </a>{' '}
+                    and post in #urgent-support — we respond much faster there.
                   </Paragraph>
                 </YStack>
               </SectionBody>

@@ -1,4 +1,5 @@
 import {
+  DISCORD_URL,
   HELP_CONTACT_ITEMS,
   HELP_FAQ_ITEMS,
   HELP_GETTING_STARTED_STEPS,
@@ -299,12 +300,15 @@ export default function HelpScreen(): React.JSX.Element {
                 🚨 Urgent account issues?
               </Text>
               <Text color="$colorPress" fontSize="$3" lineHeight={20}>
-                For account access problems or missed draft notifications, open
-                a GitHub issue tagged{' '}
-                <Text fontFamily="$mono" color={BRAND_GOLD}>
-                  urgent
+                For account access problems or missed draft notifications, join
+                our{' '}
+                <Text
+                  color={BRAND_GOLD}
+                  onPress={() => void Linking.openURL(DISCORD_URL)}
+                >
+                  Discord server
                 </Text>{' '}
-                and we'll respond as soon as possible.
+                and post in #urgent-support — we respond much faster there.
               </Text>
             </YStack>
           </YStack>
