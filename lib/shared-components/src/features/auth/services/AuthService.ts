@@ -65,6 +65,8 @@ interface UnauthorizedUserError {
 export class AuthService {
   private config: OAuthConfig;
   private oauthProxyUrl: string;
+  /** In-memory JWT — not persisted to localStorage, reducing persistence and exposure surface. */
+  private _currentJwt: string | null = null;
 
   constructor(config: OAuthConfig) {
     this.config = config;
@@ -422,6 +424,9 @@ export class AuthService {
    * Only the refresh token (if present) is kept in localStorage for mobile.
    */
   private storeTokens(tokens: AuthTokens): void {
+    // Keep in memory so callers (e.g. WebSocket) can use it without reading
+    // the HttpOnly cookie (which JS cannot access).
+    this._currentJwt = tokens.jwt;
     try {
       if (typeof localStorage !== 'undefined') {
         // Do NOT store JWT in localStorage — it's now in an HttpOnly cookie.
@@ -451,6 +456,18 @@ export class AuthService {
   }
 
   /**
+   * Return the JWT that was last received from the server (in-memory only).
+   *
+   * The JWT is NOT stored in localStorage — it lives only in the JS heap for
+   * the lifetime of the page. Returns null before the first login or refresh.
+   * Callers such as the WebSocket client use this to pass the token as a query
+   * param when the HttpOnly cookie is not sent to a different subdomain.
+   */
+  getCurrentToken(): string | null {
+    return this._currentJwt;
+  }
+
+  /**
    * Get stored JWT token.
    *
    * On web, the JWT is in an HttpOnly cookie (not accessible to JS).
@@ -473,6 +490,7 @@ export class AuthService {
    * Clear stored tokens and cached profile (logout)
    */
   clearTokens(): void {
+    this._currentJwt = null;
     try {
       if (typeof localStorage !== 'undefined') {
         localStorage.removeItem('auth_jwt');

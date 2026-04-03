@@ -49,6 +49,8 @@ interface AuthContextType {
   isLoading: boolean;
   error: string | null;
   config: OAuthConfig;
+  /** In-memory JWT, available after login or first token refresh. Null on initial page load until refresh completes. */
+  token: string | null;
   login: (email: string, password: string) => Promise<void>;
   loginWithOAuth: (oauthResponse: OAuthResponse) => Promise<void>;
   loginWithProvider: () => Promise<void>;
@@ -106,6 +108,8 @@ interface AuthState {
   error: string | null;
   isImpersonating: boolean;
   adminUser: User | null;
+  /** In-memory JWT, available after login or first token refresh. */
+  token: string | null;
 }
 
 type AuthAction =
@@ -115,6 +119,7 @@ type AuthAction =
   | { type: 'AUTH_LOGOUT' }
   | { type: 'CLEAR_ERROR' }
   | { type: 'SET_LOADING'; payload: boolean }
+  | { type: 'TOKEN_UPDATED'; payload: string | null }
   | {
       type: 'IMPERSONATE_START';
       payload: { adminUser: User; targetUser: User };
@@ -127,6 +132,7 @@ const initialAuthState: AuthState = {
   error: null,
   isImpersonating: false,
   adminUser: null,
+  token: null,
 };
 
 const authReducer = (state: AuthState, action: AuthAction): AuthState => {
@@ -163,7 +169,11 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         error: null,
         isImpersonating: false,
         adminUser: null,
+        token: null,
       };
+
+    case 'TOKEN_UPDATED':
+      return { ...state, token: action.payload };
 
     case 'CLEAR_ERROR':
       return {
@@ -206,7 +216,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
   onUserSwitch,
 }) => {
   const [authState, dispatchAuth] = useReducer(authReducer, initialAuthState);
-  const { user, isLoading, error, isImpersonating, adminUser } = authState;
+  const { user, isLoading, error, isImpersonating, adminUser, token } =
+    authState;
 
   const authService = useMemo(() => new AuthService(config), [config]);
 
@@ -300,6 +311,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
           .refreshJwt()
           .then((newToken) => {
             if (!newToken) return; // Silently skip; error link handles hard failures
+            dispatchAuth({ type: 'TOKEN_UPDATED', payload: newToken });
             const userInfo = decodeUserFromToken(newToken);
             if (userInfo) {
               dispatchAuth({ type: 'AUTH_SUCCESS', payload: userInfo });
@@ -377,6 +389,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
                 type: 'IMPERSONATE_START',
                 payload: { adminUser: adminProfile, targetUser },
               });
+              // Keep the in-memory token in sync with the impersonation JWT
+              // so the WebSocket authenticates as the impersonated user.
+              dispatchAuth({
+                type: 'TOKEN_UPDATED',
+                payload: impersonationToken,
+              });
               return;
             }
           }
@@ -411,6 +429,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
                 .refreshJwt()
                 .then((freshToken) => {
                   if (!freshToken || !isMounted) return;
+                  dispatchAuth({ type: 'TOKEN_UPDATED', payload: freshToken });
                   // Always reschedule proactive refresh when we have a fresh
                   // token, even if user decoding fails.
                   scheduleProactiveRefresh(freshToken);
@@ -430,6 +449,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
               // Token may be expired — attempt a silent refresh
               const newToken = await authService.refreshJwt();
               if (newToken && isMounted) {
+                dispatchAuth({ type: 'TOKEN_UPDATED', payload: newToken });
                 const refreshedUser = decodeUserFromToken(newToken);
                 if (refreshedUser) {
                   authService.storeUserProfile(refreshedUser);
@@ -484,6 +504,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
         );
         authService.storeUserProfile(userInfo);
         dispatchAuth({ type: 'AUTH_SUCCESS', payload: userInfo });
+        const jwt = authService.getCurrentToken();
+        if (jwt) dispatchAuth({ type: 'TOKEN_UPDATED', payload: jwt });
         const expiry = authService.getStoredTokenExpiry();
         if (expiry) scheduleProactiveRefresh(expiry);
       } catch (error) {
@@ -504,6 +526,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
         const userInfo = await authService.authenticateWithOAuth(oauthResponse);
         authService.storeUserProfile(userInfo);
         dispatchAuth({ type: 'AUTH_SUCCESS', payload: userInfo });
+        const jwt = authService.getCurrentToken();
+        if (jwt) dispatchAuth({ type: 'TOKEN_UPDATED', payload: jwt });
         const expiry = authService.getStoredTokenExpiry();
         if (expiry) scheduleProactiveRefresh(expiry);
       } catch (error) {
@@ -574,6 +598,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
         payload: { adminUser: currentAdminUser, targetUser },
       });
 
+      // Keep the in-memory token in sync so the WebSocket (and other callers
+      // of authState.token) authenticate as the impersonated user rather than
+      // the admin.
+      dispatchAuth({ type: 'TOKEN_UPDATED', payload: impersonationToken });
+
       // Flush any user-scoped caches (e.g. Apollo InMemoryCache) so the new
       // identity never receives another user's cached responses.
       void onUserSwitch?.();
@@ -603,6 +632,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
     authService.storeUserProfile(adminProfile);
 
     dispatchAuth({ type: 'IMPERSONATE_STOP', payload: adminProfile });
+
+    // Clear the impersonation token from in-memory state so the WebSocket
+    // falls back to the admin's HttpOnly cookie for subsequent connections.
+    dispatchAuth({ type: 'TOKEN_UPDATED', payload: null });
 
     // Flush any user-scoped caches (e.g. Apollo InMemoryCache) so the restored
     // admin session never gets stale impersonated-user data.
@@ -634,6 +667,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
       isLoading,
       error,
       config,
+      token,
       login,
       loginWithOAuth,
       loginWithProvider,
@@ -649,6 +683,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
       isLoading,
       error,
       config,
+      token,
       login,
       loginWithOAuth,
       loginWithProvider,

@@ -455,7 +455,7 @@ export function LeagueDetailPage(): React.JSX.Element {
     'activity' | 'chat' | 'scoring'
   >('activity');
 
-  const { user } = useAuth();
+  const { user, token: authToken } = useAuth();
 
   // Ref to hold refetchCurrentWeek so WebSocket callbacks can call it
   // without creating a hook-ordering dependency
@@ -694,11 +694,11 @@ export function LeagueDetailPage(): React.JSX.Element {
     let active = true;
     const client = new WebSocketClient({
       url: wsUrl,
-      // No token — auth is carried by the HttpOnly cookie sent with the WS handshake.
-      // NOTE: If the WS endpoint is on a different domain than the API (e.g.
-      // ws.legacy-fantasy.com vs api.legacy-fantasy.com), the cookie won't be
-      // sent. In that case, set a `Domain=.legacy-fantasy.com` attribute on
-      // the cookie or pass the token via query string.
+      // Pass the in-memory JWT as a query param so the server can authenticate
+      // even when the HttpOnly cookie isn't sent (e.g. when the WS endpoint is
+      // on a different subdomain and the cookie domain wasn't set at login time).
+      // Falls back to cookie-based auth when the token isn't available yet.
+      token: authToken ?? undefined,
       leagueId,
       viewContext: 'league',
       autoConnect: false,
@@ -725,7 +725,7 @@ export function LeagueDetailPage(): React.JSX.Element {
       setWsClient(null);
       setWsConnected(false);
     };
-  }, [leagueId, isAuthenticated]);
+  }, [leagueId, isAuthenticated, authToken]);
 
   // Subscribe to league-level events on the shared socket.
   useEffect(() => {
