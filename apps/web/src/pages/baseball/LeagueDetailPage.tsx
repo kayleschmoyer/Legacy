@@ -530,6 +530,8 @@ export function LeagueDetailPage(): React.JSX.Element {
     loading,
     error,
     refetch: refetchLeague,
+    startPolling: startLeaguePolling,
+    stopPolling: stopLeaguePolling,
   } = useGetLeagueByIdQuery({
     skip: isNaN(leagueId),
     variables: { id: leagueId },
@@ -799,6 +801,24 @@ export function LeagueDetailPage(): React.JSX.Element {
       wsClient.setHeartbeatInterval();
     }
   }, [wsClient, draftStatus]);
+
+  // Polling fallback: when the WebSocket is not connected and a draft is active,
+  // poll every 30 s so the page picks up DRAFT_COMPLETED even if the WS auth
+  // cookie was not sent to the ws. subdomain (LS-2303).
+  useEffect(() => {
+    if (
+      !wsConnected &&
+      (draftStatus === 'in-progress' || draftStatus === 'queued')
+    ) {
+      startLeaguePolling(30_000);
+    } else {
+      stopLeaguePolling();
+    }
+
+    return () => {
+      stopLeaguePolling();
+    };
+  }, [wsConnected, draftStatus, startLeaguePolling, stopLeaguePolling]);
 
   // When the draft transitions to 'completed' (via WS event or reconnect
   // catch-up), also refetch team members so newly drafted players appear on the
