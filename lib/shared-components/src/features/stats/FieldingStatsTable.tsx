@@ -1,22 +1,23 @@
-import React, { useMemo } from 'react';
-import { ScrollView, Text, XStack, YStack } from 'tamagui';
+import React from 'react';
+import { StatsTable } from './StatsTable';
+import { StatsTableColumn, StatsTableRow } from '../../types';
 
-const TABLE_HEADER = [
-  'Player',
-  'A',
-  'CG',
-  'Chances',
-  'CS',
-  'DP Def',
-  'E Def',
-  'G',
-  'GS',
-  'Inn Def',
-  'Pickoffs',
-  'PO',
-  'Pos',
-  'SB',
-  'WP',
+const FIELDING_COLUMNS: StatsTableColumn[] = [
+  { key: 'player', label: 'Player', sortable: true, type: 'string' },
+  { key: 'pos', label: 'Pos', sortable: true, type: 'string' },
+  { key: 'g', label: 'G', sortable: true, type: 'number' },
+  { key: 'gs', label: 'GS', sortable: true, type: 'number' },
+  { key: 'innDef', label: 'Inn', sortable: true, type: 'number' },
+  { key: 'po', label: 'PO', sortable: true, type: 'number' },
+  { key: 'a', label: 'A', sortable: true, type: 'number' },
+  { key: 'eDef', label: 'E', sortable: true, type: 'number' },
+  { key: 'dpDef', label: 'DP', sortable: true, type: 'number' },
+  { key: 'chances', label: 'TC', sortable: true, type: 'number' },
+  { key: 'cg', label: 'CG', sortable: true, type: 'number' },
+  { key: 'cs', label: 'CS', sortable: true, type: 'number' },
+  { key: 'sb', label: 'SB', sortable: true, type: 'number' },
+  { key: 'pickoffs', label: 'PK', sortable: true, type: 'number' },
+  { key: 'wp', label: 'WP', sortable: true, type: 'number' },
 ];
 
 // Generic fielding stats interface to avoid GraphQL dependencies
@@ -42,83 +43,40 @@ export interface FieldingStatsRecord {
 
 export interface FieldingStatsTableProps {
   stats: readonly FieldingStatsRecord[];
+  title?: string;
+  maxHeight?: number;
 }
 
-function FieldingStatsTable({ stats }: FieldingStatsTableProps) {
-  const data = useMemo(() => {
-    return stats.map((record) => [
-      record.player?.name || 'Unknown',
-      record.a?.toString() || '0',
-      record.cg?.toString() || '0',
-      record.chances?.toString() || '0',
-      record.cs?.toString() || '0',
-      record.dpDef?.toString() || '0',
-      record.eDef?.toString() || '0',
-      record.g?.toString() || '0',
-      record.gs?.toString() || '0',
-      record.innDef?.toString() || '0',
-      record.pickoffs?.toString() || '0',
-      record.po?.toString() || '0',
-      record.pos || '',
-      record.sb?.toString() || '0',
-      record.wp?.toString() || '0',
-    ]);
-  }, [stats]);
+function FieldingStatsTable({
+  stats,
+  title = 'Fielding Statistics',
+  maxHeight,
+}: FieldingStatsTableProps) {
+  const tableData: StatsTableRow[] = stats.map((record) => ({
+    player: record.player?.name ?? 'Unknown',
+    pos: record.pos ?? '',
+    g: record.g ?? 0,
+    gs: record.gs ?? 0,
+    innDef: record.innDef ?? 0,
+    po: record.po ?? 0,
+    a: record.a ?? 0,
+    eDef: record.eDef ?? 0,
+    dpDef: record.dpDef ?? 0,
+    chances: record.chances ?? 0,
+    cg: record.cg ?? 0,
+    cs: record.cs ?? 0,
+    sb: record.sb ?? 0,
+    pickoffs: record.pickoffs ?? 0,
+    wp: record.wp ?? 0,
+  }));
 
   return (
-    <ScrollView horizontal flex={1}>
-      <YStack backgroundColor="$gray10">
-        {/* Header */}
-        <XStack>
-          {TABLE_HEADER.map((header, index) => (
-            <YStack
-              key={index}
-              width={80}
-              padding="$3"
-              backgroundColor="$gray8"
-              justifyContent="center"
-              alignItems="center"
-              borderRightWidth={1}
-              borderRightColor="$gray7"
-            >
-              <Text
-                color="$yellow10"
-                fontWeight="bold"
-                fontSize="$2"
-                textAlign="center"
-              >
-                {header}
-              </Text>
-            </YStack>
-          ))}
-        </XStack>
-
-        {/* Data Rows */}
-        {data.map((row, rowIndex) => (
-          <XStack
-            key={rowIndex}
-            borderBottomWidth={1}
-            borderBottomColor="$gray8"
-          >
-            {row.map((cell, cellIndex) => (
-              <YStack
-                key={cellIndex}
-                width={80}
-                padding="$3"
-                justifyContent="center"
-                alignItems="center"
-                borderRightWidth={1}
-                borderRightColor="$gray8"
-              >
-                <Text color="$white" fontSize="$1" textAlign="center">
-                  {cell}
-                </Text>
-              </YStack>
-            ))}
-          </XStack>
-        ))}
-      </YStack>
-    </ScrollView>
+    <StatsTable
+      columns={FIELDING_COLUMNS}
+      data={tableData}
+      title={title}
+      maxHeight={maxHeight}
+    />
   );
 }
 
