@@ -31,6 +31,7 @@ import { requestReviewBatch } from './tools/request-review-batch.js';
 import { resolveThread } from './tools/resolve-thread.js';
 import { resolveThreads } from './tools/resolve-threads.js';
 import { secretsCheck } from './tools/secrets-check.js';
+import { ensureSweepLabels } from './tools/ensure-sweep-labels.js';
 import { sweepStaleClaims } from './tools/sweep-stale-claims.js';
 import { viewPR } from './tools/view-pr.js';
 
@@ -860,6 +861,14 @@ server.tool(
       .describe('Human-readable description'),
   },
   async (params) => setCommitStatus(params),
+);
+
+// --- github_ensure_sweep_labels ---
+server.tool(
+  'github_ensure_sweep_labels',
+  'Idempotently ensure the sweep coordination labels (sweep-claimed, sweep-stale-claim) exist on the repository. Safe to call at sweep startup every time — creates missing labels and no-ops if they already exist.',
+  {},
+  async () => ensureSweepLabels(),
 );
 
 // --- github_sweep_stale_claims ---

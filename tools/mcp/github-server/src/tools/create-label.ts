@@ -13,7 +13,7 @@ interface CreateLabelParams {
  * error by parsing the response JSON embedded in the error message.
  * Falls back to a GET request to confirm label existence.
  */
-async function isAlreadyExistsError(
+export async function isAlreadyExistsError(
   error: unknown,
   owner: string,
   repo: string,

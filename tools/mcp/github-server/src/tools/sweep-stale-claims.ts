@@ -1,6 +1,7 @@
 import { getRepoOwnerName } from '../auth.js';
 import { githubRest } from '../github-api.js';
 import type { ToolResult } from '../types.js';
+import { ensureSweepLabelsInternal } from './ensure-sweep-labels.js';
 
 interface SweepStaleClaimsParams {
   olderThanMinutes?: number;
@@ -23,6 +24,18 @@ export async function sweepStaleClaims(
   params: SweepStaleClaimsParams,
 ): Promise<ToolResult> {
   try {
+    let labelEnsureWarning: string | undefined;
+
+    // Best-effort: stale-claim scanning is read-only and should not fail
+    // just because label creation/update is unavailable.
+    try {
+      await ensureSweepLabelsInternal();
+    } catch (error) {
+      labelEnsureWarning = `Warning: failed to ensure sweep labels before scanning: ${
+        error instanceof Error ? error.message : String(error)
+      }`;
+    }
+
     const repo = await getRepoOwnerName();
     const thresholdMinutes = params.olderThanMinutes ?? 30;
     const now = Date.now();
@@ -66,6 +79,7 @@ export async function sweepStaleClaims(
               checkedAt: new Date().toISOString(),
               thresholdMinutes,
               totalClaimed: 0,
+              ...(labelEnsureWarning ? { warning: labelEnsureWarning } : {}),
             }),
           },
         ],
@@ -171,6 +185,7 @@ export async function sweepStaleClaims(
               checkedAt: new Date().toISOString(),
               thresholdMinutes,
               totalClaimed: prs.length,
+              ...(labelEnsureWarning ? { warning: labelEnsureWarning } : {}),
             },
             null,
             2,
