@@ -1,32 +1,24 @@
 # =============================================================================
-# SECRET VALUE VARIABLES (Set via secrets.auto.tfvars - never committed to git)
-# See secrets.auto.tfvars.example for required format and all expected keys.
+# SECRET VALUE VARIABLES
+# Only variables used directly as Lambda environment variables are declared here.
 # In CI these are supplied as TF_VAR_* environment variables from GitHub secrets.
+# Locally, set them in secrets.auto.tfvars (never commit this file).
+#
+# Secrets that are only stored in AWS Secrets Manager (fetched by Lambdas at
+# runtime) are NOT managed here — set them directly via AWS CLI:
+#   aws secretsmanager put-secret-value --secret-id dev/<name> --secret-string <value>
+#
+# BOOTSTRAPPING A NEW ENVIRONMENT: After terraform apply creates the secret
+# containers, populate their values before starting any Lambdas:
+#   aws secretsmanager put-secret-value --secret-id dev/jwt-secret-key --secret-string <value>
+#   aws secretsmanager put-secret-value --secret-id dev/google-oauth-client-secret --secret-string <value>
+#   aws secretsmanager put-secret-value --secret-id dev/oauth-proxy/cookie-secret --secret-string <value>
+#   aws secretsmanager put-secret-value --secret-id dev/stripe-secret-key --secret-string <value>
+#   aws secretsmanager put-secret-value --secret-id dev/stripe-webhook-secret --secret-string <value>
+#   aws secretsmanager put-secret-value --secret-id dev/jira-credentials --secret-string <value>
+#   aws secretsmanager put-secret-value --secret-id dev/rollbar-webhook-secret --secret-string <value>
+#   aws secretsmanager put-secret-value --secret-id dev/discord-webhook-url --secret-string <value>
 # =============================================================================
-
-variable "google_oauth_client_secret" {
-  description = "Google OAuth client secret for authentication"
-  type        = string
-  sensitive   = true
-}
-
-variable "jwt_secret_key" {
-  description = "JWT signing secret key for token validation"
-  type        = string
-  sensitive   = true
-}
-
-variable "oauth_proxy_cookie_secret" {
-  description = "Cookie signing secret for OAuth proxy sessions"
-  type        = string
-  sensitive   = true
-}
-
-variable "jira_credentials" {
-  description = "Jira OAuth 2.0 credentials JSON for bug report proxy: {client_id, client_secret, cloud_id, site_url}"
-  type        = string
-  sensitive   = true
-}
 
 variable "rollbar_access_token" {
   description = "Rollbar server-side (post_server_item) access token for Lambda error tracking"
@@ -45,24 +37,6 @@ variable "ga_api_secret" {
   type        = string
   sensitive   = true
   default     = ""
-}
-
-variable "stripe_secret_key" {
-  description = "Stripe API secret key for payment processing"
-  type        = string
-  sensitive   = true
-}
-
-variable "stripe_webhook_secret" {
-  description = "Stripe webhook endpoint signing secret for verifying webhook payloads"
-  type        = string
-  sensitive   = true
-}
-
-variable "discord_webhook_url" {
-  description = "Discord webhook URL for posting Rollbar and CloudWatch alarm notifications"
-  type        = string
-  sensitive   = true
 }
 
 variable "discord_user_signup_webhook_url" {
@@ -95,13 +69,6 @@ variable "discord_client_secret" {
 variable "discord_redirect_uri" {
   description = "Discord OAuth redirect URI (e.g. https://legacy-fantasy.com/auth/discord/callback)"
   type        = string
-  default     = ""
-}
-
-variable "rollbar_webhook_secret" {
-  description = "Rollbar webhook signing secret for HMAC-SHA256 signature verification"
-  type        = string
-  sensitive   = true
   default     = ""
 }
 
@@ -166,11 +133,6 @@ resource "aws_secretsmanager_secret" "jwt_secret" {
   tags = local.common_tags
 }
 
-resource "aws_secretsmanager_secret_version" "jwt_secret" {
-  secret_id     = aws_secretsmanager_secret.jwt_secret.id
-  secret_string = var.jwt_secret_key
-}
-
 resource "aws_secretsmanager_secret" "google_oauth_client_secret" {
   name        = "${var.environment}/google-oauth-client-secret"
   description = "Google OAuth client secret for Legacy Sports"
@@ -178,21 +140,11 @@ resource "aws_secretsmanager_secret" "google_oauth_client_secret" {
   tags = local.common_tags
 }
 
-resource "aws_secretsmanager_secret_version" "google_oauth_client_secret" {
-  secret_id     = aws_secretsmanager_secret.google_oauth_client_secret.id
-  secret_string = var.google_oauth_client_secret
-}
-
 resource "aws_secretsmanager_secret" "oauth_proxy_cookie_secret" {
   name        = "${var.environment}/oauth-proxy/cookie-secret"
   description = "OAuth proxy cookie secret for Legacy Sports"
 
   tags = local.common_tags
-}
-
-resource "aws_secretsmanager_secret_version" "oauth_proxy_cookie_secret" {
-  secret_id     = aws_secretsmanager_secret.oauth_proxy_cookie_secret.id
-  secret_string = var.oauth_proxy_cookie_secret
 }
 
 # System API key for EventBridge / admin CLI access to system mutations
@@ -225,11 +177,6 @@ resource "aws_secretsmanager_secret" "stripe_secret_key" {
   tags = local.common_tags
 }
 
-resource "aws_secretsmanager_secret_version" "stripe_secret_key" {
-  secret_id     = aws_secretsmanager_secret.stripe_secret_key.id
-  secret_string = var.stripe_secret_key
-}
-
 # Stripe webhook endpoint signing secret
 resource "aws_secretsmanager_secret" "stripe_webhook_secret" {
   name        = "${var.environment}/stripe-webhook-secret"
@@ -238,13 +185,7 @@ resource "aws_secretsmanager_secret" "stripe_webhook_secret" {
   tags = local.common_tags
 }
 
-resource "aws_secretsmanager_secret_version" "stripe_webhook_secret" {
-  secret_id     = aws_secretsmanager_secret.stripe_webhook_secret.id
-  secret_string = var.stripe_webhook_secret
-}
-
 # Jira credentials for the Jira Proxy Lambda
-# Value is managed via TF_VAR_jira_credentials (GitHub Actions secret JIRA_CREDENTIALS)
 # Format: {"client_id":"...","client_secret":"...","cloud_id":"...","site_url":"https://<org>.atlassian.net"}
 resource "aws_secretsmanager_secret" "jira_credentials" {
   name        = "${var.environment}/jira-credentials"
@@ -253,29 +194,12 @@ resource "aws_secretsmanager_secret" "jira_credentials" {
   tags = local.common_tags
 }
 
-resource "aws_secretsmanager_secret_version" "jira_credentials" {
-  secret_id     = aws_secretsmanager_secret.jira_credentials.id
-  secret_string = var.jira_credentials
-}
-
 # Rollbar webhook signing secret for the Rollbar Discord notification Lambda
 resource "aws_secretsmanager_secret" "rollbar_webhook_secret" {
   name        = "${var.environment}/rollbar-webhook-secret"
   description = "Rollbar webhook signing secret for HMAC-SHA256 signature verification"
 
   tags = local.common_tags
-}
-
-resource "aws_secretsmanager_secret_version" "rollbar_webhook_secret" {
-  count         = var.rollbar_webhook_secret != "" ? 1 : 0
-  secret_id     = aws_secretsmanager_secret.rollbar_webhook_secret.id
-  secret_string = var.rollbar_webhook_secret
-}
-
-# Preserve state address when count guard was added; no-op if [0] already exists.
-moved {
-  from = aws_secretsmanager_secret_version.rollbar_webhook_secret
-  to   = aws_secretsmanager_secret_version.rollbar_webhook_secret[0]
 }
 
 # Discord OAuth client secret for Discord login/account linking
@@ -315,9 +239,52 @@ resource "aws_secretsmanager_secret" "discord_webhook_url" {
   tags = local.common_tags
 }
 
-resource "aws_secretsmanager_secret_version" "discord_webhook_url" {
-  secret_id     = aws_secretsmanager_secret.discord_webhook_url.id
-  secret_string = var.discord_webhook_url
+# =============================================================================
+# REMOVED RESOURCES — secret versions previously managed by Terraform.
+# Values are now set directly in AWS Secrets Manager (outside Terraform).
+# These removed blocks tell Terraform to stop tracking the versions without
+# destroying the actual AWS resources.
+# To update a value: aws secretsmanager put-secret-value --secret-id <env>/<name> --secret-string <value>
+# =============================================================================
+
+removed {
+  from = aws_secretsmanager_secret_version.jwt_secret
+  lifecycle { destroy = false }
+}
+
+removed {
+  from = aws_secretsmanager_secret_version.google_oauth_client_secret
+  lifecycle { destroy = false }
+}
+
+removed {
+  from = aws_secretsmanager_secret_version.oauth_proxy_cookie_secret
+  lifecycle { destroy = false }
+}
+
+removed {
+  from = aws_secretsmanager_secret_version.stripe_secret_key
+  lifecycle { destroy = false }
+}
+
+removed {
+  from = aws_secretsmanager_secret_version.stripe_webhook_secret
+  lifecycle { destroy = false }
+}
+
+removed {
+  from = aws_secretsmanager_secret_version.jira_credentials
+  lifecycle { destroy = false }
+}
+
+removed {
+  from = aws_secretsmanager_secret_version.rollbar_webhook_secret
+  lifecycle { destroy = false }
+}
+
+removed {
+  from = aws_secretsmanager_secret_version.discord_webhook_url
+  lifecycle { destroy = false }
 }
 
 # =============================================================================

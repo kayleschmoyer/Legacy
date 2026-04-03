@@ -47,32 +47,8 @@ jobs:
       - name: Validate Required Secrets
         run: |
           MISSING=()
-          if [ -z "${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}" ]; then
-            MISSING+=("GOOGLE_OAUTH_CLIENT_SECRET")
-          fi
-          if [ -z "${{ secrets.JWT_SECRET_KEY }}" ]; then
-            MISSING+=("JWT_SECRET_KEY")
-          fi
-          if [ -z "${{ secrets.OAUTH_PROXY_COOKIE_SECRET }}" ]; then
-            MISSING+=("OAUTH_PROXY_COOKIE_SECRET")
-          fi
-          if [ -z "${{ secrets.JIRA_CREDENTIALS }}" ]; then
-            MISSING+=("JIRA_CREDENTIALS")
-          fi
           if [ -z "${{ secrets.ROLLBAR_ACCESS_TOKEN }}" ]; then
             MISSING+=("ROLLBAR_ACCESS_TOKEN")
-          fi
-          if [ -z "${{ secrets.ROLLBAR_WEBHOOK_SECRET }}" ]; then
-            MISSING+=("ROLLBAR_WEBHOOK_SECRET")
-          fi
-          if [ -z "${{ secrets.STRIPE_SECRET_KEY }}" ]; then
-            MISSING+=("STRIPE_SECRET_KEY")
-          fi
-          if [ -z "${{ secrets.STRIPE_WEBHOOK_SECRET }}" ]; then
-            MISSING+=("STRIPE_WEBHOOK_SECRET")
-          fi
-          if [ -z "${{ secrets.DISCORD_WEBHOOK_URL }}" ]; then
-            MISSING+=("DISCORD_WEBHOOK_URL")
           fi
           if [ ${#MISSING[@]} -gt 0 ]; then
             echo "::error::Missing required secrets: ${MISSING[*]}"
@@ -214,15 +190,7 @@ jobs:
         id: plan
         working-directory: terraform
         env:
-          TF_VAR_google_oauth_client_secret: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
-          TF_VAR_jwt_secret_key: ${{ secrets.JWT_SECRET_KEY }}
-          TF_VAR_oauth_proxy_cookie_secret: ${{ secrets.OAUTH_PROXY_COOKIE_SECRET }}
-          TF_VAR_jira_credentials: ${{ secrets.JIRA_CREDENTIALS }}
           TF_VAR_rollbar_access_token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
-          TF_VAR_rollbar_webhook_secret: ${{ secrets.ROLLBAR_WEBHOOK_SECRET }}
-          TF_VAR_stripe_secret_key: ${{ secrets.STRIPE_SECRET_KEY }}
-          TF_VAR_stripe_webhook_secret: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
-          TF_VAR_discord_webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
           TF_VAR_discord_user_signup_webhook_url: ${{ secrets.DISCORD_USER_SIGNUP_WEBHOOK_URL }}
           TF_VAR_discord_stripe_webhook_url: ${{ secrets.DISCORD_STRIPE_WEBHOOK_URL }}
           TF_VAR_ga_measurement_id: ${{ secrets.GA_MEASUREMENT_ID }}
@@ -307,15 +275,7 @@ jobs:
         if: steps.recheck.outputs.versions_changed == 'true'
         working-directory: terraform
         env:
-          TF_VAR_google_oauth_client_secret: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
-          TF_VAR_jwt_secret_key: ${{ secrets.JWT_SECRET_KEY }}
-          TF_VAR_oauth_proxy_cookie_secret: ${{ secrets.OAUTH_PROXY_COOKIE_SECRET }}
-          TF_VAR_jira_credentials: ${{ secrets.JIRA_CREDENTIALS }}
           TF_VAR_rollbar_access_token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
-          TF_VAR_rollbar_webhook_secret: ${{ secrets.ROLLBAR_WEBHOOK_SECRET }}
-          TF_VAR_stripe_secret_key: ${{ secrets.STRIPE_SECRET_KEY }}
-          TF_VAR_stripe_webhook_secret: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
-          TF_VAR_discord_webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
           TF_VAR_discord_user_signup_webhook_url: ${{ secrets.DISCORD_USER_SIGNUP_WEBHOOK_URL }}
           TF_VAR_discord_stripe_webhook_url: ${{ secrets.DISCORD_STRIPE_WEBHOOK_URL }}
           TF_VAR_ga_measurement_id: ${{ secrets.GA_MEASUREMENT_ID }}
@@ -357,15 +317,7 @@ jobs:
         if: steps.plan.outputs.has_changes == 'true' && steps.replan.outputs.has_changes != 'false'
         working-directory: terraform
         env:
-          TF_VAR_google_oauth_client_secret: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
-          TF_VAR_jwt_secret_key: ${{ secrets.JWT_SECRET_KEY }}
-          TF_VAR_oauth_proxy_cookie_secret: ${{ secrets.OAUTH_PROXY_COOKIE_SECRET }}
-          TF_VAR_jira_credentials: ${{ secrets.JIRA_CREDENTIALS }}
           TF_VAR_rollbar_access_token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
-          TF_VAR_rollbar_webhook_secret: ${{ secrets.ROLLBAR_WEBHOOK_SECRET }}
-          TF_VAR_stripe_secret_key: ${{ secrets.STRIPE_SECRET_KEY }}
-          TF_VAR_stripe_webhook_secret: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
-          TF_VAR_discord_webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
           TF_VAR_discord_user_signup_webhook_url: ${{ secrets.DISCORD_USER_SIGNUP_WEBHOOK_URL }}
           TF_VAR_discord_stripe_webhook_url: ${{ secrets.DISCORD_STRIPE_WEBHOOK_URL }}
           TF_VAR_ga_measurement_id: ${{ secrets.GA_MEASUREMENT_ID }}
