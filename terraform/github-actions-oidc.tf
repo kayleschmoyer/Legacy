@@ -193,11 +193,18 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "iam:DeletePolicyVersion",
           "iam:SetDefaultPolicyVersion",
           "iam:TagPolicy",
-          "iam:UntagPolicy"
+          "iam:UntagPolicy",
+          "iam:CreateInstanceProfile",
+          "iam:DeleteInstanceProfile",
+          "iam:AddRoleToInstanceProfile",
+          "iam:RemoveRoleFromInstanceProfile",
+          "iam:TagInstanceProfile",
+          "iam:UntagInstanceProfile"
         ]
         Resource = [
           "arn:aws:iam::${local.account_id}:role/${local.name_prefix}-*",
-          "arn:aws:iam::${local.account_id}:policy/${local.name_prefix}-*"
+          "arn:aws:iam::${local.account_id}:policy/${local.name_prefix}-*",
+          "arn:aws:iam::${local.account_id}:instance-profile/${local.name_prefix}-*"
         ]
       },
       # CloudWatch Logs read permissions
