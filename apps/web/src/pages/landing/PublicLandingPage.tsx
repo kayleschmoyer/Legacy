@@ -285,6 +285,39 @@ export function PublicLandingPage(): React.JSX.Element {
     void configure();
   }, [config]);
 
+  // Handle One Tap sign-in — fires when the user taps the GSI prompt that
+  // OAuthProvider.configure() shows on this page. Without this listener the
+  // credential is dispatched to no handler and authentication silently fails.
+  useEffect(() => {
+    const handleOneTapSuccess = async (event: Event) => {
+      const customEvent = event as CustomEvent<{
+        authResponse: { credential?: string };
+      }>;
+      setIsLoading(true);
+      setErrorMessage('');
+      try {
+        await loginWithOAuth(customEvent.detail.authResponse);
+      } catch (error) {
+        LOGGER.error(
+          'One Tap authentication failed on landing page:',
+          String(error),
+        );
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : 'Sign-in failed. Please try again.',
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    const wrapper = (event: Event) => {
+      void handleOneTapSuccess(event);
+    };
+    window.addEventListener('gsi-one-tap-success', wrapper);
+    return () => window.removeEventListener('gsi-one-tap-success', wrapper);
+  }, [loginWithOAuth]);
+
   const handleSignIn = useCallback(async () => {
     if (!isConfigured || isLoading) return;
     setIsLoading(true);
