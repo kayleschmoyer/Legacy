@@ -279,8 +279,9 @@ export const CAREER_STATS_COLUMNS: readonly GridColumn[] = [
     width: '70px',
     align: 'center',
     priority: 'high',
-    description: 'Offensive WAR (batting runs + baserunning + positional adj)',
-    formatter: (v: unknown) => (v != null ? (v as number).toFixed(1) : '–'),
+    description:
+      'Offensive WAR (batting runs + baserunning + positional adj). Shown as — for players with fewer than 10 career plate appearances.',
+    formatter: (v: unknown) => (v != null ? (v as number).toFixed(1) : '—'),
   },
   {
     key: 'stolenBases',
