@@ -53,7 +53,6 @@ export function StatTable({ title, headers, rows }: StatTableProps) {
         borderWidth={1}
         borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.25)}
         overflow="hidden"
-        animation="quick"
         hoverStyle={{
           borderColor: withAlpha(BRAND_NAVY_LIGHT, 0.4),
         }}
