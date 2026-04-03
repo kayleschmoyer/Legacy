@@ -20,9 +20,20 @@ Query and stream AWS CloudWatch logs for Lambda functions and other AWS services
 - Analyzing error patterns or frequency
 - Checking deployment success
 
-## RECOMMENDED: Use the Wrapper Script (Easiest for AI Agents)
+## MCP Tool (Preferred)
 
-**ALWAYS USE THIS SCRIPT FIRST** - It handles all encoding and pagination issues automatically:
+Use `aws_logs_tail` for Lambda log groups — it handles pagination automatically:
+
+```
+aws_logs_tail(logGroup: "/aws/lambda/legacy-sports-dev-graphql", since: "1h")
+aws_logs_tail(logGroup: "/aws/lambda/legacy-sports-dev-graphql", since: "30m", filter: "ERROR")
+```
+
+> **Known issue (LS-2340):** `aws_logs_tail` crashes with a `charmap` encoding error on Windows when log output contains emoji. Fall back to the wrapper script below if you hit this.
+
+## Shell Fallback: Wrapper Script
+
+The PowerShell wrapper handles encoding and pagination automatically:
 
 ```powershell
 # Basic usage - view last hour of logs
@@ -43,15 +54,9 @@ Query and stream AWS CloudWatch logs for Lambda functions and other AWS services
 
 **Available Functions**: `graphql`, `db`, `oauth-proxy`, `notifications`, `stats`, `game-selection`, `draft-processor`
 
-**Why use this script?**
+## Log Group Reference
 
-- Automatically sets `AWS_PAGER=""` (no pagination issues)
-- Automatically sets `PYTHONIOENCODING=utf-8` (no emoji/Unicode errors)
-- Simpler syntax (no need to remember full log group paths)
-- Built-in validation and helpful error messages
-- Works reliably for AI agents without manual environment setup
-
-## Lambda Function Log Groups
+### Application Lambdas
 
 | Environment | Pattern                            | Example                                  |
 | ----------- | ---------------------------------- | ---------------------------------------- |
@@ -60,7 +65,21 @@ Query and stream AWS CloudWatch logs for Lambda functions and other AWS services
 
 **Functions**: `graphql`, `db`, `oauth-proxy`, `websocket`, `stats-lambda`, `game-selection`, `draft-processor`
 
+### Runner Infrastructure Lambdas
+
+| Log group                                                 | Purpose                                                                   |
+| --------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `/aws/lambda/legacy-sports-dev-runner-scale-up`           | Scale-up Lambda — processes `workflow_job` webhook events, launches EC2   |
+| `/aws/lambda/legacy-sports-dev-runner-scale-down`         | Scale-down Lambda — terminates idle runner instances                      |
+| `/aws/lambda/legacy-sports-dev-runner-webhook`            | Webhook receiver — receives GitHub `workflow_job` events from API Gateway |
+| `/aws/lambda/legacy-sports-dev-runner-syncer`             | Binary syncer — downloads runner binary from GitHub, uploads to S3        |
+| `/aws/lambda/legacy-sports-dev-runner-dispatch-to-runner` | Dispatch Lambda — routes queued jobs to available runners                 |
+| `/github-runners/legacy-sports-dev-runner/cloud-init`     | EC2 instance boot logs — use to diagnose runner registration failures     |
+
+> Use `MSYS_NO_PATHCONV=1` prefix when passing log group paths to `aws` CLI on Windows (Git Bash converts leading `/` to a Windows path).
+
 ## Related Skills
 
 - [AWS SSO Login](aws-sso-login.md) - AWS authentication setup
 - [Deploy Lambda](deploy-lambda.md) - Deploying Lambda functions
+- [AMI Build](ami-build.md) - If runner boot logs show tool-missing errors, rebuild the AMI

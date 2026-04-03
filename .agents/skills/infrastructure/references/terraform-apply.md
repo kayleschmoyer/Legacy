@@ -66,6 +66,20 @@ terraform apply -target=aws_lambda_function.db
 terraform apply -target=aws_lambda_function.db -target=aws_lambda_function.oauth_proxy
 ```
 
+### Runner Infrastructure (Special Case — Never in Normal Apply Loop)
+
+Runner resources (`module.github_runners`) are **intentionally excluded** from the normal `terraform apply` via `enable_github_runners = false` in `infra.auto.tfvars`. This is a permanent safety guard — a normal apply never touches runner EC2 instances, ASGs, IAM policies, or Lambdas.
+
+To apply runner-specific changes (e.g., IAM permissions boundary, security groups):
+
+```bash
+make runner-apply
+```
+
+This runs a targeted plan/apply scoped to `module.github_runners` only with `enable_github_runners=true`. Requires `secrets.auto.tfvars` to be present in the terraform directory.
+
+> **Do NOT** run `terraform apply -var="enable_github_runners=true"` without `-target` — it plans the full runner fleet and may destroy live runners.
+
 > **`-target` uses Terraform resource names, NOT AWS function names.**
 > The resource name is the second label in `resource "aws_lambda_function" "<name>"` in the .tf file.
 > Example: `aws_lambda_function.stats` (NOT `aws_lambda_function.stats_lambda`).
