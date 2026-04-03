@@ -240,6 +240,7 @@ jobs:
           title: "Android Release ${{ steps.meta.outputs.tag }}"
           description: "A new Android release. [View on GitHub](${{ steps.meta.outputs.url }})"
           commits: ${{ steps.changelog.outputs.commits }}
+          thread-name: "Android Release ${{ steps.meta.outputs.tag }}"
 
       - name: Build Summary
         run: |

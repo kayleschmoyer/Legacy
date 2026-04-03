@@ -372,3 +372,4 @@ jobs:
           title: "iOS Release ${{ steps.meta.outputs.tag }}"
           description: "A new iOS release. [View on GitHub](${{ steps.meta.outputs.url }})"
           commits: ${{ steps.changelog.outputs.commits }}
+          thread-name: "iOS Release ${{ steps.meta.outputs.tag }}"

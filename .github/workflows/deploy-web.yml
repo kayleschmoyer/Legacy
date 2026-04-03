@@ -435,6 +435,7 @@ jobs:
             --arg actor "${{ github.actor }}" \
             --arg timestamp "$TIMESTAMP" \
             '{
+              thread_name: $title,
               embeds: [{
                 title: $title,
                 description: $desc,
