@@ -327,6 +327,7 @@ export default function HelpPage() {
                     size="$4"
                     borderRadius="$6"
                     fontWeight="700"
+                    backgroundColor="transparent"
                     onPress={() => setTutorialOpen(true)}
                     style={
                       {
