@@ -12,7 +12,10 @@ export function getRepoRoot(): string {
 
 /**
  * Run a shell command and return stdout.
- * Sets AWS_PAGER="" and PYTHONIOENCODING=utf-8 automatically for all commands.
+ * Sets AWS_PAGER="", PYTHONIOENCODING=utf-8:replace, and PYTHONUTF8=1 automatically
+ * for all commands. The `:replace` suffix prevents Python from raising charmap
+ * encode errors on emoji/non-ASCII log output (Windows-specific issue). PYTHONUTF8=1
+ * enables Python 3.7+ UTF-8 mode as a belt-and-suspenders fallback.
  * Throws on non-zero exit.
  */
 export function runCommand(
@@ -25,7 +28,8 @@ export function runCommand(
     const env: NodeJS.ProcessEnv = {
       ...process.env,
       AWS_PAGER: '',
-      PYTHONIOENCODING: 'utf-8',
+      PYTHONIOENCODING: 'utf-8:replace',
+      PYTHONUTF8: '1',
       ...extraEnv,
     };
 
