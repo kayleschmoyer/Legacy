@@ -239,7 +239,7 @@ const retryLink = new RetryLink({
 
 // ─── Error link with token-refresh + retry ─────────────────────────────────
 
-const errorLink = new ErrorLink(({ error, operation, forward }) => {
+export const errorLink = new ErrorLink(({ error, operation, forward }) => {
   // Check for UNAUTHENTICATED GraphQL error
   const isUnauthenticated =
     CombinedGraphQLErrors.is(error) &&
@@ -257,8 +257,35 @@ const errorLink = new ErrorLink(({ error, operation, forward }) => {
     operation.getContext()['suppressGlobalError'],
   );
 
-  if (!isUnauthenticated && !is401 && !suppressGlobalError) {
-    // Surface uncaught errors to the user via the global ApolloErrorToast.
+  // Auth errors (UNAUTHENTICATED / 401) → attempt a silent token refresh and retry.
+  // These are not reported to Rollbar: an expired/invalid token is an expected
+  // user-facing condition, not a bug.
+  if (isUnauthenticated || is401) {
+    return new Observable<ApolloLink.Result>((observer) => {
+      silentlyRefreshJwt()
+        .then((newToken) => {
+          if (!newToken) {
+            // Refresh failed — propagate the original error
+            observer.error(error);
+            return;
+          }
+
+          // Retry the original operation; authLink will pick up the updated token
+          forward(operation).subscribe({
+            next: (value) => observer.next(value),
+            error: (err: unknown) => observer.error(err),
+            complete: () => observer.complete(),
+          });
+        })
+        .catch((err: unknown) => {
+          observer.error(err);
+        });
+    });
+  }
+
+  // Non-auth errors: surface to the user via the global ApolloErrorToast and
+  // report to Rollbar — unless the caller explicitly suppressed the global error.
+  if (!suppressGlobalError) {
     if (CombinedGraphQLErrors.is(error) && error.errors.length > 0) {
       // PREMIUM_REQUIRED is an expected user-facing condition (free-tier access
       // attempt on a premium feature). Show the descriptive server message so the
@@ -304,30 +331,7 @@ const errorLink = new ErrorLink(({ error, operation, forward }) => {
     } else {
       dispatchApolloError('An unexpected error occurred');
     }
-    return;
   }
-
-  // Attempt a silent refresh and retry the operation once
-  return new Observable<ApolloLink.Result>((observer) => {
-    silentlyRefreshJwt()
-      .then((newToken) => {
-        if (!newToken) {
-          // Refresh failed — propagate the original error
-          observer.error(error);
-          return;
-        }
-
-        // Retry the original operation; authLink will pick up the updated token
-        forward(operation).subscribe({
-          next: (value) => observer.next(value),
-          error: (err: unknown) => observer.error(err),
-          complete: () => observer.complete(),
-        });
-      })
-      .catch((err: unknown) => {
-        observer.error(err);
-      });
-  });
 });
 
 export const apolloClient = new ApolloClient({

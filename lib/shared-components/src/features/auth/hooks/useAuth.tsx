@@ -507,7 +507,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
         const expiry = authService.getStoredTokenExpiry();
         if (expiry) scheduleProactiveRefresh(expiry);
       } catch (error) {
-        LOGGER.error('AuthProvider: loginWithOAuth error:', String(error));
+        // AuthService already logged this before rethrowing — no duplicate log here.
         const errorMessage =
           error instanceof Error ? error.message : 'OAuth login failed';
         dispatchAuth({ type: 'AUTH_FAILURE', payload: errorMessage });
@@ -529,7 +529,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
       }
       dispatchAuth({ type: 'AUTH_LOGOUT' });
     } catch (error) {
-      LOGGER.error('Logout failed:', String(error));
+      // Logout errors (network failure clearing server cookies) are not bugs — client state is already cleared.
+      LOGGER.warn('Logout failed:', String(error));
     }
   }, [authService, clearRefreshTimer]);
 

@@ -1,8 +1,9 @@
 /**
- * Tests for the syncUserProfileFromJwt behavior in apollo-client.ts.
+ * Tests for the syncUserProfileFromJwt behavior and errorLink decision logic
+ * in apollo-client.ts.
  *
- * The decodeJwtPayload and syncUserProfileFromJwt functions are exported
- * from apollo-client.ts and tested directly here.
+ * The decodeJwtPayload, syncUserProfileFromJwt, and errorLink exports are
+ * tested directly here.
  */
 
 // Mock modules that apollo-client.ts imports as side effects
@@ -11,7 +12,17 @@
 // jest.mock is hoisted above imports by Babel, so this factory runs before
 // apollo-client.ts is evaluated — providing a stub `createHttpLink` that
 // doesn't require global fetch.
-import { decodeJwtPayload, syncUserProfileFromJwt } from './apollo-client';
+import {
+  ApolloLink,
+  CombinedGraphQLErrors,
+  Observable,
+  ServerError,
+} from '@apollo/client';
+import {
+  decodeJwtPayload,
+  errorLink,
+  syncUserProfileFromJwt,
+} from './apollo-client';
 
 jest.mock('@apollo/client', () => {
   const actual =
@@ -162,5 +173,149 @@ describe('syncUserProfileFromJwt', () => {
     expect(localStorage.getItem('ls_user_profile')).toBeNull();
 
     window.removeEventListener('auth:token-refreshed', handler);
+  });
+});
+
+// ─── Helpers for errorLink tests ──────────────────────────────────────────────
+
+/**
+ * Build a minimal fake Apollo operation with `getContext()` returning the
+ * provided values. This matches what `createOperation` produces internally,
+ * without requiring a full ApolloClient instance.
+ */
+function makeOperation(contextValues: Record<string, unknown> = {}) {
+  return {
+    query: { kind: 'Document', definitions: [] } as never,
+    operationName: 'TestOp',
+    variables: {} as Record<string, unknown>,
+    extensions: {} as Record<string, unknown>,
+    getContext: () => contextValues,
+    setContext: jest.fn(),
+  };
+}
+
+/**
+ * Invoke the errorLink handler directly with a terminal link that errors with
+ * `terminalError`. Returns a Promise that resolves after the error propagates
+ * through the link chain.
+ */
+function runWithError(
+  terminalError: unknown,
+  contextValues: Record<string, unknown> = {},
+): Promise<void> {
+  const op = makeOperation(contextValues);
+
+  // `forward` is the next link in the chain — it immediately errors.
+  const forward = () =>
+    new Observable<never>((observer) => {
+      observer.error(terminalError);
+    });
+
+  return new Promise<void>((resolve) => {
+    // `errorLink.request` is the handler registered in the ErrorLink constructor.
+    // We call it directly with our mock operation and forward function.
+    const result = (errorLink as ApolloLink).request(
+      op as never,
+      forward as never,
+    );
+    if (result) {
+      result.subscribe({
+        next: () => {
+          /* ignore */
+        },
+        error: () => resolve(),
+        complete: () => resolve(),
+      });
+    } else {
+      // Handler returned undefined (non-auth, non-suppressGlobalError path) — already done.
+      resolve();
+    }
+  });
+}
+
+// ─── errorLink decision logic ─────────────────────────────────────────────────
+
+describe('errorLink', () => {
+  const originalFetch = global.fetch;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  it('does NOT call silentlyRefreshJwt for a non-auth GraphQL error with suppressGlobalError: true', async () => {
+    const fetchMock = jest.fn();
+    global.fetch = fetchMock;
+
+    // A regular GraphQL error (no UNAUTHENTICATED extension)
+    const nonAuthError = new CombinedGraphQLErrors(
+      { errors: [{ message: 'Something went wrong' }] },
+      [{ message: 'Something went wrong' }],
+    );
+
+    await runWithError(nonAuthError, { suppressGlobalError: true });
+
+    // silentlyRefreshJwt calls fetch('/refresh-jwt') — it must NOT be called
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('does NOT call silentlyRefreshJwt for a non-auth GraphQL error without suppressGlobalError', async () => {
+    const fetchMock = jest.fn();
+    global.fetch = fetchMock;
+
+    const nonAuthError = new CombinedGraphQLErrors(
+      { errors: [{ message: 'Something went wrong' }] },
+      [{ message: 'Something went wrong' }],
+    );
+
+    // Suppress window dispatch so the test doesn't fail on missing DOM handlers
+    jest.spyOn(window, 'dispatchEvent').mockImplementation(() => true);
+
+    await runWithError(nonAuthError, {});
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('calls silentlyRefreshJwt for an UNAUTHENTICATED GraphQL error', async () => {
+    // Mock fetch to simulate a failed refresh so the link doesn't retry
+    const fetchMock = jest.fn().mockResolvedValue({ ok: false });
+    global.fetch = fetchMock;
+
+    const unauthError = new CombinedGraphQLErrors(
+      {
+        errors: [
+          { message: 'Unauthorized', extensions: { code: 'UNAUTHENTICATED' } },
+        ],
+      },
+      [{ message: 'Unauthorized', extensions: { code: 'UNAUTHENTICATED' } }],
+    );
+
+    await runWithError(unauthError, {});
+
+    // silentlyRefreshJwt must have called fetch for the refresh endpoint
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/refresh-jwt'),
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
+  it('calls silentlyRefreshJwt for a 401 ServerError', async () => {
+    const fetchMock = jest.fn().mockResolvedValue({ ok: false });
+    global.fetch = fetchMock;
+
+    const serverError401 = new ServerError('Unauthorized', {
+      response: { status: 401 } as Response,
+      bodyText: 'Unauthorized',
+    });
+
+    await runWithError(serverError401, {});
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/refresh-jwt'),
+      expect.objectContaining({ method: 'POST' }),
+    );
   });
 });

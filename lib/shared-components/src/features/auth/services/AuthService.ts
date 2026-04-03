@@ -132,13 +132,27 @@ export class AuthService {
 
       return user;
     } catch (error) {
-      LOGGER.error(
-        'AuthService: Secure OAuth authentication failed:',
-        String(error),
-      );
-
       // Enhanced error handling for different failure scenarios
       const authError = this.handleAuthenticationError(error);
+      // Only report unexpected server errors (5xx) at error level — user-facing
+      // auth failures (wrong credentials, unauthorized account, invalid token)
+      // are expected conditions, not bugs. Reporting them as errors floods Rollbar.
+      const statusCode =
+        error instanceof Error
+          ? ((error as Error & { statusCode?: number }).statusCode ?? null)
+          : null;
+      const isServerError = statusCode !== null ? statusCode >= 500 : false;
+      if (isServerError) {
+        LOGGER.error(
+          'AuthService: Secure OAuth authentication failed:',
+          String(error),
+        );
+      } else {
+        LOGGER.warn(
+          'AuthService: Secure OAuth authentication failed:',
+          String(error),
+        );
+      }
       throw authError;
     }
   }
@@ -183,7 +197,8 @@ export class AuthService {
 
       return user;
     } catch (error) {
-      LOGGER.error('AuthService: Email authentication failed:', String(error));
+      // Wrong credentials and user-not-found are expected user conditions, not bugs.
+      LOGGER.warn('AuthService: Email authentication failed:', String(error));
       throw new Error(
         error instanceof Error ? error.message : 'Email login failed',
       );
@@ -233,12 +248,16 @@ export class AuthService {
       try {
         const errorData = JSON.parse(errorText) as { message?: string };
         if (errorData.message) {
-          message = errorData.message;
+          // Prefix with HTTP status so callers can detect 5xx errors even
+          // when the server provides a custom message.
+          message = `Secure OAuth failed: ${response.status} - ${errorData.message}`;
         }
       } catch {
         message = `Secure OAuth failed: ${response.status} - ${errorText}`;
       }
-      throw new Error(message);
+      const err = new Error(message);
+      (err as Error & { statusCode: number }).statusCode = response.status;
+      throw err;
     }
 
     const responseText = await response.text();
@@ -363,7 +382,8 @@ export class AuthService {
         }
       }
     } catch (error) {
-      LOGGER.error('Failed to store auth tokens:', String(error));
+      // localStorage unavailable (private browsing, quota) — expected in some environments
+      LOGGER.warn('Failed to store auth tokens:', String(error));
     }
   }
 
@@ -381,7 +401,7 @@ export class AuthService {
       }
       return null;
     } catch (error) {
-      LOGGER.error('Failed to retrieve stored token:', String(error));
+      LOGGER.warn('Failed to retrieve stored token:', String(error));
       return null;
     }
   }
@@ -406,7 +426,7 @@ export class AuthService {
       this.csrfTokenFallback = '';
       this.csrfStaleStorageValue = null;
     } catch (error) {
-      LOGGER.error('Failed to clear auth tokens:', String(error));
+      LOGGER.warn('Failed to clear auth tokens:', String(error));
     }
   }
 
@@ -421,7 +441,7 @@ export class AuthService {
       // Local JWT validation - check if token is properly formatted and not expired
       return this.isTokenValidLocally(jwt);
     } catch (error) {
-      LOGGER.error('Token verification failed:', String(error));
+      LOGGER.warn('Token verification failed:', String(error));
       return false;
     }
   }
@@ -513,7 +533,8 @@ export class AuthService {
 
       return result.jwt;
     } catch (error) {
-      LOGGER.error('AuthService: JWT refresh request failed:', String(error));
+      // Network errors during refresh are expected (offline, DNS failure) — not bugs.
+      LOGGER.warn('AuthService: JWT refresh request failed:', String(error));
       return null;
     }
   }
@@ -536,7 +557,7 @@ export class AuthService {
 
       return response.ok;
     } catch (error) {
-      LOGGER.error('Remote token verification failed:', String(error));
+      LOGGER.warn('Remote token verification failed:', String(error));
       return false;
     }
   }
@@ -576,7 +597,7 @@ export class AuthService {
       // Token is valid and not expired
       return true;
     } catch (error) {
-      LOGGER.error('Failed to validate JWT locally:', String(error));
+      LOGGER.warn('Failed to validate JWT locally:', String(error));
       return false;
     }
   }
@@ -594,7 +615,7 @@ export class AuthService {
         localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(user));
       }
     } catch (error) {
-      LOGGER.error('Failed to store user profile:', String(error));
+      LOGGER.warn('Failed to store user profile:', String(error));
     }
   }
 
@@ -637,7 +658,7 @@ export class AuthService {
         localStorage.setItem(ADMIN_PROFILE_KEY, JSON.stringify(user));
       }
     } catch (error) {
-      LOGGER.error('Failed to store admin profile:', String(error));
+      LOGGER.warn('Failed to store admin profile:', String(error));
     }
   }
 
@@ -683,7 +704,8 @@ export class AuthService {
         credentials: 'include',
       });
     } catch (error) {
-      LOGGER.error('AuthService: Logout request failed:', String(error));
+      // Network errors during logout are not critical — session is already cleared client-side.
+      LOGGER.warn('AuthService: Logout request failed:', String(error));
     }
   }
 

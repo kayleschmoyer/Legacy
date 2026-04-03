@@ -104,7 +104,9 @@ export function EnhancedAuthGuard({
             }
           }}
           onError={(error: Error) => {
-            LOGGER.error('Authentication Error:', error);
+            // Login failures (wrong credentials, unauthorized account) are expected
+            // user-facing conditions, not bugs — use warn to avoid Rollbar noise.
+            LOGGER.warn('Authentication Error:', error);
             const errorMessage =
               error instanceof Error ? error.message : 'Authentication failed';
             onLoginFailure?.(errorMessage);
