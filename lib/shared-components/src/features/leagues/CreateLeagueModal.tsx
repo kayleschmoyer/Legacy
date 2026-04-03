@@ -196,6 +196,7 @@ function CreateLeagueModal({
                 League Name
               </Text>
               <Input
+                width="100%"
                 backgroundColor="$gray1"
                 borderRadius="$2"
                 padding="$3"
