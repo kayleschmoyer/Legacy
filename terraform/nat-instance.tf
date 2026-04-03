@@ -127,7 +127,7 @@ resource "aws_instance" "nat_instance" {
     echo 'net.ipv4.ip_forward = 1' >> /etc/sysctl.conf
     /sbin/iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
     /sbin/iptables -F FORWARD
-    service iptables save
+    /sbin/iptables-save > /etc/sysconfig/iptables
     EOF
   )
 
