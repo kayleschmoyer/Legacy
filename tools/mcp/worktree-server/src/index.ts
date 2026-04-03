@@ -1125,6 +1125,32 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
         },
       },
     },
+    {
+      name: 'worktree_check_ignore',
+      description:
+        'Check whether paths would be ignored by .gitignore rules (git check-ignore -v). ' +
+        'Returns per-path results with the matching rule, source file, and line number. ' +
+        'Useful when a newly created file silently disappears from git status.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          paths: {
+            type: 'array',
+            items: { type: 'string' },
+            description:
+              'One or more file/directory paths to check (maximum 100). Paths are passed through as provided; only values beginning with `-` are rejected.',
+            minItems: 1,
+            maxItems: 100,
+          },
+          worktree: {
+            type: 'string',
+            description:
+              'Ticket key, absolute path, or omit for active worktree',
+          },
+        },
+        required: ['paths'],
+      },
+    },
   ],
 }));
 
@@ -4981,6 +5007,145 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               null,
               2,
             ),
+          },
+        ],
+      };
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_check_ignore
+    // -----------------------------------------------------------------------
+    case 'worktree_check_ignore': {
+      const { paths, worktree: wtKey } = args as {
+        paths: string[];
+        worktree?: string;
+      };
+
+      const target = resolveTargetDir(wtKey);
+      if ('error' in target) {
+        return {
+          content: [{ type: 'text', text: target.error }],
+          isError: true,
+        };
+      }
+      const cwd = target.path;
+
+      // Validate paths — reject empty strings, control chars, and git flags
+      for (const p of paths) {
+        if (!p || /[\r\n\0]/.test(p)) {
+          return {
+            content: [
+              { type: 'text', text: `Invalid path: ${JSON.stringify(p)}` },
+            ],
+            isError: true,
+          };
+        }
+        if (p.startsWith('-')) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Invalid path: "${p}". Paths must not start with '-'.`,
+              },
+            ],
+            isError: true,
+          };
+        }
+      }
+
+      // Run: git check-ignore -v --stdin
+      // Output format for ignored paths: <source>:<linenum>:<pattern>\t<pathname>
+      // Paths that are not ignored produce no output; exit code 1 means nothing ignored.
+      const ignored = new Map<
+        string,
+        { ruleFile: string; line: number; rule: string }
+      >();
+
+      try {
+        await new Promise<void>((resolve, reject) => {
+          const proc = execFile(
+            'git',
+            ['check-ignore', '-v', '--stdin'],
+            {
+              cwd,
+              timeout: 10_000,
+              encoding: 'utf-8',
+              maxBuffer: 10 * 1024 * 1024,
+            },
+            (err, stdout, stderr) => {
+              // exit code 1 = no files were ignored (not an error)
+              const code = (err as NodeJS.ErrnoException & { code?: number })
+                ?.code;
+              if (err && code !== 1) {
+                const details = [stderr.trim(), stdout.trim()]
+                  .filter(Boolean)
+                  .join('\n');
+                reject(
+                  new Error(
+                    details
+                      ? `git check-ignore failed: ${err.message}\n${details}`
+                      : `git check-ignore failed: ${err.message}`,
+                  ),
+                );
+                return;
+              }
+              for (const line of stdout.split('\n')) {
+                const trimmed = line.trimEnd();
+                if (!trimmed) continue;
+                // format: <source>:<linenum>:<pattern>\t<pathname>
+                const tabIdx = trimmed.indexOf('\t');
+                if (tabIdx === -1) continue;
+                const meta = trimmed.slice(0, tabIdx);
+                const pathname = trimmed.slice(tabIdx + 1);
+                // Use regex to safely parse meta — Windows paths contain colons (e.g. C:\...)
+                const metaMatch = meta.match(/^(.*):(\d+):(.*)$/);
+                if (!metaMatch) continue;
+                const [, ruleFile, lineText, rule] = metaMatch;
+                const lineNum = Number.parseInt(lineText, 10);
+                ignored.set(pathname, {
+                  ruleFile,
+                  line: Number.isNaN(lineNum) ? 0 : lineNum,
+                  rule,
+                });
+              }
+              resolve();
+            },
+          );
+
+          // Write paths to stdin
+          if (!proc.stdin) {
+            reject(new Error('git check-ignore: stdin stream unavailable'));
+            return;
+          }
+          proc.stdin.write(paths.join('\n') + '\n');
+          proc.stdin.end();
+        });
+      } catch (err) {
+        return {
+          content: [{ type: 'text', text: (err as Error).message }],
+          isError: true,
+        };
+      }
+
+      const results = paths.map((p) => {
+        const match = ignored.get(p);
+        if (match) {
+          return {
+            path: p,
+            ignored: true,
+            rule: match.rule,
+            ruleFile: match.ruleFile,
+            line: match.line,
+          };
+        }
+        return { path: p, ignored: false };
+      });
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({ results }, null, 2),
           },
         ],
       };
