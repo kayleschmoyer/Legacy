@@ -1,5 +1,7 @@
 import { and, count, desc, eq, gte, inArray, sql } from 'drizzle-orm';
 import { LOGGER } from '@legacy-sports/logging';
+import { orderFactsByDifficulty } from './DifficultyOrdering';
+import type { DifficultyTier, FactCategory } from './DifficultyOrdering';
 import * as PublicSchema from '../../drizzle/public/schema';
 import type { PublicDb } from '../client/PublicDbClient';
 
@@ -40,8 +42,8 @@ export interface PlayerFact {
   id: number;
   playerId: number;
   clueText: string;
-  category: string;
-  difficultyTier: string;
+  category: FactCategory;
+  difficultyTier: DifficultyTier;
   season: number | null;
   sortOrder: number;
 }
@@ -708,32 +710,11 @@ export class DisclosureGameService {
       );
     }
 
-    // Load facts ordered by tier (vague → moderate → identifying),
+    // Load facts and order by difficulty tier (vague → moderate → identifying),
     // with Fisher-Yates shuffle within each tier for freshness.
     const facts = await this.getPlayerFacts(playerId);
-
-    // Group by tier, shuffle each group, then flatten
-    const byTier: Record<string, typeof facts> = {
-      vague: [],
-      moderate: [],
-      identifying: [],
-    };
-    for (const f of facts) {
-      byTier[f.difficultyTier]?.push(f);
-    }
-
-    const shuffled: typeof facts = [];
-    for (const tier of ['vague', 'moderate', 'identifying'] as const) {
-      const group = byTier[tier] ?? [];
-      // Fisher-Yates in place
-      for (let i = group.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [group[i], group[j]] = [group[j], group[i]];
-      }
-      shuffled.push(...group);
-    }
-
-    const orderedFactIds = shuffled.map((f) => f.id);
+    const orderedFacts = orderFactsByDifficulty(facts);
+    const orderedFactIds = orderedFacts.map((f) => f.id);
     const now = new Date().toISOString();
 
     const [session] = await this.db

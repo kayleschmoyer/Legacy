@@ -38,6 +38,21 @@ export {
   TIER_SORT_ORDER,
 } from './DisclosureGameService';
 export type { PlayerFact, EligiblePlayer } from './DisclosureGameService';
+export {
+  assignTierFromValue,
+  bucketValue,
+  orderFactsByDifficulty,
+  shuffle,
+  OBFUSCATION_CONFIG,
+  TIER_NUMERIC_ORDER,
+  TIER_SEQUENCE,
+} from './DifficultyOrdering';
+export type {
+  DifficultyTier,
+  FactCategory,
+  ObfuscationRule,
+  OrderableFact,
+} from './DifficultyOrdering';
 export type {
   HitterStatKey,
   PitcherStatKey,
