@@ -159,6 +159,27 @@ function pitchingSummary(entry: Entry): string {
   return parts.join(', ');
 }
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/** Maximum number of items to fetch from the server for the random pool. */
+const POOL_LIMIT = 50;
+/** Number of items displayed in the widget after random selection. */
+const DISPLAY_LIMIT = 3;
+
+/**
+ * Unbiased Fisher–Yates random sample.
+ * Picks `n` items from `arr` without replacement.
+ * Returns a new array; does not mutate the input.
+ */
+function fisherYatesSample<T>(arr: readonly T[], n: number): T[] {
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy.slice(0, n);
+}
+
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
 interface EntryIconProps {
@@ -207,19 +228,36 @@ export function OnThisDayFeed({
   const day = today.getDate();
 
   const { data, loading, error } = useGetOnThisDayQuery({
-    variables: { month, day, limit: 15 },
+    variables: { month, day, limit: POOL_LIMIT },
     // Cache for 1 hour — content is stable for any given calendar date.
     fetchPolicy: 'cache-first',
   });
 
   const { data: eventsData, loading: eventsLoading } =
     useGetOnThisDayEventsQuery({
-      variables: { month, day, limit: 20 },
+      variables: { month, day, limit: POOL_LIMIT },
       fetchPolicy: 'cache-first',
     });
 
-  const entries = data?.onThisDay ?? [];
-  const events = eventsData?.onThisDayEvents ?? [];
+  const entries = useMemo(() => data?.onThisDay ?? [], [data]);
+  const events = useMemo(() => eventsData?.onThisDayEvents ?? [], [eventsData]);
+
+  // Randomly select DISPLAY_LIMIT items from each section so the widget stays
+  // concise and shows different highlights on each visit.
+  const displayedEntries = useMemo(
+    () =>
+      entries.length <= DISPLAY_LIMIT
+        ? [...entries]
+        : fisherYatesSample(entries, DISPLAY_LIMIT),
+    [entries],
+  );
+  const displayedEvents = useMemo(
+    () =>
+      events.length <= DISPLAY_LIMIT
+        ? [...events]
+        : fisherYatesSample(events, DISPLAY_LIMIT),
+    [events],
+  );
 
   const dateLabel = `${MONTH_NAMES[month - 1]} ${ordinal(day)}`;
 
@@ -300,9 +338,9 @@ export function OnThisDayFeed({
           </YStack>
         )}
 
-      {!loading && !error && entries.length > 0 && (
+      {!loading && !error && displayedEntries.length > 0 && (
         <YStack>
-          {entries.map((entry, idx) => {
+          {displayedEntries.map((entry, idx) => {
             const isBatting = entry.entryType === 'batting';
             const summary = isBatting
               ? battingSummary(entry)
@@ -374,14 +412,14 @@ export function OnThisDayFeed({
       )}
 
       {/* Events section: signings, trades, extensions */}
-      {!eventsLoading && events.length > 0 && (
+      {!eventsLoading && displayedEvents.length > 0 && (
         <YStack>
           <XStack
             alignItems="center"
             gap="$2"
             paddingHorizontal="$5"
             paddingVertical="$2"
-            borderTopWidth={entries.length > 0 ? 1 : 0}
+            borderTopWidth={displayedEntries.length > 0 ? 1 : 0}
             borderTopColor={withAlpha(BRAND_NAVY, 0.5)}
             style={{ background: withAlpha(BRAND_NAVY, 0.3) }}
           >
@@ -395,7 +433,7 @@ export function OnThisDayFeed({
             </Text>
           </XStack>
 
-          {events.map((event, idx) => {
+          {displayedEvents.map((event, idx) => {
             const label = eventTypeLabel(event.eventType ?? '');
             const accentColor =
               event.eventType === 'TR'
