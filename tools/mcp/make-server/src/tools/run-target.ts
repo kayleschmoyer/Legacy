@@ -201,6 +201,7 @@ const ALLOWED_TARGETS = new Set([
   'ami-build',
   'ami-list',
   'gen-tfvars',
+  'runner-apply',
 ]);
 
 interface RunTargetParams {
@@ -260,6 +261,10 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
     'full-check',
     'dev-setup',
     'ami-build',
+    // runner-apply runs terraform plan + apply which can take 10+ minutes.
+    // It also has an interactive confirmation prompt — always pass NO_CONFIRM=1
+    // via the variables parameter to avoid blocking on stdin (execFile has no tty).
+    'runner-apply',
   ]);
   const timeoutMs = heavyTargets.has(target) ? 600_000 : 300_000;
 

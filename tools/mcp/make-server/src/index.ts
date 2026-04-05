@@ -19,7 +19,9 @@ const server = new McpServer({
 // --- make_run ---
 server.tool(
   'make_run',
-  'Run a whitelisted Makefile target. Covers: pc, build, test, lint, typecheck, format, codegen, install, kill-stale, etc.',
+  'Run a whitelisted Makefile target. Covers: pc, build, test, lint, typecheck, format, codegen, install, kill-stale, etc. ' +
+    'NOTE: runner-apply has an interactive confirmation prompt — always pass variables="NO_CONFIRM=1" when invoking it, ' +
+    'otherwise the process will block waiting for stdin. runner-apply also runs terraform plan+apply and may take 10+ minutes.',
   {
     target: z.string().describe('Make target'),
     worktreePath: z

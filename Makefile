@@ -544,14 +544,14 @@ terraform-destroy: ## Destroy Terraform infrastructure
 	@$(call echo_yellow,Destroying Terraform infrastructure...)
 	cd terraform && terraform destroy
 
-runner-apply: ## Apply runner infrastructure only (intentionally excluded from normal apply loop)
+runner-apply: ## Apply runner infrastructure only (intentionally excluded from normal apply loop). Pass NO_CONFIRM=1 to skip the interactive confirmation (required for non-interactive/agent use).
 	@$(call echo_blue,Applying self-hosted runner infrastructure...)
 	@$(call echo_yellow,Runner resources are intentionally outside the normal Terraform loop.)
 	@$(call echo_yellow,This apply targets module.github_runners only — never the full stack.)
 	@$(call echo_yellow,Ensure github_app_id / github_app_key_base64 / github_app_webhook_secret are in secrets.auto.tfvars.)
 	cd terraform && terraform plan -out=runner.plan -var="enable_github_runners=true" -target=module.github_runners
-	@$(call echo_blue,Review the plan above. Press Enter to apply or Ctrl+C to abort.)
-	@$(if $(filter Windows_NT,$(OS)),powershell -Command "Read-Host | Out-Null",read _confirm)
+	@$(if $(filter 1,$(NO_CONFIRM)),$(call echo_yellow,Skipping confirmation (NO_CONFIRM=1)),$(call echo_blue,Review the plan above. Press Enter to apply or Ctrl+C to abort.))
+	@$(if $(filter 1,$(NO_CONFIRM)),,$(if $(filter Windows_NT,$(OS)),powershell -Command "Read-Host | Out-Null",read _confirm))
 	cd terraform && terraform apply runner.plan
 
 # Self-Hosted Runner AMI (see .agents/skills/infrastructure/references/ami-build.md)
