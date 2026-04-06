@@ -744,6 +744,11 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
           },
           path: { type: 'string', description: 'File path filter' },
           range: { type: 'string', description: 'Commit range' },
+          stat: {
+            type: 'boolean',
+            description:
+              'Include per-commit file change stats (files changed, insertions, deletions). Use maxCount=1 + stat=true as replacement for git show --stat HEAD.',
+          },
         },
       },
     },
@@ -2268,11 +2273,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         maxCount = 20,
         path: filterPath,
         range,
+        stat = false,
       } = args as {
         worktree?: string;
         maxCount?: number;
         path?: string;
         range?: string;
+        stat?: boolean;
       };
       const target = resolveTargetDir(wtKey);
       if ('error' in target) {
@@ -2307,6 +2314,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           `-n`,
           `${limit}`,
         ];
+        if (stat) gitArgs.push('--numstat');
         if (range) gitArgs.push(range);
         if (filterPath) gitArgs.push('--', filterPath);
 
@@ -2315,8 +2323,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           .split(RS)
           .filter((b) => b.trim())
           .map((record) => {
-            const fields = record.trim().split(FS);
-            return {
+            const lines = record.trim().split('\n');
+            // First line contains the format fields
+            const fields = lines[0].split(FS);
+            const commit: Record<string, unknown> = {
               sha: fields[0] ?? '',
               shortSha: fields[1] ?? '',
               message: fields[2] ?? '',
@@ -2324,6 +2334,36 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               date: fields[4] ?? '',
               refs: fields[5] ?? '',
             };
+
+            if (stat && lines.length > 1) {
+              const files: Array<{
+                path: string;
+                insertions: number;
+                deletions: number;
+              }> = [];
+              // Parse numstat lines: "12\t3\tpath/to/file" or "-\t-\tpath/to/file" for binary files
+              for (let i = 1; i < lines.length; i++) {
+                const line = lines[i];
+                const numstatMatch = line.match(/^(\d+|-)\t(\d+|-)\t(.+)$/);
+                if (numstatMatch) {
+                  files.push({
+                    path: numstatMatch[3],
+                    insertions:
+                      numstatMatch[1] === '-'
+                        ? 0
+                        : Number.parseInt(numstatMatch[1], 10),
+                    deletions:
+                      numstatMatch[2] === '-'
+                        ? 0
+                        : Number.parseInt(numstatMatch[2], 10),
+                  });
+                }
+                // Skip non-numstat lines such as summaries
+              }
+              commit.files = files;
+            }
+
+            return commit;
           });
         return {
           content: [
