@@ -249,7 +249,9 @@ server.tool(
     'Reads JSONL session files from ~/.claude/projects/ and returns a structured JSON report with every Bash command executed ' +
     'during the session — including subagent transcripts. Designed for the MCP gap audit (Phase 1) to produce a complete ' +
     'Bash command inventory that survives context-window compaction. ' +
-    'Auto-detects the current session and project when no parameters are provided.',
+    'Auto-detects the current session and project when no parameters are provided. ' +
+    'Default output: structured JSON report with full command details. ' +
+    'Pass gapsOnly:true for a compact plain-text frequency-table summary that separates potential MCP gaps from already-covered commands.',
   {
     sessionId: z
       .string()
@@ -275,6 +277,14 @@ server.tool(
       .positive()
       .optional()
       .describe('Process ID to look up session ID from ~/.claude/sessions/.'),
+    gapsOnly: z
+      .boolean()
+      .default(false)
+      .describe(
+        'Compact gap-focused output: one line per unique command pattern, <5 KB. ' +
+          'Separates potential MCP gaps from already-covered commands. ' +
+          'Use this instead of the default JSON output when running the MCP gap audit inline.',
+      ),
   },
   async (params) => auditSessionBash(params),
 );

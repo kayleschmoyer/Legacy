@@ -8,6 +8,7 @@ export interface AuditSessionBashParams {
   project?: string;
   includeMcp?: boolean;
   pid?: number;
+  gapsOnly?: boolean;
 }
 
 /** Resolve the Python interpreter: prefer python3, fall back to python / py (Windows). */
@@ -21,8 +22,9 @@ function resolvePythonInterpreter(): string {
 }
 
 /**
- * Run scripts/audit-session-bash.py and return its JSON output.
- * Always passes --format json so the result is machine-readable.
+ * Run scripts/audit-session-bash.py and return its output.
+ * When gapsOnly is true, passes --gaps-only and returns compact text.
+ * Otherwise passes --format json and returns structured JSON.
  */
 export async function auditSessionBash(
   params: AuditSessionBashParams,
@@ -31,7 +33,12 @@ export async function auditSessionBash(
   const scriptPath = resolvePath(repoRoot, 'scripts', 'audit-session-bash.py');
   const python = resolvePythonInterpreter();
 
-  const args = [scriptPath, '--format', 'json'];
+  const args = [scriptPath];
+  if (params.gapsOnly) {
+    args.push('--gaps-only');
+  } else {
+    args.push('--format', 'json');
+  }
   if (params.sessionId) args.push('--session-id', params.sessionId);
   if (params.project) args.push('--project', params.project);
   if (params.includeMcp) args.push('--include-mcp');
@@ -54,6 +61,11 @@ export async function auditSessionBash(
                 },
               ],
             });
+            return;
+          }
+          if (params.gapsOnly) {
+            // --gaps-only returns plain text, not JSON
+            done({ content: [{ type: 'text', text: stdout.trim() }] });
             return;
           }
           try {
