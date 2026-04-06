@@ -78,6 +78,52 @@ On **Claude Code on the web**, Claude's native Atlassian plugin (`mcp__claude_ai
 | `jira_link_issues`     | No native equivalent (use custom `legacy-sports-jira` MCP or `acli`)                                                                                                                                                        |
 | `jira_list_children`   | `searchJiraIssuesUsingJql` with `parent = LS-####`                                                                                                                                                                          |
 
+## Jira Pagination (Critical)
+
+The Atlassian plugin's `searchJiraIssuesUsingJql` defaults to `maxResults: 10`. The custom `jira_list_children` defaults to 25. Both will silently truncate results for large epics.
+
+**Rules:**
+
+- **Always set `maxResults: 100`** when listing children or searching tickets via the Atlassian plugin
+- **Always set `limit: 100`** when using `jira_list_children`
+- **Check for pagination** — the two tools use different pagination mechanisms (see below)
+- **Verify counts**: log "Found N total children: X To Do, Y In Progress, Z In Review, W Done" and confirm the sum matches the total
+
+> **Common trap**: an epic with 50 children returns only 10 on the first `searchJiraIssuesUsingJql` call with default parameters. The agent assumes those 10 are ALL children, works them, and prematurely transitions the parent — missing 40 tickets. This caused the LS-2079 incident.
+
+### `jira_list_children` — cursor-based pagination (`nextPageToken`)
+
+The custom MCP tool uses cursor pagination. `total` in the response equals the current page's result count, not the grand total — **do not use `total` to detect truncation**. The reliable signal is `nextPageToken`: if present, pass it back as `pageToken` and fetch the next page. Loop until `nextPageToken` is absent.
+
+```
+// Page 1
+jira_list_children({ issueKey: "LS-####", limit: 100 })
+// → { issues: [...], nextPageToken: "eyJ..." }
+
+// Page 2
+jira_list_children({ issueKey: "LS-####", limit: 100, pageToken: "eyJ..." })
+// → { issues: [...] }  ← no nextPageToken means last page
+```
+
+### `searchJiraIssuesUsingJql` (Atlassian plugin) — offset-based pagination (`startAt`/`maxResults`)
+
+The Atlassian plugin uses classic offset pagination. The response includes a `total` field that reflects the **grand total** across all pages. Fetch additional pages by incrementing `startAt` by `maxResults` until you have collected `total` issues.
+
+```
+// Page 1
+searchJiraIssuesUsingJql(
+  cloudId: "fb294606-...",
+  jql: "parent = LS-#### ORDER BY priority DESC, created ASC",
+  maxResults: 100,
+  startAt: 0
+)
+// → { total: 150, issues: [...100 items...] }
+
+// Page 2
+searchJiraIssuesUsingJql(..., startAt: 100)
+// → { total: 150, issues: [...50 items...] }
+```
+
 ## Available MCP Servers in Cloud
 
 - `legacy-sports-ci` — CI log queries, workflow reruns
