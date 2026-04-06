@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { apigatewayInspect } from './tools/apigateway-inspect.js';
+import { iamGetPolicy } from './tools/iam-get-policy.js';
 import { lambdaStatus } from './tools/lambda-status.js';
 import { LAMBDA_FUNCTIONS, logsTail } from './tools/logs-tail.js';
 import { ssmGet } from './tools/ssm-get.js';
@@ -120,6 +121,26 @@ server.tool(
       ),
   },
   async (params) => terraformOutput(params),
+);
+
+// --- aws_iam_get_policy ---
+server.tool(
+  'aws_iam_get_policy',
+  'Fetch an IAM policy document by ARN. Returns the default policy version document (URL-decoded JSON). Optionally lists all available versions.',
+  {
+    policyArn: z
+      .string()
+      .describe(
+        'Full IAM policy ARN (e.g. "arn:aws:iam::123456789012:policy/MyPolicy" or a managed policy ARN like "arn:aws:iam::aws:policy/ReadOnlyAccess").',
+      ),
+    listVersions: z
+      .boolean()
+      .default(false)
+      .describe(
+        'Also return a summary of all policy versions (versionId, isDefault, createDate). Default: false.',
+      ),
+  },
+  async (params) => iamGetPolicy(params),
 );
 
 // Start the server
