@@ -27,6 +27,8 @@ github_auth_status()
 
 If `configured: false`, **stop and prompt the user** — do not silently fall back to `gh` CLI. Tell them their GitHub credentials are missing or expired and direct them to set `GH_TOKEN` or `GITHUB_TOKEN`, run `gh auth login`, or configure `AGENT_AUTHOR_APP_PRIVATE_KEY`. Only fall back to `gh` CLI after the user confirms their auth is working or explicitly asks you to try the CLI fallback.
 
+**Cloud (Claude Code on the web)**: Use built-in `mcp__github__create_pull_request({ owner, repo, ... })` and `mcp__github__update_pull_request({ owner, repo, pullNumber, draft: false })` — these authenticate via the platform's token and avoid the username-leak issue. See [`cloud-agent-mode/SKILL.md`](../cloud-agent-mode/SKILL.md) for the full tool mapping.
+
 Verify prerequisites (`make pc`, migrations, branch pushed), create the PR **as a draft** with standard template, mark it ready for review, then transition Jira to "In Review". The draft→ready flow prevents sweep/review agents from racing with the creating agent.
 
 > Details: [references/create-pr.md](references/create-pr.md)
@@ -34,6 +36,8 @@ Verify prerequisites (`make pc`, migrations, branch pushed), create the PR **as 
 ### Phase 3: Fix Copilot Review Comments
 
 Fetch unresolved threads, apply fixes, validate, commit, push, and resolve threads. Cap at 2 fix-review rounds -- after round 2, resolve remaining threads as "acknowledged" and proceed.
+
+**Cloud (Claude Code on the web)**: Use built-in tools for operations where authorship is visible (replying to threads, requesting Copilot review). This prevents agent comments from appearing under the user's personal GitHub username. See the cloud review workflow in [`cloud-agent-mode/SKILL.md`](../cloud-agent-mode/SKILL.md) and the cloud section in [references/fix-reviews.md](references/fix-reviews.md).
 
 > Details: [references/fix-reviews.md](references/fix-reviews.md)
 
@@ -47,7 +51,7 @@ Orchestrate maintenance across all open PRs: scan, rebase conflicts, fix reviews
 
 1. **Always self-review before pushing** -- Phase 1 is not optional. It prevents CI failures and reduces Copilot review rounds.
 2. **2-round cap on Copilot fix iterations** -- Round 1: security/bugs/type safety. Round 2: remaining actionable comments. After round 2: resolve and move on.
-3. **Resolve threads after fixing** -- use `github_resolve_thread` or `github_resolve_threads` after pushing fixes. `github_resolve_threads` accepts `threadIds` only. Add `merge-when-ready` label after all threads are resolved.
+3. **Resolve threads after fixing** -- use `github_resolve_thread` or `github_resolve_threads` after pushing fixes. `github_resolve_threads` accepts `threadIds` only. Add `merge-when-ready` label after all threads are resolved. In cloud, `mcp__github__resolve_review_thread({ threadId })` is also available (one at a time; `threadId` is the GraphQL node ID).
 4. **Never skip `make pc`** -- each CI failure costs 40-60 min. Minimum alternative: `make format && make lint-fix && make typecheck`.
 5. **Always use `--body-file` or MCP tool for PR body** -- never inline `--body` in any shell (PowerShell is especially problematic).
 6. **Never create a PR from `main`** -- branch name must contain a Jira ticket key.

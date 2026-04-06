@@ -43,6 +43,26 @@ Use the MCP tools below instead of `gh` CLI. These tools handle temp file body e
 
 **GitHub auth-aware routing**: call `github_auth_status` at the start of any GitHub workflow. If `configured: true`, use our custom GitHub MCP tools. If `configured: false`, **stop and prompt the user** — do not silently fall back. Tell them their GitHub credentials are missing or expired, and direct them to set `GH_TOKEN`/`GITHUB_TOKEN`, run `gh auth login`, or configure `AGENT_AUTHOR_APP_PRIVATE_KEY` (see `.agents/skills/cloud-agent-mode/SKILL.md`). Only fall back to `gh` CLI after the user confirms their `gh` auth is working or explicitly asks you to try the CLI fallback.
 
+## Built-in GitHub Tools (Claude Code on the web)
+
+On Claude Code on the web, Claude provides built-in `mcp__github__*` tools that authenticate via the platform's own token. **Prefer these for operations where authorship is visible** (replying to threads, requesting Copilot review) — the custom `legacy-sports-github` MCP server's token fallback chain can inadvertently use the user's personal OAuth token, causing agent actions to appear under the user's GitHub username.
+
+| Custom MCP tool                        | Built-in equivalent (Claude Code on the web)                                                   |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `github_create_pr`                     | `mcp__github__create_pull_request({ owner, repo, title, head, base, body, draft })`            |
+| `github_mark_pr_ready`                 | `mcp__github__update_pull_request({ owner, repo, pullNumber, draft: false })`                  |
+| `github_view_pr`                       | `mcp__github__pull_request_read({ method: "get", owner, repo, pullNumber })`                   |
+| `github_get_review_threads`            | `mcp__github__pull_request_read({ method: "get_review_comments", owner, repo, pullNumber })`   |
+| `github_reply_to_thread`               | `mcp__github__add_reply_to_pull_request_comment({ owner, repo, pullNumber, commentId, body })` |
+| `github_resolve_thread`                | `mcp__github__resolve_review_thread({ threadId })`                                             |
+| `github_resolve_threads` (batch)       | Loop: `mcp__github__resolve_review_thread({ threadId })` per thread                            |
+| `github_request_review(copilot: true)` | `mcp__github__request_copilot_review({ owner, repo, pullNumber })`                             |
+| `github_list_prs`                      | `mcp__github__list_pull_requests({ owner, repo })`                                             |
+| `github_list_reviews`                  | `mcp__github__pull_request_read({ method: "get_reviews", owner, repo, pullNumber })`           |
+| N/A (polling)                          | `mcp__github__subscribe_pr_activity({ owner, repo, pullNumber })` — real-time events           |
+
+> **Note:** Built-in `mcp__github__*` tools are NOT available on Copilot Coding Agent — use the custom `legacy-sports-github` MCP server there. See [`cloud-agent-mode/SKILL.md`](../cloud-agent-mode/SKILL.md) for the full cloud review lifecycle workflow.
+
 ## CI Operations
 
 Use `ci_list_runs`, `ci_view_run`, `ci_get_logs`, `ci_search_logs`, and `ci_rerun` instead of `gh run` commands via Bash. These tools parse and structure log output for agent consumption.
