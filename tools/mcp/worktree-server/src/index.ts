@@ -647,7 +647,7 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
     {
       name: 'worktree_diff',
       description:
-        'Git diff against a base ref (default: origin/main). Supports stat/name-only.',
+        'Git diff against a base ref (default: origin/main). Supports stat/name-only. Pass staged:true to show staged changes (git diff --cached).',
       inputSchema: {
         type: 'object' as const,
         properties: {
@@ -658,7 +658,8 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
           },
           base: {
             type: 'string',
-            description: 'Base ref (default: origin/main)',
+            description:
+              'Base ref (default: origin/main). Ignored when staged is true.',
           },
           paths: {
             type: 'array' as const,
@@ -667,6 +668,11 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
           },
           stat: { type: 'boolean', description: 'Diffstat only' },
           nameOnly: { type: 'boolean', description: 'File names only' },
+          staged: {
+            type: 'boolean',
+            description:
+              'Show staged changes only (git diff --cached / index vs HEAD). When true, the base ref is ignored.',
+          },
         },
       },
     },
@@ -1881,12 +1887,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         paths,
         stat,
         nameOnly,
+        staged,
       } = args as {
         worktree?: string;
         base?: string;
         paths?: string[];
         stat?: boolean;
         nameOnly?: boolean;
+        staged?: boolean;
       };
 
       const target = resolveTargetDir(wtKey);
@@ -1898,28 +1906,30 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
       const cwd = target.path;
 
-      // Validate base ref (only safe rev chars; reject option-like values)
-      if (base.startsWith('-')) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Invalid base ref: "${base}". Base ref must not start with '-'.`,
-            },
-          ],
-          isError: true,
-        };
-      }
-      if (!/^[a-zA-Z0-9_./~^{}-]+$/.test(base)) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Invalid base ref: "${base}". Only alphanumeric, '.', '/', '~', '^', '-', '_', '{', '}' allowed.`,
-            },
-          ],
-          isError: true,
-        };
+      // Validate base ref only when not in staged mode
+      if (!staged) {
+        if (base.startsWith('-')) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Invalid base ref: "${base}". Base ref must not start with '-'.`,
+              },
+            ],
+            isError: true,
+          };
+        }
+        if (!/^[a-zA-Z0-9_./~^{}-]+$/.test(base)) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Invalid base ref: "${base}". Only alphanumeric, '.', '/', '~', '^', '-', '_', '{', '}' allowed.`,
+              },
+            ],
+            isError: true,
+          };
+        }
       }
 
       // Enforce mutual exclusivity of stat and nameOnly
@@ -1936,7 +1946,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       try {
-        const gitArgs = ['diff', base];
+        // staged=true → git diff --cached (index vs HEAD)
+        // staged=false/omitted → git diff <base> (working tree vs base ref)
+        const gitArgs = staged ? ['diff', '--cached'] : ['diff', base];
         if (stat) gitArgs.push('--stat');
         if (nameOnly) gitArgs.push('--name-only');
         if (paths?.length) {
@@ -1952,7 +1964,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             content: [
               {
                 type: 'text',
-                text: `No differences found between ${base} and HEAD.`,
+                text: staged
+                  ? 'No staged changes (index is clean).'
+                  : `No differences found between ${base} and the working tree.`,
               },
             ],
           };
