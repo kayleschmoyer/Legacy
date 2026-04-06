@@ -32,6 +32,7 @@ interface RunTargetParams {
   target: string;
   configuration?: string;
   noCache?: boolean;
+  updateSnapshot?: boolean;
   args?: string | string[];
   env?: Record<string, string>;
   worktreePath?: string;
@@ -147,6 +148,14 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
       }
 
       nxArgs.push('--', ...translated);
+    } else if (params.updateSnapshot && params.target === 'test') {
+      // No extra args provided — still need the -- separator for --updateSnapshot.
+      nxArgs.push('--');
+    }
+
+    // Append --updateSnapshot after all other Jest flags when requested.
+    if (params.updateSnapshot && params.target === 'test') {
+      nxArgs.push('--updateSnapshot');
     }
 
     // Jest writes test names, pass/fail counts, and the summary to stderr.

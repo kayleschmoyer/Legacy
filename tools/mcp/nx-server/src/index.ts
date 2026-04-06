@@ -105,17 +105,23 @@ server.tool(
 // ALLOWED_TARGETS in tools/run-target.ts (the canonical enforcement source).
 server.tool(
   'nx_run',
-  'Run an Nx target on a project. Allowed: build, test, lint, typecheck, codegen, serve, dev, print-schema, deploy:plan, e2e, integration, storybook.',
+  'Run an Nx target on a project. Allowed: build, test, lint, typecheck, codegen, serve, dev, print-schema, deploy:plan, e2e, integration, storybook, format.',
   {
     project: z.string().describe('Project name'),
     target: z.string().describe('Target to run'),
     configuration: z.string().optional().describe('Named configuration'),
     noCache: z.boolean().default(false).describe('Bypass Nx cache'),
+    updateSnapshot: z
+      .boolean()
+      .default(false)
+      .describe(
+        'Update Jest snapshots (appends --updateSnapshot). Only applies to the "test" target.',
+      ),
     args: z
       .union([z.string(), z.array(z.string())])
       .optional()
       .describe(
-        'Extra flags after "--" (e.g. ["-u"] for snapshots). Array preferred; string split on whitespace. ' +
+        'Extra flags after "--" (e.g. ["--verbose"] for verbose output). Array preferred; string split on whitespace. ' +
           'For multiple test patterns, pipe is preferred: ["--testPathPatterns", "FileA|FileB"]. ' +
           'Separate array elements also work: ["--testPathPatterns", "FileA", "FileB"] — on Windows these are automatically coalesced into a single pipe-separated token.',
       ),
