@@ -190,3 +190,4 @@ When running as a cloud coding agent (Claude Code on the web, Copilot Coding Age
 - **Cloud**: Ubuntu Linux · bash · no worktrees/twig · Docker PostgreSQL (no AWS access)
 - Package manager: pnpm 9.12.1 (enforced via corepack — never use npm or yarn)
 - Commit format: `type(scope): message` (e.g. `feat(auth): add oauth`)
+- **`jq` is NOT available on Windows** — never attempt `jq` via Bash on the local dev machine. For JSON parsing, use Python with explicit UTF-8 encoding: `python -c "import json, sys; data = json.load(sys.stdin); ..."` (pipe JSON into it, e.g. `cat file.json | python -c "..."`). When reading from a file, use `open(path, encoding='utf-8')` — Windows Python defaults to cp1252 encoding so always pass `encoding='utf-8'` or `encoding='utf-8-sig'`. Alternatively write a script to `scratch/<name>.py` and run it with `python scratch/<name>.py` to avoid quoting issues with `-c` arguments.
