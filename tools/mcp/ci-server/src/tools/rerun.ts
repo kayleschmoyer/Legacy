@@ -9,6 +9,24 @@ interface RerunParams {
 }
 
 export async function rerun(params: RerunParams): Promise<ToolResult> {
+  if (
+    !Number.isFinite(params.runId) ||
+    !Number.isInteger(params.runId) ||
+    params.runId <= 0
+  ) {
+    return {
+      isError: true,
+      content: [
+        {
+          type: 'text',
+          text:
+            `runId must be a positive integer; received ${params.runId}. ` +
+            `Use the "id" field from ci_list_runs output ("databaseId" is an alias for the same value).`,
+        },
+      ],
+    };
+  }
+
   try {
     if (params.jobId) {
       // Rerun a specific job

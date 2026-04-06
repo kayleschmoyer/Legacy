@@ -116,6 +116,8 @@ interface GitHubRunsResponse {
 
 function mapRun(run: GitHubWorkflowRun) {
   return {
+    // `id` is the value to pass as `runId` to ci_rerun, ci_view_run, ci_get_logs, etc.
+    id: run.id,
     attempt: run.run_attempt,
     conclusion: run.conclusion,
     createdAt: run.created_at,
