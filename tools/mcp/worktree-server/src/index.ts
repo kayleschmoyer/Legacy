@@ -2551,11 +2551,40 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       try {
         const out = run(cmd, cwd, { timeout: 30_000 });
+
+        // Append an explicit success summary so agents don't need a follow-up
+        // worktree_status call to confirm the push landed. git push writes its
+        // progress/result lines to stderr (not captured by run()), so the raw
+        // `out` may be empty or contain only hook output.
+        const pushedFullSha = run('git rev-parse HEAD', cwd).trim();
+        const pushedSha = pushedFullSha.slice(0, 7);
+        const pushedBranch = run('git branch --show-current', cwd).trim();
+        let remoteConfirmed = false;
+        try {
+          const remoteRef = `refs/heads/${pushedBranch}`;
+          const remoteInfo = execFileSync(
+            'git',
+            ['ls-remote', '--exit-code', 'origin', remoteRef],
+            { cwd, encoding: 'utf8', timeout: 30_000 },
+          ).trim();
+          const remoteSha = remoteInfo.split(/\s+/)[0] ?? '';
+          remoteConfirmed = remoteSha === pushedFullSha;
+        } catch {
+          // If the remote ref cannot be queried, leave confirmation as false.
+        }
+
+        const summary = [
+          `pushed: true`,
+          `branch: ${pushedBranch}`,
+          `sha: ${pushedSha}`,
+          `remote-confirmed: ${remoteConfirmed}`,
+        ].join('  ');
+
         return {
           content: [
             {
               type: 'text',
-              text: `[cwd: ${cwd}]\n$ ${cmd}\n\n${out.trim()}`,
+              text: `[resolvedWorktree: ${cwd}]\n[cwd: ${cwd}]\n$ ${cmd}\n\n${out.trim()}\n\n✓ ${summary}`,
             },
           ],
         };
@@ -2577,11 +2606,32 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         if (hookAmended) {
           try {
             const retryOut = run(cmd, cwd, { timeout: 30_000 });
+            const retryPushedFullSha = run('git rev-parse HEAD', cwd).trim();
+            const retryPushedSha = retryPushedFullSha.slice(0, 7);
+            const retryPushedBranch = run(
+              'git branch --show-current',
+              cwd,
+            ).trim();
+            let retryRemoteConfirmed = false;
+            try {
+              const retryRemoteRef = `refs/heads/${retryPushedBranch}`;
+              const retryRemoteInfo = execFileSync(
+                'git',
+                ['ls-remote', '--exit-code', 'origin', retryRemoteRef],
+                { cwd, encoding: 'utf8', timeout: 30_000 },
+              ).trim();
+              const retryRemoteSha = retryRemoteInfo.split(/\s+/)[0] ?? '';
+              retryRemoteConfirmed = retryRemoteSha === retryPushedFullSha;
+            } catch {
+              // If the remote ref cannot be queried, leave confirmation as false.
+            }
+            const retrySummary = `pushed: true  branch: ${retryPushedBranch}  sha: ${retryPushedSha}  remote-confirmed: ${retryRemoteConfirmed}`;
             return {
               content: [
                 {
                   type: 'text',
                   text: [
+                    `[resolvedWorktree: ${cwd}]`,
                     `[cwd: ${cwd}]`,
                     `$ ${cmd}  (initial push — hook amended commit)`,
                     `Exit code: ${e.status ?? 'unknown'}`,
@@ -2591,6 +2641,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     ``,
                     `$ ${cmd}  (retry)`,
                     retryOut.trim(),
+                    ``,
+                    `✓ ${retrySummary}`,
                   ].join('\n'),
                 },
               ],
