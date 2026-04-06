@@ -192,7 +192,18 @@ Call `jira_auth_status` at the start of any Jira workflow. If `configured: true`
 
 When running as a cloud coding agent (Claude Code on the web, Copilot Coding Agent): no worktrees/twig/acli, work directly in repo root; Linux/bash; Docker PostgreSQL; no AWS access. See `.agents/skills/cloud-agent-mode/SKILL.md` for GitHub + Jira auth setup, token configuration tables, Jira tool mapping, and available MCP servers.
 
-**Cloud workflow:** Jira (`jira_create_ticket` → `jira_check_blockers` → `jira_transition` "In Progress") → code → `make_run <target>` (preferred; shell fallback: `make <target>` if the make MCP server is unavailable) → `db_migration_status` → `db_migrate` → `make pc` → commit + push → `github_create_pr(draft: true)` → `github_mark_pr_ready` → Jira "In Review"
+**Cloud workflow (MCP-first):**
+
+1. **Jira**: `jira_create_ticket({ summary: "...", sprint: "current" })` → `jira_check_blockers({ key: "LS-####" })` → `jira_transition({ key: "LS-####", status: "In Progress" })`
+2. **Code**: implement the changes
+3. **Validate**: `make_run({ target: "typecheck" })`, `make_run({ target: "lint-fix" })`, `make_run({ target: "test" })`
+4. **DB**: `db_migration_status()` → `db_migrate()`
+5. **Pre-commit**: `make_run({ target: "pc" })`
+6. **Ship**: `worktree_commit({ message: "type(scope): msg" })` → `worktree_push()`
+7. **PR**: `github_create_pr({ title: "...", body: "...", draft: true })` → `github_mark_pr_ready({ number: <PR#> })`
+8. **Jira**: `jira_transition({ key: "LS-####", status: "In Review" })`
+
+Shell fallbacks (only if MCP server is unavailable): `make <target>`, `git commit`, `git push`, `gh pr create`.
 
 ## Environment Notes
 

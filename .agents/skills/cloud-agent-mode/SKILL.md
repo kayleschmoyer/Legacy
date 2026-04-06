@@ -14,7 +14,38 @@ When running as a **cloud coding agent**:
 - **Linux** — `bash` shell, `/` paths. No junctions or file locks.
 - **Native integrations (Claude Code on the web)** — Claude Code provides built-in GitHub and Atlassian connectors that work without configuring secrets. Prefer these over custom MCP servers when available.
 
-**Cloud workflow:** Jira (`jira_create_ticket` → `jira_check_blockers` → `jira_transition` "In Progress") → code → `make_run <target>` (preferred; shell fallback: `make <target>` if MCP server is unavailable) → `db_migration_status` → `db_migrate` → `make pc` → commit + push → `github_create_pr(draft: true)` → `github_mark_pr_ready` → Jira "In Review"
+**Cloud workflow (MCP-first):**
+
+1. **Jira**: `jira_create_ticket({ summary: "...", sprint: "current" })` → `jira_check_blockers({ key: "LS-####" })` → `jira_transition({ key: "LS-####", status: "In Progress" })`
+2. **Code**: implement the changes
+3. **Validate**: `make_run({ target: "typecheck" })`, `make_run({ target: "lint-fix" })`, `make_run({ target: "test" })`
+4. **DB**: `db_migration_status()` → `db_migrate()`
+5. **Pre-commit**: `make_run({ target: "pc" })`
+6. **Ship**: `worktree_commit({ message: "type(scope): msg" })` → `worktree_push()`
+7. **PR**: `github_create_pr({ title: "...", body: "...", draft: true })` → `github_mark_pr_ready({ number: <PR#> })`
+8. **Jira**: `jira_transition({ key: "LS-####", status: "In Review" })`
+
+Shell fallbacks (only if MCP server is unavailable): `make <target>`, `git commit`, `git push`, `gh pr create`.
+
+## Cloud MCP Cheat Sheet
+
+Always use MCP tools instead of raw shell commands. The MCP tools provide structured output, error handling, and are permission-controlled.
+
+| Instead of (Bash)                  | Use (MCP)                                                      |
+| ---------------------------------- | -------------------------------------------------------------- |
+| `make format`                      | `make_run({ target: "format" })`                               |
+| `make pc`                          | `make_run({ target: "pc" })`                                   |
+| `make lint-fix`                    | `make_run({ target: "lint-fix" })`                             |
+| `make build`                       | `make_run({ target: "build" })`                                |
+| `npx nx run proj:target`           | `nx_run({ project: "proj", target: "target" })`                |
+| `npx nx affected -t target`        | `nx_run_affected({ target: "target" })`                        |
+| `git add . && git commit -m "msg"` | `worktree_commit({ message: "msg" })`                          |
+| `git push`                         | `worktree_push()`                                              |
+| `git status`                       | `worktree_status()`                                            |
+| `git diff`                         | `worktree_diff()`                                              |
+| `git log`                          | `worktree_log()`                                               |
+| `gh pr create`                     | `github_create_pr({ title: "...", body: "...", draft: true })` |
+| `gh pr view`                       | `github_view_pr({ number: N })`                                |
 
 ## GitHub Authentication for PR Creation
 
