@@ -57,13 +57,13 @@ Follow the full [worktree-workflow skill](../worktree-workflow/SKILL.md):
 
 1. **Blocker check**: `jira_check_blockers(key: "LS-####")` — STOP if blockers are not In Review/Done
 2. **Jira "In Progress"**: `jira_transition(key: "LS-####", status: "In Progress")`
-3. **Worktree**: `make worktree TICKET=#### DESC=description` (use `PARENT=` if blocker is In Review)
-4. **Setup**: `make wt-setup WT=$wt`
+3. **Worktree**: `make_worktree_create(ticket: "####", description: "desc")` (add `parent: "LS-####"` if blocker is In Review). Shell fallback: `make worktree TICKET=#### DESC=description`
+4. **Setup**: `make_wt_setup(worktreePath: "$wt")`. Shell fallback: `make wt-setup WT=$wt`
 5. **Implement**: read the ticket description, investigate the codebase, write code + tests
    - **Bug tickets**: follow the [bug verification workflow](../debugging/SKILL.md#verification-by-bug-type) — reproduce the bug **before** writing any fix, then verify the fix resolves the reported behavior **after**. Include before/after evidence in the PR body under a `## Verification` section (appended after the standard template). `make pc` passing is necessary but not sufficient for bugs. The `## Verification` section is not part of the standard PR template -- add it manually for bug-fix PRs.
 6. **Self-review**: run the [self-review phase](../pr-lifecycle/references/self-review.md) to catch rule violations
-7. **Validate**: migrations (`db:status` + `db:up`), then `make pc`
-8. **Ship**: commit, push, [create PR](../pr-lifecycle/references/create-pr.md), transition Jira to "In Review"
+7. **Validate**: `db_migration_status(worktreePath: "$wt")` + `db_migrate(worktreePath: "$wt")`, then `make_run(target: "pc", worktreePath: "$wt")`. Shell fallback: `make pc`
+8. **Ship**: `worktree_commit({ message: "type(scope): msg" })` → `worktree_push()` → `github_create_pr(title: "LS-#### type(scope): msg", body: "<markdown>", worktreePath: "$wt", draft: true)` → `github_mark_pr_ready(number: <PR#>)` → `jira_transition(key: "LS-####", status: "In Review")`. See [create PR](../pr-lifecycle/references/create-pr.md) for details.
 9. **Complete tracking tasks**: call `TaskUpdate(taskId: <id>, status: "completed")` for every task tracking this ticket — **immediately after Jira moves to "In Review"**, before starting any next ticket.
 
 > After shipping, if this ticket is a child of a parent being processed in Parent Mode, mark tasks complete and then return to the parent loop.
