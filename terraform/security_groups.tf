@@ -101,6 +101,20 @@ resource "aws_security_group_rule" "rds_from_ci_runners" {
   description       = "PostgreSQL from self-hosted CI runners (public subnet traffic)"
 }
 
+# NAT Instance Access — SSM port-forwarding tunnels originate from the NAT
+# instance's network interface; this rule lets that traffic reach RDS.
+resource "aws_security_group_rule" "rds_from_nat_instance" {
+  count = var.use_nat_instance ? 1 : 0
+
+  type                     = "ingress"
+  from_port                = 5432
+  to_port                  = 5432
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.nat_instance.id
+  security_group_id        = aws_security_group.rds.id
+  description              = "PostgreSQL from NAT instance (SSM port-forwarding tunnel)"
+}
+
 # CLI Development Access - Direct RDS connection for development tools
 resource "aws_security_group_rule" "rds_from_cli_dev" {
   count = var.environment == "dev" && length(var.allowed_public_ips) > 0 ? 1 : 0

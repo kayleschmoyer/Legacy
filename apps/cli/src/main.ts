@@ -279,12 +279,33 @@ async function run(): Promise<void> {
     )
     .option('-u, --user <email>', 'Specific user email to target')
     .option('-a, --all', 'Apply action to all users (logout only)', false)
+    .option(
+      '--no-db-tunnel',
+      'Skip the DB tunnel after login (default: opens an SSM port-forwarding tunnel to RDS)',
+    )
+    .option(
+      '--local-port <port>',
+      'Local port for the DB tunnel (default: 5432)',
+      (v: string) => Number.parseInt(v, 10),
+    )
+    .option(
+      '--profile <name>',
+      'AWS CLI profile to use (e.g. legacy-sports-dev)',
+    )
     .action(
+      // Commander types callback params as `any`; suppress the resulting
+      // no-unsafe-argument lint error (same pattern used by other handlers).
       (
         action: 'login' | 'logout' | 'status' | 'switch' | 'list',
-        options: { user?: string; all?: boolean },
+        options: {
+          user?: string;
+          all?: boolean;
+          dbTunnel?: boolean;
+          localPort?: number;
+          profile?: string;
+        },
         // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
-      ) => handleAuth({ action, user: options.user, all: options.all } as any),
+      ) => handleAuth({ action, ...options } as any),
     );
 
   program
