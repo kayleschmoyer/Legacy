@@ -229,3 +229,7 @@ searchJiraIssuesUsingJql(..., startAt: 100)
 
 - `worktree` — no worktree management needed
 - `legacy-sports-aws` — no AWS credentials
+
+## Cloud-to-Local Teleport
+
+When a cloud agent hits a task that requires AWS credentials, real database access, Terraform, or other local-only capabilities, it should **not** skip the step or fail silently. Instead, follow the [cloud-teleport skill](../cloud-teleport/SKILL.md) to commit progress, write a structured handoff artifact, and alert the user to continue the session locally. This enables seamless cloud-to-local workflow continuity.

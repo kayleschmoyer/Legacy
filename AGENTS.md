@@ -206,6 +206,8 @@ When running as a cloud coding agent (Claude Code on the web, Copilot Coding Age
 
 Shell fallbacks (only if MCP server is unavailable): `make <target>`, `git commit`, `git push`, `gh pr create`.
 
+**Cloud-to-local teleport:** When a cloud agent hits a capability boundary (AWS operations, real DB migrations, Terraform, infrastructure), it should follow the [cloud-teleport skill](.agents/skills/cloud-teleport/SKILL.md) — commit progress, write a `.claude/teleport-handoff.md` artifact, and alert the user to continue the session locally. Do not skip or silently fail on cloud-blocked steps.
+
 ## Environment Notes
 
 - **Local**: Windows · PowerShell (`;` to chain commands, `$env:` for vars) · twig for branch management
