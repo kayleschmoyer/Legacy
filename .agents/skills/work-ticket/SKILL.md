@@ -41,8 +41,10 @@ jira_view(key: "LS-####")
 Determine the ticket type and whether it has children:
 
 ```
-jira_list_children(key: "LS-####")
+jira_list_children(key: "LS-####", limit: 100)
 ```
+
+> **Pagination required**: if the response contains `nextPageToken`, you must paginate (pass `pageToken` to subsequent calls) until `nextPageToken` is absent. Never assume the first page is complete — default limits (10-25) will silently truncate large epics.
 
 | Condition                                           | Mode                                           |
 | --------------------------------------------------- | ---------------------------------------------- |
@@ -85,16 +87,22 @@ Process children in iterative batches until the backlog is empty.
    all_released = []    # cumulative across all batches
 
    REPEAT:
-     a. List actionable children (To Do and In Progress):
-        jira_list_children(key: "LS-####")
+     a. Enumerate ALL children (paginate if needed):
+        jira_list_children(key: "LS-####", limit: 100)
+        If nextPageToken is present, continue paginating until all pages
+        are collected. Log: "Found N total children: X To Do, Y In Progress,
+        Z In Review, W Done". Verify total == sum of status counts.
      b. Filter to unblocked To Do tickets (jira_check_blockers).
         Prefer tickets without dependencies on other children.
         Process in dependency order (blockers first).
      c. Select batch: pick up to 5 unblocked To Do tickets.
         → If none found → EXIT loop (no unblocked To Do tickets remain).
-          If remaining children are blocked, report them. If some are
-          already In Progress (e.g., being worked by another agent), skip
-          and report those keys.
+          Before exiting, verify pagination was fully exhausted (no
+          `nextPageToken` remained after the last page) — if you exited
+          pagination early, you have a pagination bug; do NOT exit the
+          batch loop. If remaining children are blocked, report them. If
+          some are already In Progress (e.g., being worked by another
+          agent), skip and report those keys.
      d. Claim batch upfront: transition ALL selected tickets to "In Progress"
         before starting work on any of them. Use a single bulk call:
         jira_bulk_transition(keys: [...batch keys], status: "In Progress")
@@ -115,6 +123,8 @@ Process children in iterative batches until the backlog is empty.
    ```
 
 3. **Update parent status** after all batches complete:
+
+   > **Guard**: before transitioning parent, enumerate ALL children one final time by exhausting pagination (`nextPageToken` absent after last page). Confirm every child is In Review or Done — if even one is To Do or In Progress, do NOT transition parent to In Review.
 
    | Children state                                          | Parent status                                        |
    | ------------------------------------------------------- | ---------------------------------------------------- |
@@ -172,3 +182,4 @@ These rules apply to both leaf and parent tickets:
 - **Stacked dependencies** — if child B depends on child A, create child B's worktree with `PARENT=LS-A/branch-name` so it branches from A's branch
 - **Clean up worktrees** — after each child PR is created, clean the worktree before starting the next (`twig worktree clean`)
 - **Bug fixes require proof** — for Bug-type tickets, code changes alone are not sufficient. You must reproduce the broken behavior before fixing, and verify the fix resolves it after. See the [verification-by-bug-type table](../debugging/SKILL.md#verification-by-bug-type) for the specific method per bug category (UI screenshots, failing tests, integration tests, or query results)
+- **Paginate child listings** — `jira_list_children` defaults to 25 results per page; `jira_search` defaults to 50. Always pass `limit: 100` and keep paginating via `pageToken` until `nextPageToken` is absent. Use the absence of `nextPageToken` (not a `total` comparison) as the truncation signal — `jira_list_children`'s `total` field reflects the current page size, not the full result set. Failing to paginate caused premature parent transitions in the LS-2079 incident (agent saw 10 of 50 children, declared the epic done)
