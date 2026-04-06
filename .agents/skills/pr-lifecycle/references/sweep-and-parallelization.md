@@ -32,6 +32,9 @@ IF unsettled PRs remain after max passes:
   Comment on each: "Agent reached max pass limit without resolving this PR"
   Add each to settled (as "Unresolved")
   Report all remaining PRs in the final summary
+
+POST-SWEEP (after outer loop exits):
+  Prune stale local worktrees (see "Worktree Pruning" section below)
 ```
 
 **Why loop?** Fixing one category often creates issues in another:
@@ -183,3 +186,59 @@ The parallelization strategy above applies to sub-agents spawned by a **single**
 Each agent's inner parallelism (batches of 3 sub-agents for Passes 2 & 3) composes naturally with cross-agent coordination: the top-level agent claims a PR, spawns a sub-agent for it, and the sub-agent releases the claim on exit. Other top-level agents see the PR as claimed and skip it for the duration.
 
 > **Full claim/release protocol, label setup (gh CLI), stale detection, and sub-agent prompt templates**: see [multi-agent-sweep-coordination.md](multi-agent-sweep-coordination.md)
+
+---
+
+## Worktree Pruning (Post-Sweep)
+
+After the outer sweep loop exits, clean up local worktrees whose PR has been merged. This prevents worktree accumulation across sessions.
+
+### When to Prune
+
+Run once per sweep session, **after** the outer loop exits — never during the loop (a "merged" worktree may still be needed for conflict resolution or CI context).
+
+### Algorithm
+
+```
+1. List all local worktrees:
+   worktree_list()
+
+2. For each worktree:
+   a. Extract the Jira ticket key from the branch name (regex: LS-\d+)
+   b. If no key found → skip (not a ticket branch)
+   c. Look up the PR for that branch:
+      github_list_prs(branch: <branchName>, state: "merged")
+   d. If a PR is returned (i.e. it is merged) → prune:
+      worktree_clean(worktree: <path>)
+   e. If no PR found, or PR is open/draft/closed-unmerged → skip
+
+3. Report pruned worktrees in sweep summary
+```
+
+### Rules
+
+- **Always use `worktree_clean`** — never `git worktree remove` or manual deletion. `worktree_clean` uses `twig worktree remove` which safely handles junctions.
+- **Skip worktrees with no associated PR** — may be in-flight work that hasn't been pushed yet.
+- **Skip open, draft, and closed-unmerged PRs** — only `MERGED` state triggers pruning.
+- **Skip the main repo worktree** — `worktree_list()` already excludes the main checkout from its output, so no explicit filtering is needed.
+
+### MCP Tools
+
+| Step              | Tool                                               |
+| ----------------- | -------------------------------------------------- |
+| List worktrees    | `worktree_list()`                                  |
+| Find PR by branch | `github_list_prs(branch: <name>, state: "merged")` |
+| Prune worktree    | `worktree_clean(worktree: <path>)`                 |
+
+### Example Summary Output
+
+```
+Worktree pruning (post-sweep):
+  Pruned 3 merged worktrees:
+    LS-2191/fix-scoring        → PR #2198 (merged)
+    LS-2205/add-oauth-proxy    → PR #2210 (merged)
+    LS-2218/db-migration-fix   → PR #2220 (merged)
+  Skipped 2 worktrees (no merged PR):
+    LS-2230/wip-feature        → PR #2231 (open)
+    LS-2235/draft-work         → no PR found
+```

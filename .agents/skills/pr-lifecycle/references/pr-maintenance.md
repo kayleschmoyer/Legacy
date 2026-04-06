@@ -125,6 +125,7 @@ github_pr_dashboard(state: "open", limit: 100)
 4. **Pass 3**: Fix CI failures (load `debug-ci-failure` skill)
 5. **Verify**: clean PRs labeled by bot after Copilot re-review
 6. Repeat until clean (max 5 iterations)
+7. **Post-sweep**: Prune local worktrees whose PR has been merged (see [sweep-and-parallelization.md — Worktree Pruning](sweep-and-parallelization.md#worktree-pruning-post-sweep))
 
 ### Cloud Agent (API-Only Actions)
 
