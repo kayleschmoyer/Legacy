@@ -304,6 +304,7 @@ const DataRow = styled(XStack, {
   borderBottomWidth: 1,
   borderBottomColor: '$borderColor',
   cursor: 'default',
+  minWidth: 900,
   hoverStyle: {
     backgroundColor: '$color2',
   },
