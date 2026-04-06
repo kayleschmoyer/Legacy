@@ -33,6 +33,14 @@ server.tool(
       .describe(
         'Port to use (4300-4399). If omitted, the next available port in range is allocated automatically.',
       ),
+    timeoutMs: z
+      .number()
+      .int()
+      .min(1000)
+      .optional()
+      .describe(
+        'How long to wait for the dev server to become ready (ms). Default: 60000 (60s). Increase for slow machines or large Next.js apps.',
+      ),
   },
   async (params) => devServerStart(params),
 );

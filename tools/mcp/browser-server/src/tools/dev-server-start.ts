@@ -5,9 +5,12 @@ import { allocatePort } from '../port-manager.js';
 import { state } from '../state.js';
 import type { ToolResult } from '../types.js';
 
+export const DEV_SERVER_TIMEOUT_MESSAGE = 'Dev server did not become ready';
+
 export interface DevServerStartParams {
   worktreePath: string;
   port?: number;
+  timeoutMs?: number;
 }
 
 /** Wait for the dev server to start accepting connections. */
@@ -18,7 +21,7 @@ function waitForReady(port: number, timeoutMs: number = 60_000): Promise<void> {
       if (Date.now() - start > timeoutMs) {
         reject(
           new Error(
-            `Dev server did not become ready on port ${port} within ${timeoutMs / 1000}s`,
+            `${DEV_SERVER_TIMEOUT_MESSAGE} on port ${port} within ${timeoutMs / 1000}s`,
           ),
         );
         return;
@@ -41,6 +44,7 @@ export async function devServerStart(
   params: DevServerStartParams,
 ): Promise<ToolResult> {
   const { worktreePath } = params;
+  const timeoutMs = params.timeoutMs ?? 60_000;
 
   // Validate worktree path exists
   if (!existsSync(worktreePath)) {
@@ -141,7 +145,7 @@ export async function devServerStart(
     child.unref();
 
     // Wait for the server to be ready
-    await waitForReady(port);
+    await waitForReady(port, timeoutMs);
 
     return {
       content: [
@@ -161,6 +165,7 @@ export async function devServerStart(
     // Clean up tracked state if startup failed
     state.devServers.delete(port);
     const message = err instanceof Error ? err.message : String(err);
+    const isTimeout = message.startsWith(DEV_SERVER_TIMEOUT_MESSAGE);
     return {
       content: [
         {
@@ -168,8 +173,9 @@ export async function devServerStart(
           text: JSON.stringify({
             ok: false,
             error: `Failed to start dev server: ${message}`,
-            remedy:
-              'Check that the worktree has node_modules installed (make wt-setup) and that the port is not in use.',
+            remedy: isTimeout
+              ? 'The server did not start in time. Run `make kill-stale` to clear stale node processes holding port locks, then retry. If the problem persists, try passing a larger timeoutMs value.'
+              : 'Check that the worktree has node_modules installed (make wt-setup) and that the port is not in use.',
           }),
         },
       ],
