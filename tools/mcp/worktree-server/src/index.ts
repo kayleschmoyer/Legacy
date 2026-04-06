@@ -4979,25 +4979,73 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             gitErr instanceof Error
               ? (gitErr as { stderr?: string }).stderr || gitErr.message
               : String(gitErr);
-          return {
-            content: [
-              {
-                type: 'text',
-                text: JSON.stringify(
+          // When the worktree's .git file is missing, `git worktree remove` cannot
+          // validate the directory and refuses with "cannot remove working tree:
+          // '.git' does not exist". Fall back to direct deletion + prune.
+          if (
+            gitMsg.includes("'.git' does not exist") &&
+            existsSync(targetPath)
+          ) {
+            try {
+              rmSync(targetPath, { recursive: true, force: true });
+              results.push(
+                `Removed worktree via direct deletion (no .git — force fallback after twig ${twigTimedOut ? 'timeout' : 'failure'}): ${branch}`,
+              );
+            } catch (rmErr) {
+              const rmMsg =
+                rmErr instanceof Error ? rmErr.message : String(rmErr);
+              return {
+                content: [
                   {
-                    success: false,
-                    branch,
-                    path: targetPath,
-                    error: `Both twig and git worktree remove failed: ${gitMsg.trim()}`,
-                    hint: 'Manually delete the worktree directory and run `git worktree prune`.',
+                    type: 'text',
+                    text: JSON.stringify(
+                      {
+                        success: false,
+                        branch,
+                        path: targetPath,
+                        error: `Direct deletion fallback failed: ${rmMsg.trim()}`,
+                        hint: 'The worktree directory may be locked by another process. Run `make kill-stale` then retry.',
+                      },
+                      null,
+                      2,
+                    ),
                   },
-                  null,
-                  2,
-                ),
-              },
-            ],
-            isError: true,
-          };
+                ],
+                isError: true,
+              };
+            } finally {
+              try {
+                execFileSync('git', ['worktree', 'prune'], {
+                  cwd: MAIN_REPO,
+                  encoding: 'utf-8',
+                  timeout: 30_000,
+                });
+              } catch {
+                // prune failure is non-fatal — stale refs will be cleaned up on
+                // next `git worktree prune` or `twig worktree clean`
+              }
+            }
+          } else {
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(
+                    {
+                      success: false,
+                      branch,
+                      path: targetPath,
+                      error: `Both twig and git worktree remove failed: ${gitMsg.trim()}`,
+                      hint: 'Manually delete the worktree directory and run `git worktree prune`.',
+                    },
+                    null,
+                    2,
+                  ),
+                },
+              ],
+              isError: true,
+            };
+          }
         }
       }
 
