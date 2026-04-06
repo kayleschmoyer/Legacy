@@ -524,6 +524,20 @@ function run(
   });
 }
 
+/**
+ * Optionally cap output to the last N lines.
+ * When lines are omitted, a header indicating the omitted count is prepended
+ * so agents know the output was trimmed and can adjust if needed.
+ */
+function applyTailLines(output: string, tailLines?: number): string {
+  if (!tailLines || tailLines <= 0) return output;
+  const lines = output.trimEnd().split('\n');
+  if (lines.length <= tailLines) return output;
+  const omitted = lines.length - tailLines;
+  const tail = lines.slice(-tailLines).join('\n');
+  return `[... ${omitted} line${omitted === 1 ? '' : 's'} omitted — use tailLines=0 or omit to see full output ...]\n${tail}`;
+}
+
 // ---------------------------------------------------------------------------
 // MCP server
 // ---------------------------------------------------------------------------
@@ -832,6 +846,12 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
               'Ticket key, absolute path, or omit for active worktree',
           },
           allowMainRepo: { type: 'boolean', description: 'Allow main repo' },
+          tailLines: {
+            type: 'integer',
+            minimum: 0,
+            description:
+              'Cap output to the last N lines. Use 0 for no truncation. Useful for high-volume commands like "make pc" (~430 KB) where only the final pass/fail lines matter. A header showing the omitted line count is prepended.',
+          },
         },
         required: ['command'],
       },
@@ -3216,11 +3236,24 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     // worktree_run
     // -----------------------------------------------------------------------
     case 'worktree_run': {
-      const { command, worktree, allowMainRepo } = args as {
+      const { command, worktree, allowMainRepo, tailLines } = args as {
         command: string;
         worktree?: string;
         allowMainRepo?: boolean;
+        tailLines?: number;
       };
+
+      if (
+        tailLines !== undefined &&
+        (!Number.isInteger(tailLines) || tailLines < 0)
+      ) {
+        return {
+          content: [
+            { type: 'text', text: 'tailLines must be a non-negative integer' },
+          ],
+          isError: true,
+        };
+      }
 
       let targetDir: string;
 
@@ -3322,11 +3355,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           }
         });
 
+        const displayOutput = applyTailLines(output, tailLines);
         return {
           content: [
             {
               type: 'text',
-              text: `[cwd: ${targetDir}]\n$ ${command}\n\n${output}`,
+              text: `[cwd: ${targetDir}]\n$ ${command}\n\n${displayOutput}`,
             },
           ],
         };
@@ -3337,9 +3371,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           code?: number | string | null;
           signal?: string | null;
         };
-        const output =
+        const rawOutput =
           [e.stdout, e.stderr].filter(Boolean).join('\n') ||
           (err instanceof Error ? err.message : String(err));
+        const output = applyTailLines(rawOutput, tailLines);
         return {
           content: [
             {
