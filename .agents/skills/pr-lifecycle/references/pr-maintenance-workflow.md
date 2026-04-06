@@ -247,6 +247,19 @@ github_resolve_thread(threadId: "<threadId>")
 
 **Do NOT resolve threads that request actual code changes.**
 
+After resolving threads, the `copilot-auto-approve` workflow automatically
+re-evaluates `bot-review` via the `pull_request_review_thread` event (no manual
+dispatch needed when using user-OAuth tokens). The merge queue also re-evaluates,
+so if `bot-review` was already SUCCESS and thread resolution was the only
+remaining blocker, the PR will be picked up automatically.
+
+**Fallback**: If `bot-review` stays FAILURE after ~30 seconds (App token
+resolution doesn't emit the event), dispatch manually:
+
+```
+ci_dispatch_workflow(workflow: "copilot-auto-approve.yml", inputs: { pr_number: "<N>" })
+```
+
 ### Cloud Step 6: Final Report
 
 Produce a summary report with:

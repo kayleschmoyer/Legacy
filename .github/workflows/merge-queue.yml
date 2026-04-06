@@ -29,6 +29,12 @@ on:
   # Trigger on PR review events
   pull_request_review:
     types: [submitted] # When someone approves/requests changes
+  # Trigger when a review thread is resolved — handles the case where
+  # bot-review is already SUCCESS but required_review_thread_resolution
+  # was the only remaining blocker. Without this, the merge queue never
+  # re-evaluates after the last thread is resolved.
+  pull_request_review_thread:
+    types: [resolved]
   # Trigger when CI Orchestrator workflow completes for PR branches (not push-to-main)
   workflow_run:
     workflows: ["Legacy Sports CI Orchestrator"]
@@ -49,6 +55,7 @@ jobs:
         github.event_name == 'workflow_dispatch' ||
         (github.event_name == 'workflow_run' && github.event.workflow_run.event == 'pull_request') ||
         github.event_name == 'pull_request_review' ||
+        github.event_name == 'pull_request_review_thread' ||
         (github.event_name == 'pull_request' && github.event.action == 'labeled' && (github.event.label.name == 'merge-when-ready' || github.event.label.name == 'merge-to-parent')) ||
         (github.event_name == 'pull_request' && github.event.action == 'unlabeled' && (github.event.label.name == 'merge-when-ready' || github.event.label.name == 'merge-to-parent'))
       )
@@ -179,7 +186,7 @@ jobs:
       # replace the single queued slot, so when this run finishes processing, only the
       # most recent trigger remains to execute (which then scans all merge-ready PRs).
       - name: Debounce (let concurrent triggers settle)
-        if: github.event_name == 'workflow_run' || github.event_name == 'pull_request_review'
+        if: github.event_name == 'workflow_run' || github.event_name == 'pull_request_review' || github.event_name == 'pull_request_review_thread'
         run: sleep 30
 
       - name: Process Enhanced Merge Queue

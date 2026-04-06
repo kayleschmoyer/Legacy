@@ -146,6 +146,22 @@ foreach ($entry in $toFix) {
    .\scripts\resolve-review-threads.ps1 -PRNumber $pr.number
    ```
 
+   The `copilot-auto-approve` workflow listens for `pull_request_review_thread`
+   resolved events and automatically re-evaluates `bot-review` when threads are
+   cleared via the GitHub UI or a user-OAuth API call. No manual dispatch needed
+   in the normal case.
+
+   **Fallback** (App token resolution): GitHub's anti-recursion rule prevents
+   `pull_request_review_thread` from firing when threads are resolved using a
+   GitHub App installation token or `GITHUB_TOKEN`. If `bot-review` stays at
+   FAILURE after resolving threads, dispatch the recheck manually:
+
+   ```powershell
+   gh workflow run copilot-auto-approve.yml --field pr_number=$($pr.number)
+   ```
+
+   Or via MCP: `ci_dispatch_workflow(workflow: "copilot-auto-approve.yml", inputs: { pr_number: "<N>" })`
+
 6. **End of loop** — the `foreach ($entry in $toFix)` block repeats
    steps 1–5 for every PR with unresolved comments.
 

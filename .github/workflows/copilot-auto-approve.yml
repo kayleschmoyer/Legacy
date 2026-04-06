@@ -32,6 +32,12 @@ on:
         description: "PR number to recheck bot-review status"
         required: true
         type: number
+  # Fires when any review thread is resolved (UI or user-OAuth API call).
+  # NOTE: GitHub's anti-recursion rule prevents this from firing when threads
+  # are resolved via a GitHub App installation token or GITHUB_TOKEN — use the
+  # manual 'recheck' workflow_dispatch as fallback in those cases.
+  pull_request_review_thread:
+    types: [resolved]
 
 permissions:
   pull-requests: write
@@ -237,6 +243,16 @@ jobs:
         with:
           app-id: 3142924
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+      # When Copilot submits a COMMENTED review, the pull_request_review event
+      # fires before the review's threads have propagated to the GraphQL API.
+      # Without this delay, the thread fetch below sees 0 unresolved threads and
+      # incorrectly sets bot-review=success + approves the PR, even though Copilot
+      # just left new comments. Non-Copilot review events (human approvals) don't
+      # create new threads, so they don't need the delay.
+      - name: Wait for thread propagation (Copilot-triggered reviews)
+        if: contains(toLower(github.event.review.user.login), 'copilot')
+        run: sleep 10
 
       - name: Check threads and approve if clean
         uses: actions/github-script@v8
@@ -789,3 +805,150 @@ jobs:
               inputs: { pr_number: prNumber.toString() },
             });
             core.info(`Dispatched recheck for PR #${prNumber} (bot-review was still pending after 3m)`);
+
+  thread-resolved:
+    # Fires when any review thread is resolved (UI click or user-OAuth API call).
+    # Re-evaluates Copilot thread state and updates bot-review. This closes the
+    # dead zone where threads are resolved without a code push — previously,
+    # bot-review stayed stuck at FAILURE with no trigger to clear it.
+    #
+    # GitHub anti-recursion note: this event does NOT fire when threads are
+    # resolved via a GitHub App installation token or GITHUB_TOKEN. Use the
+    # manual 'recheck' workflow_dispatch as a fallback in those cases.
+    if: >-
+      github.event_name == 'pull_request_review_thread' &&
+      !github.event.pull_request.draft &&
+      github.event.pull_request.user.login != 'dependabot[bot]'
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    concurrency:
+      group: thread-resolved-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    steps:
+      - name: Generate bot token
+        id: bot-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: 3142924
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+      - name: Check threads and approve if clean
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ steps.bot-token.outputs.token }}
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const sha = context.payload.pull_request.head.sha;
+
+            // Must have at least one Copilot review before we can approve
+            const reviews = await github.rest.pulls.listReviews({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+            });
+            const copilotReviewLogins = ['copilot-pull-request-reviewer[bot]', 'Copilot'];
+            const copilotLogins = ['copilot-pull-request-reviewer', 'copilot-pull-request-reviewer[bot]', 'Copilot'];
+            const copilotReviews = reviews.data
+              .filter(r => copilotReviewLogins.includes(r.user.login));
+            if (copilotReviews.length === 0) {
+              core.info('No Copilot reviews yet — skipping');
+              return;
+            }
+
+            const sorted = copilotReviews.sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at));
+            const latest = sorted[0];
+
+            if (latest.state === 'APPROVED') {
+              core.info('Latest Copilot review is APPROVED — old threads superseded');
+              // Fall through to success
+            } else {
+              let allThreads = [];
+              let hasNextPage = true;
+              let cursor = null;
+              while (hasNextPage) {
+                const result = await github.graphql(`
+                  query($owner: String!, $repo: String!, $number: Int!, $cursor: String) {
+                    repository(owner: $owner, name: $repo) {
+                      pullRequest(number: $number) {
+                        reviewThreads(first: 100, after: $cursor) {
+                          pageInfo { hasNextPage endCursor }
+                          nodes {
+                            isResolved
+                            isOutdated
+                            comments(first: 1) {
+                              nodes { author { login } }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                `, {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  number: prNumber,
+                  cursor,
+                });
+                const threads = result.repository.pullRequest.reviewThreads;
+                allThreads.push(...threads.nodes);
+                hasNextPage = threads.pageInfo.hasNextPage;
+                cursor = threads.pageInfo.endCursor;
+              }
+
+              const unresolvedThreads = allThreads.filter(t =>
+                !t.isOutdated &&
+                !t.isResolved &&
+                t.comments.nodes.some(c => copilotLogins.includes(c.author.login))
+              );
+
+              if (unresolvedThreads.length > 0) {
+                core.info(`${unresolvedThreads.length} unresolved Copilot thread(s) — not approving`);
+                await github.rest.repos.createCommitStatus({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  sha,
+                  state: 'failure',
+                  context: 'bot-review',
+                  description: `Copilot review has ${unresolvedThreads.length} unresolved comment(s)`,
+                });
+                return;
+              }
+            }
+
+            // All threads resolved or superseded — set bot-review success
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha,
+              state: 'success',
+              context: 'bot-review',
+              description: 'Copilot review passed — all threads resolved',
+            });
+
+            // Check if already approved by the bot
+            const botReviews = reviews.data.filter(r =>
+              r.user.login === 'legacy-sports-review-bot[bot]' && r.state === 'APPROVED'
+            );
+            if (botReviews.length > 0) {
+              core.info('Already approved by bot — just ensuring label');
+            } else {
+              await github.rest.pulls.createReview({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber,
+                event: 'APPROVE',
+                body: 'Auto-approved: all Copilot review threads resolved.',
+              });
+              core.info(`Approved PR #${prNumber}`);
+            }
+
+            try {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                labels: ['merge-when-ready'],
+              });
+              core.info(`Labeled PR #${prNumber} merge-when-ready`);
+            } catch (e) {
+              core.warning(`Failed to add label: ${e.message}`);
+            }
