@@ -61,6 +61,67 @@ test.describe('Bug Report Button @smoke', () => {
   });
 });
 
+test.describe('Bug Report Button – Mobile @regression', () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test('bug report button is accessible via mobile nav menu', async ({
+    page,
+  }) => {
+    await page.goto('/about');
+    await page.waitForLoadState('load');
+
+    // The desktop bug-report button is hidden on narrow viewports
+    const hamburger = page.getByRole('button', { name: /open menu/i });
+    await hamburger.click();
+
+    // The BugReportButton (🐛) should now appear inside the mobile nav panel
+    const bugButton = page.getByRole('button', { name: /report a bug/i });
+    await expect(bugButton).toBeVisible();
+  });
+
+  test('bug report dialog opens from mobile nav', async ({ page }) => {
+    await page.goto('/about');
+    await page.waitForLoadState('load');
+
+    await page.getByRole('button', { name: /open menu/i }).click();
+    await page.getByRole('button', { name: /report a bug/i }).click();
+
+    await expect(
+      page.getByRole('dialog').getByText('Report a Bug'),
+    ).toBeVisible();
+  });
+
+  test('dialog stays open and accepts input after opening from mobile nav', async ({
+    page,
+  }) => {
+    await page.goto('/about');
+    await page.waitForLoadState('load');
+
+    await page.getByRole('button', { name: /open menu/i }).click();
+    await page.getByRole('button', { name: /report a bug/i }).click();
+
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByText('Report a Bug')).toBeVisible();
+
+    // Filling the description field triggers a mousedown inside Dialog.Portal,
+    // which renders outside mobileRef.  Without the bugDialogOpen guard in
+    // Navigation's outside-click handler this would collapse the mobile nav
+    // panel and unmount the dialog trigger, closing the dialog prematurely.
+    const descriptionField = dialog.getByRole('textbox', {
+      name: /bug description/i,
+    });
+    await descriptionField.fill(
+      'Mobile nav regression test: dialog should remain open after typing.',
+    );
+
+    await expect(descriptionField).toHaveValue(
+      'Mobile nav regression test: dialog should remain open after typing.',
+    );
+    // Dialog must still be visible after interacting with it
+    await expect(dialog).toBeVisible();
+  });
+});
+
 test.describe('Bug Report Dialog Interactions @regression', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/about');

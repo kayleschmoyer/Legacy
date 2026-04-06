@@ -242,6 +242,7 @@ const MobileNavLink = styled(Button, {
 function Navigation() {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [bugDialogOpen, setBugDialogOpen] = useState(false);
   const mobileRef = useRef<HTMLDivElement>(null);
 
   const isActive = useCallback(
@@ -254,9 +255,13 @@ function Navigation() {
     setMobileOpen(false);
   }, [location.pathname]);
 
-  // Close mobile nav on outside click
+  // Close mobile nav on outside click.
+  // Suppressed while the bug-report dialog is open because Dialog.Portal
+  // renders outside mobileRef, so any click inside the dialog would
+  // otherwise be treated as an outside click and collapse the nav panel.
   useEffect(() => {
     const handler = (e: MouseEvent) => {
+      if (bugDialogOpen) return;
       if (mobileRef.current && !mobileRef.current.contains(e.target as Node)) {
         setMobileOpen(false);
       }
@@ -265,7 +270,7 @@ function Navigation() {
       document.addEventListener('mousedown', handler);
       return () => document.removeEventListener('mousedown', handler);
     }
-  }, [mobileOpen]);
+  }, [mobileOpen, bugDialogOpen]);
 
   // Handle Escape key to close mobile nav
   useEffect(() => {
@@ -486,6 +491,9 @@ function Navigation() {
                 <Paragraph marginBottom={0}>Pricing</Paragraph>
               </MobileNavLink>
             </Link>
+            <XStack paddingHorizontal="$3" paddingVertical="$1">
+              <BugReportButton onDialogOpenChange={setBugDialogOpen} />
+            </XStack>
           </YStack>
         </MobileNavPanel>
       )}

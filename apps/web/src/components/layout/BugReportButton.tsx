@@ -68,11 +68,20 @@ const SEARCH_MIN_LENGTH = 10;
 /** Maximum query length sent to the backend search endpoint. */
 const SEARCH_MAX_LENGTH = 200;
 
+interface BugReportButtonProps {
+  /** Called whenever the dialog opens or closes. Lets the parent (e.g. the
+   *  mobile nav) suppress its own outside-click handler while the dialog is
+   *  mounted so the dialog portal does not register as an "outside" click. */
+  onDialogOpenChange?: (open: boolean) => void;
+}
+
 /**
  * A minimal "Report a Bug" button that opens a small dialog.
  * Attaches auth info automatically so devs can reproduce the issue.
  */
-export const BugReportButton: React.FC = () => {
+export const BugReportButton: React.FC<BugReportButtonProps> = ({
+  onDialogOpenChange,
+}) => {
   const auth = useAuth();
   const [open, setOpen] = useState(false);
   const [description, setDescription] = useState('');
@@ -102,9 +111,10 @@ export const BugReportButton: React.FC = () => {
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
       setOpen(nextOpen);
+      onDialogOpenChange?.(nextOpen);
       if (!nextOpen) resetForm();
     },
-    [resetForm],
+    [resetForm, onDialogOpenChange],
   );
 
   const handleSearchSimilar = useCallback(() => {
