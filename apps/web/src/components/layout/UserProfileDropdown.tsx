@@ -16,12 +16,19 @@ import {
   CreditCard,
   HelpCircle,
   LogOut,
+  Monitor,
+  Moon,
   Settings,
   Settings2,
   Shield,
+  Sun,
   User,
 } from '@tamagui/lucide-icons';
 import { formatDisplayName } from '../../lib/formatDisplayName';
+import {
+  type ThemePreference,
+  useThemeContext,
+} from '../../context/ThemeContext';
 
 const UserMenuButton = styled(Button, {
   backgroundColor: 'transparent',
@@ -86,6 +93,74 @@ const MenuIconBox = styled(YStack, {
   backgroundColor: '$color2',
   flexShrink: 0,
 });
+
+const ThemeOptionButton = styled(Button, {
+  flex: 1,
+  backgroundColor: '$color2',
+  borderWidth: 1,
+  borderColor: 'transparent',
+  borderRadius: '$3',
+  paddingVertical: '$2',
+  paddingHorizontal: '$1',
+  hoverStyle: { backgroundColor: '$color3' },
+  pressStyle: { scale: 0.96 },
+  variants: {
+    active: {
+      true: {
+        backgroundColor: '$accentMuted',
+        borderColor: '$brandNavy',
+        hoverStyle: { backgroundColor: '$accentMuted' },
+      },
+    },
+  } as const,
+});
+
+const THEME_OPTIONS: Array<{
+  value: ThemePreference;
+  label: string;
+  Icon: typeof Sun;
+}> = [
+  { value: 'light', label: 'Light', Icon: Sun },
+  { value: 'system', label: 'System', Icon: Monitor },
+  { value: 'dark', label: 'Dark', Icon: Moon },
+];
+
+function ThemeToggleRow() {
+  const { themePreference, setThemePreference } = useThemeContext();
+
+  return (
+    <YStack gap="$1" paddingVertical="$1">
+      <Paragraph size="$2" color="$colorPress" paddingHorizontal="$1">
+        Theme
+      </Paragraph>
+      <XStack gap="$1">
+        {THEME_OPTIONS.map(({ value, label, Icon }) => (
+          <ThemeOptionButton
+            key={value}
+            active={themePreference === value}
+            onPress={() => setThemePreference(value)}
+            aria-label={`${label} theme`}
+            aria-pressed={themePreference === value}
+          >
+            <YStack alignItems="center" gap="$1">
+              <Icon
+                size={16}
+                color={themePreference === value ? '$brandNavy' : '$colorPress'}
+              />
+              <Paragraph
+                size="$1"
+                color={themePreference === value ? '$brandNavy' : '$colorPress'}
+                fontWeight={themePreference === value ? '600' : '400'}
+              >
+                {label}
+              </Paragraph>
+            </YStack>
+          </ThemeOptionButton>
+        ))}
+      </XStack>
+    </YStack>
+  );
+}
 
 export const UserProfileDropdown: React.FC = () => {
   const auth = useAuth();
@@ -242,6 +317,11 @@ export const UserProfileDropdown: React.FC = () => {
               </Paragraph>
             </YStack>
           </XStack>
+
+          <Separator />
+
+          {/* Theme toggle */}
+          <ThemeToggleRow />
 
           <Separator />
 
