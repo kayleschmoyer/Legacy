@@ -708,3 +708,177 @@ builder.mutationField('createAllMatchups', (t) =>
     },
   }),
 );
+
+// Mutation: adminRegenerateLeagueSchedule
+// Admin-only: deletes all future 'scheduled' matchups for a league and
+// regenerates them using the current (correct) scheduling algorithm.
+// Use this to fix leagues whose schedule was created with the old buggy
+// algorithm (e.g. LS-2307: team plays another team 5x in a 10-week season).
+builder.mutationField('adminRegenerateLeagueSchedule', (t) =>
+  t.field({
+    type: AdvanceLeagueWeekResponse,
+    args: {
+      leagueId: t.arg.int({ required: true }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw AuthenticationError();
+      }
+      if (!context.user.isAdmin) {
+        throw ForbiddenError('Admin access required');
+      }
+
+      const { leagueId } = args;
+
+      // 1. Load league config
+      const leagueResult = await context.db
+        .select({
+          totalMatchups: PublicSchema.leagues.totalMatchups,
+          gamesPerMatchup: PublicSchema.leagues.gamesPerMatchup,
+          spStartsPerMatchup: PublicSchema.leagues.spStartsPerMatchup,
+          schedulingStrategy: PublicSchema.leagues.schedulingStrategy,
+        })
+        .from(PublicSchema.leagues)
+        .where(eq(PublicSchema.leagues.id, leagueId))
+        .limit(1);
+
+      if (!leagueResult[0]) {
+        throw new Error(`League ${leagueId} not found`);
+      }
+
+      const league = leagueResult[0];
+      const totalMatchups = league.totalMatchups ?? 10;
+      const gamesPerMatchup = league.gamesPerMatchup ?? 5;
+      const spStartsPerMatchup = league.spStartsPerMatchup ?? 1;
+      const strategyType = league.schedulingStrategy ?? 'round-robin';
+
+      // 2. Find the last week that has already started or finished
+      const activeMatchups = await context.db
+        .select({ weekNumber: PublicSchema.matchups.weekNumber })
+        .from(PublicSchema.matchups)
+        .where(
+          and(
+            eq(PublicSchema.matchups.leagueId, leagueId),
+            inArray(PublicSchema.matchups.status, ['in_progress', 'completed']),
+          ),
+        );
+
+      const lastActiveWeek = activeMatchups.reduce(
+        (max, m) => Math.max(max, m.weekNumber ?? 0),
+        0,
+      );
+
+      // 3. Delete future 'scheduled' matchups
+      await context.db
+        .delete(PublicSchema.matchups)
+        .where(
+          and(
+            eq(PublicSchema.matchups.leagueId, leagueId),
+            eq(PublicSchema.matchups.status, 'scheduled'),
+          ),
+        );
+
+      LOGGER.info(
+        '[adminRegenerateLeagueSchedule] Deleted scheduled matchups',
+        {
+          leagueId,
+          lastActiveWeek,
+          totalMatchups,
+        },
+      );
+
+      // 4. Regenerate future weeks only
+      const futureWeeks = totalMatchups - lastActiveWeek;
+      if (futureWeeks <= 0) {
+        LOGGER.info(
+          '[adminRegenerateLeagueSchedule] No future weeks to regenerate',
+          {
+            leagueId,
+            lastActiveWeek,
+            totalMatchups,
+          },
+        );
+        const allMatchups = await context.db
+          .select()
+          .from(PublicSchema.matchups)
+          .where(eq(PublicSchema.matchups.leagueId, leagueId));
+        const inProgressMatchup = allMatchups.find(
+          (m) => m.status === 'in_progress',
+        );
+        return {
+          matchups: allMatchups,
+          currentMatchupId: inProgressMatchup?.id ?? null,
+        };
+      }
+
+      const scheduleResult = await MatchupService.generateSchedule(context.db, {
+        leagueId,
+        numberOfWeeks: futureWeeks,
+        strategyType,
+      });
+
+      // 5. Insert new matchups with week numbers offset by lastActiveWeek
+      const insertedMatchups: Array<{
+        id: number;
+        weekNumber: number;
+        team1Id: number | null;
+        team2Id: number | null;
+      }> = [];
+
+      for (const matchup of scheduleResult.matchups) {
+        const result = await context.db
+          .insert(PublicSchema.matchups)
+          .values({
+            leagueId,
+            weekNumber: lastActiveWeek + matchup.weekNumber,
+            team1Id: matchup.team1Id,
+            team2Id: matchup.team2Id,
+            gamesPerMatchup,
+            spStartsPerMatchup,
+            status: 'scheduled',
+            team1Score: null,
+            team2Score: null,
+            startTime: null,
+            endTime: null,
+          })
+          .returning({
+            id: PublicSchema.matchups.id,
+            weekNumber: PublicSchema.matchups.weekNumber,
+            team1Id: PublicSchema.matchups.team1Id,
+            team2Id: PublicSchema.matchups.team2Id,
+          });
+        insertedMatchups.push(result[0]);
+      }
+
+      // 6. Populate matchup_players for the new matchups
+      await populateMatchupPlayersAndSeasons(
+        context.db,
+        leagueId,
+        insertedMatchups,
+        gamesPerMatchup,
+      );
+
+      LOGGER.info('[adminRegenerateLeagueSchedule] Regenerated schedule', {
+        leagueId,
+        lastActiveWeek,
+        futureWeeks,
+        inserted: insertedMatchups.length,
+      });
+
+      // 7. Return updated matchup list
+      const allMatchups = await context.db
+        .select()
+        .from(PublicSchema.matchups)
+        .where(eq(PublicSchema.matchups.leagueId, leagueId));
+
+      const inProgressMatchup = allMatchups.find(
+        (m) => m.status === 'in_progress',
+      );
+
+      return {
+        matchups: allMatchups,
+        currentMatchupId: inProgressMatchup?.id ?? null,
+      };
+    },
+  }),
+);

@@ -1402,6 +1402,7 @@ type Mutation {
   Add a player to the end of the current user's draft queue. No-ops if already queued.
   """
   addToDraftQueue(draftId: Int!, playerId: Int!): [DraftQueueEntry!]
+  adminRegenerateLeagueSchedule(leagueId: Int!): AdvanceLeagueWeekResponse
   advancePlayoffBracket(bracketId: Int!): PlayoffBracket
 
   """
