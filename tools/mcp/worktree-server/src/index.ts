@@ -2637,16 +2637,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         if (!branch) {
           // Detached HEAD — check if a rebase is in progress
           const gitDir = run('git rev-parse --git-dir', cwd).trim();
+          const resolvedGitDir = isAbsolute(gitDir)
+            ? gitDir
+            : join(cwd, gitDir);
           const inRebase =
-            existsSync(join(gitDir, 'rebase-merge')) ||
-            existsSync(join(gitDir, 'rebase-apply'));
+            existsSync(join(resolvedGitDir, 'rebase-merge')) ||
+            existsSync(join(resolvedGitDir, 'rebase-apply'));
           return {
             content: [
               {
                 type: 'text',
                 text: inRebase
-                  ? 'Refused: rebase is in progress. Finish the rebase before pushing.'
-                  : 'Refused: HEAD is detached (no branch checked out). Aborting push.',
+                  ? `[resolvedWorktree: ${cwd}]\nRefused: rebase is in progress. Finish the rebase before pushing.`
+                  : `[resolvedWorktree: ${cwd}]\nRefused: HEAD is detached (no branch checked out). Aborting push.`,
               },
             ],
             isError: true,
@@ -2657,7 +2660,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             content: [
               {
                 type: 'text',
-                text: 'Refused: cannot force-push main. Use git revert instead.',
+                text: `[resolvedWorktree: ${cwd}]\nRefused: cannot force-push main. Use git revert instead.`,
               },
             ],
             isError: true,
@@ -2669,7 +2672,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [
             {
               type: 'text',
-              text: 'Could not determine current branch. Aborting push.',
+              text: `[resolvedWorktree: ${cwd}]\nCould not determine current branch. Aborting push.`,
             },
           ],
           isError: true,
@@ -2789,6 +2792,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 {
                   type: 'text',
                   text: [
+                    `[resolvedWorktree: ${cwd}]`,
                     `[cwd: ${cwd}]`,
                     `$ ${cmd}  (initial push — hook amended commit)`,
                     `Exit code: ${e.status ?? 'unknown'}`,
@@ -2809,7 +2813,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [
             {
               type: 'text',
-              text: `[cwd: ${cwd}]\n$ ${cmd}\n\nExit code: ${e.status ?? 'unknown'}\n${output}`,
+              text: `[resolvedWorktree: ${cwd}]\n[cwd: ${cwd}]\n$ ${cmd}\n\nExit code: ${e.status ?? 'unknown'}\n${output}`,
             },
           ],
           isError: true,
