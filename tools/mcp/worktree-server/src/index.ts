@@ -15,6 +15,7 @@ import {
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -638,7 +639,8 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
           },
           amend: {
             type: 'boolean',
-            description: 'Amend previous commit (--no-edit)',
+            description:
+              'Amend previous commit. If message is provided, replaces the commit message; otherwise uses --no-edit.',
           },
         },
         required: [],
@@ -1609,9 +1611,42 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
-      // Validate conventional commit format (scope is optional) — skip for amend
+      // Validate conventional commit format (scope is optional)
       const conventionalPattern =
         /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?!?:\s.+/;
+
+      // For amend+message: message !== undefined means caller explicitly passed a message.
+      // Reject empty/whitespace-only strings so callers don't silently fall back to --no-edit.
+      if (amend && message !== undefined) {
+        const trimmed = message.trim();
+        if (!trimmed) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: 'Amend message cannot be empty. Provide a non-empty message or omit it to keep the existing commit message (--no-edit).',
+              },
+            ],
+            isError: true,
+          };
+        }
+        if (!conventionalPattern.test(trimmed)) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text:
+                  `Invalid commit message format: "${trimmed}"\n\n` +
+                  'Expected conventional commit: type[(scope)]: description\n' +
+                  'Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert\n' +
+                  'Scope is optional. Examples: "feat(auth): add oauth", "fix: typo"',
+              },
+            ],
+            isError: true,
+          };
+        }
+      }
+
       if (!amend && !conventionalPattern.test(message as string)) {
         return {
           content: [
@@ -1728,7 +1763,28 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
 
         // Commit
-        if (amend) {
+        if (amend && message !== undefined) {
+          // Amend with a new message — message has already been validated above
+          const fullMessage =
+            message.trim() +
+            '\n\nCo-Authored-By: Claude <noreply@anthropic.com>';
+          const msgPath = join(
+            tmpdir(),
+            `worktree-commit-msg-${randomUUID()}.txt`,
+          );
+          writeFileSync(msgPath, fullMessage, 'utf-8');
+          try {
+            runGit(['commit', '--amend', '-F', msgPath], cwd, {
+              env: { GIT_EDITOR: 'true' },
+            });
+          } finally {
+            try {
+              unlinkSync(msgPath);
+            } catch {
+              // ignore cleanup errors
+            }
+          }
+        } else if (amend) {
           runGit(['commit', '--amend', '--no-edit'], cwd, {
             env: { GIT_EDITOR: 'true' },
           });
@@ -1737,7 +1793,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             message + '\n\nCo-Authored-By: Claude <noreply@anthropic.com>';
           const msgPath = join(
             tmpdir(),
-            `worktree-commit-msg-${Date.now()}.txt`,
+            `worktree-commit-msg-${randomUUID()}.txt`,
           );
           writeFileSync(msgPath, fullMessage, 'utf-8');
           try {
