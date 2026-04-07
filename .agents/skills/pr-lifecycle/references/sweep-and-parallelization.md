@@ -13,13 +13,30 @@ REPEAT (max 10 passes):
 
   IF unsettled is empty → EXIT (all settled)
 
+  Pass 0: API-Fast Triage (NO git ops — ~2 min)
+    - Request Copilot reviews on bot-authored PRs
+    - Handle Dependabot PRs via comment commands
+    - Label already-clean PRs → add to settled
+    - Re-run transient CI failures early
+    - Resolve process/meta review threads
+
   Pass 1: Rebase unsettled conflicting PRs
+    - Analyze file overlap; parallel for disjoint files, sequential for overlapping
+    - Lightweight validation for clean rebases; full make pc for conflicted
     - On irrecoverable failure → comment blocker on PR, label requires-human-review only if outside agent reach → add to settled
+
   Pass 2: Fix unsettled PRs with unresolved reviews
     - On unfixable review → comment blocker on PR, label requires-human-review only if outside agent reach → add to settled
+
   Pass 3: Fix unsettled PRs with failing CI
+    - Early CI failure detection: poll per-job status, begin triage on first failure
     - On unfixable CI failure → comment blocker on PR, label requires-human-review only if outside agent reach → add to settled
-  Validate changed PRs: make pc in each worktree
+
+  Copilot Review Catch-Up: batch-check all modified PRs for new threads
+    - Queue PRs with new threads for next Pass 2 iteration
+    - Request Copilot re-review on bot-authored PRs with all threads resolved
+
+  Validate changed PRs: make pc (or lightweight) in each worktree
   Push passing PRs
 
   For each unsettled PR:
@@ -50,13 +67,17 @@ POST-SWEEP (after outer loop exits):
 
 Each PR lives in its own junctioned worktree. The shared `node_modules` is **read-only** during `make pc`, so parallel validation is safe.
 
-| Phase                  | Parallelizable?       | Reason                                                                       |
-| ---------------------- | --------------------- | ---------------------------------------------------------------------------- |
-| Rebase (Pass 1)        | **No — sequential**   | Merging PR A shifts `main`, invalidating PR B's rebase                       |
-| `make pc` validation   | **Yes — `Start-Job`** | Each worktree reads shared `node_modules`, writes only local outputs         |
-| CI wait/polling        | **Yes — batch poll**  | Just polling `ci_view_run` / `github_pr_batch_status` — no contention        |
-| Review fixes (Pass 2)  | **Yes — sub-agents**  | Each PR is in its own worktree; agents work independently (max 3 concurrent) |
-| CI code fixes (Pass 3) | **Yes — sub-agents**  | Each PR is in its own worktree; agents work independently (max 3 concurrent) |
+| Phase                            | Parallelizable?           | Reason                                                                       |
+| -------------------------------- | ------------------------- | ---------------------------------------------------------------------------- |
+| API-Fast Triage (Pass 0)         | **Yes — all API calls**   | No git ops; label, re-run CI, resolve threads, request reviews in parallel   |
+| Rebase — disjoint files (Pass 1) | **Yes — batches of 3**    | PRs touching non-overlapping files cannot create cross-PR conflicts          |
+| Rebase — overlapping files       | **No — sequential**       | Shared file paths mean PR A's rebase can invalidate PR B's                   |
+| Lightweight validation           | **Yes — `Start-Job`**     | codegen → typecheck → format; faster than full `make pc`                     |
+| Full `make pc` validation        | **Yes — `Start-Job`**     | Each worktree reads shared `node_modules`, writes only local outputs         |
+| CI wait/polling                  | **Yes — batch poll**      | Just polling `ci_view_run` / `github_pr_batch_status` — no contention        |
+| Review fixes (Pass 2)            | **Yes — sub-agents**      | Each PR is in its own worktree; agents work independently (max 3 concurrent) |
+| CI code fixes (Pass 3)           | **Yes — sub-agents**      | Each PR is in its own worktree; agents work independently (max 3 concurrent) |
+| Copilot Review Catch-Up          | **Yes — batch API calls** | Check all modified PRs for new threads in one pass                           |
 
 ### Parallel Sub-Agents for Review Fixes and CI Fixes
 
@@ -111,27 +132,67 @@ Review fixes (Pass 2) and CI code fixes (Pass 3) operate on independent PRs in s
 - PRs touch overlapping files where a fix on one PR may inform the fix on another
 - Agent platform does not support concurrent sub-agents
 
-### Parallel `make pc` Pattern
+### Lightweight Validation for Clean Rebases
 
-After rebasing N PRs sequentially, validate them all in parallel:
+When a rebase had zero conflicts and the PR's last CI run passed on the old base, the code hasn't changed — only the base moved. Use a lightweight validation instead of the full 9-step `make pc`:
+
+```
+Decision tree:
+  IF rebase had zero conflicts
+    AND last CI run passed on old base
+    AND rebase did NOT touch pnpm-lock.yaml or schema files
+  THEN:
+    Lightweight: codegen → typecheck → format (~3-5 min)
+  ELSE:
+    Full: make pc (all 9 steps) (~10-20 min)
+```
+
+**Rationale**: lint rules, test assertions, and build outputs are deterministic for unchanged code. Only codegen (may depend on new base schema), typecheck (may see new types from base), and format (style drift) can produce different results after a clean rebase.
+
+### Parallel Validation Pattern (with Nx Cache Warming)
+
+After rebasing N PRs, validate them in parallel. **Run the first worktree's validation sequentially** to warm the Nx computation cache, then parallelize the rest at higher concurrency:
 
 ```powershell
 $rebasedPRs = @(
-  @{ Number=1234; Path="D:\code\legacy-sports-worktrees\LS-1234-branch-name" }
+  @{ Number=1234; Path="D:\code\legacy-sports-worktrees\LS-1234-branch-name"; Lightweight=$true }
   # ... etc
 )
 
-$maxParallel = 3
+# Step 1: Warm Nx cache with the first PR (sequential)
+# NOTE: Requires PowerShell 7+ (pwsh). PowerShell 5.1 does not support && operator.
+# Run sequential make calls instead of chained commands on PS 5.1.
+$first = $rebasedPRs[0]
+Write-Host "Warming Nx cache with PR #$($first.Number)..."
+Set-Location $first.Path
+if ($first.Lightweight) {
+  make codegen; if ($LASTEXITCODE -ne 0) { throw "codegen failed" }
+  make typecheck; if ($LASTEXITCODE -ne 0) { throw "typecheck failed" }
+  make format; if ($LASTEXITCODE -ne 0) { throw "format failed" }
+} else {
+  make pc; if ($LASTEXITCODE -ne 0) { throw "make pc failed" }
+}
+
+# Step 2: Parallelize remaining PRs with warm cache (bump to 4 concurrent)
+$remaining = if ($rebasedPRs.Count -gt 1) { $rebasedPRs | Select-Object -Skip 1 } else { @() }
+$maxParallel = 4  # safe with warm Nx cache (was 3 without)
 $jobs = @()
-foreach ($pr in $rebasedPRs) {
+foreach ($pr in $remaining) {
   while (($jobs | Where-Object { $_.State -eq 'Running' }).Count -ge $maxParallel) {
     Start-Sleep -Seconds 5
   }
+  $isLightweight = $pr.Lightweight
   $jobs += Start-Job -Name "pc-$($pr.Number)" -ScriptBlock {
-    param($wtPath)
+    param($wtPath, $lightweight)
     Set-Location $wtPath
-    make pc 2>&1
-  } -ArgumentList $pr.Path
+    if ($lightweight) {
+      make codegen; if ($LASTEXITCODE -ne 0) { throw "codegen failed" }
+      make typecheck; if ($LASTEXITCODE -ne 0) { throw "typecheck failed" }
+      make format; if ($LASTEXITCODE -ne 0) { throw "format failed" }
+    } else {
+      make pc; if ($LASTEXITCODE -ne 0) { throw "make pc failed" }
+    }
+  } -ArgumentList $pr.Path, $isLightweight
 }
 
 $jobs | Wait-Job
@@ -140,20 +201,28 @@ foreach ($job in $jobs) {
   $prNum = $job.Name -replace 'pc-',''
   $output = Receive-Job $job
   if ($job.State -eq 'Completed' -and $job.ChildJobs[0].JobStateInfo.State -eq 'Completed') {
-    Write-Host "PR #$prNum: make pc PASSED"
+    Write-Host "PR #$prNum: validation PASSED"
   } else {
-    Write-Host "PR #$prNum: make pc FAILED"
+    Write-Host "PR #$prNum: validation FAILED"
     $output | Out-File "scratch/pr-$prNum-pc-failure.txt"
   }
   Remove-Job $job
 }
 ```
 
-**Concurrency limit**: `$maxParallel = 3` avoids disk I/O saturation.
+**Why cache warming helps**: Nx stores task computation results in `.nx-cache` at the workspace root (configured via `NX_CACHE_DIRECTORY=.nx-cache` in `.github/actions/nx-cache/action.yml` — NOT per-user or global). The first `make pc` populates this cache for shared dependencies. Subsequent worktrees benefit only if they share the same cache directory.
 
-### Early CI Failure Detection
+Cache sharing for **task results** (what actually speeds up `make pc`) requires `NX_CACHE_DIRECTORY` to point to a shared path accessible by all worktrees. Each worktree has its own root directory, so their `.nx-cache` directories are isolated by default.
 
-After pushing a rebased/fixed branch, don't wait for the entire CI run to complete. Individual jobs within a run complete independently — Build Validation can fail at minute 4 while Quality Gates doesn't finish until minute 10. Poll per-job status to detect failures early:
+The **shared `node_modules` junction** (created by `make worktree`) co-locates `node_modules/.cache/nx` (the Nx internal module cache) under the shared `node_modules` path — but this is distinct from `.nx-cache` and does **not** satisfy the task result cache requirement.
+
+Without a shared `NX_CACHE_DIRECTORY`, each worktree builds its own isolated `.nx-cache` and warming does not carry over.
+
+**Concurrency limit**: `$maxParallel = 4` (up from 3) is safe **only when caches are shared** (junction or `NX_CACHE_DIRECTORY`) — warming reduces per-job I/O significantly in that case. If worktrees have isolated caches (no junction, no shared `NX_CACHE_DIRECTORY`), keep `$maxParallel = 3` to avoid I/O contention. On machines with ≤4 cores, keep at 3 regardless.
+
+### Early CI Failure Detection (Required)
+
+After pushing a rebased/fixed branch, **always** poll per-job status instead of waiting for the full CI run. This is required behavior, not optional. Individual jobs complete independently — Build Validation can fail at minute 4 while Quality Gates doesn't finish until minute 10.
 
 ```
 After pushing branch:
@@ -161,21 +230,39 @@ After pushing branch:
   2. Poll with ci_view_run(runId, includeJobs: true) every ~60s
   3. As soon as ANY job shows conclusion: "failure":
      → Identify the failing job's jobId from ci_view_run(..., includeJobs: true)
-     → Fetch logs: ci_get_logs(runId, jobId, errorSummary: true)
+     → Fetch logs: ci_get_logs(jobId: jobId)
      → Begin fixing immediately — don't wait for full run
   4. If all critical jobs pass (Quality Gates + Build Validation):
      → Mark PR as "CI pending E2E" and move to next PR
 ```
 
-**Impact**: Detect failures ~5-8 min earlier per PR. Particularly valuable when multiple PRs have the same root cause — fix one, apply to all.
+**Impact**: Detects failures ~5-8 min earlier per PR. Particularly valuable when multiple PRs have the same root cause — fix one, apply the pattern to all.
+
+**Interleave with other work**: While waiting for PR A's CI (polling every 60s), start working on PR B. The orchestrator should maintain a list of in-flight CI runs and check them between other operations.
 
 **Tools available**: `ci_view_run` already returns per-job status and completion timestamps. No new MCP tools needed.
 
-### Why NOT Sub-Agents for Rebases
+### Rebase Parallelization: Disjoint-File Exception
 
-- **Cascade invalidation**: Merging PR A changes `main`, invalidating PR B's rebase
-- **Context accumulation**: A single agent learns patterns across PRs (e.g., "AGENTS.md is always `--theirs`")
-- **Rate limits**: Parallel sub-agents multiply costs and hit API throttling
+The original rule was "never parallelize rebases" due to cascade invalidation. This is **partially relaxed** for PRs with disjoint file paths:
+
+**When rebases MUST be sequential** (overlapping files):
+
+- PRs touch the same files — rebasing PR A changes the base for those files, invalidating PR B's rebase
+- PRs touch shared config files (`package.json`, `pnpm-lock.yaml`, `schema.graphql`, `tsconfig.base.json`)
+- File overlap analysis fails or is unavailable
+
+**When rebases CAN be parallel** (disjoint files):
+
+- PRs touch completely different file sets — PR A's rebase cannot create conflicts in PR B's files
+- Analyze via `github_pr_files(number: <PR#>)` before starting the rebase pass
+- Max 3 concurrent rebase sub-agents (same limit as review/CI fix sub-agents)
+
+**Additional reasons to prefer sequential** (even with disjoint files):
+
+- **Context accumulation**: A single agent learns conflict resolution patterns across PRs (e.g., "AGENTS.md is always `--theirs`")
+- **Rate limits**: Parallel sub-agents multiply API calls and can hit throttling
+- Fewer than 3 conflicting PRs (overhead of parallelism outweighs benefit)
 
 ---
 

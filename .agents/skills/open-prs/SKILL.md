@@ -239,9 +239,15 @@ Set-Location D:\code\legacy-sports
 
 ---
 
-## Pass 0: Request Copilot Reviews
+## Pass 0: API-Fast Triage (No Git Required)
 
-Before fixing anything, ensure every open PR has a Copilot review. The repository ruleset (`review_on_push: true`) auto-triggers Copilot for user-authored PRs, but **not for PRs authored by GitHub Apps** (the `requestReviewers` REST API silently drops Copilot when called with installation tokens). Since most agent-created PRs are authored by `legacy-sports-code-bot`, this step is essential.
+Before any git operations, settle as many PRs as possible via API-only actions. This pass typically completes in ~2 minutes and reduces the set of PRs requiring expensive worktree operations (rebase, code fix, `make pc`).
+
+**All actions in this pass are API-only — no worktree, git checkout, or push needed.**
+
+### 0a. Request Copilot Reviews
+
+Ensure every open PR has a Copilot review. The repository ruleset (`review_on_push: true`) auto-triggers Copilot for user-authored PRs, but **not for PRs authored by GitHub Apps** (the `requestReviewers` REST API silently drops Copilot when called with installation tokens). Since most agent-created PRs are authored by `legacy-sports-code-bot`, this step is essential.
 
 For each PR without a Copilot review (check `reviews` in the scan results):
 
@@ -253,11 +259,9 @@ The MCP tool uses a user OAuth token (via `gh auth token`) for Copilot requests,
 
 > **Also treat stale `COMMENTED` reviews as missing**: if a bot-authored PR has a Copilot review in `COMMENTED` state with **0 unresolved threads**, re-request a Copilot review. Copilot does not re-review automatically when threads are resolved externally — leaving `reviewDecision` as `null` and `auto-approve` permanently SKIPPED. Detect this using the actual tool fields: latest Copilot review `state === "COMMENTED"` from `github_pr_batch_status`/`view_pr`, plus no open threads (`threadCount === 0` in `github_pr_scan` or `unresolvedThreads === 0` where available).
 
----
+### 0b. Handle Dependabot PRs (Comment-Only)
 
-## Pass 0.5: Handle Dependabot PRs
-
-Before the local git passes, identify all Dependabot PRs in the scan results and handle them via comments only. When using `github_pr_scan` results (which do not include `author`), treat a PR as Dependabot if its `headRefName`/branch starts with `dependabot/`. When using richer data from `github_pr_dashboard` or `github_pr_batch_status`, you may additionally check `author.login == "dependabot[bot]"`.
+Identify all Dependabot PRs in the scan results and handle them via comments only. When using `github_pr_scan` results (which do not include `author`), treat a PR as Dependabot if its `headRefName`/branch starts with `dependabot/`. When using richer data from `github_pr_dashboard` or `github_pr_batch_status`, you may additionally check `author.login == "dependabot[bot]"`.
 
 For each Dependabot PR, apply exactly one action based on its state:
 
@@ -281,18 +285,78 @@ After posting a rebase command, the PR enters a "commanded" state. Dependabot ha
 
 **Remove Dependabot PRs from all subsequent passes (1, 2, 3)** — never enter their worktrees, modify their branches, or attempt code fixes.
 
+### 0c. Label Already-Clean PRs
+
+Any PR that is already mergeable, CI passing, and has no unresolved threads can be labeled immediately — no git operation needed:
+
+```
+github_manage_labels(number: <PR#>, add: ["merge-when-ready"])
+```
+
+Add these PRs to `settled` immediately.
+
+### 0d. Re-run Transient CI Failures
+
+For PRs with CI failures that look transient (flaky tests, infrastructure timeouts), re-run immediately so CI has time to complete while later passes do git work:
+
+```
+ci_rerun(runId: <id>, failedOnly: true)
+```
+
+Do not re-run CI for failures that clearly need code fixes (type errors, lint errors, test assertion failures). Those are handled in Pass 3.
+
+### 0e. Resolve Process/Meta Review Threads
+
+Some review threads suggest no code change — they are process comments or "nice to have" suggestions. Resolve these without code changes:
+
+```
+github_get_review_threads(number: <PR#>, unresolvedOnly: true)
+```
+
+For each thread that is a process/meta comment (not requesting code changes), resolve it directly:
+
+```
+github_resolve_thread(threadId: "<threadId>")
+```
+
+After resolving all meta threads, if no code-change threads remain, the PR may now be clean — label it `merge-when-ready` and add to `settled`.
+
 ---
 
 ## Pass 1: Rebase Conflicting PRs
 
-For each PR in `$scan.conflicting`:
+### Disjoint-File Parallel Rebase
+
+Before rebasing, analyze which PRs can be rebased in parallel by checking for file overlap:
+
+1. For each conflicting PR, collect changed file paths: `github_pr_files(number: <PR#>)` or `git diff --name-only origin/main...origin/<branch>`
+2. Build a dependency graph: PRs with **overlapping file paths** must be serialized; PRs with **disjoint files** can rebase concurrently
+3. Group PRs into parallel batches (max 3 concurrent, matching sub-agent concurrency limit)
+4. Within each batch, PRs rebase independently since they touch disjoint files — a merge to main from one cannot create conflicts in another
+5. **Fall back to fully sequential** if: file overlap analysis fails, fewer than 3 conflicting PRs, or PRs share files in high-churn areas (e.g., `package.json`, `pnpm-lock.yaml`, `schema.graphql`)
+
+> **Why this is safe**: the original "cascade invalidation" concern applies when rebasing PR A shifts main in a way that affects PR B's rebase. If A and B touch completely different files, A's rebase cannot introduce conflicts in B's files. The cascade only matters for overlapping paths.
+
+For each PR (sequentially within a dependency chain, or in parallel for disjoint batches):
 
 1. Enter the worktree (Step 2)
 2. **Rebase via MCP**: `worktree_rebase(worktree: "LS-####")` — this fetches the latest remote state and rebases onto the parent branch in one operation. Worktrees have their own fetch state and may be stale even if the main repo fetched recently.
 3. If conflicts arise → load `skills/rebase/SKILL.md` and `skills/resolve-merge-conflicts/SKILL.md`
 4. **Post-rebase stabilization**: `worktree_stabilize(worktree: "LS-####")` — reinstalls deps, regenerates schema, and runs affected codegen so `make pc` does not fail on stale artifacts.
-5. After rebasing ALL PRs, batch-validate with parallel `make pc` (see Parallelization Strategy below)
-6. **Dirty-tree guard**: after `make pc` passes, run `worktree_status(worktree: "LS-####")`. If dirty (e.g., `tsconfig.base.json` reformatted), commit with `worktree_commit(message: "style: apply formatting after rebase", worktree: "LS-####")` and re-run `make pc`.
+
+### Lightweight vs. Full Validation
+
+After rebasing, choose the validation level based on rebase outcome:
+
+| Condition                                                                 | Validation                                          | Rationale                                                              |
+| ------------------------------------------------------------------------- | --------------------------------------------------- | ---------------------------------------------------------------------- |
+| Rebase had **zero conflicts** AND PR's last CI run **passed** on old base | **Lightweight**: `codegen` → `typecheck` → `format` | Code unchanged — only base moved; lint/test/build results won't differ |
+| Rebase had **conflicts** OR last CI **failed**                            | **Full**: `make pc` (all 9 steps)                   | Conflict resolution or pre-existing failures need complete validation  |
+| Rebase touched **lock files** (`pnpm-lock.yaml`) or **schema**            | **Full**: `make pc`                                 | Dependency/schema changes can cascade unpredictably                    |
+
+After validation:
+
+6. **Dirty-tree guard**: after validation passes, run `worktree_status(worktree: "LS-####")`. If dirty (e.g., `tsconfig.base.json` reformatted), commit with `worktree_commit(message: "style: apply formatting after rebase", worktree: "LS-####")` and re-run validation.
 7. Push passing PRs: `worktree_push(worktree: "LS-####")`
 8. **Verify mergeability after push** — do not assume CONFLICTING status clears automatically:
    - GitHub's mergeability check typically updates within 2–3 minutes after a force-push
@@ -396,6 +460,44 @@ If automated classification returns `unknown` or the auto-fix doesn't resolve th
 
 PRs in `$scan.ciPending` are NOT skipped — continue with other work and circle back. If pending CI is the only remaining work, wait ~3 minutes and re-scan.
 
+### Early CI Failure Detection (Required)
+
+After pushing any rebased or fixed branch, **do not wait for the full CI run to complete**. Individual jobs complete independently — Build Validation can fail at minute 4 while Quality Gates doesn't finish until minute 10. Poll per-job status to detect failures early and begin triage immediately:
+
+```
+After pushing branch:
+  1. Get in-progress run: ci_list_runs(branch: branchName, commit: headSha, status: "in_progress", limit: 1)
+  2. Poll with ci_view_run(runId, includeJobs: true) every ~60s
+  3. As soon as ANY job shows conclusion: "failure":
+     → Identify the failing job's jobId from ci_view_run(..., includeJobs: true)
+     → Fetch logs: ci_get_logs(jobId: jobId)
+     → Begin fixing immediately — don't wait for full run
+  4. If all critical jobs pass (Quality Gates + Build Validation):
+     → Mark PR as "CI pending E2E" and move to next PR
+```
+
+**Impact**: Detects failures ~5-8 min earlier per PR. Particularly valuable when multiple PRs have the same root cause — fix one, apply the pattern to all.
+
+This is **required behavior**, not optional. Interleave CI polling with other pass work — while waiting for PR A's CI, start working on PR B.
+
+---
+
+## Copilot Review Catch-Up
+
+After Passes 1-3, Copilot may have re-reviewed pushed changes. Instead of waiting for Copilot inline (which adds ~3 min per PR), batch-check all PRs that were modified in this pass:
+
+1. For each PR that was pushed in Passes 1-3, check for new unresolved Copilot threads:
+   ```
+   github_get_review_threads(number: <PR#>, unresolvedOnly: true)
+   ```
+2. If new threads appeared, queue the PR for the next Pass 2 iteration
+3. For bot-authored PRs where all threads are now resolved, explicitly request Copilot re-review to trigger auto-approve:
+   ```
+   github_request_review(number: <PR#>)
+   ```
+
+This decouples Copilot review from the critical path — the sweep continues working while Copilot reviews asynchronously, and catches up in a batch at the end of each pass cycle.
+
 ---
 
 ## Label Clean PRs
@@ -461,25 +563,29 @@ REPEAT (max 10 passes):
   dependabot_prs = [pr for pr in workable if pr.headRefName.startswith("dependabot/")]
   regular_prs    = [pr for pr in workable if pr not in dependabot_prs]
 
-  Pass 0: Request Copilot reviews on regular (non-Dependabot) workable PRs that have none
-    - Claim PR → github_request_review() → release claim
-    - The repo ruleset auto-triggers for user-authored PRs; bot-authored PRs
-      need this explicit request (uses user OAuth token via gh auth)
-    - Note: Dependabot PRs are intentionally excluded from Pass 0 — Copilot review
-      is not needed on dependency bumps and they are handled separately in Pass 0.5
+  Pass 0: API-Fast Triage (NO git ops — ~2 min total)
+    - 0a: Request Copilot reviews on regular (non-Dependabot) workable PRs that have none
+      - Claim PR → github_request_review() → release claim
+      - Bot-authored PRs need explicit request (uses user OAuth token via gh auth)
+    - 0b: Handle Dependabot PRs (comment-only, no worktree needed)
+      - For each pr in dependabot_prs:
+          - Claim PR via github_manage_labels(number: <pr.number>, add: ["sweep-claimed"]) before acting
+          - IF pr is conflicting or has failing/stale CI → gh pr comment <pr.number> --body "@dependabot rebase"
+          - IF pr is clean (no conflicts, CI passing)   → github_manage_labels(number: <pr.number>, add: ["merge-when-ready"])
+          - IF pr has unresolved review threads         → github_manage_labels(number: <pr.number>, add: ["requires-human-review"])
+          - Release claim via github_manage_labels(number: <pr.number>, remove: ["sweep-claimed"]) after acting
+      - After acting, add pr to settled (Dependabot handles rebase asynchronously)
+    - 0c: Label already-clean PRs with merge-when-ready → add to settled
+    - 0d: Re-run transient CI failures early (flaky tests, infra timeouts) so CI runs during later passes
+    - 0e: Resolve process/meta review threads (no code change needed) — may settle additional PRs
 
-  Pass 0.5: Handle Dependabot PRs (comment-only, no worktree needed)
-    - For each pr in dependabot_prs:
-        - Claim PR via github_manage_labels(number: <pr.number>, add: ["sweep-claimed"]) before acting
-        - IF pr is conflicting or has failing/stale CI → gh pr comment <pr.number> --body "@dependabot rebase"
-        - IF pr is clean (no conflicts, CI passing)   → github_manage_labels(number: <pr.number>, add: ["merge-when-ready"])
-        - IF pr has unresolved review threads         → github_manage_labels(number: <pr.number>, add: ["requires-human-review"])
-        - Release claim via github_manage_labels(number: <pr.number>, remove: ["sweep-claimed"]) after acting
-    - After acting, add pr to settled (Dependabot handles rebase asynchronously)
-
-  Pass 1: Rebase regular conflicting PRs (SEQUENTIAL — cascade invalidation)
+  Pass 1: Rebase regular conflicting PRs (PARALLEL for disjoint files, SEQUENTIAL for overlapping)
+    - Analyze file overlap via github_pr_files() to build dependency graph
+    - Group disjoint PRs into parallel batches (max 3 concurrent)
+    - Serialize PRs with overlapping file paths
     - Claim ONE PR immediately before rebasing — do NOT bulk-claim
     - Release claim after push (success) or after commenting blocker (failure)
+    - Use lightweight validation (codegen → typecheck → format) for clean rebases; full make pc for conflicted
     - On irrecoverable failure → comment blocker, label requires-human-review only if outside agent reach → add to settled
 
   Pass 2: Fix regular PRs with unresolved reviews (PARALLEL — batches of 3 sub-agents)
@@ -491,8 +597,13 @@ REPEAT (max 10 passes):
   Pass 3: Fix regular PRs with failing CI (PARALLEL — batches of 3 sub-agents)
     - Same claim/release pattern as Pass 2
     - On unfixable CI failure → comment blocker, label requires-human-review only if outside agent reach → add to settled
+    - Use early CI failure detection: poll per-job status after push, begin triage on first failure (~5-8 min faster)
 
-  Each sub-agent runs make pc before pushing (NEVER skip — see callout below)
+  Copilot Review Catch-Up: batch-check all PRs modified in Passes 1-3 for new Copilot threads
+    - Queue PRs with new threads for next Pass 2 iteration
+    - Request Copilot re-review on bot-authored PRs where all threads are resolved
+
+  Each sub-agent runs make pc before pushing (NEVER skip — see callout below; lightweight validation is only permitted for zero-conflict rebases, not code changes)
   Collect results from all sub-agents; verify passing PRs have their branches/PRs updated
 
   Mark clean PRs (no conflicts, CI pass, no threads) → release claim → add to settled

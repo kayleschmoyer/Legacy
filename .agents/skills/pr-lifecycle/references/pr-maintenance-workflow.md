@@ -73,15 +73,29 @@ Always return to the main repo before processing the next PR:
 Set-Location D:\code\legacy-sports
 ```
 
+### Pass 0: API-Fast Triage (No Git Required)
+
+Before any git operations, settle easy PRs via API-only actions (~2 min):
+
+1. **Request Copilot reviews** on bot-authored PRs missing reviews
+2. **Handle Dependabot PRs** via comment commands (`@dependabot rebase` or label `merge-when-ready`)
+3. **Label already-clean PRs** with `merge-when-ready` → add to settled (agents may apply this label; the `copilot-auto-approve` bot also applies it after Copilot approval, but agents do not need to wait for it)
+4. **Re-run transient CI failures** (flaky tests, infra timeouts) early so CI runs during later passes
+5. **Resolve process/meta review threads** that don't need code changes
+
+This reduces the number of PRs requiring expensive worktree operations.
+
 ### Pass 1: Rebase Conflicting PRs
 
-For each PR in `$scan.conflicting`:
+**Disjoint-file parallel rebase**: Before rebasing, analyze file overlap via `github_pr_files(number: <PR#>)`. PRs with non-overlapping files can rebase in parallel (max 3 concurrent). PRs with shared files must be sequential. Fall back to fully sequential if analysis fails.
+
+For each PR in `$scan.conflicting` (parallel for disjoint, sequential for overlapping):
 
 1. Enter the worktree (Step 2)
-2. Rebase: `.\scripts\rebase-pr.ps1 -Branch $branch`
-3. If conflicts arise — load `skills/rebase/SKILL.md` and `skills/rebase/SKILL.md`
-4. After rebasing ALL PRs, batch-validate with parallel `make pc` (see [sweep-and-parallelization.md](sweep-and-parallelization.md))
-5. Push passing PRs: `git push --force-with-lease origin HEAD`
+2. Rebase: `.\scripts\rebase-pr.ps1 -Branch $branch` (or `worktree_rebase` via MCP)
+3. If conflicts arise — load `skills/rebase/SKILL.md`
+4. **Lightweight vs. full validation**: if rebase had zero conflicts and last CI passed, use lightweight validation (`codegen` → `typecheck` → `format`); otherwise full `make pc`. See [sweep-and-parallelization.md](sweep-and-parallelization.md) for the decision tree.
+5. After validating, batch-push passing PRs: `git push --force-with-lease origin HEAD`
 
 If a rebase fails irrecoverably: `git rebase --abort`, log it, move on.
 
@@ -133,6 +147,18 @@ The most common CI failure is **type errors from stale branches**. Signs:
 
 PRs in `$scan.ciPending` are NOT skipped — continue with other work and circle back. If pending CI is the only remaining work, wait ~3 minutes and re-scan.
 
+#### Early CI Failure Detection (Required)
+
+After pushing any rebased or fixed branch, poll per-job status immediately — do not wait for the full CI run. Use `ci_view_run(runId, includeJobs: true)` every ~60s. When any job fails, fetch logs and begin triage immediately. This saves ~5-8 min per PR. Interleave CI polling with other pass work.
+
+### Copilot Review Catch-Up
+
+After Passes 1-3, batch-check all modified PRs for new Copilot review threads instead of waiting inline (saves ~3 min per PR):
+
+1. Check each modified PR for new unresolved threads: `github_get_review_threads(number: <PR#>, unresolvedOnly: true)`
+2. Queue PRs with new threads for the next Pass 2 iteration
+3. For bot-authored PRs with all threads resolved, request Copilot re-review: `github_request_review(number: <PR#>)`
+
 ### Verify Clean PRs Are Labeled
 
 After all fixes, verify that clean PRs have been labeled by the `copilot-auto-approve` bot. If any PRs are missing the label, request a Copilot review to trigger the auto-approve flow:
@@ -145,17 +171,19 @@ github_request_review(number: <PR#>, copilot: true)
 
 ### Full Sweep: Outer Loop
 
-For full sweeps, run passes 1–3 in a loop (max 5 iterations) until all PRs are clean.
+For full sweeps, run passes 0–3 in a loop (max 10 iterations) until all PRs are settled (clean, `requires-human-review`, or CI pending after final pass).
 
 **Algorithm:**
 
 1. Scan all open PRs (Step 1)
-2. Pass 1: Rebase all conflicting PRs
-3. Pass 2: Fix all unresolved review comments
-4. Pass 3: Fix all CI failures
-5. Validate all changed PRs: `make pc` in each worktree
-6. Repeat passes 1–3 until no new changes are made (or max 5 iterations)
-7. Verify clean PRs are labeled (bot handles labeling automatically after Copilot re-review)
+2. Pass 0: API-Fast Triage (label clean PRs, re-run flaky CI, resolve meta threads, handle Dependabot)
+3. Pass 1: Rebase all conflicting PRs (parallel for disjoint files, sequential for overlapping)
+4. Pass 2: Fix all unresolved review comments
+5. Pass 3: Fix all CI failures (with early CI failure detection)
+6. Copilot Review Catch-Up: batch-check modified PRs for new threads
+7. Validate changed PRs: `make pc` or lightweight validation in each worktree
+8. Repeat until all PRs settled (or max 10 iterations)
+9. Verify clean PRs are labeled (bot handles labeling automatically after Copilot re-review)
 
 > Parallelization details: [sweep-and-parallelization.md](sweep-and-parallelization.md)
 
