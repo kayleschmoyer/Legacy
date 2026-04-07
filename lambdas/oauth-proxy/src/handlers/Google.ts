@@ -19,6 +19,7 @@ import { decryptCookies, encryptCookies } from '../util/cookie';
 import { buildAuthCookies, generateCsrfToken } from '../util/jwt-cookie';
 import { parseEventBody } from '../util/lambda';
 import { withDbClient } from '../util/db';
+import { getAuthSuccessHtml, htmlEscape } from '../util/html';
 
 // Extended API Gateway Event with cached OAuth data to prevent duplicate processing
 interface ExtendedAPIGatewayEvent extends APIGatewayEvent {
@@ -28,15 +29,6 @@ interface ExtendedAPIGatewayEvent extends APIGatewayEvent {
 
 const REFRESH_TOKEN_COOKIE = 'GOOGLE_REFRESH_TOKEN';
 const GOOGLE_JWT_COOKIE = 'GOOGLE_JWT';
-
-function htmlEscape(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;');
-}
 
 interface GoogleAuthSettings {
   clientId: string;
@@ -630,25 +622,7 @@ export const handleGoogleAuth = async (event: ExtendedAPIGatewayEvent) => {
         headers: {
           'Content-Type': 'text/html; charset=utf-8',
         },
-        body: `
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <title>Authentication Successful</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <style>
-        body { font-family: Arial, sans-serif; max-width: 400px; margin: 100px auto; padding: 20px; text-align: center; }
-        .success { color: #16a34a; font-size: 24px; margin: 20px 0; }
-    </style>
-</head>
-<body>
-    <div class="success">✅ Authentication Successful!</div>
-    <p>You can now close this browser window and return to your CLI.</p>
-    <p>Authenticated as: <strong>${userInfo.email}</strong></p>
-</body>
-</html>
-        `,
+        body: getAuthSuccessHtml(userInfo.email),
       };
     } catch (error) {
       LOGGER.warn(
