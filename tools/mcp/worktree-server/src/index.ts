@@ -761,6 +761,16 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
             description:
               'Only show commits older than this date. Accepts any format `git log --until` accepts. Combine with `since` to bracket a window.',
           },
+          searchString: {
+            type: 'string',
+            description:
+              'Pickaxe search (`git log -S`). Only show commits whose diff adds or removes the literal string. Combine with `path` to scope to a single file. Example: searchString="playwright_version" answers "when did this constant first appear?".',
+          },
+          searchRegex: {
+            type: 'string',
+            description:
+              'Generalized pickaxe (`git log -G`). Like `searchString` but the value is treated as a regular expression. Mutually compatible with `searchString` (both forwarded to git, but typically use one at a time).',
+          },
           stat: {
             type: 'boolean',
             description:
@@ -2362,6 +2372,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         range,
         since,
         until,
+        searchString,
+        searchRegex,
         stat = false,
       } = args as {
         worktree?: string;
@@ -2370,6 +2382,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         range?: string;
         since?: string;
         until?: string;
+        searchString?: string;
+        searchRegex?: string;
         stat?: boolean;
       };
       const target = resolveTargetDir(wtKey);
@@ -2408,6 +2422,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         if (stat) gitArgs.push('--numstat');
         if (since) gitArgs.push(`--since=${since}`);
         if (until) gitArgs.push(`--until=${until}`);
+        if (searchString) gitArgs.push(`-S${searchString}`);
+        if (searchRegex) gitArgs.push(`-G${searchRegex}`);
         if (range) gitArgs.push(range);
         if (filterPath) gitArgs.push('--', filterPath);
 
