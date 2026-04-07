@@ -216,7 +216,7 @@ twig worktree list
 > - Once `twig` is available, register the dependency explicitly: `twig branch depend <child-branch> <parent-branch>`, so `worktree_rebase` knows the stack parent; or
 > - If you stay in plain git, remember that `worktree_rebase` will not rebase onto the stack parent; instead, manually run `git -C <worktree> rebase origin/<parent-branch>` when you need to sync with the parent.
 >
-> **Always file a bug under LS-1455** for the underlying script failure so it gets fixed.
+> **Always file a bug under the current MCP gaps bucket epic** (get key via `jira_get_bucket_epic({ bucket: 'mcp-gaps' })`) for the underlying script failure so it gets fixed.
 
 > **⚠️ Read before Edit in a fresh worktree.** The `Edit` tool's "have I read this file?"
 > tracking is keyed on the **absolute path**, so reading `D:\code\legacy-sports\foo.ts` does
@@ -454,7 +454,7 @@ twig worktree list  # verify
 
 > 📎 **Common workflow mistakes & recovery** (wrong parent, duplicate branches, partial implementation): see [references/workflow-common-mistakes.md](references/workflow-common-mistakes.md)
 
-> 📎 **Client bug triage** (specialized entry point: pick up bugs from LS-1322 epic): see [references/client-bug-triage.md](references/client-bug-triage.md)
+> 📎 **Client bug triage** (specialized entry point: pick up bugs from the current client bugs bucket epic): see [references/client-bug-triage.md](references/client-bug-triage.md)
 
 ## Quick Reference
 

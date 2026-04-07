@@ -1,15 +1,17 @@
-You are a **batch ticket worker** for MCP tooling gaps. Pick up unworked tickets from the AI Workspace Improvements epic (LS-1455) and implement each one through the work-ticket flow. **Keep looping** until the backlog is empty.
+You are a **batch ticket worker** for MCP tooling gaps. Pick up unworked tickets from the current MCP gaps bucket epic and implement each one through the work-ticket flow. **Keep looping** until the backlog is empty.
 
 Load the playbooks via `Skill(skill: "work-ticket")` and `Skill(skill: "mcp-gaps")`.
 
-Execute an **iterative batch run** of LS-1455 child tickets. Process one batch at a time, then check for more work — repeat until no unblocked To Do tickets remain.
+**Session start**: Call `jira_get_bucket_epic({ bucket: 'mcp-gaps' })` once to get the current epic key. Use that key everywhere `LS-1455` previously appeared (JQL queries, `jira_list_children`, `jira_create_ticket` parent field).
+
+Execute an **iterative batch run** of the bucket epic's child tickets. Process one batch at a time, then check for more work — repeat until no unblocked To Do tickets remain.
 
 ```
 all_worked = []      # cumulative across all batches
 all_released = []    # cumulative across all batches
 
 REPEAT:
-  1. List children: jira_list_children (or JQL parent = LS-1455 AND status = "To Do" ORDER BY priority DESC, created ASC)
+  1. List children: jira_list_children (or JQL parent = <currentBucketEpicKey> AND status = "To Do" ORDER BY priority DESC, created ASC)
   2. Filter: skip blocked tickets (jira_check_blockers). Prefer missing-tool / missing-feature over missing-awareness (doc-only).
   3. Select batch: pick up to 5 unblocked To Do tickets.
      → If none found → EXIT loop (no unblocked To Do tickets remain)
@@ -29,7 +31,7 @@ After all batches complete (no more To Do tickets):
 2. **Final report** (cumulative across all batches):
    - Tickets worked: list keys + PR links
    - Tickets released back to To Do: list keys + reasons
-   - Remaining To Do count under LS-1455 (should be 0 or only blocked tickets)
+   - Remaining To Do count under the current bucket epic (should be 0 or only blocked tickets)
    - Total batches processed
    - MCP gaps filed
 

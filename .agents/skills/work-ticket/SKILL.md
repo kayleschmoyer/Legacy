@@ -139,7 +139,7 @@ After all tickets are shipped, run the [mcp-gap-audit skill](../mcp-gap-audit/SK
 
 1. Review all Bash commands from this session
 2. Classify gaps: `missing-tool`, `missing-feature`, or `missing-awareness`
-3. Check for existing tickets under LS-1455
+3. Check for existing tickets under the current bucket epic (get key via `jira_get_bucket_epic({ bucket: 'mcp-gaps' })`)
 4. Create tickets for new gaps
 5. Audit MCP tool result overflows
 

@@ -1,28 +1,28 @@
 ---
 name: client-bug-triage
-description: 'Autonomously pick up and investigate/fix client-reported bugs from the LS-1322 epic. Lists child tickets, selects the next unblocked To Do, investigates the issue, implements the fix, adds tests, validates, and ships a PR. Load when working through the client bug backlog.'
+description: 'Autonomously pick up and investigate/fix client-reported bugs from the current client bugs bucket epic. Lists child tickets, selects the next unblocked To Do, investigates the issue, implements the fix, adds tests, validates, and ships a PR. Load when working through the client bug backlog.'
 ---
 
 # Skill: Client Bug Triage
 
 ## Overview
 
-Pick up and fix client-reported bugs from the **LS-1322** epic ("Client-Reported Bugs"). These bugs are typically reported via the in-app bug report button and contain user-provided descriptions, screenshots, and sometimes device/browser info.
+Pick up and fix client-reported bugs from the **current client bugs bucket epic** (get key via `jira_get_bucket_epic({ bucket: 'client-bugs' })`). These bugs are typically reported via the in-app bug report button and contain user-provided descriptions, screenshots, and sometimes device/browser info.
 
 ## When to Use
 
 - When the user asks to work on client-reported bugs
-- When processing the LS-1322 epic backlog
+- When processing the current client bugs bucket epic backlog
 - When triaging a specific client bug ticket
 
 ## Steps
 
 ### 1. Find the next ticket
 
-List child tickets of LS-1322 filtered to "To Do":
+List child tickets of the current client bugs bucket epic filtered to "To Do". First call `jira_get_bucket_epic({ bucket: 'client-bugs' })` to get the current key, then:
 
 ```
-jira_list_children(key: "LS-1322", status: "To Do")
+jira_list_children(key: <currentKey>, status: "To Do")
 ```
 
 Select the first unblocked ticket. Check blockers with `jira_check_blockers`.

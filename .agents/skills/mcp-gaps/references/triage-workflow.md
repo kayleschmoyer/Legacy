@@ -1,15 +1,15 @@
 # MCP Gap Triage — Detailed Workflow
 
-Pick up and implement MCP tooling gap tickets from the **LS-1455** epic ("AI Workspace Improvements: MCP Tooling & Agent Skills Gaps"). Each ticket describes a missing or incomplete MCP tool, skill doc, or AGENTS.md gap that an agent identified during a prior session.
+Pick up and implement MCP tooling gap tickets from the **current MCP gaps bucket epic**. Each ticket describes a missing or incomplete MCP tool, skill doc, or AGENTS.md gap that an agent identified during a prior session.
 
 ## Steps
 
 ### 1. Find the next ticket
 
-List child tickets of LS-1455 filtered to "To Do":
+List child tickets of the current MCP gaps bucket epic filtered to "To Do". First call `jira_get_bucket_epic({ bucket: 'mcp-gaps' })` to get the current key, then:
 
 ```
-jira_list_children(key: "LS-1455", status: "To Do")
+jira_list_children(key: <currentKey>, status: "To Do")
 ```
 
 Select the first unblocked ticket. Check blockers with `jira_check_blockers`.

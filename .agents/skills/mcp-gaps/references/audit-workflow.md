@@ -1,6 +1,6 @@
 # MCP Gap Audit — Detailed Workflow
 
-After every agent session, review the Bash commands that were executed and determine which ones should have been (or could become) MCP tool invocations. For each identified gap, check whether a ticket already exists under the **LS-1455** epic ("AI Workspace Improvements") and create one if not.
+After every agent session, review the Bash commands that were executed and determine which ones should have been (or could become) MCP tool invocations. For each identified gap, check whether a ticket already exists under the **current MCP gaps bucket epic** (get key via `jira_get_bucket_epic({ bucket: 'mcp-gaps' })`) and create one if not.
 
 This workflow also catches two additional categories of MCP issues:
 
@@ -80,7 +80,7 @@ Subagent sessions contribute **more** Bash commands than parent sessions in prac
 **How to handle**:
 
 - `missing-awareness` patterns in subagents → verify that parent agents include tool preference hints when spawning subagents (see AGENTS.md for tool preference guidance). If hints are missing, that's the fix — not a new ticket.
-- `missing-feature` patterns (e.g., ephemeral worktree support) → follow Steps 4-5 to check/create tickets under LS-1455.
+- `missing-feature` patterns (e.g., ephemeral worktree support) → follow Steps 4-5 to check/create tickets under the current bucket epic.
 - If you can't access JSONL transcripts (e.g., cloud agent without filesystem access), note this in the audit report and skip to Step 2.
 
 ### 2. Classify each command
@@ -100,22 +100,24 @@ If the gap type is `missing-awareness` — the MCP tool already exists and is fu
 
 - **Summary**: `docs(skills): <description of the awareness gap>`
 - **Type**: `Task`
-- **Parent**: `LS-1455`
+- **Parent**: the key returned by `jira_get_bucket_epic({ bucket: 'mcp-gaps' })`
 - **Description**: Note which skill doc or AGENTS.md section failed to guide the agent, and propose the specific doc update
 
 Without a ticket, the same awareness gap recurs session after session because no one tracks or implements the doc fix. The ticket type is `Task` (not `Bug`) since the tool itself works correctly.
 
-### 4. Check for existing tickets under LS-1455
+### 4. Check for existing tickets under the current bucket epic
 
-Search for child tickets of the **LS-1455** epic using one of these options:
+Get the current bucket epic: `jira_get_bucket_epic({ bucket: 'mcp-gaps' })` — use the returned key for `parent` in `jira_create_ticket` and for `jira_list_children`.
+
+Search for child tickets using one of these options:
 
 - **Local-only (non-MCP) CLI** — if available on your machine:
   ```bash
-  acli jira workitem search --jql "parent = LS-1455 ORDER BY created DESC"
+  acli jira workitem search --jql "parent = <currentBucketEpicKey> ORDER BY created DESC"
   ```
 - **Jira UI** — open Jira in the browser and run the same JQL in the search bar / advanced search:
   ```text
-  parent = LS-1455 ORDER BY created DESC
+  parent = <currentBucketEpicKey> ORDER BY created DESC
   ```
 
 Once you have the list of tickets, you can use the `jira_view` MCP tool on specific keys as needed to inspect details.
@@ -132,7 +134,7 @@ For each gap not already tracked, use the `jira_create_ticket` MCP tool:
 
 - **Summary**: `feat(mcp): add <proposed_tool_name> to <server> for <purpose>`
 - **Type**: `Task`
-- **Parent**: `LS-1455`
+- **Parent**: the key returned by `jira_get_bucket_epic({ bucket: 'mcp-gaps' })`
 - **Description** (template):
 
 ```
@@ -193,9 +195,9 @@ These are **not tooling gaps** — the capability exists but agents commonly mis
 | `gh pr checks` or `gh pr view --json mergeable` in a loop to check PR status    | Use `github_pr_batch_status(prNumbers: [...])`                           | Batched GraphQL call returns mergeable status, CI jobs, reviews, and unresolved threads for multiple PRs in one request. Eliminates N sequential API calls during sweeps.                              |
 | Falling back to `gh` CLI for all GitHub operations when MCP auth expires        | Run `github_auth_status` first; if expired, refresh with `gh auth login` | When the GitHub MCP server's token expires, agents often fall back to `gh` CLI for the entire session. Check auth early and refresh — don't silently downgrade to CLI for every operation.             |
 
-#### Known tooling gaps (file tickets under LS-1455)
+#### Known tooling gaps (file tickets under the current bucket epic)
 
-These are recurring patterns where an MCP tool is **missing or incomplete**. If you observe these during an audit, check for an existing LS-1455 ticket before filing a new one.
+These are recurring patterns where an MCP tool is **missing or incomplete**. If you observe these during an audit, check for an existing ticket under the current bucket epic before filing a new one.
 
 | Pattern                                                                  | Gap type          | MCP server             | Notes                                                                                                                                                 |
 | ------------------------------------------------------------------------ | ----------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -217,7 +219,7 @@ These are recurring patterns where an MCP tool is **missing or incomplete**. If 
 | `make_run`                 | Low       | Verbose build output                  | Summary mode                        |
 | `github_list_prs`          | Low       | Large PR listings                     | Pagination or filters               |
 
-For `missing-parameter` and `bad-default` gaps, follow Steps 4-5 to check for existing tickets and create new ones under LS-1455. Use this description template:
+For `missing-parameter` and `bad-default` gaps, follow Steps 4-5 to check for existing tickets and create new ones under the current bucket epic. Use this description template:
 
 ```
 ## Gap Identified — MCP Result Overflow
@@ -285,7 +287,7 @@ These are recurring failure modes observed across sessions. If you encounter the
 | `worktree_set`           | Active state silently drops between tool calls | `bug/state-loss` | LS-1946 — `worktree_set` succeeds but subsequent tools report "No active worktree set" |
 | `worktree_clean`         | Times out with `spawnSync ETIMEDOUT`           | `bug/timeout`    | LS-1947 — hangs when worktree has independent node_modules or file locks               |
 
-For `permission-gap` and `bug` types, follow Steps 4-5 to check for existing tickets and create new ones under LS-1455. Use this description template:
+For `permission-gap` and `bug` types, follow Steps 4-5 to check for existing tickets and create new ones under the current bucket epic. Use this description template:
 
 ```
 ## Gap Identified — MCP Tool Failure
@@ -321,11 +323,11 @@ Summarize the audit results to the user:
 - Existing tickets found (with keys)
 - New tickets created (with keys)
 - Any `missing-awareness` doc-fix tickets created (with keys)
-- Any `agent-error` or `config-issue` items noted (report-only for this audit; typically addressed via follow-up `docs(skills):` documentation updates rather than new LS-1455 gap tickets)
+- Any `agent-error` or `config-issue` items noted (report-only for this audit; typically addressed via follow-up `docs(skills):` documentation updates rather than new bucket epic gap tickets)
 
 ## Gotchas
 
-- **Don't create duplicate tickets** — always search LS-1455 children first. Summaries may vary; match on the _underlying capability_, not exact wording.
+- **Don't create duplicate tickets** — always search the current bucket epic's children first. Summaries may vary; match on the _underlying capability_, not exact wording.
 - **Don't ticket one-off commands** — only commands that represent a repeatable pattern across sessions. **Heuristic**: ask "Would another agent triaging a different CI failure (or reviewing a different PR) need this same capability?" If yes, it's a repeatable pattern regardless of how simple or investigative it appears.
 - **`missing-feature` vs `missing-tool`** — if a tool exists but needs a new parameter (e.g., `nx_run` lacking `--updateSnapshot`), that's `missing-feature`, not `missing-tool`. The ticket should reference the existing tool.
 - **MCP server scope** — each server has a defined domain (see AGENTS.md MCP Servers table). Don't propose adding a git tool to the DB server.
