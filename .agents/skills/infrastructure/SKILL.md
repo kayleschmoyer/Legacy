@@ -13,17 +13,18 @@ Covers all infrastructure operations: AWS authentication, Terraform changes, Lam
 
 ## Task-Driven Guide
 
-| Task                                | Reference                                                                              |
-| ----------------------------------- | -------------------------------------------------------------------------------------- |
-| AWS credentials expired             | [references/aws-sso-login.md](references/aws-sso-login.md)                             |
-| Deploy Lambda code                  | [references/deploy-lambda.md](references/deploy-lambda.md)                             |
-| Terraform infrastructure changes    | [references/terraform-apply.md](references/terraform-apply.md)                         |
-| Clean up orphaned AWS resources     | [references/aws-orphan-cleanup.md](references/aws-orphan-cleanup.md)                   |
-| Configure Sentry sourcemaps         | [references/configure-sentry-sourcemaps.md](references/configure-sentry-sourcemaps.md) |
-| Read CloudWatch Lambda logs         | [references/cloudwatch-logs.md](references/cloudwatch-logs.md)                         |
-| Parse GitHub Actions CI logs        | [references/github-actions-logs.md](references/github-actions-logs.md)                 |
-| Sync environment variables from AWS | [references/sync-env.md](references/sync-env.md)                                       |
-| Rebuild self-hosted runner AMI      | [references/ami-build.md](references/ami-build.md)                                     |
+| Task                                                      | Reference                                                                              |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| AWS credentials expired                                   | [references/aws-sso-login.md](references/aws-sso-login.md)                             |
+| Deploy Lambda code                                        | [references/deploy-lambda.md](references/deploy-lambda.md)                             |
+| Terraform infrastructure changes                          | [references/terraform-apply.md](references/terraform-apply.md)                         |
+| Clean up orphaned AWS resources                           | [references/aws-orphan-cleanup.md](references/aws-orphan-cleanup.md)                   |
+| Configure Sentry sourcemaps                               | [references/configure-sentry-sourcemaps.md](references/configure-sentry-sourcemaps.md) |
+| Read CloudWatch Lambda logs                               | [references/cloudwatch-logs.md](references/cloudwatch-logs.md)                         |
+| Parse GitHub Actions CI logs                              | [references/github-actions-logs.md](references/github-actions-logs.md)                 |
+| Sync environment variables from AWS                       | [references/sync-env.md](references/sync-env.md)                                       |
+| Rebuild self-hosted runner AMI                            | [references/ami-build.md](references/ami-build.md)                                     |
+| Run CLI / Nx targets against dev RDS via SSM port-forward | [references/ssm-db-access.md](references/ssm-db-access.md)                             |
 
 ## Critical Rules
 
