@@ -218,6 +218,15 @@ twig worktree list
 >
 > **Always file a bug under LS-1455** for the underlying script failure so it gets fixed.
 
+> **⚠️ Read before Edit in a fresh worktree.** The `Edit` tool's "have I read this file?"
+> tracking is keyed on the **absolute path**, so reading `D:\code\legacy-sports\foo.ts` does
+> NOT satisfy the requirement for editing `D:\code\legacy-sports-worktrees\LS-####-bar\foo.ts`.
+> Always issue a `Read` against the worktree path before the first `Edit` of any file in a
+> newly created worktree, even if you already inspected the same file in the main repo earlier
+> in the session. Skipping this triggers a "File has not been read yet. Read it first before
+> writing to it." tool error — observed 3 times in a single `/work-mcp-gaps` run on 2026-04-06
+> across LS-2406, LS-2413, and LS-2408 worktrees.
+
 ### Step 2: Confirm Jira is In Progress
 
 If you haven't already transitioned the ticket (see the note at the top of this section), do it now using the `jira_transition` MCP tool:
