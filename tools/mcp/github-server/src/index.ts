@@ -34,6 +34,8 @@ import { secretsCheck } from './tools/secrets-check.js';
 import { ensureSweepLabels } from './tools/ensure-sweep-labels.js';
 import { sweepStaleClaims } from './tools/sweep-stale-claims.js';
 import { viewPR } from './tools/view-pr.js';
+import { listRunners } from './tools/list-runners.js';
+import { webhookList, webhookUpdate, webhookPing } from './tools/webhooks.js';
 
 /**
  * Shared Zod schema for generic string arrays. Accepts a real array OR a
@@ -886,6 +888,74 @@ server.tool(
       ),
   },
   async (params) => sweepStaleClaims(params),
+);
+
+// --- github_list_runners ---
+server.tool(
+  'github_list_runners',
+  'List self-hosted GitHub Actions runners for this repository. Returns id, name, OS, status (online/offline), busy flag, and labels.',
+  {
+    status: z
+      .enum(['online', 'offline'])
+      .optional()
+      .describe(
+        'Filter by runner status. Omit to return all runners regardless of status.',
+      ),
+  },
+  async (params) => listRunners(params),
+);
+
+// --- github_webhook_list ---
+server.tool(
+  'github_webhook_list',
+  'List all webhooks configured on this repository. Returns id, active status, events, URL, and last response.',
+  {},
+  async () => webhookList(),
+);
+
+// --- github_webhook_update ---
+server.tool(
+  'github_webhook_update',
+  'Update a repository webhook. Can change active status, event subscriptions, delivery URL, or content type.',
+  {
+    hookId: z.coerce
+      .number()
+      .int()
+      .positive()
+      .describe('Webhook ID (from github_webhook_list).'),
+    active: coercedBoolean
+      .optional()
+      .describe('Enable or disable the webhook.'),
+    events: stringList()
+      .optional()
+      .describe(
+        'GitHub event names to subscribe to (e.g. ["push", "pull_request"]). Replaces the full event list.',
+      ),
+    url: z
+      .string()
+      .url()
+      .optional()
+      .describe('New delivery URL for the webhook.'),
+    contentType: z
+      .enum(['json', 'form'])
+      .optional()
+      .describe('Payload content type (default: json).'),
+  },
+  async (params) => webhookUpdate(params),
+);
+
+// --- github_webhook_ping ---
+server.tool(
+  'github_webhook_ping',
+  'Send a ping event to a repository webhook to verify it is reachable.',
+  {
+    hookId: z.coerce
+      .number()
+      .int()
+      .positive()
+      .describe('Webhook ID (from github_webhook_list).'),
+  },
+  async (params) => webhookPing(params),
 );
 
 // Start the server
