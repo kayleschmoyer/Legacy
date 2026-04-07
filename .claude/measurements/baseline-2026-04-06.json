@@ -1,0 +1,1378 @@
+{
+  "tokenizer_mode": "tiktoken-cl100k_base",
+  "always_on": {
+    "files": [
+      {
+        "path": "AGENTS.md",
+        "bytes": 33600,
+        "chars": 33423,
+        "lines": 244,
+        "tokens": 7957
+      },
+      {
+        "path": "CLAUDE.md",
+        "bytes": 246,
+        "chars": 244,
+        "lines": 6,
+        "tokens": 63
+      },
+      {
+        "path": ".claude/settings.json",
+        "bytes": 2254,
+        "chars": 2254,
+        "lines": 80,
+        "tokens": 688
+      }
+    ],
+    "total_tokens": 8708,
+    "total_bytes": 36100
+  },
+  "agents_md_sections": [
+    {
+      "section": "<preamble>",
+      "bytes": 268,
+      "lines": 6,
+      "tokens": 57
+    },
+    {
+      "section": "## Critical Rules",
+      "bytes": 8038,
+      "lines": 29,
+      "tokens": 2034
+    },
+    {
+      "section": "## Branch Naming",
+      "bytes": 3029,
+      "lines": 20,
+      "tokens": 659
+    },
+    {
+      "section": "## Workflow",
+      "bytes": 9699,
+      "lines": 35,
+      "tokens": 2462
+    },
+    {
+      "section": "## Command Patterns \u2014 Avoid `cd` Compound Commands",
+      "bytes": 607,
+      "lines": 10,
+      "tokens": 132
+    },
+    {
+      "section": "## Subagent Tool Preferences",
+      "bytes": 1226,
+      "lines": 24,
+      "tokens": 300
+    },
+    {
+      "section": "## Commands",
+      "bytes": 1980,
+      "lines": 38,
+      "tokens": 442
+    },
+    {
+      "section": "## Architecture",
+      "bytes": 1551,
+      "lines": 27,
+      "tokens": 383
+    },
+    {
+      "section": "## Skills",
+      "bytes": 234,
+      "lines": 4,
+      "tokens": 53
+    },
+    {
+      "section": "## MCP Servers",
+      "bytes": 3807,
+      "lines": 20,
+      "tokens": 570
+    },
+    {
+      "section": "## Cloud Agent Mode",
+      "bytes": 2197,
+      "lines": 23,
+      "tokens": 607
+    },
+    {
+      "section": "## Environment Notes",
+      "bytes": 964,
+      "lines": 7,
+      "tokens": 258
+    }
+  ],
+  "skill_descriptions": [
+    {
+      "name": "open-prs",
+      "path": ".agents/skills/open-prs/SKILL.md",
+      "body_bytes": 61963,
+      "body_tokens": 14281,
+      "desc_chars": 662,
+      "desc_tokens": 149
+    },
+    {
+      "name": "work-ticket",
+      "path": ".agents/skills/work-ticket/SKILL.md",
+      "body_bytes": 11886,
+      "body_tokens": 2655,
+      "desc_chars": 428,
+      "desc_tokens": 86
+    },
+    {
+      "name": "mcp-gaps",
+      "path": ".agents/skills/mcp-gaps/SKILL.md",
+      "body_bytes": 8434,
+      "body_tokens": 1949,
+      "desc_chars": 343,
+      "desc_tokens": 79
+    },
+    {
+      "name": "terraform-local-apply",
+      "path": ".agents/skills/terraform-local-apply/SKILL.md",
+      "body_bytes": 7001,
+      "body_tokens": 1569,
+      "desc_chars": 334,
+      "desc_tokens": 69
+    },
+    {
+      "name": "cloud-teleport",
+      "path": ".agents/skills/cloud-teleport/SKILL.md",
+      "body_bytes": 9368,
+      "body_tokens": 2043,
+      "desc_chars": 354,
+      "desc_tokens": 66
+    },
+    {
+      "name": "cloud-agent-mode",
+      "path": ".agents/skills/cloud-agent-mode/SKILL.md",
+      "body_bytes": 24908,
+      "body_tokens": 5149,
+      "desc_chars": 325,
+      "desc_tokens": 63
+    },
+    {
+      "name": "mcp-first",
+      "path": ".agents/skills/mcp-first/SKILL.md",
+      "body_bytes": 9348,
+      "body_tokens": 2148,
+      "desc_chars": 262,
+      "desc_tokens": 61
+    },
+    {
+      "name": "read-playwright-report",
+      "path": ".agents/skills/read-playwright-report/SKILL.md",
+      "body_bytes": 4838,
+      "body_tokens": 1281,
+      "desc_chars": 249,
+      "desc_tokens": 59
+    },
+    {
+      "name": "create",
+      "path": ".agents/skills/create/SKILL.md",
+      "body_bytes": 5028,
+      "body_tokens": 1063,
+      "desc_chars": 213,
+      "desc_tokens": 56
+    },
+    {
+      "name": "infrastructure",
+      "path": ".agents/skills/infrastructure/SKILL.md",
+      "body_bytes": 7699,
+      "body_tokens": 1549,
+      "desc_chars": 321,
+      "desc_tokens": 56
+    },
+    {
+      "name": "rebase",
+      "path": ".agents/skills/rebase/SKILL.md",
+      "body_bytes": 6125,
+      "body_tokens": 1303,
+      "desc_chars": 270,
+      "desc_tokens": 54
+    },
+    {
+      "name": "secrets-handling",
+      "path": ".agents/skills/secrets-handling/SKILL.md",
+      "body_bytes": 5295,
+      "body_tokens": 1286,
+      "desc_chars": 259,
+      "desc_tokens": 53
+    },
+    {
+      "name": "repo-tooling",
+      "path": ".agents/skills/repo-tooling/SKILL.md",
+      "body_bytes": 5943,
+      "body_tokens": 1159,
+      "desc_chars": 267,
+      "desc_tokens": 52
+    },
+    {
+      "name": "add-secret-or-env-var",
+      "path": ".agents/skills/add-secret-or-env-var/SKILL.md",
+      "body_bytes": 4147,
+      "body_tokens": 922,
+      "desc_chars": 238,
+      "desc_tokens": 49
+    },
+    {
+      "name": "pr-lifecycle",
+      "path": ".agents/skills/pr-lifecycle/SKILL.md",
+      "body_bytes": 7590,
+      "body_tokens": 1605,
+      "desc_chars": 230,
+      "desc_tokens": 49
+    },
+    {
+      "name": "testing",
+      "path": ".agents/skills/testing/SKILL.md",
+      "body_bytes": 8033,
+      "body_tokens": 1764,
+      "desc_chars": 215,
+      "desc_tokens": 49
+    },
+    {
+      "name": "worktree-workflow",
+      "path": ".agents/skills/worktree-workflow/SKILL.md",
+      "body_bytes": 23224,
+      "body_tokens": 5711,
+      "desc_chars": 245,
+      "desc_tokens": 47
+    },
+    {
+      "name": "debugging",
+      "path": ".agents/skills/debugging/SKILL.md",
+      "body_bytes": 9133,
+      "body_tokens": 1593,
+      "desc_chars": 249,
+      "desc_tokens": 44
+    },
+    {
+      "name": "architecture",
+      "path": ".agents/skills/architecture/SKILL.md",
+      "body_bytes": 7027,
+      "body_tokens": 1662,
+      "desc_chars": 228,
+      "desc_tokens": 42
+    },
+    {
+      "name": "dev-environment",
+      "path": ".agents/skills/dev-environment/SKILL.md",
+      "body_bytes": 3755,
+      "body_tokens": 903,
+      "desc_chars": 211,
+      "desc_tokens": 42
+    },
+    {
+      "name": "promote-shared-components",
+      "path": ".agents/skills/promote-shared-components/SKILL.md",
+      "body_bytes": 5685,
+      "body_tokens": 1187,
+      "desc_chars": 200,
+      "desc_tokens": 42
+    },
+    {
+      "name": "standards",
+      "path": ".agents/skills/standards/SKILL.md",
+      "body_bytes": 9289,
+      "body_tokens": 1942,
+      "desc_chars": 200,
+      "desc_tokens": 37
+    },
+    {
+      "name": "cli-usage",
+      "path": ".agents/skills/cli-usage/SKILL.md",
+      "body_bytes": 2800,
+      "body_tokens": 607,
+      "desc_chars": 177,
+      "desc_tokens": 32
+    },
+    {
+      "name": "storybook",
+      "path": ".agents/skills/storybook/SKILL.md",
+      "body_bytes": 8520,
+      "body_tokens": 1965,
+      "desc_chars": 164,
+      "desc_tokens": 29
+    },
+    {
+      "name": "ui",
+      "path": ".agents/skills/ui/SKILL.md",
+      "body_bytes": 2958,
+      "body_tokens": 730,
+      "desc_chars": 143,
+      "desc_tokens": 25
+    },
+    {
+      "name": "workflow-overview",
+      "path": ".agents/skills/workflow-overview/SKILL.md",
+      "body_bytes": 24917,
+      "body_tokens": 5086,
+      "desc_chars": 115,
+      "desc_tokens": 19
+    }
+  ],
+  "slash_commands": [
+    {
+      "path": ".claude/commands/create-pr.md",
+      "bytes": 973,
+      "chars": 969,
+      "lines": 14,
+      "tokens": 229
+    },
+    {
+      "path": ".claude/commands/database.md",
+      "bytes": 644,
+      "chars": 644,
+      "lines": 8,
+      "tokens": 147
+    },
+    {
+      "path": ".claude/commands/deploy.md",
+      "bytes": 526,
+      "chars": 526,
+      "lines": 8,
+      "tokens": 114
+    },
+    {
+      "path": ".claude/commands/e2e.md",
+      "bytes": 687,
+      "chars": 685,
+      "lines": 13,
+      "tokens": 183
+    },
+    {
+      "path": ".claude/commands/fix-reviews.md",
+      "bytes": 1939,
+      "chars": 1927,
+      "lines": 16,
+      "tokens": 452
+    },
+    {
+      "path": ".claude/commands/mcp-gap-audit.md",
+      "bytes": 1465,
+      "chars": 1457,
+      "lines": 16,
+      "tokens": 331
+    },
+    {
+      "path": ".claude/commands/read-playwright-report.md",
+      "bytes": 812,
+      "chars": 808,
+      "lines": 13,
+      "tokens": 202
+    },
+    {
+      "path": ".claude/commands/rebase.md",
+      "bytes": 676,
+      "chars": 670,
+      "lines": 14,
+      "tokens": 159
+    },
+    {
+      "path": ".claude/commands/review.md",
+      "bytes": 691,
+      "chars": 689,
+      "lines": 14,
+      "tokens": 165
+    },
+    {
+      "path": ".claude/commands/sweep-prs.md",
+      "bytes": 3691,
+      "chars": 3661,
+      "lines": 46,
+      "tokens": 901
+    },
+    {
+      "path": ".claude/commands/work-bugs.md",
+      "bytes": 2365,
+      "chars": 2339,
+      "lines": 37,
+      "tokens": 581
+    },
+    {
+      "path": ".claude/commands/work-mcp-gaps.md",
+      "bytes": 2350,
+      "chars": 2324,
+      "lines": 37,
+      "tokens": 584
+    },
+    {
+      "path": ".claude/commands/work-ticket.md",
+      "bytes": 1358,
+      "chars": 1350,
+      "lines": 14,
+      "tokens": 317
+    },
+    {
+      "path": ".claude/commands/worktree.md",
+      "bytes": 635,
+      "chars": 619,
+      "lines": 8,
+      "tokens": 144
+    }
+  ],
+  "hooks": [
+    {
+      "hook": ".claude/hooks/check-github-auth.sh",
+      "stdout_bytes": 0,
+      "stdout_tokens": 0,
+      "stderr_bytes": 0,
+      "exit": 0,
+      "stdout_first_200": ""
+    },
+    {
+      "hook": ".claude/hooks/guard-main-repo.sh",
+      "stdout_bytes": 0,
+      "stdout_tokens": 0,
+      "stderr_bytes": 0,
+      "exit": 0,
+      "stdout_first_200": ""
+    }
+  ],
+  "mcp_tool_schemas": {
+    "servers": [
+      {
+        "server": "legacy-sports-ci",
+        "tool_count": 11,
+        "total_schema_tokens": 2815,
+        "total_schema_bytes": 10625,
+        "tools": [
+          {
+            "name": "ci_audit_session_bash",
+            "schema_bytes": 1750,
+            "schema_tokens": 396,
+            "desc_tokens": 127
+          },
+          {
+            "name": "ci_search_logs",
+            "schema_bytes": 1395,
+            "schema_tokens": 388,
+            "desc_tokens": 12
+          },
+          {
+            "name": "ci_find_session",
+            "schema_bytes": 1259,
+            "schema_tokens": 335,
+            "desc_tokens": 85
+          },
+          {
+            "name": "ci_get_logs",
+            "schema_bytes": 1135,
+            "schema_tokens": 311,
+            "desc_tokens": 16
+          },
+          {
+            "name": "ci_dispatch_workflow",
+            "schema_bytes": 896,
+            "schema_tokens": 234,
+            "desc_tokens": 32
+          },
+          {
+            "name": "ci_auto_fix",
+            "schema_bytes": 754,
+            "schema_tokens": 210,
+            "desc_tokens": 42
+          },
+          {
+            "name": "ci_list_runs",
+            "schema_bytes": 782,
+            "schema_tokens": 210,
+            "desc_tokens": 8
+          },
+          {
+            "name": "ci_rerun",
+            "schema_bytes": 710,
+            "schema_tokens": 207,
+            "desc_tokens": 16
+          },
+          {
+            "name": "ci_get_playwright_report",
+            "schema_bytes": 727,
+            "schema_tokens": 203,
+            "desc_tokens": 93
+          },
+          {
+            "name": "ci_view_run",
+            "schema_bytes": 585,
+            "schema_tokens": 166,
+            "desc_tokens": 10
+          },
+          {
+            "name": "ci_workflow_info",
+            "schema_bytes": 632,
+            "schema_tokens": 155,
+            "desc_tokens": 16
+          }
+        ]
+      },
+      {
+        "server": "legacy-sports-db",
+        "tool_count": 8,
+        "total_schema_tokens": 989,
+        "total_schema_bytes": 3793,
+        "tools": [
+          {
+            "name": "db_get_user",
+            "schema_bytes": 633,
+            "schema_tokens": 166,
+            "desc_tokens": 36
+          },
+          {
+            "name": "db_restore_dev_seed",
+            "schema_bytes": 644,
+            "schema_tokens": 166,
+            "desc_tokens": 27
+          },
+          {
+            "name": "db_codegen",
+            "schema_bytes": 635,
+            "schema_tokens": 164,
+            "desc_tokens": 14
+          },
+          {
+            "name": "db_query",
+            "schema_bytes": 601,
+            "schema_tokens": 163,
+            "desc_tokens": 20
+          },
+          {
+            "name": "db_print_schema",
+            "schema_bytes": 349,
+            "schema_tokens": 92,
+            "desc_tokens": 15
+          },
+          {
+            "name": "db_migration_status",
+            "schema_bytes": 350,
+            "schema_tokens": 88,
+            "desc_tokens": 11
+          },
+          {
+            "name": "db_migrate",
+            "schema_bytes": 312,
+            "schema_tokens": 82,
+            "desc_tokens": 5
+          },
+          {
+            "name": "db_check_health",
+            "schema_bytes": 269,
+            "schema_tokens": 68,
+            "desc_tokens": 14
+          }
+        ]
+      },
+      {
+        "server": "legacy-sports-jira",
+        "tool_count": 14,
+        "total_schema_tokens": 2343,
+        "total_schema_bytes": 8412,
+        "tools": [
+          {
+            "name": "jira_bulk_create_tickets",
+            "schema_bytes": 1101,
+            "schema_tokens": 311,
+            "desc_tokens": 47
+          },
+          {
+            "name": "jira_list_children",
+            "schema_bytes": 837,
+            "schema_tokens": 237,
+            "desc_tokens": 38
+          },
+          {
+            "name": "jira_link_issues",
+            "schema_bytes": 752,
+            "schema_tokens": 225,
+            "desc_tokens": 19
+          },
+          {
+            "name": "jira_create_ticket",
+            "schema_bytes": 739,
+            "schema_tokens": 202,
+            "desc_tokens": 9
+          },
+          {
+            "name": "jira_bulk_transition",
+            "schema_bytes": 705,
+            "schema_tokens": 195,
+            "desc_tokens": 35
+          },
+          {
+            "name": "jira_edit_ticket",
+            "schema_bytes": 693,
+            "schema_tokens": 190,
+            "desc_tokens": 12
+          },
+          {
+            "name": "jira_delete_ticket",
+            "schema_bytes": 698,
+            "schema_tokens": 188,
+            "desc_tokens": 34
+          },
+          {
+            "name": "jira_transition",
+            "schema_bytes": 663,
+            "schema_tokens": 184,
+            "desc_tokens": 25
+          },
+          {
+            "name": "jira_search",
+            "schema_bytes": 445,
+            "schema_tokens": 133,
+            "desc_tokens": 8
+          },
+          {
+            "name": "jira_set_parent",
+            "schema_bytes": 410,
+            "schema_tokens": 112,
+            "desc_tokens": 13
+          },
+          {
+            "name": "jira_check_blockers",
+            "schema_bytes": 402,
+            "schema_tokens": 106,
+            "desc_tokens": 26
+          },
+          {
+            "name": "jira_get_comments",
+            "schema_bytes": 330,
+            "schema_tokens": 89,
+            "desc_tokens": 12
+          },
+          {
+            "name": "jira_auth_status",
+            "schema_bytes": 326,
+            "schema_tokens": 88,
+            "desc_tokens": 33
+          },
+          {
+            "name": "jira_view",
+            "schema_bytes": 311,
+            "schema_tokens": 83,
+            "desc_tokens": 7
+          }
+        ]
+      },
+      {
+        "server": "worktree",
+        "tool_count": 26,
+        "total_schema_tokens": 3920,
+        "total_schema_bytes": 15198,
+        "tools": [
+          {
+            "name": "worktree_show_file",
+            "schema_bytes": 1101,
+            "schema_tokens": 297,
+            "desc_tokens": 58
+          },
+          {
+            "name": "worktree_run_all",
+            "schema_bytes": 1004,
+            "schema_tokens": 261,
+            "desc_tokens": 43
+          },
+          {
+            "name": "worktree_commit",
+            "schema_bytes": 958,
+            "schema_tokens": 251,
+            "desc_tokens": 28
+          },
+          {
+            "name": "worktree_lock",
+            "schema_bytes": 910,
+            "schema_tokens": 223,
+            "desc_tokens": 46
+          },
+          {
+            "name": "worktree_show_remote",
+            "schema_bytes": 819,
+            "schema_tokens": 218,
+            "desc_tokens": 47
+          },
+          {
+            "name": "worktree_diff",
+            "schema_bytes": 807,
+            "schema_tokens": 211,
+            "desc_tokens": 30
+          },
+          {
+            "name": "worktree_run",
+            "schema_bytes": 714,
+            "schema_tokens": 182,
+            "desc_tokens": 16
+          },
+          {
+            "name": "worktree_check_ignore",
+            "schema_bytes": 706,
+            "schema_tokens": 173,
+            "desc_tokens": 46
+          },
+          {
+            "name": "worktree_resolve_conflict",
+            "schema_bytes": 670,
+            "schema_tokens": 167,
+            "desc_tokens": 19
+          },
+          {
+            "name": "worktree_clean",
+            "schema_bytes": 672,
+            "schema_tokens": 166,
+            "desc_tokens": 34
+          },
+          {
+            "name": "worktree_log",
+            "schema_bytes": 620,
+            "schema_tokens": 162,
+            "desc_tokens": 6
+          },
+          {
+            "name": "worktree_list",
+            "schema_bytes": 644,
+            "schema_tokens": 156,
+            "desc_tokens": 31
+          },
+          {
+            "name": "worktree_unstage",
+            "schema_bytes": 579,
+            "schema_tokens": 156,
+            "desc_tokens": 33
+          },
+          {
+            "name": "worktree_push",
+            "schema_bytes": 570,
+            "schema_tokens": 151,
+            "desc_tokens": 12
+          },
+          {
+            "name": "worktree_checkout_file",
+            "schema_bytes": 569,
+            "schema_tokens": 149,
+            "desc_tokens": 15
+          },
+          {
+            "name": "worktree_ls_tree",
+            "schema_bytes": 503,
+            "schema_tokens": 135,
+            "desc_tokens": 13
+          },
+          {
+            "name": "worktree_rebase",
+            "schema_bytes": 426,
+            "schema_tokens": 110,
+            "desc_tokens": 17
+          },
+          {
+            "name": "worktree_show",
+            "schema_bytes": 422,
+            "schema_tokens": 109,
+            "desc_tokens": 12
+          },
+          {
+            "name": "worktree_status",
+            "schema_bytes": 404,
+            "schema_tokens": 105,
+            "desc_tokens": 19
+          },
+          {
+            "name": "worktree_rebase_continue",
+            "schema_bytes": 391,
+            "schema_tokens": 104,
+            "desc_tokens": 7
+          },
+          {
+            "name": "worktree_set",
+            "schema_bytes": 339,
+            "schema_tokens": 87,
+            "desc_tokens": 9
+          },
+          {
+            "name": "worktree_unlock",
+            "schema_bytes": 308,
+            "schema_tokens": 77,
+            "desc_tokens": 23
+          },
+          {
+            "name": "worktree_stabilize",
+            "schema_bytes": 288,
+            "schema_tokens": 75,
+            "desc_tokens": 20
+          },
+          {
+            "name": "worktree_unjunction",
+            "schema_bytes": 286,
+            "schema_tokens": 68,
+            "desc_tokens": 14
+          },
+          {
+            "name": "worktree_conflict_info",
+            "schema_bytes": 261,
+            "schema_tokens": 65,
+            "desc_tokens": 10
+          },
+          {
+            "name": "worktree_guard",
+            "schema_bytes": 227,
+            "schema_tokens": 62,
+            "desc_tokens": 12
+          }
+        ]
+      },
+      {
+        "server": "legacy-sports-aws",
+        "tool_count": 9,
+        "total_schema_tokens": 1604,
+        "total_schema_bytes": 6081,
+        "tools": [
+          {
+            "name": "aws_logs_tail",
+            "schema_bytes": 1009,
+            "schema_tokens": 280,
+            "desc_tokens": 15
+          },
+          {
+            "name": "aws_ec2_instances",
+            "schema_bytes": 773,
+            "schema_tokens": 203,
+            "desc_tokens": 32
+          },
+          {
+            "name": "aws_ssm_get",
+            "schema_bytes": 771,
+            "schema_tokens": 200,
+            "desc_tokens": 22
+          },
+          {
+            "name": "aws_iam_get_policy",
+            "schema_bytes": 732,
+            "schema_tokens": 193,
+            "desc_tokens": 27
+          },
+          {
+            "name": "aws_terraform_output",
+            "schema_bytes": 655,
+            "schema_tokens": 174,
+            "desc_tokens": 38
+          },
+          {
+            "name": "aws_ec2_console_output",
+            "schema_bytes": 676,
+            "schema_tokens": 174,
+            "desc_tokens": 35
+          },
+          {
+            "name": "aws_lambda_status",
+            "schema_bytes": 593,
+            "schema_tokens": 156,
+            "desc_tokens": 19
+          },
+          {
+            "name": "aws_apigateway_inspect",
+            "schema_bytes": 594,
+            "schema_tokens": 154,
+            "desc_tokens": 24
+          },
+          {
+            "name": "aws_sso_status",
+            "schema_bytes": 278,
+            "schema_tokens": 70,
+            "desc_tokens": 15
+          }
+        ]
+      },
+      {
+        "server": "legacy-sports-github",
+        "tool_count": 35,
+        "total_schema_tokens": 5421,
+        "total_schema_bytes": 20281,
+        "tools": [
+          {
+            "name": "github_pr_scan",
+            "schema_bytes": 1186,
+            "schema_tokens": 303,
+            "desc_tokens": 28
+          },
+          {
+            "name": "github_manage_labels_batch",
+            "schema_bytes": 897,
+            "schema_tokens": 270,
+            "desc_tokens": 64
+          },
+          {
+            "name": "github_webhook_update",
+            "schema_bytes": 941,
+            "schema_tokens": 250,
+            "desc_tokens": 20
+          },
+          {
+            "name": "github_list_prs",
+            "schema_bytes": 885,
+            "schema_tokens": 242,
+            "desc_tokens": 31
+          },
+          {
+            "name": "github_pr_dashboard",
+            "schema_bytes": 864,
+            "schema_tokens": 230,
+            "desc_tokens": 24
+          },
+          {
+            "name": "github_set_commit_status",
+            "schema_bytes": 775,
+            "schema_tokens": 208,
+            "desc_tokens": 27
+          },
+          {
+            "name": "github_retrigger_check",
+            "schema_bytes": 751,
+            "schema_tokens": 194,
+            "desc_tokens": 21
+          },
+          {
+            "name": "github_request_review_batch",
+            "schema_bytes": 691,
+            "schema_tokens": 191,
+            "desc_tokens": 22
+          },
+          {
+            "name": "github_resolve_threads",
+            "schema_bytes": 682,
+            "schema_tokens": 183,
+            "desc_tokens": 25
+          },
+          {
+            "name": "github_create_pr",
+            "schema_bytes": 654,
+            "schema_tokens": 180,
+            "desc_tokens": 12
+          },
+          {
+            "name": "github_pr_batch_status",
+            "schema_bytes": 668,
+            "schema_tokens": 179,
+            "desc_tokens": 22
+          },
+          {
+            "name": "github_manage_labels",
+            "schema_bytes": 575,
+            "schema_tokens": 168,
+            "desc_tokens": 8
+          },
+          {
+            "name": "github_create_label",
+            "schema_bytes": 566,
+            "schema_tokens": 163,
+            "desc_tokens": 14
+          },
+          {
+            "name": "github_merge_pr",
+            "schema_bytes": 597,
+            "schema_tokens": 162,
+            "desc_tokens": 24
+          },
+          {
+            "name": "github_sweep_stale_claims",
+            "schema_bytes": 637,
+            "schema_tokens": 161,
+            "desc_tokens": 45
+          },
+          {
+            "name": "github_request_review",
+            "schema_bytes": 583,
+            "schema_tokens": 157,
+            "desc_tokens": 12
+          },
+          {
+            "name": "github_list_reviews",
+            "schema_bytes": 560,
+            "schema_tokens": 156,
+            "desc_tokens": 21
+          },
+          {
+            "name": "github_reply_to_thread",
+            "schema_bytes": 633,
+            "schema_tokens": 155,
+            "desc_tokens": 31
+          },
+          {
+            "name": "github_secret_set",
+            "schema_bytes": 602,
+            "schema_tokens": 154,
+            "desc_tokens": 19
+          },
+          {
+            "name": "github_clear_ci_failure_labels",
+            "schema_bytes": 547,
+            "schema_tokens": 147,
+            "desc_tokens": 48
+          },
+          {
+            "name": "github_secrets_check",
+            "schema_bytes": 557,
+            "schema_tokens": 132,
+            "desc_tokens": 33
+          },
+          {
+            "name": "github_close_pr",
+            "schema_bytes": 443,
+            "schema_tokens": 123,
+            "desc_tokens": 7
+          },
+          {
+            "name": "github_get_review_threads",
+            "schema_bytes": 461,
+            "schema_tokens": 123,
+            "desc_tokens": 9
+          },
+          {
+            "name": "github_list_runners",
+            "schema_bytes": 481,
+            "schema_tokens": 122,
+            "desc_tokens": 30
+          },
+          {
+            "name": "github_mark_pr_ready",
+            "schema_bytes": 452,
+            "schema_tokens": 120,
+            "desc_tokens": 25
+          },
+          {
+            "name": "github_webhook_ping",
+            "schema_bytes": 430,
+            "schema_tokens": 119,
+            "desc_tokens": 14
+          },
+          {
+            "name": "github_rebase_pr",
+            "schema_bytes": 411,
+            "schema_tokens": 112,
+            "desc_tokens": 17
+          },
+          {
+            "name": "github_view_pr",
+            "schema_bytes": 393,
+            "schema_tokens": 111,
+            "desc_tokens": 17
+          },
+          {
+            "name": "github_ensure_sweep_labels",
+            "schema_bytes": 421,
+            "schema_tokens": 107,
+            "desc_tokens": 47
+          },
+          {
+            "name": "github_secret_delete",
+            "schema_bytes": 379,
+            "schema_tokens": 106,
+            "desc_tokens": 9
+          },
+          {
+            "name": "github_resolve_thread",
+            "schema_bytes": 365,
+            "schema_tokens": 92,
+            "desc_tokens": 8
+          },
+          {
+            "name": "github_auth_status",
+            "schema_bytes": 374,
+            "schema_tokens": 88,
+            "desc_tokens": 31
+          },
+          {
+            "name": "github_webhook_list",
+            "schema_bytes": 307,
+            "schema_tokens": 78,
+            "desc_tokens": 23
+          },
+          {
+            "name": "github_get_repo_info",
+            "schema_bytes": 249,
+            "schema_tokens": 68,
+            "desc_tokens": 13
+          },
+          {
+            "name": "github_secret_list",
+            "schema_bytes": 264,
+            "schema_tokens": 67,
+            "desc_tokens": 13
+          }
+        ]
+      },
+      {
+        "server": "legacy-sports-nx",
+        "tool_count": 8,
+        "total_schema_tokens": 1509,
+        "total_schema_bytes": 5612,
+        "tools": [
+          {
+            "name": "nx_run",
+            "schema_bytes": 1608,
+            "schema_tokens": 425,
+            "desc_tokens": 44
+          },
+          {
+            "name": "nx_install_package",
+            "schema_bytes": 785,
+            "schema_tokens": 239,
+            "desc_tokens": 24
+          },
+          {
+            "name": "nx_run_affected",
+            "schema_bytes": 675,
+            "schema_tokens": 181,
+            "desc_tokens": 23
+          },
+          {
+            "name": "nx_show_projects",
+            "schema_bytes": 591,
+            "schema_tokens": 153,
+            "desc_tokens": 13
+          },
+          {
+            "name": "nx_dep_graph",
+            "schema_bytes": 592,
+            "schema_tokens": 152,
+            "desc_tokens": 15
+          },
+          {
+            "name": "nx_affected",
+            "schema_bytes": 519,
+            "schema_tokens": 134,
+            "desc_tokens": 9
+          },
+          {
+            "name": "nx_check_package_health",
+            "schema_bytes": 427,
+            "schema_tokens": 113,
+            "desc_tokens": 19
+          },
+          {
+            "name": "nx_show_project",
+            "schema_bytes": 415,
+            "schema_tokens": 112,
+            "desc_tokens": 12
+          }
+        ]
+      },
+      {
+        "server": "legacy-sports-make",
+        "tool_count": 5,
+        "total_schema_tokens": 1116,
+        "total_schema_bytes": 4217,
+        "tools": [
+          {
+            "name": "make_worktree_create",
+            "schema_bytes": 1205,
+            "schema_tokens": 313,
+            "desc_tokens": 114
+          },
+          {
+            "name": "make_run",
+            "schema_bytes": 870,
+            "schema_tokens": 234,
+            "desc_tokens": 86
+          },
+          {
+            "name": "terraform_gen_tfvars",
+            "schema_bytes": 827,
+            "schema_tokens": 218,
+            "desc_tokens": 93
+          },
+          {
+            "name": "make_wt_setup",
+            "schema_bytes": 728,
+            "schema_tokens": 190,
+            "desc_tokens": 27
+          },
+          {
+            "name": "terraform_fmt",
+            "schema_bytes": 587,
+            "schema_tokens": 161,
+            "desc_tokens": 12
+          }
+        ]
+      },
+      {
+        "server": "legacy-sports-browser",
+        "tool_count": 7,
+        "total_schema_tokens": 1306,
+        "total_schema_bytes": 5154,
+        "tools": [
+          {
+            "name": "browser_navigate",
+            "schema_bytes": 1249,
+            "schema_tokens": 331,
+            "desc_tokens": 56
+          },
+          {
+            "name": "browser_dev_start",
+            "schema_bytes": 1021,
+            "schema_tokens": 262,
+            "desc_tokens": 56
+          },
+          {
+            "name": "browser_screenshot",
+            "schema_bytes": 944,
+            "schema_tokens": 228,
+            "desc_tokens": 40
+          },
+          {
+            "name": "browser_dev_stop",
+            "schema_bytes": 674,
+            "schema_tokens": 179,
+            "desc_tokens": 36
+          },
+          {
+            "name": "browser_screenshot_upload",
+            "schema_bytes": 565,
+            "schema_tokens": 137,
+            "desc_tokens": 40
+          },
+          {
+            "name": "browser_cleanup",
+            "schema_bytes": 375,
+            "schema_tokens": 88,
+            "desc_tokens": 35
+          },
+          {
+            "name": "browser_dev_status",
+            "schema_bytes": 326,
+            "schema_tokens": 81,
+            "desc_tokens": 27
+          }
+        ]
+      }
+    ],
+    "grand_total_tokens": 21023,
+    "total_tools": 123
+  },
+  "session_usage": {
+    "session_count": 542,
+    "aggregate": {
+      "input_tokens": 833622,
+      "cache_creation_tokens": 278119659,
+      "cache_read_tokens": 9637070615,
+      "output_tokens": 15966710,
+      "cache_hit_rate": 0.9718684339685258
+    },
+    "sessions_anonymized": [
+      {
+        "session": "session-001",
+        "turns_with_usage": 1559,
+        "cache_hit_rate": 0.9877329200705838
+      },
+      {
+        "session": "session-002",
+        "turns_with_usage": 898,
+        "cache_hit_rate": 0.9925251587617945
+      },
+      {
+        "session": "session-003",
+        "turns_with_usage": 884,
+        "cache_hit_rate": 0.9908027457641272
+      },
+      {
+        "session": "session-004",
+        "turns_with_usage": 800,
+        "cache_hit_rate": 0.9906887892990333
+      },
+      {
+        "session": "session-005",
+        "turns_with_usage": 1775,
+        "cache_hit_rate": 0.9577648264015519
+      },
+      {
+        "session": "session-006",
+        "turns_with_usage": 684,
+        "cache_hit_rate": 0.9906285734028116
+      },
+      {
+        "session": "session-007",
+        "turns_with_usage": 1174,
+        "cache_hit_rate": 0.981266957531696
+      },
+      {
+        "session": "session-008",
+        "turns_with_usage": 520,
+        "cache_hit_rate": 0.9822166566101582
+      },
+      {
+        "session": "session-009",
+        "turns_with_usage": 1153,
+        "cache_hit_rate": 0.9682600132909608
+      },
+      {
+        "session": "session-010",
+        "turns_with_usage": 1117,
+        "cache_hit_rate": 0.9676167566457424
+      },
+      {
+        "session": "session-011",
+        "turns_with_usage": 448,
+        "cache_hit_rate": 0.9758101190827824
+      },
+      {
+        "session": "session-012",
+        "turns_with_usage": 485,
+        "cache_hit_rate": 0.9751091609172553
+      },
+      {
+        "session": "session-013",
+        "turns_with_usage": 325,
+        "cache_hit_rate": 0.9890502671683725
+      },
+      {
+        "session": "session-014",
+        "turns_with_usage": 436,
+        "cache_hit_rate": 0.9708164676300999
+      },
+      {
+        "session": "session-015",
+        "turns_with_usage": 898,
+        "cache_hit_rate": 0.9814176548625262
+      },
+      {
+        "session": "session-016",
+        "turns_with_usage": 493,
+        "cache_hit_rate": 0.9900694169557833
+      },
+      {
+        "session": "session-017",
+        "turns_with_usage": 310,
+        "cache_hit_rate": 0.9755391101716857
+      },
+      {
+        "session": "session-018",
+        "turns_with_usage": 492,
+        "cache_hit_rate": 0.9887724195962766
+      },
+      {
+        "session": "session-019",
+        "turns_with_usage": 839,
+        "cache_hit_rate": 0.9649463143664068
+      },
+      {
+        "session": "session-020",
+        "turns_with_usage": 494,
+        "cache_hit_rate": 0.9789877501783047
+      }
+    ]
+  },
+  "settings_drift": {
+    "allow_entries": 34,
+    "enabled_mcp_servers": [
+      "legacy-sports-browser",
+      "legacy-sports-ci",
+      "legacy-sports-db",
+      "legacy-sports-github",
+      "legacy-sports-jira",
+      "legacy-sports-make",
+      "legacy-sports-nx"
+    ],
+    "servers_in_allow_but_not_enabled": [
+      "82d0c0eb-ec68-497e-bef5-b0faa209ebbb",
+      "legacy-sports-aws",
+      "worktree"
+    ],
+    "servers_enabled_but_not_in_allow": []
+  }
+}
