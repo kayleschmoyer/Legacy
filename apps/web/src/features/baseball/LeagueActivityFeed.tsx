@@ -19,6 +19,7 @@ import {
   UserCheck,
   UserMinus,
 } from '@tamagui/lucide-icons';
+import { LOGGER } from '@legacy-sports/logging';
 import {
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,
@@ -85,7 +86,7 @@ function formatRelativeDate(isoDate: string): string {
   return `${Math.floor(diffDays / 30)}mo ago`;
 }
 
-function eventToActivityItem(event: {
+export function eventToActivityItem(event: {
   id?: string | null;
   leagueId?: number | null;
   eventType?: LeagueActivityEventType | null;
@@ -95,9 +96,42 @@ function eventToActivityItem(event: {
 }): ActivityItem | null {
   if (!event.eventType || !event.id) return null;
 
-  const payload = event.payload
-    ? (JSON.parse(event.payload) as Record<string, unknown>)
-    : {};
+  let payload: Record<string, unknown> = {};
+  if (event.payload != null) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(event.payload);
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      LOGGER.warn('Bad activity payload (parse error)', {
+        id: event.id,
+        eventType: event.eventType,
+        payloadLength: event.payload.length,
+        errorMessage: error.message,
+        errorStack: error.stack,
+      });
+      // Fall back to an empty payload so the activity item still renders
+      // with its default copy instead of being dropped from the feed.
+      parsed = {};
+    }
+    if (
+      parsed === null ||
+      typeof parsed !== 'object' ||
+      Array.isArray(parsed)
+    ) {
+      LOGGER.warn('Bad activity payload (not a plain object)', {
+        id: event.id,
+        eventType: event.eventType,
+        payloadLength: event.payload.length,
+        parsedType: parsed === null ? 'null' : typeof parsed,
+      });
+      // Fall back to an empty payload so the activity item still renders
+      // with its default copy instead of being dropped from the feed.
+      payload = {};
+    } else {
+      payload = parsed as Record<string, unknown>;
+    }
+  }
   const isoDate = event.occurredAt ?? new Date().toISOString();
   const actor = event.actorUsername ?? 'A manager';
   const lid = event.leagueId ?? 0;
