@@ -40,7 +40,8 @@ export function GamesRemaining({
   compact = false,
 }: GamesRemainingProps) {
   const gamesCompleted = totalGames - gamesRemaining;
-  const progressPercentage = (gamesCompleted / totalGames) * 100;
+  const progressPercentage =
+    totalGames > 0 ? (gamesCompleted / totalGames) * 100 : 0;
   const allComplete = gamesRemaining === 0;
 
   if (compact) {
