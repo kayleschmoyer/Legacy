@@ -184,6 +184,57 @@ On **Claude Code on the web**, Claude's native Atlassian plugin (`mcp__claude_ai
 | `jira_link_issues`     | No native equivalent (use custom `legacy-sports-jira` MCP or `acli`)                                                                                                                                                        |
 | `jira_list_children`   | `searchJiraIssuesUsingJql` with `parent = LS-####`                                                                                                                                                                          |
 
+## Known cloud-environment quirks
+
+These are environment behaviors that look like bugs but are not — they cost real time on every fresh cloud session that touches Jira. If you hit either symptom below, recognize it immediately and switch strategy without declaring yourself blocked.
+
+### Quirk 1: `legacy-sports-jira` MCP server cannot reach Atlassian from cloud sessions
+
+**Symptom**: every call to `mcp__legacy-sports-jira__jira_*` returns one of:
+
+- `{"success": false, "error": "fetch failed"}`
+- `Failed to fetch Jira issue ...: fetch failed`
+
+**Misleading signal**: `jira_auth_status` returns `{"configured": true, "authMethod": "oauth"}`, so the auth-status probe will tell you everything is fine. It is not — the credentials are loaded but outbound HTTPS is blocked.
+
+**Root cause**: HTTPS egress to `api.atlassian.com` is blocked at the cloud-session proxy layer. A direct `curl` to the API endpoint returns `curl: (56) CONNECT tunnel failed, response 403`. `JIRA_CLIENT_ID`, `JIRA_CLIENT_SECRET`, `JIRA_CLOUD_ID`, and `JIRA_SITE_URL` are all set in the env, but the custom MCP server cannot make the outbound call.
+
+**Workaround**: switch to the Claude Code Atlassian plugin (`mcp__claude_ai_Atlassian__*` / `mcp__82d0c0eb-...__*`) without prompting the user. The plugin routes through Anthropic's plugin infrastructure rather than the local proxy, so it works fine. On Claude Code on the web this is the **expected primary path** — the auth-aware-routing rule in AGENTS.md treats the plugin as primary in cloud sessions, not as a fallback. Pass `cloudId: "fb294606-6c8f-4b52-9a41-11fe45b77528"` to all calls.
+
+> The earlier Jira-auth bullet in AGENTS.md only covers the case where `configured: false`. The `configured: true` + `fetch failed` case is the one that bites you on a fresh cloud session — both look identical from a "should I switch tools?" decision point, and the answer is yes.
+
+### Quirk 2: Atlassian plugin `transitionJiraIssue` rejects its `transition` parameter on cold start
+
+**Symptom**: the first 3-4 calls to `mcp__82d0c0eb-...__transitionJiraIssue` (or `mcp__claude_ai_Atlassian__transitionJiraIssue`) return:
+
+```
+MCP error -32602: Input validation error: ...
+  "code": "invalid_type",
+  "expected": "object",
+  "received": "string",
+  "path": ["transition"]
+```
+
+The call payload is formed correctly (e.g. `{"id": "21"}` as a JSON object literal). The same payload format is accepted by `editJiraIssue`, `createIssueLink`, and `addCommentToJiraIssue` at the same time. After ~5 minutes of unrelated tool calls (Read, Glob, `createJiraIssue`, etc.), the identical `transitionJiraIssue` call succeeds on retry. The same warm-start behavior reproduces when transitioning a ticket back at the end of a session.
+
+**Hypothesis**: a plugin schema cold-start where the wrapper temporarily mis-encodes the strictest object parameter (`transition` has `additionalProperties: false`, unlike `editJiraIssue.fields` which has `additionalProperties: {}`). Cannot be reliably reproduced or root-caused from inside the agent session.
+
+**Workaround**: retry the same call after any other successful plugin call has completed. ~30 seconds of normal activity is usually enough. **Do not re-architect around the failure** — it warms up on its own.
+
+### Discovering transition IDs
+
+`transitionJiraIssue` requires a numeric workflow transition ID, and these are **not** stable across projects. `getTransitionsForJiraIssue` is the right way to discover them for any given ticket. For the LS project specifically:
+
+| Status        | Transition ID |
+| ------------- | ------------- |
+| `To Do`       | `11`          |
+| `In Progress` | `21`          |
+| `In Review`   | `2`           |
+| `Done`        | `31`          |
+| `Won't Do`    | `3`           |
+
+If the IDs above stop working, call `getTransitionsForJiraIssue({ issueIdOrKey: "LS-####" })` and update this table.
+
 ## Jira Pagination (Critical)
 
 The Atlassian plugin's `searchJiraIssuesUsingJql` defaults to `maxResults: 10`. The custom `jira_list_children` defaults to 25. Both will silently truncate results for large epics.
