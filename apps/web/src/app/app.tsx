@@ -55,6 +55,7 @@ import { useAnalyticsIdentify } from '../hooks/useAnalyticsIdentify';
 import { useWebPushRegistration } from '../hooks/useWebPushRegistration';
 import { ImpersonationBanner } from '../components/ImpersonationBanner';
 import { ApolloErrorToast } from '../components/layout/ApolloErrorToast';
+import { ScoreboardTicker } from '../components/scoreboard/ScoreboardTicker';
 import { BRAND_GOLD } from '../constants/colors';
 import { NAV_BUTTON_MIN_WIDTH, NAV_Z_INDEX } from '../constants/dimensions';
 
@@ -565,6 +566,9 @@ function App() {
       {/* Global toast for uncaught Apollo/GraphQL errors */}
       <ApolloErrorToast />
       <Navigation />
+      {/* Live scores ticker — renders only when today's MLB games are available.
+          The spacer inside ScoreboardTicker ensures no blank strip on empty days. */}
+      <ScoreboardTicker />
       <YStack
         flex={1}
         padding="$4"

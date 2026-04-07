@@ -232,6 +232,11 @@ jest.mock('../hooks/useWebPushRegistration', () => ({
   useWebPushRegistration: () => null,
 }));
 
+// Mock ScoreboardTicker — it uses Apollo query hooks (for example, useGetScoreboardQuery), which require an ApolloProvider
+jest.mock('../components/scoreboard/ScoreboardTicker', () => ({
+  ScoreboardTicker: () => null,
+}));
+
 describe('App', () => {
   beforeEach(() => {
     // Clear any timers between tests

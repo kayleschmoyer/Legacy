@@ -116,6 +116,18 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = {
     data: { getUserNotificationPreferences: null },
   },
 
+  // ── Scoreboard ticker (fires on every page load via app shell) ──
+  getscoreboard: {
+    data: {
+      scoreboard: {
+        __typename: 'Scoreboard',
+        date: '2026-04-01',
+        lastUpdated: new Date().toISOString(),
+        games: [],
+      },
+    },
+  },
+
   // ── Players ─────────────────────────────────────────────────────
   getallplayers: { data: { players: [] } },
   getplayerswithstats: { data: { playersWithStats: [] } },

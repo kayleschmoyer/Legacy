@@ -361,3 +361,36 @@ test.describe('Scoreboard — error state @regression', () => {
     );
   });
 });
+
+// ─── Global ticker (ScoreboardTicker in app shell) ────────────────────────────
+
+test.describe('ScoreboardTicker — global ticker visibility @regression', () => {
+  test('ticker renders when games are present', async ({ page }) => {
+    // Override the baseline GetScoreboard response to return live games
+    await mockScoreboardGraphQL(page, {
+      games: [MOCK_LIVE_GAME, MOCK_FINAL_GAME],
+    });
+    await page.goto('/');
+    await page.waitForLoadState('load');
+
+    await expect(page.getByTestId('scoreboard-ticker')).toBeVisible();
+    // Confirm game abbreviations appear in the ticker
+    await expect(page.getByTestId('scoreboard-ticker')).toContainText('NYY');
+    await expect(page.getByTestId('scoreboard-ticker')).toContainText('BOS');
+  });
+
+  test('ticker is hidden and no blank strip shown when no games are scheduled', async ({
+    page,
+  }) => {
+    // Override the baseline GetScoreboard response to return empty games
+    await mockScoreboardGraphQL(page, { empty: true });
+    await page.goto('/');
+    await page.waitForLoadState('load');
+
+    // The ticker element should not be in the DOM when there are no games
+    await expect(page.getByTestId('scoreboard-ticker')).not.toBeVisible();
+    // Also confirm no layout spacer is injected (no aria-hidden spacer div)
+    const spacer = page.locator('[aria-hidden="true"][style*="height: 32px"]');
+    await expect(spacer).not.toBeVisible();
+  });
+});

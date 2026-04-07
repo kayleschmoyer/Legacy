@@ -7,13 +7,12 @@
  * MLB client library: lib/mlb-client (LS-1864)
  */
 import { createMlbDataProvider } from '@legacy-sports/mlb-client';
-import { LOGGER } from '@legacy-sports/logging';
 import { builder } from './builder';
-import { UserInputError } from './graphql-errors';
 
-// Singleton provider — hoisted at module scope so per-instance caches and
-// rate-limiting queues are shared across all resolver invocations.
-const mlbProvider = createMlbDataProvider();
+// Singleton provider — created once at module load so the in-memory cache and
+// rate-limiting inside the provider are preserved across Lambda invocations
+// within the same container lifetime.
+const mlbDataProvider = createMlbDataProvider();
 
 // ─── ScoreboardTeam ───────────────────────────────────────────────────────────
 
@@ -160,22 +159,7 @@ builder.queryField('scoreboard', (t) =>
         new Date().toLocaleDateString('en-CA', {
           timeZone: 'America/New_York',
         });
-
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-        throw UserInputError(
-          `Invalid date format "${date}". Expected YYYY-MM-DD (e.g. 2024-07-04).`,
-        );
-      }
-
-      try {
-        return await mlbProvider.getScoreboard(date);
-      } catch (err) {
-        LOGGER.error('Scoreboard provider error', {
-          date,
-          err: err instanceof Error ? err.message : String(err),
-        });
-        throw new Error('Failed to fetch scoreboard data. Please try again.');
-      }
+      return mlbDataProvider.getScoreboard(date);
     },
   }),
 );

@@ -39,8 +39,22 @@ export const CONTENT_STICKY_Z_INDEX = 100;
  * Minimum width (px) applied to every desktop nav button — both NavLinkButton
  * in app.tsx and DropdownButton components (MyLeaguesDropdown, HelpDropdown).
  *
- * Sized to the widest label ("My Leagues" + trophy icon + chevron) so all
+ * Sized to the widest label (\"My Leagues\" + trophy icon + chevron) so all
  * buttons share a consistent width and do not shift when the active font-weight
  * changes.
  */
 export const NAV_BUTTON_MIN_WIDTH = 120;
+
+/**
+ * Height of the live scores ticker strip in pixels.
+ * Rendered just below the sticky nav bar when today's MLB games are available.
+ * Zero-height when hidden (ticker returns null when no games exist).
+ */
+export const TICKER_HEIGHT_PX = 32;
+
+/**
+ * Z-index for the live scores ticker strip.
+ * Must be below NAV_Z_INDEX so the nav bar always renders on top,
+ * but above CONTENT_STICKY_Z_INDEX so the ticker overlays page content.
+ */
+export const TICKER_Z_INDEX = 150;
