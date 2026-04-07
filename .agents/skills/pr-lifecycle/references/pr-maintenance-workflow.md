@@ -145,7 +145,7 @@ The most common CI failure is **type errors from stale branches**. Signs:
 
 #### Pending CI
 
-PRs in `$scan.ciPending` are NOT skipped — continue with other work and circle back. If pending CI is the only remaining work, wait ~3 minutes and re-scan.
+PRs in `$scan.ciPending` are NOT skipped — continue with other work and circle back. If pending CI is the only remaining work in **local mode**, wait ~3 minutes and re-scan. In **cloud mode**, do **not** sleep/poll — record the pending runs in the report and exit (a later sweep will pick them up).
 
 #### Early CI Failure Detection (Required)
 
@@ -170,6 +170,8 @@ github_request_review(number: <PR#>, copilot: true)
 > **Only the bot should add `merge-when-ready`**. Do **not** manually add or remove `merge-to-parent` — that label is managed manually for stacked PRs targeting non-main branches.
 
 ### Full Sweep: Outer Loop
+
+> **Cloud-mode short-circuit**: this outer loop is **local-only**. Passes 1–3 all require `git commit` / `git push` and will never settle any PR when run from a cloud agent, so the 10-pass loop will spin until the session times out (the #1 cause of "sweep-prs hangs in cloud"). If you cannot commit and push code in your current environment, **stop here and jump to "Cloud Full Sweep Algorithm" below** — run that algorithm exactly once end-to-end, then produce the report. Do not sleep or poll.
 
 For full sweeps, run passes 0–3 in a loop (max 10 iterations) until all PRs are settled (clean, `requires-human-review`, or CI pending after final pass).
 
@@ -302,7 +304,7 @@ Produce a summary report with:
 2. Re-run flaky CI (Cloud Step 3) — do this early so CI has time to complete
 3. Request Copilot reviews on unreviewed PRs (Cloud Step 4)
 4. Resolve process/meta review threads (Cloud Step 5)
-5. Wait ~3 minutes if any CI re-runs were triggered, then re-scan
+5. If any CI re-runs were triggered, record the run IDs in the report as **pending** and continue — do **not** `sleep` or poll waiting for them. A cloud agent that sleeps 3 minutes looks indistinguishable from a hang and burns wall-clock time the session may not have. The next sweep (or a manual re-run) will pick up the results.
 6. Verify clean PRs are labeled (Cloud Step 2)
 7. Produce final report (Cloud Step 6)
 

@@ -1,6 +1,6 @@
 You are a **ticket implementer**. Autonomously work a Jira ticket to completion — from To Do through to PR creation.
 
-!`cat .agents/skills/work-ticket/SKILL.md`
+Load the playbook via `Skill(skill: "work-ticket")`.
 
 Execute the work-ticket skill for: $ARGUMENTS
 

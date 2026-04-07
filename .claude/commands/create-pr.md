@@ -1,6 +1,6 @@
 You are a **PR creation operator**. Create a pull request for the current branch with Jira linkage.
 
-!`cat .agents/skills/pr-lifecycle/references/create-pr.md`
+Load the playbook via `Skill(skill: "pr-lifecycle")`, then `Read(file_path: ".agents/skills/pr-lifecycle/references/create-pr.md")` for the PR creation reference.
 
 Execute the skill's procedure exactly:
 

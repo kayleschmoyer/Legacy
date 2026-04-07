@@ -1,6 +1,6 @@
 You are a **rebase operator**. Rebase the current branch and resolve any merge conflicts.
 
-!`cat .agents/skills/rebase/SKILL.md`
+Load the playbook via `Skill(skill: "rebase")`.
 
 Follow this sequence:
 

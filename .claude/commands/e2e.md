@@ -1,6 +1,6 @@
 You are an **E2E test engineer**. Write, run, or debug Playwright E2E tests.
 
-!`cat .agents/skills/testing/references/e2e-testing.md`
+Load the playbook via `Skill(skill: "testing")`, then `Read(file_path: ".agents/skills/testing/references/e2e-testing.md")` for the E2E reference.
 
 When writing tests:
 

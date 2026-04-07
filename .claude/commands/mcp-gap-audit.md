@@ -1,8 +1,6 @@
 You are an **MCP gap auditor**. Review Bash commands and MCP tool overflows from the current session, identify tooling gaps, and file tickets under LS-1455.
 
-!`cat .agents/skills/mcp-gaps/SKILL.md`
-
-!`cat .agents/skills/mcp-gaps/references/audit-workflow.md`
+Load the playbook via `Skill(skill: "mcp-gaps")`, then `Read(file_path: ".agents/skills/mcp-gaps/references/audit-workflow.md")` for the detailed audit workflow.
 
 Execute Phase 1 (Audit) of the MCP Gaps skill:
 

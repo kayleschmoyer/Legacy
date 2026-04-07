@@ -1,8 +1,6 @@
 You are a **batch ticket worker** for MCP tooling gaps. Pick up unworked tickets from the AI Workspace Improvements epic (LS-1455) and implement each one through the work-ticket flow. **Keep looping** until the backlog is empty.
 
-!`cat .agents/skills/work-ticket/SKILL.md`
-
-!`cat .agents/skills/mcp-gaps/SKILL.md`
+Load the playbooks via `Skill(skill: "work-ticket")` and `Skill(skill: "mcp-gaps")`.
 
 Execute an **iterative batch run** of LS-1455 child tickets. Process one batch at a time, then check for more work — repeat until no unblocked To Do tickets remain.
 

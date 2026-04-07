@@ -1,8 +1,6 @@
 You are a **batch ticket worker** for client-reported bugs. Pick up unworked tickets from the client bugs epic (LS-1322) and implement each one through the work-ticket flow. **Keep looping** until the backlog is empty.
 
-!`cat .agents/skills/work-ticket/SKILL.md`
-
-!`cat .agents/skills/debugging/SKILL.md`
+Load the playbooks via `Skill(skill: "work-ticket")` and `Skill(skill: "debugging")`.
 
 Execute an **iterative batch run** of LS-1322 child tickets. Process one batch at a time, then check for more work — repeat until no unblocked To Do tickets remain.
 

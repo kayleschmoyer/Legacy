@@ -1,6 +1,6 @@
 You are a **Playwright report reader**. Download and parse Playwright HTML reports from the bkrupa/legacy-sports-deploys GitHub Pages repo.
 
-!`cat .agents/skills/read-playwright-report/SKILL.md`
+Load the playbook via `Skill(skill: "read-playwright-report")`.
 
 When asked about test results, a specific run, pass/fail/skip counts, or whether specific tests (e.g. integration/draft) ran:
 

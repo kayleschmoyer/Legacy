@@ -458,7 +458,7 @@ If automated classification returns `unknown` or the auto-fix doesn't resolve th
 
 ### Pending CI
 
-PRs in `$scan.ciPending` are NOT skipped — continue with other work and circle back. If pending CI is the only remaining work, wait ~3 minutes and re-scan.
+PRs in `$scan.ciPending` are NOT skipped — continue with other work and circle back. If pending CI is the only remaining work in **local mode**, wait ~3 minutes and re-scan. In **cloud mode**, do **not** sleep/poll — record the pending runs in the report and exit (a later sweep will pick them up).
 
 ### Early CI Failure Detection (Required)
 
@@ -515,6 +515,8 @@ This is safe to do even if CI is still running or pending — failing CI will au
 ---
 
 ## Full Sweep: Outer Loop
+
+> **Cloud-mode short-circuit**: this outer loop is **local-only**. Passes 1–3 all require `git commit` / `git push` and will never settle any PR when run from a cloud agent, so the 10-pass `REPEAT` will spin until the session times out (the #1 cause of "sweep-prs hangs in cloud"). If you cannot commit and push code in your current environment, **stop here and jump to "Cloud Full Sweep Algorithm" below** — run its steps 1–8 exactly once, then produce the report. Do not sleep or poll.
 
 For full sweeps, run passes 0–3 in a loop until every PR is **settled** — either clean, CI-pending, or labeled `requires-human-review` for a blocker outside agent reach. Fixing one category often creates issues in another (rebase → CI fail, fix → new review), so multiple passes are expected.
 
@@ -832,7 +834,7 @@ For a full cloud sweep, run steps 1–8 in order. Unlike the local sweep, there 
 3. Request Copilot reviews on unreviewed PRs (Cloud Step 4) — triggers auto-approve for clean PRs
 4. Resolve process/meta review threads (Cloud Step 5)
 5. Comment on PRs with issues the cloud agent cannot fix — explain the blocker on each. Only label `requires-human-review` if the blocker is outside any agent's reach (not just "needs code changes")
-6. Wait ~3 minutes if any CI re-runs were triggered, then re-scan
+6. If any CI re-runs were triggered, record the run IDs in the report as **pending** and continue — do **not** `sleep` or poll waiting for them. A cloud agent that sleeps 3 minutes looks indistinguishable from a hang and burns wall-clock time the session may not have. The next sweep (or a manual re-run) will pick up the results.
 7. Verify clean PRs are labeled (Cloud Step 2)
 8. Produce final report (Cloud Step 6) — every PR must appear in a settled category
 
