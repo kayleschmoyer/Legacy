@@ -71,10 +71,23 @@ On **Claude Code on the web**, use the built-in `mcp__github__*` tools for the P
 
 ### Thread ID resolution
 
-The built-in `get_review_comments` returns threads with comment metadata but may not expose the GraphQL thread node ID directly. Two strategies:
+The built-in `mcp__github__pull_request_read({ method: "get_review_comments" })` returns thread metadata (`isResolved`, `isOutdated`, `isCollapsed`) and the comments inside each thread, **but does not return the GraphQL thread node ID** that `mcp__github__resolve_review_thread` requires. There is currently no way to get thread node IDs through the built-in MCP server alone — `pull_request_read` does not have a `get_review_threads` method, and `includeThreadIds` is silently ignored. Three strategies, in preference order:
 
-1. **Preferred (custom MCP for reads)**: Use `github_get_review_threads(number: <PR#>, unresolvedOnly: true)` from the custom `legacy-sports-github` server to fetch threads — it returns the GraphQL `id` per thread. Then pass those IDs to `mcp__github__resolve_review_thread(threadId)`.
-2. **Fallback (all built-in)**: Use `mcp__github__pull_request_read(method: "get_review_comments")` for thread data. Extract numeric comment IDs from the response for replies. For resolution, the thread node IDs may need to come from the custom server.
+1. **Preferred (custom MCP for reads)**: Use `github_get_review_threads(number: <PR#>, unresolvedOnly: true)` from the custom `legacy-sports-github` server to fetch threads — it returns the GraphQL `id` per thread. Then pass those IDs to `mcp__github__resolve_review_thread({ threadId })`. This is the only fully-automated path.
+2. **Local fallback (`gh` CLI)**: If `gh` is available (it usually is **not** in cloud agent environments), call:
+
+   ```bash
+   gh api graphql -f query='query($owner:String!,$repo:String!,$number:Int!,$after:String){repository(owner:$owner,name:$repo){pullRequest(number:$number){reviewThreads(first:100,after:$after){nodes{id isResolved} pageInfo{hasNextPage endCursor}}}}}' \
+     -F owner=<owner> -F repo=<repo> -F number=<PR#>
+   ```
+
+   to fetch thread node IDs. If `pageInfo.hasNextPage` is `true`, rerun the same query with `-F after=<endCursor>` and keep paging until `hasNextPage` is `false`, then resolve the collected thread IDs via `mcp__github__resolve_review_thread({ threadId })`. Without paging, this misses threads on PRs with more than 100 reviews.
+
+3. **Reply-only fallback (cloud-native, no resolution)**: If neither the custom MCP server nor `gh` is available, you cannot programmatically resolve threads. Use `mcp__github__pull_request_read({ method: "get_review_comments" })` to inspect the unresolved threads, extract the numeric `commentId` for the top-level comment in each thread, and reply to that comment via `mcp__github__add_reply_to_pull_request_comment({ commentId, body: "addressed in <sha>" })` (the built-in tool replies to a specific review **comment**, not a thread). Then **surface the blocker to the user** with a message like:
+
+   > "I've replied to all Copilot review threads on PR #2259 with the fix SHA, but the cloud-only built-in MCP server cannot resolve thread IDs. The merge queue will block on `1+ unresolved review comment thread(s)` until the threads are resolved manually. Either click Resolve in the GitHub UI, or wait for the sweep agent to pick it up — sweep typically resolves stale acknowledged threads within a few minutes."
+
+   Do not silently leave the PR in a stuck state; the user needs to know whether to wait or intervene. Tracked under [LS-2414](https://bkrupa.atlassian.net/browse/LS-2414) — once the upstream `mcp__github__*` server exposes thread node IDs, this fallback can be retired.
 
 **Which operations MUST use built-in tools** (authorship is visible to users):
 
