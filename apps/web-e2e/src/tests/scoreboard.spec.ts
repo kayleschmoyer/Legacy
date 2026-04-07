@@ -207,8 +207,9 @@ test.describe('Scoreboard — page structure @regression', () => {
   });
 
   test('shows team abbreviations for live game', async ({ page }) => {
-    await expect(page.getByText('NYY')).toBeVisible();
-    await expect(page.getByText('BOS')).toBeVisible();
+    const liveCard = page.getByTestId('game-card-1001');
+    await expect(liveCard.getByText('NYY')).toBeVisible();
+    await expect(liveCard.getByText('BOS')).toBeVisible();
   });
 
   test('shows run score for live game', async ({ page }) => {
@@ -226,8 +227,9 @@ test.describe('Scoreboard — page structure @regression', () => {
   });
 
   test('shows team abbreviations for final game', async ({ page }) => {
-    await expect(page.getByText('CHC')).toBeVisible();
-    await expect(page.getByText('STL')).toBeVisible();
+    const finalCard = page.getByTestId('game-card-1002');
+    await expect(finalCard.getByText('CHC')).toBeVisible();
+    await expect(finalCard.getByText('STL')).toBeVisible();
   });
 
   test('shows dash for preview game score instead of 0', async ({ page }) => {

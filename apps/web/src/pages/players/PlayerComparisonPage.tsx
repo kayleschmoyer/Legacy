@@ -238,6 +238,15 @@ function PlayerSearchInput({
 }) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
+  const blurTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  React.useEffect(() => {
+    return () => {
+      if (blurTimerRef.current) {
+        clearTimeout(blurTimerRef.current);
+      }
+    };
+  }, []);
 
   const { data, loading } = useGetPlayersWithStatsQuery({
     variables: { search: query, limit: 8 },
@@ -273,8 +282,19 @@ function PlayerSearchInput({
             setQuery(e.target.value);
             setOpen(true);
           }}
-          onFocus={() => setOpen(true)}
-          onBlur={() => setTimeout(() => setOpen(false), 150)}
+          onFocus={() => {
+            if (blurTimerRef.current) {
+              clearTimeout(blurTimerRef.current);
+              blurTimerRef.current = null;
+            }
+            setOpen(true);
+          }}
+          onBlur={() => {
+            blurTimerRef.current = setTimeout(() => {
+              blurTimerRef.current = null;
+              setOpen(false);
+            }, 150);
+          }}
           placeholder={
             disabled ? 'Max 4 players selected' : 'Search for a player…'
           }

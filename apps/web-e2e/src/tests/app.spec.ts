@@ -49,9 +49,9 @@ test.describe('Web Application @smoke', () => {
     await expect(page.locator('[role="banner"]')).toBeAttached();
     await expect(page.locator('[role="main"]')).toBeAttached();
 
-    // Page should have at least one heading
-    const headings = page.getByRole('heading');
-    expect(await headings.count()).toBeGreaterThan(0);
+    // Page should have at least one heading (use retrying assertion so React
+    // has time to render before we count — count() is non-retrying)
+    await expect(page.getByRole('heading').first()).toBeVisible();
   });
 
   test('should render key UI components', async ({ page }) => {

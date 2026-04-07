@@ -173,16 +173,17 @@ test.describe('League Branding @regression', () => {
     await page.goto('/baseball/league/1/commissioner');
     await page.waitForLoadState('networkidle');
 
-    // Expand the branding section
+    // Expand the branding section — use toBeVisible() so we wait for the
+    // league data to load before clicking (isVisible() is non-retrying and
+    // can return false if data hasn't loaded yet, leaving the accordion closed)
     const brandingHeader = page.getByRole('button', {
       name: /League Branding/i,
     });
-    if (await brandingHeader.isVisible()) {
-      await brandingHeader.click();
-      await expect(
-        page.getByRole('heading', { name: /League Branding/i }),
-      ).toBeVisible();
-    }
+    await expect(brandingHeader).toBeVisible({ timeout: 10000 });
+    await brandingHeader.click();
+    await expect(
+      page.getByRole('heading', { name: /League Branding/i }),
+    ).toBeVisible();
 
     const leaguePage = new LeaguePage(page);
     await expect(leaguePage.primaryColorInput).toBeVisible();
