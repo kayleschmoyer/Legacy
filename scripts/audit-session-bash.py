@@ -457,6 +457,16 @@ def format_gaps_only(bash_calls: list[dict], session_id: str) -> str:
 
 
 def main() -> None:
+    # On Windows the default stdout codec is cp1252, which cannot encode common
+    # non-ASCII characters (e.g., U+2192 RIGHTWARDS ARROW) that show up inside
+    # transcript command/description fields. Reconfigure to UTF-8 with replace
+    # so the script never crashes mid-print on a stray glyph.
+    if sys.platform == "win32":
+        for stream in (sys.stdout, sys.stderr):
+            reconfigure = getattr(stream, "reconfigure", None)
+            if callable(reconfigure):
+                reconfigure(encoding="utf-8", errors="replace")
+
     parser = argparse.ArgumentParser(
         description="Extract Bash commands from a Claude Code session transcript."
     )
