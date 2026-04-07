@@ -574,7 +574,15 @@ else
 ami-build: ## Build self-hosted runner AMI with Packer (requires VPC_ID and SUBNET_ID)
 	@$(call echo_blue,Building self-hosted runner AMI...)
 	@$(call echo_yellow,This will create a new EC2 AMI. Typical build time: 5-10 minutes.)
-	cd terraform$(PATH_SEP)runners$(PATH_SEP)packer && packer init runner-ami.pkr.hcl && packer build -var "vpc_id=$(VPC_ID)" -var "subnet_id=$(SUBNET_ID)" runner-ami.pkr.hcl
+ifeq ($(DETECTED_OS),Windows)
+# Use bash -lc (login shell) so ~/.bash_profile / ~/bin are sourced.
+# Without -l, make on Windows hands the recipe to cmd.exe and packer is not
+# found; without the login flag, bash -c skips profile init files so ~/bin/packer
+# (installed via Git Bash) is still missing from PATH.
+	bash -lc "cd terraform/runners/packer && packer init runner-ami.pkr.hcl && packer build -var 'vpc_id=$(VPC_ID)' -var 'subnet_id=$(SUBNET_ID)' runner-ami.pkr.hcl"
+else
+	cd terraform/runners/packer && packer init runner-ami.pkr.hcl && packer build -var "vpc_id=$(VPC_ID)" -var "subnet_id=$(SUBNET_ID)" runner-ami.pkr.hcl
+endif
 endif
 
 ami-list: ## List existing runner AMIs (most recent first)
