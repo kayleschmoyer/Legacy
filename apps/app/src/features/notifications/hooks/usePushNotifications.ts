@@ -18,9 +18,6 @@ import { PermissionStatus } from 'expo-modules-core';
 import { useRegisterDeviceTokenMutation } from '../../../api/db/graphql.generated';
 import { isPhysicalDevice } from '../../../common/utilities/DeviceUtils';
 
-/** Typed extraction — expo-device types may not resolve in all environments */
-const isPhysicalDevice = (Device as { isDevice: boolean }).isDevice;
-
 // Configure how notifications appear when app is in foreground
 setNotificationHandler({
   handleNotification: () =>
