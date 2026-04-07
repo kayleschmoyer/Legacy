@@ -4,7 +4,6 @@
   },
   "permissions": {
     "allow": [
-      "mcp__82d0c0eb-ec68-497e-bef5-b0faa209ebbb__*",
       "mcp__legacy-sports-aws__aws_apigateway_inspect",
       "mcp__legacy-sports-aws__aws_lambda_status",
       "mcp__legacy-sports-aws__aws_logs_tail",
@@ -41,13 +40,15 @@
     ]
   },
   "enabledMcpjsonServers": [
+    "legacy-sports-aws",
     "legacy-sports-browser",
     "legacy-sports-ci",
     "legacy-sports-db",
     "legacy-sports-github",
     "legacy-sports-jira",
     "legacy-sports-make",
-    "legacy-sports-nx"
+    "legacy-sports-nx",
+    "worktree"
   ],
   "hooks": {
     "SessionStart": [
