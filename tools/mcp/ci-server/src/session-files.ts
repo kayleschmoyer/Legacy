@@ -8,7 +8,7 @@
 
 import { homedir } from 'node:os';
 import { existsSync, readdirSync, statSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 
 /** Locate the ~/.claude/projects directory; throws if it does not exist. */
 export function findClaudeProjectsDir(): string {
@@ -40,14 +40,55 @@ export function cwdToProjectSlug(cwd: string = process.cwd()): string {
 }
 
 /**
+ * Strict allow-list for project slug basenames. Claude Code slugs are
+ * composed of letters, digits, dashes, underscores, and dots — nothing else.
+ * Rejecting anything outside this set (and in particular `..`, `/`, `\`)
+ * prevents caller-supplied values from escaping the projects directory.
+ */
+const SAFE_SLUG_RE = /^[A-Za-z0-9._-]+$/;
+
+function assertSafeSlug(slug: string): string {
+  if (!slug || slug === '.' || slug === '..') {
+    throw new Error(`Invalid project slug: ${JSON.stringify(slug)}`);
+  }
+  if (slug.includes('/') || slug.includes('\\') || slug.includes('..')) {
+    throw new Error(
+      `Invalid project slug (must not contain path separators or ".."): ${JSON.stringify(slug)}`,
+    );
+  }
+  if (!SAFE_SLUG_RE.test(slug)) {
+    throw new Error(
+      `Invalid project slug (must match /^[A-Za-z0-9._-]+$/): ${JSON.stringify(slug)}`,
+    );
+  }
+  return slug;
+}
+
+/**
  * Resolve a project slug, falling back to a partial-name match against
  * directories under ~/.claude/projects/.
+ *
+ * When `explicit` is provided it is validated against a strict allow-list
+ * (letters, digits, dots, dashes, underscores — no path separators, no `..`)
+ * and reduced to its basename before being used, so caller input can never
+ * escape the projects directory.
  */
 export function resolveProjectSlug(
   projectsDir: string,
   explicit?: string,
 ): string {
-  if (explicit) return explicit;
+  if (explicit) {
+    // basename() strips any directory components a caller may have slipped
+    // in (e.g. "../foo" -> "foo"), and the strict regex rejects the rest.
+    const safe = assertSafeSlug(basename(explicit));
+    const safeDir = join(projectsDir, safe);
+    if (!existsSync(safeDir) || !statSync(safeDir).isDirectory()) {
+      throw new Error(
+        `Project directory for slug "${safe}" does not exist under ${projectsDir}`,
+      );
+    }
+    return safe;
+  }
   const slug = cwdToProjectSlug();
   const slugDir = join(projectsDir, slug);
   if (existsSync(slugDir) && statSync(slugDir).isDirectory()) {

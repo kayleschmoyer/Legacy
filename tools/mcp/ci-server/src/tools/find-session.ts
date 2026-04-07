@@ -1,4 +1,4 @@
-import { createReadStream } from 'node:fs';
+import { createReadStream, type ReadStream } from 'node:fs';
 import { createInterface } from 'node:readline';
 import {
   findClaudeProjectsDir,
@@ -29,44 +29,74 @@ interface FileMatchSummary {
   matchCount: number;
 }
 
-/** Stream a JSONL file line-by-line and count substring matches. */
+/**
+ * Stream a JSONL file line-by-line and count substring matches.
+ *
+ * Handles async stream errors explicitly: `createReadStream` emits most
+ * failures asynchronously (EACCES mid-read, EIO, etc.), and `rl.close()`
+ * alone does not destroy the underlying file descriptor — the stream is
+ * always `destroy()`'d in `finally` to release the FD.
+ */
 async function scanFile(
   jsonlPath: string,
   query: string,
 ): Promise<FileMatchSummary | null> {
-  let stream;
+  let stream: ReadStream;
   try {
     stream = createReadStream(jsonlPath, { encoding: 'utf8' });
   } catch {
     return null;
   }
 
-  return new Promise((resolvePromise) => {
-    const rl = createInterface({ input: stream, crlfDelay: Infinity });
-    let firstMatchLine = 0;
-    let matchCount = 0;
-    let lineNumber = 0;
+  try {
+    return await new Promise<FileMatchSummary | null>((resolvePromise) => {
+      const rl = createInterface({ input: stream, crlfDelay: Infinity });
+      let firstMatchLine = 0;
+      let matchCount = 0;
+      let lineNumber = 0;
+      let settled = false;
 
-    rl.on('line', (line) => {
-      lineNumber++;
-      if (line.includes(query)) {
-        if (firstMatchLine === 0) firstMatchLine = lineNumber;
-        matchCount++;
-      }
-    });
+      const settle = (value: FileMatchSummary | null) => {
+        if (settled) return;
+        settled = true;
+        resolvePromise(value);
+      };
 
-    rl.on('close', () => {
-      if (matchCount === 0) {
-        resolvePromise(null);
-      } else {
-        resolvePromise({ firstMatchLine, matchCount });
-      }
-    });
+      rl.on('line', (line) => {
+        lineNumber++;
+        if (line.includes(query)) {
+          if (firstMatchLine === 0) firstMatchLine = lineNumber;
+          matchCount++;
+        }
+      });
 
-    rl.on('error', () => {
-      resolvePromise(null);
+      rl.on('close', () => {
+        if (matchCount === 0) {
+          settle(null);
+        } else {
+          settle({ firstMatchLine, matchCount });
+        }
+      });
+
+      rl.on('error', () => {
+        settle(null);
+      });
+
+      stream.on('error', () => {
+        // Ensure readline stops consuming a broken stream and resolves.
+        try {
+          rl.close();
+        } catch {
+          // ignore
+        }
+        settle(null);
+      });
     });
-  });
+  } finally {
+    if (!stream.destroyed) {
+      stream.destroy();
+    }
+  }
 }
 
 /**

@@ -10,6 +10,7 @@ import { getPlaywrightReport } from './tools/get-playwright-report.js';
 import { listRuns } from './tools/list-runs.js';
 import { rerun } from './tools/rerun.js';
 import { searchLogs } from './tools/search-logs.js';
+import { sessionStats } from './tools/session-stats.js';
 import { viewRun } from './tools/view-run.js';
 import { workflowInfo } from './tools/workflow-info.js';
 
@@ -315,7 +316,7 @@ server.tool(
       .describe(
         'Also scan subagent JSONLs under <sessionId>/subagents/ (default: true).',
       ),
-    limit: z
+    limit: z.coerce
       .number()
       .int()
       .positive()
@@ -326,6 +327,45 @@ server.tool(
       ),
   },
   async (params) => findSession(params),
+);
+
+server.tool(
+  'ci_session_stats',
+  'Summarise tool-use counts and message metrics for a Claude Code session transcript. ' +
+    'Returns total messages, first/last timestamp, per-tool call counts, and bashFallbackRatio ' +
+    '(Bash count / total tool uses) — a quick "how MCP-first was this session?" heuristic. ' +
+    'Optionally aggregates subagent transcripts into the totals and breaks them out per-subagent. ' +
+    'Defaults to the most recently modified parent JSONL when sessionId is omitted.',
+  {
+    sessionId: z
+      .string()
+      .optional()
+      .describe(
+        'Parent session UUID. Defaults to the most recently modified parent JSONL.',
+      ),
+    project: z
+      .string()
+      .optional()
+      .describe(
+        'Project slug (e.g. "D--code-legacy-sports"). Auto-detected from CWD if omitted.',
+      ),
+    lineRange: z
+      .tuple([z.coerce.number().int().min(1), z.coerce.number().int().min(1)])
+      .refine(([start, end]) => end >= start, {
+        message: 'lineRange must satisfy end >= start',
+      })
+      .optional()
+      .describe(
+        'Only count messages in this 1-based [start, end] line range — useful for analysing a specific phase of a long session.',
+      ),
+    includeSubagents: z
+      .boolean()
+      .default(false)
+      .describe(
+        'Aggregate subagent stats into the parent totals and return per-subagent breakdowns (default: false).',
+      ),
+  },
+  async (params) => sessionStats(params),
 );
 
 const transport = new StdioServerTransport();
