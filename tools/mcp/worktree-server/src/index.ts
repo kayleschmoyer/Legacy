@@ -775,7 +775,11 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
       inputSchema: {
         type: 'object' as const,
         properties: {
-          ref: { type: 'string', description: 'Git ref to list from' },
+          ref: {
+            type: 'string',
+            description:
+              'Git ref to list from (default: "HEAD"). Accepts any rev: branch, tag, or SHA.',
+          },
           path: {
             type: 'string',
             description: 'Directory path (relative to root)',
@@ -790,7 +794,6 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
               'Ticket key, absolute path, or omit for active worktree',
           },
         },
-        required: ['ref'],
       },
     },
     {
@@ -2478,12 +2481,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     // -----------------------------------------------------------------------
     case 'worktree_ls_tree': {
       const {
-        ref,
+        ref = 'HEAD',
         path: dirPath,
         recursive = true,
         worktree,
       } = args as {
-        ref: string;
+        ref?: string;
         path?: string;
         recursive?: boolean;
         worktree?: string;
