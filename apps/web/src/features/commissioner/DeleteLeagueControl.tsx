@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Button,
@@ -41,6 +41,19 @@ export function DeleteLeagueControl({
   const [loading, setLoading] = useState(false);
 
   const [deleteLeague] = useDeleteLeagueMutation();
+  const redirectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clear any pending redirect timer on unmount so we don't navigate from a
+  // dead component after a successful delete.
+  useEffect(
+    () => () => {
+      if (redirectTimeoutRef.current !== null) {
+        clearTimeout(redirectTimeoutRef.current);
+        redirectTimeoutRef.current = null;
+      }
+    },
+    [],
+  );
 
   const handleButtonClick = () => {
     setShowConfirmDialog(true);
@@ -70,10 +83,25 @@ export function DeleteLeagueControl({
       setShowConfirmDialog(false);
       onSuccess?.();
 
-      // Redirect to home after successful deletion
-      setTimeout(() => {
+      // Redirect to home after successful deletion. Track the timer so we
+      // can cancel it on unmount (the parent may remove us from the tree
+      // inside onSuccess — or the user may navigate away — before the
+      // 2-second window elapses).
+      // Clear any prior pending timer first in case handleConfirm runs
+      // multiple times, so we don't leak a stale timeout.
+      if (redirectTimeoutRef.current !== null) {
+        clearTimeout(redirectTimeoutRef.current);
+        redirectTimeoutRef.current = null;
+      }
+      const timeoutId = setTimeout(() => {
+        // Only clear the ref if it still points to this scheduled timer —
+        // a later invocation may have replaced it.
+        if (redirectTimeoutRef.current === timeoutId) {
+          redirectTimeoutRef.current = null;
+        }
         navigate('/');
       }, 2000);
+      redirectTimeoutRef.current = timeoutId;
     } catch (err) {
       setLoading(false);
       const errorMessage =
