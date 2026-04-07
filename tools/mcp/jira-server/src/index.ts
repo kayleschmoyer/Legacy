@@ -14,6 +14,7 @@ import { transition, VALID_STATUSES } from './tools/transition.js';
 import { view } from './tools/view.js';
 import { bulkTransition } from './tools/bulk-transition.js';
 import { bulkCreate } from './tools/bulk-create.js';
+import { getBucketEpic, setBucketEpic } from './tools/bucket-epic.js';
 import { tryGetJiraCredentials } from './netrc.js';
 
 // Check credentials at startup — warn if missing but don't exit.
@@ -315,6 +316,29 @@ server.tool(
       ),
   },
   async (params) => deleteTicket(params),
+);
+
+// --- jira_get_bucket_epic ---
+server.tool(
+  'jira_get_bucket_epic',
+  'Get the current bucket epic for "client-bugs" or "mcp-gaps" from Jira project property. Returns a JSON object with success, bucket, key, cached (boolean), and updatedAt (ISO string or null). Cached 5 minutes.',
+  {
+    bucket: z
+      .enum(['client-bugs', 'mcp-gaps'])
+      .describe('Which bucket epic to look up'),
+  },
+  async (params) => getBucketEpic(params),
+);
+
+// --- jira_set_bucket_epic ---
+server.tool(
+  'jira_set_bucket_epic',
+  'Set the current bucket epic key for "client-bugs" or "mcp-gaps". Writes to Jira project property. Requires project admin credentials.',
+  {
+    bucket: z.enum(['client-bugs', 'mcp-gaps']),
+    epicKey: z.string().describe('Jira issue key, e.g. "LS-2501"'),
+  },
+  async (params) => setBucketEpic(params),
 );
 
 // Start the server
