@@ -213,6 +213,25 @@ variable "github_runners_max_count" {
   default     = 20
 }
 
+# LS-2429: Version-scoped runner AMI selection.
+#
+# This variable drives the AMI name filter in module "github_runners" so that
+# terraform picks the newest AMI whose name starts with
+# "legacy-sports-runner-pw<runner_ami_playwright_version>-". The actual value
+# lives in terraform/runner-ami.auto.tfvars (committed) so that every Playwright
+# bump PR updates it atomically alongside pnpm-lock.yaml and the Packer
+# playwright_version default. CI enforces all three are in sync via the
+# runner-ami-drift-check workflow — drift is a hard block on merge.
+#
+# Rollback strategy: previous-version AMIs remain in the account until pruned by
+# the scheduled prune-runner-amis workflow. Reverting the Playwright bump PR
+# restores this variable to the prior value, the filter picks up the still-present
+# older AMI, and the launch template reverts on next terraform apply.
+variable "runner_ami_playwright_version" {
+  description = "Playwright version that must be present in the target runner AMI. Matched against the AMI name prefix 'legacy-sports-runner-pw<version>-'. Must equal the resolved playwright-core version in pnpm-lock.yaml and the playwright_version default in terraform/packer/runner-ami.pkr.hcl. Intentionally has NO default — terraform/runner-ami.auto.tfvars is the single source of truth, and any plan/apply that cannot find a value here will fail fast (per Copilot review on PR #2281)."
+  type        = string
+}
+
 variable "github_app_id" {
   description = "GitHub App ID for self-hosted runner registration"
   type        = string

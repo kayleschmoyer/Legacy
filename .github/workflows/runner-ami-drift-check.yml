@@ -1,0 +1,132 @@
+# runner-ami-drift-check.yml — Hard-blocking drift check for runner AMI versioning.
+#
+# LS-2429. This workflow enforces that three sources of the Playwright version
+# remain in sync on every PR:
+#
+#   1. pnpm-lock.yaml               — the resolved playwright-core version
+#   2. terraform/packer/runner-ami.pkr.hcl — playwright_version variable default
+#   3. terraform/runner-ami.auto.tfvars — runner_ami_playwright_version
+#
+# If any two of these disagree the job fails. The required fix is to run the
+# `rebuild-runner-ami` workflow (or `make ami-build` locally), which rebuilds
+# the AMI under the new version name and commits updated values for (2) and
+# (3) back to the PR branch so the filter in terraform/github-runners.tf will
+# select the new AMI after merge.
+#
+# This is a required status check — it is the gate that turns a Playwright
+# dependabot bump from "silently drifts the fleet" into "must ship a matching AMI".
+
+name: Runner AMI Drift Check
+
+on:
+  pull_request:
+    paths:
+      - "pnpm-lock.yaml"
+      - "package.json"
+      - "terraform/packer/runner-ami.pkr.hcl"
+      - "terraform/runner-ami.auto.tfvars"
+      - ".github/workflows/runner-ami-drift-check.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "pnpm-lock.yaml"
+      - "package.json"
+      - "terraform/packer/runner-ami.pkr.hcl"
+      - "terraform/runner-ami.auto.tfvars"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  check:
+    name: Playwright AMI Drift
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Extract Playwright versions from all three sources
+        id: versions
+        run: |
+          set -euo pipefail
+
+          # (1) Resolved playwright-core version from pnpm-lock.yaml.
+          # pnpm v9 lockfiles pin transitive dependencies with `<pkg>@<version>:`
+          # at column 0. There should be exactly one such entry for playwright-core.
+          lockfile_version=$(grep -E "^  playwright-core@" pnpm-lock.yaml \
+            | head -n 1 \
+            | sed -E 's/^  playwright-core@([0-9.]+):.*/\1/')
+          if [[ -z "$lockfile_version" ]]; then
+            echo "::error::Could not extract playwright-core version from pnpm-lock.yaml"
+            exit 1
+          fi
+
+          # (2) playwright_version default from the Packer HCL.
+          # Matches `default = "1.2.3"` on the line immediately following the
+          # `variable "playwright_version"` declaration. Uses awk to avoid the
+          # fragility of multiline sed.
+          packer_version=$(awk '
+            /variable "playwright_version"/ { in_var = 1; next }
+            in_var && /default[[:space:]]*=[[:space:]]*"/ {
+              match($0, /"[0-9.]+"/)
+              print substr($0, RSTART + 1, RLENGTH - 2)
+              exit
+            }
+          ' terraform/packer/runner-ami.pkr.hcl)
+          if [[ -z "$packer_version" ]]; then
+            echo "::error::Could not extract playwright_version default from terraform/packer/runner-ami.pkr.hcl"
+            exit 1
+          fi
+
+          # (3) runner_ami_playwright_version from the committed tfvars.
+          tfvars_version=$(awk '
+            /^runner_ami_playwright_version[[:space:]]*=/ {
+              match($0, /"[0-9.]+"/)
+              print substr($0, RSTART + 1, RLENGTH - 2)
+              exit
+            }
+          ' terraform/runner-ami.auto.tfvars)
+          if [[ -z "$tfvars_version" ]]; then
+            echo "::error::Could not extract runner_ami_playwright_version from terraform/runner-ami.auto.tfvars"
+            exit 1
+          fi
+
+          echo "lockfile_version=$lockfile_version" >> "$GITHUB_OUTPUT"
+          echo "packer_version=$packer_version" >> "$GITHUB_OUTPUT"
+          echo "tfvars_version=$tfvars_version" >> "$GITHUB_OUTPUT"
+
+          echo "pnpm-lock.yaml          playwright-core           = $lockfile_version"
+          echo "runner-ami.pkr.hcl      playwright_version        = $packer_version"
+          echo "runner-ami.auto.tfvars  runner_ami_playwright_ver = $tfvars_version"
+
+      - name: Fail if versions drift
+        env:
+          LOCKFILE_VERSION: ${{ steps.versions.outputs.lockfile_version }}
+          PACKER_VERSION: ${{ steps.versions.outputs.packer_version }}
+          TFVARS_VERSION: ${{ steps.versions.outputs.tfvars_version }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$LOCKFILE_VERSION" == "$PACKER_VERSION" && "$PACKER_VERSION" == "$TFVARS_VERSION" ]]; then
+            echo "✅ All three sources agree on Playwright $LOCKFILE_VERSION."
+            exit 0
+          fi
+
+          echo "::error::Playwright version drift detected."
+          echo ""
+          echo "  pnpm-lock.yaml          playwright-core           = $LOCKFILE_VERSION"
+          echo "  runner-ami.pkr.hcl      playwright_version        = $PACKER_VERSION"
+          echo "  runner-ami.auto.tfvars  runner_ami_playwright_ver = $TFVARS_VERSION"
+          echo ""
+          echo "All three values MUST be identical. Drift means the runner AMI"
+          echo "filter in terraform/github-runners.tf will not select a matching"
+          echo "AMI after merge, and the runner fleet will fail to scale."
+          echo ""
+          echo "To fix: trigger the 'Rebuild Runner AMI' workflow against this"
+          echo "PR (it will build a new AMI and commit the version updates back"
+          echo "to this branch), or run 'make ami-build' locally and update the"
+          echo "Packer HCL default + runner-ami.auto.tfvars manually."
+          exit 1

@@ -28,8 +28,9 @@ variable "pnpm_version" {
 }
 
 variable "playwright_version" {
-  type    = string
-  default = "1.58.2"
+  type        = string
+  description = "Playwright version to install in the AMI. MUST match the resolved playwright-core version in pnpm-lock.yaml — CI enforces this in .github/workflows/runner-ami-drift-check.yml. The value here is also baked into the AMI name (legacy-sports-runner-pw<version>-<timestamp>) so terraform's name filter in github-runners.tf can select the correct AMI without an explicit AMI ID."
+  default     = "1.59.1"
 }
 
 variable "terraform_version" {
@@ -95,8 +96,12 @@ variable "subnet_id" {
   description = "Public subnet ID for the Packer build instance (must have IGW route)"
 }
 
+# NOTE: The AMI name must begin with "legacy-sports-runner-pw<playwright_version>-"
+# because terraform/github-runners.tf filters by this exact prefix to select the AMI
+# without an explicit AMI ID. Changing this prefix requires a coordinated update to
+# the filter block in github-runners.tf and the drift-check workflow.
 source "amazon-ebs" "runner" {
-  ami_name      = "legacy-sports-runner-{{timestamp}}"
+  ami_name      = "legacy-sports-runner-pw${var.playwright_version}-{{timestamp}}"
   instance_type = var.instance_type
   region        = var.region
 
@@ -177,7 +182,9 @@ build {
   # Playwright: system dependencies + Chromium browser binary + global CLI
   #
   # IMPORTANT: playwright_version must be kept in sync with the @playwright/test
-  # version declared in the root package.json.
+  # version declared in the root package.json. CI enforces this via the
+  # runner-ami-drift-check workflow — any drift between pnpm-lock.yaml's
+  # resolved playwright-core version and this variable's default fails CI.
   # Playwright requires the browser binary version to exactly match the library
   # version — a mismatch causes CI to re-download the browser on every run.
   #
@@ -190,7 +197,18 @@ build {
       "sudo mkdir -p /opt/playwright-browsers",
       "sudo chmod 755 /opt/playwright-browsers",
       "sudo env PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers npx --yes playwright@${var.playwright_version} install chromium",
+      # Explicitly install chromium-headless-shell. `playwright install chromium`
+      # is supposed to include this variant but in 1.58.2+ the chromium_headless_shell-*
+      # directory was intermittently missing from rebuilt AMIs, forcing CI to fall
+      # back to a runtime install. This line is belt-and-suspenders: cheap insurance
+      # against future Playwright releases regressing the bundled behavior. (LS-2429)
+      "sudo env PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers npx --yes playwright@${var.playwright_version} install chromium-headless-shell",
       "sudo chmod -R a+rX /opt/playwright-browsers",
+      # Debug: dump the installed browser directories into the Packer build log
+      # so future AMI builds have verifiable evidence that both chromium-<rev>
+      # and chromium_headless_shell-<rev> directories exist. If this regresses
+      # again, the Packer log is the first place to look.
+      "ls -la /opt/playwright-browsers/",
       "sudo npm install -g playwright@${var.playwright_version}",
       # Export PLAYWRIGHT_BROWSERS_PATH for login shells
       "echo 'export PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers' | sudo tee /etc/profile.d/playwright.sh",

@@ -1,0 +1,169 @@
+# prune-runner-amis.yml — Scheduled cleanup of old runner AMIs. LS-2429.
+#
+# LS-2429 switched the runner AMI filter from "latest by name pattern" to
+# "latest matching a specific Playwright version in the name". Old AMIs are
+# therefore no longer automatically retired by being overtaken — they linger
+# in the account until explicitly deregistered.
+#
+# This workflow keeps the 5 most recent runner AMIs across all Playwright
+# versions that are still referenced by at least one branch (main + open PR
+# branches), plus the AMI currently selected by the launch template. Older
+# AMIs and their backing snapshots are deregistered and deleted.
+#
+# Runs weekly. Safe to re-run — idempotent.
+
+name: Prune Runner AMIs
+
+on:
+  schedule:
+    # Sunday 07:15 UTC — off-peak, avoids overlapping with scheduled deploys.
+    - cron: "15 7 * * 0"
+  workflow_dispatch:
+    inputs:
+      keep-count:
+        description: "Number of recent AMIs to keep (default 5)"
+        required: false
+        default: "5"
+        type: string
+      dry-run:
+        description: "Dry run: log what would be deleted without actually deleting"
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  prune:
+    name: Prune old runner AMIs
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Configure AWS credentials (builder role)
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: arn:aws:iam::176661590736:role/legacy-sports-dev-runner-ami-builder
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Compute protected AMI set
+        id: protect
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          # Protected versions = main's runner_ami_playwright_version + every
+          # open PR branch's runner_ami_playwright_version. A PR that has not
+          # yet rebuilt the AMI will still reference the old version via its
+          # tfvars, so we keep it alive until the PR merges or closes.
+          {
+            PROTECTED_VERSIONS=$(awk '
+              /^runner_ami_playwright_version[[:space:]]*=/ {
+                match($0, /"[0-9.]+"/)
+                print substr($0, RSTART + 1, RLENGTH - 2)
+                exit
+              }
+            ' terraform/runner-ami.auto.tfvars)
+
+            # Enumerate open PRs and pull their tfvars via the API (no need to
+            # check out each branch).
+            gh pr list --state open --json headRefName --limit 100 \
+              | jq -r '.[].headRefName' \
+              | while read -r BRANCH; do
+                  VERSION=$(gh api "repos/${{ github.repository }}/contents/terraform/runner-ami.auto.tfvars?ref=$BRANCH" \
+                    --jq '.content' 2>/dev/null \
+                    | base64 -d 2>/dev/null \
+                    | awk '
+                        /^runner_ami_playwright_version[[:space:]]*=/ {
+                          match($0, /"[0-9.]+"/)
+                          print substr($0, RSTART + 1, RLENGTH - 2)
+                          exit
+                        }
+                      ' || true)
+                  if [[ -n "$VERSION" ]]; then
+                    echo "$VERSION"
+                  fi
+                done
+          } | sort -u > protected-versions.txt
+
+          echo "Protected versions (main + open PRs):"
+          cat protected-versions.txt
+
+      - name: Prune
+        env:
+          KEEP_COUNT: ${{ github.event.inputs.keep-count || '5' }}
+          DRY_RUN: ${{ github.event.inputs.dry-run || 'false' }}
+        run: |
+          set -euo pipefail
+
+          echo "Keep count:            $KEEP_COUNT"
+          echo "Dry run:               $DRY_RUN"
+
+          # List all runner AMIs owned by this account, newest first.
+          ALL_AMIS=$(aws ec2 describe-images \
+            --owners self \
+            --filters "Name=name,Values=legacy-sports-runner-*" \
+            --query "sort_by(Images, &CreationDate) | reverse(@) | [*].{Id:ImageId,Name:Name,Created:CreationDate}" \
+            --output json)
+
+          echo "Total AMIs: $(echo "$ALL_AMIS" | jq 'length')"
+
+          # Determine AMIs to keep:
+          #   - First N (by creation date desc)
+          #   - Any AMI whose name includes one of the protected version strings
+          KEEP_IDS=$(echo "$ALL_AMIS" | jq -r --argjson n "$KEEP_COUNT" '.[0:$n] | .[].Id')
+
+          while read -r VERSION; do
+            [[ -z "$VERSION" ]] && continue
+            MATCH_IDS=$(echo "$ALL_AMIS" \
+              | jq -r --arg v "$VERSION" '.[] | select(.Name | contains("-pw" + $v + "-")) | .Id')
+            KEEP_IDS=$(printf "%s\n%s" "$KEEP_IDS" "$MATCH_IDS")
+          done < protected-versions.txt
+
+          KEEP_IDS_UNIQUE=$(echo "$KEEP_IDS" | sort -u | grep -v '^$' || true)
+          echo "Keeping AMIs:"
+          printf "%s\n" "$KEEP_IDS_UNIQUE"
+
+          # Enumerate deletion candidates.
+          DELETE_IDS=$(echo "$ALL_AMIS" | jq -r '.[].Id' | grep -vFxf <(echo "$KEEP_IDS_UNIQUE") || true)
+
+          if [[ -z "$DELETE_IDS" ]]; then
+            echo "✅ Nothing to prune."
+            exit 0
+          fi
+
+          echo "Candidates for deletion:"
+          printf "%s\n" "$DELETE_IDS"
+
+          for AMI_ID in $DELETE_IDS; do
+            # Look up associated snapshot IDs before deregistering — once the
+            # AMI is deregistered, the snapshot association is gone.
+            SNAPSHOTS=$(aws ec2 describe-images \
+              --image-ids "$AMI_ID" \
+              --query "Images[0].BlockDeviceMappings[?Ebs.SnapshotId].Ebs.SnapshotId" \
+              --output text 2>/dev/null || echo "")
+
+            if [[ "$DRY_RUN" == "true" ]]; then
+              echo "[dry-run] Would deregister $AMI_ID and delete snapshots: $SNAPSHOTS"
+              continue
+            fi
+
+            echo "Deregistering $AMI_ID..."
+            aws ec2 deregister-image --image-id "$AMI_ID"
+
+            for SNAPSHOT_ID in $SNAPSHOTS; do
+              echo "  Deleting snapshot $SNAPSHOT_ID..."
+              aws ec2 delete-snapshot --snapshot-id "$SNAPSHOT_ID" || \
+                echo "::warning::Failed to delete snapshot $SNAPSHOT_ID (may be in use)"
+            done
+          done
+
+          echo "✅ Prune complete."

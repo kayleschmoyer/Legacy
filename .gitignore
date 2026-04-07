@@ -312,6 +312,8 @@ terraform.tfvars
 *.tfvars
 # Non-sensitive infra feature flags — checked in for CI reproducibility (LS-1665)
 !terraform/infra.auto.tfvars
+# Committed runner AMI version selector — source of truth for drift check (LS-2429)
+!terraform/runner-ami.auto.tfvars
 
 # Tamagui generated files
 **/.tamagui/

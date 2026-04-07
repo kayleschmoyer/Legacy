@@ -1,0 +1,289 @@
+# rebuild-runner-ami.yml — Build a new runner AMI via Packer in CI and commit
+# the version updates back to the triggering PR branch. LS-2429.
+#
+# Purpose:
+#   Removes the "AWS SSO access" bottleneck for Playwright bumps. Dependabot (or
+#   any contributor) can open a PR that bumps @playwright/test + playwright, and
+#   a maintainer can trigger this workflow on the PR. The workflow:
+#
+#     1. Reads the resolved playwright-core version from pnpm-lock.yaml on the
+#        PR branch.
+#     2. Runs `make ami-build` inside CI using OIDC creds for the
+#        `runner-ami-builder` IAM role, producing a new AMI named
+#        `legacy-sports-runner-pw<version>-<timestamp>`.
+#     3. Updates the `playwright_version` default in the Packer HCL and the
+#        `runner_ami_playwright_version` value in runner-ami.auto.tfvars.
+#     4. Commits those updates back to the PR branch using a bot token so the
+#        runner-ami-drift-check workflow re-runs and passes.
+#
+#   After the PR merges, `runner-terraform-apply.yml` rolls the launch template
+#   to the new AMI automatically.
+#
+# Triggers:
+#   - pull_request with the label `rebuild-runner-ami` (added manually or by a
+#     future dependabot auto-labeller).
+#   - workflow_dispatch with a PR number input (for manual kick).
+#
+# Why label-triggered and not automatic:
+#   Packer builds take ~10 min and cost ~$0.50 each. We deliberately require an
+#   explicit signal to avoid spending time/money on drafts or experimental PRs.
+#   For dependabot, a future follow-up can auto-label Playwright bump PRs.
+
+name: Rebuild Runner AMI
+
+on:
+  pull_request:
+    types: [labeled]
+  workflow_dispatch:
+    inputs:
+      pr-number:
+        description: "PR number to build AMI against (will commit updates back to that PR's branch)"
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: write
+  pull-requests: write
+
+concurrency:
+  # One AMI build per PR at a time.
+  group: rebuild-runner-ami-${{ github.event.pull_request.number || github.event.inputs.pr-number }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build runner AMI
+    # For pull_request events, only run when the `rebuild-runner-ami` label is applied.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.label.name == 'rebuild-runner-ami' }}
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 25
+    env:
+      AWS_REGION: us-east-1
+    steps:
+      - name: Validate required secrets
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Per Copilot review on PR #2281: fail fast with a clear message if
+          # the bot token is missing rather than dying obscurely at checkout.
+          if [ -z "${BOT_TOKEN:-}" ]; then
+            echo "::error::secrets.BOT_GITHUB_TOKEN is not configured."
+            echo "::error::This workflow needs a token that can push back to PR branches AND retrigger required checks."
+            echo "::error::The default GITHUB_TOKEN cannot retrigger required checks, so a legacy-sports-code-bot PAT or GitHub App installation token is required."
+            echo "::error::Add it under repo Settings -> Secrets and variables -> Actions -> New repository secret."
+            exit 1
+          fi
+          echo "✅ BOT_GITHUB_TOKEN is configured."
+
+      - name: Resolve PR ref
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            PR_NUMBER='${{ github.event.inputs.pr-number }}'
+          else
+            PR_NUMBER='${{ github.event.pull_request.number }}'
+          fi
+
+          # Look up the head repo + ref via the GitHub API so we can check out
+          # the PR branch even when the trigger is workflow_dispatch.
+          PR_JSON=$(gh api "repos/${{ github.repository }}/pulls/$PR_NUMBER")
+          HEAD_REF=$(echo "$PR_JSON" | jq -r .head.ref)
+          HEAD_SHA=$(echo "$PR_JSON" | jq -r .head.sha)
+          HEAD_REPO=$(echo "$PR_JSON" | jq -r .head.repo.full_name)
+
+          if [[ "$HEAD_REPO" != "${{ github.repository }}" ]]; then
+            echo "::error::Refusing to build AMI for a fork PR ($HEAD_REPO). Rebase into the main repo first."
+            exit 1
+          fi
+
+          echo "pr_number=$PR_NUMBER"   >> "$GITHUB_OUTPUT"
+          echo "head_ref=$HEAD_REF"     >> "$GITHUB_OUTPUT"
+          echo "head_sha=$HEAD_SHA"     >> "$GITHUB_OUTPUT"
+
+      - name: Checkout PR branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.pr.outputs.head_ref }}
+          fetch-depth: 0
+          # Use a bot token so the push back to the PR branch triggers downstream CI.
+          # The default GITHUB_TOKEN cannot push back to a branch in a way that
+          # re-runs required checks.
+          token: ${{ secrets.BOT_GITHUB_TOKEN }}
+
+      - name: Extract target Playwright version from lockfile
+        id: lockfile
+        run: |
+          set -euo pipefail
+          VERSION=$(grep -E "^  playwright-core@" pnpm-lock.yaml \
+            | head -n 1 \
+            | sed -E 's/^  playwright-core@([0-9.]+):.*/\1/')
+          if [[ -z "$VERSION" ]]; then
+            echo "::error::Could not extract playwright-core version from pnpm-lock.yaml"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Target Playwright version: $VERSION"
+
+      - name: Configure AWS credentials (Packer builder role)
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: arn:aws:iam::176661590736:role/legacy-sports-dev-runner-ami-builder
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Resolve VPC + subnet for Packer build
+        id: network
+        run: |
+          set -euo pipefail
+          # Build instance runs in the legacy-sports VPC's first public subnet.
+          # This account has no default VPC, so we look up the project VPC by
+          # its Name tag. Packer needs a public subnet because the build
+          # instance pulls packages from public repositories (apt, npm, GitHub,
+          # Docker Hub, Android SDK).
+          VPC_ID=$(aws ec2 describe-vpcs \
+            --filters "Name=tag:Name,Values=legacy-sports-dev-vpc" \
+            --query "Vpcs[0].VpcId" --output text)
+          if [[ "$VPC_ID" == "None" || -z "$VPC_ID" ]]; then
+            echo "::error::Could not find legacy-sports-dev-vpc"
+            exit 1
+          fi
+          SUBNET_ID=$(aws ec2 describe-subnets \
+            --filters "Name=vpc-id,Values=$VPC_ID" "Name=map-public-ip-on-launch,Values=true" \
+            --query "Subnets[0].SubnetId" --output text)
+          if [[ "$SUBNET_ID" == "None" || -z "$SUBNET_ID" ]]; then
+            echo "::error::Could not resolve a public subnet in $VPC_ID for Packer build"
+            exit 1
+          fi
+          echo "vpc_id=$VPC_ID"       >> "$GITHUB_OUTPUT"
+          echo "subnet_id=$SUBNET_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Packer
+        uses: hashicorp/setup-packer@v3
+        with:
+          version: "latest"
+
+      - name: Build AMI via Packer
+        id: build
+        working-directory: terraform/packer
+        env:
+          VERSION: ${{ steps.lockfile.outputs.version }}
+          VPC_ID: ${{ steps.network.outputs.vpc_id }}
+          SUBNET_ID: ${{ steps.network.outputs.subnet_id }}
+        run: |
+          set -euo pipefail
+          packer init runner-ami.pkr.hcl
+          packer build \
+            -var "playwright_version=$VERSION" \
+            -var "vpc_id=$VPC_ID" \
+            -var "subnet_id=$SUBNET_ID" \
+            runner-ami.pkr.hcl 2>&1 | tee packer-build.log
+
+          # Extract the new AMI ID from the build log. Packer's amazon-ebs builder
+          # prints a line of the form "us-east-1: ami-0123456789abcdef0" at the end.
+          AMI_ID=$(grep -oE "us-east-1: ami-[0-9a-f]+" packer-build.log | tail -n 1 | awk '{print $2}')
+          if [[ -z "$AMI_ID" ]]; then
+            echo "::error::Could not extract AMI ID from Packer build log"
+            exit 1
+          fi
+          echo "ami_id=$AMI_ID" >> "$GITHUB_OUTPUT"
+          echo "✅ Built AMI $AMI_ID for Playwright $VERSION"
+
+      - name: Update Packer default + tfvars on PR branch
+        env:
+          VERSION: ${{ steps.lockfile.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          # Packer HCL default: update the playwright_version variable default.
+          # We only want to touch the default line that immediately follows the
+          # `variable "playwright_version"` block — the file contains other
+          # `default = "..."` lines that must not be modified.
+          python3 - <<'PYEOF'
+          import re
+          import os
+          from pathlib import Path
+
+          version = os.environ["VERSION"]
+          path = Path("terraform/packer/runner-ami.pkr.hcl")
+          text = path.read_text()
+
+          new_text = re.sub(
+              r'(variable "playwright_version"\s*\{[^}]*?default\s*=\s*)"[^"]+"',
+              lambda m: m.group(1) + f'"{version}"',
+              text,
+              count=1,
+              flags=re.DOTALL,
+          )
+
+          if new_text == text:
+              raise SystemExit("Failed to update playwright_version default in Packer HCL")
+          path.write_text(new_text)
+          print(f"Updated Packer default to {version}")
+          PYEOF
+
+          # Terraform tfvars: update runner_ami_playwright_version.
+          python3 - <<'PYEOF'
+          import re
+          import os
+          from pathlib import Path
+
+          version = os.environ["VERSION"]
+          path = Path("terraform/runner-ami.auto.tfvars")
+          text = path.read_text()
+
+          new_text = re.sub(
+              r'(runner_ami_playwright_version\s*=\s*)"[^"]+"',
+              lambda m: m.group(1) + f'"{version}"',
+              text,
+              count=1,
+          )
+
+          if new_text == text:
+              raise SystemExit("Failed to update runner_ami_playwright_version in tfvars")
+          path.write_text(new_text)
+          print(f"Updated tfvars to {version}")
+          PYEOF
+
+      - name: Commit and push updates
+        env:
+          VERSION: ${{ steps.lockfile.outputs.version }}
+          AMI_ID: ${{ steps.build.outputs.ami_id }}
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
+        run: |
+          set -euo pipefail
+          git config user.name  "legacy-sports-code-bot"
+          git config user.email "legacy-sports-code-bot@users.noreply.github.com"
+
+          if git diff --quiet terraform/packer/runner-ami.pkr.hcl terraform/runner-ami.auto.tfvars; then
+            echo "ℹ️ No changes to commit — Packer HCL and tfvars already match lockfile version $VERSION."
+            exit 0
+          fi
+
+          git add terraform/packer/runner-ami.pkr.hcl terraform/runner-ami.auto.tfvars
+          git commit -m "chore(infra): bump runner AMI to Playwright $VERSION ($AMI_ID)
+
+          Built by rebuild-runner-ami.yml on PR #$PR_NUMBER.
+          New AMI: $AMI_ID
+
+          Co-Authored-By: legacy-sports-code-bot <legacy-sports-code-bot@users.noreply.github.com>"
+          git push
+
+      - name: Comment on PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.lockfile.outputs.version }}
+          AMI_ID: ${{ steps.build.outputs.ami_id }}
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
+        run: |
+          gh pr comment "$PR_NUMBER" --body "🧱 **Runner AMI rebuilt**
+
+          Built a new AMI for Playwright \`$VERSION\`: \`$AMI_ID\`
+
+          Packer HCL \`playwright_version\` default and \`runner-ami.auto.tfvars\` have
+          been updated on this branch. The runner-ami-drift-check workflow will re-run
+          and should now pass. On merge, \`runner-terraform-apply.yml\` will roll the
+          launch template to the new AMI."

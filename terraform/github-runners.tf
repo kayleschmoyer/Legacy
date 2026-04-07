@@ -147,9 +147,17 @@ module "github_runners" {
   # ── AMI (pre-baked via Packer — see terraform/packer/runner-ami.pkr.hcl) ──
   # Ubuntu 22.04 with Node.js 22, pnpm, Playwright deps, runner deps pre-installed.
   # Boots in ~30s instead of 5-7 min from stock AMI.
+  #
+  # LS-2429: AMI selection is version-scoped by Playwright version via the
+  # name filter below. Packer stamps the Playwright version into the AMI name
+  # (legacy-sports-runner-pw<version>-<timestamp>) so that terraform selects
+  # exactly the AMI built for var.runner_ami_playwright_version — no explicit
+  # AMI ID, no SSM parameter. Multiple versions of the AMI coexist in the
+  # account until pruned, enabling trivial rollback by reverting the tfvars
+  # change that bumped this variable.
   ami = {
     filter = {
-      name  = ["legacy-sports-runner-*"]
+      name  = ["legacy-sports-runner-pw${var.runner_ami_playwright_version}-*"]
       state = ["available"]
     }
     owners = ["self"]

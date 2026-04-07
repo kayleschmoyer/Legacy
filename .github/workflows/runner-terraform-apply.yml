@@ -1,0 +1,194 @@
+# runner-terraform-apply.yml — Apply runner infrastructure changes post-merge.
+# LS-2429.
+#
+# Runs on push-to-main when any runner-relevant file changes. Executes the
+# equivalent of `make runner-apply NO_CONFIRM=1`: a targeted terraform apply
+# against `module.github_runners` with `-var="enable_github_runners=true"`.
+# This is deliberately separate from lambda-terraform-apply.yml because the
+# runner module is excluded from the normal apply loop (the flag is false in
+# infra.auto.tfvars by design — see AGENTS.md and the Makefile runner-apply
+# target).
+#
+# Triggering:
+#   - push to main with path changes to runner-relevant files.
+#   - workflow_dispatch for manual re-rolls (e.g. after a hand-built AMI).
+#
+# After this workflow applies, the launch template is updated to point at the
+# AMI name filter scoped to `var.runner_ami_playwright_version`. Running
+# runners drain naturally; new scale-ups pick up the new AMI.
+
+name: Apply Runner Infrastructure
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "terraform/packer/runner-ami.pkr.hcl"
+      - "terraform/runner-ami.auto.tfvars"
+      - "terraform/github-runners.tf"
+      - "terraform/runner-ami-builder-iam.tf"
+      - "terraform/runner-userdata.sh"
+      - ".github/workflows/runner-terraform-apply.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: runner-terraform-apply
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  apply:
+    name: Apply runner infrastructure
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    steps:
+      - name: Validate runner secrets
+        run: |
+          set -euo pipefail
+          MISSING=()
+          if [ -z "${{ secrets.RUNNER_GITHUB_APP_ID }}" ]; then
+            MISSING+=("RUNNER_GITHUB_APP_ID")
+          fi
+          if [ -z "${{ secrets.RUNNER_GITHUB_APP_KEY_BASE64 }}" ]; then
+            MISSING+=("RUNNER_GITHUB_APP_KEY_BASE64")
+          fi
+          if [ -z "${{ secrets.RUNNER_GITHUB_APP_WEBHOOK_SECRET }}" ]; then
+            MISSING+=("RUNNER_GITHUB_APP_WEBHOOK_SECRET")
+          fi
+          if [ ${#MISSING[@]} -gt 0 ]; then
+            echo "::error::Missing required runner secrets: ${MISSING[*]}"
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: arn:aws:iam::176661590736:role/legacy-sports-dev-github-actions
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Verify target AMI exists
+        env:
+          RUNNER_AMI_PLAYWRIGHT_VERSION: |
+            ${{ github.event_name == 'push' && 'from-tfvars' || 'from-tfvars' }}
+        run: |
+          set -euo pipefail
+          # Read the target version from the committed tfvars file.
+          VERSION=$(awk '
+            /^runner_ami_playwright_version[[:space:]]*=/ {
+              match($0, /"[0-9.]+"/)
+              print substr($0, RSTART + 1, RLENGTH - 2)
+              exit
+            }
+          ' terraform/runner-ami.auto.tfvars)
+          if [[ -z "$VERSION" ]]; then
+            echo "::error::Could not read runner_ami_playwright_version from tfvars"
+            exit 1
+          fi
+
+          echo "Target Playwright version: $VERSION"
+          echo "Expected AMI name prefix: legacy-sports-runner-pw$VERSION-"
+
+          AMI_COUNT=$(aws ec2 describe-images \
+            --owners self \
+            --filters "Name=name,Values=legacy-sports-runner-pw$VERSION-*" "Name=state,Values=available" \
+            --query "length(Images)" \
+            --output text)
+
+          if [[ "$AMI_COUNT" == "0" ]]; then
+            echo "::error::No available AMI found matching 'legacy-sports-runner-pw$VERSION-*'."
+            echo "::error::A matching AMI must be built via 'Rebuild Runner AMI' workflow or 'make ami-build' before this apply can proceed."
+            exit 1
+          fi
+
+          echo "✅ Found $AMI_COUNT AMI(s) matching the target version."
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "~> 1.14"
+
+      - name: Terraform init
+        working-directory: terraform
+        run: terraform init -input=false
+
+      - name: Terraform plan (runner module only)
+        id: plan
+        working-directory: terraform
+        env:
+          TF_VAR_rollbar_access_token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
+          TF_VAR_discord_user_signup_webhook_url: ${{ secrets.DISCORD_USER_SIGNUP_WEBHOOK_URL }}
+          TF_VAR_discord_stripe_webhook_url: ${{ secrets.DISCORD_STRIPE_WEBHOOK_URL }}
+          TF_VAR_ga_measurement_id: ${{ secrets.GA_MEASUREMENT_ID }}
+          TF_VAR_ga_api_secret: ${{ secrets.GA_API_SECRET }}
+          TF_VAR_github_app_id: ${{ secrets.RUNNER_GITHUB_APP_ID }}
+          TF_VAR_github_app_key_base64: ${{ secrets.RUNNER_GITHUB_APP_KEY_BASE64 }}
+          TF_VAR_github_app_webhook_secret: ${{ secrets.RUNNER_GITHUB_APP_WEBHOOK_SECRET }}
+          TF_VAR_mlb_data_api_key: ${{ secrets.MLB_DATA_API_KEY }}
+        run: |
+          set -euo pipefail
+          # Override enable_github_runners to true for this targeted apply. The
+          # tfvars file intentionally leaves it false so the normal apply loop
+          # (lambda-terraform-apply.yml) does NOT touch runner infra.
+          terraform plan \
+            -input=false \
+            -var="enable_github_runners=true" \
+            -target=module.github_runners \
+            -target=aws_iam_role.runner_ami_builder \
+            -target=aws_iam_role_policy.runner_ami_builder \
+            -out=runner.tfplan \
+            -lock-timeout=5m
+
+      - name: Terraform apply
+        working-directory: terraform
+        env:
+          TF_VAR_rollbar_access_token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
+          TF_VAR_discord_user_signup_webhook_url: ${{ secrets.DISCORD_USER_SIGNUP_WEBHOOK_URL }}
+          TF_VAR_discord_stripe_webhook_url: ${{ secrets.DISCORD_STRIPE_WEBHOOK_URL }}
+          TF_VAR_ga_measurement_id: ${{ secrets.GA_MEASUREMENT_ID }}
+          TF_VAR_ga_api_secret: ${{ secrets.GA_API_SECRET }}
+          TF_VAR_github_app_id: ${{ secrets.RUNNER_GITHUB_APP_ID }}
+          TF_VAR_github_app_key_base64: ${{ secrets.RUNNER_GITHUB_APP_KEY_BASE64 }}
+          TF_VAR_github_app_webhook_secret: ${{ secrets.RUNNER_GITHUB_APP_WEBHOOK_SECRET }}
+          TF_VAR_mlb_data_api_key: ${{ secrets.MLB_DATA_API_KEY }}
+        run: |
+          set -euo pipefail
+          terraform apply -input=false -auto-approve -lock-timeout=5m runner.tfplan
+          echo "## ✅ Runner infrastructure applied" >> "$GITHUB_STEP_SUMMARY"
+          echo "Launch template now selects the AMI scoped to the target Playwright version." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Inspect state lock on failure
+        if: always() && failure()
+        run: |
+          set -euo pipefail
+          # Per Copilot review on PR #2281: do NOT unconditionally delete the
+          # DynamoDB state lock. A concurrent run may legitimately hold it, and
+          # force-deleting breaks mutual exclusion. Instead, fetch and log the
+          # lock contents so an operator can decide whether it's stale and
+          # manually clear it if needed.
+          echo "🔎 Inspecting terraform state lock after failure..."
+          LOCK_KEY='{"LockID":{"S":"legacy-sports-terraform-state/legacy-sports/terraform.tfstate"}}'
+          LOCK_ITEM=$(aws dynamodb get-item \
+            --table-name terraform-state-locks \
+            --key "$LOCK_KEY" \
+            --region us-east-1 \
+            --output json 2>&1) || LOCK_ITEM='{}'
+
+          echo "$LOCK_ITEM"
+
+          if [ "$LOCK_ITEM" = '{}' ] || ! echo "$LOCK_ITEM" | grep -q '"Item"'; then
+            echo "ℹ️ No terraform lock item found — nothing to clear."
+            echo "ℹ️ No terraform lock item found." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "⚠️ Terraform lock item exists. Review the lock holder/Info above before any manual cleanup."
+            echo "⚠️ Terraform lock item exists. Review the job logs for the DynamoDB lock contents before manually clearing a stale lock." >> "$GITHUB_STEP_SUMMARY"
+          fi

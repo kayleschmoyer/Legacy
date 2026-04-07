@@ -1221,6 +1221,7 @@ export type Mutation = {
   addDefaultPositionsToLeague?: Maybe<Array<LeaguePosition>>;
   /** Add a player to the end of the current user's draft queue. No-ops if already queued. */
   addToDraftQueue?: Maybe<Array<DraftQueueEntry>>;
+  adminRegenerateLeagueSchedule?: Maybe<AdvanceLeagueWeekResponse>;
   advancePlayoffBracket?: Maybe<PlayoffBracket>;
   /** Automatically advance matchups for leagues where all games are complete. When leagueId is provided, processes only that league (commissioner access). Without leagueId, processes all leagues (admin / system only). Triggered Sundays at 3am EST by EventBridge. */
   autoAdvanceMatchups?: Maybe<AutoAdvanceMatchupsResult>;
@@ -1416,6 +1417,10 @@ export type MutationAddDefaultPositionsToLeagueArgs = {
 export type MutationAddToDraftQueueArgs = {
   draftId: Scalars['Int']['input'];
   playerId: Scalars['Int']['input'];
+};
+
+export type MutationAdminRegenerateLeagueScheduleArgs = {
+  leagueId: Scalars['Int']['input'];
 };
 
 export type MutationAdvancePlayoffBracketArgs = {

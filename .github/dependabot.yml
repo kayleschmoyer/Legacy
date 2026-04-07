@@ -162,6 +162,20 @@ updates:
           - "minor"
           - "patch"
 
+      # Playwright — must bump @playwright/test and playwright in lockstep so the
+      # CI runner-ami-drift-check workflow can find a single resolved
+      # playwright-core version matching the Packer AMI. Versions are exact-pinned
+      # in package.json (no caret) to prevent silent drift during ad-hoc
+      # `pnpm install --no-frozen-lockfile` runs — dependabot still drives
+      # intentional bumps by rewriting the pin. See LS-2429.
+      playwright-ecosystem:
+        patterns:
+          - "@playwright/test"
+          - "playwright"
+        update-types:
+          - "minor"
+          - "patch"
+
       # Development tools and types (safer to update)
       dev-tools:
         patterns:
