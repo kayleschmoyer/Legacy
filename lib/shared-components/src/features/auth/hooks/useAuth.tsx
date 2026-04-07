@@ -504,6 +504,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
         );
         authService.storeUserProfile(userInfo);
         dispatchAuth({ type: 'AUTH_SUCCESS', payload: userInfo });
+        // Prefer the in-memory JWT from the login response over localStorage —
+        // on web the JWT is no longer persisted to localStorage (it lives in
+        // an HttpOnly cookie), so getStoredToken() would return null and leave
+        // authState.token null, breaking consumers like WebSocket auth.
         const jwt = authService.getCurrentToken();
         if (jwt) dispatchAuth({ type: 'TOKEN_UPDATED', payload: jwt });
         const expiry = authService.getStoredTokenExpiry();
@@ -526,6 +530,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
         const userInfo = await authService.authenticateWithOAuth(oauthResponse);
         authService.storeUserProfile(userInfo);
         dispatchAuth({ type: 'AUTH_SUCCESS', payload: userInfo });
+        // See login() above — prefer in-memory JWT since getStoredToken()
+        // returns null on web (JWT lives in an HttpOnly cookie).
         const jwt = authService.getCurrentToken();
         if (jwt) dispatchAuth({ type: 'TOKEN_UPDATED', payload: jwt });
         const expiry = authService.getStoredTokenExpiry();

@@ -9,6 +9,7 @@ import { useAuth } from '@legacy-sports/shared-components/auth';
 import { ScrollView, Spinner, styled, Text } from 'tamagui';
 import { BrandIcon, type BrandIconName } from '../../components/icons';
 import { PageMeta } from '../../components/PageMeta';
+import { storeCsrfToken } from '../../lib/csrf';
 import {
   BG_DARK,
   BRAND_GOLD,
@@ -364,8 +365,8 @@ export function PublicLandingPage(): React.JSX.Element {
           throw new Error('Discord sign-in did not return a token');
 
         // Persist CSRF token so subsequent API requests include it.
-        if (result.csrfToken && typeof localStorage !== 'undefined') {
-          localStorage.setItem('ls_csrf_token', result.csrfToken);
+        if (result.csrfToken) {
+          storeCsrfToken(result.csrfToken);
         }
 
         // Decode user and expiry from the JWT so AuthProvider can restore
@@ -410,7 +411,7 @@ export function PublicLandingPage(): React.JSX.Element {
 
         // Navigate to home; AuthProvider will restore the session from cache
         // and the HttpOnly JWT cookie will authenticate API requests.
-        window.location.replace('/');
+        window.location.replace(import.meta.env.BASE_URL || '/');
       } catch (err) {
         LOGGER.error('Discord callback exchange failed:', String(err));
         setErrorMessage(

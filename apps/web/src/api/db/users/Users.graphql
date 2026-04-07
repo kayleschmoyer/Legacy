@@ -5,6 +5,8 @@ fragment User on User {
   accessLevel
   avatarUrl
   subscriptionTier
+  discordId
+  discordUsername
 }
 
 fragment AdminUser on User {

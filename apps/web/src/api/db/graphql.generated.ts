@@ -8464,6 +8464,8 @@ export type UserFragment = {
   accessLevel?: string | null;
   avatarUrl?: string | null;
   subscriptionTier?: string | null;
+  discordId?: string | null;
+  discordUsername?: string | null;
 };
 
 export type AdminUserFragment = {
@@ -8488,6 +8490,8 @@ export type GetUserByIdQuery = {
     accessLevel?: string | null;
     avatarUrl?: string | null;
     subscriptionTier?: string | null;
+    discordId?: string | null;
+    discordUsername?: string | null;
   } | null;
 };
 
@@ -8507,6 +8511,8 @@ export type GetAllUsersQuery = {
     accessLevel?: string | null;
     avatarUrl?: string | null;
     subscriptionTier?: string | null;
+    discordId?: string | null;
+    discordUsername?: string | null;
   }> | null;
 };
 
@@ -8534,6 +8540,8 @@ export type UpdateUserRoleMutation = {
     accessLevel?: string | null;
     avatarUrl?: string | null;
     subscriptionTier?: string | null;
+    discordId?: string | null;
+    discordUsername?: string | null;
   } | null;
 };
 
@@ -8567,6 +8575,8 @@ export type UpdateUsernameMutation = {
     accessLevel?: string | null;
     avatarUrl?: string | null;
     subscriptionTier?: string | null;
+    discordId?: string | null;
+    discordUsername?: string | null;
   } | null;
 };
 
@@ -9131,6 +9141,8 @@ export const UserFragmentDoc = gql`
     accessLevel
     avatarUrl
     subscriptionTier
+    discordId
+    discordUsername
   }
 `;
 export const AdminUserFragmentDoc = gql`

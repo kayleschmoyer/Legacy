@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   H1,
   Paragraph,
@@ -6,8 +6,9 @@ import {
   XStack,
   YStack,
 } from '@legacy-sports/shared-components/ui';
-import { useAuth } from '@legacy-sports/shared-components/auth';
-import { Input, ScrollView, styled } from 'tamagui';
+import { AuthService, useAuth } from '@legacy-sports/shared-components/auth';
+import { BrandIcon } from '@legacy-sports/shared-components/icons';
+import { Input, ScrollView, Spinner, styled } from 'tamagui';
 import { PageMeta } from '../../components/PageMeta';
 import {
   useGetUserByIdQuery,
@@ -22,6 +23,7 @@ import {
   BRAND_NAVY,
   BRAND_NAVY_LIGHT,
   BRAND_SEAM_RED,
+  DISCORD_BLURPLE,
   withAlpha,
 } from '../../constants/colors';
 
@@ -199,9 +201,15 @@ function getAccessBadgeColor(level: string): string {
 
 /* ─── Main Component ─── */
 
+const DISCORD_OAUTH_STATE_STORAGE_KEY = 'discord_oauth_link_state';
+
 const ProfileSettingsPage: React.FC = () => {
   const auth = useAuth();
   const user = auth?.user;
+  const authService = useMemo(
+    () => new AuthService(auth.config),
+    [auth.config],
+  );
   const [imageError, setImageError] = useState(false);
   const userName = user?.username ?? '';
   const userEmail = user?.email ?? '';
@@ -219,8 +227,11 @@ const ProfileSettingsPage: React.FC = () => {
 
   const currentAvatarUrl = userData?.user?.avatarUrl ?? null;
   const dbUsername = userData?.user?.username ?? userName;
+  const discordUsername = userData?.user?.discordUsername ?? null;
 
   const [isEditingUsername, setIsEditingUsername] = useState(false);
+  const [isDiscordLoading, setIsDiscordLoading] = useState(false);
+  const [discordError, setDiscordError] = useState<string | null>(null);
   const [editedUsername, setEditedUsername] = useState(dbUsername);
   const [usernameError, setUsernameError] = useState<string | null>(null);
 
@@ -283,6 +294,62 @@ const ProfileSettingsPage: React.FC = () => {
       },
     });
   }, [editedUsername, dbUsername, updateUsername, refetchUser]);
+
+  const handleConnectDiscord = useCallback(() => {
+    const clientId = auth.config.discordClientId;
+    if (!clientId) return;
+
+    // Generate a cryptographically random state nonce to prevent link-CSRF attacks
+    const stateBytes = new Uint8Array(16);
+    window.crypto.getRandomValues(stateBytes);
+    const state = Array.from(stateBytes, (b) =>
+      b.toString(16).padStart(2, '0'),
+    ).join('');
+    try {
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.setItem(DISCORD_OAUTH_STATE_STORAGE_KEY, state);
+      }
+    } catch {
+      // sessionStorage unavailable — abort to avoid unvalidatable redirect
+      setDiscordError('Unable to start Discord connection. Please try again.');
+      return;
+    }
+
+    const appBaseUrl = new URL(
+      import.meta.env.BASE_URL,
+      window.location.origin,
+    );
+    const redirectUri = new URL('auth/discord/callback', appBaseUrl).toString();
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      response_type: 'code',
+      scope: 'identify email',
+      state,
+    });
+    window.location.href = `https://discord.com/api/oauth2/authorize?${params.toString()}`;
+  }, [auth.config.discordClientId]);
+
+  const handleDisconnectDiscord = useCallback(async () => {
+    if (
+      !window.confirm(
+        'Are you sure you want to disconnect your Discord account?',
+      )
+    )
+      return;
+    setIsDiscordLoading(true);
+    setDiscordError(null);
+    try {
+      await authService.unlinkDiscordAccount();
+      await refetchUser();
+    } catch (err) {
+      setDiscordError(
+        err instanceof Error ? err.message : 'Failed to disconnect Discord',
+      );
+    } finally {
+      setIsDiscordLoading(false);
+    }
+  }, [authService, refetchUser]);
 
   if (!user) {
     return null;
@@ -500,7 +567,9 @@ const ProfileSettingsPage: React.FC = () => {
                 </Paragraph>
                 <Paragraph size="$3" color="$colorPress" flex={1}>
                   You can change your username above. Email and profile photo
-                  are managed through your Google account.
+                  are managed through your Google account. Link Discord in the
+                  Connected Accounts section below for an additional sign-in
+                  option.
                 </Paragraph>
               </InfoBanner>
             </SectionBody>
@@ -596,6 +665,90 @@ const ProfileSettingsPage: React.FC = () => {
               </YStack>
             </SectionBody>
           </SectionCard>
+
+          {/* ── Connected Accounts ── */}
+          {auth.config.discordClientId ? (
+            <SectionCard
+              style={{
+                background: `linear-gradient(135deg, ${withAlpha(BG_DARK, 0.85)} 0%, ${withAlpha(BRAND_NAVY, 0.25)} 100%)`,
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+              }}
+            >
+              <SectionHeader>
+                <SectionIconBox>
+                  <BrandIcon name="discord" size={20} />
+                </SectionIconBox>
+                <YStack flex={1}>
+                  <Paragraph size="$4" color="$color" fontWeight="600">
+                    Connected Accounts
+                  </Paragraph>
+                  <Paragraph size="$2" color="$colorPress">
+                    Link third-party accounts for additional sign-in options
+                  </Paragraph>
+                </YStack>
+              </SectionHeader>
+
+              <SectionBody>
+                <XStack
+                  alignItems="center"
+                  justifyContent="space-between"
+                  gap="$4"
+                  $sm={{ flexDirection: 'column', alignItems: 'flex-start' }}
+                >
+                  <XStack alignItems="center" gap="$3" flex={1}>
+                    <BrandIcon name="discord" size={24} />
+                    <YStack gap="$0.5">
+                      <Paragraph size="$4" color="$color" fontWeight="500">
+                        Discord
+                      </Paragraph>
+                      <Paragraph size="$3" color="$colorPress">
+                        {discordUsername
+                          ? `Connected as ${discordUsername}`
+                          : 'Not connected'}
+                      </Paragraph>
+                    </YStack>
+                  </XStack>
+
+                  {discordUsername ? (
+                    <EditButton
+                      onPress={() => void handleDisconnectDiscord()}
+                      disabled={isDiscordLoading}
+                      opacity={isDiscordLoading ? 0.6 : 1}
+                      style={{
+                        backgroundColor: withAlpha(BRAND_SEAM_RED, 0.8),
+                      }}
+                    >
+                      {isDiscordLoading ? (
+                        <Spinner size="small" color="white" />
+                      ) : (
+                        <Paragraph size="$2" fontWeight="600" color="white">
+                          Disconnect
+                        </Paragraph>
+                      )}
+                    </EditButton>
+                  ) : (
+                    <EditButton
+                      onPress={handleConnectDiscord}
+                      disabled={isDiscordLoading}
+                      opacity={isDiscordLoading ? 0.6 : 1}
+                      style={{ backgroundColor: DISCORD_BLURPLE }}
+                    >
+                      <Paragraph size="$2" fontWeight="600" color="white">
+                        Connect Discord
+                      </Paragraph>
+                    </EditButton>
+                  )}
+                </XStack>
+
+                {discordError ? (
+                  <Paragraph size="$2" style={{ color: BRAND_SEAM_RED }}>
+                    {discordError}
+                  </Paragraph>
+                ) : null}
+              </SectionBody>
+            </SectionCard>
+          ) : null}
 
           {/* ── Danger Zone ── */}
           <SectionCard

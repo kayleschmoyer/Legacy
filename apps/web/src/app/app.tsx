@@ -107,6 +107,11 @@ const AdminRevenuePage = React.lazy(
 const ProfileSettingsPage = React.lazy(
   () => import('../pages/profile/ProfileSettingsPage'),
 );
+const DiscordCallbackPage = React.lazy(() =>
+  import('../pages/auth/DiscordCallbackPage').then((m) => ({
+    default: m.DiscordCallbackPage,
+  })),
+);
 const SubscriptionPage = React.lazy(
   () => import('../pages/profile/SubscriptionPage'),
 );
@@ -627,6 +632,10 @@ function App() {
             <Route path="/admin" element={<AdminPage />} />
             <Route path="/admin/revenue" element={<AdminRevenuePage />} />
             <Route path="/profile/settings" element={<ProfileSettingsPage />} />
+            <Route
+              path="/auth/discord/callback"
+              element={<DiscordCallbackPage />}
+            />
             <Route
               path="/profile/subscription"
               element={<SubscriptionPage />}

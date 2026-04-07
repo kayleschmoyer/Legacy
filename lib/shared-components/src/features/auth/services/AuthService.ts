@@ -52,6 +52,21 @@ interface UnauthorizedUserError {
 }
 
 /**
+ * Error thrown by OAuth calls that preserves the HTTP status code so callers
+ * can distinguish 4xx (expected auth failures) from 5xx (server errors) and
+ * route logging/user-facing messages accordingly.
+ */
+export class OAuthServiceError extends Error {
+  readonly statusCode: number;
+
+  constructor(message: string, statusCode: number) {
+    super(message);
+    this.name = 'OAuthServiceError';
+    this.statusCode = statusCode;
+  }
+}
+
+/**
  * Modern authentication service with secure user pre-authorization.
  *
  * This service now uses a single secure OAuth lambda that:
@@ -65,8 +80,15 @@ interface UnauthorizedUserError {
 export class AuthService {
   private config: OAuthConfig;
   private oauthProxyUrl: string;
-  /** In-memory JWT — not persisted to localStorage, reducing persistence and exposure surface. */
-  private _currentJwt: string | null = null;
+
+  /**
+   * In-memory copy of the most recently issued JWT. Used by consumers that
+   * need access to the token value (e.g. WebSocket auth query param) since
+   * the JWT is no longer persisted to localStorage (it lives in an HttpOnly
+   * cookie). This is populated by `storeTokens()` and cleared by
+   * `clearTokens()`.
+   */
+  private currentJwt: string | null = null;
 
   constructor(config: OAuthConfig) {
     this.config = config;
@@ -134,27 +156,26 @@ export class AuthService {
 
       return user;
     } catch (error) {
-      // Enhanced error handling for different failure scenarios
-      const authError = this.handleAuthenticationError(error);
-      // Only report unexpected server errors (5xx) at error level — user-facing
-      // auth failures (wrong credentials, unauthorized account, invalid token)
-      // are expected conditions, not bugs. Reporting them as errors floods Rollbar.
-      const statusCode =
-        error instanceof Error
-          ? ((error as Error & { statusCode?: number }).statusCode ?? null)
-          : null;
-      const isServerError = statusCode !== null ? statusCode >= 500 : false;
-      if (isServerError) {
-        LOGGER.error(
-          'AuthService: Secure OAuth authentication failed:',
-          String(error),
-        );
-      } else {
+      const errorWithStatus = error as {
+        status?: number;
+        statusCode?: number;
+      };
+      const status = errorWithStatus.status ?? errorWithStatus.statusCode;
+
+      if (typeof status === 'number' && status >= 400 && status < 500) {
         LOGGER.warn(
           'AuthService: Secure OAuth authentication failed:',
           String(error),
         );
+      } else {
+        LOGGER.error(
+          'AuthService: Secure OAuth authentication failed:',
+          String(error),
+        );
       }
+
+      // Enhanced error handling for different failure scenarios
+      const authError = this.handleAuthenticationError(error);
       throw authError;
     }
   }
@@ -223,6 +244,78 @@ export class AuthService {
   }
 
   /**
+   * Link a Discord account to the currently authenticated user.
+   * POSTs the OAuth authorization code to `/oauth/discord/link` with the
+   * CSRF double-submit token required for cookie-authenticated requests.
+   */
+  async linkDiscordAccount(code: string): Promise<void> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    const csrf = this.getCsrfToken();
+    if (csrf) headers['X-CSRF-Token'] = csrf;
+
+    const response = await fetch(`${this.oauthProxyUrl}/discord/link`, {
+      method: 'POST',
+      headers,
+      credentials: 'include',
+      body: JSON.stringify({ code }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      let message = `Discord link failed: ${response.status}`;
+      try {
+        const errorData = JSON.parse(errorText) as {
+          message?: string;
+          error?: string;
+        };
+        if (errorData.message || errorData.error) {
+          message = errorData.message ?? errorData.error ?? message;
+        }
+      } catch {
+        // keep default message
+      }
+      throw new Error(message);
+    }
+  }
+
+  /**
+   * Unlink the Discord account from the currently authenticated user.
+   * Sends the CSRF double-submit token required for cookie-authenticated requests.
+   */
+  async unlinkDiscordAccount(): Promise<void> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    const csrf = this.getCsrfToken();
+    if (csrf) headers['X-CSRF-Token'] = csrf;
+
+    const response = await fetch(`${this.oauthProxyUrl}/discord/unlink`, {
+      method: 'POST',
+      headers,
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      let message = `Discord unlink failed: ${response.status}`;
+      try {
+        const errorData = JSON.parse(errorText) as {
+          message?: string;
+          error?: string;
+        };
+        if (errorData.message || errorData.error) {
+          message = errorData.message ?? errorData.error ?? message;
+        }
+      } catch {
+        // keep default message
+      }
+      throw new Error(message);
+    }
+  }
+
+  /**
    * Authenticate user with email/password through local authentication
    */
   async authenticateWithEmail(email: string, password: string): Promise<User> {
@@ -262,8 +355,7 @@ export class AuthService {
 
       return user;
     } catch (error) {
-      // Wrong credentials and user-not-found are expected user conditions, not bugs.
-      LOGGER.warn('AuthService: Email authentication failed:', String(error));
+      LOGGER.error('AuthService: Email authentication failed:', String(error));
       throw new Error(
         error instanceof Error ? error.message : 'Email login failed',
       );
@@ -302,27 +394,29 @@ export class AuthService {
     if (response.status === 403) {
       // User not pre-authorized
       const errorData = (await response.json()) as UnauthorizedUserError;
-      throw new Error(
+      throw new OAuthServiceError(
         errorData.message || 'User not authorized for this application',
+        response.status,
       );
     }
 
     if (!response.ok) {
       const errorText = await response.text();
+      // Always prefix with the status so downstream matchers (e.g. "failed: 500")
+      // and human logs retain the HTTP status signal. The statusCode is also
+      // attached to the thrown error so callers can branch programmatically.
       let message = `Secure OAuth failed: ${response.status}`;
       try {
         const errorData = JSON.parse(errorText) as { message?: string };
         if (errorData.message) {
-          // Prefix with HTTP status so callers can detect 5xx errors even
-          // when the server provides a custom message.
           message = `Secure OAuth failed: ${response.status} - ${errorData.message}`;
         }
       } catch {
-        message = `Secure OAuth failed: ${response.status} - ${errorText}`;
+        if (errorText) {
+          message = `Secure OAuth failed: ${response.status} - ${errorText}`;
+        }
       }
-      const err = new Error(message);
-      (err as Error & { statusCode: number }).statusCode = response.status;
-      throw err;
+      throw new OAuthServiceError(message, response.status);
     }
 
     const responseText = await response.text();
@@ -424,9 +518,10 @@ export class AuthService {
    * Only the refresh token (if present) is kept in localStorage for mobile.
    */
   private storeTokens(tokens: AuthTokens): void {
-    // Keep in memory so callers (e.g. WebSocket) can use it without reading
-    // the HttpOnly cookie (which JS cannot access).
-    this._currentJwt = tokens.jwt;
+    // Track the JWT in memory so consumers that need the raw token (e.g.
+    // WebSocket auth) can access it via getCurrentToken(). The JWT itself
+    // is NOT persisted to localStorage — it lives in an HttpOnly cookie.
+    this.currentJwt = tokens.jwt;
     try {
       if (typeof localStorage !== 'undefined') {
         // Do NOT store JWT in localStorage — it's now in an HttpOnly cookie.
@@ -450,21 +545,8 @@ export class AuthService {
         }
       }
     } catch (error) {
-      // localStorage unavailable (private browsing, quota) — expected in some environments
-      LOGGER.warn('Failed to store auth tokens:', String(error));
+      LOGGER.error('Failed to store auth tokens:', String(error));
     }
-  }
-
-  /**
-   * Return the JWT that was last received from the server (in-memory only).
-   *
-   * The JWT is NOT stored in localStorage — it lives only in the JS heap for
-   * the lifetime of the page. Returns null before the first login or refresh.
-   * Callers such as the WebSocket client use this to pass the token as a query
-   * param when the HttpOnly cookie is not sent to a different subdomain.
-   */
-  getCurrentToken(): string | null {
-    return this._currentJwt;
   }
 
   /**
@@ -481,16 +563,29 @@ export class AuthService {
       }
       return null;
     } catch (error) {
-      LOGGER.warn('Failed to retrieve stored token:', String(error));
+      LOGGER.error('Failed to retrieve stored token:', String(error));
       return null;
     }
+  }
+
+  /**
+   * Get the current in-memory JWT. This is set by the most recent successful
+   * `storeTokens()` call (e.g. after login, OAuth, or refresh) and cleared on
+   * logout. Prefer this over `getStoredToken()` for consumers that need the
+   * raw JWT at runtime (e.g. WebSocket auth query param), since the JWT is
+   * no longer persisted to localStorage on web — it lives in an HttpOnly
+   * cookie that JS cannot read. Falls back to the localStorage value used
+   * during admin impersonation when no in-memory token is set.
+   */
+  getCurrentToken(): string | null {
+    return this.currentJwt ?? this.getStoredToken();
   }
 
   /**
    * Clear stored tokens and cached profile (logout)
    */
   clearTokens(): void {
-    this._currentJwt = null;
+    this.currentJwt = null;
     try {
       if (typeof localStorage !== 'undefined') {
         localStorage.removeItem('auth_jwt');
@@ -507,7 +602,7 @@ export class AuthService {
       this.csrfTokenFallback = '';
       this.csrfStaleStorageValue = null;
     } catch (error) {
-      LOGGER.warn('Failed to clear auth tokens:', String(error));
+      LOGGER.error('Failed to clear auth tokens:', String(error));
     }
   }
 
@@ -522,7 +617,7 @@ export class AuthService {
       // Local JWT validation - check if token is properly formatted and not expired
       return this.isTokenValidLocally(jwt);
     } catch (error) {
-      LOGGER.warn('Token verification failed:', String(error));
+      LOGGER.error('Token verification failed:', String(error));
       return false;
     }
   }
@@ -614,8 +709,7 @@ export class AuthService {
 
       return result.jwt;
     } catch (error) {
-      // Network errors during refresh are expected (offline, DNS failure) — not bugs.
-      LOGGER.warn('AuthService: JWT refresh request failed:', String(error));
+      LOGGER.error('AuthService: JWT refresh request failed:', String(error));
       return null;
     }
   }
@@ -638,7 +732,7 @@ export class AuthService {
 
       return response.ok;
     } catch (error) {
-      LOGGER.warn('Remote token verification failed:', String(error));
+      LOGGER.error('Remote token verification failed:', String(error));
       return false;
     }
   }
@@ -678,7 +772,7 @@ export class AuthService {
       // Token is valid and not expired
       return true;
     } catch (error) {
-      LOGGER.warn('Failed to validate JWT locally:', String(error));
+      LOGGER.error('Failed to validate JWT locally:', String(error));
       return false;
     }
   }
@@ -696,7 +790,7 @@ export class AuthService {
         localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(user));
       }
     } catch (error) {
-      LOGGER.warn('Failed to store user profile:', String(error));
+      LOGGER.error('Failed to store user profile:', String(error));
     }
   }
 
@@ -739,7 +833,7 @@ export class AuthService {
         localStorage.setItem(ADMIN_PROFILE_KEY, JSON.stringify(user));
       }
     } catch (error) {
-      LOGGER.warn('Failed to store admin profile:', String(error));
+      LOGGER.error('Failed to store admin profile:', String(error));
     }
   }
 
@@ -785,8 +879,7 @@ export class AuthService {
         credentials: 'include',
       });
     } catch (error) {
-      // Network errors during logout are not critical — session is already cleared client-side.
-      LOGGER.warn('AuthService: Logout request failed:', String(error));
+      LOGGER.error('AuthService: Logout request failed:', String(error));
     }
   }
 

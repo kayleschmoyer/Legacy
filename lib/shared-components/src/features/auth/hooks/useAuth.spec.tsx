@@ -42,6 +42,7 @@ jest.mock('../services/AuthService', () => {
       authenticateWithOAuth: jest.fn(),
       requestLogout: jest.fn(() => Promise.resolve()),
       getStoredToken: jest.fn(() => null),
+      getCurrentToken: jest.fn(() => null),
     })),
   };
 });
@@ -114,6 +115,7 @@ describe('AuthProvider – auth:token-refreshed event', () => {
       authenticateWithOAuth: jest.fn(),
       requestLogout: jest.fn(() => Promise.resolve()),
       getStoredToken: jest.fn(() => null),
+      getCurrentToken: jest.fn(() => null),
     };
     MockedAuthService.mockImplementation(
       () => mockInstance as unknown as AuthService,
