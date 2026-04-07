@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { auditSessionBash } from './tools/audit-session-bash.js';
 import { autoFix } from './tools/auto-fix.js';
 import { dispatchWorkflow } from './tools/dispatch-workflow.js';
+import { findSession } from './tools/find-session.js';
 import { getLogs } from './tools/get-logs.js';
 import { getPlaywrightReport } from './tools/get-playwright-report.js';
 import { listRuns } from './tools/list-runs.js';
@@ -287,6 +288,44 @@ server.tool(
       ),
   },
   async (params) => auditSessionBash(params),
+);
+
+server.tool(
+  'ci_find_session',
+  'Find Claude Code session JSONL files containing a substring (e.g. a Jira key, branch name, or commit SHA). ' +
+    'Scans every JSONL under ~/.claude/projects/<slug>/ — including subagent transcripts — and returns matches sorted by ' +
+    'last-modified descending. Use this to locate "where did I work on LS-#### earlier today?" without manually grepping ' +
+    'session files. Empty matches array if nothing found.',
+  {
+    query: z
+      .string()
+      .min(1)
+      .describe(
+        'Substring to search for in session JSONLs (e.g. "LS-2366", "fix-nightly-playwright", a git SHA).',
+      ),
+    project: z
+      .string()
+      .optional()
+      .describe(
+        'Project slug (e.g. "D--code-legacy-sports"). Auto-detected from CWD if omitted.',
+      ),
+    includeSubagents: z
+      .boolean()
+      .default(true)
+      .describe(
+        'Also scan subagent JSONLs under <sessionId>/subagents/ (default: true).',
+      ),
+    limit: z
+      .number()
+      .int()
+      .positive()
+      .max(500)
+      .default(50)
+      .describe(
+        'Maximum number of matches to return (default: 50, max: 500). Older matches are dropped first.',
+      ),
+  },
+  async (params) => findSession(params),
 );
 
 const transport = new StdioServerTransport();
