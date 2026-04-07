@@ -751,6 +751,16 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
           },
           path: { type: 'string', description: 'File path filter' },
           range: { type: 'string', description: 'Commit range' },
+          since: {
+            type: 'string',
+            description:
+              'Only show commits more recent than this date. Accepts any format `git log --since` accepts (e.g. "2026-04-03 15:00", "2.weeks.ago", ISO 8601). Combine with `until` to bracket a window.',
+          },
+          until: {
+            type: 'string',
+            description:
+              'Only show commits older than this date. Accepts any format `git log --until` accepts. Combine with `since` to bracket a window.',
+          },
           stat: {
             type: 'boolean',
             description:
@@ -2347,12 +2357,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         maxCount = 20,
         path: filterPath,
         range,
+        since,
+        until,
         stat = false,
       } = args as {
         worktree?: string;
         maxCount?: number;
         path?: string;
         range?: string;
+        since?: string;
+        until?: string;
         stat?: boolean;
       };
       const target = resolveTargetDir(wtKey);
@@ -2389,6 +2403,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           `${limit}`,
         ];
         if (stat) gitArgs.push('--numstat');
+        if (since) gitArgs.push(`--since=${since}`);
+        if (until) gitArgs.push(`--until=${until}`);
         if (range) gitArgs.push(range);
         if (filterPath) gitArgs.push('--', filterPath);
 
