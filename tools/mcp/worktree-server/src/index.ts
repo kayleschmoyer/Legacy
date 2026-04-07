@@ -637,6 +637,11 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
             description:
               'Alias for worktree. Ticket key, absolute path, or omit for active worktree',
           },
+          worktreeId: {
+            type: 'string',
+            description:
+              'Alias for worktree. Ticket key, absolute path, or omit for active worktree',
+          },
           amend: {
             type: 'boolean',
             description:
@@ -790,6 +795,11 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
               'Ticket key, absolute path, or omit for active worktree',
           },
           worktreeKey: {
+            type: 'string',
+            description:
+              'Alias for worktree. Ticket key, absolute path, or omit for active worktree',
+          },
+          worktreeId: {
             type: 'string',
             description:
               'Alias for worktree. Ticket key, absolute path, or omit for active worktree',
@@ -1439,16 +1449,24 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const {
         message,
         files: rawFiles,
-        worktree,
+        worktree: worktreeRaw,
         worktreeKey,
+        worktreeId,
         amend,
       } = args as {
         message?: string;
         files?: unknown;
         worktree?: unknown;
         worktreeKey?: unknown;
+        worktreeId?: unknown;
         amend?: boolean;
       };
+      // Accept worktreeId as an alias for worktree (agents sometimes pass worktreeId
+      // from older documentation or habit).
+      const worktree = worktreeRaw ?? worktreeId;
+      // Track which parameter name was actually provided so error messages are accurate.
+      const worktreeParamName =
+        worktreeRaw !== undefined ? 'worktree' : 'worktreeId';
       if (worktreeKey !== undefined && typeof worktreeKey !== 'string') {
         return {
           content: [
@@ -1476,7 +1494,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [
             {
               type: 'text',
-              text: `Invalid worktree: expected string, got ${typeof worktree}`,
+              text: `Invalid ${worktreeParamName}: expected string, got ${typeof worktree}`,
             },
           ],
           isError: true,
@@ -1487,7 +1505,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [
             {
               type: 'text',
-              text: 'Invalid worktree: provided value is empty or whitespace-only. Omit the parameter to use the active worktree.',
+              text: `Invalid ${worktreeParamName}: provided value is empty or whitespace-only. Omit the parameter to use the active worktree.`,
             },
           ],
           isError: true,
@@ -2547,11 +2565,23 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     // worktree_push
     // -----------------------------------------------------------------------
     case 'worktree_push': {
-      const { worktree, worktreeKey, setUpstream } = args as {
+      const {
+        worktree: worktreeRaw,
+        worktreeKey,
+        worktreeId,
+        setUpstream,
+      } = args as {
         worktree?: unknown;
         worktreeKey?: unknown;
+        worktreeId?: unknown;
         setUpstream?: boolean;
       };
+      // Accept worktreeId as an alias for worktree (agents sometimes pass worktreeId
+      // from older documentation or habit).
+      const worktree = worktreeRaw ?? worktreeId;
+      // Track which parameter name was actually provided so error messages are accurate.
+      const worktreeParamName =
+        worktreeRaw !== undefined ? 'worktree' : 'worktreeId';
       if (worktreeKey !== undefined && typeof worktreeKey !== 'string') {
         return {
           content: [
@@ -2579,7 +2609,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [
             {
               type: 'text',
-              text: `Invalid worktree: expected string, got ${typeof worktree}`,
+              text: `Invalid ${worktreeParamName}: expected string, got ${typeof worktree}`,
             },
           ],
           isError: true,
@@ -2590,7 +2620,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [
             {
               type: 'text',
-              text: 'Invalid worktree: provided value is empty or whitespace-only. Omit the parameter to use the active worktree.',
+              text: `Invalid ${worktreeParamName}: provided value is empty or whitespace-only. Omit the parameter to use the active worktree.`,
             },
           ],
           isError: true,
