@@ -17,6 +17,13 @@ export interface RollbarConfig {
   maxItems?: number;
   /** Maximum error items to send per minute. Defaults to 25. */
   itemsPerMinute?: number;
+  /**
+   * Client-side sampling rate in [0, 1]. A value of 1 (default) sends every
+   * captured item to Rollbar; 0.1 sends roughly 10% of items and drops the
+   * rest before they count against `maxItems` / `itemsPerMinute`. Implemented
+   * via `checkIgnore` since Rollbar.js has no native sample-rate option.
+   */
+  captureRate?: number;
 }
 
 export interface RollbarBreadcrumb {

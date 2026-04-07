@@ -26,6 +26,12 @@ class WebRollbarImplementation implements RollbarInterface {
 
   init(config: RollbarConfig): void {
     try {
+      // Clamp captureRate into [0, 1]. undefined means "send everything".
+      const rawRate = config.captureRate;
+      const captureRate =
+        typeof rawRate === 'number' && Number.isFinite(rawRate)
+          ? Math.min(1, Math.max(0, rawRate))
+          : 1;
       this.rollbar = new Rollbar({
         accessToken: config.accessToken,
         environment: config.environment,
@@ -59,6 +65,14 @@ class WebRollbarImplementation implements RollbarInterface {
         //   completes via postMessage fallback. Without this filter, the COOP
         //   spam exhausts maxItems/itemsPerMinute and silently drops real errors.
         checkIgnore: (_isUncaught: boolean, args: unknown[]) => {
+          // Client-side sampling: drop (1 - captureRate) of items before they
+          // reach Rollbar. Rollbar.js has no built-in sample-rate option, so
+          // we implement it here. captureRate === 1 means "send everything",
+          // 0 means "drop everything". Applied BEFORE the noise filters so
+          // sampling doesn't waste budget on ignored-anyway errors.
+          if (captureRate < 1 && Math.random() >= captureRate) {
+            return true;
+          }
           const err = args[0];
           if (err instanceof Error && err.name === 'AbortError') {
             return true;
@@ -216,6 +230,18 @@ class WebRollbarImplementation implements RollbarInterface {
       process.env['VITE_APP_VERSION'] ||
       undefined;
 
+    // Client-side sample rate (LS-2447). Statically replaced by Vite's
+    // `define` config at build time like the other VITE_* vars above.
+    const rawCaptureRate = process.env.VITE_ROLLBAR_CAPTURE_RATE;
+    const trimmedCaptureRate = rawCaptureRate?.trim();
+    let captureRate: number | undefined;
+    if (trimmedCaptureRate !== undefined && trimmedCaptureRate !== '') {
+      const parsed = Number(trimmedCaptureRate);
+      if (Number.isFinite(parsed)) {
+        captureRate = Math.min(1, Math.max(0, parsed));
+      }
+    }
+
     return {
       accessToken,
       environment,
@@ -223,6 +249,7 @@ class WebRollbarImplementation implements RollbarInterface {
       captureUnhandledRejections: true,
       verbose: environment === 'development',
       release,
+      captureRate,
     };
   }
 }

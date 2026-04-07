@@ -65,9 +65,15 @@ export const getEnvironmentConfig = (): EnvironmentConfig => ({
   rollbarAccessToken: import.meta.env.VITE_ROLLBAR_ACCESS_TOKEN as
     | string
     | undefined,
-  rollbarCaptureRate: import.meta.env.VITE_ROLLBAR_CAPTURE_RATE
-    ? parseFloat(import.meta.env.VITE_ROLLBAR_CAPTURE_RATE as string)
-    : 1.0,
+  rollbarCaptureRate: (() => {
+    const raw = import.meta.env.VITE_ROLLBAR_CAPTURE_RATE as string | undefined;
+    if (!raw) return 1.0;
+    const trimmed = raw.trim();
+    if (trimmed === '') return 1.0;
+    const parsed = Number(trimmed);
+    if (!Number.isFinite(parsed)) return 1.0;
+    return Math.min(1, Math.max(0, parsed));
+  })(),
   googleAnalyticsMeasurementId: import.meta.env.VITE_GA_MEASUREMENT_ID as
     | string
     | undefined,

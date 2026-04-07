@@ -226,6 +226,12 @@ export default defineConfig(({ mode }) => {
       'process.env.VITE_ROLLBAR_ACCESS_TOKEN': JSON.stringify(
         env.VITE_ROLLBAR_ACCESS_TOKEN || '',
       ),
+      // Rollbar client-side sample rate (LS-2447). Read via process.env in
+      // rollbar.web.ts getRollbarConfigFromEnv(); Vite also exposes VITE_*
+      // vars on import.meta.env for apps/web/src/config/environment.ts.
+      'process.env.VITE_ROLLBAR_CAPTURE_RATE': JSON.stringify(
+        env.VITE_ROLLBAR_CAPTURE_RATE || '',
+      ),
       // Release info used by rollbar.web.ts getRollbarConfigFromEnv()
       'process.env.VITE_COMMIT_SHA': JSON.stringify(commitSha),
       'process.env.VITE_APP_VERSION': JSON.stringify(appVersion),
