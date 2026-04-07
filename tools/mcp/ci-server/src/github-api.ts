@@ -171,6 +171,30 @@ export async function githubGetArrayBuffer(path: string): Promise<ArrayBuffer> {
   return res.arrayBuffer();
 }
 
+/** Make a PUT request to the GitHub REST API. Used for state-toggling endpoints (e.g. workflow enable/disable). */
+export async function githubPut<T>(path: string, body?: unknown): Promise<T> {
+  const { token, slug } = await ensureAuth();
+  const url = `${GITHUB_API}/repos/${slug}${path}`;
+
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      ...buildHeaders(token),
+      'Content-Type': 'application/json',
+    },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`GitHub API ${res.status}: ${sanitizeErrorBody(text)}`);
+  }
+
+  // Workflow enable/disable returns 204 No Content
+  if (res.status === 204) return {} as T;
+  return (await res.json()) as T;
+}
+
 /** Make a POST request to the GitHub REST API. */
 export async function githubPost<T>(path: string, body?: unknown): Promise<T> {
   const { token, slug } = await ensureAuth();

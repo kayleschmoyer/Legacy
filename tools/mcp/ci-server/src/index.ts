@@ -13,6 +13,11 @@ import { searchLogs } from './tools/search-logs.js';
 import { sessionStats } from './tools/session-stats.js';
 import { viewRun } from './tools/view-run.js';
 import { workflowInfo } from './tools/workflow-info.js';
+import {
+  workflowDisable,
+  workflowEnable,
+  workflowState,
+} from './tools/workflow-state.js';
 
 const server = new McpServer({
   name: 'legacy-sports-ci',
@@ -204,6 +209,42 @@ server.tool(
       .describe('Include GitHub App installation permissions (default: false)'),
   },
   async (params) => workflowInfo(params),
+);
+
+server.tool(
+  'ci_workflow_state',
+  'Get the current state of a single workflow (active, disabled_manually, disabled_inactivity). Read-only — does not modify state. Use ci_workflow_enable / ci_workflow_disable to change it.',
+  {
+    workflow: z
+      .union([z.string(), z.number().int()])
+      .transform(String)
+      .describe('Workflow filename (e.g. "deploy.yml") or numeric ID'),
+  },
+  async (params) => workflowState(params),
+);
+
+server.tool(
+  'ci_workflow_enable',
+  'Enable a manually-disabled GitHub Actions workflow. Wraps `gh workflow enable <workflow>` via the REST API. Returns the workflow state after the change.',
+  {
+    workflow: z
+      .union([z.string(), z.number().int()])
+      .transform(String)
+      .describe('Workflow filename (e.g. "deploy.yml") or numeric ID'),
+  },
+  async (params) => workflowEnable(params),
+);
+
+server.tool(
+  'ci_workflow_disable',
+  'Disable a GitHub Actions workflow. Wraps `gh workflow disable <workflow>` via the REST API. Returns the workflow state after the change. Use during incident recovery to halt automatic runs.',
+  {
+    workflow: z
+      .union([z.string(), z.number().int()])
+      .transform(String)
+      .describe('Workflow filename (e.g. "deploy.yml") or numeric ID'),
+  },
+  async (params) => workflowDisable(params),
 );
 
 server.tool(
