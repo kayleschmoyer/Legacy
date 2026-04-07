@@ -202,7 +202,7 @@ jobs:
       - name: Deploy to GitHub Pages
         if: "!inputs.dry_run"
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
 
       - name: "Rollbar Deploy Succeeded (Rollback)"
         if: "!inputs.dry_run && success()"
