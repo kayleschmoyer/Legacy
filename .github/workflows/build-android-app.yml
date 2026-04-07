@@ -52,7 +52,8 @@ env:
   GRADLE_OPTS: >-
     -Dorg.gradle.internal.http.connectionTimeout=120000
     -Dorg.gradle.internal.http.socketTimeout=120000
-  NODE_OPTIONS: "--max-old-space-size=4096"
+  # 2GB is sufficient for Metro bundler; 4GB + Gradle workers exceeded 8GB RAM on c6a.xlarge (OOM kill)
+  NODE_OPTIONS: "--max-old-space-size=2048"
 
 jobs:
   build-android:
