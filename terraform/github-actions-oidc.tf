@@ -628,6 +628,29 @@ resource "aws_iam_policy" "github_actions_supplemental" {
           "arn:aws:events:${local.region}:${local.account_id}:event-bus/${local.name_prefix}-*"
         ]
       },
+      # github-runners module — refresh-time read perms for resources owned by `make runner-apply`.
+      # The regular Apply Lambda Infrastructure workflow doesn't manage these resources, but
+      # terraform refresh still touches them on every plan, so the role needs read access.
+      # Tracked by LS-2425 (structural fix to stop refreshing module.github_runners entirely).
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:ListTagsForResource"
+        ]
+        Resource = [
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/github-self-hosted-runners/*",
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/github-self-hosted-runners/*:*"
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "events:DescribeArchive"
+        ]
+        Resource = [
+          "arn:aws:events:${local.region}:${local.account_id}:archive/${local.name_prefix}-*"
+        ]
+      },
       # S3 runner-dist bucket - ListBucket (bucket-level) + GetObject (object-level, HeadObject for aws_s3_object refresh)
       {
         Effect = "Allow"
@@ -641,7 +664,8 @@ resource "aws_iam_policy" "github_actions_supplemental" {
       {
         Effect = "Allow"
         Action = [
-          "s3:GetObject"
+          "s3:GetObject",
+          "s3:GetObjectTagging"
         ]
         Resource = [
           "arn:aws:s3:::${local.name_prefix}-runner-*/*"
@@ -1004,6 +1028,8 @@ resource "aws_iam_role_policy" "github_actions_plan_policy" {
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/apigateway/${local.name_prefix}-*:*",
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/github-runners/*",
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/github-runners/*:*",
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/github-self-hosted-runners/*",
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/github-self-hosted-runners/*:*",
           "arn:aws:logs:${local.region}:${local.account_id}:log-group::log-stream:"
         ]
       },
@@ -1123,13 +1149,15 @@ resource "aws_iam_role_policy" "github_actions_plan_policy" {
         Action = [
           "events:DescribeRule",
           "events:DescribeEventBus",
+          "events:DescribeArchive",
           "events:ListTargetsByRule",
           "events:ListRules",
           "events:ListTagsForResource"
         ]
         Resource = [
           "arn:aws:events:${local.region}:${local.account_id}:rule/${local.name_prefix}-*",
-          "arn:aws:events:${local.region}:${local.account_id}:event-bus/${local.name_prefix}-*"
+          "arn:aws:events:${local.region}:${local.account_id}:event-bus/${local.name_prefix}-*",
+          "arn:aws:events:${local.region}:${local.account_id}:archive/${local.name_prefix}-*"
         ]
       },
       # Budgets read
@@ -1163,7 +1191,8 @@ resource "aws_iam_role_policy" "github_actions_plan_policy" {
           "s3:GetBucketObjectLockConfiguration",
           "s3:GetBucketOwnershipControls",
           "s3:GetBucketNotification",
-          "s3:GetObject"
+          "s3:GetObject",
+          "s3:GetObjectTagging"
         ]
         Resource = [
           "arn:aws:s3:::${local.name_prefix}-*",
