@@ -2,7 +2,11 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { apigatewayInspect } from './tools/apigateway-inspect.js';
-import { ec2ConsoleOutput, ec2Instances } from './tools/ec2.js';
+import {
+  ec2ConsoleOutput,
+  ec2Instances,
+  ec2NetworkInspect,
+} from './tools/ec2.js';
 import { iamGetPolicy } from './tools/iam-get-policy.js';
 import { lambdaStatus } from './tools/lambda-status.js';
 import { LAMBDA_FUNCTIONS, logsTail } from './tools/logs-tail.js';
@@ -165,6 +169,25 @@ server.tool(
       ),
   },
   async (params) => ec2ConsoleOutput(params),
+);
+
+// --- aws_ec2_network_inspect ---
+server.tool(
+  'aws_ec2_network_inspect',
+  'Discover the project VPC and its subnets in one call. Returns the VPC (id, CIDR, name, tags) plus subnets grouped into public/private/database categories using the Name tag (and falling back to MapPublicIpOnLaunch). Used to find a public subnet for Packer / temporary build instances without chaining describe-vpcs + describe-subnets via Bash.',
+  {
+    environment: z
+      .enum(['dev', 'prod'])
+      .default('dev')
+      .describe('Filter by Environment tag (default: dev)'),
+    subnetType: z
+      .enum(['public', 'private', 'all'])
+      .default('all')
+      .describe(
+        'Subnet category to return (default: all). "public" or "private" filter the response; "all" returns every category including database subnets.',
+      ),
+  },
+  async (params) => ec2NetworkInspect(params),
 );
 
 // --- aws_iam_get_policy ---

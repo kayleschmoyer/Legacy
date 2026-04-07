@@ -220,3 +220,209 @@ export async function ec2ConsoleOutput(
     );
   }
 }
+
+// ---------------------------------------------------------------------------
+// aws_ec2_network_inspect
+// ---------------------------------------------------------------------------
+
+export interface NetworkInspectParams {
+  environment?: string;
+  subnetType?: 'public' | 'private' | 'all';
+}
+
+interface AwsVpc {
+  VpcId?: string;
+  CidrBlock?: string;
+  Tags?: Ec2Tag[];
+}
+
+interface DescribeVpcsResponse {
+  Vpcs?: AwsVpc[];
+}
+
+interface AwsSubnet {
+  SubnetId?: string;
+  VpcId?: string;
+  CidrBlock?: string;
+  AvailabilityZone?: string;
+  MapPublicIpOnLaunch?: boolean;
+  Tags?: Ec2Tag[];
+}
+
+interface DescribeSubnetsResponse {
+  Subnets?: AwsSubnet[];
+}
+
+function classifySubnet(subnet: AwsSubnet): 'public' | 'private' | 'database' {
+  // Prefer the Name tag for explicit categorization since the project tags
+  // subnets as legacy-sports-{env}-{public|private|database}-{n}.
+  const name = getTag(subnet.Tags, 'Name') ?? '';
+  if (/database/i.test(name)) return 'database';
+  if (/public/i.test(name)) return 'public';
+  if (/private/i.test(name)) return 'private';
+  // Fallback: rely on MapPublicIpOnLaunch (only public subnets typically have
+  // this true).
+  return subnet.MapPublicIpOnLaunch ? 'public' : 'private';
+}
+
+export async function ec2NetworkInspect(
+  params: NetworkInspectParams,
+): Promise<ToolResult> {
+  const repoRoot = getRepoRoot();
+  const { environment = 'dev', subnetType = 'all' } = params;
+
+  // Step 1: locate the project VPC. Try the project Name tag first
+  // (legacy-sports-{env}-vpc); fall back to the Environment tag.
+  let vpc: AwsVpc | undefined;
+  const vpcCandidates: AwsVpc[] = [];
+  try {
+    const byNameOutput = await runCommand(
+      'aws',
+      [
+        'ec2',
+        'describe-vpcs',
+        '--output',
+        'json',
+        '--filters',
+        `Name=tag:Name,Values=legacy-sports-${environment}-vpc`,
+      ],
+      repoRoot,
+    );
+    const byName = JSON.parse(byNameOutput) as DescribeVpcsResponse;
+    vpcCandidates.push(...(byName.Vpcs ?? []));
+
+    if (vpcCandidates.length === 0) {
+      const byEnvOutput = await runCommand(
+        'aws',
+        [
+          'ec2',
+          'describe-vpcs',
+          '--output',
+          'json',
+          '--filters',
+          `Name=tag:Environment,Values=${environment}`,
+        ],
+        repoRoot,
+      );
+      const byEnv = JSON.parse(byEnvOutput) as DescribeVpcsResponse;
+      vpcCandidates.push(...(byEnv.Vpcs ?? []));
+    }
+
+    if (vpcCandidates.length > 1) {
+      const ids = vpcCandidates.map((v) => v.VpcId).join(', ');
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              ok: false,
+              environment,
+              error: `Multiple VPCs matched for environment "${environment}" (${ids}). Refine the environment name or VPC tags so exactly one VPC is selected.`,
+            }),
+          },
+        ],
+        isError: true,
+      };
+    }
+    vpc = vpcCandidates[0];
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return errorResult('Failed to describe VPCs', message);
+  }
+
+  if (!vpc?.VpcId) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            ok: false,
+            environment,
+            error: `No VPC found for environment "${environment}". Looked for tag:Name=legacy-sports-${environment}-vpc and tag:Environment=${environment}.`,
+          }),
+        },
+      ],
+      isError: true,
+    };
+  }
+
+  // Step 2: enumerate subnets in that VPC.
+  let subnets: AwsSubnet[] = [];
+  try {
+    const subnetsOutput = await runCommand(
+      'aws',
+      [
+        'ec2',
+        'describe-subnets',
+        '--output',
+        'json',
+        '--filters',
+        `Name=vpc-id,Values=${vpc.VpcId}`,
+      ],
+      repoRoot,
+    );
+    const subnetsData = JSON.parse(subnetsOutput) as DescribeSubnetsResponse;
+    subnets = subnetsData.Subnets ?? [];
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return errorResult('Failed to describe subnets', message);
+  }
+
+  const grouped: {
+    public: Array<Record<string, unknown>>;
+    private: Array<Record<string, unknown>>;
+    database: Array<Record<string, unknown>>;
+  } = { public: [], private: [], database: [] };
+
+  for (const s of subnets) {
+    const category = classifySubnet(s);
+    const entry = {
+      id: s.SubnetId,
+      az: s.AvailabilityZone,
+      cidr: s.CidrBlock,
+      name: getTag(s.Tags, 'Name') ?? null,
+      mapPublicIpOnLaunch: s.MapPublicIpOnLaunch ?? false,
+    };
+    grouped[category].push(entry);
+  }
+
+  // Apply subnetType filter (default "all" returns everything)
+  const finalSubnets =
+    subnetType === 'all'
+      ? grouped
+      : subnetType === 'public'
+        ? { public: grouped.public, private: [], database: [] }
+        : { public: [], private: grouped.private, database: [] };
+
+  const vpcTags: Record<string, string> = {};
+  for (const t of vpc.Tags ?? []) {
+    if (t.Key !== undefined) vpcTags[t.Key] = t.Value ?? '';
+  }
+
+  return {
+    content: [
+      {
+        type: 'text',
+        text: JSON.stringify(
+          {
+            environment,
+            vpc: {
+              id: vpc.VpcId,
+              cidr: vpc.CidrBlock,
+              name: vpcTags.Name ?? null,
+              tags: vpcTags,
+            },
+            subnets: finalSubnets,
+            counts: {
+              public: finalSubnets.public.length,
+              private: finalSubnets.private.length,
+              database: finalSubnets.database.length,
+            },
+          },
+          null,
+          2,
+        ),
+      },
+    ],
+  };
+}
