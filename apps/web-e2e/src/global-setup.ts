@@ -4,14 +4,22 @@ import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
+import { E2E_SIGNING_SECRET } from './utils/jwt';
+
 /**
  * Playwright global setup for E2E authentication.
  *
  * Two modes:
- *   CI  – Signs a JWT directly using the JWT_SECRET env var (no external service needed).
- *   Local – Uses the OAuth device flow so the developer authenticates with their real
- *           Google account. The resulting token is cached in `.auth/token-cache.json`
- *           so you only need to re-authenticate when the token expires.
+ *   CI    – Signs a JWT with a hardcoded dev-only secret (E2E_SIGNING_SECRET).
+ *           The hermetic E2E tests mock every network call with
+ *           `route.fulfill()` — there is no backend in CI — so the signature
+ *           is never validated. The JWT payload is only used for client-side
+ *           storage state (cookie + localStorage user profile). The
+ *           production JWT signing key is intentionally NOT used here.
+ *   Local – Uses the OAuth device flow so the developer authenticates with
+ *           their real Google account. The resulting token is cached in
+ *           `.auth/token-cache.json` so you only need to re-authenticate
+ *           when the token expires.
  *
  * The generated JWT is saved as a Playwright `storageState` file (.auth/state.json)
  * which is automatically loaded into every browser context via the Playwright config.
@@ -20,9 +28,6 @@ import path from 'path';
 const AUTH_DIR = path.join(__dirname, '..', '.auth');
 const STORAGE_STATE_PATH = path.join(AUTH_DIR, 'state.json');
 const TOKEN_CACHE_PATH = path.join(AUTH_DIR, 'token-cache.json');
-
-/** Dev-only fallback secret — matches apps/cli/src/commands/generateJwt.ts */
-const DEV_JWT_SECRET = 'dev-jwt-secret-key-not-for-production-use-only';
 
 interface TokenCache {
   jwt: string;
@@ -70,9 +75,11 @@ export default async function globalSetup(config: FullConfig) {
 // ---------------------------------------------------------------------------
 
 async function resolveAuthToken(): Promise<string> {
-  // CI mode — sign a JWT locally using JWT_SECRET
+  // CI mode — sign a JWT locally with the hardcoded hermetic-test secret.
+  // No real backend validates this; the signature only needs to produce a
+  // syntactically valid JWT for Playwright storageState.
   if (process.env.CI || process.env.E2E_AUTH_MODE === 'ci') {
-    console.log('[E2E Auth] CI mode — signing JWT with JWT_SECRET');
+    console.log('[E2E Auth] CI mode — signing hermetic JWT');
     return signJwtLocally();
   }
 
@@ -86,14 +93,6 @@ async function resolveAuthToken(): Promise<string> {
 // ---------------------------------------------------------------------------
 
 function signJwtLocally(): string {
-  const secret = process.env.JWT_SECRET || DEV_JWT_SECRET;
-
-  if (secret === DEV_JWT_SECRET) {
-    console.warn(
-      '[E2E Auth] ⚠️  Using dev fallback JWT secret. Set JWT_SECRET for production-like tokens.',
-    );
-  }
-
   return sign(
     {
       id: 1,
@@ -102,7 +101,7 @@ function signJwtLocally(): string {
       accessLevel: 'admin',
       iat: Math.floor(Date.now() / 1000),
     },
-    secret,
+    E2E_SIGNING_SECRET,
     { algorithm: 'HS256', expiresIn: '24h' },
   );
 }

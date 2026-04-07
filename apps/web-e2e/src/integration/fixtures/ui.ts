@@ -9,29 +9,41 @@ import { getTestUserJwt, TEST_USERS } from '../../utils/test-user-auth';
  * Fixtures for live-backend UI E2E tests.
  *
  * Authentication:
- *   Reads the admin JWT from the CLI token store (`~/.legacy-sports/auth.json`).
- *   Run `./ls-cli.ps1 auth login` before running these tests.
+ *   The commissioner JWT is sourced from (in order):
+ *     1. `INTEGRATION_JWT` env var — escape hatch for passing a pre-issued
+ *        JWT directly (not used by the standard nightly CI workflow; handy
+ *        for local debugging or ad-hoc runs against a specific user)
+ *     2. The CLI token store at `~/.legacy-sports/auth.json` (local dev — run
+ *        `./ls-cli.ps1 auth login` before running these tests)
+ *     3. `getTestUserJwt(TEST_USERS.COMMISSIONER)` — logs in (or registers)
+ *        the E2E commissioner user via the OAuth proxy using
+ *        `E2E_COMMISSIONER_EMAIL` / `E2E_COMMISSIONER_PASSWORD`. This is the
+ *        path used by the nightly CI workflow.
  *
- *   The admin token is used directly for `commissionerPage` and `commissionerJwt`.
- *   Manager JWTs are obtained by impersonating non-admin users. Tests swap
- *   tokens in localStorage to act as different users within one browser.
+ *   Manager JWTs are obtained by logging in each `TEST_USERS.MANAGER_*`
+ *   user directly via `getTestUserJwt`. No admin impersonation is used —
+ *   each manager has its own credentials provisioned via `E2E_MANAGER_*_EMAIL`
+ *   and `E2E_MANAGER_*_PASSWORD` env vars (see `utils/test-user-auth.ts`).
+ *
+ *   Tests can swap tokens in cookies/localStorage via `switchUser()` to act
+ *   as different users within one browser context.
  *
  * Provides:
- * - `commissionerPage` — browser context authenticated as the admin (commissioner)
+ * - `commissionerPage` — browser context authenticated as the commissioner
  * - `commissionerJwt`  — raw JWT for the commissioner
- * - `managerJwt1/2/3`  — raw JWTs for impersonated managers 1-3
+ * - `managerJwt1/2/3`  — raw JWTs for managers 1-3 (direct login, not impersonation)
  */
 
 export interface UIIntegrationFixtures {
-  /** Browser page authenticated as the admin (commissioner). */
+  /** Browser page authenticated as the commissioner. */
   commissionerPage: Page;
-  /** Raw JWT for the commissioner (admin). */
+  /** Raw JWT for the commissioner. */
   commissionerJwt: string;
-  /** Raw JWT for impersonated Manager 1. */
+  /** Raw JWT for Manager 1 (obtained via direct login). */
   managerJwt1: string;
-  /** Raw JWT for impersonated Manager 2. */
+  /** Raw JWT for Manager 2 (obtained via direct login). */
   managerJwt2: string;
-  /** Raw JWT for impersonated Manager 3. */
+  /** Raw JWT for Manager 3 (obtained via direct login). */
   managerJwt3: string;
   /** Separate browser context page authenticated as Manager 1. */
   managerPage1: Page;
@@ -43,10 +55,6 @@ export interface UIIntegrationFixtures {
 
 const WEB_BASE =
   process.env.INTEGRATION_WEB_URL ?? 'https://legacy-fantasy.com';
-const GQL_BASE = (
-  process.env.INTEGRATION_BASE_URL ?? 'https://api.legacy-fantasy.com/'
-).replace(/\/?$/, '/');
-
 /**
  * Build a Playwright storageState for cookie-based auth (integration tests).
  * Sets ls_jwt cookie, ls_csrf cookie, and caches user profile in localStorage.
@@ -161,102 +169,6 @@ async function getAuthJwt(): Promise<string> {
   return getTestUserJwt(TEST_USERS.COMMISSIONER);
 }
 
-// ---------------------------------------------------------------------------
-// Impersonation helpers
-// ---------------------------------------------------------------------------
-
-interface GqlResponse<T> {
-  data?: T;
-  errors?: Array<{ message: string }>;
-}
-
-/** Raw fetch against the GQL endpoint with retry on network failures. */
-async function gqlFetch<T>(
-  jwt: string,
-  query: string,
-  variables?: Record<string, unknown>,
-): Promise<T> {
-  const maxAttempts = 3;
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      const res = await fetch(GQL_BASE + 'graphql', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${jwt}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ query, variables }),
-      });
-      const json = (await res.json()) as GqlResponse<T>;
-      if (json.errors?.length) {
-        throw new Error(`GraphQL error: ${json.errors[0].message}`);
-      }
-      if (!json.data) {
-        throw new Error('GraphQL response contained no data');
-      }
-      return json.data;
-    } catch (err) {
-      if (attempt === maxAttempts) throw err;
-      await new Promise((r) => setTimeout(r, 1_000 * attempt));
-    }
-  }
-
-  throw new Error('gqlFetch failed after retries');
-}
-
-/** Cached impersonation tokens so we only call the mutation once per user. */
-const impersonationCache = new Map<number, string>();
-
-/**
- * Use the admin JWT to impersonate another user by ID.
- * Returns a fresh JWT for the impersonated user.
- */
-async function impersonate(adminJwt: string, userId: number): Promise<string> {
-  const cached = impersonationCache.get(userId);
-  if (cached) return cached;
-
-  const data = await gqlFetch<{ impersonateUser: { token: string } }>(
-    adminJwt,
-    `mutation ImpersonateUser($userId: Int!) {
-       impersonateUser(userId: $userId) { token }
-     }`,
-    { userId },
-  );
-
-  const token = data.impersonateUser.token;
-  impersonationCache.set(userId, token);
-  return token;
-}
-
-/**
- * Query the users list and return three non-admin user IDs to impersonate.
- * Caches the result so repeated calls don't hit the API.
- */
-let managerIds: [number, number, number] | undefined;
-
-async function getManagerUserIds(
-  adminJwt: string,
-): Promise<[number, number, number]> {
-  if (managerIds) return managerIds;
-
-  const data = await gqlFetch<{
-    users: Array<{ id: number; accessLevel: string | null }>;
-  }>(adminJwt, `query { users(limit: 20) { id accessLevel } }`);
-
-  const candidates = data.users.filter((u) => u.accessLevel !== 'admin');
-
-  if (candidates.length < 3) {
-    throw new Error(
-      `Need at least 3 non-admin users to impersonate, found ${candidates.length}. ` +
-        'Create test users in the database first.',
-    );
-  }
-
-  managerIds = [candidates[0].id, candidates[1].id, candidates[2].id];
-  return managerIds;
-}
-
 export const test = base.extend<UIIntegrationFixtures>({
   commissionerPage: async ({ browser }, use) => {
     const jwt = await getAuthJwt();
@@ -275,24 +187,16 @@ export const test = base.extend<UIIntegrationFixtures>({
   },
 
   managerJwt1: async ({}, use) => {
-    const adminJwt = await getAuthJwt();
-    const [mgr1Id] = await getManagerUserIds(adminJwt);
-    const jwt = await impersonate(adminJwt, mgr1Id);
-    await use(jwt);
+    // Register/login manager directly — no admin impersonation needed
+    await use(await getTestUserJwt(TEST_USERS.MANAGER_1));
   },
 
   managerJwt2: async ({}, use) => {
-    const adminJwt = await getAuthJwt();
-    const [, mgr2Id] = await getManagerUserIds(adminJwt);
-    const jwt = await impersonate(adminJwt, mgr2Id);
-    await use(jwt);
+    await use(await getTestUserJwt(TEST_USERS.MANAGER_2));
   },
 
   managerJwt3: async ({}, use) => {
-    const adminJwt = await getAuthJwt();
-    const [, , mgr3Id] = await getManagerUserIds(adminJwt);
-    const jwt = await impersonate(adminJwt, mgr3Id);
-    await use(jwt);
+    await use(await getTestUserJwt(TEST_USERS.MANAGER_3));
   },
 
   managerPage1: async ({ browser, managerJwt1 }, use) => {

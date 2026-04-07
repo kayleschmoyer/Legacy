@@ -324,8 +324,24 @@ jobs:
         shell: bash
         env:
           CI: "true"
-          JWT_SECRET: ${{ secrets.JWT_SECRET_KEY }}
+          # Hermetic e2e tests mock every network call with route.fulfill()
+          # (there is no backend in CI), so the JWT signature is never
+          # validated. The tests use a hardcoded dev secret baked into the
+          # source — we do NOT pass the production JWT_SECRET_KEY into the
+          # test runner env. Integration tests use real OAuth login via
+          # getTestUserJwt, so they don't need a signing key either.
           INTEGRATION_BASE_URL: ${{ secrets.INTEGRATION_BASE_URL }}
+          # E2E_* credentials are only needed by the integration suite (real
+          # OAuth login). Hermetic e2e tests mock the network and don't need
+          # them.
+          E2E_COMMISSIONER_EMAIL: ${{ matrix.suite == 'integration' && secrets.E2E_COMMISSIONER_EMAIL || '' }}
+          E2E_COMMISSIONER_PASSWORD: ${{ matrix.suite == 'integration' && secrets.E2E_COMMISSIONER_PASSWORD || '' }}
+          E2E_MANAGER_1_EMAIL: ${{ matrix.suite == 'integration' && secrets.E2E_MANAGER_1_EMAIL || '' }}
+          E2E_MANAGER_1_PASSWORD: ${{ matrix.suite == 'integration' && secrets.E2E_MANAGER_1_PASSWORD || '' }}
+          E2E_MANAGER_2_EMAIL: ${{ matrix.suite == 'integration' && secrets.E2E_MANAGER_2_EMAIL || '' }}
+          E2E_MANAGER_2_PASSWORD: ${{ matrix.suite == 'integration' && secrets.E2E_MANAGER_2_PASSWORD || '' }}
+          E2E_MANAGER_3_EMAIL: ${{ matrix.suite == 'integration' && secrets.E2E_MANAGER_3_EMAIL || '' }}
+          E2E_MANAGER_3_PASSWORD: ${{ matrix.suite == 'integration' && secrets.E2E_MANAGER_3_PASSWORD || '' }}
         run: |
           SUITE="${{ matrix.suite }}"
           IS_SCHEDULE="${{ github.event_name == 'schedule' }}"
@@ -458,10 +474,10 @@ jobs:
             echo "has-report=true" >> $GITHUB_OUTPUT
             # When merging e2e + integration blobs, playwright rejects blobs recorded
             # with different testDirs (src/tests vs src/integration/tests). Provide a
-            # merge config pointing to the common parent directory.
-            cat <<'EOF' > playwright.merge.config.js
-            module.exports = { testDir: "apps/web-e2e/src" };
-            EOF
+            # merge config pointing to the common parent directory. Use printf with
+            # a single-quoted format string so the JS payload is written verbatim —
+            # no backslash escaping, no shell interpolation.
+            printf '%s\n' 'module.exports = { testDir: "apps/web-e2e/src" };' > playwright.merge.config.js
             pnpm dlx playwright@1.58.2 merge-reports --reporter html -c playwright.merge.config.js ./all-blob-reports
           else
             echo "has-report=false" >> $GITHUB_OUTPUT

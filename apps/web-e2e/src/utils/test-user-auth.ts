@@ -60,11 +60,14 @@ function resolveOAuthBaseUrl(): string {
 }
 
 /**
- * Obtain a JWT for a test user by registering or logging in against the live
- * OAuth proxy. The JWT contains a real auto-incremented database user ID.
+ * Obtain a JWT for a test user by logging in (or registering) against the
+ * live OAuth proxy. The JWT contains a real auto-incremented database user ID.
  *
- * - Tries `POST /oauth/register` first (creates user if it doesn't exist)
- * - Falls back to `POST /oauth/login` if the user is already registered
+ * - Tries `POST /oauth/login` first — prevents accidentally creating a user
+ *   with wrong credentials if the test user already exists (the common case
+ *   in CI, where test users are provisioned ahead of time).
+ * - Falls back to `POST /oauth/register` only if login fails (first-time
+ *   provisioning on a fresh environment).
  */
 export async function getTestUserJwt(
   creds: TestUserCredentials,
@@ -82,7 +85,36 @@ async function registerOrLogin(
   oauthUrl: string,
   creds: TestUserCredentials,
 ): Promise<string> {
-  // Try register first
+  if (!creds.email || !creds.password) {
+    throw new Error(
+      'Test user credentials are empty. Set E2E_COMMISSIONER_EMAIL / ' +
+        'E2E_COMMISSIONER_PASSWORD (and E2E_MANAGER_*) env vars, or create ' +
+        'a .env.e2e file.',
+    );
+  }
+
+  // Try login first — avoids accidentally creating a user with wrong credentials
+  const loginRes = await fetch(`${oauthUrl}/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: creds.email,
+      password: creds.password,
+    }),
+  });
+
+  if (loginRes.ok) {
+    const data = (await loginRes.json()) as AuthResponse;
+    return data.jwt;
+  }
+
+  // Capture login failure details before attempting register, so if both
+  // attempts fail we can surface why login failed (wrong password, disabled
+  // user, etc.) — which is the common case in CI.
+  const loginStatus = loginRes.status;
+  const loginErrorText = await loginRes.text().catch(() => 'unknown');
+
+  // Login failed — try register (user may not exist yet)
   const registerRes = await fetch(`${oauthUrl}/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -98,24 +130,11 @@ async function registerOrLogin(
     return data.jwt;
   }
 
-  // If registration failed (user already exists), try login
-  const loginRes = await fetch(`${oauthUrl}/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      email: creds.email,
-      password: creds.password,
-    }),
-  });
-
-  if (loginRes.ok) {
-    const data = (await loginRes.json()) as AuthResponse;
-    return data.jwt;
-  }
-
-  const errorText = await loginRes.text().catch(() => 'unknown');
+  const registerErrorText = await registerRes.text().catch(() => 'unknown');
   throw new Error(
-    `Failed to authenticate test user ${creds.email}: ${loginRes.status} ${errorText}`,
+    `Failed to authenticate test user ${creds.email}: ` +
+      `login failed with ${loginStatus} ${loginErrorText}, ` +
+      `then register failed with ${registerRes.status} ${registerErrorText}`,
   );
 }
 

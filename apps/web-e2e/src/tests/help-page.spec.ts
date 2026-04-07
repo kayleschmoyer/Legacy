@@ -324,15 +324,31 @@ test.describe('Help Page — contact and support @regression', () => {
   });
 
   test('shows Join our Discord contact option', async ({ page }) => {
-    await expect(page.getByText('Join our Discord')).toBeVisible();
+    await expect(
+      page.getByText('Join our Discord', { exact: true }),
+    ).toBeVisible();
   });
 
-  test('Join our Discord option links to discord.gg/legacy-sports', async ({
+  test('Join our Discord option opens discord.gg/legacy-sports', async ({
     page,
   }) => {
-    const link = page.getByRole('link', { name: /join our discord/i });
-    await expect(link).toBeVisible();
-    await expect(link).toHaveAttribute('href', /discord\.gg\/legacy-sports/i);
+    // The contact card uses window.open() with noopener — the popup URL is
+    // unreliable because discord.gg aggressively redirects.  Intercept
+    // window.open to capture the intended URL instead.
+    await page.evaluate(() => {
+      (window as unknown as Record<string, string>).__openedUrl = '';
+      window.open = ((url?: string | URL) => {
+        (window as unknown as Record<string, string>).__openedUrl = String(
+          url ?? '',
+        );
+        return null;
+      }) as typeof window.open;
+    });
+    await page.getByText('Join our Discord', { exact: true }).click();
+    const openedUrl = await page.evaluate(
+      () => (window as unknown as Record<string, string>).__openedUrl,
+    );
+    expect(openedUrl).toMatch(/discord\.gg\/legacy-sports/i);
   });
 
   test('urgent account issues callout links to Discord #urgent-support', async ({

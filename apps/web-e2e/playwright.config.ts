@@ -24,7 +24,8 @@ export default defineConfig({
     : {}),
 
   /* Authenticate once via global setup, then share storageState with all tests.
-   * CI: signs a JWT using JWT_SECRET env var.
+   * CI: signs a JWT with a hardcoded dev secret (hermetic — no backend
+   *     validates it).
    * Local: uses OAuth device flow (opens browser, caches token). */
   globalSetup: require.resolve('./src/global-setup'),
   /* Run tests in files in parallel */

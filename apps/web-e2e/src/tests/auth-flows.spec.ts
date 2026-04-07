@@ -7,16 +7,13 @@
 
 import { sign } from 'jsonwebtoken';
 import { adminTest, expect, test, unauthTest } from '../fixtures/auth-enhanced';
+import { E2E_SIGNING_SECRET } from '../utils/jwt';
 
 /** Read the base URL that Playwright is actually using (set in playwright.config.ts). */
 const E2E_ORIGIN = `http://localhost:${process.env.E2E_PORT || 4280}`;
 
-/** Dev-only fallback secret — matches global-setup.ts and auth-enhanced.ts. */
-const DEV_JWT_SECRET = 'dev-jwt-secret-key-not-for-production-use-only';
-
 /** Create a JWT whose `exp` is already in the past (expired 1 hour ago). */
 function signExpiredJwt(): string {
-  const secret = process.env.JWT_SECRET ?? DEV_JWT_SECRET;
   const now = Math.floor(Date.now() / 1000);
   return sign(
     {
@@ -27,7 +24,7 @@ function signExpiredJwt(): string {
       iat: now - 7200, // issued 2 hours ago
       exp: now - 3600, // expired 1 hour ago
     },
-    secret,
+    E2E_SIGNING_SECRET,
     { algorithm: 'HS256' },
   );
 }

@@ -1,17 +1,28 @@
 import { sign, type SignOptions } from 'jsonwebtoken';
 
 /**
- * Dev-only fallback secret — matches apps/cli/src/commands/generateJwt.ts.
- * In CI, JWT_SECRET should be set as an env var.
+ * Shared signing secret for hermetic E2E tests — intentionally public.
+ *
+ * The hermetic test suite mocks every network call with `route.fulfill()`,
+ * so no real backend ever validates these tokens. The production JWT signing
+ * key is intentionally NOT used here — keeping it out of the CI runner's
+ * environment prevents accidental exposure via logs, dependencies, or
+ * exfiltration.
+ *
+ * Exported as a single constant so every E2E auth helper (global-setup,
+ * fixtures, individual specs) imports the same value and cannot drift.
+ *
+ * Matches `apps/cli/src/commands/generateJwt.ts` for local dev parity.
  */
-const DEV_JWT_SECRET = 'dev-jwt-secret-key-not-for-production-use-only';
+export const E2E_SIGNING_SECRET =
+  'dev-jwt-secret-key-not-for-production-use-only';
 
 /**
  * JWT generation utility for E2E tests.
  *
- * Signs JWTs directly using `jsonwebtoken` and the JWT_SECRET env var (or the
- * dev fallback). No CLI subprocess is spawned — this is fast, synchronous, and
- * works identically in CI and local environments.
+ * Signs JWTs directly using `jsonwebtoken` and the hardcoded
+ * `E2E_SIGNING_SECRET`. No CLI subprocess is spawned — this is fast,
+ * synchronous, and works identically in CI and local environments.
  */
 export class E2EJwtUtil {
   /**
@@ -24,7 +35,6 @@ export class E2EJwtUtil {
     id?: number;
   }): string {
     const { email, expiration = '1h', accessLevel = 'none', id = 1 } = options;
-    const secret = process.env.JWT_SECRET || DEV_JWT_SECRET;
 
     return sign(
       {
@@ -34,7 +44,7 @@ export class E2EJwtUtil {
         accessLevel,
         iat: Math.floor(Date.now() / 1000),
       },
-      secret,
+      E2E_SIGNING_SECRET,
       { algorithm: 'HS256', expiresIn: expiration as SignOptions['expiresIn'] },
     );
   }
