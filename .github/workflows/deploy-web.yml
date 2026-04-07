@@ -1,13 +1,25 @@
 name: Deploy Web to GitHub Pages
 
+# Triggering:
+#   - Primary: called from the umbrella Deploy workflow via workflow_call
+#     (push to main is handled there so all deploys report under a single run)
+#   - Manual: workflow_dispatch for targeted one-off deploys
+
 on:
-  push:
-    branches: [main]
-    paths:
-      - apps/web/**
-      - lib/shared-components/**
-      - .github/workflows/deploy-web.yml
+  workflow_call:
+    inputs:
+      suppress-notifications:
+        description: "Suppress Discord notifications and badge updates (umbrella deploy aggregates these). Release creation is NOT gated by this — releases continue regardless."
+        required: false
+        default: false
+        type: boolean
   workflow_dispatch:
+    inputs:
+      suppress-notifications:
+        description: "Suppress Discord notifications and badge updates. Release creation is NOT gated by this."
+        required: false
+        default: false
+        type: boolean
 
 # Cancel in-progress deployments for the same branch
 concurrency:
@@ -169,7 +181,7 @@ jobs:
           comment: "Web deploy via GitHub Pages (run ${{ github.run_id }})"
 
       - name: "Discord Deploy Succeeded"
-        if: github.ref == 'refs/heads/main' && success()
+        if: github.ref == 'refs/heads/main' && success() && inputs['suppress-notifications'] != true
         uses: ./.github/actions/discord-notify
         with:
           webhook-url: ${{ secrets.DISCORD_DEPLOY_WEBHOOK_URL }}
@@ -179,7 +191,7 @@ jobs:
           description: "Web app deployed to GitHub Pages"
 
       - name: "Discord Deploy Failed"
-        if: always() && github.ref == 'refs/heads/main' && failure()
+        if: always() && github.ref == 'refs/heads/main' && failure() && inputs['suppress-notifications'] != true
         uses: ./.github/actions/discord-notify
         with:
           webhook-url: ${{ secrets.DISCORD_DEPLOY_WEBHOOK_URL }}
@@ -189,7 +201,7 @@ jobs:
           description: "Web app deployment failed"
 
       - name: Update Deployment Badge
-        if: always()
+        if: always() && inputs['suppress-notifications'] != true
         uses: ./.github/actions/update-deployment-badge
         with:
           github-token: ${{ secrets.GIST_TOKEN }}
@@ -203,7 +215,16 @@ jobs:
     name: Create GitHub Release
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     needs: [setup, build-and-deploy]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Release creation is intentionally NOT gated by suppress-notifications:
+    # the umbrella deploy passes suppress-notifications: true to silence per-target
+    # Discord/badge noise, but releases must still be created on main deploys.
+    # When this reusable workflow is invoked by the umbrella Deploy workflow,
+    # github.event_name is workflow_call (not the parent's event), so allow that
+    # alongside direct push runs. Intentionally exclude workflow_dispatch:
+    # manual ad-hoc runs should not produce GitHub Releases (avoids extra
+    # release noise on test/debug invocations). Use the umbrella Deploy
+    # workflow_dispatch (workflow_call → here) to cut a release manually.
+    if: (github.event_name == 'push' || github.event_name == 'workflow_call') && github.ref == 'refs/heads/main'
     # Release creation is non-critical — don't fail the overall deploy
     continue-on-error: true
 
@@ -247,12 +268,15 @@ jobs:
     needs: [setup, build-and-deploy, create-release]
     # Only notify when both deploy and release creation succeeded.
     # This avoids posting links to non-existent or failed releases.
+    # The Discord release summary IS gated on suppress-notifications because the
+    # umbrella deploy posts its own consolidated rollup summary to Discord.
     if: >-
       !cancelled() &&
       needs.build-and-deploy.result == 'success' &&
       needs.create-release.result == 'success' &&
-      github.event_name == 'push' &&
-      github.ref == 'refs/heads/main'
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') &&
+      github.ref == 'refs/heads/main' &&
+      inputs['suppress-notifications'] != true
 
     steps:
       - name: Checkout (for commit history)

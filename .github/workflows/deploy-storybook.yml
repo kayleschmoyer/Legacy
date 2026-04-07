@@ -7,17 +7,15 @@ name: Deploy Storybook
 # the external deploy repo (bkrupa/legacy-sports-deploys) under /storybook/.
 #
 # Triggers:
-#   - On every push to main that touches shared-components or storybook config
+#   - Called from the umbrella Deploy workflow via workflow_call on main push
 #   - On every PR that touches shared-components (posts a sticky comment)
 #   - Manual dispatch
 # =============================================================================
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "lib/shared-components/**"
-      - ".github/workflows/deploy-storybook.yml"
+  # Push to main is handled by the umbrella Deploy workflow via workflow_call
+  # so all deploys report under a single run.
+  workflow_call:
 
   pull_request:
     types: [opened, synchronize, reopened]

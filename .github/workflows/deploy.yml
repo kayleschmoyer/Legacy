@@ -1,0 +1,375 @@
+name: Deploy
+
+# =============================================================================
+# Umbrella Deploy Workflow
+# =============================================================================
+# Single entry point for all main-branch deploys. Detects which deployable
+# targets were affected by the push and calls per-target reusable child
+# workflows conditionally. A single rollup-status job aggregates results so
+# humans (and Discord) see one unified "this is what shipped for commit X"
+# message instead of multiple independent workflow runs racing for attention.
+#
+# Children:
+#   - Upload Lambdas   (.github/workflows/upload-lambdas.yml)
+#   - Deploy Web       (.github/workflows/deploy-web.yml)
+#   - Deploy Storybook (.github/workflows/deploy-storybook.yml)
+#
+# Downstream (still standalone for concurrency/batching reasons):
+#   - Apply Lambda Infrastructure triggers on this workflow's completion via
+#     workflow_run and reconciles terraform state with the SSM version
+#     parameters that the Upload Lambdas child writes. It keeps its own
+#     cancel-in-progress concurrency group so back-to-back deploys still
+#     batch into a single terraform apply.
+# =============================================================================
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      force-lambdas:
+        description: "Force the lambda deploy child (bypass paths filter)"
+        required: false
+        default: false
+        type: boolean
+      force-web:
+        description: "Force the web deploy child (bypass paths filter)"
+        required: false
+        default: false
+        type: boolean
+      force-storybook:
+        description: "Force the storybook deploy child (bypass paths filter)"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write # create-release in web child needs this
+  id-token: write # AWS OIDC + GitHub Pages
+  pages: write
+  actions: read
+  pull-requests: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Detect which deploy targets are affected by this push.
+  # Uses dorny/paths-filter rather than the repo's heavier detect-changes
+  # composite action — this workflow only needs a coarse per-target boolean.
+  # ---------------------------------------------------------------------------
+  detect-changes:
+    name: Detect Deploy Targets
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    outputs:
+      lambdas: ${{ steps.result.outputs.lambdas }}
+      web: ${{ steps.result.outputs.web }}
+      storybook: ${{ steps.result.outputs.storybook }}
+
+    steps:
+      - name: Guard — main branch only
+        # Deploy mutates production-adjacent state (SSM lambda versions, S3,
+        # GitHub Pages) and posts Discord notifications / updates the Deploy
+        # badge. Those side-effects must never run from a non-main branch,
+        # even via workflow_dispatch. The downstream lambda-terraform-apply
+        # workflow_run is already restricted to branches: [main], so a
+        # non-main dispatch that bumped SSM versions would leave infra
+        # unreconciled. Fail fast at the top of detect-changes — since every
+        # other job needs detect-changes, this halts the entire umbrella run
+        # before any child can be invoked.
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::Deploy workflow can only run on main branch. Got ref=${{ github.ref }}"
+          exit 1
+
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Paths filter
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            lambdas:
+              - 'lambdas/**'
+              - 'lib/**'
+              - '.github/workflows/upload-lambdas.yml'
+              - '.github/workflows/deploy.yml'
+            web:
+              - 'apps/web/**'
+              - 'lib/shared-components/**'
+              - '.github/workflows/deploy-web.yml'
+              - '.github/workflows/deploy.yml'
+            storybook:
+              - 'lib/shared-components/**'
+              - '.github/workflows/deploy-storybook.yml'
+              - '.github/workflows/deploy.yml'
+
+      - name: Combine with manual overrides
+        id: result
+        run: |
+          # Union paths-filter results with workflow_dispatch force-* inputs.
+          # force-* inputs are only defined on workflow_dispatch events; on push
+          # they resolve to the empty string and are a no-op.
+          LAMBDAS="${{ steps.filter.outputs.lambdas }}"
+          WEB="${{ steps.filter.outputs.web }}"
+          STORYBOOK="${{ steps.filter.outputs.storybook }}"
+
+          if [ "${{ inputs['force-lambdas'] }}" = "true" ]; then
+            LAMBDAS="true"
+          fi
+          if [ "${{ inputs['force-web'] }}" = "true" ]; then
+            WEB="true"
+          fi
+          if [ "${{ inputs['force-storybook'] }}" = "true" ]; then
+            STORYBOOK="true"
+          fi
+
+          echo "lambdas=$LAMBDAS" >> "$GITHUB_OUTPUT"
+          echo "web=$WEB" >> "$GITHUB_OUTPUT"
+          echo "storybook=$STORYBOOK" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## 🎯 Deploy Targets"
+            echo ""
+            echo "| Target | Affected |"
+            echo "| --- | --- |"
+            echo "| Lambdas | $LAMBDAS |"
+            echo "| Web | $WEB |"
+            echo "| Storybook | $STORYBOOK |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------
+  # Child: Upload Lambdas
+  # ---------------------------------------------------------------------------
+  upload-lambdas:
+    name: Upload Lambdas
+    needs: detect-changes
+    if: needs.detect-changes.outputs.lambdas == 'true'
+    uses: ./.github/workflows/upload-lambdas.yml
+    secrets: inherit
+    with:
+      suppress-notifications: true
+
+  # ---------------------------------------------------------------------------
+  # Child: Deploy Web
+  # ---------------------------------------------------------------------------
+  deploy-web:
+    name: Deploy Web
+    needs: detect-changes
+    if: needs.detect-changes.outputs.web == 'true'
+    uses: ./.github/workflows/deploy-web.yml
+    secrets: inherit
+    with:
+      suppress-notifications: true
+
+  # ---------------------------------------------------------------------------
+  # Child: Deploy Storybook
+  # ---------------------------------------------------------------------------
+  deploy-storybook:
+    name: Deploy Storybook
+    needs: detect-changes
+    if: needs.detect-changes.outputs.storybook == 'true'
+    uses: ./.github/workflows/deploy-storybook.yml
+    secrets: inherit
+
+  # ---------------------------------------------------------------------------
+  # Rollup: aggregate child results, post one Discord summary, update badge.
+  # Runs even if individual children were skipped or failed.
+  # ---------------------------------------------------------------------------
+  rollup-status:
+    name: Rollup Status
+    needs: [detect-changes, upload-lambdas, deploy-web, deploy-storybook]
+    if: always()
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Compute rollup
+        id: rollup
+        shell: bash
+        env:
+          DETECT_CHANGES_RESULT: ${{ needs.detect-changes.result }}
+          LAMBDAS_TARGETED: ${{ needs.detect-changes.outputs.lambdas }}
+          WEB_TARGETED: ${{ needs.detect-changes.outputs.web }}
+          STORYBOOK_TARGETED: ${{ needs.detect-changes.outputs.storybook }}
+          LAMBDAS_RESULT: ${{ needs.upload-lambdas.result }}
+          WEB_RESULT: ${{ needs.deploy-web.result }}
+          STORYBOOK_RESULT: ${{ needs.deploy-storybook.result }}
+        run: |
+          set -euo pipefail
+
+          # Translate child job results into a single rollup state.
+          # Each target is one of: success | failure | skipped | cancelled | not-targeted.
+          translate() {
+            local targeted="$1"
+            local result="$2"
+            if [ "$targeted" != "true" ]; then
+              echo "not-targeted"
+              return
+            fi
+            case "$result" in
+              success)   echo "success" ;;
+              failure)   echo "failure" ;;
+              cancelled) echo "cancelled" ;;
+              skipped)   echo "skipped" ;;
+              *)         echo "$result" ;;
+            esac
+          }
+
+          LAMBDAS_STATE=$(translate "$LAMBDAS_TARGETED" "$LAMBDAS_RESULT")
+          WEB_STATE=$(translate "$WEB_TARGETED" "$WEB_RESULT")
+          STORYBOOK_STATE=$(translate "$STORYBOOK_TARGETED" "$STORYBOOK_RESULT")
+
+          # If detect-changes itself failed/cancelled, no per-target booleans are
+          # available — surface that as the overall state immediately so we don't
+          # silently report a "skipped" deploy when the workflow actually broke.
+          if [ "$DETECT_CHANGES_RESULT" != "success" ]; then
+            case "$DETECT_CHANGES_RESULT" in
+              failure)   OVERALL="failure" ;;
+              cancelled) OVERALL="cancelled" ;;
+              *)         OVERALL="failure" ;;
+            esac
+          else
+            # Overall status: failure if any targeted child failed, cancelled if
+            # one or more targeted children were cancelled and none failed,
+            # success if at least one child succeeded and none failed/cancelled,
+            # skipped if nothing was targeted at all. Distinguishing cancelled
+            # from failure avoids false-failure Discord alerts when a deploy is
+            # superseded by a newer run via cancel-in-progress concurrency.
+            OVERALL="skipped"
+            ANY_FAILURE=false
+            ANY_CANCELLED=false
+            ANY_SUCCESS=false
+            for STATE in "$LAMBDAS_STATE" "$WEB_STATE" "$STORYBOOK_STATE"; do
+              case "$STATE" in
+                failure)   ANY_FAILURE=true ;;
+                cancelled) ANY_CANCELLED=true ;;
+                success)   ANY_SUCCESS=true ;;
+              esac
+            done
+            if [ "$ANY_FAILURE" = "true" ]; then
+              OVERALL="failure"
+            elif [ "$ANY_CANCELLED" = "true" ]; then
+              OVERALL="cancelled"
+            elif [ "$ANY_SUCCESS" = "true" ]; then
+              OVERALL="success"
+            fi
+          fi
+
+          echo "lambdas_state=$LAMBDAS_STATE" >> "$GITHUB_OUTPUT"
+          echo "web_state=$WEB_STATE" >> "$GITHUB_OUTPUT"
+          echo "storybook_state=$STORYBOOK_STATE" >> "$GITHUB_OUTPUT"
+          echo "overall=$OVERALL" >> "$GITHUB_OUTPUT"
+
+          # Derive a coarse environment label for the Discord rollup. The
+          # umbrella can include the web deploy (which targets production) or
+          # be lambdas/storybook only (dev). Use "production" when web is
+          # actually targeted, otherwise "dev". Avoid hard-coding so the
+          # rollup notification matches what was actually shipped.
+          if [ "$WEB_TARGETED" = "true" ]; then
+            ROLLUP_ENVIRONMENT="production"
+          else
+            ROLLUP_ENVIRONMENT="dev"
+          fi
+          echo "environment=$ROLLUP_ENVIRONMENT" >> "$GITHUB_OUTPUT"
+
+          # Build a human-readable description for Discord / step summary.
+          emoji_for() {
+            case "$1" in
+              success)      echo "✅" ;;
+              failure)      echo "❌" ;;
+              cancelled)    echo "⚠️" ;;
+              skipped)      echo "⏭️" ;;
+              not-targeted) echo "—" ;;
+              *)            echo "❔" ;;
+            esac
+          }
+
+          LAMBDAS_EMOJI=$(emoji_for "$LAMBDAS_STATE")
+          WEB_EMOJI=$(emoji_for "$WEB_STATE")
+          STORYBOOK_EMOJI=$(emoji_for "$STORYBOOK_STATE")
+
+          DESCRIPTION=$(printf "%s Lambdas: %s\\n%s Web: %s\\n%s Storybook: %s" \
+            "$LAMBDAS_EMOJI" "$LAMBDAS_STATE" \
+            "$WEB_EMOJI" "$WEB_STATE" \
+            "$STORYBOOK_EMOJI" "$STORYBOOK_STATE")
+
+          {
+            echo "description<<DESC_EOF"
+            printf "%s\n" "$DESCRIPTION"
+            echo "DESC_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## 📊 Deploy Rollup"
+            echo ""
+            echo "| Target | State |"
+            echo "| --- | --- |"
+            echo "| Lambdas | $LAMBDAS_EMOJI $LAMBDAS_STATE |"
+            echo "| Web | $WEB_EMOJI $WEB_STATE |"
+            echo "| Storybook | $STORYBOOK_EMOJI $STORYBOOK_STATE |"
+            echo ""
+            echo "**Overall:** $OVERALL"
+            echo ""
+            if [ "$LAMBDAS_STATE" = "success" ]; then
+              echo "> ℹ️ Terraform apply runs as a separate downstream workflow."
+              echo "> See the **Apply Lambda Infrastructure** run triggered by this Deploy."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Build deploy changelog
+        id: changelog
+        shell: bash
+        run: |
+          COMMITS=$(git log --pretty=format:'[`%h`](https://github.com/${{ github.repository }}/commit/%H) %s' \
+            --no-merges -10)
+          {
+            echo "commits<<CHANGELOG_EOF"
+            echo "$COMMITS"
+            echo "CHANGELOG_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Discord Deploy Summary (success)
+        if: steps.rollup.outputs.overall == 'success'
+        uses: ./.github/actions/discord-notify
+        with:
+          webhook-url: ${{ secrets.DISCORD_DEPLOY_WEBHOOK_URL }}
+          status: success
+          title: "Deploy Summary"
+          environment: ${{ steps.rollup.outputs.environment }}
+          description: ${{ steps.rollup.outputs.description }}
+          commits: ${{ steps.changelog.outputs.commits }}
+
+      - name: Discord Deploy Summary (failure)
+        if: steps.rollup.outputs.overall == 'failure'
+        uses: ./.github/actions/discord-notify
+        with:
+          webhook-url: ${{ secrets.DISCORD_DEPLOY_WEBHOOK_URL }}
+          status: failure
+          title: "Deploy Summary"
+          environment: ${{ steps.rollup.outputs.environment }}
+          description: ${{ steps.rollup.outputs.description }}
+          commits: ${{ steps.changelog.outputs.commits }}
+
+      - name: Update Deploy Badge
+        if: always() && steps.rollup.outputs.overall != 'skipped'
+        uses: ./.github/actions/update-deployment-badge
+        with:
+          github-token: ${{ secrets.GIST_TOKEN }}
+          gist-id: ${{ secrets.CI_BADGES_GIST_ID }}
+          deployment-name: "Deploy"
+          deployment-status: ${{ steps.rollup.outputs.overall }}
+          workflow-run-id: ${{ github.run_id }}
+          branch: ${{ github.ref_name }}
+
+      - name: Fail job if any child failed
+        if: steps.rollup.outputs.overall == 'failure'
+        run: |
+          echo "::error::One or more deploy children failed — see rollup summary above."
+          exit 1
