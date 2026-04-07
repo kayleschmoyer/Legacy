@@ -252,17 +252,47 @@ jobs:
               *) BROWSER_ENGINE="$BROWSER" ;;
             esac
           fi
-          # Self-hosted AMI pre-installs Chromium at /opt/playwright-browsers with
-          # PLAYWRIGHT_BROWSERS_PATH set in /opt/actions-runner/.env. Check for the
-          # browser directory directly — the old `--dry-run` approach was unreliable.
-          BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/playwright-browsers}"
-          if [ "$BROWSER_ENGINE" = "chromium" ] && compgen -G "${BROWSERS_PATH}/chromium-*" > /dev/null 2>&1; then
-            echo "✅ Chromium already installed at ${BROWSERS_PATH} (AMI cache)"
-            export PLAYWRIGHT_BROWSERS_PATH="$BROWSERS_PATH"
-            echo "PLAYWRIGHT_BROWSERS_PATH=$BROWSERS_PATH" >> "$GITHUB_ENV"
-            exit 0
+          # The self-hosted AMI prebakes Chromium at /opt/playwright-browsers via
+          # the Packer build, but that cache has two failure modes that broke E2E
+          # for every PR since the 2026-04-04 nightly:
+          #
+          #   1. Version drift — the AMI was baked with `playwright@1.58.2 install
+          #      chromium`, which downloads a chromium_headless_shell-YYYY pinned
+          #      to that playwright version. When the project's playwright drifts
+          #      (e.g. via lockfile regen resolving `^1.58.2` → 1.59.1), tests
+          #      want a newer revision (chromium_headless_shell-1217) the AMI
+          #      doesn't have.
+          #
+          #   2. Read-only cache — /opt/playwright-browsers is `chmod 755` owned
+          #      by root from the Packer bake, so the runner user cannot write to
+          #      it to install missing browsers at runtime.
+          #
+          # Strategy: ignore the AMI cache. Unset PLAYWRIGHT_BROWSERS_PATH and
+          # install to the runner user's default cache (~/.cache/ms-playwright),
+          # which is writable. `playwright install` is idempotent. LS-2429 tracks
+          # rebaking the AMI with a writable cache so this can be revisited.
+          unset PLAYWRIGHT_BROWSERS_PATH
+          echo "PLAYWRIGHT_BROWSERS_PATH=" >> "$GITHUB_ENV"
+          echo "    AMI cache state at /opt/playwright-browsers (informational only):"
+          # Note: avoid `ls | head` here — the workflow runs with `set -o pipefail`
+          # and SIGPIPE from head closing the pipe would propagate as a non-zero
+          # exit, making any `|| fallback` branch unreliable. Check existence
+          # explicitly first.
+          if [ -d /opt/playwright-browsers ]; then
+            ls -la /opt/playwright-browsers 2>&1 | head -20
+          else
+            echo "    (directory does not exist)"
           fi
+          echo ""
+          echo "    Installing browsers to user cache (~/.cache/ms-playwright)..."
           pnpm exec playwright install "$BROWSER_ENGINE" --with-deps
+          echo ""
+          echo "    User cache state after install:"
+          if [ -d "$HOME/.cache/ms-playwright" ]; then
+            ls -la "$HOME/.cache/ms-playwright" 2>&1 | head -20
+          else
+            echo "    (no user cache)"
+          fi
 
       # =======================================================================
       # E2E suite: build web app and start a local server

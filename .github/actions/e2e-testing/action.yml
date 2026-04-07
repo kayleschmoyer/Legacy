@@ -138,22 +138,63 @@ runs:
         echo "- **Test Patterns**: ${{ inputs.test-patterns }}"
         echo "- **Exclude Patterns**: ${{ inputs.test-patterns-invert }}"
 
-        # Install Playwright browsers if needed.
-        # Self-hosted runners may pre-install Chromium at /opt/playwright-browsers
-        # and provide PLAYWRIGHT_BROWSERS_PATH via the runner environment. Check
-        # the browser directory directly — the old `--dry-run` approach was unreliable.
+        # Install Playwright browsers.
+        #
+        # Self-hosted runners pre-bake Chromium at /opt/playwright-browsers via
+        # the Packer AMI build, but that cache has two failure modes that broke
+        # E2E for every PR since the 2026-04-04 nightly:
+        #
+        #   1. Version drift — the AMI was baked with `playwright@1.58.2 install
+        #      chromium`, which downloads chromium-XXXX and chromium_headless_shell-YYYY
+        #      pinned to that playwright version. When the project's playwright
+        #      version drifts (e.g. via `pnpm install --no-frozen-lockfile`
+        #      resolving `^1.58.2` → 1.59.1), tests want a NEWER browser revision
+        #      (chromium_headless_shell-1217) that the AMI doesn't have.
+        #
+        #   2. Read-only cache — /opt/playwright-browsers is `chmod 755` owned by
+        #      root from the Packer bake, so the runner user cannot write into it
+        #      to install missing browsers at runtime. A simple `playwright install`
+        #      against PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers silently
+        #      fails to write and tests still fail at browserType.launch.
+        #
+        # Strategy: ignore the AMI cache entirely. Unset PLAYWRIGHT_BROWSERS_PATH
+        # and install to the runner user's default cache (~/.cache/ms-playwright),
+        # which is writable. Playwright's install command is idempotent — if the
+        # required revision is already cached locally, it's a fast no-op. The first
+        # run on a fresh runner pays a one-time download cost (~30-60s); subsequent
+        # runs on the same instance reuse the user cache.
+        #
+        # The AMI prebake remains useful for system dependencies (apt packages
+        # baked via `playwright install-deps chromium`); only the browser binary
+        # cache is problematic. LS-2429 tracks re-baking the AMI with a writable
+        # cache directory and a verification step so this can be revisited later.
         echo "🔧 Setting up Playwright browsers..."
-        BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/playwright-browsers}"
-        if [ "${{ inputs.browser }}" = "chromium" ] && compgen -G "${BROWSERS_PATH}/chromium-*" > /dev/null 2>&1; then
-          export PLAYWRIGHT_BROWSERS_PATH="$BROWSERS_PATH"
-          echo "PLAYWRIGHT_BROWSERS_PATH=$BROWSERS_PATH" >> "$GITHUB_ENV"
-          echo "✅ Chromium already installed at ${BROWSERS_PATH} (AMI cache)"
-        elif ! $PLAYWRIGHT_BIN install ${{ inputs.browser }} --with-deps >/dev/null 2>&1; then
-          echo "⚠️ Playwright browser installation failed - attempting fallback"
-          if ! $PLAYWRIGHT_BIN install-deps ${{ inputs.browser }} || ! $PLAYWRIGHT_BIN install ${{ inputs.browser }}; then
-            echo "::error::Failed to install Playwright browser '${{ inputs.browser }}' after fallback attempt"
+        unset PLAYWRIGHT_BROWSERS_PATH
+        echo "PLAYWRIGHT_BROWSERS_PATH=" >> "$GITHUB_ENV"
+        echo "    AMI cache state at /opt/playwright-browsers (informational only):"
+        # Note: avoid `ls | head` here — composite actions run with `set -o pipefail`
+        # and SIGPIPE from head closing the pipe would propagate as a non-zero exit,
+        # making any `|| fallback` branch unreliable. Check existence explicitly.
+        if [ -d /opt/playwright-browsers ]; then
+          ls -la /opt/playwright-browsers 2>&1 | head -20
+        else
+          echo "    (directory does not exist)"
+        fi
+        echo ""
+        echo "    Installing browsers to user cache (~/.cache/ms-playwright)..."
+        if ! $PLAYWRIGHT_BIN install ${{ inputs.browser }} --with-deps; then
+          echo "⚠️ Playwright browser installation failed — attempting fallback without --with-deps"
+          if ! $PLAYWRIGHT_BIN install ${{ inputs.browser }}; then
+            echo "::error::Failed to install Playwright browser '${{ inputs.browser }}'"
             exit 1
           fi
+        fi
+        echo ""
+        echo "    User cache state after install:"
+        if [ -d "$HOME/.cache/ms-playwright" ]; then
+          ls -la "$HOME/.cache/ms-playwright" 2>&1 | head -20
+        else
+          echo "    (no user cache)"
         fi
 
         # Verify the pre-built web artifact exists (required by webServer config)
