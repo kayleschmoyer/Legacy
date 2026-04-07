@@ -1,10 +1,9 @@
 import type { FullConfig } from '@playwright/test';
-import { sign } from 'jsonwebtoken';
 import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
-import { E2E_SIGNING_SECRET } from './utils/jwt';
+import { E2EJwtUtil } from './utils/jwt';
 
 /**
  * Playwright global setup for E2E authentication.
@@ -93,17 +92,12 @@ async function resolveAuthToken(): Promise<string> {
 // ---------------------------------------------------------------------------
 
 function signJwtLocally(): string {
-  return sign(
-    {
-      id: 1,
-      email: 'e2e-test@legacysports.dev',
-      username: 'e2e-test',
-      accessLevel: 'admin',
-      iat: Math.floor(Date.now() / 1000),
-    },
-    E2E_SIGNING_SECRET,
-    { algorithm: 'HS256', expiresIn: '24h' },
-  );
+  return E2EJwtUtil.generateJwt({
+    id: 1,
+    email: 'e2e-test@legacysports.dev',
+    accessLevel: 'admin',
+    expiration: '24h',
+  });
 }
 
 // ---------------------------------------------------------------------------

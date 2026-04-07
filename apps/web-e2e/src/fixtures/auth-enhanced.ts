@@ -4,29 +4,27 @@ import {
   type Page,
   type TestInfo,
 } from '@playwright/test';
-import { sign } from 'jsonwebtoken';
 
 import {
   BASELINE_GRAPHQL_RESPONSES,
   extractOperationName,
 } from './shared-mocks';
-import { E2E_SIGNING_SECRET } from '../utils/jwt';
+import { E2E_SIGNING_SECRET, signE2EJwt } from '../utils/jwt';
 
 /** Read the base URL that Playwright is actually using (set in playwright.config.ts). */
 const E2E_ORIGIN = `http://localhost:${process.env.E2E_PORT || 4280}`;
 
 function signTestJwt(overrides: Record<string, unknown> = {}): string {
-  return sign(
+  return signE2EJwt(
     {
       id: 1,
       email: 'user@test.com',
       username: 'testuser',
       accessLevel: 'none',
-      iat: Math.floor(Date.now() / 1000),
       ...overrides,
     },
     E2E_SIGNING_SECRET,
-    { algorithm: 'HS256', expiresIn: '1h' },
+    '1h',
   );
 }
 

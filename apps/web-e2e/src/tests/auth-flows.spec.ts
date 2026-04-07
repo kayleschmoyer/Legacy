@@ -5,9 +5,8 @@
  * and logout — both programmatic and via the profile dropdown UI.
  */
 
-import { sign } from 'jsonwebtoken';
 import { adminTest, expect, test, unauthTest } from '../fixtures/auth-enhanced';
-import { E2E_SIGNING_SECRET } from '../utils/jwt';
+import { E2E_SIGNING_SECRET, signE2EJwt } from '../utils/jwt';
 
 /** Read the base URL that Playwright is actually using (set in playwright.config.ts). */
 const E2E_ORIGIN = `http://localhost:${process.env.E2E_PORT || 4280}`;
@@ -15,7 +14,7 @@ const E2E_ORIGIN = `http://localhost:${process.env.E2E_PORT || 4280}`;
 /** Create a JWT whose `exp` is already in the past (expired 1 hour ago). */
 function signExpiredJwt(): string {
   const now = Math.floor(Date.now() / 1000);
-  return sign(
+  return signE2EJwt(
     {
       id: 1,
       email: 'user@test.com',
@@ -25,7 +24,6 @@ function signExpiredJwt(): string {
       exp: now - 3600, // expired 1 hour ago
     },
     E2E_SIGNING_SECRET,
-    { algorithm: 'HS256' },
   );
 }
 

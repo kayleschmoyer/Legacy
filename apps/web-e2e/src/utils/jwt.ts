@@ -1,4 +1,4 @@
-import { sign, type SignOptions } from 'jsonwebtoken';
+import { createHmac } from 'crypto';
 
 /**
  * Shared signing secret for hermetic E2E tests — intentionally public.
@@ -17,10 +17,83 @@ import { sign, type SignOptions } from 'jsonwebtoken';
 export const E2E_SIGNING_SECRET =
   'dev-jwt-secret-key-not-for-production-use-only';
 
+// ---------------------------------------------------------------------------
+// Minimal HS256 JWT signer — uses Node.js built-in `crypto` only.
+//
+// The hermetic E2E suite mocks all network traffic with `route.fulfill()`, so
+// no Lambda ever receives or verifies these tokens. Their payloads are only
+// decoded (never verified) by client-side React code to populate
+// cookies/localStorage. We therefore don't need the full `jsonwebtoken`
+// package — a standard HMAC-SHA256 signature is sufficient.
+// ---------------------------------------------------------------------------
+
+function base64UrlEncode(input: string | Buffer): string {
+  const buf = typeof input === 'string' ? Buffer.from(input, 'utf8') : input;
+  return buf
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '');
+}
+
+function parseExpiresIn(expiresIn: string): number {
+  const match = /^(\d+)(s|m|h|d)?$/.exec(expiresIn);
+  if (!match) throw new Error(`Invalid expiresIn value: "${expiresIn}"`);
+  const n = parseInt(match[1], 10);
+  switch (match[2]) {
+    case 's':
+      return n;
+    case 'm':
+      return n * 60;
+    case 'h':
+      return n * 3600;
+    case 'd':
+      return n * 86400;
+    default:
+      return n; // bare number treated as seconds
+  }
+}
+
+/**
+ * Sign an HS256 JWT for use in E2E test fixtures.
+ *
+ * Uses only Node.js built-in `crypto` — no external JWT library needed.
+ * Hermetic tests never hit a real backend, so the signature is never
+ * validated; this is sufficient to produce a syntactically valid JWT.
+ *
+ * @param payload    JWT claims. `iat` defaults to the current time but can be
+ *                   overridden by including it in `payload`.
+ * @param secret     Signing secret.
+ * @param expiresIn  Optional expiry string (e.g. '1h', '24h', '30m').
+ *                   Ignored when `payload.exp` is already set.
+ */
+export function signE2EJwt(
+  payload: Record<string, unknown>,
+  secret: string,
+  expiresIn?: string,
+): string {
+  const now = Math.floor(Date.now() / 1000);
+  const fullPayload: Record<string, unknown> = {
+    iat: now,
+    ...payload,
+  };
+  if (expiresIn !== undefined && fullPayload.exp === undefined) {
+    fullPayload.exp = now + parseExpiresIn(expiresIn);
+  }
+
+  const header = base64UrlEncode(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+  const body = base64UrlEncode(JSON.stringify(fullPayload));
+  const data = `${header}.${body}`;
+  const signature = base64UrlEncode(
+    createHmac('sha256', secret).update(data).digest(),
+  );
+  return `${data}.${signature}`;
+}
+
 /**
  * JWT generation utility for E2E tests.
  *
- * Signs JWTs directly using `jsonwebtoken` and the hardcoded
+ * Signs JWTs using the Node.js built-in `crypto` module and the hardcoded
  * `E2E_SIGNING_SECRET`. No CLI subprocess is spawned — this is fast,
  * synchronous, and works identically in CI and local environments.
  */
@@ -36,16 +109,15 @@ export class E2EJwtUtil {
   }): string {
     const { email, expiration = '1h', accessLevel = 'none', id = 1 } = options;
 
-    return sign(
+    return signE2EJwt(
       {
         id,
         email,
         username: email.split('@')[0],
         accessLevel,
-        iat: Math.floor(Date.now() / 1000),
       },
       E2E_SIGNING_SECRET,
-      { algorithm: 'HS256', expiresIn: expiration as SignOptions['expiresIn'] },
+      expiration,
     );
   }
 
