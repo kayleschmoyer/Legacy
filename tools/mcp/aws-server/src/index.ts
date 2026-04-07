@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { apigatewayInspect } from './tools/apigateway-inspect.js';
+import { ec2ConsoleOutput, ec2Instances } from './tools/ec2.js';
 import { iamGetPolicy } from './tools/iam-get-policy.js';
 import { lambdaStatus } from './tools/lambda-status.js';
 import { LAMBDA_FUNCTIONS, logsTail } from './tools/logs-tail.js';
@@ -121,6 +122,49 @@ server.tool(
       ),
   },
   async (params) => terraformOutput(params),
+);
+
+// --- aws_ec2_instances ---
+server.tool(
+  'aws_ec2_instances',
+  'List EC2 instances filtered by environment tag. Returns instanceId, type, state, name tag, IPs, launchTime, imageId, and keyName.',
+  {
+    environment: z
+      .enum(['dev', 'prod'])
+      .default('dev')
+      .describe('Filter by Environment tag (default: dev)'),
+    state: z
+      .enum(['running', 'stopped', 'pending', 'terminated'])
+      .optional()
+      .describe(
+        'Filter by instance state. Omit to return instances in all states.',
+      ),
+    nameFilter: z
+      .string()
+      .optional()
+      .describe(
+        'Wildcard substring to match against the Name tag (e.g. "runner" matches "*runner*").',
+      ),
+  },
+  async (params) => ec2Instances(params),
+);
+
+// --- aws_ec2_console_output ---
+server.tool(
+  'aws_ec2_console_output',
+  'Retrieve the system console output for an EC2 instance. Useful for diagnosing boot failures, kernel panics, and cloud-init errors on instances that cannot be SSH-ed into.',
+  {
+    instanceId: z
+      .string()
+      .describe('EC2 instance ID (e.g. "i-0abc123def456789").'),
+    latest: z
+      .boolean()
+      .default(true)
+      .describe(
+        'Retrieve the most recent 64 KB of console output (default: true). Set false to get the oldest available output.',
+      ),
+  },
+  async (params) => ec2ConsoleOutput(params),
 );
 
 // --- aws_iam_get_policy ---
