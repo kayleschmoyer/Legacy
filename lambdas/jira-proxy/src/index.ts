@@ -10,7 +10,12 @@ import {
   withRollbar,
 } from '@legacy-sports/rollbar';
 import type { AttachmentInput, CreateIssueInput } from './JiraClient';
-import { createJiraBug, searchJiraBugs } from './JiraClient';
+import {
+  createJiraBug,
+  resolveCurrentBugEpicKey,
+  searchJiraBugs,
+} from './JiraClient';
+import { getAccessToken, getApiBaseUrl } from './oauth';
 
 /** Verified JWT payload fields used for attribution. */
 interface JwtUserPayload {
@@ -458,7 +463,6 @@ async function handleCreateBug(
 ): Promise<APIGatewayProxyResult> {
   const jiraSecretName = process.env['JIRA_SECRET_NAME'];
   const jiraProjectKey = process.env['JIRA_PROJECT_KEY'];
-  const bugEpicKey = (process.env['BUG_EPIC_KEY'] ?? '').trim();
 
   if (!jiraSecretName) {
     LOGGER.error('JIRA_SECRET_NAME environment variable is not set');
@@ -503,11 +507,20 @@ async function handleCreateBug(
   );
 
   try {
+    const accessToken = await getAccessToken(jiraSecretName);
+    const apiBaseUrl = await getApiBaseUrl(jiraSecretName);
+    const epicKey = await resolveCurrentBugEpicKey(
+      accessToken,
+      apiBaseUrl,
+      jiraProjectKey,
+    );
     const result = await createJiraBug(
       input,
       jiraProjectKey,
       jiraSecretName,
-      bugEpicKey || undefined,
+      epicKey,
+      accessToken,
+      apiBaseUrl,
     );
     return jsonResponse(201, result, event);
   } catch (err) {

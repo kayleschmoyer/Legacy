@@ -1,6 +1,10 @@
 import type { APIGatewayEvent } from 'aws-lambda';
 import { sign } from 'jsonwebtoken';
-import { createJiraBug, searchJiraBugs } from './JiraClient';
+import {
+  createJiraBug,
+  resolveCurrentBugEpicKey,
+  searchJiraBugs,
+} from './JiraClient';
 import { baseHandler } from './index';
 
 // jest.mock calls are hoisted before imports by babel-jest at runtime
@@ -16,6 +20,16 @@ jest.mock('@legacy-sports/rollbar', () => ({
 jest.mock('./JiraClient', () => ({
   createJiraBug: jest.fn(),
   searchJiraBugs: jest.fn(),
+  resolveCurrentBugEpicKey: jest.fn(),
+}));
+
+// Mock oauth helpers used in handleCreateBug
+jest.mock('./oauth', () => ({
+  getAccessToken: jest.fn().mockResolvedValue('mock-access-token'),
+  getApiBaseUrl: jest
+    .fn()
+    .mockResolvedValue('https://api.atlassian.com/ex/jira/mock'),
+  getSiteUrl: jest.fn().mockResolvedValue('https://mock.atlassian.net'),
 }));
 
 const mockCreateJiraBug = createJiraBug as jest.MockedFunction<
@@ -24,7 +38,10 @@ const mockCreateJiraBug = createJiraBug as jest.MockedFunction<
 const mockSearchJiraBugs = searchJiraBugs as jest.MockedFunction<
   typeof searchJiraBugs
 >;
-
+const mockResolveCurrentBugEpicKey =
+  resolveCurrentBugEpicKey as jest.MockedFunction<
+    typeof resolveCurrentBugEpicKey
+  >;
 const TEST_JWT_SECRET = 'test-secret';
 
 function makeValidAuthHeader(overrides: Record<string, unknown> = {}): string {
@@ -63,6 +80,8 @@ describe('Jira Proxy Handler', () => {
     process.env['JIRA_PROJECT_KEY'] = 'LS';
     process.env['JWT_SECRET'] = TEST_JWT_SECRET;
     originalCorsOrigins = process.env['CORS_ALLOWED_ORIGINS'];
+    // Default: property lookup returns undefined (no epic parent)
+    mockResolveCurrentBugEpicKey.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -297,16 +316,42 @@ describe('Jira Proxy Handler', () => {
         'LS',
         'test-secret',
         undefined,
+        'mock-access-token',
+        'https://api.atlassian.com/ex/jira/mock',
       );
     });
 
-    it('passes BUG_EPIC_KEY to createJiraBug when set', async () => {
-      const originalEpicKey = process.env['BUG_EPIC_KEY'];
+    it('passes epic key from project property to createJiraBug', async () => {
+      mockResolveCurrentBugEpicKey.mockResolvedValueOnce('LS-9999');
+      mockCreateJiraBug.mockResolvedValueOnce({
+        issueKey: 'LS-101',
+        issueUrl: 'https://test.atlassian.net/browse/LS-101',
+      });
+
+      const event = makeEvent();
+      const result = await baseHandler(event);
+      expect(result.statusCode).toBe(201);
+
+      expect(mockCreateJiraBug).toHaveBeenCalledWith(
+        expect.objectContaining({ summary: 'Test bug' }),
+        'LS',
+        'test-secret',
+        'LS-9999',
+        'mock-access-token',
+        'https://api.atlassian.com/ex/jira/mock',
+      );
+    });
+
+    it('forwards the epic key returned by the resolver (simulating fallback env value) to createJiraBug', async () => {
+      const originalFallback = process.env['BUG_EPIC_FALLBACK_KEY'];
       try {
-        process.env['BUG_EPIC_KEY'] = 'LS-1322';
+        process.env['BUG_EPIC_FALLBACK_KEY'] = 'LS-1322';
+        // The resolver is mocked to return the fallback value directly.
+        // This test verifies the handler correctly passes whatever the resolver returns to createJiraBug.
+        mockResolveCurrentBugEpicKey.mockResolvedValueOnce('LS-1322');
         mockCreateJiraBug.mockResolvedValueOnce({
-          issueKey: 'LS-101',
-          issueUrl: 'https://test.atlassian.net/browse/LS-101',
+          issueKey: 'LS-102',
+          issueUrl: 'https://test.atlassian.net/browse/LS-102',
         });
 
         const event = makeEvent();
@@ -318,14 +363,37 @@ describe('Jira Proxy Handler', () => {
           'LS',
           'test-secret',
           'LS-1322',
+          'mock-access-token',
+          'https://api.atlassian.com/ex/jira/mock',
         );
       } finally {
-        if (originalEpicKey === undefined) {
-          delete process.env['BUG_EPIC_KEY'];
+        if (originalFallback === undefined) {
+          delete process.env['BUG_EPIC_FALLBACK_KEY'];
         } else {
-          process.env['BUG_EPIC_KEY'] = originalEpicKey;
+          process.env['BUG_EPIC_FALLBACK_KEY'] = originalFallback;
         }
       }
+    });
+
+    it('passes undefined epic key when property lookup returns undefined and no fallback set', async () => {
+      mockResolveCurrentBugEpicKey.mockResolvedValueOnce(undefined);
+      mockCreateJiraBug.mockResolvedValueOnce({
+        issueKey: 'LS-103',
+        issueUrl: 'https://test.atlassian.net/browse/LS-103',
+      });
+
+      const event = makeEvent();
+      const result = await baseHandler(event);
+      expect(result.statusCode).toBe(201);
+
+      expect(mockCreateJiraBug).toHaveBeenCalledWith(
+        expect.objectContaining({ summary: 'Test bug' }),
+        'LS',
+        'test-secret',
+        undefined,
+        'mock-access-token',
+        'https://api.atlassian.com/ex/jira/mock',
+      );
     });
 
     it('returns 500 when Jira API fails', async () => {
@@ -370,6 +438,8 @@ describe('Jira Proxy Handler', () => {
         'LS',
         'test-secret',
         undefined,
+        'mock-access-token',
+        'https://api.atlassian.com/ex/jira/mock',
       );
     });
 
@@ -398,6 +468,8 @@ describe('Jira Proxy Handler', () => {
         'LS',
         'test-secret',
         undefined,
+        'mock-access-token',
+        'https://api.atlassian.com/ex/jira/mock',
       );
     });
   });
@@ -496,6 +568,8 @@ describe('Jira Proxy Handler', () => {
         'LS',
         'test-secret',
         undefined,
+        'mock-access-token',
+        'https://api.atlassian.com/ex/jira/mock',
       );
     });
   });

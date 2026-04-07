@@ -1,6 +1,52 @@
 import { LOGGER } from '@legacy-sports/logging';
 import { getAccessToken, getApiBaseUrl, getSiteUrl } from './oauth';
 
+// Module-scope cache — survives warm invocations, reset on cold start.
+// Keyed by "<apiBaseUrl>:<projectKey>" so different tenants/projects don't collide.
+const bugEpicCache = new Map<string, { key: string; expiresAt: number }>();
+const BUG_EPIC_CACHE_TTL_MS = 5 * 60 * 1000;
+
+/**
+ * Resolve the current bug epic key from Jira project property bucket.client-bugs.
+ * Falls back to BUG_EPIC_FALLBACK_KEY env var on lookup failure.
+ */
+export async function resolveCurrentBugEpicKey(
+  accessToken: string,
+  apiBaseUrl: string,
+  projectKey: string,
+): Promise<string | undefined> {
+  const cacheKey = `${apiBaseUrl}:${projectKey}`;
+  const now = Date.now();
+  const cached = bugEpicCache.get(cacheKey);
+  if (cached && cached.expiresAt > now) {
+    return cached.key;
+  }
+  try {
+    const response = await fetch(
+      `${apiBaseUrl}/rest/api/3/project/${projectKey}/properties/bucket.client-bugs`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          Accept: 'application/json',
+        },
+      },
+    );
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const data = (await response.json()) as { value: { key: string } };
+    const key = data.value?.key?.trim();
+    if (!key) throw new Error('Property exists but has no key value');
+    bugEpicCache.set(cacheKey, { key, expiresAt: now + BUG_EPIC_CACHE_TTL_MS });
+    return key;
+  } catch (err) {
+    LOGGER.warn(
+      `Failed to resolve current bug epic from project property: ${String(err)}`,
+    );
+  }
+  return process.env['BUG_EPIC_FALLBACK_KEY']?.trim() || undefined;
+}
+
 interface JiraIssueFields {
   summary: string;
   description?: JiraDocNode;
@@ -216,9 +262,12 @@ export async function createJiraBug(
   projectKey: string,
   secretName: string,
   epicKey?: string,
+  prefetchedAccessToken?: string,
+  prefetchedApiBaseUrl?: string,
 ): Promise<CreateIssueResult> {
-  const accessToken = await getAccessToken(secretName);
-  const apiBaseUrl = await getApiBaseUrl(secretName);
+  const accessToken =
+    prefetchedAccessToken ?? (await getAccessToken(secretName));
+  const apiBaseUrl = prefetchedApiBaseUrl ?? (await getApiBaseUrl(secretName));
   const siteUrl = await getSiteUrl(secretName);
 
   const fields: JiraIssueFields = {

@@ -171,6 +171,12 @@ variable "monthly_budget_amount" {
   default     = 200
 }
 
+variable "bug_epic_fallback_key" {
+  description = "Fallback bug epic key used if Jira project property lookup fails"
+  type        = string
+  default     = "LS-1322"
+}
+
 # ── Per-environment retention maps ──────────────────────────────────────────────
 # Explicit maps so staging gets its own values instead of falling through to the
 # prod branch of a ternary.

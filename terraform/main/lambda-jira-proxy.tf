@@ -89,7 +89,7 @@ resource "aws_lambda_function" "jira_proxy" {
     variables = {
       JIRA_SECRET_NAME                    = aws_secretsmanager_secret.jira_credentials.name
       JIRA_PROJECT_KEY                    = "LS"
-      BUG_EPIC_KEY                        = "LS-1322"
+      BUG_EPIC_FALLBACK_KEY               = var.bug_epic_fallback_key
       JWT_SECRET_NAME                     = aws_secretsmanager_secret.jwt_secret.name
       NODE_ENV                            = var.environment
       LOG_LEVEL                           = "info"

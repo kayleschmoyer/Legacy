@@ -1,4 +1,8 @@
-import { createJiraBug, searchJiraBugs } from './JiraClient';
+import {
+  createJiraBug,
+  resolveCurrentBugEpicKey,
+  searchJiraBugs,
+} from './JiraClient';
 
 jest.mock('./oauth', () => ({
   getAccessToken: jest.fn().mockResolvedValue('test-access-token'),
@@ -313,5 +317,163 @@ describe('searchJiraBugs', () => {
     expect(calls[0][0]).toContain(API_BASE);
     const headers = calls[0][1].headers as Record<string, string>;
     expect(headers['Authorization']).toBe('Bearer test-access-token');
+  });
+});
+
+describe('resolveCurrentBugEpicKey', () => {
+  const ACCESS_TOKEN = 'test-access-token';
+  const PROJECT_KEY = 'LS';
+
+  let fetchSpy: jest.MockedFunction<typeof fetch>;
+  let originalFallback: string | undefined;
+
+  beforeEach(() => {
+    fetchSpy = jest.spyOn(global, 'fetch') as jest.MockedFunction<typeof fetch>;
+    originalFallback = process.env['BUG_EPIC_FALLBACK_KEY'];
+    // Bust the module-scope cache by using a unique apiBaseUrl per test
+    // (cache is keyed by `${apiBaseUrl}:${projectKey}`).
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+    jest.clearAllMocks();
+    if (originalFallback === undefined) {
+      delete process.env['BUG_EPIC_FALLBACK_KEY'];
+    } else {
+      process.env['BUG_EPIC_FALLBACK_KEY'] = originalFallback;
+    }
+  });
+
+  /** Return a unique API base URL per test so the module-scope Map cache never hits. */
+  function uniqueApiBase(suffix: string): string {
+    return `${API_BASE}-${suffix}`;
+  }
+
+  function makePropertyResponse(key: string): Response {
+    return new Response(JSON.stringify({ value: { key } }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  it('returns the epic key from the Jira project property', async () => {
+    const base = uniqueApiBase('success');
+    fetchSpy.mockResolvedValueOnce(makePropertyResponse('LS-1322'));
+
+    const result = await resolveCurrentBugEpicKey(
+      ACCESS_TOKEN,
+      base,
+      PROJECT_KEY,
+    );
+
+    expect(result).toBe('LS-1322');
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(fetchSpy.mock.calls[0][0]).toBe(
+      `${base}/rest/api/3/project/${PROJECT_KEY}/properties/bucket.client-bugs`,
+    );
+    const headers = fetchSpy.mock.calls[0][1]?.headers as Record<
+      string,
+      string
+    >;
+    expect(headers['Authorization']).toBe(`Bearer ${ACCESS_TOKEN}`);
+  });
+
+  it('returns fallback env var when the HTTP response is not ok', async () => {
+    const base = uniqueApiBase('non-2xx');
+    process.env['BUG_EPIC_FALLBACK_KEY'] = 'LS-FALLBACK';
+    fetchSpy.mockResolvedValueOnce(new Response('Not Found', { status: 404 }));
+
+    const result = await resolveCurrentBugEpicKey(
+      ACCESS_TOKEN,
+      base,
+      PROJECT_KEY,
+    );
+
+    expect(result).toBe('LS-FALLBACK');
+  });
+
+  it('returns fallback env var when property body has no key value', async () => {
+    const base = uniqueApiBase('no-key');
+    process.env['BUG_EPIC_FALLBACK_KEY'] = 'LS-FALLBACK2';
+    fetchSpy.mockResolvedValueOnce(
+      new Response(JSON.stringify({ value: {} }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+
+    const result = await resolveCurrentBugEpicKey(
+      ACCESS_TOKEN,
+      base,
+      PROJECT_KEY,
+    );
+
+    expect(result).toBe('LS-FALLBACK2');
+  });
+
+  it('returns undefined when lookup fails and no fallback env var is set', async () => {
+    const base = uniqueApiBase('no-fallback');
+    delete process.env['BUG_EPIC_FALLBACK_KEY'];
+    fetchSpy.mockResolvedValueOnce(
+      new Response('Internal Server Error', { status: 500 }),
+    );
+
+    const result = await resolveCurrentBugEpicKey(
+      ACCESS_TOKEN,
+      base,
+      PROJECT_KEY,
+    );
+
+    expect(result).toBeUndefined();
+  });
+
+  it('returns cached value within TTL without re-fetching', async () => {
+    const base = uniqueApiBase('cache-hit');
+    fetchSpy.mockResolvedValue(makePropertyResponse('LS-CACHED'));
+
+    const first = await resolveCurrentBugEpicKey(
+      ACCESS_TOKEN,
+      base,
+      PROJECT_KEY,
+    );
+    const second = await resolveCurrentBugEpicKey(
+      ACCESS_TOKEN,
+      base,
+      PROJECT_KEY,
+    );
+
+    expect(first).toBe('LS-CACHED');
+    expect(second).toBe('LS-CACHED');
+    // fetch should only be called once — second call hits the cache
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses project key in the property URL, not a hardcoded value', async () => {
+    const base = uniqueApiBase('project-key');
+    fetchSpy.mockResolvedValueOnce(makePropertyResponse('LS-9000'));
+
+    await resolveCurrentBugEpicKey(ACCESS_TOKEN, base, 'MYPROJECT');
+
+    expect(fetchSpy.mock.calls[0][0]).toContain(
+      '/project/MYPROJECT/properties/bucket.client-bugs',
+    );
+  });
+
+  it('uses separate cache entries for different project keys', async () => {
+    const base = uniqueApiBase('cache-keyed');
+    fetchSpy
+      .mockResolvedValueOnce(makePropertyResponse('LS-AAA'))
+      .mockResolvedValueOnce(makePropertyResponse('OTHER-BBB'));
+
+    const resultLS = await resolveCurrentBugEpicKey(ACCESS_TOKEN, base, 'LS');
+    const resultOther = await resolveCurrentBugEpicKey(
+      ACCESS_TOKEN,
+      base,
+      'OTHER',
+    );
+
+    expect(resultLS).toBe('LS-AAA');
+    expect(resultOther).toBe('OTHER-BBB');
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 });
