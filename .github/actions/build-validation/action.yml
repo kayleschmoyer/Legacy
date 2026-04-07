@@ -325,23 +325,18 @@ runs:
         terraform_version: "~> 1.14"
         terraform_wrapper: false
 
-    - name: "�🔐 AWS Infrastructure Validation"
+    - name: "🔐 AWS Infrastructure Validation"
       id: terraform-validation
       if: inputs.should-validate-terraform == 'true'
       shell: bash
       run: |
         echo "::group::🔐 Terraform Infrastructure Validation"
-        echo "::notice::To reproduce locally: cd terraform && terraform validate"
+        echo "::notice::To reproduce locally: terraform -chdir=terraform/main validate && terraform -chdir=terraform/runners validate"
 
-        # Change to terraform directory
-        if [ ! -d "terraform" ]; then
-          echo "❌ Terraform directory not found"
-          echo "::error::Terraform directory missing - infrastructure changes detected but no terraform/ directory found"
-          echo "result=failure" >> $GITHUB_OUTPUT
-          exit 1
-        fi
-
-        cd terraform
+        # As of LS-2425, terraform configuration is split into two states:
+        #   terraform/main/    — Lambda app infrastructure
+        #   terraform/runners/ — self-hosted runner fleet
+        # Both must validate for the build to succeed.
 
         # Verify Terraform is available
         echo "🔍 Verifying Terraform installation..."
@@ -353,46 +348,48 @@ runs:
         fi
         echo "✅ Terraform version: $(terraform version -json | grep -o '"terraform_version":"[^"]*' | cut -d'"' -f4)"
 
-        # Initialize terraform (validation mode)
-        echo "🔧 Initializing Terraform..."
-        if terraform init -backend=false -input=false 2>&1 | tee terraform-init.log; then
-          echo "✅ Terraform initialization succeeded"
-        else
-          echo "❌ Terraform initialization failed"
-          echo "## Terraform Initialization Errors"
-          cat terraform-init.log
-          echo "::error::Terraform initialization failed"
-          echo "result=failure" >> $GITHUB_OUTPUT
-          exit 1
-        fi
+        OVERALL=success
+        for STATE_DIR in terraform/main terraform/runners; do
+          echo ""
+          echo "── Validating $STATE_DIR ──"
 
-        # Validate terraform configuration
-        echo "🔍 Validating Terraform configuration..."
-        if terraform validate 2>&1 | tee terraform-validate.log; then
-          echo "✅ Terraform configuration is valid"
-          
-          # Check for common terraform files
-          TERRAFORM_FILES=("main.tf" "variables.tf" "outputs.tf")
-          PRESENT_FILES=()
-          
-          for file in "${TERRAFORM_FILES[@]}"; do
-            if [ -f "$file" ]; then
-              PRESENT_FILES+=("$file")
-            fi
-          done
-          
-          # Create terraform validation summary
-          echo "## 🔐 Terraform Validation Summary" >> $GITHUB_STEP_SUMMARY
-          echo "- **Status**: ✅ Configuration Valid" >> $GITHUB_STEP_SUMMARY
-          echo "- **Configuration Files**: ${PRESENT_FILES[*]}" >> $GITHUB_STEP_SUMMARY
+          if [ ! -d "$STATE_DIR" ]; then
+            echo "❌ Directory not found: $STATE_DIR"
+            echo "::error::$STATE_DIR is missing — infrastructure changes detected but the state directory is absent"
+            OVERALL=failure
+            continue
+          fi
+
+          # Initialize terraform (validation mode — no backend)
+          echo "🔧 Initializing $STATE_DIR..."
+          if terraform -chdir="$STATE_DIR" init -backend=false -input=false 2>&1 | tee "${STATE_DIR//\//-}-init.log"; then
+            echo "✅ $STATE_DIR initialization succeeded"
+          else
+            echo "❌ $STATE_DIR initialization failed"
+            echo "::error::Terraform initialization failed in $STATE_DIR"
+            OVERALL=failure
+            continue
+          fi
+
+          # Validate terraform configuration
+          echo "🔍 Validating $STATE_DIR..."
+          if terraform -chdir="$STATE_DIR" validate 2>&1 | tee "${STATE_DIR//\//-}-validate.log"; then
+            echo "✅ $STATE_DIR configuration is valid"
+          else
+            echo "❌ $STATE_DIR validation failed"
+            echo "::error::Terraform configuration is invalid in $STATE_DIR"
+            OVERALL=failure
+          fi
+        done
+
+        echo ""
+        echo "## 🔐 Terraform Validation Summary" >> $GITHUB_STEP_SUMMARY
+        if [ "$OVERALL" = "success" ]; then
+          echo "- **Status**: ✅ Configuration Valid (terraform/main + terraform/runners)" >> $GITHUB_STEP_SUMMARY
           echo "- **Validation Mode**: Syntax and structure check only" >> $GITHUB_STEP_SUMMARY
-          
           echo "result=success" >> $GITHUB_OUTPUT
         else
-          echo "❌ Terraform validation failed"
-          echo "## Terraform Configuration Errors"
-          cat terraform-validate.log
-          echo "::error::Terraform configuration is invalid."
+          echo "- **Status**: ❌ Validation failed — see job logs" >> $GITHUB_STEP_SUMMARY
           echo "result=failure" >> $GITHUB_OUTPUT
           exit 1
         fi

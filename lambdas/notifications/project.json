@@ -51,8 +51,8 @@
       "dependsOn": ["package"],
       "options": {
         "commands": [
-          "cd terraform && terraform apply -target=aws_lambda_function.notifications -auto-approve",
-          "cd terraform && terraform apply -target=aws_sqs_queue.notifications_queue -auto-approve"
+          "terraform -chdir=terraform/main apply -target=aws_lambda_function.notifications -auto-approve",
+          "terraform -chdir=terraform/main apply -target=aws_sqs_queue.notifications_queue -auto-approve"
         ],
         "parallel": false,
         "cwd": "."

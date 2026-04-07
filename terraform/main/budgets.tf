@@ -94,10 +94,12 @@ resource "aws_sns_topic_policy" "ops_alerts" {
           }
         },
       ],
-      # Only include the EventBridge statement when runners are enabled — the
-      # rotation reminder EventBridge rule only exists in that case, and
-      # one([]) returns null which produces an invalid SNS policy.
-      var.enable_github_runners ? [
+      # EventBridge publish permission for runner-related rules.
+      # The runner_secret_rotation_reminder EventBridge rule lives in
+      # terraform/runners/ as of LS-2425, so this policy uses a wildcard ARN
+      # pattern instead of a direct resource reference (which would create a
+      # cross-state dependency).
+      [
         {
           Sid       = "AllowEventBridgePublish"
           Effect    = "Allow"
@@ -107,11 +109,13 @@ resource "aws_sns_topic_policy" "ops_alerts" {
           Condition = {
             StringEquals = {
               "aws:SourceAccount" = data.aws_caller_identity.current.account_id
-              "aws:SourceArn"     = one(aws_cloudwatch_event_rule.runner_secret_rotation_reminder[*].arn)
+            }
+            ArnLike = {
+              "aws:SourceArn" = "arn:aws:events:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:rule/${local.name_prefix}-runner-*"
             }
           }
         },
-      ] : []
+      ]
     )
   })
 }

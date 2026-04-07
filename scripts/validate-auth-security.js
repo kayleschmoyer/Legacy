@@ -44,8 +44,9 @@ const ALLOWED_EXCEPTIONS = [
   'AGENTS.md',
   'README.md',
   'agents.md',
-  // Terraform outputs are templates
-  'terraform/outputs.tf',
+  // Terraform outputs are templates (LS-2425: split into main/ and runners/)
+  'terraform/main/outputs.tf',
+  'terraform/runners/outputs.tf',
   // The validation script itself contains regex patterns
   'scripts/validate-auth-security.js',
   // .env.example should only have safe placeholders

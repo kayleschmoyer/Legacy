@@ -50,8 +50,8 @@ aws sts get-caller-identity      # Check current auth status
 ```powershell
 pnpm exec nx run db:build --skip-nx-cache   # ALWAYS rebuild fresh
 node scripts/terraform-unlock.js             # Clear locks
-terraform -chdir=terraform plan              # Check infra changes
-terraform -chdir=terraform apply             # Apply if needed
+terraform -chdir=terraform/main plan              # Check infra changes
+terraform -chdir=terraform/main apply             # Apply if needed
 .\scripts\deploy-lambda.ps1 -FunctionName graphql  # Deploy code
 ```
 
@@ -61,15 +61,16 @@ terraform -chdir=terraform apply             # Apply if needed
 
 ```powershell
 node scripts/terraform-unlock.js             # Clear locks (always first)
-terraform -chdir=terraform plan              # Preview changes
-terraform -chdir=terraform apply             # Apply changes
-terraform -chdir=terraform apply -target=aws_lambda_function.db  # Target specific resource
+terraform -chdir=terraform/main plan              # Preview changes
+terraform -chdir=terraform/main apply        # Apply main/ (Lambda app infra) — LS-2425: split into main/ + runners/
+terraform -chdir=terraform/main apply -target=aws_lambda_function.db  # Target specific resource
+terraform -chdir=terraform/runners apply     # Apply runners/ (self-hosted runner fleet)
 ```
 
 ### Common Terraform Issues
 
 - **State lock error** — `node scripts/terraform-unlock.js`
-- **Secrets prompt in worktree** — `make wt-setup WT=<path>` or copy `terraform/secrets.auto.tfvars`
+- **Secrets prompt in worktree** — `make wt-setup WT=<path>` or copy `terraform/main/secrets.auto.tfvars` and `terraform/runners/secrets.auto.tfvars` (LS-2425: each state has its own gitignored secrets file)
 - **S3 package not found** — db Lambda uploads to `db/` prefix but Terraform expects `graphql/`
 
 See [references/terraform-common-issues.md](references/terraform-common-issues.md) and [references/terraform-state-and-operations.md](references/terraform-state-and-operations.md) for detailed troubleshooting.

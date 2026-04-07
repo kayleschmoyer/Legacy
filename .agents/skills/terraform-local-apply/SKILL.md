@@ -1,6 +1,6 @@
 ---
 name: terraform-local-apply
-description: 'Run terraform plan/apply locally against the AWS dev environment. Load before any terraform operation — plan, apply, destroy, import, state. Covers the GitHub Runners safety model (infra.auto.tfvars sets enable_github_runners=false), AWS SSO credential checks, state lock clearance, and the correct command sequence for local applies.'
+description: 'Run terraform plan/apply locally against the AWS dev environment. Load before any terraform operation — plan, apply, destroy, import, state. Covers the LS-2425 two-state architecture (terraform/main/ for Lambda app infra and terraform/runners/ for self-hosted runners), AWS SSO credential checks, state lock clearance, and the correct command sequence for local applies.'
 ---
 
 # Skill: Terraform Local Apply
@@ -9,63 +9,31 @@ description: 'Run terraform plan/apply locally against the AWS dev environment. 
 
 Run Terraform against the AWS dev environment from a local workstation or worktree.
 
-## GitHub Runners Safety Model
+## Two-state architecture (LS-2425)
 
-`terraform/infra.auto.tfvars` is **committed to the repo** and explicitly sets:
+The terraform configuration is split into **two physically separate state files**:
 
-```hcl
-enable_github_runners = false
-```
+| Path                 | State key                         | Owns                                                                                                                                     |
+| -------------------- | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `terraform/main/`    | `legacy-sports/terraform.tfstate` | Lambda app infra: VPC, RDS, Lambdas, API Gateway, secrets, OIDC IAM role, Lambda alarms, budgets                                         |
+| `terraform/runners/` | `legacy-sports/runners.tfstate`   | Self-hosted runner fleet: github-aws-runners module, runner cache, dashboard, runner alarms, AMI builder IAM, runner-specific OIDC perms |
 
-This is an intentional safety guard. Runner infrastructure was provisioned once via a targeted apply and is **not** continuously managed through the Terraform apply loop. Runners are self-managing — a GitHub `workflow_job` webhook triggers a Lambda that scales the EC2 Spot fleet up, and a cron Lambda scales it down. No Terraform apply is needed for day-to-day runner scaling.
+The two states share infrastructure (VPC, subnets, RDS SG) via `data.terraform_remote_state.main` from `runners/`. `main/` does not consume any outputs from `runners/` — the dependency is one-way.
 
-**CI does NOT override this flag.** The `lambda-terraform-apply.yml` workflow reads `infra.auto.tfvars` directly and only validates runner secrets when the value is `true`. Runner resources (SGs, ASGs, Lambdas) are intentionally outside the normal plan/apply loop.
-
-**What this means for local and CI applies:**
-
-- A plain `terraform plan` / `terraform apply` (local or CI) is safe — runner resources are never in the diff
-- To see a plan that _includes_ runner resources, add `-var="enable_github_runners=true"` — but **do not apply without `-target`** (see Runner Config Changes below)
-- **This exclusion is the intended long-term strategy** — not a temporary state or a bug. Runner resources were explicitly removed from state (LS-2051/LS-2056) to prevent phantom destroy plans on every apply.
-
-### Making Runner Config Changes
-
-If you need to change runner infrastructure (egress rules, instance types, IAM, module version), use the dedicated make target:
-
-```powershell
-# Preferred: use the make target (handles -target and -var automatically)
-make runner-apply
-```
-
-Or manually:
-
-```powershell
-# 1. Ensure runner secrets are present in secrets.auto.tfvars:
-#    github_app_id, github_app_key_base64, github_app_webhook_secret
-
-# 2. Preview runner changes (always review before applying)
-terraform -chdir=terraform plan -var="enable_github_runners=true"
-
-# 3. Apply ONLY runner resources — never apply the full stack with runners enabled
-terraform -chdir=terraform apply -var="enable_github_runners=true" `
-  -target=module.github_runners
-```
-
-> ⚠️ Never run `terraform apply -var="enable_github_runners=true"` without `-target`. A full apply with runners enabled will plan to recreate all runner infrastructure and may disrupt the live fleet.
+**Why two states?** Before LS-2425, the runner module lived in the same state as the Lambda app but was gated behind `count = var.enable_github_runners ? 1 : 0`. The regular CI workflow ran with `enable_github_runners = false`, which made terraform compute a destroy-everything plan for the runner module on every refresh. State separation makes this bug class structurally impossible — `terraform/main/` cannot see runner resources because they are not in its state file.
 
 ## Prerequisites
 
 ### 1. Check AWS SSO credentials
 
 ```powershell
-# Verify credentials are active before any terraform command
 aws sts get-caller-identity
 ```
 
-If the command fails or returns an error, credentials are expired:
+If the command fails, credentials are expired:
 
 ```powershell
 aws sso login --profile <your-profile>
-# Then re-verify:
 aws sts get-caller-identity
 ```
 
@@ -74,83 +42,107 @@ aws sts get-caller-identity
 ### 2. Clear any state locks
 
 ```powershell
-# Always run this before plan/apply — a previous interrupted run may hold the lock
+# Touches both terraform/main/ and terraform/runners/ state lock keys
 node scripts/terraform-unlock.js
 ```
 
-## Standard Workflow
+## Standard Workflow — Lambda app infra (`terraform/main/`)
 
 ```powershell
-# 1. Refresh secrets.auto.tfvars from env vars
+# 1. Refresh main/secrets.auto.tfvars from env vars
 make gen-tfvars
 
 # 2. Clear state lock
 node scripts/terraform-unlock.js
 
 # 3. Format and validate
-terraform -chdir=terraform fmt
-terraform -chdir=terraform validate
+terraform -chdir=terraform/main fmt
+terraform -chdir=terraform/main validate
 
 # 4. Plan (always review before applying)
-terraform -chdir=terraform plan
+terraform -chdir=terraform/main plan
+# or: make terraform-plan
 
 # 5. Apply after reviewing the plan
-terraform -chdir=terraform apply
+terraform -chdir=terraform/main apply
+# or: make terraform-apply
+```
+
+## Standard Workflow — Runner fleet (`terraform/runners/`)
+
+```powershell
+# 1. Ensure runner secrets are in terraform/runners/secrets.auto.tfvars:
+#    github_app_id, github_app_key_base64, github_app_webhook_secret
+
+# 2. Download Lambda zips that match the github-aws-runners module version
+make runner-lambdas-sync
+
+# 3. Clear state lock + plan
+node scripts/terraform-unlock.js
+make runner-plan
+
+# 4. Apply (with confirmation)
+make runner-apply
+# Or non-interactively:
+make runner-apply NO_CONFIRM=1
 ```
 
 > **Never pipe `terraform apply` through output-truncating filters** (`Select-Object -Last N`, etc.) — this interrupts Terraform before it releases the DynamoDB state lock, leaving it orphaned.
 
 ## Targeting Specific Resources
 
-Use `-target` to apply changes to a single resource without touching everything else:
+Use `-target` to apply changes to a single resource without touching everything else. The state file you target depends on which resource you're modifying:
 
 ```powershell
-terraform -chdir=terraform apply -target=aws_lambda_function.graphql
+# Lambda app resource → use main/
+terraform -chdir=terraform/main apply -target=aws_lambda_function.graphql
+
+# Runner module resource → use runners/
+terraform -chdir=terraform/runners apply -target=module.github_runners.module.runners.aws_lambda_function.scale_up
 ```
 
-> `-target` uses Terraform resource names (e.g. `aws_lambda_function.graphql`), NOT AWS resource names. Look up the resource label in `terraform/lambda-*.tf`.
+> `-target` uses Terraform resource names (e.g. `aws_lambda_function.graphql`), NOT AWS resource names. Look up the resource label in `terraform/main/lambda-*.tf` or `terraform/runners/github-runners.tf`.
 
-| Lambda          | Terraform target                      |
-| --------------- | ------------------------------------- |
-| graphql / db    | `aws_lambda_function.graphql`         |
-| stats           | `aws_lambda_function.stats`           |
-| game-selection  | `aws_lambda_function.game_selection`  |
-| draft-processor | `aws_lambda_function.draft_processor` |
-| oauth-proxy     | `aws_lambda_function.oauth_proxy`     |
-| websocket       | `aws_lambda_function.websocket`       |
-| jira-proxy      | `aws_lambda_function.jira_proxy`      |
-| stripe-webhook  | `aws_lambda_function.stripe_webhook`  |
-
-> This table is not exhaustive. For the full set of Lambda resources and their Terraform targets, see `terraform/lambda-*.tf`.
+| Lambda            | State   | Terraform target                                                                      |
+| ----------------- | ------- | ------------------------------------------------------------------------------------- |
+| graphql / db      | main    | `aws_lambda_function.graphql`                                                         |
+| stats             | main    | `aws_lambda_function.stats`                                                           |
+| game-selection    | main    | `aws_lambda_function.game_selection`                                                  |
+| draft-processor   | main    | `aws_lambda_function.draft_processor`                                                 |
+| oauth-proxy       | main    | `aws_lambda_function.oauth_proxy`                                                     |
+| websocket         | main    | `aws_lambda_function.websocket`                                                       |
+| jira-proxy        | main    | `aws_lambda_function.jira_proxy`                                                      |
+| stripe-webhook    | main    | `aws_lambda_function.stripe_webhook`                                                  |
+| runner scale-up   | runners | `module.github_runners.module.runners.aws_lambda_function.scale_up`                   |
+| runner scale-down | runners | `module.github_runners.module.runners.aws_lambda_function.scale_down`                 |
+| runner webhook    | runners | `module.github_runners.module.webhook.module.eventbridge.aws_lambda_function.webhook` |
 
 ## Worktree Gotcha: Missing secrets.auto.tfvars
 
-`terraform/secrets.auto.tfvars` is gitignored and lives only in the main repo. A fresh worktree will not have it, causing Terraform to prompt interactively for secret variables.
+`terraform/main/secrets.auto.tfvars` and `terraform/runners/secrets.auto.tfvars` are both gitignored and live only in the main repo. A fresh worktree will not have them, causing Terraform to prompt interactively for secret variables.
 
 ```powershell
-# Fix: generate from env vars (works in any worktree)
-make gen-tfvars
-
-# Or re-run wt-setup (also copies secrets from main repo automatically)
+# Fix: re-run wt-setup (copies both secrets files from main repo automatically)
 make wt-setup WT=<path-to-worktree>
 ```
 
 ## Pre-Apply Checklist
 
-- [ ] `make gen-tfvars` ran — `secrets.auto.tfvars` is current with env vars
+- [ ] `make gen-tfvars` ran (or `make wt-setup` did) — both `secrets.auto.tfvars` files are current
 - [ ] `aws sts get-caller-identity` succeeds
 - [ ] `node scripts/terraform-unlock.js` ran — no active lock
-- [ ] `terraform plan` reviewed — changes are expected and runner resources are NOT in the diff
-- [ ] `secrets.auto.tfvars` present in worktree (if running from a worktree)
+- [ ] `terraform plan` reviewed — changes match expectation
+- [ ] You're applying the **right** state file (main/ for Lambda app, runners/ for runner fleet)
 
 ## Troubleshooting
 
-| Symptom                                       | Fix                                                                           |
-| --------------------------------------------- | ----------------------------------------------------------------------------- |
-| "Error acquiring the state lock"              | `node scripts/terraform-unlock.js`                                            |
-| Prompts for secret variables interactively    | Run `make gen-tfvars` (or copy `secrets.auto.tfvars` from main repo)          |
-| "No valid credential sources found"           | `aws sso login --profile <profile>`                                           |
-| Plan unexpectedly shows runner infrastructure | Check `infra.auto.tfvars` is present and sets `enable_github_runners = false` |
-| "Required version constraint"                 | Check `terraform/main.tf` and install matching `terraform` binary             |
+| Symptom                                                | Fix                                                                                                                                                                                                  |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "Error acquiring the state lock"                       | `node scripts/terraform-unlock.js`                                                                                                                                                                   |
+| Prompts for secret variables interactively             | Run `make wt-setup WT=<path>` (copies both gitignored secrets files)                                                                                                                                 |
+| "No valid credential sources found"                    | `aws sso login --profile <profile>`                                                                                                                                                                  |
+| Plan unexpectedly shows runner infrastructure in main/ | LS-2425 incident — runner resources should not be in `main/` state. Run `terraform -chdir=terraform/main state list \| grep github_runners` to confirm; if any are present, escalate before applying |
+| "Required version constraint"                          | Check `terraform/main/main.tf` (or `terraform/runners/backend.tf`) and install matching `terraform` binary                                                                                           |
+| `runners/` plan shows VPC/SG creates                   | Cross-state outputs missing in `terraform/main/outputs.tf` — re-run `terraform -chdir=terraform/main apply` to publish them, then re-init `terraform/runners/`                                       |
 
 > 📎 Full issue catalogue: see [references/terraform-common-issues.md](../infrastructure/references/terraform-common-issues.md)

@@ -66,19 +66,24 @@ terraform apply -target=aws_lambda_function.db
 terraform apply -target=aws_lambda_function.db -target=aws_lambda_function.oauth_proxy
 ```
 
-### Runner Infrastructure (Special Case — Never in Normal Apply Loop)
+### Runner Infrastructure (Separate State, LS-2425)
 
-Runner resources (`module.github_runners`) are **intentionally excluded** from the normal `terraform apply` via `enable_github_runners = false` in `infra.auto.tfvars`. This is a permanent safety guard — a normal apply never touches runner EC2 instances, ASGs, IAM policies, or Lambdas.
+As of LS-2425, runner resources (`module.github_runners`) live in their own terraform state at `terraform/runners/`, completely separate from `terraform/main/`. The regular Apply Lambda Infrastructure workflow operates against `terraform/main/` and physically cannot see runner resources.
 
-To apply runner-specific changes (e.g., IAM permissions boundary, security groups):
+To apply runner-specific changes (e.g., IAM permissions boundary, security groups, AMI version):
 
 ```bash
-make runner-apply
+make runner-apply              # plan + apply with confirmation
+make runner-apply NO_CONFIRM=1 # non-interactive (for agent use)
 ```
 
-This runs a targeted plan/apply scoped to `module.github_runners` only with `enable_github_runners=true`. Requires `secrets.auto.tfvars` to be present in the terraform directory.
+Behind the scenes this runs `terraform -chdir=terraform/runners init/plan/apply` against the runner state file. Requires `terraform/runners/secrets.auto.tfvars` to be present (contains `github_app_id`, `github_app_key_base64`, `github_app_webhook_secret`).
 
-> **Do NOT** run `terraform apply -var="enable_github_runners=true"` without `-target` — it plans the full runner fleet and may destroy live runners.
+To target a specific runner-module resource:
+
+```bash
+terraform -chdir=terraform/runners apply -target=module.github_runners.module.runners.aws_lambda_function.scale_up
+```
 
 > **`-target` uses Terraform resource names, NOT AWS function names.**
 > The resource name is the second label in `resource "aws_lambda_function" "<name>"` in the .tf file.

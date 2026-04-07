@@ -17,8 +17,8 @@
 #
 # After running:
 #   1. Complete the manual steps printed below
-#   2. Update terraform/secrets.auto.tfvars with the new values
-#   3. Run: terraform -chdir=terraform apply
+#   2. Update terraform/runners/secrets.auto.tfvars with the new values
+#   3. Run: terraform -chdir=terraform/runners apply
 
 set -euo pipefail
 
@@ -30,15 +30,15 @@ fi
 
 # ── Detect prefix from terraform config ──────────────────────────────────────
 
-RUNNERS_TF="$(dirname "$0")/../terraform/github-runners.tf"
+RUNNERS_TF="$(dirname "$0")/../terraform/runners/github-runners.tf"
 if [[ ! -f "$RUNNERS_TF" ]]; then
-  echo "ERROR: terraform/github-runners.tf not found. Run from repo root or adjust path." >&2
+  echo "ERROR: terraform/runners/github-runners.tf not found. Run from repo root or adjust path." >&2
   exit 1
 fi
 
 # Extract project_name and environment from variables.tf defaults, fall back to
 # env vars TF_VAR_project_name / TF_VAR_environment if set.
-PROJECT_NAME="${TF_VAR_project_name:-$(sed -n '/variable "project_name"/,/^}/{/default/{s/.*default[^"]*"\([^"]*\)".*/\1/p}}' "$(dirname "$0")/../terraform/variables.tf" | head -n1)}"
+PROJECT_NAME="${TF_VAR_project_name:-$(sed -n '/variable "project_name"/,/^}/{/default/{s/.*default[^"]*"\([^"]*\)".*/\1/p}}' "$(dirname "$0")/../terraform/main/variables.tf" | head -n1)}"
 ENVIRONMENT="${TF_VAR_environment:-${ENVIRONMENT:-prod}}"
 PREFIX="${PROJECT_NAME}-${ENVIRONMENT}-runner"
 
@@ -118,7 +118,7 @@ fi
 
 # ── Manual steps ─────────────────────────────────────────────────────────────
 
-APP_ID=$(grep -m1 'github_app_id' "$(dirname "$0")/../terraform/secrets.auto.tfvars" 2>/dev/null \
+APP_ID=$(grep -m1 'github_app_id' "$(dirname "$0")/../terraform/runners/secrets.auto.tfvars" 2>/dev/null \
   | grep -oP '(?<=")[^"]+(?=")' || echo "<your-app-id>")
 
 echo ""
@@ -139,13 +139,13 @@ echo "   On the same GitHub App settings page:"
 echo "   → Private keys section → Generate a new private key"
 echo "   → Download the .pem file"
 echo "   → Convert to base64: base64 < downloaded.pem | tr -d '\n'"
-echo "   → Update terraform/secrets.auto.tfvars:"
+echo "   → Update terraform/runners/secrets.auto.tfvars:"
 echo "       github_app_key_base64 = \"<new-base64-value>\""
 echo "   → Delete the old private key from the GitHub App page"
 echo "   → Delete the downloaded .pem file"
 echo ""
 echo "3. APPLY TERRAFORM"
-echo "   terraform -chdir=terraform apply"
+echo "   terraform -chdir=terraform/runners apply"
 echo "   (This pushes the new key_base64 value to SSM)"
 echo ""
 echo "════════════════════════════════════════════════════════════════"

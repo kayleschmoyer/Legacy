@@ -187,8 +187,8 @@ make pc                  # Re-validate after migration
 **Infrastructure teleport:**
 
 ```bash
-terraform -chdir=terraform plan    # Review infra changes
-terraform -chdir=terraform apply   # Apply after review
+terraform -chdir=terraform/main plan    # Review infra changes
+terraform -chdir=terraform/main apply   # Apply after review
 ```
 
 **Deployment teleport:**

@@ -2,7 +2,7 @@
 // download-runner-lambdas.js
 //
 // Downloads the three Lambda zip files required by the github-aws-runners
-// Terraform module. The module version is read from terraform/github-runners.tf
+// Terraform module. The module version is read from terraform/runners/github-runners.tf
 // so this script always downloads the version that matches what is deployed.
 //
 // Usage:
@@ -10,7 +10,7 @@
 //   node scripts/download-runner-lambdas.js 7.6.0    # override version
 //
 // Called by `make runner-lambdas-sync`. Run this after bumping the module
-// version in terraform/github-runners.tf before running terraform init/apply.
+// version in terraform/runners/github-runners.tf before running terraform init/apply.
 
 'use strict';
 
@@ -20,12 +20,18 @@ const path = require('path');
 
 const REPO = 'github-aws-runners/terraform-aws-github-runner';
 const ZIPS = ['webhook.zip', 'runners.zip', 'runner-binaries-syncer.zip'];
-const OUT_DIR = path.join(__dirname, '..', 'terraform', 'lambdas');
+const OUT_DIR = path.join(__dirname, '..', 'terraform', 'runners', 'lambdas');
 
 // ── Version detection ────────────────────────────────────────────────────────
 
 function detectVersion() {
-  const tfPath = path.join(__dirname, '..', 'terraform', 'github-runners.tf');
+  const tfPath = path.join(
+    __dirname,
+    '..',
+    'terraform',
+    'runners',
+    'github-runners.tf',
+  );
   const content = fs.readFileSync(tfPath, 'utf8');
   // Match the version = "x.y.z" line that follows the github-aws-runners source.
   // The source and version lines appear consecutively in the module block.
@@ -34,7 +40,7 @@ function detectVersion() {
   );
   if (!match) {
     throw new Error(
-      'Could not find github-aws-runners module version in terraform/github-runners.tf.\n' +
+      'Could not find github-aws-runners module version in terraform/runners/github-runners.tf.\n' +
         'Pass the version explicitly: node scripts/download-runner-lambdas.js <version>',
     );
   }
@@ -160,7 +166,9 @@ async function main() {
     console.log(`${size} KB`);
   }
 
-  console.log(`\nRunner Lambda zips ready in terraform/lambdas/ (v${version})`);
+  console.log(
+    `\nRunner Lambda zips ready in terraform/runners/lambdas/ (v${version})`,
+  );
 }
 
 main().catch((err) => {

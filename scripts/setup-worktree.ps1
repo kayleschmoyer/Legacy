@@ -3,7 +3,7 @@
 # Automates the six manual steps every worktree needs:
 #   1. node_modules             - junction to main repo when lockfiles match; full pnpm install otherwise
 #   2. .env                     - copy from main repo
-#   3. terraform/secrets.auto.tfvars - copy from main repo (prevents interactive terraform prompts)
+#   3. terraform/main/secrets.auto.tfvars and terraform/runners/secrets.auto.tfvars - copy from main repo (prevents interactive terraform prompts; LS-2425 split)
 #   4. .twig                    - junction to main repo (shared branch-dependency state)
 #   5. .github/skills           - junction to .agents/skills (backward-compat for old skill paths)
 #   6. certs/                   - junction to main repo (RDS SSL certificate for DB connections)
@@ -367,37 +367,79 @@ else {
 }
 
 # ---------------------------------------------------------------------------
-# 3. terraform/secrets.auto.tfvars
+# 3. terraform/main/secrets.auto.tfvars and terraform/runners/secrets.auto.tfvars
 # ---------------------------------------------------------------------------
-# Terraform requires secret variables (google_oauth_client_secret, jwt_secret_key,
-# oauth_proxy_cookie_secret, jira_credentials, rollbar_access_token) that are
-# never committed to git. They live in terraform/secrets.auto.tfvars in the main
-# repo. Copy them to the worktree so `terraform plan/apply` doesn't block on
-# interactive prompts or fail with "No value for required variable".
+# Terraform requires secret variables that are never committed to git. As of
+# LS-2425, the terraform configuration is split into two states (main/ for
+# Lambda app infra, runners/ for self-hosted runners) and each has its own
+# gitignored secrets.auto.tfvars. Copy both to the worktree so terraform
+# plan/apply doesn't block on interactive prompts or fail with
+# "No value for required variable".
 
-Write-Step "terraform/secrets.auto.tfvars"
+function Sync-SecretsFile {
+    param(
+        [Parameter(Mandatory=$true)][string]$SrcPath,
+        [Parameter(Mandatory=$true)][string]$DestPath,
+        [Parameter(Mandatory=$true)][string]$DisplayName
+    )
 
-$mainTfSecrets = Join-Path (Join-Path $MainRepoPath "terraform") "secrets.auto.tfvars"
-$wtTfSecrets   = Join-Path (Join-Path $WorktreePath "terraform") "secrets.auto.tfvars"
+    if (-not (Test-Path $SrcPath)) {
+        Write-Warn "No $DisplayName in main repo -- skipping (run terraform setup first)"
+        return
+    }
 
-if (-not (Test-Path $mainTfSecrets)) {
-    Write-Warn "No terraform/secrets.auto.tfvars in main repo -- skipping (run terraform setup first)"
-}
-elseif (Test-Path $wtTfSecrets) {
-    $mainHash = Get-FileHash256 $mainTfSecrets
-    $wtHash   = Get-FileHash256 $wtTfSecrets
-    if ($mainHash -eq $wtHash) {
-        Write-Ok "terraform/secrets.auto.tfvars already up to date"
+    # Ensure parent directory exists
+    $parent = Split-Path -Parent $DestPath
+    if ($parent -and -not (Test-Path $parent)) {
+        New-Item -ItemType Directory -Path $parent -Force | Out-Null
+    }
+
+    if (Test-Path $DestPath) {
+        $srcHash = Get-FileHash256 $SrcPath
+        $destHash = Get-FileHash256 $DestPath
+        if ($srcHash -eq $destHash) {
+            Write-Ok "$DisplayName already up to date"
+        }
+        else {
+            Copy-Item $SrcPath $DestPath -Force
+            Write-Ok "$DisplayName updated from main repo"
+        }
     }
     else {
-        Copy-Item $mainTfSecrets $wtTfSecrets -Force
-        Write-Ok "terraform/secrets.auto.tfvars updated from main repo"
+        Copy-Item $SrcPath $DestPath
+        Write-Ok "$DisplayName copied from main repo"
     }
 }
-else {
-    Copy-Item $mainTfSecrets $wtTfSecrets
-    Write-Ok "terraform/secrets.auto.tfvars copied from main repo"
+
+# LS-2425 backwards-compat: if the main repo still has the pre-LS-2425 single
+# secrets.auto.tfvars at terraform/secrets.auto.tfvars, one-time-migrate it to
+# terraform/main/secrets.auto.tfvars (since all the variables it carries are
+# main/-side). This makes the first `make wt-setup` after the LS-2425 merge
+# work cleanly even on stale main repos that haven't pulled yet.
+$mainRepoLegacySecrets = Join-Path (Join-Path $MainRepoPath "terraform") "secrets.auto.tfvars"
+$mainRepoNewMainSecrets = Join-Path (Join-Path $MainRepoPath "terraform/main") "secrets.auto.tfvars"
+if ((Test-Path $mainRepoLegacySecrets) -and -not (Test-Path $mainRepoNewMainSecrets)) {
+    Write-Step "Migrating pre-LS-2425 terraform/secrets.auto.tfvars in main repo"
+    $mainRepoNewMainDir = Join-Path $MainRepoPath "terraform/main"
+    if (-not (Test-Path $mainRepoNewMainDir)) {
+        New-Item -ItemType Directory -Path $mainRepoNewMainDir -Force | Out-Null
+    }
+    Copy-Item $mainRepoLegacySecrets $mainRepoNewMainSecrets
+    Write-Ok "Copied legacy secrets to terraform/main/secrets.auto.tfvars in main repo"
+    Write-Warn "The legacy file at terraform/secrets.auto.tfvars is preserved. Delete it manually after verifying everything works."
 }
+
+Write-Step "terraform/main/secrets.auto.tfvars"
+Sync-SecretsFile `
+    -SrcPath  (Join-Path (Join-Path $MainRepoPath "terraform/main") "secrets.auto.tfvars") `
+    -DestPath (Join-Path (Join-Path $WorktreePath "terraform/main") "secrets.auto.tfvars") `
+    -DisplayName "terraform/main/secrets.auto.tfvars"
+
+Write-Step "terraform/runners/secrets.auto.tfvars"
+Sync-SecretsFile `
+    -SrcPath  (Join-Path (Join-Path $MainRepoPath "terraform/runners") "secrets.auto.tfvars") `
+    -DestPath (Join-Path (Join-Path $WorktreePath "terraform/runners") "secrets.auto.tfvars") `
+    -DisplayName "terraform/runners/secrets.auto.tfvars"
 
 # ---------------------------------------------------------------------------
 # 4. .twig junction

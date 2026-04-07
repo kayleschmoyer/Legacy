@@ -71,14 +71,14 @@ jobs:
                 print substr($0, RSTART + 1, RLENGTH - 2)
                 exit
               }
-            ' terraform/runner-ami.auto.tfvars)
+            ' terraform/runners/runner-ami.auto.tfvars)
 
             # Enumerate open PRs and pull their tfvars via the API (no need to
             # check out each branch).
             gh pr list --state open --json headRefName --limit 100 \
               | jq -r '.[].headRefName' \
               | while read -r BRANCH; do
-                  VERSION=$(gh api "repos/${{ github.repository }}/contents/terraform/runner-ami.auto.tfvars?ref=$BRANCH" \
+                  VERSION=$(gh api "repos/${{ github.repository }}/contents/terraform/runners/runner-ami.auto.tfvars?ref=$BRANCH" \
                     --jq '.content' 2>/dev/null \
                     | base64 -d 2>/dev/null \
                     | awk '

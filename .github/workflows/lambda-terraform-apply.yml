@@ -55,27 +55,9 @@ jobs:
             exit 1
           fi
           echo "✅ All required secrets are configured"
-
-          # Runner secrets are only required when runners are enabled in tfvars
-          if grep -q 'enable_github_runners\s*=\s*true' terraform/infra.auto.tfvars 2>/dev/null; then
-            RUNNER_MISSING=()
-            if [ -z "${{ secrets.RUNNER_GITHUB_APP_ID }}" ]; then
-              RUNNER_MISSING+=("RUNNER_GITHUB_APP_ID")
-            fi
-            if [ -z "${{ secrets.RUNNER_GITHUB_APP_KEY_BASE64 }}" ]; then
-              RUNNER_MISSING+=("RUNNER_GITHUB_APP_KEY_BASE64")
-            fi
-            if [ -z "${{ secrets.RUNNER_GITHUB_APP_WEBHOOK_SECRET }}" ]; then
-              RUNNER_MISSING+=("RUNNER_GITHUB_APP_WEBHOOK_SECRET")
-            fi
-            if [ ${#RUNNER_MISSING[@]} -gt 0 ]; then
-              echo "::error::Runner secrets required (enable_github_runners=true): ${RUNNER_MISSING[*]}"
-              exit 1
-            fi
-            echo "✅ All runner secrets are configured"
-          else
-            echo "ℹ️ Runners disabled — skipping runner secret validation"
-          fi
+          # Note: runner secret validation moved to runner-terraform-apply.yml as part
+          # of LS-2425 (state separation). The regular Apply Lambda Infrastructure
+          # workflow no longer touches the github-aws-runners module.
 
       - name: Checkout code
         uses: actions/checkout@v6
@@ -152,13 +134,13 @@ jobs:
           terraform_version: "~> 1.14"
 
       - name: Initialize Terraform
-        working-directory: terraform
+        working-directory: terraform/main
         run: |
           echo "🔧 Initializing Terraform..."
           terraform init -input=false
 
       - name: Clear Stale Locks
-        working-directory: terraform
+        working-directory: terraform/main
         run: |
           echo "🔍 Checking for stale Terraform locks..."
 
@@ -188,17 +170,16 @@ jobs:
 
       - name: Plan Infrastructure Changes
         id: plan
-        working-directory: terraform
+        working-directory: terraform/main
         env:
           TF_VAR_rollbar_access_token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
           TF_VAR_discord_user_signup_webhook_url: ${{ secrets.DISCORD_USER_SIGNUP_WEBHOOK_URL }}
           TF_VAR_discord_stripe_webhook_url: ${{ secrets.DISCORD_STRIPE_WEBHOOK_URL }}
           TF_VAR_ga_measurement_id: ${{ secrets.GA_MEASUREMENT_ID }}
           TF_VAR_ga_api_secret: ${{ secrets.GA_API_SECRET }}
-          TF_VAR_github_app_id: ${{ secrets.RUNNER_GITHUB_APP_ID }}
-          TF_VAR_github_app_key_base64: ${{ secrets.RUNNER_GITHUB_APP_KEY_BASE64 }}
-          TF_VAR_github_app_webhook_secret: ${{ secrets.RUNNER_GITHUB_APP_WEBHOOK_SECRET }}
           TF_VAR_mlb_data_api_key: ${{ secrets.MLB_DATA_API_KEY }}
+          # Note: TF_VAR_github_app_* removed in LS-2425 — those variables now
+          # live in terraform/runners/ and are passed by runner-terraform-apply.yml.
         run: |
           set -o pipefail
           echo "📋 Planning Terraform changes..."
@@ -227,7 +208,7 @@ jobs:
 
       - name: Release Lock on Plan Failure
         if: always() && steps.plan.outcome == 'failure'
-        working-directory: terraform
+        working-directory: terraform/main
         run: |
           echo "🔓 Releasing terraform lock after plan failure..."
           aws dynamodb delete-item \
@@ -273,17 +254,16 @@ jobs:
       - name: Re-plan if Versions Changed
         id: replan
         if: steps.recheck.outputs.versions_changed == 'true'
-        working-directory: terraform
+        working-directory: terraform/main
         env:
           TF_VAR_rollbar_access_token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
           TF_VAR_discord_user_signup_webhook_url: ${{ secrets.DISCORD_USER_SIGNUP_WEBHOOK_URL }}
           TF_VAR_discord_stripe_webhook_url: ${{ secrets.DISCORD_STRIPE_WEBHOOK_URL }}
           TF_VAR_ga_measurement_id: ${{ secrets.GA_MEASUREMENT_ID }}
           TF_VAR_ga_api_secret: ${{ secrets.GA_API_SECRET }}
-          TF_VAR_github_app_id: ${{ secrets.RUNNER_GITHUB_APP_ID }}
-          TF_VAR_github_app_key_base64: ${{ secrets.RUNNER_GITHUB_APP_KEY_BASE64 }}
-          TF_VAR_github_app_webhook_secret: ${{ secrets.RUNNER_GITHUB_APP_WEBHOOK_SECRET }}
           TF_VAR_mlb_data_api_key: ${{ secrets.MLB_DATA_API_KEY }}
+          # Note: TF_VAR_github_app_* removed in LS-2425 — those variables now
+          # live in terraform/runners/ and are passed by runner-terraform-apply.yml.
         run: |
           echo "⚠️ SSM versions changed during plan — re-planning with updated values..."
           EXIT_CODE=0
@@ -315,17 +295,16 @@ jobs:
       - name: Apply Infrastructure Changes
         id: apply
         if: steps.plan.outputs.has_changes == 'true' && steps.replan.outputs.has_changes != 'false'
-        working-directory: terraform
+        working-directory: terraform/main
         env:
           TF_VAR_rollbar_access_token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
           TF_VAR_discord_user_signup_webhook_url: ${{ secrets.DISCORD_USER_SIGNUP_WEBHOOK_URL }}
           TF_VAR_discord_stripe_webhook_url: ${{ secrets.DISCORD_STRIPE_WEBHOOK_URL }}
           TF_VAR_ga_measurement_id: ${{ secrets.GA_MEASUREMENT_ID }}
           TF_VAR_ga_api_secret: ${{ secrets.GA_API_SECRET }}
-          TF_VAR_github_app_id: ${{ secrets.RUNNER_GITHUB_APP_ID }}
-          TF_VAR_github_app_key_base64: ${{ secrets.RUNNER_GITHUB_APP_KEY_BASE64 }}
-          TF_VAR_github_app_webhook_secret: ${{ secrets.RUNNER_GITHUB_APP_WEBHOOK_SECRET }}
           TF_VAR_mlb_data_api_key: ${{ secrets.MLB_DATA_API_KEY }}
+          # Note: TF_VAR_github_app_* removed in LS-2425 — those variables now
+          # live in terraform/runners/ and are passed by runner-terraform-apply.yml.
         run: |
           echo "🚀 Applying Terraform changes..."
 
@@ -375,7 +354,7 @@ jobs:
 
       - name: Release Lock on Apply Failure
         if: always() && steps.apply.outcome == 'failure'
-        working-directory: terraform
+        working-directory: terraform/main
         run: |
           echo "🔓 Releasing terraform lock after apply failure..."
           aws dynamodb delete-item \
@@ -462,7 +441,7 @@ jobs:
 
       - name: Cleanup on Failure
         if: always() && (failure() || cancelled())
-        working-directory: terraform
+        working-directory: terraform/main
         run: |
           echo "🔓 Ensuring terraform lock is released..."
           aws dynamodb delete-item \

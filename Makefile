@@ -9,7 +9,7 @@
 	start dev dev-web dev-mobile dev-db dev-graphql dev-storybook graphiql docker-up \
 	android ios build-android build-ios \
 	db-migrate db-studio db-reset db-tunnel db-dump db-restore db-dump-dev db-restore-dev db-check-connections codegen \
-	deploy-lambdas deploy-infrastructure terraform-init terraform-plan terraform-apply terraform-apply-auto terraform-destroy gen-tfvars \
+	deploy-lambdas terraform-init terraform-plan terraform-apply terraform-apply-auto terraform-destroy gen-tfvars \
 	runner-apply ami-build ami-list runner-secrets-rotate runner-lambdas-sync \
 	sync-env check-services graph affected list-projects workspace-lint pr \
 	ci ci-force ci-full release full-deploy full-check dev-setup \
@@ -509,50 +509,59 @@ else
 	scripts$(PATH_SEP)deploy-lambda-all.sh
 endif
 
-deploy-infrastructure: ## Deploy infrastructure with Terraform
-	@$(call echo_blue,Deploying infrastructure...)
-ifeq ($(DETECTED_OS),Windows)
-	cd terraform && powershell -ExecutionPolicy Bypass -File deploy.ps1
-else
-	cd terraform && ./deploy.sh
-endif
+# deploy-infrastructure target was removed in LS-2425. The terraform/deploy.ps1
+# and terraform/deploy.sh scripts it invoked were obsolete bootstrap scripts that
+# pre-dated `make terraform-apply`. Use `make terraform-apply` (Lambda app) and
+# `make runner-apply` (runner fleet) instead.
 
-gen-tfvars: ## Generate terraform/secrets.auto.tfvars from env vars (safe to re-run)
-	@$(call echo_blue,Generating terraform/secrets.auto.tfvars...)
+gen-tfvars: ## Generate terraform/main/secrets.auto.tfvars from env vars (safe to re-run)
+	@$(call echo_blue,Generating terraform/main/secrets.auto.tfvars...)
 	node scripts/gen-tfvars.js
-	@$(call echo_green,Done — terraform/secrets.auto.tfvars updated)
+	@$(call echo_green,Done — terraform/main/secrets.auto.tfvars updated)
 
-terraform-init: ## Initialize Terraform working directory
-	@$(call echo_blue,Initializing Terraform...)
-	cd terraform && terraform init
+# Lambda app infrastructure (terraform/main/) — used by the regular
+# Apply Lambda Infrastructure workflow. Does NOT touch runner resources;
+# the runner fleet lives in terraform/runners/ as of LS-2425.
 
-terraform-plan: ## Plan Terraform deployment
-	@$(call echo_blue,Planning Terraform deployment...)
-	cd terraform && terraform plan
+terraform-init: ## Initialize Terraform working directory (terraform/main/)
+	@$(call echo_blue,Initializing Terraform [main]...)
+	terraform -chdir=terraform/main init
 
-terraform-apply: ## Apply Terraform changes (with confirmation)
-	@$(call echo_blue,Applying Terraform changes...)
+terraform-plan: ## Plan Terraform deployment (terraform/main/)
+	@$(call echo_blue,Planning Terraform deployment [main]...)
+	terraform -chdir=terraform/main plan
+
+terraform-apply: ## Apply Terraform changes (terraform/main/, with confirmation)
+	@$(call echo_blue,Applying Terraform changes [main]...)
 	@$(call echo_yellow,This will apply changes to AWS infrastructure!)
-	cd terraform && terraform apply
+	terraform -chdir=terraform/main apply
 
-terraform-apply-auto: ## Apply Terraform changes (auto-approve, use with caution)
-	@$(call echo_blue,Auto-applying Terraform changes...)
+terraform-apply-auto: ## Apply Terraform changes (terraform/main/, auto-approve, use with caution)
+	@$(call echo_blue,Auto-applying Terraform changes [main]...)
 	@$(call echo_red,WARNING: Auto-approving Terraform changes!)
-	cd terraform && terraform apply -auto-approve
+	terraform -chdir=terraform/main apply -auto-approve
 
-terraform-destroy: ## Destroy Terraform infrastructure
-	@$(call echo_yellow,Destroying Terraform infrastructure...)
-	cd terraform && terraform destroy
+terraform-destroy: ## Destroy Terraform infrastructure (terraform/main/)
+	@$(call echo_yellow,Destroying Terraform infrastructure [main]...)
+	terraform -chdir=terraform/main destroy
 
-runner-apply: ## Apply runner infrastructure only (intentionally excluded from normal apply loop). Pass NO_CONFIRM=1 to skip the interactive confirmation (required for non-interactive/agent use).
+runner-apply: ## Apply runner infrastructure (terraform/runners/). Pass NO_CONFIRM=1 to skip the interactive confirmation.
 	@$(call echo_blue,Applying self-hosted runner infrastructure...)
-	@$(call echo_yellow,Runner resources are intentionally outside the normal Terraform loop.)
-	@$(call echo_yellow,This apply targets module.github_runners only — never the full stack.)
-	@$(call echo_yellow,Ensure github_app_id / github_app_key_base64 / github_app_webhook_secret are in secrets.auto.tfvars.)
-	cd terraform && terraform plan -out=runner.plan -var="enable_github_runners=true" -target=module.github_runners
+	@$(call echo_yellow,Runner state lives in terraform/runners/ as of LS-2425.)
+	@$(call echo_yellow,Ensure github_app_id / github_app_key_base64 / github_app_webhook_secret are in terraform/runners/secrets.auto.tfvars.)
+	terraform -chdir=terraform/runners init -input=false
+	terraform -chdir=terraform/runners plan -out=runner.plan
 	@$(if $(filter 1,$(NO_CONFIRM)),$(call echo_yellow,Skipping confirmation (NO_CONFIRM=1)),$(call echo_blue,Review the plan above. Press Enter to apply or Ctrl+C to abort.))
 	@$(if $(filter 1,$(NO_CONFIRM)),,$(if $(filter Windows_NT,$(OS)),powershell -Command "Read-Host | Out-Null",read _confirm))
-	cd terraform && terraform apply runner.plan
+	terraform -chdir=terraform/runners apply runner.plan
+
+runner-init: ## Initialize Terraform working directory (terraform/runners/)
+	@$(call echo_blue,Initializing Terraform [runners]...)
+	terraform -chdir=terraform/runners init
+
+runner-plan: ## Plan runner Terraform deployment (terraform/runners/)
+	@$(call echo_blue,Planning runner Terraform deployment [runners]...)
+	terraform -chdir=terraform/runners plan
 
 # Self-Hosted Runner AMI (see .agents/skills/infrastructure/references/ami-build.md)
 ifeq ($(strip $(VPC_ID)),)
@@ -565,7 +574,7 @@ else
 ami-build: ## Build self-hosted runner AMI with Packer (requires VPC_ID and SUBNET_ID)
 	@$(call echo_blue,Building self-hosted runner AMI...)
 	@$(call echo_yellow,This will create a new EC2 AMI. Typical build time: 5-10 minutes.)
-	cd terraform$(PATH_SEP)packer && packer init runner-ami.pkr.hcl && packer build -var "vpc_id=$(VPC_ID)" -var "subnet_id=$(SUBNET_ID)" runner-ami.pkr.hcl
+	cd terraform$(PATH_SEP)runners$(PATH_SEP)packer && packer init runner-ami.pkr.hcl && packer build -var "vpc_id=$(VPC_ID)" -var "subnet_id=$(SUBNET_ID)" runner-ami.pkr.hcl
 endif
 
 ami-list: ## List existing runner AMIs (most recent first)
@@ -580,7 +589,7 @@ else
 	ENVIRONMENT=$(or $(ENVIRONMENT),prod) DRY_RUN=$(DRY_RUN) bash scripts$(PATH_SEP)rotate-runner-secrets.sh
 endif
 
-runner-lambdas-sync: ## Download Lambda zips matching the github-aws-runners version in terraform/github-runners.tf. Usage: make runner-lambdas-sync [VERSION=x.y.z]
+runner-lambdas-sync: ## Download Lambda zips matching the github-aws-runners version in terraform/runners/github-runners.tf. Usage: make runner-lambdas-sync [VERSION=x.y.z]
 	@$(call echo_blue,Syncing runner Lambda zips...)
 	node scripts$(PATH_SEP)download-runner-lambdas.js $(VERSION)
 
@@ -682,7 +691,7 @@ ci-full: clean install lint typecheck test build ## Complete CI pipeline with fu
 release: clean install build-all test-all ## Prepare for release
 	@$(call echo_green,Release preparation completed!)
 
-full-deploy: clean install build-all deploy-lambdas deploy-infrastructure ## Complete deployment
+full-deploy: clean install build-all deploy-lambdas terraform-apply ## Complete deployment (Lambda app infra + Lambda code)
 	@$(call echo_green,Full deployment completed!)
 
 # Development workflow shortcuts

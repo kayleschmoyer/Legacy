@@ -22,13 +22,12 @@ locals {
 # =============================================================================
 
 module "github_runners" {
-  count   = var.enable_github_runners ? 1 : 0
   source  = "github-aws-runners/github-runner/aws"
   version = "7.5.0"
 
   aws_region = var.aws_region
-  vpc_id     = aws_vpc.main.id
-  subnet_ids = aws_subnet.public[*].id
+  vpc_id     = local.vpc_id
+  subnet_ids = local.public_subnet_ids
 
   prefix = "${local.name_prefix}-runner"
 
@@ -98,7 +97,7 @@ module "github_runners" {
   # Attach S3 cache IAM policy so runner instances can read/write the pnpm
   # store tarball. The permissions boundary already permits this bucket but
   # the module's runner role also needs an attached policy (LS-1663).
-  runner_iam_role_managed_policy_arns = [aws_iam_policy.runner_cache[0].arn]
+  runner_iam_role_managed_policy_arns = [aws_iam_policy.runner_cache.arn]
 
   # CloudWatch agent — custom config avoids the module default's invalid
   # log_class property that causes the agent to fail on startup (LS-1667).
@@ -294,7 +293,7 @@ module "github_runners" {
       description      = "HTTPS - GitHub API, npm registry, S3, VPC endpoints"
     },
     {
-      cidr_blocks      = [var.vpc_cidr]
+      cidr_blocks      = [local.vpc_cidr_block]
       ipv6_cidr_blocks = []
       prefix_list_ids  = null
       from_port        = 53
@@ -305,7 +304,7 @@ module "github_runners" {
       description      = "DNS (UDP) - VPC DNS resolver"
     },
     {
-      cidr_blocks      = [var.vpc_cidr]
+      cidr_blocks      = [local.vpc_cidr_block]
       ipv6_cidr_blocks = []
       prefix_list_ids  = null
       from_port        = 53
@@ -316,7 +315,7 @@ module "github_runners" {
       description      = "DNS (TCP) - VPC DNS resolver"
     },
     {
-      cidr_blocks      = aws_subnet.public[*].cidr_block
+      cidr_blocks      = local.public_subnet_cidr_blocks
       ipv6_cidr_blocks = []
       prefix_list_ids  = null
       from_port        = 5432
@@ -342,20 +341,22 @@ module "github_runners" {
   # ── IAM hardening (LS-1653) ────────────────────────────────────────────────
   # Permissions boundary prevents the runner role from exceeding least-privilege,
   # regardless of what the module's default policy grants.
-  role_permissions_boundary = var.enable_github_runners ? aws_iam_policy.runner_permissions_boundary[0].arn : null
+  role_permissions_boundary = aws_iam_policy.runner_permissions_boundary.arn
 
   # Ensure log groups (with retention policy) exist before the module creates
   # EC2 instances. Without this edge, Terraform may launch runners in parallel
   # with log group creation, letting the CloudWatch agent create the group first
   # with default "never expire" retention.
-  # Also ensure the GitHub Actions apply role's IAM policies are fully updated
-  # before the module creates its Lambda functions and EC2 runner roles, to
-  # prevent AccessDenied races when permissions are added in the same apply.
+  #
+  # Note: cross-state depends_on against main/'s aws_iam_role_policy.github_actions_additional
+  # and aws_iam_policy.github_actions_supplemental was removed as part of LS-2425
+  # state separation — those policies live in terraform/main/ now and cross-state
+  # depends_on is not supported. The race they were guarding against (AccessDenied
+  # on first runner-apply when IAM perms hadn't propagated) was a one-time bootstrap
+  # concern and has long since been resolved in production.
   depends_on = [
     aws_cloudwatch_log_group.runner_cloud_init,
     aws_cloudwatch_log_group.runner_syslog,
-    aws_iam_role_policy.github_actions_additional,
-    aws_iam_policy.github_actions_supplemental,
   ]
 
   tags = local.common_tags
@@ -369,21 +370,24 @@ module "github_runners" {
 # The agent ships cloud-init (userdata) and syslog to these groups.
 # =============================================================================
 resource "aws_cloudwatch_log_group" "runner_cloud_init" {
-  count             = var.enable_github_runners ? 1 : 0
   name              = "${local.runner_log_group_base}/cloud-init"
   retention_in_days = local.log_retention_days[var.environment]
 
-  tags       = local.common_tags
-  depends_on = [aws_vpc_endpoint.logs]
+  tags = local.common_tags
+
+  # Note: cross-state depends_on against main/'s aws_vpc_endpoint.logs was removed
+  # as part of LS-2425 state separation. The endpoint is needed for the runtime
+  # CloudWatch agent to ship logs through the VPC endpoint, not for terraform to
+  # create the log group itself (which uses public CloudWatch Logs APIs). The
+  # endpoint is provisioned by make terraform-apply against terraform/main/ and
+  # exists long before make runner-apply runs.
 }
 
 resource "aws_cloudwatch_log_group" "runner_syslog" {
-  count             = var.enable_github_runners ? 1 : 0
   name              = "${local.runner_log_group_base}/syslog"
   retention_in_days = local.log_retention_days[var.environment]
 
-  tags       = local.common_tags
-  depends_on = [aws_vpc_endpoint.logs]
+  tags = local.common_tags
 }
 
 # =============================================================================
@@ -409,7 +413,6 @@ resource "aws_cloudwatch_log_group" "runner_syslog" {
 # GitHub Actions OIDC role (github-actions-oidc.tf).
 # =============================================================================
 resource "aws_iam_policy" "runner_permissions_boundary" {
-  count       = var.enable_github_runners ? 1 : 0
   name        = "${local.name_prefix}-runner-permissions-boundary"
   description = "Permissions boundary for all IAM roles created by the github-runners module (EC2 runner instances and Lambda functions). Limits the maximum permissions any module-created role can assume, regardless of attached policies."
 
@@ -612,8 +615,7 @@ resource "aws_iam_policy" "runner_permissions_boundary" {
 
   tags = local.common_tags
 
-  # Ensure the GitHub Actions apply role's IAM policies are updated before
-  # creating this permissions boundary policy to prevent AccessDenied races
-  # when iam:CreatePolicy is added in the same apply as this resource.
-  depends_on = [aws_iam_role_policy.github_actions_additional]
+  # Note: cross-state depends_on against main/'s aws_iam_role_policy.github_actions_additional
+  # was removed as part of LS-2425 state separation. The bootstrap race it guarded
+  # against is no longer relevant — the policy is stable in production.
 }

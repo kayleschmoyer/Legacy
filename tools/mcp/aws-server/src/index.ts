@@ -106,7 +106,7 @@ server.tool(
 // --- aws_terraform_output ---
 server.tool(
   'aws_terraform_output',
-  'Query Terraform state outputs. Runs `terraform output -json` and returns unwrapped values. Use instead of `cd terraform && terraform output -json | python -c ...`.',
+  'Query Terraform state outputs. Runs `terraform output -json` and returns unwrapped values. Defaults to terraform/main; pass `chdir: "terraform/runners"` for runner-specific outputs (github_runners_webhook_url). Use instead of `cd terraform/main && terraform output -json | python -c ...`.',
   {
     keys: z
       .array(z.string())
@@ -118,7 +118,7 @@ server.tool(
       .string()
       .optional()
       .describe(
-        'Terraform directory relative to repo root (default: "terraform").',
+        'Terraform directory relative to repo root (default: "terraform/main"). Use "terraform/runners" for runner state outputs.',
       ),
   },
   async (params) => terraformOutput(params),

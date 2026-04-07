@@ -75,26 +75,26 @@
       "options": {
         "commands": [
           "echo '🔍 Validating Terraform configuration for Draft Processor lambda...'",
-          "cd ../../terraform && terraform fmt -check || (echo '⚠️  Terraform formatting issues found' && terraform fmt)",
-          "cd ../../terraform && terraform validate || echo '⚠️  Terraform validation failed - this may be expected in CI without full AWS context'",
-          "cd ../../terraform && (terraform plan -target=aws_lambda_function.draft_processor 2>&1 || echo '⚠️  Terraform plan failed - this is expected in CI without terraform state and AWS credentials')"
+          "terraform -chdir=terraform/main fmt -check || (echo '⚠️  Terraform formatting issues found' && terraform -chdir=terraform/main fmt)",
+          "terraform -chdir=terraform/main validate || echo '⚠️  Terraform validation failed - this may be expected in CI without full AWS context'",
+          "terraform -chdir=terraform/main plan -target=aws_lambda_function.draft_processor 2>&1 || echo '⚠️  Terraform plan failed - this is expected in CI without terraform state and AWS credentials'"
         ],
         "parallel": false,
-        "cwd": "lambdas/draft-processor"
+        "cwd": "."
       }
     },
     "deploy:apply": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "cd ../../terraform && terraform apply -target=aws_lambda_function.draft_processor -auto-approve",
-        "cwd": "lambdas/draft-processor"
+        "command": "terraform -chdir=terraform/main apply -target=aws_lambda_function.draft_processor -auto-approve",
+        "cwd": "."
       }
     },
     "logs": {
       "executor": "nx:run-commands",
       "options": {
         "command": "aws logs tail \"/aws/lambda/legacy-sports-dev-draft-processor\" --follow",
-        "cwd": "terraform"
+        "cwd": "."
       }
     }
   }

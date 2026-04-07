@@ -14,36 +14,12 @@
 # CI/local dev connect via the RDS instance endpoint, not through the proxy.
 enable_rds_proxy = true
 
-# ── Self-hosted GitHub Actions Runners ────────────────────────────────────────
-# ⚠️  INTENTIONALLY false — this is a safety guard against accidental local or
-# CI terraform apply destroying live runner infrastructure (dozens of resources).
-#
-# Runner infrastructure was provisioned once via a targeted apply with
-# enable_github_runners=true and the required secrets. It is currently NOT
-# continuously managed through this Terraform config — runner scaling is handled
-# by the autoscaling module itself (webhook → Lambda → EC2 spot).
-#
-# NOTE: CI does NOT override this flag. The lambda-terraform-apply workflow reads
-# this file directly and only validates runner secrets when the value is true.
-# This means runner resources (SGs, ASGs, Lambdas) are intentionally outside
-# the normal plan/apply loop.
-#
-# This is the INTENDED long-term strategy — not a temporary state or a bug.
-# Runner resources were explicitly removed from Terraform state (LS-2051/LS-2056)
-# to prevent phantom destroy plans on every apply. Runner config changes (egress
-# rules, instance types, IAM hardening) require a targeted one-off apply:
-#   make runner-apply
-#
-# To see an accurate plan that includes runner resources:
-#   terraform plan -var="enable_github_runners=true"
-enable_github_runners = false
+# ── Self-hosted CI runner DB access ──────────────────────────────────────────
 # Allow self-hosted CI runners (VPC public subnets) to reach RDS on port 5432.
-# Unlike the full runner fleet, this single SG rule is safe to keep in the normal
-# apply loop — it is idempotent and has no teardown risk. Decoupled from
-# enable_github_runners (see LS-2254).
-enable_ci_runner_db_access    = true
-github_runners_instance_types = ["c7a.xlarge", "c6a.xlarge", "c7i.xlarge", "m7a.xlarge"]
-github_runners_max_count      = 20
+# This single SG rule is safe in the normal apply loop because it is idempotent
+# and has no teardown risk. The runner fleet itself lives in terraform/runners/
+# as of LS-2425 — see terraform/runners/README.md for the runner architecture.
+enable_ci_runner_db_access = true
 
 # ── MLB Data Provider ─────────────────────────────────────────────────────────
 # The free MLB Stats API (mlb-statsapi) is NOT licensed for commercial use.
@@ -51,7 +27,7 @@ github_runners_max_count      = 20
 #
 # This value is non-sensitive and safe to check in. The API key itself is
 # sensitive and is supplied separately:
-#   - Locally:  set mlb_data_api_key in terraform/secrets.auto.tfvars
+#   - Locally:  set mlb_data_api_key in terraform/main/secrets.auto.tfvars
 #   - CI/prod:  set MLB_DATA_API_KEY in GitHub repository secrets
 #               (TF_VAR_mlb_data_api_key is injected by lambda-terraform-apply.yml)
 #

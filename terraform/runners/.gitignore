@@ -1,0 +1,35 @@
+# Terraform files
+*.tfstate
+*.tfstate.*
+*.tfvars.backup
+*.tfplan
+*.pkrvars.hcl
+.terraform/
+
+# Lambda deployment packages downloaded by scripts/download-runner-lambdas.js
+lambdas/
+*.zip
+build/
+
+# Sensitive files
+terraform.tfvars
+secrets.auto.tfvars
+
+# Non-sensitive infra feature flags — checked in for CI reproducibility (LS-2429)
+!runner-ami.auto.tfvars
+*.pem
+*.key
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log

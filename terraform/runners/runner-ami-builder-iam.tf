@@ -41,7 +41,7 @@ resource "aws_iam_role" "runner_ami_builder" {
       {
         Effect = "Allow"
         Principal = {
-          Federated = aws_iam_openid_connect_provider.github_actions.arn
+          Federated = data.aws_iam_openid_connect_provider.github_actions.arn
         }
         Action = "sts:AssumeRoleWithWebIdentity"
         Condition = {
@@ -155,8 +155,5 @@ resource "aws_iam_role_policy" "runner_ami_builder" {
   })
 }
 
-output "runner_ami_builder_role_arn" {
-  description = "ARN of the OIDC role assumed by rebuild-runner-ami.yml to run Packer (LS-2429)"
-  value       = aws_iam_role.runner_ami_builder.arn
-  sensitive   = false
-}
+# Note: the runner_ami_builder_role_arn output moved to terraform/runners/outputs.tf
+# in LS-2425 to follow the convention of grouping outputs in outputs.tf.

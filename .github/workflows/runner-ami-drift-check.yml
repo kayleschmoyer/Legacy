@@ -4,13 +4,13 @@
 # remain in sync on every PR:
 #
 #   1. pnpm-lock.yaml               — the resolved playwright-core version
-#   2. terraform/packer/runner-ami.pkr.hcl — playwright_version variable default
-#   3. terraform/runner-ami.auto.tfvars — runner_ami_playwright_version
+#   2. terraform/runners/packer/runner-ami.pkr.hcl — playwright_version variable default
+#   3. terraform/runners/runner-ami.auto.tfvars — runner_ami_playwright_version
 #
 # If any two of these disagree the job fails. The required fix is to run the
 # `rebuild-runner-ami` workflow (or `make ami-build` locally), which rebuilds
 # the AMI under the new version name and commits updated values for (2) and
-# (3) back to the PR branch so the filter in terraform/github-runners.tf will
+# (3) back to the PR branch so the filter in terraform/runners/github-runners.tf will
 # select the new AMI after merge.
 #
 # This is a required status check — it is the gate that turns a Playwright
@@ -23,8 +23,8 @@ on:
     paths:
       - "pnpm-lock.yaml"
       - "package.json"
-      - "terraform/packer/runner-ami.pkr.hcl"
-      - "terraform/runner-ami.auto.tfvars"
+      - "terraform/runners/packer/runner-ami.pkr.hcl"
+      - "terraform/runners/runner-ami.auto.tfvars"
       - ".github/workflows/runner-ami-drift-check.yml"
   push:
     branches:
@@ -32,8 +32,8 @@ on:
     paths:
       - "pnpm-lock.yaml"
       - "package.json"
-      - "terraform/packer/runner-ami.pkr.hcl"
-      - "terraform/runner-ami.auto.tfvars"
+      - "terraform/runners/packer/runner-ami.pkr.hcl"
+      - "terraform/runners/runner-ami.auto.tfvars"
   workflow_dispatch:
 
 permissions:
@@ -75,9 +75,9 @@ jobs:
               print substr($0, RSTART + 1, RLENGTH - 2)
               exit
             }
-          ' terraform/packer/runner-ami.pkr.hcl)
+          ' terraform/runners/packer/runner-ami.pkr.hcl)
           if [[ -z "$packer_version" ]]; then
-            echo "::error::Could not extract playwright_version default from terraform/packer/runner-ami.pkr.hcl"
+            echo "::error::Could not extract playwright_version default from terraform/runners/packer/runner-ami.pkr.hcl"
             exit 1
           fi
 
@@ -88,9 +88,9 @@ jobs:
               print substr($0, RSTART + 1, RLENGTH - 2)
               exit
             }
-          ' terraform/runner-ami.auto.tfvars)
+          ' terraform/runners/runner-ami.auto.tfvars)
           if [[ -z "$tfvars_version" ]]; then
-            echo "::error::Could not extract runner_ami_playwright_version from terraform/runner-ami.auto.tfvars"
+            echo "::error::Could not extract runner_ami_playwright_version from terraform/runners/runner-ami.auto.tfvars"
             exit 1
           fi
 
@@ -122,7 +122,7 @@ jobs:
           echo "  runner-ami.auto.tfvars  runner_ami_playwright_ver = $TFVARS_VERSION"
           echo ""
           echo "All three values MUST be identical. Drift means the runner AMI"
-          echo "filter in terraform/github-runners.tf will not select a matching"
+          echo "filter in terraform/runners/github-runners.tf will not select a matching"
           echo "AMI after merge, and the runner fleet will fail to scale."
           echo ""
           echo "To fix: trigger the 'Rebuild Runner AMI' workflow against this"

@@ -24,11 +24,7 @@ on:
     branches:
       - main
     paths:
-      - "terraform/packer/runner-ami.pkr.hcl"
-      - "terraform/runner-ami.auto.tfvars"
-      - "terraform/github-runners.tf"
-      - "terraform/runner-ami-builder-iam.tf"
-      - "terraform/runner-userdata.sh"
+      - "terraform/runners/**"
       - ".github/workflows/runner-terraform-apply.yml"
   workflow_dispatch:
 
@@ -77,9 +73,6 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Verify target AMI exists
-        env:
-          RUNNER_AMI_PLAYWRIGHT_VERSION: |
-            ${{ github.event_name == 'push' && 'from-tfvars' || 'from-tfvars' }}
         run: |
           set -euo pipefail
           # Read the target version from the committed tfvars file.
@@ -89,7 +82,7 @@ jobs:
               print substr($0, RSTART + 1, RLENGTH - 2)
               exit
             }
-          ' terraform/runner-ami.auto.tfvars)
+          ' terraform/runners/runner-ami.auto.tfvars)
           if [[ -z "$VERSION" ]]; then
             echo "::error::Could not read runner_ami_playwright_version from tfvars"
             exit 1
@@ -118,48 +111,32 @@ jobs:
           terraform_version: "~> 1.14"
 
       - name: Terraform init
-        working-directory: terraform
+        working-directory: terraform/runners
         run: terraform init -input=false
 
-      - name: Terraform plan (runner module only)
+      - name: Terraform plan
         id: plan
-        working-directory: terraform
+        working-directory: terraform/runners
         env:
-          TF_VAR_rollbar_access_token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
-          TF_VAR_discord_user_signup_webhook_url: ${{ secrets.DISCORD_USER_SIGNUP_WEBHOOK_URL }}
-          TF_VAR_discord_stripe_webhook_url: ${{ secrets.DISCORD_STRIPE_WEBHOOK_URL }}
-          TF_VAR_ga_measurement_id: ${{ secrets.GA_MEASUREMENT_ID }}
-          TF_VAR_ga_api_secret: ${{ secrets.GA_API_SECRET }}
           TF_VAR_github_app_id: ${{ secrets.RUNNER_GITHUB_APP_ID }}
           TF_VAR_github_app_key_base64: ${{ secrets.RUNNER_GITHUB_APP_KEY_BASE64 }}
           TF_VAR_github_app_webhook_secret: ${{ secrets.RUNNER_GITHUB_APP_WEBHOOK_SECRET }}
-          TF_VAR_mlb_data_api_key: ${{ secrets.MLB_DATA_API_KEY }}
         run: |
           set -euo pipefail
-          # Override enable_github_runners to true for this targeted apply. The
-          # tfvars file intentionally leaves it false so the normal apply loop
-          # (lambda-terraform-apply.yml) does NOT touch runner infra.
+          # As of LS-2425, terraform/runners/ is its own state file. The plan
+          # operates against the entire runners state — no -target or
+          # -var=enable_github_runners workarounds needed.
           terraform plan \
             -input=false \
-            -var="enable_github_runners=true" \
-            -target=module.github_runners \
-            -target=aws_iam_role.runner_ami_builder \
-            -target=aws_iam_role_policy.runner_ami_builder \
             -out=runner.tfplan \
             -lock-timeout=5m
 
       - name: Terraform apply
-        working-directory: terraform
+        working-directory: terraform/runners
         env:
-          TF_VAR_rollbar_access_token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
-          TF_VAR_discord_user_signup_webhook_url: ${{ secrets.DISCORD_USER_SIGNUP_WEBHOOK_URL }}
-          TF_VAR_discord_stripe_webhook_url: ${{ secrets.DISCORD_STRIPE_WEBHOOK_URL }}
-          TF_VAR_ga_measurement_id: ${{ secrets.GA_MEASUREMENT_ID }}
-          TF_VAR_ga_api_secret: ${{ secrets.GA_API_SECRET }}
           TF_VAR_github_app_id: ${{ secrets.RUNNER_GITHUB_APP_ID }}
           TF_VAR_github_app_key_base64: ${{ secrets.RUNNER_GITHUB_APP_KEY_BASE64 }}
           TF_VAR_github_app_webhook_secret: ${{ secrets.RUNNER_GITHUB_APP_WEBHOOK_SECRET }}
-          TF_VAR_mlb_data_api_key: ${{ secrets.MLB_DATA_API_KEY }}
         run: |
           set -euo pipefail
           terraform apply -input=false -auto-approve -lock-timeout=5m runner.tfplan
@@ -176,7 +153,7 @@ jobs:
           # lock contents so an operator can decide whether it's stale and
           # manually clear it if needed.
           echo "🔎 Inspecting terraform state lock after failure..."
-          LOCK_KEY='{"LockID":{"S":"legacy-sports-terraform-state/legacy-sports/terraform.tfstate"}}'
+          LOCK_KEY='{"LockID":{"S":"legacy-sports-terraform-state/legacy-sports/runners.tfstate"}}'
           LOCK_ITEM=$(aws dynamodb get-item \
             --table-name terraform-state-locks \
             --key "$LOCK_KEY" \

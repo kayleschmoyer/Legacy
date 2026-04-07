@@ -21,7 +21,7 @@ The self-hosted GitHub Actions runners use a pre-baked Ubuntu 22.04 AMI built wi
 | Java 17               | openjdk-17-jre-headless                       | Android SDK tooling (sdkmanager is JVM-based)       |
 | Android SDK           | API 35, build-tools 35.0.0, NDK 27.1.12297006 | Mobile CI                                           |
 
-> Some tool versions are pinned in `terraform/packer/runner-ami.pkr.hcl`; entries marked `latest` or `latest stable` are installed at whatever version is current at build time, so the AMI can drift across rebuilds. Keep `playwright_version` in sync with the **resolved** `@playwright/test` version used by the repo — check the lockfile rather than `package.json` if it uses a caret range. A mismatch causes CI to re-download browsers on every run.
+> Some tool versions are pinned in `terraform/runners/packer/runner-ami.pkr.hcl`; entries marked `latest` or `latest stable` are installed at whatever version is current at build time, so the AMI can drift across rebuilds. Keep `playwright_version` in sync with the **resolved** `@playwright/test` version used by the repo — check the lockfile rather than `package.json` if it uses a caret range. A mismatch causes CI to re-download browsers on every run.
 >
 > `Amazon CloudWatch Agent` is **not** baked into the AMI by the Packer template. When `enable_cloudwatch_agent = true` is set in `github-runners.tf`, the agent is installed during instance boot by the runner module's userdata. Do not list it as a baked-in tool.
 
@@ -29,7 +29,7 @@ The self-hosted GitHub Actions runners use a pre-baked Ubuntu 22.04 AMI built wi
 
 Rebuild the AMI when:
 
-- The Packer template changes (`terraform/packer/runner-ami.pkr.hcl`) — e.g., new system packages, version bumps
+- The Packer template changes (`terraform/runners/packer/runner-ami.pkr.hcl`) — e.g., new system packages, version bumps
 - A CI job fails due to a missing tool on the runner (add it to the Packer template first, then rebuild)
 - Periodic security updates (Ubuntu base image patches)
 
@@ -149,9 +149,9 @@ aws ec2 describe-images --owners self \
 
 ### Roll out to runners
 
-The ASG uses a name-based AMI filter (`legacy-sports-runner-*`, most recent) defined in `terraform/github-runners.tf`. **No `terraform apply` is needed** — new runner instances automatically pick up the latest AMI.
+The ASG uses a name-based AMI filter (`legacy-sports-runner-*`, most recent) defined in `terraform/runners/github-runners.tf`. **No `terraform apply` is needed** — new runner instances automatically pick up the latest AMI.
 
-Runners are configured as non-ephemeral via `enable_ephemeral_runners = false` in `terraform/github-runners.tf` — they stay online across multiple jobs rather than terminating after each one. To force all runners onto the new AMI:
+Runners are configured as non-ephemeral via `enable_ephemeral_runners = false` in `terraform/runners/github-runners.tf` — they stay online across multiple jobs rather than terminating after each one. To force all runners onto the new AMI:
 
 1. **Wait for natural turnover** — the scale-down Lambda terminates idle runners; new instances launched by the next job trigger will use the new AMI.
 2. **Force immediate replacement** (optional) — terminate running instances via AWS Console or CLI. The ASG will launch replacements with the new AMI on the next `workflow_job` webhook event.

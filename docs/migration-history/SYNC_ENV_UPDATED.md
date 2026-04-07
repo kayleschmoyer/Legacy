@@ -143,7 +143,7 @@ DB_PASSWORD=your-local-password
 aws sts get-caller-identity
 
 # Verify Terraform state
-cd terraform && terraform show
+cd terraform/main && terraform show
 ```
 
 ### Database Connection Issues

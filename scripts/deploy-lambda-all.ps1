@@ -30,5 +30,5 @@ Write-Host ""
 Write-Host "✅ All Lambda functions deployed successfully!" -ForegroundColor Green
 Write-Host ""
 Write-Host "🔄 Final steps:" -ForegroundColor Yellow
-Write-Host "   1. Run 'cd terraform && terraform plan' to see all updates"
+Write-Host "   1. Run 'cd terraform/main && terraform plan' to see all updates"
 Write-Host "   2. Run 'terraform apply' to deploy all new versions"

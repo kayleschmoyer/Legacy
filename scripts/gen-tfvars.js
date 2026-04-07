@@ -1,13 +1,18 @@
 #!/usr/bin/env node
 /**
- * gen-tfvars.js — Generate terraform/secrets.auto.tfvars from environment variables.
+ * gen-tfvars.js — Generate terraform/main/secrets.auto.tfvars from environment variables.
  *
  * Reads well-known env vars (and common aliases) and writes the tfvars file that
  * Terraform auto-loads for local development. In CI, these are supplied as
  * TF_VAR_* env vars from GitHub Actions secrets instead.
  *
+ * As of LS-2425 the terraform configuration is split into terraform/main/ and
+ * terraform/runners/. This script writes only main/'s secrets file. The runner-
+ * specific secrets (github_app_id, github_app_key_base64, github_app_webhook_secret)
+ * live in terraform/runners/secrets.auto.tfvars and must be set manually.
+ *
  * Usage:
- *   node scripts/gen-tfvars.js              # write terraform/secrets.auto.tfvars
+ *   node scripts/gen-tfvars.js              # write terraform/main/secrets.auto.tfvars
  *   node scripts/gen-tfvars.js --check      # report what's missing, don't write
  *   node scripts/gen-tfvars.js --dry-run    # print output without writing
  */
@@ -16,7 +21,12 @@ const fs = require('fs');
 const path = require('path');
 
 const REPO_ROOT = path.resolve(__dirname, '..');
-const OUT_FILE = path.join(REPO_ROOT, 'terraform', 'secrets.auto.tfvars');
+const OUT_FILE = path.join(
+  REPO_ROOT,
+  'terraform',
+  'main',
+  'secrets.auto.tfvars',
+);
 
 const args = process.argv.slice(2);
 const CHECK_ONLY = args.includes('--check');

@@ -208,6 +208,10 @@ resource "aws_iam_role_policy" "github_actions_additional" {
         ]
       },
       # CloudWatch Logs read permissions
+      # Note: runner log group read perms (/github-runners/* and /github-self-hosted-runners/*)
+      # are no longer needed here as of LS-2425. State separation moved module.github_runners
+      # into terraform/runners/ which has its own state file, so the regular Apply Lambda
+      # Infrastructure workflow no longer refreshes runner resources.
       {
         Effect = "Allow"
         Action = [
@@ -221,8 +225,6 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/lambda/${local.name_prefix}-*:*",
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/apigateway/${local.name_prefix}-*",
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/apigateway/${local.name_prefix}-*:*",
-          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/github-runners/*",
-          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/github-runners/*:*",
           "arn:aws:logs:${local.region}:${local.account_id}:log-group::log-stream:"
         ]
       },
@@ -576,8 +578,11 @@ resource "aws_iam_role_policy" "github_actions_additional" {
 }
 
 # Supplemental managed policy for permissions that would push the inline policy over the 10 KB limit.
-# Covers: Budgets CRUD, EventBridge event bus CRUD, S3 bucket- and object-level reads for the runner-dist bucket,
-# and Secrets Manager write permissions for all Terraform-managed secrets.
+# Covers: Budgets CRUD, ACM (certificate) read/write, and Secrets Manager write permissions for all
+# Terraform-managed secrets. As of LS-2425, runner-module-specific permissions
+# (logs:ListTagsForResource on /github-self-hosted-runners/*, S3 reads on the runner-dist bucket,
+# events:DescribeArchive on the runner archive, EventBridge event bus CRUD) live in
+# terraform/runners/runner-iam-additional.tf and are attached to the same role by name.
 #
 # Import: this policy was bootstrapped manually before the first apply to break the chicken-and-egg
 # dependency (the workflow needs the permissions to plan, but apply is needed to grant them).
@@ -611,64 +616,6 @@ resource "aws_iam_policy" "github_actions_supplemental" {
         ]
         Resource = [
           "arn:aws:budgets::${local.account_id}:budget/${local.name_prefix}-*"
-        ]
-      },
-      # EventBridge event bus - github-runners module manages an event bus resource
-      {
-        Effect = "Allow"
-        Action = [
-          "events:DescribeEventBus",
-          "events:CreateEventBus",
-          "events:DeleteEventBus",
-          "events:TagResource",
-          "events:UntagResource",
-          "events:ListTagsForResource"
-        ]
-        Resource = [
-          "arn:aws:events:${local.region}:${local.account_id}:event-bus/${local.name_prefix}-*"
-        ]
-      },
-      # github-runners module — refresh-time read perms for resources owned by `make runner-apply`.
-      # The regular Apply Lambda Infrastructure workflow doesn't manage these resources, but
-      # terraform refresh still touches them on every plan, so the role needs read access.
-      # Tracked by LS-2425 (structural fix to stop refreshing module.github_runners entirely).
-      {
-        Effect = "Allow"
-        Action = [
-          "logs:ListTagsForResource"
-        ]
-        Resource = [
-          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/github-self-hosted-runners/*",
-          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/github-self-hosted-runners/*:*"
-        ]
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "events:DescribeArchive"
-        ]
-        Resource = [
-          "arn:aws:events:${local.region}:${local.account_id}:archive/${local.name_prefix}-*"
-        ]
-      },
-      # S3 runner-dist bucket - ListBucket (bucket-level) + GetObject (object-level, HeadObject for aws_s3_object refresh)
-      {
-        Effect = "Allow"
-        Action = [
-          "s3:ListBucket"
-        ]
-        Resource = [
-          "arn:aws:s3:::${local.name_prefix}-runner-*"
-        ]
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "s3:GetObject",
-          "s3:GetObjectTagging"
-        ]
-        Resource = [
-          "arn:aws:s3:::${local.name_prefix}-runner-*/*"
         ]
       },
       # ACM permissions — moved here from the inline policy to stay under the 10 KB limit.
@@ -1012,6 +959,10 @@ resource "aws_iam_role_policy" "github_actions_plan_policy" {
         ]
       },
       # CloudWatch Logs read
+      # Note: runner log group read perms (/github-runners/* and /github-self-hosted-runners/*)
+      # are no longer needed here as of LS-2425. State separation moved module.github_runners
+      # into terraform/runners/ which has its own state file, so the regular Apply Lambda
+      # Infrastructure workflow no longer refreshes runner resources.
       {
         Sid    = "CloudWatchLogsRead"
         Effect = "Allow"
@@ -1026,10 +977,6 @@ resource "aws_iam_role_policy" "github_actions_plan_policy" {
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/lambda/${local.name_prefix}-*:*",
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/apigateway/${local.name_prefix}-*",
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/apigateway/${local.name_prefix}-*:*",
-          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/github-runners/*",
-          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/github-runners/*:*",
-          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/github-self-hosted-runners/*",
-          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/github-self-hosted-runners/*:*",
           "arn:aws:logs:${local.region}:${local.account_id}:log-group::log-stream:"
         ]
       },
@@ -1143,21 +1090,22 @@ resource "aws_iam_role_policy" "github_actions_plan_policy" {
         ]
       },
       # EventBridge read
+      # Note: events:DescribeArchive and the archive/* ARN scope are no longer needed
+      # here as of LS-2425. State separation moved module.github_runners (which owns the
+      # only EventBridge archive in the project) into terraform/runners/.
       {
         Sid    = "EventBridgeRead"
         Effect = "Allow"
         Action = [
           "events:DescribeRule",
           "events:DescribeEventBus",
-          "events:DescribeArchive",
           "events:ListTargetsByRule",
           "events:ListRules",
           "events:ListTagsForResource"
         ]
         Resource = [
           "arn:aws:events:${local.region}:${local.account_id}:rule/${local.name_prefix}-*",
-          "arn:aws:events:${local.region}:${local.account_id}:event-bus/${local.name_prefix}-*",
-          "arn:aws:events:${local.region}:${local.account_id}:archive/${local.name_prefix}-*"
+          "arn:aws:events:${local.region}:${local.account_id}:event-bus/${local.name_prefix}-*"
         ]
       },
       # Budgets read
@@ -1169,7 +1117,9 @@ resource "aws_iam_role_policy" "github_actions_plan_policy" {
           "arn:aws:budgets::${local.account_id}:budget/${local.name_prefix}-*"
         ]
       },
-      # S3 read (project buckets including runner-dist)
+      # S3 read (project buckets — Lambda deployment bucket, ci-artifacts, etc.)
+      # The runner-dist bucket lives in terraform/runners/ as of LS-2425; runner-module
+      # S3 read perms moved to terraform/runners/runner-iam-additional.tf.
       {
         Sid    = "S3Read"
         Effect = "Allow"

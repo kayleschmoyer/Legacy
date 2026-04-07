@@ -403,7 +403,7 @@ jobs:
 
       - name: Initialize Terraform
         if: "!inputs.dry_run"
-        working-directory: terraform
+        working-directory: terraform/main
         run: terraform init -input=false
 
       - name: Clear Stale Locks
@@ -462,7 +462,7 @@ jobs:
       - name: Plan and Apply Terraform
         if: "!inputs.dry_run"
         id: terraform-apply
-        working-directory: terraform
+        working-directory: terraform/main
         env:
           TF_VAR_google_oauth_client_secret: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
           TF_VAR_jwt_secret_key: ${{ secrets.JWT_SECRET_KEY }}

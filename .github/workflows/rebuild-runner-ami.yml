@@ -208,7 +208,7 @@ jobs:
           from pathlib import Path
 
           version = os.environ["VERSION"]
-          path = Path("terraform/packer/runner-ami.pkr.hcl")
+          path = Path("terraform/runners/packer/runner-ami.pkr.hcl")
           text = path.read_text()
 
           new_text = re.sub(
@@ -232,7 +232,7 @@ jobs:
           from pathlib import Path
 
           version = os.environ["VERSION"]
-          path = Path("terraform/runner-ami.auto.tfvars")
+          path = Path("terraform/runners/runner-ami.auto.tfvars")
           text = path.read_text()
 
           new_text = re.sub(
@@ -258,12 +258,12 @@ jobs:
           git config user.name  "legacy-sports-code-bot"
           git config user.email "legacy-sports-code-bot@users.noreply.github.com"
 
-          if git diff --quiet terraform/packer/runner-ami.pkr.hcl terraform/runner-ami.auto.tfvars; then
+          if git diff --quiet terraform/runners/packer/runner-ami.pkr.hcl terraform/runners/runner-ami.auto.tfvars; then
             echo "ℹ️ No changes to commit — Packer HCL and tfvars already match lockfile version $VERSION."
             exit 0
           fi
 
-          git add terraform/packer/runner-ami.pkr.hcl terraform/runner-ami.auto.tfvars
+          git add terraform/runners/packer/runner-ami.pkr.hcl terraform/runners/runner-ami.auto.tfvars
           git commit -m "chore(infra): bump runner AMI to Playwright $VERSION ($AMI_ID)
 
           Built by rebuild-runner-ami.yml on PR #$PR_NUMBER.

@@ -15,19 +15,19 @@
 # =============================================================================
 
 resource "aws_s3_bucket" "runner_cache" {
-  count  = var.enable_github_runners ? 1 : 0
   bucket = "${local.name_prefix}-runner-cache"
   tags   = local.common_tags
 
-  # Ensure the GitHub Actions apply role's IAM policies are updated before
-  # creating the bucket to prevent AccessDenied races when s3:CreateBucket
-  # permission is added in the same apply as this resource is first created.
-  depends_on = [aws_iam_role_policy.github_actions_additional]
+  # Note: the original depends_on against aws_iam_role_policy.github_actions_additional
+  # was removed as part of LS-2425 state separation — that policy lives in
+  # terraform/main/ now and cross-state depends_on is not supported. The race it
+  # was guarding against (AccessDenied on first s3:CreateBucket) has already
+  # been resolved in production; the policy is stable and the dependency is
+  # only needed on initial bootstrap.
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "runner_cache" {
-  count  = var.enable_github_runners ? 1 : 0
-  bucket = aws_s3_bucket.runner_cache[0].id
+  bucket = aws_s3_bucket.runner_cache.id
 
   rule {
     apply_server_side_encryption_by_default {
@@ -37,8 +37,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "runner_cache" {
 }
 
 resource "aws_s3_bucket_public_access_block" "runner_cache" {
-  count  = var.enable_github_runners ? 1 : 0
-  bucket = aws_s3_bucket.runner_cache[0].id
+  bucket = aws_s3_bucket.runner_cache.id
 
   block_public_acls       = true
   block_public_policy     = true
@@ -47,8 +46,7 @@ resource "aws_s3_bucket_public_access_block" "runner_cache" {
 }
 
 resource "aws_s3_bucket_lifecycle_configuration" "runner_cache" {
-  count  = var.enable_github_runners ? 1 : 0
-  bucket = aws_s3_bucket.runner_cache[0].id
+  bucket = aws_s3_bucket.runner_cache.id
 
   rule {
     id     = "expire-stale-tarballs"
@@ -74,7 +72,6 @@ resource "aws_s3_bucket_lifecycle_configuration" "runner_cache" {
 # but the module's runner EC2 role also needs an attached policy granting access.
 
 resource "aws_iam_policy" "runner_cache" {
-  count       = var.enable_github_runners ? 1 : 0
   name        = "${local.name_prefix}-runner-cache-access"
   description = "Grants runner EC2 instances read/write access to the pnpm store cache bucket."
 
@@ -85,13 +82,13 @@ resource "aws_iam_policy" "runner_cache" {
         Sid      = "S3CacheObjects"
         Effect   = "Allow"
         Action   = ["s3:GetObject", "s3:PutObject"]
-        Resource = "${aws_s3_bucket.runner_cache[0].arn}/*"
+        Resource = "${aws_s3_bucket.runner_cache.arn}/*"
       },
       {
         Sid      = "S3CacheBucket"
         Effect   = "Allow"
         Action   = ["s3:ListBucket"]
-        Resource = aws_s3_bucket.runner_cache[0].arn
+        Resource = aws_s3_bucket.runner_cache.arn
         Condition = {
           StringLike = {
             "s3:prefix" = ["pnpm-store/*"]
@@ -103,8 +100,6 @@ resource "aws_iam_policy" "runner_cache" {
 
   tags = local.common_tags
 
-  # Ensure the GitHub Actions apply role's IAM policies are updated before
-  # creating this policy to prevent AccessDenied races when iam:CreatePolicy
-  # permission is added in the same apply as this resource is first created.
-  depends_on = [aws_iam_role_policy.github_actions_additional]
+  # Note: cross-state depends_on against main/'s aws_iam_role_policy was removed
+  # in LS-2425 (state separation). See note above on the bucket resource.
 }

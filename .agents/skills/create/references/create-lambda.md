@@ -72,7 +72,7 @@ lambdas/<name>/
       "dependsOn": ["package"],
       "options": {
         "commands": [
-          "cd terraform",
+          "cd terraform/main",
           "terraform apply -target=aws_lambda_function.<name_underscore> -auto-approve",
           "terraform apply -target=aws_api_gateway_deployment.main -auto-approve"
         ],

@@ -6,12 +6,12 @@
 # rates and error counts (are the orchestration functions healthy?), and
 # scale-up duration (how long does it take to launch a runner?).
 #
-# Dashboard is gated on enable_github_runners so it is only created in
-# environments that have the runner infrastructure.
+# Lives in terraform/runners/ as of LS-2425. Always created when this state
+# is applied — the previous enable_github_runners gate is no longer needed
+# now that runner state is fully separated from main/.
 # =============================================================================
 
 resource "aws_cloudwatch_dashboard" "runner" {
-  count          = var.enable_github_runners ? 1 : 0
   dashboard_name = "${local.name_prefix}-runner-performance"
 
   dashboard_body = jsonencode({
@@ -45,6 +45,7 @@ resource "aws_cloudwatch_dashboard" "runner" {
           view    = "timeSeries"
           stacked = false
           period  = 60
+          region  = local.region
           metrics = [
             ["AWS/SQS", "ApproximateNumberOfMessagesVisible", "QueueName", "${local.name_prefix}-runner-queued-builds.fifo",
               { stat = "Maximum", label = "Queued Jobs (max)", color = "#d62728" }
@@ -76,6 +77,7 @@ resource "aws_cloudwatch_dashboard" "runner" {
           view    = "timeSeries"
           stacked = false
           period  = 60
+          region  = local.region
           stat    = "Maximum"
           metrics = [
             ["AWS/SQS", "ApproximateAgeOfOldestMessage", "QueueName", "${local.name_prefix}-runner-queued-builds.fifo",
@@ -100,6 +102,7 @@ resource "aws_cloudwatch_dashboard" "runner" {
           view    = "timeSeries"
           stacked = false
           period  = 300
+          region  = local.region
           metrics = [
             ["AWS/Lambda", "Invocations", "FunctionName", "${local.name_prefix}-runner-webhook",
               { stat = "Sum", label = "Invocations", color = "#1f77b4" }
@@ -126,6 +129,7 @@ resource "aws_cloudwatch_dashboard" "runner" {
           view    = "timeSeries"
           stacked = false
           period  = 300
+          region  = local.region
           metrics = [
             ["AWS/Lambda", "Invocations", "FunctionName", "${local.name_prefix}-runner-scale-up",
               { stat = "Sum", label = "Invocations", color = "#2ca02c" }
@@ -152,6 +156,7 @@ resource "aws_cloudwatch_dashboard" "runner" {
           view    = "timeSeries"
           stacked = false
           period  = 300
+          region  = local.region
           metrics = [
             ["AWS/Lambda", "Invocations", "FunctionName", "${local.name_prefix}-runner-scale-down",
               { stat = "Sum", label = "Invocations", color = "#9467bd" }
@@ -179,6 +184,7 @@ resource "aws_cloudwatch_dashboard" "runner" {
           view    = "timeSeries"
           stacked = false
           period  = 300
+          region  = local.region
           metrics = [
             ["AWS/Lambda", "Duration", "FunctionName", "${local.name_prefix}-runner-scale-up",
               { stat = "p50", label = "p50", color = "#2ca02c" }

@@ -60,32 +60,31 @@
       "dependsOn": ["build"],
       "options": {
         "commands": [
-          "echo '🔍 Validating Terraform configuration for stats lambda...'",
-          "cd ../../terraform && terraform fmt -check || (echo '⚠️  Terraform formatting issues found' && terraform fmt)",
-          "cd ../../terraform && terraform validate || echo '⚠️  Terraform validation failed - this may be expected in CI without full AWS context'",
-          "cd ../../terraform && (terraform plan -target=aws_lambda_function.stats 2>&1 || echo '⚠️  Terraform plan failed - this is expected in CI without terraform state and AWS credentials')"
+          "echo '\ud83d\udd0d Validating Terraform configuration for stats lambda...'",
+          "terraform -chdir=terraform/main fmt -check || (echo '\u26a0\ufe0f  Terraform formatting issues found' && terraform -chdir=terraform/main fmt)",
+          "terraform -chdir=terraform/main validate || echo '\u26a0\ufe0f  Terraform validation failed - this may be expected in CI without full AWS context'",
+          "terraform -chdir=terraform/main plan -target=aws_lambda_function.stats 2>&1 || echo '\u26a0\ufe0f  Terraform plan failed - this is expected in CI without terraform state and AWS credentials'"
         ],
         "parallel": false,
-        "cwd": "lambdas/stats-lambda"
+        "cwd": "."
       }
     },
     "deploy:apply": {
       "executor": "nx:run-commands",
       "options": {
         "commands": [
-          "cd ../../terraform",
-          "terraform apply -target=aws_lambda_function.stats -target=aws_lambda_event_source_mapping.stats_sqs -target=aws_api_gateway_resource.stats -target=aws_api_gateway_resource.stats_paths -target=aws_api_gateway_method.stats_options -target=aws_api_gateway_method.stats_post -target=aws_api_gateway_integration.stats_options -target=aws_api_gateway_integration.stats_post -target=aws_lambda_permission.stats_api_gateway -auto-approve",
-          "terraform apply -target=aws_api_gateway_deployment.main -auto-approve"
+          "terraform -chdir=terraform/main apply -target=aws_lambda_function.stats -target=aws_lambda_event_source_mapping.stats_sqs -target=aws_api_gateway_resource.stats -target=aws_api_gateway_resource.stats_paths -target=aws_api_gateway_method.stats_options -target=aws_api_gateway_method.stats_post -target=aws_api_gateway_integration.stats_options -target=aws_api_gateway_integration.stats_post -target=aws_lambda_permission.stats_api_gateway -auto-approve",
+          "terraform -chdir=terraform/main apply -target=aws_api_gateway_deployment.main -auto-approve"
         ],
         "parallel": false,
-        "cwd": "lambdas/stats-lambda"
+        "cwd": "."
       }
     },
     "test-endpoint": {
       "executor": "nx:run-commands",
       "options": {
         "commands": [
-          "curl -X POST \"https://$(cd terraform && terraform output -raw api_gateway_url)/stats/load-career\" -H \"Content-Type: application/json\" -d '{\"test\": true}'"
+          "curl -X POST \"https://$(terraform -chdir=terraform/main output -raw api_gateway_url)/stats/load-career\" -H \"Content-Type: application/json\" -d '{\"test\": true}'"
         ],
         "parallel": false,
         "cwd": "."

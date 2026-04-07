@@ -92,11 +92,12 @@ If you find yourself on a branch that does not match this convention (for exampl
 
 **Never use `cd <dir> && <command>` or `cd <dir> ; <command>` patterns.** These trigger security prompts in some agents and obscure which directory a command targets. Use flag-based alternatives:
 
-| Pattern                         | Replacement                      |
-| ------------------------------- | -------------------------------- |
-| `cd $wt && git ...`             | `git -C $wt ...`                 |
-| `cd $wt && make ...`            | `make -C $wt ...`                |
-| `cd terraform && terraform ...` | `terraform -chdir=terraform ...` |
+| Pattern                              | Replacement                                        |
+| ------------------------------------ | -------------------------------------------------- |
+| `cd $wt && git ...`                  | `git -C $wt ...`                                   |
+| `cd $wt && make ...`                 | `make -C $wt ...`                                  |
+| `cd terraform/main && terraform ...` | `terraform -chdir=terraform/main ...` (Lambda app) |
+| `cd terraform/runners && ...`        | `terraform -chdir=terraform/runners ...` (Runners) |
 
 ## Subagent Tool Preferences
 
@@ -152,9 +153,13 @@ pnpm exec nx affected -t <target>
 # GraphQL codegen:
 make codegen
 
-# Self-hosted runner infrastructure (requires AWS SSO + runner secrets in secrets.auto.tfvars):
-make runner-apply                                    # targeted apply for runner infra only (intentionally excluded from normal loop)
-make ami-build VPC_ID=vpc-xxx SUBNET_ID=subnet-xxx  # build new AMI with Packer
+# Self-hosted runner infrastructure (requires AWS SSO + runner secrets in terraform/runners/secrets.auto.tfvars):
+# As of LS-2425, runner state lives in terraform/runners/ — physically separate from terraform/main/.
+make runner-apply                                    # plan + apply terraform/runners/ (with confirmation)
+make runner-apply NO_CONFIRM=1                       # non-interactive (for agent use)
+make runner-init                                     # terraform init terraform/runners/
+make runner-plan                                     # terraform plan terraform/runners/
+make ami-build VPC_ID=vpc-xxx SUBNET_ID=subnet-xxx  # build new AMI with Packer (terraform/runners/packer/)
 make ami-list                                        # list existing runner AMIs
 ```
 

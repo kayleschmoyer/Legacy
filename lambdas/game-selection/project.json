@@ -50,9 +50,8 @@
       "dependsOn": ["package"],
       "options": {
         "commands": [
-          "cd terraform",
-          "terraform apply -target=aws_lambda_function.game_selection -target=aws_api_gateway_resource.game_selection -target=aws_api_gateway_resource.game_selection_paths -target=aws_api_gateway_method.game_selection_options -target=aws_api_gateway_method.game_selection_any -target=aws_api_gateway_integration.game_selection_options -target=aws_api_gateway_integration.game_selection_any -target=aws_lambda_permission.game_selection_api_gateway -auto-approve",
-          "terraform apply -target=aws_api_gateway_deployment.main -auto-approve"
+          "terraform -chdir=terraform/main apply -target=aws_lambda_function.game_selection -target=aws_api_gateway_resource.game_selection -target=aws_api_gateway_resource.game_selection_paths -target=aws_api_gateway_method.game_selection_options -target=aws_api_gateway_method.game_selection_any -target=aws_api_gateway_integration.game_selection_options -target=aws_api_gateway_integration.game_selection_any -target=aws_lambda_permission.game_selection_api_gateway -auto-approve",
+          "terraform -chdir=terraform/main apply -target=aws_api_gateway_deployment.main -auto-approve"
         ],
         "parallel": false,
         "cwd": "."
@@ -63,10 +62,10 @@
       "dependsOn": ["package"],
       "options": {
         "commands": [
-          "echo '🔍 Validating Terraform configuration for game-selection lambda...'",
-          "cd terraform && terraform fmt -check || (echo '⚠️  Terraform formatting issues found' && terraform fmt)",
-          "cd terraform && terraform validate || echo '⚠️  Terraform validation failed - this may be expected in CI without full AWS context'",
-          "cd terraform && (terraform plan -target=aws_lambda_function.game_selection -target=aws_api_gateway_resource.game_selection -target=aws_api_gateway_resource.game_selection_paths -target=aws_api_gateway_method.game_selection_options -target=aws_api_gateway_method.game_selection_any -target=aws_api_gateway_integration.game_selection_options -target=aws_api_gateway_integration.game_selection_any -target=aws_lambda_permission.game_selection_api_gateway 2>&1 || echo '⚠️  Terraform plan failed - this is expected in CI without terraform state and AWS credentials')"
+          "echo '\ud83d\udd0d Validating Terraform configuration for game-selection lambda...'",
+          "terraform -chdir=terraform/main fmt -check || (echo '\u26a0\ufe0f  Terraform formatting issues found' && terraform -chdir=terraform/main fmt)",
+          "terraform -chdir=terraform/main validate || echo '\u26a0\ufe0f  Terraform validation failed - this may be expected in CI without full AWS context'",
+          "terraform -chdir=terraform/main plan -target=aws_lambda_function.game_selection -target=aws_api_gateway_resource.game_selection -target=aws_api_gateway_resource.game_selection_paths -target=aws_api_gateway_method.game_selection_options -target=aws_api_gateway_method.game_selection_any -target=aws_api_gateway_integration.game_selection_options -target=aws_api_gateway_integration.game_selection_any -target=aws_lambda_permission.game_selection_api_gateway 2>&1 || echo '\u26a0\ufe0f  Terraform plan failed - this is expected in CI without terraform state and AWS credentials'"
         ],
         "parallel": false,
         "cwd": "."
@@ -76,7 +75,7 @@
       "executor": "nx:run-commands",
       "options": {
         "commands": [
-          "curl -X GET \"https://$(cd terraform && terraform output -raw api_gateway_url)/games/health\" -H \"Content-Type: application/json\""
+          "curl -X GET \"https://$(terraform -chdir=terraform/main output -raw api_gateway_url)/games/health\" -H \"Content-Type: application/json\""
         ],
         "parallel": false,
         "cwd": "."

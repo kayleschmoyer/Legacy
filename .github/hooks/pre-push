@@ -93,22 +93,27 @@ fi
 tf_changed=$(git diff --name-only "$tf_base_ref"...HEAD -- 'terraform/' 2>/dev/null || true)
 if [ -n "$tf_changed" ] && command -v terraform >/dev/null 2>&1; then
   printf "pre-push: validating terraform...\n"
-  if [ -d "terraform" ]; then
-    tf_init_out=$(terraform -chdir=terraform init -backend=false -input=false 2>&1)
+  # As of LS-2425, terraform configuration is split into terraform/main/ and
+  # terraform/runners/. Validate both — either may have changed.
+  for tf_dir in terraform/main terraform/runners; do
+    if [ ! -d "$tf_dir" ]; then
+      continue
+    fi
+    tf_init_out=$(terraform -chdir="$tf_dir" init -backend=false -input=false 2>&1)
     tf_init_status=$?
     if [ $tf_init_status -ne 0 ]; then
-      printf >&2 "\nWARNING: terraform init failed (exit %d) — skipping validate. Output:\n%s\n" "$tf_init_status" "$tf_init_out"
-    else
-      tf_validate_out=$(terraform -chdir=terraform validate 2>&1)
-      tf_validate_status=$?
-      if [ $tf_validate_status -ne 0 ]; then
-        printf "\nERROR: terraform validate failed:\n%s\n" "$tf_validate_out"
-        printf "\nFix the terraform errors before pushing.\n"
-        printf "To bypass: git push --no-verify\n"
-        exit 1
-      fi
+      printf >&2 "\nWARNING: terraform init failed in %s (exit %d) — skipping validate. Output:\n%s\n" "$tf_dir" "$tf_init_status" "$tf_init_out"
+      continue
     fi
-  fi
+    tf_validate_out=$(terraform -chdir="$tf_dir" validate 2>&1)
+    tf_validate_status=$?
+    if [ $tf_validate_status -ne 0 ]; then
+      printf "\nERROR: terraform validate failed in %s:\n%s\n" "$tf_dir" "$tf_validate_out"
+      printf "\nFix the terraform errors before pushing.\n"
+      printf "To bypass: git push --no-verify\n"
+      exit 1
+    fi
+  done
 fi
 
 printf "pre-push: running code formatter...\n"

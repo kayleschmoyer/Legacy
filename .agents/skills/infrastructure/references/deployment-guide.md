@@ -61,7 +61,7 @@ aws configure  # If not configured
 pnpm exec nx run db:build --skip-nx-cache
 Select-String -Path lambdas/db/dist/index.js -Pattern "yourNewFunctionName"
 .\scripts\deploy-lambda.ps1 -FunctionName graphql
-terraform -chdir=terraform apply -target="aws_lambda_function.graphql" -auto-approve
+terraform -chdir=terraform/main apply -target="aws_lambda_function.graphql" -auto-approve
 ```
 
 ### Lambda package too large
@@ -85,7 +85,7 @@ $version = aws ssm get-parameter --name "/legacy-sports/dev/lambda/graphql/versi
 aws s3 cp `
   s3://legacy-sports-dev-lambdas-cca20ad9/db/db-$version.zip `
   s3://legacy-sports-dev-lambdas-cca20ad9/graphql/graphql-$version.zip
-terraform -chdir=terraform apply -auto-approve
+terraform -chdir=terraform/main apply -auto-approve
 ```
 
 ## Full Deployment Workflow
@@ -106,7 +106,7 @@ aws s3 cp `
   s3://legacy-sports-dev-lambdas-cca20ad9/graphql/graphql-$version.zip
 
 # 4. Apply Terraform
-terraform -chdir=terraform apply -auto-approve
+terraform -chdir=terraform/main apply -auto-approve
 
 # 5. Test and check logs
 .\scripts\aws-logs.ps1 -Function graphql -Since 15m

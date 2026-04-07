@@ -23,7 +23,10 @@ export async function terraformOutput(
 
   // Reject absolute paths and validate that the resolved directory stays
   // within the repo root to prevent path traversal attacks.
-  const chdir = params.chdir ?? 'terraform';
+  // Default to terraform/main since most outputs (vpc_id, lambda ARNs, RDS endpoint,
+  // etc.) live there. Pass chdir: 'terraform/runners' for runner-specific outputs
+  // (github_runners_webhook_url).
+  const chdir = params.chdir ?? 'terraform/main';
   if (chdir.startsWith('/') || chdir.startsWith('\\')) {
     return {
       content: [
