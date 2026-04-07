@@ -331,7 +331,12 @@ jobs:
   deploy-playwright-report:
     name: "Deploy Playwright Report"
     needs: [e2e]
-    if: "!cancelled() && needs.e2e.result != 'skipped'"
+    # Dependabot-triggered runs do not have access to repository secrets, so the
+    # GitHub App token mint required to push to bkrupa/legacy-sports-deploys
+    # always fails ("appId option is required"). The Playwright HTML report is
+    # cosmetic for dep bumps anyway — skip the job entirely so dependabot PRs
+    # do not show a stuck failed required check.
+    if: "!cancelled() && needs.e2e.result != 'skipped' && (github.event_name != 'pull_request' || github.event.pull_request.user.login != 'dependabot[bot]')"
     runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
     steps:
