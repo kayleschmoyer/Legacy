@@ -51,7 +51,7 @@ Orchestrate maintenance across all open PRs: scan, rebase conflicts, fix reviews
 
 1. **Always self-review before pushing** -- Phase 1 is not optional. It prevents CI failures and reduces Copilot review rounds.
 2. **2-round cap on Copilot fix iterations** -- Round 1: security/bugs/type safety. Round 2: remaining actionable comments. After round 2: resolve and move on.
-3. **Resolve threads after fixing** -- use `github_resolve_thread` or `github_resolve_threads` after pushing fixes. `github_resolve_threads` accepts `threadIds` only. Add `merge-when-ready` label after all threads are resolved. In cloud, `mcp__github__resolve_review_thread({ threadId })` is also available (one at a time; `threadId` is the GraphQL node ID).
+3. **Resolve threads after fixing** -- use `github_resolve_threads({ threadIds: [...] })` MCP tool after pushing fixes — **do NOT use `gh api graphql` mutation to resolve threads**. `github_resolve_threads` is the MCP-first path. Thread IDs come from `github_get_review_threads(number: <PR#>, unresolvedOnly: true)`. Add `merge-when-ready` label after all threads are resolved. In cloud, `mcp__github__resolve_review_thread({ threadId })` is also available (one at a time). Fall back to `gh api graphql` **only** if a thread ID cannot be obtained via `github_get_review_threads(...)` or another documented tool that returns thread IDs.
 4. **Never skip `make pc`** -- each CI failure costs 40-60 min. Minimum alternative: `make format && make lint-fix && make typecheck`.
 5. **Always use `--body-file` or MCP tool for PR body** -- never inline `--body` in any shell (PowerShell is especially problematic).
 6. **Never create a PR from `main`** -- branch name must contain a Jira ticket key.
