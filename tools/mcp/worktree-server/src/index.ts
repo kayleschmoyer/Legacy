@@ -1304,6 +1304,32 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
       },
     },
     {
+      name: 'worktree_remove_batch',
+      description:
+        'Remove multiple worktrees in one call using `twig worktree remove`. ' +
+        'Junction-aware — safer than `git worktree remove`. Use for bulk sweep pruning. ' +
+        'Each worktree entry is processed independently; failures do not stop remaining removals.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          worktrees: {
+            type: 'array',
+            items: { type: 'string' },
+            description:
+              'Worktrees to remove. Each entry can be a ticket key (e.g. "LS-1234"), branch name (e.g. "LS-1234/foo"), directory name, or absolute path. Maximum 100.',
+            minItems: 1,
+            maxItems: 100,
+          },
+          force: {
+            type: 'boolean',
+            description:
+              'Fall back to `git worktree remove --force` (with junction removal first) when twig fails. Default: false.',
+          },
+        },
+        required: ['worktrees'],
+      },
+    },
+    {
       name: 'worktree_check_ignore',
       description:
         'Check whether paths would be ignored by .gitignore rules (git check-ignore -v). ' +
@@ -5780,6 +5806,282 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             ),
           },
         ],
+      };
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_remove_batch
+    // -----------------------------------------------------------------------
+    case 'worktree_remove_batch': {
+      const { worktrees: worktreeInputs, force = false } = args as {
+        worktrees: string[];
+        force?: boolean;
+      };
+
+      if (!Array.isArray(worktreeInputs) || worktreeInputs.length === 0) {
+        return {
+          content: [
+            { type: 'text', text: 'worktrees must be a non-empty array.' },
+          ],
+          isError: true,
+        };
+      }
+
+      if (worktreeInputs.length > 100) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Too many entries: ${worktreeInputs.length} provided, maximum is 100.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      const batchResults: Array<{
+        worktree: string;
+        success: boolean;
+        message: string;
+      }> = [];
+
+      // Cache the worktree list once before the loop to avoid re-running
+      // `git worktree list --porcelain` for every entry (Thread 6 fix).
+      let cachedWorktrees: ReturnType<typeof getWorktrees> | null = null;
+      try {
+        cachedWorktrees = getWorktrees();
+      } catch {
+        // If we can't list worktrees, proceed with null — per-entry resolution
+        // will fall back gracefully.
+      }
+
+      for (const entry of worktreeInputs) {
+        const trimmed = String(entry).trim();
+        if (!trimmed) {
+          batchResults.push({
+            worktree: String(entry),
+            success: false,
+            message: 'Empty or whitespace-only entry.',
+          });
+          continue;
+        }
+
+        // Resolve up-front so both force and non-force paths work with any
+        // identifier type (ticket key, path, directory name, or branch name).
+        // Wrap in a per-entry try/catch so resolution failures produce a single
+        // failed result instead of aborting the whole batch (Thread 6 fix).
+        let resolved: ReturnType<typeof resolveWorktreePath>;
+        try {
+          resolved = resolveWorktreePath(trimmed);
+        } catch (resolveErr) {
+          batchResults.push({
+            worktree: trimmed,
+            success: false,
+            message: `Failed to resolve worktree '${trimmed}': ${resolveErr instanceof Error ? resolveErr.message : String(resolveErr)}`,
+          });
+          continue;
+        }
+
+        // Determine the branch identifier for the twig call by looking up the
+        // resolved path in the cached worktree list (Thread 2 fix). This mirrors
+        // how worktree_clean resolves the branch before calling twig.
+        let twigIdentifier: string = trimmed;
+        if (!('error' in resolved) && cachedWorktrees) {
+          const matchedWt = cachedWorktrees.find((w) => {
+            const a = resolve(w.path);
+            const b = resolve(resolved.path);
+            return process.platform === 'win32'
+              ? a.toLowerCase() === b.toLowerCase()
+              : a === b;
+          });
+          if (matchedWt?.branch) {
+            twigIdentifier = matchedWt.branch;
+          }
+        }
+
+        // Try twig worktree remove first
+        let twigFailed = false;
+        let twigTimedOut = false;
+        try {
+          execFileSync('twig', ['worktree', 'remove', '--', twigIdentifier], {
+            cwd: MAIN_REPO,
+            encoding: 'utf-8',
+            timeout: 60_000,
+            maxBuffer: 10 * 1024 * 1024,
+          });
+          // Clear active worktree state AFTER successful removal (Thread 1 fix).
+          if (!('error' in resolved)) {
+            if (
+              activeWorktree &&
+              resolve(activeWorktree) === resolve(resolved.path)
+            ) {
+              activeWorktree = null;
+              persistActiveWorktree(null);
+            }
+          }
+          batchResults.push({
+            worktree: trimmed,
+            success: true,
+            message: `Removed worktree: ${trimmed}`,
+          });
+          continue;
+        } catch (err) {
+          const msg =
+            err instanceof Error
+              ? (err as { stderr?: string }).stderr || err.message
+              : String(err);
+          twigTimedOut = msg.includes('ETIMEDOUT') || msg.includes('timed out');
+          twigFailed = true;
+
+          if (!force) {
+            batchResults.push({
+              worktree: trimmed,
+              success: false,
+              message: `twig worktree remove failed: ${msg.trim()}. Retry with force=true.`,
+            });
+            continue;
+          }
+        }
+
+        // Force fallback: resolve worktree path, remove junctions, git worktree remove --force
+        if (twigFailed && force) {
+          if ('error' in resolved) {
+            batchResults.push({
+              worktree: trimmed,
+              success: false,
+              message: resolved.error,
+            });
+            continue;
+          }
+          const targetPath = resolved.path;
+
+          let junctionError: string | null = null;
+          for (const junctionName of [
+            'node_modules',
+            '.twig',
+            '.github/skills',
+          ]) {
+            const jPath = join(targetPath, junctionName);
+            try {
+              if (existsSync(jPath) && lstatSync(jPath).isSymbolicLink()) {
+                rmSync(jPath, { recursive: false });
+              }
+            } catch (linkErr) {
+              junctionError = `Failed to remove junction '${junctionName}': ${linkErr instanceof Error ? linkErr.message : String(linkErr)}`;
+              break;
+            }
+          }
+
+          if (junctionError) {
+            batchResults.push({
+              worktree: trimmed,
+              success: false,
+              message: junctionError,
+            });
+            continue;
+          }
+
+          try {
+            execFileSync(
+              'git',
+              ['worktree', 'remove', '--force', '--', targetPath],
+              {
+                cwd: MAIN_REPO,
+                encoding: 'utf-8',
+                timeout: 60_000,
+                maxBuffer: 10 * 1024 * 1024,
+              },
+            );
+            // Clear active worktree state AFTER successful removal (Thread 1 fix).
+            if (
+              activeWorktree &&
+              resolve(activeWorktree) === resolve(targetPath)
+            ) {
+              activeWorktree = null;
+              persistActiveWorktree(null);
+            }
+            batchResults.push({
+              worktree: trimmed,
+              success: true,
+              message: `Removed via git force (twig ${twigTimedOut ? 'timed out' : 'failed'}): ${trimmed}`,
+            });
+          } catch (gitErr) {
+            const gitStderr =
+              gitErr instanceof Error
+                ? (gitErr as { stderr?: string }).stderr || gitErr.message
+                : String(gitErr);
+            // When the worktree's .git file is missing, `git worktree remove`
+            // refuses with "'.git' does not exist". Fall back to direct deletion
+            // + prune (mirrors worktree_clean recovery logic).
+            if (
+              gitStderr.includes("'.git' does not exist") &&
+              existsSync(targetPath)
+            ) {
+              try {
+                rmSync(targetPath, { recursive: true, force: true });
+                // Clear active worktree state AFTER successful removal (Thread 1 fix).
+                if (
+                  activeWorktree &&
+                  resolve(activeWorktree) === resolve(targetPath)
+                ) {
+                  activeWorktree = null;
+                  persistActiveWorktree(null);
+                }
+                batchResults.push({
+                  worktree: trimmed,
+                  success: true,
+                  message: `Removed via direct deletion (no .git — force fallback after twig ${twigTimedOut ? 'timeout' : 'failure'}): ${trimmed}`,
+                });
+              } catch (rmErr) {
+                const rmMsg =
+                  rmErr instanceof Error ? rmErr.message : String(rmErr);
+                batchResults.push({
+                  worktree: trimmed,
+                  success: false,
+                  message: `Direct deletion fallback failed: ${rmMsg.trim()}. The worktree directory may be locked — run \`make kill-stale\` then retry.`,
+                });
+              } finally {
+                try {
+                  execFileSync('git', ['worktree', 'prune'], {
+                    cwd: MAIN_REPO,
+                    encoding: 'utf-8',
+                    timeout: 30_000,
+                  });
+                } catch {
+                  // prune failure is non-fatal
+                }
+              }
+            } else {
+              batchResults.push({
+                worktree: trimmed,
+                success: false,
+                message: `git worktree remove --force failed: ${gitStderr.trim()}`,
+              });
+            }
+          }
+        }
+      }
+
+      const removedCount = batchResults.filter((r) => r.success).length;
+      const failedCount = batchResults.filter((r) => !r.success).length;
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                total: batchResults.length,
+                removed: removedCount,
+                failed: failedCount,
+                results: batchResults,
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+        isError: failedCount > 0,
       };
     }
 
