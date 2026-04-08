@@ -103,6 +103,7 @@ export function buildHeaders(token: string): Record<string, string> {
 export async function githubGet<T>(
   path: string,
   params?: Record<string, string>,
+  options?: { signal?: AbortSignal },
 ): Promise<T> {
   const { token, slug } = await ensureAuth();
   const url = new URL(`${GITHUB_API}/repos/${slug}${path}`);
@@ -114,6 +115,7 @@ export async function githubGet<T>(
 
   const res = await fetch(url.toString(), {
     headers: buildHeaders(token),
+    signal: options?.signal,
   });
 
   if (!res.ok) {
