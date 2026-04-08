@@ -185,138 +185,172 @@ export class LeagueService {
       startDate,
     } = input;
 
+    if (numberOfTeams < 1) {
+      throw new Error(`numberOfTeams must be at least 1, got ${numberOfTeams}`);
+    }
+    if (numberOfDivisions < 1) {
+      throw new Error(
+        `numberOfDivisions must be at least 1, got ${numberOfDivisions}`,
+      );
+    }
+    if (numberOfDivisions > numberOfTeams) {
+      throw new Error(
+        `numberOfDivisions (${numberOfDivisions}) cannot exceed numberOfTeams (${numberOfTeams})`,
+      );
+    }
+
     return runWithPublicClient(this.options, async (db) => {
-      // Generate unique invite code
+      // Generate unique invite code outside the transaction (read-only check)
       const inviteCode = await this.generateUniqueInviteCode(db);
 
-      // 1. Insert league
-      const [league] = await db
-        .insert(PublicSchema.leagues)
-        .values({
-          name,
-          owner: ownerId,
-          maxRosterSize,
-          currentMatchup: null,
-          inviteCode,
-          playerPool,
-          eraFilter,
-          hofOnly,
-          customEraStartYear,
-          customEraEndYear,
-          waiverType,
-          waiverEnabled,
-          faabBudgetDefault,
-          schedulingStrategy,
-          numberOfDivisions,
-          isPublic,
-          // Salary cap settings
-          salaryCapEnabled,
-          salaryCap,
-          salaryFloor,
-          luxuryTaxThreshold,
-          minSalary,
-          salaryEscalationPct,
-          salaryDecayPct,
-          auctionBudget,
-          auctionMinBid,
-        })
-        .returning({
-          id: PublicSchema.leagues.id,
-          name: PublicSchema.leagues.name,
-          owner: PublicSchema.leagues.owner,
-          maxRosterSize: PublicSchema.leagues.maxRosterSize,
-          currentMatchup: PublicSchema.leagues.currentMatchup,
-          currentWeek: PublicSchema.leagues.currentWeek,
-          draftStatus: PublicSchema.leagues.draftStatus,
-          leaguePhase: PublicSchema.leagues.leaguePhase,
-          inviteCode: PublicSchema.leagues.inviteCode,
-          playerPool: PublicSchema.leagues.playerPool,
-          eraFilter: PublicSchema.leagues.eraFilter,
-          hofOnly: PublicSchema.leagues.hofOnly,
-          customEraStartYear: PublicSchema.leagues.customEraStartYear,
-          customEraEndYear: PublicSchema.leagues.customEraEndYear,
-          waiverType: PublicSchema.leagues.waiverType,
-          waiverEnabled: PublicSchema.leagues.waiverEnabled,
-          faabBudgetDefault: PublicSchema.leagues.faabBudgetDefault,
-          isPublic: PublicSchema.leagues.isPublic,
-        });
+      const result = await db.transaction(async (tx) => {
+        // 1. Insert league
+        const [league] = await tx
+          .insert(PublicSchema.leagues)
+          .values({
+            name,
+            owner: ownerId,
+            maxRosterSize,
+            currentMatchup: null,
+            inviteCode,
+            playerPool,
+            eraFilter,
+            hofOnly,
+            customEraStartYear,
+            customEraEndYear,
+            waiverType,
+            waiverEnabled,
+            faabBudgetDefault,
+            schedulingStrategy,
+            numberOfDivisions,
+            isPublic,
+            // Salary cap settings
+            salaryCapEnabled,
+            salaryCap,
+            salaryFloor,
+            luxuryTaxThreshold,
+            minSalary,
+            salaryEscalationPct,
+            salaryDecayPct,
+            auctionBudget,
+            auctionMinBid,
+          })
+          .returning({
+            id: PublicSchema.leagues.id,
+            name: PublicSchema.leagues.name,
+            owner: PublicSchema.leagues.owner,
+            maxRosterSize: PublicSchema.leagues.maxRosterSize,
+            currentMatchup: PublicSchema.leagues.currentMatchup,
+            currentWeek: PublicSchema.leagues.currentWeek,
+            draftStatus: PublicSchema.leagues.draftStatus,
+            leaguePhase: PublicSchema.leagues.leaguePhase,
+            inviteCode: PublicSchema.leagues.inviteCode,
+            playerPool: PublicSchema.leagues.playerPool,
+            eraFilter: PublicSchema.leagues.eraFilter,
+            hofOnly: PublicSchema.leagues.hofOnly,
+            customEraStartYear: PublicSchema.leagues.customEraStartYear,
+            customEraEndYear: PublicSchema.leagues.customEraEndYear,
+            waiverType: PublicSchema.leagues.waiverType,
+            waiverEnabled: PublicSchema.leagues.waiverEnabled,
+            faabBudgetDefault: PublicSchema.leagues.faabBudgetDefault,
+            isPublic: PublicSchema.leagues.isPublic,
+          });
 
-      // 2. Create teams — assign each team to a division (round-robin across divisions)
-      // e.g. 4 teams / 3 divisions → div 1 gets 2, div 2 gets 1, div 3 gets 1
-      // Strip email domain if the username looks like an email address
-      const displayName = /^[^@]+@[^@]+\.[^@]+$/.test(ownerUsername)
-        ? ownerUsername.split('@')[0]
-        : ownerUsername;
-      const teamNames = [`${displayName}'s Team`, ...DEFAULT_TEAM_NAMES];
-      const teamsToCreate = Math.min(numberOfTeams, teamNames.length);
-      const teamData = teamNames
-        .slice(0, teamsToCreate)
-        .map((teamName, index) => ({
-          name: teamName,
+        // 2. Create teams — assign each team to a division (round-robin across divisions)
+        // e.g. 4 teams / 3 divisions → div 1 gets 2, div 2 gets 1, div 3 gets 1
+        // Strip email domain if the username looks like an email address
+        const displayName = /^[^@]+@[^@]+\.[^@]+$/.test(ownerUsername)
+          ? ownerUsername.split('@')[0]
+          : ownerUsername;
+        const teamNames = [`${displayName}'s Team`, ...DEFAULT_TEAM_NAMES];
+        // Clamp to available team names. Callers should not pass numberOfTeams
+        // greater than teamNames.length (currently 16), but we cap silently for
+        // backwards compatibility rather than throwing a hard error here.
+        const teamsToCreate = Math.min(numberOfTeams, teamNames.length);
+        const teamData = teamNames
+          .slice(0, teamsToCreate)
+          .map((teamName, index) => ({
+            name: teamName,
+            leagueId: league.id,
+            divisionId: (index % numberOfDivisions) + 1,
+            waiverOrder: index + 1,
+            faabBudget: faabBudgetDefault,
+          }));
+
+        const teams = await tx
+          .insert(PublicSchema.teams)
+          .values(teamData)
+          .returning({
+            id: PublicSchema.teams.id,
+            name: PublicSchema.teams.name,
+            leagueId: PublicSchema.teams.leagueId,
+            divisionId: PublicSchema.teams.divisionId,
+            createdAt: PublicSchema.teams.createdAt,
+            updatedAt: PublicSchema.teams.updatedAt,
+            waiverOrder: PublicSchema.teams.waiverOrder,
+            faabBudget: PublicSchema.teams.faabBudget,
+          });
+
+        // 3. Create league member for owner (assign to first team)
+        if (!teams[0]?.id) {
+          throw new Error('Failed to create league teams');
+        }
+        const ownerMember = {
           leagueId: league.id,
-          divisionId: (index % numberOfDivisions) + 1,
-          waiverOrder: index + 1,
-          faabBudget: faabBudgetDefault,
-        }));
+          userId: ownerId,
+          teamId: teams[0].id,
+          permissionLevel: 'commissioner' as const,
+        };
+        await tx.insert(PublicSchema.leagueMembers).values(ownerMember);
 
-      const teams = await db
-        .insert(PublicSchema.teams)
-        .values(teamData)
-        .returning({
-          id: PublicSchema.teams.id,
-          name: PublicSchema.teams.name,
-          leagueId: PublicSchema.teams.leagueId,
-          divisionId: PublicSchema.teams.divisionId,
-          createdAt: PublicSchema.teams.createdAt,
-          updatedAt: PublicSchema.teams.updatedAt,
-          waiverOrder: PublicSchema.teams.waiverOrder,
-          faabBudget: PublicSchema.teams.faabBudget,
+        // 4. Create roster positions
+        const positionData = DEFAULT_ROSTER_POSITIONS.map((positionType) => ({
+          leagueId: league.id,
+          positionType,
+        }));
+        await tx.insert(PublicSchema.leaguePosition).values(positionData);
+
+        // 5. Create draft record — always, so draft settings are never missing
+        await tx.insert(PublicSchema.drafts).values({
+          leagueId: league.id,
+          draftMode,
+          selectionMethod,
+          draftOrder,
+          ...(startDate
+            ? {
+                scheduledAt: new Date(startDate),
+                date: startDate.split('T')[0],
+              }
+            : {}),
         });
 
-      // 3. Create league member for owner (assign to first team)
-      const ownerMember = {
-        leagueId: league.id,
-        userId: ownerId,
-        teamId: teams[0].id,
-        permissionLevel: 'commissioner' as const,
-      };
-      await db.insert(PublicSchema.leagueMembers).values(ownerMember);
+        // 6. Create default scoring profile — always, so the scoring editor
+        //    never throws "Active scoring profile not found" for new leagues.
+        //    getActiveScoringProfileForLeague queries isDefault=true; entries
+        //    are populated on the first ScoringService.updateActiveProfile call
+        //    via updateLeagueScoringProfileEntries (upsert).
+        await tx.insert(PublicSchema.leagueScoringProfiles).values({
+          leagueId: league.id,
+          isDefault: true,
+        });
 
-      // 4. Create roster positions
-      const positionData = DEFAULT_ROSTER_POSITIONS.map((positionType) => ({
-        leagueId: league.id,
-        positionType,
-      }));
-      await db.insert(PublicSchema.leaguePosition).values(positionData);
-
-      // 5. Create draft record — always, so draft settings are never missing
-      await db.insert(PublicSchema.drafts).values({
-        leagueId: league.id,
-        draftMode,
-        selectionMethod,
-        draftOrder,
-        ...(startDate
-          ? {
-              scheduledAt: new Date(startDate),
-              date: startDate.split('T')[0],
-            }
-          : {}),
+        return {
+          league,
+          teams,
+          leagueMembers: [ownerMember],
+        };
       });
 
       LOGGER.info('League created with all related records', {
-        leagueId: league.id,
+        leagueId: result.league.id,
         name,
-        numberOfTeams: teamsToCreate,
+        numberOfTeams: result.teams.length,
         draftMode,
         selectionMethod,
         draftOrder,
       });
 
-      return {
-        league,
-        teams,
-        leagueMembers: [ownerMember],
-      };
+      return result;
     });
   }
 
