@@ -290,7 +290,7 @@ export function useDraftQueries({
   const { data: statsData } = useQuery<GetDraftPlayerStatsQuery>(
     GET_DRAFT_PLAYER_STATS,
     {
-      variables: { first: 5000, minGames: 1 },
+      variables: { first: 30000, minGames: 1 },
       skip: isAuctionDraft,
       errorPolicy: 'all',
     },
