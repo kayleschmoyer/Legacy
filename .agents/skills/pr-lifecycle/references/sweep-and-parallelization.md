@@ -63,6 +63,8 @@ POST-SWEEP (after outer loop exits):
 
 **Key difference from the old pass-counter approach:** settled PRs are skipped in subsequent passes, so work is never repeated. The loop exits when all PRs are settled, not after a fixed count. The max 10 pass cap is a safety net — expect 2–4 passes in practice.
 
+> **Bulk status check**: use `github_pr_batch_status({ numbers: [N1, N2, ...] })` to check CI status, labels, and mergeability (`mergeable`) in batches instead of sequential `gh pr view` calls. `numbers` is limited to **50 PRs per call**, so for larger sweeps split the PR list into chunks of 50 and make multiple batch calls. This is the MCP-first path for any multi-PR status query — do **not** loop `gh pr view <number>` or `github_view_pr` per PR when you need a batch snapshot.
+
 ## Parallelization Strategy
 
 Each PR lives in its own junctioned worktree. The shared `node_modules` is **read-only** during `make pc`, so parallel validation is safe.
