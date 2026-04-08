@@ -418,7 +418,15 @@ jobs:
           PLAYWRIGHT_ARGS+=( "--shard=${{ matrix.shard }}" )
 
           # Workers and retries
-          if [ "$IS_NIGHTLY_LIKE" = "true" ]; then
+          # Integration suite must always run with 1 worker — concurrent
+          # league-creation flows against the live backend cause Lambda
+          # throttling and flaky "Failed to fetch" / null teamId responses.
+          # playwright.integration.config.ts sets workers: 1 for the same
+          # reason, but CLI --workers overrides the config value, so we must
+          # be explicit here too. See LS-2824.
+          if [ "$SUITE" = "integration" ]; then
+            PLAYWRIGHT_ARGS+=( "--workers=1" )
+          elif [ "$IS_NIGHTLY_LIKE" = "true" ]; then
             PLAYWRIGHT_ARGS+=( "--workers=4" "--retries=2" )
           else
             PLAYWRIGHT_ARGS+=( "--workers=${{ inputs.workers }}" "--retries=${{ inputs.retries }}" )
