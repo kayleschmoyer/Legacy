@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Button,
   H1,
@@ -362,7 +363,7 @@ export default function HelpPage() {
               </SectionHeader>
               <SectionBody>
                 <XStack flexWrap="wrap" gap="$3">
-                  <a href="/baseball" style={{ textDecoration: 'none' }}>
+                  <Link to="/baseball" style={{ textDecoration: 'none' }}>
                     <QuickLinkChip>
                       <Paragraph fontSize={16} lineHeight={18}>
                         <span role="img" aria-label="baseball">
@@ -373,8 +374,8 @@ export default function HelpPage() {
                         My Leagues
                       </Paragraph>
                     </QuickLinkChip>
-                  </a>
-                  <a href="/players" style={{ textDecoration: 'none' }}>
+                  </Link>
+                  <Link to="/players" style={{ textDecoration: 'none' }}>
                     <QuickLinkChip>
                       <Paragraph fontSize={16} lineHeight={18}>
                         <span role="img" aria-label="players">
@@ -385,8 +386,8 @@ export default function HelpPage() {
                         Players
                       </Paragraph>
                     </QuickLinkChip>
-                  </a>
-                  <a href="/players/stats" style={{ textDecoration: 'none' }}>
+                  </Link>
+                  <Link to="/players/stats" style={{ textDecoration: 'none' }}>
                     <QuickLinkChip>
                       <Paragraph fontSize={16} lineHeight={18}>
                         <span role="img" aria-label="statistics">
@@ -397,9 +398,9 @@ export default function HelpPage() {
                         Player Stats
                       </Paragraph>
                     </QuickLinkChip>
-                  </a>
-                  <a
-                    href="/baseball/league/create"
+                  </Link>
+                  <Link
+                    to="/baseball/league/create"
                     style={{ textDecoration: 'none' }}
                   >
                     <QuickLinkChip>
@@ -412,9 +413,9 @@ export default function HelpPage() {
                         Create League
                       </Paragraph>
                     </QuickLinkChip>
-                  </a>
-                  <a
-                    href="/profile/settings"
+                  </Link>
+                  <Link
+                    to="/profile/settings"
                     style={{ textDecoration: 'none' }}
                   >
                     <QuickLinkChip>
@@ -427,7 +428,7 @@ export default function HelpPage() {
                         Profile Settings
                       </Paragraph>
                     </QuickLinkChip>
-                  </a>
+                  </Link>
                 </XStack>
               </SectionBody>
             </SectionCard>
