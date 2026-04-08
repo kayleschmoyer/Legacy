@@ -14,6 +14,7 @@ import { describeSecurityGroups } from './tools/security-groups.js';
 import { lambdaStatus } from './tools/lambda-status.js';
 import { LAMBDA_FUNCTIONS, logsTail } from './tools/logs-tail.js';
 import { ssmGet } from './tools/ssm-get.js';
+import { ssmRunCommand } from './tools/ssm-run-command.js';
 import { ssoLogin } from './tools/sso-login.js';
 import { ssoStatus } from './tools/sso-status.js';
 import { terraformOutput } from './tools/terraform-output.js';
@@ -110,6 +111,34 @@ server.tool(
       ),
   },
   async (params) => ssmGet(params),
+);
+
+// --- aws_ssm_run_command ---
+server.tool(
+  'aws_ssm_run_command',
+  'Run ad-hoc shell commands on an EC2 instance via AWS SSM (no SSH needed). Requires the instance to have the SSM agent running and the IAM role to have AmazonSSMManagedInstanceCore. Polls until completion and returns stdout/stderr. Use for debugging runner state (e.g. inspecting /opt/playwright-browsers).',
+  {
+    instanceId: z
+      .string()
+      .describe(
+        'EC2 instance ID (e.g. "i-0abc1234def56789a"). Get from aws_ec2_instances.',
+      ),
+    commands: z
+      .array(z.string())
+      .min(1)
+      .max(20)
+      .describe(
+        "Simple commands with arguments only. Each command is validated and must not contain: pipes (|), redirects (>, <), semicolons (;), ampersands (&), dollar signs ($), quotes (\" or '), backticks (`), parentheses, braces, backslashes, or newlines. Example: ['ls -la', 'cat /etc/hostname']",
+      ),
+    timeout: z.coerce
+      .number()
+      .int()
+      .min(10)
+      .max(3600)
+      .default(60)
+      .describe('Command timeout in seconds (min: 10, default: 60, max: 3600)'),
+  },
+  async (params) => ssmRunCommand(params),
 );
 
 // --- aws_sso_status ---
