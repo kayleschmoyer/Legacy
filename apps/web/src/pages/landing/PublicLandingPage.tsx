@@ -285,11 +285,17 @@ function buildDiscordAuthUrl(
 const DISCORD_LOGIN_STATE_KEY = 'discord_oauth_login_state';
 
 export function PublicLandingPage(): React.JSX.Element {
-  const { config, loginWithOAuth } = useAuth();
+  const { config, loginWithOAuth, error: authError } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isDiscordLoading, setIsDiscordLoading] = useState(false);
   const [isConfigured, setIsConfigured] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+
+  // Prefer locally-set error (from catch blocks in this component) but fall
+  // back to the auth context error so that AUTH_FAILURE messages (which are
+  // dispatched before this component remounts after the loading spinner)
+  // are still visible to the user.
+  const displayError = errorMessage || authError || '';
 
   // Handle Discord OAuth callback: automatically exchange the code when the
   // page loads on the /auth/discord/callback path.
@@ -685,9 +691,9 @@ export function PublicLandingPage(): React.JSX.Element {
               ) : null}
             </XStack>
 
-            {errorMessage ? (
+            {displayError ? (
               <Text fontSize="$3" color="$red9" textAlign="center">
-                {errorMessage}
+                {displayError}
               </Text>
             ) : null}
 

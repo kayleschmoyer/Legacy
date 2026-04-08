@@ -372,6 +372,10 @@ jobs:
           E2E_MANAGER_2_PASSWORD: ${{ matrix.suite == 'integration' && secrets.E2E_MANAGER_2_PASSWORD || '' }}
           E2E_MANAGER_3_EMAIL: ${{ matrix.suite == 'integration' && secrets.E2E_MANAGER_3_EMAIL || '' }}
           E2E_MANAGER_3_PASSWORD: ${{ matrix.suite == 'integration' && secrets.E2E_MANAGER_3_PASSWORD || '' }}
+          # Google test credentials for google-oauth.integration.spec.ts
+          # The API smoke tests always run; the UI popup test is skipped when absent.
+          GOOGLE_TEST_EMAIL: ${{ matrix.suite == 'integration' && secrets.GOOGLE_TEST_EMAIL || '' }}
+          GOOGLE_TEST_PASSWORD: ${{ matrix.suite == 'integration' && secrets.GOOGLE_TEST_PASSWORD || '' }}
         run: |
           SUITE="${{ matrix.suite }}"
           IS_SCHEDULE="${{ github.event_name == 'schedule' }}"
