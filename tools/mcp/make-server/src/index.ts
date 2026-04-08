@@ -7,6 +7,14 @@ import { runCommand, getRepoRoot } from './run-command.js';
 import { runTarget } from './tools/run-target.js';
 import { worktreeCreate } from './tools/worktree-create.js';
 import { wtSetup } from './tools/wt-setup.js';
+import {
+  terraformStatePull,
+  terraformStatePush,
+  terraformStateMv,
+  terraformStateList,
+  terraformStateRm,
+  terraformStateMvBatch,
+} from './tools/terraform-state.js';
 
 // Absolute path: Windows (C:\... or C:/...) or Unix (/...)
 const ABSOLUTE_PATH_REGEX = /^([A-Za-z]:[/\\]|\/)/;
@@ -311,6 +319,240 @@ server.tool(
         isError: true,
       };
     }
+  },
+);
+
+// --- terraform_state_pull ---
+server.tool(
+  'terraform_state_pull',
+  'Pull the current Terraform state JSON from the remote backend. ' +
+    'Equivalent to `terraform -chdir=<dir> state pull`. ' +
+    'Returns the raw Terraform state JSON text; clients must parse it if they need an object. ' +
+    'Use `dir` as a relative path like "terraform/main" or "terraform/runners", or an absolute path. ' +
+    'Security warning: Terraform state commonly contains sensitive values such as provider credentials, tokens, and secrets, and MCP tool output may be persisted in logs or transcripts. Only use this tool when you explicitly need the full state contents.',
+  {
+    dir: z
+      .string()
+      .describe(
+        'Terraform working directory, e.g. "terraform/main" or "terraform/runners". ' +
+          'Relative to repo root, or absolute.',
+      ),
+    worktreePath: z
+      .string()
+      .regex(ABSOLUTE_PATH_REGEX, 'worktreePath must be an absolute path')
+      .optional()
+      .describe(
+        'Repo or worktree root (default: repo root). Used to resolve relative `dir` values.',
+      ),
+  },
+  async (params) => {
+    const repoRoot = params.worktreePath || getRepoRoot();
+    return terraformStatePull({ dir: params.dir, repoRoot });
+  },
+);
+
+// --- terraform_state_push ---
+server.tool(
+  'terraform_state_push',
+  'Push a Terraform state JSON to the remote backend. ' +
+    'Equivalent to `terraform -chdir=<dir> state push <state-file>`. ' +
+    'The state is written to a temp file and pushed. ' +
+    'CAUTION: This overwrites the remote state — always pull first and verify.',
+  {
+    dir: z
+      .string()
+      .describe(
+        'Terraform working directory, e.g. "terraform/main" or "terraform/runners".',
+      ),
+    stateJson: z
+      .string()
+      .describe(
+        'Full Terraform state as a JSON string (from terraform_state_pull).',
+      ),
+    force: z
+      .boolean()
+      .default(false)
+      .describe(
+        'Pass -force to bypass serial number check. Use only when you are certain the state is correct.',
+      ),
+    worktreePath: z
+      .string()
+      .regex(ABSOLUTE_PATH_REGEX, 'worktreePath must be an absolute path')
+      .optional()
+      .describe('Repo or worktree root (default: repo root).'),
+  },
+  async (params) => {
+    const repoRoot = params.worktreePath || getRepoRoot();
+    return terraformStatePush({
+      dir: params.dir,
+      stateJson: params.stateJson,
+      force: params.force,
+      repoRoot,
+    });
+  },
+);
+
+// --- terraform_state_mv ---
+server.tool(
+  'terraform_state_mv',
+  'Move a resource in Terraform state. ' +
+    'Equivalent to `terraform -chdir=<dir> state mv <source> <destination>`. ' +
+    'Use to rename resources or move them between modules without destroying/recreating.',
+  {
+    dir: z
+      .string()
+      .describe(
+        'Terraform working directory, e.g. "terraform/main" or "terraform/runners".',
+      ),
+    source: z
+      .string()
+      .describe(
+        'Source resource address, e.g. "aws_lambda_function.old_name".',
+      ),
+    destination: z
+      .string()
+      .describe(
+        'Destination resource address, e.g. "aws_lambda_function.new_name".',
+      ),
+    worktreePath: z
+      .string()
+      .regex(ABSOLUTE_PATH_REGEX, 'worktreePath must be an absolute path')
+      .optional()
+      .describe('Repo or worktree root (default: repo root).'),
+  },
+  async (params) => {
+    const repoRoot = params.worktreePath || getRepoRoot();
+    return terraformStateMv({
+      dir: params.dir,
+      source: params.source,
+      destination: params.destination,
+      repoRoot,
+    });
+  },
+);
+
+// --- terraform_state_list ---
+server.tool(
+  'terraform_state_list',
+  'List resources in Terraform state. ' +
+    'Equivalent to `terraform -chdir=<dir> state list [<address>]`. ' +
+    'Omit `address` to list all resources; provide an address to filter.',
+  {
+    dir: z
+      .string()
+      .describe(
+        'Terraform working directory, e.g. "terraform/main" or "terraform/runners".',
+      ),
+    address: z
+      .string()
+      .optional()
+      .describe(
+        'Optional resource address filter, e.g. "aws_lambda_function.graphql". ' +
+          'Supports partial module paths.',
+      ),
+    worktreePath: z
+      .string()
+      .regex(ABSOLUTE_PATH_REGEX, 'worktreePath must be an absolute path')
+      .optional()
+      .describe('Repo or worktree root (default: repo root).'),
+  },
+  async (params) => {
+    const repoRoot = params.worktreePath || getRepoRoot();
+    return terraformStateList({
+      dir: params.dir,
+      address: params.address,
+      repoRoot,
+    });
+  },
+);
+
+// --- terraform_state_rm ---
+server.tool(
+  'terraform_state_rm',
+  'Remove a resource from Terraform state (does NOT destroy the real infrastructure). ' +
+    'Equivalent to `terraform -chdir=<dir> state rm <address>`. ' +
+    'Use `dryRun: true` to preview what would be removed without modifying state.',
+  {
+    dir: z
+      .string()
+      .describe(
+        'Terraform working directory, e.g. "terraform/main" or "terraform/runners".',
+      ),
+    address: z
+      .string()
+      .describe(
+        'Resource address to remove, e.g. "aws_lambda_function.old_resource".',
+      ),
+    dryRun: z
+      .boolean()
+      .default(false)
+      .describe(
+        'Pass -dry-run to preview removal without modifying state. Recommended before destructive removes.',
+      ),
+    worktreePath: z
+      .string()
+      .regex(ABSOLUTE_PATH_REGEX, 'worktreePath must be an absolute path')
+      .optional()
+      .describe('Repo or worktree root (default: repo root).'),
+  },
+  async (params) => {
+    const repoRoot = params.worktreePath || getRepoRoot();
+    return terraformStateRm({
+      dir: params.dir,
+      address: params.address,
+      dryRun: params.dryRun,
+      repoRoot,
+    });
+  },
+);
+
+// --- terraform_state_mv_batch ---
+server.tool(
+  'terraform_state_mv_batch',
+  'Batch-move resources in Terraform state. ' +
+    'Accepts up to 200 { from, to } pairs and runs them sequentially. ' +
+    'All pairs are attempted even if earlier ones fail; returns per-pair success/error results. ' +
+    'Use for bulk module renames or resource restructuring.',
+  {
+    dir: z
+      .string()
+      .describe(
+        'Terraform working directory, e.g. "terraform/main" or "terraform/runners".',
+      ),
+    moves: z
+      .array(
+        z.object({
+          from: z.string().describe('Source resource address'),
+          to: z.string().describe('Destination resource address'),
+        }),
+      )
+      .min(1)
+      .max(200)
+      .describe('Array of { from, to } address pairs to move sequentially.'),
+    batchTimeoutSeconds: z
+      .number()
+      .int()
+      .positive()
+      .default(300)
+      .describe(
+        'Overall timeout for the entire batch in seconds (default: 300). ' +
+          'If elapsed time exceeds this limit before all moves complete, ' +
+          'remaining moves are skipped with a timeout error and partial results are returned.',
+      ),
+    worktreePath: z
+      .string()
+      .regex(ABSOLUTE_PATH_REGEX, 'worktreePath must be an absolute path')
+      .optional()
+      .describe('Repo or worktree root (default: repo root).'),
+  },
+  async (params) => {
+    const repoRoot = params.worktreePath || getRepoRoot();
+    return terraformStateMvBatch({
+      dir: params.dir,
+      moves: params.moves,
+      batchTimeoutSeconds: params.batchTimeoutSeconds,
+      repoRoot,
+    });
   },
 );
 

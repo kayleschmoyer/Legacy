@@ -16,12 +16,14 @@ export function runCommand(
   args: string[],
   cwd: string,
   timeoutMs = COMMAND_TIMEOUT,
+  shell = true,
+  maxBuffer = 10 * 1024 * 1024,
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     execFile(
       command,
       args,
-      { cwd, timeout: timeoutMs, shell: true, maxBuffer: 10 * 1024 * 1024 },
+      { cwd, timeout: timeoutMs, shell, maxBuffer },
       (err, stdout, stderr) => {
         if (err) {
           // Include both stdout and stderr so callers get full context

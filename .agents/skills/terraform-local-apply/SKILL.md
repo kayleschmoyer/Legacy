@@ -146,3 +146,72 @@ make wt-setup WT=<path-to-worktree>
 | `runners/` plan shows VPC/SG creates                   | Cross-state outputs missing in `terraform/main/outputs.tf` — re-run `terraform -chdir=terraform/main apply` to publish them, then re-init `terraform/runners/`                                       |
 
 > 📎 Full issue catalogue: see [references/terraform-common-issues.md](../infrastructure/references/terraform-common-issues.md)
+
+## MCP State Management Tools
+
+The `legacy-sports-make` MCP server exposes 6 terraform state tools. Prefer these over raw `terraform state` shell commands — they validate inputs, are Windows-safe, and return structured JSON output for successful operations. Some validation and command failures may still return plain-text error messages, so do not assume every response is JSON.
+
+All tools accept:
+
+- `dir` — terraform working directory, relative to repo root (e.g. `"terraform/main"`, `"terraform/runners"`) or an absolute path
+- `worktreePath` (optional) — repo/worktree root for resolving relative `dir` values (defaults to repo root)
+
+| Tool                       | Equivalent CLI                                | When to use                                                                                                                               |
+| -------------------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `terraform_state_pull`     | `terraform -chdir=<dir> state pull`           | Inspect current state JSON; always pull before a push to get the latest serial number                                                     |
+| `terraform_state_push`     | `terraform -chdir=<dir> state push <file>`    | Restore or overwrite remote state; use after manual repairs. Pass `force: true` only when the serial number mismatch is intentional       |
+| `terraform_state_mv`       | `terraform -chdir=<dir> state mv <src> <dst>` | Rename a single resource or move it to a different module without destroying real infrastructure                                          |
+| `terraform_state_list`     | `terraform -chdir=<dir> state list [<addr>]`  | List all tracked resources; optionally filter by address prefix (e.g. `"module.github_runners"`)                                          |
+| `terraform_state_rm`       | `terraform -chdir=<dir> state rm <addr>`      | Remove a resource from state tracking without deleting the real AWS resource. Always run with `dryRun: true` first to confirm the address |
+| `terraform_state_mv_batch` | multiple `terraform state mv` calls           | Rename or restructure many resources at once (up to 200 pairs). Runs sequentially and returns per-pair success/failure                    |
+
+> **Caution:** Terraform state JSON often includes sensitive values (provider credentials, secrets). Do not share or paste tool output from `terraform_state_pull`.
+
+### Common patterns
+
+**Inspect what's in state before surgery:**
+
+```
+terraform_state_list({ dir: "terraform/main" })
+```
+
+**Rename a resource (e.g. after a .tf refactor):**
+
+```
+terraform_state_mv({
+  dir: "terraform/main",
+  source: "aws_lambda_function.old_name",
+  destination: "aws_lambda_function.new_name"
+})
+```
+
+**Bulk module restructure:**
+
+```
+terraform_state_mv_batch({
+  dir: "terraform/runners",
+  moves: [
+    { from: "module.old_runners.aws_iam_role.runner", to: "module.new_runners.aws_iam_role.runner" },
+    { from: "module.old_runners.aws_lambda_function.scale_up", to: "module.new_runners.aws_lambda_function.scale_up" }
+  ]
+})
+```
+
+**Orphan a resource (stop tracking without destroying):**
+
+```
+// Preview first
+terraform_state_rm({ dir: "terraform/main", address: "aws_s3_bucket.legacy", dryRun: true })
+// Then remove
+terraform_state_rm({ dir: "terraform/main", address: "aws_s3_bucket.legacy" })
+```
+
+**Repair corrupted remote state:**
+
+```
+// 1. Pull current state
+terraform_state_pull({ dir: "terraform/main" })
+// 2. Edit the JSON (Claude Code Edit tool)
+// 3. Push repaired state
+terraform_state_push({ dir: "terraform/main", stateJson: "<edited JSON>" })
+```
