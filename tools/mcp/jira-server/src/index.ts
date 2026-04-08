@@ -123,11 +123,22 @@ server.tool(
   'jira_bulk_create_tickets',
   'Create up to 50 Jira tickets in one call. Returns per-ticket success/failure. Use when filing multiple tickets (e.g. MCP gap audits, E2E coverage gaps) to avoid N serial API round-trips.',
   {
-    tickets: z
-      .array(ticketSchema)
-      .min(1)
-      .max(50)
-      .describe('List of tickets to create (max 50 per call)'),
+    tickets: z.preprocess((val) => {
+      if (typeof val !== 'string') return val; // already array — let Zod validate it
+      const trimmed = val.trimStart();
+      if (!trimmed.startsWith('[')) {
+        // Not a JSON array string — return as-is and let z.array validation fail with a clear message
+        return val;
+      }
+      try {
+        return JSON.parse(val);
+      } catch {
+        // Return the original string on invalid JSON so z.array() rejects it
+        // with a type error rather than letting a thrown exception escape the
+        // preprocess pipeline (which can bypass Zod's error handling).
+        return val;
+      }
+    }, z.array(ticketSchema).min(1).max(50).describe('Array of ticket objects to create. Each ticket must have a summary. Type defaults to Task. Pass sprint: "current" to add to the active sprint.')),
   },
   async (params) => bulkCreate(params),
 );
