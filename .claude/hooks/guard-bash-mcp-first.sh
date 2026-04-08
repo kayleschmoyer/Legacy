@@ -34,16 +34,23 @@ if [ -z "$COMMAND" ]; then
   exit 0
 fi
 
-# Strip leading whitespace and capture the first token
+# Strip leading whitespace and capture the first token.
+# Split on whitespace AND shell operators (;, &, |) and redirection operators
+# (<, >) so compound commands like `ls;pwd`, `ls&&echo ok`, `ls>/tmp/out`,
+# and `cat</etc/hosts` are all caught correctly.
 TRIMMED=$(echo "$COMMAND" | sed -E 's/^[[:space:]]+//')
-FIRST_WORD=$(echo "$TRIMMED" | awk '{print $1}')
+FIRST_WORD=$(echo "$TRIMMED" | sed -E 's/[[:space:];|&<>].*//')
 
-# Normalize FIRST_WORD to its basename so absolute-path invocations like
-# /bin/head, /usr/bin/rg, etc. match the same cases as bare names.
-FIRST_WORD=$(basename "$FIRST_WORD")
+# Normalize to basename so absolute-path invocations like /bin/head or
+# /usr/bin/rg match the same cases as bare names.
+# Guard empty/"-" values and stop option parsing so option-like input cannot
+# make basename error and accidentally bypass the block logic.
+if [ -n "$FIRST_WORD" ] && [ "$FIRST_WORD" != "-" ]; then
+  FIRST_WORD=$(basename -- "$FIRST_WORD")
+fi
 
-# Pattern: first word is one of the banned binaries, optionally with a path
-# prefix. We match the bare binary name only — `aws ls` and friends are not
+# Pattern: first word is one of the banned binaries. We match the bare binary
+# name only (after basename normalization) — `aws ls` and friends are not
 # affected because they start with `aws`.
 case "$FIRST_WORD" in
   ls)
@@ -60,22 +67,37 @@ case "$FIRST_WORD" in
     #   - true pipelines:  cat file | ...   (single |, not ||)
     #   - no file args:    cat              (stdin passthrough)
     #   - redirect forms:  cat > file  /  cat >> file  /  cat file > out
-    # Block: cat <file(s)> with no redirect or pipeline (plain file read)
-    REST=$(echo "$TRIMMED" | sed -E 's/^[^[:space:]]+[[:space:]]*//')
-    # Heredoc
+    # Block: cat <file(s)> with no redirect or pipeline (plain file read),
+    #        including redirection-adjacent forms like cat</etc/hosts.
+    # Derive REST by stripping the leading "cat" command (with optional spaces)
+    # so redirection-adjacent forms like `cat</etc/hosts` yield `</etc/hosts`.
+    REST=$(echo "$TRIMMED" | sed -E 's/^cat[[:space:]]*//')
+    # Heredoc: cat <<EOF
     if echo "$TRIMMED" | grep -qE '<<'; then
       exit 0
     fi
     # True pipeline: single | not part of ||
-    if echo "$TRIMMED" | grep -qP '(?<!\|)\|(?!\|)'; then
+    # Uses portable awk (not grep -P) for cross-platform compatibility.
+    if echo "$TRIMMED" | awk '{
+      for (i=1;i<=length($0);i++) {
+        if (substr($0,i,1)=="|") {
+          prev=(i>1?substr($0,i-1,1):"")
+          nxt=(i<length($0)?substr($0,i+1,1):"")
+          if (prev!="|" && nxt!="|") { exit 0 }
+        }
+      }
+      exit 1
+    }'; then
       exit 0
     fi
     # No arguments at all (stdin passthrough)
     if [ -z "$REST" ]; then
       exit 0
     fi
-    # Redirect forms: > or >> anywhere in the arguments
-    if echo "$REST" | grep -qE '>>|>'; then
+    # Output redirect forms: > or >> anywhere in REST (cat > file, cat >> file,
+    # cat file > out). Input redirect (<) without heredoc (<<) is a plain file
+    # read — it is blocked, including cat</etc/hosts.
+    if echo "$REST" | grep -qE '>>|[^<]>|^>'; then
       exit 0
     fi
     REPLACEMENT="Read (Read({ file_path: \"<absolute path>\" }))"
@@ -99,7 +121,7 @@ case "$FIRST_WORD" in
 esac
 
 cat >&2 <<EOF
-BLOCKED: Bash command starts with \`$BAD\`, which has a direct built-in replacement. Use $REPLACEMENT instead — see the "Concrete substitutions" table in AGENTS.md.
+BLOCKED: Bash command starts with \`$BAD\`, which has a direct built-in replacement. Use $REPLACEMENT instead — see the "Tool-first for file operations" section in AGENTS.md (and the "Concrete substitutions" table for quick examples).
 
 Original command:
   $TRIMMED

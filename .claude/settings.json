@@ -71,6 +71,15 @@
             "command": ".claude/hooks/guard-main-repo.sh"
           }
         ]
+      },
+      {
+        "matcher": "^Bash$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/guard-bash-mcp-first.sh"
+          }
+        ]
       }
     ]
   },

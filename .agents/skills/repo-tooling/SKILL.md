@@ -38,6 +38,18 @@ Consolidated skill for running and fixing ESLint, TypeScript type checking, buil
 
 > **Always use `make` targets** -- they set `NODE_OPTIONS` for the Windows windowsHide patch.
 
+## PreToolUse Bash MCP-First Hook
+
+`.claude/hooks/guard-bash-mcp-first.sh` is a `PreToolUse` hook that intercepts `Bash` tool calls and **blocks** commands starting with `ls`, `find`, `cat` (plain file reads), `head`, `tail`, `grep`, or `rg`. Each block message points at the correct built-in replacement (`Glob`, `Grep`, `Read`) per the AGENTS.md "Concrete substitutions" table. Blocking is the backstop because doc-only reminders have repeatedly failed in long agent sessions.
+
+**Bypassing** for genuine fallback cases:
+
+- `cat` is allowed when used as a heredoc (`cat <<EOF`), as a true pipeline source (`cat file | ...`, single `|` not `||`), with no file arguments (stdin passthrough), or with redirect operators (`cat > file`, `cat >> file`, `cat file > out`). Otherwise, `cat` with file arguments is blocked, including plain reads like `cat file` or `cat file1 file2`.
+- For other true fallback cases (e.g. `find ... -exec ...` with no built-in equivalent), set `ALLOW_BASH_FALLBACK=1` in the shell environment for the session — the hook honors it and exits 0.
+- If the hook itself is broken (e.g. a regex bug), edit `.claude/hooks/guard-bash-mcp-first.sh` and verify locally before reverting; do not silently disable it in `settings.json`.
+
+The hook is registered under `hooks.PreToolUse` in `.claude/settings.json` next to the existing `guard-main-repo.sh`.
+
 ## Decision Tree
 
 | Situation                                | Reference                                                                                                |
