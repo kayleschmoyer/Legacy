@@ -90,36 +90,38 @@ Review fixes (Pass 2) and CI code fixes (Pass 3) operate on independent PRs in s
 1. After the scan identifies PRs needing review fixes or CI fixes, group them into a batch (max 3 concurrent)
 2. Spawn one `Agent` per PR, each working in its own worktree. Use the appropriate prompt template:
 
+   > **Orchestrator rule**: write the commit/push instruction as an **outcome** ("commit and push the fix") — never include explicit `git -C <path> commit` or `git -C <path> push` instructions in the prompt. Explicit git commands override the tool preference hints and can prevent the agent from using `worktree_commit`/`worktree_push`, which add the concrete safety checks we want here (for example: refusing unsafe pushes such as `main`, using `--force-with-lease`, retrying cleanly when hooks auto-amend and abort the first push, and confirming the remote when needed).
+
    **Review fix sub-agent (Pass 2):**
 
    > Fix review comments on PR #\<number\> in worktree \<path\>.
-   > Read unresolved threads, apply fixes, run make pc, commit, push.
+   > Read unresolved threads, apply fixes, run make pc, commit and push the fix.
    > Resolve all fixed threads in one call via github_resolve_threads(threadIds: [...]).
    > If unfixable, comment on the PR with the diagnosed blocker and move on.
    >
    > Tool preferences:
    >
-   > - Use Glob (not find/ls) for file discovery
+   > - Use Glob (not find/ls) for file discovery — do NOT use `find` or `ls`; if Glob returns empty on an absolute Windows worktree path, fall back to `worktree_ls_tree` first, or `worktree_run({ command: "ls <dir>" })` for that narrow case
    > - Use Grep (not grep/rg) for content search
    > - Use Read (not cat/head/tail) for reading files
    > - Use worktree_run for git commands (not git -C via Bash)
-   > - Use worktree_commit/worktree_push for commits and pushes
+   > - Use worktree_commit/worktree_push for commits and pushes (not git -C commit / git -C push)
 
    **CI fix sub-agent (Pass 3):**
 
    > Fix the CI failure on PR #\<number\> in worktree \<path\>.
-   > Diagnose using ci_get_logs, apply the fix, run make pc, commit, push.
+   > Diagnose using ci_get_logs, apply the fix, run make pc, commit and push the fix.
    > After a successful push, call github_clear_ci_failure_labels(number: \<number\>) to remove stale ci-failure-\* labels.
    > The CI system will re-add labels if CI fails again after the push.
    > If unfixable, comment on the PR with the diagnosed root cause and what was attempted — do not remove labels.
    >
    > Tool preferences:
    >
-   > - Use Glob (not find/ls) for file discovery
+   > - Use Glob (not find/ls) for file discovery — do NOT use `find` or `ls`; if Glob returns empty on an absolute Windows worktree path, fall back to `worktree_ls_tree` first, or `worktree_run({ command: "ls <dir>" })` for that narrow case
    > - Use Grep (not grep/rg) for content search
    > - Use Read (not cat/head/tail) for reading files
    > - Use worktree_run for git commands (not git -C via Bash)
-   > - Use worktree_commit/worktree_push for commits and pushes
+   > - Use worktree_commit/worktree_push for commits and pushes (not git -C commit / git -C push)
 
 3. Wait for all agents in the batch to complete before spawning the next batch
 4. Collect results from each agent — verify PR state (fixed, blocker commented, or failed)

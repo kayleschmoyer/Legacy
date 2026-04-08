@@ -124,8 +124,10 @@ For subagents that perform git operations in worktrees, also include:
 
 ```
   - Use worktree_run for git commands (preferred over git -C via Bash; git -C is the shell fallback when MCP tools are unavailable)
-  - Use worktree_commit/worktree_push for commits and pushes
+  - Use worktree_commit/worktree_push for commits and pushes (not git -C commit / git -C push)
 ```
+
+> **Critical**: when writing the sub-agent prompt, do **not** include explicit `git -C <path> commit` or `git -C <path> push` instructions — these override the preference hint and bypass `worktree_commit`/`worktree_push` wrapper safety behavior (for example main-branch protection, the hook-amend retry/confirmation flow, and the default `--force-with-lease` behavior). Write the prompt in terms of outcomes ("commit and push the fix") and let the sub-agent use MCP tools.
 
 ## Commands
 
