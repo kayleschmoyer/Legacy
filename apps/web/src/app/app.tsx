@@ -159,7 +159,6 @@ const NavContent = styled(XStack, {
 const NavLinks = styled(XStack, {
   alignItems: 'center',
   gap: '$3',
-  flex: 1,
   justifyContent: 'center',
   minWidth: 0,
   flexWrap: 'nowrap',
@@ -317,31 +316,33 @@ function Navigation() {
       >
         <NavContent>
           {/* ── Brand ── */}
-          <Link
-            to="/"
-            aria-label="Legacy Sports home"
-            style={{ textDecoration: 'none', flexShrink: 0 }}
-          >
-            <XStack alignItems="center" gap="$2" cursor="pointer">
-              <img
-                src="/logo.png"
-                alt="Legacy Sports"
-                data-testid="header-logo"
-                style={{ height: 38, width: 'auto', display: 'block' }}
-              />
-              <Paragraph
-                marginBottom={0}
-                fontWeight="700"
-                fontSize={18}
-                color={BRAND_GOLD}
-                letterSpacing={0.5}
-                userSelect="none"
-                data-testid="brand-text"
-              >
-                Legacy Sports
-              </Paragraph>
-            </XStack>
-          </Link>
+          <XStack flex={1} alignItems="center" justifyContent="flex-start">
+            <Link
+              to="/"
+              aria-label="Legacy Sports home"
+              style={{ textDecoration: 'none', flexShrink: 0 }}
+            >
+              <XStack alignItems="center" gap="$2" cursor="pointer">
+                <img
+                  src="/logo.png"
+                  alt="Legacy Sports"
+                  data-testid="header-logo"
+                  style={{ height: 38, width: 'auto', display: 'block' }}
+                />
+                <Paragraph
+                  marginBottom={0}
+                  fontWeight="700"
+                  fontSize={18}
+                  color={BRAND_GOLD}
+                  letterSpacing={0.5}
+                  userSelect="none"
+                  data-testid="brand-text"
+                >
+                  Legacy Sports
+                </Paragraph>
+              </XStack>
+            </Link>
+          </XStack>
 
           {/* ── Desktop Navigation ── */}
           <NavLinks
@@ -374,7 +375,12 @@ function Navigation() {
           </NavLinks>
 
           {/* ── Right section ── */}
-          <XStack alignItems="center" gap="$3" flexShrink={0}>
+          <XStack
+            flex={1}
+            alignItems="center"
+            justifyContent="flex-end"
+            gap="$3"
+          >
             {/* Hide bug-report on narrow viewports to keep hamburger in viewport */}
             <XStack display="none" $gtMd={{ display: 'flex' }}>
               <BugReportButton />

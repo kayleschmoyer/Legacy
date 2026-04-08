@@ -22,35 +22,41 @@ exports[`App FootballScreen should match complete football page layout snapshot 
     <div />
     <div>
       <div>
-        <a
-          aria-label="Legacy Sports home"
-          href="/"
-          style="text-decoration: none; flex-shrink: 0;"
+        <div
+          alignitems="center"
+          flex="1"
+          justifycontent="flex-start"
         >
-          <div
-            alignitems="center"
-            cursor="pointer"
-            gap="$2"
+          <a
+            aria-label="Legacy Sports home"
+            href="/"
+            style="text-decoration: none; flex-shrink: 0;"
           >
-            <img
-              alt="Legacy Sports"
-              data-testid="header-logo"
-              src="/logo.png"
-              style="height: 38px; width: auto; display: block;"
-            />
-            <p
-              color="#C5A55A"
-              data-testid="brand-text"
-              font-size="18"
-              font-weight="700"
-              letter-spacing="0.5"
-              marginbottom="0"
-              userselect="none"
+            <div
+              alignitems="center"
+              cursor="pointer"
+              gap="$2"
             >
-              Legacy Sports
-            </p>
-          </div>
-        </a>
+              <img
+                alt="Legacy Sports"
+                data-testid="header-logo"
+                src="/logo.png"
+                style="height: 38px; width: auto; display: block;"
+              />
+              <p
+                color="#C5A55A"
+                data-testid="brand-text"
+                font-size="18"
+                font-weight="700"
+                letter-spacing="0.5"
+                marginbottom="0"
+                userselect="none"
+              >
+                Legacy Sports
+              </p>
+            </div>
+          </a>
+        </div>
         <div
           aria-label="Primary"
           as="nav"
@@ -90,8 +96,9 @@ exports[`App FootballScreen should match complete football page layout snapshot 
         </div>
         <div
           alignitems="center"
-          flexshrink="0"
+          flex="1"
           gap="$3"
+          justifycontent="flex-end"
         >
           <div
             display="none"
@@ -153,35 +160,41 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
     <div />
     <div>
       <div>
-        <a
-          aria-label="Legacy Sports home"
-          href="/"
-          style="text-decoration: none; flex-shrink: 0;"
+        <div
+          alignitems="center"
+          flex="1"
+          justifycontent="flex-start"
         >
-          <div
-            alignitems="center"
-            cursor="pointer"
-            gap="$2"
+          <a
+            aria-label="Legacy Sports home"
+            href="/"
+            style="text-decoration: none; flex-shrink: 0;"
           >
-            <img
-              alt="Legacy Sports"
-              data-testid="header-logo"
-              src="/logo.png"
-              style="height: 38px; width: auto; display: block;"
-            />
-            <p
-              color="#C5A55A"
-              data-testid="brand-text"
-              font-size="18"
-              font-weight="700"
-              letter-spacing="0.5"
-              marginbottom="0"
-              userselect="none"
+            <div
+              alignitems="center"
+              cursor="pointer"
+              gap="$2"
             >
-              Legacy Sports
-            </p>
-          </div>
-        </a>
+              <img
+                alt="Legacy Sports"
+                data-testid="header-logo"
+                src="/logo.png"
+                style="height: 38px; width: auto; display: block;"
+              />
+              <p
+                color="#C5A55A"
+                data-testid="brand-text"
+                font-size="18"
+                font-weight="700"
+                letter-spacing="0.5"
+                marginbottom="0"
+                userselect="none"
+              >
+                Legacy Sports
+              </p>
+            </div>
+          </a>
+        </div>
         <div
           aria-label="Primary"
           as="nav"
@@ -221,8 +234,9 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
         </div>
         <div
           alignitems="center"
-          flexshrink="0"
+          flex="1"
           gap="$3"
+          justifycontent="flex-end"
         >
           <div
             display="none"
@@ -282,35 +296,41 @@ exports[`App Navigation should render navigation with correct links 1`] = `
     <div />
     <div>
       <div>
-        <a
-          aria-label="Legacy Sports home"
-          href="/"
-          style="text-decoration: none; flex-shrink: 0;"
+        <div
+          alignitems="center"
+          flex="1"
+          justifycontent="flex-start"
         >
-          <div
-            alignitems="center"
-            cursor="pointer"
-            gap="$2"
+          <a
+            aria-label="Legacy Sports home"
+            href="/"
+            style="text-decoration: none; flex-shrink: 0;"
           >
-            <img
-              alt="Legacy Sports"
-              data-testid="header-logo"
-              src="/logo.png"
-              style="height: 38px; width: auto; display: block;"
-            />
-            <p
-              color="#C5A55A"
-              data-testid="brand-text"
-              font-size="18"
-              font-weight="700"
-              letter-spacing="0.5"
-              marginbottom="0"
-              userselect="none"
+            <div
+              alignitems="center"
+              cursor="pointer"
+              gap="$2"
             >
-              Legacy Sports
-            </p>
-          </div>
-        </a>
+              <img
+                alt="Legacy Sports"
+                data-testid="header-logo"
+                src="/logo.png"
+                style="height: 38px; width: auto; display: block;"
+              />
+              <p
+                color="#C5A55A"
+                data-testid="brand-text"
+                font-size="18"
+                font-weight="700"
+                letter-spacing="0.5"
+                marginbottom="0"
+                userselect="none"
+              >
+                Legacy Sports
+              </p>
+            </div>
+          </a>
+        </div>
         <div
           aria-label="Primary"
           as="nav"
@@ -350,8 +370,9 @@ exports[`App Navigation should render navigation with correct links 1`] = `
         </div>
         <div
           alignitems="center"
-          flexshrink="0"
+          flex="1"
           gap="$3"
+          justifycontent="flex-end"
         >
           <div
             display="none"
