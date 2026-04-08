@@ -9,17 +9,19 @@ This workflow also catches two additional categories of MCP issues:
 
 ## Steps
 
-### 1. Collect non-MCP commands from the session
+### 1. Collect Bash commands and MCP issues from the session
 
 **Primary method — parse session transcript** (recommended, survives context compaction):
 
-```bash
-python scripts/audit-session-bash.py --include-mcp
+```
+ci_audit_session_bash({ includeMcp: true, gapsOnly: true })
 ```
 
-This parses the current session's JSONL transcript file (parent + all subagents) and outputs every Bash command with timestamps. It auto-detects the current session by finding the most recently modified JSONL in the project's `~/.claude/projects/` directory. Use `--format json` for programmatic consumption, or `--session-id <uuid>` to target a specific session.
+This parses the current session's JSONL transcript file (parent + all subagents) and outputs every Bash command with timestamps. It auto-detects the current session by finding the most recently modified JSONL in the project's `~/.claude/projects/` directory. Pass `sessionId` to target a specific session. The tool returns structured JSON by default; use `gapsOnly: true` for the compact gap-focused text output shown above, or omit it if you want the full structured results.
 
-**Fallback** — if the script is unavailable (e.g., cloud agent without the script in the repo), review the conversation history manually for all `Bash` tool invocations. Note that this only captures commands still in the context window — commands from before compaction will be missed.
+**Shell fallback** — if the CI MCP server is unavailable: `python scripts/audit-session-bash.py --include-mcp --gaps-only`. Use `--session-id <uuid>` to target a specific session.
+
+**Manual fallback** — if the script is also unavailable (e.g., cloud agent without the script in the repo), review the conversation history manually for all `Bash` tool invocations. Note that this only captures commands still in the context window — commands from before compaction will be missed.
 
 Once you have the command list (from either method), filter out noise. Ignore:
 
@@ -49,9 +51,9 @@ These commands look "investigative" but represent repeatable workflows every age
 
 ### 1b. Collect non-MCP commands from subagent sessions
 
-Subagent sessions contribute **more** Bash commands than parent sessions in practice (87 git/ls/find commands from subagents vs 82 from parents across 60 audited sessions). The main conversation audit (Step 1) only captures parent-level commands.
+Subagent sessions contribute **more** Bash commands than parent sessions in practice (87 git/ls/find commands from subagents vs 82 from parents across 60 audited sessions). If you had to use Step 1's manual conversation-history fallback, that review only captures parent-session commands still visible in the context window.
 
-> **If you used `audit-session-bash.py` in Step 1**, subagent commands are already included in the output (grouped by subagent source file). Skip the manual collection below and proceed to filtering.
+> **If you used `ci_audit_session_bash` in Step 1**, subagent commands are already included in the output (grouped by subagent source file). Skip the manual collection below and proceed to filtering.
 
 **Manual fallback** — subagent transcripts live at `~/.claude/projects/<project-hash>/<sessionId>/subagents/*.jsonl`. Each JSONL line is a message object; Bash tool calls appear as:
 
@@ -159,9 +161,9 @@ Identified during agent session on <date>.
 
 ### 6. Audit MCP tool result overflows
 
-> **If you used `audit-session-bash.py --include-mcp` in Step 1**, MCP overflows and failures are already included in the output. Use that data here instead of manually reviewing conversation history.
+> **If you ran `ci_audit_session_bash` with `includeMcp: true` and without `gapsOnly`**, MCP overflows and failures are already included in the output. Use that data here instead of manually reviewing conversation history. Note: the Step 1 example uses `gapsOnly: true` (compact text output) which omits `mcp_issues` — if you followed that example, re-run without `gapsOnly` (e.g. `ci_audit_session_bash({ includeMcp: true })`) to get the full structured results including overflow and failure data.
 
-Review the conversation history (or script output) for MCP tool calls that returned errors containing:
+Review the conversation history (or tool output) for MCP tool calls that returned errors containing:
 
 - `exceeds maximum allowed tokens`
 - `Output has been saved to`
