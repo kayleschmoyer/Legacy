@@ -776,7 +776,7 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
       name: 'worktree_list',
       description:
         'List active worktrees with junction status and branch info. ' +
-        'Pass remote=true to list remote branches instead (with optional pattern filter and ahead/behind counts).',
+        'Pass remote=true to list remote branches instead (with optional pattern or merged-into-ref filters and ahead/behind counts).',
       inputSchema: {
         type: 'object' as const,
         properties: {
@@ -789,6 +789,11 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
             type: 'string',
             description:
               'Glob pattern to filter remote branches (e.g. "*LS-193*"). Only used when remote=true.',
+          },
+          merged: {
+            type: 'string',
+            description:
+              'Only include remote branches merged into this ref (e.g. "origin/main"). Only used when remote=true. Equivalent to `git branch -r --merged <ref>`.',
           },
           limit: {
             type: 'number',
@@ -2339,10 +2344,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     // worktree_list
     // -----------------------------------------------------------------------
     case 'worktree_list': {
-      const { remote, pattern, limit } = args as {
+      const { remote, pattern, limit, merged } = args as {
         remote?: boolean;
         pattern?: string;
         limit?: number;
+        merged?: string;
       };
 
       // Remote branch listing mode
@@ -2360,14 +2366,47 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           };
         }
 
+        // Validate merged ref (reject flag injection and unsafe chars)
+        if (merged) {
+          if (merged.startsWith('-')) {
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: `merged: invalid ref value "${merged}". Ref must not start with '-'.`,
+                },
+              ],
+              isError: true,
+            };
+          }
+          if (!/^[a-zA-Z0-9_./~^{}-]+$/.test(merged)) {
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: `merged: invalid ref value "${merged}". Only alphanumeric, '_', '.', '/', '~', '^', '{', '}', '-' allowed.`,
+                },
+              ],
+              isError: true,
+            };
+          }
+        }
+
         try {
           // Fetch latest remote state
           runGit(['fetch', 'origin', '--prune'], MAIN_REPO, {
             timeout: 30_000,
           });
 
-          // List remote branches (optionally filtered by pattern)
-          const listArgs = ['branch', '-r', '--list'];
+          // List remote branches (optionally filtered by pattern and/or merged into a ref).
+          // Note: only `origin/` refs are reliably up-to-date here — the fetch above only prunes origin.
+          // For `merged`, use `origin/<branch>` (e.g. "origin/main") to ensure the ref is current.
+          // Refs from other remotes or local-only refs may produce stale or incorrect results.
+          const listArgs = ['branch', '-r'];
+          if (merged) {
+            listArgs.push('--merged', merged);
+          }
+          listArgs.push('--list');
           if (pattern) {
             // Ensure pattern targets origin/ namespace
             const fullPattern = pattern.startsWith('origin/')
@@ -2383,14 +2422,25 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               (line) => line.length > 0 && !line.includes(' -> '), // skip HEAD alias
             );
 
+          const compareBase = merged ?? 'origin/main';
+
           if (branches.length === 0) {
             return {
               content: [
                 {
                   type: 'text',
-                  text: pattern
-                    ? `No remote branches matching "${pattern}".`
-                    : 'No remote branches found.',
+                  text: JSON.stringify(
+                    {
+                      count: 0,
+                      totalRemote: 0,
+                      truncated: false,
+                      ...(merged ? { mergedInto: merged } : {}),
+                      compareBase,
+                      branches: [],
+                    },
+                    null,
+                    2,
+                  ),
                 },
               ],
             };
@@ -2401,23 +2451,22 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           const cappedBranches = branches.slice(0, maxBranches);
           const truncated = branches.length > maxBranches;
 
-          // Get ahead/behind counts relative to origin/main for each branch
+          // Get ahead/behind counts relative to compareBase for each branch
           const results: Array<{
             branch: string;
             ahead: number;
             behind: number;
             lastCommitDate: string;
           }> = [];
-
           for (const branch of cappedBranches) {
-            if (branch === 'origin/main' || branch === 'origin/HEAD') continue;
+            if (branch === compareBase || branch === 'origin/HEAD') continue;
             try {
               const counts = runGit(
                 [
                   'rev-list',
                   '--left-right',
                   '--count',
-                  `origin/main...${branch}`,
+                  `${compareBase}...${branch}`,
                 ],
                 MAIN_REPO,
               ).trim();
@@ -2461,6 +2510,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     count: results.length,
                     totalRemote: branches.length,
                     truncated,
+                    ...(merged ? { mergedInto: merged } : {}),
+                    compareBase,
                     branches: results,
                   },
                   null,
