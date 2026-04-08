@@ -22,7 +22,7 @@ When running as a **cloud coding agent**:
 4. **DB**: `db_migration_status()` → `db_migrate()`
 5. **Pre-commit**: `make_run({ target: "pc" })`
 6. **Ship**: `worktree_commit({ message: "type(scope): msg" })` → `worktree_push()`
-7. **PR**: `github_create_pr({ title: "...", body: "...", draft: true })` → `github_mark_pr_ready({ number: <PR#> })` (on Claude Code on the web, prefer built-in tools — see [Review Lifecycle in Cloud](#review-lifecycle-in-cloud))
+7. **PR**: `github_create_pr({ title: "...", body: "...", draft: true })` → `github_manage_labels({ number: <PR#>, add: ["agent-in-progress"] })` → `github_mark_pr_ready({ number: <PR#> })` (apply label while still a draft, before marking ready — see [Review Lifecycle in Cloud](#review-lifecycle-in-cloud))
 8. **Jira**: `jira_transition({ key: "LS-####", status: "In Review" })`
 
 9. **Review lifecycle**: monitor PR → fix Copilot comments → reply → resolve threads → re-request review (see [Review Lifecycle in Cloud](#review-lifecycle-in-cloud) below)

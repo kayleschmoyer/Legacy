@@ -403,6 +403,7 @@ See the [pr-workflow skill](../pr-workflow/SKILL.md) for the full PR template wo
 
 ```
 github_create_pr(title: "LS-#### type(scope): description", body: <markdown>, draft: true, worktreePath: <path>)
+github_manage_labels(number: <PR#>, add: ["agent-in-progress"])
 github_mark_pr_ready(number: <PR#>)
 ```
 
@@ -412,6 +413,7 @@ github_mark_pr_ready(number: <PR#>)
 ```bash
 gh pr create --draft --title "LS-#### type(scope): description" --body-file ".github/tmp-pr-body.md" --base main
 bash scripts/cleanup-pr-body.sh
+gh pr edit <PR#> --add-label "agent-in-progress"
 gh pr ready <PR#>
 ```
 
@@ -484,9 +486,12 @@ make -C $wt pc
 
 # 6. PR + Jira (DO NOT stop at make pc) — MCP tools primary
 github_create_pr(title: "LS-#### type(scope): msg", body: <markdown>, draft: true, worktreePath: $wt)
+github_manage_labels(number: <PR#>, add: ["agent-in-progress"])  # apply while still draft
 github_mark_pr_ready(number: <PR#>)
 jira_transition(key: "LS-####", status: "In Review")
 # Shell fallback (only if MCP unavailable): gh pr create --draft --title "..." --body-file ".github/tmp-pr-body.md" --base main
+#   gh pr edit <PR#> --add-label "agent-in-progress"
+#   gh pr ready <PR#>
 
 # 7. Cleanup after merge
 cd "D:\code\legacy-sports"

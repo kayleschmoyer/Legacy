@@ -103,14 +103,15 @@ If either returns `configured: false`, **stop and prompt the user** before proce
 ### Both Environments
 
 - **Skip draft PRs — always** — draft PRs are owned by their creating agent and are actively being worked on. **Never edit, rebase, label, or resolve threads on a draft PR.** Always pass `excludeDrafts: true` explicitly to `github_pr_scan` and `github_pr_dashboard` — do not rely on the default. Exclude drafts on every pass and every re-scan within a sweep (not just at initial scan time): a PR that transitions from draft → ready _during_ a sweep pass should only be picked up on the _next_ full pass. Wait for the creating agent to mark it ready via `github_mark_pr_ready`. Log the number of drafts skipped in the sweep report.
-- **Dependabot PRs — comment-only** — never make local code changes to Dependabot-authored PRs. Identify them by author (`dependabot[bot]`) or branch prefix (`dependabot/`). Route them **only** to Pass 0.5 (below) and **exclude them from all other passes** (0, 1, 2, 3). All interactions use Dependabot comment commands: `@dependabot rebase` for conflicts or stale CI, `merge-when-ready` label for clean PRs. Dependabot owns its branches — local rebases, lockfile regeneration, and code edits are invalid on these PRs.
+- **Skip `agent-in-progress` PRs** — PRs labeled `agent-in-progress` are actively being watched by another agent that is shepherding them to merge. **Never edit, rebase, add labels, or resolve threads on these PRs.** Check for this label at the start of each pass using `github_view_pr`, `github_pr_dashboard`, or `github_pr_batch_status` (not scan results — `github_pr_scan` does not include a `labels` field). Log the count of skipped PRs in the sweep report. The label is removed by the owning agent when its session ends (merged or exited); if a labeled PR appears genuinely abandoned — determined by checking the PR's `updatedAt` timestamp from `github_view_pr`, `github_pr_dashboard`, or `github_pr_batch_status`: if `updatedAt` was more than 4 hours ago — remove the stale label via `github_manage_labels(number: <PR#>, remove: ["agent-in-progress"])` and include it in the next sweep pass. Do not rely on label creation time.
+- **Dependabot PRs — comment-only** — never make local code changes to Dependabot-authored PRs. Identify them by author (`dependabot[bot]`) or branch prefix (`dependabot/`). Route them **only** to [0b. Handle Dependabot PRs](#0b-handle-dependabot-prs) (below) and **exclude them from all other passes** (0, 1, 2, 3). All interactions use Dependabot comment commands: `@dependabot rebase` for conflicts or stale CI, `merge-when-ready` label for clean PRs. Dependabot owns its branches — local rebases, lockfile regeneration, and code edits are invalid on these PRs.
 - **Remove `@me` filter** — use `--limit 200` to catch all open PRs, not just yours
 - **Resolve review threads after fixing** — leaving threads unresolved is incomplete work
 - **Use `github_get_review_threads` first — avoid scratch scripts** — to check or list review threads, call `github_get_review_threads(number: <PR#>, unresolvedOnly: true)` by default. Do not write Python/GraphQL scratch scripts for this. If the MCP tool is unavailable or cannot provide the required thread IDs, use the documented limited `gh api graphql` fallback in `skills/pr-lifecycle/SKILL.md`; otherwise prefer the MCP tool's structured thread data (id, body, resolved, author) directly.
 - **Proactively label clean PRs** — when a PR has no unresolved review threads, add `merge-when-ready` immediately via `github_manage_labels(number: <PR#>, add: ["merge-when-ready"])`. Failing CI will automatically remove the label, so there is no risk in labeling early. The `copilot-auto-approve` bot also adds this label, but the agent should not wait for it.
 - **Dashboard CI summary can be stale** — the dashboard reports `ciStatus` as `none`, `pass`, `fail`, or `pending`. Stale checks (e.g., Enhanced Merge Queue on an old SHA) can cause a PR to show `fail` or `pending` even when current-SHA checks all pass. Use `github_pr_batch_status` to inspect actual job-level results: if all CI Pipeline and Security Scanning jobs are SUCCESS/SKIPPED, the PR is clean regardless of dashboard `ciStatus`.
 - **Burn through until settled** — every PR must reach a terminal state. A PR is settled when it is clean, has CI pending after the final pass, or labeled `requires-human-review` with a comment explaining the blocker. Do not stop the sweep while actionable PRs remain (subject to the max-passes safety cap).
-- **`requires-human-review` — only for blockers outside agent reach** — this label means the PR is blocked on something no agent can fix, no matter how many retries or approaches it tries. Valid reasons: missing credentials/secrets the agent cannot access, product or design decisions that require human judgment, blocked on an external team or system, or requires manual infrastructure access. **Invalid reasons (never label for these):** CI failures (rebase, fix the code, or re-run), review comments (read the code and fix them), Dependabot PRs with conflicts or stale CI (use `@dependabot rebase` comment — see Pass 0.5), complexity or multiple failed attempts (try a different approach). Before labeling, the agent **must** have attempted at least one fix. When the label is genuinely needed, add it via `github_manage_labels(number: <PR#>, add: ["requires-human-review"])` with a PR comment explaining the specific blocker that is outside agent capability.
+- **`requires-human-review` — only for blockers outside agent reach** — this label means the PR is blocked on something no agent can fix, no matter how many retries or approaches it tries. Valid reasons: missing credentials/secrets the agent cannot access, product or design decisions that require human judgment, blocked on an external team or system, or requires manual infrastructure access. **Invalid reasons (never label for these):** CI failures (rebase, fix the code, or re-run), review comments (read the code and fix them), Dependabot PRs with conflicts or stale CI (use `@dependabot rebase` comment — see [0b. Handle Dependabot PRs](#0b-handle-dependabot-prs)), complexity or multiple failed attempts (try a different approach). Before labeling, the agent **must** have attempted at least one fix. When the label is genuinely needed, add it via `github_manage_labels(number: <PR#>, add: ["requires-human-review"])` with a PR comment explaining the specific blocker that is outside agent capability.
 
 ### Local Agent Only
 
@@ -385,10 +386,9 @@ If a rebase fails irrecoverably: `git rebase --abort`, comment on the PR with th
 For each PR in `$scan.reviews` (in parallel batches of 3):
 
 1. Enter the worktree (Step 2)
-2. **Fetch Jira implementation context** — extract the ticket key from the PR branch name or title (pattern `LS-\d+`), then call `jira_view(key: "LS-####")` to retrieve the ticket description, and `jira_get_comments(key: "LS-####")` to retrieve ticket comments. Look specifically for a comment with an **"## Implementation Notes"** header left by the implementing agent (see `work-ticket` skill step 5a). Surface this context verbatim in the sub-agent prompt so the agent understands the original approach, design decisions, and constraints before interpreting review feedback. If Jira is unreachable or no notes exist, proceed without — do not block the fix pass. (This is an intentional exception to the "Jira — auth-aware routing" stop rule — implementation notes are supplementary context, not a blocking gate; the sweep must continue even without them.)
-3. **Load `skills/pr-lifecycle/SKILL.md`** — it contains the full workflow: reading comments, applying fixes, validating, committing, resolving threads, and the common-patterns reference table
-4. After pushing, re-check for new threads (Copilot re-reviews on push)
-5. If a review fix sub-agent **cannot complete the task but runs successfully**, analyze why, and optionally do **one** orchestrator-driven retry with a different approach (e.g., read the module source, check related files for patterns, try an alternative implementation). If it still cannot resolve the comments, comment on the PR with the diagnosed blocker. Only label `requires-human-review` if the blocker is outside agent reach (needs credentials, product decisions, or external dependencies) — otherwise leave it unlabeled for a future sweep attempt. If the sub-agent **execution itself fails** (crash, timeout, or tool error), do not retry — comment on the PR with the failure details and continue to the next PR (do not label, as the failure may be transient).
+2. **Load `skills/pr-lifecycle/SKILL.md`** — it contains the full workflow: reading comments, applying fixes, validating, committing, resolving threads, and the common-patterns reference table
+3. After pushing, re-check for new threads (Copilot re-reviews on push)
+4. If a review fix sub-agent **cannot complete the task but runs successfully**, analyze why, and optionally do **one** orchestrator-driven retry with a different approach (e.g., read the module source, check related files for patterns, try an alternative implementation). If it still cannot resolve the comments, comment on the PR with the diagnosed blocker. Only label `requires-human-review` if the blocker is outside agent reach (needs credentials, product decisions, or external dependencies) — otherwise leave it unlabeled for a future sweep attempt. If the sub-agent **execution itself fails** (crash, timeout, or tool error), do not retry — comment on the PR with the failure details and continue to the next PR (do not label, as the failure may be transient).
 
 > **Re-request Copilot review after resolving threads on bot-authored PRs**: for each bot-authored PR where review threads were resolved in this pass (either by code fix + push or by resolving meta threads), call `github_request_review(number: <PR#>)`. This only asks Copilot to review again; it does **not** itself emit a `pull_request_review` event. When Copilot actually submits a new review, GitHub emits `pull_request_review: submitted`, which triggers the `review-check` job; on successful completion, the `auto-approve` job (configured in `.github/workflows/copilot-auto-approve.yml` to run on `workflow_run`) can then approve and label the PR. If you skip the explicit re-request, Copilot never re-reviews, so no new `pull_request_review` event is fired and the auto-approve flow never runs, leaving approvals stuck.
 
@@ -549,14 +549,12 @@ gh label list --search "sweep-" --json name | grep -q "sweep-stale-claim" \
 settled = {}  # PR numbers that have reached a terminal state
 
 REPEAT (max 10 passes):
-  Scan all open PRs, excluding drafts (Step 1):
-    github_pr_scan(excludeDrafts: true)
-  # Note: github_pr_scan does NOT support an excludeLabels parameter.
-  # Label-based exclusion (e.g. "sweep-claimed") must be done via post-filtering,
-  # either here or using data from github_pr_batch_status / github_pr_dashboard.
+  Scan all open PRs, excluding drafts and sweep-claimed/agent-in-progress labels (Step 1):
+    github_pr_scan(excludeDrafts: true, excludeLabels: ["sweep-claimed", "agent-in-progress"])
+  # Note: github_pr_scan result PR objects do NOT include a `labels` field.
+  # Use the excludeLabels parameter when scanning rather than trying to post-filter returned PRs by label.
   all_prs = scan.conflicting + scan.reviews + scan.ciFailing + scan.ciPending + scan.clean
-  workable = [pr for pr in all_prs if pr.number not in settled
-                                   and "sweep-claimed" not in pr.labels]
+  workable = [pr for pr in all_prs if pr.number not in settled]
   # Note: draft count is in scan.draftsExcluded (field may be omitted when 0) — log it in the sweep summary
 
   IF workable is empty → EXIT (all settled or held by other agents)
@@ -614,6 +612,16 @@ REPEAT (max 10 passes):
   Mark PRs with only pending CI after final pass → release claim → add to settled
 
   IF all PRs in settled → EXIT
+
+  # At the END of each pass: reclaim stale agent-in-progress labels so abandoned PRs re-enter on the NEXT pass.
+  # (Reclaiming at the end — not the start — ensures reclaimed PRs are not acted on mid-pass.)
+  #   agent_labeled = github_pr_dashboard(label: "agent-in-progress").prs
+  #   for pr in agent_labeled:
+  #     if pr.updatedAt < (now - 4 hours):
+  #       github_manage_labels(number: pr.number, remove: ["agent-in-progress"])
+  #       log: "Reclaimed stale agent-in-progress label from PR #<pr.number> (last updated: <pr.updatedAt>)"
+  # Note: active agent-in-progress PRs are owned by their creating agent — only reclaim when idle >= 4 hours.
+  → Loop back to top of REPEAT
 ```
 
 > **⚠️ CRITICAL: Run `make pc` before pushing.** Every agent that modifies code must validate before pushing. Skipping saves 5 min but each CI failure costs 40-60 min in re-dispatch + CI queue time. Minimum alternative: `make format && make lint-fix && make typecheck`. When dispatching sub-agents, always include "Run `make -C $wt pc` before committing" in the agent prompt.

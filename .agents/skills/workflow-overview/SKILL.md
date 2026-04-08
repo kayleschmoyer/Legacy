@@ -72,9 +72,10 @@ Can be bypassed with `--no-verify`.
 1. **Self-review** -- run the `/review` skill to catch project-rule violations before pushing.
 2. **Push** -- `worktree_push(setUpstream: true)`.
 3. **Create draft PR** -- `github_create_pr(draft: true)`. Draft-first prevents sweep/review agents from racing with the creating agent.
-4. **Mark ready for review** -- `github_mark_pr_ready(number: <PR#>)`.
-5. **Copilot review** -- For user-authored PRs, the repository ruleset automatically requests Copilot review; no explicit call is needed. For GitHub App-authored PRs, agents should call `github_request_review(number: <PR#>)` with a user OAuth token. Note: the REST `requestReviewers` API silently drops Copilot when called with `GITHUB_TOKEN` or installation tokens.
-6. **Transition Jira to In Review** -- `jira_transition(key: "LS-####", status: "In Review")`.
+4. **Apply `agent-in-progress` label** -- `github_manage_labels(number: <PR#>, add: ["agent-in-progress"])` while still a draft, before marking ready. This closes the race window.
+5. **Mark ready for review** -- `github_mark_pr_ready(number: <PR#>)`.
+6. **Copilot review** -- For user-authored PRs, the repository ruleset automatically requests Copilot review; no explicit call is needed. For GitHub App-authored PRs, agents should call `github_request_review(number: <PR#>)` with a user OAuth token. Note: the REST `requestReviewers` API silently drops Copilot when called with `GITHUB_TOKEN` or installation tokens.
+7. **Transition Jira to In Review** -- `jira_transition(key: "LS-####", status: "In Review")`.
 
 ## Phase 3: CI Pipeline
 

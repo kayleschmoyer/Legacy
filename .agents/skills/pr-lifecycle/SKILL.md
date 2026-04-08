@@ -55,13 +55,14 @@ Orchestrate maintenance across all open PRs: scan, rebase conflicts, fix reviews
 4. **Never skip `make pc`** -- each CI failure costs 40-60 min. Minimum alternative: `make format && make lint-fix && make typecheck`.
 5. **Always use `--body-file` or MCP tool for PR body** -- never inline `--body` in any shell (PowerShell is especially problematic).
 6. **Never create a PR from `main`** -- branch name must contain a Jira ticket key.
-7. **Always create PRs as drafts** -- use `draft: true` in `github_create_pr` MCP tool. Mark ready with `github_mark_pr_ready` after creation. This prevents sweep/review agents from racing with the creating agent.
+7. **Always create PRs as drafts** -- use `draft: true` in `github_create_pr` MCP tool. Apply the `agent-in-progress` label while still a draft, then mark ready. This closes the race window — the PR becomes visible to sweeps already labeled. See [create-pr.md](references/create-pr.md) for the canonical step order.
 
 ## Quick Commands
 
 ```
-# MCP (preferred) — always create as draft, then mark ready
+# MCP (preferred) — create as draft, label, then mark ready
 github_create_pr(title: "LS-#### type(scope): msg", body: <markdown>, draft: true, worktreePath: <path>)
+github_manage_labels(number: <PR#>, add: ["agent-in-progress"])
 github_mark_pr_ready(number: <PR#>)
 ```
 
