@@ -13,6 +13,11 @@ import { iamGetPolicy } from './tools/iam-get-policy.js';
 import { describeSecurityGroups } from './tools/security-groups.js';
 import { lambdaStatus } from './tools/lambda-status.js';
 import { LAMBDA_FUNCTIONS, logsTail } from './tools/logs-tail.js';
+import {
+  describeSecret,
+  getSecretValue,
+  listSecrets,
+} from './tools/secretsmanager.js';
 import { ssmGet } from './tools/ssm-get.js';
 import { ssmRunCommand } from './tools/ssm-run-command.js';
 import { ssoLogin } from './tools/sso-login.js';
@@ -139,6 +144,66 @@ server.tool(
       .describe('Command timeout in seconds (min: 10, default: 60, max: 3600)'),
   },
   async (params) => ssmRunCommand(params),
+);
+
+// --- aws_secretsmanager_describe_secret ---
+server.tool(
+  'aws_secretsmanager_describe_secret',
+  'Get metadata for a Secrets Manager secret (ARN, KMS key, rotation, last changed). Does NOT return the secret value. Use aws_secretsmanager_get_secret_value to write the value to a file.',
+  {
+    secretId: z
+      .string()
+      .describe(
+        'Secret ID or name (e.g. "mlb-data-api-key" or "dev/mlb-data-api-key")',
+      ),
+    environment: z
+      .enum(['dev', 'prod'])
+      .default('dev')
+      .describe('Environment prefix for short secret IDs (default: dev)'),
+  },
+  async (params) => describeSecret(params),
+);
+
+// --- aws_secretsmanager_get_secret_value ---
+server.tool(
+  'aws_secretsmanager_get_secret_value',
+  'Write a Secrets Manager secret value to a local file. The value is NEVER returned in the tool response — only written to disk. Use the outputFile path with downstream tools (e.g. terraform apply). Follows secrets-handling best practices.',
+  {
+    secretId: z
+      .string()
+      .describe(
+        'Secret ID or name (e.g. "mlb-data-api-key" or "dev/mlb-data-api-key")',
+      ),
+    environment: z
+      .enum(['dev', 'prod'])
+      .default('dev')
+      .describe('Environment prefix for short secret IDs (default: dev)'),
+    outputFile: z
+      .string()
+      .describe(
+        'Relative path within the repo (absolute paths are rejected for safety). Example: "scratch/secret.tmp"',
+      ),
+  },
+  async (params) => getSecretValue(params),
+);
+
+// --- aws_secretsmanager_list_secrets ---
+server.tool(
+  'aws_secretsmanager_list_secrets',
+  'List Secrets Manager secret names and ARNs. No values are returned. Defaults to listing secrets with the environment prefix (e.g. "dev/").',
+  {
+    environment: z
+      .enum(['dev', 'prod'])
+      .default('dev')
+      .describe('Environment prefix filter (default: dev)'),
+    filter: z
+      .string()
+      .optional()
+      .describe(
+        'Override the name filter. Default is "{environment}/" prefix.',
+      ),
+  },
+  async (params) => listSecrets(params),
 );
 
 // --- aws_sso_status ---
