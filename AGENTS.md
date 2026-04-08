@@ -112,13 +112,15 @@ Agent(subagent_type: "Explore", prompt: """
   <task description here>
 
   Tool preferences:
-  - Use Glob (not find/ls) for file discovery; if Glob returns empty on an absolute Windows worktree path, fall back to worktree_ls_tree or worktree_run({ command: "ls <dir>" })
+  - Use Glob (not find/ls) for file discovery — do NOT use `find` or `ls` even if they seem faster or more familiar. If Glob returns empty on an absolute Windows worktree path, fall back to worktree_ls_tree
   - Use Grep (not grep/rg/`find | xargs grep`) for content search — Grep accepts both pattern and glob filter in one call, so `find | xargs grep` is never needed
   - Use Read (not cat/head/tail) for reading files
 """)
 ```
 
 These three lines eliminate the most common subagent Bash anti-patterns (`find` 56x/session, `grep` 23x, `ls` 8x in production audits). Without them, subagents default to shell commands because they lack the project's MCP-first context.
+
+> **Why the explicit "do NOT"?** In production sessions, Explore subagents fell back to `find` and `ls` even when the parent prompt included "Use Glob (not find/ls)" — the affirmative form alone was insufficient. The "do NOT use `find` or `ls`" phrasing is intentional and must be kept verbatim. The only documented exception is the Windows worktree fallback in the hint above: if `Glob` unexpectedly returns empty on an absolute worktree path, fall back to `worktree_ls_tree(...)` — do not use `ls` (even via `worktree_run`) as a general fallback for normal file discovery.
 
 For subagents that perform git operations in worktrees, also include:
 
