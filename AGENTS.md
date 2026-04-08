@@ -21,6 +21,7 @@ This file provides guidance to AI coding agents working with code in this reposi
     - `cat file` → `Read(file_path: "...")`
     - `head -N file` → `Read(file_path: "...", limit: N)`
     - `tail -N file` → first `Read(file_path: "...")` to determine `total_lines`, then if needed `Read(file_path: "...", offset: <total_lines - N>, limit: N)` to re-read just the tail range; if the file is small, keep the full `Read`
+    - `sed -n 'X,Yp' file` → `Read(file_path: "...", offset: X-1, limit: Y-X+1)` (note: `Read`'s `offset` is 0-indexed — line number 1 = offset 0)
     - `find . -name "*.ts"` → `Glob(pattern: "**/*.ts")`
   - **Glob limitation on Windows worktrees**: `Glob` with `path=` set to an absolute Windows worktree path (e.g. `D:/code/legacy-sports-worktrees/LS-1234-foo`) may silently return empty results due to junction traversal issues. If Glob returns nothing unexpectedly, fall back to `worktree_ls_tree({ ref: "HEAD", path: "<dir>" })` (MCP — lists Git-tracked files only, not untracked) or `worktree_run({ command: "ls <dir>" })` for directory listing.
 - **No `console.*`** — use `LOGGER` from `@legacy-sports/logging` instead of `console.log/warn/error/debug`. Exceptions: `lib/logging/` (the logger itself), `apps/cli/`, migration files, and build-time scripts (`codegen.ts`, Vite plugins).
