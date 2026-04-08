@@ -10,6 +10,7 @@ import {
   ec2NetworkInspect,
 } from './tools/ec2.js';
 import { iamGetPolicy } from './tools/iam-get-policy.js';
+import { describeSecurityGroups } from './tools/security-groups.js';
 import { lambdaStatus } from './tools/lambda-status.js';
 import { LAMBDA_FUNCTIONS, logsTail } from './tools/logs-tail.js';
 import { ssmGet } from './tools/ssm-get.js';
@@ -200,6 +201,52 @@ server.tool(
       ),
   },
   async (params) => ec2ConsoleOutput(params),
+);
+
+// --- aws_ec2_describe_security_groups ---
+server.tool(
+  'aws_ec2_describe_security_groups',
+  'List EC2 security groups with their inbound/outbound rules. Filter by group IDs, environment tag, name pattern, or VPC ID. NOTE: groupIds is mutually exclusive with nameFilter and vpcId — pass one or the other, not both.',
+  {
+    groupIds: z
+      .array(
+        z
+          .string()
+          .regex(
+            /^sg-[0-9a-f]{8,17}$/,
+            'Each group ID must match sg-[0-9a-f]{8,17}',
+          ),
+      )
+      .min(1, 'groupIds must contain at least one security group ID')
+      .optional()
+      .describe(
+        'Specific security group IDs (e.g. ["sg-0abc1234"]). Must contain at least one ID when provided. Mutually exclusive with nameFilter and vpcId. Each ID must match sg-[0-9a-f]{8,17}.',
+      ),
+    environment: z
+      .enum(['dev', 'prod'])
+      .default('dev')
+      .describe(
+        'Filter by Environment tag (default: dev). Ignored when groupIds is provided.',
+      ),
+    nameFilter: z
+      .string()
+      .regex(
+        /^[A-Za-z0-9._*-]+$/,
+        'nameFilter may only contain alphanumerics, dots, underscores, hyphens, and wildcards (*)',
+      )
+      .optional()
+      .describe(
+        'Wildcard substring to match against group name (e.g. "rds" matches "*rds*"). Cannot be combined with groupIds.',
+      ),
+    vpcId: z
+      .string()
+      .regex(/^vpc-[0-9a-f]{8,17}$/, 'vpcId must match vpc-[0-9a-f]{8,17}')
+      .optional()
+      .describe(
+        'Filter by VPC ID (must match vpc-[0-9a-f]{8,17}). Cannot be combined with groupIds.',
+      ),
+  },
+  async (params) => describeSecurityGroups(params),
 );
 
 // --- aws_ec2_launch_template_inspect ---

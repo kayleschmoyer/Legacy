@@ -1,28 +1,6 @@
 import { getRepoRoot, runCommand } from '../run-command.js';
 import type { ToolResult } from '../types.js';
-
-const SSO_ERROR_PATTERN =
-  /sso session.*expired|sso.*expired|credentials.*expired|InvalidClientTokenId|ExpiredToken/i;
-
-function ssoRemedy(): string {
-  return 'Run `aws sso login` to re-authenticate, then retry.';
-}
-
-function errorResult(context: string, message: string): ToolResult {
-  return {
-    content: [
-      {
-        type: 'text',
-        text: JSON.stringify({
-          ok: false,
-          error: `${context}: ${message}`,
-          remedy: SSO_ERROR_PATTERN.test(message) ? ssoRemedy() : undefined,
-        }),
-      },
-    ],
-    isError: true,
-  };
-}
+import { SSO_ERROR_PATTERN, errorResult, ssoRemedy } from '../aws-error.js';
 
 // ---------------------------------------------------------------------------
 // aws_ec2_instances
