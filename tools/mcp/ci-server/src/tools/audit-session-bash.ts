@@ -9,6 +9,7 @@ export interface AuditSessionBashParams {
   includeMcp?: boolean;
   pid?: number;
   gapsOnly?: boolean;
+  scanScratch?: boolean;
 }
 
 /** Resolve the Python interpreter: prefer python3, fall back to python / py (Windows). */
@@ -43,6 +44,7 @@ export async function auditSessionBash(
   if (params.project) args.push('--project', params.project);
   if (params.includeMcp) args.push('--include-mcp');
   if (params.pid !== undefined) args.push('--pid', String(params.pid));
+  if (params.scanScratch) args.push('--scan-scratch');
 
   const tryExec = (interpreter: string): Promise<ToolResult> =>
     new Promise((done) => {

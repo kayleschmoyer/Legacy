@@ -294,7 +294,8 @@ server.tool(
     'Bash command inventory that survives context-window compaction. ' +
     'Auto-detects the current session and project when no parameters are provided. ' +
     'Default output: structured JSON report with full command details. ' +
-    'Pass gapsOnly:true for a compact plain-text frequency-table summary that separates potential MCP gaps from already-covered commands.',
+    'Pass gapsOnly:true for a compact plain-text frequency-table summary that separates potential MCP gaps from already-covered commands. ' +
+    'Pass scanScratch:true to also scan scratch/*.py files for subprocess shell patterns (subprocess.run, Popen, os.system, etc.).',
   {
     sessionId: z
       .string()
@@ -327,6 +328,16 @@ server.tool(
         'Compact gap-focused output: one line per unique command pattern, <5 KB. ' +
           'Separates potential MCP gaps from already-covered commands. ' +
           'Use this instead of the default JSON output when running the MCP gap audit inline.',
+      ),
+    scanScratch: z
+      .boolean()
+      .default(false)
+      .describe(
+        'Also scan scratch/*.py files for subprocess shell patterns ' +
+          '(subprocess.run, Popen, call, check_output, check_call, os.system). ' +
+          'Results appear under "scratch_subprocess_calls" in JSON output, or as a ' +
+          '"=== scratch/*.py subprocess calls ===" section in text/gaps-only output. ' +
+          'Default: false.',
       ),
   },
   async (params) => auditSessionBash(params),

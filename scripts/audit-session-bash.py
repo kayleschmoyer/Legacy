@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from collections import Counter
 from pathlib import Path
@@ -255,10 +256,39 @@ def extract_mcp_calls(jsonl_path: Path, source: str = "parent") -> list[dict]:
     return results
 
 
+def extract_scratch_subprocess_calls(repo_root: Path) -> list[dict]:
+    """Scan scratch/*.py files for subprocess/os.system calls."""
+    scratch_dir = repo_root / "scratch"
+    if not scratch_dir.is_dir():
+        return []
+
+    results = []
+    subprocess_re = re.compile(
+        r"subprocess\.(run|Popen|call|check_output|check_call)\s*\(|os\.system\s*\("
+    )
+
+    for py_file in sorted(scratch_dir.glob("*.py")):
+        try:
+            content = py_file.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        for line_num, line in enumerate(content.splitlines(), 1):
+            if subprocess_re.search(line):
+                results.append(
+                    {
+                        "file": str(py_file.relative_to(repo_root)),
+                        "line": line_num,
+                        "command_preview": re.sub(r'(["\']).*?\1', r'\1...\1', line.strip())[:100],
+                    }
+                )
+    return results
+
+
 def format_text(
     bash_calls: list[dict],
     mcp_issues: list[dict],
     session_id: str,
+    scratch_calls: list[dict] | None = None,
 ) -> str:
     """Format results as human-readable text."""
     lines = []
@@ -266,8 +296,11 @@ def format_text(
     lines.append(f"Total Bash commands: {len(bash_calls)}")
     lines.append("")
 
-    if not bash_calls and not mcp_issues:
-        lines.append("No Bash commands or MCP issues found.")
+    if not bash_calls and not mcp_issues and not scratch_calls:
+        if scratch_calls is not None:
+            lines.append("No Bash commands, MCP issues, or scratch subprocess calls found.")
+        else:
+            lines.append("No Bash commands or MCP issues found.")
         return "\n".join(lines)
 
     # Group by source
@@ -322,6 +355,14 @@ def format_text(
                 lines.append(f"  Error: {m['error_snippet']}")
                 lines.append("")
 
+    if scratch_calls is not None:
+        lines.append(f"=== scratch/*.py subprocess calls ({len(scratch_calls)}) ===")
+        lines.append("")
+        for entry in scratch_calls:
+            lines.append(f"  {entry['file']}:{entry['line']}")
+            lines.append(f"      {entry['command_preview']}")
+            lines.append("")
+
     # Summary
     lines.append("=== Summary ===")
     lines.append(f"  Parent Bash commands:   {len(parent_cmds)}")
@@ -329,7 +370,9 @@ def format_text(
     if mcp_issues:
         lines.append(f"  MCP overflows:          {len([m for m in mcp_issues if m.get('is_overflow')])}")
         lines.append(f"  MCP failures:           {len([m for m in mcp_issues if m.get('is_error') and not m.get('is_overflow')])}")
-    lines.append(f"  Total:                  {len(bash_calls)}")
+    if scratch_calls is not None:
+        lines.append(f"  scratch subprocess calls: {len(scratch_calls)}")
+    lines.append(f"  Total Bash commands:    {len(bash_calls)}")
 
     return "\n".join(lines)
 
@@ -403,7 +446,11 @@ def _command_pattern(cmd: str) -> str:
     return " ".join(parts[:3])
 
 
-def format_gaps_only(bash_calls: list[dict], session_id: str) -> str:
+def format_gaps_only(
+    bash_calls: list[dict],
+    session_id: str,
+    scratch_calls: list[dict] | None = None,
+) -> str:
     """Compact gap-focused output: one line per unique command pattern.
 
     Groups all Bash commands by normalised pattern, separates MCP-covered
@@ -451,6 +498,12 @@ def format_gaps_only(bash_calls: list[dict], session_id: str) -> str:
         lines.append(f"=== MCP-covered ({len(covered)} patterns) ===")
         for pat, count, tool in covered:
             lines.append(f"  {count:3d}x  {pat:<40s}  [{tool}]")
+        lines.append("")
+
+    if scratch_calls is not None:
+        lines.append(f"=== scratch/*.py subprocess calls ({len(scratch_calls)}) ===")
+        for entry in scratch_calls:
+            lines.append(f"  {entry['file']}:{entry['line']}  {entry['command_preview']}")
         lines.append("")
 
     return "\n".join(lines)
@@ -502,6 +555,15 @@ def main() -> None:
             "Separates potential MCP gaps from already-covered commands."
         ),
     )
+    parser.add_argument(
+        "--scan-scratch",
+        action="store_true",
+        help=(
+            "Also scan scratch/*.py files for subprocess.run/Popen/call/check_output/"
+            "check_call and os.system patterns. Results are included in the JSON output "
+            "under 'scratch_subprocess_calls' or appended as a section in text/gaps-only output."
+        ),
+    )
     args = parser.parse_args()
 
     projects_dir = find_claude_projects_dir()
@@ -548,9 +610,15 @@ def main() -> None:
     bash_calls.sort(key=lambda c: c.get("timestamp", ""))
     mcp_issues.sort(key=lambda c: c.get("timestamp", ""))
 
+    # Scan scratch/*.py for subprocess calls if requested
+    scratch_calls: list[dict] | None = None
+    if args.scan_scratch:
+        repo_root = Path(__file__).resolve().parent.parent
+        scratch_calls = extract_scratch_subprocess_calls(repo_root)
+
     # Output
     if args.gaps_only:
-        print(format_gaps_only(bash_calls, session_id))
+        print(format_gaps_only(bash_calls, session_id, scratch_calls=scratch_calls))
     elif args.format == "json":
         output = {
             "session_id": session_id,
@@ -560,9 +628,11 @@ def main() -> None:
         }
         if args.include_mcp:
             output["mcp_issues"] = mcp_issues
+        if scratch_calls is not None:
+            output["scratch_subprocess_calls"] = scratch_calls
         print(json.dumps(output, indent=2))
     else:
-        print(format_text(bash_calls, mcp_issues, session_id))
+        print(format_text(bash_calls, mcp_issues, session_id, scratch_calls=scratch_calls))
 
 
 if __name__ == "__main__":
