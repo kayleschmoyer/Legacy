@@ -1,11 +1,12 @@
 # Legacy Sports Database Tables Documentation
 
-**Last Updated**: February 8, 2026
+**Last Updated**: April 7, 2026
 
-**Total Tables**: 36 tables + views
+**Total Tables**: 36+ tables + views
 
 **Recent Updates**:
 
+- ✅ Documented matchup-system tables and links to [Matchup System Architecture](matchup-system.md) (LS-35)
 - ✅ Added CASCADE DELETE relationships for leagues and teams (LS-66)
 - ✅ Added week advancement status tracking to leagues
 - ✅ Added stats loading status to matchups for async processing
@@ -74,19 +75,58 @@ The Legacy Sports database follows a **season-to-career aggregation pattern** wi
     22-23. Roster Management - Position slots and lock rules
     24-25. System - Users and messages
 
+### Matchup System
+
+See [Matchup System Architecture](matchup-system.md) for the end-to-end
+data flow and the [Matchup API Reference](../api/matchup-api.md) for the
+GraphQL surface.
+
+Defined in `lib/db-client/src/drizzle/public/models/Matchups.ts`:
+
+| Table                         | Purpose                                                                                     |
+| ----------------------------- | ------------------------------------------------------------------------------------------- |
+| `matchups`                    | One row per (league, week, team1, team2). Holds `status`, `stats_loading_status`, scores.   |
+| `matchup_players`             | Per-matchup roster snapshot with `position_id` and `manually_edited` flag for lineup edits. |
+| `league_week_player_seasons`  | Per-player season selection for the matchup week (the season-selection feature).            |
+| `matchup_player_games`        | Per-day game picks (`game_num`, `game_identifier`, `fielding_game_pos`, `sp_skipped`).      |
+| `matchup_messages`            | Trash-talk / chat messages with reply threading, pinning, and soft-delete (LS-31).          |
+| `matchup_message_reactions`   | Emoji reactions: `like` / `fire` / `laugh` / `wow` / `trophy` / `thumbs_down`.              |
+| `matchup_chat_blocks`         | User block list with `matchup` / `league` / `global` scope and optional expiration.         |
+| `matchup_message_connections` | WebSocket connection tracking for presence and live delivery.                               |
+| `matchup_message_reports`     | Moderation queue: `pending` → `reviewing` → `resolved` / `dismissed`.                       |
+
+> **Per-game scores are not persisted.** Only league-versioned scoring
+> multipliers and the resulting team totals (`matchups.team1_score`,
+> `matchups.team2_score`) are stored. See
+> [Scoring engine](matchup-system.md#3-scoring-engine).
+
 ### Scoring System (26-29)
 
-26. Scoring Stat Definitions - Available statistics catalog
-27. League Scoring Profiles - Versionable scoring configurations
-28. League Scoring Profile Entries - Per-stat multipliers
-29. League Scoring Change Log - Audit trail
+26. Scoring Stat Definitions (`scoring_stat_definitions`) - Available statistics catalog
+27. League Scoring Profiles (`league_scoring_profiles`) - Versionable scoring configurations
+28. League Scoring Profile Entries (`league_scoring_profile_entries`) - Per-stat multipliers
+29. League Scoring Change Log (`league_scoring_change_log`) - Audit trail of profile changes
 
 ### Playoff System (30-33)
 
-30. Playoff Brackets - Tournament configuration
-31. Playoff Matchups - Individual playoff games
-32. Playoff Seeds - Team seeding and rankings
-33. Champion Trophies - Historical championship records
+Defined in `lib/db-client/src/drizzle/public/models/Playoffs.ts`:
+
+30. Playoff Brackets (`playoff_brackets`) - Tournament configuration: format (`4-team|6-team|8-team`), `start_week`, `multi_week_matchups`
+31. Playoff Matchups (`playoff_matchups`) - Individual playoff games with `playoff_round` enum
+32. Playoff Seeds (`playoff_seeds`) - Snapshot of top-N seeding at playoff start
+33. Champion Trophies (`champion_trophies`) - Historical championship record, unique per `(league_id, season)`
+
+### Tiebreaker System
+
+Also defined in `Playoffs.ts`:
+
+| Table                | Purpose                                                                                                                             |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `tiebreaker_rules`   | One row per league with `primary_method`, `secondary_method`, `tertiary_method`, `allow_commissioner_override`, and JSONB `config`. |
+| `tiebreaker_history` | Append-only audit log: `applied_method`, `was_commissioner_override`, `winner_id`.                                                  |
+
+Methods: `highest_category`, `total_season_points`, `head_to_head_record`,
+`random`, `co_champion`.
 
 ### Notification System (34-36)
 

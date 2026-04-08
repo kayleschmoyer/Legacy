@@ -20,6 +20,8 @@ _Start here if you're new to the project_
 - [🔒 Security & Secrets](guides/security-and-secrets.md) - Security best practices
 - [📟 CLI Player Stats Commands](guides/cli-player-stats-commands.md) - Player statistics CLI reference
 - [🏆 League Flow Complete Guide](guides/league-flow-complete-guide.md) - End-to-end league lifecycle
+- [⚔️ Matchup System Guide](guides/matchup-system-guide.md) - Head-to-head matchups for league members
+- [🛠️ Commissioner Matchup Management](guides/commissioner-matchup-management.md) - Commissioner controls for matchups, scoring, playoffs
 - [🎯 Live Draft Frontend Integration](guides/live-draft-frontend-integration.md) - Real-time draft UI
 - [🗄️ Database Role Separation](guides/database-role-separation.md) - PostgreSQL role setup
 - [🔐 Database Schema Protection](guides/database-schema-protection-setup.md) - Schema change safeguards
@@ -36,6 +38,7 @@ _Understanding how the system works_
 - [🔗 GraphQL Integration](architecture/graphql-integration.md) - API design and implementation
 - [✅ Schema Validation](architecture/schema-validation.md) - Drizzle schema patterns
 - [🎯 Season Selection Architecture](architecture/season-selection-architecture.md) - Per-player season assignment
+- [⚔️ Matchup System Architecture](architecture/matchup-system.md) - End-to-end matchup, scoring, playoffs, and tiebreaker design
 
 ### 🔐 **Authentication** → [`/authentication/`](authentication/)
 
@@ -124,6 +127,7 @@ _Database migrations, schema changes, and ORM_
 ### 📚 **Additional Resources**
 
 - [📄 API Documentation](api/) - GraphQL schema and endpoints
+- [⚔️ Matchup API Reference](api/matchup-api.md) - Matchup queries, mutations, and types
 - [🤖 AI Agent Instructions](agents/) - Structured CSV files for AI assistance
 - [🐛 Bug Fixes & Incidents](fixes/) - Root-cause analyses and applied fixes
 - [🌟 Feature Documentation](features/) - Major feature designs
