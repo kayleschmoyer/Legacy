@@ -1,5 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import {
+  useLocation,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from 'react-router-dom';
 import {
   type PlayerStatsViewMode,
   PlayerStatsPage as SharedPlayerStatsPage,
@@ -268,16 +273,27 @@ export function PlayerStatsPage() {
  * Player Detail Page
  *
  * Renders a full-page view for `/players/:id` with the player detail modal
- * auto-opened, and a back button to return to the stats list.
+ * auto-opened, and a back button that navigates back to the previous page,
+ * falling back to /players/stats when there is no prior in-app history.
  */
 export function PlayerDetailPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { id } = useParams<{ id: string }>();
   const playerId = id ? parseInt(id, 10) : null;
 
-  const handleBackToStats = useCallback(() => {
-    navigate('/players/stats');
-  }, [navigate]);
+  // Navigate back to the previous page, or fall back to /players/stats when
+  // the page was opened via a direct link/new tab (no prior in-app history).
+  // location.key is 'default' only on the first entry (direct navigation/deep
+  // link); any in-app navigation gives it a unique key string assigned by
+  // React Router (not a URL hash).
+  const handleBack = useCallback(() => {
+    if (location.key !== 'default') {
+      navigate(-1);
+    } else {
+      navigate('/players/stats', { replace: true });
+    }
+  }, [navigate, location.key]);
 
   return (
     <div
@@ -293,7 +309,7 @@ export function PlayerDetailPage() {
         description="View detailed career statistics and performance history for this MLB player on Legacy Sports."
       />
       <button
-        onClick={handleBackToStats}
+        onClick={handleBack}
         style={{
           marginBottom: '1rem',
           padding: '0.5rem 1rem',
@@ -305,13 +321,13 @@ export function PlayerDetailPage() {
           fontWeight: 600,
         }}
       >
-        ← Back to Player Statistics
+        ← Back
       </button>
 
       <PlayerDetailModal
         open={true}
         onOpenChange={(open) => {
-          if (!open) navigate('/players/stats');
+          if (!open) handleBack();
         }}
         playerId={playerId}
         playerName="Player details"
