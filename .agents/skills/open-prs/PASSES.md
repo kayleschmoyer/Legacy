@@ -176,6 +176,8 @@ Do not re-run CI for failures that clearly need code fixes (type errors, lint er
 
 Some review threads suggest no code change — they are process comments or "nice to have" suggestions. Resolve these without code changes:
 
+> **Do not write Python/GraphQL scratch scripts to check review threads in this pass.** Use `github_get_review_threads` directly — it returns structured thread data (id, body, resolved, author). If `github_get_review_threads` is unavailable, stop and escalate instead of improvising with `gh api graphql` here.
+
 ```
 github_get_review_threads(number: <PR#>, unresolvedOnly: true)
 ```
