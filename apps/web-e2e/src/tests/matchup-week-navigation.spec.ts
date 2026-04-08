@@ -431,7 +431,9 @@ test.describe('Matchup Week Navigation – current week display @smoke', () => {
     await expect(page.getByText('Week 3').first()).toBeVisible();
 
     // Wait for the matchup cards to load (they depend on GetMatchupsByWeek)
-    const userMatchupCard = page.getByLabel('Alpha Squad vs Beta Force');
+    const userMatchupCard = page.getByLabel('Alpha Squad vs Beta Force', {
+      exact: true,
+    });
     await expect(userMatchupCard).toBeVisible();
 
     // Team scores should be visible inside the navigation matchup cards
