@@ -72,9 +72,22 @@ async function resolveWorkflowId(workflow: string): Promise<string> {
   }
 
   if (!match) {
+    // Fall back to partial/substring match (case-insensitive).
+    const partialMatches = allWorkflows.filter((w) =>
+      w.name.toLowerCase().includes(targetName),
+    );
+    if (partialMatches.length === 1) {
+      return basename(partialMatches[0].path);
+    }
+    if (partialMatches.length > 1) {
+      const names = partialMatches.map((w) => `"${w.name}"`).join(', ');
+      throw new Error(
+        `Ambiguous workflow name "${normalized}" — ${partialMatches.length} partial matches: ${names}. Use a more specific name or the exact workflow filename.`,
+      );
+    }
     const names = allWorkflows.map((w) => `"${w.name}"`).join(', ');
     throw new Error(
-      `No workflow found with name "${workflow}". Available: ${names}`,
+      `No workflow found with name "${normalized}". Available: ${names}`,
     );
   }
   // path is like ".github/workflows/ci-pipeline.yml" — use the filename only.
