@@ -21,6 +21,7 @@ import { prDashboard } from './tools/pr-dashboard.js';
 import { prScan } from './tools/pr-scan.js';
 import { rebasePR } from './tools/rebase-pr.js';
 import { replyToThread } from './tools/reply-to-thread.js';
+import { commentPR } from './tools/comment-pr.js';
 import { retriggerCheck } from './tools/retrigger-check.js';
 import { secretDelete } from './tools/secret-delete.js';
 import { secretList } from './tools/secret-list.js';
@@ -518,6 +519,21 @@ server.tool(
       .describe('Markdown body of the reply comment'),
   },
   async (params) => replyToThread(params),
+);
+
+// --- github_comment_pr ---
+server.tool(
+  'github_comment_pr',
+  'Post a general (top-level) comment on a PR. Use for diagnostic notes, blocker explanations, and status updates — distinct from review thread replies (use github_reply_to_thread for those). Maps to POST /repos/{owner}/{repo}/issues/{number}/comments.',
+  {
+    number: z.coerce.number().int().positive().describe('PR number'),
+    body: z
+      .string()
+      .trim()
+      .min(1, 'Comment body cannot be empty')
+      .describe('Markdown body of the comment'),
+  },
+  async (params) => commentPR(params),
 );
 
 // --- github_clear_ci_failure_labels ---
