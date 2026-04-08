@@ -140,6 +140,170 @@ export async function ec2Instances(
 }
 
 // ---------------------------------------------------------------------------
+// aws_ec2_describe_image
+// ---------------------------------------------------------------------------
+
+export interface Ec2DescribeImageParams {
+  imageId: string;
+  tag?: string;
+}
+
+interface AwsImage {
+  ImageId?: string;
+  Name?: string;
+  CreationDate?: string;
+  State?: string;
+  Architecture?: string;
+  OwnerId?: string;
+  Description?: string;
+  Tags?: Ec2Tag[];
+}
+
+interface DescribeImagesResponse {
+  Images?: AwsImage[];
+}
+
+const IMAGE_ID_RE = /^ami-[0-9a-f]{8,17}$/;
+const SAFE_TAG_KEY_RE = /^[A-Za-z0-9._:/+=@\- ]+$/;
+
+export async function ec2DescribeImage(
+  params: Ec2DescribeImageParams,
+): Promise<ToolResult> {
+  const repoRoot = getRepoRoot();
+  const { imageId } = params;
+  let tag = params.tag;
+
+  if (!IMAGE_ID_RE.test(imageId)) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            ok: false,
+            error: `Invalid imageId "${imageId}": must match ami-[0-9a-f]{8,17}.`,
+          }),
+        },
+      ],
+      isError: true,
+    };
+  }
+
+  if (tag !== undefined) {
+    tag = tag.trim();
+    if (tag === '') {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              ok: false,
+              error: 'tag must not be empty or whitespace-only.',
+            }),
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+  if (tag !== undefined && !SAFE_TAG_KEY_RE.test(tag)) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            ok: false,
+            error: `Invalid tag key "${tag}": must contain only alphanumerics, dots, underscores, colons, slashes, plus, equals, at, hyphens, and spaces.`,
+          }),
+        },
+      ],
+      isError: true,
+    };
+  }
+
+  const args = [
+    'ec2',
+    'describe-images',
+    '--image-ids',
+    imageId,
+    '--output',
+    'json',
+  ];
+
+  try {
+    const output = await runCommand('aws', args, repoRoot);
+    const data = JSON.parse(output) as DescribeImagesResponse;
+    const image = data.Images?.[0];
+
+    if (!image) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              ok: false,
+              imageId,
+              error: `AMI ${imageId} not found or not accessible to this account.`,
+            }),
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    const tagsObject: Record<string, string> = {};
+    for (const t of image.Tags ?? []) {
+      if (t.Key !== undefined) tagsObject[t.Key] = t.Value ?? '';
+    }
+
+    if (tag !== undefined) {
+      const value = tagsObject[tag];
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                imageId: image.ImageId ?? '',
+                tag,
+                value: value ?? null,
+                found: value !== undefined,
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+      };
+    }
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(
+            {
+              imageId: image.ImageId ?? '',
+              name: image.Name,
+              creationDate: image.CreationDate,
+              state: image.State,
+              architecture: image.Architecture,
+              ownerId: image.OwnerId,
+              description: image.Description ?? null,
+              tags: tagsObject,
+            },
+            null,
+            2,
+          ),
+        },
+      ],
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return errorResult(`Failed to describe image ${imageId}`, message);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // aws_ec2_console_output
 // ---------------------------------------------------------------------------
 

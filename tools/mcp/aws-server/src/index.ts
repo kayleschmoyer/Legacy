@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { apigatewayInspect } from './tools/apigateway-inspect.js';
 import {
   ec2ConsoleOutput,
+  ec2DescribeImage,
   ec2Instances,
   ec2LaunchTemplateInspect,
   ec2NetworkInspect,
@@ -208,6 +209,22 @@ server.tool(
       ),
   },
   async (params) => ec2NetworkInspect(params),
+);
+
+// --- aws_ec2_describe_image ---
+server.tool(
+  'aws_ec2_describe_image',
+  'Look up AMI metadata (name, creation date, state, tags) by image ID. Pass `tag` to return only the value of a single tag (e.g. PlaywrightVersion). Used to answer "what is baked into this AMI?" without falling back to raw `aws ec2 describe-images`.',
+  {
+    imageId: z.string().describe('The AMI ID (e.g. "ami-03f0d40f5298d8217").'),
+    tag: z
+      .string()
+      .optional()
+      .describe(
+        'If provided, return only the value of this specific tag (e.g. "PlaywrightVersion", "PnpmVersion"). Otherwise return the full image metadata with all tags.',
+      ),
+  },
+  async (params) => ec2DescribeImage(params),
 );
 
 // --- aws_iam_get_policy ---
