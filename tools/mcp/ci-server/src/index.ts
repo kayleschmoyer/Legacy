@@ -292,10 +292,23 @@ server.tool(
       .default('main')
       .describe('Git ref (branch/tag) to run against (default: "main")'),
     inputs: z
-      .record(z.string(), z.string())
+      .preprocess(
+        (val) => {
+          if (typeof val === 'string' && val.trim().startsWith('{')) {
+            try {
+              return JSON.parse(val) as unknown;
+            } catch {
+              return val;
+            }
+          }
+          return val;
+        },
+        z.record(z.string(), z.string()),
+      )
       .optional()
       .describe(
-        'Key-value map of workflow input parameters (all values must be strings)',
+        'Key-value map of workflow input parameters (all values must be strings). ' +
+          'Accepts either a plain object or a JSON string.',
       ),
   },
   async (params) => dispatchWorkflow(params),
