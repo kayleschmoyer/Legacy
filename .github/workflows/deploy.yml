@@ -47,7 +47,6 @@ permissions:
   contents: write # create-release in web child needs this
   id-token: write # AWS OIDC + GitHub Pages
   pages: write
-  actions: read
   pull-requests: read
 
 jobs:
@@ -147,6 +146,11 @@ jobs:
     name: Upload Lambdas
     needs: detect-changes
     if: needs.detect-changes.outputs.lambdas == 'true'
+    permissions:
+      actions: write # needed by trigger-ci job (workflow_call permission inheritance)
+      id-token: write # required for AWS OIDC in the reusable workflow
+      contents: read # required by the reusable workflow and cannot be elevated by the callee
+      pull-requests: read # required by the reusable workflow and cannot be elevated by the callee
     uses: ./.github/workflows/upload-lambdas.yml
     secrets: inherit
     with:
