@@ -63,6 +63,11 @@ Follow the full [worktree-workflow skill](../worktree-workflow/SKILL.md):
 4. **Setup**: `make_wt_setup(worktreePath: "$wt")`. Shell fallback: `make wt-setup WT=$wt`
 5. **Implement**: read the ticket description, investigate the codebase, write code + tests
    - **Bug tickets**: follow the [bug verification workflow](../debugging/SKILL.md#verification-by-bug-type) — reproduce the bug **before** writing any fix, then verify the fix resolves the reported behavior **after**. Include before/after evidence in the PR body under a `## Verification` section (appended after the standard template). `make pc` passing is necessary but not sufficient for bugs. The `## Verification` section is not part of the standard PR template -- add it manually for bug-fix PRs.
+     5a. **Write implementation notes to Jira**: after completing the implementation (before committing), append an `## Implementation Notes` section to the Jira ticket description so sweep agents have context when fixing review feedback later. First read the current description via `jira_view`, then append:
+   ```
+   jira_edit_ticket(key: "LS-####", fields: { description: "<existing description>\n\n## Implementation Notes\n\n**Approach:** <1-2 sentences on what was done and why>\n\n**Key files changed:**\n- `path/to/file.ts` — reason\n- ...\n\n**Design decisions / constraints discovered:**\n- <any non-obvious choices, tradeoffs, or codebase constraints the agent found>\n\n**Testing:** <how correctness was verified — unit tests, manual repro, etc.>" })
+   ```
+   Preserve the original description and only append/refresh the `## Implementation Notes` section at the end. Keep notes factual and brief. Focus on information that is _not_ derivable from reading the diff: constraints, considered alternatives, and context that informs whether a review comment's suggested change is safe or problematic.
 6. **Self-review**: run the [self-review phase](../pr-lifecycle/references/self-review.md) to catch rule violations
 7. **Validate**: `db_migration_status(worktreePath: "$wt")` + `db_migrate(worktreePath: "$wt")`, then `make_run(target: "pc", worktreePath: "$wt")`. Shell fallback: `make pc`
 

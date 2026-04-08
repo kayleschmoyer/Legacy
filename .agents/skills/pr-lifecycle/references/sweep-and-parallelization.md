@@ -99,6 +99,10 @@ Review fixes (Pass 2) and CI code fixes (Pass 3) operate on independent PRs in s
    > Resolve all fixed threads in one call via github_resolve_threads(threadIds: [...]).
    > If unfixable, comment on the PR with the diagnosed blocker and move on.
    >
+   > **Implementation context from Jira** (ticket \<LS-####\>):
+   > \<paste the "## Implementation Notes" comment from `jira_get_comments(key: "LS-####")` verbatim (look for a comment with that header), or "No implementation notes found." if absent\>
+   > Use this context to understand the original approach and design decisions before interpreting review feedback. If a reviewer's suggestion conflicts with a noted constraint, acknowledge it in the PR comment rather than blindly applying the change.
+   >
    > Tool preferences:
    >
    > - Use Glob (not find/ls) for file discovery — do NOT use `find` or `ls`; if Glob returns empty on an absolute Windows worktree path, fall back to `worktree_ls_tree` first, or `worktree_run({ command: "ls <dir>" })` for that narrow case
