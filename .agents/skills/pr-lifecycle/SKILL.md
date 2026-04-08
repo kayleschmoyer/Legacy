@@ -78,21 +78,22 @@ gh pr ready <PR#>
 
 ## Reference Documents
 
-| Document                                                                                 | Content                                                                     |
-| ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| [references/self-review.md](references/self-review.md)                                   | Self-review checklist and steps                                             |
-| [references/create-pr.md](references/create-pr.md)                                       | PR creation prerequisites, template, and post-creation steps                |
-| [references/fix-reviews.md](references/fix-reviews.md)                                   | Fix Copilot review comments (single PR and batch)                           |
-| [references/pr-maintenance.md](references/pr-maintenance.md)                             | Full PR lifecycle management doc                                            |
-| [references/common-review-patterns.md](references/common-review-patterns.md)             | Top 20 Copilot review patterns and fixes                                    |
-| [references/fix-copilot-reviews-workflow.md](references/fix-copilot-reviews-workflow.md) | Batch workflow for fixing reviews across all open PRs                       |
-| [references/pr-body-powershell-pitfalls.md](references/pr-body-powershell-pitfalls.md)   | PowerShell encoding issues with PR bodies                                   |
-| [references/pr-common-issues.md](references/pr-common-issues.md)                         | Common PR creation issues and fixes                                         |
-| [references/pr-maintenance-workflow.md](references/pr-maintenance-workflow.md)           | Detailed sweep workflow (local and cloud modes)                             |
-| [references/pr-ui-screenshots.md](references/pr-ui-screenshots.md)                       | When and how to include UI screenshots                                      |
-| [references/sweep-and-parallelization.md](references/sweep-and-parallelization.md)       | Sweep loop algorithm and parallel validation                                |
-| [references/agent-screenshots.md](references/agent-screenshots.md)                       | Capture before/after screenshots for UI PRs using browser MCP               |
-| [references/bug-verification-templates.md](references/bug-verification-templates.md)     | PR body templates for proving bug fixes (screenshots, tests, queries, logs) |
+| Document                                                                                       | Content                                                                     |
+| ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| [references/self-review.md](references/self-review.md)                                         | Self-review checklist and steps                                             |
+| [references/create-pr.md](references/create-pr.md)                                             | PR creation prerequisites, template, and post-creation steps                |
+| [references/fix-reviews.md](references/fix-reviews.md)                                         | Fix Copilot review comments (single PR and batch)                           |
+| [references/pr-maintenance.md](references/pr-maintenance.md)                                   | Full PR lifecycle management doc                                            |
+| [references/common-review-patterns.md](references/common-review-patterns.md)                   | Top 20 Copilot review patterns and fixes                                    |
+| [references/fix-copilot-reviews-workflow.md](references/fix-copilot-reviews-workflow.md)       | Batch workflow for fixing reviews across all open PRs                       |
+| [references/pr-body-powershell-pitfalls.md](references/pr-body-powershell-pitfalls.md)         | PowerShell encoding issues with PR bodies                                   |
+| [references/pr-common-issues.md](references/pr-common-issues.md)                               | Common PR creation issues and fixes                                         |
+| [references/pr-maintenance-workflow.md](references/pr-maintenance-workflow.md)                 | Detailed sweep workflow (local and cloud modes)                             |
+| [references/pr-ui-screenshots.md](references/pr-ui-screenshots.md)                             | When and how to include UI screenshots                                      |
+| [references/sweep-and-parallelization.md](references/sweep-and-parallelization.md)             | Sweep loop algorithm and parallel validation                                |
+| [references/agent-screenshots.md](references/agent-screenshots.md)                             | Capture before/after screenshots for UI PRs using browser MCP               |
+| [references/bug-verification-templates.md](references/bug-verification-templates.md)           | PR body templates for proving bug fixes (screenshots, tests, queries, logs) |
+| [workflow-overview (PR Preview section)](../workflow-overview/SKILL.md#pr-preview-deployments) | PR preview URL pattern and how to verify deployment (do not list branches)  |
 
 ## Related Skills
 

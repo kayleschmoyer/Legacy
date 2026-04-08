@@ -307,6 +307,29 @@ When multiple CI runs complete within seconds, multiple `workflow_run` triggers 
 | `deploy-storybook.yml`       | Push to `main` (component paths)                    | GitHub Pages (Storybook)                  |
 | `deploy-pr-preview.yml`      | PR events                                           | Preview deployments for PRs               |
 
+### PR Preview Deployments
+
+`deploy-pr-preview.yml` deploys web builds for open PRs to the `gh-pages` branch of `bkrupa/legacy-sports-deploys`. Previews live at **subdirectory paths**, not separate branches:
+
+```
+https://bkrupa.github.io/legacy-sports-deploys/pr-<N>/
+```
+
+where `<N>` is the numeric PR number (e.g. `pr-2317/`).
+
+**Agents: do not list branches of `legacy-sports-deploys` to check for a preview.** There is no `pr-<N>` branch — previews are paths inside `gh-pages`. The correct way to reference or verify a preview:
+
+- **Construct the URL directly** — if the preview deploy job ran and succeeded, the preview is there: `https://bkrupa.github.io/legacy-sports-deploys/pr-<N>/` (replace `<N>` with the PR number). Note: the preview only exists if `apps/web`, `lib/shared-components`, or `lib/ui-abstractions` were changed — CI can pass without the preview job running.
+- **Verify deployment via the gh-pages tree** (if you must confirm a path exists; replace `<N>` with the PR number):
+  ```bash
+  PR=2317  # replace with actual PR number
+  gh api "repos/bkrupa/legacy-sports-deploys/git/trees/gh-pages?recursive=1" \
+    --jq ".tree[] | select(.path | startswith(\"pr-${PR}/\")) | .path" | head -5
+  ```
+- **Playwright reports** for a PR use the analogous `gh-pages` subdirectory: `playwright-report/pr-<N>/` (e.g. `https://bkrupa.github.io/legacy-sports-deploys/playwright-report/pr-2317/`). See [read-playwright-report skill](../read-playwright-report/SKILL.md) for how to download and parse reports.
+
+Preview deployments are kicked off by the deploy workflow after successful PR CI; changes to `apps/web`, `lib/shared-components`, or `lib/ui-abstractions` affect whether the `web-build` artifact is present, but the deploy can still proceed via its fallback build path when that artifact is absent.
+
 ### Web Deploy Pipeline
 
 1. Extract version info from `apps/web/package.json`

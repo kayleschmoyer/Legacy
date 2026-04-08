@@ -13,6 +13,7 @@ Reports are published to GitHub Pages on the `gh-pages` branch of **`bkrupa/lega
 playwright-report/
   nightly-<run_id>/     # scheduled runs
   manual-<run_number>/  # manual dispatches
+  pr-<N>/               # PR CI runs (where N is the PR number)
 ```
 
 Report URL pattern:
