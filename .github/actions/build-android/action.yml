@@ -81,20 +81,36 @@ runs:
     - name: "🏗️ Build Android APK"
       id: build
       shell: bash
+      env:
+        # Isolate Gradle user home to runner temp so gradle.properties is fresh
+        # each run and never accumulates duplicate entries across jobs.
+        GRADLE_USER_HOME: ${{ runner.temp }}/gradle
       run: |
         cd apps/app/android
         chmod +x gradlew
 
         BUILD_TYPE="${{ inputs.build-type }}"
 
-        # Cap Gradle JVM heap to 2GB — prevents OOM on 8GB runners when combined with
-        # Node/Metro (2GB) and 2 Gradle workers. Total budget: ~5.5GB of 8GB available.
-        # Flags are passed directly to GRADLE_OPTS (not via jvmargs) so they apply
-        # under --no-daemon where jvmargs is not forwarded to the build JVM.
-        export GRADLE_OPTS="${GRADLE_OPTS:+$GRADLE_OPTS }-Xmx2g -XX:MaxMetaspaceSize=512m"
+        # Cap Gradle daemon JVM heap via user-home gradle.properties.
+        # GRADLE_OPTS only affects the thin Gradle launcher JVM, not the daemon.
+        # In Gradle 8, --no-daemon still spawns a single-use daemon whose heap is
+        # set by org.gradle.jvmargs. The project gradle.properties has -Xmx4096m
+        # for local dev; user-home properties take precedence so this overrides it
+        # on CI without affecting developer machines.
+        # GRADLE_USER_HOME is set to $RUNNER_TEMP/gradle (env above) so this
+        # file is isolated per run and never persists across jobs.
+        mkdir -p "$GRADLE_USER_HOME"
+        printf 'org.gradle.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=512m\n' > "$GRADLE_USER_HOME/gradle.properties"
+
+        # Memory budget on 8GB runner after this fix:
+        #   Gradle daemon JVM:  2GB (org.gradle.jvmargs above)
+        #   Node/Metro:         2GB (NODE_OPTIONS in workflow)
+        #   Native clang++:    ~1-2GB (arm64-v8a + x86_64 in parallel)
+        #   OS + other:        ~500MB
+        #   Total:             ~5.5-6.5GB ✅
 
         # Shared Gradle flags — single source of truth for all Android builds
-        # max-workers=2: 4 workers + Gradle JVM + Node Metro exceeded 8GB RAM (OOM kill)
+        # max-workers=2: more workers + large daemon + Node Metro exceeded 8GB RAM (OOM kill)
         GRADLE_FLAGS="--no-daemon --stacktrace --parallel --max-workers=2 --build-cache"
 
         # ABI filtering — Reanimated v4 C++ worklet compilation is expensive
