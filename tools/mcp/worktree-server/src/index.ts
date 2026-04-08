@@ -454,6 +454,68 @@ function runGit(
 }
 
 /**
+ * Apply a regex grep filter to file content. Used by `worktree_show_file` and
+ * `worktree_show_remote` to return only matching lines for large files where
+ * the agent already knows what to look for. Returns either a result object or
+ * `{ error: string }` on failure (invalid pattern, etc.).
+ *
+ * Note: `pattern` is compiled as a JavaScript RegExp and applied per-line.
+ * Callers should prefer simple, non-backtracking patterns to avoid ReDoS.
+ */
+const GREP_DEFAULT_MAX_MATCHES = 50;
+const GREP_HARD_MAX_MATCHES = 500;
+
+function grepContent(
+  content: string,
+  pattern: string,
+  maxMatches?: number,
+):
+  | {
+      matches: Array<{ line: number; text: string }>;
+      totalMatches: number;
+      truncated: boolean;
+      maxMatches: number;
+    }
+  | { error: string } {
+  const normalizedMaxMatches =
+    typeof maxMatches === 'number' && Number.isFinite(maxMatches)
+      ? Math.trunc(maxMatches)
+      : GREP_DEFAULT_MAX_MATCHES;
+
+  const cap = Math.min(
+    Math.max(normalizedMaxMatches, 1),
+    GREP_HARD_MAX_MATCHES,
+  );
+
+  let regex: RegExp;
+  try {
+    regex = new RegExp(pattern);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { error: `Invalid grep pattern "${pattern}": ${message}` };
+  }
+
+  const lines = content.split('\n');
+  const matches: Array<{ line: number; text: string }> = [];
+  let totalMatches = 0;
+  for (let i = 0; i < lines.length; i++) {
+    if (regex.test(lines[i])) {
+      totalMatches++;
+      if (matches.length < cap) {
+        matches.push({ line: i + 1, text: lines[i] });
+      }
+    }
+  }
+
+  return {
+    matches,
+    totalMatches,
+    truncated: totalMatches > matches.length,
+    maxMatches: cap,
+  };
+}
+
+/**
  * Perform a single rebase-continue step: stage files, run `git rebase --continue`,
  * and return structured state. Shared by `worktree_rebase` (auto-continue loop)
  * and `worktree_rebase_continue` tool.
@@ -1002,6 +1064,18 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
             description:
               'Last line to return (1-based, inclusive). Requires startLine. Defaults to startLine when omitted.',
           },
+          grep: {
+            type: 'string',
+            description:
+              'Optional JavaScript RegExp source string passed to `new RegExp(pattern)`. Provide only the pattern text (for example, `foo.*bar`), not a slash-delimited literal like `/foo.*bar/`, and flags such as `i` or `m` are not supported by this parameter. When provided, only matching lines (with line numbers) are returned instead of the full file. Use this for large files where you know what to look for. Mutually exclusive with `startLine`/`endLine`.',
+          },
+          maxMatches: {
+            type: 'integer',
+            minimum: 1,
+            maximum: 500,
+            description:
+              'Max number of matched lines to return when `grep` is provided (default: 50, max: 500).',
+          },
         },
         required: ['path'],
       },
@@ -1030,6 +1104,18 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
             type: 'string',
             description:
               'Optional line range to return (e.g. "1-30", "50-100"). Returns the full file if omitted.',
+          },
+          grep: {
+            type: 'string',
+            description:
+              'Optional JavaScript RegExp pattern. When provided, only matching lines (with line numbers) are returned instead of the full file. Use this for large files where you know what to look for. Mutually exclusive with `lines`.',
+          },
+          maxMatches: {
+            type: 'integer',
+            minimum: 1,
+            maximum: 500,
+            description:
+              'Max number of matched lines to return when `grep` is provided (default: 50, max: 500).',
           },
         },
         required: ['ref', 'path'],
@@ -4100,13 +4186,33 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         worktree,
         startLine: startLineArg,
         endLine: endLineArg,
+        grep: grepPattern,
+        maxMatches: grepMaxMatches,
       } = args as {
         ref?: string;
         path: string;
         worktree?: string;
         startLine?: number;
         endLine?: number;
+        grep?: string;
+        maxMatches?: number;
       };
+
+      // grep is mutually exclusive with line ranges
+      if (
+        grepPattern !== undefined &&
+        (startLineArg !== undefined || endLineArg !== undefined)
+      ) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: '`grep` is mutually exclusive with `startLine`/`endLine` — pick one or the other.',
+            },
+          ],
+          isError: true,
+        };
+      }
 
       let cwd: string;
       if (worktree) {
@@ -4224,6 +4330,73 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       try {
         let content = runGit(['show', `${ref}:${filePath}`], cwd);
 
+        // Apply grep filter if provided (mutually exclusive with line range,
+        // already validated above)
+        if (grepPattern !== undefined) {
+          const result = grepContent(content, grepPattern, grepMaxMatches);
+          if ('error' in result) {
+            return {
+              content: [{ type: 'text', text: result.error }],
+              isError: true,
+            };
+          }
+
+          const MAX_OUTPUT_CHARS = 512_000;
+          const grepPayload = {
+            ref,
+            path: filePath,
+            grep: grepPattern,
+            ...result,
+          };
+          let grepText = JSON.stringify(grepPayload, null, 2);
+
+          if (grepText.length > MAX_OUTPUT_CHARS) {
+            const originalMatches = result.matches;
+            let low = 0;
+            let high = originalMatches.length;
+            let bestText = JSON.stringify(
+              {
+                ...grepPayload,
+                matches: [],
+                outputTruncated: originalMatches.length > 0,
+                outputTruncationReason: `Response limited to ${MAX_OUTPUT_CHARS} characters`,
+              },
+              null,
+              2,
+            );
+
+            while (low <= high) {
+              const mid = Math.floor((low + high) / 2);
+              const candidateText = JSON.stringify(
+                {
+                  ...grepPayload,
+                  matches: originalMatches.slice(0, mid),
+                  outputTruncated: mid < originalMatches.length,
+                  outputTruncationReason:
+                    mid < originalMatches.length
+                      ? `Response limited to ${MAX_OUTPUT_CHARS} characters`
+                      : undefined,
+                },
+                null,
+                2,
+              );
+
+              if (candidateText.length <= MAX_OUTPUT_CHARS) {
+                bestText = candidateText;
+                low = mid + 1;
+              } else {
+                high = mid - 1;
+              }
+            }
+
+            grepText = bestText;
+          }
+
+          return {
+            content: [{ type: 'text', text: grepText }],
+          };
+        }
+
         // Apply line range if provided
         if (startLineArg !== undefined) {
           const endLine = endLineArg ?? startLineArg;
@@ -4311,11 +4484,28 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         ref: rawRef,
         path: filePath,
         lines,
+        grep: grepPattern,
+        maxMatches: grepMaxMatches,
       } = args as {
         ref: string;
         path: string;
         lines?: string;
+        grep?: string;
+        maxMatches?: number;
       };
+
+      // grep is mutually exclusive with lines
+      if (grepPattern !== undefined && lines !== undefined) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: '`grep` is mutually exclusive with `lines` — pick one or the other.',
+            },
+          ],
+          isError: true,
+        };
+      }
 
       // Auto-prepend "origin/" if the ref doesn't already start with a known remote name
       let ref: string;
@@ -4508,6 +4698,72 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       try {
         let content = runGit(['show', `${ref}:${filePath}`], cwd);
+
+        // Apply grep filter if provided (mutually exclusive with line range)
+        if (grepPattern !== undefined) {
+          const result = grepContent(content, grepPattern, grepMaxMatches);
+          if ('error' in result) {
+            return {
+              content: [{ type: 'text', text: result.error }],
+              isError: true,
+            };
+          }
+
+          const MAX_OUTPUT_CHARS = 512_000;
+          const grepPayload = {
+            ref,
+            path: filePath,
+            grep: grepPattern,
+            ...result,
+          };
+          let grepText = JSON.stringify(grepPayload, null, 2);
+
+          if (grepText.length > MAX_OUTPUT_CHARS) {
+            const originalMatches = result.matches;
+            let low = 0;
+            let high = originalMatches.length;
+            let bestText = JSON.stringify(
+              {
+                ...grepPayload,
+                matches: [],
+                outputTruncated: originalMatches.length > 0,
+                outputTruncationReason: `Response limited to ${MAX_OUTPUT_CHARS} characters`,
+              },
+              null,
+              2,
+            );
+
+            while (low <= high) {
+              const mid = Math.floor((low + high) / 2);
+              const candidateText = JSON.stringify(
+                {
+                  ...grepPayload,
+                  matches: originalMatches.slice(0, mid),
+                  outputTruncated: mid < originalMatches.length,
+                  outputTruncationReason:
+                    mid < originalMatches.length
+                      ? `Response limited to ${MAX_OUTPUT_CHARS} characters`
+                      : undefined,
+                },
+                null,
+                2,
+              );
+
+              if (candidateText.length <= MAX_OUTPUT_CHARS) {
+                bestText = candidateText;
+                low = mid + 1;
+              } else {
+                high = mid - 1;
+              }
+            }
+
+            grepText = bestText;
+          }
+
+          return {
+            content: [{ type: 'text', text: grepText }],
+          };
+        }
 
         // Apply line range if specified
         if (startLine !== undefined) {
