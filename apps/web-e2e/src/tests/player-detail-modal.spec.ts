@@ -675,9 +675,9 @@ test.describe('Player Detail Modal — Edge Cases @regression', () => {
     const dialog = page.locator('div[role="dialog"]');
     await expect(dialog).toBeVisible();
 
-    // The PlayerDetailPage renders a "← Back to Player Statistics" button
+    // The PlayerDetailPage renders a "← Back" button
     const backButton = page.getByRole('button', {
-      name: /back to player statistics/i,
+      name: /← back/i,
     });
     await expect(backButton).toBeVisible();
     // dispatchEvent bypasses overlay interception from the open dialog
