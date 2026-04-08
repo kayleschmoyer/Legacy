@@ -23,6 +23,7 @@ export function runCommand(
   args: string[],
   cwd: string,
   extraEnv: Record<string, string> = {},
+  timeout: number = COMMAND_TIMEOUT,
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const env: NodeJS.ProcessEnv = {
@@ -36,7 +37,7 @@ export function runCommand(
     execFile(
       command,
       args,
-      { cwd, timeout: COMMAND_TIMEOUT, shell: true, env },
+      { cwd, timeout, shell: true, env },
       (err, stdout, stderr) => {
         if (err) {
           const msg = stderr?.trim() || stdout?.trim() || err.message;

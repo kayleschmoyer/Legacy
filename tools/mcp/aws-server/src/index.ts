@@ -13,6 +13,7 @@ import { iamGetPolicy } from './tools/iam-get-policy.js';
 import { lambdaStatus } from './tools/lambda-status.js';
 import { LAMBDA_FUNCTIONS, logsTail } from './tools/logs-tail.js';
 import { ssmGet } from './tools/ssm-get.js';
+import { ssoLogin } from './tools/sso-login.js';
 import { ssoStatus } from './tools/sso-status.js';
 import { terraformOutput } from './tools/terraform-output.js';
 
@@ -107,6 +108,25 @@ server.tool(
   'Check AWS SSO session authentication. Returns caller identity or error with remedy.',
   {},
   async () => ssoStatus(),
+);
+
+// --- aws_sso_login ---
+server.tool(
+  'aws_sso_login',
+  'Initiate AWS SSO login using --no-browser mode, which prints a device authorization URL instead of opening a browser. Returns the URL so the user can authenticate. Call aws_sso_status after authentication to verify. Use when aws_sso_status returns authenticated: false.',
+  {
+    profile: z
+      .string()
+      .regex(
+        /^[A-Za-z0-9._-]+$/,
+        'Profile name may only contain letters, digits, dots, underscores, and hyphens',
+      )
+      .optional()
+      .describe(
+        'AWS profile name (default: "default" or $AWS_PROFILE env var)',
+      ),
+  },
+  async (params) => ssoLogin(params),
 );
 
 // --- aws_terraform_output ---
