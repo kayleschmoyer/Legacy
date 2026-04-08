@@ -175,6 +175,13 @@ interface ReportStats {
   ok: boolean;
 }
 
+interface FailureDetail {
+  name: string;
+  file: string;
+  error: string | null;
+  snippet: string | null;
+}
+
 interface ReportResult {
   reportName: string;
   url: string;
@@ -182,6 +189,7 @@ interface ReportResult {
   files: TestFileSummary[];
   failedTests: string[];
   flakyTests: string[];
+  failureDetails: FailureDetail[];
 }
 
 // Typed subset of the Playwright report.json format
@@ -194,13 +202,26 @@ interface PlaywrightStats {
   ok: boolean;
 }
 
+interface PlaywrightTestResult {
+  status: string;
+  errors?: Array<{
+    message?: string;
+    value?: string;
+    snippet?: string;
+  }>;
+  duration?: number;
+}
+
+interface PlaywrightTest {
+  title: string;
+  outcome: string;
+  path?: string[];
+  results?: PlaywrightTestResult[];
+}
+
 interface PlaywrightTestFile {
   fileName: string;
-  tests: Array<{
-    title: string;
-    outcome: string;
-    path?: string[];
-  }>;
+  tests: PlaywrightTest[];
   stats?: PlaywrightStats;
 }
 
@@ -344,11 +365,25 @@ export async function getPlaywrightReport(params: {
 
   const failedTests: string[] = [];
   const flakyTests: string[] = [];
+  const failureDetails: FailureDetail[] = [];
   for (const file of report.files ?? []) {
     for (const test of file.tests ?? []) {
       const fullTitle = [...(test.path ?? []), test.title].join(' > ');
-      if (test.outcome === 'unexpected') failedTests.push(fullTitle);
-      else if (test.outcome === 'flaky') flakyTests.push(fullTitle);
+      if (test.outcome === 'unexpected') {
+        failedTests.push(fullTitle);
+        const firstResult = test.results?.find(
+          (r) => r.errors && r.errors.length > 0,
+        );
+        const firstError = firstResult?.errors?.[0];
+        failureDetails.push({
+          name: fullTitle,
+          file: file.fileName,
+          error: firstError?.message ?? firstError?.value ?? null,
+          snippet: firstError?.snippet ?? null,
+        });
+      } else if (test.outcome === 'flaky') {
+        flakyTests.push(fullTitle);
+      }
     }
   }
 
@@ -366,6 +401,7 @@ export async function getPlaywrightReport(params: {
     files,
     failedTests,
     flakyTests,
+    failureDetails,
   };
 
   return {
