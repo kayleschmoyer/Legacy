@@ -51,9 +51,9 @@ Always use MCP tools instead of raw shell commands. The MCP tools provide struct
 
 ## Review Lifecycle in Cloud
 
-On **Claude Code on the web**, use the built-in `mcp__github__*` tools for the PR review lifecycle. These tools authenticate via the platform's own token, avoiding the token-fallback issue where the custom `legacy-sports-github` MCP server can fall through to a user's personal OAuth token (causing agent comments to appear under the user's GitHub username instead of a bot identity).
+On **Claude Code on the web**, use the built-in `mcp__github__*` tools for authorship-sensitive PR operations (replies, Copilot review requests) — these tools authenticate via the platform's own token, ensuring agent comments appear under a bot identity rather than the user's GitHub username. However, **use the custom `legacy-sports-github` server for reading and resolving review threads** — the built-in `pull_request_read` does not return GraphQL thread node IDs, which are required for thread resolution (see "Which operations MUST use the custom MCP server" below).
 
-### Cloud review workflow (built-in tools)
+### Cloud review workflow
 
 ```
 1. Create PR (draft)     → mcp__github__create_pull_request({ owner, repo, title, head, base, draft: true })
@@ -61,10 +61,10 @@ On **Claude Code on the web**, use the built-in `mcp__github__*` tools for the P
 3. Request Copilot       → mcp__github__request_copilot_review({ owner, repo, pullNumber })
 4. Subscribe to events   → mcp__github__subscribe_pr_activity({ owner, repo, pullNumber })
 5. [Copilot posts comments — delivered via <github-webhook-activity> messages]
-6. Read review threads   → mcp__github__pull_request_read({ method: "get_review_comments", owner, repo, pullNumber })
+6. Read review threads   → github_get_review_threads({ number: <PR#>, unresolvedOnly: true })  ← custom server (returns GraphQL thread node IDs)
 7. Fix code, validate (make pc), commit & push
-8. Reply to threads      → mcp__github__add_reply_to_pull_request_comment({ owner, repo, pullNumber, commentId, body })
-9. Resolve threads       → mcp__github__resolve_review_thread({ threadId })
+8. Reply to threads      → mcp__github__add_reply_to_pull_request_comment({ owner, repo, pullNumber, commentId, body })  ← built-in (bot identity)
+9. Resolve threads       → github_resolve_threads({ threadIds: [...] })  ← custom server (batch, requires node IDs from step 6)
 10. Re-request review    → mcp__github__request_copilot_review({ owner, repo, pullNumber })
 11. [Loop back to 5 if new comments arrive, cap at 2 rounds]
 ```
@@ -96,29 +96,36 @@ The built-in `mcp__github__pull_request_read({ method: "get_review_comments" })`
 | Reply to review thread | Comment appears under bot identity, not user    | `mcp__github__add_reply_to_pull_request_comment` |
 | Request Copilot review | App tokens silently fail; platform handles auth | `mcp__github__request_copilot_review`            |
 
+**Which operations MUST use the custom MCP server** (built-in lacks required data):
+
+| Operation            | Custom MCP tool (required)                                                                         | Why built-in is insufficient                                                                                                                                 |
+| -------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Fetch review threads | `github_get_review_threads({ number, unresolvedOnly: true })` — returns GraphQL thread `id` values | `mcp__github__pull_request_read({ method: "get_review_comments", owner, repo, pullNumber })` ⚠️ does **not** return thread node IDs — resolve step will fail |
+| Resolve threads      | `github_resolve_threads({ threadIds })` (batch)                                                    | `mcp__github__resolve_review_thread({ threadId })` ⚠️ requires node IDs only the custom server returns — unusable without step above                         |
+
+> **Custom server startup patience**: the `legacy-sports-github` MCP server may take a few seconds to initialize in cloud environments. If a call returns a connection error on first attempt, wait ~10 seconds and retry once before concluding the server is unavailable and falling back to built-in tools.
+
 **Which operations can use either** (no visible authorship / read-only):
 
-| Operation              | Custom MCP tool                                  | Built-in tool                                                      |
-| ---------------------- | ------------------------------------------------ | ------------------------------------------------------------------ |
-| Read review threads    | `github_get_review_threads` (returns thread IDs) | `mcp__github__pull_request_read(method: "get_review_comments")`    |
-| Resolve threads        | `github_resolve_threads({ threadIds })` (batch)  | `mcp__github__resolve_review_thread({ threadId })` (one at a time) |
-| Read PR details        | `github_view_pr`                                 | `mcp__github__pull_request_read(method: "get")`                    |
-| Subscribe to PR events | N/A                                              | `mcp__github__subscribe_pr_activity`                               |
+| Operation              | Custom MCP tool  | Built-in tool                                   |
+| ---------------------- | ---------------- | ----------------------------------------------- |
+| Read PR details        | `github_view_pr` | `mcp__github__pull_request_read(method: "get")` |
+| Subscribe to PR events | N/A              | `mcp__github__subscribe_pr_activity`            |
 
 ### Tool mapping (custom → built-in)
 
-| Custom MCP tool                                    | Built-in equivalent                                                                            |
-| -------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `github_create_pr({ title, body, draft })`         | `mcp__github__create_pull_request({ owner, repo, title, head, base, body, draft })`            |
-| `github_mark_pr_ready({ number })`                 | `mcp__github__update_pull_request({ owner, repo, pullNumber, draft: false })`                  |
-| `github_view_pr({ number })`                       | `mcp__github__pull_request_read({ method: "get", owner, repo, pullNumber })`                   |
-| `github_get_review_threads({ number })`            | `mcp__github__pull_request_read({ method: "get_review_comments", owner, repo, pullNumber })`   |
-| `github_reply_to_thread({ threadId, body })`       | `mcp__github__add_reply_to_pull_request_comment({ owner, repo, pullNumber, commentId, body })` |
-| `github_resolve_thread({ threadId })`              | `mcp__github__resolve_review_thread({ threadId })`                                             |
-| `github_resolve_threads({ threadIds })`            | Loop: `mcp__github__resolve_review_thread({ threadId })` per thread                            |
-| `github_request_review({ number, copilot: true })` | `mcp__github__request_copilot_review({ owner, repo, pullNumber })`                             |
-| `github_list_prs()`                                | `mcp__github__list_pull_requests({ owner, repo })`                                             |
-| `github_list_reviews({ number })`                  | `mcp__github__pull_request_read({ method: "get_reviews", owner, repo, pullNumber })`           |
+| Custom MCP tool                                    | Built-in equivalent                                                                                                                                                                   |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `github_create_pr({ title, body, draft })`         | `mcp__github__create_pull_request({ owner, repo, title, head, base, body, draft })`                                                                                                   |
+| `github_mark_pr_ready({ number })`                 | `mcp__github__update_pull_request({ owner, repo, pullNumber, draft: false })`                                                                                                         |
+| `github_view_pr({ number })`                       | `mcp__github__pull_request_read({ method: "get", owner, repo, pullNumber })`                                                                                                          |
+| `github_get_review_threads({ number })`            | `mcp__github__pull_request_read({ method: "get_review_comments", owner, repo, pullNumber })` ⚠️ built-in does **not** return GraphQL thread node IDs — avoid for review-fix workflows |
+| `github_reply_to_thread({ threadId, body })`       | `mcp__github__add_reply_to_pull_request_comment({ owner, repo, pullNumber, commentId, body })`                                                                                        |
+| `github_resolve_thread({ threadId })`              | `mcp__github__resolve_review_thread({ threadId })`                                                                                                                                    |
+| `github_resolve_threads({ threadIds })`            | Loop: `mcp__github__resolve_review_thread({ threadId })` per thread                                                                                                                   |
+| `github_request_review({ number, copilot: true })` | `mcp__github__request_copilot_review({ owner, repo, pullNumber })`                                                                                                                    |
+| `github_list_prs()`                                | `mcp__github__list_pull_requests({ owner, repo })`                                                                                                                                    |
+| `github_list_reviews({ number })`                  | `mcp__github__pull_request_read({ method: "get_reviews", owner, repo, pullNumber })`                                                                                                  |
 
 > **Note:** On Copilot Coding Agent, the built-in `mcp__github__*` tools are NOT available — use the custom `legacy-sports-github` MCP server with `GH_TOKEN` from `.github/copilot-setup-steps.yml`.
 
