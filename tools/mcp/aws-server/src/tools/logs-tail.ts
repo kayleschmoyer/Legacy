@@ -100,6 +100,7 @@ export async function logsTail(params: LogsTailParams): Promise<ToolResult> {
       /sso session.*expired|sso.*expired|credentials.*expired|InvalidClientTokenId|ExpiredToken/i.test(
         message,
       );
+    const isUnknownOptionsError = /unknown options?:/i.test(message);
 
     return {
       content: [
@@ -111,7 +112,12 @@ export async function logsTail(params: LogsTailParams): Promise<ToolResult> {
             error: message,
             remedy: isSsoError
               ? 'Run `aws sso login` to re-authenticate, then retry.'
-              : undefined,
+              : isUnknownOptionsError
+                ? 'The AWS CLI received an unrecognized option. Valid parameters for aws_logs_tail are: function, since, filter, environment. Check that no unexpected fields were passed.'
+                : null,
+            hint: isUnknownOptionsError
+              ? 'Retry with only the documented aws_logs_tail input fields (function, since [default: 1h], filter [optional], environment [dev|prod, default: dev]). Remove any extra or misspelled fields.'
+              : null,
           }),
         },
       ],
