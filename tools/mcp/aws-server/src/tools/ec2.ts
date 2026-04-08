@@ -222,6 +222,235 @@ export async function ec2ConsoleOutput(
 }
 
 // ---------------------------------------------------------------------------
+
+// aws_ec2_launch_template_inspect
+// ---------------------------------------------------------------------------
+
+export interface LaunchTemplateInspectParams {
+  environment?: string;
+  name?: string;
+}
+
+interface LaunchTemplate {
+  LaunchTemplateId?: string;
+  LaunchTemplateName?: string;
+  LatestVersionNumber?: number;
+  Tags?: Ec2Tag[];
+}
+
+interface DescribeLaunchTemplatesResponse {
+  LaunchTemplates?: LaunchTemplate[];
+}
+
+interface IamInstanceProfileSpec {
+  Arn?: string;
+  Name?: string;
+}
+
+interface LaunchTemplateData {
+  ImageId?: string;
+  InstanceType?: string;
+  KeyName?: string;
+  IamInstanceProfile?: IamInstanceProfileSpec;
+  UserData?: string;
+}
+
+interface LaunchTemplateVersion {
+  LaunchTemplateId?: string;
+  VersionNumber?: number;
+  LaunchTemplateData?: LaunchTemplateData;
+}
+
+interface DescribeLaunchTemplateVersionsResponse {
+  LaunchTemplateVersions?: LaunchTemplateVersion[];
+}
+
+interface SsmParameterValue {
+  Parameter?: { Value?: string };
+}
+
+const SSM_RESOLVE_PREFIX = 'resolve:ssm:';
+
+async function resolveSsmParam(
+  raw: string,
+  cwd: string,
+): Promise<{ resolved: string; ssmParam?: string; ssmError?: string }> {
+  if (!raw.startsWith(SSM_RESOLVE_PREFIX)) return { resolved: raw };
+  // Format: resolve:ssm:/path/to/param  (optionally :version suffix)
+  const rest = raw.slice(SSM_RESOLVE_PREFIX.length);
+  const colonIdx = rest.lastIndexOf(':');
+  // If a numeric version suffix is present, strip it. Otherwise the colon is
+  // part of the parameter name (rare).
+  const param =
+    colonIdx > 0 && /^\d+$/.test(rest.slice(colonIdx + 1))
+      ? rest.slice(0, colonIdx)
+      : rest;
+  try {
+    const ssmOutput = await runCommand(
+      'aws',
+      [
+        'ssm',
+        'get-parameter',
+        '--name',
+        param,
+        '--with-decryption',
+        '--output',
+        'json',
+      ],
+      cwd,
+    );
+    const data = JSON.parse(ssmOutput) as SsmParameterValue;
+    return {
+      resolved: data.Parameter?.Value ?? raw,
+      ssmParam: param,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { resolved: raw, ssmParam: param, ssmError: message };
+  }
+}
+
+const SAFE_LT_NAME_RE = /^[A-Za-z0-9._*-]+$/;
+
+export async function ec2LaunchTemplateInspect(
+  params: LaunchTemplateInspectParams,
+): Promise<ToolResult> {
+  const repoRoot = getRepoRoot();
+  const { environment = 'dev', name } = params;
+
+  if (name !== undefined && !SAFE_LT_NAME_RE.test(name)) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            ok: false,
+            error:
+              'Invalid name: only alphanumeric characters, dots, underscores, hyphens, and wildcards (*) are allowed.',
+          }),
+        },
+      ],
+      isError: true,
+    };
+  }
+
+  const filters = [`Name=tag:Environment,Values=${environment}`];
+  if (name) filters.push(`Name=tag:Name,Values=*${name}*`);
+
+  // Step 1: list launch templates matching the environment (and optional name)
+  let templates: LaunchTemplate[];
+  try {
+    const output = await runCommand(
+      'aws',
+      [
+        'ec2',
+        'describe-launch-templates',
+        '--output',
+        'json',
+        ...filters.flatMap((f) => ['--filters', f]),
+      ],
+      repoRoot,
+    );
+    const data = JSON.parse(output) as DescribeLaunchTemplatesResponse;
+    templates = data.LaunchTemplates ?? [];
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return errorResult('Failed to describe launch templates', message);
+  }
+
+  // Step 2: for each template, fetch the latest version data and resolve any
+  // SSM-indirected ImageId. We process all templates in parallel via
+  // Promise.all for faster results.
+  const results = await Promise.all(
+    templates.map(async (lt) => {
+      const ltId = lt.LaunchTemplateId;
+      const tagsObject: Record<string, string> = {};
+      for (const t of lt.Tags ?? []) {
+        if (t.Key !== undefined) tagsObject[t.Key] = t.Value ?? '';
+      }
+      if (!ltId) {
+        return {
+          launchTemplateId: null,
+          name: lt.LaunchTemplateName ?? null,
+          tags: tagsObject,
+          error:
+            'Missing LaunchTemplateId in describe-launch-templates response',
+        };
+      }
+      try {
+        const versionsOutput = await runCommand(
+          'aws',
+          [
+            'ec2',
+            'describe-launch-template-versions',
+            '--launch-template-id',
+            ltId,
+            '--versions',
+            '$Latest',
+            '--output',
+            'json',
+          ],
+          repoRoot,
+        );
+        const versionsData = JSON.parse(
+          versionsOutput,
+        ) as DescribeLaunchTemplateVersionsResponse;
+        const latest = versionsData.LaunchTemplateVersions?.[0];
+        const ltData = latest?.LaunchTemplateData ?? {};
+        const rawImageId = ltData.ImageId ?? '';
+        const {
+          resolved: imageId,
+          ssmParam,
+          ssmError,
+        } = rawImageId
+          ? await resolveSsmParam(rawImageId, repoRoot)
+          : { resolved: '' };
+
+        return {
+          launchTemplateId: ltId,
+          name: lt.LaunchTemplateName ?? null,
+          latestVersion:
+            latest?.VersionNumber ?? lt.LatestVersionNumber ?? null,
+          imageId: imageId || null,
+          imageIdRaw: rawImageId || null,
+          ssmParam: ssmParam ?? null,
+          ssmError: ssmError ?? null,
+          instanceType: ltData.InstanceType ?? null,
+          keyName: ltData.KeyName ?? null,
+          iamInstanceProfile:
+            ltData.IamInstanceProfile?.Name ??
+            ltData.IamInstanceProfile?.Arn ??
+            null,
+          hasUserData: ltData.UserData != null,
+          tags: tagsObject,
+        };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return {
+          launchTemplateId: ltId,
+          name: lt.LaunchTemplateName ?? null,
+          tags: tagsObject,
+          error: message,
+          remedy: SSO_ERROR_PATTERN.test(message) ? ssoRemedy() : undefined,
+        };
+      }
+    }),
+  );
+
+  return {
+    content: [
+      {
+        type: 'text',
+        text: JSON.stringify(
+          { count: results.length, launchTemplates: results },
+          null,
+          2,
+        ),
+      },
+    ],
+  };
+}
+
 // aws_ec2_network_inspect
 // ---------------------------------------------------------------------------
 

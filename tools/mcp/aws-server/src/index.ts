@@ -5,6 +5,7 @@ import { apigatewayInspect } from './tools/apigateway-inspect.js';
 import {
   ec2ConsoleOutput,
   ec2Instances,
+  ec2LaunchTemplateInspect,
   ec2NetworkInspect,
 } from './tools/ec2.js';
 import { iamGetPolicy } from './tools/iam-get-policy.js';
@@ -169,6 +170,25 @@ server.tool(
       ),
   },
   async (params) => ec2ConsoleOutput(params),
+);
+
+// --- aws_ec2_launch_template_inspect ---
+server.tool(
+  'aws_ec2_launch_template_inspect',
+  'Inspect EC2 launch templates filtered by Environment tag (and optional name substring). Returns the latest version data: AMI (resolved through any `resolve:ssm:` indirection by calling SSM), instance type, key name, IAM instance profile, and tags. Used for "what is this fleet currently configured to launch?" debugging without chaining describe-launch-templates + describe-launch-template-versions + ssm get-parameter via Bash.',
+  {
+    environment: z
+      .enum(['dev', 'prod'])
+      .default('dev')
+      .describe('Filter by Environment tag (default: dev)'),
+    name: z
+      .string()
+      .optional()
+      .describe(
+        'Wildcard substring to match against the Name tag (e.g. "runner" matches "*runner*"). Optional.',
+      ),
+  },
+  async (params) => ec2LaunchTemplateInspect(params),
 );
 
 // --- aws_ec2_network_inspect ---
