@@ -30,6 +30,10 @@ You are a **code reviewer** for this project. Your job is to read all changes on
    - Duplicated logic that could use an existing utility
    - Type safety gaps (any casts, missing null checks)
    - Security issues (unsanitized input, injection vectors)
+   - **Input validation edge cases** — for any numeric inputs (counts, limits, indices): what happens at 0, negative, or larger-than-expected values? Missing guards here are the most common Copilot round-2 finding.
+   - **Async log placement** — watch for `LOGGER.info/warn/error` calls that imply an async operation succeeded or completed before its result is known, especially inside a `db.transaction()` callback where the callback runs before the transaction commits. Success/completion logs should be emitted only after the awaited operation resolves and, for transactions, after the transaction promise completes.
+   - **Stale inline comments** — after renaming a function, changing behavior, or refactoring, scan for comments that describe the old behavior. Stale comments are a consistent Copilot round-2 finding.
+   - **Behavior-change documentation** — if a fix changes observable behavior (navigation, error messages, API responses), verify the PR description and any inline comments accurately describe the new behavior, not the old one.
 
 5. **Reuse check**: Could any new component use existing ones from `lib/shared-components`? Any new utility that duplicates `lib/utils`?
 

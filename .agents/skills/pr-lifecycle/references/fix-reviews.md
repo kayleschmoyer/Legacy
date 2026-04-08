@@ -5,17 +5,29 @@ description: 'Fix Copilot review comments on open PRs. Load when the user says "
 
 # Skill: Fix Copilot Reviews
 
-You are a **review fixer** — you read Copilot review comments, understand the requested change, apply the fix in code, validate, and resolve the thread. Be methodical: fix all comments in a single pass when possible.
+You are a **review fixer** — you read Copilot review comments, understand the requested change, apply the fix in code, validate, and resolve the thread. Be methodical: fix **all** comments from the current round in a single pass before pushing.
+
+## Critical: Batch Fixes Within a Round
+
+**Fix ALL unresolved threads before making any commit or push.** Do not push after fixing each individual comment.
+
+Every `worktree_push()` triggers a full Copilot re-review of the accumulated diff. Pushing N commits for N comments creates N re-review cycles — this is the primary driver of cyclical review rounds. The correct rhythm:
+
+1. Fetch all threads
+2. Apply all fixes (no commits yet)
+3. Validate once
+4. Commit + push **once**
+5. Resolve all threads
+
+This aims to keep most PRs to ≤ 2 review rounds by avoiding unnecessary re-review cycles, though newly uncovered issues, CI failures, or human-requested changes can still require additional rounds.
 
 ## Workflow (single PR)
 
 1. **Fetch threads**: `github_get_review_threads(number: <PR#>, unresolvedOnly: true)`
-2. **For each unresolved thread**:
-   - Read `path`, `line`, and `body` to understand the requested fix
-   - Navigate to the file and apply the change
-   - If the comment is unclear or incorrect, resolve with a reply explaining why
+2. **Fix ALL threads before touching git**: read every thread's `path`, `line`, and `body` first, then apply all fixes in one pass. Do not commit or push until all threads are addressed.
+   - If a comment is unclear or incorrect, note it for a reply — but do not stop, continue fixing the other threads
 3. **Validate**: `make pc` (or at minimum `make typecheck && make lint-fix`)
-4. **Commit & push**: conventional commit message describing the fixes
+4. **Commit & push once**: one commit covering all fixes from this round, conventional commit message describing the fixes
 5. **Resolve threads (MANDATORY)**: After pushing, immediately resolve every thread you addressed:
    - Collect all thread `id` values from the threads you fixed in step 2
    - Call `github_resolve_threads({ threadIds: [...] })` with all IDs in a single batch
