@@ -25,6 +25,8 @@ import { getAuthSuccessHtml, htmlEscape } from '../util/html';
 interface ExtendedAPIGatewayEvent extends APIGatewayEvent {
   _credential?: string; // Cached validated credential
   _exchangedTokens?: Credentials; // Cached token exchange result
+  _resolvedUser?: InternalUser; // Pre-fetched user to skip second DB round-trip
+  _googlePicture?: string; // Pre-extracted picture from verified token
 }
 
 const REFRESH_TOKEN_COOKIE = 'GOOGLE_REFRESH_TOKEN';
@@ -35,7 +37,16 @@ interface GoogleAuthSettings {
   clientSecret: string;
 }
 
+// Module-level cache — persists across warm Lambda invocations; safe because
+// the secret and client ID do not change between requests.
+let _cachedGoogleAuthSettings: GoogleAuthSettings | undefined;
+
 async function getGoogleAuthSettings(): Promise<GoogleAuthSettings> {
+  if (_cachedGoogleAuthSettings) {
+    LOGGER.debug('Using cached Google auth settings');
+    return _cachedGoogleAuthSettings;
+  }
+
   LOGGER.debug('Getting Google auth settings...');
 
   const clientId = getEnvVarRequired(EnvironmentVariable.CLIENT_ID);
@@ -51,10 +62,8 @@ async function getGoogleAuthSettings(): Promise<GoogleAuthSettings> {
 
   LOGGER.debug('Google OAuth client secret retrieved successfully');
 
-  return {
-    clientId: clientId,
-    clientSecret: clientSecret,
-  };
+  _cachedGoogleAuthSettings = { clientId, clientSecret };
+  return _cachedGoogleAuthSettings;
 }
 
 // Main OAuth client - use 'postmessage' for GSI web flows
@@ -282,9 +291,10 @@ export const handleSecureGoogleAuth = async (
         }
         userEmail = payload.email;
 
-        // Store credential on the event so the main flow can reuse the same value
+        // Store credential and picture on the event so the main flow can reuse them
         // without re-reading the request body; the ID token is still re-verified later.
         event._credential = body.credential;
+        event._googlePicture = payload.picture;
 
         LOGGER.debug('Email verified from ID token successfully');
       } catch (error) {
@@ -343,9 +353,10 @@ export const handleSecureGoogleAuth = async (
         }
         userEmail = payload.email;
 
-        // Store tokens in the event body so we can reuse them later
-        // This avoids the "invalid_grant" error from double-exchange
+        // Store tokens and picture on the event so we can reuse them later.
+        // Storing tokens avoids the "invalid_grant" error from double-exchange.
         event._exchangedTokens = tokens;
+        event._googlePicture = payload.picture;
 
         LOGGER.debug(
           'Email verified from authorization code flow successfully',
@@ -381,6 +392,10 @@ export const handleSecureGoogleAuth = async (
     const user = await getOrCreateUser(userEmail);
 
     LOGGER.info(`User ready for authentication (ID: ${user.id})`);
+
+    // Cache the resolved user on the event so handleGoogleAuth can skip its
+    // own DB lookup (getUserFromGoogleEmail) and avoid a second DB connection.
+    event._resolvedUser = user;
 
     // Step 3: NOW do full OAuth validation since user exists
     LOGGER.debug(
@@ -545,32 +560,48 @@ export const handleGoogleAuth = async (event: ExtendedAPIGatewayEvent) => {
   let internalJwt: string;
 
   try {
-    // Try database access
-    LOGGER.debug('Attempting to connect to database...');
-
-    const result = await withDbClient(async (db) => {
-      LOGGER.debug('Database connection successful, getting user from JWT...');
-
-      const user = await getUserFromGoogleEmail(db, googleEmail);
-
-      LOGGER.debug('User retrieved from database:', {
-        id: user.id,
-        username: user.username,
-        accessLevel: user.accessLevel,
+    if (event._resolvedUser) {
+      // User was pre-fetched by handleSecureGoogleAuth — skip the DB round-trip.
+      // _googlePicture was also captured there; fall back to the picture extracted
+      // by the verifyIdToken call above in case the event path differs.
+      LOGGER.debug(
+        'Using pre-resolved user from secure flow, skipping DB lookup',
+      );
+      userInfo = event._resolvedUser;
+      internalJwt = await createJwt(userInfo, {
+        picture: event._googlePicture ?? googlePicture,
       });
-
-      // Use picture extracted from the already-verified Google ID token payload
-      const jwt = await createJwt(user, {
-        picture: googlePicture,
-      });
-
       LOGGER.debug('Internal JWT created successfully');
+    } else {
+      // No pre-resolved user — open a DB connection to look up the user.
+      LOGGER.debug('Attempting to connect to database...');
 
-      return { user, jwt };
-    });
+      const result = await withDbClient(async (db) => {
+        LOGGER.debug(
+          'Database connection successful, getting user from JWT...',
+        );
 
-    userInfo = result.user;
-    internalJwt = result.jwt;
+        const user = await getUserFromGoogleEmail(db, googleEmail);
+
+        LOGGER.debug('User retrieved from database:', {
+          id: user.id,
+          username: user.username,
+          accessLevel: user.accessLevel,
+        });
+
+        // Use picture extracted from the already-verified Google ID token payload
+        const jwt = await createJwt(user, {
+          picture: googlePicture,
+        });
+
+        LOGGER.debug('Internal JWT created successfully');
+
+        return { user, jwt };
+      });
+
+      userInfo = result.user;
+      internalJwt = result.jwt;
+    }
   } catch (dbError) {
     LOGGER.error(
       'Database unavailable during authentication — refusing to issue JWT:',

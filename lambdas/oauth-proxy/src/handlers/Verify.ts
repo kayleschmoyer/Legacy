@@ -21,7 +21,16 @@ interface GoogleUserInfo {
   [key: string]: unknown;
 }
 
+// Module-level cache — persists across warm Lambda invocations; safe because
+// the secret and client ID do not change between requests.
+let _cachedGoogleAuthSettings: GoogleAuthSettings | undefined;
+
 async function getGoogleAuthSettings(): Promise<GoogleAuthSettings> {
+  if (_cachedGoogleAuthSettings) {
+    LOGGER.debug('Using cached Google auth settings');
+    return _cachedGoogleAuthSettings;
+  }
+
   LOGGER.debug('Getting Google auth settings...');
 
   const clientId = getEnvVarRequired(EnvironmentVariable.CLIENT_ID);
@@ -37,10 +46,8 @@ async function getGoogleAuthSettings(): Promise<GoogleAuthSettings> {
 
   LOGGER.debug('Google OAuth client secret retrieved successfully');
 
-  return {
-    clientId: clientId,
-    clientSecret: clientSecret,
-  };
+  _cachedGoogleAuthSettings = { clientId, clientSecret };
+  return _cachedGoogleAuthSettings;
 }
 
 const getOAuthClient = memoizeOne((clientId: string, clientSecret: string) => {
