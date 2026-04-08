@@ -43,9 +43,9 @@ For each PR where `ciStatus` is `fail`, inspect the failed checks to determine i
 Use the CI MCP tools to read logs:
 
 ```
-ci_list_runs(branch: "<headRefName>", status: "failure", limit: 1)
+ci_list_runs(branch: "<branch>", status: "failure", limit: 1)
 ci_get_logs(runId: <runId>, failedOnly: true)
-ci_search_logs(runId: <runId>, pattern: "error|FAIL|Error:", context: 5)
+ci_search_logs(runId: <runId>, pattern: "error|FAIL|Error:", isRegex: true, contextBefore: 5, contextAfter: 5)
 ```
 
 ### 3b. Decide: re-run or escalate

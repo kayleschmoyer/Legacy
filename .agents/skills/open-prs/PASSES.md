@@ -23,11 +23,17 @@ Use the `taskId` returned by `TaskCreate` (or, if reusing an existing sweep task
 
 Every operation starts with a scan. This produces a single snapshot used by all passes.
 
+**MCP (preferred):**
+
 ```
-github_pr_scan(excludeDrafts: true, excludeLabels: ["sweep-claimed"])
+github_pr_dashboard(state: "open", limit: 100, excludeDrafts: true)
 ```
 
-Shell fallback (PowerShell only — does not filter drafts or claimed PRs):
+This returns a structured list of open PRs with CI status, review state, labels, and merge state in a single MCP/tool call; the tool may make multiple underlying GitHub API requests — no PowerShell or file I/O needed. Use the returned PR list directly for pass categorization.
+
+Important: `github_pr_dashboard` is capped at 100 results. On the default scan path (without an `author` filter), results are sorted by `UPDATED_AT` descending. For repos with >100 open PRs, use label filters for additional runs, or use author filters only when needed and do not assume the same `UPDATED_AT` ordering; alternatively use the `scan-prs.ps1 -Limit` shell fallback.
+
+**Shell fallback** (only if `github_pr_dashboard` MCP tool is unavailable):
 
 ```powershell
 Set-Location D:\code\legacy-sports
@@ -35,11 +41,11 @@ Set-Location D:\code\legacy-sports
 $scan = Get-Content scratch/pr-scan.json | ConvertFrom-Json
 ```
 
-The scan produces categorized lists:
+When using the shell fallback, the scan produces categorized lists:
 
 | Field               | Contains                                                                         |
 | ------------------- | -------------------------------------------------------------------------------- |
-| `$scan.totalOpen`   | Total open PR count (after applying excludeDrafts)                               |
+| `$scan.totalOpen`   | Total open PR count                                                              |
 | `$scan.conflicting` | PRs with merge conflicts (`{ number, title, headRefName }`)                      |
 | `$scan.reviews`     | PRs with unresolved review threads (`{ number, title, headRefName, threads[] }`) |
 | `$scan.ciFailing`   | PRs with failing CI (`{ number, title, headRefName, failedChecks[] }`)           |
@@ -112,7 +118,7 @@ Before any git operations, settle as many PRs as possible via API-only actions. 
 
 Ensure every open PR has a Copilot review. The repository ruleset (`review_on_push: true`) auto-triggers Copilot for user-authored PRs, but **not for PRs authored by GitHub Apps** (the `requestReviewers` REST API silently drops Copilot when called with installation tokens). Since most agent-created PRs are authored by `legacy-sports-code-bot`, this step is essential.
 
-For each PR without a Copilot review (check `reviews` in the scan results):
+For each PR without a Copilot review (check `github_pr_batch_status(numbers: [...], compact: false)` results — the `reviews` field is available in `github_pr_batch_status` and `scan-prs.ps1` output, not in `github_pr_dashboard` rows). **Note**: `github_pr_batch_status` accepts at most 50 PR numbers per call — chunk larger lists into batches of ≤50 before calling.
 
 ```
 github_request_review(number: <PR#>)
@@ -134,19 +140,15 @@ For each Dependabot PR, apply exactly one action based on its state:
 | Clean (no conflicts, CI passing) | Label `merge-when-ready` via `github_manage_labels`                                                       |
 | Has unresolved review threads    | Label `requires-human-review` — note: Dependabot PR has unresolved human review threads; do not auto-edit |
 
-After posting `@dependabot rebase`, the PR is **settled for the current pass** — Dependabot handles the rebase asynchronously. The PR reaches its final settled state in a future sweep, when it becomes clean (labeled `merge-when-ready`) or labeled `requires-human-review`.
+Dependabot PRs are only considered **settled** when they are either clean (labeled `merge-when-ready`) or labeled `requires-human-review`. After posting `@dependabot rebase`, the PR is settled for the current pass — Dependabot handles the rebase asynchronously and the updated branch will appear in the next sweep.
 
-Post a Dependabot command comment using `github_comment_pr` (MCP):
-
-```
-github_comment_pr(number: <PR#>, body: "@dependabot rebase")
-```
-
-Shell fallback (if MCP unavailable):
+Post a Dependabot command comment using the `gh` CLI:
 
 ```bash
 gh pr comment <PR#> --body "@dependabot rebase"
 ```
+
+> **MCP vs. `gh` note** — An MCP tool exists for posting generic PR comments, but use `gh pr comment` for Dependabot commands. This is a deliberate exception to the "prefer MCP tools over raw `gh` commands" rule because Dependabot command handling may depend on the authenticated GitHub user/session that posts the comment. Ensure `gh` is authenticated with an account that has write access to the repository so Dependabot commands are accepted.
 
 After posting a rebase command, the PR enters a "commanded" state. Dependabot handles the rebase asynchronously — the updated branch will appear in the next sweep with fresh status. Mark the PR as settled for the current pass.
 
@@ -250,7 +252,7 @@ If a rebase fails irrecoverably: `git rebase --abort`, comment on the PR with th
 
 **Parallel by default** — PRs with review comments are independent and can be fixed concurrently. Spawn up to 3 sub-agents, each working in its own worktree. See [sweep-and-parallelization.md](../pr-lifecycle/references/sweep-and-parallelization.md) for the agent prompt template and failure handling.
 
-For each PR in `$scan.reviews` (in parallel batches of 3):
+For each PR in the review-comments bucket from Step 1's `github_pr_dashboard` result (in parallel batches of 3):
 
 1. Enter the worktree (Step 2)
 2. **Load `skills/pr-lifecycle/SKILL.md`** — it contains the full workflow: reading comments, applying fixes, validating, committing, resolving threads, and the common-patterns reference table
@@ -269,14 +271,14 @@ For each PR in `$scan.reviews` (in parallel batches of 3):
 
 **Parallel by default** — CI fixes for different PRs are independent. After the orchestrator classifies each failure (3a), spawn up to 3 sub-agents for PRs that need code fixes. PRs needing only a CI re-run (`flaky`, `infrastructure`) are handled inline by the orchestrator — no sub-agent needed. See [sweep-and-parallelization.md](../pr-lifecycle/references/sweep-and-parallelization.md) for details.
 
-For each PR in `$scan.ciFailing` (in parallel batches of 3 for code fixes):
+For each PR in the derived `ciFailing` bucket (from `github_pr_dashboard` in the preferred path, or `$scan.ciFailing` only in the shell fallback path), process in parallel batches of 3 for code fixes:
 
 ### 3a. Automated CI Triage
 
 Before diving into manual debugging, use existing CI MCP tools to diagnose the failure:
 
-1. **Get logs**: `ci_get_logs(runId: <runId>)` to retrieve full CI output
-2. **Search for patterns**: `ci_search_logs(runId: <runId>, pattern: "error|failed|Error")` to find failure points
+1. **Get logs**: `ci_get_logs(runId: <runId>)` to retrieve logs from failed CI steps
+2. **Search for patterns**: `ci_search_logs(runId: <runId>, pattern: "error|failed|Error", isRegex: true)` to find failure points
 3. **Classify** the failure based on log output and apply the appropriate fix:
 
 | Classification   | Fix Action                                                                |
@@ -327,7 +329,7 @@ If automated classification returns `unknown` or the auto-fix doesn't resolve th
 
 ### Pending CI
 
-PRs in `$scan.ciPending` are NOT skipped — continue with other work and circle back. If pending CI is the only remaining work in **local mode**, wait ~3 minutes and re-scan. In **cloud mode**, do **not** sleep/poll — record the pending runs in the report and exit (a later sweep will pick them up).
+PRs with dashboard status `pr.ciStatus == "pending"` are NOT skipped — continue with other work and circle back. If pending CI is the only remaining work in **local mode**, wait ~3 minutes and re-scan. In **cloud mode**, do **not** sleep/poll — record the pending runs in the report and exit (a later sweep will pick them up).
 
 ### Early CI Failure Detection (Required)
 
@@ -404,11 +406,11 @@ The outer loop uses `sweep-claimed` labels to coordinate across agents. This is 
 ```
 # Startup: ensure coordination labels exist
 github_ensure_sweep_labels()
-# Shell fallback (bash only):
-#   gh label list --search "sweep-" --json name | grep -q "sweep-claimed" \
-#     || gh label create "sweep-claimed" --color "e4e669" --description "Sweep agent actively working on this PR"
-#   gh label list --search "sweep-" --json name | grep -q "sweep-stale-claim" \
-#     || gh label create "sweep-stale-claim" --color "d93f0b" --description "sweep-claimed was not cleaned up — claiming agent may have crashed"
+# (shell fallback only if MCP unavailable)
+# gh label list --search "sweep-" --json name | grep -q "sweep-claimed" \
+#   || gh label create "sweep-claimed" --color "e4e669" --description "Sweep agent actively working on this PR"
+# gh label list --search "sweep-" --json name | grep -q "sweep-stale-claim" \
+#   || gh label create "sweep-stale-claim" --color "d93f0b" --description "sweep-claimed was not cleaned up — claiming agent may have crashed"
 
 # Optional: reclaim stale sweep-claimed labels before scanning (long sweeps >20 PRs)
 #   github_sweep_stale_claims(olderThanMinutes: 30)
@@ -418,18 +420,39 @@ github_ensure_sweep_labels()
 settled = {}  # PR numbers that have reached a terminal state
 
 REPEAT (max 10 passes):
-  Scan all open PRs, excluding drafts and already-claimed PRs (Step 1):
-    github_pr_scan(excludeDrafts: true, excludeLabels: ["sweep-claimed"])
-  all_prs = scan.conflicting + scan.reviews + scan.ciFailing + scan.ciPending + scan.clean
-  workable = [pr for pr in all_prs if pr.number not in settled]
-  # Note: draft count is in scan.draftsExcluded (field may be omitted when 0) — log it in the sweep summary
+  Scan all open PRs, excluding drafts (Step 1):
+    dashboard = github_pr_dashboard(state: "open", limit: 100, excludeDrafts: true)
+  # Prefer github_pr_dashboard over github_pr_scan — it returns richer data (CI status,
+  # labels, review state, merge state) in one MCP/tool call, eliminating the scan-prs.ps1 round-trip.
+  # github_pr_dashboard returns { summary, prs: [...] }. Categorize each PR from prs[] using:
+  #   mergeable       → "MERGEABLE" | "CONFLICTING" | "UNKNOWN"
+  #   ciStatus        → "pass" | "fail" | "pending" | "none"
+  #   reviewDecision  → "APPROVED" | "CHANGES_REQUESTED" | "REVIEW_REQUIRED" | null
+  #   unresolvedThreads → number of open review threads
+  #   labels          → string[] of label names
+  # Label-based exclusion (e.g. "sweep-claimed") must be done via post-filtering.
+  all_prs = dashboard.prs  # full list returned by github_pr_dashboard
+  workable = [pr for pr in all_prs if pr.number not in settled
+                                   and "sweep-claimed" not in pr.labels]
+  # Derive buckets from pr fields:
+  #   conflicting  = [pr for pr in workable if pr.mergeable == "CONFLICTING"]
+  #   ciFailing    = [pr for pr in workable if pr.ciStatus == "fail"]
+  #   ciPending    = [pr for pr in workable if pr.ciStatus == "pending"]
+  #   reviews      = [pr for pr in workable if pr.reviewDecision in ("CHANGES_REQUESTED", "REVIEW_REQUIRED")
+  #                                         or pr.unresolvedThreads > 0
+  #                                         or pr.unresolvedThreads < 0]  # unknown thread state; inspect manually
+  #   clean        = [pr for pr in workable if pr.mergeable == "MERGEABLE"
+  #                                         and pr.ciStatus == "pass"
+  #                                         and pr.reviewDecision in ("APPROVED", null)
+  #                                         and pr.unresolvedThreads == 0]
+  # Note: draft count is in dashboard.draftsExcluded (top-level field, may be omitted when 0) — log it in the sweep summary
 
   IF workable is empty → EXIT (all settled or held by other agents)
 
   # Partition into Dependabot PRs (comment-only) and regular PRs (local git ops)
-  # github_pr_scan results include headRefName but not author; use branch prefix to identify Dependabot PRs.
+  # github_pr_dashboard rows use branch for the head ref name; use its prefix to identify Dependabot PRs.
   # If author.login is available (e.g., from github_pr_batch_status), you may also check == "dependabot[bot]".
-  dependabot_prs = [pr for pr in workable if pr.headRefName.startswith("dependabot/")]
+  dependabot_prs = [pr for pr in workable if pr.branch.startswith("dependabot/")]
   regular_prs    = [pr for pr in workable if pr not in dependabot_prs]
 
   Pass 0: API-Fast Triage (NO git ops — ~2 min total)
@@ -439,8 +462,7 @@ REPEAT (max 10 passes):
     - 0b: Handle Dependabot PRs (comment-only, no worktree needed)
       - For each pr in dependabot_prs:
           - Claim PR via github_manage_labels(number: <pr.number>, add: ["sweep-claimed"]) before acting
-          - IF pr is conflicting or has failing/stale CI → github_comment_pr(number: <pr.number>, body: "@dependabot rebase")
-            # Shell fallback: gh pr comment <pr.number> --body "@dependabot rebase"
+          - IF pr is conflicting or has failing/stale CI → gh pr comment <pr.number> --body "@dependabot rebase"
           - IF pr is clean (no conflicts, CI passing)   → github_manage_labels(number: <pr.number>, add: ["merge-when-ready"])
           - IF pr has unresolved review threads         → github_manage_labels(number: <pr.number>, add: ["requires-human-review"])
           - Release claim via github_manage_labels(number: <pr.number>, remove: ["sweep-claimed"]) after acting
@@ -542,7 +564,7 @@ For each PR marked as settled in this sweep, verify:
 1. **If rebased this sweep**: confirm the branch is still based on the current base branch
 
    ```
-   worktree_run({ command: "git fetch origin && git merge-base origin/<baseRefName> origin/<branch>" })
+   worktree_run(command: "git fetch origin && git merge-base origin/<baseRefName> origin/<branch>")
    ```
 
    Output must equal `git rev-parse origin/<baseRefName>`. If not → rebase again; update settled state.

@@ -14,18 +14,14 @@ This file provides guidance to AI coding agents working with code in this reposi
 - **Shared node_modules** — never `make clean`/`make install`/`pnpm install` in the main repo while worktrees exist. Broken node_modules in a junction? Check if it's a junction first, then ask the user — never fix autonomously. Always use `make install` (never raw `pnpm install`). See `skills/worktree-workflow/SKILL.md`.
 - **Make first**: prefer `make <target>` over raw `pnpm exec nx` — it sets `NODE_OPTIONS` for the Windows windowsHide patch and is cross-platform safe. For project-specific targets use `pnpm exec nx run <project>:<target>`. Never use `pnpm run` directly (exception: `lib/db-client` migration scripts that have no Nx target equivalent). See `skills/repo-tooling/SKILL.md` for the full target list.
 - **Tool-first for file operations**: use the built-in `Glob` tool (not `find`/`ls`) for file discovery, `Grep` tool (not `grep`/`rg`/`find | xargs grep`) for content search, and `Read` tool (not `cat`/`head`/`tail`) for reading files. These built-in tools are path-scopable, permission-controlled, and avoid unnecessary shell execution. `find … | xargs grep` is never necessary — `Grep` accepts both a `pattern` and a `glob` filter in one call. Fall back to Bash only when the built-in tool genuinely cannot handle the case.
-  - **Concrete substitutions** (reach for these automatically — do not use the Bash equivalents):
-    - `grep -r "pattern" dir/` → `Grep(pattern: "pattern", path: "dir", output_mode: "content")`
-    - `grep -rl "pattern" dir/` (files only) → `Grep(pattern: "pattern", path: "dir", output_mode: "files_with_matches")`
-    - `grep -rl "pattern" dir/ --include="*.ts"` → `Grep(pattern: "pattern", path: "dir", glob: "**/*.ts", output_mode: "files_with_matches")`
-    - `cat file` → `Read(file_path: "...")`
-    - `head -N file` → `Read(file_path: "...", limit: N)`
-    - `tail -N file` → first `Read(file_path: "...")` to determine `total_lines`, then if needed `Read(file_path: "...", offset: <total_lines - N>, limit: N)` to re-read just the tail range; if the file is small, keep the full `Read`
-    - `sed -n 'X,Yp' file` → `Read(file_path: "...", offset: X-1, limit: Y-X+1)` (note: `Read`'s `offset` is 0-indexed — line number 1 = offset 0)
-    - `find . -name "*.ts"` → `Glob(pattern: "**/*.ts")`
-    - `tail ~/.claude/.../tasks/<taskId>.output` → `TaskOutput(taskId: "<taskId>")` for background agent task output (no path needed — tool resolves it automatically; returned content can be inspected for length/line counts directly)
-    - `wc -l tasks/<taskId>.output` or `wc -c tasks/<taskId>.output` → `TaskOutput(taskId: "<taskId>")` then compute counts from the returned content using `wc` semantics (`-l`: count `\n` characters; `-c`: count UTF-8 bytes, not string `.length`)
-  - **Glob limitation on Windows worktrees**: `Glob` with `path=` set to an absolute Windows worktree path (e.g. `D:/code/legacy-sports-worktrees/LS-1234-foo`) may silently return empty results due to junction traversal issues. If Glob returns nothing unexpectedly, fall back to `worktree_ls_tree({ ref: "HEAD", path: "<dir>" })` (MCP — lists Git-tracked files only, not untracked) or `worktree_run({ command: "ls <dir>" })` for directory listing.
+  - **Concrete substitutions** (reach for these automatically — do not use the Bash equivalents): - `grep -r "pattern" dir/` → `Grep(pattern: "pattern", path: "dir", output_mode: "content")` - `grep -rl "pattern" dir/` (files only) → `Grep(pattern: "pattern", path: "dir", output_mode: "files_with_matches")` - `grep -rl "pattern" dir/ --include="*.ts"` → `Grep(pattern: "pattern", path: "dir", glob: "**/*.ts", output_mode: "files_with_matches")` - `cat file` → `Read(file_path: "...")` - `head -N file` → `Read(file_path: "...", limit: N)` - `tail -N file` → first `Read(file_path: "...")` to determine `total_lines`, then if needed `Read(file_path: "...", offset: <total_lines - N>, limit: N)` to re-read just the tail range; if the file is small, keep the full `Read` - `find . -name "*.ts"` → `Glob(pattern: "**/*.ts")`
+    <<<<<<< HEAD
+    <<<<<<< HEAD - `tail ~/.claude/.../tasks/<taskId>.output` → `TaskOutput(taskId: "<taskId>")` for background agent task output (no path needed — tool resolves it automatically; returned content can be inspected for length/line counts directly) - `wc -l tasks/<taskId>.output` or `wc -c tasks/<taskId>.output` → `TaskOutput(taskId: "<taskId>")` then compute counts from the returned content using `wc` semantics (`-l`: count `\n` characters; `-c`: count UTF-8 bytes, not string `.length`)
+  - # **Glob limitation on Windows worktrees**: `Glob` with `path=` set to an absolute Windows worktree path (e.g. `D:/code/legacy-sports-worktrees/LS-1234-foo`) may silently return empty results due to junction traversal issues. If Glob returns nothing unexpectedly, fall back to `worktree_ls_tree({ ref: "HEAD", path: "<dir>" })` (MCP — lists Git-tracked files only, not untracked) or `worktree_run({ command: "ls <dir>" })` for directory listing.
+  - **Glob limitation on Windows worktrees**: `Glob` with `path=` set to an absolute Windows worktree path (e.g. `D:/code/legacy-sports-worktrees/LS-1234-foo`) may silently return empty results due to junction traversal issues. If Glob returns nothing unexpectedly, fall back to `worktree_ls_tree({ ref: "HEAD", path: "<dir>" })` (MCP — lists Git-tracked files only, not untracked) or `worktree_run(command: "ls <dir>")` for directory listing.
+    > > > > > > > # a4d341d11 (docs(skills): fix PASSES.md bucket predicates and AGENTS.md worktree_run style)
+  - **Glob limitation on Windows worktrees**: `Glob` with `path=` set to an absolute Windows worktree path (e.g. `D:/code/legacy-sports-worktrees/LS-1234-foo`) may silently return empty results due to junction traversal issues. If Glob returns nothing unexpectedly, fall back to `worktree_ls_tree({ ref: "HEAD", path: "<dir>" })` (MCP — lists Git-tracked files only, not untracked) or `worktree_run(command: "dir <dir>")` for directory listing.
+    > > > > > > > c7c434c06 (docs(skills): fix PASSES.md dashboard var, sort caveat, and AGENTS.md dir fallback)
 - **No `console.*`** — use `LOGGER` from `@legacy-sports/logging` instead of `console.log/warn/error/debug`. Exceptions: `lib/logging/` (the logger itself), `apps/cli/`, migration files, and build-time scripts (`codegen.ts`, Vite plugins).
 - **No suppression** — fix root causes; never use `@ts-ignore` or `eslint-disable` (see `skills/standards/SKILL.md`)
 - **Never embed secrets in tool calls** — never put raw secret values (API keys, tokens, private keys) in `Edit`, `Write`, or `Bash` arguments; they end up in session history. Use file-to-file copy patterns instead. See `.agents/skills/secrets-handling/SKILL.md`.
@@ -115,7 +111,7 @@ Agent(subagent_type: "Explore", prompt: """
   <task description here>
 
   Tool preferences:
-  - Use Glob (not find/ls) for file discovery — do NOT use `find` or `ls` even if they seem faster or more familiar. If Glob returns empty on an absolute Windows worktree path, fall back to worktree_ls_tree
+  - Use Glob (not find/ls) for file discovery; if Glob returns empty on an absolute Windows worktree path, fall back to worktree_ls_tree or worktree_run(command: "ls <dir>")
   - Use Grep (not grep/rg/`find | xargs grep`) for content search — Grep accepts both pattern and glob filter in one call, so `find | xargs grep` is never needed
   - Use Read (not cat/head/tail) for reading files
 """)
@@ -123,16 +119,18 @@ Agent(subagent_type: "Explore", prompt: """
 
 These three lines eliminate the most common subagent Bash anti-patterns (`find` 56x/session, `grep` 23x, `ls` 8x in production audits). Without them, subagents default to shell commands because they lack the project's MCP-first context.
 
-> **Why the explicit "do NOT"?** In production sessions, Explore subagents fell back to `find` and `ls` even when the parent prompt included "Use Glob (not find/ls)" — the affirmative form alone was insufficient. The "do NOT use `find` or `ls`" phrasing is intentional and must be kept verbatim. The only documented exception is the Windows worktree fallback in the hint above: if `Glob` unexpectedly returns empty on an absolute worktree path, fall back to `worktree_ls_tree(...)` — do not use `ls` (even via `worktree_run`) as a general fallback for normal file discovery.
-
 For subagents that perform git operations in worktrees, also include:
 
 ```
   - Use worktree_run for git commands (preferred over git -C via Bash; git -C is the shell fallback when MCP tools are unavailable)
-  - Use worktree_commit/worktree_push for commits and pushes (not git -C commit / git -C push)
+  - Use worktree_commit/worktree_push for commits and pushes
 ```
 
-> **Critical**: when writing the sub-agent prompt, do **not** include explicit `git -C <path> commit` or `git -C <path> push` instructions — these override the preference hint and bypass `worktree_commit`/`worktree_push` wrapper safety behavior (for example main-branch protection, the hook-amend retry/confirmation flow, and the default `--force-with-lease` behavior). Write the prompt in terms of outcomes ("commit and push the fix") and let the sub-agent use MCP tools.
+For subagents running PR sweeps (open-prs skill), also include:
+
+```
+  - For scanning open PRs, use github_pr_dashboard(state: "open", limit: 100, excludeDrafts: true) instead of scan-prs.ps1 or github_pr_scan — it returns richer CI/review/label data in one MCP/tool call (the tool may make multiple underlying GitHub API requests)
+```
 
 ## Commands
 
@@ -209,19 +207,19 @@ Detailed how-to docs live in `.agents/skills/<name>/SKILL.md`. The `description`
 
 ## MCP Servers
 
-| Server                  | Purpose                                                                                                                                                                                                  |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `legacy-sports-db`      | Database queries, migrations, schema generation                                                                                                                                                          |
-| `legacy-sports-jira`    | Ticket CRUD, transitions, blocker checks                                                                                                                                                                 |
-| `legacy-sports-ci`      | CI log queries, workflow reruns                                                                                                                                                                          |
-| `legacy-sports-github`  | PR and review lifecycle (GitHub REST/GraphQL API). `github_view_pr` returns CI check status (`statusCheckRollup`), labels, state, draft status, and review decision — prefer it over `gh pr view --json` |
-| `legacy-sports-nx`      | Nx project discovery, affected analysis, target execution                                                                                                                                                |
-| `legacy-sports-make`    | Makefile targets: validation, build, install, worktree setup                                                                                                                                             |
-| `worktree`              | Worktree lifecycle: list, set active, run, guard, rebase, stabilize, push                                                                                                                                |
-| `legacy-sports-aws`     | CloudWatch log tailing, AWS SSO status checks                                                                                                                                                            |
-| `claude_ai_Stripe`      | Claude Code built-in Stripe integration (Claude Code only; not configured via this repo's `.vscode/mcp.json`)                                                                                            |
-| `claude_ai_Atlassian`   | Claude Code built-in Atlassian plugin — Jira + Confluence via OAuth 2.1 (no credentials needed). Cloud ID: `fb294606-6c8f-4b52-9a41-11fe45b77528`. Preferred for Jira on Claude Code on the web          |
-| `legacy-sports-browser` | Dev server lifecycle, headless screenshots, GitHub image upload                                                                                                                                          |
+| Server                  | Purpose                                                                                                                                                                                         |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `legacy-sports-db`      | Database queries, migrations, schema generation                                                                                                                                                 |
+| `legacy-sports-jira`    | Ticket CRUD, transitions, blocker checks                                                                                                                                                        |
+| `legacy-sports-ci`      | CI log queries, workflow reruns                                                                                                                                                                 |
+| `legacy-sports-github`  | PR and review lifecycle (GitHub REST/GraphQL API)                                                                                                                                               |
+| `legacy-sports-nx`      | Nx project discovery, affected analysis, target execution                                                                                                                                       |
+| `legacy-sports-make`    | Makefile targets: validation, build, install, worktree setup                                                                                                                                    |
+| `worktree`              | Worktree lifecycle: list, set active, run, guard, rebase, stabilize, push                                                                                                                       |
+| `legacy-sports-aws`     | CloudWatch log tailing, AWS SSO status checks                                                                                                                                                   |
+| `claude_ai_Stripe`      | Claude Code built-in Stripe integration (Claude Code only; not configured via this repo's `.vscode/mcp.json`)                                                                                   |
+| `claude_ai_Atlassian`   | Claude Code built-in Atlassian plugin — Jira + Confluence via OAuth 2.1 (no credentials needed). Cloud ID: `fb294606-6c8f-4b52-9a41-11fe45b77528`. Preferred for Jira on Claude Code on the web |
+| `legacy-sports-browser` | Dev server lifecycle, headless screenshots, GitHub image upload                                                                                                                                 |
 
 Call `jira_auth_status` at the start of any Jira workflow. If `configured: true` and API calls succeed, use our custom tools (`jira_view`, `jira_create_ticket`, `jira_transition`, `jira_check_blockers`). If `configured: false` or API calls fail, **stop and prompt the user first** — do not silently switch tools. Tell the user their Jira auth is broken and what to fix (see Critical Rules above for the exact env vars). Only proceed with the Atlassian plugin fallback (`mcp__claude_ai_Atlassian__*`, cloud ID `fb294606-6c8f-4b52-9a41-11fe45b77528`) after the user opts in or you are confirmed to be on Claude Code on the web where the plugin is primary.
 
