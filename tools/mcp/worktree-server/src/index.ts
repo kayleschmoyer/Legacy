@@ -11,12 +11,14 @@ import {
   mkdirSync,
   readFileSync,
   readlinkSync,
+  realpathSync,
   rmSync,
+  statSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { randomUUID } from 'node:crypto';
-import { dirname, isAbsolute, join, resolve, sep } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { tmpdir } from 'node:os';
 
 // ---------------------------------------------------------------------------
@@ -839,6 +841,30 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
               'Include per-commit file change stats (files changed, insertions, deletions). Use maxCount=1 + stat=true as replacement for git show --stat HEAD.',
           },
         },
+      },
+    },
+    {
+      name: 'worktree_file_info',
+      description:
+        'Get metadata for one or more files (bytes, line count, approximate token count). For files ≤10MB, reads files only to count lines — contents are not returned to the caller; approximate token count is derived from byte size. For files >10MB, returns only byte size. Useful for choosing a Read strategy for large files (the Read tool has a 10k-token limit) and for replacing `wc -l` Bash fallbacks.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          paths: {
+            type: 'array',
+            items: { type: 'string' },
+            description:
+              'One or more file paths (max 100). Relative paths are resolved against the worktree root; absolute paths are used as-is.',
+            minItems: 1,
+            maxItems: 100,
+          },
+          worktree: {
+            type: 'string',
+            description:
+              'Ticket key, absolute path, or omit for active worktree. Used as the root for relative paths.',
+          },
+        },
+        required: ['paths'],
       },
     },
     {
@@ -2602,6 +2628,155 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           isError: true,
         };
       }
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_file_info
+    // -----------------------------------------------------------------------
+    case 'worktree_file_info': {
+      const { paths, worktree } = args as {
+        paths: string[];
+        worktree?: string;
+      };
+
+      if (!Array.isArray(paths) || paths.length === 0) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: '`paths` must be a non-empty array of strings.',
+            },
+          ],
+          isError: true,
+        };
+      }
+      if (paths.length > 100) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Too many paths: ${paths.length}. Max 100 per call.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      let cwd: string;
+      if (worktree) {
+        const target = resolveTargetDir(worktree);
+        if ('error' in target) {
+          return {
+            content: [{ type: 'text', text: target.error }],
+            isError: true,
+          };
+        }
+        cwd = target.path;
+      } else if (activeWorktree) {
+        cwd = activeWorktree;
+      } else {
+        cwd = MAIN_REPO;
+      }
+
+      // Hoist realpathSync(cwd) outside the loop — cwd is constant for the
+      // duration of this call and realpathSync is a synchronous syscall.
+      const realCwd = (() => {
+        try {
+          return realpathSync(cwd);
+        } catch {
+          return cwd;
+        }
+      })();
+
+      const files = paths.map((p) => {
+        if (typeof p !== 'string' || p.length === 0) {
+          return {
+            path: String(p),
+            exists: false,
+            error: 'Path must be a non-empty string',
+          };
+        }
+        if (p.includes('\0') || p.includes('\n')) {
+          return {
+            path: p,
+            exists: false,
+            error: 'Path must not contain null bytes or newline characters',
+          };
+        }
+        // Always resolve (even absolute paths) to normalize away any `..` segments.
+        const absolute = resolve(cwd, p);
+        // Prevent path traversal: canonicalize both sides with realpathSync so
+        // that symlinked directories cannot escape the worktree root. Fall back
+        // to the unresolved path if the path does not yet exist (checked below).
+        const realAbsolute = (() => {
+          try {
+            return realpathSync(absolute);
+          } catch {
+            return absolute;
+          }
+        })();
+        const rel = relative(realCwd, realAbsolute);
+        if (rel.startsWith('..') || isAbsolute(rel)) {
+          return {
+            path: p,
+            exists: false,
+            error: 'Path is outside the worktree root',
+          };
+        }
+        try {
+          if (!existsSync(absolute)) {
+            return { path: p, exists: false };
+          }
+          const stat = statSync(absolute);
+          if (!stat.isFile()) {
+            return {
+              path: p,
+              exists: true,
+              bytes: stat.size,
+              error: 'Not a regular file',
+            };
+          }
+          // Read once for line counting. Files larger than 10 MB get
+          // bytes-only metadata to avoid loading huge binaries into memory
+          // just to count newlines; token estimate is derived from bytes.
+          const MAX_READ = 10 * 1024 * 1024;
+          if (stat.size > MAX_READ) {
+            return {
+              path: p,
+              exists: true,
+              bytes: stat.size,
+              note: `File > ${MAX_READ} bytes — line/token count skipped`,
+            };
+          }
+          // Read raw bytes so line counting does not create an additional
+          // UTF-16 string copy in memory when the contents are not returned.
+          const content = readFileSync(absolute);
+          // Line count: number of LF bytes only; matches `wc -l`.
+          let lines = 0;
+          for (let i = 0; i < content.length; i++) {
+            if (content[i] === 10) lines++;
+          }
+          // Rough token estimate: ~4 bytes per token (Anthropic guidance for
+          // English/code). Use stat.size (bytes) to match documented behavior
+          // and avoid UTF-16 code-unit discrepancies for non-ASCII files.
+          const approxTokens = Math.ceil(stat.size / 4);
+          return {
+            path: p,
+            exists: true,
+            bytes: stat.size,
+            lines,
+            approxTokens,
+          };
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : String(err);
+          const exists = existsSync(absolute);
+          return { path: p, exists, error: message };
+        }
+      });
+
+      return {
+        content: [{ type: 'text', text: JSON.stringify({ files }, null, 2) }],
+      };
     }
 
     // -----------------------------------------------------------------------

@@ -21,6 +21,10 @@ Use `worktree_commit` instead of `git add`/`git commit` via Bash — it handles 
 
 **`worktree_run` shell on Windows**: uses Git Bash (`bash.exe` from Git for Windows) when available, falling back to `cmd.exe`. When Git Bash is used, common Unix shell idioms and utilities such as `&&`, `|`, `head`, and `grep` are available. When it falls back to `cmd.exe`, only cmd built-ins and operators like `&&` and `|` are supported — do not rely on Unix utilities (`head`, `grep`, etc.). Avoid PowerShell-specific syntax in `worktree_run` commands.
 
+## File Size & Line Count
+
+Use `worktree_file_info({ paths: [...] })` instead of `wc -l file1 file2 ...` via Bash to get byte sizes and, when available, line counts and approximate token counts for one or more files in a single round-trip. For files larger than 10MB, the tool returns only `bytes` (no `lines` or `approxTokens`); if `approxTokens` is omitted, fall back to `bytes` (dividing by 4 gives a rough token estimate) to decide whether `Read` will fit within its 10k-token limit or whether `offset`/`limit` chunking is needed. Accepts both relative paths (resolved against the worktree root) and absolute paths within the worktree root.
+
 ## GitHub PR Operations
 
 Use the MCP tools below instead of `gh` CLI. These tools handle temp file body encoding, GraphQL thread IDs, and structured output. Fall back to `gh` CLI **only** when the MCP server is unavailable.
