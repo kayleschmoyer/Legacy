@@ -16,7 +16,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { randomUUID } from 'node:crypto';
-import { dirname, isAbsolute, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, resolve, sep } from 'node:path';
 import { tmpdir } from 'node:os';
 
 // ---------------------------------------------------------------------------
@@ -1291,6 +1291,32 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
             items: { type: 'string' },
             description:
               'One or more file/directory paths to check (maximum 100). Paths are passed through as provided; only values beginning with `-` are rejected.',
+            minItems: 1,
+            maxItems: 100,
+          },
+          worktree: {
+            type: 'string',
+            description:
+              'Ticket key, absolute path, or omit for active worktree',
+          },
+        },
+        required: ['paths'],
+      },
+    },
+    {
+      name: 'worktree_is_tracked',
+      description:
+        'Check whether one or more paths are tracked by git (i.e. recorded in the index). ' +
+        'Answers the "is this committed source or a build artifact?" question without falling back ' +
+        'to `git ls-files <path>` via Bash. Returns tracked/ignored status and file size in one call.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          paths: {
+            type: 'array',
+            items: { type: 'string' },
+            description:
+              'One or more file paths to check (maximum 100). Relative to the worktree root.',
             minItems: 1,
             maxItems: 100,
           },
@@ -5709,6 +5735,241 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           };
         }
         return { path: p, ignored: false };
+      });
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({ results }, null, 2),
+          },
+        ],
+      };
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_is_tracked
+    // -----------------------------------------------------------------------
+    case 'worktree_is_tracked': {
+      const { paths, worktree: wtKey } = args as {
+        paths: string[];
+        worktree?: string;
+      };
+
+      if (!Array.isArray(paths) || paths.length === 0) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: '`paths` must be a non-empty array of strings.',
+            },
+          ],
+          isError: true,
+        };
+      }
+      if (paths.length > 100) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Too many paths: ${paths.length}. Max 100 per call.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+      for (const p of paths) {
+        if (typeof p !== 'string' || !p || /[\r\n\0]/.test(p)) {
+          return {
+            content: [
+              { type: 'text', text: `Invalid path: ${JSON.stringify(p)}` },
+            ],
+            isError: true,
+          };
+        }
+        if (p.startsWith('-')) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Invalid path: "${p}". Paths must not start with '-'.`,
+              },
+            ],
+            isError: true,
+          };
+        }
+        if (isAbsolute(p)) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Invalid path: "${p}". Paths must be relative to the worktree root (no absolute paths).`,
+              },
+            ],
+            isError: true,
+          };
+        }
+        // Normalize separators before checking for '..' so that Windows-style
+        // paths like 'foo\..\..\secrets.txt' are caught by the same test.
+        const pNorm = p.replace(/\\/g, '/');
+        if (
+          pNorm.split('/').some((seg) => seg === '..') ||
+          pNorm.startsWith('../')
+        ) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Invalid path: "${p}". Paths must not escape the worktree root (no '..' segments).`,
+              },
+            ],
+            isError: true,
+          };
+        }
+      }
+
+      const target = resolveTargetDir(wtKey);
+      if ('error' in target) {
+        return {
+          content: [{ type: 'text', text: target.error }],
+          isError: true,
+        };
+      }
+      const cwd = target.path;
+
+      // Secondary containment check: even after the '..' segment check above,
+      // verify that each resolved path stays within the worktree root.  This
+      // catches any edge cases (e.g. symlink-induced escapes or OS-specific
+      // normalisation quirks) that the segment-based check may miss.
+      for (const p of paths) {
+        const pNorm = p.replace(/\\/g, '/');
+        const resolved = resolve(cwd, pNorm);
+        if (!resolved.startsWith(cwd + sep) && resolved !== cwd) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Invalid path: "${p}". Path escapes worktree root.`,
+              },
+            ],
+            isError: true,
+          };
+        }
+      }
+
+      // Tracked check: `git ls-files -- <paths...>` returns each tracked path
+      // on a line of its own. Untracked paths produce no output. We compare
+      // by normalized forward-slash path so Windows backslashes work.
+      const normalized = (p: string) =>
+        p.replace(/\\/g, '/').replace(/^\.\//, '');
+      // Normalize to forward slashes for git compatibility; preserve original
+      // for result.path
+      const normalizedPaths = paths.map((p) => normalized(p));
+      const trackedSet = new Set<string>();
+      try {
+        const output = runGit(['ls-files', '--', ...normalizedPaths], cwd, {
+          timeout: 15_000,
+        });
+        for (const line of output.split('\n')) {
+          const trimmed = line.trim();
+          if (trimmed) trackedSet.add(normalized(trimmed));
+        }
+      } catch (err: unknown) {
+        const e = err as { stderr?: string; message?: string };
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `git ls-files failed: ${(e.stderr || e.message || String(err)).trim()}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      // Ignored check: uses `git check-ignore --stdin` (no -v flag; output is
+      // just the path when ignored). Reuses the same flow as
+      // worktree_check_ignore, but we only need the boolean.
+      const ignoredSet = new Set<string>();
+      let ignoredCheckFailed = false;
+      try {
+        await new Promise<void>((resolveFn, rejectFn) => {
+          const proc = execFile(
+            'git',
+            ['check-ignore', '--stdin'],
+            {
+              cwd,
+              timeout: 10_000,
+              encoding: 'utf-8',
+              maxBuffer: 10 * 1024 * 1024,
+            },
+            (err, stdout) => {
+              const code = (err as NodeJS.ErrnoException & { code?: number })
+                ?.code;
+              // exit 1 = nothing ignored (not an error)
+              if (err && code !== 1) {
+                const message =
+                  err instanceof Error ? err.message : 'check-ignore failed';
+                rejectFn(new Error(message));
+                return;
+              }
+              for (const line of stdout.split('\n')) {
+                const trimmed = line.trim();
+                if (trimmed) ignoredSet.add(normalized(trimmed));
+              }
+              resolveFn();
+            },
+          );
+          if (!proc.stdin) {
+            rejectFn(new Error('git check-ignore: stdin stream unavailable'));
+            return;
+          }
+          proc.stdin.write(normalizedPaths.join('\n') + '\n');
+          proc.stdin.end();
+        });
+      } catch {
+        // Non-fatal — the tool's primary contract is the tracked flag.
+        // Mark the check as failed so callers can distinguish "not ignored"
+        // from "unknown" in the result entries.
+        ignoredCheckFailed = true;
+      }
+
+      const results = paths.map((p, i) => {
+        const key = normalized(p);
+        const tracked = trackedSet.has(key);
+        // `ignored` is a boolean when git check-ignore succeeds, or null when
+        // the check could not be completed (e.g. git unavailable, process
+        // error).  Callers should treat null as "unknown" — distinct from
+        // false ("not ignored").  When ignored is null, ignoredError contains
+        // a brief description of why the check failed.
+        const ignored: boolean | null = ignoredCheckFailed
+          ? null
+          : ignoredSet.has(key);
+        const ignoredError: string | undefined = ignoredCheckFailed
+          ? 'git check-ignore did not complete successfully'
+          : undefined;
+
+        let sizeBytes: number | undefined;
+        try {
+          const pNormalized = normalizedPaths[i];
+          const absolute = isAbsolute(pNormalized)
+            ? pNormalized
+            : resolve(cwd, pNormalized);
+          if (existsSync(absolute)) {
+            const stat = lstatSync(absolute);
+            if (stat.isFile()) sizeBytes = stat.size;
+          }
+        } catch {
+          // best effort
+        }
+
+        return {
+          path: p,
+          tracked,
+          ignored,
+          ...(ignoredError !== undefined ? { ignoredError } : {}),
+          sizeBytes,
+        };
       });
 
       return {
