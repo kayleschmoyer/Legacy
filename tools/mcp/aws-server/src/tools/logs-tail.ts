@@ -32,6 +32,7 @@ interface LogsTailParams {
   since: string;
   filter?: string;
   environment: string;
+  maxLines: number;
 }
 
 /**
@@ -63,7 +64,15 @@ export async function logsTail(params: LogsTailParams): Promise<ToolResult> {
 
   try {
     const output = await runCommand('aws', args, repoRoot);
-    const text = output || '(no log events found in the given time range)';
+    const rawText = output || '(no log events found in the given time range)';
+    const MAX_LINES = params.maxLines;
+    const lines = rawText.split('\n');
+    const truncated = lines.length > MAX_LINES;
+    const logLines = truncated ? lines.slice(lines.length - MAX_LINES) : lines;
+    // When output is truncated, a `truncationNotice` field is added to the
+    // response describing how many lines are shown vs. total. The log content
+    // itself is never prefixed — callers should read `truncationNotice` to
+    // detect truncation.
     return {
       content: [
         {
@@ -72,7 +81,15 @@ export async function logsTail(params: LogsTailParams): Promise<ToolResult> {
             logGroup,
             since: params.since,
             filter: params.filter ?? null,
-            logs: text,
+            truncated,
+            ...(truncated
+              ? {
+                  totalLines: lines.length,
+                  shownLines: logLines.length,
+                  truncationNotice: `Showing last ${logLines.length} of ${lines.length} lines`,
+                }
+              : {}),
+            logs: logLines.join('\n'),
           }),
         },
       ],

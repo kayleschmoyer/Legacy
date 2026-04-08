@@ -56,6 +56,15 @@ server.tool(
       .enum(['dev', 'prod'])
       .default('dev')
       .describe('AWS environment (default: dev)'),
+    maxLines: z.coerce
+      .number()
+      .int()
+      .positive()
+      .max(1000)
+      .default(500)
+      .describe(
+        'Cap output to the last N lines (default: 500, maximum: 1000). Use a smaller value for high-volume log groups to avoid token overflow.',
+      ),
   },
   async (params) => logsTail(params),
 );
