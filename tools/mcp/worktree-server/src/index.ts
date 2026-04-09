@@ -1204,6 +1204,34 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
       },
     },
     {
+      name: 'worktree_rm',
+      description:
+        'Delete a file or directory from a worktree. ' +
+        'Refuses to delete paths outside the worktree root, .git/, or node_modules/. ' +
+        'Use for removing accidentally created files, duplicates, or generated outputs before regeneration.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          path: {
+            type: 'string',
+            description:
+              'Path relative to the worktree root (e.g. "scratch/debug.ts", "apps/web/old-component.tsx").',
+          },
+          recursive: {
+            type: 'boolean',
+            description:
+              'Allow deleting non-empty directories. Default: false.',
+          },
+          worktree: {
+            type: 'string',
+            description:
+              'Ticket key, absolute path, or omit for active worktree.',
+          },
+        },
+        required: ['path'],
+      },
+    },
+    {
       name: 'worktree_run_all',
       description:
         'Run a make target across all active worktrees and report pass/fail per worktree. ' +
@@ -5331,6 +5359,163 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             {
               type: 'text',
               text: `Unstage failed (exit code ${e.status ?? 'unknown'}):\n${output}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_rm
+    // -----------------------------------------------------------------------
+    case 'worktree_rm': {
+      const rawArgs = args as Record<string, unknown>;
+      const relPath = rawArgs.path;
+      if (typeof relPath !== 'string' || relPath.length === 0) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'worktree_rm requires a non-empty string "path"',
+            },
+          ],
+          isError: true,
+        };
+      }
+      if (relPath.includes('\0') || relPath.includes('\n')) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'worktree_rm: path must not contain null bytes or newline characters',
+            },
+          ],
+          isError: true,
+        };
+      }
+      const recursive = rawArgs.recursive === true;
+      const wtKey =
+        typeof rawArgs.worktree === 'string' ? rawArgs.worktree : undefined;
+
+      const target = resolveTargetDir(wtKey);
+      if ('error' in target) {
+        return {
+          content: [{ type: 'text', text: target.error }],
+          isError: true,
+        };
+      }
+      const cwd = target.path;
+
+      // Normalize: convert backslashes, collapse segments, strip trailing slash
+      const segments = relPath
+        .replace(/\\/g, '/')
+        .split('/')
+        .filter((s) => s.length > 0 && s !== '.');
+      const normalized = segments.join('/');
+
+      // Reject empty path, absolute path, traversal, or protected directories
+      if (
+        normalized === '' ||
+        isAbsolute(relPath) ||
+        relPath.trimStart().startsWith('/') ||
+        segments.includes('..') ||
+        segments.some((s) => s.toLowerCase() === '.git') ||
+        segments.some((s) => s.toLowerCase() === 'node_modules')
+      ) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Refused: path "${relPath}" is outside the worktree root or targets a protected directory (.git, node_modules).`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      const absPath = join(cwd, normalized);
+
+      // Confirm the resolved path is still inside the worktree (symlink-safe)
+      let realCwd: string;
+      try {
+        realCwd = realpathSync(cwd);
+      } catch {
+        realCwd = cwd;
+      }
+      let realAbsPath: string;
+      try {
+        const lstStat = lstatSync(absPath);
+        // For symlinks, check the symlink entry itself (not its target) — we only remove the link,
+        // not follow it into external directories.
+        realAbsPath = lstStat.isSymbolicLink()
+          ? absPath
+          : realpathSync(absPath);
+      } catch {
+        // Path doesn't exist yet — fall through to ENOENT handling below
+        realAbsPath = absPath;
+      }
+      const relativeToWorktree = relative(realCwd, realAbsPath);
+      if (
+        realAbsPath !== realCwd &&
+        (relativeToWorktree === '..' ||
+          relativeToWorktree.startsWith(`..${sep}`) ||
+          isAbsolute(relativeToWorktree))
+      ) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Refused: resolved path "${realAbsPath}" escapes worktree root "${realCwd}".`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      try {
+        const stat = lstatSync(absPath);
+        if (stat.isDirectory()) {
+          rmSync(absPath, { recursive: recursive === true, force: false });
+        } else {
+          unlinkSync(absPath);
+        }
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                { success: true, path: normalized, deleted: true },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      } catch (err: unknown) {
+        const e = err as { code?: string; message?: string };
+        if (e.code === 'ENOENT') {
+          return {
+            content: [{ type: 'text', text: `Path not found: "${relPath}"` }],
+            isError: true,
+          };
+        }
+        if (e.code === 'ENOTEMPTY') {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Directory "${relPath}" is not empty. Pass recursive: true to delete it and its contents.`,
+              },
+            ],
+            isError: true,
+          };
+        }
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Failed to delete "${relPath}": ${e.message ?? String(err)}`,
             },
           ],
           isError: true,
