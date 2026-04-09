@@ -16,6 +16,7 @@
     "./leagues": "./src/entry/leagues.ts",
     "./matchup": "./src/entry/matchup.ts",
     "./navigation": "./src/entry/navigation.ts",
+    "./notifications": "./src/entry/notifications.ts",
     "./players": "./src/entry/players.ts",
     "./roster": "./src/entry/roster.ts",
     "./season-draft": "./src/entry/season-draft.ts",
