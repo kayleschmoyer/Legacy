@@ -30,6 +30,7 @@ permissions:
   contents: write # Required for creating releases
   pages: write
   id-token: write
+  actions: read # Required for nrwl/nx-set-shas base SHA resolution
 
 env:
   NX_DAEMON: false
