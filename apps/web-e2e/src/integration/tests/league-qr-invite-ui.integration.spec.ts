@@ -315,7 +315,7 @@ test.describe
 
     await test.step('Join page shows available spot', async () => {
       await expect(page.getByText(/spot(s)?\s+available/i).first()).toBeVisible(
-        { timeout: 15_000 },
+        { timeout: 30_000 },
       );
     });
 

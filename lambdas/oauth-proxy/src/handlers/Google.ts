@@ -18,6 +18,7 @@ import { createJwt, JWT_COOKIE_NAME } from '../util/jwt';
 import { decryptCookies, encryptCookies } from '../util/cookie';
 import { buildAuthCookies, generateCsrfToken } from '../util/jwt-cookie';
 import { parseEventBody } from '../util/lambda';
+import { z } from 'zod';
 import { withDbClient } from '../util/db';
 import { getAuthSuccessHtml, htmlEscape } from '../util/html';
 
@@ -262,7 +263,37 @@ export const handleSecureGoogleAuth = async (
   );
 
   try {
-    const body = parseEventBody<GoogleAuthRequest>(event);
+    if (!event.body) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({
+          error: 'Bad Request',
+          message: 'Request body is required',
+        }),
+      };
+    }
+
+    const googleAuthRequestSchema = z.object({
+      code: z.string().optional(),
+      credential: z.string().optional(),
+      redirect_uri: z.string().optional(),
+    });
+
+    let body: GoogleAuthRequest;
+    try {
+      body = parseEventBody(event, googleAuthRequestSchema);
+    } catch (err) {
+      LOGGER.warn('handleSecureGoogleAuth: failed to parse request body', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return {
+        statusCode: 400,
+        body: JSON.stringify({
+          error: 'Bad Request',
+          message: 'Invalid request body',
+        }),
+      };
+    }
 
     LOGGER.debug('Request body parsed successfully', {
       hasCode: !!body.code,

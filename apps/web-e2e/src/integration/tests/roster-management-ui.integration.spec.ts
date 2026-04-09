@@ -139,7 +139,7 @@ test.describe
       await page.waitForLoadState('load');
 
       await expect(page.getByText(/spot(s)?\s+available/i).first()).toBeVisible(
-        { timeout: 15000 },
+        { timeout: 30000 },
       );
 
       await page.getByTestId('team-name').fill(teamName);

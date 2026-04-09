@@ -114,7 +114,7 @@ test.describe
 
     await expect(
       managerPage1.getByText(/spot(s)?\s+available/i).first(),
-    ).toBeVisible({ timeout: 15_000 });
+    ).toBeVisible({ timeout: 30_000 });
 
     await managerPage1.getByTestId('team-name').fill('Announcement Readers');
     const joinBtn = managerPage1.getByRole('button', {

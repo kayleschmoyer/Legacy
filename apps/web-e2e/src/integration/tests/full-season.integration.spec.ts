@@ -102,6 +102,7 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
           input: {
             leagueName: 'Integration Season Test League',
             numberOfTeams: 3,
+            maxRosterSize: 4,
             playerPool: 'all',
           },
         },

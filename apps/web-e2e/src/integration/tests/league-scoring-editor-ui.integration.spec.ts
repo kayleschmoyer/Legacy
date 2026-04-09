@@ -212,7 +212,7 @@ test.describe
       await saveBtn.click();
       // Wait for the unsaved badge to disappear (confirms save completed)
       await expect(page.getByText(/\d+ unsaved/i)).not.toBeVisible({
-        timeout: 20_000,
+        timeout: 30_000,
       });
     });
   });

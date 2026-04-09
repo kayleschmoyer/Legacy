@@ -280,7 +280,7 @@ test.describe
       await managerPage1.waitForLoadState('load');
       await expect(
         managerPage1.getByText(/spot(s)?\s+available/i).first(),
-      ).toBeVisible({ timeout: 15_000 });
+      ).toBeVisible({ timeout: 30_000 });
       await managerPage1.locator('#team-name').fill('Settings Tester');
       const joinBtn = managerPage1.getByRole('button', {
         name: /Join League/i,

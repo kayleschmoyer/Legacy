@@ -44,7 +44,17 @@ export async function createLeagueViaUI(
     // we can detect network failures vs. slow redirects.
     const responsePromise = page
       .waitForResponse(
-        (r) => r.url().includes('graphql') && r.request().method() === 'POST',
+        (r) => {
+          if (!r.url().includes('graphql') || r.request().method() !== 'POST') {
+            return false;
+          }
+          try {
+            const postData = r.request().postData();
+            return postData?.includes('createLeagueAndTeams') ?? false;
+          } catch {
+            return false;
+          }
+        },
         { timeout: 45_000 },
       )
       .catch(() => null);
@@ -79,10 +89,12 @@ export async function createLeagueViaUI(
     // league limit).  Fail immediately with a descriptive message instead of
     // waiting 45 s for a redirect that will never come.
     if (response) {
-      let body: { errors?: Array<{ message: string }> } | null = null;
+      let body: {
+        errors?: Array<{ message: string; extensions?: { code?: string } }>;
+      } | null = null;
       try {
         body = (await response.json()) as {
-          errors?: Array<{ message: string }>;
+          errors?: Array<{ message: string; extensions?: { code?: string } }>;
         };
       } catch (err) {
         if (!(err instanceof SyntaxError)) {
@@ -90,10 +102,25 @@ export async function createLeagueViaUI(
         }
       }
       if (body?.errors?.length) {
-        const messages = body.errors.map((e) => e.message).join('; ');
-        throw new Error(
-          `League creation failed with GraphQL error: ${messages}`,
+        // Auth errors (UNAUTHENTICATED) are transient — Apollo's error link will
+        // silently refresh the JWT and retry the mutation.  Only suppress when
+        // ALL errors are auth-related; if any non-auth error is present, throw
+        // immediately with a descriptive message rather than waiting 45 s.
+        const allAuthErrors = body.errors.every(
+          (e) =>
+            e.extensions?.code === 'UNAUTHENTICATED' ||
+            /authentication required|unauthenticated|unauthorized/i.test(
+              e.message,
+            ),
         );
+        if (!allAuthErrors) {
+          const messages = body.errors.map((e) => e.message).join('; ');
+          throw new Error(
+            `League creation failed with GraphQL error: ${messages}`,
+          );
+        }
+        // All errors are auth-related — fall through to the URL redirect wait
+        // (45 s) so Apollo can retry after refreshing the JWT.
       }
     }
 

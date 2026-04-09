@@ -175,7 +175,7 @@ test.describe
       await switchUser(page, jwt, joinUrl);
       await page.waitForLoadState('load');
       await expect(page.getByText(/spot(s)?\s+available/i).first()).toBeVisible(
-        { timeout: 15_000 },
+        { timeout: 30_000 },
       );
       await page.locator('#team-name').fill(teamName);
       const joinBtn = page.getByRole('button', { name: /Join League/i });

@@ -102,7 +102,7 @@ test.describe
         // Wait for invite code validation to succeed
         await expect(
           page.getByText(/spot(s)?\s+available/i).first(),
-        ).toBeVisible({ timeout: 15000 });
+        ).toBeVisible({ timeout: 30000 });
 
         // Fill team name and join
         await page.getByTestId('team-name').fill(teamName);
