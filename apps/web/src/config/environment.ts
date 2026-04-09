@@ -48,7 +48,19 @@ export const getEnvironmentConfig = (): EnvironmentConfig => ({
   graphqlUrl:
     (import.meta.env.VITE_GRAPHQL_HOST as string) ||
     'http://localhost:5000/graphql',
-  websocketUrl: (import.meta.env.VITE_WEBSOCKET_URL as string) || '',
+  // In E2E tests, VITE_WEBSOCKET_URL is "" (not set at build time), which
+  // causes esbuild to constant-fold `env.websocketUrl` to "" and dead-code-
+  // eliminate the WebSocket connection guard in LeagueDetailPage.  The
+  // window.__e2eWsUrl global (set via page.addInitScript before any scripts
+  // run) is a runtime-only override that prevents constant folding.
+  // Gated on navigator.webdriver so it only activates under automated
+  // browsers (Playwright/Selenium) and is inert in normal production loads.
+  websocketUrl:
+    typeof window !== 'undefined' &&
+    navigator.webdriver === true &&
+    typeof window.__e2eWsUrl === 'string'
+      ? window.__e2eWsUrl
+      : (import.meta.env.VITE_WEBSOCKET_URL as string) || '',
   isDev: import.meta.env.DEV === true,
   authTestMode: import.meta.env.VITE_AUTH_TEST_MODE === 'true',
   baseUrl: import.meta.env.BASE_URL || '/',

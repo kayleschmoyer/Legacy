@@ -90,7 +90,6 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 
 LOGGER.info('Starting app with unified authentication flow...');
-LOGGER.info('Environment config:', env);
 
 try {
   root.render(

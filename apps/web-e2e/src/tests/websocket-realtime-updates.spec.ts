@@ -111,38 +111,25 @@ const MOCK_ACTIVITY_WITH_ITEMS = [
 
 /**
  * In CI the web build has VITE_WEBSOCKET_URL="" (no env var at build time).
- * The app's environment config therefore evaluates to `websocketUrl: ""`,
- * and LeagueDetailPage's guard `if (!wsUrl || …) return` prevents any
- * WebSocket connection.
+ * esbuild constant-folds the empty string through to LeagueDetailPage's guard
+ * (`if (!wsUrl || …) return`), dead-code-eliminating the WebSocket setup.
  *
- * We fix this by intercepting the main JS bundle response and replacing the
- * empty websocketUrl literal with a fake test URL.  Playwright's
- * `routeWebSocket(/wss?:\/\//)` will intercept the connection attempt before
- * it reaches the network, so the actual URL is irrelevant.
+ * We work around this by setting `window.__e2eWsUrl` via addInitScript —
+ * which runs before any page scripts — so the environment module reads the
+ * injected URL at module initialisation time instead of the baked-in "".
+ * `environment.ts` checks `window.__e2eWsUrl` first (see the comment there).
+ * Playwright's `routeWebSocket(/wss?:\/\//)` then intercepts the connection
+ * attempt before it reaches the network, so the actual URL is irrelevant.
  */
 const E2E_WS_URL = 'wss://e2e-test.local/ws';
 
 async function injectWebSocketUrl(page: import('@playwright/test').Page) {
-  // Only intercept the main entry bundle (Vite names it index-{hash}.js).
-  // Avoid intercepting all JS files to minimize overhead.
-  await page.route(/\/assets\/index-[^/]+\.js$/, async (route) => {
-    const response = await route.fetch();
-    const body = await response.text();
-    // The Vite build inlines websocketUrl:"<value>" where <value> may be
-    // empty (CI) or a real URL (local dev).  Replace the first occurrence
-    // with our deterministic test URL so the WebSocket fixture can intercept.
-    const replaced = body.replace(
-      /websocketUrl\s*:\s*"[^"]*"/,
-      `websocketUrl:"${E2E_WS_URL}"`,
-    );
-    if (replaced === body) {
-      throw new Error(
-        'injectWebSocketUrl: Failed to inject test WebSocket URL — ' +
-          'pattern `websocketUrl: "..."` not found in bundle. Build output may have changed.',
-      );
-    }
-    await route.fulfill({ response, body: replaced });
-  });
+  // Set the override global before ANY page scripts run.  environment.ts reads
+  // window.__e2eWsUrl at module-evaluation time, so this must happen first.
+  // The type is declared in apps/web/src/types/e2e-globals.d.ts.
+  await page.addInitScript((wsUrl: string) => {
+    window.__e2eWsUrl = wsUrl;
+  }, E2E_WS_URL);
 }
 
 // ── Wire-format helpers ─────────────────────────────────────────────────────
