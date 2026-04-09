@@ -19,6 +19,7 @@ interface ReviewThread {
   id: string;
   isResolved: boolean;
   isOutdated: boolean;
+  createdAt: string;
   comments: { pageInfo: { hasNextPage: boolean }; nodes: ThreadComment[] };
 }
 
@@ -43,6 +44,7 @@ query($owner: String!, $repo: String!, $number: Int!) {
           id
           isResolved
           isOutdated
+          createdAt
           comments(first: 50) {
             pageInfo { hasNextPage }
             nodes {
@@ -91,6 +93,7 @@ export async function getReviewThreads(
         id: t.id,
         isResolved: t.isResolved,
         isOutdated: t.isOutdated,
+        createdAt: t.createdAt, // thread-level createdAt (PullRequestReviewThread.createdAt), not first comment timestamp
         commentCount: t.comments.nodes.length,
         comments: t.comments.nodes.map((c) => ({
           author: c.author?.login ?? 'unknown',
