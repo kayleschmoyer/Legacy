@@ -51,6 +51,17 @@
     "worktree"
   ],
   "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/cleanup-worktree-junction.sh"
+          }
+        ]
+      }
+    ],
     "SessionStart": [
       {
         "matcher": "",
