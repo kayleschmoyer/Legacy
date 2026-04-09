@@ -91,27 +91,48 @@ runs:
 
         BUILD_TYPE="${{ inputs.build-type }}"
 
-        # Cap Gradle daemon JVM heap via user-home gradle.properties.
-        # GRADLE_OPTS only affects the thin Gradle launcher JVM, not the daemon.
-        # In Gradle 8, --no-daemon still spawns a single-use daemon whose heap is
-        # set by org.gradle.jvmargs. The project gradle.properties has -Xmx4096m
-        # for local dev; user-home properties take precedence so this overrides it
-        # on CI without affecting developer machines.
-        # GRADLE_USER_HOME is set to $RUNNER_TEMP/gradle (env above) so this
-        # file is isolated per run and never persists across jobs.
+        # --- Memory hardening ---
+        # 1. Override org.gradle.jvmargs in the project gradle.properties directly.
+        #    Expo prebuild regenerates android/ each run so this never persists to repo.
+        #    Belt-and-suspenders: also write GRADLE_USER_HOME/gradle.properties (set
+        #    to $RUNNER_TEMP/gradle by the step env above).
+        if grep -q '^org\.gradle\.jvmargs=' gradle.properties; then
+          sed -i 's|^org\.gradle\.jvmargs=.*|org.gradle.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=512m|' gradle.properties
+        else
+          printf '\norg.gradle.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=512m\n' >> gradle.properties
+        fi
+        EFFECTIVE_JVMARGS="$(grep -m1 '^org\.gradle\.jvmargs=' gradle.properties || true)"
+        if [ -z "$EFFECTIVE_JVMARGS" ]; then
+          echo "❌ Failed to configure org.gradle.jvmargs in gradle.properties"
+          exit 1
+        fi
+        echo "ℹ️  Effective jvmargs: $EFFECTIVE_JVMARGS"
         mkdir -p "$GRADLE_USER_HOME"
         printf 'org.gradle.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=512m\n' > "$GRADLE_USER_HOME/gradle.properties"
 
-        # Memory budget on 8GB runner after this fix:
-        #   Gradle daemon JVM:  2GB (org.gradle.jvmargs above)
+        # 2. Limit parallel C++ jobs per CMake invocation.
+        #    Ninja defaults to nCPU parallel clang++ processes.
+        export CMAKE_BUILD_PARALLEL_LEVEL=2
+
+        # 3. Log memory every 30s so we can see what's consuming RAM if it OOMs.
+        (while true; do
+          free -m | awk '/^Mem:/{printf "[mem] used=%sMB free=%sMB\n", $3, $4}'
+          sleep 30
+        done) &
+        MEM_MONITOR_PID=$!
+        trap "kill $MEM_MONITOR_PID 2>/dev/null || true" EXIT
+
+        # Memory budget on 8GB runner:
+        #   Gradle daemon JVM:  2GB (jvmargs above)
         #   Node/Metro:         2GB (NODE_OPTIONS in workflow)
-        #   Native clang++:    ~1-2GB (arm64-v8a + x86_64 in parallel)
+        #   Native clang++:    ~2 clang++ × 400MB ≈ 800MB (sequential --no-parallel)
         #   OS + other:        ~500MB
-        #   Total:             ~5.5-6.5GB ✅
+        #   Total:             ~5.3GB ✅
 
         # Shared Gradle flags — single source of truth for all Android builds
-        # max-workers=2: more workers + large daemon + Node Metro exceeded 8GB RAM (OOM kill)
-        GRADLE_FLAGS="--no-daemon --stacktrace --parallel --max-workers=2 --build-cache"
+        # --no-parallel: prevents same-project ABI tasks running concurrently,
+        #   which was causing ~4 simultaneous clang++ compilations even with --max-workers=2.
+        GRADLE_FLAGS="--no-daemon --stacktrace --no-parallel --max-workers=1 --build-cache"
 
         # ABI filtering — Reanimated v4 C++ worklet compilation is expensive
         # Debug:   arm64-v8a only (single ABI, fast iteration)
