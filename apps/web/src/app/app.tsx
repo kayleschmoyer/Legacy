@@ -5,7 +5,8 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Link, Route, Routes, useLocation } from 'react-router-dom';
+import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { useAuth } from '@legacy-sports/shared-components/auth';
 import {
   Button,
   Paragraph,
@@ -96,6 +97,15 @@ const EliteDraftBoardScreen = React.lazy(() =>
     default: m.EliteDraftBoardScreen,
   })),
 );
+/** Route-level guard for admin pages — redirects non-admins to home.
+ *  Defense-in-depth alongside the in-page accessLevel check in AdminPage. */
+function AdminGuard({ children }: { children: React.ReactNode }) {
+  const { user, isLoading } = useAuth();
+  if (isLoading) return null;
+  if (user?.accessLevel !== 'admin') return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
 const AdminPage = React.lazy(() =>
   import('../pages/admin/AdminPage').then((m) => ({
     default: m.AdminPage,
@@ -634,8 +644,22 @@ function App() {
             <Route path="/about" element={<AboutPage />} />
             <Route path="/help" element={<HelpPage />} />
             <Route path="/pricing" element={<PricingPage />} />
-            <Route path="/admin" element={<AdminPage />} />
-            <Route path="/admin/revenue" element={<AdminRevenuePage />} />
+            <Route
+              path="/admin"
+              element={
+                <AdminGuard>
+                  <AdminPage />
+                </AdminGuard>
+              }
+            />
+            <Route
+              path="/admin/revenue"
+              element={
+                <AdminGuard>
+                  <AdminRevenuePage />
+                </AdminGuard>
+              }
+            />
             <Route path="/profile/settings" element={<ProfileSettingsPage />} />
             <Route
               path="/auth/discord/callback"

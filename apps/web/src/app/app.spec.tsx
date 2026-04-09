@@ -130,7 +130,7 @@ jest.mock('@legacy-sports/shared-components/players', () => ({
 }));
 
 jest.mock('@legacy-sports/shared-components/auth', () => ({
-  useAuth: () => ({
+  useAuth: jest.fn(() => ({
     isAuthenticated: true,
     isLoading: false,
     isImpersonating: false,
@@ -140,7 +140,7 @@ jest.mock('@legacy-sports/shared-components/auth', () => ({
       email: 'test@example.com',
     },
     logout: jest.fn(),
-  }),
+  })),
 }));
 
 // Mock analytics identify hook (requires ApolloProvider not present in tests)
@@ -374,6 +374,95 @@ describe('App', () => {
       // Find the navigation element
       const navigation = container.querySelector('nav');
       expect(navigation).toMatchSnapshot();
+    });
+  });
+
+  describe('AdminGuard', () => {
+    let useAuthMock: jest.Mock;
+
+    beforeEach(() => {
+      useAuthMock = (
+        jest.requireMock(
+          '@legacy-sports/shared-components/auth',
+        ) as unknown as {
+          useAuth: jest.Mock;
+        }
+      ).useAuth;
+    });
+
+    afterEach(() => {
+      // Restore default non-admin mock so other test suites are unaffected
+      useAuthMock.mockReturnValue({
+        isAuthenticated: true,
+        isLoading: false,
+        isImpersonating: false,
+        user: {
+          id: 'test-user-id',
+          username: 'testuser',
+          email: 'test@example.com',
+        },
+        logout: jest.fn(),
+      });
+    });
+
+    it('redirects non-admin user from /admin to /', () => {
+      // Default mock has no accessLevel — AdminGuard redirects to /
+      const { container } = render(
+        <MemoryRouter
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+          initialEntries={['/admin']}
+        >
+          <App />
+        </MemoryRouter>,
+      );
+      expect(container).toHaveTextContent('Home Page');
+    });
+
+    it('allows admin user to access /admin without redirecting to home', () => {
+      useAuthMock.mockReturnValue({
+        isAuthenticated: true,
+        isLoading: false,
+        isImpersonating: false,
+        user: {
+          id: 'admin-user-id',
+          username: 'adminuser',
+          email: 'admin@example.com',
+          accessLevel: 'admin',
+        },
+        logout: jest.fn(),
+      });
+
+      const { container } = render(
+        <MemoryRouter
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+          initialEntries={['/admin']}
+        >
+          <App />
+        </MemoryRouter>,
+      );
+      // Guard passes — not redirected to home
+      expect(container).not.toHaveTextContent('Home Page');
+    });
+
+    it('renders nothing while auth is loading — does not redirect', () => {
+      useAuthMock.mockReturnValue({
+        isAuthenticated: false,
+        isLoading: true,
+        isImpersonating: false,
+        user: undefined,
+        logout: jest.fn(),
+      });
+
+      const { container } = render(
+        <MemoryRouter
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+          initialEntries={['/admin']}
+        >
+          <App />
+        </MemoryRouter>,
+      );
+      // isLoading → AdminGuard returns null (no Navigate) — not redirected to home
+      expect(container).not.toHaveTextContent('Home Page');
     });
   });
 
