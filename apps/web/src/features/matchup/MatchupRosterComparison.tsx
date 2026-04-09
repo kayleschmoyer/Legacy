@@ -561,13 +561,6 @@ export function MatchupRosterComparison({
   const leagueId = matchup.leagueId ?? 0;
   const gamesPerMatchup = matchup.gamesPerMatchup ?? 3;
 
-  // Debug logging
-  LOGGER.info('[MatchupRosterComparison] Debug Info:', {
-    matchupId: matchup.id,
-    leagueId,
-    gamesPerMatchup,
-  });
-
   // Fetch league scoring settings for accurate projections
   const { settings: scoringSettings, loading: scoringLoading } =
     useLeagueScoringSettings(leagueId);
@@ -615,15 +608,8 @@ export function MatchupRosterComparison({
     const map = new Map<number, SeasonStats>();
 
     if (!data?.getMatchupPlayers) {
-      LOGGER.info('[MatchupRosterComparison] No matchup players data yet');
       return map;
     }
-
-    LOGGER.info(
-      '[MatchupRosterComparison] Building seasonStatsMap from',
-      data.getMatchupPlayers.length,
-      'players',
-    );
 
     data.getMatchupPlayers.forEach((matchupPlayer: MatchupPlayerFragment) => {
       const playerId = matchupPlayer.playerId;
@@ -695,19 +681,6 @@ export function MatchupRosterComparison({
           : undefined,
       });
     });
-
-    LOGGER.info(
-      '[MatchupRosterComparison] seasonStatsMap built with',
-      map.size,
-      'players',
-    );
-    if (map.size > 0) {
-      const firstEntries = Array.from(map.entries()).slice(0, 2);
-      LOGGER.info(
-        '[MatchupRosterComparison] Sample SeasonStats:',
-        firstEntries,
-      );
-    }
 
     return map;
   }, [data]);
@@ -805,14 +778,6 @@ export function MatchupRosterComparison({
 
       const seasonStats = seasonStatsMap.get(playerId);
 
-      LOGGER.info('[calculatePlayerProjection] Player', playerId, ':', {
-        hasSeasonStats: !!seasonStats,
-        hasScoringSettings: !!scoringSettings,
-        gamesPlayed,
-        gamesRemaining,
-        actualScore,
-      });
-
       if (seasonStats && scoringSettings) {
         // Use real projection function with season stats
         try {
@@ -822,12 +787,6 @@ export function MatchupRosterComparison({
           );
           const projectedRemainingScore =
             projection.totalPerGame * gamesRemaining;
-          LOGGER.info('[calculatePlayerProjection] Projection calculated:', {
-            playerId,
-            totalPerGame: projection.totalPerGame,
-            projectedRemainingScore,
-            finalTotal: actualScore + projectedRemainingScore,
-          });
           return actualScore + projectedRemainingScore;
         } catch (error) {
           LOGGER.warn(
