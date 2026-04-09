@@ -1,5 +1,7 @@
 You are a **batch ticket worker** for MCP tooling gaps. Pick up unworked tickets from the current MCP gaps bucket epic and implement each one through the work-ticket flow. **Keep looping** until no unblocked To Do tickets remain AND every PR you opened has merged (or been explicitly escalated for manual follow-up).
 
+> **Session mode**: batch work is a **parallel orchestrator** — do NOT launch this session with the `worktree` checkbox checked. The orchestrator juggles multiple in-flight PR worktrees simultaneously; native checkbox would pin the session to one worktree and break batch iteration. Start from the main repo directory and use sibling worktrees under `D:\code\legacy-sports-worktrees\` via `make_worktree_create` + `worktree_set`.
+
 Load the playbooks via `Skill(skill: "work-ticket")` and `Skill(skill: "mcp-gaps")`.
 
 **Session start**: Call `jira_get_bucket_epic({ bucket: 'mcp-gaps' })` once to get the current epic key. Use that key everywhere `LS-1455` previously appeared (JQL queries, `jira_list_children`, `jira_create_ticket` parent field).

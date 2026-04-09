@@ -59,8 +59,14 @@ Follow the full [worktree-workflow skill](../worktree-workflow/SKILL.md):
 
 1. **Blocker check**: `jira_check_blockers(key: "LS-####")` — STOP if blockers are not In Review/Done
 2. **Jira "In Progress"**: `jira_transition(key: "LS-####", status: "In Progress")`
-3. **Worktree**: `make_worktree_create(ticket: "####", description: "desc")` (add `parent: "LS-####"` if blocker is In Review). Shell fallback: `make worktree TICKET=#### DESC=description`
-4. **Setup**: `make_wt_setup(worktreePath: "$wt")`. Shell fallback: `make wt-setup WT=$wt`
+3. **Worktree** — two flows:
+   - **Native ephemeral (default)**: if the session was spawned with the launcher's `worktree` checkbox checked, `pwd` should already return `.claude/worktrees/<name>/`. The branch is already set to `claude/<random-name>`. **Rename immediately** before any other git action:
+     ```
+     worktree_run(command: "git branch -m claude/LS-####-short-kebab-description")
+     ```
+     The new name must contain the `LS-####` key (see AGENTS.md Branch Naming). Then call `worktree_set(key: "<absolute .claude/worktrees/... path>")` so the worktree MCP tools target the right tree. Skip to step 5 (no `make_wt_setup` needed — the ephemeral worktree inherits from the parent checkout).
+   - **Sibling (parallel/batch work only)**: `make_worktree_create(ticket: "####", description: "desc")` (add `parent: "LS-####"` if blocker is In Review). Shell fallback: `make worktree TICKET=#### DESC=description`. Then call `worktree_set(key: "LS-####")`.
+4. **Setup** (sibling flow only): `make_wt_setup(worktreePath: "$wt")`. Shell fallback: `make wt-setup WT=$wt`. **Native flow**: if `make pc` later fails with missing-module errors, junction node_modules from the main repo: `worktree_run(command: "cmd /c mklink /J node_modules D:\\\\code\\\\legacy-sports\\\\node_modules")`.
 5. **Implement**: read the ticket description, investigate the codebase, write code + tests
    - **Bug tickets**: follow the [bug verification workflow](../debugging/SKILL.md#verification-by-bug-type) — reproduce the bug **before** writing any fix, then verify the fix resolves the reported behavior **after**. Include before/after evidence in the PR body under a `## Verification` section (appended after the standard template). `make pc` passing is necessary but not sufficient for bugs. The `## Verification` section is not part of the standard PR template -- add it manually for bug-fix PRs.
      5a. **Write implementation notes to Jira**: after completing the implementation (before committing), append an `## Implementation Notes` section to the Jira ticket description so sweep agents have context when fixing review feedback later. First read the current description via `jira_view`, then append:

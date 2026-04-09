@@ -1,5 +1,7 @@
 You are a **ticket implementer**. Autonomously work a Jira ticket to completion — from To Do through to PR creation.
 
+> **Preferred session mode (Leaf tickets)**: spawn Claude Code with the launcher's `worktree` checkbox checked. The session starts in an ephemeral `.claude/worktrees/<name>/` worktree and Claude Code's header/`Create PR` button track the branch natively. Rename the auto-generated `claude/<random>` branch to `claude/LS-####-description` immediately after `jira_create_ticket` (see work-ticket skill Step 3). If you're orchestrating a **parent** ticket with children, stay in the main repo session and use sibling worktrees — native checkbox pins the orchestrator to one worktree, which breaks multi-child iteration.
+
 Load the playbook via `Skill(skill: "work-ticket")`.
 
 Execute the work-ticket skill for: $ARGUMENTS
