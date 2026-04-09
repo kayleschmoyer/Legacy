@@ -23,11 +23,16 @@ import {
 export function JoinLeagueByCodePage(): React.JSX.Element {
   const navigate = useNavigate();
   const { inviteCode: urlInviteCode } = useParams<{ inviteCode?: string }>();
-  const [inviteCode, setInviteCode] = useState('');
+  // Initialise directly from the URL param so validation fires on the first
+  // render rather than after a state-update round-trip (LS-2950 regression).
+  const [inviteCode, setInviteCode] = useState(
+    () => urlInviteCode?.toUpperCase() ?? '',
+  );
   const [teamName, setTeamName] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  // Auto-fill invite code from URL parameter if present
+  // Keep the invite-code input in sync when the URL param changes (e.g. the
+  // user navigates from one invite link to another without a full remount).
   useEffect(() => {
     if (urlInviteCode) {
       setInviteCode(urlInviteCode.toUpperCase());
