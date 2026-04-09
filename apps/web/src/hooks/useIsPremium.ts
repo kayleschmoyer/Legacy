@@ -4,9 +4,9 @@ import { useGetUserByIdQuery } from '../api/db/graphql.generated';
 /**
  * Returns whether the current user has premium access.
  *
- * Returns `true` while auth or the user query is loading to prevent the gate
- * overlay from flashing. Checks `subscriptionTier === 'premium'` from the
- * database; admins are always treated as premium regardless of tier.
+ * Returns `false` while auth or the user query is loading to prevent granting
+ * access before status is confirmed. Checks `subscriptionTier === 'premium'`
+ * from the database; admins are always treated as premium regardless of tier.
  */
 export function useIsPremium(): boolean {
   const { isPremium } = useIsPremiumStatus();
@@ -31,7 +31,7 @@ export function useIsPremiumStatus(): {
 
   const isLoading = authLoading || userLoading;
 
-  if (isLoading) return { isPremium: true, isLoading };
+  if (isLoading) return { isPremium: false, isLoading };
   if (user?.accessLevel === 'admin') return { isPremium: true, isLoading };
   return {
     isPremium: data?.user?.subscriptionTier === 'premium',
