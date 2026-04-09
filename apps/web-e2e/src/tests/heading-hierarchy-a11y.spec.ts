@@ -1,0 +1,193 @@
+/**
+ * Heading Hierarchy Accessibility E2E Suite (LS-2226)
+ *
+ * Covers:
+ *  - Each major page has exactly one h1 element
+ *  - Heading levels descend properly (h1 → h2 → h3, no skipped levels)
+ *  - H1 text is meaningful (not empty)
+ *  - H1 is the first heading on the page
+ *
+ * Pages tested:
+ *  - /about (static, no auth required)
+ *  - /help (static)
+ *  - /baseball/league/1/overview (data-driven, auth required)
+ *  - / (home page)
+ */
+
+import { expect, test } from '../fixtures/auth-enhanced';
+
+// ---------------------------------------------------------------------------
+// Helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Get all heading elements from a page and validate hierarchy.
+ * Returns {h1Count, headings, issues}
+ */
+async function getHeadingHierarchy(page: import('@playwright/test').Page) {
+  return await page.evaluate(() => {
+    const headingSelectors = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
+    const headings = Array.from(
+      document.querySelectorAll(headingSelectors.join(', ')),
+    ).map((el) => ({
+      level: parseInt(el.tagName.charAt(1), 10),
+      text: el.textContent?.trim().substring(0, 100) ?? '',
+    }));
+
+    const issues: string[] = [];
+    let prevLevel = 0;
+
+    for (const heading of headings) {
+      if (prevLevel > 0 && heading.level > prevLevel + 1) {
+        issues.push(
+          `Skipped heading level: h${prevLevel} → h${heading.level} ("${heading.text}")`,
+        );
+      }
+      prevLevel = heading.level;
+    }
+
+    const h1Count = headings.filter((h) => h.level === 1).length;
+
+    return { h1Count, headings, issues };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 1. /about page
+// ---------------------------------------------------------------------------
+
+test.describe('Heading hierarchy — /about @regression', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/about');
+    await page.waitForLoadState('load');
+  });
+
+  test('About page has exactly one h1', async ({ page }) => {
+    const { h1Count } = await getHeadingHierarchy(page);
+    expect(h1Count).toBe(1);
+  });
+
+  test('About page heading levels do not skip', async ({ page }) => {
+    const { issues } = await getHeadingHierarchy(page);
+    expect(issues).toHaveLength(0);
+  });
+
+  test('About page h1 text is not empty', async ({ page }) => {
+    const { headings } = await getHeadingHierarchy(page);
+    const h1 = headings.find((h) => h.level === 1);
+    expect(h1).toBeDefined();
+    expect(h1?.text.length).toBeGreaterThan(0);
+  });
+
+  test('About page h1 is the first heading on the page', async ({ page }) => {
+    const { headings } = await getHeadingHierarchy(page);
+    expect(headings.length).toBeGreaterThan(0);
+    expect(headings[0].level).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 2. /help page
+// ---------------------------------------------------------------------------
+
+test.describe('Heading hierarchy — /help @regression', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/help');
+    await page.waitForLoadState('load');
+  });
+
+  test('Help page has exactly one h1', async ({ page }) => {
+    const { h1Count } = await getHeadingHierarchy(page);
+    expect(h1Count).toBe(1);
+  });
+
+  test('Help page heading levels do not skip', async ({ page }) => {
+    const { issues } = await getHeadingHierarchy(page);
+    expect(issues).toHaveLength(0);
+  });
+
+  test('Help page h1 text is not empty', async ({ page }) => {
+    const { headings } = await getHeadingHierarchy(page);
+    const h1 = headings.find((h) => h.level === 1);
+    expect(h1).toBeDefined();
+    expect(h1?.text.length).toBeGreaterThan(0);
+  });
+
+  test('Help page h1 is the first heading on the page', async ({ page }) => {
+    const { headings } = await getHeadingHierarchy(page);
+    expect(headings.length).toBeGreaterThan(0);
+    expect(headings[0].level).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 3. /baseball/league/1/overview (authenticated, data-driven)
+// ---------------------------------------------------------------------------
+
+test.describe('Heading hierarchy — /baseball/league/1/overview @regression', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/baseball/league/1/overview');
+    await page.waitForLoadState('networkidle');
+  });
+
+  test('League overview page has exactly one h1 after data loads', async ({
+    page,
+  }) => {
+    const { h1Count } = await getHeadingHierarchy(page);
+    expect(h1Count).toBe(1);
+  });
+
+  test('League overview page heading hierarchy is valid', async ({ page }) => {
+    const { issues } = await getHeadingHierarchy(page);
+    expect(issues).toHaveLength(0);
+  });
+
+  test('League overview page h1 text is not empty', async ({ page }) => {
+    const { headings } = await getHeadingHierarchy(page);
+    const h1 = headings.find((h) => h.level === 1);
+    expect(h1).toBeDefined();
+    expect(h1?.text.length).toBeGreaterThan(0);
+  });
+
+  test('League overview page h1 is the first heading on the page', async ({
+    page,
+  }) => {
+    const { headings } = await getHeadingHierarchy(page);
+    expect(headings.length).toBeGreaterThan(0);
+    expect(headings[0].level).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 4. / (home page)
+// ---------------------------------------------------------------------------
+
+test.describe('Heading hierarchy — / (home) @regression', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('load');
+  });
+
+  test('Home page has exactly one h1', async ({ page }) => {
+    const { h1Count } = await getHeadingHierarchy(page);
+    expect(h1Count).toBe(1);
+  });
+
+  test('Home page heading levels do not skip', async ({ page }) => {
+    const { issues } = await getHeadingHierarchy(page);
+    expect(issues).toHaveLength(0);
+  });
+
+  test('Home page h1 text is not empty', async ({ page }) => {
+    const { headings } = await getHeadingHierarchy(page);
+    const h1 = headings.find((h) => h.level === 1);
+    expect(h1).toBeDefined();
+    expect(h1?.text.length).toBeGreaterThan(0);
+  });
+
+  test('Home page h1 is the first heading on the page', async ({ page }) => {
+    const { headings } = await getHeadingHierarchy(page);
+    expect(headings.length).toBeGreaterThan(0);
+    expect(headings[0].level).toBe(1);
+  });
+});

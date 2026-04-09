@@ -2,7 +2,7 @@ import React from 'react';
 import {
   Button,
   H1,
-  H3,
+  H2,
   XStack,
   YStack,
 } from '@legacy-sports/shared-components/ui';
@@ -111,7 +111,7 @@ export default function AboutPage() {
       </YStack>
 
       <InfoCard>
-        <H3 marginBottom="$2">Build Information</H3>
+        <H2 marginBottom="$2">Build Information</H2>
 
         <InfoRow>
           <Label>Version:</Label>
@@ -140,7 +140,7 @@ export default function AboutPage() {
       </InfoCard>
 
       <InfoCard>
-        <H3 marginBottom="$2">Application Info</H3>
+        <H2 marginBottom="$2">Application Info</H2>
 
         <InfoRow>
           <Label>Environment:</Label>
@@ -159,7 +159,7 @@ export default function AboutPage() {
       </InfoCard>
 
       <InfoCard>
-        <H3 marginBottom="$2">Links</H3>
+        <H2 marginBottom="$2">Links</H2>
 
         <YStack gap="$3">
           <Button

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   Button,
   H1,
-  H3,
+  H2,
   Paragraph,
   Separator,
   XStack,
@@ -300,7 +300,7 @@ export default function HelpPage() {
                   </Paragraph>
                 </SectionIconBox>
                 <YStack flex={1} gap="$1">
-                  <H3 color="$color">New to Legacy Sports?</H3>
+                  <H2 color="$color">New to Legacy Sports?</H2>
                   <Paragraph color="$colorPress" fontSize="$3" lineHeight={20}>
                     Take the interactive tutorial to learn how historical-stats
                     scoring, season assignment, and game selection work.
@@ -359,7 +359,7 @@ export default function HelpPage() {
                     </span>
                   </Paragraph>
                 </SectionIconBox>
-                <H3 color="$color">Quick Links</H3>
+                <H2 color="$color">Quick Links</H2>
               </SectionHeader>
               <SectionBody>
                 <XStack flexWrap="wrap" gap="$3">
@@ -443,7 +443,7 @@ export default function HelpPage() {
                     </span>
                   </Paragraph>
                 </SectionIconBox>
-                <H3 color="$color">Frequently Asked Questions</H3>
+                <H2 color="$color">Frequently Asked Questions</H2>
               </SectionHeader>
               <SectionBody>
                 {HELP_FAQ_ITEMS.map((item) => (
@@ -467,7 +467,7 @@ export default function HelpPage() {
                   </Paragraph>
                 </SectionIconBox>
                 <YStack flex={1} gap="$1">
-                  <H3 color="$color">Historical Stats — How It Works</H3>
+                  <H2 color="$color">Historical Stats — How It Works</H2>
                   <Paragraph color="$colorPress" fontSize="$3" lineHeight={20}>
                     Unique to Legacy Sports — answers to common questions about
                     our historical-stats game mechanic.
@@ -494,7 +494,7 @@ export default function HelpPage() {
                     </span>
                   </Paragraph>
                 </SectionIconBox>
-                <H3 color="$color">Getting Started</H3>
+                <H2 color="$color">Getting Started</H2>
               </SectionHeader>
               <SectionBody gap="$5">
                 {HELP_GETTING_STARTED_STEPS.map(({ step, title, body }) => (
@@ -543,7 +543,7 @@ export default function HelpPage() {
                     </span>
                   </Paragraph>
                 </SectionIconBox>
-                <H3 color="$color">Contact &amp; Support</H3>
+                <H2 color="$color">Contact &amp; Support</H2>
               </SectionHeader>
               <SectionBody>
                 <YStack gap="$3">
