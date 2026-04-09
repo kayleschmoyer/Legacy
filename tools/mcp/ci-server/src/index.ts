@@ -20,6 +20,19 @@ import {
   workflowState,
 } from './tools/workflow-state.js';
 
+/**
+ * Shared Zod schema for boolean parameters. Accepts a real boolean OR a
+ * string "true"/"false"/"1"/"0" (MCP callers sometimes serialise booleans to
+ * strings). Use in place of z.boolean() for all tool schema parameters.
+ */
+const coercedBoolean = z.preprocess((val) => {
+  if (typeof val === 'string') {
+    if (val === 'true' || val === '1') return true;
+    if (val === 'false' || val === '0') return false;
+  }
+  return val;
+}, z.boolean());
+
 const server = new McpServer({
   name: 'legacy-sports-ci',
   version: '1.0.0',
@@ -57,8 +70,7 @@ server.tool(
       .optional()
       .describe('Run ID (required when jobId is not provided)'),
     jobId: z.coerce.number().int().positive().optional().describe('Job ID'),
-    failedOnly: z
-      .boolean()
+    failedOnly: coercedBoolean
       .default(true)
       .describe('Failed steps only (default: true)'),
     attempt: z.coerce
@@ -76,8 +88,7 @@ server.tool(
       .describe(
         'Maximum lines of log output to return (max: 5000). Defaults to 500 when errorSummary is false. When errorSummary is true, fetches up to 10000 lines for broader error extraction.',
       ),
-    errorSummary: z
-      .boolean()
+    errorSummary: coercedBoolean
       .default(false)
       .describe(
         'Extract only error/failure lines with context (~200 lines max).',
@@ -112,8 +123,7 @@ server.tool(
   'Rerun failed jobs, a specific job, or an entire CI run.',
   {
     runId: z.coerce.number().int().positive().describe('Run ID'),
-    failedOnly: z
-      .boolean()
+    failedOnly: coercedBoolean
       .default(true)
       .describe('Rerun only failed jobs unless jobId set (default: true)'),
     jobId: z.coerce
@@ -122,7 +132,7 @@ server.tool(
       .positive()
       .optional()
       .describe('Specific job ID to rerun'),
-    debug: z.boolean().default(false).describe('Enable debug logging'),
+    debug: coercedBoolean.default(false).describe('Enable debug logging'),
   },
   async (params) => rerun(params),
 );
@@ -137,10 +147,9 @@ server.tool(
       .positive()
       .optional()
       .describe('Run ID (required when jobId is not provided)'),
-    pattern: z.string().describe('Search string or regex pattern'),
+    pattern: z.string().min(1).describe('Search string or regex pattern'),
     jobId: z.coerce.number().int().positive().optional().describe('Job ID'),
-    failedOnly: z
-      .boolean()
+    failedOnly: coercedBoolean
       .default(true)
       .describe('Failed steps only (default: true)'),
     attempt: z.coerce
@@ -149,8 +158,10 @@ server.tool(
       .positive()
       .optional()
       .describe('Attempt number'),
-    isRegex: z.boolean().default(false).describe('Treat pattern as regex'),
-    caseSensitive: z.boolean().default(false).describe('Case-sensitive match'),
+    isRegex: coercedBoolean.default(false).describe('Treat pattern as regex'),
+    caseSensitive: coercedBoolean
+      .default(false)
+      .describe('Case-sensitive match'),
     contextBefore: z.coerce
       .number()
       .int()
@@ -187,8 +198,7 @@ server.tool(
       .positive()
       .optional()
       .describe('Attempt number'),
-    includeJobs: z
-      .boolean()
+    includeJobs: coercedBoolean
       .default(true)
       .describe('Include jobs (default: true)'),
   },
@@ -235,8 +245,7 @@ server.tool(
       .transform(String)
       .optional()
       .describe('Workflow filename or numeric ID; omit to list all'),
-    includePermissions: z
-      .boolean()
+    includePermissions: coercedBoolean
       .default(false)
       .describe('Include GitHub App installation permissions (default: false)'),
   },
@@ -354,8 +363,7 @@ server.tool(
       .describe(
         'Project slug (e.g. "D--code-legacy-sports"). Auto-detected from CWD if omitted.',
       ),
-    includeMcp: z
-      .boolean()
+    includeMcp: coercedBoolean
       .default(false)
       .describe(
         'Include MCP tool overflows and failures in the report (default: false).',
@@ -366,16 +374,14 @@ server.tool(
       .positive()
       .optional()
       .describe('Process ID to look up session ID from ~/.claude/sessions/.'),
-    gapsOnly: z
-      .boolean()
+    gapsOnly: coercedBoolean
       .default(false)
       .describe(
         'Compact gap-focused output: one line per unique command pattern, <5 KB. ' +
           'Separates potential MCP gaps from already-covered commands. ' +
           'Use this instead of the default JSON output when running the MCP gap audit inline.',
       ),
-    scanScratch: z
-      .boolean()
+    scanScratch: coercedBoolean
       .default(false)
       .describe(
         'Also scan scratch/*.py files for subprocess shell patterns ' +
@@ -407,8 +413,7 @@ server.tool(
       .describe(
         'Project slug (e.g. "D--code-legacy-sports"). Auto-detected from CWD if omitted.',
       ),
-    includeSubagents: z
-      .boolean()
+    includeSubagents: coercedBoolean
       .default(true)
       .describe(
         'Also scan subagent JSONLs under <sessionId>/subagents/ (default: true).',
@@ -455,8 +460,7 @@ server.tool(
       .describe(
         'Only count messages in this 1-based [start, end] line range — useful for analysing a specific phase of a long session.',
       ),
-    includeSubagents: z
-      .boolean()
+    includeSubagents: coercedBoolean
       .default(false)
       .describe(
         'Aggregate subagent stats into the parent totals and return per-subagent breakdowns (default: false).',
