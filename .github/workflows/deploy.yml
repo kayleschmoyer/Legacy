@@ -47,7 +47,7 @@ permissions:
   contents: write # create-release in web child needs this
   id-token: write # AWS OIDC + GitHub Pages
   pages: write
-  pull-requests: read
+  pull-requests: write # deploy-storybook child posts a sticky PR comment
 
 jobs:
   # ---------------------------------------------------------------------------
