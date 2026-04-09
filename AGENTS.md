@@ -113,11 +113,12 @@ Agent(subagent_type: "Explore", prompt: """
   Tool preferences:
   - Use Glob (not find/ls) for file discovery; if Glob returns empty on an absolute Windows worktree path, fall back to worktree_ls_tree or worktree_run(command: "ls <dir>")
   - Use Grep (not grep/rg/`find | xargs grep`) for content search — Grep accepts both pattern and glob filter in one call, so `find | xargs grep` is never needed
-  - Use Read (not cat/head/tail) for reading files
+  - Use Read (not cat/head/tail) for reading files — including uncommitted changes and untracked/new files
+  - Use worktree_show_file(path: "...", ref: "HEAD") for **tracked** files at a Git ref when a worktree is active (worktree_set has been called) — it runs `git show HEAD:<path>` so it does NOT see uncommitted working-tree changes or untracked files, but avoids needing absolute paths
 """)
 ```
 
-These three lines eliminate the most common subagent Bash anti-patterns (`find` 56x/session, `grep` 23x, `ls` 8x in production audits). Without them, subagents default to shell commands because they lack the project's MCP-first context.
+These four lines eliminate the most common subagent Bash anti-patterns (`find` 56x/session, `grep` 23x, `ls` 8x, `cat` on worktree paths 4x in production audits). Without them, subagents default to shell commands because they lack the project's MCP-first context.
 
 For subagents that perform git operations in worktrees, also include:
 
