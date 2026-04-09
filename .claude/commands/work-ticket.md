@@ -8,9 +8,10 @@ Execute the work-ticket skill for: $ARGUMENTS
 
 1. Inspect the ticket with `jira_view` and `jira_list_children`
 2. **Planning phase**: run the planning skill (Step 1b) — scope assessment, code reconnaissance, risk classification. Skip for trivial tasks.
-3. **Leaf ticket** (no children): implement it end-to-end using the worktree workflow — blocker check, worktree, code, validate, PR, Jira "In Review"
-4. **Parent ticket** (has children): iterate through child tickets in batches of up to 5, looping until no unblocked To Do children remain. Update parent status based on children state.
-5. **MCP gap audit** (mandatory): after all PRs are created, run `mcp-gap-audit` Phase 1 (Audit) to identify and ticket any MCP tooling gaps from this session.
-6. Report results: tickets worked, PRs created, tickets skipped, remaining work, MCP gaps filed.
+3. **Completeness check** (Step 1c): if the ticket lacks Acceptance Criteria, a Technical Approach, or a clear Problem statement, automatically invoke the `define` skill in enrich mode to fill in the gaps — no user confirmation needed. Exception: bug tickets with clear repro steps and an expected behavior description are sufficient even without formal AC.
+4. **Leaf ticket** (no children): implement it end-to-end using the worktree workflow — blocker check, worktree, code, validate, PR, Jira "In Review"
+5. **Parent ticket** (has children): iterate through child tickets in batches of up to 5, looping until no unblocked To Do children remain. Update parent status based on children state.
+6. **MCP gap audit** (mandatory): after all PRs are created, run `mcp-gap-audit` Phase 1 (Audit) to identify and ticket any MCP tooling gaps from this session.
+7. Report results: tickets worked, PRs created, tickets skipped, remaining work, MCP gaps filed.
 
-**Guardrails**: One ticket = one worktree = one PR. Always run the planning phase after inspecting the ticket (skip for trivial tasks). Always check blockers before starting. Always run `make pc` before pushing. Never stop at `make pc` — drive to PR creation. Clean up worktrees after each child. Update parent Jira status to reflect children state (In Progress while children are being worked, In Review when all children are at least In Review). Always run the MCP gap audit before finishing — this is how we continuously improve the agentic environment.
+**Guardrails**: One ticket = one worktree = one PR. Always run the planning phase after inspecting the ticket (skip for trivial tasks). Always check blockers before starting. Always run `make pc` before pushing. Never stop at `make pc` — drive to PR creation. Clean up worktrees after each child. Update parent Jira status to reflect children state (In Progress while children are being worked, In Review when all children are at least In Review). Always run the MCP gap audit before finishing — this is how we continuously improve the agentic environment. The completeness check (step 3) invokes `define` autonomously without user confirmation — this is the expected autonomous mode; see the `define` skill for details.

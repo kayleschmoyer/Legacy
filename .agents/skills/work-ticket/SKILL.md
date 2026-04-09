@@ -77,6 +77,36 @@ jira_create_ticket(
 )
 ```
 
+### Step 1c: Completeness check — auto-enrich if the ticket is underspecified
+
+After the planning phase, assess whether the ticket contains enough structure to implement safely. A ticket is considered **complete** if it has all three of:
+
+1. **Acceptance Criteria** — at least one testable `- [ ]` condition (or equivalent prose that is unambiguously verifiable)
+2. **Technical Approach** — a description of _what_ to change and _where_ (file paths, systems, APIs), even if brief
+3. **A clear Problem statement** — why this work exists, not just what to do
+
+> **Exception — Bug tickets**: if the ticket type is Bug and the description contains a clear repro scenario and expected vs. actual behaviour, that satisfies the completeness check even without a formal `## Acceptance Criteria` section.
+
+If any of the above are missing, **automatically invoke the define skill in enrich mode** before proceeding:
+
+```
+Skill(skill: "define")
+// Pass the ticket key; the define skill will read the current description,
+// identify gaps, draft the missing sections, and update the Jira ticket.
+// Do NOT ask the user for permission — proceed autonomously.
+// After the define skill completes, re-read the ticket via jira_view to get the updated description.
+```
+
+Do not skip this step to save time. An underspecified ticket produces an underspecified implementation — fixing misaligned scope after a PR is open costs more than enriching the ticket now.
+
+After the define skill updates the ticket, re-read it:
+
+```
+jira_view(key: "LS-####")
+```
+
+Then continue to Step 2 with the enriched description.
+
 ### Step 2: Route to the correct mode
 
 #### Leaf Mode (no children)
