@@ -40,6 +40,7 @@ import { sweepStaleClaims } from './tools/sweep-stale-claims.js';
 import { viewPR } from './tools/view-pr.js';
 import { listRunners } from './tools/list-runners.js';
 import { webhookList, webhookUpdate, webhookPing } from './tools/webhooks.js';
+import { prCommits } from './tools/pr-commits.js';
 
 /**
  * Shared Zod schema for generic string arrays. Accepts a real array OR a
@@ -813,6 +814,23 @@ server.tool(
       ),
   },
   async (params) => secretsCheck(params),
+);
+
+// --- github_pr_commits ---
+server.tool(
+  'github_pr_commits',
+  'List commits on a pull request. Returns sha, shortSha, message (first line), author, date, and url for each commit. Useful for correlating pushes with review events or inspecting PR history.',
+  {
+    number: z.coerce.number().int().positive().describe('PR number'),
+    limit: z.coerce
+      .number()
+      .int()
+      .positive()
+      .max(100)
+      .default(30)
+      .describe('Max commits to return (default: 30, max: 100)'),
+  },
+  async (params) => prCommits(params),
 );
 
 // --- github_view_pr ---
