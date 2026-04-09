@@ -187,6 +187,18 @@ For **work subagents** dispatched by multi-ticket orchestrators (`/sweep-prs`, `
 
 Work subagents inherit all MCP connections from the parent session (all 9 servers), so `github_create_pr`, `worktree_commit`, `make_run`, `jira_transition` etc. are all available without the LS-2902 first-N cap that affects session-launcher worktrees. This is why multi-ticket orchestrators should always use `Agent(isolation: "worktree")` rather than session-launcher worktrees for each ticket.
 
+**When a subagent fails to push or create a PR**, the parent agent should prefer MCP tools to recover; use `gh` CLI only when MCP is unavailable:
+
+```
+worktree_push(worktree: "<subagent-worktree-path>", setUpstream: true)
+github_create_pr(worktreePath: "<absolute-subagent-worktree-path>", title: "...", body: "...", draft: true)
+github_manage_labels(number: <PR#>, add: ["agent-in-progress"])
+github_mark_pr_ready(number: <PR#>)
+github_request_review(number: <PR#>)
+```
+
+The `legacy-sports-github` MCP server exposes all required operations as first-class tools (`github_create_pr`, `github_mark_pr_ready`, `github_manage_labels`, `github_request_review`) and should always be preferred. Using `gh pr create` / `gh pr ready` / `gh pr edit --add-label` is the shell fallback for when MCP is unavailable. See `skills/pr-lifecycle/SKILL.md` ("Parent-Agent PR Recovery") for the full recovery workflow.
+
 ## Commands
 
 ```bash

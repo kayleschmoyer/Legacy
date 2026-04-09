@@ -96,6 +96,47 @@ gh pr ready <PR#>
 | [references/bug-verification-templates.md](references/bug-verification-templates.md)           | PR body templates for proving bug fixes (screenshots, tests, queries, logs) |
 | [workflow-overview (PR Preview section)](../workflow-overview/SKILL.md#pr-preview-deployments) | PR preview URL pattern and how to verify deployment (do not list branches)  |
 
+## Parent-Agent PR Recovery
+
+When a subagent fails to push or create a PR, the parent agent should **prefer MCP tools** to recover — use `gh` only when MCP is unavailable. The subagent's commits already exist in its ephemeral worktree; the parent just needs to push and ship.
+
+**Recovery sequence (MCP-first):**
+
+```
+# 1. Push the subagent's commits (include worktree path and setUpstream for new branches)
+worktree_push(worktree: "<absolute path to subagent worktree>", setUpstream: true)
+# OR if worktree_set is active for the subagent's worktree:
+worktree_run(command: "git push --set-upstream origin <branch>")
+
+# 2. Create the PR as a draft, targeting the subagent's worktree
+github_create_pr(
+  worktreePath: "<absolute path to subagent worktree>",
+  title: "LS-#### type(scope): msg",
+  body: <markdown>,
+  draft: true
+)
+
+# 3. Apply the agent-in-progress label
+github_manage_labels(number: <PR#>, add: ["agent-in-progress"])
+
+# 4. Mark ready for review
+github_mark_pr_ready(number: <PR#>)
+
+# 5. Request Copilot review
+github_request_review(number: <PR#>)
+```
+
+**Prefer MCP; use `gh` only when MCP is unavailable.** The `legacy-sports-github` MCP server exposes all required operations as first-class tools (`github_create_pr`, `github_mark_pr_ready`, `github_manage_labels`, `github_request_review`) and should always be preferred. `gh pr create` / `gh pr ready` / `gh pr edit --add-label` are shell-level fallbacks for when MCP servers are unavailable. Using `gh` CLI in a recovery context can also silently use the wrong working directory, bypasses the `worktreePath` parameter that routes the PR to the correct branch, and produces shell-history noise that MCP gap audits flag.
+
+**Shell fallback (only if MCP server is unavailable):**
+
+```bash
+gh pr create --draft --title "LS-#### type(scope): msg" --body-file ".github/tmp-pr-body.md" --base main
+bash scripts/cleanup-pr-body.sh
+gh pr edit <PR#> --add-label "agent-in-progress"
+gh pr ready <PR#>
+```
+
 ## Related Skills
 
 - [rebase-and-conflicts](../rebase-and-conflicts/SKILL.md) -- Rebase branches and resolve merge conflicts
