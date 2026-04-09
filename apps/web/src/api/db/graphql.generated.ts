@@ -5897,6 +5897,16 @@ export type MatchupFragment = {
   selectedGamesCount?: number | null;
   startTime?: string | null;
   endTime?: string | null;
+  team1?: {
+    __typename?: 'Team';
+    id?: number | null;
+    name?: string | null;
+  } | null;
+  team2?: {
+    __typename?: 'Team';
+    id?: number | null;
+    name?: string | null;
+  } | null;
 };
 
 export type GetMatchupByIdQueryVariables = Exact<{
@@ -5921,6 +5931,16 @@ export type GetMatchupByIdQuery = {
     selectedGamesCount?: number | null;
     startTime?: string | null;
     endTime?: string | null;
+    team1?: {
+      __typename?: 'Team';
+      id?: number | null;
+      name?: string | null;
+    } | null;
+    team2?: {
+      __typename?: 'Team';
+      id?: number | null;
+      name?: string | null;
+    } | null;
   } | null;
 };
 
@@ -5947,6 +5967,16 @@ export type GetMatchupsForLeagueQuery = {
     selectedGamesCount?: number | null;
     startTime?: string | null;
     endTime?: string | null;
+    team1?: {
+      __typename?: 'Team';
+      id?: number | null;
+      name?: string | null;
+    } | null;
+    team2?: {
+      __typename?: 'Team';
+      id?: number | null;
+      name?: string | null;
+    } | null;
   }> | null;
 };
 
@@ -5982,6 +6012,16 @@ export type GetMatchupsByWeekQuery = {
     selectedGamesCount?: number | null;
     startTime?: string | null;
     endTime?: string | null;
+    team1?: {
+      __typename?: 'Team';
+      id?: number | null;
+      name?: string | null;
+    } | null;
+    team2?: {
+      __typename?: 'Team';
+      id?: number | null;
+      name?: string | null;
+    } | null;
   }> | null;
 };
 
@@ -6034,6 +6074,16 @@ export type GetMatchupHistoryQuery = {
     selectedGamesCount?: number | null;
     startTime?: string | null;
     endTime?: string | null;
+    team1?: {
+      __typename?: 'Team';
+      id?: number | null;
+      name?: string | null;
+    } | null;
+    team2?: {
+      __typename?: 'Team';
+      id?: number | null;
+      name?: string | null;
+    } | null;
   }> | null;
 };
 
@@ -6585,6 +6635,16 @@ export type GetTeamMatchupHistoryQuery = {
     selectedGamesCount?: number | null;
     startTime?: string | null;
     endTime?: string | null;
+    team1?: {
+      __typename?: 'Team';
+      id?: number | null;
+      name?: string | null;
+    } | null;
+    team2?: {
+      __typename?: 'Team';
+      id?: number | null;
+      name?: string | null;
+    } | null;
   }> | null;
 };
 
@@ -8781,6 +8841,14 @@ export const MatchupFragmentDoc = gql`
     selectedGamesCount
     startTime
     endTime
+    team1 {
+      id
+      name
+    }
+    team2 {
+      id
+      name
+    }
   }
 `;
 export const MatchupPlayerFragmentDoc = gql`

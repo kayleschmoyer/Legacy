@@ -63,7 +63,7 @@ export function MatchupCard({
     return null;
   }
 
-  const { weekNumber, team1Score, team2Score, status } = matchup;
+  const { weekNumber, team1Score, team2Score, status, team1, team2 } = matchup;
 
   const isLive = status === MatchupStatus.InProgress;
   const isCompleted = status === MatchupStatus.Completed;
@@ -148,7 +148,7 @@ export function MatchupCard({
               color={team1Wins ? '$color' : '$textMuted'}
               numberOfLines={1}
             >
-              Team 1
+              {team1?.name ?? 'Team 1'}
             </Text>
           </XStack>
           <ScoreValue fontSize="$6" color={team1Wins ? '$color' : '$textMuted'}>
@@ -169,7 +169,7 @@ export function MatchupCard({
               color={team2Wins ? '$color' : '$textMuted'}
               numberOfLines={1}
             >
-              Team 2
+              {team2?.name ?? 'Team 2'}
             </Text>
           </XStack>
           <ScoreValue fontSize="$6" color={team2Wins ? '$color' : '$textMuted'}>

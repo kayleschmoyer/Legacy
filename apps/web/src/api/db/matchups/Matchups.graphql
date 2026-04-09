@@ -13,6 +13,14 @@ fragment Matchup on Matchup {
   selectedGamesCount
   startTime
   endTime
+  team1 {
+    id
+    name
+  }
+  team2 {
+    id
+    name
+  }
 }
 
 query GetMatchupById($id: Int!) {
