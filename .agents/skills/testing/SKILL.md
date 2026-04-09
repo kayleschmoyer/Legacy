@@ -119,4 +119,4 @@ make pc
 
 ## Integration with Workflow
 
-Testing is part of the pre-commit sequence: typecheck -> lint -> test -> build. Run the full suite with `make pc`. See [makefile](../makefile/SKILL.md) for all targets.
+Testing is part of the pre-commit sequence: typecheck -> lint -> test -> build. Run the full suite with `make pc`. See [repo-tooling](../repo-tooling/SKILL.md) for all targets.
