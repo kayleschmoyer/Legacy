@@ -1,7 +1,6 @@
 // const { withNxMetro } = require('@nx/react-native');
 const { getDefaultConfig } = require('@expo/metro-config');
 const { mergeConfig } = require('@react-native/metro-config');
-const exclusionList = require('metro-config/src/defaults/exclusionList');
 const path = require('path');
 
 /**
@@ -55,11 +54,7 @@ const customConfig = {
     // blockList, Metro processes them as part of the Expo Router route manifest
     // and they pull in @testing-library/react-native, which tries to
     // require('console') — a Node built-in that Metro cannot resolve.
-    // exclusionList normalizes path separators across platforms (POSIX + Windows)
-    blockList: exclusionList([
-      /.*\.(spec|test)\.[jt]sx?$/,
-      /.*[/\\]__tests__[/\\].*/,
-    ]),
+    blockList: /.*\.(spec|test)\.[jt]sx?$|.*[/\\]__tests__[/\\].*/,
     // Explicit alias for expo-linking to help with resolution
     alias: {
       'expo-linking': path.resolve(
