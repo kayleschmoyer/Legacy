@@ -45,6 +45,18 @@ git push --force-with-lease origin HEAD
 | Stacked/dependent branches need rebasing    | `make rebase-tree` or `make rebase-tree-auto`                                                            |
 | Stuck mid-rebase or need recovery           | See [rebase-interactive-and-recovery.md](references/rebase-interactive-and-recovery.md)                  |
 
+## Check for Conflicts After Rebase
+
+After `worktree_rebase` (or any `git rebase`), call `worktree_conflict_info()` to get a structured list of files still in an **unresolved conflict state** (files with unmerged index entries) along with their conflict marker line ranges and content previews.
+
+```
+worktree_conflict_info()
+```
+
+If `worktree_conflict_info` returns no conflicts, all merge conflicts are resolved — proceed to stabilization. If conflicts remain, resolve them using `worktree_resolve_conflict` or by editing files directly, then continue the rebase.
+
+> **Note**: `worktree_conflict_info` only reports files that are still unmerged in the Git index. It does **not** scan for leftover conflict markers (`<<<<<<<`/`=======`/`>>>>>>>`) accidentally left in already-resolved files. If you need to verify no stray markers remain after resolving, use the shell fallback: `grep -rn -E '^<<<<<<<|^=======|^>>>>>>>'`.
+
 ## Post-Rebase Stabilization (CRITICAL)
 
 > Do NOT push until `make pc` passes. This is the #1 cause of post-rebase CI failures.
@@ -92,14 +104,15 @@ $conflicting | Select-Object number, headRefName
 
 ## Troubleshooting
 
-| Problem                           | Fix                                                                    |
-| --------------------------------- | ---------------------------------------------------------------------- |
-| "Cannot rebase: unstaged changes" | `git stash --include-untracked`, rebase, then pop                      |
-| "CONFLICT (modify/delete)"        | `git rm <file>` if delete correct, else `git checkout --ours <file>`   |
-| Empty commits                     | `git rebase --skip`                                                    |
-| Stale rebase-merge directory      | `git rebase --abort`                                                   |
-| Lost commits                      | `git reflog` then `git reset --hard <hash>`                            |
-| Leftover conflict markers         | Search with `grep -rn '^<<<<<<<\|^=======\|^>>>>>>>'` and fix manually |
+| Problem                            | Fix                                                                                                                                                                                                                                                  |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "Cannot rebase: unstaged changes"  | `git stash --include-untracked`, rebase, then pop                                                                                                                                                                                                    |
+| "CONFLICT (modify/delete)"         | `git rm <file>` if delete correct, else `git checkout --ours <file>`                                                                                                                                                                                 |
+| Empty commits                      | `git rebase --skip`                                                                                                                                                                                                                                  |
+| Stale rebase-merge directory       | `git rebase --abort`                                                                                                                                                                                                                                 |
+| Lost commits                       | `git reflog` then `git reset --hard <hash>`                                                                                                                                                                                                          |
+| Unresolved conflicts mid-rebase    | `worktree_conflict_info()` (MCP-first) — lists all unresolved entries including binary conflicts (which have no textual markers). Shell fallback (text conflicts only): `grep -rn -E '^<<<<<<<\|^=======\|^>>>>>>>'` — note: misses binary conflicts |
+| Leftover markers in resolved files | `grep -rn -E '^<<<<<<<\|^=======\|^>>>>>>>'` — `worktree_conflict_info` only sees index-unmerged files, not stray markers accidentally left in resolved files                                                                                        |
 
 ## References
 
