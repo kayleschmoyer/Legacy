@@ -921,6 +921,11 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
               'Alias for worktree. Ticket key, absolute path, or omit for active worktree',
           },
           setUpstream: { type: 'boolean', description: 'Set upstream (-u)' },
+          skipLint: {
+            type: 'boolean',
+            description:
+              'Set SKIP_PREPUSH_LINT=1 before pushing. Use when pnpm virtual store is absent and the pre-push formatter hook fails.',
+          },
         },
       },
     },
@@ -3004,11 +3009,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         worktreeKey,
         worktreeId,
         setUpstream,
+        skipLint,
       } = args as {
         worktree?: unknown;
         worktreeKey?: unknown;
         worktreeId?: unknown;
         setUpstream?: boolean;
+        skipLint?: boolean;
       };
       // Accept worktreeId as an alias for worktree (agents sometimes pass worktreeId
       // from older documentation or habit).
@@ -3143,11 +3150,37 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
-      const upstreamFlag = setUpstream ? ' -u' : '';
+      if (setUpstream !== undefined && typeof setUpstream !== 'boolean') {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `[resolvedWorktree: ${cwd}]\nInvalid argument: setUpstream must be a boolean.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      if (skipLint !== undefined && typeof skipLint !== 'boolean') {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `[resolvedWorktree: ${cwd}]\nInvalid argument: skipLint must be a boolean.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      const upstreamFlag = setUpstream === true ? ' -u' : '';
       const cmd = `git push${upstreamFlag} --force-with-lease origin HEAD`;
+      const pushEnv =
+        skipLint === true ? { SKIP_PREPUSH_LINT: '1' } : undefined;
 
       try {
-        const out = run(cmd, cwd, { timeout: 30_000 });
+        const out = run(cmd, cwd, { timeout: 30_000, env: pushEnv });
 
         // Append an explicit success summary so agents don't need a follow-up
         // worktree_status call to confirm the push landed. git push writes its
@@ -3202,7 +3235,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         if (hookAmended) {
           try {
-            const retryOut = run(cmd, cwd, { timeout: 30_000 });
+            const retryOut = run(cmd, cwd, { timeout: 30_000, env: pushEnv });
             const retryPushedFullSha = run('git rev-parse HEAD', cwd).trim();
             const retryPushedSha = retryPushedFullSha.slice(0, 7);
             const retryPushedBranch = run(
