@@ -47,7 +47,6 @@ import {
   Zap,
 } from '@tamagui/lucide-icons';
 import { QRCodeSVG } from 'qrcode.react';
-import { WebSocketClient } from '@legacy-sports/websocket-client';
 import { ClientNotificationType } from '@legacy-sports/utils';
 import {
   calculateMatchupProjection,
@@ -135,6 +134,7 @@ import { MatchupScoreboard } from '../../features/matchup/MatchupScoreboard';
 import { GamesRemaining } from '../../features/matchup/GamesRemaining';
 import { MatchupRosterComparison } from '../../features/matchup/MatchupRosterComparison';
 import { announcePolite } from '../../utils/a11y';
+import { useLeagueWebSocketLifecycle } from '../../hooks/useLeagueWebSocketLifecycle';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
   resetLeagueState,
@@ -680,54 +680,8 @@ export function LeagueDetailPage(): React.JSX.Element {
   // Create the single shared WebSocket connection for this league page.
   // All child components (chat, trades, roster) subscribe via
   // LeagueWebSocketContext instead of opening their own connections.
-  const [wsClient, setWsClient] = useState<WebSocketClient | null>(null);
-  const [wsConnected, setWsConnected] = useState(false);
-  const [wsError, setWsError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const wsUrl = env.websocketUrl;
-    LOGGER.info('[LeagueDetailPage] WebSocket config', {
-      websocketUrl: wsUrl ? `${wsUrl.substring(0, 30)}...` : 'NOT SET',
-      isAuthenticated,
-      leagueId,
-    });
-    if (!wsUrl || !isAuthenticated || isNaN(leagueId)) return;
-
-    let active = true;
-    const client = new WebSocketClient({
-      url: wsUrl,
-      // Pass the in-memory JWT as a query param so the server can authenticate
-      // even when the HttpOnly cookie isn't sent (e.g. when the WS endpoint is
-      // on a different subdomain and the cookie domain wasn't set at login time).
-      // Falls back to cookie-based auth when the token isn't available yet.
-      token: authToken ?? undefined,
-      leagueId,
-      viewContext: 'league',
-      autoConnect: false,
-    });
-    setWsClient(client);
-    client.on('connected', () => {
-      if (active) {
-        setWsConnected(true);
-        setWsError(null);
-      }
-    });
-    client.on('disconnected', () => {
-      if (active) setWsConnected(false);
-    });
-    client.on('error', (err: Error) => {
-      if (active) setWsError(err.message);
-    });
-    void Promise.resolve().then(() => {
-      if (active) client.connect();
-    });
-    return () => {
-      active = false;
-      client.dispose();
-      setWsClient(null);
-      setWsConnected(false);
-    };
-  }, [leagueId, isAuthenticated, authToken]);
+  const { client: wsClient, connected: wsConnected } =
+    useLeagueWebSocketLifecycle({ leagueId, isAuthenticated, authToken });
 
   // Subscribe to league-level events on the shared socket.
   useEffect(() => {
@@ -758,16 +712,6 @@ export function LeagueDetailPage(): React.JSX.Element {
     handleMatchupStatsComplete,
     handlePlayerStatsLoading,
   ]);
-
-  useEffect(() => {
-    if (wsError) {
-      LOGGER.debug('[LeagueDetailPage] WebSocket error:', wsError);
-    }
-  }, [wsError]);
-
-  useEffect(() => {
-    LOGGER.info('[LeagueDetailPage] WebSocket connected:', wsConnected);
-  }, [wsConnected]);
 
   // One-time catch-up refetch: when the WebSocket (re)connects while a draft
   // is still in-progress or queued, fetch the league once in case the
