@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-redundant-type-constituents -- Complex type mapping for scoring calculations */
 import React, { useMemo, useState } from 'react';
 import { Card, H4, Separator, styled, Text, XStack, YStack } from 'tamagui';
 import { ChevronRight, Users } from '@tamagui/lucide-icons';
@@ -103,9 +102,7 @@ const skeletonPulseStyle = {
   animationTimingFunction: 'ease-in-out',
 } as React.CSSProperties;
 
-function SkeletonPulse(
-  props: React.ComponentProps<typeof YStack> & { backgroundColor?: string },
-) {
+function SkeletonPulse(props: React.ComponentProps<typeof YStack>) {
   const { style, backgroundColor, ...rest } = props;
   return (
     <YStack
@@ -918,16 +915,16 @@ export function MatchupRosterComparison({
 
     // Calculate separate totals for batter and pitcher slots (only assigned players score)
     const team1BatterTotals = {
-      actual: batterSlotRows.reduce((sum: any, row) => {
+      actual: batterSlotRows.reduce<number>((sum, row) => {
         const gameSum =
-          row.team1Player?.games?.reduce(
-            (s: any, g: any) => s + calculateGameScore(g),
+          row.team1Player?.games?.reduce<number>(
+            (s, g) => s + calculateGameScore(g),
             0,
           ) ?? 0;
         return sum + gameSum;
       }, 0),
-      projected: batterSlotRows.reduce(
-        (sum: any, row) =>
+      projected: batterSlotRows.reduce<number>(
+        (sum, row) =>
           sum +
           (row.team1Player ? calculatePlayerProjection(row.team1Player) : 0),
         0,
@@ -935,16 +932,16 @@ export function MatchupRosterComparison({
     };
 
     const team1PitcherTotals = {
-      actual: pitcherSlotRows.reduce((sum: any, row) => {
+      actual: pitcherSlotRows.reduce<number>((sum, row) => {
         const gameSum =
-          row.team1Player?.games?.reduce(
-            (s: any, g: any) => s + calculateGameScore(g),
+          row.team1Player?.games?.reduce<number>(
+            (s, g) => s + calculateGameScore(g),
             0,
           ) ?? 0;
         return sum + gameSum;
       }, 0),
-      projected: pitcherSlotRows.reduce(
-        (sum: any, row) =>
+      projected: pitcherSlotRows.reduce<number>(
+        (sum, row) =>
           sum +
           (row.team1Player ? calculatePlayerProjection(row.team1Player) : 0),
         0,
@@ -952,16 +949,16 @@ export function MatchupRosterComparison({
     };
 
     const team2BatterTotals = {
-      actual: batterSlotRows.reduce((sum: any, row) => {
+      actual: batterSlotRows.reduce<number>((sum, row) => {
         const gameSum =
-          row.team2Player?.games?.reduce(
-            (s: any, g: any) => s + calculateGameScore(g),
+          row.team2Player?.games?.reduce<number>(
+            (s, g) => s + calculateGameScore(g),
             0,
           ) ?? 0;
         return sum + gameSum;
       }, 0),
-      projected: batterSlotRows.reduce(
-        (sum: any, row) =>
+      projected: batterSlotRows.reduce<number>(
+        (sum, row) =>
           sum +
           (row.team2Player ? calculatePlayerProjection(row.team2Player) : 0),
         0,
@@ -969,16 +966,16 @@ export function MatchupRosterComparison({
     };
 
     const team2PitcherTotals = {
-      actual: pitcherSlotRows.reduce((sum: any, row) => {
+      actual: pitcherSlotRows.reduce<number>((sum, row) => {
         const gameSum =
-          row.team2Player?.games?.reduce(
-            (s: any, g: any) => s + calculateGameScore(g),
+          row.team2Player?.games?.reduce<number>(
+            (s, g) => s + calculateGameScore(g),
             0,
           ) ?? 0;
         return sum + gameSum;
       }, 0),
-      projected: pitcherSlotRows.reduce(
-        (sum: any, row) =>
+      projected: pitcherSlotRows.reduce<number>(
+        (sum, row) =>
           sum +
           (row.team2Player ? calculatePlayerProjection(row.team2Player) : 0),
         0,
