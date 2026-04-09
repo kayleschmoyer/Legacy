@@ -169,6 +169,16 @@ For subagents running PR sweeps (open-prs skill), also include:
   - For scanning open PRs, use github_pr_dashboard(state: "open", limit: 100, excludeDrafts: true) instead of scan-prs.ps1 or github_pr_scan — it returns richer CI/review/label data in one MCP/tool call (the tool may make multiple underlying GitHub API requests)
 ```
 
+For subagents that explore or modify **MCP server code** (e.g. adding a new tool to `tools/mcp/github-server/`), include:
+
+```
+  - When exploring MCP server structure, use Glob/Read/Grep instead of ls/cat/grep:
+    - List tool files: Glob(pattern: "**/*.ts", path: "tools/mcp/<server>/src/tools")
+    - Read a tool file: Read(file_path: "tools/mcp/<server>/src/tools/<tool>.ts")
+    - Find tool registrations: Grep(pattern: "server\\.tool\\(", path: "tools/mcp/<server>/src/index.ts")
+    - Find imports: Grep(pattern: "^import", path: "tools/mcp/<server>/src/index.ts")
+```
+
 For **work subagents** dispatched by multi-ticket orchestrators (`/sweep-prs`, `/work-bugs`, `/work-mcp-gaps`, `/work-ticket` Parent Mode) via `Agent(isolation: "worktree")`, always include **setup steps** before the work instructions — the subagent's ephemeral worktree starts empty:
 
 ```
