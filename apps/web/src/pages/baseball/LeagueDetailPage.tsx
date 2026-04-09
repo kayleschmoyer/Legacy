@@ -95,8 +95,10 @@ import {
 } from '../../constants/colors';
 import { LeagueRosterManagement } from '../../features/roster/LeagueRosterManagement';
 import { canPlayerPlayPosition } from '../../features/roster/LeagueRosterManagement';
-import { PendingWaiverClaims } from '../../features/roster/PendingWaiverClaims';
-import { PendingTradeOffers } from '../../features/roster/PendingTradeOffers';
+import {
+  PendingTradeOffers,
+  PendingWaiverClaims,
+} from '@legacy-sports/shared-components/roster';
 import { LeagueStandings } from '../../features/roster/LeagueStandings';
 import { PlayoffBracketDisplay } from '../../components/matchup/PlayoffBracketDisplay';
 import { LeagueChatTab } from '../../features/baseball/LeagueChatTab';

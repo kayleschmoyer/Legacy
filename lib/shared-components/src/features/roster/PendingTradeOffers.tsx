@@ -2,8 +2,9 @@
  * PendingTradeOffers — compact trade-offer summary for the Roster tab.
  *
  * Shows incoming offers (user can Accept / Reject) and outgoing offers
- * (user can Cancel). Subscribes to the `trade-offer` WebSocket event so
- * the list refreshes in real time without a manual page reload.
+ * (user can Cancel). Accepts an optional `onRefresh` callback that the
+ * caller can wire up to a WebSocket or polling mechanism for real-time
+ * updates.
  */
 import React, { useCallback } from 'react';
 import { Button, XStack, YStack } from '@legacy-sports/shared-components/ui';
@@ -23,7 +24,6 @@ import {
   useGetTeamTradeOffersQuery,
   useRejectTradeMutation,
 } from '../../api/db/graphql.generated';
-import { useLeagueWebSocket } from '../../hooks/useLeagueWebSocket';
 import {
   BRAND_GOLD_LIGHT,
   BRAND_NAVY_LIGHT,
@@ -32,13 +32,15 @@ import {
   PURPLE,
   WHITE,
   withAlpha,
-} from '../../constants/colors';
+} from '../../utils/colors';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface PendingTradeOffersProps {
   teamId: number;
-  leagueId: number;
+  leagueId?: number;
+  /** Optional callback invoked by the caller on WebSocket/polling events. */
+  onRefresh?: () => void;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -58,16 +60,6 @@ export function PendingTradeOffers({
   const [acceptTrade] = useAcceptTradeMutation();
   const [rejectTrade] = useRejectTradeMutation();
   const [cancelTrade] = useCancelTradeMutation();
-
-  // ── WebSocket: auto-refresh on trade-offer or roster-update events ─────────
-  useLeagueWebSocket({
-    onTradeOffer: () => {
-      void refetch();
-    },
-    onRosterUpdate: () => {
-      void refetch();
-    },
-  });
 
   // ── Action handlers ───────────────────────────────────────────────────────
 

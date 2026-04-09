@@ -14,7 +14,7 @@ import {
   GRADIENT_ACCENT_AMBER,
   SURFACE_PANEL,
   withAlpha,
-} from '../../constants/colors';
+} from '../../utils/colors';
 
 interface PendingWaiverClaimsProps {
   teamId: number;
