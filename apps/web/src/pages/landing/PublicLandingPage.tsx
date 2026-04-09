@@ -411,8 +411,13 @@ export function PublicLandingPage(): React.JSX.Element {
               }
             }
           }
-        } catch {
-          // Best-effort — AuthProvider will refresh on next load
+        } catch (err) {
+          // Best-effort — AuthProvider will restore the session from the
+          // HttpOnly cookie on next load even if this decode fails.
+          LOGGER.warn(
+            'Failed to decode Discord JWT payload for session pre-cache',
+            err instanceof Error ? err : String(err),
+          );
         }
 
         // Navigate to home; AuthProvider will restore the session from cache
