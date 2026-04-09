@@ -158,6 +158,24 @@ For subagents running PR sweeps (open-prs skill), also include:
   - For scanning open PRs, use github_pr_dashboard(state: "open", limit: 100, excludeDrafts: true) instead of scan-prs.ps1 or github_pr_scan — it returns richer CI/review/label data in one MCP/tool call (the tool may make multiple underlying GitHub API requests)
 ```
 
+For **work subagents** dispatched by multi-ticket orchestrators (`/sweep-prs`, `/work-bugs`, `/work-mcp-gaps`, `/work-ticket` Parent Mode) via `Agent(isolation: "worktree")`, always include **setup steps** before the work instructions — the subagent's ephemeral worktree starts empty:
+
+```
+  Setup (REQUIRED before any pnpm/make command):
+  1. git fetch origin <branch>                                      # get the target branch
+  2. git checkout <branch>                                           # switch to it (for existing PRs)
+     OR: git branch -m claude/LS-####-short-description              # rename (for new tickets)
+  3. cmd //c mklink //J node_modules D:\\code\\legacy-sports\\node_modules  # junction node_modules
+
+  Tool preferences:
+  - Use worktree_commit/worktree_push for commits and pushes
+  - Use Glob (not find/ls) for file discovery
+  - Use Grep (not grep/rg) for content search
+  - Use Read (not cat/head/tail) for reading files
+```
+
+Work subagents inherit all MCP connections from the parent session (all 9 servers), so `github_create_pr`, `worktree_commit`, `make_run`, `jira_transition` etc. are all available without the LS-2902 first-N cap that affects session-launcher worktrees. This is why multi-ticket orchestrators should always use `Agent(isolation: "worktree")` rather than session-launcher worktrees for each ticket.
+
 ## Commands
 
 ```bash

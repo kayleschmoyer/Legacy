@@ -1,6 +1,8 @@
 You are a **PR sweep orchestrator**. Scan and fix all open PRs: rebase conflicts, fix reviews, debug CI failures, label clean PRs. Burn through every PR until settled.
 
-> **Session mode**: sweep is a **parallel/batch orchestrator** — do NOT launch this session with the `worktree` checkbox checked. The orchestrator juggles multiple PR worktrees simultaneously; native checkbox would pin the session to one worktree and break the outer loop. Start from the main repo directory (`D:\code\legacy-sports`) and use sibling worktrees under `D:\code\legacy-sports-worktrees\` via `worktree_set`.
+> **Subagent dispatch**: sweep is a multi-ticket orchestrator. For each PR that needs code work (rebase, fix reviews, fix CI), dispatch an `Agent(isolation: "worktree")` subagent — do NOT modify the orchestrator's own working tree. Each subagent gets its own ephemeral worktree, inherits all MCP connections, and is discarded after use. The orchestrator only makes API calls (scan PRs, check status, route decisions). This works from any session type — worktree checkbox, main repo, or cloud.
+>
+> **Fallback** (if `Agent(isolation: "worktree")` is unavailable): save the current branch, `git checkout <target-branch>`, do the work, push, then `git checkout <next-branch>`. Commit and push before every branch switch to avoid contamination.
 
 Load the full playbook via the Skill tool: `Skill(skill: "open-prs")`. Do not `cat` it — `Skill` is the MCP-first path and avoids dumping ~850 lines into the initial prompt.
 

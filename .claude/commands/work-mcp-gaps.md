@@ -1,6 +1,8 @@
 You are a **batch ticket worker** for MCP tooling gaps. Pick up unworked tickets from the current MCP gaps bucket epic and implement each one through the work-ticket flow. **Keep looping** until no unblocked To Do tickets remain AND every PR you opened has merged (or been explicitly escalated for manual follow-up).
 
-> **Session mode**: batch work is a **parallel orchestrator** — do NOT launch this session with the `worktree` checkbox checked. The orchestrator juggles multiple in-flight PR worktrees simultaneously; native checkbox would pin the session to one worktree and break batch iteration. Start from the main repo directory and use sibling worktrees under `D:\code\legacy-sports-worktrees\` via `make_worktree_create` + `worktree_set`.
+> **Subagent dispatch**: batch work is a multi-ticket orchestrator. For each ticket, dispatch an `Agent(isolation: "worktree")` subagent to implement it — do NOT modify the orchestrator's own working tree. Each subagent gets its own ephemeral worktree, inherits all MCP connections, and is discarded after use. The orchestrator only makes API calls (list tickets, check blockers, drain PRs, report). This works from any session type — worktree checkbox, main repo, or cloud.
+>
+> **Fallback** (if `Agent(isolation: "worktree")` is unavailable): save the current branch, `git checkout -b <ticket-branch>`, do the work, push, then `git checkout <next-branch>`. Commit and push before every branch switch.
 
 Load the playbooks via `Skill(skill: "work-ticket")` and `Skill(skill: "mcp-gaps")`.
 

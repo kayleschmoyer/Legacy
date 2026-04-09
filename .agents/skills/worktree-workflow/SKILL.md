@@ -9,10 +9,11 @@ This skill is a **router**. It describes the two worktree flows, when to use eac
 
 ## Choose your flow
 
-| Flow                                | When                                                                                                                                       | Detail guide                                                                                                                |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
-| **Native ephemeral (primary)**      | Single-ticket leaf work. Session spawned with Claude Code launcher `worktree` checkbox checked.                                            | See "Native Flow" below + [AGENTS.md Workflow Step 4](../../../AGENTS.md) + [work-ticket SKILL.md](../work-ticket/SKILL.md) |
-| **Sibling (parallel / batch only)** | Sweep (`open-prs`), batch workers (`work-bugs`, `work-mcp-gaps`), parent ticket iteration, chained branches, multi-worktree orchestrators. | See [references/sibling/sibling-worktree-flow.md](references/sibling/sibling-worktree-flow.md)                              |
+| Flow                                 | When                                                                                                  | Detail guide                                                                                                                |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| **Native ephemeral (primary)**       | Single-ticket leaf work. Session spawned with Claude Code launcher `worktree` checkbox checked.       | See "Native Flow" below + [AGENTS.md Workflow Step 4](../../../AGENTS.md) + [work-ticket SKILL.md](../work-ticket/SKILL.md) |
+| **Subagent dispatch (multi-ticket)** | Multi-ticket orchestrators: sweep, work-bugs, work-mcp-gaps, parent/epic iteration, batch workers.    | See "Subagent Dispatch" below + orchestrator command files                                                                  |
+| **Sibling worktree (legacy)**        | Fallback when `Agent(isolation: "worktree")` is unavailable, or chained branch stacks requiring twig. | See [references/sibling/sibling-worktree-flow.md](references/sibling/sibling-worktree-flow.md)                              |
 
 > **Both flows keep `D:\code\legacy-sports` on `main`.** Working in the main repo directory with HEAD on a feature branch is forbidden. The native flow puts the branch in `.claude/worktrees/<name>/`; the sibling flow puts it in `D:\code\legacy-sports-worktrees\<ticket>\`.
 
@@ -53,11 +54,80 @@ The Claude Code session was spawned with the launcher `worktree` checkbox checke
 - **On exit**, `ExitWorktree(action: "remove")` cleans up the ephemeral worktree. Only call this when explicitly done — the worktree can survive across sessions if kept.
 - **If MCP servers are missing** from the session (LS-2902 — Claude Code connects only the first few servers from `.mcp.json` in worktree-spawned sessions), the critical ticket-work servers (`worktree`, `github`, `make`, `nx`) are now at the top of `.mcp.json` so they load first. Fallback for missing ones: `gh` CLI, raw `git`, `pnpm exec nx` — all work from Bash.
 
-## Sibling Flow (parallel / batch only)
+## Subagent Dispatch (multi-ticket orchestrators)
 
-If you are running a parallel orchestrator — `open-prs` (sweep), `work-bugs`, `work-mcp-gaps`, a parent ticket iterating through children, or a chained-branch workflow — you need sibling worktrees because the native flow pins the session to one worktree.
+Multi-ticket commands (`/sweep-prs`, `/work-bugs`, `/work-mcp-gaps`, `/work-ticket` on an epic/parent with children) dispatch **`Agent(isolation: "worktree")` subagents** for each ticket or PR that needs code work. The orchestrator itself only makes API calls — it never modifies its own working tree.
 
-> **📎 Full sibling-flow guide**: [references/sibling/sibling-worktree-flow.md](references/sibling/sibling-worktree-flow.md). Load this only when you are actually running a parallel orchestrator — it is long and not relevant to single-ticket sessions.
+**Why subagents?**
+
+- Each subagent gets its own ephemeral worktree — no contamination between tickets
+- Subagents **inherit the parent's MCP connections** (all 9 servers), bypassing the LS-2902 first-N loading cap that affects session-launcher worktrees
+- Automatic cleanup — ephemeral worktrees are discarded after the subagent returns
+- **Session-type-agnostic** — works identically whether the orchestrator was launched with the worktree checkbox, from the main repo, or from a cloud environment
+
+**Subagent dispatch pattern:**
+
+```
+for each ticket/PR needing code work:
+  result = Agent(
+    isolation: "worktree",
+    prompt: """
+      Implement/fix <ticket-or-PR-description>.
+
+      Setup:
+      1. git fetch origin <branch-or-main>
+      2. git checkout <existing-branch>  (for PRs)  OR  stay on the ephemeral branch (for new tickets)
+      3. cmd //c mklink //J node_modules D:\\code\\legacy-sports\\node_modules
+      4. <rename branch if new ticket: git branch -m claude/LS-####-description>
+
+      Work:
+      5. <specific instructions — implement ticket, fix review, rebase, etc.>
+      6. make_run(target: "pc")
+      7. worktree_commit + worktree_push
+      8. github_create_pr (if new) or push to existing PR branch
+
+      Tool preferences:
+      - Use worktree_commit/worktree_push for commits and pushes
+      - Use Glob (not find/ls) for file discovery
+      - Use Grep (not grep/rg) for content search
+      - Use Read (not cat/head/tail) for reading files
+
+      Return: { prNumber, status, issues }
+    """
+  )
+  # Orchestrator processes result, updates tracking, moves to next item
+```
+
+**Orchestrator responsibilities** (API calls only, no file edits):
+
+- Scan PRs (`github_pr_dashboard`) or list tickets (`jira_list_children`)
+- Route decisions (what each PR/ticket needs: rebase, fix review, implement)
+- Dispatch subagents with specific instructions
+- Track in-flight PRs and drain them (check merge status, re-dispatch for fixes)
+- Report results
+
+**Fallback — sequential branch switching** (if `Agent(isolation: "worktree")` is unavailable):
+
+```
+original_branch = git branch --show-current
+for each target:
+  git fetch origin <branch>
+  git checkout <branch>
+  cmd //c mklink //J node_modules D:\\code\\legacy-sports\\node_modules  # if not already junctioned
+  # ... do work, commit, push ...
+  # (must commit+push before switching — dirty working tree blocks checkout)
+git checkout $original_branch
+```
+
+## Sibling Worktree Flow (legacy / chained branches)
+
+The sibling worktree flow under `D:\code\legacy-sports-worktrees\` is now a **legacy fallback**, retained for:
+
+- Chained branch stacks that require `twig` parent dependency tracking
+- Environments where `Agent(isolation: "worktree")` is not available AND sequential branch switching is impractical
+- Pre-existing sibling worktrees from before the native-checkbox migration
+
+> **📎 Full sibling-flow guide**: [references/sibling/sibling-worktree-flow.md](references/sibling/sibling-worktree-flow.md). Load this only when you specifically need the sibling worktree pattern.
 
 Quick sibling-flow reference:
 

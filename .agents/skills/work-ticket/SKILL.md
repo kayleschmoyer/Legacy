@@ -117,7 +117,7 @@ Process children in iterative batches until the backlog is empty.
 
 2. **Iterative batch loop** — repeat until no unblocked To Do children remain:
 
-   ```
+   ````
    all_worked = []      # cumulative across all batches
    all_released = []    # cumulative across all batches
 
@@ -142,24 +142,65 @@ Process children in iterative batches until the backlog is empty.
         before starting work on any of them. Use a single bulk call:
         jira_bulk_transition(keys: [...batch keys], status: "In Progress")
         Do not call jira_transition per ticket — one bulk call saves N round-trips.
-     e. Work each child ticket via Leaf Mode (Step 2 above):
-        - Each child gets its own worktree + branch + PR (one ticket = one PR)
-        - After completing Leaf Mode step 8 for each child (mark PR ready, request
-          Copilot review, and subscribe to PR activity), transition it to "In Review"
-          via individual jira_transition — this happens one child at a time as each PR ships
-        - Shepherd each child PR through to merge (watch CI, fix review comments, rebase as needed)
-          before starting the next child — the child is not done until its PR is merged
+     e. **Dispatch a subagent for each child ticket** — do NOT modify the orchestrator's
+        own working tree. Each child gets its own isolated ephemeral worktree:
+
+        ```
+        Agent(
+          isolation: "worktree",
+          prompt: """
+            Implement Jira ticket LS-<child_key>. Follow these steps:
+
+            Setup:
+            1. git fetch origin main
+            2. cmd //c mklink //J node_modules D:\\code\\legacy-sports\\node_modules
+            3. jira_transition(key: "LS-<child_key>", status: "In Progress")
+
+            Work:
+            4. Read the ticket: jira_view(key: "LS-<child_key>")
+            5. Implement the ticket (code + tests)
+            6. Self-review changes
+            7. db_migration_status() + db_migrate()
+            8. make_run(target: "pc") — must pass
+            9. worktree_commit(message: "type(scope): description")
+            10. git branch -m claude/LS-<child_key>-short-description
+            11. worktree_push(setUpstream: true)
+            12. github_create_pr(title: "LS-<child_key> ...", draft: true)
+            13. github_manage_labels(add: ["agent-in-progress"])
+            14. github_mark_pr_ready
+            15. github_request_review
+            16. jira_transition(key: "LS-<child_key>", status: "In Review")
+
+            Return the PR number and any issues encountered.
+
+            Tool preferences:
+            - Use worktree_commit/worktree_push for commits and pushes
+            - Use Glob (not find/ls) for file discovery
+            - Use Grep (not grep/rg) for content search
+            - Use Read (not cat/head/tail) for reading files
+          """
+        )
+        ```
+
+        After the subagent returns:
+        - Record the PR number in the tracking list
+        - Monitor the PR: watch CI, fix review comments (dispatch another subagent
+          for fixes if needed), rebase as needed
+        - Shepherd each child PR through to merge before starting the next child
         - Mark the child's tracking task completed (`TaskUpdate(taskId: <id>, status: "completed")`)
-          **after the child PR merges and the gap audit is complete**, never at PR creation —
-          marking tasks complete while the PR is still open is a failure mode
-        - Clean up the worktree after the PR merges, before starting the next child
+          **after the child PR merges and the gap audit is complete**, never at PR creation
+
+        **Fallback** (if `Agent(isolation: "worktree")` is unavailable):
+        save the current branch, `git checkout -b LS-<child_key>/description origin/main`,
+        junction node_modules, do the work, push, create PR, then
+        `git checkout <original-branch>`. Commit and push before every switch.
      f. Release uncompleted: any claimed ticket that did not reach "In Review":
         - If no PR exists → transition back to "To Do" via individual jira_transition
           (note: jira_bulk_transition does not support "To Do"; use single calls here)
         - If a PR/branch exists → keep "In Progress" and report for manual follow-up
      g. Append results to all_worked / all_released.
      → Loop back to step a.
-   ```
+   ````
 
 3. **Update parent status** after all batches complete:
 
