@@ -179,17 +179,17 @@ On **Claude Code on the web**, Claude's native Atlassian plugin (`mcp__claude_ai
 
 **Jira tool mapping** (native Atlassian plugin equivalents):
 
-| Custom MCP tool        | Native plugin equivalent                                                                                                                                                                                                    |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `jira_view`            | `getJiraIssue`                                                                                                                                                                                                              |
-| `jira_search`          | `searchJiraIssuesUsingJql`                                                                                                                                                                                                  |
-| `jira_create_ticket`   | `createJiraIssue`                                                                                                                                                                                                           |
-| `jira_edit_ticket`     | `editJiraIssue`                                                                                                                                                                                                             |
-| `jira_transition`      | `transitionJiraIssue` (call `getTransitionsForJiraIssue` first)                                                                                                                                                             |
-| `jira_bulk_transition` | No native bulk equivalent — call `transitionJiraIssue` per key in parallel. Use for batch claim/release (e.g. claim 5 tickets In Progress at once). Supports: "In Progress", "In Review", "Done" — does not support "To Do" |
-| `jira_get_comments`    | No direct equivalent — use `getJiraIssue` with `comment` field                                                                                                                                                              |
-| `jira_link_issues`     | No native equivalent (use custom `legacy-sports-jira` MCP or `acli`)                                                                                                                                                        |
-| `jira_list_children`   | `searchJiraIssuesUsingJql` with `parent = LS-####`                                                                                                                                                                          |
+| Custom MCP tool        | Native plugin equivalent                                                                                                                                                                                                                                              |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `jira_view`            | `getJiraIssue`                                                                                                                                                                                                                                                        |
+| `jira_search`          | `searchJiraIssuesUsingJql`                                                                                                                                                                                                                                            |
+| `jira_create_ticket`   | `createJiraIssue`                                                                                                                                                                                                                                                     |
+| `jira_edit_ticket`     | `editJiraIssue`                                                                                                                                                                                                                                                       |
+| `jira_transition`      | `transitionJiraIssue` — **pass transition as an object, not a string**: `transitionJiraIssue({ cloudId: "fb294606-6c8f-4b52-9a41-11fe45b77528", issueIdOrKey: "LS-####", transition: { id: "21" } })`. Call `getTransitionsForJiraIssue` first to get the numeric ID. |
+| `jira_bulk_transition` | No native bulk equivalent — call `transitionJiraIssue` per key in parallel. Use for batch claim/release (e.g. claim 5 tickets In Progress at once). Supports: "In Progress", "In Review", "Done" — does not support "To Do"                                           |
+| `jira_get_comments`    | No direct equivalent — use `getJiraIssue` with `comment` field                                                                                                                                                                                                        |
+| `jira_link_issues`     | No native equivalent (use custom `legacy-sports-jira` MCP or `acli`)                                                                                                                                                                                                  |
+| `jira_list_children`   | `searchJiraIssuesUsingJql` with `parent = LS-####`                                                                                                                                                                                                                    |
 
 ## Known cloud-environment quirks
 
@@ -227,6 +227,17 @@ The call payload is formed correctly (e.g. `{"id": "21"}` as a JSON object liter
 **Hypothesis**: a plugin schema cold-start where the wrapper temporarily mis-encodes the strictest object parameter (`transition` has `additionalProperties: false`, unlike `editJiraIssue.fields` which has `additionalProperties: {}`). Cannot be reliably reproduced or root-caused from inside the agent session.
 
 **Workaround**: retry the same call after any other successful plugin call has completed. ~30 seconds of normal activity is usually enough. **Do not re-architect around the failure** — it warms up on its own.
+
+**Correct call pattern** (once warm):
+
+1. Get transition IDs for the ticket:
+   `getTransitionsForJiraIssue({ cloudId: "fb294606-6c8f-4b52-9a41-11fe45b77528", issueIdOrKey: "LS-####" })`
+2. Then pass the transition as a JSON object (NOT a string):
+   `transitionJiraIssue({ cloudId: "fb294606-6c8f-4b52-9a41-11fe45b77528", issueIdOrKey: "LS-####", transition: { id: "21" } })`
+
+**Common mistake**: passing a string like `transition: "In Progress"` or `transition: "{\"id\": \"21\"}"`
+causes the `"expected object, received string"` error even when the server is warm.
+The `transition` parameter MUST be a JSON object `{ id: "21" }`, not a string.
 
 ### Discovering transition IDs
 
