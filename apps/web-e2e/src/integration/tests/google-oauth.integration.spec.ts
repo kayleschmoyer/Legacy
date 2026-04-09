@@ -61,6 +61,16 @@ const GOOGLE_PASSWORD = process.env['GOOGLE_TEST_PASSWORD'] ?? '';
 /** Maximum response time we accept — anything longer indicates a timeout risk. */
 const MAX_RESPONSE_MS = 15_000;
 
+// Suppress Chromium automation detection flags as much as possible.
+// Must be top-level (not inside a describe) because it forces a new worker.
+// Note: headless mode is still detected by Google; run with --headed for
+// reliable results in development.
+test.use({
+  launchOptions: {
+    args: ['--disable-blink-features=AutomationControlled'],
+  },
+});
+
 // ---------------------------------------------------------------------------
 // API smoke tests — always run, no browser needed
 // ---------------------------------------------------------------------------
@@ -201,15 +211,6 @@ test.describe('Google OAuth — UI popup flow', () => {
     'Popup flow test is opt-in: set GOOGLE_OAUTH_POPUP_TEST=1 (plus GOOGLE_TEST_EMAIL / ' +
       'GOOGLE_TEST_PASSWORD) and run in --headed mode to enable this test.',
   );
-
-  // Suppress Chromium automation detection flags as much as possible.
-  // Note: headless mode is still detected by Google; run with --headed for
-  // reliable results in development.
-  test.use({
-    launchOptions: {
-      args: ['--disable-blink-features=AutomationControlled'],
-    },
-  });
 
   test('clicking Get Started with Google authenticates via popup and shows the app', async ({
     browser,
