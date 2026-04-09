@@ -1,5 +1,6 @@
 import { jiraRequest, getSiteUrl } from '../jira-api.js';
 import { getJiraCredentials } from '../netrc.js';
+import { buildStructuredDescription } from '../adf.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { getActiveSprintId } from './get-active-sprint.js';
 
@@ -7,6 +8,9 @@ export interface BulkCreateTicketInput {
   summary: string;
   type?: string;
   description?: string;
+  context?: string;
+  risk?: string;
+  planningNotes?: string;
   parent?: string;
   sprint?: string;
 }
@@ -34,19 +38,6 @@ interface JiraBulkCreateResponse {
     failedElementNumber: number;
     elementErrors: { errors: Record<string, string>; errorMessages: string[] };
   }>;
-}
-
-function buildDescription(text: string): Record<string, unknown> {
-  return {
-    type: 'doc',
-    version: 1,
-    content: [
-      {
-        type: 'paragraph',
-        content: [{ type: 'text', text }],
-      },
-    ],
-  };
 }
 
 /** Create multiple Jira tickets in one bulk API call. */
@@ -145,8 +136,14 @@ export async function bulkCreate(
       issuetype: { name: ticket.type ?? 'Task' },
       summary: ticket.summary,
     };
-    if (ticket.description) {
-      fields['description'] = buildDescription(ticket.description);
+    const adfDescription = buildStructuredDescription({
+      description: ticket.description,
+      context: ticket.context,
+      risk: ticket.risk,
+      planningNotes: ticket.planningNotes,
+    });
+    if (adfDescription) {
+      fields['description'] = adfDescription;
     }
     if (ticket.parent) {
       fields['parent'] = { key: ticket.parent };

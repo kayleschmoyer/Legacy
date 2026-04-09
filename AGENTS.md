@@ -64,7 +64,8 @@ If you find yourself on a branch that does not match this convention (for exampl
 ## Workflow
 
 0.  **Epic check**: if the given ticket is an Epic, do NOT implement the epic directly. Instead, use `jira_view` to inspect the epic's child issues, identify the next unblocked To Do ticket, and begin working on that child ticket. If `jira_list_children` is available, prefer it; otherwise use `acli jira workitem search --jql "parent = LS-####"`. Repeat for each child until all are complete or blocked.
-1.  Ticket: create if needed using the `jira_create_ticket` MCP tool with `sprint: "current"` to add it to the active sprint (or `acli jira workitem create --summary "..." --project LS --type Task`) — note `$key`
+1.  Ticket: create if needed using the `jira_create_ticket` MCP tool with `sprint: "current"` to add it to the active sprint (or `acli jira workitem create --summary "..." --project LS --type Task`) — note `$key`. Use the optional `context`, `risk`, and `planningNotes` fields to capture planning output (see [planning skill](/.agents/skills/planning/SKILL.md) and Risk Classification below).
+    1b. **Planning phase**: after inspecting the ticket, run the [planning skill](/.agents/skills/planning/SKILL.md) to assess scope, read relevant code, identify constraints, and classify risk. Skip for trivial tasks (typos, doc-only, single-line changes). The planning output informs implementation approach and time budget.
 2.  **Dependency check**: inspect the Jira ticket for "blocked-by" linked issues. Query their status before any status transition:
     - **Blocker is not In Review or Done — STOP.** Do not proceed with the ticket. Inform the user that the blocking ticket must reach at least "In Review" before work can begin.
     - **Blocker is In Review — use its branch as the parent.** The worktree must branch from that ticket's branch, not from `main` (see `skills/worktree-workflow/SKILL.md` Step 1).
@@ -129,6 +130,18 @@ If you find yourself on a branch that does not match this convention (for exampl
 
 15. **Complete tracking tasks**: call `TaskUpdate(taskId, status: "completed")` for every task created to track this work — only after the PR is merged and the gap audit is complete. In parent/batch mode, mark the child's task completed before starting the next child. Leaving tasks open after merge is a failure mode — the task tracker is the agent's signal to the user that work is truly done.
 16. Cleanup: `twig worktree clean` then `git branch -d LS-####/description` then Jira "Done" — **NEVER use `git worktree remove` directly** (see Rules)
+
+## Risk Classification
+
+Every implementation task has a risk level that determines how much planning is appropriate. Use this quick reference; see `.agents/skills/planning/SKILL.md` for the full framework.
+
+| Level      | Scope                                                   | Planning Budget | Examples                                           |
+| ---------- | ------------------------------------------------------- | --------------- | -------------------------------------------------- |
+| **Low**    | Cosmetic, docs, test-only, single-file, no schema/infra | 2-3 min         | Typo fix, add test, update README                  |
+| **Medium** | Business logic, multi-file, schema, new components      | 5-10 min        | New resolver, UI feature, refactor across files    |
+| **High**   | Auth, payments, infra, migrations, cross-service        | 10-15 min       | OAuth, Stripe webhook, Terraform, schema migration |
+
+**Ticket descriptions**: when creating tickets with `jira_create_ticket`, use the optional `context`, `risk`, and `planningNotes` fields to capture planning output. These render as structured sections in the ticket description, giving future agents (and humans) immediate context for the work.
 
 ## Command Patterns — Avoid `cd` Compound Commands
 

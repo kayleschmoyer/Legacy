@@ -73,6 +73,7 @@ After the loop exits (no unblocked To Do tickets AND no in-flight PRs — note: 
 **Guardrails**:
 
 - One ticket = one worktree = one PR.
+- For `missing-tool` and `missing-feature` tickets, run the planning phase to understand the MCP server's existing patterns before adding code. `missing-awareness` (doc-only) tickets can skip planning.
 - Always run `make pc` before pushing.
 - **Never stop after `github_create_pr`** — track the PR in `in_flight_prs` and drain it in the next iteration.
 - **The exit condition is "no work remains"**, not "no To Do tickets remain". If the To Do list is empty but PRs are still in-flight, keep draining.

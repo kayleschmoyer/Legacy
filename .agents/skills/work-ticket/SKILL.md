@@ -51,6 +51,32 @@ jira_list_children(key: "LS-####", limit: 100)
 | No children (or `jira_list_children` returns empty) | **Leaf mode** — implement this ticket directly |
 | Has children                                        | **Parent mode** — work the children            |
 
+### Step 1b: Planning phase
+
+After inspecting the ticket, run the [planning skill](../planning/SKILL.md) before implementation.
+
+**Why**: agents that skip planning produce code that works in isolation but misses constraints, breaks adjacent systems, or solves the wrong problem. A 5-minute planning phase prevents 45-minute rework cycles.
+
+1. **Scope assessment** — classify as Trivial/Low/Medium/High based on what the ticket touches (see planning skill Step 1). Trivial tickets (typo fix, doc-only) skip planning entirely.
+2. **Code reconnaissance** — read the target files, their imports, consumers, and tests. Build a mental model of the current state before proposing changes.
+3. **Risk classification** — classify the change and set a time budget:
+   - **Low** (2-3 min): single-file, single-concern, no schema/infra
+   - **Medium** (5-10 min): multi-file, business logic, schema changes, new components
+   - **High** (10-15 min): auth, payments, infra, migrations, cross-service
+4. **Planning output** — carry forward: goal statement ("I am changing X because Y"), risk level, file plan, constraints, verification plan.
+
+When creating the Jira ticket (if one doesn't exist), use the structured fields to capture planning context:
+
+```
+jira_create_ticket(
+  summary: "type(scope): description",
+  context: "<why this work matters>",
+  risk: "<Low|Medium|High> — <reasoning>",
+  planningNotes: "<relevant files, constraints, dependencies>",
+  sprint: "current"
+)
+```
+
 ### Step 2: Route to the correct mode
 
 #### Leaf Mode (no children)
@@ -257,6 +283,7 @@ The skill is responsible for shepherding the PR all the way to "merged" (step 9 
 
 ## Gotchas
 
+- **Don't over-plan trivial tasks** — the planning skill has a scope assessment step that tells you when to skip. A typo fix does not need 10 minutes of reconnaissance.
 - **Always check blockers before starting** — working a ticket whose blocker is still in progress wastes effort
 - **One worktree per child** — never combine multiple child tickets into one branch/PR
 - **Don't skip `make pc`** — even when processing multiple children, validate each one

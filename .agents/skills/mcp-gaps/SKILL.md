@@ -14,6 +14,8 @@ Three-phase workflow for closing MCP tooling gaps:
 
 This skill enforces the **MCP-first principle** from AGENTS.md: shell commands are fallbacks, not defaults.
 
+**Why this matters**: every shell command in an agent session represents friction that slows down all future sessions. Filing tickets for gaps is how we systematically eliminate that friction — each ticket closed makes every agent faster.
+
 ## When to Use
 
 | Trigger                                         | Phase  |
@@ -54,10 +56,11 @@ This skill enforces the **MCP-first principle** from AGENTS.md: shell commands a
 > Full procedure: [`references/triage-workflow.md`](references/triage-workflow.md)
 
 1. **Find** the next unblocked To Do ticket: call `jira_get_bucket_epic({ bucket: 'mcp-gaps' })` to get the current epic key, then `jira_list_children(key: <currentKey>, status: "To Do")`
-2. **Understand** the gap type — determines implementation approach:
-   - `missing-tool` — add a new tool to the appropriate MCP server
-   - `missing-feature` — add a parameter/flag to an existing tool
-   - `missing-awareness` / doc gap — update skill docs or AGENTS.md
+2. **Understand** the gap type — determines implementation approach and risk:
+   - `missing-tool` — add a new tool to the appropriate MCP server. **Risk: Medium** (new code in a shared server used by all agents)
+   - `missing-feature` — add a parameter/flag to an existing tool. **Risk: Medium** (modifying existing server code)
+   - `missing-awareness` / doc gap — update skill docs or AGENTS.md. **Risk: Low** (doc changes only)
+     For `missing-tool` and `missing-feature` gaps, run the [planning skill](../planning/SKILL.md) before implementation to understand the MCP server's existing patterns, conventions, and tool registration approach. Changes to auth-related tools or tools that make external API calls are **High risk**.
 3. **Implement** following the target MCP server's conventions
 4. **Validate** with `make pc`
 5. **Ship** — commit, push, create PR, transition Jira to "In Review"

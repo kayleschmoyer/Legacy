@@ -93,6 +93,24 @@ server.tool(
       .default('Task')
       .describe('Issue type (default: Task)'),
     description: z.string().optional().describe('Ticket description'),
+    context: z
+      .string()
+      .optional()
+      .describe(
+        'Why this work is being done — the user problem, business need, or technical debt that motivated the ticket',
+      ),
+    risk: z
+      .string()
+      .optional()
+      .describe(
+        'Risk level (Low/Medium/High) with reasoning — e.g. "Medium — modifies business logic in 3 files"',
+      ),
+    planningNotes: z
+      .string()
+      .optional()
+      .describe(
+        'Relevant files, constraints, and dependencies discovered during planning',
+      ),
     parent: z.string().optional().describe('Parent epic key'),
     sprint: z
       .string()
@@ -111,6 +129,24 @@ const ticketSchema = z.object({
     .default('Task')
     .describe('Issue type (default: Task)'),
   description: z.string().optional().describe('Ticket description'),
+  context: z
+    .string()
+    .optional()
+    .describe(
+      'Why this work is being done — the user problem, business need, or technical debt that motivated the ticket',
+    ),
+  risk: z
+    .string()
+    .optional()
+    .describe(
+      'Risk level (Low/Medium/High) with reasoning — e.g. "Medium — modifies business logic in 3 files"',
+    ),
+  planningNotes: z
+    .string()
+    .optional()
+    .describe(
+      'Relevant files, constraints, and dependencies discovered during planning',
+    ),
   parent: z.string().optional().describe('Parent epic key (e.g. "LS-1455")'),
   sprint: z
     .string()

@@ -26,6 +26,8 @@ Work through these phases sequentially. Each phase links to a detailed reference
 
 Run a structured review of all branch changes before committing/pushing. Catches project-rule violations that `make pc` does not check (semantic issues, dead code, reuse opportunities).
 
+> Self-review is a verification step, not a planning step. If you find yourself making significant design changes during self-review, you may have skipped the [planning phase](../planning/SKILL.md) — consider stopping and re-planning.
+
 > Details: [references/self-review.md](references/self-review.md)
 
 ### Phase 2: Create PR with Jira Linkage
@@ -41,6 +43,8 @@ If `configured: false`, **stop and prompt the user** — do not silently fall ba
 **Cloud (Claude Code on the web)**: Use built-in `mcp__github__create_pull_request({ owner, repo, ... })` and `mcp__github__update_pull_request({ owner, repo, pullNumber, draft: false })` — these authenticate via the platform's token and avoid the username-leak issue. See [`cloud-agent-mode/SKILL.md`](../cloud-agent-mode/SKILL.md) for the full tool mapping.
 
 Verify prerequisites (`make pc`, migrations, branch pushed), create the PR **as a draft** with standard template, mark it ready for review, then transition Jira to "In Review". The draft→ready flow prevents sweep/review agents from racing with the creating agent.
+
+When a planning phase was run (see [planning skill](../planning/SKILL.md)), include its output in the PR body: the **Context** (why) and **Risk Assessment** sections help reviewers focus on the right areas.
 
 > Details: [references/create-pr.md](references/create-pr.md)
 
@@ -164,6 +168,7 @@ gh pr ready <PR#>
 
 ## Related Skills
 
+- [planning](../planning/SKILL.md) -- Structured planning phase (referenced by self-review and PR body guidance)
 - [rebase-and-conflicts](../rebase-and-conflicts/SKILL.md) -- Rebase branches and resolve merge conflicts
 - [debug-ci-failure](../debug-ci-failure/SKILL.md) -- Debug CI failures
 - [worktree-workflow](../worktree-workflow/SKILL.md) -- Working in isolated worktrees

@@ -13,6 +13,10 @@ description: 'Rebase branches onto main (or another base) and resolve merge conf
 - Cascade rebases through stacked/dependent branches
 - Recover from a stuck or failed rebase
 
+## Risk Level
+
+Rebasing is inherently a **Medium-risk** operation — it modifies git history and can introduce conflicts in areas you didn't originally change. For branches with High-risk changes (auth, payments, infrastructure), take extra care during conflict resolution. If the rebase introduces conflicts in unfamiliar code areas, re-run the [planning skill](../planning/SKILL.md) on the conflicting files before resolving.
+
 ## Quick Start: Simple Rebase
 
 **Preferred (MCP):** `worktree_rebase` -- fetches, rebases, sets `GIT_EDITOR=true` automatically.
@@ -60,6 +64,8 @@ If `worktree_conflict_info` returns no conflicts, all merge conflicts are resolv
 ## Post-Rebase Stabilization (CRITICAL)
 
 > Do NOT push until `make pc` passes. This is the #1 cause of post-rebase CI failures.
+>
+> **Why**: rebasing can silently break type compatibility, schema alignment, and lock file integrity even when no conflicts are reported. The stabilization step catches these invisible breakages before they become CI failures that cost 40-60 minutes each.
 
 ```bash
 make install
@@ -125,6 +131,7 @@ $conflicting | Select-Object number, headRefName
 
 ## Related Skills
 
+- [planning](../planning/SKILL.md) -- re-plan when rebase introduces conflicts in unfamiliar code
 - [branch-tree](../branch-tree/SKILL.md) -- view and manage dependent branch trees
 - [worktree-workflow](../worktree-workflow/SKILL.md) -- working in isolated worktrees
 - [repo-tooling](../repo-tooling/SKILL.md) -- fix TypeScript and lint errors after rebase

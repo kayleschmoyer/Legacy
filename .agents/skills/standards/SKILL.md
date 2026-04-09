@@ -7,6 +7,8 @@ description: 'Coding standards, config conventions, lint discipline, and codegen
 
 Consolidated reference for coding standards, configuration conventions, lint discipline, and codegen policy. These rules are enforced by CI and code review -- follow them during implementation to avoid review findings.
 
+These standards inform the risk assessment in the [planning skill](../planning/SKILL.md). Changes that touch areas covered by the top review findings (codegen, security, errors) are typically Medium or High risk.
+
 ## Critical Rules
 
 ### No lint suppression -- fix root causes
@@ -89,6 +91,7 @@ Run `make pc` before pushing. Skipping saves 5 min but each CI failure costs 40-
 
 ## Related Skills
 
+- [planning](../planning/SKILL.md) -- risk classification informed by these standards
 - [review](../review/SKILL.md) -- self-review checklist (references this skill)
 - [fix-copilot-reviews](../fix-copilot-reviews/SKILL.md) -- batch-fix Copilot review comments
 - [codegen](../codegen/SKILL.md) -- codegen workflow details

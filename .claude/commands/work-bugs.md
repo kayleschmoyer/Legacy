@@ -73,6 +73,7 @@ After the loop exits (no unblocked To Do tickets AND no in-flight PRs — note: 
 **Guardrails**:
 
 - One ticket = one worktree = one PR.
+- Always run the planning phase after inspecting each bug ticket — reproduction is part of planning. High-risk bugs (distributed systems, auth) require full planning with downstream impact analysis.
 - Always run `make pc` before pushing.
 - **Never stop after `github_create_pr`** — track the PR in `in_flight_prs` and drain it in the next iteration.
 - **The exit condition is "no work remains"**, not "no To Do tickets remain". If the To Do list is empty but PRs are still in-flight, keep draining.

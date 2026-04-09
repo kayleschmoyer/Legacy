@@ -1,5 +1,6 @@
 import { jiraRequest, getSiteUrl } from '../jira-api.js';
 import { getJiraCredentials } from '../netrc.js';
+import { buildStructuredDescription } from '../adf.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { getActiveSprintId } from './get-active-sprint.js';
 
@@ -7,6 +8,9 @@ interface CreateTicketParams {
   summary: string;
   type?: string;
   description?: string;
+  context?: string;
+  risk?: string;
+  planningNotes?: string;
   parent?: string;
   sprint?: string;
 }
@@ -31,7 +35,16 @@ interface CreateTicketResponse {
 export async function createTicket(
   params: CreateTicketParams,
 ): Promise<CallToolResult> {
-  const { summary, type = 'Task', description, parent, sprint } = params;
+  const {
+    summary,
+    type = 'Task',
+    description,
+    context,
+    risk,
+    planningNotes,
+    parent,
+    sprint,
+  } = params;
 
   // Resolve credentials once upfront to avoid redundant lookups for the
   // browse URL later.
@@ -44,17 +57,14 @@ export async function createTicket(
     summary,
   };
 
-  if (description) {
-    fields['description'] = {
-      type: 'doc',
-      version: 1,
-      content: [
-        {
-          type: 'paragraph',
-          content: [{ type: 'text', text: description }],
-        },
-      ],
-    };
+  const adfDescription = buildStructuredDescription({
+    description,
+    context,
+    risk,
+    planningNotes,
+  });
+  if (adfDescription) {
+    fields['description'] = adfDescription;
   }
 
   if (parent) {
