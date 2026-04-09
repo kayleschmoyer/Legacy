@@ -23,18 +23,19 @@ This aims to keep most PRs to ≤ 2 review rounds by avoiding unnecessary re-rev
 
 ## Workflow (single PR)
 
-1. **Fetch threads**: `github_get_review_threads(number: <PR#>, unresolvedOnly: true)`
-2. **Fix ALL threads before touching git**: read every thread's `path`, `line`, and `body` first, then apply all fixes in one pass. Do not commit or push until all threads are addressed.
+1. **Activate worktree context (FIRST)**: call `worktree_set({ key: "LS-####" })` (sibling worktrees) or `worktree_set({ key: "<absolute .claude/worktrees/... path>" })` (ephemeral worktrees). Do this before any git operations — it ensures `worktree_diff`, `worktree_commit`, and `worktree_push` target the correct worktree path. Never use raw `git -C <path> diff/commit/push` when a worktree MCP tool is available.
+2. **Fetch threads**: `github_get_review_threads(number: <PR#>, unresolvedOnly: true)`
+3. **Fix ALL threads before modifying files**: read every thread's `path`, `line`, and `body` first, then apply all fixes in one pass. Do not commit or push until all threads are addressed.
    - If a comment is unclear or incorrect, note it for a reply — but do not stop, continue fixing the other threads
-3. **Validate**: `make pc` (or at minimum `make typecheck && make lint-fix`)
-4. **Commit & push once**: one commit covering all fixes from this round, conventional commit message describing the fixes
-5. **Resolve threads (MANDATORY)**: After pushing, immediately resolve every thread you addressed:
-   - Collect all thread `id` values from the threads you fixed in step 2
+4. **Validate**: `make pc` (or at minimum `make typecheck && make lint-fix`)
+5. **Commit & push once**: one commit covering all fixes from this round, conventional commit message describing the fixes
+6. **Resolve threads (MANDATORY)**: After pushing, immediately resolve every thread you addressed:
+   - Collect all thread `id` values from the threads you fixed in step 3
    - Call `github_resolve_threads({ threadIds: [...] })` with all IDs in a single batch
    - GitHub does NOT auto-resolve threads when code changes — you must explicitly resolve them
    - For threads you chose not to fix (disagreed / out of scope), reply with an explanation, then resolve
    - **Never leave addressed threads unresolved** — this blocks the merge queue and triggers re-review
-6. Copilot re-reviews automatically on push; new threads from the re-review are a separate round
+7. Copilot re-reviews automatically on push; new threads from the re-review are a separate round
 
 ## Two-Round Cap
 
