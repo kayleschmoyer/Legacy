@@ -71,6 +71,13 @@ On Claude Code on the web, Claude provides built-in `mcp__github__*` tools that 
 
 Use `ci_list_runs`, `ci_view_run`, `ci_get_logs`, `ci_search_logs`, and `ci_rerun` instead of `gh run` commands via Bash. These tools parse and structure log output for agent consumption.
 
+**Waiting for CI to complete**: use `ci_wait_for_run({ runId: "<id>" })` to block until a run finishes — never use `sleep N && gh run view <runId> --json status,conclusion` or `sleep N && gh pr view <pr> --json statusCheckRollup` polling loops. Get the run ID from `ci_list_runs({ branch: "<branch>", limit: 1 })`, then call `ci_wait_for_run` once.
+
+| Shell pattern (do NOT use)                                       | MCP tool (use this)                                                                                                 |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `sleep N && gh run view <runId> --json status,conclusion` (loop) | `ci_wait_for_run({ runId: "<id>" })`                                                                                |
+| `sleep N && gh pr view <pr> --json statusCheckRollup` (loop)     | `ci_wait_for_run({ runId: "<id>" })` + `mcp__github__subscribe_pr_activity({ owner, repo, pullNumber })` for events |
+
 ## Database Operations
 
 Use `db_migration_status` instead of `pnpm --prefix lib/db-client run db:status` via Bash, `db_migrate` instead of `pnpm --prefix lib/db-client run db:up`, `db_query` for ad-hoc SQL, `db_codegen` for GraphQL codegen, and `db_print_schema` for schema regeneration.
