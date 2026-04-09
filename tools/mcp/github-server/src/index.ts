@@ -20,6 +20,7 @@ import { prBatchStatus } from './tools/pr-batch-status.js';
 import { prDashboard } from './tools/pr-dashboard.js';
 import { prScan } from './tools/pr-scan.js';
 import { rebasePR } from './tools/rebase-pr.js';
+import { addReviewReply } from './tools/add-review-reply.js';
 import { replyToThread } from './tools/reply-to-thread.js';
 import { commentPR } from './tools/comment-pr.js';
 import { editPR } from './tools/edit-pr.js';
@@ -503,6 +504,24 @@ server.tool(
       ),
   },
   async (params) => listReviews(params),
+);
+
+// --- github_add_review_reply ---
+server.tool(
+  'github_add_review_reply',
+  'Post a reply to a PR review comment using the numeric comment ID (from github_get_review_threads). Uses REST POST /pulls/{number}/comments with in_reply_to. Complements github_reply_to_thread (which uses GraphQL thread IDs).',
+  {
+    number: z.coerce.number().int().positive().describe('PR number'),
+    commentId: z.coerce
+      .number()
+      .int()
+      .positive()
+      .describe(
+        'Numeric REST comment ID — use `comments[].databaseId` from `github_get_review_threads` output',
+      ),
+    body: z.string().trim().min(1).describe('Reply text (markdown)'),
+  },
+  async (params) => addReviewReply(params),
 );
 
 // --- github_reply_to_thread ---

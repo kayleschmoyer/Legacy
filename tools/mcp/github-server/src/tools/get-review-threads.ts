@@ -8,6 +8,7 @@ interface GetReviewThreadsParams {
 }
 
 interface ThreadComment {
+  databaseId: number | null;
   author: { login: string } | null;
   body: string;
   path: string | null;
@@ -48,6 +49,7 @@ query($owner: String!, $repo: String!, $number: Int!) {
           comments(first: 50) {
             pageInfo { hasNextPage }
             nodes {
+              databaseId
               author { login }
               body
               path
@@ -96,6 +98,7 @@ export async function getReviewThreads(
         createdAt: t.createdAt, // thread-level createdAt (PullRequestReviewThread.createdAt), not first comment timestamp
         commentCount: t.comments.nodes.length,
         comments: t.comments.nodes.map((c) => ({
+          databaseId: c.databaseId, // null if GitHub didn't return an ID; use non-null IDs with github_add_review_reply
           author: c.author?.login ?? 'unknown',
           body: c.body,
           path: c.path,
