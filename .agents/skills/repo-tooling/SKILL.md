@@ -27,7 +27,7 @@ Consolidated skill for running and fixing ESLint, TypeScript type checking, buil
 | Lint (auto-fix)     | `make lint-fix`             | Fixes ~80% of issues automatically |
 | Lint (dry run)      | `make lint`                 | Report only, no changes            |
 | Type check          | `make typecheck`            | Affected projects only             |
-| Format              | `pnpm exec nx format:write` | Prettier across all files          |
+| Format              | `make format`               | Prettier across all files          |
 | Build (affected)    | `make build`                | Build changed projects             |
 | Codegen             | `make codegen`              | GraphQL type generation            |
 | DB migration status | `db_migration_status` (MCP) | Check for pending migrations       |
