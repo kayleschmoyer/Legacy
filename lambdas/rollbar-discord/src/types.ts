@@ -2,6 +2,15 @@
 export interface RollbarEvent {
   event_name: string;
   data: {
+    deploy?: {
+      environment?: string;
+      revision?: string;
+      local_username?: string;
+      status?: string;
+      comment?: string;
+      start_time?: number;
+      finish_time?: number;
+    };
     item?: {
       id?: number;
       counter?: number;

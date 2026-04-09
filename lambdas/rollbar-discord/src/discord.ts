@@ -31,8 +31,58 @@ function levelToColor(level: string | undefined): number {
  * Format a Rollbar webhook event into a Discord embed.
  */
 export function formatRollbarEmbed(event: RollbarEvent): DiscordEmbed {
-  const item = event.data.item;
-  const occurrence = event.data.occurrence;
+  const { item, occurrence, deploy } = event.data;
+
+  // Deploy events have a distinct payload shape — handle them separately.
+  if (deploy) {
+    const environment = deploy.environment ?? 'unknown';
+    const status = deploy.status ?? 'unknown';
+    const fields: DiscordEmbed['fields'] = [
+      { name: 'Event', value: event.event_name, inline: true },
+      { name: 'Status', value: status.toUpperCase(), inline: true },
+      { name: 'Environment', value: environment, inline: true },
+    ];
+
+    if (deploy.revision) {
+      fields.push({
+        name: 'Revision',
+        value: deploy.revision.slice(0, 8),
+        inline: true,
+      });
+    }
+
+    if (deploy.local_username) {
+      fields.push({
+        name: 'Deployed by',
+        value: deploy.local_username,
+        inline: true,
+      });
+    }
+
+    const normalizedStatus = status.toLowerCase();
+    const color =
+      normalizedStatus === 'failed'
+        ? COLOR_ERROR
+        : normalizedStatus === 'started'
+          ? COLOR_WARNING
+          : normalizedStatus === 'succeeded'
+            ? COLOR_OK
+            : COLOR_INFO; // unknown/unrecognized status → neutral blurple
+
+    return {
+      title: `Deploy to ${environment}`,
+      description: deploy.comment || 'No comment provided',
+      color,
+      fields,
+      footer: { text: 'Rollbar' },
+      ...(deploy.finish_time
+        ? { timestamp: new Date(deploy.finish_time * 1000).toISOString() }
+        : deploy.start_time
+          ? { timestamp: new Date(deploy.start_time * 1000).toISOString() }
+          : {}),
+    };
+  }
+
   const level = item?.level ?? occurrence?.level ?? 'error';
   const environment = item?.environment ?? occurrence?.environment ?? 'unknown';
 
