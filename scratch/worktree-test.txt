@@ -1,1 +1,0 @@
-worktree native detection test
