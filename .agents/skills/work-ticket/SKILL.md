@@ -100,7 +100,7 @@ Follow the full [worktree-workflow skill](../worktree-workflow/SKILL.md):
    - **Do not start unrelated work** while this PR is open. Do not exit the workflow. Do not mark the tracking task completed.
    - When the PR is merged (visible via the subscription or `github_view_pr` showing `merged: true`), proceed to step 10.
 
-10. **MCP gap audit (after merge)**: follow [`skills/mcp-gaps/SKILL.md`](../mcp-gaps/SKILL.md) Phase 1 — review all Bash commands and MCP overflows from this session, classify gaps, file any new tickets under LS-1455. Mandatory.
+10. **MCP gap audit (after merge)**: follow [`skills/mcp-gaps/SKILL.md`](../mcp-gaps/SKILL.md) Phase 1 — review all Bash commands and MCP overflows from this session, classify gaps, file any new tickets under the current bucket epic (get key via `jira_get_bucket_epic({ bucket: 'mcp-gaps' })`). Mandatory.
 11. **Complete tracking tasks**: call `TaskUpdate(taskId: <id>, status: "completed")` for every task tracking this ticket — **only after the PR is merged and the gap audit is complete**, never before. Marking the task complete while the PR is still open is a failure mode.
 
 > After step 11, if this ticket is a child of a parent being processed in Parent Mode, return to the parent loop.
