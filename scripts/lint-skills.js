@@ -4,14 +4,30 @@
 // Run via: make lint-skills  OR  node scripts/lint-skills.js
 
 const { execFileSync } = require('child_process');
-const { readdirSync, statSync } = require('fs');
+const { readdirSync, statSync, existsSync, readFileSync } = require('fs');
 const { join, resolve } = require('path');
 
 const root = resolve(__dirname, '..');
 const skillsDir = join(root, '.agents', 'skills');
 
-const dirs = readdirSync(skillsDir).filter((name) =>
-  statSync(join(skillsDir, name)).isDirectory(),
+// Skip third-party skills managed via skills-lock.json — they may use
+// frontmatter fields not in the agentskills spec (e.g. user-invocable, argument-hint).
+const lockPath = join(root, 'skills-lock.json');
+let thirdPartySkills = new Set();
+if (existsSync(lockPath)) {
+  try {
+    thirdPartySkills = new Set(
+      Object.keys(JSON.parse(readFileSync(lockPath, 'utf8')).skills ?? {}),
+    );
+  } catch (e) {
+    console.error(`Warning: could not parse skills-lock.json: ${e.message}`);
+  }
+}
+
+const dirs = readdirSync(skillsDir).filter(
+  (name) =>
+    statSync(join(skillsDir, name)).isDirectory() &&
+    !thirdPartySkills.has(name),
 );
 
 let passed = 0;
