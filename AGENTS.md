@@ -302,6 +302,40 @@ scripts/       PowerShell and shell automation scripts
 - Web E2E: Playwright (hermetic — mock all network with `route.fulfill()`, never `route.continue()`)
 - Mobile E2E: WebdriverIO
 
+## Design Context
+
+Full design brief lives in `.impeccable.md` at the project root — load it before doing any frontend design work. Summary below for quick reference.
+
+**Users**: Fantasy sports players (25–45), league commissioners and active players. Use the app nights/evenings while watching live games. Competitive, data-obsessive, deep league loyalty. **Emotional goal**: anticipation and excitement — the feeling right before a draft.
+
+**Brand**: Nostalgic, sporty, professional. Heritage details (gold, navy) are earned moments, not wallpaper. **Anti-reference**: Yahoo Sports — blocky card grids, no craft, information dumped uniformly.
+
+**Typography**:
+
+- Display / Headings: **Big Shoulders Display** (condensed grotesque — scoreboard, vintage baseball program energy)
+- Body / UI: **Literata** (reading-optimized, editorial warmth)
+- Data: `font-variant-numeric: tabular-nums` on all statistics; columns align on decimal
+- Never use: Inter, Playfair Display, Syne, or any font in the standard AI-reflex list
+
+**Color rules**:
+
+- Background layers: `#0A0F1A` → `#0D1526` → `#111B2F` → `#16223A` (page → subtle → panel → elevated)
+- Accents are earned moments: gold (`#C5A55A`) for wins/results, seam red (`#C41E3A`) for alerts/action, deep navy (`#1B3A5C`) for primary interactive
+- **Banned**: `border-left`/`border-right` accent stripes >1px, gradient text (`background-clip: text`), cyan/purple/neon glow
+
+**Motion**:
+
+- Route transitions carry directional meaning: drill-down enters by sliding in from the right, back navigations exit by sliding out to the left, tab switches crossfade
+- Timing: navigation 280–320ms ease-out-quart; micro-interactions 120–150ms
+- Animate transform + opacity only — never layout properties
+- Honor `prefers-reduced-motion`
+
+**Layout**:
+
+- Progressive disclosure: surface what matters now, hide secondary nav behind deliberate action
+- Editorial hierarchy: every screen has a point of view — not everything at equal weight
+- No generic card grids; data tables are the product and should feel as designed as headlines
+
 ## Skills
 
 Detailed how-to docs live in `.agents/skills/<name>/SKILL.md`. The `description` frontmatter field enables skill auto-discovery; agents can also browse the directory directly. CSV reference data is in `docs/agents/*.csv`.
