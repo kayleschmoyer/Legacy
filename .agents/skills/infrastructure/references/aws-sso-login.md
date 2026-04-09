@@ -45,24 +45,32 @@ Invalid credentials
 Failed to resolve AWS credentials
 ```
 
-## Command
+## Check Auth Status First (REQUIRED)
+
+**Always check auth status before triggering login.** Never call `aws sso login` unconditionally.
+
+```typescript
+// MCP tool (preferred)
+aws_sso_status();
+```
+
+```powershell
+# Shell fallback
+aws sts get-caller-identity
+```
+
+If either returns a valid identity / `authenticated: true`, **skip login entirely** — the session is still valid.
+
+## Login Command (only when status check shows expired)
 
 ```powershell
 aws sso login
 ```
 
-## Alternative Commands
-
 ### Login with specific profile
 
 ```powershell
 aws sso login --profile legacy-sports-dev
-```
-
-### Check current authentication status
-
-```powershell
-aws sts get-caller-identity
 ```
 
 ## Expected Output
@@ -108,45 +116,35 @@ Check that the operation completes without authentication errors.
 
 ## Common Operations Requiring SSO
 
-### Database Operations
+For every AWS-dependent operation, apply this pattern — substituting the command from the table below:
 
-```powershell
-# If CLI database commands fail with SSO error
-aws sso login
-pnpm exec nx start cli -- query-db --query "SELECT 1"
+```typescript
+// 1. Check first — MCP tool (preferred)
+aws_sso_status();
 ```
 
-### Environment Sync
-
 ```powershell
-# If sync-env fails
+# 1. Check first — shell fallback
+aws sts get-caller-identity
+# 2. Only if expired:
 aws sso login
-.\scripts\sync-env.ps1
+# 3. Run the operation
+<command>
 ```
 
-### Lambda Deployment
-
-```powershell
-# If deploy fails
-aws sso login
-.\scripts\deploy-lambda.ps1 -FunctionName graphql
-```
-
-### Terraform Operations
-
-```powershell
-# If terraform fails
-aws sso login
-cd terraform
-terraform plan
-```
+| Operation            | `<command>`                                             |
+| -------------------- | ------------------------------------------------------- |
+| Database query       | `pnpm exec nx start cli -- query-db --query "SELECT 1"` |
+| Environment sync     | `.\scripts\sync-env.ps1`                                |
+| Lambda deployment    | `.\scripts\deploy-lambda.ps1 -FunctionName graphql`     |
+| Terraform plan/apply | `terraform -chdir=terraform/main plan`                  |
 
 ## Session Duration
 
 - SSO sessions typically last 8-12 hours
 - Sessions expire after inactivity
 - Re-login required when session expires
-- Consider running `aws sso login` at start of work session
+- At the start of a work session, **check status first** (`aws_sso_status()`) — do not unconditionally run `aws sso login`
 
 ## Troubleshooting
 
@@ -190,8 +188,8 @@ This skill should be checked before:
 
 ## Best Practices
 
-1. **Proactive**: Check authentication at start of work session
-2. **Prompt immediately**: Don't retry commands multiple times before prompting
+1. **Check status first (REQUIRED)**: Always call `aws_sso_status()` (MCP) or `aws sts get-caller-identity` (shell) before any AWS operation — never call `aws sso login` unconditionally. Repeated unconditional logins look like credential abuse to AWS and can trigger security alerts.
+2. **Prompt immediately on expiry**: Don't retry commands multiple times before prompting
 3. **Wait for confirmation**: Let user complete login before retrying
 4. **Clear instructions**: Always show the exact command to run
 5. **Verify**: Confirm operation succeeds after login

@@ -41,7 +41,7 @@ You do **not** need to rebuild when:
 
 ## Prerequisites
 
-1. **AWS SSO authenticated**: `aws sso login` (check with `aws sts get-caller-identity`)
+1. **AWS SSO authenticated**: check with `aws_sso_status()` (MCP) or `aws sts get-caller-identity` — only run `aws sso login` if credentials are expired
 2. **Packer installed and accessible** — see [Windows note](#windows-packer-location) below
 3. **VPC and subnet IDs**: the build instance needs a public subnet with an Internet Gateway route
 

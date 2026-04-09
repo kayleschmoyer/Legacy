@@ -14,7 +14,7 @@ Dumps the live `legacy-sports-dev-postgres` RDS instance to a compressed custom-
 
 ### Prerequisites
 
-- AWS SSO authenticated: `aws sso login`
+- AWS SSO authenticated: check with `aws_sso_status()` (MCP) or `aws sts get-caller-identity` — only run `aws sso login` if expired
 - Docker Desktop running
 - `.env` present with `DB_USER` and `DB_PASSWORD` (run `pnpm run sync-env` if missing)
 
@@ -70,7 +70,14 @@ s3://legacy-sports-dev-lambdas-cca20ad9/db-dumps/
 
 **AWS SSO expired**
 
+```typescript
+// MCP tool (preferred) — check before logging in
+aws_sso_status();
+```
+
 ```powershell
+# Shell fallback — confirm expired, then login
+aws sts get-caller-identity
 aws sso login
 ```
 
@@ -94,7 +101,7 @@ Downloads `latest.dump` from S3 and restores it into the `ls-postgres` Docker co
 
 ### Prerequisites
 
-- AWS SSO authenticated: `aws sso login`
+- AWS SSO authenticated: check with `aws_sso_status()` (MCP) or `aws sts get-caller-identity` — only run `aws sso login` if expired
 - Docker Desktop running
 - Postgres container running: `docker compose up -d postgres`
 
@@ -148,7 +155,14 @@ make db-migrate
 
 **AWS SSO expired**
 
+```typescript
+// MCP tool (preferred) — check before logging in
+aws_sso_status();
+```
+
 ```powershell
+# Shell fallback — confirm expired, then login
+aws sts get-caller-identity
 aws sso login
 ```
 
