@@ -6,6 +6,39 @@ import {
 } from './netrc.js';
 import { getAccessToken } from './oauth.js';
 
+/**
+ * Determine whether a fetch error represents a transient connection issue
+ * that warrants a retry (ECONNRESET, ECONNREFUSED, ETIMEDOUT, fetch failures).
+ */
+function isConnectionError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const msg = err.message.toLowerCase();
+  const cause = err.cause;
+  const causeCode =
+    cause !== null &&
+    typeof cause === 'object' &&
+    'code' in cause &&
+    typeof cause.code === 'string'
+      ? cause.code
+      : '';
+  return (
+    msg.includes('econnreset') ||
+    msg.includes('econnrefused') ||
+    msg.includes('etimedout') ||
+    msg.includes('enotfound') ||
+    msg.includes('und_err_connect_timeout') ||
+    msg.includes('socket hang up') ||
+    msg.includes('network error') ||
+    msg.includes('fetch failed') ||
+    causeCode === 'ECONNRESET' ||
+    causeCode === 'ECONNREFUSED' ||
+    causeCode === 'ETIMEDOUT' ||
+    causeCode === 'ENOTFOUND' ||
+    causeCode === 'UND_ERR_SOCKET' ||
+    causeCode === 'UND_ERR_CONNECT_TIMEOUT'
+  );
+}
+
 /** Truncate API error bodies and redact potential auth tokens. */
 function sanitizeErrorBody(text: string, maxLen = 500): string {
   let sanitized = text
@@ -67,8 +100,11 @@ export async function getJiraSiteUrl(): Promise<string> {
   return getSiteUrl(creds);
 }
 
-/** Make an authenticated Jira REST API request. */
-export async function jiraRequest<T = unknown>(
+/**
+ * Execute one HTTP attempt against the Jira REST API.
+ * Separated from jiraRequest so the retry wrapper can call it cleanly.
+ */
+async function jiraRequestOnce<T = unknown>(
   opts: JiraRequestOptions,
 ): Promise<T> {
   const creds = await getJiraCredentials();
@@ -115,4 +151,48 @@ export async function jiraRequest<T = unknown>(
     return JSON.parse(text) as T;
   }
   return undefined as T;
+}
+
+/**
+ * Make an authenticated Jira REST API request.
+ *
+ * Automatically retries once on transient connection errors (ECONNRESET,
+ * ECONNREFUSED, ETIMEDOUT, fetch failures) for GET requests only. Non-GET
+ * requests (POST/PUT/DELETE) are not retried because the first request may
+ * have completed before the connection dropped, and retrying could duplicate
+ * side effects (e.g. creating duplicate issues or comments).
+ *
+ * This handles mid-session disconnects that occur after ~40 minutes of
+ * inactivity when the underlying HTTP connection has been silently dropped.
+ */
+export async function jiraRequest<T = unknown>(
+  opts: JiraRequestOptions,
+): Promise<T> {
+  try {
+    return await jiraRequestOnce<T>(opts);
+  } catch (err) {
+    if (!isConnectionError(err) || opts.method !== 'GET') {
+      throw err;
+    }
+    const errMsg = err instanceof Error ? err.message : String(err);
+    const cause = err instanceof Error ? err.cause : undefined;
+    const causeMsg =
+      cause !== null &&
+      typeof cause === 'object' &&
+      'message' in cause &&
+      typeof cause.message === 'string'
+        ? ` (cause: ${cause.message})`
+        : cause !== null &&
+            typeof cause === 'object' &&
+            'code' in cause &&
+            typeof cause.code === 'string'
+          ? ` (code: ${cause.code})`
+          : '';
+    process.stderr.write(
+      `[legacy-sports-jira] Connection error on ${opts.method} ${opts.path}: ${errMsg}${causeMsg}. Retrying…\n`,
+    );
+    // Retry once — getJiraCredentials and getAuthHeader are re-called inside
+    // jiraRequestOnce to re-resolve credentials.
+    return jiraRequestOnce<T>(opts);
+  }
 }
