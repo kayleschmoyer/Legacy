@@ -54,7 +54,7 @@ Choose the reproduction method based on bug category. **You MUST save a named ar
 
 > **Checkpoint:** after this step you must have at least one named artifact. If you cannot produce one, document why (see "reproduction not possible" below) — but do not proceed to step 4 without either an artifact or a documented reason.
 
-> **If reproduction is not possible** (environment-specific, production data required, mobile-only): document why in the PR body under a `## Verification` section and add a regression test covering the code path. See [bug-verification-templates.md](../../pr-lifecycle/references/bug-verification-templates.md) for the "reproduction not possible" template.
+> **If reproduction is not possible** (environment-specific, production data required, mobile-only): document why in the PR body under a `## Verification` section and add a regression test covering the code path. See [bug-verification-templates.md](../../../pr-lifecycle/references/bug-verification-templates.md) for the "reproduction not possible" template.
 
 ### 4. Investigate the root cause
 
@@ -83,7 +83,7 @@ Choose the reproduction method based on bug category. **You MUST save a named ar
 
 ### 5. Implement the fix
 
-Follow the [fix-bugs skill](../../debugging/references/bug-fixing.md) principles:
+Follow the [fix-bugs skill](../../../debugging/references/bug-fixing.md) principles:
 
 - **Fix the root cause**, not the symptom
 - **Never silence error reporting** to make a bug "go away"
@@ -126,13 +126,13 @@ Follow the standard workflow:
 
 1. Commit with conventional message: `fix(scope): description`
 2. Push with `--force-with-lease`
-3. **Build the `## Verification` section** from the artifacts collected in steps 3 and 6. Use the appropriate template from [bug-verification-templates.md](../../pr-lifecycle/references/bug-verification-templates.md):
+3. **Build the `## Verification` section** from the artifacts collected in steps 3 and 6. Use the appropriate template from [bug-verification-templates.md](../../../pr-lifecycle/references/bug-verification-templates.md):
    - UI bugs: upload `bug-before.png` and `bug-after.png` via `browser_screenshot_upload()`, embed the markdown image URLs
    - Resolver/logic bugs: paste the failing and passing test output from `scratch/before-test-output.txt` and `scratch/after-test-output.txt`
    - Data/query bugs: paste query results from `scratch/before-query-result.txt` and `scratch/after-query-result.txt`
    - Distributed system bugs: paste log/test output from the corresponding scratch files
    - Mixed bugs: combine templates for each layer involved
-4. Create PR as draft with `github_create_pr({ draft: true })`, then mark ready with `github_mark_pr_ready`. The PR body **must** use the [bug-fix PR body template](../../pr-lifecycle/references/create-pr.md#bug-fix-pr-body-template) with the `## Verification` section populated from steps 3 and 6 above. **Do not create the PR if the `## Verification` section is empty.**
+4. Create PR as draft with `github_create_pr({ draft: true })`, then mark ready with `github_mark_pr_ready`. The PR body **must** use the [bug-fix PR body template](../../../pr-lifecycle/references/create-pr.md#bug-fix-pr-body-template) with the `## Verification` section populated from steps 3 and 6 above. **Do not create the PR if the `## Verification` section is empty.**
 5. Transition Jira ticket to "In Review"
 
 ## Gotchas

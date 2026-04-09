@@ -15,9 +15,11 @@ Complete reference for the Legacy Sports ticket-to-merge pipeline. Covers every 
    - Blocker In Review -- branch off the blocker's branch (use `PARENT=LS-XXXX/branch`).
    - Blocker Done or no blockers -- branch off `origin/main`.
 3. **Transition to In Progress** -- only after blockers pass.
-4. **Create worktree (Windows-only helper)** -- `make worktree TICKET=#### DESC=description`. This creates the branch, worktree, and registers the parent dependency. On macOS/Linux, create a ticket branch and worktree using standard `git` commands.
-5. **Setup worktree (Windows-only helper)** -- `make wt-setup WT=$wt` (installs deps, copies `.env`, junctions `.twig`). On macOS/Linux, run the equivalent steps manually: install dependencies, copy `.env`, and link shared resources.
-6. **Working directory** -- All subsequent work happens inside the worktree path, never in the main repo.
+4. **Worktree — two flows:**
+   - **Native ephemeral (primary / default for single-ticket work)** — spawn Claude Code with the launcher `worktree` checkbox checked. The session starts in `.claude/worktrees/<name>/` on an auto-generated `claude/<random>` branch. Rename the branch via `git branch -m claude/LS-####-short-kebab-description` **before the first push**. Claude Code's header, `Create PR` button, and `gitStatus` all reflect the ticket branch natively — no custom tooling needed. See AGENTS.md Workflow Step 4 for the full flow.
+   - **Sibling worktree (parallel / batch work only)** — `make_worktree_create({ ticket: "####", description: "..." })` MCP tool, or shell fallback `make worktree TICKET=#### DESC=description` on Windows. Use only for sweep, batch workers, chained branches, or multi-ticket orchestrators that need multiple worktrees active simultaneously. On macOS/Linux (cloud agents), the sibling flow is not available — cloud agents work directly on the branch.
+5. **Setup worktree (sibling flow only)** -- `make_wt_setup({ worktreePath: "$wt" })` MCP tool or shell fallback `make wt-setup WT=$wt` on Windows. For native-flow sessions, the ephemeral worktree needs `node_modules` junctioned from the main repo before any pnpm/make command: `worktree_run(command: "cmd //c mklink //J node_modules D:\\\\code\\\\legacy-sports\\\\node_modules")` (confirmed in LS-2903). On macOS/Linux, run the equivalent install steps manually.
+6. **Working directory** -- All subsequent work happens inside the active worktree path. For native-flow sessions, that's the current `pwd` (`.claude/worktrees/<name>/`). For sibling-flow sessions, that's `$wt` under `D:\code\legacy-sports-worktrees\`. Never edit code in `D:\code\legacy-sports` with HEAD on `main`.
 
 ## Phase 1: Local Validation
 
