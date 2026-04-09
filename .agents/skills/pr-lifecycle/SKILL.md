@@ -47,6 +47,19 @@ Orchestrate maintenance across all open PRs: scan, rebase conflicts, fix reviews
 
 > Details: [references/pr-maintenance.md](references/pr-maintenance.md)
 
+## Review Thread Workflow (bot-review failures)
+
+When `bot-review` CI check fails or Copilot posts review comments, use this MCP-first workflow:
+
+1. **Get unresolved threads**: `github_get_review_threads({ number: PR#, unresolvedOnly: true })`
+   - Returns structured thread data such as thread `id`, `isResolved`, `isOutdated`, and a `comments` array. Each comment entry includes fields like `path`, `line`, and `body` — no need for raw GraphQL.
+2. **Inspect the returned comments and fix the code** in the flagged files/lines
+3. **Commit and push** the fix
+4. **Resolve threads**: `github_resolve_threads({ threadIds: [<thread-id>, ...] })`
+5. **Re-request review**: `github_request_review({ number: PR# })`
+
+> **Avoid `gh api graphql` to enumerate review threads** — prefer `github_get_review_threads`, which returns structured data including GraphQL thread node IDs (required for resolution). Use `gh api graphql` only as a last resort when MCP or another documented tool is unavailable or does not return the needed thread IDs.
+
 ## Critical Rules
 
 1. **Always self-review before pushing** -- Phase 1 is not optional. It prevents CI failures and reduces Copilot review rounds.
