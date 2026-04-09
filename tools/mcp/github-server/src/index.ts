@@ -24,6 +24,7 @@ import { addReviewReply } from './tools/add-review-reply.js';
 import { replyToThread } from './tools/reply-to-thread.js';
 import { commentPR } from './tools/comment-pr.js';
 import { editPR } from './tools/edit-pr.js';
+import { listCommitStatuses } from './tools/list-commit-statuses.js';
 import { retriggerCheck } from './tools/retrigger-check.js';
 import { secretDelete } from './tools/secret-delete.js';
 import { secretList } from './tools/secret-list.js';
@@ -913,6 +914,16 @@ server.tool(
       .describe('Human-readable description'),
   },
   async (params) => setCommitStatus(params),
+);
+
+// --- github_list_commit_statuses ---
+server.tool(
+  'github_list_commit_statuses',
+  'List GitHub commit statuses (Statuses API) for a PR\'s HEAD commit. These are DISTINCT from Check Runs (Checks API) — bot-review and similar statuses appear here, not in github_retrigger_check. Use this to diagnose "check not found" errors when github_retrigger_check fails.',
+  {
+    number: z.coerce.number().int().positive().describe('PR number'),
+  },
+  async (params) => listCommitStatuses(params),
 );
 
 // --- github_ensure_sweep_labels ---

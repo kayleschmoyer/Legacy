@@ -80,6 +80,7 @@ When `bot-review` CI check fails or Copilot posts review comments, use this MCP-
 5. **Always use `--body-file` or MCP tool for PR body** -- never inline `--body` in any shell (PowerShell is especially problematic).
 6. **Never create a PR from `main`** -- branch name must contain a Jira ticket key.
 7. **Always create PRs as drafts** -- use `draft: true` in `github_create_pr` MCP tool. Apply the `agent-in-progress` label while still a draft, then mark ready. This closes the race window — the PR becomes visible to sweeps already labeled. See [create-pr.md](references/create-pr.md) for the canonical step order.
+8. **Check Runs ≠ Commit Statuses** -- `github_retrigger_check` only works on **Check Runs** (Checks API). `bot-review` and other bot-set statuses use the **Statuses API** and will NOT be found by `github_retrigger_check`. If you get "No check run named 'X' found", use `github_list_commit_statuses({ number: <PR#> })` to see commit statuses instead. To clear a stale commit status: push a new commit (re-triggers the workflow) or dispatch via `ci_dispatch_workflow`. Note: `github_merge_pr(strategy: "direct")` does NOT bypass required commit statuses — it uses the standard merge API which still enforces branch protection rules.
 
 ## Quick Commands
 
