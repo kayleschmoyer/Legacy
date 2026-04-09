@@ -11,6 +11,8 @@ This workflow also catches two additional categories of MCP issues:
 
 ### 1. Collect Bash commands and MCP issues from the session
 
+> **Start here**: `ci_audit_session_bash({ gapsOnly: true, includeMcp: true })` — this is the **first tool to call**. It auto-detects the current session and returns a frequency-table summary of Bash command usage, highlighting potential gaps. Do NOT manually parse session JSONL files — the tool does this natively and is faster.
+
 **Primary method — parse session transcript** (recommended, survives context compaction):
 
 ```
