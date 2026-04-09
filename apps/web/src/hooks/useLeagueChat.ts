@@ -32,12 +32,6 @@ export interface ChatMessage {
 }
 
 // ---------------------------------------------------------------------------
-// Debug helper — all chat logs include a high-resolution timestamp so we can
-// reconstruct the exact ordering of events across two browser windows.
-// ---------------------------------------------------------------------------
-const _ts = () => new Date().toISOString();
-
-// ---------------------------------------------------------------------------
 // Hook
 // ---------------------------------------------------------------------------
 export function useLeagueChat(leagueId: number): {
@@ -91,21 +85,10 @@ export function useLeagueChat(leagueId: number): {
         metadata: parsedMetadata,
       };
     });
-    LOGGER.info(`[chat ${_ts()}] history-effect fired`, {
-      historyCount: historyItems.length,
-      historyIds: historyItems.map((m) => m.id),
-      idTypes: historyItems.slice(-3).map((m) => `${m.id}(${typeof m.id})`),
-    });
     setMessages((prev) => {
       const historyIds = new Set(historyItems.map((m) => m.id));
       const wsOnly = prev.filter((m) => !historyIds.has(m.id));
-      const next = [...historyItems, ...wsOnly];
-      LOGGER.info(`[chat ${_ts()}] history-effect setMessages`, {
-        prevIds: prev.map((m) => m.id),
-        wsOnlyIds: wsOnly.map((m) => m.id),
-        nextIds: next.map((m) => m.id),
-      });
-      return next;
+      return [...historyItems, ...wsOnly];
     });
   }, [historyData]);
 
@@ -122,10 +105,6 @@ export function useLeagueChat(leagueId: number): {
     async (text: string, gifUrl?: string) => {
       const trimmed = text.trim();
       if (!trimmed && !gifUrl) return;
-      LOGGER.info(`[chat ${_ts()}] sendMessage called`, {
-        text: trimmed,
-        gifUrl,
-      });
       setSendError(null);
       try {
         await sendMutation({
@@ -157,28 +136,15 @@ export function useLeagueChat(leagueId: number): {
               messageType: raw.messageType ?? 'text',
               metadata: null,
             };
-            LOGGER.info(`[chat ${_ts()}] onCompleted`, {
-              msgId: msg.id,
-              idType: typeof msg.id,
-              rawId: raw.id,
-              rawIdType: typeof raw.id,
-              text: msg.messageText.substring(0, 30),
-            });
             setMessages((prev) => {
               const isDupe = prev.some((m) => m.id === msg.id);
-              LOGGER.info(`[chat ${_ts()}] onCompleted setMessages`, {
-                msgId: msg.id,
-                isDupe,
-                prevIds: prev.map((m) => m.id),
-              });
               if (isDupe) return prev;
               return [...prev, msg];
             });
           },
         });
-        LOGGER.info(`[chat ${_ts()}] sendMessage await resolved`);
       } catch (err) {
-        LOGGER.error(`[chat ${_ts()}] sendMessage failed`, { err });
+        LOGGER.error('useLeagueChat: sendMessage failed', { err });
         setSendError('Failed to send message. Please try again.');
       }
     },
@@ -189,22 +155,8 @@ export function useLeagueChat(leagueId: number): {
   useLeagueWebSocket({
     onLeagueChatMessage: (n) => {
       const numericId = Number(n.messageId);
-      LOGGER.info(`[chat ${_ts()}] ws-handler received`, {
-        messageId: numericId,
-        idType: typeof numericId,
-        rawMessageId: n.messageId,
-        rawIdType: typeof n.messageId,
-        senderId: n.senderId,
-        text: n.messageText?.substring(0, 30),
-      });
       setMessages((prev) => {
         const isDupe = prev.some((m) => m.id === numericId);
-        LOGGER.info(`[chat ${_ts()}] ws-handler setMessages`, {
-          messageId: numericId,
-          isDupe,
-          prevIds: prev.map((m) => m.id),
-          prevIdTypes: prev.slice(-3).map((m) => `${m.id}(${typeof m.id})`),
-        });
         if (isDupe) return prev;
         return [
           ...prev,
@@ -225,7 +177,6 @@ export function useLeagueChat(leagueId: number): {
     onReconnect: () => {
       // Refetch history to catch any messages that arrived while the socket
       // was down.
-      LOGGER.info(`[chat ${_ts()}] ws reconnected — refetching history`);
       void refetchRef.current();
     },
   });
