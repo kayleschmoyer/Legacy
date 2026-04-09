@@ -163,6 +163,11 @@ jobs:
     name: Deploy Web
     needs: detect-changes
     if: needs.detect-changes.outputs.web == 'true'
+    permissions:
+      actions: read # nx-set-shas base SHA resolution
+      contents: write # create-release
+      pages: write # GitHub Pages deploy
+      id-token: write # AWS OIDC + GitHub Pages
     uses: ./.github/workflows/deploy-web.yml
     secrets: inherit
     with:
@@ -175,6 +180,9 @@ jobs:
     name: Deploy Storybook
     needs: detect-changes
     if: needs.detect-changes.outputs.storybook == 'true'
+    permissions:
+      contents: read # checkout; pushes to deploy repo use PAT from secrets
+      pull-requests: write # deploy-storybook posts a sticky PR comment
     uses: ./.github/workflows/deploy-storybook.yml
     secrets: inherit
 
