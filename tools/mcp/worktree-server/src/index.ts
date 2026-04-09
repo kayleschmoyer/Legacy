@@ -1386,6 +1386,41 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
         required: ['paths'],
       },
     },
+    {
+      name: 'worktree_attach',
+      description:
+        'Attach an existing branch as a new sibling worktree under ' +
+        'D:\\code\\legacy-sports-worktrees\\. Use this when resuming work on an ' +
+        'existing PR branch — it runs `git worktree add <path> <branch>`, sets ' +
+        'the new worktree as active, and optionally runs `make wt-setup`. ' +
+        'MCP alternative to raw `git worktree add` via Bash.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          branch: {
+            type: 'string',
+            description:
+              'Existing branch name (e.g. "LS-2857/fix-ci" or "claude/LS-2857-fix-ci"). ' +
+              'The branch must already exist locally or on origin.',
+          },
+          path: {
+            type: 'string',
+            description:
+              'Explicit worktree path. Defaults to ' +
+              'D:\\code\\legacy-sports-worktrees\\<slug> where slug is derived ' +
+              'from the branch name by replacing "/" with "-".',
+          },
+          setup: {
+            type: 'boolean',
+            description:
+              'If true, run `make wt-setup` after attaching to copy .env, ' +
+              'create junctions, and install git hooks (default: false). ' +
+              'Windows-only — ignored on other platforms.',
+          },
+        },
+        required: ['branch'],
+      },
+    },
   ],
 }));
 
@@ -6508,6 +6543,219 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           },
         ],
       };
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_attach
+    // -----------------------------------------------------------------------
+    case 'worktree_attach': {
+      const {
+        branch,
+        path: explicitPath,
+        setup = false,
+      } = args as {
+        branch: string;
+        path?: string;
+        setup?: boolean;
+      };
+
+      // Validate branch name — only safe git ref chars; reject flag injection
+      if (!branch || branch.startsWith('-')) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Invalid branch: "${branch}". Branch name must not be empty or start with '-'.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+      if (!/^[a-zA-Z0-9_./@-]+$/.test(branch)) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Invalid branch: "${branch}". Only alphanumeric, '_', '.', '/', '@', '-' allowed.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      // Reject unsafe git ref patterns: "..", "/..", ".lock" suffix, trailing "."
+      if (/(\.\.|\/\.|\.lock$|\.$)/.test(branch)) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Invalid branch: "${branch}". Contains unsafe git ref characters (e.g. "..", "/..", ".lock", trailing ".").`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      // Derive default worktree path from MAIN_REPO parent so it's platform-agnostic
+      const WORKTREES_ROOT = join(
+        dirname(MAIN_REPO),
+        'legacy-sports-worktrees',
+      );
+      const slug = branch.replace(/\//g, '-');
+      const worktreePath = explicitPath ?? join(WORKTREES_ROOT, slug);
+
+      // Validate explicit path if provided
+      if (explicitPath) {
+        if (!isAbsolute(explicitPath)) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Invalid path: "${explicitPath}". Must be an absolute path.`,
+              },
+            ],
+            isError: true,
+          };
+        }
+        const resolvedExplicit = resolve(explicitPath);
+        const resolvedMain = resolve(MAIN_REPO);
+        if (
+          resolvedExplicit === resolvedMain ||
+          resolvedExplicit.startsWith(resolvedMain + sep)
+        ) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: 'Cannot create a worktree inside or at the main repo directory.',
+              },
+            ],
+            isError: true,
+          };
+        }
+      }
+
+      const log: string[] = [];
+
+      try {
+        // Fetch origin so branch is available locally even if not yet checked out
+        log.push('$ git fetch origin');
+        try {
+          runGit(['fetch', 'origin'], MAIN_REPO, { timeout: 30_000 });
+          log.push('Fetch complete.');
+        } catch (fetchErr) {
+          // Non-fatal — branch may already be local
+          log.push(
+            `Fetch warning (continuing): ${fetchErr instanceof Error ? fetchErr.message : String(fetchErr)}`,
+          );
+        }
+
+        // Run git worktree add — if the branch exists locally use it directly;
+        // otherwise create a local tracking branch from origin/<branch>.
+        const localRef = runGit(['branch', '--list', branch], MAIN_REPO).trim();
+        if (localRef) {
+          log.push(`$ git worktree add "${worktreePath}" "${branch}"`);
+          runGit(['worktree', 'add', worktreePath, branch], MAIN_REPO, {
+            timeout: 60_000,
+          });
+        } else {
+          log.push(
+            `$ git worktree add --track -b "${branch}" "${worktreePath}" "origin/${branch}"`,
+          );
+          runGit(
+            [
+              'worktree',
+              'add',
+              '--track',
+              '-b',
+              branch,
+              worktreePath,
+              `origin/${branch}`,
+            ],
+            MAIN_REPO,
+            { timeout: 60_000 },
+          );
+        }
+        log.push('Worktree created.');
+
+        // Set as active worktree
+        activeWorktree = resolve(worktreePath);
+        persistActiveWorktree(activeWorktree);
+        log.push(`Active worktree set to: ${activeWorktree}`);
+
+        // Optionally run wt-setup (Windows-only)
+        if (setup) {
+          if (process.platform !== 'win32') {
+            log.push(
+              'setup=true ignored on non-Windows platform. Run `make install` manually.',
+            );
+          } else {
+            log.push(`$ make wt-setup WT=${worktreePath}`);
+            try {
+              const makeOutput = execFileSync(
+                'cmd',
+                ['/c', 'make', 'wt-setup', `WT=${worktreePath}`],
+                {
+                  cwd: MAIN_REPO,
+                  encoding: 'utf-8',
+                  timeout: 300_000,
+                  maxBuffer: 10 * 1024 * 1024,
+                },
+              );
+              log.push(makeOutput);
+              log.push('wt-setup complete.');
+            } catch (setupErr) {
+              log.push(
+                `wt-setup warning: ${setupErr instanceof Error ? setupErr.message : String(setupErr)}`,
+              );
+            }
+          }
+        }
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  success: true,
+                  branch,
+                  worktreePath: activeWorktree,
+                  log: log.join('\n'),
+                  nextSteps: [
+                    `Worktree is now active — run worktree_set({ key: "${branch}" }) to re-activate after server restart`,
+                    setup
+                      ? 'Setup complete'
+                      : 'Junction node_modules manually if needed: cmd /c mklink /J node_modules D:\\\\code\\\\legacy-sports\\\\node_modules',
+                  ],
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      } catch (err) {
+        log.push(`Error: ${err instanceof Error ? err.message : String(err)}`);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  success: false,
+                  branch,
+                  worktreePath,
+                  log: log.join('\n'),
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+          isError: true,
+        };
+      }
     }
 
     default:
