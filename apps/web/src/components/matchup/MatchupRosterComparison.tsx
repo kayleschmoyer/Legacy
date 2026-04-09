@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument -- Complex type mapping for scoring calculations */
 import React, { useMemo, useState } from 'react';
 import { Card, H4, H5, Separator, Text, XStack, YStack } from 'tamagui';
 import { LOGGER } from '@legacy-sports/logging';
@@ -946,57 +945,49 @@ export function MatchupRosterComparison({
 
     // Calculate separate totals for batters and pitchers
     const team1BatterTotals = {
-      actual: team1Batters.reduce((sum: any, p: MatchupPlayerFragment) => {
+      actual: team1Batters.reduce<number>((sum, p) => {
         const gameSum =
-          p.games?.reduce((s: any, g: any) => s + calculateGameScore(g), 0) ??
-          0;
+          p.games?.reduce<number>((s, g) => s + calculateGameScore(g), 0) ?? 0;
         return sum + gameSum;
       }, 0),
-      projected: team1Batters.reduce(
-        (sum: any, p: MatchupPlayerFragment) =>
-          sum + calculatePlayerProjection(p),
+      projected: team1Batters.reduce<number>(
+        (sum, p) => sum + calculatePlayerProjection(p),
         0,
       ),
     };
 
     const team1PitcherTotals = {
-      actual: team1Pitchers.reduce((sum: any, p: MatchupPlayerFragment) => {
+      actual: team1Pitchers.reduce<number>((sum, p) => {
         const gameSum =
-          p.games?.reduce((s: any, g: any) => s + calculateGameScore(g), 0) ??
-          0;
+          p.games?.reduce<number>((s, g) => s + calculateGameScore(g), 0) ?? 0;
         return sum + gameSum;
       }, 0),
-      projected: team1Pitchers.reduce(
-        (sum: any, p: MatchupPlayerFragment) =>
-          sum + calculatePlayerProjection(p),
+      projected: team1Pitchers.reduce<number>(
+        (sum, p) => sum + calculatePlayerProjection(p),
         0,
       ),
     };
 
     const team2BatterTotals = {
-      actual: team2Batters.reduce((sum: any, p: MatchupPlayerFragment) => {
+      actual: team2Batters.reduce<number>((sum, p) => {
         const gameSum =
-          p.games?.reduce((s: any, g: any) => s + calculateGameScore(g), 0) ??
-          0;
+          p.games?.reduce<number>((s, g) => s + calculateGameScore(g), 0) ?? 0;
         return sum + gameSum;
       }, 0),
-      projected: team2Batters.reduce(
-        (sum: any, p: MatchupPlayerFragment) =>
-          sum + calculatePlayerProjection(p),
+      projected: team2Batters.reduce<number>(
+        (sum, p) => sum + calculatePlayerProjection(p),
         0,
       ),
     };
 
     const team2PitcherTotals = {
-      actual: team2Pitchers.reduce((sum: any, p: MatchupPlayerFragment) => {
+      actual: team2Pitchers.reduce<number>((sum, p) => {
         const gameSum =
-          p.games?.reduce((s: any, g: any) => s + calculateGameScore(g), 0) ??
-          0;
+          p.games?.reduce<number>((s, g) => s + calculateGameScore(g), 0) ?? 0;
         return sum + gameSum;
       }, 0),
-      projected: team2Pitchers.reduce(
-        (sum: any, p: MatchupPlayerFragment) =>
-          sum + calculatePlayerProjection(p),
+      projected: team2Pitchers.reduce<number>(
+        (sum, p) => sum + calculatePlayerProjection(p),
         0,
       ),
     };
