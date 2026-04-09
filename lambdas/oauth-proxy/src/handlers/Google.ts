@@ -10,6 +10,7 @@ import { LOGGER } from '@legacy-sports/logging';
 import { readSecret } from '@legacy-sports/aws-utils';
 import memoizeOne from 'memoize-one';
 import { InternalUser } from '@legacy-sports/db-client';
+import { z } from 'zod';
 import { getOrCreateUser } from './UserManager';
 import { completeDeviceFlow } from './DeviceFlow';
 import { EnvironmentVariable, Secret, SECRET_CONFIG } from '../util';
@@ -18,7 +19,6 @@ import { createJwt, JWT_COOKIE_NAME } from '../util/jwt';
 import { decryptCookies, encryptCookies } from '../util/cookie';
 import { buildAuthCookies, generateCsrfToken } from '../util/jwt-cookie';
 import { parseEventBody } from '../util/lambda';
-import { z } from 'zod';
 import { withDbClient } from '../util/db';
 import { getAuthSuccessHtml, htmlEscape } from '../util/html';
 

@@ -22,6 +22,7 @@ import { prScan } from './tools/pr-scan.js';
 import { rebasePR } from './tools/rebase-pr.js';
 import { replyToThread } from './tools/reply-to-thread.js';
 import { commentPR } from './tools/comment-pr.js';
+import { editPR } from './tools/edit-pr.js';
 import { retriggerCheck } from './tools/retrigger-check.js';
 import { secretDelete } from './tools/secret-delete.js';
 import { secretList } from './tools/secret-list.js';
@@ -536,6 +537,18 @@ server.tool(
       .describe('Markdown body of the comment'),
   },
   async (params) => commentPR(params),
+);
+
+// --- github_edit_pr ---
+server.tool(
+  'github_edit_pr',
+  "Update a PR's title and/or body. Use when Copilot or reviewers request description fixes. Maps to PATCH /repos/{owner}/{repo}/pulls/{pull_number}.",
+  {
+    number: z.coerce.number().int().positive().describe('PR number'),
+    title: z.string().trim().min(1).optional().describe('New PR title'),
+    body: z.string().optional().describe('New PR body (markdown)'),
+  },
+  async (params) => editPR(params),
 );
 
 // --- github_clear_ci_failure_labels ---
