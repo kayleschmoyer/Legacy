@@ -55,21 +55,6 @@ class UniversalLogger implements Logger {
     this.additionalLogFiles.push(filePath);
   }
 
-  private safeEncodeForConsole(str: string): string {
-    // For Node.js environments, use Buffer to properly encode UTF-8
-    if (typeof Buffer !== 'undefined') {
-      try {
-        // Convert to Buffer and back to ensure proper UTF-8 encoding
-        return Buffer.from(str, 'utf8').toString('utf8');
-      } catch {
-        // Fallback: just return the string
-        return str;
-      }
-    }
-    // For browser/mobile environments, return as-is
-    return str;
-  }
-
   private formatMessage(
     level: string,
     message: string,
@@ -95,9 +80,7 @@ class UniversalLogger implements Logger {
             })
             .join(' ')
         : '';
-    const formattedMessage = `[${timestamp}] ${level.toUpperCase()}: ${message}${formattedArgs}`;
-    // Apply emoji-safe encoding for console output
-    return this.safeEncodeForConsole(formattedMessage);
+    return `[${timestamp}] ${level.toUpperCase()}: ${message}${formattedArgs}`;
   }
 
   private writeToFile(level: string, message: string, ...args: LogArgs): void {
