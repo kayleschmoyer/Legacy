@@ -171,10 +171,11 @@ async function jiraFetch<T = unknown>(
     throw new Error(`Jira API ${method} ${path} → ${resp.status}: ${text}`);
   }
 
-  // 204 No Content
-  if (resp.status === 204) return undefined as unknown as T;
+  // 204 No Content or empty body (PUT project properties returns 200/201 with no body)
+  const text = await resp.text();
+  if (!text || resp.status === 204) return undefined as unknown as T;
 
-  return resp.json() as Promise<T>;
+  return JSON.parse(text) as T;
 }
 
 // ---------------------------------------------------------------------------
@@ -261,11 +262,15 @@ async function searchIssues(
   jql: string,
   maxResults = 50,
 ): Promise<JiraIssue[]> {
-  const data = await jiraFetch<JiraSearchResult>('POST', '/rest/api/3/search', {
-    jql,
-    maxResults,
-    fields: ['summary', 'status', 'labels', 'parent'],
-  });
+  const data = await jiraFetch<JiraSearchResult>(
+    'POST',
+    '/rest/api/3/search/jql',
+    {
+      jql,
+      maxResults,
+      fields: ['summary', 'status', 'labels', 'parent'],
+    },
+  );
   return data.issues;
 }
 
