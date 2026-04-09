@@ -16,6 +16,8 @@ declare module '@tamagui/core' {
     position?: string;
     top?: string | number;
     zIndex?: number;
+    // Overflow (Tamagui restricts to RN values; add web values here)
+    overflow?: string;
     // Background
     backgroundColor?: string;
     // Shorthand properties that should definitely work

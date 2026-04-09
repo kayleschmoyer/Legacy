@@ -164,7 +164,7 @@ const NavLinks = styled(XStack, {
   flexWrap: 'nowrap',
   // Explicit overflow: visible ensures dropdown menus extending below the nav
   // are not clipped (CSS default, but stated for clarity).
-  overflow: 'visible' as never,
+  overflow: 'visible',
 });
 
 /** Pill-shaped nav link button with active indicator dot */
@@ -293,12 +293,11 @@ function Navigation() {
     <YStack
       ref={mobileRef}
       role="banner"
-      position={'sticky' as never}
+      style={{ position: 'sticky', overflow: 'visible' }}
       top={0}
       // NAV_Z_INDEX must exceed every secondary sticky element (e.g. CONTENT_STICKY_Z_INDEX)
       // so the nav bar always remains above page content when both are sticky.
       zIndex={NAV_Z_INDEX}
-      overflow={'visible' as never}
     >
       {/* Gradient accent strip */}
       <AccentBar

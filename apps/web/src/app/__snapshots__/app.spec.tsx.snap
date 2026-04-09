@@ -13,9 +13,8 @@ exports[`App FootballScreen should match complete football page layout snapshot 
     Skip to main content
   </a>
   <div
-    overflow="visible"
-    position="sticky"
     role="banner"
+    style="position: sticky; overflow: visible;"
     top="0"
     zindex="200"
   >
@@ -151,9 +150,8 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
     Skip to main content
   </a>
   <div
-    overflow="visible"
-    position="sticky"
     role="banner"
+    style="position: sticky; overflow: visible;"
     top="0"
     zindex="200"
   >
@@ -287,9 +285,8 @@ exports[`App Navigation should render navigation with correct links 1`] = `
     Skip to main content
   </a>
   <div
-    overflow="visible"
-    position="sticky"
     role="banner"
+    style="position: sticky; overflow: visible;"
     top="0"
     zindex="200"
   >
