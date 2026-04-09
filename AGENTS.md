@@ -98,7 +98,7 @@ If you find yourself on a branch that does not match this convention (for exampl
     - 5b. **Agent multi-root access** (optional, parallel flow): `make sync-worktrees` then `code legacy-sports.code-workspace` — gives agents search access across all sibling worktrees in one window.
 
 6.  **All remaining work happens in the active worktree.** For native-flow sessions, that's your current `pwd` (`.claude/worktrees/<name>/`) — no path juggling needed. For parallel-flow sessions, every file edit, terminal command, and git operation must target `$wt` (the sibling worktree path). Never edit code in `D:\code\legacy-sports` with HEAD on `main`.
-7.  Code: `make <target>` (e.g. `make test`, `make build`, `make typecheck`, `make lint-fix`). For project-specific targets: `pnpm exec nx run <project>:<target>`. Never use `pnpm run` directly (shell fallback for `lib/db-client` migration scripts is the sole exception — see step 10).
+7.  Code: `make <target>` (e.g. `make test`, `make build`, `make typecheck`, `make lint-fix`). For project-specific targets: `pnpm exec nx run <project>:<target>`. Never use `pnpm run` directly (shell fallback for `lib/db-client` migration scripts is the sole exception — see step 10). **In sibling worktrees**, use `make_run({ target: "...", worktreePath: "$wt" })` (not `cd $wt && make/pnpm`) — this correctly sets `NODE_OPTIONS` for the Windows windowsHide patch. For Nx project-specific targets in a sibling worktree: `worktree_run({ command: "pnpm exec nx run <project>:<target>" })` (after `worktree_set`).
     - 7a. **Nx project name discovery**: the Nx project name is NOT always the directory name. If `nx_run` (or `pnpm exec nx run`) fails with "Cannot find project 'foo'", use `nx_show_projects()` (MCP) to list all project names, then match by directory name or pattern. Never read `project.json` via Bash or `cat` — `nx_show_projects` is the MCP-native alternative. Example: `nx_show_projects({ withTarget: "typecheck" })` lists all projects that have a `typecheck` target.
     - 7b. **Test new test files (MANDATORY)**: if you wrote or modified any test file (`.spec.ts`, `.spec.tsx`, `.test.ts`, `.test.tsx`, `.integration.spec.ts`), run those tests locally and confirm they pass **before committing**. For Jest: `pnpm exec nx run <project>:test --testPathPattern="SpecName"`. For Playwright E2E: `pnpm exec nx build web` then `pnpm exec nx e2e web-e2e -- --grep='test name' --config=apps/web-e2e/playwright.config.ts`. Never push untested test code. See `.agents/skills/testing/SKILL.md`.
 8.  Commit: Run `make format` (or `make_run format`) **before** `worktree_commit` to pre-format code and avoid formatter noise in the validation run. Then `worktree_commit(message: "type(scope): msg")` then `worktree_push()` (shell fallback: `git commit` / `git push`)
@@ -128,12 +128,13 @@ If you find yourself on a branch that does not match this convention (for exampl
 
 **Never use `cd <dir> && <command>` or `cd <dir> ; <command>` patterns.** These trigger security prompts in some agents and obscure which directory a command targets. Use flag-based alternatives:
 
-| Pattern                              | Replacement                                        |
-| ------------------------------------ | -------------------------------------------------- |
-| `cd $wt && git ...`                  | `git -C $wt ...`                                   |
-| `cd $wt && make ...`                 | `make -C $wt ...`                                  |
-| `cd terraform/main && terraform ...` | `terraform -chdir=terraform/main ...` (Lambda app) |
-| `cd terraform/runners && ...`        | `terraform -chdir=terraform/runners ...` (Runners) |
+| Pattern                                         | Replacement                                                                                                                                                                                      |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `cd $wt && git ...`                             | `git -C $wt ...`                                                                                                                                                                                 |
+| `cd $wt && make ...`                            | `make -C $wt ...`                                                                                                                                                                                |
+| `cd $wt && pnpm exec nx run <project>:<target>` | `make_run({ target: "<target>", worktreePath: "$wt" })` for make-wrapped targets; `worktree_run({ command: "pnpm exec nx run <project>:<target>" })` for Nx-specific targets not in the Makefile |
+| `cd terraform/main && terraform ...`            | `terraform -chdir=terraform/main ...` (Lambda app)                                                                                                                                               |
+| `cd terraform/runners && ...`                   | `terraform -chdir=terraform/runners ...` (Runners)                                                                                                                                               |
 
 ## Subagent Tool Preferences
 
