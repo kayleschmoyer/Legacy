@@ -932,7 +932,7 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
     {
       name: 'worktree_rebase',
       description:
-        'Fetch and rebase onto parent. Run worktree_stabilize after before pushing.',
+        "Fetch and rebase onto parent. Accepts an optional 'base' parameter to rebase onto an explicit branch (e.g. 'origin/main') when the branch has no twig parent registered. Run worktree_stabilize after rebasing, before pushing.",
       inputSchema: {
         type: 'object' as const,
         properties: {
@@ -945,6 +945,11 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
           skip: {
             type: 'boolean',
             description: 'Skip current commit in rebase',
+          },
+          base: {
+            type: 'string',
+            description:
+              "Explicit git ref or commit-ish to rebase onto, e.g. 'origin/main' or 'HEAD~3'. Defaults to twig parent if omitted; falls back to 'origin/main' if twig has no parent registered. Cannot be combined with 'abort' or 'skip'.",
           },
         },
       },
@@ -3322,10 +3327,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     // worktree_rebase
     // -----------------------------------------------------------------------
     case 'worktree_rebase': {
-      const { worktree, abort, skip } = args as {
+      const { worktree, abort, skip, base } = args as {
         worktree?: string;
         abort?: boolean;
         skip?: boolean;
+        base?: string;
       };
 
       const target = resolveTargetDir(worktree);
@@ -3352,6 +3358,42 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               {
                 type: 'text',
                 text: `[cwd: ${cwd}] Cannot specify both abort and skip. Use one or the other.`,
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        if (base !== undefined && base.startsWith('-')) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Invalid base ref: "${base}". Base ref must not start with '-'.`,
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        if (base !== undefined && !/^[a-zA-Z0-9_./~^{}-]+$/.test(base)) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Invalid base ref: "${base}". Only alphanumeric, '.', '/', '~', '^', '-', '_', '{', '}' allowed.`,
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        if (base !== undefined && (abort || skip)) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: 'Cannot specify base together with abort or skip',
               },
             ],
             isError: true,
@@ -3405,19 +3447,55 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           log.push(`(warning: could not update origin/main — ${reason})`);
         }
 
-        // Rebase via twig (knows the parent branch)
-        log.push('$ twig rebase');
-        const rebaseOut = run('twig rebase', cwd, {
-          timeout: 120_000,
-          env: agentEnv,
-        });
+        // Rebase: use explicit base if provided, otherwise try twig, fall back to origin/main
+        let rebaseOut = '';
+        if (base) {
+          log.push(`$ git rebase ${base}`);
+          rebaseOut = runGit(['rebase', base], cwd, {
+            timeout: 120_000,
+            env: agentEnv,
+          });
+        } else {
+          try {
+            log.push('$ twig rebase');
+            rebaseOut = run('twig rebase', cwd, {
+              timeout: 120_000,
+              env: agentEnv,
+            });
+          } catch (twigErr: unknown) {
+            const twigMsg =
+              twigErr instanceof Error ? twigErr.message : String(twigErr);
+            const twigStdout =
+              (twigErr as { stdout?: string; stderr?: string }).stdout ?? '';
+            const twigStderr =
+              (twigErr as { stdout?: string; stderr?: string }).stderr ?? '';
+            const noParent =
+              /no parent|parent branch/i.test(twigMsg) ||
+              /no parent|parent branch/i.test(twigStdout + twigStderr);
+            if (noParent) {
+              log.push(
+                `(twig rebase failed — no parent registered: ${twigMsg})`,
+                '(falling back to: git rebase origin/main)',
+              );
+              log.push('$ git rebase origin/main');
+              rebaseOut = run('git rebase origin/main', cwd, {
+                timeout: 120_000,
+                env: agentEnv,
+              });
+            } else {
+              throw twigErr;
+            }
+          }
+        }
         log.push(rebaseOut.trim());
 
         // Check if twig reported "up to date" but branch is actually behind origin/main.
         // This can happen when twig compares against a stale local main ref.
-        const upToDate = /already up[ -]to[ -]date|is up[ -]to[ -]date/i.test(
-          rebaseOut,
-        );
+        // Skip this check when `base` was explicitly provided — the caller chose their base,
+        // so we must not silently rebase onto origin/main instead.
+        const upToDate =
+          !base &&
+          /already up[ -]to[ -]date|is up[ -]to[ -]date/i.test(rebaseOut);
         if (upToDate) {
           try {
             // Verify: is origin/main actually an ancestor of HEAD?
