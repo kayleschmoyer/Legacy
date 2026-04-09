@@ -77,8 +77,18 @@ If you find yourself on a branch that does not match this convention (for exampl
 
       Skip this step for sibling worktrees — those are already named correctly by `make_worktree_create`. If you forget and push first, Jira Branch Sync will fall back to parsing the PR title/body, but the remote branch name will still violate the naming convention.
 
-5.  Setup worktree (parallel flow only): on **Windows**, use `make_wt_setup({ worktreePath: "$wt" })` MCP tool or shell fallback `make wt-setup WT=$wt`. On **Linux/macOS** (cloud agents), `make wt-setup` is not available — instead run `make install` in the worktree, copy `.env` from the main repo, and optionally run `make setup-hooks`. **Native-flow sessions**: dependency setup expectations are still being characterized (LS-2903 spike) — current assumption is that the ephemeral `.claude/worktrees/<name>/` inherits a working `node_modules` from the parent checkout; if `make pc` fails with missing-module errors, junction-link from the main repo: `cmd /c mklink /J node_modules D:\code\legacy-sports\node_modules`.
+5.  Setup worktree:
+    - **Parallel flow (sibling worktree)**: on Windows, `make_wt_setup({ worktreePath: "$wt" })` MCP tool or shell fallback `make wt-setup WT=$wt`. On Linux/macOS (cloud agents), `make wt-setup` is not available — run `make install` in the worktree, copy `.env` from the main repo, and optionally run `make setup-hooks`.
+    - **Native flow (ephemeral worktree — REQUIRED)**: `.claude/worktrees/<name>/` ships with NO `node_modules`. Before running any pnpm or make command, junction `node_modules` from the main repo (confirmed in LS-2903):
+
+      ```bash
+      worktree_run(command: "cmd //c mklink //J node_modules D:\\\\code\\\\legacy-sports\\\\node_modules")
+      ```
+
+      This is instant (no disk copy), the main repo's `node_modules` is untouched, and `pnpm exec nx`, `make typecheck`, `make pc` all work after it. Skip `make wt-setup` — that's sibling-only.
+
     - 5b. **Agent multi-root access** (optional, parallel flow): `make sync-worktrees` then `code legacy-sports.code-workspace` — gives agents search access across all sibling worktrees in one window.
+
 6.  **All remaining work happens in the active worktree.** For native-flow sessions, that's your current `pwd` (`.claude/worktrees/<name>/`) — no path juggling needed. For parallel-flow sessions, every file edit, terminal command, and git operation must target `$wt` (the sibling worktree path). Never edit code in `D:\code\legacy-sports` with HEAD on `main`.
 7.  Code: `make <target>` (e.g. `make test`, `make build`, `make typecheck`, `make lint-fix`). For project-specific targets: `pnpm exec nx run <project>:<target>`. Never use `pnpm run` directly (shell fallback for `lib/db-client` migration scripts is the sole exception — see step 10).
     - 7a. **Nx project name discovery**: the Nx project name is NOT always the directory name. If `nx_run` (or `pnpm exec nx run`) fails with "Cannot find project 'foo'", use `nx_show_projects()` (MCP) to list all project names, then match by directory name or pattern. Never read `project.json` via Bash or `cat` — `nx_show_projects` is the MCP-native alternative. Example: `nx_show_projects({ withTarget: "typecheck" })` lists all projects that have a `typecheck` target.
@@ -229,17 +239,19 @@ Detailed how-to docs live in `.agents/skills/<name>/SKILL.md`. The `description`
 
 | Server                  | Purpose                                                                                                                                                                                         |
 | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `legacy-sports-db`      | Database queries, migrations, schema generation                                                                                                                                                 |
-| `legacy-sports-jira`    | Ticket CRUD, transitions, blocker checks                                                                                                                                                        |
-| `legacy-sports-ci`      | CI log queries, workflow reruns                                                                                                                                                                 |
-| `legacy-sports-github`  | PR and review lifecycle (GitHub REST/GraphQL API)                                                                                                                                               |
-| `legacy-sports-nx`      | Nx project discovery, affected analysis, target execution                                                                                                                                       |
-| `legacy-sports-make`    | Makefile targets: validation, build, install, worktree setup                                                                                                                                    |
 | `worktree`              | Worktree lifecycle: list, set active, run, guard, rebase, stabilize, push                                                                                                                       |
+| `legacy-sports-github`  | PR and review lifecycle (GitHub REST/GraphQL API)                                                                                                                                               |
+| `legacy-sports-make`    | Makefile targets: validation, build, install, worktree setup                                                                                                                                    |
+| `legacy-sports-nx`      | Nx project discovery, affected analysis, target execution                                                                                                                                       |
+| `legacy-sports-jira`    | Ticket CRUD, transitions, blocker checks                                                                                                                                                        |
+| `legacy-sports-db`      | Database queries, migrations, schema generation                                                                                                                                                 |
+| `legacy-sports-ci`      | CI log queries, workflow reruns                                                                                                                                                                 |
 | `legacy-sports-aws`     | CloudWatch log tailing, AWS SSO status checks                                                                                                                                                   |
+| `legacy-sports-browser` | Dev server lifecycle, headless screenshots, GitHub image upload                                                                                                                                 |
 | `claude_ai_Stripe`      | Claude Code built-in Stripe integration (Claude Code only; not configured via this repo's `.vscode/mcp.json`)                                                                                   |
 | `claude_ai_Atlassian`   | Claude Code built-in Atlassian plugin — Jira + Confluence via OAuth 2.1 (no credentials needed). Cloud ID: `fb294606-6c8f-4b52-9a41-11fe45b77528`. Preferred for Jira on Claude Code on the web |
-| `legacy-sports-browser` | Dev server lifecycle, headless screenshots, GitHub image upload                                                                                                                                 |
+
+> **Server load order matters in native-worktree sessions**: Claude Code's worktree-spawned sessions only connect the first few servers from `.mcp.json` at session start (LS-2902 — suspected startup timeout / first-N cap upstream). The `.mcp.json` ordering prioritizes ticket-work tools (`worktree`, `github`, `make`, `nx`) so those load first; `aws` and `browser` are last because they are rarely used in ticket implementation. If a native session is missing a server, fall back to shell (`gh`, `git`, `pnpm exec`) or move to a sibling worktree which has all servers available.
 
 Call `jira_auth_status` at the start of any Jira workflow. If `configured: true` and API calls succeed, use our custom tools (`jira_view`, `jira_create_ticket`, `jira_transition`, `jira_check_blockers`). If `configured: false` or API calls fail, **stop and prompt the user first** — do not silently switch tools. Tell the user their Jira auth is broken and what to fix (see Critical Rules above for the exact env vars). Only proceed with the Atlassian plugin fallback (`mcp__claude_ai_Atlassian__*`, cloud ID `fb294606-6c8f-4b52-9a41-11fe45b77528`) after the user opts in or you are confirmed to be on Claude Code on the web where the plugin is primary.
 

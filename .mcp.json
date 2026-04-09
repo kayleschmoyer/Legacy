@@ -1,13 +1,25 @@
 {
   "$schema": "https://raw.githubusercontent.com/anthropics/claude-code/main/.mcp.schema.json",
   "mcpServers": {
-    "legacy-sports-ci": {
+    "worktree": {
       "command": "pnpm",
-      "args": ["exec", "tsx", "tools/mcp/ci-server/src/index.ts"]
+      "args": ["exec", "tsx", "tools/mcp/worktree-server/src/index.ts"]
     },
-    "legacy-sports-db": {
+    "legacy-sports-github": {
       "command": "pnpm",
-      "args": ["exec", "tsx", "tools/mcp/db-server/src/index.ts"]
+      "args": ["exec", "tsx", "tools/mcp/github-server/src/index.ts"],
+      "env": {
+        "GH_TOKEN": "${GH_TOKEN:-}",
+        "AGENT_AUTHOR_APP_PRIVATE_KEY": "${AGENT_AUTHOR_APP_PRIVATE_KEY:-}"
+      }
+    },
+    "legacy-sports-make": {
+      "command": "pnpm",
+      "args": ["exec", "tsx", "tools/mcp/make-server/src/index.ts"]
+    },
+    "legacy-sports-nx": {
+      "command": "pnpm",
+      "args": ["exec", "tsx", "tools/mcp/nx-server/src/index.ts"]
     },
     "legacy-sports-jira": {
       "command": "pnpm",
@@ -21,29 +33,17 @@
         "JIRA_API_TOKEN": "${JIRA_API_TOKEN:-}"
       }
     },
-    "worktree": {
+    "legacy-sports-db": {
       "command": "pnpm",
-      "args": ["exec", "tsx", "tools/mcp/worktree-server/src/index.ts"]
+      "args": ["exec", "tsx", "tools/mcp/db-server/src/index.ts"]
+    },
+    "legacy-sports-ci": {
+      "command": "pnpm",
+      "args": ["exec", "tsx", "tools/mcp/ci-server/src/index.ts"]
     },
     "legacy-sports-aws": {
       "command": "pnpm",
       "args": ["exec", "tsx", "tools/mcp/aws-server/src/index.ts"]
-    },
-    "legacy-sports-github": {
-      "command": "pnpm",
-      "args": ["exec", "tsx", "tools/mcp/github-server/src/index.ts"],
-      "env": {
-        "GH_TOKEN": "${GH_TOKEN:-}",
-        "AGENT_AUTHOR_APP_PRIVATE_KEY": "${AGENT_AUTHOR_APP_PRIVATE_KEY:-}"
-      }
-    },
-    "legacy-sports-nx": {
-      "command": "pnpm",
-      "args": ["exec", "tsx", "tools/mcp/nx-server/src/index.ts"]
-    },
-    "legacy-sports-make": {
-      "command": "pnpm",
-      "args": ["exec", "tsx", "tools/mcp/make-server/src/index.ts"]
     },
     "legacy-sports-browser": {
       "command": "pnpm",
