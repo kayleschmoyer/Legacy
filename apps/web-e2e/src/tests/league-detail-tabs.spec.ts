@@ -556,6 +556,28 @@ test.describe('Pending Waivers — no claims @regression', () => {
   });
 });
 
+// ── LS-2940: /my-team alias for /team-settings @regression ───────────────────
+
+test.describe('my-team URL alias — LS-2940 regression @regression', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockLeagueDetailGraphQL(page);
+    await page.goto('/baseball/league/1/my-team');
+    await page.waitForLoadState('load');
+  });
+
+  test('/my-team stays on /my-team, mounts team-settings panel, and shows no error', async ({
+    page,
+  }) => {
+    // URL should remain /my-team (alias, not a redirect to /team-settings or /overview)
+    await expect(page).toHaveURL(/\/baseball\/league\/1\/my-team/);
+    await expect(page.locator('body')).not.toContainText(
+      'Unexpected Application Error',
+    );
+    // The team settings panel should be mounted
+    await expect(page.locator('#panel-team-settings')).toBeAttached();
+  });
+});
+
 // ── LS-1303: Unknown tab and commissioner redirect @regression ────────────────
 
 test.describe('Unknown Tab Redirect — LS-1303 regression @regression', () => {

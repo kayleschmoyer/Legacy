@@ -394,6 +394,7 @@ const TAB_ALIASES: Record<string, TabId> = {
   history: 'history',
   matchup: 'matchup',
   trades: 'trades',
+  'my-team': 'team-settings',
   'team-settings': 'team-settings',
   commissioner: 'commissioner',
 };
