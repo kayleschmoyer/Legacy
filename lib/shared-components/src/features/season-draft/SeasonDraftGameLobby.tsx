@@ -1,12 +1,18 @@
 import React from 'react';
 import {
-  ActivityIndicator,
+  Button,
+  Card,
+  H1,
+  H2,
   ScrollView,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import { Button, Card, H2, H3, Text, XStack, YStack } from 'tamagui';
+  Separator,
+  Spinner,
+  Text,
+  XStack,
+  YStack,
+} from 'tamagui';
 import { useGetSeasonDraftGamesQuery } from '../../api/db/graphql.generated';
+import { BRAND_NAVY_LIGHT, withAlpha } from '../../utils/colors';
 
 /** Human-readable labels for stat keys */
 const STAT_LABELS: Record<string, string> = {
@@ -36,11 +42,12 @@ interface GameSummary {
   isMyTurn: boolean;
 }
 
+/** Status colors use Tamagui theme tokens so they stay theme-aware and consistent. */
 const STATUS_COLORS: Record<string, string> = {
-  setup: '$yellow10',
-  drafting: '$green10',
+  setup: '$amber10',
+  drafting: '$green9',
   completed: '$blue10',
-  cancelled: '$red10',
+  cancelled: '$textMuted',
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -79,176 +86,135 @@ export const SeasonDraftGameLobby: React.FC<SeasonDraftGameLobbyProps> = ({
 
   if (loading && games.length === 0) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" />
-        <Text marginTop="$2">Loading games...</Text>
-      </View>
+      <YStack flex={1} justifyContent="center" alignItems="center" space="$3">
+        <Spinner size="large" color="$brandGold" />
+        <Text color="$textMuted">Loading games…</Text>
+      </YStack>
     );
   }
 
   return (
     <YStack flex={1} backgroundColor="$background">
-      {/* Header */}
+      {/* ── Header: left/title/right flex layout for reliable centering ── */}
       <XStack
-        padding="$4"
-        backgroundColor="$blue10"
-        justifyContent="space-between"
+        paddingHorizontal="$5"
+        paddingVertical="$4"
+        backgroundColor="$brandNavy"
         alignItems="center"
       >
-        {onBack && (
-          <Button size="$3" onPress={onBack}>
-            ← Back
-          </Button>
-        )}
-        <H2 color="white" flex={1} textAlign="center">
+        <XStack flex={1} justifyContent="flex-start">
+          {onBack && (
+            <Button
+              size="$3"
+              chromeless
+              color="white"
+              onPress={onBack}
+              pressStyle={{ opacity: 0.7 }}
+            >
+              ← Back
+            </Button>
+          )}
+        </XStack>
+
+        <H1 color="white" fontSize="$6" textAlign="center">
           Season Draft Games
-        </H2>
-        <Button size="$3" onPress={onCreateGame}>
-          + New Game
-        </Button>
+        </H1>
+
+        <XStack flex={1} justifyContent="flex-end">
+          <Button
+            size="$3"
+            backgroundColor="$brandGold"
+            color="$brandNavy"
+            fontWeight="700"
+            onPress={onCreateGame}
+            pressStyle={{ backgroundColor: '$brandGoldDark' }}
+          >
+            + New Game
+          </Button>
+        </XStack>
       </XStack>
 
       <ScrollView>
-        <YStack padding="$4" space="$4">
-          {/* Create Game CTA */}
+        <YStack
+          padding="$4"
+          space="$5"
+          maxWidth={680}
+          alignSelf="center"
+          width="100%"
+        >
+          {/* ── Empty state ── */}
           {games.length === 0 && (
-            <Card padding="$6" alignItems="center">
-              <H3 marginBottom="$2">No games yet</H3>
-              <Text color="$gray10" marginBottom="$4" textAlign="center">
+            <Card
+              padding="$6"
+              alignItems="center"
+              backgroundColor="$surfaceCard"
+              borderColor="$surfacePanelBorder"
+              borderWidth={1}
+              space="$3"
+            >
+              <H2 color="white" textAlign="center">
+                No games yet
+              </H2>
+              <Text color="$textMuted" textAlign="center" maxWidth={340}>
                 Create your first Season Draft Game and challenge your friends!
               </Text>
               <Button
-                size="$5"
-                backgroundColor="$green10"
-                color="white"
+                size="$4"
+                marginTop="$2"
+                backgroundColor="$brandGold"
+                color="$brandNavy"
+                fontWeight="700"
                 onPress={onCreateGame}
+                pressStyle={{ backgroundColor: '$brandGoldDark' }}
               >
                 Create Game
               </Button>
             </Card>
           )}
 
-          {/* Active Games */}
+          {/* ── Active Games ── */}
           {activeGames.length > 0 && (
-            <YStack>
-              <H3 marginBottom="$2">Active Games</H3>
+            <YStack space="$2">
+              <H2 color="white" fontSize="$5">
+                Active Games
+              </H2>
+              <Separator borderColor="$surfacePanelBorder" />
               {activeGames.map((game) => (
-                <TouchableOpacity
+                <GameCard
                   key={game.id}
+                  game={game}
                   onPress={() => onSelectGame(game.id)}
-                >
-                  <Card
-                    padding="$4"
-                    marginBottom="$2"
-                    borderLeftWidth={4}
-                    borderLeftColor={
-                      game.isMyTurn && game.status === 'drafting'
-                        ? '$green10'
-                        : '$gray6'
-                    }
-                  >
-                    <XStack justifyContent="space-between" alignItems="center">
-                      <YStack flex={1}>
-                        <Text fontSize="$5" fontWeight="bold">
-                          {game.name}
-                        </Text>
-                        <XStack space="$2" marginTop="$1">
-                          <Text fontSize="$2" color="$gray10">
-                            {game.playerType === 'pitcher'
-                              ? 'Pitcher'
-                              : 'Hitter'}
-                          </Text>
-                          <Text fontSize="$2" color="$gray10">
-                            •
-                          </Text>
-                          <Text fontSize="$2" color="$gray10">
-                            {STAT_LABELS[game.statKey] ?? game.statKey}
-                          </Text>
-                          <Text fontSize="$2" color="$gray10">
-                            •
-                          </Text>
-                          <Text fontSize="$2" color="$gray10">
-                            {game.gameMode === 'career_team'
-                              ? 'Career'
-                              : 'Season'}
-                          </Text>
-                        </XStack>
-                      </YStack>
-                      <YStack alignItems="flex-end">
-                        <Text
-                          fontSize="$2"
-                          color={STATUS_COLORS[game.status]}
-                          fontWeight="bold"
-                        >
-                          {STATUS_LABELS[game.status]}
-                        </Text>
-                        {game.isMyTurn && game.status === 'drafting' && (
-                          <Text
-                            fontSize="$3"
-                            color="$green10"
-                            fontWeight="bold"
-                            marginTop="$1"
-                          >
-                            Your Turn!
-                          </Text>
-                        )}
-                      </YStack>
-                    </XStack>
-                  </Card>
-                </TouchableOpacity>
+                />
               ))}
             </YStack>
           )}
 
-          {/* Completed Games */}
+          {/* ── Past Games ── */}
           {completedGames.length > 0 && (
-            <YStack>
-              <H3 marginBottom="$2">Past Games</H3>
+            <YStack space="$2">
+              <H2 color="white" fontSize="$5">
+                Past Games
+              </H2>
+              <Separator borderColor="$surfacePanelBorder" />
               {completedGames.map((game) => (
-                <TouchableOpacity
+                <GameCard
                   key={game.id}
+                  game={game}
                   onPress={() => onSelectGame(game.id)}
-                >
-                  <Card padding="$4" marginBottom="$2" opacity={0.7}>
-                    <XStack justifyContent="space-between" alignItems="center">
-                      <YStack flex={1}>
-                        <Text fontSize="$5" fontWeight="bold">
-                          {game.name}
-                        </Text>
-                        <XStack space="$2" marginTop="$1">
-                          <Text fontSize="$2" color="$gray10">
-                            {game.playerType === 'pitcher'
-                              ? 'Pitcher'
-                              : 'Hitter'}
-                          </Text>
-                          <Text fontSize="$2" color="$gray10">
-                            •
-                          </Text>
-                          <Text fontSize="$2" color="$gray10">
-                            {STAT_LABELS[game.statKey] ?? game.statKey}
-                          </Text>
-                        </XStack>
-                      </YStack>
-                      <Text
-                        fontSize="$2"
-                        color={STATUS_COLORS[game.status]}
-                        fontWeight="bold"
-                      >
-                        {STATUS_LABELS[game.status]}
-                      </Text>
-                    </XStack>
-                  </Card>
-                </TouchableOpacity>
+                  muted
+                />
               ))}
             </YStack>
           )}
 
-          {/* Refresh */}
+          {/* ── Refresh ── */}
           <Button
             size="$3"
             variant="outlined"
-            onPress={() => void refetch()}
             alignSelf="center"
+            borderColor="$surfacePanelBorder"
+            color="$textMuted"
+            onPress={() => void refetch()}
           >
             Refresh
           </Button>
@@ -257,5 +223,95 @@ export const SeasonDraftGameLobby: React.FC<SeasonDraftGameLobbyProps> = ({
     </YStack>
   );
 };
+
+// ── GameCard ────────────────────────────────────────────────────────────────
+
+interface GameCardProps {
+  game: GameSummary;
+  onPress: () => void;
+  muted?: boolean;
+}
+
+function GameCard({
+  game,
+  onPress,
+  muted = false,
+}: GameCardProps): React.JSX.Element {
+  const isYourTurn = game.isMyTurn && game.status === 'drafting';
+
+  return (
+    <Card
+      padding="$4"
+      backgroundColor={
+        isYourTurn ? withAlpha(BRAND_NAVY_LIGHT, 0.4) : '$surfaceCard'
+      }
+      borderColor={isYourTurn ? '$brandGold' : '$surfacePanelBorder'}
+      borderWidth={1}
+      opacity={muted ? 0.65 : 1}
+      onPress={onPress}
+      pressStyle={{ scale: 0.98 }}
+      hoverStyle={{
+        borderColor: isYourTurn ? '$brandGold' : '$brandNavyLight',
+      }}
+      cursor="pointer"
+    >
+      <XStack justifyContent="space-between" alignItems="center">
+        <YStack flex={1} space="$1">
+          <Text fontSize="$5" fontWeight="700" color="white">
+            {game.name}
+          </Text>
+          <XStack space="$2" alignItems="center">
+            <Text fontSize="$2" color="$textMuted">
+              {game.playerType === 'pitcher' ? 'Pitcher' : 'Hitter'}
+            </Text>
+            <Text fontSize="$2" color="$textMuted">
+              ·
+            </Text>
+            <Text fontSize="$2" color="$textMuted">
+              {STAT_LABELS[game.statKey] ?? game.statKey}
+            </Text>
+            <Text fontSize="$2" color="$textMuted">
+              ·
+            </Text>
+            <Text fontSize="$2" color="$textMuted">
+              {game.gameMode === 'career_team' ? 'Career' : 'Season'}
+            </Text>
+          </XStack>
+        </YStack>
+
+        <YStack alignItems="flex-end" space="$1">
+          <XStack alignItems="center" space="$1">
+            <YStack
+              width={6}
+              height={6}
+              borderRadius={3}
+              backgroundColor={STATUS_COLORS[game.status]}
+            />
+            <Text
+              fontSize="$2"
+              color={STATUS_COLORS[game.status]}
+              fontWeight="600"
+            >
+              {STATUS_LABELS[game.status]}
+            </Text>
+          </XStack>
+
+          {isYourTurn && (
+            <XStack
+              backgroundColor="$brandGold"
+              paddingHorizontal="$2"
+              paddingVertical="$1"
+              borderRadius="$1"
+            >
+              <Text fontSize="$1" color="$brandNavy" fontWeight="800">
+                YOUR TURN
+              </Text>
+            </XStack>
+          )}
+        </YStack>
+      </XStack>
+    </Card>
+  );
+}
 
 export default SeasonDraftGameLobby;
