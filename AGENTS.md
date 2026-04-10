@@ -26,6 +26,7 @@ This file provides guidance to AI coding agents working with code in this reposi
     - `head -N file` → `Read(file_path: "...", limit: N)`
     - `tail -N file` → first `Read(file_path: "...")` to determine `total_lines`, then if needed `Read(file_path: "...", offset: <total_lines - N>, limit: N)` to re-read just the tail range; if the file is small, keep the full `Read`
     - `find . -name "*.ts"` → `Glob(pattern: "**/*.ts")`
+    - `git checkout HEAD -- <file>` (restore a specific file from `HEAD`, discarding both staged and unstaged changes for that path) → `worktree_checkout_file(files: ["..."], worktree: "...")` when a worktree is active; shell fallback: `git -C <worktree-path> checkout HEAD -- <file>`
     - `sleep N && gh run view <runId> --json status,conclusion` (CI polling loop) → `ci_wait_for_run({ runId: "<runId>" })` — polls until the run completes or times out (default 10 min; pass `timeoutMs` for long runs) and returns structured status/conclusion; never use sleep + polling loops to wait for CI
     - `tail ~/.claude/.../tasks/<taskId>.output` → `TaskOutput(taskId: "<taskId>")` for background agent task output (no path needed — tool resolves it automatically; returned content can be inspected for length/line counts directly)
     - `wc -l tasks/<taskId>.output` or `wc -c tasks/<taskId>.output` → `TaskOutput(taskId: "<taskId>")` then compute counts from the returned content using `wc` semantics (`-l`: count `\n` characters; `-c`: count UTF-8 bytes, not string `.length`)
