@@ -313,13 +313,16 @@ async function transitionToDone(issueKey: string): Promise<void> {
     transitions: Array<{
       id: string;
       name: string;
-      to: { statusCategory: { key: string } };
+      to: { name: string; statusCategory: { key: string } };
     }>;
   }>('GET', `/rest/api/3/issue/${issueKey}/transitions`);
 
-  const doneTransition = data.transitions.find(
-    (t) => t.to.statusCategory.key === 'done',
-  );
+  // Match on the destination status name ("Done") rather than the transition name,
+  // since transition names vary by workflow. "Won't Do" shares statusCategory.key
+  // === 'done', so we can't rely on that alone.
+  const doneTransition =
+    data.transitions.find((t) => t.to.name === 'Done') ??
+    data.transitions.find((t) => t.to.statusCategory.key === 'done');
 
   if (!doneTransition) {
     throw new Error(`No 'Done' transition found for issue ${issueKey}`);
