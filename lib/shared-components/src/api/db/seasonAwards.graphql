@@ -1,0 +1,40 @@
+fragment LeagueSeasonAward on LeagueSeasonAward {
+  id
+  leagueId
+  season
+  playerId
+  playerFirstName
+  playerLastName
+  awardType
+  notes
+  createdAt
+  updatedAt
+}
+
+# ── Queries ────────────────────────────────────────────────────────────────
+
+query GetLeagueSeasonAwards($leagueId: Int!, $season: Int) {
+  leagueSeasonAwards(leagueId: $leagueId, season: $season) {
+    ...LeagueSeasonAward
+  }
+}
+
+# ── Mutations ──────────────────────────────────────────────────────────────
+
+mutation UpsertLeagueSeasonAward($input: UpsertLeagueSeasonAwardInput!) {
+  upsertLeagueSeasonAward(input: $input) {
+    ...LeagueSeasonAward
+  }
+}
+
+mutation DeleteLeagueSeasonAward(
+  $leagueId: Int!
+  $season: Int!
+  $awardType: String!
+) {
+  deleteLeagueSeasonAward(
+    leagueId: $leagueId
+    season: $season
+    awardType: $awardType
+  )
+}

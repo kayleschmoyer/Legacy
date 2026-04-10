@@ -4793,6 +4793,97 @@ export type GetMatchupsByWeekQuery = {
   }> | null;
 };
 
+export type GetPlayersWithStatsQueryVariables = Exact<{
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<Scalars['String']['input']>;
+  orderDirection?: InputMaybe<Scalars['String']['input']>;
+  position?: InputMaybe<Scalars['String']['input']>;
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+export type GetPlayersWithStatsQuery = {
+  __typename?: 'Query';
+  players?: Array<{
+    __typename?: 'Player';
+    id?: number | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    eligiblePositions?: Array<string> | null;
+    primaryEra?: string | null;
+    scoring?: {
+      __typename?: 'PlayerScoring';
+      battingScore?: number | null;
+      pitchingScore?: number | null;
+      fieldingScore?: number | null;
+      hitterScore?: number | null;
+      hitterAvgPointsPerGame?: number | null;
+      pitchingAvgPointsPerGame?: number | null;
+      totalScore?: number | null;
+      careerGames?: number | null;
+      avgPointsPerGame?: number | null;
+    } | null;
+    averageSeasonBatting?: {
+      __typename?: 'AverageSeasonBatting';
+      seasons?: number | null;
+      games?: number | null;
+      atBats?: number | null;
+      runs?: number | null;
+      hits?: number | null;
+      homeRuns?: number | null;
+      rbi?: number | null;
+      stolenBases?: number | null;
+      battingAverage?: number | null;
+      onBasePercentage?: number | null;
+      sluggingPercentage?: number | null;
+    } | null;
+    careerBatting?: {
+      __typename?: 'CareerBatting';
+      games?: number | null;
+      runs?: number | null;
+      homeRuns?: number | null;
+      rbi?: number | null;
+      stolenBases?: number | null;
+      hits?: number | null;
+      atBats?: number | null;
+      plateAppearances?: number | null;
+      baseOnBalls?: number | null;
+      hitByPitch?: number | null;
+      sacrificeHits?: number | null;
+      totalBases?: number | null;
+      offensiveWAR?: number | null;
+    } | null;
+    careerPitching?: {
+      __typename?: 'CareerPitching';
+      wins?: number | null;
+      losses?: number | null;
+      era?: string | null;
+      games?: number | null;
+      gamesStarted?: number | null;
+      saves?: number | null;
+      strikeouts?: number | null;
+      baseOnBalls?: number | null;
+      hits?: number | null;
+      earnedRuns?: number | null;
+      outsRecorded?: number | null;
+      winPercentage?: number | null;
+      pitchingWAR?: number | null;
+    } | null;
+    careerAchievements?: {
+      __typename?: 'CareerAchievements';
+      allStarSelections?: number | null;
+      mvpAwards?: number | null;
+      cyYoungAwards?: number | null;
+      goldGloves?: number | null;
+      silverSluggers?: number | null;
+      worldSeriesRings?: number | null;
+      hallOfFame?: boolean | null;
+      rookieOfTheYear?: boolean | null;
+    } | null;
+  }> | null;
+};
+
 export type GetPositionsForLeagueQueryVariables = Exact<{
   leagueId: Scalars['Int']['input'];
 }>;
@@ -6252,6 +6343,74 @@ export type SearchUsersForDraftQuery = {
   }> | null;
 };
 
+export type LeagueSeasonAwardFragment = {
+  __typename?: 'LeagueSeasonAward';
+  id?: number | null;
+  leagueId?: number | null;
+  season?: number | null;
+  playerId?: number | null;
+  playerFirstName?: string | null;
+  playerLastName?: string | null;
+  awardType?: string | null;
+  notes?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+};
+
+export type GetLeagueSeasonAwardsQueryVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+  season?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type GetLeagueSeasonAwardsQuery = {
+  __typename?: 'Query';
+  leagueSeasonAwards?: Array<{
+    __typename?: 'LeagueSeasonAward';
+    id?: number | null;
+    leagueId?: number | null;
+    season?: number | null;
+    playerId?: number | null;
+    playerFirstName?: string | null;
+    playerLastName?: string | null;
+    awardType?: string | null;
+    notes?: string | null;
+    createdAt?: string | null;
+    updatedAt?: string | null;
+  }> | null;
+};
+
+export type UpsertLeagueSeasonAwardMutationVariables = Exact<{
+  input: UpsertLeagueSeasonAwardInput;
+}>;
+
+export type UpsertLeagueSeasonAwardMutation = {
+  __typename?: 'Mutation';
+  upsertLeagueSeasonAward?: {
+    __typename?: 'LeagueSeasonAward';
+    id?: number | null;
+    leagueId?: number | null;
+    season?: number | null;
+    playerId?: number | null;
+    playerFirstName?: string | null;
+    playerLastName?: string | null;
+    awardType?: string | null;
+    notes?: string | null;
+    createdAt?: string | null;
+    updatedAt?: string | null;
+  } | null;
+};
+
+export type DeleteLeagueSeasonAwardMutationVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+  season: Scalars['Int']['input'];
+  awardType: Scalars['String']['input'];
+}>;
+
+export type DeleteLeagueSeasonAwardMutation = {
+  __typename?: 'Mutation';
+  deleteLeagueSeasonAward?: boolean | null;
+};
+
 export type SeasonDraftPickFragment = {
   __typename?: 'SeasonDraftPick';
   playerName?: string | null;
@@ -7259,6 +7418,20 @@ export const PlayerFragmentDoc = gql`
     lastName
     brefId
     statsLastFetchedAt
+  }
+`;
+export const LeagueSeasonAwardFragmentDoc = gql`
+  fragment LeagueSeasonAward on LeagueSeasonAward {
+    id
+    leagueId
+    season
+    playerId
+    playerFirstName
+    playerLastName
+    awardType
+    notes
+    createdAt
+    updatedAt
   }
 `;
 export const SeasonDraftPickHistoryFragmentDoc = gql`
@@ -9909,6 +10082,182 @@ export type GetMatchupsByWeekSuspenseQueryHookResult = ReturnType<
 export type GetMatchupsByWeekQueryResult = Apollo.QueryResult<
   GetMatchupsByWeekQuery,
   GetMatchupsByWeekQueryVariables
+>;
+export const GetPlayersWithStats = gql`
+  query GetPlayersWithStats(
+    $limit: Int
+    $offset: Int
+    $orderBy: String = "lastName"
+    $orderDirection: String = "asc"
+    $position: String
+    $leagueId: Int
+    $search: String
+  ) {
+    players(
+      limit: $limit
+      offset: $offset
+      orderBy: $orderBy
+      orderDirection: $orderDirection
+      position: $position
+      leagueId: $leagueId
+      search: $search
+    ) {
+      id
+      firstName
+      lastName
+      eligiblePositions
+      scoring {
+        battingScore
+        pitchingScore
+        fieldingScore
+        hitterScore
+        hitterAvgPointsPerGame
+        pitchingAvgPointsPerGame
+        totalScore
+        careerGames
+        avgPointsPerGame
+      }
+      averageSeasonBatting {
+        seasons
+        games
+        atBats
+        runs
+        hits
+        homeRuns
+        rbi
+        stolenBases
+        battingAverage
+        onBasePercentage
+        sluggingPercentage
+      }
+      careerBatting {
+        games
+        runs
+        homeRuns
+        rbi
+        stolenBases
+        hits
+        atBats
+        plateAppearances
+        baseOnBalls
+        hitByPitch
+        sacrificeHits
+        totalBases
+        offensiveWAR
+      }
+      careerPitching {
+        wins
+        losses
+        era
+        games
+        gamesStarted
+        saves
+        strikeouts
+        baseOnBalls
+        hits
+        earnedRuns
+        outsRecorded
+        winPercentage
+        pitchingWAR
+      }
+      careerAchievements {
+        allStarSelections
+        mvpAwards
+        cyYoungAwards
+        goldGloves
+        silverSluggers
+        worldSeriesRings
+        hallOfFame
+        rookieOfTheYear
+      }
+      primaryEra
+    }
+  }
+`;
+
+/**
+ * __useGetPlayersWithStatsQuery__
+ *
+ * To run a query within a React component, call `useGetPlayersWithStatsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetPlayersWithStatsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetPlayersWithStatsQuery({
+ *   variables: {
+ *      limit: // value for 'limit'
+ *      offset: // value for 'offset'
+ *      orderBy: // value for 'orderBy'
+ *      orderDirection: // value for 'orderDirection'
+ *      position: // value for 'position'
+ *      leagueId: // value for 'leagueId'
+ *      search: // value for 'search'
+ *   },
+ * });
+ */
+export function useGetPlayersWithStatsQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    GetPlayersWithStatsQuery,
+    GetPlayersWithStatsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetPlayersWithStatsQuery,
+    GetPlayersWithStatsQueryVariables
+  >(GetPlayersWithStats, options);
+}
+export function useGetPlayersWithStatsLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetPlayersWithStatsQuery,
+    GetPlayersWithStatsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetPlayersWithStatsQuery,
+    GetPlayersWithStatsQueryVariables
+  >(GetPlayersWithStats, options);
+}
+export function useGetPlayersWithStatsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetPlayersWithStatsQuery,
+        GetPlayersWithStatsQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetPlayersWithStatsQuery,
+    GetPlayersWithStatsQueryVariables
+  >(
+    GetPlayersWithStats,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetPlayersWithStatsQuery,
+          GetPlayersWithStatsQueryVariables
+        >,
+  );
+}
+export type GetPlayersWithStatsQueryHookResult = ReturnType<
+  typeof useGetPlayersWithStatsQuery
+>;
+export type GetPlayersWithStatsLazyQueryHookResult = ReturnType<
+  typeof useGetPlayersWithStatsLazyQuery
+>;
+export type GetPlayersWithStatsSuspenseQueryHookResult = ReturnType<
+  typeof useGetPlayersWithStatsSuspenseQuery
+>;
+export type GetPlayersWithStatsQueryResult = Apollo.QueryResult<
+  GetPlayersWithStatsQuery,
+  GetPlayersWithStatsQueryVariables
 >;
 export const GetPositionsForLeague = gql`
   query GetPositionsForLeague($leagueId: Int!) {
@@ -14363,6 +14712,207 @@ export type SearchUsersForDraftSuspenseQueryHookResult = ReturnType<
 export type SearchUsersForDraftQueryResult = Apollo.QueryResult<
   SearchUsersForDraftQuery,
   SearchUsersForDraftQueryVariables
+>;
+export const GetLeagueSeasonAwards = gql`
+  query GetLeagueSeasonAwards($leagueId: Int!, $season: Int) {
+    leagueSeasonAwards(leagueId: $leagueId, season: $season) {
+      ...LeagueSeasonAward
+    }
+  }
+  ${LeagueSeasonAwardFragmentDoc}
+`;
+
+/**
+ * __useGetLeagueSeasonAwardsQuery__
+ *
+ * To run a query within a React component, call `useGetLeagueSeasonAwardsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetLeagueSeasonAwardsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetLeagueSeasonAwardsQuery({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *      season: // value for 'season'
+ *   },
+ * });
+ */
+export function useGetLeagueSeasonAwardsQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetLeagueSeasonAwardsQuery,
+    GetLeagueSeasonAwardsQueryVariables
+  > &
+    (
+      | { variables: GetLeagueSeasonAwardsQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetLeagueSeasonAwardsQuery,
+    GetLeagueSeasonAwardsQueryVariables
+  >(GetLeagueSeasonAwards, options);
+}
+export function useGetLeagueSeasonAwardsLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetLeagueSeasonAwardsQuery,
+    GetLeagueSeasonAwardsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetLeagueSeasonAwardsQuery,
+    GetLeagueSeasonAwardsQueryVariables
+  >(GetLeagueSeasonAwards, options);
+}
+export function useGetLeagueSeasonAwardsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetLeagueSeasonAwardsQuery,
+        GetLeagueSeasonAwardsQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetLeagueSeasonAwardsQuery,
+    GetLeagueSeasonAwardsQueryVariables
+  >(
+    GetLeagueSeasonAwards,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetLeagueSeasonAwardsQuery,
+          GetLeagueSeasonAwardsQueryVariables
+        >,
+  );
+}
+export type GetLeagueSeasonAwardsQueryHookResult = ReturnType<
+  typeof useGetLeagueSeasonAwardsQuery
+>;
+export type GetLeagueSeasonAwardsLazyQueryHookResult = ReturnType<
+  typeof useGetLeagueSeasonAwardsLazyQuery
+>;
+export type GetLeagueSeasonAwardsSuspenseQueryHookResult = ReturnType<
+  typeof useGetLeagueSeasonAwardsSuspenseQuery
+>;
+export type GetLeagueSeasonAwardsQueryResult = Apollo.QueryResult<
+  GetLeagueSeasonAwardsQuery,
+  GetLeagueSeasonAwardsQueryVariables
+>;
+export const UpsertLeagueSeasonAward = gql`
+  mutation UpsertLeagueSeasonAward($input: UpsertLeagueSeasonAwardInput!) {
+    upsertLeagueSeasonAward(input: $input) {
+      ...LeagueSeasonAward
+    }
+  }
+  ${LeagueSeasonAwardFragmentDoc}
+`;
+export type UpsertLeagueSeasonAwardMutationFn = MutationFunction<
+  UpsertLeagueSeasonAwardMutation,
+  UpsertLeagueSeasonAwardMutationVariables
+>;
+
+/**
+ * __useUpsertLeagueSeasonAwardMutation__
+ *
+ * To run a mutation, you first call `useUpsertLeagueSeasonAwardMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpsertLeagueSeasonAwardMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [upsertLeagueSeasonAwardMutation, { data, loading, error }] = useUpsertLeagueSeasonAwardMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useUpsertLeagueSeasonAwardMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    UpsertLeagueSeasonAwardMutation,
+    UpsertLeagueSeasonAwardMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    UpsertLeagueSeasonAwardMutation,
+    UpsertLeagueSeasonAwardMutationVariables
+  >(UpsertLeagueSeasonAward, options);
+}
+export type UpsertLeagueSeasonAwardMutationHookResult = ReturnType<
+  typeof useUpsertLeagueSeasonAwardMutation
+>;
+export type UpsertLeagueSeasonAwardMutationResult =
+  Apollo.MutationResult<UpsertLeagueSeasonAwardMutation>;
+export type UpsertLeagueSeasonAwardMutationOptions = BaseMutationOptions<
+  UpsertLeagueSeasonAwardMutation,
+  UpsertLeagueSeasonAwardMutationVariables
+>;
+export const DeleteLeagueSeasonAward = gql`
+  mutation DeleteLeagueSeasonAward(
+    $leagueId: Int!
+    $season: Int!
+    $awardType: String!
+  ) {
+    deleteLeagueSeasonAward(
+      leagueId: $leagueId
+      season: $season
+      awardType: $awardType
+    )
+  }
+`;
+export type DeleteLeagueSeasonAwardMutationFn = MutationFunction<
+  DeleteLeagueSeasonAwardMutation,
+  DeleteLeagueSeasonAwardMutationVariables
+>;
+
+/**
+ * __useDeleteLeagueSeasonAwardMutation__
+ *
+ * To run a mutation, you first call `useDeleteLeagueSeasonAwardMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useDeleteLeagueSeasonAwardMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [deleteLeagueSeasonAwardMutation, { data, loading, error }] = useDeleteLeagueSeasonAwardMutation({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *      season: // value for 'season'
+ *      awardType: // value for 'awardType'
+ *   },
+ * });
+ */
+export function useDeleteLeagueSeasonAwardMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    DeleteLeagueSeasonAwardMutation,
+    DeleteLeagueSeasonAwardMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    DeleteLeagueSeasonAwardMutation,
+    DeleteLeagueSeasonAwardMutationVariables
+  >(DeleteLeagueSeasonAward, options);
+}
+export type DeleteLeagueSeasonAwardMutationHookResult = ReturnType<
+  typeof useDeleteLeagueSeasonAwardMutation
+>;
+export type DeleteLeagueSeasonAwardMutationResult =
+  Apollo.MutationResult<DeleteLeagueSeasonAwardMutation>;
+export type DeleteLeagueSeasonAwardMutationOptions = BaseMutationOptions<
+  DeleteLeagueSeasonAwardMutation,
+  DeleteLeagueSeasonAwardMutationVariables
 >;
 export const SetTradeBlock = gql`
   mutation SetTradeBlock(

@@ -119,7 +119,7 @@ import { LeagueSettingsControl } from '../../components/commissioner/LeagueSetti
 import { LeagueBrandingControl } from '../../components/commissioner/LeagueBrandingControl';
 import { AchievementRestrictionsControl } from '../../components/commissioner/AchievementRestrictionsControl';
 import { TiebreakerConfig } from '../../components/league/TiebreakerConfig';
-import { SeasonAwardsControl } from '../../components/commissioner/SeasonAwardsControl';
+import { SeasonAwardsControl } from '@legacy-sports/shared-components/commissioner';
 import { LeagueDuesControl } from '../../components/commissioner/LeagueDuesControl';
 import { LeagueDuesStatusDashboard } from '../../components/commissioner/LeagueDuesStatusDashboard';
 import { WaiverProcessControl } from '../../features/commissioner/WaiverProcessControl';

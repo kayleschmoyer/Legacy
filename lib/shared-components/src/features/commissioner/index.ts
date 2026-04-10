@@ -19,3 +19,5 @@ export { LeagueBrandingControl } from './LeagueBrandingControl';
 export type { LeagueBrandingControlProps } from './LeagueBrandingControl';
 export { LeagueSettingsControl } from './LeagueSettingsControl';
 export type { LeagueSettingsControlProps } from './LeagueSettingsControl';
+export { SeasonAwardsControl } from './SeasonAwardsControl';
+export type { SeasonAwardsControlProps } from './SeasonAwardsControl';

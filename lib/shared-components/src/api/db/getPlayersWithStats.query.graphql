@@ -1,0 +1,89 @@
+query GetPlayersWithStats(
+  $limit: Int
+  $offset: Int
+  $orderBy: String = "lastName"
+  $orderDirection: String = "asc"
+  $position: String
+  $leagueId: Int
+  $search: String
+) {
+  players(
+    limit: $limit
+    offset: $offset
+    orderBy: $orderBy
+    orderDirection: $orderDirection
+    position: $position
+    leagueId: $leagueId
+    search: $search
+  ) {
+    id
+    firstName
+    lastName
+    eligiblePositions
+    scoring {
+      battingScore
+      pitchingScore
+      fieldingScore
+      hitterScore
+      hitterAvgPointsPerGame
+      pitchingAvgPointsPerGame
+      totalScore
+      careerGames
+      avgPointsPerGame
+    }
+    averageSeasonBatting {
+      seasons
+      games
+      atBats
+      runs
+      hits
+      homeRuns
+      rbi
+      stolenBases
+      battingAverage
+      onBasePercentage
+      sluggingPercentage
+    }
+    careerBatting {
+      games
+      runs
+      homeRuns
+      rbi
+      stolenBases
+      hits
+      atBats
+      plateAppearances
+      baseOnBalls
+      hitByPitch
+      sacrificeHits
+      totalBases
+      offensiveWAR
+    }
+    careerPitching {
+      wins
+      losses
+      era
+      games
+      gamesStarted
+      saves
+      strikeouts
+      baseOnBalls
+      hits
+      earnedRuns
+      outsRecorded
+      winPercentage
+      pitchingWAR
+    }
+    careerAchievements {
+      allStarSelections
+      mvpAwards
+      cyYoungAwards
+      goldGloves
+      silverSluggers
+      worldSeriesRings
+      hallOfFame
+      rookieOfTheYear
+    }
+    primaryEra
+  }
+}
