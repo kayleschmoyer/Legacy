@@ -3845,6 +3845,35 @@ export type PlaceBidMutation = {
   } | null;
 };
 
+export type AutoAdvanceMatchupsMutationVariables = Exact<{
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type AutoAdvanceMatchupsMutation = {
+  __typename?: 'Mutation';
+  autoAdvanceMatchups?: {
+    __typename?: 'AutoAdvanceMatchupsResult';
+    leaguesProcessed?: number | null;
+    leaguesAdvanced?: number | null;
+    leaguesSkipped?: number | null;
+    errors?: Array<string> | null;
+  } | null;
+};
+
+export type AutoSelectGamesMutationVariables = Exact<{
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type AutoSelectGamesMutation = {
+  __typename?: 'Mutation';
+  autoSelectGames?: {
+    __typename?: 'AutoSelectGamesResult';
+    leaguesProcessed?: number | null;
+    gamesTriggered?: number | null;
+    errors?: Array<string> | null;
+  } | null;
+};
+
 export type CancelSeasonDraftGameMutationVariables = Exact<{
   gameId: Scalars['Int']['input'];
 }>;
@@ -4793,6 +4822,32 @@ export type GetMatchupsByWeekQuery = {
   }> | null;
 };
 
+export type GetMatchupsForLeagueQueryVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+  weekNumber?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type GetMatchupsForLeagueQuery = {
+  __typename?: 'Query';
+  getMatchupsForLeague?: Array<{
+    __typename?: 'Matchup';
+    id?: string | null;
+    weekNumber?: number | null;
+    leagueId?: number | null;
+    team1Id?: number | null;
+    team2Id?: number | null;
+    team1Score?: number | null;
+    team2Score?: number | null;
+    status?: MatchupStatus | null;
+    statsLoadingStatus?: StatsLoadingStatus | null;
+    gamesPerMatchup?: number | null;
+    spStartsPerMatchup?: number | null;
+    selectedGamesCount?: number | null;
+    startTime?: string | null;
+    endTime?: string | null;
+  }> | null;
+};
+
 export type GetPlayersWithStatsQueryVariables = Exact<{
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
@@ -5034,6 +5089,30 @@ export type GiveUpDisclosureGameMutation = {
   giveUpDisclosureGame?: {
     __typename?: 'GiveUpDisclosureGameResult';
     correctPlayerId?: number | null;
+  } | null;
+};
+
+export type InitializeDraftMutationVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+  draftOrder?: InputMaybe<Scalars['String']['input']>;
+  draftMode?: InputMaybe<Scalars['String']['input']>;
+  selectionMethod?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+export type InitializeDraftMutation = {
+  __typename?: 'Mutation';
+  initializeDraft?: {
+    __typename?: 'Draft';
+    id?: number | null;
+    leagueId?: number | null;
+    draftMode?: string | null;
+    selectionMethod?: string | null;
+    draftOrder?: string | null;
+    currentPick?: number | null;
+    pickTimeLimitSeconds?: number | null;
+    currentPickDeadline?: string | null;
+    draftStartedAt?: string | null;
+    draftCompletedAt?: string | null;
   } | null;
 };
 
@@ -6154,6 +6233,71 @@ export type PlayerFragment = {
   lastName?: string | null;
   brefId?: string | null;
   statsLastFetchedAt?: string | null;
+};
+
+export type RenewLeagueMutationVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+  keepRosters: Scalars['Boolean']['input'];
+}>;
+
+export type RenewLeagueMutation = {
+  __typename?: 'Mutation';
+  renewLeague?: {
+    __typename?: 'League';
+    id?: number | null;
+    name?: string | null;
+    owner?: number | null;
+    maxRosterSize?: number | null;
+    currentMatchup?: number | null;
+    currentWeekNumber?: number | null;
+    draftStatus?: string | null;
+    leaguePhase?: string | null;
+    inviteCode?: string | null;
+    playerPool?: string | null;
+    weekAdvanceStatus?: string | null;
+    waiverType?: string | null;
+    waiverEnabled?: boolean | null;
+    faabBudgetDefault?: number | null;
+    spStartsPerMatchup?: number | null;
+    gamesPerMatchup?: number | null;
+    minCareerGames?: number | null;
+    minCareerSeasons?: number | null;
+    totalMatchups?: number | null;
+    playoffEnabled?: boolean | null;
+    playoffFormat?: string | null;
+    playoffMultiWeek?: boolean | null;
+    lmNotes?: string | null;
+    isMockDraft?: boolean | null;
+    isPublic?: boolean | null;
+    logoUrl?: string | null;
+    bannerUrl?: string | null;
+    primaryColor?: string | null;
+    secondaryColor?: string | null;
+    previousLeagueId?: number | null;
+    frozenAt?: string | null;
+    seasonNumber?: number | null;
+    salaryCapEnabled?: boolean | null;
+    salaryCap?: number | null;
+    salaryFloor?: number | null;
+    luxuryTaxThreshold?: number | null;
+    minSalary?: number | null;
+    salaryEscalationPct?: number | null;
+    salaryDecayPct?: number | null;
+    auctionBudget?: number | null;
+    auctionMinBid?: number | null;
+    eraFilter?: string | null;
+    hofOnly?: boolean | null;
+    customEraStartYear?: number | null;
+    customEraEndYear?: number | null;
+    userMembership?: {
+      __typename?: 'LeagueMember';
+      leagueId?: number | null;
+      userId?: number | null;
+      teamId?: number | null;
+      permissionLevel?: string | null;
+      username?: string | null;
+    } | null;
+  } | null;
 };
 
 export type GetLeagueScoringProfileQueryVariables = Exact<{
@@ -7846,6 +7990,111 @@ export type PlaceBidMutationResult = Apollo.MutationResult<PlaceBidMutation>;
 export type PlaceBidMutationOptions = BaseMutationOptions<
   PlaceBidMutation,
   PlaceBidMutationVariables
+>;
+export const AutoAdvanceMatchups = gql`
+  mutation AutoAdvanceMatchups($leagueId: Int) {
+    autoAdvanceMatchups(leagueId: $leagueId) {
+      leaguesProcessed
+      leaguesAdvanced
+      leaguesSkipped
+      errors
+    }
+  }
+`;
+export type AutoAdvanceMatchupsMutationFn = MutationFunction<
+  AutoAdvanceMatchupsMutation,
+  AutoAdvanceMatchupsMutationVariables
+>;
+
+/**
+ * __useAutoAdvanceMatchupsMutation__
+ *
+ * To run a mutation, you first call `useAutoAdvanceMatchupsMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useAutoAdvanceMatchupsMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [autoAdvanceMatchupsMutation, { data, loading, error }] = useAutoAdvanceMatchupsMutation({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *   },
+ * });
+ */
+export function useAutoAdvanceMatchupsMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    AutoAdvanceMatchupsMutation,
+    AutoAdvanceMatchupsMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    AutoAdvanceMatchupsMutation,
+    AutoAdvanceMatchupsMutationVariables
+  >(AutoAdvanceMatchups, options);
+}
+export type AutoAdvanceMatchupsMutationHookResult = ReturnType<
+  typeof useAutoAdvanceMatchupsMutation
+>;
+export type AutoAdvanceMatchupsMutationResult =
+  Apollo.MutationResult<AutoAdvanceMatchupsMutation>;
+export type AutoAdvanceMatchupsMutationOptions = BaseMutationOptions<
+  AutoAdvanceMatchupsMutation,
+  AutoAdvanceMatchupsMutationVariables
+>;
+export const AutoSelectGames = gql`
+  mutation AutoSelectGames($leagueId: Int) {
+    autoSelectGames(leagueId: $leagueId) {
+      leaguesProcessed
+      gamesTriggered
+      errors
+    }
+  }
+`;
+export type AutoSelectGamesMutationFn = MutationFunction<
+  AutoSelectGamesMutation,
+  AutoSelectGamesMutationVariables
+>;
+
+/**
+ * __useAutoSelectGamesMutation__
+ *
+ * To run a mutation, you first call `useAutoSelectGamesMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useAutoSelectGamesMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [autoSelectGamesMutation, { data, loading, error }] = useAutoSelectGamesMutation({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *   },
+ * });
+ */
+export function useAutoSelectGamesMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    AutoSelectGamesMutation,
+    AutoSelectGamesMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    AutoSelectGamesMutation,
+    AutoSelectGamesMutationVariables
+  >(AutoSelectGames, options);
+}
+export type AutoSelectGamesMutationHookResult = ReturnType<
+  typeof useAutoSelectGamesMutation
+>;
+export type AutoSelectGamesMutationResult =
+  Apollo.MutationResult<AutoSelectGamesMutation>;
+export type AutoSelectGamesMutationOptions = BaseMutationOptions<
+  AutoSelectGamesMutation,
+  AutoSelectGamesMutationVariables
 >;
 export const CancelSeasonDraftGame = gql`
   mutation CancelSeasonDraftGame($gameId: Int!) {
@@ -10083,6 +10332,98 @@ export type GetMatchupsByWeekQueryResult = Apollo.QueryResult<
   GetMatchupsByWeekQuery,
   GetMatchupsByWeekQueryVariables
 >;
+export const GetMatchupsForLeague = gql`
+  query GetMatchupsForLeague($leagueId: Int!, $weekNumber: Int) {
+    getMatchupsForLeague(leagueId: $leagueId, weekNumber: $weekNumber) {
+      ...Matchup
+    }
+  }
+  ${MatchupFragmentDoc}
+`;
+
+/**
+ * __useGetMatchupsForLeagueQuery__
+ *
+ * To run a query within a React component, call `useGetMatchupsForLeagueQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetMatchupsForLeagueQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetMatchupsForLeagueQuery({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *      weekNumber: // value for 'weekNumber'
+ *   },
+ * });
+ */
+export function useGetMatchupsForLeagueQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetMatchupsForLeagueQuery,
+    GetMatchupsForLeagueQueryVariables
+  > &
+    (
+      | { variables: GetMatchupsForLeagueQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetMatchupsForLeagueQuery,
+    GetMatchupsForLeagueQueryVariables
+  >(GetMatchupsForLeague, options);
+}
+export function useGetMatchupsForLeagueLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetMatchupsForLeagueQuery,
+    GetMatchupsForLeagueQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetMatchupsForLeagueQuery,
+    GetMatchupsForLeagueQueryVariables
+  >(GetMatchupsForLeague, options);
+}
+export function useGetMatchupsForLeagueSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetMatchupsForLeagueQuery,
+        GetMatchupsForLeagueQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetMatchupsForLeagueQuery,
+    GetMatchupsForLeagueQueryVariables
+  >(
+    GetMatchupsForLeague,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetMatchupsForLeagueQuery,
+          GetMatchupsForLeagueQueryVariables
+        >,
+  );
+}
+export type GetMatchupsForLeagueQueryHookResult = ReturnType<
+  typeof useGetMatchupsForLeagueQuery
+>;
+export type GetMatchupsForLeagueLazyQueryHookResult = ReturnType<
+  typeof useGetMatchupsForLeagueLazyQuery
+>;
+export type GetMatchupsForLeagueSuspenseQueryHookResult = ReturnType<
+  typeof useGetMatchupsForLeagueSuspenseQuery
+>;
+export type GetMatchupsForLeagueQueryResult = Apollo.QueryResult<
+  GetMatchupsForLeagueQuery,
+  GetMatchupsForLeagueQueryVariables
+>;
 export const GetPlayersWithStats = gql`
   query GetPlayersWithStats(
     $limit: Int
@@ -10898,6 +11239,78 @@ export type GiveUpDisclosureGameMutationResult =
 export type GiveUpDisclosureGameMutationOptions = BaseMutationOptions<
   GiveUpDisclosureGameMutation,
   GiveUpDisclosureGameMutationVariables
+>;
+export const InitializeDraft = gql`
+  mutation InitializeDraft(
+    $leagueId: Int!
+    $draftOrder: String
+    $draftMode: String
+    $selectionMethod: String
+  ) {
+    initializeDraft(
+      leagueId: $leagueId
+      draftOrder: $draftOrder
+      draftMode: $draftMode
+      selectionMethod: $selectionMethod
+    ) {
+      id
+      leagueId
+      draftMode
+      selectionMethod
+      draftOrder
+      currentPick
+      pickTimeLimitSeconds
+      currentPickDeadline
+      draftStartedAt
+      draftCompletedAt
+    }
+  }
+`;
+export type InitializeDraftMutationFn = MutationFunction<
+  InitializeDraftMutation,
+  InitializeDraftMutationVariables
+>;
+
+/**
+ * __useInitializeDraftMutation__
+ *
+ * To run a mutation, you first call `useInitializeDraftMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useInitializeDraftMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [initializeDraftMutation, { data, loading, error }] = useInitializeDraftMutation({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *      draftOrder: // value for 'draftOrder'
+ *      draftMode: // value for 'draftMode'
+ *      selectionMethod: // value for 'selectionMethod'
+ *   },
+ * });
+ */
+export function useInitializeDraftMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    InitializeDraftMutation,
+    InitializeDraftMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    InitializeDraftMutation,
+    InitializeDraftMutationVariables
+  >(InitializeDraft, options);
+}
+export type InitializeDraftMutationHookResult = ReturnType<
+  typeof useInitializeDraftMutation
+>;
+export type InitializeDraftMutationResult =
+  Apollo.MutationResult<InitializeDraftMutation>;
+export type InitializeDraftMutationOptions = BaseMutationOptions<
+  InitializeDraftMutation,
+  InitializeDraftMutationVariables
 >;
 export const GetLeagueActivity = gql`
   query GetLeagueActivity(
@@ -14116,6 +14529,58 @@ export type GetOnThisDayEventsSuspenseQueryHookResult = ReturnType<
 export type GetOnThisDayEventsQueryResult = Apollo.QueryResult<
   GetOnThisDayEventsQuery,
   GetOnThisDayEventsQueryVariables
+>;
+export const RenewLeague = gql`
+  mutation RenewLeague($leagueId: Int!, $keepRosters: Boolean!) {
+    renewLeague(leagueId: $leagueId, keepRosters: $keepRosters) {
+      ...League
+    }
+  }
+  ${LeagueFragmentDoc}
+`;
+export type RenewLeagueMutationFn = MutationFunction<
+  RenewLeagueMutation,
+  RenewLeagueMutationVariables
+>;
+
+/**
+ * __useRenewLeagueMutation__
+ *
+ * To run a mutation, you first call `useRenewLeagueMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useRenewLeagueMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [renewLeagueMutation, { data, loading, error }] = useRenewLeagueMutation({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *      keepRosters: // value for 'keepRosters'
+ *   },
+ * });
+ */
+export function useRenewLeagueMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    RenewLeagueMutation,
+    RenewLeagueMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<RenewLeagueMutation, RenewLeagueMutationVariables>(
+    RenewLeague,
+    options,
+  );
+}
+export type RenewLeagueMutationHookResult = ReturnType<
+  typeof useRenewLeagueMutation
+>;
+export type RenewLeagueMutationResult =
+  Apollo.MutationResult<RenewLeagueMutation>;
+export type RenewLeagueMutationOptions = BaseMutationOptions<
+  RenewLeagueMutation,
+  RenewLeagueMutationVariables
 >;
 export const GetLeagueScoringProfile = gql`
   query GetLeagueScoringProfile($leagueId: Int!) {

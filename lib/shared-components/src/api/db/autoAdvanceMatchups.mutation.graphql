@@ -1,0 +1,8 @@
+mutation AutoAdvanceMatchups($leagueId: Int) {
+  autoAdvanceMatchups(leagueId: $leagueId) {
+    leaguesProcessed
+    leaguesAdvanced
+    leaguesSkipped
+    errors
+  }
+}

@@ -112,7 +112,7 @@ import {
   mapSeasonFieldingStats,
   mapSeasonPitchingStats,
 } from '../../lib/scoring/mapGraphQLToScoringFormat';
-import { NextStepControl } from '../../features/commissioner/NextStepControl';
+import { NextStepControl } from '../../features/commissioner';
 import { AvatarImage, AvatarPicker } from '../../components/common';
 import { DraftSettingsControl } from '../../components/commissioner/DraftSettingsControl';
 import { LeagueSettingsControl } from '../../components/commissioner/LeagueSettingsControl';
@@ -3168,6 +3168,12 @@ export function LeagueDetailPage(): React.JSX.Element {
             onSuccess={handleMatchupSuccess}
             onError={handleMatchupError}
             onLeagueUpdate={handleLeagueUpdate}
+            onNavigateToDraftBoard={() =>
+              navigate(`/baseball/league/${leagueId}/draft`)
+            }
+            onNavigateToLeague={(newLeagueId) =>
+              navigate(`/baseball/league/${newLeagueId}`)
+            }
           />
         ),
       },

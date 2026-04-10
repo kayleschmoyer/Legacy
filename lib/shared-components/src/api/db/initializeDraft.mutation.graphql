@@ -1,0 +1,24 @@
+mutation InitializeDraft(
+  $leagueId: Int!
+  $draftOrder: String
+  $draftMode: String
+  $selectionMethod: String
+) {
+  initializeDraft(
+    leagueId: $leagueId
+    draftOrder: $draftOrder
+    draftMode: $draftMode
+    selectionMethod: $selectionMethod
+  ) {
+    id
+    leagueId
+    draftMode
+    selectionMethod
+    draftOrder
+    currentPick
+    pickTimeLimitSeconds
+    currentPickDeadline
+    draftStartedAt
+    draftCompletedAt
+  }
+}

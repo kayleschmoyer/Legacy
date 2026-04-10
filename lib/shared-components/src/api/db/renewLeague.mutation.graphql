@@ -1,0 +1,5 @@
+mutation RenewLeague($leagueId: Int!, $keepRosters: Boolean!) {
+  renewLeague(leagueId: $leagueId, keepRosters: $keepRosters) {
+    ...League
+  }
+}

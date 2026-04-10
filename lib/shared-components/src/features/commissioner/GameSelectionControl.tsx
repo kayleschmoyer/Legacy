@@ -10,6 +10,13 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
+import {
+  BRAND_GOLD_LIGHT,
+  BRAND_NAVY,
+  BRAND_NAVY_DARK,
+  BRAND_NAVY_LIGHT,
+  withAlpha,
+} from '../../utils/colors';
 
 export interface GameSelectionControlProps {
   leagueId: number;
@@ -71,11 +78,15 @@ export function GameSelectionControl({
   };
 
   return (
-    <Card bordered padding="$4" backgroundColor="$blue2">
+    <Card
+      bordered
+      padding="$4"
+      backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.12)}
+    >
       <YStack space="$3">
         <XStack alignItems="center" space="$2">
           <H4>Game Selection</H4>
-          <Text fontSize="$2" color="$blue10">
+          <Text fontSize="$2" color={BRAND_GOLD_LIGHT}>
             (Commissioner Only)
           </Text>
         </XStack>
@@ -99,7 +110,10 @@ export function GameSelectionControl({
             />
 
             <Button
-              theme="blue"
+              backgroundColor={BRAND_NAVY_LIGHT}
+              color="white"
+              pressStyle={{ backgroundColor: BRAND_NAVY_DARK }}
+              hoverStyle={{ backgroundColor: BRAND_NAVY }}
               onPress={() => setShowConfirmDialog(true)}
               disabled={loading}
             >
@@ -158,7 +172,10 @@ export function GameSelectionControl({
                   <Button theme="alt2">Cancel</Button>
                 </Dialog.Close>
                 <Button
-                  theme="blue"
+                  backgroundColor={BRAND_NAVY_LIGHT}
+                  color="white"
+                  pressStyle={{ backgroundColor: BRAND_NAVY_DARK }}
+                  hoverStyle={{ backgroundColor: BRAND_NAVY }}
                   onPress={handleTriggerSelection}
                   disabled={loading}
                 >

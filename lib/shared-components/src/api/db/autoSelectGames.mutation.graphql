@@ -1,0 +1,7 @@
+mutation AutoSelectGames($leagueId: Int) {
+  autoSelectGames(leagueId: $leagueId) {
+    leaguesProcessed
+    gamesTriggered
+    errors
+  }
+}

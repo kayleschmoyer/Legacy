@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
 import {
   Button,
   Card,
   Dialog,
   H4,
+  Label,
+  RadioGroup,
   Spinner,
   Text,
   XStack,
@@ -19,18 +20,36 @@ import {
   useGetLeagueDraftQuery,
   useGetMatchupsForLeagueQuery,
   useInitializeDraftMutation,
+  useRenewLeagueMutation,
 } from '../../api/db/graphql.generated';
+import {
+  BRAND_GOLD_LIGHT,
+  BRAND_NAVY,
+  BRAND_NAVY_DARK,
+  BRAND_NAVY_LIGHT,
+  withAlpha,
+} from '../../utils/colors';
 
 export interface NextStepControlProps {
   leagueId: number;
   currentMatchup?: Matchup | null;
   gamesPerMatchup: number;
   draftStatus?: string | null;
+  /** When true, the "Start Draft" button is blocked because draft settings
+   * have unsaved changes that must be saved first. */
+  hasPendingSettingsChanges?: boolean;
+  leagueName?: string;
+  frozenAt?: string | null;
+  totalMatchups?: number;
   onSuccess?: (
     actionType?: 'selectGame' | 'advance' | 'draft' | 'createWeek1',
   ) => void;
   onError?: (error: Error) => void;
   onLeagueUpdate?: (league: LeagueFragment) => void;
+  /** Called when the draft is in-progress (live) to navigate to the draft board */
+  onNavigateToDraftBoard?: () => void;
+  /** Called after a successful league renewal, with the new league ID */
+  onNavigateToLeague?: (leagueId: number) => void;
 }
 
 /**
@@ -47,12 +66,23 @@ export function NextStepControl({
   currentMatchup,
   gamesPerMatchup,
   draftStatus,
+  hasPendingSettingsChanges = false,
+  leagueName = 'this league',
+  frozenAt,
+  totalMatchups,
   onSuccess,
   onError,
   onLeagueUpdate: _onLeagueUpdate,
+  onNavigateToDraftBoard,
+  onNavigateToLeague,
 }: NextStepControlProps) {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showRenewalDialog, setShowRenewalDialog] = useState(false);
+  const [keepRosters, setKeepRosters] = useState<'keep' | 'draft'>('draft');
+  const [renewalLoading, setRenewalLoading] = useState(false);
+
+  const [renewLeague] = useRenewLeagueMutation();
 
   const [autoAdvanceMatchups] = useAutoAdvanceMatchupsMutation({
     refetchQueries: [
@@ -96,14 +126,58 @@ export function NextStepControl({
       0,
     ) ?? 0;
 
-  const nextWeek = highestWeek + 1;
+  // LS-702: use gamesPerMatchup from the internal matchups query as the
+  // authoritative source. The prop falls back to 1 when the commissioner has
+  // no personal team matchup and league.gamesPerMatchup hasn't loaded yet.
+  const effectiveGamesPerMatchup =
+    allMatchupsData?.getMatchupsForLeague?.find(
+      (m: { gamesPerMatchup?: number | null }) => m.gamesPerMatchup != null,
+    )?.gamesPerMatchup ?? gamesPerMatchup;
+
   const hasCurrentMatchup = !!currentMatchup && !!currentMatchup.id;
-  const currentWeek = highestWeek;
+  // LS-509: derive currentWeek from the actual currentMatchup (which reflects
+  // leagues.currentMatchup → week-1 after generation), NOT from max(weekNumber).
+  // After createAllMatchupsForLeague pre-creates all 10 weeks, highestWeek = 10
+  // which would wrongly display "Current Matchup: Week 10".
+  const currentWeek = currentMatchup?.weekNumber ?? highestWeek;
+  const nextWeek = currentWeek + 1;
+
+  // Season is fully complete when all scheduled weeks have been played and there
+  // is no longer an active matchup.
+  const isSeasonComplete =
+    draftStatus === 'completed' &&
+    !frozenAt &&
+    highestWeek > 0 &&
+    totalMatchups != null &&
+    highestWeek >= totalMatchups &&
+    !hasCurrentMatchup;
+
+  const handleRenewalConfirm = async () => {
+    setRenewalLoading(true);
+    try {
+      const result = await renewLeague({
+        variables: { leagueId, keepRosters: keepRosters === 'keep' },
+        refetchQueries: ['GetUserLeagues'],
+        awaitRefetchQueries: true,
+      });
+      setRenewalLoading(false);
+      setShowRenewalDialog(false);
+      const newLeagueId = result.data?.renewLeague?.id;
+      if (newLeagueId) {
+        onNavigateToLeague?.(newLeagueId);
+      }
+    } catch (err) {
+      setRenewalLoading(false);
+      const errorMessage =
+        err instanceof Error ? err.message : 'Unknown error occurred';
+      onError?.(new Error(errorMessage));
+    }
+  };
 
   // Get selected games count from matchup data
   const selectedGamesCount = currentMatchup?.selectedGamesCount ?? 0;
   const nextGameNumber = selectedGamesCount + 1;
-  const allGamesSelected = selectedGamesCount >= gamesPerMatchup;
+  const allGamesSelected = selectedGamesCount >= effectiveGamesPerMatchup;
 
   // Determine action type:
   // - If no matchups (week 0) and draft not completed -> start draft only
@@ -140,6 +214,10 @@ export function NextStepControl({
       actionType === 'draft' &&
       (initializeDraftLoading || isDraftInProgress || isDraftCompleted)
     ) {
+      return;
+    }
+    // Prevent starting the draft when draft settings have unsaved changes
+    if (actionType === 'draft' && hasPendingSettingsChanges) {
       return;
     }
     setShowConfirmDialog(true);
@@ -216,7 +294,7 @@ export function NextStepControl({
         }
       } else {
         if (errorMessage.includes('Game number must be between')) {
-          errorMessage = `Invalid game number. Please select a game between 1 and ${gamesPerMatchup}.`;
+          errorMessage = `Invalid game number. Please select a game between 1 and ${effectiveGamesPerMatchup}.`;
         }
       }
 
@@ -236,7 +314,7 @@ export function NextStepControl({
     } else if (actionType === 'createWeek1') {
       return 'Create Week 1 Matchups';
     } else if (actionType === 'selectGame') {
-      return `Select Game ${nextGameNumber} of ${gamesPerMatchup}`;
+      return `Select Game ${nextGameNumber} of ${effectiveGamesPerMatchup}`;
     } else {
       return 'Advance League Week';
     }
@@ -284,7 +362,10 @@ export function NextStepControl({
     } else if (actionType === 'createWeek1') {
       return 'Draft complete! Next: Create matchups for Week 1.';
     } else if (actionType === 'selectGame') {
-      return `Next: Select game ${nextGameNumber} of ${gamesPerMatchup} for all matchups in the current week.`;
+      const draftPrefix = isDraftCompleted
+        ? 'Draft complete! All season matchups were created automatically. '
+        : '';
+      return `${draftPrefix}Next: Select game ${nextGameNumber} of ${effectiveGamesPerMatchup} for all matchups in the current week.`;
     } else {
       return 'All games selected! Next: Advance to the next league week.';
     }
@@ -292,9 +373,13 @@ export function NextStepControl({
 
   return (
     <>
-      <Card backgroundColor="$blue2" borderColor="$blue6" padding="$4">
+      <Card
+        backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.12)}
+        borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.35)}
+        padding="$4"
+      >
         <YStack space="$3">
-          <H4 color="$blue11">Next Step</H4>
+          <H4 color={BRAND_GOLD_LIGHT}>Next Step</H4>
 
           {hasCurrentMatchup ? (
             <YStack space="$2">
@@ -302,7 +387,8 @@ export function NextStepControl({
                 Current Matchup: Week {currentWeek}
               </Text>
               <Text color="$gray11" fontSize="$3">
-                Games Selected: {selectedGamesCount} of {gamesPerMatchup}
+                Games Selected: {selectedGamesCount} of{' '}
+                {effectiveGamesPerMatchup}
               </Text>
               <Text color="$gray11" fontSize="$3">
                 Status: {currentMatchup.status}
@@ -318,7 +404,7 @@ export function NextStepControl({
                       backgroundColor={
                         currentMatchup.statsLoadingStatus ===
                         StatsLoadingStatus.Queued
-                          ? '$blue3'
+                          ? withAlpha(BRAND_NAVY_LIGHT, 0.18)
                           : currentMatchup.statsLoadingStatus ===
                               StatsLoadingStatus.Loading
                             ? '$yellow3'
@@ -330,7 +416,7 @@ export function NextStepControl({
                       borderColor={
                         currentMatchup.statsLoadingStatus ===
                         StatsLoadingStatus.Queued
-                          ? '$blue8'
+                          ? BRAND_NAVY_LIGHT
                           : currentMatchup.statsLoadingStatus ===
                               StatsLoadingStatus.Loading
                             ? '$yellow8'
@@ -348,7 +434,7 @@ export function NextStepControl({
                         color={
                           currentMatchup.statsLoadingStatus ===
                           StatsLoadingStatus.Queued
-                            ? '$blue11'
+                            ? BRAND_GOLD_LIGHT
                             : currentMatchup.statsLoadingStatus ===
                                 StatsLoadingStatus.Loading
                               ? '$yellow11'
@@ -375,15 +461,16 @@ export function NextStepControl({
 
           <XStack justifyContent="flex-start" gap="$3">
             {isDraftInProgress && isLiveDraft ? (
-              <Link
-                to={`/baseball/league/${leagueId}/draft`}
-                style={{ textDecoration: 'none' }}
-              >
-                <Button theme="green">Go to Draft Board</Button>
-              </Link>
+              <Button theme="green" onPress={() => onNavigateToDraftBoard?.()}>
+                Go to Draft Board
+              </Button>
             ) : (
               <Button
-                theme="blue"
+                data-testid="start-draft-button"
+                backgroundColor={BRAND_NAVY_LIGHT}
+                color="white"
+                pressStyle={{ backgroundColor: BRAND_NAVY_DARK }}
+                hoverStyle={{ backgroundColor: BRAND_NAVY }}
                 onPress={handleButtonClick}
                 disabled={
                   loading ||
@@ -391,7 +478,8 @@ export function NextStepControl({
                   matchupsLoading ||
                   isGameSelectionInProgress ||
                   isDraftInProgress ||
-                  (actionType === 'draft' && isDraftCompleted)
+                  (actionType === 'draft' && isDraftCompleted) ||
+                  (actionType === 'draft' && hasPendingSettingsChanges)
                 }
                 icon={
                   loading ||
@@ -407,6 +495,26 @@ export function NextStepControl({
               </Button>
             )}
           </XStack>
+
+          {actionType === 'draft' &&
+            hasPendingSettingsChanges &&
+            !isDraftInProgress &&
+            !isDraftCompleted && (
+              <XStack
+                alignItems="center"
+                gap="$2"
+                backgroundColor="$orange3"
+                borderColor="$orange8"
+                borderWidth={1}
+                borderRadius="$3"
+                paddingHorizontal="$3"
+                paddingVertical="$2"
+              >
+                <Text color="$orange11" fontWeight="600" fontSize="$3">
+                  Save your draft settings before starting the draft.
+                </Text>
+              </XStack>
+            )}
 
           {isDraftInProgress && !isLiveDraft && (
             <XStack
@@ -448,6 +556,36 @@ export function NextStepControl({
           <Text fontSize="$2" color="$gray10">
             {getDescriptionText()}
           </Text>
+
+          {isSeasonComplete && (
+            <YStack
+              gap="$3"
+              borderTopWidth={1}
+              borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.25)}
+              paddingTop="$3"
+              marginTop="$1"
+            >
+              <Text fontWeight="600" fontSize="$3" color={BRAND_GOLD_LIGHT}>
+                Season Complete
+              </Text>
+              <Text color="$gray11" fontSize="$2">
+                All weeks have been played. Ready to start a new season? A new
+                league will be created preserving all settings and members. This
+                league will be archived as a historical record.
+              </Text>
+              <XStack>
+                <Button
+                  backgroundColor={BRAND_NAVY_LIGHT}
+                  color="white"
+                  pressStyle={{ backgroundColor: BRAND_NAVY_DARK }}
+                  hoverStyle={{ backgroundColor: BRAND_NAVY }}
+                  onPress={() => setShowRenewalDialog(true)}
+                >
+                  Start New Season
+                </Button>
+              </XStack>
+            </YStack>
+          )}
         </YStack>
       </Card>
 
@@ -484,10 +622,122 @@ export function NextStepControl({
 
             <XStack gap="$3" justifyContent="flex-end">
               <Dialog.Close displayWhenAdapted asChild>
-                <Button theme="alt2">Cancel</Button>
+                <Button theme="alt2" accessibilityLabel="Cancel">
+                  Cancel
+                </Button>
               </Dialog.Close>
-              <Button theme="blue" onPress={handleConfirm}>
+              <Button
+                backgroundColor={BRAND_NAVY_LIGHT}
+                color="white"
+                pressStyle={{ backgroundColor: BRAND_NAVY_DARK }}
+                hoverStyle={{ backgroundColor: BRAND_NAVY }}
+                onPress={handleConfirm}
+              >
                 Confirm
+              </Button>
+            </XStack>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog>
+
+      {/* Season Renewal Dialog */}
+      <Dialog open={showRenewalDialog} onOpenChange={setShowRenewalDialog}>
+        <Dialog.Portal>
+          <Dialog.Overlay
+            key="renewal-overlay"
+            animation="quick"
+            opacity={0.5}
+            enterStyle={{ opacity: 0 }}
+            exitStyle={{ opacity: 0 }}
+          />
+          <Dialog.Content
+            bordered
+            elevate
+            key="renewal-content"
+            role="alertdialog"
+            aria-modal={true}
+            aria-labelledby="season-renewal-title"
+            aria-describedby="season-renewal-description"
+            animateOnly={['transform', 'opacity']}
+            animation={[
+              'quick',
+              {
+                opacity: {
+                  overshootClamping: true,
+                },
+              },
+            ]}
+            enterStyle={{ x: 0, y: -20, opacity: 0, scale: 0.9 }}
+            exitStyle={{ x: 0, y: 10, opacity: 0, scale: 0.95 }}
+            gap="$4"
+            padding="$4"
+            width={520}
+          >
+            <Dialog.Title id="season-renewal-title">
+              Start New Season for "{leagueName}"?
+            </Dialog.Title>
+            <Dialog.Description id="season-renewal-description">
+              A new league will be created with all settings and members carried
+              forward. This league will be frozen and kept as a historical
+              record.
+            </Dialog.Description>
+
+            <YStack space="$3">
+              <Text fontSize="$3" fontWeight="bold">
+                How should rosters be handled?
+              </Text>
+              <RadioGroup
+                value={keepRosters}
+                onValueChange={(val) => setKeepRosters(val as 'keep' | 'draft')}
+              >
+                <YStack space="$2">
+                  <XStack alignItems="center" gap="$2">
+                    <RadioGroup.Item value="draft" id="roster-draft">
+                      <RadioGroup.Indicator />
+                    </RadioGroup.Item>
+                    <Label htmlFor="roster-draft" fontSize="$3">
+                      Hold a new draft — start with empty rosters
+                    </Label>
+                  </XStack>
+                  <XStack alignItems="center" gap="$2">
+                    <RadioGroup.Item value="keep" id="roster-keep">
+                      <RadioGroup.Indicator />
+                    </RadioGroup.Item>
+                    <Label htmlFor="roster-keep" fontSize="$3">
+                      Keep same rosters — carry over all player assignments
+                    </Label>
+                  </XStack>
+                </YStack>
+              </RadioGroup>
+              <Text fontSize="$2" color="$gray10">
+                {keepRosters === 'draft'
+                  ? 'All team rosters will be cleared. The commissioner can configure the draft before it begins.'
+                  : 'All current player assignments will be copied to the new season. No draft will be needed.'}
+              </Text>
+            </YStack>
+
+            <XStack gap="$3" justifyContent="flex-end">
+              <Dialog.Close displayWhenAdapted asChild>
+                <Button
+                  theme="alt2"
+                  disabled={renewalLoading}
+                  accessibilityLabel="Cancel"
+                >
+                  Cancel
+                </Button>
+              </Dialog.Close>
+              <Button
+                backgroundColor={BRAND_NAVY_LIGHT}
+                color="white"
+                pressStyle={{ backgroundColor: BRAND_NAVY_DARK }}
+                hoverStyle={{ backgroundColor: BRAND_NAVY }}
+                onPress={handleRenewalConfirm}
+                disabled={renewalLoading}
+                icon={renewalLoading ? <Spinner /> : undefined}
+              >
+                {renewalLoading
+                  ? 'Creating new season...'
+                  : 'Confirm New Season'}
               </Button>
             </XStack>
           </Dialog.Content>
