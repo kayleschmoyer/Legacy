@@ -10,6 +10,7 @@ import {
 } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
 import { and, eq, inArray, not } from 'drizzle-orm';
+import { GraphQLError } from 'graphql';
 
 import {
   AdvanceLeagueWeekResponse,
@@ -680,17 +681,60 @@ builder.mutationField('createAllMatchups', (t) =>
         await verifyCommissionerAccess(context.db, leagueId, context.user.id);
       }
 
-      // Verify no matchups exist already
-      const existingMatchups = await context.db
+      // If matchups already exist (e.g. auto-created on draft completion),
+      // return them instead of throwing — makes this mutation idempotent so
+      // commissioners can safely call it even after the draft processor has
+      // already created matchups (LS-2952).
+      const existingMatchupsCheck = await context.db
         .select({ id: PublicSchema.matchups.id })
         .from(PublicSchema.matchups)
         .where(eq(PublicSchema.matchups.leagueId, leagueId))
         .limit(1);
 
-      if (existingMatchups.length > 0) {
-        throw new Error(
-          'Matchups already exist for this league. Use advanceLeagueWeek or adjust settings instead.',
+      if (existingMatchupsCheck.length > 0) {
+        // Fetch the league to check whether creation completed fully.
+        // A fully-completed run sets both currentMatchup (the active matchup
+        // FK) and currentWeek (the canonical week number). If either is null
+        // the previous run was aborted mid-way and the schedule is in an
+        // inconsistent state — returning partial data silently would be worse
+        // than surfacing the problem immediately.
+        const [leagueRow] = await context.db
+          .select({
+            currentMatchup: PublicSchema.leagues.currentMatchup,
+            currentWeek: PublicSchema.leagues.currentWeek,
+          })
+          .from(PublicSchema.leagues)
+          .where(eq(PublicSchema.leagues.id, leagueId))
+          .limit(1);
+
+        if (
+          leagueRow?.currentMatchup == null ||
+          leagueRow?.currentWeek == null
+        ) {
+          LOGGER.error(
+            'createAllMatchups: matchups exist but league currentMatchup/currentWeek are not set — partial initialization detected',
+            { leagueId, leagueRow },
+          );
+          throw new GraphQLError(
+            'Matchup schedule is in an inconsistent state (matchups exist but the league was not fully initialized). Please contact support.',
+            { extensions: { code: 'INTERNAL_SERVER_ERROR' } },
+          );
+        }
+
+        LOGGER.info(
+          'createAllMatchups: matchups already exist and league is fully initialized, returning existing matchups',
+          { leagueId },
         );
+
+        const allMatchups = await context.db
+          .select()
+          .from(PublicSchema.matchups)
+          .where(eq(PublicSchema.matchups.leagueId, leagueId));
+
+        return {
+          matchups: allMatchups,
+          currentMatchupId: leagueRow.currentMatchup,
+        };
       }
 
       const result = await createAllMatchupsForLeague(context.db, leagueId);
