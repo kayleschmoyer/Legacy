@@ -44,7 +44,7 @@ on:
 permissions:
   pull-requests: write
   contents: read
-  statuses: write
+  checks: write
 
 jobs:
   request-review:
@@ -59,13 +59,17 @@ jobs:
         with:
           script: |
             const sha = context.payload.pull_request.head.sha;
-            await github.rest.repos.createCommitStatus({
+            await github.rest.checks.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              sha,
-              state: 'success',
-              context: 'bot-review',
-              description: 'Copilot review skipped for dependabot PRs',
+              name: 'bot-review',
+              head_sha: sha,
+              status: 'completed',
+              conclusion: 'success',
+              output: {
+                title: 'Copilot review skipped',
+                summary: 'Copilot review skipped for dependabot PRs',
+              },
             });
             core.info(`Auto-passed bot-review for dependabot PR #${context.payload.pull_request.number}`);
 
@@ -84,9 +88,19 @@ jobs:
       - name: Set bot-review status
         if: github.event.pull_request.user.login != 'dependabot[bot]'
         uses: actions/github-script@v8
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         with:
           github-token: ${{ steps.bot-token.outputs.token }}
           script: |
+            const createCheck = async (p) => {
+              const resp = await fetch(
+                `https://api.github.com/repos/${p.owner}/${p.repo}/check-runs`,
+                { method: 'POST', headers: { Authorization: `Bearer ${process.env.GITHUB_TOKEN}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' }, body: JSON.stringify(p) }
+              );
+              if (!resp.ok) throw new Error(`checks.create ${resp.status}: ${await resp.text()}`);
+            };
+
             const prNumber = context.payload.pull_request.number;
             const sha = context.payload.pull_request.head.sha;
 
@@ -174,13 +188,17 @@ jobs:
                   }
 
                   if (carryForward) {
-                    await github.rest.repos.createCommitStatus({
+                    await createCheck({
                       owner: context.repo.owner,
                       repo: context.repo.repo,
-                      sha,
-                      state: 'success',
-                      context: 'bot-review',
-                      description: 'Copilot review passed — carried forward after rebase',
+                      name: 'bot-review',
+                      head_sha: sha,
+                      status: 'completed',
+                      conclusion: 'success',
+                      output: {
+                        title: 'Copilot review passed',
+                        summary: 'Copilot review passed — carried forward after rebase',
+                      },
                     });
                     // Also ensure the PR is approved and labeled — the auto-approve
                     // job may not re-fire after a rebase if the Copilot workflow doesn't re-run.
@@ -219,13 +237,16 @@ jobs:
               }
             }
 
-            await github.rest.repos.createCommitStatus({
+            await createCheck({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              sha,
-              state: 'pending',
-              context: 'bot-review',
-              description: 'Waiting for Copilot review to complete',
+              name: 'bot-review',
+              head_sha: sha,
+              status: 'in_progress',
+              output: {
+                title: 'Waiting for Copilot review',
+                summary: 'Waiting for Copilot review to complete',
+              },
             });
 
   review-check:
@@ -261,9 +282,19 @@ jobs:
 
       - name: Check threads and approve if clean
         uses: actions/github-script@v8
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         with:
           github-token: ${{ steps.bot-token.outputs.token }}
           script: |
+            const createCheck = async (p) => {
+              const resp = await fetch(
+                `https://api.github.com/repos/${p.owner}/${p.repo}/check-runs`,
+                { method: 'POST', headers: { Authorization: `Bearer ${process.env.GITHUB_TOKEN}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' }, body: JSON.stringify(p) }
+              );
+              if (!resp.ok) throw new Error(`checks.create ${resp.status}: ${await resp.text()}`);
+            };
+
             const prNumber = context.payload.pull_request.number;
             const sha = context.payload.pull_request.head.sha;
 
@@ -335,26 +366,34 @@ jobs:
 
               if (unresolvedThreads.length > 0) {
                 core.info(`${unresolvedThreads.length} unresolved Copilot thread(s) — not approving`);
-                await github.rest.repos.createCommitStatus({
+                await createCheck({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  sha,
-                  state: 'failure',
-                  context: 'bot-review',
-                  description: `Copilot review has ${unresolvedThreads.length} unresolved comment(s)`,
+                  name: 'bot-review',
+                  head_sha: sha,
+                  status: 'completed',
+                  conclusion: 'failure',
+                  output: {
+                    title: 'Copilot review blocked',
+                    summary: `Copilot review has ${unresolvedThreads.length} unresolved comment(s)`,
+                  },
                 });
                 return;
               }
             }
 
             // All threads resolved or superseded — set bot-review success
-            await github.rest.repos.createCommitStatus({
+            await createCheck({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              sha,
-              state: 'success',
-              context: 'bot-review',
-              description: 'Copilot review passed — all threads resolved',
+              name: 'bot-review',
+              head_sha: sha,
+              status: 'completed',
+              conclusion: 'success',
+              output: {
+                title: 'Copilot review passed',
+                summary: 'Copilot review passed — all threads resolved',
+              },
             });
 
             // Check if already approved by the bot to avoid duplicate approvals
@@ -442,13 +481,17 @@ jobs:
         with:
           script: |
             const conclusion = '${{ github.event.workflow_run.conclusion }}';
-            await github.rest.repos.createCommitStatus({
+            await github.rest.checks.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              sha: '${{ github.event.workflow_run.head_sha }}',
-              state: 'failure',
-              context: 'bot-review',
-              description: `Copilot review ${conclusion} — re-push to retry`,
+              name: 'bot-review',
+              head_sha: '${{ github.event.workflow_run.head_sha }}',
+              status: 'completed',
+              conclusion: 'failure',
+              output: {
+                title: 'Copilot review failed',
+                summary: `Copilot review ${conclusion} — re-push to retry`,
+              },
             });
 
       - name: Generate bot token
@@ -571,19 +614,33 @@ jobs:
           steps.pr.outputs.number != '' &&
           github.event.workflow_run.conclusion == 'success'
         uses: actions/github-script@v8
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         with:
           github-token: ${{ steps.bot-token.outputs.token }}
           script: |
+            const createCheck = async (p) => {
+              const resp = await fetch(
+                `https://api.github.com/repos/${p.owner}/${p.repo}/check-runs`,
+                { method: 'POST', headers: { Authorization: `Bearer ${process.env.GITHUB_TOKEN}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' }, body: JSON.stringify(p) }
+              );
+              if (!resp.ok) throw new Error(`checks.create ${resp.status}: ${await resp.text()}`);
+            };
+
             const hasComments = '${{ steps.check.outputs.has_comments }}' === 'true';
-            await github.rest.repos.createCommitStatus({
+            await createCheck({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              sha: '${{ github.event.workflow_run.head_sha }}',
-              state: hasComments ? 'failure' : 'success',
-              context: 'bot-review',
-              description: hasComments
-                ? 'Copilot review has unresolved comments'
-                : 'Copilot review passed — approved',
+              name: 'bot-review',
+              head_sha: '${{ github.event.workflow_run.head_sha }}',
+              status: 'completed',
+              conclusion: hasComments ? 'failure' : 'success',
+              output: {
+                title: hasComments ? 'Copilot review blocked' : 'Copilot review passed',
+                summary: hasComments
+                  ? 'Copilot review has unresolved comments'
+                  : 'Copilot review passed — approved',
+              },
             });
 
       - name: Approve PR and label for merge
@@ -617,9 +674,19 @@ jobs:
 
       - name: Check threads and approve if clean
         uses: actions/github-script@v8
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         with:
           github-token: ${{ steps.bot-token.outputs.token }}
           script: |
+            const createCheck = async (p) => {
+              const resp = await fetch(
+                `https://api.github.com/repos/${p.owner}/${p.repo}/check-runs`,
+                { method: 'POST', headers: { Authorization: `Bearer ${process.env.GITHUB_TOKEN}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' }, body: JSON.stringify(p) }
+              );
+              if (!resp.ok) throw new Error(`checks.create ${resp.status}: ${await resp.text()}`);
+            };
+
             const prNumber = parseInt('${{ inputs.pr_number }}', 10);
             if (isNaN(prNumber)) {
               core.setFailed('Invalid pr_number input');
@@ -704,26 +771,34 @@ jobs:
 
               if (unresolvedThreads.length > 0) {
                 core.info(`${unresolvedThreads.length} unresolved Copilot thread(s) — not approving`);
-                await github.rest.repos.createCommitStatus({
+                await createCheck({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  sha,
-                  state: 'failure',
-                  context: 'bot-review',
-                  description: `Copilot review has ${unresolvedThreads.length} unresolved comment(s)`,
+                  name: 'bot-review',
+                  head_sha: sha,
+                  status: 'completed',
+                  conclusion: 'failure',
+                  output: {
+                    title: 'Copilot review blocked',
+                    summary: `Copilot review has ${unresolvedThreads.length} unresolved comment(s)`,
+                  },
                 });
                 return;
               }
             }
 
             // All threads resolved or superseded — set bot-review success
-            await github.rest.repos.createCommitStatus({
+            await createCheck({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              sha,
-              state: 'success',
-              context: 'bot-review',
-              description: 'Copilot review passed — all threads resolved',
+              name: 'bot-review',
+              head_sha: sha,
+              status: 'completed',
+              conclusion: 'success',
+              output: {
+                title: 'Copilot review passed',
+                summary: 'Copilot review passed — all threads resolved',
+              },
             });
 
             // Approve if not already approved
@@ -764,7 +839,7 @@ jobs:
     # pending and this is a no-op. (See LS-1986)
     permissions:
       actions: write
-      statuses: read
+      checks: read
     concurrency:
       group: copilot-delayed-recheck-${{ github.event.pull_request.number }}
       cancel-in-progress: true
@@ -785,14 +860,19 @@ jobs:
         with:
           script: |
             const sha = context.payload.pull_request.head.sha;
-            const { data: statuses } = await github.rest.repos.listCommitStatusesForRef({
+            const { data } = await github.rest.checks.listForRef({
               owner: context.repo.owner,
               repo: context.repo.repo,
               ref: sha,
+              check_name: 'bot-review',
             });
-            // GitHub returns statuses newest-first; find the latest bot-review
-            const botReview = statuses.find(s => s.context === 'bot-review');
-            const state = botReview ? botReview.state : 'unknown';
+            // GitHub returns check runs newest-first; pick the most recent one
+            const botReview = data.check_runs[0];
+            // Treat in_progress or queued the same as the old 'pending' state
+            const isPending = botReview
+              ? botReview.status === 'in_progress' || botReview.status === 'queued'
+              : false;
+            const state = isPending ? 'pending' : (botReview ? botReview.status : 'unknown');
             core.setOutput('state', state);
             core.info(`Current bot-review state: ${state}`);
 
