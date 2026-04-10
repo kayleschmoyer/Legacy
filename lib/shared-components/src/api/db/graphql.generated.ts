@@ -4461,6 +4461,54 @@ export type GetCareerPitchingStatsCountQuery = {
   careerPitchingStatsCount?: number | null;
 };
 
+export type GetLeagueAnalyticsQueryVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+}>;
+
+export type GetLeagueAnalyticsQuery = {
+  __typename?: 'Query';
+  getLeagueAnalytics?: {
+    __typename?: 'LeagueAnalytics';
+    leagueId?: number | null;
+    leagueName?: string | null;
+    currentWeek?: number | null;
+    totalTeams?: number | null;
+    averagePointsPerMatchup?: number | null;
+    teamStats?: Array<{
+      __typename?: 'TeamStatistics';
+      teamId?: number | null;
+      teamName?: string | null;
+      averagePoints?: number | null;
+      wins?: number | null;
+      losses?: number | null;
+      ties?: number | null;
+      winPercentage?: number | null;
+      currentStreak?: string | null;
+      currentStreakCount?: number | null;
+    }> | null;
+    powerRankings?: Array<{
+      __typename?: 'PowerRanking';
+      rank?: number | null;
+      teamId?: number | null;
+      teamName?: string | null;
+      powerScore?: number | null;
+      recentFormScore?: number | null;
+      pointDifferential?: number | null;
+    }> | null;
+    playoffProjections?: Array<{
+      __typename?: 'PlayoffProjection';
+      teamId?: number | null;
+      teamName?: string | null;
+      currentRecord?: string | null;
+      playoffProbability?: number | null;
+      projectedWins?: number | null;
+      projectedLosses?: number | null;
+      magicNumber?: number | null;
+      eliminationNumber?: number | null;
+    }> | null;
+  } | null;
+};
+
 export type GetLeagueByIdQueryVariables = Exact<{
   id: Scalars['Int']['input'];
 }>;
@@ -9678,6 +9726,129 @@ export type GetCareerPitchingStatsCountSuspenseQueryHookResult = ReturnType<
 export type GetCareerPitchingStatsCountQueryResult = Apollo.QueryResult<
   GetCareerPitchingStatsCountQuery,
   GetCareerPitchingStatsCountQueryVariables
+>;
+export const GetLeagueAnalytics = gql`
+  query GetLeagueAnalytics($leagueId: Int!) {
+    getLeagueAnalytics(leagueId: $leagueId) {
+      leagueId
+      leagueName
+      currentWeek
+      totalTeams
+      averagePointsPerMatchup
+      teamStats {
+        teamId
+        teamName
+        averagePoints
+        wins
+        losses
+        ties
+        winPercentage
+        currentStreak
+        currentStreakCount
+      }
+      powerRankings {
+        rank
+        teamId
+        teamName
+        powerScore
+        recentFormScore
+        pointDifferential
+      }
+      playoffProjections {
+        teamId
+        teamName
+        currentRecord
+        playoffProbability
+        projectedWins
+        projectedLosses
+        magicNumber
+        eliminationNumber
+      }
+    }
+  }
+`;
+
+/**
+ * __useGetLeagueAnalyticsQuery__
+ *
+ * To run a query within a React component, call `useGetLeagueAnalyticsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetLeagueAnalyticsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetLeagueAnalyticsQuery({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *   },
+ * });
+ */
+export function useGetLeagueAnalyticsQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetLeagueAnalyticsQuery,
+    GetLeagueAnalyticsQueryVariables
+  > &
+    (
+      | { variables: GetLeagueAnalyticsQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetLeagueAnalyticsQuery,
+    GetLeagueAnalyticsQueryVariables
+  >(GetLeagueAnalytics, options);
+}
+export function useGetLeagueAnalyticsLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetLeagueAnalyticsQuery,
+    GetLeagueAnalyticsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetLeagueAnalyticsQuery,
+    GetLeagueAnalyticsQueryVariables
+  >(GetLeagueAnalytics, options);
+}
+export function useGetLeagueAnalyticsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetLeagueAnalyticsQuery,
+        GetLeagueAnalyticsQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetLeagueAnalyticsQuery,
+    GetLeagueAnalyticsQueryVariables
+  >(
+    GetLeagueAnalytics,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetLeagueAnalyticsQuery,
+          GetLeagueAnalyticsQueryVariables
+        >,
+  );
+}
+export type GetLeagueAnalyticsQueryHookResult = ReturnType<
+  typeof useGetLeagueAnalyticsQuery
+>;
+export type GetLeagueAnalyticsLazyQueryHookResult = ReturnType<
+  typeof useGetLeagueAnalyticsLazyQuery
+>;
+export type GetLeagueAnalyticsSuspenseQueryHookResult = ReturnType<
+  typeof useGetLeagueAnalyticsSuspenseQuery
+>;
+export type GetLeagueAnalyticsQueryResult = Apollo.QueryResult<
+  GetLeagueAnalyticsQuery,
+  GetLeagueAnalyticsQueryVariables
 >;
 export const GetLeagueById = gql`
   query GetLeagueById($id: Int!) {

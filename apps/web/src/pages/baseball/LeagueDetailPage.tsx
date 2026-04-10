@@ -59,6 +59,7 @@ import {
   PendingTradeOffers,
   PendingWaiverClaims,
 } from '@legacy-sports/shared-components/roster';
+import { SeasonAwardsControl } from '@legacy-sports/shared-components/commissioner';
 import { PageMeta } from '../../components/PageMeta';
 import { LeagueActivityFeed } from '../../features/baseball/LeagueActivityFeed';
 import { LeagueHistory } from '../../features/baseball/LeagueHistory';
@@ -119,7 +120,6 @@ import { LeagueSettingsControl } from '../../components/commissioner/LeagueSetti
 import { LeagueBrandingControl } from '../../components/commissioner/LeagueBrandingControl';
 import { AchievementRestrictionsControl } from '../../components/commissioner/AchievementRestrictionsControl';
 import { TiebreakerConfig } from '../../components/league/TiebreakerConfig';
-import { SeasonAwardsControl } from '@legacy-sports/shared-components/commissioner';
 import { LeagueDuesControl } from '../../components/commissioner/LeagueDuesControl';
 import { LeagueDuesStatusDashboard } from '../../components/commissioner/LeagueDuesStatusDashboard';
 import {

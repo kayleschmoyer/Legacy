@@ -1,0 +1,38 @@
+query GetLeagueAnalytics($leagueId: Int!) {
+  getLeagueAnalytics(leagueId: $leagueId) {
+    leagueId
+    leagueName
+    currentWeek
+    totalTeams
+    averagePointsPerMatchup
+    teamStats {
+      teamId
+      teamName
+      averagePoints
+      wins
+      losses
+      ties
+      winPercentage
+      currentStreak
+      currentStreakCount
+    }
+    powerRankings {
+      rank
+      teamId
+      teamName
+      powerScore
+      recentFormScore
+      pointDifferential
+    }
+    playoffProjections {
+      teamId
+      teamName
+      currentRecord
+      playoffProbability
+      projectedWins
+      projectedLosses
+      magicNumber
+      eliminationNumber
+    }
+  }
+}
