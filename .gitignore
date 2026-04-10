@@ -1,5 +1,8 @@
 # See http://help.github.com/ignore-files/ for more about ignoring files.
 
+# Git LFS hook stubs written to dev/null/ by git-lfs during clone/checkout
+dev/null/
+
 # compiled output
 dist
 static

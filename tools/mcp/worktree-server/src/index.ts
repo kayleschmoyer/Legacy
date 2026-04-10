@@ -1460,6 +1460,33 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
         required: ['branch'],
       },
     },
+    {
+      name: 'worktree_rename_branch',
+      description:
+        'Rename the current branch in the active (or specified) worktree. ' +
+        'Use this after `jira_create_ticket` returns the LS key to rename the ' +
+        'auto-generated `claude/<random>` branch to `claude/LS-####-description` ' +
+        'before the first push (AGENTS.md Step 4b). MCP alternative to ' +
+        '`git branch -m <newName>` via Bash.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          newName: {
+            type: 'string',
+            description:
+              'New branch name. Must contain an LS-#### Jira key ' +
+              '(e.g. "claude/LS-2994-add-rename-tool"). ' +
+              'Must not be "main" or "origin/main".',
+          },
+          worktree: {
+            type: 'string',
+            description:
+              'Ticket key, absolute path, or omit for active worktree.',
+          },
+        },
+        required: ['newName'],
+      },
+    },
   ],
 }));
 
@@ -7048,6 +7075,159 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 null,
                 2,
               ),
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_rename_branch
+    // -----------------------------------------------------------------------
+    case 'worktree_rename_branch': {
+      const { newName, worktree: wtKey } = args as {
+        newName: string;
+        worktree?: string;
+      };
+
+      // Validate newName contains an LS-#### key
+      if (!/LS-\d+/.test(newName)) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Refused: newName "${newName}" must contain an LS-#### Jira key (e.g. "claude/LS-2994-add-rename-tool").`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      // Refuse renames targeting main or origin/main
+      const normalized = newName.replace(/^origin\//, '');
+      if (normalized === 'main') {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Refused: cannot rename branch to "main" or "origin/main".`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      const target = resolveTargetDir(wtKey);
+      if ('error' in target) {
+        return {
+          content: [{ type: 'text', text: target.error }],
+          isError: true,
+        };
+      }
+      const cwd = target.path;
+
+      // Get current branch name
+      let previousName: string;
+      try {
+        previousName = runGit(['branch', '--show-current'], cwd).trim();
+      } catch (err) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Failed to determine current branch: ${err instanceof Error ? err.message : String(err)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      if (!previousName) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Refused: HEAD is detached (no branch checked out). Cannot rename.',
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      if (previousName === 'main') {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Refused: cannot rename the main branch.',
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      // Validate newName is a safe git ref before passing to git (prevents
+      // flag injection from values starting with '-' and rejects illegal ref
+      // patterns like '..', '.lock', trailing '.', etc.).
+      try {
+        runGit(['check-ref-format', '--branch', newName], cwd);
+      } catch (err: unknown) {
+        const e = err as {
+          stdout?: string;
+          stderr?: string;
+          message?: string;
+        };
+        const output =
+          [e.stdout, e.stderr].filter(Boolean).join('\n') ||
+          e.message ||
+          String(err);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Refused: invalid branch name "${newName}".\n${output}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      try {
+        runGit(['branch', '-m', '--', newName], cwd);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  success: true,
+                  previousName,
+                  newName,
+                  worktree: cwd,
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      } catch (err: unknown) {
+        const e = err as {
+          stdout?: string;
+          stderr?: string;
+          status?: number;
+          message?: string;
+        };
+        const output =
+          [e.stdout, e.stderr].filter(Boolean).join('\n') ||
+          e.message ||
+          String(err);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Failed to rename branch (exit code ${e.status ?? 'unknown'}):\n${output}`,
             },
           ],
           isError: true,
