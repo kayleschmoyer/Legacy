@@ -172,6 +172,8 @@ jobs:
     secrets: inherit
     with:
       suppress-notifications: true
+    # workflow_call outputs (version, build_number, release_tag) are declared in deploy-web.yml
+    # and accessible here via needs.deploy-web.outputs.* in rollup-status
 
   # ---------------------------------------------------------------------------
   # Child: Deploy Storybook
@@ -368,6 +370,54 @@ jobs:
           environment: ${{ steps.rollup.outputs.environment }}
           description: ${{ steps.rollup.outputs.description }}
           commits: ${{ steps.changelog.outputs.commits }}
+
+      - name: Build release description
+        id: release-desc
+        if: steps.rollup.outputs.overall == 'success'
+        shell: bash
+        env:
+          WEB_TARGETED: ${{ needs.detect-changes.outputs.web }}
+          LAMBDAS_TARGETED: ${{ needs.detect-changes.outputs.lambdas }}
+          STORYBOOK_TARGETED: ${{ needs.detect-changes.outputs.storybook }}
+          WEB_VERSION: ${{ needs.deploy-web.outputs.version }}
+          WEB_BUILD: ${{ needs.deploy-web.outputs.build_number }}
+          # release_url is only set when the GitHub Release was actually created
+          # successfully — empty when create-release was skipped or failed.
+          WEB_RELEASE_URL: ${{ needs.deploy-web.outputs.release_url }}
+        run: |
+          LINES=()
+          if [ "$WEB_TARGETED" = "true" ] && [ -n "$WEB_RELEASE_URL" ]; then
+            LINES+=("**Web** v${WEB_VERSION}-${WEB_BUILD} — [Release notes](${WEB_RELEASE_URL})")
+          elif [ "$WEB_TARGETED" = "true" ] && [ -n "$WEB_VERSION" ]; then
+            LINES+=("**Web** v${WEB_VERSION}-${WEB_BUILD} deployed")
+          elif [ "$WEB_TARGETED" = "true" ]; then
+            LINES+=("**Web** deployed")
+          fi
+          if [ "$LAMBDAS_TARGETED" = "true" ]; then
+            LINES+=("**Lambdas** uploaded — Terraform applying")
+          fi
+          if [ "$STORYBOOK_TARGETED" = "true" ]; then
+            LINES+=("**Storybook** deployed")
+          fi
+
+          DESC=$(printf "%s\n" "${LINES[@]}")
+          {
+            echo "desc<<DESC_EOF"
+            printf "%s\n" "$DESC"
+            echo "DESC_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Discord Release Rollup
+        if: steps.rollup.outputs.overall == 'success'
+        uses: ./.github/actions/discord-notify
+        with:
+          webhook-url: ${{ secrets.DISCORD_RELEASE_WEBHOOK_URL }}
+          status: success
+          title: "Deploy — ${{ steps.rollup.outputs.environment }}"
+          environment: ${{ steps.rollup.outputs.environment }}
+          description: ${{ steps.release-desc.outputs.desc }}
+          commits: ${{ steps.changelog.outputs.commits }}
+          thread-name: "Deploy #${{ github.run_number }}"
 
       - name: Update Deploy Badge
         if: always() && steps.rollup.outputs.overall != 'skipped'
