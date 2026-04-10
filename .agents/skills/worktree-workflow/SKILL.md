@@ -44,6 +44,7 @@ The Claude Code session was spawned with the launcher `worktree` checkbox checke
 9. **Migrations** — `db_migration_status()` then `db_migrate()`.
 10. **Validate** — `make_run(target: "pc")`. Must pass before pushing.
 11. **Ship** — `worktree_commit` → `worktree_push` → `github_create_pr(draft: true)` → `github_manage_labels([+"agent-in-progress"])` → `github_mark_pr_ready` → `github_request_review` → subscribe to PR activity → `jira_transition("In Review")`.
+    - **Pre-push hook fails with `nx` not found or `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL`**: `node_modules/.bin` is empty or missing (where the pnpm shims live). Use `worktree_push({ skipLint: true })` — do **not** use `SKIP_PREPUSH_LINT=1 git push`. **Important:** `skipLint` bypasses the entire hook after the lockfile checks — conflict-marker and Terraform validations are also skipped, not just formatting. Only use as a last resort; manually run Prettier and check for conflict markers before pushing: `node node_modules/prettier/bin/prettier.cjs --write <files>`.
 12. **Watch to merge** — monitor CI, fix failures, respond to review comments, rebase as needed.
 13. **After merge** — MCP gap audit, mark tracking tasks complete, cleanup.
 
