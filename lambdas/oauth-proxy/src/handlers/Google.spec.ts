@@ -307,6 +307,36 @@ describe('handleGoogleRefresh', () => {
   });
 });
 
+describe('handleSecureGoogleAuth — missing body', () => {
+  const lambdaMock = jest.requireMock<{
+    parseEventBody: jest.Mock;
+  }>('../util/lambda');
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('returns 400 when body is null', async () => {
+    const event: APIGatewayEvent = { ...makeEvent({}), body: null };
+    const result = await handleSecureGoogleAuth(event);
+    expect(result.statusCode).toBe(400);
+    const body = JSON.parse(result.body) as { error: string; message: string };
+    expect(body.error).toBe('Bad Request');
+    expect(body.message).toBe('Request body is required');
+    expect(lambdaMock.parseEventBody).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when body is an empty string', async () => {
+    const event: APIGatewayEvent = { ...makeEvent({}), body: '' };
+    const result = await handleSecureGoogleAuth(event);
+    expect(result.statusCode).toBe(400);
+    const body = JSON.parse(result.body) as { error: string; message: string };
+    expect(body.error).toBe('Bad Request');
+    expect(body.message).toBe('Request body is required');
+    expect(lambdaMock.parseEventBody).not.toHaveBeenCalled();
+  });
+});
+
 describe('handleSecureGoogleAuth — redirect_uri validation', () => {
   beforeEach(() => {
     jest.clearAllMocks();
