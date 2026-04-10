@@ -122,7 +122,10 @@ import { TiebreakerConfig } from '../../components/league/TiebreakerConfig';
 import { SeasonAwardsControl } from '@legacy-sports/shared-components/commissioner';
 import { LeagueDuesControl } from '../../components/commissioner/LeagueDuesControl';
 import { LeagueDuesStatusDashboard } from '../../components/commissioner/LeagueDuesStatusDashboard';
-import { WaiverProcessControl } from '../../features/commissioner/WaiverProcessControl';
+import {
+  SeasonRenewalControl,
+  WaiverProcessControl,
+} from '../../features/commissioner';
 import { DeleteLeagueControl } from '../../features/commissioner/DeleteLeagueControl';
 import {
   useCurrentWeek,
@@ -3346,6 +3349,27 @@ export function LeagueDetailPage(): React.JSX.Element {
             error={scoringError}
             onRefetch={async () => {
               await refetchScoringProfile({ leagueId });
+            }}
+          />
+        ),
+      },
+      {
+        id: 'season-renewal',
+        title: 'New Season',
+        content: (
+          <SeasonRenewalControl
+            leagueId={leagueId}
+            leagueName={league.name ?? 'Unknown League'}
+            draftStatus={league.draftStatus ?? ''}
+            frozenAt={league.frozenAt}
+            onSuccess={() => {
+              showMatchupSuccess('New season created successfully!');
+            }}
+            onError={(err) => {
+              setMatchupErrorMessage(err.message);
+            }}
+            onRenewSuccess={(newLeagueId) => {
+              navigate(`/baseball/league/${newLeagueId}/overview`);
             }}
           />
         ),

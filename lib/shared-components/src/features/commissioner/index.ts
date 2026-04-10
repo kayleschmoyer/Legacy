@@ -27,3 +27,7 @@ export { NextStepControl } from './NextStepControl';
 export type { NextStepControlProps } from './NextStepControl';
 export { SeasonAwardsControl } from './SeasonAwardsControl';
 export type { SeasonAwardsControlProps } from './SeasonAwardsControl';
+export { SeasonRenewalControl } from './SeasonRenewalControl';
+export type { SeasonRenewalControlProps } from './SeasonRenewalControl';
+export { WaiverProcessControl } from './WaiverProcessControl';
+export type { WaiverProcessControlProps } from './WaiverProcessControl';

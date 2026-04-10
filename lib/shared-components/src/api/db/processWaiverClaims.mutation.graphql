@@ -1,0 +1,7 @@
+mutation ProcessWaiverClaims($leagueId: Int!) {
+  processWaiverClaims(leagueId: $leagueId) {
+    processed
+    succeeded
+    failed
+  }
+}

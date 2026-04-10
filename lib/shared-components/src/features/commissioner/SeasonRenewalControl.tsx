@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Button,
   Card,
@@ -21,6 +20,7 @@ export interface SeasonRenewalControlProps {
   frozenAt?: string | null;
   onSuccess?: () => void;
   onError?: (error: Error) => void;
+  onRenewSuccess?: (newLeagueId: number) => void;
 }
 
 /**
@@ -43,8 +43,8 @@ export function SeasonRenewalControl({
   frozenAt,
   onSuccess,
   onError,
+  onRenewSuccess,
 }: SeasonRenewalControlProps) {
-  const navigate = useNavigate();
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [keepRosters, setKeepRosters] = useState<'keep' | 'draft'>('draft');
   const [loading, setLoading] = useState(false);
@@ -71,7 +71,7 @@ export function SeasonRenewalControl({
 
       const newLeagueId = result.data?.renewLeague?.id;
       if (newLeagueId) {
-        navigate(`/baseball/league/${newLeagueId}`);
+        onRenewSuccess?.(newLeagueId);
       }
     } catch (err) {
       setLoading(false);
@@ -120,7 +120,7 @@ export function SeasonRenewalControl({
             elevate
             key="content"
             role="alertdialog"
-            aria-modal="true"
+            aria-modal={true}
             aria-labelledby="season-renewal-title"
             aria-describedby="season-renewal-description"
             animateOnly={['transform', 'opacity']}

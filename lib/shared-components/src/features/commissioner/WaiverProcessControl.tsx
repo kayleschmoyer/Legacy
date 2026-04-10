@@ -10,7 +10,7 @@ import {
   YStack,
 } from 'tamagui';
 import { useProcessWaiverClaimsMutation } from '../../api/db/graphql.generated';
-import { BRAND_NAVY_LIGHT } from '../../constants/colors';
+import { BRAND_NAVY_LIGHT } from '../../utils/colors';
 
 export interface WaiverProcessControlProps {
   leagueId: number;

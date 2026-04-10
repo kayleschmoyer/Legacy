@@ -6235,6 +6235,20 @@ export type PlayerFragment = {
   statsLastFetchedAt?: string | null;
 };
 
+export type ProcessWaiverClaimsMutationVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+}>;
+
+export type ProcessWaiverClaimsMutation = {
+  __typename?: 'Mutation';
+  processWaiverClaims?: {
+    __typename?: 'ProcessWaiverClaimsResult';
+    processed?: number | null;
+    succeeded?: number | null;
+    failed?: number | null;
+  } | null;
+};
+
 export type RenewLeagueMutationVariables = Exact<{
   leagueId: Scalars['Int']['input'];
   keepRosters: Scalars['Boolean']['input'];
@@ -14529,6 +14543,58 @@ export type GetOnThisDayEventsSuspenseQueryHookResult = ReturnType<
 export type GetOnThisDayEventsQueryResult = Apollo.QueryResult<
   GetOnThisDayEventsQuery,
   GetOnThisDayEventsQueryVariables
+>;
+export const ProcessWaiverClaims = gql`
+  mutation ProcessWaiverClaims($leagueId: Int!) {
+    processWaiverClaims(leagueId: $leagueId) {
+      processed
+      succeeded
+      failed
+    }
+  }
+`;
+export type ProcessWaiverClaimsMutationFn = MutationFunction<
+  ProcessWaiverClaimsMutation,
+  ProcessWaiverClaimsMutationVariables
+>;
+
+/**
+ * __useProcessWaiverClaimsMutation__
+ *
+ * To run a mutation, you first call `useProcessWaiverClaimsMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useProcessWaiverClaimsMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [processWaiverClaimsMutation, { data, loading, error }] = useProcessWaiverClaimsMutation({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *   },
+ * });
+ */
+export function useProcessWaiverClaimsMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    ProcessWaiverClaimsMutation,
+    ProcessWaiverClaimsMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    ProcessWaiverClaimsMutation,
+    ProcessWaiverClaimsMutationVariables
+  >(ProcessWaiverClaims, options);
+}
+export type ProcessWaiverClaimsMutationHookResult = ReturnType<
+  typeof useProcessWaiverClaimsMutation
+>;
+export type ProcessWaiverClaimsMutationResult =
+  Apollo.MutationResult<ProcessWaiverClaimsMutation>;
+export type ProcessWaiverClaimsMutationOptions = BaseMutationOptions<
+  ProcessWaiverClaimsMutation,
+  ProcessWaiverClaimsMutationVariables
 >;
 export const RenewLeague = gql`
   mutation RenewLeague($leagueId: Int!, $keepRosters: Boolean!) {
