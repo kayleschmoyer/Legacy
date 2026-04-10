@@ -687,7 +687,7 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
     {
       name: 'worktree_commit',
       description:
-        'Stage and commit. Refuses main. Refuses .env/credentials. Supports amend. Auto-appends Co-Authored-By.',
+        'Stage and commit. Pass `files` (string or string[]) to stage only specific paths (default: all). Refuses main. Refuses .env/credentials. Supports amend. Auto-appends Co-Authored-By.',
       inputSchema: {
         type: 'object' as const,
         properties: {
