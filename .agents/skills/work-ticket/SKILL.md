@@ -123,11 +123,11 @@ Follow the full [worktree-workflow skill](../worktree-workflow/SKILL.md):
      The new name must contain the `LS-####` key (see AGENTS.md Branch Naming). Then call `worktree_set(key: "<absolute .claude/worktrees/... path>")` so the worktree MCP tools target the right tree.
    - **Sibling (parallel/batch work only)**: `make_worktree_create(ticket: "####", description: "desc")` (add `parent: "LS-####"` if blocker is In Review). Shell fallback: `make worktree TICKET=#### DESC=description`. Then call `worktree_set(key: "LS-####")`.
 4. **Setup**:
-   - **Native flow (REQUIRED before any pnpm/make command)**: `.claude/worktrees/<name>/` has no `node_modules`. Junction from the main repo first (confirmed in LS-2903):
+   - **Native flow (REQUIRED before any pnpm/make command)**: `.claude/worktrees/<name>/` has no `node_modules`. Junction from the main repo first (LS-2903/LS-3003):
      ```
-     worktree_run(command: "cmd //c mklink //J node_modules D:\\\\code\\\\legacy-sports\\\\node_modules")
+     worktree_setup_node_modules()
      ```
-     After that `pnpm exec nx`, `make typecheck`, `make pc` all work. Do NOT call `make_wt_setup` — it's sibling-only.
+     Idempotent, no escaping needed. Fallback if MCP unavailable: `powershell -Command "New-Item -ItemType Junction -Path '<worktree>\node_modules' -Target 'D:\code\legacy-sports\node_modules'"`. After that `pnpm exec nx`, `make typecheck`, `make pc` all work. Do NOT call `make_wt_setup` — it's sibling-only.
    - **Sibling flow**: `make_wt_setup(worktreePath: "$wt")`. Shell fallback: `make wt-setup WT=$wt`.
 5. **Implement**: read the ticket description, investigate the codebase, write code + tests
    - **Bug tickets**: follow the [bug verification workflow](../debugging/SKILL.md#verification-by-bug-type) — reproduce the bug **before** writing any fix, then verify the fix resolves the reported behavior **after**. Include before/after evidence in the PR body under a `## Verification` section (appended after the standard template). `make pc` passing is necessary but not sufficient for bugs. The `## Verification` section is not part of the standard PR template -- add it manually for bug-fix PRs.
@@ -209,7 +209,7 @@ Process children in iterative batches until the backlog is empty.
 
             Setup:
             1. git fetch origin main
-            2. cmd //c mklink //J node_modules D:\\code\\legacy-sports\\node_modules
+            2. worktree_setup_node_modules()
             3. jira_transition(key: "LS-<child_key>", status: "In Progress")
 
             Work:

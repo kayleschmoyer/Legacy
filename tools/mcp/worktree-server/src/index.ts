@@ -14,6 +14,7 @@ import {
   realpathSync,
   rmSync,
   statSync,
+  symlinkSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
@@ -1184,6 +1185,30 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
             type: 'string',
             description:
               'Ticket key, absolute path, or omit for active worktree',
+          },
+        },
+      },
+    },
+    {
+      name: 'worktree_setup_node_modules',
+      description:
+        "Create a node_modules junction from the worktree to the main repo's " +
+        'node_modules. Required in every native ephemeral worktree before running ' +
+        'pnpm/make commands. Idempotent — skips creation if a valid junction already ' +
+        'exists. Eliminates shell path-escaping issues from manual mklink commands.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          worktree: {
+            type: 'string',
+            description:
+              'Ticket key, absolute path, or omit for active worktree.',
+          },
+          mainRepoPath: {
+            type: 'string',
+            description:
+              'Path to the main repo root (parent of node_modules). ' +
+              'Defaults to the detected main repo.',
           },
         },
       },
@@ -4667,6 +4692,212 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
 
     // -----------------------------------------------------------------------
+    // worktree_setup_node_modules
+    // -----------------------------------------------------------------------
+    case 'worktree_setup_node_modules': {
+      const { worktree: wtKey, mainRepoPath: customMainRepo } = args as {
+        worktree?: string;
+        mainRepoPath?: string;
+      };
+
+      const target = resolveTargetDir(wtKey);
+      if ('error' in target) {
+        return {
+          content: [{ type: 'text', text: target.error }],
+          isError: true,
+        };
+      }
+
+      const cwd = target.path;
+      const nmPath = join(cwd, 'node_modules');
+      const mainRepo = customMainRepo ?? MAIN_REPO;
+      const mainNmPath = join(mainRepo, 'node_modules');
+
+      try {
+        // Verify the main repo's node_modules exists
+        if (!existsSync(mainNmPath)) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(
+                  {
+                    success: false,
+                    message: `Main repo node_modules not found at ${mainNmPath}. Run 'make install' in the main repo first.`,
+                  },
+                  null,
+                  2,
+                ),
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        /**
+         * Normalize a path for junction-target comparison on Windows.
+         * realpathSync may return paths with different casing or a \\?\ prefix;
+         * toLowerCase + prefix stripping ensures consistent comparison.
+         */
+        const normalizeForCompare = (p: string): string => {
+          let normalized = p;
+          try {
+            normalized = realpathSync(normalized);
+          } catch {
+            normalized = resolve(normalized);
+          }
+          if (process.platform === 'win32') {
+            if (normalized.startsWith('\\\\?\\')) {
+              normalized = normalized.slice(4);
+            }
+            normalized = normalized.toLowerCase();
+          }
+          return normalized;
+        };
+
+        // Check if node_modules already exists
+        if (existsSync(nmPath)) {
+          const stat = lstatSync(nmPath);
+          if (stat.isSymbolicLink()) {
+            // Already a junction/symlink — verify it points to the right target
+            let currentTarget: string;
+            try {
+              currentTarget = realpathSync(nmPath);
+            } catch {
+              currentTarget = readlinkSync(nmPath);
+            }
+            if (
+              normalizeForCompare(currentTarget) ===
+              normalizeForCompare(mainNmPath)
+            ) {
+              // Correct junction already exists — idempotent success
+              const verified = existsSync(join(nmPath, 'nx'));
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify(
+                      {
+                        success: true,
+                        created: false,
+                        alreadyExists: true,
+                        junctionPath: nmPath,
+                        target: mainNmPath,
+                        verified,
+                        message:
+                          'node_modules junction already exists and points to the correct target.',
+                      },
+                      null,
+                      2,
+                    ),
+                  },
+                ],
+              };
+            }
+            // Junction points to wrong target — remove and recreate
+            rmSync(nmPath, { recursive: false });
+          } else if (stat.isDirectory()) {
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(
+                    {
+                      success: false,
+                      message:
+                        'node_modules is already a real directory (not a junction). ' +
+                        'Delete it manually first if you want to replace it with a junction.',
+                    },
+                    null,
+                    2,
+                  ),
+                },
+              ],
+              isError: true,
+            };
+          } else {
+            // Regular file or other unexpected type
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(
+                    {
+                      success: false,
+                      message:
+                        `node_modules exists but is not a symlink/junction or directory (type: ${stat.mode.toString(8)}). ` +
+                        'Delete it manually before creating a junction.',
+                    },
+                    null,
+                    2,
+                  ),
+                },
+              ],
+              isError: true,
+            };
+          }
+        }
+
+        // Create the junction using Node.js path APIs (no shell escaping needed)
+        if (process.platform === 'win32') {
+          // Windows: use execFileSync with structured args array to avoid all
+          // shell escaping issues. Paths are passed as separate argv elements —
+          // no quoting, no backslash doubling, no mangling.
+          execFileSync('cmd', ['/c', 'mklink', '/J', nmPath, mainNmPath], {
+            encoding: 'utf-8',
+            timeout: 15_000,
+          });
+        } else {
+          symlinkSync(mainNmPath, nmPath);
+        }
+
+        const verified = existsSync(join(nmPath, 'nx'));
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  success: true,
+                  created: true,
+                  junctionPath: nmPath,
+                  target: mainNmPath,
+                  verified,
+                  message: verified
+                    ? 'node_modules junction created and verified. Ready to run pnpm/make commands.'
+                    : 'Junction created but nx not found — verify main repo node_modules is populated.',
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      } catch (err: unknown) {
+        const e = err as { message?: string; stdout?: string; stderr?: string };
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  success: false,
+                  message: `Failed to create node_modules junction: ${e.message ?? String(err)}`,
+                  ...(e.stdout ? { stdout: e.stdout } : {}),
+                  ...(e.stderr ? { stderr: e.stderr } : {}),
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
     // worktree_show_file
     // -----------------------------------------------------------------------
     case 'worktree_show_file': {
@@ -7060,7 +7291,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     `Worktree is now active — run worktree_set({ key: "${branch}" }) to re-activate after server restart`,
                     setup
                       ? 'Setup complete'
-                      : 'Junction node_modules manually if needed: cmd /c mklink /J node_modules D:\\\\code\\\\legacy-sports\\\\node_modules',
+                      : 'Junction node_modules if needed: worktree_setup_node_modules()',
                   ],
                 },
                 null,

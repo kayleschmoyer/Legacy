@@ -35,11 +35,11 @@ The Claude Code session was spawned with the launcher `worktree` checkbox checke
    ```
    worktree_set(key: "<absolute .claude/worktrees/... path from pwd>")
    ```
-7. **Junction `node_modules` from the main repo** (REQUIRED before any pnpm/make command — confirmed in LS-2903):
+7. **Junction `node_modules` from the main repo** (REQUIRED before any pnpm/make command — LS-2903/LS-3003):
    ```
-   worktree_run(command: "cmd //c mklink //J node_modules D:\\\\code\\\\legacy-sports\\\\node_modules")
+   worktree_setup_node_modules()
    ```
-   The double-slash is intentional — Git Bash / MSYS escape so `cmd.exe` sees `/c` and `/J` literally.
+   Uses Node.js path APIs internally — no shell escaping needed. Idempotent (safe to call if junction already exists). Fallback if MCP unavailable: `powershell -Command "New-Item -ItemType Junction -Path '<worktree>\node_modules' -Target 'D:\code\legacy-sports\node_modules'"`
 8. **Implement** — read the ticket description, investigate, write code + tests. See [work-ticket SKILL.md Step 5](../work-ticket/SKILL.md) for self-review + implementation notes.
 9. **Migrations** — `db_migration_status()` then `db_migrate()`.
 10. **Validate** — `make_run(target: "pc")`. Must pass before pushing.
@@ -78,7 +78,7 @@ for each ticket/PR needing code work:
       Setup:
       1. git fetch origin <branch-or-main>
       2. git checkout <existing-branch>  (for PRs)  OR  stay on the ephemeral branch (for new tickets)
-      3. cmd //c mklink //J node_modules D:\\code\\legacy-sports\\node_modules
+      3. worktree_setup_node_modules()   # or PowerShell fallback if MCP unavailable
       4. <rename branch if new ticket: git branch -m claude/LS-####-description>
 
       Work:
@@ -114,7 +114,7 @@ original_branch = git branch --show-current
 for each target:
   git fetch origin <branch>
   git checkout <branch>
-  cmd //c mklink //J node_modules D:\\code\\legacy-sports\\node_modules  # if not already junctioned
+  worktree_setup_node_modules()  # idempotent — skips if junction already correct
   # ... do work, commit, push ...
   # (must commit+push before switching — dirty working tree blocks checkout)
 git checkout $original_branch

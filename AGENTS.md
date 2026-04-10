@@ -92,21 +92,21 @@ If you find yourself on a branch that does not match this convention (for exampl
 
 5.  Setup worktree:
     - **Parallel flow (sibling worktree)**: on Windows, `make_wt_setup({ worktreePath: "$wt" })` MCP tool or shell fallback `make wt-setup WT=$wt`. On Linux/macOS (cloud agents), `make wt-setup` is not available — run `make install` in the worktree, copy `.env` from the main repo, and optionally run `make setup-hooks`.
-    - **Native flow (ephemeral worktree — REQUIRED)**: `.claude/worktrees/<name>/` ships with NO `node_modules`. Before running any pnpm or make command, junction `node_modules` from the main repo (confirmed in LS-2903):
+    - **Native flow (ephemeral worktree — REQUIRED)**: `.claude/worktrees/<name>/` ships with NO `node_modules`. Before running any pnpm or make command, junction `node_modules` from the main repo using the MCP tool (LS-3003):
 
-      ```bash
-      worktree_run(command: "cmd //c mklink //J node_modules D:\\\\code\\\\legacy-sports\\\\node_modules")
+      ```
+      worktree_setup_node_modules()
       ```
 
-      This is instant (no disk copy), the main repo's `node_modules` is untouched, and `pnpm exec nx`, `make typecheck`, `make pc` all work after it. Skip `make wt-setup` — that's sibling-only.
+      This is instant (no disk copy), the main repo's `node_modules` is untouched, and `pnpm exec nx`, `make typecheck`, `make pc` all work after it. The tool is idempotent — safe to call even if the junction already exists. Skip `make wt-setup` — that's sibling-only.
 
-      If `worktree_run` is unavailable, use the **PowerShell fallback** (raw cmd.exe junction creation with Bash mangles backslashes):
+      If `worktree_setup_node_modules` is unavailable (MCP server not loaded), use the **PowerShell fallback** (raw cmd.exe junction creation with Bash mangles backslashes):
 
       ```bash
       powershell -Command "New-Item -ItemType Junction -Path 'D:\code\legacy-sports\.claude\worktrees\<name>\node_modules' -Target 'D:\code\legacy-sports\node_modules'"
       ```
 
-      > **Warning**: Never use `cmd //c mklink //J node_modules D:\\code\\...` directly in bash — bash mangles the backslashes, silently creating a junction to a non-existent path (`codelegacy-sportsnode_modules`). Always use PowerShell for junction creation when `worktree_run` is unavailable. Verify the junction after creation: `test -d node_modules/nx && echo ok || echo broken`.
+      > **Warning**: Never use `worktree_run(command: "cmd //c mklink //J ...")` or `cmd //c mklink //J node_modules D:\\code\\...` directly in bash — both approaches require fragile backslash escaping that silently creates junctions to wrong paths. Use `worktree_setup_node_modules()` (MCP) or the PowerShell fallback above. Verify the junction after creation: `test -d node_modules/nx && echo ok || echo broken`.
 
     - 5b. **Agent multi-root access** (optional, parallel flow): `make sync-worktrees` then `code legacy-sports.code-workspace` — gives agents search access across all sibling worktrees in one window.
 
@@ -212,7 +212,7 @@ For **work subagents** dispatched by multi-ticket orchestrators (`/sweep-prs`, `
   1. git fetch origin <branch>                                      # get the target branch
   2. git checkout <branch>                                           # switch to it (for existing PRs)
      OR: worktree_rename_branch({ newName: "claude/LS-####-short-description" })  # rename (for new tickets)
-  3. powershell -Command "New-Item -ItemType Junction -Path 'node_modules' -Target 'D:\code\legacy-sports\node_modules'"  # junction node_modules
+  3. worktree_setup_node_modules()                                    # junction node_modules (fallback: powershell New-Item -ItemType Junction)
 
   Tool preferences:
   - Use worktree_commit/worktree_push for commits and pushes
