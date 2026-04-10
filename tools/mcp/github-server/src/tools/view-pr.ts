@@ -21,6 +21,13 @@ interface StatusContextNode {
 
 type StatusCheckNode = CheckRunNode | StatusContextNode;
 
+interface PRFileNode {
+  path: string;
+  additions: number;
+  deletions: number;
+  changeType: string;
+}
+
 interface PRGraphQLResponse {
   repository: {
     pullRequest: null | {
@@ -42,6 +49,10 @@ interface PRGraphQLResponse {
       additions: number;
       deletions: number;
       changedFiles: number;
+      files: {
+        nodes: Array<PRFileNode>;
+        pageInfo: { hasNextPage: boolean };
+      };
       commits: {
         totalCount: number;
         nodes: Array<{
@@ -89,6 +100,15 @@ query($owner: String!, $repo: String!, $number: Int!) {
       additions
       deletions
       changedFiles
+      files(first: 100) {
+        nodes {
+          path
+          additions
+          deletions
+          changeType
+        }
+        pageInfo { hasNextPage }
+      }
       commits(last: 1) {
         totalCount
         nodes {
@@ -125,6 +145,20 @@ query($owner: String!, $repo: String!, $number: Int!) {
     }
   }
 }`;
+
+/** Map GraphQL PullRequestFile.changeType to REST-compatible status strings. */
+const CHANGE_TYPE_MAP: Record<string, string> = {
+  ADDED: 'added',
+  CHANGED: 'changed',
+  COPIED: 'copied',
+  DELETED: 'removed',
+  MODIFIED: 'modified',
+  RENAMED: 'renamed',
+};
+
+function mapChangeType(changeType: string): string {
+  return CHANGE_TYPE_MAP[changeType] ?? changeType.toLowerCase();
+}
 
 function normalizeChecks(nodes: (StatusCheckNode | null)[]): CICheck[] {
   return nodes
@@ -190,6 +224,18 @@ export async function viewPR(params: ViewPRParams): Promise<ToolResult> {
       additions: pr.additions,
       deletions: pr.deletions,
       changedFiles: pr.changedFiles,
+      files: pr.files.nodes.map((f) => ({
+        path: f.path,
+        additions: f.additions,
+        deletions: f.deletions,
+        status: mapChangeType(f.changeType),
+      })),
+      ...(pr.files.pageInfo.hasNextPage
+        ? {
+            filesNote:
+              'Truncated to first 100 files; PR has more changed files.',
+          }
+        : {}),
       commits: { totalCount: pr.commits.totalCount },
       statusCheckRollup: normalizeChecks(checkNodes),
       reviews: pr.reviews.nodes.map((r) => ({

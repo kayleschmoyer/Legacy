@@ -836,7 +836,7 @@ server.tool(
 // --- github_view_pr ---
 server.tool(
   'github_view_pr',
-  'Prefer this over `gh pr view` via shell. View PR details: title, body, state, checks, reviews, diff stats.',
+  'Prefer this over `gh pr view` or `gh pr diff --name-only` via shell. View PR details: title, body, state, checks, reviews, diff stats, and changed files list (path, additions, deletions, status).',
   {
     number: z.coerce.number().int().positive().describe('PR number'),
   },
