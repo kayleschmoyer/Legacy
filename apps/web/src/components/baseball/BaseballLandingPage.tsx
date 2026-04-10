@@ -794,7 +794,11 @@ export function BaseballLandingPage() {
   );
 
   /* ─── Loading guards: prevent blank/wrong state while data resolves ─── */
-  if (auth.isLoading || (auth.user && isLoading && !data)) {
+  // Guard the one-render window between auth resolving and Apollo starting the
+  // query — in that window isLoading is still false but data is undefined.
+  // Without `|| !data`, the empty-league layout flashes for returning users (LS-1269).
+  // Exclude the error case so the error UI below can render when the query fails.
+  if (auth.isLoading || (!!auth.user && (isLoading || (!data && !error)))) {
     return (
       <PageContainer
         aria-label="Baseball fantasy landing page"

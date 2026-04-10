@@ -343,6 +343,34 @@ describe('BaseballLandingPage', () => {
     // No "Loading your leagues..." text — the spinner is the only indicator
   });
 
+  it('shows spinner in the auth-resolved-but-query-not-started window (LS-1269)', () => {
+    // Regression test: when auth.user is set but Apollo's subscription effect
+    // hasn't fired yet, useGetUserLeaguesQuery returns { loading: false,
+    // data: undefined, error: undefined }.  Without the !data guard the
+    // onboarding layout would flash briefly before the query begins.
+    const {
+      useGetUserLeaguesQuery,
+    }: any = require('../../api/db/graphql.generated');
+    useGetUserLeaguesQuery.mockReturnValue({
+      data: undefined,
+      loading: false,
+      error: undefined,
+    });
+
+    render(
+      <MemoryRouter>
+        <BaseballLandingPage />
+      </MemoryRouter>,
+    );
+
+    // Spinner must be shown — the loading guard should block rendering
+    expect(screen.getByRole('status')).toBeInTheDocument();
+    // The empty-league / onboarding layout must NOT flash
+    expect(screen.queryByText(/Create League/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Join League/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/No leagues yet/i)).not.toBeInTheDocument();
+  });
+
   it('does not show the no-leagues empty state when the query fails', () => {
     const {
       useGetUserLeaguesQuery,

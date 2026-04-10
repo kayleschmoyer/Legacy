@@ -418,7 +418,15 @@ export function HomePage(): React.JSX.Element {
   };
 
   /* ─── Loading state — prevents unauthenticated hero flash ─── */
-  if (auth.isLoading || (!!auth.user && leaguesLoading)) {
+  // Also guard the one-render window between auth resolving and Apollo
+  // starting the leagues query (skip: !auth.user flips to false).  In that
+  // window leaguesLoading is still false but leagueData is undefined — without
+  // this, returning users briefly see the first-time onboarding layout (LS-1269).
+  // Exclude the error case so the error UI below can render when the query fails.
+  if (
+    auth.isLoading ||
+    (!!auth.user && (leaguesLoading || (!leagueData && !leaguesError)))
+  ) {
     return (
       <ScrollView>
         <PageMeta
