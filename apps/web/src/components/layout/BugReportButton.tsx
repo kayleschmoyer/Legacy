@@ -7,6 +7,7 @@ import {
 } from '@legacy-sports/shared-components/ui';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import { Dialog } from 'tamagui';
+import { Bug } from '@tamagui/lucide-icons';
 import { env } from '../../config/environment';
 import { CSRF_HEADER, getCsrfToken } from '../../lib/csrf';
 
@@ -311,11 +312,7 @@ export const BugReportButton: React.FC<BugReportButtonProps> = ({
           aria-label="Report a bug"
           title="Report a bug"
         >
-          <Paragraph fontSize={16} lineHeight={18} marginBottom={0}>
-            <span role="img" aria-hidden>
-              🐛
-            </span>
-          </Paragraph>
+          <Bug size={18} />
         </Button>
       </Dialog.Trigger>
 
