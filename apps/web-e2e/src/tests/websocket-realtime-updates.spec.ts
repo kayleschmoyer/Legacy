@@ -15,8 +15,8 @@
  */
 
 import type { WebSocketRoute } from '@playwright/test';
-import { expect } from '../fixtures/auth-enhanced';
-import { test } from '../fixtures/auth-enhanced';
+import { injectWebSocketUrl, isGraphQL } from './helpers/websocket-test-utils';
+import { expect, test } from '../fixtures/auth-enhanced';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 
 // ── Constants ───────────────────────────────────────────────────────────────
@@ -107,31 +107,6 @@ const MOCK_ACTIVITY_WITH_ITEMS = [
   },
 ];
 
-// ── WebSocket URL injection ──────────────────────────────────────────────────
-
-/**
- * In CI the web build has VITE_WEBSOCKET_URL="" (no env var at build time).
- * esbuild constant-folds the empty string through to LeagueDetailPage's guard
- * (`if (!wsUrl || …) return`), dead-code-eliminating the WebSocket setup.
- *
- * We work around this by setting `window.__e2eWsUrl` via addInitScript —
- * which runs before any page scripts — so the environment module reads the
- * injected URL at module initialisation time instead of the baked-in "".
- * `environment.ts` checks `window.__e2eWsUrl` first (see the comment there).
- * Playwright's `routeWebSocket(/wss?:\/\//)` then intercepts the connection
- * attempt before it reaches the network, so the actual URL is irrelevant.
- */
-const E2E_WS_URL = 'wss://e2e-test.local/ws';
-
-async function injectWebSocketUrl(page: import('@playwright/test').Page) {
-  // Set the override global before ANY page scripts run.  environment.ts reads
-  // window.__e2eWsUrl at module-evaluation time, so this must happen first.
-  // The type is declared in apps/web/src/types/e2e-globals.d.ts.
-  await page.addInitScript((wsUrl: string) => {
-    window.__e2eWsUrl = wsUrl;
-  }, E2E_WS_URL);
-}
-
 // ── Wire-format helpers ─────────────────────────────────────────────────────
 
 function wsNotification(data: Record<string, unknown>): string {
@@ -139,16 +114,6 @@ function wsNotification(data: Record<string, unknown>): string {
 }
 
 // ── GraphQL route helper ────────────────────────────────────────────────────
-
-function isGraphQL(url: URL): boolean {
-  const s = url.toString();
-  return (
-    s.includes('/graphql') &&
-    !s.includes('/@fs/') &&
-    !s.includes('.ts') &&
-    !s.includes('.js')
-  );
-}
 
 interface SetupOptions {
   league?: typeof BASE_LEAGUE;
