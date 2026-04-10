@@ -131,7 +131,7 @@
     ".\\scripts\\resolve-review-threads.ps1": true,
     ".\\scripts\\ci-failure-log.ps1": true
   },
-  "chat.editing.autoAcceptDelay": 10,
+  "chat.editing.autoAcceptDelay": 0,
   "C_Cpp.files.exclude": {
     "**/node_modules/**": true,
     "**/dist/**": true,
