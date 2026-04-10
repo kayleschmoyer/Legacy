@@ -55,6 +55,10 @@ import {
 } from '@legacy-sports/scoring';
 import { LeagueScoringSummary } from '@legacy-sports/shared-components/leagues';
 import { MatchupNavigationControls } from '@legacy-sports/shared-components/matchup';
+import {
+  PendingTradeOffers,
+  PendingWaiverClaims,
+} from '@legacy-sports/shared-components/roster';
 import { PageMeta } from '../../components/PageMeta';
 import { LeagueActivityFeed } from '../../features/baseball/LeagueActivityFeed';
 import { LeagueHistory } from '../../features/baseball/LeagueHistory';
@@ -94,10 +98,6 @@ import {
 } from '../../constants/colors';
 import { LeagueRosterManagement } from '../../features/roster/LeagueRosterManagement';
 import { canPlayerPlayPosition } from '../../features/roster/LeagueRosterManagement';
-import {
-  PendingTradeOffers,
-  PendingWaiverClaims,
-} from '@legacy-sports/shared-components/roster';
 import { LeagueStandings } from '../../features/roster/LeagueStandings';
 import { PlayoffBracketDisplay } from '../../components/matchup/PlayoffBracketDisplay';
 import { LeagueChatTab } from '../../features/baseball/LeagueChatTab';
@@ -175,7 +175,6 @@ export interface PlayerMatchupData {
 
 const PageContainer = styled(YStack, {
   flex: 1,
-  minHeight: '100vh',
   backgroundColor: '$background',
   paddingBottom: '$8',
 });
