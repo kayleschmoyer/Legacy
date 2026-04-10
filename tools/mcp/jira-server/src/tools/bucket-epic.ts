@@ -96,7 +96,8 @@ export async function setBucketEpic(params: {
       method: 'PUT',
       path: `/rest/api/3/project/LS/properties/bucket.${bucket}`,
       body: {
-        value: { key: trimmedKey, updatedAt: new Date().toISOString() },
+        key: trimmedKey,
+        updatedAt: new Date().toISOString(),
       },
     });
     cache.delete(bucket); // clear cache so next read reflects the new value
