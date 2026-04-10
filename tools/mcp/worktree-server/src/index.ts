@@ -1522,6 +1522,46 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
         required: ['newName'],
       },
     },
+    {
+      name: 'worktree_reset',
+      description:
+        'Reset HEAD to a specific commit SHA (git reset). ' +
+        'Safety: refuses main branch and only allows resetting to ancestor SHAs ' +
+        '(commits already reachable from HEAD) to prevent accidental data loss. ' +
+        'Typical use: strip a stray commit pushed by another agent and restore ' +
+        'the branch to the correct SHA before force-pushing with worktree_push.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          sha: {
+            type: 'string',
+            description:
+              'Target commit SHA to reset to. Must be an ancestor of the current HEAD.',
+          },
+          mode: {
+            type: 'string',
+            enum: ['hard', 'soft', 'mixed'],
+            description:
+              "Reset mode (default: 'hard'). 'hard' resets index and working tree. " +
+              "'soft' moves HEAD only, leaving changes staged. " +
+              "'mixed' resets index but leaves working tree unchanged.",
+          },
+          force: {
+            type: 'boolean',
+            description:
+              'Skip the dirty-worktree safety check for --hard resets. ' +
+              'When false (default), worktree_reset refuses to hard-reset if there are ' +
+              'uncommitted working tree changes. Pass true to override and discard them.',
+          },
+          worktree: {
+            type: 'string',
+            description:
+              'Ticket key, absolute path, or omit for active worktree',
+          },
+        },
+        required: ['sha'],
+      },
+    },
   ],
 }));
 
@@ -7469,6 +7509,286 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             {
               type: 'text',
               text: `Failed to rename branch (exit code ${e.status ?? 'unknown'}):\n${output}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_reset
+    // -----------------------------------------------------------------------
+    case 'worktree_reset': {
+      const {
+        sha,
+        mode = 'hard',
+        force = false,
+        worktree: wtKeyRaw,
+      } = args as {
+        sha: string;
+        mode?: 'hard' | 'soft' | 'mixed';
+        force?: boolean;
+        worktree?: unknown;
+      };
+
+      // Validate worktree param type (mirrors worktree_push pattern)
+      if (wtKeyRaw !== undefined && typeof wtKeyRaw !== 'string') {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Invalid worktree: expected string, got ${typeof wtKeyRaw}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+      if (typeof wtKeyRaw === 'string' && wtKeyRaw.trim().length === 0) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Invalid worktree: provided value is empty or whitespace-only. Omit the parameter to use the active worktree.',
+            },
+          ],
+          isError: true,
+        };
+      }
+      const wtKey = typeof wtKeyRaw === 'string' ? wtKeyRaw.trim() : undefined;
+
+      // Validate SHA format (full or abbreviated hex, 4–64 chars)
+      if (!/^[0-9a-fA-F]{4,64}$/.test(sha)) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Invalid sha: "${sha}". Must be a hex commit SHA (4–64 characters).`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      // Validate mode
+      if (!['hard', 'soft', 'mixed'].includes(mode)) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Invalid mode: "${mode}". Must be one of: hard, soft, mixed.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      const target = resolveTargetDir(wtKey);
+      if ('error' in target) {
+        return {
+          content: [{ type: 'text', text: target.error }],
+          isError: true,
+        };
+      }
+      const cwd = target.path;
+
+      try {
+        // Safety: refuse to reset on main branch or in detached HEAD state
+        // (mirrors worktree_push's guard — detached HEAD may indicate mid-rebase/merge)
+        const branch = run('git branch --show-current', cwd).trim();
+        if (!branch) {
+          const gitDir = run('git rev-parse --git-dir', cwd).trim();
+          const resolvedGitDir = isAbsolute(gitDir)
+            ? gitDir
+            : join(cwd, gitDir);
+          const inRebase =
+            existsSync(join(resolvedGitDir, 'rebase-merge')) ||
+            existsSync(join(resolvedGitDir, 'rebase-apply'));
+          return {
+            content: [
+              {
+                type: 'text',
+                text: inRebase
+                  ? `[resolvedWorktree: ${cwd}]\nRefused: rebase is in progress. Finish or abort the rebase before resetting.`
+                  : `[resolvedWorktree: ${cwd}]\nRefused: HEAD is detached (no branch checked out). Aborting reset.`,
+              },
+            ],
+            isError: true,
+          };
+        }
+        if (branch === 'main') {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `[resolvedWorktree: ${cwd}]\nRefused: cannot reset on main branch.`,
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        // Resolve target SHA to full form (handles abbreviated SHAs)
+        let targetSha: string;
+        try {
+          targetSha = runGit(
+            ['rev-parse', '--verify', `${sha}^{commit}`],
+            cwd,
+          ).trim();
+        } catch {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `[resolvedWorktree: ${cwd}]\nCannot resolve SHA: "${sha}". Commit not found in repository.`,
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        // Get current HEAD SHA
+        const previousSha = run('git rev-parse HEAD', cwd).trim();
+
+        // If already at target, nothing to do
+        if (targetSha === previousSha) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(
+                  {
+                    resolvedWorktree: cwd,
+                    reset: false,
+                    reason: 'Already at target SHA — no reset needed.',
+                    previousSha,
+                    currentSha: targetSha,
+                    mode,
+                    filesChanged: 0,
+                  },
+                  null,
+                  2,
+                ),
+              },
+            ],
+          };
+        }
+
+        // Safety: verify target SHA is an ancestor of HEAD to prevent data loss.
+        // git merge-base --is-ancestor exits 0 if ancestor, 1 if not.
+        try {
+          runGit(['merge-base', '--is-ancestor', targetSha, 'HEAD'], cwd);
+        } catch {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: [
+                  `[resolvedWorktree: ${cwd}]`,
+                  `Refused: "${sha}" (${targetSha.slice(0, 7)}) is not an ancestor of HEAD (${previousSha.slice(0, 7)}).`,
+                  `worktree_reset only allows resetting to ancestor commits to prevent accidental data loss.`,
+                  `If you intentionally need a non-ancestor reset, use worktree_run with git reset directly.`,
+                ].join('\n'),
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        // Safety: for --hard resets, refuse when the worktree is dirty unless
+        // force=true is explicitly passed to opt in.
+        // Use diff --quiet rather than status --porcelain so untracked files
+        // (which git reset --hard leaves untouched) don't trigger a false positive.
+        if (mode === 'hard' && !force) {
+          const indexDirty = (() => {
+            try {
+              runGit(['diff', '--quiet'], cwd, { timeout: 15_000 });
+              return false;
+            } catch {
+              return true;
+            }
+          })();
+          const stagedDirty = (() => {
+            try {
+              runGit(['diff', '--cached', '--quiet'], cwd, { timeout: 15_000 });
+              return false;
+            } catch {
+              return true;
+            }
+          })();
+          if (indexDirty || stagedDirty) {
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: [
+                    `[resolvedWorktree: ${cwd}]`,
+                    `Refused: git reset --hard ${targetSha.slice(0, 7)} would discard uncommitted working tree changes.`,
+                    `Commit, stash, or discard local changes first, or pass force: true to override.`,
+                  ].join('\n'),
+                },
+              ],
+              isError: true,
+            };
+          }
+        }
+
+        // Count files affected between target and current HEAD
+        let filesChanged = 0;
+        try {
+          const diffOut = runGit(
+            ['diff', '--name-only', targetSha, previousSha],
+            cwd,
+            { timeout: 15_000 },
+          ).trim();
+          filesChanged = diffOut ? diffOut.split('\n').length : 0;
+        } catch {
+          // Non-fatal — proceed with reset even if diff count fails
+        }
+
+        // Perform the reset
+        runGit(['reset', `--${mode}`, targetSha], cwd);
+
+        const currentSha = run('git rev-parse HEAD', cwd).trim();
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  resolvedWorktree: cwd,
+                  command: `git reset --${mode} ${targetSha.slice(0, 7)}`,
+                  reset: true,
+                  previousSha,
+                  currentSha,
+                  mode,
+                  filesChanged,
+                  nextStep:
+                    mode === 'hard'
+                      ? 'worktree_push() to force-push the reset branch.'
+                      : 'stage/commit your changes, then worktree_push().',
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      } catch (err: unknown) {
+        const e = err as { stdout?: string; stderr?: string; status?: number };
+        const output = [e.stdout, e.stderr].filter(Boolean).join('\n');
+        return {
+          content: [
+            {
+              type: 'text',
+              text: [
+                `[resolvedWorktree: ${cwd}]`,
+                `worktree_reset failed`,
+                output,
+              ]
+                .filter(Boolean)
+                .join('\n'),
             },
           ],
           isError: true,
