@@ -328,25 +328,36 @@ export function LeagueScoringEditor(
   const [updateScoring, { loading: saving }] =
     useUpdateLeagueScoringProfileMutation();
 
-  // Guard against the stats-sync effect overwriting optimistic baseline updates
-  // mid-save. When onRefetch() returns, the parent re-renders with a new profile
-  // → new stats ref → the effect fires and resets baselineMultipliers. If the
-  // refetch returns stale cache data, that reset re-introduces the dirty state
-  // and the "unsaved" badge reappears even though the save succeeded.
+  // Guard against the stats-sync effect overwriting optimistic baseline/form
+  // state mid-save. When onRefetch() is in flight, cache-and-network emits an
+  // intermediate render with the stale Apollo cache before the fresh network
+  // response arrives. If the effect fires during that stale-cache render, it
+  // would reset formValues to the old multiplier while baseline still holds the
+  // optimistically-updated new value → pendingUpdates > 0 → badge reappears.
+  // Guarding both setters preserves the optimistic state until isSavingRef is
+  // cleared, after which the effect runs with fresh server data.
   const isSavingRef = useRef(false);
 
+  // Tracks whether a stats-sync was skipped because a save was in flight.
+  // If true, the finally block re-applies the latest stats once isSavingRef is
+  // cleared so that baseline/formValues always reflect fresh server data after
+  // a save completes.
+  const skippedSyncRef = useRef(false);
+
   useEffect(() => {
-    // Only guard the baseline overwrite during save — the optimistic baseline
-    // set in handleSave is correct and must not be clobbered by a refetch that
-    // may return stale cache data. All other resync work (formValues,
-    // fieldErrors, flags) still runs so that added/removed stats or
-    // server-normalized multipliers are picked up immediately.
-    if (!isSavingRef.current) {
+    // During a save, the optimistic baseline and the user's entered form values
+    // are the source of truth. Skip both resync operations so that a
+    // cache-and-network stale-cache intermediate render cannot re-dirty the
+    // form while the mutation / refetch are still in flight. Record the skip so
+    // the finally block can replay the sync once saving is done.
+    if (isSavingRef.current) {
+      skippedSyncRef.current = true;
+    } else {
       setBaselineMultipliers(
         Object.fromEntries(stats.map((s) => [s.id, s.multiplier])),
       );
+      setFormValues(createInitialValues(stats));
     }
-    setFormValues(createInitialValues(stats));
     setFieldErrors(createInitialErrors(stats));
     setSaveError(null);
     setSaveSuccess(false);
@@ -427,12 +438,35 @@ export function LeagueScoringEditor(
       return;
     }
 
-    // Snapshot the updates before the async gap — state may change mid-flight.
+    // Snapshot the updates, current baseline, and current form values before the
+    // async gap — state may change mid-flight and we need them for rollback on
+    // error so the user's edits are fully restored.
     const updatesToSave = pendingUpdates;
+    const previousBaseline = baselineMultipliers;
+    const previousFormValues = formValues;
 
-    // Prevent the stats-sync effect from overwriting our optimistic baseline
-    // while the refetch is in flight (see isSavingRef comment above).
+    // Prevent the stats-sync effect from overwriting our optimistic state
+    // while the mutation / refetch are in flight (see isSavingRef comment).
     isSavingRef.current = true;
+
+    // Optimistically update baseline and form values BEFORE the mutation so the
+    // "unsaved" badge clears immediately when save is initiated rather than
+    // waiting for the full mutation + refetch round-trip. This eliminates the
+    // >20s badge-visible window seen in slow CI environments.
+    setBaselineMultipliers((prev) => {
+      const next = { ...prev };
+      for (const update of updatesToSave) {
+        next[update.statDefinitionId] = update.multiplier;
+      }
+      return next;
+    });
+    setFormValues((prev) => {
+      const next = { ...prev };
+      for (const update of updatesToSave) {
+        next[update.statDefinitionId] = formatMultiplier(update.multiplier);
+      }
+      return next;
+    });
 
     try {
       await updateScoring({
@@ -442,29 +476,16 @@ export function LeagueScoringEditor(
         },
       });
 
-      // Optimistically update the baseline so pendingUpdates clears immediately.
-      // Without this, the "unsaved" badge persists until the refetch → parent
-      // re-render → stats-update pipeline completes asynchronously.
-      setBaselineMultipliers((prev) => {
-        const next = { ...prev };
-        for (const update of updatesToSave) {
-          next[update.statDefinitionId] = update.multiplier;
-        }
-        return next;
-      });
-
       await onRefetch();
 
-      setFormValues((prev) => {
-        const next = { ...prev };
-        for (const update of updatesToSave) {
-          next[update.statDefinitionId] = formatMultiplier(update.multiplier);
-        }
-        return next;
-      });
       setSaveSuccess(true);
       setSaveError(null);
     } catch (mutationError) {
+      // Rollback both the baseline and formValues to their pre-save snapshots so
+      // the "unsaved" badge reappears and the form is fully restored to the
+      // user's entered values — retryable without losing any edits.
+      setBaselineMultipliers(previousBaseline);
+      setFormValues(previousFormValues);
       setSaveSuccess(false);
       setSaveError(
         mutationError instanceof Error
@@ -473,6 +494,18 @@ export function LeagueScoringEditor(
       );
     } finally {
       isSavingRef.current = false;
+
+      // If stats changed while saving was in flight (e.g. the refetch resolved
+      // and triggered the useEffect while isSavingRef was true), replay the sync
+      // now that the guard is cleared so baseline/formValues reflect fresh
+      // server data.
+      if (skippedSyncRef.current) {
+        skippedSyncRef.current = false;
+        setBaselineMultipliers(
+          Object.fromEntries(stats.map((s) => [s.id, s.multiplier])),
+        );
+        setFormValues(createInitialValues(stats));
+      }
     }
   };
 
