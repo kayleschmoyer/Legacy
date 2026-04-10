@@ -181,6 +181,16 @@ function normalizeFilesParam(
   raw: unknown,
 ): string[] | undefined | { error: string } {
   if (raw === undefined || raw === null) return undefined;
+  // Handle JSON-encoded array sent by some MCP clients (e.g. Claude Desktop)
+  // e.g. files = '["path/to/file.ts"]' instead of files = ["path/to/file.ts"]
+  if (typeof raw === 'string' && raw.trim().startsWith('[')) {
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (Array.isArray(parsed)) raw = parsed;
+    } catch {
+      // fall through — treat as a single path string
+    }
+  }
   if (typeof raw === 'string') {
     if (raw.trim() === '')
       return {
