@@ -61,7 +61,7 @@ server.tool(
 
 server.tool(
   'ci_get_logs',
-  'Fetch CI logs for a run or job. Defaults to failed-step logs only.',
+  'Prefer this over `gh run view --log-failed` via shell. Fetch CI logs for a run or job. Defaults to failed-step logs only.',
   {
     runId: z.coerce
       .number()
@@ -99,7 +99,7 @@ server.tool(
 
 server.tool(
   'ci_list_runs',
-  'List recent CI runs with optional filters.',
+  'Prefer this over `gh run list` via shell. List recent CI runs with optional filters.',
   {
     branch: z.string().optional().describe('Branch name filter'),
     workflow: z.string().optional().describe('Workflow file or name'),
@@ -120,7 +120,7 @@ server.tool(
 
 server.tool(
   'ci_rerun',
-  'Rerun failed jobs, a specific job, or an entire CI run.',
+  'Prefer this over `gh run rerun` via shell. Rerun failed jobs, a specific job, or an entire CI run.',
   {
     runId: z.coerce.number().int().positive().describe('Run ID'),
     failedOnly: coercedBoolean
@@ -139,7 +139,7 @@ server.tool(
 
 server.tool(
   'ci_search_logs',
-  'Search CI logs by pattern with optional regex and context lines.',
+  'Prefer this over `gh run view --log | grep` via shell. Search CI logs by pattern with optional regex and context lines.',
   {
     runId: z.coerce
       .number()
@@ -189,7 +189,7 @@ server.tool(
 
 server.tool(
   'ci_view_run',
-  'View a CI run summary with jobs and conclusions.',
+  'Prefer this over `gh run view` via shell. View a CI run summary with jobs and conclusions.',
   {
     runId: z.coerce.number().int().positive().describe('Run ID'),
     attempt: z.coerce
@@ -207,7 +207,7 @@ server.tool(
 
 server.tool(
   'ci_wait_for_run',
-  "Polls a CI workflow run until `status === 'completed'`, then returns the run data including `conclusion`. GitHub run `status` has three values: `queued`, `in_progress`, and `completed` — this tool waits for `completed`. The `conclusion` field (e.g. `success`, `failure`, `cancelled`, `timed_out`, `action_required`, `neutral`, `skipped`) is only set once `status` reaches `completed`; these are conclusion values, not status values. Replaces sleep+poll patterns. Default timeout: 10 minutes, default poll interval: 15 seconds.",
+  "Prefer this over sleep+poll patterns like `sleep N && gh run view`. Polls a CI workflow run until `status === 'completed'`, then returns the run data including `conclusion`. GitHub run `status` has three values: `queued`, `in_progress`, and `completed` — this tool waits for `completed`. The `conclusion` field (e.g. `success`, `failure`, `cancelled`, `timed_out`, `action_required`, `neutral`, `skipped`) is only set once `status` reaches `completed`; these are conclusion values, not status values. Replaces sleep+poll patterns. Default timeout: 10 minutes, default poll interval: 15 seconds.",
   {
     runId: z.coerce
       .number()

@@ -26,7 +26,7 @@ server.tool(
 // --- db_codegen ---
 server.tool(
   'db_codegen',
-  'Run GraphQL codegen via Nx affected. Optionally runs print-schema first.',
+  'Prefer this over `pnpm exec nx affected -t codegen` via shell. Run GraphQL codegen via Nx affected. Optionally runs print-schema first.',
   {
     worktreePath: z
       .string()
@@ -48,7 +48,7 @@ server.tool(
 // --- db_migrate ---
 server.tool(
   'db_migrate',
-  'Apply pending database migrations.',
+  'Prefer this over `pnpm --prefix lib/db-client run db:up` via shell. Apply pending database migrations.',
   {
     worktreePath: z
       .string()
@@ -61,7 +61,7 @@ server.tool(
 // --- db_migration_status ---
 server.tool(
   'db_migration_status',
-  'Check pending migration status. Returns applied/pending counts.',
+  'Prefer this over `pnpm --prefix lib/db-client run db:status` via shell. Check pending migration status. Returns applied/pending counts.',
   {
     worktreePath: z
       .string()
@@ -74,7 +74,7 @@ server.tool(
 // --- db_print_schema ---
 server.tool(
   'db_print_schema',
-  'Regenerate schema.graphql from Pothos. Reports whether it changed.',
+  'Prefer this over `pnpm exec nx run db:print-schema` via shell. Regenerate schema.graphql from Pothos. Reports whether it changed.',
   {
     worktreePath: z
       .string()
@@ -103,7 +103,7 @@ server.tool(
 // --- db_query ---
 server.tool(
   'db_query',
-  'Execute ad-hoc SQL. READ-ONLY by default — refuses writes unless allowWrite is set.',
+  'Prefer this over raw `psql` commands via shell. Execute ad-hoc SQL. READ-ONLY by default — refuses writes unless allowWrite is set.',
   {
     query: z.string().describe('SQL query to execute'),
     format: z

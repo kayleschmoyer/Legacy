@@ -424,7 +424,7 @@ server.tool(
 // --- github_create_pr ---
 server.tool(
   'github_create_pr',
-  'Create a pull request. Title should include Jira key.',
+  'Prefer this over `gh pr create` via shell. Create a pull request. Title should include Jira key.',
   {
     title: z.string().describe('PR title with Jira key'),
     body: z.string().describe('PR body (markdown)'),
@@ -467,7 +467,7 @@ server.tool(
 // --- github_list_prs ---
 server.tool(
   'github_list_prs',
-  'List PRs with optional filters. Auto-paginates to return all matching PRs (up to limit). Response includes total and hasMore fields.',
+  'Prefer this over `gh pr list` via shell. List PRs with optional filters. Auto-paginates to return all matching PRs (up to limit). Response includes total and hasMore fields.',
   {
     state: z
       .enum(['open', 'closed', 'merged', 'all'])
@@ -585,7 +585,7 @@ server.tool(
 // --- github_manage_labels ---
 server.tool(
   'github_manage_labels',
-  'Add or remove labels on a PR.',
+  'Prefer this over `gh pr edit --add-label` via shell. Add or remove labels on a PR.',
   {
     number: z.coerce.number().int().positive().describe('PR number'),
     add: labelList.optional().describe('Labels to add'),
@@ -617,7 +617,7 @@ server.tool(
 // --- github_merge_pr ---
 server.tool(
   'github_merge_pr',
-  'Merge a PR. Default: merge queue (--auto --squash). "direct" uses --admin (requires authorization).',
+  'Prefer this over `gh pr merge` via shell. Merge a PR. Default: merge queue (--auto --squash). "direct" uses --admin (requires authorization).',
   {
     number: z.coerce.number().int().positive().describe('PR number'),
     strategy: z
@@ -836,7 +836,7 @@ server.tool(
 // --- github_view_pr ---
 server.tool(
   'github_view_pr',
-  'View PR details: title, body, state, checks, reviews, diff stats.',
+  'Prefer this over `gh pr view` via shell. View PR details: title, body, state, checks, reviews, diff stats.',
   {
     number: z.coerce.number().int().positive().describe('PR number'),
   },

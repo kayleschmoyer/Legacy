@@ -79,7 +79,7 @@ server.tool(
 // --- nx_install_package ---
 server.tool(
   'nx_install_package',
-  'Install an npm package at workspace root. Refuses if node_modules is a junction. Checks for @types/ companion.',
+  'Prefer this over running `pnpm add -w` (or `pnpm add -Dw` for dev dependencies) via shell. Refuses if node_modules is a junction. Checks for @types/ companion. Install an npm package at workspace root.',
   {
     name: z
       .string()
@@ -105,7 +105,7 @@ server.tool(
 // ALLOWED_TARGETS in tools/run-target.ts (the canonical enforcement source).
 server.tool(
   'nx_run',
-  'Run an Nx target on a project. Allowed: build, test, lint, typecheck, codegen, serve, dev, print-schema, deploy:plan, e2e, integration, storybook, format.',
+  'Prefer this over `pnpm exec nx run <project>:<target>` via shell. Run an Nx target on a project. Allowed: build, test, lint, typecheck, codegen, serve, dev, print-schema, deploy:plan, e2e, integration, storybook, format.',
   {
     project: z.string().describe('Project name'),
     target: z.string().describe('Target to run'),
@@ -144,7 +144,7 @@ server.tool(
 // ALLOWED_TARGETS in tools/run-affected.ts (the canonical enforcement source).
 server.tool(
   'nx_run_affected',
-  'Run an Nx target on all affected projects. Allowed: build, test, lint, typecheck, codegen.',
+  'Prefer this over `pnpm exec nx affected -t <target>` via shell. Run an Nx target on all affected projects. Allowed: build, test, lint, typecheck, codegen.',
   {
     target: z.string().describe('Target to run on affected projects'),
     base: z

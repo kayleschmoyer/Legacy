@@ -27,7 +27,7 @@ const server = new McpServer({
 // --- make_run ---
 server.tool(
   'make_run',
-  'Run a whitelisted Makefile target. Covers: pc, build, test, lint, typecheck, format, codegen, install, kill-stale, etc. ' +
+  'Prefer this over `make <target>` via shell. Run a whitelisted Makefile target. Covers: pc, build, test, lint, typecheck, format, codegen, install, kill-stale, etc. ' +
     'NOTE: runner-apply has an interactive confirmation prompt — always pass variables="NO_CONFIRM=1" when invoking it, ' +
     'otherwise the process will block waiting for stdin. runner-apply also runs terraform plan+apply and may take 10+ minutes.',
   {
@@ -48,7 +48,7 @@ server.tool(
 // --- make_worktree_create ---
 server.tool(
   'make_worktree_create',
-  'Create a new git worktree for a Jira ticket. Runs `make worktree TICKET=... DESC=...` ' +
+  'Prefer this over `make worktree` via shell. Create a new git worktree for a Jira ticket. Runs `make worktree TICKET=... DESC=...` ' +
     'which creates the branch, worktree directory, and registers the parent dependency. ' +
     'After creation, run make_wt_setup to install dependencies. ' +
     'IMPORTANT: Use this instead of `make worktree` via Bash — it validates inputs ' +
@@ -79,7 +79,7 @@ server.tool(
 // --- make_wt_setup ---
 server.tool(
   'make_wt_setup',
-  'Set up a worktree: junction node_modules, copy .env, configure .twig, install hooks. Run after worktree creation.',
+  'Prefer this over `make wt-setup` via shell. Set up a worktree: junction node_modules, copy .env, configure .twig, install hooks. Run after worktree creation.',
   {
     worktreePath: z
       .string()

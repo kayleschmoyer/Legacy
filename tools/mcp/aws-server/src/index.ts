@@ -51,7 +51,7 @@ server.tool(
 // --- aws_logs_tail ---
 server.tool(
   'aws_logs_tail',
-  'Fetch recent CloudWatch logs for a Lambda function (app or runner infrastructure).',
+  'Prefer this over `aws logs tail` via shell. Fetch recent CloudWatch logs for a Lambda function (app or runner infrastructure).',
   {
     function: z.enum(LAMBDA_FUNCTIONS).describe('Lambda function short name'),
     since: z
@@ -209,7 +209,7 @@ server.tool(
 // --- aws_sso_status ---
 server.tool(
   'aws_sso_status',
-  'Check AWS SSO session authentication. Returns caller identity or error with remedy.',
+  'Prefer this over `aws sts get-caller-identity` via shell. Check AWS SSO session authentication. Returns caller identity or error with remedy.',
   {},
   async () => ssoStatus(),
 );
