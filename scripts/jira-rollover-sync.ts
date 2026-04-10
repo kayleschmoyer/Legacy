@@ -551,6 +551,17 @@ async function runRollover(sprintName: string): Promise<void> {
 
   for (const bucket of BUCKETS) {
     const summary = `${bucket.summaryPrefix} — ${sprintName}`;
+    const openEpics = await findOpenEpicsByLabel(bucket.label);
+    const existingSprintEpic = openEpics.find(
+      (e) => e.fields.summary === summary,
+    );
+    if (existingSprintEpic) {
+      console.log(
+        `\nSkipping epic creation for "${bucket.name}": ${existingSprintEpic.key} already exists for this sprint`,
+      );
+      continue;
+    }
+
     const labels = [bucket.label, 'pinned-status'];
 
     console.log(`\nCreating epic: "${summary}"`);
