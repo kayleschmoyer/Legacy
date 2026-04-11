@@ -9,6 +9,7 @@ import {
   existsSync,
   lstatSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   readlinkSync,
   realpathSync,
@@ -4810,31 +4811,42 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               normalizeForCompare(currentTarget) ===
               normalizeForCompare(mainNmPath)
             ) {
-              // Correct junction already exists — idempotent success
-              const verified = existsSync(join(nmPath, 'nx'));
-              return {
-                content: [
-                  {
-                    type: 'text',
-                    text: JSON.stringify(
-                      {
-                        success: true,
-                        created: false,
-                        alreadyExists: true,
-                        junctionPath: nmPath,
-                        target: mainNmPath,
-                        verified,
-                        message:
-                          'node_modules junction already exists and points to the correct target.',
-                      },
-                      null,
-                      2,
-                    ),
-                  },
-                ],
-              };
+              // Correct junction already exists — verify it's healthy
+              const binDir = join(nmPath, '.bin');
+              let binPopulated = false;
+              try {
+                binPopulated = readdirSync(binDir).length > 0;
+              } catch {
+                /* .bin doesn't exist */
+              }
+              const verified = existsSync(join(nmPath, 'nx')) && binPopulated;
+
+              if (verified) {
+                return {
+                  content: [
+                    {
+                      type: 'text',
+                      text: JSON.stringify(
+                        {
+                          success: true,
+                          created: false,
+                          alreadyExists: true,
+                          junctionPath: nmPath,
+                          target: mainNmPath,
+                          verified,
+                          message:
+                            'node_modules junction already exists and points to the correct target.',
+                        },
+                        null,
+                        2,
+                      ),
+                    },
+                  ],
+                };
+              }
+              // Junction exists but .bin is empty or nx is missing — remove and recreate
             }
-            // Junction points to wrong target — remove and recreate
+            // Remove junction (wrong target OR correct target but unhealthy) and recreate
             rmSync(nmPath, { recursive: false });
           } else if (stat.isDirectory()) {
             return {
@@ -4891,7 +4903,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           symlinkSync(mainNmPath, nmPath);
         }
 
-        const verified = existsSync(join(nmPath, 'nx'));
+        const createdBinDir = join(nmPath, '.bin');
+        let createdBinPopulated = false;
+        try {
+          createdBinPopulated = readdirSync(createdBinDir).length > 0;
+        } catch {
+          /* .bin doesn't exist */
+        }
+        const nxExists = existsSync(join(nmPath, 'nx'));
+        const verified = nxExists && createdBinPopulated;
 
         return {
           content: [
@@ -4906,7 +4926,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                   verified,
                   message: verified
                     ? 'node_modules junction created and verified. Ready to run pnpm/make commands.'
-                    : 'Junction created but nx not found — verify main repo node_modules is populated.',
+                    : !nxExists
+                      ? 'Junction created but nx not found — verify main repo node_modules is populated.'
+                      : 'Junction created but .bin is empty — main repo node_modules may be incomplete. Run make install in the main repo.',
                 },
                 null,
                 2,

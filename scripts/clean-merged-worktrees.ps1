@@ -122,6 +122,9 @@ foreach ($line in $porcelainOutput) {
                 $cleaned++
             } else {
                 Write-Host "          Cleaning via twig..." -ForegroundColor Gray
+                # Remove session-active marker before cleanup so cleanup-orphaned-junctions.sh
+                # (Claude Code SessionStart hook) no longer skips this worktree after deletion.
+                Remove-Item -Path (Join-Path $currentPath '.claude-session') -Force -ErrorAction SilentlyContinue
                 try {
                     Push-Location $mainRepo
                     twig worktree clean --path $currentPath 2>&1 | ForEach-Object { Write-Host "          $_" -ForegroundColor Gray }
@@ -174,6 +177,9 @@ if ($currentBranch -and $currentPath) {
                 $cleaned++
             } else {
                 Write-Host "          Cleaning via twig..." -ForegroundColor Gray
+                # Remove session-active marker before cleanup so cleanup-orphaned-junctions.sh
+                # (Claude Code SessionStart hook) no longer skips this worktree after deletion.
+                Remove-Item -Path (Join-Path $currentPath '.claude-session') -Force -ErrorAction SilentlyContinue
                 try {
                     Push-Location $mainRepo
                     twig worktree clean --path $currentPath 2>&1 | ForEach-Object { Write-Host "          $_" -ForegroundColor Gray }

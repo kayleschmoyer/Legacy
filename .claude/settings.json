@@ -68,6 +68,10 @@
         "hooks": [
           {
             "type": "command",
+            "command": ".claude/hooks/setup-worktree-junction.sh"
+          },
+          {
+            "type": "command",
             "command": ".claude/hooks/check-github-auth.sh"
           },
           {

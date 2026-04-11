@@ -98,7 +98,9 @@ If you find yourself on a branch that does not match this convention (for exampl
       worktree_setup_node_modules()
       ```
 
-      This is instant (no disk copy), the main repo's `node_modules` is untouched, and `pnpm exec nx`, `make typecheck`, `make pc` all work after it. The tool is idempotent — safe to call even if the junction already exists. Skip `make wt-setup` — that's sibling-only.
+      This is instant (no disk copy), the main repo's `node_modules` is untouched, and `pnpm exec nx`, `make typecheck`, `make pc` all work after it. The tool is idempotent — safe to call even if the junction already exists, and will auto-repair a broken junction (empty `.bin`). Skip `make wt-setup` — that's sibling-only.
+
+      > **Note**: The `setup-worktree-junction.sh` SessionStart hook automatically validates and recreates the junction at session start. Call `worktree_setup_node_modules()` explicitly if you suspect the junction became stale mid-session (e.g. after a concurrent agent ran `make install` in the main repo).
 
       If `worktree_setup_node_modules` is unavailable (MCP server not loaded), use the **PowerShell fallback** (raw cmd.exe junction creation with Bash mangles backslashes):
 

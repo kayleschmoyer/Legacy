@@ -18,6 +18,12 @@ if [[ "$WORKTREE" != *"/.claude/worktrees/"* ]]; then
   exit 0
 fi
 
+# Remove the session-active marker written by setup-worktree-junction.sh.
+# This lets cleanup-orphaned-junctions.sh in future sessions distinguish
+# cleanly-stopped sessions (no marker) from crashed ones (stale marker).
+MARKER="$WORKTREE/.claude-session"
+[ -f "$MARKER" ] && rm -f "$MARKER"
+
 NM="$WORKTREE/node_modules"
 
 if [ ! -e "$NM" ] && [ ! -L "$NM" ]; then
