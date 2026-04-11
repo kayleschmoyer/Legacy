@@ -4,10 +4,12 @@
 
 ### twig tree / twig branch commands don't work in worktree
 
-`.twig/state.json` is gitignored and absent. Create a junction pointing to the main repo's `.twig` (substitute `$wt` with the worktree path from `twig worktree list`):
+`.twig/state.json` is gitignored and absent. The easiest fix is to re-run `make wt-setup WT=$wt`, which handles symlink creation with automatic junction fallback. To create the link manually (substitute `$wt` with the worktree path from `twig worktree list`):
 
 ```powershell
-cmd /c mklink /J "$wt\.twig" "D:\code\legacy-sports\.twig"
+# Symlink (requires Developer Mode); falls back to junction if mklink /D fails
+cmd /c mklink /D "$wt\.twig" "D:\code\legacy-sports\.twig"
+# If the above fails: cmd /c mklink /J "$wt\.twig" "D:\code\legacy-sports\.twig"
 ```
 
 Verify it worked:

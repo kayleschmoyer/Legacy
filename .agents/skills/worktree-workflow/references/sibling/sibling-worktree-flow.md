@@ -82,7 +82,7 @@ worktree_unlock(worktree: "LS-1234")
 
 - Main repo is on `main` and up to date
 - After creating a worktree, run `make install` inside it to install Node.js and Python dependencies
-- Copy `.env` and junction `.twig` into the worktree (see Step 3)
+- Copy `.env` and symlink `.twig` into the worktree (see Step 3)
 
 ## Complete Workflow
 
@@ -236,7 +236,7 @@ $wt = "<path-from-twig-worktree-list>"
 make wt-setup WT=$wt
 ```
 
-`make wt-setup` compares lockfile hashes — if they match main, it creates a junction (instant, zero disk); if they differ, it runs `pnpm install`. Also copies `.env` and junctions `.twig`.
+`make wt-setup` compares lockfile hashes — if they match main, it creates a `node_modules` symlink (instant, zero disk) when Developer Mode is enabled; if symlinks are unavailable or lockfiles differ, it falls back to `pnpm install`. It also copies `.env` and symlinks `.twig`, `certs/`, and `.github/skills`.
 
 Pass `-Force` to skip the lockfile check and always run a full `pnpm install`:
 

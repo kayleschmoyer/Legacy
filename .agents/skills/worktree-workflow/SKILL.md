@@ -134,7 +134,7 @@ Quick sibling-flow reference:
 
 ```
 make_worktree_create({ ticket: "####", description: "desc" })   # create branch + sibling worktree
-make_wt_setup({ worktreePath: "<path>" })                       # junction node_modules, copy .env, link .twig
+make_wt_setup({ worktreePath: "<path>" })                       # symlink node_modules, copy .env, link .twig
 worktree_set(key: "LS-####")                                    # make it active
 # ... work ...
 worktree_commit + worktree_push + github_create_pr
