@@ -196,7 +196,9 @@ interface SetupOptions {
   scoringProfile?: ReturnType<typeof makeScoringProfile> | null;
   scoringProfileDelay?: number;
   scoringProfileError?: boolean;
-  onUpdateScoringProfile?: () => unknown;
+  /** Artificial delay (ms) before fulfilling UpdateLeagueScoringProfile. */
+  updateScoringProfileDelay?: number;
+  onUpdateScoringProfile?: (variables: Record<string, unknown>) => unknown;
 }
 
 async function setupGraphQL(
@@ -208,13 +210,17 @@ async function setupGraphQL(
     scoringProfile = makeScoringProfile(),
     scoringProfileDelay,
     scoringProfileError = false,
+    updateScoringProfileDelay,
     onUpdateScoringProfile,
   } = opts;
 
   await page.route(
     (url) => isGraphQLEndpoint(url),
     async (route, request) => {
-      const body = request.postDataJSON() as { operationName?: string };
+      const body = request.postDataJSON() as {
+        operationName?: string;
+        variables?: Record<string, unknown>;
+      };
       const op = body.operationName ?? '';
 
       if (op === 'GetLeagueById') {
@@ -319,7 +325,14 @@ async function setupGraphQL(
         return;
       }
       if (op === 'UpdateLeagueScoringProfile') {
-        const result = onUpdateScoringProfile?.() ?? makeScoringProfile();
+        if (updateScoringProfileDelay) {
+          await new Promise<void>((resolve) =>
+            setTimeout(resolve, updateScoringProfileDelay),
+          );
+        }
+        const result =
+          onUpdateScoringProfile?.(body.variables ?? {}) ??
+          makeScoringProfile();
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -585,6 +598,103 @@ test.describe('Commissioner Scoring Editor — Editing @critical', () => {
 
     // Mutation should have been called
     await expect.poll(() => mutationCalled, { timeout: 5000 }).toBe(true);
+  });
+
+  test('"unsaved" badge disappears after save completes @critical', async ({
+    page,
+  }) => {
+    // Hermetic equivalent of integration test Phase 3 (LS-2957).
+    // Verifies that:
+    //   (a) The badge clears optimistically when save is initiated.
+    //   (b) The badge stays hidden after the full save + refetch cycle,
+    //       catching the LS-2957 regression where skippedSyncRef replayed
+    //       stale closure stats and made the badge reappear.
+    const UPDATED_MULTIPLIER = 3;
+
+    // The mutation mock adds a short delay so the "Saving…" button state is
+    // reliably observable. The mutation returns a realistic updated profile
+    // reflecting the submitted multiplier (derived from mutation variables).
+    // The stateless GetLeagueScoringProfile refetch still returns the original
+    // profile, exercising the skippedSyncRef replay path: statsRef.current
+    // (updated by the refetch render) is used instead of the stale closure to
+    // avoid reintroducing pendingUpdates.
+    await setupGraphQL(page, {
+      updateScoringProfileDelay: 200,
+      onUpdateScoringProfile: (variables) => {
+        const updates = (
+          variables as {
+            updates?: Array<{ statId: number; multiplier: number }>;
+          }
+        ).updates;
+        const hrUpdate = updates?.find((u) => u.statId === 1);
+        const hrMultiplier = hrUpdate?.multiplier ?? UPDATED_MULTIPLIER;
+        return makeScoringProfile({
+          stats: [
+            {
+              __typename: 'ScoringRule',
+              multiplier: hrMultiplier,
+              defaultMultiplier: 1,
+              isOverride: hrMultiplier !== 1,
+              isEnabled: true,
+              definition: {
+                __typename: 'ScoringStatDefinition',
+                id: 1,
+                statKey: 'hr',
+                statGroup: 'batting',
+                displayName: 'Home Runs',
+                description: 'Home run bonus',
+                sourceColumn: 'homeRuns',
+                defaultMultiplier: 1,
+                minMultiplier: 0,
+                maxMultiplier: 10,
+                stepSize: 0.5,
+                isRequired: false,
+                enforcePositive: false,
+                enforceNegative: false,
+              },
+            },
+          ],
+        });
+      },
+    });
+
+    await page.goto('/baseball/league/1/commissioner');
+    await expandScoringSection(page);
+
+    const scoringRegion = page.getByRole('region', { name: 'Scoring' });
+    const unsavedBadge = scoringRegion.getByText(/unsaved/i);
+
+    // Change the Home Runs multiplier
+    const hrInput = scoringRegion.getByRole('textbox', {
+      name: 'Home Runs multiplier',
+    });
+    await hrInput.fill(String(UPDATED_MULTIPLIER));
+    await hrInput.blur();
+
+    // Badge appears
+    await expect(unsavedBadge).toBeVisible();
+
+    // Click Save and wait for the "Saving…" button state to appear, confirming
+    // the async save path was entered (guards against a false pass if the
+    // mutation completes before the assertion runs).
+    const saveButton = scoringRegion.getByRole('button', { name: /^Save/ });
+    await expect(saveButton).toBeEnabled();
+    await saveButton.click();
+    // The badge clears optimistically on click.
+    await expect(unsavedBadge).not.toBeVisible({ timeout: 5_000 });
+
+    // Wait for the save cycle to complete: the Save button transitions through
+    // "Saving…" back to its default label when mutation + refetch both finish.
+    // Scope the locator to scoringRegion to avoid matching unrelated buttons.
+    const savingButton = scoringRegion.getByRole('button', { name: /saving/i });
+    // First confirm the "Saving…" state is reached (proves the async path ran).
+    await expect(savingButton).toBeVisible({ timeout: 5_000 });
+    // Then wait for it to disappear (mutation + refetch cycle complete).
+    await expect(savingButton).not.toBeVisible({ timeout: 10_000 });
+
+    // Verify badge is still hidden after cache reconciliation — this is the
+    // assertion that catches the LS-2957 regression.
+    await expect(unsavedBadge).not.toBeVisible();
   });
 
   test('reset button clears pending changes @regression', async ({ page }) => {

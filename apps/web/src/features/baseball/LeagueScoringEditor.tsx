@@ -344,6 +344,15 @@ export function LeagueScoringEditor(
   // a save completes.
   const skippedSyncRef = useRef(false);
 
+  // Always-current snapshot of `stats` for use inside async closures (e.g. the
+  // handleSave finally block). Because handleSave is an async function, the
+  // `stats` variable it closes over is the value from the render in which it
+  // was defined. If Apollo triggers intermediate renders while the mutation /
+  // refetch are in flight (cache-and-network), `stats` in the closure becomes
+  // stale. Reading statsRef.current instead always gets the latest value.
+  const statsRef = useRef(stats);
+  statsRef.current = stats;
+
   useEffect(() => {
     // During a save, the optimistic baseline and the user's entered form values
     // are the source of truth. Skip both resync operations so that a
@@ -499,12 +508,21 @@ export function LeagueScoringEditor(
       // and triggered the useEffect while isSavingRef was true), replay the sync
       // now that the guard is cleared so baseline/formValues reflect fresh
       // server data.
+      //
+      // IMPORTANT: use statsRef.current (always-fresh) rather than the `stats`
+      // closure variable, which is stale — it was captured at the render when
+      // handleSave was defined and does NOT reflect Apollo renders that occurred
+      // during the async mutation / refetch gap. Using stale stats here would
+      // reset baseline/formValues to the pre-save multiplier, potentially
+      // causing a mismatch that re-introduces pendingUpdates > 0 and makes the
+      // "unsaved" badge reappear even after a successful save.
       if (skippedSyncRef.current) {
         skippedSyncRef.current = false;
+        const latestStats = statsRef.current;
         setBaselineMultipliers(
-          Object.fromEntries(stats.map((s) => [s.id, s.multiplier])),
+          Object.fromEntries(latestStats.map((s) => [s.id, s.multiplier])),
         );
-        setFormValues(createInitialValues(stats));
+        setFormValues(createInitialValues(latestStats));
       }
     }
   };
