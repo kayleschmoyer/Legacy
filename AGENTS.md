@@ -140,7 +140,7 @@ If you find yourself on a branch that does not match this convention (for exampl
     > **Bucket epic lookup**: never hardcode `LS-1455` or `LS-1322`. Call `jira_get_bucket_epic({ bucket: 'mcp-gaps' })` or `jira_get_bucket_epic({ bucket: 'client-bugs' })` to get the current epic key. These keys roll over at sprint boundaries via a Jira Automation rule + `make jira-rollover-sync ARGS=--sync`.
 
 15. **Complete tracking tasks**: call `TaskUpdate(taskId, status: "completed")` for every task created to track this work — only after the PR is merged and the gap audit is complete. In parent/batch mode, mark the child's task completed before starting the next child. Leaving tasks open after merge is a failure mode — the task tracker is the agent's signal to the user that work is truly done.
-16. Cleanup: `twig worktree clean` then `git branch -d LS-####/description` then Jira "Done" — **NEVER use `git worktree remove` directly** (see Rules)
+16. Cleanup: **remove all worktree junctions first** — `make wt-setup` creates junctions for `node_modules`, `.twig`, `certs/`, and `.github/skills`. Remove each with `worktree_run(command: "cmd //c rmdir <name>")` (or `worktree_unjunction()` for `node_modules`). Only once **every** junction is gone should you run `twig worktree clean`, then `git branch -d LS-####/description`, then Jira "Done". **NEVER use `git worktree remove` directly** (see Rules). Removing junctions first is critical on Windows — git and twig both follow NTFS junctions during recursive directory deletion, which can wipe the main repo's files through any remaining junction.
 
 ## Risk Classification
 

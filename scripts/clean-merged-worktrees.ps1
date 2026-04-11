@@ -53,6 +53,29 @@ if ($commonDir -eq ".git") {
 $cleaned = 0
 $skipped = 0
 
+# Remove all known junctions from a worktree directory before cleanup.
+# Returns $true if all junctions were removed (or didn't exist), $false if any
+# junction could not be removed (twig cleanup should be skipped to avoid data loss).
+function Remove-WorktreeJunctions {
+    param([string]$WorktreePath)
+    $allRemoved = $true
+    foreach ($junctionName in @('node_modules', '.twig', 'certs', '.github\skills')) {
+        $jPath = Join-Path $WorktreePath $junctionName
+        $jItem = Get-Item $jPath -Force -ErrorAction SilentlyContinue
+        if ($jItem -and ($jItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+            cmd /c "rmdir `"$jPath`"" 2>$null | Out-Null
+            $stillExists = Get-Item $jPath -Force -ErrorAction SilentlyContinue
+            if ($stillExists -and ($stillExists.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+                Write-Host "          WARNING: Failed to remove junction '$junctionName' — skipping twig cleanup to avoid data loss." -ForegroundColor Red
+                $allRemoved = $false
+                break
+            }
+            Write-Host "          Removed junction: $junctionName" -ForegroundColor Gray
+        }
+    }
+    return $allRemoved
+}
+
 Write-Host ""
 Write-Host "=== Merged Worktree Cleanup ===" -ForegroundColor Cyan
 Write-Host "Scanning worktrees for merged PRs..."
@@ -121,6 +144,19 @@ foreach ($line in $porcelainOutput) {
                 Write-Host "          [dry-run] Would clean via twig" -ForegroundColor DarkYellow
                 $cleaned++
             } else {
+                # Remove junctions BEFORE twig runs. On Windows, git (which twig calls
+                # internally) follows NTFS junctions during recursive directory deletion,
+                # wiping the junction target (e.g. the main repo's node_modules).
+                # cmd /c rmdir (non-recursive) removes the junction link without touching
+                # the target. It fails harmlessly on non-empty real directories.
+                $junctionRemovalFailed = -not (Remove-WorktreeJunctions $currentPath)
+
+                if ($junctionRemovalFailed) {
+                    $skipped++
+                    Write-Host ""
+                    continue
+                }
+
                 Write-Host "          Cleaning via twig..." -ForegroundColor Gray
                 # Remove session-active marker before cleanup so cleanup-orphaned-junctions.sh
                 # (Claude Code SessionStart hook) no longer skips this worktree after deletion.
@@ -176,25 +212,32 @@ if ($currentBranch -and $currentPath) {
                 Write-Host "          [dry-run] Would clean via twig" -ForegroundColor DarkYellow
                 $cleaned++
             } else {
-                Write-Host "          Cleaning via twig..." -ForegroundColor Gray
-                # Remove session-active marker before cleanup so cleanup-orphaned-junctions.sh
-                # (Claude Code SessionStart hook) no longer skips this worktree after deletion.
-                Remove-Item -Path (Join-Path $currentPath '.claude-session') -Force -ErrorAction SilentlyContinue
-                try {
-                    Push-Location $mainRepo
-                    twig worktree clean --path $currentPath 2>&1 | ForEach-Object { Write-Host "          $_" -ForegroundColor Gray }
-                    if ($LASTEXITCODE -eq 0) {
-                        Write-Host "          Cleaned successfully." -ForegroundColor Green
-                        $cleaned++
-                    } else {
-                        Write-Host "          WARNING: twig worktree clean failed. Skipping." -ForegroundColor Red
+                # Remove junctions BEFORE twig runs (see main loop for rationale).
+                $junctionRemovalFailed = -not (Remove-WorktreeJunctions $currentPath)
+
+                if (-not $junctionRemovalFailed) {
+                    Write-Host "          Cleaning via twig..." -ForegroundColor Gray
+                    # Remove session-active marker before cleanup so cleanup-orphaned-junctions.sh
+                    # (Claude Code SessionStart hook) no longer skips this worktree after deletion.
+                    Remove-Item -Path (Join-Path $currentPath '.claude-session') -Force -ErrorAction SilentlyContinue
+                    try {
+                        Push-Location $mainRepo
+                        twig worktree clean --path $currentPath 2>&1 | ForEach-Object { Write-Host "          $_" -ForegroundColor Gray }
+                        if ($LASTEXITCODE -eq 0) {
+                            Write-Host "          Cleaned successfully." -ForegroundColor Green
+                            $cleaned++
+                        } else {
+                            Write-Host "          WARNING: twig worktree clean failed. Skipping." -ForegroundColor Red
+                            $skipped++
+                        }
+                    } catch {
+                        Write-Host "          WARNING: twig worktree clean failed: $_" -ForegroundColor Red
                         $skipped++
+                    } finally {
+                        Pop-Location
                     }
-                } catch {
-                    Write-Host "          WARNING: twig worktree clean failed: $_" -ForegroundColor Red
+                } else {
                     $skipped++
-                } finally {
-                    Pop-Location
                 }
             }
             Write-Host ""
