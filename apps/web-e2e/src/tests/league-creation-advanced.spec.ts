@@ -501,14 +501,23 @@ test.describe('League Creation — Advanced Settings @regression', () => {
 
   // ─── Form Validation (inline error card) ──────────────────────────────────
 
-  test('should keep submit disabled for name too short', async ({ page }) => {
+  test('submit button is enabled even with a short league name', async ({
+    page,
+  }) => {
+    // The button is always enabled — validation fires on submit (LS-2953).
     await page.goto('/baseball/league/create');
     await page.waitForLoadState('networkidle');
 
     await page.getByPlaceholder('Enter your league name').fill('Ab');
-    await expect(
-      page.getByRole('button', { name: /create league/i }),
-    ).toBeDisabled();
+    const createButton = page.getByRole('button', { name: /create league/i });
+    await expect(createButton).toBeEnabled();
+
+    // Clicking shows a validation error without crashing the page
+    await createButton.click();
+    await expect(page.getByRole('alert')).toBeVisible();
+    await expect(page.locator('body')).not.toContainText(
+      'Unexpected Application Error',
+    );
   });
 
   test('should display inline error card for name too long on submit', async ({
@@ -525,19 +534,20 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     );
   });
 
-  test('should enable submit once short name is corrected', async ({
+  test('submit button is always enabled regardless of league name length', async ({
     page,
   }) => {
+    // The button is always enabled — validation fires on submit (LS-2953).
     await page.goto('/baseball/league/create');
     await page.waitForLoadState('networkidle');
 
-    // Short names keep the submit button disabled
+    // Short name — button is still enabled (validation fires on submit)
     await page.getByPlaceholder('Enter your league name').fill('Ab');
     await expect(
       page.getByRole('button', { name: /create league/i }),
-    ).toBeDisabled();
+    ).toBeEnabled();
 
-    // Fix the name and verify submit becomes enabled
+    // Valid name — button remains enabled
     await page
       .getByPlaceholder('Enter your league name')
       .fill('Fixed League Name');

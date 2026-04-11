@@ -94,12 +94,14 @@ test.describe('League Creation Form @critical', () => {
     await expect(input).toHaveValue('My Test League');
   });
 
-  test('Create League button is disabled when league name is empty', async ({
+  test('Create League button is enabled even when league name is empty', async ({
     page,
   }) => {
+    // The submit button is always enabled so the user can click to see validation
+    // errors explaining why the form cannot be submitted (LS-2953).
     const createButton = page.getByRole('button', { name: /create league/i });
     await expect(createButton).toBeVisible();
-    await expect(createButton).toBeDisabled();
+    await expect(createButton).toBeEnabled();
   });
 
   test('Create League button is enabled after entering a valid name', async ({
@@ -113,16 +115,22 @@ test.describe('League Creation Form @critical', () => {
     await expect(createButton).toBeEnabled();
   });
 
-  test('short league name keeps create disabled', async ({ page }) => {
+  test('clicking submit with short league name shows a validation error', async ({
+    page,
+  }) => {
     const input = page.getByPlaceholder('Enter your league name');
     await expect(input).toBeVisible();
     await input.fill('Ab');
 
     const createButton = page.getByRole('button', { name: /create league/i });
-    await expect(createButton).toBeDisabled();
-
-    await input.fill('Abc');
     await expect(createButton).toBeEnabled();
+
+    await createButton.click();
+    // Validation error card should appear
+    await expect(page.getByRole('alert')).toBeVisible();
+    await expect(page.locator('body')).not.toContainText(
+      'Unexpected Application Error',
+    );
   });
 
   test('number-of-teams selector is present with default value', async ({
@@ -134,9 +142,11 @@ test.describe('League Creation Form @critical', () => {
     await expect(teamOptions.first()).toBeVisible();
   });
 
-  test('league name is cleared after typing and re-emptying disables the button', async ({
+  test('Create League button remains enabled after clearing the league name', async ({
     page,
   }) => {
+    // The button stays enabled regardless of the league name value so the user
+    // can always click to see validation feedback (LS-2953).
     const input = page.getByPlaceholder('Enter your league name');
     const createButton = page.getByRole('button', { name: /create league/i });
     await expect(input).toBeVisible();
@@ -145,7 +155,7 @@ test.describe('League Creation Form @critical', () => {
     await expect(createButton).toBeEnabled();
 
     await input.clear();
-    await expect(createButton).toBeDisabled();
+    await expect(createButton).toBeEnabled();
   });
 });
 

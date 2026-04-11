@@ -5,6 +5,7 @@ import {
   H1,
   H2,
   Input,
+  Label,
   ScrollView,
   styled,
   Text,
@@ -539,15 +540,18 @@ export function LeagueCreatePage(): React.JSX.Element {
               >
                 {/* League Name */}
                 <YStack space="$2">
-                  <Text
+                  <Label
+                    htmlFor="league-name-input"
                     size="$4"
                     fontWeight="600"
                     color="$gray12"
-                    nativeID="label-league-name"
+                    paddingVertical={0}
+                    height="auto"
                   >
                     League Name *
-                  </Text>
+                  </Label>
                   <Input
+                    id="league-name-input"
                     size="$4"
                     placeholder="Enter your league name"
                     value={formData.leagueName}
@@ -557,7 +561,6 @@ export function LeagueCreatePage(): React.JSX.Element {
                     borderColor="$borderColor"
                     backgroundColor="$color1"
                     disabled={loading}
-                    aria-labelledby="label-league-name"
                     aria-required="true"
                   />
                 </YStack>
@@ -1806,7 +1809,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                   size="$4"
                   variant="primary"
                   type="submit"
-                  disabled={loading || !isLeagueNameLengthValid}
+                  disabled={loading}
                   opacity={loading ? 0.6 : 1}
                 >
                   {loading ? 'Creating...' : 'Create League'}
