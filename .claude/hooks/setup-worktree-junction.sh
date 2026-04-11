@@ -22,7 +22,26 @@
 #   - The Stop hook (cleanup-worktree-junction.sh) removes .claude-session
 #     and the junction itself when the session ends cleanly.
 
-WORKTREE=$(pwd)
+# Prefer CLAUDE_PROJECT_DIR over pwd — Claude Code may invoke hooks with the
+# main repo as the process cwd even for worktree sessions, while CLAUDE_PROJECT_DIR
+# is the stable per-session project root (set to the worktree path by the launcher).
+WORKTREE="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+
+# Diagnostic: opt-in logging gated on CLAUDE_HOOK_DEBUG=1.
+# Runs before the guard so failures (wrong CLAUDE_PROJECT_DIR) are visible.
+# Log is capped at 200 lines to prevent unbounded growth.
+if [[ "${CLAUDE_HOOK_DEBUG:-}" == "1" ]]; then
+  {
+    echo "--- setup-worktree-junction $(date -u +%Y-%m-%dT%H:%M:%SZ) ---"
+    echo "  pwd:                 $(pwd)"
+    echo "  CLAUDE_PROJECT_DIR:  ${CLAUDE_PROJECT_DIR:-unset}"
+    echo "  WORKTREE (resolved): $WORKTREE"
+  } >> /tmp/claude-hook-debug.log 2>&1
+  if [ -f /tmp/claude-hook-debug.log ]; then
+    tail -200 /tmp/claude-hook-debug.log > /tmp/claude-hook-debug.log.tmp 2>/dev/null \
+      && mv /tmp/claude-hook-debug.log.tmp /tmp/claude-hook-debug.log 2>/dev/null || true
+  fi
+fi
 
 # Only act inside Claude Code ephemeral worktrees
 if [[ "$WORKTREE" != *"/.claude/worktrees/"* ]]; then

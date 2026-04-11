@@ -23,7 +23,7 @@
 # sessions older than 30 minutes) are removed before the junction is cleaned up.
 # For Copilot agents-* worktrees, setup-worktree.ps1 writes the same marker.
 
-WORKTREE=$(pwd)
+WORKTREE="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 
 # Only act inside Claude Code ephemeral worktrees
 if [[ "$WORKTREE" != *"/.claude/worktrees/"* ]]; then

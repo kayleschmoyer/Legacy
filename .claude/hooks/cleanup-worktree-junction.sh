@@ -11,7 +11,7 @@
 # symlinks), so we always attempt the non-recursive rmdir whenever node_modules exists.
 # cmd rmdir succeeds for junctions/symlinks and fails harmlessly on non-empty real dirs.
 
-WORKTREE=$(pwd)
+WORKTREE="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 
 # Only act inside Claude Code ephemeral worktrees
 if [[ "$WORKTREE" != *"/.claude/worktrees/"* ]]; then
