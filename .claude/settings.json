@@ -75,10 +75,6 @@
           {
             "type": "command",
             "command": ".claude/hooks/check-github-auth.sh"
-          },
-          {
-            "type": "command",
-            "command": ".claude/hooks/cleanup-orphaned-junctions.sh"
           }
         ]
       }

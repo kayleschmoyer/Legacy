@@ -297,9 +297,6 @@ else {
             }
             cmd /c "mklink /J `"$wtNM`" `"$mainNM`"" | Out-Null
             Write-Ok "Junctioned node_modules -> main repo (lockfiles match, saved ~1.8 GB)"
-            # Write session-active marker so cleanup-orphaned-junctions.sh (Claude Code
-            # SessionStart hook) skips this worktree while the session is still running.
-            [int][double]::Parse((Get-Date -UFormat %s)) | Set-Content -Path (Join-Path $WorktreePath '.claude-session') -NoNewline -Encoding ascii
         }
     }
     elseif ($lockfilesMatch -and $currentIsJunction) {
@@ -318,8 +315,6 @@ else {
         }
         else {
             Write-Ok "node_modules already junctioned to main repo (lockfiles still match)"
-            # Refresh session-active marker so the timestamp reflects the current session.
-            [int][double]::Parse((Get-Date -UFormat %s)) | Set-Content -Path (Join-Path $WorktreePath '.claude-session') -NoNewline -Encoding ascii
         }
     }
     elseif (-not $lockfilesMatch -and $currentIsJunction) {

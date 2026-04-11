@@ -1,17 +1,11 @@
 #!/bin/bash
-# SessionStart hook: write a session-active marker and validate/recreate the
-# node_modules junction for ephemeral worktrees (.claude/worktrees/<name>/).
-#
-# MUST run BEFORE cleanup-orphaned-junctions.sh in the SessionStart hook list
-# so the marker is written before the sibling-cleanup scan executes.
+# SessionStart hook: validate and recreate the node_modules junction for
+# ephemeral worktrees (.claude/worktrees/<name>/).
 #
 # Responsibilities:
-#   1. Write .claude-session marker with the current epoch timestamp.
-#      cleanup-orphaned-junctions.sh reads this to skip junctions belonging to
-#      sessions that are still alive (< 30 minutes old).
-#   2. Validate the junction: check that .bin is non-empty (empty .bin is the
+#   1. Validate the junction: check that .bin is non-empty (empty .bin is the
 #      most common symptom of a stale or broken junction on Windows/pnpm).
-#   3. If missing or invalid, recreate via cmd mklink /J (preferred) or
+#   2. If missing or invalid, recreate via cmd mklink /J (preferred) or
 #      PowerShell New-Item -ItemType Junction as fallback.
 #
 # Windows notes:
@@ -19,8 +13,8 @@
 #   - `cmd //c` is required — git-bash interprets a single /c as a path.
 #   - Path conversion: cygpath -w is the primary method; the sed fallback
 #     uses the repo-specific /d/ prefix that matches this machine's layout.
-#   - The Stop hook (cleanup-worktree-junction.sh) removes .claude-session
-#     and the junction itself when the session ends cleanly.
+#   - The Stop hook (cleanup-worktree-junction.sh) removes the junction
+#     when the session ends cleanly.
 
 # Prefer CLAUDE_PROJECT_DIR over pwd — Claude Code may invoke hooks with the
 # main repo as the process cwd even for worktree sessions, while CLAUDE_PROJECT_DIR
@@ -48,10 +42,7 @@ if [[ "$WORKTREE" != *"/.claude/worktrees/"* ]]; then
   exit 0
 fi
 
-# --- 1. Write session-active marker -----------------------------------------
-date +%s > "$WORKTREE/.claude-session"
-
-# --- 2. Determine paths ------------------------------------------------------
+# --- 1. Determine paths ------------------------------------------------------
 NM="$WORKTREE/node_modules"
 BIN="$NM/.bin"
 
@@ -65,7 +56,7 @@ if [ ! -d "$MAIN_NM" ]; then
   exit 0
 fi
 
-# --- 3. Decide if junction needs creation/repair -----------------------------
+# --- 2. Decide if junction needs creation/repair -----------------------------
 needs_recreate=false
 
 if [ ! -e "$NM" ] && [ ! -L "$NM" ]; then
@@ -80,11 +71,11 @@ if [ "$needs_recreate" = "false" ]; then
   exit 0
 fi
 
-# --- 4. Remove any existing stale/broken junction (non-recursive, safe) ------
+# --- 3. Remove any existing stale/broken junction (non-recursive, safe) ------
 WIN_NM=$(cygpath -w "$NM" 2>/dev/null || echo "$NM" | sed 's|/d/|D:\\|; s|/|\\|g')
 cmd //c "rmdir \"$WIN_NM\"" >/dev/null 2>&1
 
-# --- 5. Recreate junction via cmd mklink /J ----------------------------------
+# --- 4. Recreate junction via cmd mklink /J ----------------------------------
 WIN_MAIN_NM=$(cygpath -w "$MAIN_NM" 2>/dev/null || echo "$MAIN_NM" | sed 's|/d/|D:\\|; s|/|\\|g')
 cmd //c "mklink /J \"$WIN_NM\" \"$WIN_MAIN_NM\"" >/dev/null 2>&1
 

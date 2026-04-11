@@ -78,9 +78,13 @@ clean_worktree_junctions() {
 NOW=$(date +%s)
 
 # 1. Scan sibling ephemeral worktrees (.claude/worktrees/*)
+# Skip the current session's own directory — it is always active so its
+# junctions should never be removed by this script.
 CLAUDE_WORKTREES_DIR=$(dirname "$WORKTREE")
 for SIBLING_DIR in "$CLAUDE_WORKTREES_DIR"/*/; do
   [ -d "$SIBLING_DIR" ] || continue
+  # Strip trailing slash for exact comparison
+  [[ "${SIBLING_DIR%/}" == "$WORKTREE" ]] && continue
   clean_worktree_junctions "$SIBLING_DIR" "$NOW"
 done
 

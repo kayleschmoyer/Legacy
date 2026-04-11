@@ -13,14 +13,6 @@
         "AGENT_AUTHOR_APP_PRIVATE_KEY": "${AGENT_AUTHOR_APP_PRIVATE_KEY:-}"
       }
     },
-    "legacy-sports-make": {
-      "command": "pnpm",
-      "args": ["exec", "tsx", "tools/mcp/make-server/src/index.ts"]
-    },
-    "legacy-sports-nx": {
-      "command": "pnpm",
-      "args": ["exec", "tsx", "tools/mcp/nx-server/src/index.ts"]
-    },
     "legacy-sports-jira": {
       "command": "pnpm",
       "args": ["exec", "tsx", "tools/mcp/jira-server/src/index.ts"],
@@ -32,6 +24,14 @@
         "JIRA_EMAIL": "${JIRA_EMAIL:-}",
         "JIRA_API_TOKEN": "${JIRA_API_TOKEN:-}"
       }
+    },
+    "legacy-sports-make": {
+      "command": "pnpm",
+      "args": ["exec", "tsx", "tools/mcp/make-server/src/index.ts"]
+    },
+    "legacy-sports-nx": {
+      "command": "pnpm",
+      "args": ["exec", "tsx", "tools/mcp/nx-server/src/index.ts"]
     },
     "legacy-sports-db": {
       "command": "pnpm",
