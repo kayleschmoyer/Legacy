@@ -38,6 +38,7 @@ build/
 .next/
 .expo/
 .tamagui/
+__pycache__/
 **/*.tsbuildinfo
 **/*.zip
 
