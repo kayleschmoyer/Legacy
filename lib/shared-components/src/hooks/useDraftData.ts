@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 interface Player {
   id: string;
@@ -15,6 +15,17 @@ interface DraftTeam {
   picks: string[];
 }
 
+interface DraftDataResponse {
+  players: Player[];
+  draftOrder: DraftTeam[];
+  currentPick: number;
+}
+
+function normalizeError(err: unknown): Error {
+  if (err instanceof Error) return err;
+  return new Error(String(err));
+}
+
 export const useDraftData = (
   sport: string,
   leagueId: string,
@@ -25,30 +36,64 @@ export const useDraftData = (
   const [currentPick, setCurrentPick] = useState<number>(1);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  useEffect(() => {
-    const fetchData = async () => {
+  const fetchData = useCallback(
+    async (signal: AbortSignal) => {
+      setIsLoading(true);
+      setError(null);
+
       try {
         const response = await fetch(
           `/api/draft/${sport}/${leagueId}/${teamId}`,
+          { signal },
         );
         if (!response.ok) throw new Error('Failed to fetch draft data');
-        const data = (await response.json()) as {
-          players: Player[];
-          draftOrder: DraftTeam[];
-          currentPick: number;
-        };
-        setPlayers(data.players);
-        setDraftOrder(data.draftOrder);
-        setCurrentPick(data.currentPick);
-      } catch (err) {
-        setError(err as Error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    void fetchData();
-  }, [sport, leagueId, teamId]);
 
-  return { players, draftOrder, currentPick, isLoading, error };
+        let data: DraftDataResponse;
+        try {
+          data = (await response.json()) as DraftDataResponse;
+        } catch {
+          throw new Error('Failed to parse draft data response as JSON');
+        }
+
+        if (!signal.aborted) {
+          setPlayers(data.players);
+          setDraftOrder(data.draftOrder);
+          setCurrentPick(data.currentPick);
+        }
+      } catch (err) {
+        if (!signal.aborted) {
+          setError(normalizeError(err));
+        }
+      } finally {
+        if (!signal.aborted) {
+          setIsLoading(false);
+        }
+      }
+    },
+    [sport, leagueId, teamId],
+  );
+
+  useEffect(() => {
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    void fetchData(controller.signal);
+
+    return () => {
+      abortControllerRef.current?.abort();
+      abortControllerRef.current = null;
+    };
+  }, [fetchData]);
+
+  const refetch = useCallback(() => {
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    void fetchData(controller.signal);
+  }, [fetchData]);
+
+  return { players, draftOrder, currentPick, isLoading, error, refetch };
 };
