@@ -240,6 +240,19 @@ function getJunctionTarget(p: string): string | null {
   }
 }
 
+/**
+ * Coerce MCP string booleans to real booleans. The MCP framework sometimes
+ * serialises JSON booleans as strings ("true"/"false" or "1"/"0"). This mirrors the
+ * coercedBoolean preprocess used in the github-server (LS-1907 / LS-3007).
+ */
+function coerceBool(val: unknown): unknown {
+  if (typeof val === 'string') {
+    if (val === 'true' || val === '1') return true;
+    if (val === 'false' || val === '0') return false;
+  }
+  return val;
+}
+
 /** Enumerate all git worktrees (excluding the main repo itself). */
 function getWorktrees(): WorktreeInfo[] {
   const output = execSync('git worktree list --porcelain', {
@@ -934,11 +947,15 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
             description:
               'Alias for worktree. Ticket key, absolute path, or omit for active worktree',
           },
-          setUpstream: { type: 'boolean', description: 'Set upstream (-u)' },
+          setUpstream: {
+            type: 'boolean',
+            description:
+              'Set upstream (-u). Also accepts string "true"/"false"/"1"/"0" (MCP framework coercion).',
+          },
           skipLint: {
             type: 'boolean',
             description:
-              'Set SKIP_PREPUSH_LINT=1 before pushing. Use when pnpm virtual store is absent and the pre-push formatter hook fails.',
+              'Set SKIP_PREPUSH_LINT=1 before pushing. Use when pnpm virtual store is absent and the pre-push formatter hook fails. Also accepts string "true"/"false"/"1"/"0" (MCP framework coercion).',
           },
         },
       },
@@ -3193,15 +3210,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         worktree: worktreeRaw,
         worktreeKey,
         worktreeId,
-        setUpstream,
-        skipLint,
+        setUpstream: setUpstreamRaw,
+        skipLint: skipLintRaw,
       } = args as {
         worktree?: unknown;
         worktreeKey?: unknown;
         worktreeId?: unknown;
-        setUpstream?: boolean;
-        skipLint?: boolean;
+        setUpstream?: unknown;
+        skipLint?: unknown;
       };
+      // Coerce string booleans to real booleans (MCP framework may serialise
+      // JSON booleans as strings — same class of bug as LS-1907).
+      const setUpstream = coerceBool(setUpstreamRaw);
+      const skipLint = coerceBool(skipLintRaw);
       // Accept worktreeId as an alias for worktree (agents sometimes pass worktreeId
       // from older documentation or habit).
       const worktree = worktreeRaw ?? worktreeId;
