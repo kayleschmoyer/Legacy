@@ -9,7 +9,7 @@ import {
   PublicSchema,
 } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import { and, eq, inArray, not } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, not } from 'drizzle-orm';
 import { GraphQLError } from 'graphql';
 
 import {
@@ -693,11 +693,11 @@ builder.mutationField('createAllMatchups', (t) =>
 
       if (existingMatchupsCheck.length > 0) {
         // Fetch the league to check whether creation completed fully.
-        // A fully-completed run sets both currentMatchup (the active matchup
-        // FK) and currentWeek (the canonical week number). If either is null
-        // the previous run was aborted mid-way and the schedule is in an
-        // inconsistent state — returning partial data silently would be worse
-        // than surfacing the problem immediately.
+        // A fully-completed run sets both currentMatchup (FK to the active
+        // matchup) and currentWeek. If BOTH are NULL the previous run was
+        // aborted mid-way and the schedule is in partial-init state. Note:
+        // currentMatchup alone can be NULL in a finished season (normal); the
+        // partial-init guard therefore requires BOTH to be NULL.
         const [leagueRow] = await context.db
           .select({
             currentMatchup: PublicSchema.leagues.currentMatchup,
@@ -708,17 +708,102 @@ builder.mutationField('createAllMatchups', (t) =>
           .limit(1);
 
         if (
-          leagueRow?.currentMatchup == null ||
+          leagueRow?.currentMatchup == null &&
           leagueRow?.currentWeek == null
         ) {
-          LOGGER.error(
-            'createAllMatchups: matchups exist but league currentMatchup/currentWeek are not set — partial initialization detected',
+          // Partial initialization: matchups were inserted (e.g. by the
+          // commissioner-pick auto-creation path) but the final league-update
+          // step never ran (e.g. because an exception was swallowed in the
+          // try/catch around createAllMatchupsForLeague). The repair guard
+          // requires BOTH fields to be NULL — currentMatchup alone can be NULL
+          // in a finished season (autoAdvanceMatchups clears it after the final
+          // week), so we must not mistake that for partial init.
+          LOGGER.warn(
+            'createAllMatchups: matchups exist but league currentMatchup/currentWeek are both NULL — attempting repair',
             { leagueId, leagueRow },
           );
-          throw new GraphQLError(
-            'Matchup schedule is in an inconsistent state (matchups exist but the league was not fully initialized). Please contact support.',
-            { extensions: { code: 'INTERNAL_SERVER_ERROR' } },
+
+          // Step 1: locate week-1 matchup — order by id ascending for a stable,
+          // deterministic result even if multiple week-1 rows exist.
+          const [week1Matchup] = await context.db
+            .select({ id: PublicSchema.matchups.id })
+            .from(PublicSchema.matchups)
+            .where(
+              and(
+                eq(PublicSchema.matchups.leagueId, leagueId),
+                eq(PublicSchema.matchups.weekNumber, 1),
+              ),
+            )
+            .orderBy(asc(PublicSchema.matchups.id))
+            .limit(1);
+
+          const repairedMatchupId = week1Matchup?.id ?? null;
+
+          if (repairedMatchupId == null) {
+            // Matchups exist but none are for week 1 — genuinely unexpected.
+            LOGGER.error(
+              'createAllMatchups: matchups exist but no week-1 matchup found — cannot repair',
+              { leagueId },
+            );
+            throw new GraphQLError(
+              'Matchup schedule is in an inconsistent state and could not be repaired automatically. Please contact support.',
+              { extensions: { code: 'INTERNAL_SERVER_ERROR' } },
+            );
+          }
+
+          // Step 2: activate all week-1 matchups to in_progress.  If the
+          // interrupted run failed before the activation step, matchups are
+          // still 'scheduled' and autoAdvanceMatchups would skip them forever.
+          const week1Rows = await context.db
+            .select({ id: PublicSchema.matchups.id })
+            .from(PublicSchema.matchups)
+            .where(
+              and(
+                eq(PublicSchema.matchups.leagueId, leagueId),
+                eq(PublicSchema.matchups.weekNumber, 1),
+              ),
+            );
+          const week1Ids = week1Rows.map((m) => m.id);
+          if (week1Ids.length > 0) {
+            await context.db
+              .update(PublicSchema.matchups)
+              .set({ status: 'in_progress' })
+              .where(inArray(PublicSchema.matchups.id, week1Ids));
+          }
+
+          // Step 3: update league row only when still in partial-init state —
+          // conditional WHERE prevents clobbering a concurrent successful init.
+          await context.db
+            .update(PublicSchema.leagues)
+            .set({
+              currentMatchup: repairedMatchupId,
+              currentWeek: 1,
+              weekAdvanceStatus: 'idle',
+            })
+            .where(
+              and(
+                eq(PublicSchema.leagues.id, leagueId),
+                and(
+                  isNull(PublicSchema.leagues.currentMatchup),
+                  isNull(PublicSchema.leagues.currentWeek),
+                ),
+              ),
+            );
+
+          LOGGER.info(
+            'createAllMatchups: repaired partial initialization — league currentMatchup and currentWeek updated',
+            { leagueId, repairedMatchupId, week1Ids },
           );
+
+          const allMatchups = await context.db
+            .select()
+            .from(PublicSchema.matchups)
+            .where(eq(PublicSchema.matchups.leagueId, leagueId));
+
+          return {
+            matchups: allMatchups,
+            currentMatchupId: repairedMatchupId,
+          };
         }
 
         LOGGER.info(
