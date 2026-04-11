@@ -38,6 +38,12 @@ Do not proceed until auth is confirmed working or the user explicitly opts in to
 jira_view(key: "LS-####")
 ```
 
+After `jira_view` returns, **rename the current session** to include the ticket key and summary:
+
+```
+worktree_rename_session(title: "LS-#### <summary, truncated to 80 chars>")
+```
+
 Determine the ticket type and whether it has children:
 
 ```

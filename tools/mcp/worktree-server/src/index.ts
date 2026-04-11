@@ -6,6 +6,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { execFile, execFileSync, execSync } from 'node:child_process';
 import {
+  appendFileSync,
   existsSync,
   lstatSync,
   mkdirSync,
@@ -21,7 +22,7 @@ import {
 } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 
 // ---------------------------------------------------------------------------
 // Constants & state
@@ -1545,6 +1546,33 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
           },
         },
         required: ['newName'],
+      },
+    },
+    {
+      name: 'worktree_rename_session',
+      description:
+        'Set the display title for the current Claude Code session. ' +
+        'Appends a custom-title entry to the session JSONL so the session ' +
+        'appears with the given title in /resume and the session list. ' +
+        'Call after jira_view to set the title to "LS-#### <ticket summary>". ' +
+        'Safe to call multiple times — the last title wins.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          title: {
+            type: 'string',
+            description:
+              'New session title (e.g. "LS-3052 feat(skills): add session rename"). ' +
+              'Must be non-empty.',
+          },
+          worktree: {
+            type: 'string',
+            description:
+              'Ticket key or absolute path whose session to rename. ' +
+              'Omit to use the active worktree (or main repo if none active).',
+          },
+        },
+        required: ['title'],
       },
     },
     {
@@ -7859,6 +7887,134 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           isError: true,
         };
       }
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_rename_session
+    // -----------------------------------------------------------------------
+    case 'worktree_rename_session': {
+      const { title, worktree: wtKey } = args as {
+        title: string;
+        worktree?: string;
+      };
+
+      if (!title || title.trim().length === 0) {
+        return {
+          content: [{ type: 'text', text: 'title must be non-empty.' }],
+          isError: true,
+        };
+      }
+
+      // Determine the CWD that Claude Code used to create the session.
+      // In a native worktree session this is the worktree path; otherwise
+      // the main repo root.
+      const target = resolveTargetDir(wtKey);
+      if ('error' in target) {
+        // If the caller explicitly passed a worktree key that couldn't be
+        // resolved, return the error — don't silently fall back to MAIN_REPO
+        // which would rename the wrong session.
+        if (wtKey) {
+          return {
+            content: [{ type: 'text', text: target.error }],
+            isError: true,
+          };
+        }
+      }
+      const sessionCwd: string = 'error' in target ? MAIN_REPO : target.path;
+
+      // Claude Code encodes the CWD by replacing every non-alphanumeric
+      // character with '-' to form the project directory name.
+      // Verified on disk: `.claude` encodes as `-claude` (not `.claude`),
+      // matching the official docs: "every non-alphanumeric → '-'".
+      const encoded = sessionCwd.replace(/[^a-zA-Z0-9]/g, '-');
+      const sessionsDir = join(homedir(), '.claude', 'projects', encoded);
+
+      // Wrap filesystem operations in try/catch so failures return an
+      // isError response instead of crashing the MCP server process.
+      let jsonlFiles: Array<{ name: string; mtime: number }>;
+      try {
+        if (!existsSync(sessionsDir) || !statSync(sessionsDir).isDirectory()) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `No sessions directory found at ${sessionsDir}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        // Find the most recently modified .jsonl file (the active session).
+        jsonlFiles = readdirSync(sessionsDir)
+          .filter((f) => f.endsWith('.jsonl'))
+          .map((f) => ({
+            name: f,
+            mtime: statSync(join(sessionsDir, f)).mtimeMs,
+          }))
+          .sort((a, b) => b.mtime - a.mtime);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Failed to read session files in ${sessionsDir}: ${message}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      if (jsonlFiles.length === 0) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `No session files found in ${sessionsDir}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      const latest = jsonlFiles[0];
+      const sessionId = latest.name.replace(/\.jsonl$/, '');
+      const sessionFile = join(sessionsDir, latest.name);
+      const trimmedTitle = title.trim();
+
+      try {
+        const entry = JSON.stringify({
+          type: 'custom-title',
+          customTitle: trimmedTitle,
+          sessionId,
+        });
+        appendFileSync(sessionFile, '\n' + entry, 'utf8');
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Failed to write session title to ${sessionFile}: ${message}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              { success: true, sessionId, title: trimmedTitle },
+              null,
+              2,
+            ),
+          },
+        ],
+      };
     }
 
     // -----------------------------------------------------------------------
