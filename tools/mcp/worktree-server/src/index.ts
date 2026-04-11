@@ -702,7 +702,8 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
               { type: 'string' as const },
               { type: 'array' as const, items: { type: 'string' } },
             ],
-            description: 'Files to stage (default: all)',
+            description:
+              'Files to stage. When provided, ONLY these files are staged (staging area is cleared first). When omitted, new commits stage all changes including untracked files (git add -A), while amend stages only tracked changes (git add -u, after clearing the index) to avoid pulling in untracked files.',
           },
           worktree: {
             type: 'string',
@@ -2107,9 +2108,40 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
       }
 
+      // Check whether HEAD exists (fails on unborn branches / empty repos).
+      // Used below to guard reset operations that require a valid HEAD ref.
+      let headExists = true;
+      try {
+        runGit(['rev-parse', '--verify', 'HEAD'], cwd);
+      } catch {
+        headExists = false;
+      }
+
+      // Amend requires an existing commit — reject early with a clear message.
+      if (amend && !headExists) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Cannot amend because this repository does not have a HEAD commit yet. Create an initial commit first, or retry without amend.',
+            },
+          ],
+          isError: true,
+        };
+      }
+
       try {
         // Stage files using execFileSync to avoid shell injection
         if (!stageAll) {
+          // Unstage everything first so previously-staged files that are NOT in
+          // the explicit list don't sneak into this commit (fixes the case where
+          // a prior git-add-A or another operation left unintended files staged).
+          if (headExists) {
+            runGit(['reset', 'HEAD', '--'], cwd);
+          } else {
+            // Unborn branch: clear the index without referencing HEAD.
+            runGit(['read-tree', '--empty'], cwd);
+          }
           runGit(['add', '--', ...files], cwd);
         } else {
           // Stage all modified files, but check for dangerous files first
@@ -2125,9 +2157,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             };
           }
 
-          // Check for dangerous files in the changeset
+          // Check for dangerous files in the would-be-staged set.
+          // When amending we use `git add -u` (tracked only), so untracked
+          // files (lines starting with "??") are NOT staged — exclude them
+          // from the danger scan to avoid false positives.
           const changedFiles = status
             .split('\n')
+            .filter((l) => l && !(amend && l.startsWith('??')))
             .map((l) => l.slice(3).trim())
             .filter(Boolean);
           for (const f of changedFiles) {
@@ -2137,7 +2173,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                   {
                     type: 'text',
                     text:
-                      `Refused: "${f}" looks like a credential/secret file and would be staged by git add -A.\n` +
+                      `Refused: "${f}" looks like a credential/secret file and would be staged.\n` +
                       'Specify files explicitly to exclude it.',
                   },
                 ],
@@ -2146,7 +2182,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             }
           }
 
-          runGit(['add', '-A'], cwd);
+          if (amend) {
+            // Reset the index to HEAD first, then restage only tracked changes.
+            // This removes any previously-staged untracked files that
+            // git add -u alone would leave in the index, preventing stray
+            // files from corrupting the amended commit.
+            if (headExists) {
+              runGit(['reset', 'HEAD', '--'], cwd);
+            }
+            runGit(['add', '-u'], cwd);
+          } else {
+            runGit(['add', '-A'], cwd);
+          }
         }
 
         // Commit
