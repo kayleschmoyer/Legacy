@@ -57,16 +57,21 @@ async function evaluateFormA11y(page: import('@playwright/test').Page) {
       // Require non-empty aria-label values
       const ariaLabelValue = el.getAttribute('aria-label')?.trim() ?? '';
       const hasAriaLabel = ariaLabelValue.length > 0;
-      // Require aria-labelledby to reference an existing element with non-empty text
+      // Require aria-labelledby to reference an existing element that provides
+      // an accessible name via textContent, aria-label, or title attribute.
       const ariaLabelledByValue =
         el.getAttribute('aria-labelledby')?.trim() ?? '';
       const hasAriaLabelledBy =
         ariaLabelledByValue.length > 0 &&
-        ariaLabelledByValue
-          .split(/\s+/)
-          .some(
-            (refId) => !!document.getElementById(refId)?.textContent?.trim(),
+        ariaLabelledByValue.split(/\s+/).some((refId) => {
+          const ref = document.getElementById(refId);
+          if (!ref) return false;
+          return (
+            !!ref.textContent?.trim() ||
+            !!ref.getAttribute('aria-label')?.trim() ||
+            !!ref.getAttribute('title')?.trim()
           );
+        });
       const id = el.id;
       // Check explicit label[for=id], implicit wrapping <label>, and labels API
       const hasAssociatedLabel =
@@ -205,8 +210,28 @@ test.describe('Form field accessibility @regression', () => {
 
         // Check for at least one proper accessible label mechanism
         const hasLabel = await nameInput.evaluate((el: HTMLInputElement) => {
+          // aria-label with non-empty value
+          if ((el.getAttribute('aria-label')?.trim() ?? '').length > 0)
+            return true;
+          // aria-labelledby referencing an element that provides an accessible name
+          // (via textContent, aria-label, or title — matching evaluateFormA11y logic)
+          const ariaLabelledByValue =
+            el.getAttribute('aria-labelledby')?.trim() ?? '';
+          if (
+            ariaLabelledByValue.length > 0 &&
+            ariaLabelledByValue.split(/\s+/).some((refId) => {
+              const ref = document.getElementById(refId);
+              if (!ref) return false;
+              return (
+                !!ref.textContent?.trim() ||
+                !!ref.getAttribute('aria-label')?.trim() ||
+                !!ref.getAttribute('title')?.trim()
+              );
+            })
+          )
+            return true;
+          // associated <label> element
           return (
-            (el.getAttribute('aria-label')?.trim() ?? '').length > 0 ||
             (el.id
               ? !!document.querySelector(`label[for="${el.id}"]`)
               : false) ||
@@ -265,16 +290,21 @@ test.describe('Form field accessibility @regression', () => {
       await page.goto('/baseball/league/create');
       await page.waitForLoadState('networkidle');
 
-      // Try to submit empty form
-      const submitBtn = page.getByRole('button', { name: /create/i }).first();
-      if ((await submitBtn.count()) > 0 && (await submitBtn.isVisible())) {
-        await submitBtn.click();
+      // The Create League button is always enabled (only disabled while loading).
+      // Fill a short name (<3 chars) to trigger client-side validation without navigating away,
+      // so the page stability check is meaningful.
+      const nameInput = page.getByPlaceholder('Enter your league name');
+      await nameInput.fill('AB');
 
-        // Page should remain stable and show validation (not crash)
-        await expect(page.locator('body')).not.toContainText(
-          'Unexpected Application Error',
-        );
-      }
+      const submitBtn = page.getByRole('button', { name: /create/i }).first();
+      await expect(submitBtn).toBeVisible();
+      await expect(submitBtn).toBeEnabled();
+      await submitBtn.click();
+
+      // Page should remain stable and show validation (not crash)
+      await expect(page.locator('body')).not.toContainText(
+        'Unexpected Application Error',
+      );
     });
 
     test('aria-invalid value is "true" on any field the form marks invalid after submit attempt', async ({
@@ -284,29 +314,34 @@ test.describe('Form field accessibility @regression', () => {
       await page.goto('/baseball/league/create');
       await page.waitForLoadState('networkidle');
 
-      // Attempt to trigger validation by clicking submit without filling required fields
+      // Button is always enabled (only disabled while loading). Fill a short name (<3 chars)
+      // so client-side validation fires and the page stays on /baseball/league/create.
+      const nameInput = page.getByPlaceholder('Enter your league name');
+      await nameInput.fill('AB');
+
+      // Attempt to trigger validation by clicking submit
       const submitBtn = page.getByRole('button', { name: /create/i }).first();
-      if ((await submitBtn.count()) > 0 && (await submitBtn.isVisible())) {
-        await submitBtn.click();
-        // Give validation a moment to apply
-        await page.waitForTimeout(300);
+      await expect(submitBtn).toBeVisible();
+      await expect(submitBtn).toBeEnabled();
+      await submitBtn.click();
+      // Give validation a moment to apply
+      await page.waitForTimeout(300);
 
-        const validationDetails = await evaluateValidationA11y(page);
+      const validationDetails = await evaluateValidationA11y(page);
 
-        // If any field is marked invalid, aria-invalid must be "true" (never empty or other value)
-        const invalidFields = validationDetails.filter(
-          (f) => f.ariaInvalid !== null,
-        );
+      // If any field is marked invalid, aria-invalid must be "true" (never empty or other value)
+      const invalidFields = validationDetails.filter(
+        (f) => f.ariaInvalid !== null,
+      );
 
-        for (const field of invalidFields) {
-          // aria-invalid should only be "true" or "false", never empty string or other
-          expect(['true', 'false']).toContain(field.ariaInvalid);
-        }
-
-        await expect(page.locator('body')).not.toContainText(
-          'Unexpected Application Error',
-        );
+      for (const field of invalidFields) {
+        // aria-invalid should only be "true" or "false", never empty string or other
+        expect(['true', 'false']).toContain(field.ariaInvalid);
       }
+
+      await expect(page.locator('body')).not.toContainText(
+        'Unexpected Application Error',
+      );
     });
 
     test('if aria-describedby is present on form fields, referenced IDs exist in the DOM', async ({
@@ -316,25 +351,30 @@ test.describe('Form field accessibility @regression', () => {
       await page.goto('/baseball/league/create');
       await page.waitForLoadState('networkidle');
 
+      // Button is always enabled (only disabled while loading). Fill a short name (<3 chars)
+      // so client-side validation fires and the page stays on /baseball/league/create.
+      const nameInput = page.getByPlaceholder('Enter your league name');
+      await nameInput.fill('AB');
+
       // Trigger validation
       const submitBtn = page.getByRole('button', { name: /create/i }).first();
-      if ((await submitBtn.count()) > 0 && (await submitBtn.isVisible())) {
-        await submitBtn.click();
-        await page.waitForTimeout(300);
+      await expect(submitBtn).toBeVisible();
+      await expect(submitBtn).toBeEnabled();
+      await submitBtn.click();
+      await page.waitForTimeout(300);
 
-        const validationDetails = await evaluateValidationA11y(page);
+      const validationDetails = await evaluateValidationA11y(page);
 
-        // For any field using aria-describedby, the referenced element must exist in DOM
-        for (const field of validationDetails) {
-          for (const described of field.describedByElements) {
-            expect(described.exists).toBe(true);
-          }
+      // For any field using aria-describedby, the referenced element must exist in DOM
+      for (const field of validationDetails) {
+        for (const described of field.describedByElements) {
+          expect(described.exists).toBe(true);
         }
-
-        await expect(page.locator('body')).not.toContainText(
-          'Unexpected Application Error',
-        );
       }
+
+      await expect(page.locator('body')).not.toContainText(
+        'Unexpected Application Error',
+      );
     });
 
     test('form structure is present on league creation page', async ({
