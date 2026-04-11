@@ -128,25 +128,6 @@ body {
   }
 }
 
-@keyframes shimmer {
-  0% {
-    background-position: -200px 0;
-  }
-  100% {
-    background-position: calc(200px + 100%) 0;
-  }
-}
-
-@keyframes glow {
-  0%,
-  100% {
-    box-shadow: 0 0 5px rgba(255, 165, 0, 0.2);
-  }
-  50% {
-    box-shadow: 0 0 20px rgba(255, 165, 0, 0.4);
-  }
-}
-
 @keyframes fadeInUp {
   from {
     opacity: 0;
