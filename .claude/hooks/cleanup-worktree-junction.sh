@@ -1,15 +1,15 @@
 #!/bin/bash
-# Stop hook: remove node_modules junction from ephemeral worktree before session ends.
-# Prevents Claude Code's own worktree cleanup from following the junction into the main
-# repo's node_modules when running git worktree remove on .claude/worktrees/<name>/.
+# Stop hook: remove node_modules symlink from ephemeral worktree before session ends.
+# This is a belt-and-suspenders cleanup — the main protection is that directory
+# symlinks (mklink /D) are NOT followed by recursive-delete tools, so even if this
+# hook doesn't fire (e.g. Claude Code archive), the target is safe.
 #
-# Uses `cmd //c rmdir` (non-recursive) only after confirming node_modules is a
-# symlink/junction. Real directories are left untouched; the command is used solely to
-# remove the link itself and never the target.
+# Uses `cmd //c rmdir` (non-recursive) which safely removes both symlinks and
+# junctions without touching the target. Real directories are left untouched.
 #
 # Note: on Windows git-bash, `[ -L ]` returns false for NTFS junctions (only true
 # symlinks), so we always attempt the non-recursive rmdir whenever node_modules exists.
-# cmd rmdir succeeds for junctions/symlinks and fails harmlessly on non-empty real dirs.
+# cmd rmdir succeeds for symlinks/junctions and fails harmlessly on non-empty real dirs.
 
 WORKTREE="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 
@@ -25,8 +25,6 @@ if [ ! -e "$NM" ] && [ ! -L "$NM" ]; then
 fi
 
 # Attempt non-recursive removal whenever node_modules exists in an ephemeral worktree.
-# This safely removes a junction/symlink without touching the target, and will fail
-# harmlessly for a real non-empty directory.
 WIN_PATH=$(cygpath -w "$NM" 2>/dev/null || echo "$NM" | sed 's|/d/|D:\\|; s|/|\\|g')
 cmd //c "rmdir \"$WIN_PATH\"" >/dev/null 2>&1
 

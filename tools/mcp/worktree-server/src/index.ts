@@ -1194,10 +1194,11 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
     {
       name: 'worktree_setup_node_modules',
       description:
-        "Create a node_modules junction from the worktree to the main repo's " +
+        "Create a node_modules symlink from the worktree to the main repo's " +
         'node_modules. Required in every native ephemeral worktree before running ' +
-        'pnpm/make commands. Idempotent — skips creation if a valid junction already ' +
-        'exists. Eliminates shell path-escaping issues from manual mklink commands.',
+        'pnpm/make commands. Idempotent — skips creation if a valid symlink already ' +
+        'exists. Uses directory symlink (mklink /D) instead of junction to prevent ' +
+        'cascade deletion when Claude Code archives the worktree.',
       inputSchema: {
         type: 'object' as const,
         properties: {
@@ -4854,11 +4855,32 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             } catch {
               currentTarget = readlinkSync(nmPath);
             }
+
+            // Detect if this is a junction (unsafe) vs symlink (safe).
+            // On Windows, lstatSync reports both as isSymbolicLink(). Use
+            // execFileSync to check the actual link type via `dir /AL`.
+            let isJunctionNotSymlink = false;
+            if (process.platform === 'win32') {
+              try {
+                const dirOutput = execFileSync(
+                  'cmd',
+                  ['/c', 'dir', '/AL', dirname(nmPath)],
+                  { encoding: 'utf-8', timeout: 5_000 },
+                );
+                isJunctionNotSymlink =
+                  dirOutput.includes('<JUNCTION>') &&
+                  dirOutput.includes('node_modules');
+              } catch {
+                /* detection failed — assume safe */
+              }
+            }
+
             if (
               normalizeForCompare(currentTarget) ===
-              normalizeForCompare(mainNmPath)
+                normalizeForCompare(mainNmPath) &&
+              !isJunctionNotSymlink
             ) {
-              // Correct junction already exists — verify it's healthy
+              // Correct symlink already exists — verify it's healthy
               const binDir = join(nmPath, '.bin');
               let binPopulated = false;
               try {
@@ -4878,11 +4900,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                           success: true,
                           created: false,
                           alreadyExists: true,
-                          junctionPath: nmPath,
+                          symlinkPath: nmPath,
                           target: mainNmPath,
                           verified,
                           message:
-                            'node_modules junction already exists and points to the correct target.',
+                            'node_modules symlink already exists and points to the correct target.',
                         },
                         null,
                         2,
@@ -4891,9 +4913,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                   ],
                 };
               }
-              // Junction exists but .bin is empty or nx is missing — remove and recreate
+              // Symlink exists but .bin is empty or nx is missing — remove and recreate
             }
-            // Remove junction (wrong target OR correct target but unhealthy) and recreate
+            // Remove link (wrong target, unhealthy, OR junction needing migration) and recreate
             rmSync(nmPath, { recursive: false });
           } else if (stat.isDirectory()) {
             return {
@@ -4937,12 +4959,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           }
         }
 
-        // Create the junction using Node.js path APIs (no shell escaping needed)
+        // Create a directory symlink (not junction) using Node.js path APIs.
+        // Symlinks are NOT followed by recursive-delete tools (PowerShell
+        // Remove-Item, Node.js fs.rmSync, git worktree remove), so Claude
+        // Code's archive can safely delete the worktree without destroying
+        // the main repo's node_modules through the link. Junctions ARE
+        // followed, causing catastrophic data loss (see claude-code#29249).
+        // Requires Windows Developer Mode (one-time system setting).
         if (process.platform === 'win32') {
           // Windows: use execFileSync with structured args array to avoid all
           // shell escaping issues. Paths are passed as separate argv elements —
           // no quoting, no backslash doubling, no mangling.
-          execFileSync('cmd', ['/c', 'mklink', '/J', nmPath, mainNmPath], {
+          // mklink /D = directory symlink (safe); mklink /J = junction (unsafe)
+          execFileSync('cmd', ['/c', 'mklink', '/D', nmPath, mainNmPath], {
             encoding: 'utf-8',
             timeout: 15_000,
           });
@@ -4968,14 +4997,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 {
                   success: true,
                   created: true,
-                  junctionPath: nmPath,
+                  symlinkPath: nmPath,
                   target: mainNmPath,
                   verified,
                   message: verified
-                    ? 'node_modules junction created and verified. Ready to run pnpm/make commands.'
+                    ? 'node_modules symlink created and verified. Ready to run pnpm/make commands.'
                     : !nxExists
-                      ? 'Junction created but nx not found — verify main repo node_modules is populated.'
-                      : 'Junction created but .bin is empty — main repo node_modules may be incomplete. Run make install in the main repo.',
+                      ? 'Symlink created but nx not found — verify main repo node_modules is populated.'
+                      : 'Symlink created but .bin is empty — main repo node_modules may be incomplete. Run make install in the main repo.',
                 },
                 null,
                 2,
@@ -4992,7 +5021,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               text: JSON.stringify(
                 {
                   success: false,
-                  message: `Failed to create node_modules junction: ${e.message ?? String(err)}`,
+                  message:
+                    `Failed to create node_modules symlink: ${e.message ?? String(err)}` +
+                    (String(e.message ?? e.stderr ?? '').match(
+                      /privilege|EPERM|1314/i,
+                    )
+                      ? '\n\nHint: Directory symlinks require Windows Developer Mode. ' +
+                        'Enable it: Settings > System > For Developers > Developer Mode'
+                      : ''),
                   ...(e.stdout ? { stdout: e.stdout } : {}),
                   ...(e.stderr ? { stderr: e.stderr } : {}),
                 },
