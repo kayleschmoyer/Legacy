@@ -11,8 +11,6 @@ import {
   BRAND_SEAM_RED,
   EMERALD,
   GRADIENT_BOARD_BG,
-  GRADIENT_GOLD,
-  GRADIENT_SEAM_RED,
   GRADIENT_WHITE_CARD,
   OVERLAY_WHITE_10,
   SLATE_300,
@@ -94,10 +92,7 @@ function SetupScreen({
               margin: '0 0 12px 0',
               fontSize: '36px',
               fontWeight: '800',
-              background: GRADIENT_GOLD,
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
+              color: BRAND_GOLD,
             }}
           >
             Mock Draft Simulator
@@ -308,14 +303,13 @@ function SetupScreen({
                 padding: '16px',
                 borderRadius: '12px',
                 border: 'none',
-                background: GRADIENT_SEAM_RED,
+                background: BRAND_SEAM_RED,
                 color: '#ffffff',
                 fontSize: '17px',
                 fontWeight: '700',
                 cursor: loading ? 'not-allowed' : 'pointer',
                 opacity: loading ? 0.7 : 1,
-                boxShadow: `0 8px 24px ${withAlpha(BRAND_SEAM_RED, 0.4)}`,
-                transition: 'transform 0.1s ease, box-shadow 0.1s ease',
+                transition: 'transform 0.1s ease',
               }}
               onMouseOver={(e) => {
                 if (!loading)

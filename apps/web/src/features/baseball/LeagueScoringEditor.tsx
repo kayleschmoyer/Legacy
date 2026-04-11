@@ -27,7 +27,6 @@ import {
   BRAND_NAVY,
   BRAND_NAVY_LIGHT,
   GRADIENT_BUTTON_PRIMARY,
-  GRADIENT_BUTTON_SAVE,
   GREEN,
   INDIGO,
   ORANGE,
@@ -996,15 +995,6 @@ export function LeagueScoringEditor(
               pressStyle={canSave ? { scale: 0.97 } : {}}
               animation="quick"
               icon={<Save size={14} />}
-              style={
-                canSave
-                  ? {
-                      background: GRADIENT_BUTTON_SAVE,
-                      boxShadow: `0 4px 14px ${withAlpha(BRAND_NAVY_LIGHT, 0.4)}`,
-                      transition: 'box-shadow 0.2s ease',
-                    }
-                  : undefined
-              }
             >
               {saving
                 ? 'Saving…'

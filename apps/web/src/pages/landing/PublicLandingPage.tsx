@@ -184,11 +184,7 @@ const heroHeadingStyle: React.CSSProperties = {
   letterSpacing: -1,
   lineHeight: 1.1,
   fontSize: 'clamp(2.5rem, 6vw, 4rem)',
-  background: `linear-gradient(135deg, #F5F7FA 0%, ${BRAND_GOLD_LIGHT} 60%, ${BRAND_GOLD} 100%)`,
-  WebkitBackgroundClip: 'text',
-  WebkitTextFillColor: 'transparent',
-  backgroundClip: 'text',
-  color: BRAND_GOLD_LIGHT,
+  color: BRAND_GOLD,
 };
 
 const featureCardGlassStyle: React.CSSProperties = {
