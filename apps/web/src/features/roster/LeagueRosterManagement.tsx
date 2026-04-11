@@ -867,8 +867,8 @@ function BenchPlayerCard({
       alignItems="center"
       gap="$3"
       minHeight={48}
-      borderLeftWidth={3}
-      borderLeftColor={isActive ? accentColor : 'transparent'}
+      borderWidth={1}
+      borderColor={isActive ? accentColor : 'transparent'}
       className={recentlyMoved ? 'roster-flash' : undefined}
     >
       {/* Player info */}
@@ -1218,8 +1218,8 @@ function BenchPanel({
                 alignItems="center"
                 gap="$3"
                 minHeight={48}
-                borderLeftWidth={3}
-                borderLeftColor="$green9"
+                borderWidth={1}
+                borderColor="$green9"
               >
                 <YStack flex={1} minWidth={0} gap="$0.5">
                   <Text fontSize="$3" fontWeight="600" color="$color12">

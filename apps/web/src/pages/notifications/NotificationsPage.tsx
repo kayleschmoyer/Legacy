@@ -82,8 +82,7 @@ const NotificationCard = styled(Button, {
   variants: {
     unread: {
       true: {
-        borderLeftWidth: 3,
-        borderLeftColor: BRAND_NAVY_LIGHT,
+        borderColor: BRAND_NAVY_LIGHT,
       },
     },
   } as const,

@@ -208,8 +208,8 @@ export function LeagueStandings({
                 ? '$background'
                 : '$surfaceSubtle'
           }
-          borderLeftWidth={3}
-          borderLeftColor={isUserTeam ? BRAND_NAVY_LIGHT : 'transparent'}
+          borderWidth={1}
+          borderColor={isUserTeam ? BRAND_NAVY_LIGHT : 'transparent'}
           role="listitem"
           cursor="pointer"
           hoverStyle={{
