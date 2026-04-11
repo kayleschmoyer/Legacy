@@ -19,19 +19,6 @@ const ThrowingComponent = ({ error }: { error: Error }): React.ReactElement => {
 };
 
 describe('ErrorBoundary', () => {
-  const globalRecord = global as Record<string, unknown>;
-  let originalDev: unknown;
-
-  beforeAll(() => {
-    // React Native global required by ErrorBoundary's render method
-    originalDev = globalRecord.__DEV__;
-    globalRecord.__DEV__ = false;
-  });
-
-  afterAll(() => {
-    globalRecord.__DEV__ = originalDev;
-  });
-
   beforeEach(() => {
     jest.clearAllMocks();
     // Suppress React's own console.error output during tests that intentionally throw

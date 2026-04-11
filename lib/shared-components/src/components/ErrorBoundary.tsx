@@ -1,5 +1,5 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
+import { Button, Text, YStack } from 'tamagui';
 import { LOGGER } from '@legacy-sports/logging';
 
 interface Props {
@@ -68,73 +68,52 @@ export class ErrorBoundary extends Component<Props, State> {
 
       // Default error UI
       return (
-        <View
-          style={{
-            flex: 1,
-            justifyContent: 'center',
-            alignItems: 'center',
-            padding: 20,
-            backgroundColor: '#f8f9fa',
-          }}
+        <YStack
+          flex={1}
+          justifyContent="center"
+          alignItems="center"
+          padding="$5"
+          backgroundColor="$background"
+          gap="$4"
         >
           <Text
-            style={{
-              fontSize: 24,
-              fontWeight: 'bold',
-              marginBottom: 10,
-              color: '#dc3545',
-            }}
+            fontSize="$8"
+            fontWeight="700"
+            color="$red10"
+            textAlign="center"
           >
             Oops! Something went wrong
           </Text>
-          <Text
-            style={{
-              fontSize: 16,
-              textAlign: 'center',
-              color: '#6c757d',
-              marginBottom: 20,
-            }}
-          >
+          <Text fontSize="$4" textAlign="center" color="$color10">
             We're sorry for the inconvenience. The error has been reported and
             we'll look into it.
           </Text>
-          <TouchableOpacity
+          <Button
             onPress={this.handleRetry}
-            style={{
-              backgroundColor: '#dc3545',
-              paddingHorizontal: 24,
-              paddingVertical: 12,
-              borderRadius: 8,
-              marginBottom: 20,
-            }}
+            backgroundColor="$red9"
+            borderRadius="$3"
+            paddingHorizontal="$5"
+            pressStyle={{ backgroundColor: '$red10' }}
           >
-            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>
+            <Text color="$color1" fontWeight="700" fontSize="$4">
               Try Again
             </Text>
-          </TouchableOpacity>
-          {__DEV__ && this.state.error && (
-            <View
-              style={{
-                backgroundColor: '#fff',
-                padding: 15,
-                borderRadius: 8,
-                borderWidth: 1,
-                borderColor: '#dc3545',
-                maxWidth: '100%',
-              }}
+          </Button>
+          {process.env.NODE_ENV !== 'production' && this.state.error && (
+            <YStack
+              backgroundColor="$background"
+              padding="$4"
+              borderRadius="$3"
+              borderWidth={1}
+              borderColor="$red7"
+              maxWidth="100%"
             >
-              <Text
-                style={{
-                  fontFamily: 'monospace',
-                  fontSize: 12,
-                  color: '#dc3545',
-                }}
-              >
+              <Text fontFamily="$mono" fontSize="$2" color="$red10">
                 {this.state.error.toString()}
               </Text>
-            </View>
+            </YStack>
           )}
-        </View>
+        </YStack>
       );
     }
 
