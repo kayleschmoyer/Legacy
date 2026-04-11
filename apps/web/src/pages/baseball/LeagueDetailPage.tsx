@@ -291,20 +291,23 @@ const InviteCard = styled(Card, {
   padding: '$5',
 });
 
-const CommissionerSectionHeader = styled(XStack, {
-  paddingHorizontal: '$4',
-  paddingVertical: '$3',
-  alignItems: 'center',
-  justifyContent: 'space-between',
+const CommissionerSectionHeader = styled(YStack, {
   backgroundColor: '$surfacePanel',
   borderRadius: '$5',
   borderWidth: 1,
   borderColor: '$glassBorder',
-  cursor: 'pointer' as never,
-  animation: 'quick',
-  hoverStyle: {
-    backgroundColor: '$color2',
-  },
+});
+
+const CommissionerSectionToggle = styled(XStack, {
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  width: '100%',
+  paddingHorizontal: '$4',
+  paddingVertical: '$3',
+  cursor: 'pointer',
+  backgroundColor: 'transparent',
+  borderWidth: 0,
+  color: '$color',
 });
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -3434,37 +3437,45 @@ export function LeagueDetailPage(): React.JSX.Element {
         {sections.map(({ id, title, content }) => {
           const open = isOpen(id);
           const sectionId = `commissioner-section-${id}`;
+          const buttonId = `commissioner-section-btn-${id}`;
           return (
             <YStack key={id}>
               <CommissionerSectionHeader
-                data-testid={`commissioner-section-toggle-${id}`}
-                onPress={() => toggleCommissionerSection(id)}
-                role="button"
-                aria-expanded={open}
-                aria-controls={sectionId}
                 borderBottomLeftRadius={open ? 0 : '$5'}
                 borderBottomRightRadius={open ? 0 : '$5'}
                 borderBottomWidth={open ? 0 : 1}
               >
-                <Text fontWeight="700" fontSize="$4" color="$color">
-                  {title}
-                </Text>
-                <span
-                  aria-hidden="true"
-                  style={{
-                    display: 'inline-flex',
-                    transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
-                    transition: 'transform 0.2s ease',
-                  }}
-                >
-                  <ChevronDown size={16} color="$colorPress" />
-                </span>
+                <h4 style={{ margin: 0, padding: 0 }}>
+                  <CommissionerSectionToggle
+                    tag="button"
+                    id={buttonId}
+                    type="button"
+                    data-testid={`commissioner-section-toggle-${id}`}
+                    aria-expanded={open}
+                    aria-controls={sectionId}
+                    onPress={() => toggleCommissionerSection(id)}
+                  >
+                    <Text fontWeight="700" fontSize="$4" color="$color">
+                      {title}
+                    </Text>
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        display: 'inline-flex',
+                        transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
+                        transition: 'transform 0.2s ease',
+                      }}
+                    >
+                      <ChevronDown size={16} color="$colorPress" />
+                    </span>
+                  </CommissionerSectionToggle>
+                </h4>
               </CommissionerSectionHeader>
               {open && (
                 <YStack
                   id={sectionId}
                   role="region"
-                  aria-label={title}
+                  aria-labelledby={buttonId}
                   borderLeftWidth={1}
                   borderRightWidth={1}
                   borderBottomWidth={1}

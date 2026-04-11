@@ -1,14 +1,5 @@
 import React, { useState } from 'react';
-import {
-  Button,
-  Card,
-  Dialog,
-  H4,
-  Spinner,
-  Text,
-  XStack,
-  YStack,
-} from 'tamagui';
+import { Button, Card, Dialog, Spinner, Text, XStack, YStack } from 'tamagui';
 import { useProcessWaiverClaimsMutation } from '../../api/db/graphql.generated';
 import { BRAND_NAVY_LIGHT } from '../../utils/colors';
 
@@ -72,7 +63,6 @@ export function WaiverProcessControl({
         borderRadius="$6"
       >
         <YStack gap="$3">
-          <H4 color="$textPrimary">Waiver Processing</H4>
           <Text color="$textMuted" fontSize="$3">
             Waivers are automatically processed nightly at 2am EST. Use this
             button to process pending waiver claims for your league immediately.

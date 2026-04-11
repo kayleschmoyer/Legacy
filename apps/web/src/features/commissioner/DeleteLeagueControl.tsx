@@ -4,7 +4,6 @@ import {
   Button,
   Card,
   Dialog,
-  H4,
   Input,
   Spinner,
   Text,
@@ -116,8 +115,6 @@ export function DeleteLeagueControl({
     <>
       <Card backgroundColor="$red2" borderColor="$red6" padding="$4">
         <YStack space="$3">
-          <H4 color="$red11">Danger Zone</H4>
-
           <Text color="$gray11" fontSize="$3">
             Permanently delete this league and all associated data. This action
             cannot be undone.

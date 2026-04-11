@@ -3,7 +3,6 @@ import {
   Button,
   Card,
   Dialog,
-  H4,
   Label,
   RadioGroup,
   Spinner,
@@ -379,8 +378,6 @@ export function NextStepControl({
         padding="$4"
       >
         <YStack space="$3">
-          <H4 color={BRAND_GOLD_LIGHT}>Next Step</H4>
-
           {hasCurrentMatchup ? (
             <YStack space="$2">
               <Text color="$gray11" fontSize="$3">
@@ -391,7 +388,10 @@ export function NextStepControl({
                 {effectiveGamesPerMatchup}
               </Text>
               <Text color="$gray11" fontSize="$3">
-                Status: {currentMatchup.status}
+                Status:{' '}
+                {currentMatchup.status
+                  ?.replace(/_/g, ' ')
+                  ?.replace(/\b\w/g, (c) => c.toUpperCase()) ?? '—'}
               </Text>
               {currentMatchup.statsLoadingStatus &&
                 currentMatchup.statsLoadingStatus !==
