@@ -1582,6 +1582,30 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
         required: ['sha'],
       },
     },
+    {
+      name: 'worktree_delete_remote_branch',
+      description:
+        'Delete a remote branch via `git push origin --delete <branch>`. ' +
+        'Refuses to delete main or origin/main. ' +
+        'Use this to clean up accidentally-pushed branches that have no open PR.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          branch: {
+            type: 'string',
+            description:
+              'Remote branch name to delete (e.g. "claude/LS-1234-my-branch"). ' +
+              'Do not include the "origin/" prefix.',
+          },
+          worktree: {
+            type: 'string',
+            description:
+              'Ticket key, absolute path, or omit for active worktree',
+          },
+        },
+        required: ['branch'],
+      },
+    },
   ],
 }));
 
@@ -7915,6 +7939,139 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               ]
                 .filter(Boolean)
                 .join('\n'),
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_delete_remote_branch
+    // -----------------------------------------------------------------------
+    case 'worktree_delete_remote_branch': {
+      const { branch, worktree: wtKey } = args as {
+        branch: string;
+        worktree?: string;
+      };
+
+      // Validate branch is a non-empty string
+      if (typeof branch !== 'string' || branch.trim().length === 0) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Invalid branch: must be a non-empty string.',
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      const normalizedBranch = branch.trim();
+
+      // Reject full ref paths (refs/heads/..., refs/remotes/...) — only bare
+      // short branch names are accepted (e.g. "claude/LS-1234-foo").
+      // A full ref path could bypass the main-branch guard below
+      // (e.g. "refs/heads/main" would not match the "origin/" strip).
+      if (normalizedBranch.startsWith('refs/')) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text:
+                `Refused: branch must be a short name, not a full ref path. ` +
+                `Got "${normalizedBranch}". Strip the "refs/heads/" or "refs/remotes/" prefix before calling this tool.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      // Refuse to delete main or origin/main (strip origin/ prefix for comparison)
+      const bareRef = normalizedBranch.replace(/^origin\//, '');
+      if (bareRef === 'main') {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Refused: cannot delete "main" or "origin/main" remote branch.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      // Validate branch name is a safe git ref (prevents flag injection from
+      // values starting with '-' and rejects illegal ref patterns like '..').
+      const target = resolveTargetDir(wtKey);
+      if ('error' in target) {
+        return {
+          content: [{ type: 'text', text: target.error }],
+          isError: true,
+        };
+      }
+      const cwd = target.path;
+
+      try {
+        runGit(['check-ref-format', '--branch', normalizedBranch], cwd);
+      } catch (err: unknown) {
+        const e = err as {
+          stdout?: string;
+          stderr?: string;
+          message?: string;
+        };
+        const output =
+          [e.stdout, e.stderr].filter(Boolean).join('\n') ||
+          e.message ||
+          String(err);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Refused: invalid branch name "${normalizedBranch}".\n${output}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      try {
+        runGit(['push', 'origin', '--delete', '--', normalizedBranch], cwd, {
+          timeout: 30_000,
+        });
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  deleted: true,
+                  branch: normalizedBranch,
+                  remote: 'origin',
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      } catch (err: unknown) {
+        const e = err as {
+          stdout?: string;
+          stderr?: string;
+          status?: number;
+          message?: string;
+        };
+        const output =
+          [e.stdout, e.stderr].filter(Boolean).join('\n') ||
+          e.message ||
+          String(err);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Failed to delete remote branch "${normalizedBranch}" (exit code ${e.status ?? 'unknown'}):\n${output}`,
             },
           ],
           isError: true,
