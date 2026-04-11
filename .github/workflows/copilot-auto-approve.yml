@@ -134,6 +134,12 @@ jobs:
                     core.info('Latest Copilot review is APPROVED — carrying forward');
                     carryForward = true;
                   } else {
+                    // Short-circuit: if Copilot couldn't review any files (e.g. only
+                    // permission bit changes), carry forward immediately — no threads exist.
+                    if (latest.body && latest.body.includes("wasn't able to review any files")) {
+                      core.info('Copilot had no reviewable files — carrying forward');
+                      carryForward = true;
+                    } else {
                     // Latest Copilot review is not APPROVED — check threads
                     // (threads may have been resolved or become outdated since the last review)
                     const copilotLogins = [
@@ -185,6 +191,7 @@ jobs:
                     } else {
                       core.info(`Copilot has ${unresolvedThreads.length} unresolved thread(s) — setting pending`);
                     }
+                    } // end: has reviewable files check
                   }
 
                   if (carryForward) {
@@ -323,6 +330,12 @@ jobs:
               core.info('Latest Copilot review is APPROVED — old threads superseded');
               // Fall through to set success + approve + label below
             } else {
+              // Short-circuit: if Copilot couldn't review any files (e.g. only
+              // permission bit changes), skip thread check and auto-pass.
+              if (latest.body && latest.body.includes("wasn't able to review any files")) {
+                core.info('Copilot had no reviewable files — auto-passing bot-review');
+                // Fall through to set success + approve + label below
+              } else {
               // Latest Copilot review is not APPROVED — check threads
               // (threads may have been resolved or become outdated since the last review)
               let allThreads = [];
@@ -380,6 +393,7 @@ jobs:
                 });
                 return;
               }
+              } // end: has reviewable files check
             }
 
             // All threads resolved or superseded — set bot-review success
@@ -551,6 +565,13 @@ jobs:
               if (latest.commit_id !== currentSha) {
                 core.setOutput('has_comments', 'false');
                 core.info(`Latest Copilot review is on ${latest.commit_id.slice(0, 7)}, current HEAD is ${currentSha.slice(0, 7)} — old review superseded by clean workflow run`);
+                return;
+              }
+              // Case 3: Copilot reported no reviewable files (e.g. only permission
+              // bit changes) — no threads will exist, auto-pass immediately.
+              if (latest.body && latest.body.includes("wasn't able to review any files")) {
+                core.setOutput('has_comments', 'false');
+                core.info('Copilot had no reviewable files — auto-passing bot-review');
                 return;
               }
             }
