@@ -957,6 +957,11 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
             description:
               'Set SKIP_PREPUSH_LINT=1 before pushing. Use when pnpm virtual store is absent and the pre-push formatter hook fails. Also accepts string "true"/"false"/"1"/"0" (MCP framework coercion).',
           },
+          remoteBranch: {
+            type: 'string',
+            description:
+              'Push to this remote branch name instead of the local branch name. Must contain an LS-#### Jira key. Use on first push from native ephemeral worktrees to set an LS-keyed remote ref without renaming the local branch (keeps Claude Code UI in sync). Sets upstream (-u) automatically. On subsequent pushes the stored upstream is detected and reused — omit this param.',
+          },
         },
       },
     },
@@ -3236,12 +3241,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         worktreeId,
         setUpstream: setUpstreamRaw,
         skipLint: skipLintRaw,
+        remoteBranch,
       } = args as {
         worktree?: unknown;
         worktreeKey?: unknown;
         worktreeId?: unknown;
         setUpstream?: unknown;
         skipLint?: unknown;
+        remoteBranch?: unknown;
       };
       // Coerce string booleans to real booleans (MCP framework may serialise
       // JSON booleans as strings — same class of bug as LS-1907).
@@ -3404,13 +3411,181 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
-      const upstreamFlag = setUpstream === true ? ' -u' : '';
-      const cmd = `git push${upstreamFlag} --force-with-lease origin HEAD`;
+      if (remoteBranch !== undefined && typeof remoteBranch !== 'string') {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `[resolvedWorktree: ${cwd}]\nInvalid argument: remoteBranch must be a string.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+      if (
+        typeof remoteBranch === 'string' &&
+        remoteBranch.trim().length === 0
+      ) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `[resolvedWorktree: ${cwd}]\nInvalid argument: remoteBranch is empty. Omit it to push to the default remote ref.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+      // Normalize remoteBranch: strip leading "origin/" so callers can pass
+      // either "claude/LS-####-desc" or "origin/claude/LS-####-desc" and get
+      // the same result. Reject "refs/" prefixes — callers must pass the branch
+      // name only, not a full refspec like "refs/heads/...".
+      let normalizedRemoteBranch: string | undefined;
+      if (typeof remoteBranch === 'string') {
+        let rb = remoteBranch.trim();
+        if (rb.startsWith('refs/')) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `[resolvedWorktree: ${cwd}]\nRefused: remoteBranch must be a branch name, not a full refspec (got "${rb}"). Pass only the branch name portion, e.g. "claude/LS-3049-my-feature".`,
+              },
+            ],
+            isError: true,
+          };
+        }
+        if (rb.startsWith('origin/')) {
+          rb = rb.slice('origin/'.length);
+        }
+        if (!rb) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `[resolvedWorktree: ${cwd}]\nInvalid argument: remoteBranch is empty after stripping the "origin/" prefix. Pass a branch name like "claude/LS-3049-my-feature".`,
+              },
+            ],
+            isError: true,
+          };
+        }
+        normalizedRemoteBranch = rb;
+      }
+      if (normalizedRemoteBranch !== undefined) {
+        if (!/LS-\d+/.test(normalizedRemoteBranch)) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `[resolvedWorktree: ${cwd}]\nRefused: remoteBranch "${normalizedRemoteBranch}" must contain an LS-#### Jira key (e.g. "claude/LS-3049-my-feature").`,
+              },
+            ],
+            isError: true,
+          };
+        }
+        if (normalizedRemoteBranch === 'main') {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `[resolvedWorktree: ${cwd}]\nRefused: cannot push to "main" via remoteBranch.`,
+              },
+            ],
+            isError: true,
+          };
+        }
+        // Validate that the branch name is a legal git ref (prevents flag
+        // injection from values starting with '-' and rejects illegal patterns).
+        try {
+          runGit(['check-ref-format', '--branch', normalizedRemoteBranch], cwd);
+        } catch (err: unknown) {
+          const e = err as {
+            stdout?: string;
+            stderr?: string;
+            message?: string;
+          };
+          const output =
+            [e.stdout, e.stderr].filter(Boolean).join('\n') ||
+            (e as Error).message ||
+            String(err);
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `[resolvedWorktree: ${cwd}]\nRefused: invalid branch name "${normalizedRemoteBranch}".\n${output}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+      }
+
+      // Determine the actual remote ref to push to:
+      // 1. If remoteBranch was explicitly provided, use it (sets upstream).
+      // 2. Else if an upstream tracking ref is already configured and differs
+      //    from the local branch name (asymmetric upstream from a prior push
+      //    with remoteBranch), use that remote branch so subsequent pushes
+      //    continue targeting the correct remote ref.
+      // 3. Otherwise fall back to the current behaviour (push to same-named remote).
+      let resolvedRemoteBranch: string | undefined;
+      if (normalizedRemoteBranch) {
+        resolvedRemoteBranch = normalizedRemoteBranch;
+      } else {
+        try {
+          const upstream = run(
+            'git rev-parse --abbrev-ref --symbolic-full-name @{u}',
+            cwd,
+          ).trim();
+          // upstream is "origin/<branchName>" when set
+          const remotePrefix = 'origin/';
+          if (upstream.startsWith(remotePrefix)) {
+            const upstreamBranch = upstream.slice(remotePrefix.length);
+            // Only use the detected upstream if it differs from the local branch
+            // (i.e., an asymmetric remote was previously set via remoteBranch).
+            const localBranchForCheck = run(
+              'git branch --show-current',
+              cwd,
+            ).trim();
+            if (upstreamBranch !== localBranchForCheck) {
+              // Safety: only follow asymmetric upstreams that look like LS-keyed
+              // agent branches set via a prior remoteBranch push. This prevents
+              // a mis-configured upstream pointing at "main" (or any other
+              // protected branch) from bypassing the 'main' guard above.
+              const upstreamIsMain =
+                upstreamBranch === 'main' ||
+                upstreamBranch.replace(/^origin\//, '') === 'main';
+              const upstreamHasLsKey = /LS-\d+/.test(upstreamBranch);
+              if (!upstreamIsMain && upstreamHasLsKey) {
+                resolvedRemoteBranch = upstreamBranch;
+              }
+            }
+          }
+        } catch {
+          // No upstream configured — will use default symmetric push behaviour.
+        }
+      }
+
       const pushEnv =
         skipLint === true ? { SKIP_PREPUSH_LINT: '1' } : undefined;
 
+      // Build args array for git push. Using runGit (execFileSync — no shell)
+      // ensures resolvedRemoteBranch is never interpolated into a shell command
+      // string, preventing flag injection or unexpected shell expansion.
+      const wantsUpstream =
+        setUpstream === true || normalizedRemoteBranch !== undefined;
+      const pushArgs = [
+        'push',
+        ...(wantsUpstream ? ['-u'] : []),
+        '--force-with-lease',
+        'origin',
+        resolvedRemoteBranch
+          ? `HEAD:refs/heads/${resolvedRemoteBranch}`
+          : 'HEAD',
+      ];
+      // cmdDisplay is only used in log output — never passed to a shell.
+      const cmdDisplay = `git ${pushArgs.join(' ')}`;
+
       try {
-        const out = run(cmd, cwd, { timeout: 30_000, env: pushEnv });
+        const out = runGit(pushArgs, cwd, { timeout: 30_000, env: pushEnv });
 
         // Append an explicit success summary so agents don't need a follow-up
         // worktree_status call to confirm the push landed. git push writes its
@@ -3419,9 +3594,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const pushedFullSha = run('git rev-parse HEAD', cwd).trim();
         const pushedSha = pushedFullSha.slice(0, 7);
         const pushedBranch = run('git branch --show-current', cwd).trim();
+        // When pushing to an asymmetric remote ref, confirm against that ref.
+        const confirmedRemoteRef = resolvedRemoteBranch ?? pushedBranch;
         let remoteConfirmed = false;
         try {
-          const remoteRef = `refs/heads/${pushedBranch}`;
+          const remoteRef = `refs/heads/${confirmedRemoteRef}`;
           const remoteInfo = execFileSync(
             'git',
             ['ls-remote', '--exit-code', 'origin', remoteRef],
@@ -3433,18 +3610,22 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           // If the remote ref cannot be queried, leave confirmation as false.
         }
 
-        const summary = [
+        const summaryParts = [
           `pushed: true`,
-          `branch: ${pushedBranch}`,
+          `local-branch: ${pushedBranch}`,
+          ...(resolvedRemoteBranch
+            ? [`remote-branch: ${resolvedRemoteBranch}`]
+            : []),
           `sha: ${pushedSha}`,
           `remote-confirmed: ${remoteConfirmed}`,
-        ].join('  ');
+        ];
+        const summary = summaryParts.join('  ');
 
         return {
           content: [
             {
               type: 'text',
-              text: `[resolvedWorktree: ${cwd}]\n[cwd: ${cwd}]\n$ ${cmd}\n\n${out.trim()}\n\n✓ ${summary}`,
+              text: `[resolvedWorktree: ${cwd}]\n[cwd: ${cwd}]\n$ ${cmdDisplay}\n\n${out.trim()}\n\n✓ ${summary}`,
             },
           ],
         };
@@ -3465,16 +3646,21 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         if (hookAmended) {
           try {
-            const retryOut = run(cmd, cwd, { timeout: 30_000, env: pushEnv });
+            const retryOut = runGit(pushArgs, cwd, {
+              timeout: 30_000,
+              env: pushEnv,
+            });
             const retryPushedFullSha = run('git rev-parse HEAD', cwd).trim();
             const retryPushedSha = retryPushedFullSha.slice(0, 7);
             const retryPushedBranch = run(
               'git branch --show-current',
               cwd,
             ).trim();
+            const retryConfirmedRemoteRef =
+              resolvedRemoteBranch ?? retryPushedBranch;
             let retryRemoteConfirmed = false;
             try {
-              const retryRemoteRef = `refs/heads/${retryPushedBranch}`;
+              const retryRemoteRef = `refs/heads/${retryConfirmedRemoteRef}`;
               const retryRemoteInfo = execFileSync(
                 'git',
                 ['ls-remote', '--exit-code', 'origin', retryRemoteRef],
@@ -3485,7 +3671,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             } catch {
               // If the remote ref cannot be queried, leave confirmation as false.
             }
-            const retrySummary = `pushed: true  branch: ${retryPushedBranch}  sha: ${retryPushedSha}  remote-confirmed: ${retryRemoteConfirmed}`;
+            const retrySummaryParts = [
+              `pushed: true`,
+              `local-branch: ${retryPushedBranch}`,
+              ...(resolvedRemoteBranch
+                ? [`remote-branch: ${resolvedRemoteBranch}`]
+                : []),
+              `sha: ${retryPushedSha}`,
+              `remote-confirmed: ${retryRemoteConfirmed}`,
+            ];
+            const retrySummary = retrySummaryParts.join('  ');
             return {
               content: [
                 {
@@ -3493,13 +3688,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                   text: [
                     `[resolvedWorktree: ${cwd}]`,
                     `[cwd: ${cwd}]`,
-                    `$ ${cmd}  (initial push — hook amended commit)`,
+                    `$ ${cmdDisplay}  (initial push — hook amended commit)`,
                     `Exit code: ${e.status ?? 'unknown'}`,
                     output,
                     ``,
                     `Pre-push hook amended the commit; retrying push...`,
                     ``,
-                    `$ ${cmd}  (retry)`,
+                    `$ ${cmdDisplay}  (retry)`,
                     retryOut.trim(),
                     ``,
                     `✓ ${retrySummary}`,
@@ -3521,11 +3716,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                   text: [
                     `[resolvedWorktree: ${cwd}]`,
                     `[cwd: ${cwd}]`,
-                    `$ ${cmd}  (initial push — hook amended commit)`,
+                    `$ ${cmdDisplay}  (initial push — hook amended commit)`,
                     `Exit code: ${e.status ?? 'unknown'}`,
                     output,
                     ``,
-                    `$ ${cmd}  (retry)`,
+                    `$ ${cmdDisplay}  (retry)`,
                     `Exit code: ${r.status ?? 'unknown'}`,
                     retryOutput,
                   ].join('\n'),
@@ -3540,7 +3735,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [
             {
               type: 'text',
-              text: `[resolvedWorktree: ${cwd}]\n[cwd: ${cwd}]\n$ ${cmd}\n\nExit code: ${e.status ?? 'unknown'}\n${output}`,
+              text: `[resolvedWorktree: ${cwd}]\n[cwd: ${cwd}]\n$ ${cmdDisplay}\n\nExit code: ${e.status ?? 'unknown'}\n${output}`,
             },
           ],
           isError: true,
