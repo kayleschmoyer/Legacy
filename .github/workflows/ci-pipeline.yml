@@ -331,6 +331,14 @@ jobs:
   deploy-playwright-report:
     name: "Deploy Playwright Report"
     needs: [e2e]
+    # Serialize pushes to bkrupa/legacy-sports-deploys gh-pages branch.
+    # Concurrent runs from different PRs would otherwise race: both clone the
+    # same branch HEAD, then the second push fails with "fetch first" because
+    # the first push already advanced the ref. cancel-in-progress: false queues
+    # them instead of cancelling so every PR's report still lands.
+    concurrency:
+      group: deploy-playwright-report-gh-pages
+      cancel-in-progress: false
     # Dependabot-triggered runs do not have access to repository secrets, so the
     # GitHub App token mint required to push to bkrupa/legacy-sports-deploys
     # always fails ("appId option is required"). The Playwright HTML report is
