@@ -32,7 +32,6 @@ import { setCommitStatus } from './tools/set-commit-status.js';
 import { secretSet } from './tools/secret-set.js';
 import { requestReview } from './tools/request-review.js';
 import { requestReviewBatch } from './tools/request-review-batch.js';
-import { resolveThread } from './tools/resolve-thread.js';
 import { resolveThreads } from './tools/resolve-threads.js';
 import { secretsCheck } from './tools/secrets-check.js';
 import { ensureSweepLabels } from './tools/ensure-sweep-labels.js';
@@ -767,18 +766,6 @@ server.tool(
       .describe('Request Copilot review (default: true)'),
   },
   async (params) => requestReviewBatch(params),
-);
-
-// --- github_resolve_thread ---
-server.tool(
-  'github_resolve_thread',
-  'Resolve a single review thread via GraphQL.',
-  {
-    threadId: z
-      .string()
-      .describe('Thread node ID from github_get_review_threads'),
-  },
-  async (params) => resolveThread(params),
 );
 
 // --- github_resolve_threads ---

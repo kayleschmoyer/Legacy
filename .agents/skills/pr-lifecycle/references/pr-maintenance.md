@@ -75,12 +75,12 @@ Run a structured self-review of all changes before committing. This catches proj
 
 When Copilot reviews have unresolved comments requiring code changes:
 
-1. Fetch unresolved threads: `github_get_review_threads(number: <PR#>, unresolvedOnly: true)`
+1. Fetch unresolved threads: `github_get_review_threads({ number: <PR#>, unresolvedOnly: true })`
 2. Read each comment's `path`, `line`, and `body`
 3. Apply the requested fix in the worktree
 4. Validate: `make pc`
 5. Commit & push
-6. Resolve threads: `github_resolve_thread(threadId: "<id>")`
+6. Resolve threads: `github_resolve_threads({ threadIds: ["<id1>", "<id2>", ...], prNumber: <PR#> })`
 7. Copilot re-reviews automatically — bot approves and labels when clean
 
 ### Two-Round Cap

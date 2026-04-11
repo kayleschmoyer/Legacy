@@ -80,14 +80,16 @@ Some review threads suggest no code change — they are process comments, "nice 
 For each PR with unresolved threads, fetch the thread details:
 
 ```
-github_get_review_threads(number: <PR#>, unresolvedOnly: true)
+github_get_review_threads({ number: <PR#>, unresolvedOnly: true })
 ```
 
 For each thread, read the comment body. If the thread is a **process/meta comment** that does not require a code change (e.g., "Consider extracting this into a utility in a future PR", "Nice improvement", suggestions about documentation outside the PR scope), resolve it:
 
 ```
-github_resolve_thread(threadId: "<threadId>")
+github_resolve_threads({ threadIds: ["<threadId1>", "<threadId2>", ...], prNumber: <PR#> })
 ```
+
+Batch all resolvable threads for a PR into one call. The `prNumber` parameter triggers a bot-review recheck after resolution; if the app token lacks `actions: write` permission, the recheck dispatch is skipped/non-fatal and reported in the tool output (for example via `recheckNote`), but threads are still resolved — the recheck fires automatically on the next push.
 
 **Do NOT resolve threads that request actual code changes** — those require a local agent. If a PR has unresolved threads that all require code changes, comment on the PR listing the unresolved threads. The PR is now **settled** (needs local agent — do not label `requires-human-review` since a local agent can fix code).
 
