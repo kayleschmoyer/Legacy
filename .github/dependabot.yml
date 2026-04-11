@@ -36,9 +36,11 @@ updates:
       - dependency-name: "react-native"
         update-types: ["version-update:semver-major"]
 
-      # NX ecosystem - major updates often require migration scripts
-      - dependency-name: "nx"
-        update-types: ["version-update:semver-major"]
+      # NX ecosystem - all major bumps are batched via the nx-ecosystem group
+      # below (which includes major in its update-types) so all nx + @nx/* +
+      # @nrwl/* packages move together in one PR. Do NOT add individual nx
+      # major ignore rules here — ignore takes precedence over groups and
+      # would suppress the batched PR entirely (see PR #2284 for context).
 
       # Jest ecosystem - major updates can break testing setup
       - dependency-name: "jest"
@@ -102,13 +104,17 @@ updates:
         update-types:
           - "patch"
 
-      # NX ecosystem - keep NX packages together
+      # NX ecosystem - keep ALL NX packages together including major bumps.
+      # Major Nx version upgrades require all nx + @nx/* + @nrwl/* packages to
+      # move in lockstep (see PR #2284 where a solo @nx/jest major bump pulled
+      # in nx@22 as a transitive dep alongside nx@21, breaking the workspace).
       nx-ecosystem:
         patterns:
           - "nx"
           - "@nx/*"
           - "@nrwl/*"
         update-types:
+          - "major"
           - "minor"
           - "patch"
 
