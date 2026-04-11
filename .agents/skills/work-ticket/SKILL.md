@@ -146,15 +146,17 @@ Follow the full [worktree-workflow skill](../worktree-workflow/SKILL.md):
    > **⛔ Do NOT stop here.** Creating the PR is also not the finish line. Subscribing to PR activity is mandatory — without it, CI failures and review comments do not stream back into the session and the watch-to-merge step in step 9 cannot react. If you exit after `github_create_pr` without subscribing and watching, the ticket is unfinished.
 
 9. **Watch the PR through to merge** (REQUIRED — this step replaces "stop after PR"):
-   - Monitor PR activity from the subscription. CI failures and Copilot review comments arrive as `<github-webhook-activity>` messages. When no events arrive for a while, poll explicitly: `github_view_pr({ number: <PR#> })` for status, `ci_list_runs({ branch: "<branch>", limit: 1 })` + `ci_view_run({ runId: <id>, includeJobs: true })` for CI.
-   - **Investigate and fix every CI failure**. Use `ci_get_logs({ runId, errorSummary: true })` to grab the failed-step output. Common categories that this skill should fix automatically without escalation:
-     - Stale branch / lint / format / type errors → fix locally, push (`worktree_commit` + `worktree_push`)
+   - Call `github_wait_for_pr_event({ number: <PR#> })`. It blocks until something agent-actionable occurs and returns `{ event, pr, ... }`. Handle the event, then call it again. This covers both Check Runs (Actions jobs) and Commit Statuses (bot/external CI like `bot-review`) — no polling loop needed.
+   - **`checks_failed`**: the event payload gives you `failedChecks` (name/type/url) but not a runId. Get the runId with `ci_list_runs({ branch: "<headRefName>", limit: 1 })`, then `ci_get_logs({ runId, errorSummary: true })` to grab failed-step output. Common fixes:
+     - Lint / format / type errors → fix, push (`worktree_commit` + `worktree_push`)
      - Branch behind `main` → run the [rebase skill](../rebase/SKILL.md) (`worktree_rebase` → `worktree_stabilize` → `make pc` → push)
      - Flaky tests → re-run via `ci_rerun({ runId, failedOnly: true })`; if persistent, dig in
-   - **Respond to Copilot review comments**. Read threads with `github_get_review_threads({ number: <PR#>, unresolvedOnly: true })`, fix each issue in the worktree, push, reply via `github_reply_to_thread({ threadId, body: "addressed in <sha>" })`, then resolve via `github_resolve_threads({ threadIds: [...], prNumber: <PR#> })`. Re-request review with `github_request_review({ number: <PR#> })` when the round is done. Cap at 2 review rounds before escalating to the user.
-   - **Rebase against `main` as needed**. If the PR turns CONFLICTING after a merge, re-run the rebase skill — do not just label it for the sweep.
+     - `failedChecks.type === "check_run"` → retrigger with `github_retrigger_check`; `type === "commit_status"` → push a new commit or dispatch the workflow
+   - **`new_review_thread`**: the event payload includes thread body/path/line. Fix each issue in the worktree, push, reply via `github_reply_to_thread({ threadId, body: "addressed in <sha>" })`, then resolve via `github_resolve_threads({ threadIds: [...], prNumber: <PR#> })`. Re-request review with `github_request_review({ number: <PR#> })` when the round is done. Cap at 2 review rounds before escalating to the user. (Copilot feedback always arrives as `new_review_thread` — never as `review_changes_requested`.)
+   - **`conflicts`**: re-run the rebase skill — do not just label it for the sweep.
+   - **`review_approved`** + checks passing → merge.
+   - **`merged`**: proceed to step 10.
    - **Do not start unrelated work** while this PR is open. Do not exit the workflow. Do not mark the tracking task completed.
-   - When the PR is merged (visible via the subscription or `github_view_pr` showing `merged: true`), proceed to step 10.
 
 10. **MCP gap audit (after merge)**: follow [`skills/mcp-gaps/SKILL.md`](../mcp-gaps/SKILL.md) Phase 1 — review all Bash commands and MCP overflows from this session, classify gaps, file any new tickets under the current bucket epic (get key via `jira_get_bucket_epic({ bucket: 'mcp-gaps' })`). Mandatory.
 11. **Complete tracking tasks**: call `TaskUpdate(taskId: <id>, status: "completed")` for every task tracking this ticket — **only after the PR is merged and the gap audit is complete**, never before. Marking the task complete while the PR is still open is a failure mode.

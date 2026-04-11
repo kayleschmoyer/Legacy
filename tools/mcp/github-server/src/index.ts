@@ -41,6 +41,7 @@ import { viewPR } from './tools/view-pr.js';
 import { listRunners } from './tools/list-runners.js';
 import { webhookList, webhookUpdate, webhookPing } from './tools/webhooks.js';
 import { prCommits } from './tools/pr-commits.js';
+import { waitForPREvent, ALL_PR_EVENTS } from './tools/wait-for-pr-event.js';
 
 /**
  * Shared Zod schema for generic string arrays. Accepts a real array OR a
@@ -1035,6 +1036,70 @@ server.tool(
       .describe('Webhook ID (from github_webhook_list).'),
   },
   async (params) => webhookPing(params),
+);
+
+// --- github_wait_for_pr_event ---
+server.tool(
+  'github_wait_for_pr_event',
+  `Block until an agent-actionable event occurs on a PR, then return structured data describing what happened. Prefer this over polling loops (ci_wait_for_run + github_view_pr in a loop).
+
+Events:
+- checks_failed: any check run (Actions) OR commit status (bot/external CI) in the PR status rollup fails
+- checks_passed: all check runs AND commit statuses in the PR status rollup are green
+- new_review_thread: new unresolved review thread opened — fires for Copilot comments and human threads (Copilot never submits formal approve/request-changes; its feedback arrives exclusively here)
+- review_changes_requested: human reviewer submits "changes requested" (NOT Copilot)
+- review_approved: human reviewer approves (NOT Copilot)
+- conflicts: branch becomes un-mergeable (CONFLICTING)
+- merged: PR was merged to base branch
+- closed: PR was closed without merge
+
+Only fires on NEW transitions for non-terminal states — pre-existing checks/reviews/conflicts at call time are ignored (e.g. already-failing checks do not immediately trigger checks_failed). Exception: if the PR is already merged or closed when called, merged/closed fire immediately since there is nothing further to wait for.
+For checks_failed: returned failedChecks.type distinguishes check_run (can retrigger via github_retrigger_check) from commit_status (requires a new push or workflow dispatch). To get a runId for ci_get_logs, call ci_list_runs({ branch: "<headRefName>", limit: 1 }).
+On timeout: returns isError=true with event="timeout". Call again to continue waiting.`,
+  {
+    number: z.coerce.number().int().positive().describe('PR number'),
+    waitFor: z
+      .preprocess(
+        (val) => {
+          if (Array.isArray(val)) return val;
+          if (typeof val === 'string') {
+            if (val.trimStart().startsWith('[')) {
+              try {
+                const parsed = JSON.parse(val);
+                if (Array.isArray(parsed)) return parsed;
+              } catch {
+                // fall through
+              }
+            }
+            return [val];
+          }
+          return val;
+        },
+        z.array(
+          z.enum([
+            'checks_failed',
+            'checks_passed',
+            'new_review_thread',
+            'review_changes_requested',
+            'review_approved',
+            'conflicts',
+            'merged',
+            'closed',
+          ]),
+        ),
+      )
+      .default(ALL_PR_EVENTS)
+      .describe(
+        `Event types to wait for. Defaults to all agent-actionable events: ${ALL_PR_EVENTS.join(', ')}.`,
+      ),
+    timeoutMs: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(600_000)
+      .describe('Timeout in milliseconds (default: 600000 = 10 minutes).'),
+  },
+  async (params) => waitForPREvent(params),
 );
 
 // Start the server
