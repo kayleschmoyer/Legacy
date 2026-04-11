@@ -28,10 +28,15 @@ export function Dropdown({
   items,
   disabled = false,
   placeholder = 'Select an option...',
+  'aria-label': ariaLabel,
 }: DropdownProperties): React.JSX.Element {
   return (
     <Select value={value} onValueChange={disabled ? undefined : onChange}>
-      <Select.Trigger disabled={disabled} opacity={disabled ? 0.5 : 1}>
+      <Select.Trigger
+        disabled={disabled}
+        opacity={disabled ? 0.5 : 1}
+        aria-label={ariaLabel}
+      >
         <Select.Value placeholder={placeholder} />
       </Select.Trigger>
 
