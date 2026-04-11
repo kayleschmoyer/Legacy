@@ -29,6 +29,8 @@ This file provides guidance to AI coding agents working with code in this reposi
     - `git checkout HEAD -- <file>` (restore a specific file from `HEAD`, discarding both staged and unstaged changes for that path) → `worktree_checkout_file(files: ["..."], worktree: "...")` when a worktree is active; shell fallback: `git -C <worktree-path> checkout HEAD -- <file>`
     - `git branch -m <newName>` (rename current branch, e.g. after `jira_create_ticket`) → `worktree_rename_branch({ newName: "claude/LS-####-description" })` when a worktree is active; shell fallback: `git -C <worktree-path> branch -m <newName>`
     - `git -C <worktree> add <file> && git -C <worktree> commit -m "..."` (selective staging) → `worktree_commit({ files: ["<file>"], message: "..." })` when a worktree is active; omit `files` to stage all changes (git add -A)
+    - `git -C <wt> diff HEAD` (inspect uncommitted working-tree changes) → `worktree_diff({ base: "HEAD" })` when a worktree is active; shell fallback: `git -C <worktree-path> diff HEAD`
+    - `git -C <wt> branch --show-current` or `git -C <wt> status` (current branch / working-tree status) → `worktree_status()` when a worktree is active; shell fallback: `git -C <worktree-path> branch --show-current` / `git -C <worktree-path> status`
     - `sleep N && gh run view <runId> --json status,conclusion` (CI polling loop) → `ci_wait_for_run({ runId: "<runId>" })` — polls until the run completes or times out (default 10 min; pass `timeoutMs` for long runs) and returns structured status/conclusion; never use sleep + polling loops to wait for CI
     - `tail ~/.claude/.../tasks/<taskId>.output` → `TaskOutput(taskId: "<taskId>")` for background agent task output (no path needed — tool resolves it automatically; returned content can be inspected for length/line counts directly)
     - `wc -l tasks/<taskId>.output` or `wc -c tasks/<taskId>.output` → `TaskOutput(taskId: "<taskId>")` then compute counts from the returned content using `wc` semantics (`-l`: count `\n` characters; `-c`: count UTF-8 bytes, not string `.length`)
@@ -189,6 +191,8 @@ For subagents that perform git operations in worktrees, also include:
 ```
   - Use worktree_run for git commands (preferred over git -C via Bash; git -C is the shell fallback when MCP tools are unavailable)
   - Use worktree_commit/worktree_push for commits and pushes
+  - Use worktree_diff({ base: "HEAD" }) to inspect uncommitted changes (replaces git -C <wt> diff HEAD)
+  - Use worktree_status() to get current branch and working-tree status (replaces git -C <wt> branch --show-current / git status)
 ```
 
 For subagents running PR sweeps (open-prs skill), also include:
@@ -218,6 +222,8 @@ For **work subagents** dispatched by multi-ticket orchestrators (`/sweep-prs`, `
 
   Tool preferences:
   - Use worktree_commit/worktree_push for commits and pushes
+  - Use worktree_diff({ base: "HEAD" }) to inspect uncommitted changes (replaces git -C <wt> diff HEAD)
+  - Use worktree_status() to get current branch and working-tree status (replaces git -C <wt> branch --show-current / git status)
   - Use Glob (not find/ls) for file discovery
   - Use Grep (not grep/rg) for content search
   - Use Read (not cat/head/tail) for reading files
