@@ -62,55 +62,21 @@ Subagents do **not** inherit AGENTS.md context. Always include tool preference h
 
 ## Commands
 
-```bash
-make build          # build affected projects
-make test           # test changed files
-make test-all       # test all projects
-make lint           # lint
-make lint-fix       # lint with auto-fix
-make typecheck      # type check all projects
-make format         # format code
-make pc             # full pre-commit validation (lint + typecheck + test + build)
-make codegen        # GraphQL codegen
-
-make dev            # start all dev services
-make dev-storybook  # Storybook component dev
-make graphiql       # GraphQL explorer
-make db-migrate     # run database migrations
-make db-studio      # Drizzle Studio UI
-
-make worktree TICKET=#### DESC=description   # create sibling worktree (parallel work only)
-make wt-setup WT=$wt                         # install deps and configure sibling worktree
-make kill-stale                              # kill stale node processes
-
-pnpm exec nx run <project>:<target>          # project-specific targets
-pnpm exec nx affected -t <target>            # affected analysis
-```
-
-**`scratch/` directory**: use for ad-hoc output files (lint results, CI logs, debug dumps). Everything in `scratch/` is gitignored. **On Windows, avoid `node -e "..."`** for multi-line scripts — write to `scratch/<name>.js` instead.
+See `skills/repo-tooling/SKILL.md` for the full command reference. Key: `make pc` (pre-commit), `make build`, `make test`, `make typecheck`, `make lint-fix`, `make format`, `make codegen`. Dev: `make dev`, `make dev-storybook`. Project-specific: `pnpm exec nx run <project>:<target>`. Use `scratch/` for ad-hoc output (gitignored). On Windows, write scripts to `scratch/<name>.js` instead of `node -e "..."`.
 
 ## Architecture
 
-**Stack**: React Native (Expo) - Next.js - AWS Lambda - GraphQL (Apollo) - PostgreSQL (Drizzle ORM) - Nx monorepo - pnpm
+**Stack**: React Native (Expo) · Next.js · AWS Lambda · GraphQL (Apollo) · PostgreSQL (Drizzle ORM) · Nx monorepo · pnpm
 
 ```
 apps/          React Native app, Next.js web app, CLI, E2E test suites
 lambdas/       Serverless backend: GraphQL API (db), game-selection, stats, draft-processor, websocket, oauth-proxy, stripe-webhook, apple-iap
 lib/           19+ shared libraries (shared-components, db-client, scoring, data-loaders, logging, api, utils, aws-utils, analytics, ...)
 terraform/     Infrastructure-as-Code
-scripts/       PowerShell and shell automation scripts
 .agents/skills/ Modular skill docs for specific tasks
 ```
 
-**GraphQL API**: Lives in `lambdas/db` (Apollo Server on Lambda). Schema changes require Drizzle migrations in `lib/db-client/migrations/` and regenerating types via `make codegen`.
-
-**Cross-platform components**: `lib/shared-components/src/platform-components/` — `.native.ts` files are auto-resolved by Metro. The `__PLATFORM_COMPONENTS__` magic string is used for build-time resolution of more complex platform splits.
-
-**Database**: Drizzle ORM with PostgreSQL. Schema lives in `lib/db-client`. Always run `db_migration_status` and `db_migrate` MCP tools before `make pc`.
-
-**Logging**: Import `LOGGER` from `@legacy-sports/logging`. ESLint enforces `no-console`.
-
-**Testing**: Unit/integration: Jest (`make test`). Web E2E: Playwright (hermetic — `route.fulfill()` only). Mobile E2E: WebdriverIO.
+**GraphQL API** lives in `lambdas/db`. Schema changes require Drizzle migrations in `lib/db-client/migrations/` + `make codegen`. Cross-platform: `lib/shared-components/src/platform-components/` (`.native.ts` auto-resolved by Metro).
 
 ## Design Context
 
@@ -122,23 +88,9 @@ Detailed how-to docs live in `.agents/skills/<name>/SKILL.md`. The `description`
 
 ## MCP Servers
 
-| Server                  | Purpose                                                                                                                   |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `worktree`              | Worktree lifecycle: list, set active, run, guard, rebase, stabilize, push                                                 |
-| `legacy-sports-github`  | PR and review lifecycle (GitHub REST/GraphQL API)                                                                         |
-| `legacy-sports-make`    | Makefile targets: validation, build, install, worktree setup                                                              |
-| `legacy-sports-nx`      | Nx project discovery, affected analysis, target execution                                                                 |
-| `legacy-sports-jira`    | Ticket CRUD, transitions, blocker checks                                                                                  |
-| `legacy-sports-db`      | Database queries, migrations, schema generation                                                                           |
-| `legacy-sports-ci`      | CI log queries, workflow reruns; `ci_audit_session_bash` for MCP gap audits                                               |
-| `legacy-sports-aws`     | CloudWatch log tailing, AWS SSO status checks                                                                             |
-| `legacy-sports-browser` | Dev server lifecycle, headless screenshots, GitHub image upload                                                           |
-| `claude_ai_Stripe`      | Claude Code built-in Stripe integration                                                                                   |
-| `claude_ai_Atlassian`   | Claude Code built-in Atlassian plugin (Jira + Confluence via OAuth 2.1). Cloud ID: `fb294606-6c8f-4b52-9a41-11fe45b77528` |
+See `skills/mcp-first/SKILL.md` for the full server list and per-server tool mapping. Servers: `worktree`, `legacy-sports-github`, `legacy-sports-make`, `legacy-sports-nx`, `legacy-sports-jira`, `legacy-sports-db`, `legacy-sports-ci`, `legacy-sports-aws`, `legacy-sports-browser`, plus Claude built-ins (`claude_ai_Stripe`, `claude_ai_Atlassian` — cloud ID `fb294606-6c8f-4b52-9a41-11fe45b77528`).
 
-> **Server load order matters in native-worktree sessions**: Claude Code's worktree-spawned sessions only connect the first few servers from `.mcp.json` at session start (LS-2902). The ordering prioritizes ticket-work tools (`worktree`, `github`, `make`, `nx`). If a native session is missing a server, fall back to shell or move to a sibling worktree.
-
-> **MCP-first principle**: always prefer MCP tools over equivalent shell commands. See `skills/mcp-first/SKILL.md` for the full per-server tool mapping.
+> **Server load order**: native-worktree sessions may only connect the first few servers (LS-2902). If missing a server, fall back to shell or use a sibling worktree.
 
 ## Cloud Agent Mode
 

@@ -22,17 +22,29 @@ Consolidated skill for running and fixing ESLint, TypeScript type checking, buil
 
 ## Quick Commands
 
-| Task                | Command                     | Notes                              |
-| ------------------- | --------------------------- | ---------------------------------- |
-| Lint (auto-fix)     | `make lint-fix`             | Fixes ~80% of issues automatically |
-| Lint (dry run)      | `make lint`                 | Report only, no changes            |
-| Type check          | `make typecheck`            | Affected projects only             |
-| Format              | `make format`               | Prettier across all files          |
-| Build (affected)    | `make build`                | Build changed projects             |
-| Codegen             | `make codegen`              | GraphQL type generation            |
-| DB migration status | `db_migration_status` (MCP) | Check for pending migrations       |
-| DB migrate          | `db_migrate` (MCP)          | Apply pending migrations           |
-| Full pre-commit     | `make pc`                   | typecheck + lint + test + build    |
+| Task                | Command                               | Notes                              |
+| ------------------- | ------------------------------------- | ---------------------------------- |
+| Lint (auto-fix)     | `make lint-fix`                       | Fixes ~80% of issues automatically |
+| Lint (dry run)      | `make lint`                           | Report only, no changes            |
+| Test (affected)     | `make test`                           | Affected projects only             |
+| Type check          | `make typecheck`                      | Affected projects only             |
+| Format              | `make format`                         | Prettier across all files          |
+| Build (affected)    | `make build`                          | Build changed projects             |
+| Codegen             | `make codegen`                        | GraphQL type generation            |
+| DB migration status | `db_migration_status` (MCP)           | Check for pending migrations       |
+| DB migrate (MCP)    | `db_migrate` (MCP)                    | Apply pending migrations           |
+| DB migrate (shell)  | `make db-migrate`                     | Shell fallback / non-MCP envs      |
+| Full pre-commit     | `make pc`                             | typecheck + lint + test + build    |
+| Test all            | `make test-all`                       | All projects, not just affected    |
+| Dev servers         | `make dev`                            | Start all dev services             |
+| Storybook           | `make dev-storybook`                  | Component dev                      |
+| GraphQL explorer    | `make graphiql`                       | GraphQL playground                 |
+| DB Studio           | `make db-studio`                      | Drizzle Studio UI                  |
+| Create worktree     | `make worktree TICKET=#### DESC=desc` | Sibling worktree (parallel only)   |
+| Setup worktree      | `make wt-setup WT=$wt`                | Install deps + configure worktree  |
+| Kill stale procs    | `make kill-stale`                     | Find stale node processes          |
+| Project target      | `pnpm exec nx run <proj>:<target>`    | Nx project-specific                |
+| Affected targets    | `pnpm exec nx affected -t <target>`   | Changed projects only              |
 
 > **MCP first**: prefer `nx_run` / `nx_run_affected` MCP tools over shell commands when available.
 
