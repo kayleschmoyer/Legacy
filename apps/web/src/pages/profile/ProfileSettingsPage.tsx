@@ -383,9 +383,7 @@ const ProfileSettingsPage: React.FC = () => {
           {/* ── Profile Card ── */}
           <SectionCard
             style={{
-              background: `linear-gradient(135deg, ${withAlpha(BG_DARK, 0.85)} 0%, ${withAlpha(BRAND_NAVY, 0.25)} 100%)`,
-              backdropFilter: 'blur(20px)',
-              WebkitBackdropFilter: 'blur(20px)',
+              background: `linear-gradient(135deg, ${BG_DARK} 0%, ${BRAND_NAVY} 100%)`,
             }}
           >
             <SectionHeader>
@@ -578,9 +576,7 @@ const ProfileSettingsPage: React.FC = () => {
           {/* ── App Avatar ── */}
           <SectionCard
             style={{
-              background: `linear-gradient(135deg, ${withAlpha(BG_DARK, 0.85)} 0%, ${withAlpha(BRAND_NAVY, 0.25)} 100%)`,
-              backdropFilter: 'blur(20px)',
-              WebkitBackdropFilter: 'blur(20px)',
+              background: `linear-gradient(135deg, ${BG_DARK} 0%, ${BRAND_NAVY} 100%)`,
             }}
           >
             <SectionHeader>
@@ -614,9 +610,7 @@ const ProfileSettingsPage: React.FC = () => {
           {/* ── Account Security ── */}
           <SectionCard
             style={{
-              background: `linear-gradient(135deg, ${withAlpha(BG_DARK, 0.85)} 0%, ${withAlpha(BRAND_NAVY, 0.2)} 100%)`,
-              backdropFilter: 'blur(20px)',
-              WebkitBackdropFilter: 'blur(20px)',
+              background: `linear-gradient(135deg, ${BG_DARK} 0%, ${BRAND_NAVY} 100%)`,
             }}
           >
             <SectionHeader>
@@ -670,9 +664,7 @@ const ProfileSettingsPage: React.FC = () => {
           {auth.config.discordClientId ? (
             <SectionCard
               style={{
-                background: `linear-gradient(135deg, ${withAlpha(BG_DARK, 0.85)} 0%, ${withAlpha(BRAND_NAVY, 0.25)} 100%)`,
-                backdropFilter: 'blur(20px)',
-                WebkitBackdropFilter: 'blur(20px)',
+                background: `linear-gradient(135deg, ${BG_DARK} 0%, ${BRAND_NAVY} 100%)`,
               }}
             >
               <SectionHeader>
@@ -753,9 +745,7 @@ const ProfileSettingsPage: React.FC = () => {
           {/* ── Danger Zone ── */}
           <SectionCard
             style={{
-              background: `linear-gradient(135deg, ${withAlpha(BG_DARK, 0.85)} 0%, ${withAlpha(BRAND_SEAM_RED, 0.06)} 100%)`,
-              backdropFilter: 'blur(20px)',
-              WebkitBackdropFilter: 'blur(20px)',
+              background: `linear-gradient(135deg, ${BG_DARK} 0%, ${withAlpha(BRAND_SEAM_RED, 0.12)} 100%)`,
               borderColor: withAlpha(BRAND_SEAM_RED, 0.25),
             }}
           >

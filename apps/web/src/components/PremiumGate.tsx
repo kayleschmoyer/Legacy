@@ -94,8 +94,7 @@ export function PremiumGate({
           alignItems="center"
           justifyContent="center"
           style={{
-            background: `linear-gradient(180deg, ${withAlpha(BRAND_NAVY, 0.55)} 0%, ${withAlpha(BRAND_NAVY, 0.88)} 100%)`,
-            backdropFilter: 'blur(2px)',
+            background: `linear-gradient(180deg, ${withAlpha(BRAND_NAVY, 0.7)} 0%, ${BRAND_NAVY} 100%)`,
           }}
         >
           <YStack

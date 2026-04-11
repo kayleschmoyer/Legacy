@@ -33,7 +33,6 @@ import {
   GRADIENT_ACCENT_GREEN,
   GREEN,
   RED,
-  SURFACE_PANEL,
   SURFACE_SUBTLE,
   VIOLET,
   withAlpha,
@@ -173,14 +172,13 @@ function ensureFlashStyle(): void {
 
 // ── Styled Primitives ──────────────────────────────────────────────────────────
 
-const GlassHeader = styled(XStack, {
+const StickyRosterHeader = styled(XStack, {
   position: 'sticky' as const,
   // Offset by the nav bar height so this sticks directly below the nav,
   // not overlapping it. zIndex must stay below NAV_Z_INDEX.
   top: NAV_HEIGHT_PX,
   zIndex: CONTENT_STICKY_Z_INDEX,
-  backgroundColor: '$background075',
-  backdropFilter: 'blur(12px)',
+  backgroundColor: '$surfacePanel',
   paddingVertical: '$3',
   paddingHorizontal: '$4',
   borderBottomWidth: 1,
@@ -1105,17 +1103,13 @@ function BenchPanel({
   };
   return (
     <YStack
-      backgroundColor={withAlpha(SURFACE_PANEL, 0.7)}
+      backgroundColor="$surfacePanel"
       borderColor="$surfacePanelBorder"
       borderWidth={1}
       borderRadius="$5"
       overflow="hidden"
       role="region"
       aria-labelledby={titleId}
-      style={{
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
-      }}
     >
       {/* Gradient accent bar */}
       <YStack
@@ -1571,7 +1565,7 @@ export function LeagueRosterManagement({
     >
       <YStack gap="$4" width="100%" maxWidth={1280} alignSelf="center">
         {/* ── Header with glass effect ─────────────────────────────── */}
-        <GlassHeader>
+        <StickyRosterHeader>
           <YStack gap="$1">
             <H4 margin={0}>{teamName ?? 'My Roster'}</H4>
             <Text fontSize="$2" color="$textMuted">
@@ -1595,7 +1589,7 @@ export function LeagueRosterManagement({
               tone={emptyCount === 0 ? 'positive' : 'warning'}
             />
           </XStack>
-        </GlassHeader>
+        </StickyRosterHeader>
 
         {/* ── Selected player banner ──────────────────────────────── */}
         {selectedPlayer && !readOnly && (
@@ -1618,15 +1612,11 @@ export function LeagueRosterManagement({
           {/* ── Lineup Table ──────────────────────────────────────── */}
           <YStack flex={3} minWidth={0}>
             <YStack
-              backgroundColor={withAlpha(SURFACE_PANEL, 0.85)}
+              backgroundColor="$surfacePanel"
               borderColor="$surfacePanelBorder"
               borderWidth={1}
               borderRadius="$5"
               overflow="hidden"
-              style={{
-                backdropFilter: 'blur(8px)',
-                WebkitBackdropFilter: 'blur(8px)',
-              }}
             >
               {/* Gradient accent bar */}
               <YStack

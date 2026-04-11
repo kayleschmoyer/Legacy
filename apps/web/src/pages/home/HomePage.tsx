@@ -238,16 +238,12 @@ const heroGradientStyle: React.CSSProperties = {
   background: `linear-gradient(180deg, ${withAlpha(BRAND_NAVY, 0.15)} 0%, transparent 70%)`,
 };
 
-const sportCardGlassStyle = (accentColor: string): React.CSSProperties => ({
-  background: `linear-gradient(135deg, ${withAlpha(BG_DARK, 0.85)} 0%, ${accentColor} 100%)`,
-  backdropFilter: 'blur(20px)',
-  WebkitBackdropFilter: 'blur(20px)',
+const sportCardStyle = (accentColor: string): React.CSSProperties => ({
+  background: `linear-gradient(135deg, ${BG_DARK} 0%, ${accentColor} 100%)`,
 });
 
-const featureCardGlassStyle: React.CSSProperties = {
-  background: `linear-gradient(135deg, ${withAlpha(BG_DARK, 0.72)} 0%, ${withAlpha(BRAND_NAVY, 0.35)} 100%)`,
-  backdropFilter: 'blur(16px)',
-  WebkitBackdropFilter: 'blur(16px)',
+const featureCardStyle: React.CSSProperties = {
+  background: `linear-gradient(135deg, ${BG_DARK} 0%, ${BRAND_NAVY} 100%)`,
 };
 
 /* ─── Sport Config ─── */
@@ -601,9 +597,7 @@ export function HomePage(): React.JSX.Element {
                 borderColor="$glassBorder"
                 padding="$5"
                 style={{
-                  background: `linear-gradient(135deg, ${withAlpha(BG_DARK, 0.72)} 0%, ${withAlpha(BRAND_NAVY, 0.35)} 100%)`,
-                  backdropFilter: 'blur(16px)',
-                  WebkitBackdropFilter: 'blur(16px)',
+                  background: `linear-gradient(135deg, ${BG_DARK} 0%, ${BRAND_NAVY} 100%)`,
                 }}
               >
                 <StatBox>
@@ -642,9 +636,7 @@ export function HomePage(): React.JSX.Element {
                     flex={1}
                     minWidth={280}
                     style={{
-                      background: `linear-gradient(135deg, ${withAlpha(BG_DARK, 0.85)} 0%, ${withAlpha(BRAND_NAVY, 0.55)} 100%)`,
-                      backdropFilter: 'blur(20px)',
-                      WebkitBackdropFilter: 'blur(20px)',
+                      background: `linear-gradient(135deg, ${BG_DARK} 0%, ${BRAND_NAVY} 100%)`,
                     }}
                     onPress={() => {
                       navigate(`/baseball/league/${league.id}`);
@@ -692,7 +684,7 @@ export function HomePage(): React.JSX.Element {
                     key={sport.key}
                     flex={1}
                     minWidth={300}
-                    style={sportCardGlassStyle(sport.accent)}
+                    style={sportCardStyle(sport.accent)}
                     onPress={() => {
                       navigate(sport.route);
                     }}
@@ -855,7 +847,7 @@ export function HomePage(): React.JSX.Element {
                     key={sport.key}
                     flex={1}
                     minWidth={300}
-                    style={sportCardGlassStyle(sport.accent)}
+                    style={sportCardStyle(sport.accent)}
                     {...(sport.available
                       ? {
                           onPress: () => {
@@ -953,10 +945,7 @@ export function HomePage(): React.JSX.Element {
 
               <XStack gap="$4" flexWrap="wrap">
                 {FEATURES.map((feature) => (
-                  <FeatureCard
-                    key={feature.label}
-                    style={featureCardGlassStyle}
-                  >
+                  <FeatureCard key={feature.label} style={featureCardStyle}>
                     <FeatureIconCircle>
                       <BrandIcon
                         name={feature.icon}
@@ -1009,9 +998,7 @@ export function HomePage(): React.JSX.Element {
                 borderColor: '$glassBorderHover',
               }}
               style={{
-                background: `linear-gradient(135deg, ${withAlpha(BRAND_NAVY, 0.25)} 0%, ${withAlpha(BG_DARK, 0.85)} 100%)`,
-                backdropFilter: 'blur(18px)',
-                WebkitBackdropFilter: 'blur(18px)',
+                background: `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BG_DARK} 100%)`,
               }}
             >
               <BrandIconBadge

@@ -26,6 +26,7 @@ import {
   BRAND_NAVY_DARK,
   BRAND_NAVY_LIGHT,
   BRAND_SEAM_RED,
+  SURFACE_PANEL,
   withAlpha,
 } from '../../constants/colors';
 import {
@@ -426,9 +427,7 @@ export default function PricingPage() {
   };
 
   const premiumCardStyle: React.CSSProperties = {
-    background: `linear-gradient(135deg, ${withAlpha(BRAND_NAVY_LIGHT, 0.12)} 0%, ${withAlpha(BRAND_GOLD, 0.05)} 100%)`,
-    backdropFilter: 'blur(12px)',
-    WebkitBackdropFilter: 'blur(12px)',
+    background: `linear-gradient(135deg, ${withAlpha(BRAND_NAVY_LIGHT, 0.18)} 0%, ${SURFACE_PANEL} 100%)`,
     borderColor: BRAND_NAVY_LIGHT,
   };
 
@@ -853,9 +852,7 @@ export default function PricingPage() {
             borderWidth={1}
             borderColor="$glassBorder"
             style={{
-              background: `linear-gradient(135deg, ${withAlpha(BRAND_NAVY_LIGHT, 0.1)} 0%, ${withAlpha(BRAND_GOLD, 0.05)} 100%)`,
-              backdropFilter: 'blur(12px)',
-              WebkitBackdropFilter: 'blur(12px)',
+              background: `linear-gradient(135deg, ${withAlpha(BRAND_NAVY_LIGHT, 0.15)} 0%, ${SURFACE_PANEL} 100%)`,
             }}
           >
             <H2

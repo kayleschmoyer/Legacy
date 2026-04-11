@@ -32,6 +32,7 @@ import {
   EMERALD,
   GREEN,
   RED,
+  SURFACE_PANEL,
   withAlpha,
 } from '../../constants/colors';
 import { env } from '../../config/environment';
@@ -170,16 +171,13 @@ const pageBackgroundStyle: React.CSSProperties = {
   backgroundAttachment: 'fixed',
 };
 
-const cardGlassStyle: React.CSSProperties = {
-  background: `linear-gradient(135deg, ${withAlpha(BG_DARK, 0.85)} 0%, ${withAlpha(BRAND_NAVY, 0.25)} 100%)`,
-  backdropFilter: 'blur(20px)',
-  WebkitBackdropFilter: 'blur(20px)',
+const cardPanelStyle: React.CSSProperties = {
+  background: `linear-gradient(135deg, ${BG_DARK} 0%, ${BRAND_NAVY} 100%)`,
 };
 
 const goldCardStyle: React.CSSProperties = {
   background: `linear-gradient(135deg, ${withAlpha(BRAND_GOLD, 0.08)} 0%, ${withAlpha(BRAND_GOLD_PRESS, 0.04)} 100%)`,
-  backdropFilter: 'blur(20px)',
-  WebkitBackdropFilter: 'blur(20px)',
+  backgroundColor: SURFACE_PANEL,
 };
 
 /* ─── Helpers ─── */
@@ -231,8 +229,6 @@ function PastDueBanner({
     <SectionCard
       style={{
         background: withAlpha(AMBER, 0.08),
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
         borderColor: withAlpha(AMBER, 0.35),
       }}
     >
@@ -439,9 +435,7 @@ function CancelConfirmDialog({
         maxWidth={480}
         width="90%"
         style={{
-          background: `linear-gradient(135deg, ${withAlpha(BG_DARK, 0.97)} 0%, ${withAlpha(BRAND_NAVY, 0.4)} 100%)`,
-          backdropFilter: 'blur(24px)',
-          WebkitBackdropFilter: 'blur(24px)',
+          background: `linear-gradient(135deg, ${BG_DARK} 0%, ${BRAND_NAVY} 100%)`,
         }}
       >
         <SectionHeader>
@@ -648,7 +642,7 @@ const SubscriptionPage: React.FC = () => {
           )}
 
           {/* ── Current Plan Card ── */}
-          <SectionCard style={cardGlassStyle}>
+          <SectionCard style={cardPanelStyle}>
             <SectionHeader>
               <SectionIconBox
                 style={

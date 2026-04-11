@@ -49,6 +49,7 @@ import {
   GREEN,
   INJURY_OUT,
   SLATE_400,
+  SURFACE_CARD,
   SURFACE_PANEL,
   WHITE,
   withAlpha,
@@ -824,9 +825,7 @@ export function BaseballLandingPage() {
       role="region"
       aria-labelledby="baseball-hero-title"
       style={{
-        background: `linear-gradient(135deg, ${withAlpha(BG_DARK, 0.9)} 0%, ${withAlpha(BRAND_NAVY, 0.55)} 50%, ${withAlpha(BRAND_SEAM_RED, 0.2)} 100%)`,
-        backdropFilter: 'blur(28px)',
-        WebkitBackdropFilter: 'blur(28px)',
+        background: `linear-gradient(135deg, ${BG_DARK} 0%, ${BRAND_NAVY} 50%, ${SURFACE_CARD} 100%)`,
         boxShadow: `0 8px 32px ${withAlpha(BRAND_NAVY, 0.18)}, inset 0 1px 0 ${withAlpha(WHITE, 0.05)}`,
       }}
     >
@@ -877,9 +876,7 @@ export function BaseballLandingPage() {
       <HeroSidePanel>
         <StatsCard
           style={{
-            background: `linear-gradient(160deg, ${withAlpha(BG_DARK, 0.95)} 0%, ${withAlpha(SURFACE_PANEL, 0.88)} 100%)`,
-            backdropFilter: 'blur(16px)',
-            WebkitBackdropFilter: 'blur(16px)',
+            background: `linear-gradient(160deg, ${BG_DARK} 0%, ${SURFACE_PANEL} 100%)`,
           }}
         >
           <StatsHeader>
@@ -906,9 +903,7 @@ export function BaseballLandingPage() {
 
         <QuickGlanceCard
           style={{
-            background: `linear-gradient(160deg, ${withAlpha(SURFACE_PANEL, 0.8)} 0%, ${withAlpha(BG_DARK, 0.65)} 100%)`,
-            backdropFilter: 'blur(14px)',
-            WebkitBackdropFilter: 'blur(14px)',
+            background: `linear-gradient(160deg, ${SURFACE_PANEL} 0%, ${BG_DARK} 100%)`,
           }}
         >
           <Paragraph
@@ -941,9 +936,7 @@ export function BaseballLandingPage() {
       role="region"
       aria-labelledby="baseball-hero-title"
       style={{
-        background: `linear-gradient(135deg, ${withAlpha(BG_DARK, 0.88)} 0%, ${withAlpha(BRAND_NAVY, 0.45)} 50%, ${withAlpha(BRAND_SEAM_RED, 0.12)} 100%)`,
-        backdropFilter: 'blur(24px)',
-        WebkitBackdropFilter: 'blur(24px)',
+        background: `linear-gradient(135deg, ${BG_DARK} 0%, ${BRAND_NAVY} 50%, ${SURFACE_CARD} 100%)`,
         boxShadow: `0 4px 20px ${withAlpha(BRAND_NAVY, 0.14)}, inset 0 1px 0 ${withAlpha(WHITE, 0.04)}`,
       }}
     >
@@ -1092,9 +1085,7 @@ export function BaseballLandingPage() {
                     accessibilityLabel={`View ${league.name || 'league'}`}
                     role="link"
                     style={{
-                      background: `linear-gradient(135deg, ${withAlpha(BG_DARK, 0.8)} 0%, ${withAlpha(SURFACE_PANEL, 0.58)} 100%)`,
-                      backdropFilter: 'blur(14px)',
-                      WebkitBackdropFilter: 'blur(14px)',
+                      background: `linear-gradient(135deg, ${BG_DARK} 0%, ${SURFACE_PANEL} 100%)`,
                     }}
                   >
                     {/* League identity */}
@@ -1180,9 +1171,7 @@ export function BaseballLandingPage() {
           ) : (
             <EmptyState
               style={{
-                background: `linear-gradient(135deg, ${withAlpha(BG_DARK, 0.82)} 0%, ${withAlpha(BRAND_NAVY, 0.22)} 100%)`,
-                backdropFilter: 'blur(20px)',
-                WebkitBackdropFilter: 'blur(20px)',
+                background: `linear-gradient(135deg, ${BG_DARK} 0%, ${BRAND_NAVY} 100%)`,
               }}
             >
               <EmptyStateIcon>
@@ -1248,8 +1237,6 @@ export function BaseballLandingPage() {
             aria-labelledby="create-league-title"
             aria-describedby="create-league-desc"
             style={{
-              backdropFilter: 'blur(20px)',
-              WebkitBackdropFilter: 'blur(20px)',
               boxShadow: `0 16px 48px ${withAlpha(BLACK, 0.3)}, 0 0 0 1px ${withAlpha(BRAND_NAVY, 0.12)}`,
             }}
           >

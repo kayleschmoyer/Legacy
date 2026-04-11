@@ -11,10 +11,8 @@
 .app-header {
   text-align: center;
   padding: 1rem 2rem;
-  background: var(--glassSurface, rgba(10, 15, 26, 0.75));
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--glassBorder, rgba(255, 255, 255, 0.08));
+  background: #111b2f;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .app-header h1 {
@@ -34,9 +32,7 @@
 }
 
 .app-nav {
-  background: var(--glassSurface, rgba(10, 15, 26, 0.75));
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: #111b2f;
   padding: 0.75rem 1rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }

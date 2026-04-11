@@ -20,6 +20,7 @@ import {
   BRAND_SEAM_RED,
   DISCORD_BLURPLE,
   DISCORD_BLURPLE_DARK,
+  SURFACE_PANEL,
   withAlpha,
 } from '../../constants/colors';
 
@@ -187,16 +188,12 @@ const heroHeadingStyle: React.CSSProperties = {
   color: BRAND_GOLD,
 };
 
-const featureCardGlassStyle: React.CSSProperties = {
-  background: `linear-gradient(135deg, ${withAlpha(BG_DARK, 0.72)} 0%, ${withAlpha(BRAND_NAVY, 0.35)} 100%)`,
-  backdropFilter: 'blur(16px)',
-  WebkitBackdropFilter: 'blur(16px)',
+const featureCardStyle: React.CSSProperties = {
+  background: `linear-gradient(135deg, ${BG_DARK} 0%, ${BRAND_NAVY} 100%)`,
 };
 
-const sportCardGlassStyle = (accentColor: string): React.CSSProperties => ({
-  background: `linear-gradient(135deg, ${withAlpha(BG_DARK, 0.85)} 0%, ${accentColor} 100%)`,
-  backdropFilter: 'blur(20px)',
-  WebkitBackdropFilter: 'blur(20px)',
+const sportCardStyle = (accentColor: string): React.CSSProperties => ({
+  background: `linear-gradient(135deg, ${BG_DARK} 0%, ${accentColor} 100%)`,
 });
 
 /* ─── Feature & Sport Data ─── */
@@ -529,11 +526,9 @@ export function PublicLandingPage(): React.JSX.Element {
     window.location.href = buildDiscordAuthUrl(clientId, redirectUri, state);
   }, [config.discordClientId]);
 
-  const navGlassStyle = useMemo<React.CSSProperties>(
+  const navStyle = useMemo<React.CSSProperties>(
     () => ({
-      background: `${withAlpha(BG_DARK, 0.88)}`,
-      backdropFilter: 'blur(20px)',
-      WebkitBackdropFilter: 'blur(20px)',
+      background: SURFACE_PANEL,
       borderBottom: `1px solid ${withAlpha(BRAND_NAVY, 0.4)}`,
     }),
     [],
@@ -554,7 +549,7 @@ export function PublicLandingPage(): React.JSX.Element {
         paddingVertical="$3"
         alignItems="center"
         justifyContent="space-between"
-        style={navGlassStyle}
+        style={navStyle}
         $sm={{ paddingHorizontal: '$3' }}
       >
         {/* Logo */}
@@ -734,7 +729,7 @@ export function PublicLandingPage(): React.JSX.Element {
 
             <XStack flexWrap="wrap" gap="$4" justifyContent="center">
               {FEATURES.map((feature) => (
-                <FeatureCard key={feature.label} style={featureCardGlassStyle}>
+                <FeatureCard key={feature.label} style={featureCardStyle}>
                   <FeatureIconCircle>
                     <BrandIcon
                       name={feature.icon}
@@ -791,7 +786,7 @@ export function PublicLandingPage(): React.JSX.Element {
               {SPORTS.map((sport) => (
                 <SportCard
                   key={sport.label}
-                  style={sportCardGlassStyle(sport.accent)}
+                  style={sportCardStyle(sport.accent)}
                 >
                   <XStack alignItems="center" gap="$3">
                     <YStack

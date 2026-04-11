@@ -244,17 +244,15 @@ function getPageBackgroundStyle(isDark: boolean): React.CSSProperties {
   };
 }
 
-function getCardStyle(isDark: boolean, navyAlpha = 0.25): React.CSSProperties {
+function getCardStyle(isDark: boolean, navyStop = 100): React.CSSProperties {
+  // Two subtle variants (100% / 80% stop) preserve visual distinction between
+  // primary and alternate cards now that glassmorphism blur has been removed.
   return isDark
     ? {
-        background: `linear-gradient(135deg, ${withAlpha(BG_DARK, 0.85)} 0%, ${withAlpha(BRAND_NAVY, navyAlpha)} 100%)`,
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
+        background: `linear-gradient(135deg, ${BG_DARK} 0%, ${BRAND_NAVY} ${navyStop}%)`,
       }
     : {
-        background: `linear-gradient(135deg, ${withAlpha('#FFFFFF', 0.9)} 0%, ${withAlpha(BRAND_NAVY, 0.04)} 100%)`,
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
+        background: `linear-gradient(135deg, #FFFFFF 0%, ${withAlpha(BRAND_NAVY, 0.06)} ${navyStop}%)`,
       };
 }
 
@@ -566,7 +564,7 @@ const PreferencesPage: React.FC = () => {
     [isDark],
   );
   const cardStyle = useMemo(() => getCardStyle(isDark), [isDark]);
-  const cardStyleAlt = useMemo(() => getCardStyle(isDark, 0.2), [isDark]);
+  const cardStyleAlt = useMemo(() => getCardStyle(isDark, 80), [isDark]);
   const [prefs, setPrefs] = useState<UserPreferences>(() => ({
     ...loadPrefs(),
     // theme is owned by ThemeContext; sync local mirror from context

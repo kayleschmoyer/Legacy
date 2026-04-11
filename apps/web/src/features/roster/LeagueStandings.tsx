@@ -9,7 +9,6 @@ import {
   BRAND_GOLD_LIGHT,
   BRAND_NAVY_LIGHT,
   GRADIENT_ACCENT_AMBER,
-  SURFACE_PANEL,
   SURFACE_SUBTLE,
   withAlpha,
 } from '../../constants/colors';
@@ -432,17 +431,13 @@ export function LeagueStandings({
 
   return (
     <Card
-      backgroundColor={withAlpha(SURFACE_PANEL, 0.7)}
+      backgroundColor="$surfacePanel"
       borderColor="$surfacePanelBorder"
       borderWidth={1}
       borderRadius="$5"
       overflow="hidden"
       role="region"
       aria-label="League standings"
-      style={{
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
-      }}
     >
       {/* Gradient accent bar */}
       <YStack

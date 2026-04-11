@@ -116,7 +116,6 @@ function SetupScreen({
             background: GRADIENT_WHITE_CARD,
             borderRadius: '20px',
             padding: '32px',
-            backdropFilter: 'blur(24px)',
             border: `1px solid ${OVERLAY_WHITE_10}`,
             boxShadow: `0 16px 64px ${withAlpha(BLACK, 0.4)}`,
           }}

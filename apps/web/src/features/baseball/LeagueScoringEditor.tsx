@@ -21,7 +21,6 @@ import {
   useUpdateLeagueScoringProfileMutation,
 } from '../../api/db/graphql.generated';
 import {
-  BG_DARK,
   BLACK,
   BRAND_GOLD_LIGHT,
   BRAND_NAVY,
@@ -690,7 +689,7 @@ export function LeagueScoringEditor(
       overflow="hidden"
       style={{ boxShadow: `0 4px 24px ${withAlpha(BLACK, 0.25)}` }}
     >
-      {/* Glassmorphism header */}
+      {/* Panel header */}
       <XStack
         paddingHorizontal="$5"
         paddingVertical="$4"
@@ -698,11 +697,7 @@ export function LeagueScoringEditor(
         gap="$3"
         borderBottomWidth={1}
         borderBottomColor="$surfacePanelBorder"
-        style={{
-          background: `linear-gradient(135deg, ${withAlpha(BRAND_NAVY_LIGHT, 0.08)} 0%, ${withAlpha(BG_DARK, 0.85)} 60%)`,
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-        }}
+        backgroundColor="$surfacePanel"
       >
         <XStack
           width={40}

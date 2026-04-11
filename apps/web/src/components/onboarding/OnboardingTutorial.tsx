@@ -10,6 +10,7 @@ import {
 import { ConceptTooltip } from './ConceptTooltip';
 import {
   BG_DARK,
+  BLACK,
   BRAND_GOLD,
   BRAND_GOLD_DARK,
   BRAND_GOLD_LIGHT,
@@ -576,9 +577,7 @@ export function OnboardingTutorial({ onClose }: OnboardingTutorialProps) {
         right: 0,
         bottom: 0,
         zIndex: 1000,
-        background: withAlpha('#000', 0.75),
-        backdropFilter: 'blur(4px)',
-        WebkitBackdropFilter: 'blur(4px)',
+        background: withAlpha(BLACK, 0.85),
         padding: '16px',
         display: 'flex',
         alignItems: 'center',
@@ -595,16 +594,14 @@ export function OnboardingTutorial({ onClose }: OnboardingTutorialProps) {
         borderWidth={1}
         borderColor={withAlpha(BRAND_GOLD, 0.3)}
         style={{
-          background: `linear-gradient(145deg, ${withAlpha('#0D1526', 0.98)} 0%, ${withAlpha(BRAND_NAVY, 0.95)} 100%)`,
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
+          background: `linear-gradient(145deg, #0D1526 0%, ${BRAND_NAVY} 100%)`,
           width: '100%',
           maxWidth: 560,
           maxHeight: '90vh',
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
-          boxShadow: `0 24px 80px ${withAlpha('#000', 0.6)}`,
+          boxShadow: `0 24px 80px ${withAlpha(BLACK, 0.6)}`,
         }}
         role="dialog"
         aria-modal="true"

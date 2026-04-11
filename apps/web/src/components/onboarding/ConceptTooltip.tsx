@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import ReactDOM from 'react-dom';
 import { Paragraph, XStack, YStack } from '@legacy-sports/shared-components/ui';
 import {
+  BLACK,
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,
   BRAND_NAVY_LIGHT,
@@ -116,14 +117,12 @@ export function ConceptTooltip({ term, explanation }: ConceptTooltipProps) {
               transform: 'translate(-50%, -100%)',
               zIndex: 99999,
               width: TOOLTIP_WIDTH,
-              background: `linear-gradient(135deg, #0D1526 0%, ${withAlpha(BRAND_NAVY_LIGHT, 0.95)} 100%)`,
-              backdropFilter: 'blur(16px)',
-              WebkitBackdropFilter: 'blur(16px)',
+              background: `linear-gradient(135deg, #0D1526 0%, ${BRAND_NAVY_LIGHT} 100%)`,
               border: `1px solid ${withAlpha(BRAND_GOLD, 0.35)}`,
               borderRadius: 10,
               padding: '10px 14px',
               pointerEvents: 'none',
-              boxShadow: `0 8px 32px ${withAlpha('#000', 0.5)}`,
+              boxShadow: `0 8px 32px ${withAlpha(BLACK, 0.5)}`,
             }}
           >
             {/* Arrow – counter-shift so it always points at the anchor */}

@@ -37,8 +37,7 @@ export function ImpersonationBanner(): React.JSX.Element | null {
         position: 'sticky',
         top: 0,
         zIndex: 9999,
-        background: `linear-gradient(90deg, ${BRAND_SEAM_RED} 0%, ${withAlpha(BRAND_SEAM_RED, 0.85)} 100%)`,
-        backdropFilter: 'blur(8px)',
+        background: BRAND_SEAM_RED,
         borderBottom: `2px solid ${withAlpha(BRAND_GOLD_LIGHT, 0.4)}`,
       }}
     >

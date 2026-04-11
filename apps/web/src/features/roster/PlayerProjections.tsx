@@ -4,7 +4,6 @@ import {
   AMBER,
   BRAND_GOLD_LIGHT,
   BRAND_NAVY_LIGHT,
-  SURFACE_PANEL,
   SURFACE_SUBTLE,
   VIOLET,
   withAlpha,
@@ -88,16 +87,12 @@ export function PlayerProjections({
 
   return (
     <Card
-      backgroundColor={withAlpha(SURFACE_PANEL, 0.7)}
+      backgroundColor="$surfacePanel"
       borderColor="$surfacePanelBorder"
       borderWidth={1}
       borderRadius="$5"
       overflow="hidden"
       width="100%"
-      style={{
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
-      }}
     >
       {/* Gradient accent bar */}
       <YStack

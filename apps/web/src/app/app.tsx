@@ -149,10 +149,9 @@ const AccentBar = styled(YStack, {
 });
 
 const NavContainer = styled(YStack, {
-  backgroundColor: '$background',
+  backgroundColor: '$surfacePanel',
   borderBottomWidth: 1,
   borderBottomColor: '$borderColor',
-  // backdrop-blur applied via inline style
 });
 
 const NavContent = styled(XStack, {
@@ -317,12 +316,7 @@ function Navigation() {
         }}
       />
 
-      <NavContainer
-        style={{
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-        }}
-      >
+      <NavContainer>
         <NavContent>
           {/* ── Brand ── */}
           <XStack flex={1} alignItems="center" justifyContent="flex-start">
