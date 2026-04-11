@@ -60,6 +60,7 @@ Thumbs.db
 .nx/workspace-data
 
 # Expo
+node_modules
 node_modules/
 .expo/
 .yarn/
