@@ -105,6 +105,68 @@ function restoreActiveWorktree(): string | null {
   return null;
 }
 
+/**
+ * Detect whether the MCP server was launched from inside a native Claude Code
+ * ephemeral worktree (`.claude/worktrees/<name>/`).
+ *
+ * When a session is opened with the Claude Code launcher's "worktree" checkbox,
+ * the primary working directory — and therefore the MCP server's `process.cwd()`
+ * — is the ephemeral worktree directory.  In that case we should use the CWD as
+ * the active worktree instead of restoring from the state file, which may
+ * contain stale state written by a different session.
+ *
+ * Returns the resolved CWD if it is a valid ephemeral worktree, or `null`.
+ */
+function detectEphemeralWorktreeCwd(): string | null {
+  try {
+    const cwd = resolve(process.cwd());
+    const worktreesDir = resolve(join(MAIN_REPO, '.claude', 'worktrees'));
+    // CWD must be a direct child of the worktrees directory.
+    if (!cwd.startsWith(worktreesDir + sep)) return null;
+    // Must be a valid git worktree: .git must be a file (not a directory) whose
+    // `gitdir:` pointer falls under MAIN_REPO/.git/worktrees/.  This prevents
+    // false-positives from standalone repos accidentally placed under the
+    // .claude/worktrees/ path.
+    const gitPath = join(cwd, '.git');
+    if (!existsSync(gitPath)) return null;
+    if (!lstatSync(gitPath).isFile()) return null;
+    const gitFileContents = readFileSync(gitPath, 'utf-8').trim();
+    const gitDirPrefix = 'gitdir:';
+    if (!gitFileContents.startsWith(gitDirPrefix)) return null;
+    const rawGitDir = gitFileContents.slice(gitDirPrefix.length).trim();
+    if (!rawGitDir) return null;
+    const resolvedGitDir = resolve(cwd, rawGitDir);
+    const mainRepoWorktreesGitDir = resolve(
+      join(MAIN_REPO, '.git', 'worktrees'),
+    );
+    if (!resolvedGitDir.startsWith(mainRepoWorktreesGitDir + sep)) return null;
+    return cwd;
+  } catch {
+    return null;
+  }
+}
+
+// Auto-detect the active worktree from process CWD at server startup.
+//
+// If the MCP server is launched from inside an ephemeral worktree directory
+// (native Claude Code session with the "worktree" checkbox), initialise the
+// active worktree from the CWD so that worktree_commit / worktree_push work
+// without an explicit worktree_set call.
+//
+// Critically: we also clear the state file so that stale state written by a
+// previous session does not leak into this one.  Without this, a session that
+// ran worktree_set("X") would leave ".twig/mcp-active-worktree" pointing to X,
+// and a fresh ephemeral-worktree session that never calls worktree_set would
+// silently commit/push to X instead of its own worktree.
+{
+  const cwdWorktree = detectEphemeralWorktreeCwd();
+  if (cwdWorktree) {
+    activeWorktree = cwdWorktree;
+    // Erase any persisted state — it belongs to a different session.
+    persistActiveWorktree(null);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Worktree locking — file-based coordination for multi-agent workflows
 // ---------------------------------------------------------------------------
@@ -1645,7 +1707,10 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
-  // Restore persisted active worktree on first tool call after server restart.
+  // Restore persisted active worktree on first tool call after server restart
+  // (sibling-worktree sessions that call worktree_set explicitly).  CWD-based
+  // auto-detection for native ephemeral worktrees already runs at module init,
+  // so activeWorktree will be non-null there and this line is a no-op.
   activeWorktree ??= restoreActiveWorktree();
 
   switch (name) {
