@@ -4,6 +4,30 @@
 
 Be **thorough in a single pass**. Surface all findings in one review rather than trickling comments across multiple rounds. A comprehensive first review is far more valuable than three incremental ones — each round costs CI time and developer context switches.
 
+**A follow-up review from you is a failure mode, not a feature.** If you add comments after a PR is updated with fixes from your previous comments, you have failed to do your job completely the first time.
+
+### Full-Diff-First Protocol
+
+Before writing **any** comment:
+
+1. **Read every file in the diff** — do not comment as you read; complete the full survey first.
+2. **Identify cross-file patterns** — the same bug or anti-pattern may appear in multiple files; group these into a single comment with all affected locations noted.
+3. **Run the exhaustiveness checklist** (see below) — mentally check each tier before opening a review.
+4. **Then write all comments at once** — submit a single comprehensive review, not a stream of incremental observations.
+
+### Pre-Submit Exhaustiveness Checklist
+
+Before submitting your review, confirm you have checked:
+
+- [ ] All Tier 1 categories across every changed file
+- [ ] All Tier 2 categories for files with significant logic changes
+- [ ] Cross-file concerns: shared state, exported types, GraphQL schema ↔ codegen consistency
+- [ ] Async correctness: `await` placement, unhandled rejections, race conditions
+- [ ] Test coverage: is changed behavior exercised by a test?
+- [ ] Import boundaries: does the change violate Nx module boundaries?
+
+If any box would be unchecked, keep reviewing — do not submit until you have covered everything.
+
 ## Priority Tiers
 
 Focus your review budget on high-impact issues. If you must limit comments, prioritize by tier:
@@ -102,7 +126,8 @@ Fantasy sports players (25–45) who are league commissioners and active partici
 ## Code Review Conventions
 
 - When suggesting a fix, prefer a concrete `suggestion` block over a prose description
-- If a comment applies to a pattern repeated multiple times, comment once and note "same applies at lines X, Y, Z"
+- **Group repeated patterns**: if a bug or anti-pattern appears in multiple files, write **one** comment that names all affected locations — never one comment per occurrence
+- **Never drip-feed**: if you discover something during a follow-up pass that you could have caught in the first pass, that is a process failure — retrospectively note all missed findings in a single follow-up comment rather than opening a new review round for each one
 - For shell scripts (`.sh`): focus on correctness under `set -euo pipefail` — unquoted variables, missing error handling, and commands that fail silently are the priority
 - For TypeScript: focus on type safety, error handling, and async correctness over style
 - For infrastructure files (`.yml`, `.json` configs): focus on security and correctness, not formatting
