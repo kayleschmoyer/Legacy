@@ -728,6 +728,22 @@ export async function getRepoOwnerName(): Promise<{
 }> {
   if (cachedRepo) return cachedRepo;
 
+  // In cloud sessions (GitHub Actions, Claude Code on the web), the git remote
+  // URL may be a proxied URL that doesn't contain "github.com". Check the
+  // standard GITHUB_REPOSITORY env var ("owner/repo") first.
+  const ghRepo = process.env.GITHUB_REPOSITORY?.trim();
+  if (ghRepo) {
+    const slashIdx = ghRepo.indexOf('/');
+    if (slashIdx > 0) {
+      const owner = ghRepo.slice(0, slashIdx).trim();
+      const name = ghRepo.slice(slashIdx + 1).trim();
+      if (owner && name) {
+        cachedRepo = { owner, name };
+        return cachedRepo;
+      }
+    }
+  }
+
   const remoteUrl = await new Promise<string>((res, reject) => {
     execFile(
       'git',
@@ -743,13 +759,30 @@ export async function getRepoOwnerName(): Promise<{
     );
   });
 
-  const match = /github\.com[:/]([^/]+)\/([^/.]+)/.exec(remoteUrl);
-  if (!match) {
-    throw new Error(
-      `Could not parse GitHub owner/repo from remote URL: ${remoteUrl}`,
-    );
+  // Standard github.com SSH and HTTPS patterns. Explicitly strip a trailing
+  // ".git" so that repo names containing dots (e.g. "my.repo") are preserved.
+  const match = /github\.com[:/]([^/]+)\/(.+?)(?:\.git)?$/.exec(remoteUrl);
+  if (match) {
+    cachedRepo = { owner: match[1], name: match[2] };
+    return cachedRepo;
   }
 
-  cachedRepo = { owner: match[1], name: match[2] };
-  return cachedRepo;
+  // Fallback for proxied remote URLs. Normalize SCP-style remotes
+  // (git@proxy:owner/repo.git) to slash-delimited paths, strip a trailing
+  // ".git", then extract the last two path segments as owner/repo.
+  const normalizedRemoteUrl = remoteUrl
+    .replace(/\.git$/, '')
+    .replace(/^([^/]+):([^/].*\/[^/]+)$/, '$1/$2');
+  const remoteSegments = normalizedRemoteUrl.split('/').filter(Boolean);
+  if (remoteSegments.length >= 2) {
+    cachedRepo = {
+      owner: remoteSegments[remoteSegments.length - 2],
+      name: remoteSegments[remoteSegments.length - 1],
+    };
+    return cachedRepo;
+  }
+
+  throw new Error(
+    `Could not parse GitHub owner/repo from remote URL: ${remoteUrl}`,
+  );
 }
