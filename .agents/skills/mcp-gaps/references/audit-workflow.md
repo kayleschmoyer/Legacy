@@ -1,15 +1,15 @@
 # MCP Gap Audit — Detailed Workflow
 
-After every agent session, review the Bash commands that were executed and determine which ones should have been (or could become) MCP tool invocations. For each identified gap, check whether a ticket already exists under the **current MCP gaps bucket epic** (get key via `jira_get_bucket_epic({ bucket: 'mcp-gaps' })`) and create one if not.
+After every agent session, review the Bash and PowerShell commands that were executed and determine which ones should have been (or could become) MCP tool invocations. For each identified gap, check whether a ticket already exists under the **current MCP gaps bucket epic** (get key via `jira_get_bucket_epic({ bucket: 'mcp-gaps' })`) and create one if not.
 
 This workflow also catches two additional categories of MCP issues:
 
 - **Overflows** — MCP tools that _were_ used but returned results too large for the context window (a silent productivity killer that wastes context on failed tool calls)
-- **Failures** — MCP tools that were called but returned errors (403, path bugs, permission gaps), causing agents to fall back to Bash commands
+- **Failures** — MCP tools that were called but returned errors (403, path bugs, permission gaps), causing agents to fall back to Bash or PowerShell commands
 
 ## Steps
 
-### 1. Collect Bash commands and MCP issues from the session
+### 1. Collect Bash and PowerShell commands and MCP issues from the session
 
 > **Start here**: `ci_audit_session_bash({ gapsOnly: true, includeMcp: true })` — this is the **first tool to call**. It auto-detects the current session and returns a frequency-table summary of Bash command usage, highlighting potential gaps. Do NOT manually parse session JSONL files — the tool does this natively and is faster.
 
@@ -19,11 +19,11 @@ This workflow also catches two additional categories of MCP issues:
 ci_audit_session_bash({ includeMcp: true, gapsOnly: true })
 ```
 
-This parses the current session's JSONL transcript file (parent + all subagents) and outputs every Bash command with timestamps. It auto-detects the current session by finding the most recently modified JSONL in the project's `~/.claude/projects/` directory. Pass `sessionId` to target a specific session. The tool returns structured JSON by default; use `gapsOnly: true` for the compact gap-focused text output shown above, or omit it if you want the full structured results.
+This parses the current session's JSONL transcript file (parent + all subagents) and outputs every `Bash` tool invocation (Claude Code) with timestamps. **Current limitation:** `ci_audit_session_bash` and `scripts/audit-session-bash.py` do not yet extract `powershell` tool invocations (GitHub Copilot CLI) — review those separately via the manual fallback below. It auto-detects the current session by finding the most recently modified JSONL in the project's `~/.claude/projects/` directory. Pass `sessionId` to target a specific session. The tool returns structured JSON by default; use `gapsOnly: true` for the compact gap-focused text output shown above, or omit it if you want the full structured results.
 
 **Shell fallback** — if the CI MCP server is unavailable: `python scripts/audit-session-bash.py --include-mcp --gaps-only`. Use `--session-id <uuid>` to target a specific session.
 
-**Manual fallback** — if the script is also unavailable (e.g., cloud agent without the script in the repo), review the conversation history manually for all `Bash` tool invocations. Note that this only captures commands still in the context window — commands from before compaction will be missed.
+**Manual fallback / PowerShell collection** — review the conversation history for `powershell` tool invocations, and for any `Bash` invocations you need to recover from the still-visible transcript. JSONL parsing via `ci_audit_session_bash` / `scripts/audit-session-bash.py` is the recommended source for Claude Code `Bash` invocations, but those tools do **not** currently extract GitHub Copilot CLI `powershell` invocations. For `powershell`, manual conversation-history review is therefore the current collection method, with the important limitation that it only captures commands still in the context window — commands from before compaction will be missed.
 
 Once you have the command list (from either method), filter out noise. Ignore:
 
@@ -32,7 +32,7 @@ Once you have the command list (from either method), filter out noise. Ignore:
 - **File listing/search via Bash** when a dedicated tool exists — `ls | tail`, `ls -1 | sort`, `find . -name "*.ts"` should use **Glob** (pattern matching, sorted by modification time). `ls` is fine for quick directory orientation, but when used to discover files by name/pattern or determine naming conventions (e.g., listing migrations to find the latest timestamp), Glob is the correct tool. Classify as `missing-awareness` if the agent used Bash instead
 - **Commands with no realistic MCP equivalent** (e.g., interactive editors, ad-hoc `python -c` scripts)
 
-**Do NOT ignore documented Bash exceptions.** AGENTS.md and skill docs sometimes document shell commands as accepted workarounds (e.g., "no Nx target equivalent", "shell fallback"). These are _acknowledged_ gaps, not permanent exemptions. The audit should still flag them as gaps (usually `missing-tool` or `missing-feature` as appropriate) so they get tracked and eventually closed. Add a note in the ticket description: `This is a documented exception in AGENTS.md/skill docs — filing to track closure.`
+**Do NOT ignore documented Bash/PowerShell exceptions.** AGENTS.md and skill docs sometimes document shell commands as accepted workarounds (e.g., "no Nx target equivalent", "shell fallback"). These are _acknowledged_ gaps, not permanent exemptions. The audit should still flag them as gaps (usually `missing-tool` or `missing-feature` as appropriate) so they get tracked and eventually closed. Add a note in the ticket description: `This is a documented exception in AGENTS.md/skill docs — filing to track closure.`
 
 Focus on commands that:
 
@@ -53,11 +53,11 @@ These commands look "investigative" but represent repeatable workflows every age
 
 ### 1b. Collect non-MCP commands from subagent sessions
 
-Subagent sessions contribute **more** Bash commands than parent sessions in practice (87 git/ls/find commands from subagents vs 82 from parents across 60 audited sessions). If you had to use Step 1's manual conversation-history fallback, that review only captures parent-session commands still visible in the context window.
+Subagent sessions contribute **more** shell commands than parent sessions in practice (87 git/ls/find commands from subagents vs 82 from parents across 60 audited sessions). If you had to use Step 1's manual conversation-history fallback, that review only captures parent-session commands still visible in the context window.
 
 > **If you used `ci_audit_session_bash` in Step 1**, subagent commands are already included in the output (grouped by subagent source file). Skip the manual collection below and proceed to filtering.
 
-**Manual fallback** — subagent transcripts live at `~/.claude/projects/<project-hash>/<sessionId>/subagents/*.jsonl`. Each JSONL line is a message object; Bash tool calls appear as:
+**Manual fallback** — subagent transcripts live at `~/.claude/projects/<project-hash>/<sessionId>/subagents/*.jsonl`. These are Claude Code session logs only — GitHub Copilot CLI sessions are not stored here. Each JSONL line is a message object; Bash tool calls appear as:
 
 ```json
 {
@@ -69,7 +69,7 @@ Subagent sessions contribute **more** Bash commands than parent sessions in prac
 }
 ```
 
-**What to collect**: extract all `Bash` tool calls from subagent JSONL files for the current session. Apply the same filtering rules as Step 1 (ignore one-off investigative commands, focus on repeatable patterns).
+**What to collect**: extract all `Bash` tool calls from subagent JSONL files for the current session (these are Claude Code sessions only — `powershell` invocations from Copilot CLI are not present in these files). Apply the same filtering rules as Step 1 (ignore one-off investigative commands, focus on repeatable patterns).
 
 **Common subagent anti-patterns** (highest frequency first):
 
@@ -93,7 +93,7 @@ For each candidate command, determine:
 
 | Field               | Description                                                                                                                                         |
 | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Shell command**   | The exact command or pattern (e.g., `pnpm exec nx run <project>:test -- -u`)                                                                        |
+| **Shell command**   | The exact command or pattern (e.g., `pnpm exec nx run <project>:test -- -u`) — note whether it was invoked via `Bash` or `powershell` tool          |
 | **Why it was used** | What the agent was trying to accomplish                                                                                                             |
 | **MCP server**      | Which existing MCP server should own this (or "new server needed")                                                                                  |
 | **Gap type**        | `missing-tool` (no tool exists), `missing-feature` (tool exists but lacks a flag/option), `missing-awareness` (tool exists but agent didn't use it) |
@@ -145,6 +145,7 @@ For each gap not already tracked, use the `jira_create_ticket` MCP tool:
 ## Gap Identified
 
 **Shell command observed**: `<command>`
+**Tool type**: Bash | powershell
 **Agent intent**: <what the agent was trying to do>
 **Gap type**: missing-tool | missing-feature
 
@@ -256,19 +257,19 @@ Review the conversation history for MCP tool calls that returned errors — look
 - **State loss** — tool succeeds but its side effects don't persist (e.g., `worktree_set` succeeds, then subsequent tools can't find the active worktree)
 - **Unexpected empty results** — tool returns success but data is missing or malformed
 
-These failures are distinct from overflows (Step 6) — the tool was invoked with correct parameters but failed at the server level. When tools fail silently, agents fall back to Bash commands, negating the MCP-first principle.
+These failures are distinct from overflows (Step 6) — the tool was invoked with correct parameters but failed at the server level. When tools fail silently, agents fall back to Bash or PowerShell commands, negating the MCP-first principle.
 
 > **Do NOT dismiss failures as "environmental" or "known".** Every failure must be triaged and ticketed with an appropriate fix type (`permission-gap`, `bug`, `config-issue`, or `expected-limitation`). Timeouts, state loss, and silent errors all deserve tickets. Even if the failure seems intermittent or platform-specific, another agent will hit the same issue — file a ticket so it gets investigated. Always check for an existing ticket before filing, but never skip filing because the failure "seems like a one-off."
 
 For each failure, record:
 
-| Field          | Description                                                                   |
-| -------------- | ----------------------------------------------------------------------------- |
-| **MCP tool**   | Server and tool name (e.g., `legacy-sports-github / github_pr_scan`)          |
-| **Error**      | The error message or HTTP status                                              |
-| **Impact**     | What the agent did instead (e.g., fell back to 22 `gh` CLI commands)          |
-| **Root cause** | Why the tool failed                                                           |
-| **Fix type**   | `permission-gap`, `bug`, `config-issue`, or `expected-limitation` (see below) |
+| Field          | Description                                                                                 |
+| -------------- | ------------------------------------------------------------------------------------------- |
+| **MCP tool**   | Server and tool name (e.g., `legacy-sports-github / github_pr_scan`)                        |
+| **Error**      | The error message or HTTP status                                                            |
+| **Impact**     | What the agent did instead (e.g., fell back to 22 `gh` CLI commands via Bash or PowerShell) |
+| **Root cause** | Why the tool failed                                                                         |
+| **Fix type**   | `permission-gap`, `bug`, `config-issue`, or `expected-limitation` (see below)               |
 
 #### Classification
 
@@ -300,7 +301,7 @@ For `permission-gap` and `bug` types, follow Steps 4-5 to check for existing tic
 
 **MCP tool**: `<server> / <tool_name>`
 **Error observed**: `<error message>`
-**Impact**: <what the agent fell back to, how many Bash commands resulted>
+**Impact**: <what the agent fell back to, how many Bash/PowerShell commands resulted>
 **Fix type**: permission-gap | bug | bug/timeout | bug/state-loss | config-issue
 
 ## Root Cause
@@ -322,7 +323,7 @@ Observed during agent session on <date>.
 
 Summarize the audit results to the user:
 
-- Total Bash commands reviewed
+- Total Bash and PowerShell commands reviewed (broken down by tool type)
 - Commands identified as MCP gaps
 - MCP tool overflows identified (with fix types)
 - MCP tool failures identified (with fix types)

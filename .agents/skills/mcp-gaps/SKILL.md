@@ -1,6 +1,6 @@
 ---
 name: mcp-gaps
-description: 'Identify and implement MCP tooling gaps. Phase 1 (Audit): run after shipping a PR to review Bash commands and MCP overflows from the session, filing tickets under the current MCP gaps bucket epic. Phase 2 (Triage): pick up and implement backlog tickets from the current MCP gaps bucket epic. Load when finishing ticket work (audit) or working through the AI Workspace Improvements backlog (triage).'
+description: 'Identify and implement MCP tooling gaps. Phase 1 (Audit): run after shipping a PR to review Bash and PowerShell commands and MCP overflows from the session, filing tickets under the current MCP gaps bucket epic. Phase 2 (Triage): pick up and implement backlog tickets from the current MCP gaps bucket epic. Load when finishing ticket work (audit) or working through the AI Workspace Improvements backlog (triage).'
 ---
 
 # Skill: MCP Gaps
@@ -9,7 +9,7 @@ description: 'Identify and implement MCP tooling gaps. Phase 1 (Audit): run afte
 
 Three-phase workflow for closing MCP tooling gaps:
 
-1. **Audit** — after every agent session, review Bash commands, MCP tool overflows, and MCP tool failures to identify gaps, then file tickets under the **current MCP gaps bucket epic** (get key via `jira_get_bucket_epic({ bucket: 'mcp-gaps' })`).
+1. **Audit** — after every agent session, review Bash and PowerShell commands, MCP tool overflows, and MCP tool failures to identify gaps, then file tickets under the **current MCP gaps bucket epic** (get key via `jira_get_bucket_epic({ bucket: 'mcp-gaps' })`).
 2. **Triage** — pick up tickets from the current bucket epic backlog, implement the fix, validate, and ship a PR.
 
 This skill enforces the **MCP-first principle** from AGENTS.md: shell commands are fallbacks, not defaults.
@@ -32,7 +32,7 @@ This skill enforces the **MCP-first principle** from AGENTS.md: shell commands a
 
 > Full procedure: [`references/audit-workflow.md`](references/audit-workflow.md)
 
-1. **Collect** Bash commands and MCP tool issues from the session using `ci_audit_session_bash({ includeMcp: true, gapsOnly: true })` (parses the full JSONL transcript — survives context compaction; `includeMcp: true` also captures overflows and failures used in steps 6/6b). Shell fallback if the CI MCP server is unavailable: `python scripts/audit-session-bash.py --include-mcp --gaps-only`. Fallback without any script: manually review conversation history. Skip one-off investigative commands and commands already covered by MCP tools. **Include documented Bash exceptions** — patterns marked as "shell fallback" or "no Nx target equivalent" in AGENTS.md/skill docs are acknowledged gaps, not permanent exemptions
+1. **Collect** Bash and PowerShell commands and MCP tool issues from the session using `ci_audit_session_bash({ includeMcp: true, gapsOnly: true })` (parses the full JSONL transcript — survives context compaction; currently extracts `Bash` tool invocations; `includeMcp: true` also captures overflows and failures used in steps 6/6b). **Current limitation:** `ci_audit_session_bash` and `scripts/audit-session-bash.py` do not yet extract `powershell` tool invocations from Copilot CLI transcripts — review those separately in the conversation history. Shell fallback if the CI MCP server is unavailable: `python scripts/audit-session-bash.py --include-mcp --gaps-only`. Fallback without any script: manually review conversation history for both `Bash` and `powershell` tool invocations. Skip one-off investigative commands and commands already covered by MCP tools. **Include documented Bash/PowerShell exceptions** — patterns marked as "shell fallback" or "no Nx target equivalent" in AGENTS.md/skill docs are acknowledged gaps, not permanent exemptions
 2. **Classify** each as `missing-tool`, `missing-feature`, or `missing-awareness`. Documented exceptions should be classified as `missing-tool` or `missing-feature` as appropriate, with a note that they are currently documented
 3. **File `missing-awareness` gaps as doc-fix tickets** — use summary prefix `docs(skills):`, type `Task`, and set parent epic to the current bucket epic (get key via `jira_get_bucket_epic({ bucket: 'mcp-gaps' })`). Without a ticket, the same awareness gap recurs across sessions
 4. **Check** for existing tickets under the current bucket epic (`jira_list_children` or JQL `parent = <currentBucketEpicKey>`)
@@ -96,12 +96,14 @@ Each JSONL line is a message object. Bash tool calls appear as:
 }
 ```
 
+> **Note:** `~/.claude/projects/` contains only Claude Code session transcripts. GitHub Copilot CLI sessions are logged separately (outside `~/.claude/projects/`) and cannot be mined with the script below. For Copilot CLI `powershell` invocations, rely on conversation-history review (Step 1).
+
 ### Extraction procedure
 
-1. **Aggregate Bash commands** across all sessions in the project directory:
+1. **Aggregate Bash commands** across all Claude Code sessions in the project directory:
 
    ```python
-   # One-liner to extract all Bash commands from recent sessions
+   # One-liner to extract all Bash commands from recent Claude Code sessions
    python -c "
    import json, collections
    from pathlib import Path
@@ -121,7 +123,7 @@ Each JSONL line is a message object. Bash tool calls appear as:
 2. **Drill into high-frequency commands** — for each command appearing 5+ times, extract the full command strings to understand patterns:
 
    ```python
-   # Extract full commands for a specific binary (e.g., find)
+   # Extract full commands for a specific binary (e.g., find) across Bash tools (Claude Code sessions)
    python -c "
    import json
    from pathlib import Path
@@ -148,7 +150,7 @@ Each JSONL line is a message object. Bash tool calls appear as:
 
 After a deep audit, summarize:
 
-- Top 10 Bash commands by frequency
+- Top 10 Bash and PowerShell commands by frequency
 - New gaps discovered (not already tracked under the current bucket epic)
 - Existing gaps whose frequency increased (priority bump candidates)
 - Gaps that decreased after recent fixes (effectiveness validation)
