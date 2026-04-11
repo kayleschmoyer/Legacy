@@ -1,7 +1,7 @@
 # setup-worktree.ps1 - Smart worktree dependency setup
 #
 # Automates the six manual steps every worktree needs:
-#   1. node_modules             - junction to main repo when lockfiles match; full pnpm install otherwise
+#   1. node_modules             - symlink to main repo when lockfiles match; full pnpm install otherwise
 #   2. .env                     - copy from main repo
 #   3. terraform/main/secrets.auto.tfvars and terraform/runners/secrets.auto.tfvars - copy from main repo (prevents interactive terraform prompts; LS-2425 split)
 #   4. .twig                    - junction to main repo (shared branch-dependency state)
@@ -111,20 +111,50 @@ function Assert-NodeModulesValid {
     return $true
 }
 
+function Test-IsReparsePoint {
+    # Returns $true for both junctions and directory symlinks (both are reparse points).
+    # Uses Get-Item -LiteralPath to detect the reparse point attribute even when the
+    # target is missing (Test-Path returns $false for broken symlinks/junctions).
+    param([string]$Path)
+    try {
+        $item = Get-Item -LiteralPath $Path -Force -ErrorAction Stop
+        return ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0
+    } catch {
+        return $false
+    }
+}
+
+# Test-IsJunction: returns $true for junctions AND symlinks (any reparse point).
+# Callers use this to check "is this a link we created?" before removal or health checks.
 function Test-IsJunction {
     param([string]$Path)
-    if (-not (Test-Path $Path)) { return $false }
-    $item = Get-Item $Path -Force
-    return ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0
+    return Test-IsReparsePoint $Path
+}
+
+function Test-IsActualJunction {
+    # Returns $true ONLY for NTFS junctions (not directory symlinks).
+    # Used to detect unsafe junctions that need migration to symlinks.
+    param([string]$Path)
+    if (-not (Test-IsReparsePoint $Path)) { return $false }
+    try {
+        $item = Get-Item -LiteralPath $Path -Force -ErrorAction Stop
+        return $item.LinkType -eq 'Junction'
+    } catch {
+        return $false
+    }
 }
 
 function Remove-JunctionSafe {
-    # Remove a junction WITHOUT deleting the target contents.
+    # Remove a junction or symlink WITHOUT deleting the target contents.
     # Remove-Item -Recurse on a junction follows it; cmd rmdir does not.
     param([string]$Path)
-    if (Test-IsJunction $Path) {
+    if (Test-IsReparsePoint $Path) {
         cmd /c "rmdir `"$Path`"" 2>$null
-        Write-Ok "Removed stale junction at $Path"
+        if (Test-Path $Path) {
+            Write-Warn "Failed to remove link at $Path (may be locked by another process)"
+        } else {
+            Write-Ok "Removed stale link at $Path"
+        }
     }
 }
 
@@ -287,7 +317,7 @@ else {
         }
         else {
             if (Test-Path $wtNM) {
-                Write-Warn "Removing existing node_modules to replace with junction (lockfiles match)"
+                Write-Warn "Removing existing node_modules to replace with symlink (lockfiles match)"
                 # cmd rmdir /s /q is 5-10x faster than Remove-Item -Recurse on Windows
                 cmd /c "rmdir /s /q `"$wtNM`"" 2>$null
                 if (Test-Path $wtNM) {
@@ -295,16 +325,28 @@ else {
                     Remove-Item $wtNM -Recurse -Force -ErrorAction SilentlyContinue
                 }
             }
-            cmd /c "mklink /J `"$wtNM`" `"$mainNM`"" | Out-Null
-            Write-Ok "Junctioned node_modules -> main repo (lockfiles match, saved ~1.8 GB)"
+            # mklink /D creates a directory symlink (not junction). Recursive-delete
+            # tools remove symlinks without following them, preventing Claude Code's
+            # archive or Copilot CLI cleanup from destroying main repo's node_modules.
+            # Requires Windows Developer Mode (one-time system setting).
+            cmd /c "mklink /D `"$wtNM`" `"$mainNM`"" | Out-Null
+            if ($LASTEXITCODE -ne 0 -or -not (Test-IsReparsePoint $wtNM)) {
+                Write-Warn "mklink /D failed — Developer Mode may not be enabled."
+                Write-Warn "  Enable it: Settings > System > For Developers > Developer Mode"
+                Write-Warn "  Falling back to independent pnpm install."
+                Invoke-PnpmInstallWithRetry -InstallPath $WorktreePath
+                Write-Ok "pnpm install completed (independent node_modules, enable Developer Mode for symlink)"
+            } else {
+                Write-Ok "Symlinked node_modules -> main repo (lockfiles match, saved ~1.8 GB)"
+            }
         }
     }
     elseif ($lockfilesMatch -and $currentIsJunction) {
-        # Already junctioned -- verify the target is still healthy
+        # Already linked — verify the target is still healthy
         if (-not (Assert-NodeModulesValid $wtNM)) {
-            $reason = "junctioned node_modules is missing .modules.yaml or .bin"
+            $reason = "linked node_modules is missing .modules.yaml or .bin"
             if (Confirm-IndependentInstall -Reason $reason) {
-                Write-Warn "Replacing broken junction with independent install"
+                Write-Warn "Replacing broken link with independent install"
                 Remove-JunctionSafe $wtNM
                 Invoke-PnpmInstallWithRetry -InstallPath $WorktreePath
                 Write-Ok "pnpm install completed (independent node_modules, main repo still needs repair)"
@@ -313,8 +355,21 @@ else {
                 Write-Error "Aborting: fix main repo node_modules first (cd $MainRepoPath ; make install), then re-run wt-setup."
             }
         }
+        elseif (Test-IsActualJunction $wtNM) {
+            # Healthy but is an NTFS junction — migrate to symlink for safety
+            Write-Warn "Migrating node_modules from junction to symlink (prevents cascade deletion)"
+            Remove-JunctionSafe $wtNM
+            cmd /c "mklink /D `"$wtNM`" `"$mainNM`"" | Out-Null
+            if ($LASTEXITCODE -ne 0 -or -not (Test-IsReparsePoint $wtNM)) {
+                Write-Warn "mklink /D failed — falling back to junction (enable Developer Mode for symlinks)"
+                cmd /c "mklink /J `"$wtNM`" `"$mainNM`"" | Out-Null
+                Write-Ok "Re-created as junction (upgrade to symlink by enabling Developer Mode)"
+            } else {
+                Write-Ok "Migrated node_modules junction -> symlink"
+            }
+        }
         else {
-            Write-Ok "node_modules already junctioned to main repo (lockfiles still match)"
+            Write-Ok "node_modules already symlinked to main repo (lockfiles still match)"
         }
     }
     elseif (-not $lockfilesMatch -and $currentIsJunction) {
