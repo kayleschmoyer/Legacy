@@ -1,0 +1,51 @@
+{
+  "name": "github-webhook",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "lambdas/github-webhook/src",
+  "projectType": "application",
+  "tags": ["lambda", "platform:node", "scope:lambda", "type:api"],
+  "targets": {
+    "typecheck": {
+      "options": {
+        "command": "tsc --noEmit -p tsconfig.app.json"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["production", "^production"],
+      "outputs": ["{projectRoot}/dist"],
+      "dependsOn": ["^build"],
+      "options": {
+        "command": "vite build",
+        "cwd": "lambdas/github-webhook"
+      },
+      "configurations": {
+        "development": {
+          "command": "vite build --mode development"
+        },
+        "production": {
+          "command": "vite build --mode production"
+        }
+      }
+    },
+    "deploy": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build"],
+      "options": {
+        "command": "../../scripts/deploy-lambda.ps1 -FunctionName github-webhook",
+        "cwd": "lambdas/github-webhook"
+      }
+    },
+    "logs": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": [
+          "aws logs tail /aws/lambda/legacy-sports-dev-github-webhook --follow --region us-east-1"
+        ],
+        "parallel": false,
+        "cwd": "."
+      }
+    }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "name": "@legacy-sports/github-webhook-lambda",
+  "version": "0.0.1",
+  "main": "dist/index.js",
+  "private": true,
+  "scripts": {
+    "build": "vite build",
+    "test": "jest --onlyChanged",
+    "test:watch": "jest --watch --onlyChanged",
+    "test:all-files": "jest"
+  },
+  "dependencies": {
+    "@legacy-sports/aws-utils": "workspace:*",
+    "@legacy-sports/logging": "workspace:*",
+    "aws-lambda": "*",
+    "jsonwebtoken": "*"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "*",
+    "@types/jsonwebtoken": "*",
+    "@types/node": "*",
+    "jest": "*",
+    "typescript": "*",
+    "vite": "*"
+  }
+}

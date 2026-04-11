@@ -978,6 +978,40 @@ importers:
         specifier: '*'
         version: 6.4.2(@types/node@24.10.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)
 
+  lambdas/github-webhook:
+    dependencies:
+      '@legacy-sports/aws-utils':
+        specifier: workspace:*
+        version: link:../../lib/aws-utils
+      '@legacy-sports/logging':
+        specifier: workspace:*
+        version: link:../../lib/logging
+      aws-lambda:
+        specifier: '*'
+        version: 1.0.7
+      jsonwebtoken:
+        specifier: '*'
+        version: 9.0.3
+    devDependencies:
+      '@types/aws-lambda':
+        specifier: '*'
+        version: 8.10.161
+      '@types/jsonwebtoken':
+        specifier: '*'
+        version: 9.0.10
+      '@types/node':
+        specifier: '*'
+        version: 24.10.0
+      jest:
+        specifier: '*'
+        version: 30.3.0(@types/node@24.10.0)(babel-plugin-macros@3.1.0)(esbuild-register@3.6.0(esbuild@0.28.0))(ts-node@10.9.2(@swc/core@1.15.24(@swc/helpers@0.5.21))(@types/node@24.10.0)(typescript@5.9.3))
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vite:
+        specifier: '*'
+        version: 6.4.2(@types/node@24.10.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)
+
   lambdas/image-upload:
     dependencies:
       '@aws-sdk/client-s3':

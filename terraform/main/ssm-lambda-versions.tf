@@ -187,5 +187,6 @@ output "lambda_version_parameters" {
     websocket       = aws_ssm_parameter.websocket_lambda_version.name
     jira_proxy      = aws_ssm_parameter.jira_proxy_lambda_version.name
     rollbar_discord = aws_ssm_parameter.rollbar_discord_lambda_version.name
+    github_webhook  = aws_ssm_parameter.github_webhook_lambda_version.name
   }
 }

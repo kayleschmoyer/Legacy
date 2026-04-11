@@ -85,6 +85,13 @@ resource "aws_api_gateway_deployment" "main" {
       aws_api_gateway_integration.image_upload_root_post.id,
       aws_api_gateway_integration.image_upload_options.id,
       aws_api_gateway_integration.image_upload_post.id,
+      # GitHub Webhook resources (LS-3033)
+      aws_api_gateway_resource.github_webhook.id,
+      aws_api_gateway_resource.github_webhook_paths.id,
+      aws_api_gateway_method.github_webhook_root_any.id,
+      aws_api_gateway_method.github_webhook_any.id,
+      aws_api_gateway_integration.github_webhook_root_any.id,
+      aws_api_gateway_integration.github_webhook_any.id,
     ]))
   }
 
@@ -119,6 +126,10 @@ resource "aws_api_gateway_deployment" "main" {
     aws_api_gateway_integration.image_upload_root_post,
     aws_api_gateway_integration.image_upload_options,
     aws_api_gateway_integration.image_upload_post,
+    aws_api_gateway_method.github_webhook_root_any,
+    aws_api_gateway_method.github_webhook_any,
+    aws_api_gateway_integration.github_webhook_root_any,
+    aws_api_gateway_integration.github_webhook_any,
   ]
 }
 

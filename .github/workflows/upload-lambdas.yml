@@ -51,6 +51,7 @@ on:
           - rollbar-discord
           - stripe-webhook
           - websocket
+          - github-webhook
       force-all:
         description: "Force build and deploy all lambdas, bypassing nx affected detection"
         required: false
@@ -348,6 +349,12 @@ jobs:
               "s3Prefix":"websocket", "ssmName":"websocket",
               "badgeName":"Upload WebSocket Lambda",
               "distPath":"dist/lambdas/websocket", "rollbar":true
+            },
+            {
+              "project":"github-webhook", "dir":"github-webhook",
+              "s3Prefix":"github-webhook", "ssmName":"github-webhook",
+              "badgeName":"Upload GitHub Webhook Lambda",
+              "distPath":"lambdas/github-webhook/dist", "rollbar":false
             }
           ]'
 
