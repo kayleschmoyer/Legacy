@@ -933,7 +933,7 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
           stat: {
             type: 'boolean',
             description:
-              'Include per-commit file change stats (files changed, insertions, deletions). Use maxCount=1 + stat=true as replacement for git show --stat HEAD.',
+              'Include per-commit file change stats. Each entry in the `files` array has `path`, `status` (A=added, M=modified, D=deleted, R=renamed, C=copied), `insertions`, and `deletions`. Use maxCount=1 + stat=true as a replacement for `git show --stat HEAD` or `git diff HEAD~1 HEAD --name-status`.',
           },
         },
       },
@@ -2998,7 +2998,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           `-n`,
           `${limit}`,
         ];
-        if (stat) gitArgs.push('--numstat');
+        if (stat) {
+          gitArgs.push('--numstat');
+          gitArgs.push('--name-status');
+        }
         if (since) gitArgs.push(`--since=${since}`);
         if (until) gitArgs.push(`--until=${until}`);
         if (searchString) gitArgs.push(`-S${searchString}`);
@@ -3024,18 +3027,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             };
 
             if (stat && lines.length > 1) {
-              const files: Array<{
-                path: string;
-                insertions: number;
-                deletions: number;
-              }> = [];
-              // Parse numstat lines: "12\t3\tpath/to/file" or "-\t-\tpath/to/file" for binary files
+              // First pass: build numstat map path → counts from lines starting with digit/-.
+              // numstat always uses the canonical (destination) path, even for renames.
+              // Format: "12\t3\tpath/to/file" or "-\t-\tpath/to/file" for binary files
+              const numstatByPath = new Map<
+                string,
+                { insertions: number; deletions: number }
+              >();
               for (let i = 1; i < lines.length; i++) {
                 const line = lines[i];
                 const numstatMatch = line.match(/^(\d+|-)\t(\d+|-)\t(.+)$/);
                 if (numstatMatch) {
-                  files.push({
-                    path: numstatMatch[3],
+                  numstatByPath.set(numstatMatch[3], {
                     insertions:
                       numstatMatch[1] === '-'
                         ? 0
@@ -3046,7 +3049,36 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                         : Number.parseInt(numstatMatch[2], 10),
                   });
                 }
-                // Skip non-numstat lines such as summaries
+              }
+
+              // Second pass: build file list from --name-status lines, which are
+              // authoritative for both status and canonical path. For renames/copies
+              // the destination path is parts[2]; otherwise parts[1].
+              // Format: "M\tpath", "A\tpath", "D\tpath", "R100\told\tnew", "C50\told\tnew"
+              const files: Array<{
+                path: string;
+                status: string;
+                insertions: number;
+                deletions: number;
+              }> = [];
+              for (let i = 1; i < lines.length; i++) {
+                const line = lines[i];
+                if (!/^[A-Z]/.test(line)) continue;
+                const parts = line.split('\t');
+                const statusLetter = parts[0][0]; // first char is always the status letter
+                const canonicalPath =
+                  (statusLetter === 'R' || statusLetter === 'C') && parts[2]
+                    ? parts[2]
+                    : parts[1];
+                if (!canonicalPath) continue;
+                const counts = numstatByPath.get(canonicalPath);
+                files.push({
+                  path: canonicalPath,
+                  status: statusLetter,
+                  // Pure renames with no content change won't appear in numstat; default to 0
+                  insertions: counts?.insertions ?? 0,
+                  deletions: counts?.deletions ?? 0,
+                });
               }
               commit.files = files;
             }
