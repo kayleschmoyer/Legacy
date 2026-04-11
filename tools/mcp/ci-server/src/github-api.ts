@@ -1,8 +1,12 @@
 import { execFile } from 'node:child_process';
+import { createSign } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const GITHUB_API = 'https://api.github.com';
+const DEFAULT_APP_ID = '3158619';
+const DEFAULT_INSTALLATION_ID = '118260223';
 
 /** Truncate API error bodies and redact potential auth tokens. */
 function sanitizeErrorBody(text: string, maxLen = 500): string {
@@ -28,13 +32,145 @@ export function getRepoRoot(): string {
   return resolve(thisDir, '..', '..', '..', '..');
 }
 
-/** Resolve the GitHub token from env or fall back to `gh auth token`. */
-export async function getToken(): Promise<string> {
-  const envToken = process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN;
-  if (envToken) return envToken;
+// ---------------------------------------------------------------------------
+// GitHub App token generation (cloud environments)
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve the GitHub App private key from the AGENT_AUTHOR_APP_PRIVATE_KEY env var.
+ * Accepts PEM content directly or a file path. Returns null if not configured.
+ */
+function getAppPrivateKey(): string | null {
+  const raw = process.env['AGENT_AUTHOR_APP_PRIVATE_KEY'];
+  if (!raw) return null;
+
+  // If it looks like a file path and the file exists, read it
+  if (!raw.includes('-----BEGIN') && existsSync(raw)) {
+    return readFileSync(raw, 'utf-8');
+  }
+
+  // Otherwise treat as PEM content (cloud env vars often store PEMs with literal \n)
+  return raw.replace(/\\n/g, '\n');
+}
+
+/** Base64url encode a string (no padding). */
+function base64url(str: string): string {
+  return Buffer.from(str).toString('base64url');
+}
+
+/** Create a JWT signed with the GitHub App's private key (RS256). */
+function createAppJWT(privateKey: string, appId: string): string {
+  const now = Math.floor(Date.now() / 1000);
+  const header = { alg: 'RS256', typ: 'JWT' };
+  const payload = {
+    iat: now - 60, // clock skew tolerance
+    exp: now + 600, // 10 minutes (GitHub max)
+    iss: appId,
+  };
+
+  const segments = [
+    base64url(JSON.stringify(header)),
+    base64url(JSON.stringify(payload)),
+  ];
+  const signingInput = segments.join('.');
+
+  const sign = createSign('RSA-SHA256');
+  sign.update(signingInput);
+  const signature = sign.sign(privateKey, 'base64url');
+
+  return `${signingInput}.${signature}`;
+}
+
+/**
+ * Generate a short-lived GitHub App installation token from AGENT_AUTHOR_APP_PRIVATE_KEY.
+ * Returns the token and its expiry time, or null if the env var is not set.
+ */
+async function generateGitHubAppToken(): Promise<{
+  token: string;
+  expiresAt: Date;
+} | null> {
+  const privateKey = getAppPrivateKey();
+  if (!privateKey) return null;
+
+  // Trim env values; cloud secrets managers often append newlines/whitespace
+  // that silently invalidate the JWT `iss` claim or the installation path.
+  const appId = process.env['GITHUB_APP_ID']?.trim() || DEFAULT_APP_ID;
+  const installationId =
+    process.env['GITHUB_INSTALLATION_ID']?.trim() || DEFAULT_INSTALLATION_ID;
+
+  const jwt = createAppJWT(privateKey, appId);
+
+  const res = await fetch(
+    `${GITHUB_API}/app/installations/${installationId}/access_tokens`,
+    {
+      method: 'POST',
+      signal: AbortSignal.timeout(10_000),
+      headers: {
+        Authorization: `Bearer ${jwt}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+        'User-Agent': 'legacy-sports-ci-server',
+      },
+    },
+  );
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(
+      `GitHub App token exchange failed (${res.status}): ${sanitizeErrorBody(body)}`,
+    );
+  }
+
+  const data = (await res.json()) as { token?: string; expires_at?: string };
+  if (!data.token) {
+    throw new Error(
+      `No token in GitHub App response: ${JSON.stringify(data).slice(0, 200)}`,
+    );
+  }
+
+  const expiresAt = data.expires_at
+    ? new Date(data.expires_at)
+    : new Date(Date.now() + 60 * 60 * 1000);
+
+  return { token: data.token, expiresAt };
+}
+
+// ---------------------------------------------------------------------------
+// Token resolution
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve the GitHub token, returning the token and its expiry if known.
+ *
+ * Precedence when multiple env vars are set:
+ *   1. GH_TOKEN (matches `gh` CLI convention and `github-server/src/auth.ts`)
+ *   2. GITHUB_TOKEN
+ *   3. GitHub App token from AGENT_AUTHOR_APP_PRIVATE_KEY (cloud sessions)
+ *   4. `gh auth token` CLI (local dev fallback)
+ *
+ * Env values are trimmed; whitespace-only is treated as unset so that empty
+ * GITHUB_TOKEN doesn't silently shadow a valid GH_TOKEN (and vice versa).
+ */
+async function resolveToken(): Promise<{ token: string; expiresAt?: Date }> {
+  const envToken =
+    process.env.GH_TOKEN?.trim() ||
+    process.env.GITHUB_TOKEN?.trim() ||
+    undefined;
+  if (envToken) return { token: envToken };
+
+  // Try GitHub App token (cloud environments with AGENT_AUTHOR_APP_PRIVATE_KEY)
+  try {
+    const appResult = await generateGitHubAppToken();
+    if (appResult)
+      return { token: appResult.token, expiresAt: appResult.expiresAt };
+  } catch (err) {
+    process.stderr.write(
+      `Warning: GitHub App token generation failed: ${err instanceof Error ? err.message : err}. Trying gh CLI.\n`,
+    );
+  }
 
   // Fall back to gh CLI token (local dev)
-  return new Promise((resolvePromise, reject) => {
+  const token = await new Promise<string>((resolvePromise, reject) => {
     const cmd = process.platform === 'win32' ? 'gh.exe' : 'gh';
     execFile(cmd, ['auth', 'token'], { timeout: 5_000 }, (err, stdout) => {
       if (err) {
@@ -49,6 +185,12 @@ export async function getToken(): Promise<string> {
       resolvePromise(stdout.trim());
     });
   });
+  return { token };
+}
+
+/** Resolve the GitHub token from env, GitHub App key, or fall back to `gh auth token`. */
+export async function getToken(): Promise<string> {
+  return (await resolveToken()).token;
 }
 
 /** Parse owner/repo from the git remote origin URL. */
@@ -65,9 +207,11 @@ async function getRepoSlug(): Promise<string> {
           return;
         }
         const url = stdout.trim();
-        // Match both HTTPS and SSH formats
+        // Match github.com HTTPS/SSH formats and local proxy format (/git/owner/repo)
         const match =
-          url.match(/github\.com[:/]([^/]+\/[^/.]+?)(?:\.git)?$/) ?? [];
+          url.match(/github\.com[:/]([^/]+\/[^/]+?)(?:\.git)?$/) ??
+          url.match(/\/git\/([^/]+\/[^/]+?)(?:\.git)?$/) ??
+          [];
         if (!match[1]) {
           reject(
             new Error(`Could not parse owner/repo from remote URL: ${url}`),
@@ -80,12 +224,25 @@ async function getRepoSlug(): Promise<string> {
   });
 }
 
-// Cache token and slug for the lifetime of the server process
+// Cache token and slug for the lifetime of the server process (with expiry for App tokens)
 let cachedToken: string | undefined;
+let cachedTokenExpiry: Date | undefined;
 let cachedSlug: string | undefined;
 
 async function ensureAuth(): Promise<{ token: string; slug: string }> {
-  if (!cachedToken) cachedToken = await getToken();
+  const now = new Date();
+  if (!cachedToken || (cachedTokenExpiry && cachedTokenExpiry <= now)) {
+    cachedToken = undefined;
+    cachedTokenExpiry = undefined;
+    const result = await resolveToken();
+    cachedToken = result.token;
+    if (result.expiresAt) {
+      // Apply a 5-minute safety buffer before the real expiry so we
+      // re-generate before GitHub's 1-hour window closes.
+      cachedTokenExpiry = new Date(result.expiresAt.getTime() - 5 * 60 * 1000);
+    }
+    // Env-var and gh-cli tokens have no known expiry; they last the process lifetime.
+  }
   if (!cachedSlug) cachedSlug = await getRepoSlug();
   return { token: cachedToken, slug: cachedSlug };
 }
