@@ -34,7 +34,7 @@ globalThis.fetch = mockFetch;
 process.env['DISCORD_WEBHOOK_URL_SECRET_NAME'] = 'discord-webhook-url';
 process.env['ROLLBAR_WEBHOOK_SECRET_SECRET_NAME'] = 'rollbar-webhook-secret';
 
-import { baseHandler } from './index';
+import { baseHandler, parsePlainTextBudgetNotification } from './index';
 
 const VALID_AUTH_TOKEN = 'test-rollbar-webhook-secret';
 
@@ -84,6 +84,62 @@ function makeSnsEvent(message: string): SNSEvent {
     ],
   };
 }
+
+describe('parsePlainTextBudgetNotification', () => {
+  const fullMessage = [
+    'AWS Budget Notification April 12, 2026',
+    'AWS Account 123456789012',
+    '',
+    'Dear AWS Customer,',
+    '',
+    'You requested that we alert you when the ACTUAL Cost associated with your my-budget budget is greater than $200.00 for the current month.',
+    '',
+    'Budget Name: my-budget',
+    'Budget Type: COST',
+    'Budgeted Amount: $200.00',
+    'Alert Type: ACTUAL',
+    'Alert Threshold: > $200.00 (100.0%)',
+    'ACTUAL Amount: $205.50',
+    'FORECASTED Amount: $250.00',
+    '',
+    '[1] https://console.aws.amazon.com/billing/home#/budgets',
+  ].join('\n');
+
+  it('extracts all fields from a full budget notification', () => {
+    const result = parsePlainTextBudgetNotification(fullMessage);
+    expect(result).toEqual({
+      accountId: '123456789012',
+      budgetName: 'my-budget',
+      budgetType: 'COST',
+      budgetLimit: '$200.00',
+      actualSpend: '$205.50',
+      forecastedSpend: '$250.00',
+      thresholdPercentage: '100.0',
+    });
+  });
+
+  it('handles messages without forecasted spend', () => {
+    const noForecast = fullMessage.replace('FORECASTED Amount: $250.00\n', '');
+    const result = parsePlainTextBudgetNotification(noForecast);
+    expect(result).not.toBeNull();
+    expect(result!.forecastedSpend).toBeUndefined();
+  });
+
+  it('handles integer threshold percentages', () => {
+    const intThreshold = fullMessage.replace('(100.0%)', '(80%)');
+    const result = parsePlainTextBudgetNotification(intThreshold);
+    expect(result).not.toBeNull();
+    expect(result!.thresholdPercentage).toBe('80');
+  });
+
+  it('returns null for non-budget text', () => {
+    expect(parsePlainTextBudgetNotification('Hello world')).toBeNull();
+  });
+
+  it('returns null for empty string', () => {
+    expect(parsePlainTextBudgetNotification('')).toBeNull();
+  });
+});
 
 describe('baseHandler', () => {
   beforeEach(() => {
@@ -237,8 +293,59 @@ describe('baseHandler', () => {
     });
   });
 
-  describe('SNS — Budget Notification', () => {
-    it('posts budget embed to Discord', async () => {
+  describe('SNS — Budget Notification (plain text)', () => {
+    const plainTextBudget = [
+      'AWS Budget Notification April 12, 2026',
+      'AWS Account 123456789012',
+      '',
+      'Dear AWS Customer,',
+      '',
+      'You requested that we alert you when the ACTUAL Cost associated with your legacy-sports-dev-monthly-budget budget is greater than $100.00 for the current month. The ACTUAL Cost associated with this budget is $82.50. You can find additional details below and in the AWS Budgets dashboard [1].',
+      '',
+      'Budget Name: legacy-sports-dev-monthly-budget',
+      'Budget Type: COST',
+      'Budgeted Amount: $100.00',
+      'Alert Type: ACTUAL',
+      'Alert Threshold: > $100.00 (80%)',
+      'ACTUAL Amount: $82.50',
+      'FORECASTED Amount: $110.00',
+      '',
+      '[1] https://console.aws.amazon.com/billing/home#/budgets',
+    ].join('\n');
+
+    it('posts budget embed to Discord from plain-text SNS message', async () => {
+      const event = makeSnsEvent(plainTextBudget);
+      await baseHandler(event);
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      const [url, opts] = mockFetch.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe('https://discord.com/api/webhooks/test');
+      const body = JSON.parse(opts.body as string) as {
+        embeds: Array<{ title: string; footer: { text: string } }>;
+      };
+      expect(body.embeds[0].title).toBe(
+        'Budget Alert: legacy-sports-dev-monthly-budget',
+      );
+      expect(body.embeds[0].footer.text).toBe('AWS Budgets');
+    });
+
+    it('posts 100% threshold budget alert from plain text', async () => {
+      const over100 = plainTextBudget
+        .replace('(80%)', '(100%)')
+        .replace('ACTUAL Amount: $82.50', 'ACTUAL Amount: $105.00');
+      const event = makeSnsEvent(over100);
+      await baseHandler(event);
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      const body = JSON.parse(
+        (mockFetch.mock.calls[0] as [string, RequestInit])[1].body as string,
+      ) as { embeds: Array<{ color: number }> };
+      expect(body.embeds[0].color).toBe(0xed4245); // red for >=100%
+    });
+  });
+
+  describe('SNS — Budget Notification (JSON fallback)', () => {
+    it('still handles JSON budget payloads for forward-compatibility', async () => {
       const budgetNotification = {
         accountId: '123456789012',
         budgetName: 'legacy-sports-dev-monthly-budget',
@@ -255,11 +362,9 @@ describe('baseHandler', () => {
       await baseHandler(event);
 
       expect(mockFetch).toHaveBeenCalledTimes(1);
-      const [url, opts] = mockFetch.mock.calls[0] as [string, RequestInit];
-      expect(url).toBe('https://discord.com/api/webhooks/test');
-      const body = JSON.parse(opts.body as string) as {
-        embeds: Array<{ title: string; footer: { text: string } }>;
-      };
+      const body = JSON.parse(
+        (mockFetch.mock.calls[0] as [string, RequestInit])[1].body as string,
+      ) as { embeds: Array<{ title: string; footer: { text: string } }> };
       expect(body.embeds[0].title).toBe(
         'Budget Alert: legacy-sports-dev-monthly-budget',
       );

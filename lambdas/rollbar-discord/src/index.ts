@@ -104,6 +104,62 @@ function isCloudWatchAlarm(parsed: unknown): parsed is CloudWatchAlarm {
   );
 }
 
+/**
+ * Parse an AWS Budget SNS notification from plain text.
+ *
+ * AWS Budgets sends plain-text messages to SNS (not JSON). The format contains
+ * key-value lines like:
+ *   Budget Name: my-budget
+ *   Budget Type: COST
+ *   Budgeted Amount: $200.00
+ *   Alert Threshold: > $200.00 (100.0%)
+ *   ACTUAL Amount: $205.50
+ *   FORECASTED Amount: $250.00
+ *   AWS Account 123456789012
+ */
+export function parsePlainTextBudgetNotification(
+  message: string,
+): BudgetNotification | null {
+  const budgetName = message.match(/Budget Name:\s*(.+)/)?.[1]?.trim();
+  const budgetType = message.match(/Budget Type:\s*(.+)/)?.[1]?.trim();
+  const budgetLimit = message.match(/Budgeted Amount:\s*(.+)/)?.[1]?.trim();
+  const actualSpend = message.match(/ACTUAL Amount:\s*(.+)/)?.[1]?.trim();
+  const thresholdMatch = message.match(
+    /Alert Threshold:\s*[><=]*\s*\$[\d,.]+\s*\((\d+(?:\.\d+)?)%\)/,
+  );
+  const thresholdPercentage = thresholdMatch?.[1];
+  const accountId = message.match(/AWS Account\s+(\d{12})/)?.[1];
+
+  if (
+    !budgetName ||
+    !budgetType ||
+    !budgetLimit ||
+    !actualSpend ||
+    !thresholdPercentage ||
+    !accountId
+  ) {
+    return null;
+  }
+
+  const notification: BudgetNotification = {
+    accountId,
+    budgetName,
+    budgetType,
+    budgetLimit,
+    actualSpend,
+    thresholdPercentage,
+  };
+
+  const forecastedSpend = message
+    .match(/FORECASTED Amount:\s*(.+)/)?.[1]
+    ?.trim();
+  if (forecastedSpend) {
+    notification.forecastedSpend = forecastedSpend;
+  }
+
+  return notification;
+}
+
 async function handleSnsEvent(event: SNSEvent): Promise<void> {
   const discordUrl = await getDiscordWebhookUrl();
 
@@ -113,7 +169,29 @@ async function handleSnsEvent(event: SNSEvent): Promise<void> {
     try {
       parsed = JSON.parse(message) as unknown;
     } catch {
-      LOGGER.warn('Failed to parse SNS message as JSON', { message });
+      // AWS Budget notifications arrive as plain text, not JSON.
+      // Try to parse the message as a plain-text budget notification before
+      // giving up.
+      const budget = parsePlainTextBudgetNotification(message);
+      if (budget) {
+        try {
+          const embed = formatBudgetEmbed(budget);
+          await postToDiscord(discordUrl, embed);
+          LOGGER.info(`Posted budget alert "${budget.budgetName}" to Discord`);
+        } catch (error) {
+          LOGGER.error('Failed to post budget notification to Discord', {
+            message,
+            error,
+          });
+        }
+      } else {
+        LOGGER.warn(
+          'Failed to parse SNS message as JSON or plain-text budget',
+          {
+            message,
+          },
+        );
+      }
       continue;
     }
 
