@@ -578,8 +578,10 @@ function RosterRow({
         )}
       </YStack>
 
-      {/* Score & Projection */}
-      {matchupData && hasPlayer && (
+      {/* Score & Projection — always render when a player is assigned so
+         columns stay in the DOM; avoids Tamagui animation mount issues
+         that caused values to appear only after user interaction (LS-2943) */}
+      {hasPlayer && (
         <XStack alignItems="center" gap="$3" flexShrink={0}>
           <YStack alignItems="center" minWidth={36}>
             <Text
@@ -591,7 +593,7 @@ function RosterRow({
               Score
             </Text>
             <Text fontSize="$3" fontWeight="700" color="$color12">
-              {formatMatchupStat(matchupData.score)}
+              {formatMatchupStat(matchupData?.score ?? null)}
             </Text>
           </YStack>
           <YStack alignItems="center" minWidth={36}>
@@ -604,7 +606,7 @@ function RosterRow({
               Proj
             </Text>
             <Text fontSize="$3" fontWeight="700" color={BRAND_GOLD_LIGHT}>
-              {formatMatchupStat(matchupData.projection)}
+              {formatMatchupStat(matchupData?.projection ?? null)}
             </Text>
           </YStack>
         </XStack>
