@@ -356,7 +356,8 @@
       "@tamagui/web": "1.144.4",
       "@tamagui/config": "$@tamagui/config",
       "@tamagui/animations-react-native": "$@tamagui/animations-react-native",
-      "react-native": "$react-native"
+      "react-native": "$react-native",
+      "basic-ftp": ">=5.2.1"
     },
     "peerDependencyRules": {
       "allowedVersions": {
@@ -368,6 +369,18 @@
         "graphiql-explorer>react": "19",
         "graphiql-explorer>react-dom": "19"
       }
+    },
+    "packageExtensions": {
+      "tr46@0.0.3": {
+        "dependencies": {
+          "punycode": "^2.3.1"
+        }
+      }
+    },
+    "patchedDependencies": {
+      "tr46@0.0.3": "patches/tr46@0.0.3.patch",
+      "tr46@3.0.0": "patches/tr46@3.0.0.patch",
+      "whatwg-url-without-unicode@8.0.0-3": "patches/whatwg-url-without-unicode@8.0.0-3.patch"
     }
   }
 }

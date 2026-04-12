@@ -13,6 +13,20 @@ overrides:
   '@tamagui/config': 1.144.4
   '@tamagui/animations-react-native': 1.144.4
   react-native: 0.81.5
+  basic-ftp: '>=5.2.1'
+
+packageExtensionsChecksum: f82047138a008e1073df626cfbc513eb
+
+patchedDependencies:
+  tr46@0.0.3:
+    hash: xrmx2c4tl4w7gunvtqpvz3544q
+    path: patches/tr46@0.0.3.patch
+  tr46@3.0.0:
+    hash: cxhqzbni374uri5m7aytkltrda
+    path: patches/tr46@3.0.0.patch
+  whatwg-url-without-unicode@8.0.0-3:
+    hash: af3qskinebb5ngdpttolycgxry
+    path: patches/whatwg-url-without-unicode@8.0.0-3.patch
 
 importers:
 
@@ -9586,8 +9600,8 @@ packages:
     resolution: {integrity: sha512-NF+epuEdnUYVlGuhaxbbq+dvJttwLnGY+YixlXlME5KpQ5W3CnXA5cVTneY3SPbPDRkcjMbifrwmFYcClgOZeg==}
     engines: {node: '>= 0.8'}
 
-  basic-ftp@5.2.0:
-    resolution: {integrity: sha512-VoMINM2rqJwJgfdHq6RiUudKt2BV+FY5ZFezP/ypmwayk68+NzzAQy4XXLlqsGD4MCzq3DrmNFD/uUmBJuGoXw==}
+  basic-ftp@5.2.2:
+    resolution: {integrity: sha512-1tDrzKsdCg70WGvbFss/ulVAxupNauGnOlgpyjKzeQxzyllBLS0CGLV7tjIXTK3ZQA9/FBEm9qyFFN1bciA6pw==}
     engines: {node: '>=10.0.0'}
 
   bcrypt-pbkdf@1.0.2:
@@ -30829,7 +30843,7 @@ snapshots:
     dependencies:
       safe-buffer: 5.1.2
 
-  basic-ftp@5.2.0: {}
+  basic-ftp@5.2.2: {}
 
   bcrypt-pbkdf@1.0.2:
     dependencies:
@@ -33114,7 +33128,7 @@ snapshots:
       react: 19.2.4
       react-native: 0.81.5(@babel/core@7.29.0)(@react-native/metro-config@0.81.6(@babel/core@7.29.0)(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.4)(utf-8-validate@6.0.6)
       react-refresh: 0.14.2
-      whatwg-url-without-unicode: 8.0.0-3
+      whatwg-url-without-unicode: 8.0.0-3(patch_hash=af3qskinebb5ngdpttolycgxry)
     optionalDependencies:
       '@expo/dom-webview': 55.0.5(expo@54.0.33)(react-native@0.81.5(@babel/core@7.29.0)(@react-native/metro-config@0.81.6(@babel/core@7.29.0)(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.4)(utf-8-validate@6.0.6))(react@19.2.4)
       '@expo/metro-runtime': 6.1.2(expo@54.0.33)(react-dom@19.2.4(react@19.2.4))(react-native@0.81.5(@babel/core@7.29.0)(@react-native/metro-config@0.81.6(@babel/core@7.29.0)(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.4)(utf-8-validate@6.0.6))(react@19.2.4)
@@ -33750,7 +33764,7 @@ snapshots:
 
   get-uri@6.0.5:
     dependencies:
-      basic-ftp: 5.2.0
+      basic-ftp: 5.2.2
       data-uri-to-buffer: 6.0.2
       debug: 4.4.3(supports-color@5.5.0)
     transitivePeerDependencies:
@@ -40362,9 +40376,11 @@ snapshots:
     dependencies:
       tldts: 7.0.28
 
-  tr46@0.0.3: {}
+  tr46@0.0.3(patch_hash=xrmx2c4tl4w7gunvtqpvz3544q):
+    dependencies:
+      punycode: 2.3.1
 
-  tr46@3.0.0:
+  tr46@3.0.0(patch_hash=cxhqzbni374uri5m7aytkltrda):
     dependencies:
       punycode: 2.3.1
 
@@ -41175,7 +41191,7 @@ snapshots:
 
   whatwg-mimetype@4.0.0: {}
 
-  whatwg-url-without-unicode@8.0.0-3:
+  whatwg-url-without-unicode@8.0.0-3(patch_hash=af3qskinebb5ngdpttolycgxry):
     dependencies:
       buffer: 5.7.1
       punycode: 2.3.1
@@ -41183,7 +41199,7 @@ snapshots:
 
   whatwg-url@11.0.0:
     dependencies:
-      tr46: 3.0.0
+      tr46: 3.0.0(patch_hash=cxhqzbni374uri5m7aytkltrda)
       webidl-conversions: 7.0.0
 
   whatwg-url@14.2.0:
@@ -41193,7 +41209,7 @@ snapshots:
 
   whatwg-url@5.0.0:
     dependencies:
-      tr46: 0.0.3
+      tr46: 0.0.3(patch_hash=xrmx2c4tl4w7gunvtqpvz3544q)
       webidl-conversions: 3.0.1
 
   which-boxed-primitive@1.1.1:
