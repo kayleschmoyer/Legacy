@@ -61,6 +61,11 @@
           {
             "type": "command",
             "command": ".claude/hooks/cleanup-worktree-symlink.sh"
+          },
+          {
+            "type": "command",
+            "command": "& '.claude/hooks/cleanup-worktree-symlink.ps1'",
+            "shell": "powershell"
           }
         ]
       }
@@ -72,6 +77,11 @@
           {
             "type": "command",
             "command": ".claude/hooks/setup-worktree-symlink.sh"
+          },
+          {
+            "type": "command",
+            "command": "& '.claude/hooks/setup-worktree-symlink.ps1'",
+            "shell": "powershell"
           },
           {
             "type": "command",
@@ -87,6 +97,11 @@
           {
             "type": "command",
             "command": ".claude/hooks/guard-main-repo.sh"
+          },
+          {
+            "type": "command",
+            "command": "& '.claude/hooks/guard-main-repo.ps1'",
+            "shell": "powershell"
           }
         ]
       },
@@ -96,6 +111,11 @@
           {
             "type": "command",
             "command": ".claude/hooks/guard-bash-mcp-first.sh"
+          },
+          {
+            "type": "command",
+            "command": "& '.claude/hooks/guard-bash-mcp-first.ps1'",
+            "shell": "powershell"
           }
         ]
       }

@@ -45,8 +45,22 @@ if [[ "${CLAUDE_HOOK_DEBUG:-}" == "1" ]]; then
   fi
 fi
 
-# Only act inside Claude Code ephemeral worktrees
-if [[ "$WORKTREE" != *"/.claude/worktrees/"* ]]; then
+# Only act inside known ephemeral worktrees:
+#   Pattern A (Claude Code): .../<repo>/.claude/worktrees/<name>
+#   Pattern B (Copilot/twig): .../<repo>.worktrees/<name>
+PARENT_DIR=$(dirname "$WORKTREE")
+PARENT_NAME=$(basename "$PARENT_DIR")
+
+MAIN_REPO=""
+if [[ "$WORKTREE" == *"/.claude/worktrees/"* ]]; then
+  # Pattern A: strip /.claude/worktrees/<name>
+  MAIN_REPO=$(echo "$WORKTREE" | sed 's|/.claude/worktrees/[^/]*$||')
+elif [[ "$PARENT_NAME" == *.worktrees ]]; then
+  # Pattern B: <root>/<reponame>.worktrees/<name> → main repo is <root>/<reponame>
+  ROOT_DIR=$(dirname "$PARENT_DIR")
+  MAIN_REPO_NAME="${PARENT_NAME%.worktrees}"
+  MAIN_REPO="$ROOT_DIR/$MAIN_REPO_NAME"
+else
   exit 0
 fi
 
@@ -54,8 +68,6 @@ fi
 NM="$WORKTREE/node_modules"
 BIN="$NM/.bin"
 
-# Strip /.claude/worktrees/<name> to get main repo root
-MAIN_REPO=$(echo "$WORKTREE" | sed 's|/.claude/worktrees/[^/]*$||')
 MAIN_NM="$MAIN_REPO/node_modules"
 
 # If main repo node_modules doesn't exist there's nothing we can do here.

@@ -10,8 +10,11 @@
 
 WORKTREE="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 
-# Only act inside Claude Code ephemeral worktrees
-if [[ "$WORKTREE" != *"/.claude/worktrees/"* ]]; then
+# Only act inside known ephemeral worktrees (Claude Code or Copilot/twig)
+PARENT_DIR=$(dirname "$WORKTREE")
+PARENT_NAME=$(basename "$PARENT_DIR")
+
+if [[ "$WORKTREE" != *"/.claude/worktrees/"* ]] && [[ "$PARENT_NAME" != *.worktrees ]]; then
   exit 0
 fi
 

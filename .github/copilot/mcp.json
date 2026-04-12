@@ -3,17 +3,35 @@
     "legacy-sports-ci": {
       "type": "stdio",
       "command": "node",
-      "args": ["--import", "tsx", "tools/mcp/ci-server/src/index.ts"]
+      "args": [
+        ".github/copilot/hooks/mcp-bootstrap.mjs",
+        "node",
+        "--import",
+        "tsx",
+        "tools/mcp/ci-server/src/index.ts"
+      ]
     },
     "legacy-sports-db": {
       "type": "stdio",
       "command": "node",
-      "args": ["--import", "tsx", "tools/mcp/db-server/src/index.ts"]
+      "args": [
+        ".github/copilot/hooks/mcp-bootstrap.mjs",
+        "node",
+        "--import",
+        "tsx",
+        "tools/mcp/db-server/src/index.ts"
+      ]
     },
     "legacy-sports-jira": {
       "type": "stdio",
       "command": "node",
-      "args": ["--import", "tsx", "tools/mcp/jira-server/src/index.ts"],
+      "args": [
+        ".github/copilot/hooks/mcp-bootstrap.mjs",
+        "node",
+        "--import",
+        "tsx",
+        "tools/mcp/jira-server/src/index.ts"
+      ],
       "env": {
         "JIRA_CLIENT_ID": "${JIRA_CLIENT_ID}",
         "JIRA_CLIENT_SECRET": "${JIRA_CLIENT_SECRET}",
@@ -26,17 +44,35 @@
     "worktree": {
       "type": "stdio",
       "command": "node",
-      "args": ["--import", "tsx", "tools/mcp/worktree-server/src/index.ts"]
+      "args": [
+        ".github/copilot/hooks/mcp-bootstrap.mjs",
+        "node",
+        "--import",
+        "tsx",
+        "tools/mcp/worktree-server/src/index.ts"
+      ]
     },
     "legacy-sports-aws": {
       "type": "stdio",
       "command": "node",
-      "args": ["--import", "tsx", "tools/mcp/aws-server/src/index.ts"]
+      "args": [
+        ".github/copilot/hooks/mcp-bootstrap.mjs",
+        "node",
+        "--import",
+        "tsx",
+        "tools/mcp/aws-server/src/index.ts"
+      ]
     },
     "legacy-sports-github": {
       "type": "stdio",
       "command": "node",
-      "args": ["--import", "tsx", "tools/mcp/github-server/src/index.ts"],
+      "args": [
+        ".github/copilot/hooks/mcp-bootstrap.mjs",
+        "node",
+        "--import",
+        "tsx",
+        "tools/mcp/github-server/src/index.ts"
+      ],
       "_comment": "GH_TOKEN is set by copilot-setup-steps.yml from the Agent Author app; falls back to GITHUB_TOKEN or native GitHub App generation at runtime",
       "env": {
         "GH_TOKEN": "${GH_TOKEN}",
@@ -47,17 +83,35 @@
     "legacy-sports-nx": {
       "type": "stdio",
       "command": "node",
-      "args": ["--import", "tsx", "tools/mcp/nx-server/src/index.ts"]
+      "args": [
+        ".github/copilot/hooks/mcp-bootstrap.mjs",
+        "node",
+        "--import",
+        "tsx",
+        "tools/mcp/nx-server/src/index.ts"
+      ]
     },
     "legacy-sports-make": {
       "type": "stdio",
       "command": "node",
-      "args": ["--import", "tsx", "tools/mcp/make-server/src/index.ts"]
+      "args": [
+        ".github/copilot/hooks/mcp-bootstrap.mjs",
+        "node",
+        "--import",
+        "tsx",
+        "tools/mcp/make-server/src/index.ts"
+      ]
     },
     "legacy-sports-browser": {
       "type": "stdio",
       "command": "node",
-      "args": ["--import", "tsx", "tools/mcp/browser-server/src/index.ts"]
+      "args": [
+        ".github/copilot/hooks/mcp-bootstrap.mjs",
+        "node",
+        "--import",
+        "tsx",
+        "tools/mcp/browser-server/src/index.ts"
+      ]
     }
   }
 }
