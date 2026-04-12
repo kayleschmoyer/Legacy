@@ -204,20 +204,20 @@ jobs:
       - name: "Checkout Repository"
         uses: actions/checkout@v6
         with:
-          fetch-depth: 1
+          fetch-depth: 0
 
       - name: "Setup Workspace"
         uses: ./.github/actions/setup
         with:
           node-version: 22
           install-dependencies: true
-          set-nx-shas: false
+          set-nx-shas: true
           include-optional-deps: false
 
       # detect-changes derives web/mobile/lambdas from broad source categories
-      # (app-code, lib-code, lambda-code, config). Nx `affected` handles
-      # fine-grained project selection inside each build step.
-      # requires-full-build covers integration builds and dependency changes.
+      # (app-code, lib-code, lambda-code, config). Within each enabled category,
+      # `nx affected` provides fine-grained project selection so only truly
+      # impacted projects are built. requires-full-build covers integration builds.
       - name: "Build Validation"
         id: build
         uses: ./.github/actions/build-validation

@@ -140,17 +140,15 @@ runs:
       if: inputs.should-build-lambdas == 'true'
       shell: bash
       run: |
+        set -o pipefail
         echo "::group::⚡ Lambda Functions Build"
 
-        echo "::notice::To reproduce locally: pnpm exec nx run-many -t build --projects=draft-processor,game-selection,oauth-proxy,stats-lambda"
+        echo "::notice::To reproduce locally: pnpm exec nx affected -t build --exclude=web,app"
 
         ERROR_CONTEXT="build-lambdas-$(date +%s)"
 
-        # Define lambda projects to build
-        LAMBDA_PROJECTS="draft-processor,game-selection,oauth-proxy,stats-lambda"
-
-        echo "🚀 Building lambda functions..."
-        BUILD_CMD="pnpm exec nx run-many -t build --projects=$LAMBDA_PROJECTS --parallel=3"
+        echo "🚀 Building affected lambda functions..."
+        BUILD_CMD="pnpm exec nx affected -t build --exclude=web,app --parallel=3"
 
         if $BUILD_CMD 2>&1 | tee "${ERROR_CONTEXT}.log"; then
           echo "✅ Lambda functions built successfully"
@@ -167,20 +165,21 @@ runs:
           exit 1
         fi
 
-        # Attempt to package lambdas for deployment validation
+        # Attempt to package affected lambdas for deployment validation
         echo "📦 Attempting lambda packaging..."
-        if pnpm exec nx run-many -t package --projects=$LAMBDA_PROJECTS 2>&1 | tee -a "${ERROR_CONTEXT}.log"; then
+        if pnpm exec nx affected -t package --exclude=web,app 2>&1 | tee -a "${ERROR_CONTEXT}.log"; then
           echo "✅ Lambda functions packaged successfully"
-          
-          # Check package sizes if available
+
+          # Check package sizes for any built lambda output directories
           PACKAGE_INFO=""
-          for project in ${LAMBDA_PROJECTS//,/ }; do
-            if [ -d "dist/lambdas/$project" ]; then
-              PACKAGE_SIZE=$(du -sh "dist/lambdas/$project" | cut -f1)
+          for dir in dist/lambdas/*/; do
+            if [ -d "$dir" ]; then
+              project=$(basename "$dir")
+              PACKAGE_SIZE=$(du -sh "$dir" | cut -f1)
               PACKAGE_INFO="$PACKAGE_INFO\n  - $project: $PACKAGE_SIZE"
             fi
           done
-          
+
           if [ -n "$PACKAGE_INFO" ]; then
             echo "📊 Lambda Package Sizes:$PACKAGE_INFO"
           fi
@@ -188,10 +187,13 @@ runs:
           echo "⚠️ Lambda packaging failed (may be expected if no package target configured)"
         fi
 
+        # Report which projects were built (from nx affected output)
+        BUILT_PROJECTS=$(grep -oP '(?<=Running target build for project )\S+' "${ERROR_CONTEXT}.log" | sort -u | tr '\n' ',' | sed 's/,$//' || echo "see log")
+
         # Create lambda build summary
         echo "## ⚡ Lambda Build Summary" >> $GITHUB_STEP_SUMMARY
         echo "- **Status**: ✅ Success" >> $GITHUB_STEP_SUMMARY
-        echo "- **Projects Built**: $LAMBDA_PROJECTS" >> $GITHUB_STEP_SUMMARY
+        echo "- **Projects Built**: ${BUILT_PROJECTS:-affected lambdas}" >> $GITHUB_STEP_SUMMARY
         echo "- **Output Directory**: dist/lambdas/" >> $GITHUB_STEP_SUMMARY
 
         echo "result=success" >> $GITHUB_OUTPUT
