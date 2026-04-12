@@ -48,6 +48,15 @@ When a planning phase was run (see [planning skill](../planning/SKILL.md)), incl
 
 > Details: [references/create-pr.md](references/create-pr.md)
 
+### Phase 2b: Watch PR to Merge
+
+After creating the PR and transitioning Jira, enter the event loop to shepherd the PR through CI and reviews — do **not** treat PR creation as the end of the task.
+
+- **Local agents**: call `github_wait_for_pr_event({ number: <PR#> })` — it blocks until an agent-actionable event fires (CI fail/pass, new review thread, review decision, conflicts, merged, closed) and returns `{ event, pr, ... }`. Handle the event (fixing code, resolving threads, re-running CI), then call it again. Continue until `merged` or `closed`.
+- **Cloud agents (Claude Code on the web)**: call `mcp__github__subscribe_pr_activity({ owner, repo, pullNumber: <PR#> })` to receive real-time `<github-webhook-activity>` messages, then react to incoming messages as they arrive. Do not also call `github_wait_for_pr_event` — the webhook subscription replaces the polling loop.
+
+See [drive-pr](../drive-pr/SKILL.md) Step 6 for the full event-handling table. See Critical Rule 9 below for the tool details.
+
 ### Phase 3: Fix Copilot Review Comments
 
 Fetch unresolved threads, apply fixes, validate, commit, push, and resolve threads. Cap at 2 fix-review rounds -- after round 2, resolve remaining threads as "acknowledged" and proceed.
