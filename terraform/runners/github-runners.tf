@@ -139,9 +139,10 @@ module "github_runners" {
   runner_boot_time_in_minutes = 10
 
   # Minimum runtime before the scale-down Lambda considers a runner eligible for
-  # termination. 15 minutes gives non-ephemeral runners enough idle time to pick
-  # up follow-on jobs in a burst before being reclaimed.
-  minimum_running_time_in_minutes = 15
+  # termination. 5 minutes is enough for a warm runner to pick up a follow-on
+  # job in a burst, while avoiding the cost of keeping 10+ parallel runners
+  # idle for 15 minutes after lightweight jobs complete (LS-cost-optimization).
+  minimum_running_time_in_minutes = 5
 
   # ── AMI (pre-baked via Packer — see terraform/packer/runner-ami.pkr.hcl) ──
   # Ubuntu 22.04 with Node.js 22, pnpm, Playwright deps, runner deps pre-installed.

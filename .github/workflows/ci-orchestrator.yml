@@ -198,7 +198,7 @@ jobs:
       debug_mode: ${{ github.event_name == 'workflow_dispatch' && inputs.debug_mode || false }}
       e2e-test-patterns: "@critical"
       e2e-exclude-patterns: "@slow"
-      e2e-shard-total: 2
+      e2e-shard-total: 1
       runner-label: ${{ needs.determine-scope.outputs.runner-label }}
     secrets: inherit
 
