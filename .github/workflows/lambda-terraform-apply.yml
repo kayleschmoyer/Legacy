@@ -335,12 +335,34 @@ jobs:
           # Note: TF_VAR_github_app_* removed in LS-2425 — those variables now
           # live in terraform/runners/ and are passed by runner-terraform-apply.yml.
         run: |
+          set -o pipefail
           echo "🚀 Applying Terraform changes..."
 
-          terraform apply -input=false -auto-approve -lock-timeout=5m tfplan
-
-          echo "## ✅ Infrastructure Updated" >> $GITHUB_STEP_SUMMARY
-          echo "Applied changes for ${{ steps.check-updates.outputs.total_lambdas }} Lambda function(s)" >> $GITHUB_STEP_SUMMARY
+          if terraform apply -input=false -auto-approve -lock-timeout=5m tfplan 2>&1 | tee apply.log; then
+            echo "## ✅ Infrastructure Updated" >> $GITHUB_STEP_SUMMARY
+            echo "Applied changes for ${{ steps.check-updates.outputs.total_lambdas }} Lambda function(s)" >> $GITHUB_STEP_SUMMARY
+          else
+            # Extract the Terraform error block for the Discord notification.
+            # Strip ANSI codes, box-drawing characters, and any values that
+            # look like secrets (tokens, keys, URLs with credentials) to avoid
+            # leaking TF_VAR_* values that terraform may echo on certain errors.
+            ERROR_MSG=$(grep -A 5 '│.*Error:' apply.log \
+              | head -20 \
+              | sed 's/\x1b\[[0-9;]*m//g' \
+              | sed 's/[│╷╵]//g' \
+              | sed 's/^[[:space:]]*//' \
+              | sed -E 's/(token|key|secret|password|credential)[=: ]*[^ "]+/\1=***REDACTED***/gi' \
+              | grep -v '^$' \
+              || echo "Unknown error — check workflow logs")
+            # Truncate to 900 chars for the Discord embed description
+            if [ ${#ERROR_MSG} -gt 900 ]; then
+              ERROR_MSG="${ERROR_MSG:0:900}…"
+            fi
+            echo "apply_error<<TF_ERROR_EOF" >> "$GITHUB_OUTPUT"
+            echo "$ERROR_MSG" >> "$GITHUB_OUTPUT"
+            echo "TF_ERROR_EOF" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
 
       - name: Post-Apply Version Verification
         id: verify-versions
@@ -469,7 +491,7 @@ jobs:
         if: steps.apply.outcome == 'success'
         uses: ./.github/actions/discord-notify
         with:
-          webhook-url: ${{ secrets.DISCORD_DEPLOY_WEBHOOK_URL }}
+          webhook-url: ${{ secrets.DISCORD_ERRORS_WEBHOOK_URL }}
           status: success
           title: "Lambda Infrastructure Deploy"
           environment: ${{ env.AWS_STAGE }}
@@ -480,11 +502,15 @@ jobs:
         if: always() && steps.apply.outcome == 'failure'
         uses: ./.github/actions/discord-notify
         with:
-          webhook-url: ${{ secrets.DISCORD_DEPLOY_WEBHOOK_URL }}
+          webhook-url: ${{ secrets.DISCORD_ERRORS_WEBHOOK_URL }}
           status: failure
           title: "Lambda Infrastructure Deploy"
           environment: ${{ env.AWS_STAGE }}
-          description: "Terraform apply failed"
+          description: |
+            Terraform apply failed:
+            ```
+            ${{ steps.apply.outputs.apply_error || 'Unknown error — check workflow logs' }}
+            ```
           commits: ${{ steps.deploy-changelog.outputs.commits }}
 
       - name: Verify Deployment

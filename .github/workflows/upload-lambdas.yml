@@ -409,7 +409,11 @@ jobs:
   upload:
     name: ${{ matrix.lambda.badgeName }}
     needs: detect
-    if: needs.detect.outputs.has-lambdas == 'true'
+    # always() is required to break the skip-chain poison: when verify-ci is
+    # skipped (skip-ci-check=true), GitHub Actions auto-skips all transitive
+    # dependents unless they use always(). The detect.result check ensures we
+    # only run when detect actually succeeded.
+    if: always() && needs.detect.result == 'success' && needs.detect.outputs.has-lambdas == 'true'
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     strategy:
