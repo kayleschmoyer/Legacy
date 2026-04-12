@@ -12,6 +12,7 @@ import {
   YStack,
 } from 'tamagui';
 import { Filter, RotateCcw, X } from '@tamagui/lucide-icons';
+import { BATTING_POSITIONS, PITCHING_POSITIONS } from '@legacy-sports/utils';
 import { PlayerStatsFilters } from './PlayerStatsTypes';
 
 // GraphQL Int is a 32-bit signed integer — clamp filter inputs to prevent query errors
@@ -138,14 +139,33 @@ export function PlayerStatsFilterDialog({
 
                 <YStack flex={1} minWidth={180}>
                   <Label htmlFor="position-filter">Position</Label>
-                  <Input
-                    id="position-filter"
-                    placeholder="e.g., 1B, OF, P"
-                    value={localFilters.position || ''}
-                    onChangeText={(value: string) =>
-                      updateFilter('position', value)
+                  <Select
+                    value={localFilters.position || '__all__'}
+                    onValueChange={(value) =>
+                      updateFilter(
+                        'position',
+                        value === '__all__' ? undefined : value,
+                      )
                     }
-                  />
+                  >
+                    <Select.Trigger id="position-filter">
+                      <Select.Value placeholder="All positions" />
+                    </Select.Trigger>
+                    <Select.Content zIndex={200000}>
+                      <Select.Viewport>
+                        <Select.Item index={0} value="__all__">
+                          <Select.ItemText>All Positions</Select.ItemText>
+                        </Select.Item>
+                        {[...BATTING_POSITIONS, ...PITCHING_POSITIONS].map(
+                          (pos, idx) => (
+                            <Select.Item key={pos} index={idx + 1} value={pos}>
+                              <Select.ItemText>{pos}</Select.ItemText>
+                            </Select.Item>
+                          ),
+                        )}
+                      </Select.Viewport>
+                    </Select.Content>
+                  </Select>
                 </YStack>
               </XStack>
 

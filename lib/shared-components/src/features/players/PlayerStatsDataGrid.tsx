@@ -24,7 +24,18 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Button, H2, H3, Input, Spinner, Text, XStack, YStack } from 'tamagui';
+import {
+  Button,
+  H2,
+  H3,
+  Input,
+  Select,
+  Spinner,
+  Text,
+  XStack,
+  YStack,
+} from 'tamagui';
+import { BATTING_POSITIONS } from '@legacy-sports/utils';
 import {
   type CareerStatsQueryParams,
   DEFAULT_CAREER_STATS_PARAMS,
@@ -712,21 +723,36 @@ export function PlayerStatsDataGrid({
               <Text fontSize="$2" style={{ color: TEXT_MUTED }}>
                 Pos:
               </Text>
-              <Input
-                width={52}
-                size="$2"
-                value={positionFilter}
-                onChangeText={handlePositionFilterChange}
-                placeholder="SS"
-                backgroundColor="rgba(10,15,26,0.6)"
-                borderWidth={1}
-                borderColor="rgba(44,74,124,0.4)"
-                borderRadius={8}
-                color={TEXT_HIGH_CONTRAST}
-                placeholderTextColor={TEXT_MUTED}
-                textAlign="center"
-                maxLength={3}
-              />
+              <Select
+                value={positionFilter || '__all__'}
+                onValueChange={(value) =>
+                  handlePositionFilterChange(value === '__all__' ? '' : value)
+                }
+              >
+                <Select.Trigger
+                  width={80}
+                  size="$2"
+                  backgroundColor="rgba(10,15,26,0.6)"
+                  borderWidth={1}
+                  borderColor="rgba(44,74,124,0.4)"
+                  borderRadius={8}
+                  aria-label="Position"
+                >
+                  <Select.Value placeholder="All" color={TEXT_HIGH_CONTRAST} />
+                </Select.Trigger>
+                <Select.Content zIndex={200000}>
+                  <Select.Viewport>
+                    <Select.Item index={0} value="__all__">
+                      <Select.ItemText>All</Select.ItemText>
+                    </Select.Item>
+                    {[...BATTING_POSITIONS].map((pos, idx) => (
+                      <Select.Item key={pos} index={idx + 1} value={pos}>
+                        <Select.ItemText>{pos}</Select.ItemText>
+                      </Select.Item>
+                    ))}
+                  </Select.Viewport>
+                </Select.Content>
+              </Select>
             </XStack>
           </XStack>
         )}

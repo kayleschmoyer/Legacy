@@ -394,6 +394,17 @@ describe('PlayerStatsDataGrid - Rendering', () => {
     expect(screen.getByText('Min HR:')).toBeInTheDocument();
   });
 
+  test('should render position dropdown with aria-label when showFilters is true', () => {
+    render(
+      <TestWrapper>
+        <PlayerStatsDataGrid {...defaultProps} showFilters={true} />
+      </TestWrapper>,
+    );
+
+    expect(screen.getByText('Pos:')).toBeInTheDocument();
+    expect(screen.getByLabelText('Position')).toBeInTheDocument();
+  });
+
   test('should show pagination controls when showPagination is true', async () => {
     render(
       <TestWrapper>

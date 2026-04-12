@@ -1,5 +1,6 @@
 // Mobile-safe utilities - no AWS SDK dependencies
 
+export * from './lib/allowed-positions';
 export * from './lib/DbCredentials';
 export * from './lib/DbOptions';
 export * from './lib/ErrorHandling';
