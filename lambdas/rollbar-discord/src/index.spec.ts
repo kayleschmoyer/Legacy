@@ -166,6 +166,25 @@ describe('baseHandler', () => {
       const result = await baseHandler(event);
       expect(result).toEqual(expect.objectContaining({ statusCode: 400 }));
     });
+
+    it('returns 200 with skipped status for events without actionable data', async () => {
+      const event = makeApiGatewayEvent({
+        httpMethod: 'POST',
+        path: '/rollbar-discord/webhook',
+        body: JSON.stringify({
+          event_name: 'deploy',
+          data: {},
+        }),
+      });
+
+      const result = await baseHandler(event);
+      expect(result).toEqual({
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'skipped' }),
+      });
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
   });
 
   describe('API Gateway — 404', () => {

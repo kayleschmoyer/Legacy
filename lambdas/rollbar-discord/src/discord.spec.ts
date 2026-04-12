@@ -29,10 +29,11 @@ describe('formatRollbarEmbed', () => {
 
     const embed = formatRollbarEmbed(event);
 
-    expect(embed.title).toBe('TypeError: Cannot read property "foo"');
-    expect(embed.color).toBe(0xed4245); // red for error
-    expect(embed.url).toBe('https://rollbar.com/item/123');
-    expect(embed.fields).toEqual(
+    expect(embed).not.toBeNull();
+    expect(embed!.title).toBe('TypeError: Cannot read property "foo"');
+    expect(embed!.color).toBe(0xed4245); // red for error
+    expect(embed!.url).toBe('https://rollbar.com/item/123');
+    expect(embed!.fields).toEqual(
       expect.arrayContaining([
         { name: 'Event', value: 'new_item', inline: true },
         { name: 'Level', value: 'ERROR', inline: true },
@@ -41,8 +42,8 @@ describe('formatRollbarEmbed', () => {
         { name: 'Framework', value: 'node-js', inline: true },
       ]),
     );
-    expect(embed.timestamp).toBeDefined();
-    expect(embed.footer).toEqual({ text: 'Rollbar' });
+    expect(embed!.timestamp).toBeDefined();
+    expect(embed!.footer).toEqual({ text: 'Rollbar' });
   });
 
   it('formats an occurrence event with exception', () => {
@@ -67,10 +68,11 @@ describe('formatRollbarEmbed', () => {
 
     const embed = formatRollbarEmbed(event);
 
-    expect(embed.color).toBe(0xfee75c); // yellow for warning
-    expect(embed.description).toContain('ValidationError');
-    expect(embed.description).toContain('Invalid input');
-    expect(embed.fields).toEqual(
+    expect(embed).not.toBeNull();
+    expect(embed!.color).toBe(0xfee75c); // yellow for warning
+    expect(embed!.description).toContain('ValidationError');
+    expect(embed!.description).toContain('Invalid input');
+    expect(embed!.fields).toEqual(
       expect.arrayContaining([
         { name: 'Request', value: 'POST /api/test', inline: false },
       ]),
@@ -95,10 +97,11 @@ describe('formatRollbarEmbed', () => {
 
     const embed = formatRollbarEmbed(event);
 
-    expect(embed.title).toBe('Deploy to production');
-    expect(embed.description).toBe('deploying webs');
-    expect(embed.color).toBe(0x57f287); // green for succeeded
-    expect(embed.fields).toEqual(
+    expect(embed).not.toBeNull();
+    expect(embed!.title).toBe('Deploy to production');
+    expect(embed!.description).toBe('deploying webs');
+    expect(embed!.color).toBe(0x57f287); // green for succeeded
+    expect(embed!.fields).toEqual(
       expect.arrayContaining([
         { name: 'Event', value: 'deploy', inline: true },
         { name: 'Status', value: 'SUCCEEDED', inline: true },
@@ -107,8 +110,8 @@ describe('formatRollbarEmbed', () => {
         { name: 'Deployed by', value: 'brian', inline: true },
       ]),
     );
-    expect(embed.timestamp).toBe(new Date(1382656039 * 1000).toISOString());
-    expect(embed.footer).toEqual({ text: 'Rollbar' });
+    expect(embed!.timestamp).toBe(new Date(1382656039 * 1000).toISOString());
+    expect(embed!.footer).toEqual({ text: 'Rollbar' });
   });
 
   it('formats a deploy event with failed status as red', () => {
@@ -124,8 +127,9 @@ describe('formatRollbarEmbed', () => {
 
     const embed = formatRollbarEmbed(event);
 
-    expect(embed.color).toBe(0xed4245); // red for failed
-    expect(embed.title).toBe('Deploy to production');
+    expect(embed).not.toBeNull();
+    expect(embed!.color).toBe(0xed4245); // red for failed
+    expect(embed!.title).toBe('Deploy to production');
   });
 
   it('formats a deploy event with started status as yellow', () => {
@@ -142,8 +146,9 @@ describe('formatRollbarEmbed', () => {
 
     const embed = formatRollbarEmbed(event);
 
-    expect(embed.color).toBe(0xfee75c); // yellow for started
-    expect(embed.timestamp).toBe(new Date(1382656038 * 1000).toISOString());
+    expect(embed).not.toBeNull();
+    expect(embed!.color).toBe(0xfee75c); // yellow for started
+    expect(embed!.timestamp).toBe(new Date(1382656038 * 1000).toISOString());
   });
 
   it('formats a deploy event with missing optional fields gracefully', () => {
@@ -156,10 +161,11 @@ describe('formatRollbarEmbed', () => {
 
     const embed = formatRollbarEmbed(event);
 
-    expect(embed.title).toBe('Deploy to unknown');
-    expect(embed.description).toBe('No comment provided');
-    expect(embed.color).toBe(0x5865f2); // neutral blurple for unknown status
-    expect(embed.fields).toEqual(
+    expect(embed).not.toBeNull();
+    expect(embed!.title).toBe('Deploy to unknown');
+    expect(embed!.description).toBe('No comment provided');
+    expect(embed!.color).toBe(0x5865f2); // neutral blurple for unknown status
+    expect(embed!.fields).toEqual(
       expect.arrayContaining([
         { name: 'Environment', value: 'unknown', inline: true },
         { name: 'Status', value: 'UNKNOWN', inline: true },
@@ -180,7 +186,8 @@ describe('formatRollbarEmbed', () => {
 
     const embed = formatRollbarEmbed(event);
 
-    expect(embed.color).toBe(0x57f287); // green for succeeded regardless of casing
+    expect(embed).not.toBeNull();
+    expect(embed!.color).toBe(0x57f287); // green for succeeded regardless of casing
   });
 
   it('truncates long titles', () => {
@@ -196,8 +203,27 @@ describe('formatRollbarEmbed', () => {
     };
 
     const embed = formatRollbarEmbed(event);
-    expect(embed.title.length).toBeLessThanOrEqual(256);
-    expect(embed.title.endsWith('...')).toBe(true);
+    expect(embed).not.toBeNull();
+    expect(embed!.title.length).toBeLessThanOrEqual(256);
+    expect(embed!.title.endsWith('...')).toBe(true);
+  });
+
+  it('returns null for deploy event without deploy payload', () => {
+    const event: RollbarEvent = {
+      event_name: 'deploy',
+      data: {},
+    };
+
+    expect(formatRollbarEmbed(event)).toBeNull();
+  });
+
+  it('returns null for event without item or occurrence data', () => {
+    const event: RollbarEvent = {
+      event_name: 'reactivated_item',
+      data: {},
+    };
+
+    expect(formatRollbarEmbed(event)).toBeNull();
   });
 });
 

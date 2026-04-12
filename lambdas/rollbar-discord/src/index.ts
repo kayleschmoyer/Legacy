@@ -182,6 +182,13 @@ export async function handleApiGatewayEvent(
     }
 
     const embed = formatRollbarEmbed(payload);
+    if (!embed) {
+      LOGGER.info(
+        `Skipping Rollbar event "${payload.event_name}" — no actionable data`,
+      );
+      return jsonResponse(200, { status: 'skipped' });
+    }
+
     const discordUrl = await getDiscordWebhookUrl();
     await postToDiscord(discordUrl, embed);
 

@@ -29,12 +29,16 @@ function levelToColor(level: string | undefined): number {
 
 /**
  * Format a Rollbar webhook event into a Discord embed.
+ * Returns `null` for events without actionable data (e.g. deploy events
+ * missing a deploy payload, or events with no item/occurrence).
  */
-export function formatRollbarEmbed(event: RollbarEvent): DiscordEmbed {
+export function formatRollbarEmbed(event: RollbarEvent): DiscordEmbed | null {
   const { item, occurrence, deploy } = event.data;
 
   // Deploy events have a distinct payload shape — handle them separately.
-  if (deploy) {
+  if (event.event_name === 'deploy') {
+    // Drop deploy events without a deploy payload — they produce empty embeds.
+    if (!deploy) return null;
     const environment = deploy.environment ?? 'unknown';
     const status = deploy.status ?? 'unknown';
     const fields: DiscordEmbed['fields'] = [
@@ -82,6 +86,9 @@ export function formatRollbarEmbed(event: RollbarEvent): DiscordEmbed {
           : {}),
     };
   }
+
+  // Drop events without any usable payload — they produce generic embeds.
+  if (!item && !occurrence) return null;
 
   const level = item?.level ?? occurrence?.level ?? 'error';
   const environment = item?.environment ?? occurrence?.environment ?? 'unknown';
