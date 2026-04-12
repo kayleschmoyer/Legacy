@@ -94,7 +94,7 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [
       // Load TS paths first to ensure proper resolution
-      nxViteTsPaths(),
+      nxViteTsPaths({ debug: false }),
       reactNativeWeb(),
       tamaguiPlugin({
         config: resolve(
