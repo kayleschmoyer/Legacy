@@ -112,13 +112,26 @@ function Assert-NodeModulesValid {
 }
 
 function Test-IsReparsePoint {
-    # Returns $true for directory symlinks (reparse points).
+    # Returns $true for directory symlinks AND junctions (both are reparse points).
     # Uses Get-Item -LiteralPath to detect the reparse point attribute even when the
     # target is missing (Test-Path returns $false for broken symlinks).
     param([string]$Path)
     try {
         $item = Get-Item -LiteralPath $Path -Force -ErrorAction Stop
         return ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0
+    } catch {
+        return $false
+    }
+}
+
+function Test-IsJunction {
+    # Returns $true if the path is an NTFS junction (not a directory symlink).
+    # `git worktree remove` follows junctions and recursively deletes the target.
+    # See LS-3084.
+    param([string]$Path)
+    try {
+        $item = Get-Item -LiteralPath $Path -Force -ErrorAction Stop
+        return $item.LinkType -eq 'Junction'
     } catch {
         return $false
     }
@@ -328,12 +341,13 @@ else {
                     Remove-Item $wtNM -Recurse -Force -ErrorAction SilentlyContinue
                 }
             }
-            # mklink /D creates a directory symlink. Recursive-delete
-            # tools remove symlinks without following them, preventing Claude Code's
-            # archive or Copilot CLI cleanup from destroying main repo's node_modules.
-            # Requires Windows Developer Mode (one-time system setting).
-            cmd /c "mklink /D `"$wtNM`" `"$mainNM`"" | Out-Null
-            if ($LASTEXITCODE -ne 0 -or -not (Test-IsReparsePoint $wtNM)) {
+            # Delegate to mklink-symlink.ps1 in a separate process (LS-3084).
+            # Must use powershell -File (not &) because mklink-symlink.ps1 uses
+            # `exit` which would terminate the current script via call operator.
+            $mklinkScript = Join-Path $PSScriptRoot 'mklink-symlink.ps1'
+            $psExe = Join-Path $PSHOME $(if ($PSVersionTable.PSEdition -eq 'Desktop') { 'powershell.exe' } else { 'pwsh.exe' })
+            & $psExe -NoProfile -NonInteractive -File $mklinkScript -Link $wtNM -Target $mainNM -Force 2>&1 | Out-Null
+            if (-not (Test-IsReparsePoint $wtNM)) {
                 Write-Warn "mklink /D failed — Developer Mode may not be enabled."
                 Write-Warn "  Enable it: Settings > System > For Developers > Developer Mode"
                 Write-Warn "  Falling back to independent pnpm install."
@@ -345,7 +359,16 @@ else {
         }
     }
     elseif ($lockfilesMatch -and $currentIsLink) {
-        # Already linked — verify the target is still healthy
+        # Already linked — convert junction to symlink if needed (LS-3084).
+        # `git worktree remove` follows junctions and destroys the target.
+        if (Test-IsJunction $wtNM) {
+            Write-Warn "node_modules is an NTFS junction — converting to directory symlink"
+            Remove-LinkSafe $wtNM
+            $mklinkScript = Join-Path $PSScriptRoot 'mklink-symlink.ps1'
+            $psExe = Join-Path $PSHOME $(if ($PSVersionTable.PSEdition -eq 'Desktop') { 'powershell.exe' } else { 'pwsh.exe' })
+            & $psExe -NoProfile -NonInteractive -File $mklinkScript -Link $wtNM -Target $mainNM -Force 2>&1 | Out-Null
+        }
+        # Verify the target is still healthy
         if (-not (Assert-NodeModulesValid $wtNM)) {
             $reason = "linked node_modules is missing .modules.yaml or .bin"
             if (Confirm-IndependentInstall -Reason $reason) {

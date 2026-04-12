@@ -53,6 +53,18 @@ elif [ ! -d "$BIN" ] || [ -z "$(ls -A "$BIN" 2>/dev/null | head -c1)" ]; then
   needs_recreate=true
 fi
 
+# Also recreate if the existing link is an NTFS junction (LS-3084).
+# `git worktree remove` follows junctions and recursively deletes the target,
+# which would destroy the main repo's node_modules. Symlinks are safe.
+if [ "$needs_recreate" = "false" ] && [ -e "$NM" ] && command -v cygpath &>/dev/null; then
+  WIN_NM_CHECK=$(cygpath -w "$NM" 2>/dev/null || echo "$NM" | sed 's|/d/|D:\\|; s|/|\\|g')
+  LINK_TYPE=$(powershell -NoProfile -NonInteractive -Command \
+    "(Get-Item -LiteralPath '$WIN_NM_CHECK' -Force -ErrorAction SilentlyContinue).LinkType" 2>/dev/null || true)
+  if [ "$LINK_TYPE" = "Junction" ]; then
+    needs_recreate=true
+  fi
+fi
+
 if [ "$needs_recreate" = "false" ]; then
   echo "node_modules symlink is healthy at: $NM"
   # Refresh session marker
@@ -60,30 +72,21 @@ if [ "$needs_recreate" = "false" ]; then
   exit 0
 fi
 
-# --- 4. Remove any existing stale/broken entry (non-recursive, safe) --------
-if [ -e "$NM" ] || [ -L "$NM" ]; then
-  if command -v cygpath &>/dev/null; then
-    # Git-bash / MSYS2 on Windows — use cmd rmdir (non-recursive, safe for symlinks)
-    WIN_NM=$(cygpath -w "$NM" 2>/dev/null || echo "$NM" | sed 's|/d/|D:\\|; s|/|\\|g')
-    cmd //c "rmdir \"$WIN_NM\"" >/dev/null 2>&1 || true
-  else
-    rm -rf "$NM"
-  fi
-fi
-
-# --- 5. Recreate as directory symlink ----------------------------------------
+# --- 4. Remove stale link + recreate as directory symlink -------------------
+# IMPORTANT: `cmd //c "mklink /D ..."` from bash/MSYS2 silently fails because
+# MSYS2 path translation mangles the mklink arguments (LS-3084). Inline
+# PowerShell -Command strings also break due to bash/PS escaping conflicts.
+# The fix: delegate to scripts/mklink-symlink.ps1 for Windows.
 if command -v cygpath &>/dev/null; then
-  # Windows (git-bash): use mklink /D for a true directory symlink
+  # Windows (git-bash): delegate to PowerShell script
   WIN_NM=$(cygpath -w "$NM" 2>/dev/null || echo "$NM" | sed 's|/d/|D:\\|; s|/|\\|g')
   WIN_MAIN_NM=$(cygpath -w "$MAIN_NM" 2>/dev/null || echo "$MAIN_NM" | sed 's|/d/|D:\\|; s|/|\\|g')
-  cmd //c "mklink /D \"$WIN_NM\" \"$WIN_MAIN_NM\"" >/dev/null 2>&1 || true
+  WIN_WORKTREE=$(cygpath -w "$WORKTREE" 2>/dev/null || echo "$WORKTREE" | sed 's|/d/|D:\\|; s|/|\\|g')
 
-  # Verify; fall back to PowerShell if cmd mklink failed
-  if [ ! -d "$NM" ]; then
-    powershell -NoProfile -NonInteractive -Command \
-      "New-Item -ItemType SymbolicLink -Path '$WIN_NM' -Target '$WIN_MAIN_NM'" \
-      >/dev/null 2>&1 || true
-  fi
+  MKLINK_SCRIPT="$WIN_WORKTREE\\scripts\\mklink-symlink.ps1"
+  powershell -NoProfile -NonInteractive -File "$MKLINK_SCRIPT" \
+    -Link "$WIN_NM" -Target "$WIN_MAIN_NM" -Force \
+    >/dev/null 2>&1 || true
 
   if [ ! -d "$NM" ]; then
     echo "WARNING: Failed to create node_modules symlink in worktree." >&2
@@ -92,7 +95,10 @@ if command -v cygpath &>/dev/null; then
     exit 1
   fi
 else
-  # Linux / macOS: standard ln -s
+  # Linux / macOS: standard rm + ln -s
+  if [ -e "$NM" ] || [ -L "$NM" ]; then
+    rm -rf "$NM"
+  fi
   ln -s "$MAIN_NM" "$NM"
 fi
 

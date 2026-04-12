@@ -295,6 +295,34 @@ function isSymlink(p: string): boolean {
   }
 }
 
+/**
+ * Get the Windows link type for a reparse point.
+ * Returns 'SymbolicLink' | 'Junction' | null.
+ *
+ * On Windows, lstatSync().isSymbolicLink() returns true for BOTH directory
+ * symlinks and NTFS junctions. `git worktree remove` follows junctions and
+ * recursively deletes the target — so we must distinguish them. See LS-3084.
+ */
+function getWindowsLinkType(p: string): 'SymbolicLink' | 'Junction' | null {
+  if (process.platform !== 'win32') return null;
+  try {
+    const out = execFileSync(
+      'powershell',
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        `(Get-Item -LiteralPath '${p.replace(/'/g, "''")}' -Force).LinkType`,
+      ],
+      { encoding: 'utf-8', timeout: 10_000 },
+    ).trim();
+    if (out === 'SymbolicLink' || out === 'Junction') return out;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 function getSymlinkTarget(p: string): string | null {
   try {
     return readlinkSync(p);
@@ -5207,15 +5235,20 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           return normalized;
         };
 
+        // Track whether we're converting a junction (used in success response)
+        let isJunction = false;
+
         // Check if node_modules already exists
         if (existsSync(nmPath)) {
           const stat = lstatSync(nmPath);
           if (stat.isSymbolicLink()) {
-            // Already a symlink — verify it points to the right target.
-            // Note: on Windows, lstatSync().isSymbolicLink() returns true for
-            // both directory symlinks and NTFS junctions. Legacy junctions from
-            // older code will pass this check. If that's a concern, recreate
-            // the worktree to get a proper directory symlink.
+            // Already a reparse point — but on Windows lstatSync().isSymbolicLink()
+            // returns true for BOTH directory symlinks and NTFS junctions. Junctions
+            // are dangerous: recursive-delete tools follow them and destroy the
+            // target. Detect and convert junctions automatically (LS-3084).
+            const winLinkType = getWindowsLinkType(nmPath);
+            isJunction = winLinkType === 'Junction';
+
             let currentTarget: string;
             try {
               currentTarget = realpathSync(nmPath);
@@ -5224,10 +5257,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             }
 
             if (
+              !isJunction &&
               normalizeForCompare(currentTarget) ===
-              normalizeForCompare(mainNmPath)
+                normalizeForCompare(mainNmPath)
             ) {
-              // Correct symlink already exists — verify it's healthy
+              // Correct directory symlink already exists — verify it's healthy
               const binDir = join(nmPath, '.bin');
               let binPopulated = false;
               try {
@@ -5247,6 +5281,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                           success: true,
                           created: false,
                           alreadyExists: true,
+                          linkType: winLinkType ?? 'symlink',
                           symlinkPath: nmPath,
                           target: mainNmPath,
                           verified,
@@ -5262,8 +5297,21 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               }
               // Symlink exists but .bin is empty or nx is missing — remove and recreate
             }
-            // Remove link (wrong target or unhealthy) and recreate
-            rmSync(nmPath, { recursive: false });
+            // Remove link (junction, wrong target, or unhealthy) and recreate.
+            // If junction, log the conversion.
+            if (isJunction) {
+              // Use cmd rmdir for safe junction removal (non-recursive)
+              if (process.platform === 'win32') {
+                execFileSync('cmd', ['/c', 'rmdir', nmPath], {
+                  encoding: 'utf-8',
+                  timeout: 10_000,
+                });
+              } else {
+                rmSync(nmPath, { recursive: false });
+              }
+            } else {
+              rmSync(nmPath, { recursive: false });
+            }
           } else if (stat.isDirectory()) {
             return {
               content: [
@@ -5334,6 +5382,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
         const nxExists = existsSync(join(nmPath, 'nx'));
         const verified = nxExists && createdBinPopulated;
+        // Verify link type post-creation (LS-3084)
+        const createdLinkType = getWindowsLinkType(nmPath);
 
         return {
           content: [
@@ -5343,11 +5393,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 {
                   success: true,
                   created: true,
+                  linkType: createdLinkType ?? 'symlink',
+                  ...(isJunction ? { convertedFromJunction: true } : {}),
                   symlinkPath: nmPath,
                   target: mainNmPath,
                   verified,
                   message: verified
-                    ? 'node_modules symlink created and verified. Ready to run pnpm/make commands.'
+                    ? `node_modules ${isJunction ? 'junction converted to ' : ''}symlink created and verified. Ready to run pnpm/make commands.`
                     : !nxExists
                       ? 'Symlink created but nx not found — verify main repo node_modules is populated.'
                       : 'Symlink created but .bin is empty — main repo node_modules may be incomplete. Run make install in the main repo.',

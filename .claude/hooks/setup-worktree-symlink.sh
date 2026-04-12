@@ -5,8 +5,7 @@
 # Responsibilities:
 #   1. Validate the symlink: check that .bin is non-empty (empty .bin is the
 #      most common symptom of a stale or broken link on Windows/pnpm).
-#   2. If missing or invalid, recreate via cmd mklink /D (directory symlink,
-#      preferred) or PowerShell New-Item -ItemType SymbolicLink as fallback.
+#   2. If missing or invalid, recreate via PowerShell bridge to cmd mklink /D.
 #
 # Why symlinks:
 #   Directory symlinks (mklink /D) are NOT followed by recursive-delete tools
@@ -17,7 +16,9 @@
 #
 # Windows notes:
 #   - Runs in git-bash (ships with Git for Windows); cygpath is available.
-#   - `cmd //c` is required — git-bash interprets a single /c as a path.
+#   - `cmd //c "mklink /D ..."` from bash/MSYS2 SILENTLY FAILS because MSYS2
+#     path translation mangles the mklink arguments (LS-3084). The fix is to
+#     call cmd.exe *from PowerShell* which invokes it natively without mangling.
 #   - Path conversion: cygpath -w is the primary method; the sed fallback
 #     uses the repo-specific /d/ prefix that matches this machine's layout.
 #   - The Stop hook (cleanup-worktree-symlink.sh) removes the symlink
@@ -74,33 +75,50 @@ elif [ ! -d "$BIN" ] || [ -z "$(ls -A "$BIN" 2>/dev/null | head -c1)" ]; then
   needs_recreate=true
 fi
 
+# Also recreate if the existing link is an NTFS junction (LS-3084).
+# `git worktree remove` follows junctions and recursively deletes the target,
+# which would destroy the main repo's node_modules. Symlinks are safe.
+if [ "$needs_recreate" = "false" ] && [ -e "$NM" ] && command -v cygpath &>/dev/null; then
+  WIN_NM_CHECK=$(cygpath -w "$NM" 2>/dev/null || echo "$NM" | sed 's|/d/|D:\\|; s|/|\\|g')
+  LINK_TYPE=$(powershell -NoProfile -NonInteractive -Command \
+    "(Get-Item -LiteralPath '$WIN_NM_CHECK' -Force -ErrorAction SilentlyContinue).LinkType" 2>/dev/null || true)
+  if [ "$LINK_TYPE" = "Junction" ]; then
+    needs_recreate=true
+  fi
+fi
+
 if [ "$needs_recreate" = "false" ]; then
   exit 0
 fi
 
-# --- 3. Remove any existing stale/broken link (non-recursive, safe) ----------
-WIN_NM=$(cygpath -w "$NM" 2>/dev/null || echo "$NM" | sed 's|/d/|D:\\|; s|/|\\|g')
-cmd //c "rmdir \"$WIN_NM\"" >/dev/null 2>&1
+# --- 3. Remove stale link + recreate ----------------------------------------
+if command -v cygpath &>/dev/null; then
+  # Windows (git-bash): delegate to PowerShell script.
+  # IMPORTANT: `cmd //c "mklink /D ..."` from bash/MSYS2 silently fails because
+  # MSYS2 path translation mangles the mklink arguments (LS-3084). Inline
+  # PowerShell -Command strings also break due to bash/PS escaping conflicts
+  # (`$null` gets eaten). The fix: delegate to scripts/mklink-symlink.ps1 which
+  # runs entirely in PowerShell with no cross-shell quoting.
+  WIN_NM=$(cygpath -w "$NM" 2>/dev/null || echo "$NM" | sed 's|/d/|D:\\|; s|/|\\|g')
+  WIN_MAIN_NM=$(cygpath -w "$MAIN_NM" 2>/dev/null || echo "$MAIN_NM" | sed 's|/d/|D:\\|; s|/|\\|g')
+  WIN_WORKTREE=$(cygpath -w "$WORKTREE" 2>/dev/null || echo "$WORKTREE" | sed 's|/d/|D:\\|; s|/|\\|g')
 
-# --- 4. Recreate as directory symlink via cmd mklink /D ----------------------
-# mklink /D creates a directory symlink. Recursive-delete tools remove the
-# symlink without following it into the target — this is the key protection
-# against Claude Code's archive destroying the main repo's node_modules.
-WIN_MAIN_NM=$(cygpath -w "$MAIN_NM" 2>/dev/null || echo "$MAIN_NM" | sed 's|/d/|D:\\|; s|/|\\|g')
-cmd //c "mklink /D \"$WIN_NM\" \"$WIN_MAIN_NM\"" >/dev/null 2>&1
+  MKLINK_SCRIPT="$WIN_WORKTREE\\scripts\\mklink-symlink.ps1"
+  powershell -NoProfile -NonInteractive -File "$MKLINK_SCRIPT" \
+    -Link "$WIN_NM" -Target "$WIN_MAIN_NM" -Force \
+    >/dev/null 2>&1 || true
 
-# Verify; fall back to PowerShell if cmd mklink failed
-if [ ! -d "$NM" ]; then
-  powershell -NoProfile -NonInteractive -Command \
-    "New-Item -ItemType SymbolicLink -Path '$WIN_NM' -Target '$WIN_MAIN_NM'" \
-    >/dev/null 2>&1
-fi
-
-# If both methods failed, warn the user — most likely Developer Mode is off
-if [ ! -d "$NM" ]; then
-  echo "WARNING: Failed to create node_modules symlink in worktree." >&2
-  echo "  Directory symlinks require Windows Developer Mode to be enabled." >&2
-  echo "  Enable it: Settings > System > For Developers > Developer Mode" >&2
+  if [ ! -d "$NM" ]; then
+    echo "WARNING: Failed to create node_modules symlink in worktree." >&2
+    echo "  Directory symlinks require Windows Developer Mode to be enabled." >&2
+    echo "  Enable it: Settings > System > For Developers > Developer Mode" >&2
+  fi
+else
+  # Linux / macOS: standard rm + ln -s
+  if [ -e "$NM" ] || [ -L "$NM" ]; then
+    rm -rf "$NM"
+  fi
+  ln -s "$MAIN_NM" "$NM"
 fi
 
 exit 0

@@ -5,8 +5,7 @@
 #
 # Responsibilities:
 #   1. Validate the symlink: check that .bin is non-empty.
-#   2. If missing or invalid, recreate via cmd mklink /D (directory symlink,
-#      preferred) or PowerShell New-Item -ItemType SymbolicLink as fallback.
+#   2. If missing, invalid, or a legacy junction, recreate via cmd mklink /D.
 #
 # Why symlinks (not junctions):
 #   Directory symlinks (mklink /D) are NOT followed by recursive-delete tools
@@ -67,6 +66,16 @@ if (-not (Test-Path $nm)) {
     $needsRecreate = $true
 }
 
+# Also recreate if the existing link is an NTFS junction (LS-3084).
+# `git worktree remove` follows junctions and recursively deletes the target,
+# which would destroy the main repo's node_modules. Symlinks are safe.
+if (-not $needsRecreate -and (Test-Path $nm)) {
+    $linkItem = Get-Item $nm -Force -ErrorAction SilentlyContinue
+    if ($linkItem.LinkType -eq 'Junction') {
+        $needsRecreate = $true
+    }
+}
+
 if (-not $needsRecreate) {
     Write-Host "node_modules symlink is healthy at: $nm"
     # Refresh session marker
@@ -74,29 +83,21 @@ if (-not $needsRecreate) {
     exit 0
 }
 
-# --- 4. Remove any existing stale/broken entry (non-recursive, safe) ----------
-if (Test-Path $nm) {
-    # cmd rmdir is non-recursive: removes symlinks without touching target
-    cmd /c "rmdir `"$nm`"" 2>$null
-}
-
-# --- 5. Recreate as directory symlink via cmd mklink /D -----------------------
-# mklink /D creates a directory symlink; recursive-delete tools remove the
-# link without following it into the target — protecting the main node_modules.
-cmd /c "mklink /D `"$nm`" `"$mainNm`"" 2>$null | Out-Null
-
-# Verify; fall back to PowerShell New-Item if cmd mklink failed
+# --- 4. Delegate to mklink-symlink.ps1 for reliable symlink creation ---------
+# Handles: removal of stale links, junction-to-symlink conversion, creation,
+# and verification — all in pure PowerShell (no cross-shell quoting issues).
+# Must invoke via powershell -File (not &) because mklink-symlink.ps1 uses
+# `exit` which would terminate the current script via the call operator.
+$mklinkScript = Join-Path $worktree 'scripts' 'mklink-symlink.ps1'
+$psExe = Join-Path $PSHOME $(if ($PSVersionTable.PSEdition -eq 'Desktop') { 'powershell.exe' } else { 'pwsh.exe' })
+& $psExe -NoProfile -NonInteractive -File $mklinkScript -Link $nm -Target $mainNm -Force
 if (-not (Test-Path $nm -PathType Container)) {
-    try {
-        New-Item -ItemType SymbolicLink -Path $nm -Target $mainNm -ErrorAction Stop | Out-Null
-    } catch {
-        Write-Warning "Failed to create node_modules symlink."
-        Write-Warning "  Source : $nm"
-        Write-Warning "  Target : $mainNm"
-        Write-Warning "Directory symlinks require Windows Developer Mode."
-        Write-Warning "Enable it: Settings > System > For Developers > Developer Mode"
-        exit 1
-    }
+    Write-Warning "Failed to create node_modules symlink."
+    Write-Warning "  Source : $nm"
+    Write-Warning "  Target : $mainNm"
+    Write-Warning "Directory symlinks require Windows Developer Mode."
+    Write-Warning "Enable it: Settings > System > For Developers > Developer Mode"
+    exit 1
 }
 
 Write-Host "node_modules symlink created:"
