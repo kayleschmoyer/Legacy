@@ -366,7 +366,29 @@ jobs:
             MATRIX=$(echo "$REGISTRY" | jq -c '.')
           else
             echo "🔍 Detecting affected lambda projects..."
-            AFFECTED_RAW=$(pnpm exec nx show projects --affected --type app 2>/dev/null || echo "")
+
+            # nrwl/nx-set-shas sets NX_BASE via the Setup action, but in a
+            # workflow_call context (called from Deploy on push-to-main) the
+            # workflow-run lookup resolves against the *calling* workflow and
+            # may fail silently (error-on-no-successful-workflow: false),
+            # leaving NX_BASE unset or equal to HEAD.  When HEAD === NX_BASE,
+            # `nx affected` finds zero changes and no lambdas get deployed.
+            # Detect this and fall back to HEAD~1 (each push is one squash
+            # merge, so HEAD~1 is the correct prior state).
+            EFFECTIVE_BASE="${NX_BASE:-}"
+            HEAD_SHA=$(git rev-parse HEAD)
+            RESOLVED_BASE=$(git rev-parse "$EFFECTIVE_BASE" 2>/dev/null || echo "")
+            if [ -z "$EFFECTIVE_BASE" ] || [ -z "$RESOLVED_BASE" ] || [ "$RESOLVED_BASE" = "$HEAD_SHA" ]; then
+              EFFECTIVE_BASE="HEAD~1"
+              echo "⚠️ NX_BASE unset, unresolvable, or same as HEAD — falling back to HEAD~1"
+            fi
+            echo "Using NX_BASE=$EFFECTIVE_BASE for affected detection"
+
+            if ! AFFECTED_RAW=$(pnpm exec nx show projects --affected --base="$EFFECTIVE_BASE" --head=HEAD --type app 2>&1); then
+              echo "::error::nx affected detection failed — aborting to prevent silent no-op deploy"
+              echo "$AFFECTED_RAW"
+              exit 1
+            fi
             echo "Affected projects: $AFFECTED_RAW"
 
             # Filter registry to only affected lambda projects
