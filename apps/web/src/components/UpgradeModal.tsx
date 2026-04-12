@@ -11,11 +11,7 @@ import {
   TEXT_PRIMARY,
   withAlpha,
 } from '../constants/colors';
-import {
-  ANNUAL_PRICE_DISPLAY,
-  ANNUAL_SAVINGS_PCT,
-  MONTHLY_PRICE_DISPLAY,
-} from '../constants/pricing';
+import { useStripePrices } from '../hooks/useStripePrices';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -62,6 +58,12 @@ export function UpgradeModal({
   featureName,
   featureDescription,
 }: UpgradeModalProps) {
+  const {
+    monthlyPriceDisplay: MONTHLY_PRICE_DISPLAY,
+    annualPriceDisplay: ANNUAL_PRICE_DISPLAY,
+    annualSavingsPct: ANNUAL_SAVINGS_PCT,
+  } = useStripePrices();
+
   return (
     <BaseModal
       open={open}

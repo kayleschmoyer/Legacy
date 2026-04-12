@@ -29,11 +29,7 @@ import {
   SURFACE_PANEL,
   withAlpha,
 } from '../../constants/colors';
-import {
-  ANNUAL_SAVINGS_PCT,
-  ANNUAL_TOTAL,
-  MONTHLY_PRICE,
-} from '../../constants/pricing';
+import { useStripePrices } from '../../hooks/useStripePrices';
 
 /* ─── Styled Components ─── */
 
@@ -413,10 +409,12 @@ export default function PricingPage() {
   const [isAnnual, setIsAnnual] = useState(true);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
-  const monthlyPrice = MONTHLY_PRICE;
-  const annualTotal = ANNUAL_TOTAL.toFixed(2);
+  const prices = useStripePrices();
+  const monthlyPrice = prices.monthlyPrice;
+  const annualTotal = prices.annualTotal.toFixed(2);
   // Derive per-month cost from annualTotal so display always matches the billed amount.
-  const annualMonthlyPrice = ANNUAL_TOTAL / 12;
+  const annualMonthlyPrice = prices.annualTotal / 12;
+  const ANNUAL_SAVINGS_PCT = prices.annualSavingsPct;
 
   const pageBackground: React.CSSProperties = {
     background: `

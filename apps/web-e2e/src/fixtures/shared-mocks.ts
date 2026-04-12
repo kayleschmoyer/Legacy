@@ -86,6 +86,11 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = {
 
   // ── Subscription ──────────────────────────────────────────────────
   getmysubscription: { data: { mySubscription: null } },
+  getstripeprices: {
+    data: {
+      stripePrices: { monthlyPriceCents: 499, annualTotalCents: 3999 },
+    },
+  },
 
   // ── Trade block ───────────────────────────────────────────────────
   getleaguetradeblock: { data: { leagueTradeBlock: [] } },

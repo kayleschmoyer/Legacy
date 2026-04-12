@@ -132,6 +132,94 @@ SubscriptionInfoRef.implement({
   }),
 });
 
+// ─── Stripe Prices ──────────────────────────────────────────────────────────
+
+const StripePriceInfoRef = builder.objectRef<{
+  monthlyPriceCents: number;
+  annualTotalCents: number;
+}>('StripePriceInfo');
+
+StripePriceInfoRef.implement({
+  fields: (t) => ({
+    monthlyPriceCents: t.exposeInt('monthlyPriceCents', { nullable: false }),
+    annualTotalCents: t.exposeInt('annualTotalCents', { nullable: false }),
+  }),
+});
+
+/** In-memory TTL cache for Stripe prices (avoids hitting Stripe on every request). */
+let cachedPrices: {
+  monthlyPriceCents: number;
+  annualTotalCents: number;
+} | null = null;
+let cachedPricesExpiresAt = 0;
+const PRICE_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+async function fetchStripePrices(): Promise<{
+  monthlyPriceCents: number;
+  annualTotalCents: number;
+}> {
+  const now = Date.now();
+  if (cachedPrices && now < cachedPricesExpiresAt) {
+    return cachedPrices;
+  }
+
+  const monthlyPriceId = process.env['STRIPE_MONTHLY_PRICE_ID'];
+  const annualPriceId = process.env['STRIPE_ANNUAL_PRICE_ID'];
+
+  if (!monthlyPriceId || !annualPriceId) {
+    throw new Error(
+      'Stripe price IDs are not configured (STRIPE_MONTHLY_PRICE_ID / STRIPE_ANNUAL_PRICE_ID)',
+    );
+  }
+
+  const stripe = await getStripeClient();
+  const [monthlyPrice, annualPrice] = await Promise.all([
+    stripe.prices.retrieve(monthlyPriceId),
+    stripe.prices.retrieve(annualPriceId),
+  ]);
+
+  if (
+    typeof monthlyPrice.unit_amount !== 'number' ||
+    typeof annualPrice.unit_amount !== 'number'
+  ) {
+    throw new Error(
+      'Stripe prices do not have unit_amount set — metered or tiered pricing is not supported',
+    );
+  }
+
+  const result = {
+    monthlyPriceCents: monthlyPrice.unit_amount,
+    annualTotalCents: annualPrice.unit_amount,
+  };
+
+  cachedPrices = result;
+  cachedPricesExpiresAt = now + PRICE_CACHE_TTL_MS;
+
+  return result;
+}
+
+builder.queryField('stripePrices', (t) =>
+  t.field({
+    type: StripePriceInfoRef,
+    nullable: true,
+    description:
+      'Return live subscription prices from Stripe. ' +
+      'No authentication required — pricing is public. ' +
+      'Results are cached server-side for 5 minutes.',
+    resolve: async () => {
+      try {
+        return await fetchStripePrices();
+      } catch (err) {
+        LOGGER.warn('Failed to fetch Stripe prices; returning null', {
+          error: err,
+          errorMessage: err instanceof Error ? err.message : String(err),
+        });
+        return null;
+      }
+    },
+  }),
+);
+
 // ─── Queries ─────────────────────────────────────────────────────────────────
 
 builder.queryField('mySubscription', (t) =>

@@ -11,6 +11,13 @@ query GetMySubscription {
   }
 }
 
+query GetStripePrices {
+  stripePrices {
+    monthlyPriceCents
+    annualTotalCents
+  }
+}
+
 mutation CreateCheckoutSession(
   $priceId: String!
   $successUrl: String!

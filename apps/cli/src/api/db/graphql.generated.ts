@@ -2372,6 +2372,8 @@ export type Query = {
   seasonDraftGames?: Maybe<Array<SeasonDraftGameSummary>>;
   seasonFieldingStats?: Maybe<Array<SeasonFielding>>;
   seasonPitchingStats?: Maybe<Array<SeasonPitching>>;
+  /** Return live subscription prices from Stripe. No authentication required — pricing is public. Results are cached server-side for 5 minutes. */
+  stripePrices?: Maybe<StripePriceInfo>;
   /** Return earned badges for a team in a league */
   teamBadges?: Maybe<Array<UserBadge>>;
   teamById?: Maybe<Team>;
@@ -3328,6 +3330,12 @@ export enum StatsLoadingStatus {
   Queued = 'queued',
   Retry = 'retry',
 }
+
+export type StripePriceInfo = {
+  __typename?: 'StripePriceInfo';
+  annualTotalCents: Scalars['Int']['output'];
+  monthlyPriceCents: Scalars['Int']['output'];
+};
 
 export type SubscriberGrowthPoint = {
   __typename?: 'SubscriberGrowthPoint';

@@ -2372,6 +2372,8 @@ export type Query = {
   seasonDraftGames?: Maybe<Array<SeasonDraftGameSummary>>;
   seasonFieldingStats?: Maybe<Array<SeasonFielding>>;
   seasonPitchingStats?: Maybe<Array<SeasonPitching>>;
+  /** Return live subscription prices from Stripe. No authentication required — pricing is public. Results are cached server-side for 5 minutes. */
+  stripePrices?: Maybe<StripePriceInfo>;
   /** Return earned badges for a team in a league */
   teamBadges?: Maybe<Array<UserBadge>>;
   teamById?: Maybe<Team>;
@@ -3328,6 +3330,12 @@ export enum StatsLoadingStatus {
   Queued = 'queued',
   Retry = 'retry',
 }
+
+export type StripePriceInfo = {
+  __typename?: 'StripePriceInfo';
+  annualTotalCents: Scalars['Int']['output'];
+  monthlyPriceCents: Scalars['Int']['output'];
+};
 
 export type SubscriberGrowthPoint = {
   __typename?: 'SubscriberGrowthPoint';
@@ -7821,6 +7829,17 @@ export type GetMySubscriptionQuery = {
     tier?: string | null;
     currentPeriodEnd?: string | null;
     cancelAtPeriodEnd?: boolean | null;
+  } | null;
+};
+
+export type GetStripePricesQueryVariables = Exact<{ [key: string]: never }>;
+
+export type GetStripePricesQuery = {
+  __typename?: 'Query';
+  stripePrices?: {
+    __typename?: 'StripePriceInfo';
+    monthlyPriceCents: number;
+    annualTotalCents: number;
   } | null;
 };
 
@@ -18669,6 +18688,92 @@ export type GetMySubscriptionSuspenseQueryHookResult = ReturnType<
 export type GetMySubscriptionQueryResult = Apollo.QueryResult<
   GetMySubscriptionQuery,
   GetMySubscriptionQueryVariables
+>;
+export const GetStripePrices = gql`
+  query GetStripePrices {
+    stripePrices {
+      monthlyPriceCents
+      annualTotalCents
+    }
+  }
+`;
+
+/**
+ * __useGetStripePricesQuery__
+ *
+ * To run a query within a React component, call `useGetStripePricesQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetStripePricesQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetStripePricesQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useGetStripePricesQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    GetStripePricesQuery,
+    GetStripePricesQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<GetStripePricesQuery, GetStripePricesQueryVariables>(
+    GetStripePrices,
+    options,
+  );
+}
+export function useGetStripePricesLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetStripePricesQuery,
+    GetStripePricesQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetStripePricesQuery,
+    GetStripePricesQueryVariables
+  >(GetStripePrices, options);
+}
+export function useGetStripePricesSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetStripePricesQuery,
+        GetStripePricesQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetStripePricesQuery,
+    GetStripePricesQueryVariables
+  >(
+    GetStripePrices,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetStripePricesQuery,
+          GetStripePricesQueryVariables
+        >,
+  );
+}
+export type GetStripePricesQueryHookResult = ReturnType<
+  typeof useGetStripePricesQuery
+>;
+export type GetStripePricesLazyQueryHookResult = ReturnType<
+  typeof useGetStripePricesLazyQuery
+>;
+export type GetStripePricesSuspenseQueryHookResult = ReturnType<
+  typeof useGetStripePricesSuspenseQuery
+>;
+export type GetStripePricesQueryResult = Apollo.QueryResult<
+  GetStripePricesQuery,
+  GetStripePricesQueryVariables
 >;
 export const CreateCheckoutSession = gql`
   mutation CreateCheckoutSession(

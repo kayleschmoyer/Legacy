@@ -36,14 +36,7 @@ import {
   withAlpha,
 } from '../../constants/colors';
 import { env } from '../../config/environment';
-import {
-  ANNUAL_MONTHLY_EQUIVALENT,
-  ANNUAL_PRICE_DISPLAY,
-  ANNUAL_SAVINGS_PCT,
-  ANNUAL_TOTAL,
-  MONTHLY_PRICE,
-  MONTHLY_PRICE_DISPLAY,
-} from '../../constants/pricing';
+import { useStripePrices } from '../../hooks/useStripePrices';
 import {
   trackBeginCheckout,
   trackPurchase,
@@ -270,9 +263,11 @@ function PastDueBanner({
 function PricingToggle({
   billingCycle,
   onChange,
+  annualSavingsPct,
 }: {
   billingCycle: 'monthly' | 'annual';
   onChange: (cycle: 'monthly' | 'annual') => void;
+  annualSavingsPct: string;
 }) {
   return (
     <YStack alignItems="center" gap="$3">
@@ -328,7 +323,7 @@ function PricingToggle({
                 fontWeight="600"
                 style={{ color: GREEN } as React.CSSProperties}
               >
-                Save {ANNUAL_SAVINGS_PCT}
+                Save {annualSavingsPct}
               </Paragraph>
             </BadgeTag>
           </XStack>
@@ -511,6 +506,15 @@ const SubscriptionPage: React.FC = () => {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+
+  const {
+    monthlyPrice: MONTHLY_PRICE,
+    annualTotal: ANNUAL_TOTAL,
+    monthlyPriceDisplay: MONTHLY_PRICE_DISPLAY,
+    annualPriceDisplay: ANNUAL_PRICE_DISPLAY,
+    annualMonthlyEquivalent: ANNUAL_MONTHLY_EQUIVALENT,
+    annualSavingsPct: ANNUAL_SAVINGS_PCT,
+  } = useStripePrices();
 
   useEffect(() => {
     const checkoutStatus = searchParams.get('checkout');
@@ -889,6 +893,7 @@ const SubscriptionPage: React.FC = () => {
                 <PricingToggle
                   billingCycle={billingCycle}
                   onChange={setBillingCycle}
+                  annualSavingsPct={ANNUAL_SAVINGS_PCT}
                 />
 
                 {/* Price display */}
