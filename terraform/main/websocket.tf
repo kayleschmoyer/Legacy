@@ -31,13 +31,21 @@ resource "aws_dynamodb_table" "websocket_connections" {
   global_secondary_index {
     name            = "LeagueIdIndex"
     projection_type = "ALL"
-    hash_key        = "leagueId"
+
+    key_schema {
+      attribute_name = "leagueId"
+      key_type       = "HASH"
+    }
   }
 
   global_secondary_index {
     name            = "MatchupIdIndex"
     projection_type = "ALL"
-    hash_key        = "matchupId"
+
+    key_schema {
+      attribute_name = "matchupId"
+      key_type       = "HASH"
+    }
   }
 
   # UserIdIndex — enables efficient direct-message delivery:
@@ -46,7 +54,11 @@ resource "aws_dynamodb_table" "websocket_connections" {
   global_secondary_index {
     name            = "UserIdIndex"
     projection_type = "KEYS_ONLY"
-    hash_key        = "userId"
+
+    key_schema {
+      attribute_name = "userId"
+      key_type       = "HASH"
+    }
   }
 
   ttl {

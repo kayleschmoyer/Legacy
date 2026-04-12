@@ -116,7 +116,11 @@ resource "aws_dynamodb_table" "oauth_device_flows" {
   global_secondary_index {
     name            = "userCode-index"
     projection_type = "KEYS_ONLY"
-    hash_key        = "userCode"
+
+    key_schema {
+      attribute_name = "userCode"
+      key_type       = "HASH"
+    }
   }
 
   ttl {
