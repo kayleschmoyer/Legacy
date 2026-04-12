@@ -281,13 +281,13 @@ interface WorktreeInfo {
   key: string;
   path: string;
   branch: string | null;
-  hasJunctionedNodeModules: boolean;
+  hasLinkedNodeModules: boolean;
   nodeModulesTarget: string | null;
   lock: AgentLock | null;
   lockStale: boolean;
 }
 
-function isJunction(p: string): boolean {
+function isSymlink(p: string): boolean {
   try {
     return lstatSync(p).isSymbolicLink();
   } catch {
@@ -295,7 +295,7 @@ function isJunction(p: string): boolean {
   }
 }
 
-function getJunctionTarget(p: string): string | null {
+function getSymlinkTarget(p: string): string | null {
   try {
     return readlinkSync(p);
   } catch {
@@ -353,15 +353,15 @@ function getWorktrees(): WorktreeInfo[] {
     const key = keyMatch?.[1] ?? dirName;
 
     const nmPath = join(wtPath, 'node_modules');
-    const junctioned = isJunction(nmPath);
-    const target = junctioned ? getJunctionTarget(nmPath) : null;
+    const linked = isSymlink(nmPath);
+    const target = linked ? getSymlinkTarget(nmPath) : null;
     const lock = readLock(wtPath);
 
     worktrees.push({
       key,
       path: wtPath,
       branch,
-      hasJunctionedNodeModules: junctioned,
+      hasLinkedNodeModules: linked,
       nodeModulesTarget: target,
       lock,
       lockStale: lock ? isLockStale(lock) : false,
@@ -865,7 +865,7 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
     {
       name: 'worktree_list',
       description:
-        'List active worktrees with junction status and branch info. ' +
+        'List active worktrees with symlink status and branch info. ' +
         'Pass remote=true to list remote branches instead (with optional pattern or merged-into-ref filters and ahead/behind counts).',
       inputSchema: {
         type: 'object' as const,
@@ -1262,9 +1262,9 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
       },
     },
     {
-      name: 'worktree_unjunction',
+      name: 'worktree_unlink',
       description:
-        'Remove node_modules junction so worktree gets independent deps via make install.',
+        'Remove node_modules symlink so worktree gets independent deps via make install.',
       inputSchema: {
         type: 'object' as const,
         properties: {
@@ -1282,8 +1282,8 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
         "Create a node_modules symlink from the worktree to the main repo's " +
         'node_modules. Required in every native ephemeral worktree before running ' +
         'pnpm/make commands. Idempotent — skips creation if a valid symlink already ' +
-        'exists. Uses directory symlink (mklink /D) instead of junction to prevent ' +
-        'cascade deletion when Claude Code archives the worktree.',
+        'exists. Uses directory symlink (mklink /D) to prevent cascade deletion ' +
+        'when Claude Code archives the worktree.',
       inputSchema: {
         type: 'object' as const,
         properties: {
@@ -1446,8 +1446,8 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
     {
       name: 'worktree_clean',
       description:
-        'Remove a worktree safely (junction-aware). Uses `twig worktree remove` to avoid ' +
-        'destroying shared junctions. Clears active worktree if it was the one removed.',
+        'Remove a worktree safely (symlink-aware). Uses `twig worktree remove` to avoid ' +
+        'destroying shared symlinks. Clears active worktree if it was the one removed.',
       inputSchema: {
         type: 'object' as const,
         properties: {
@@ -1465,7 +1465,7 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
             type: 'boolean',
             description:
               'Fall back to `git worktree remove --force` if twig times out or fails. ' +
-              'Removes junctions first to avoid deleting through them. (default: false)',
+              'Removes symlinks first to avoid deleting through them. (default: false)',
           },
         },
       },
@@ -1474,7 +1474,7 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
       name: 'worktree_remove_batch',
       description:
         'Remove multiple worktrees in one call using `twig worktree remove`. ' +
-        'Junction-aware — safer than `git worktree remove`. Use for bulk sweep pruning. ' +
+        'Symlink-aware — safer than `git worktree remove`. Use for bulk sweep pruning. ' +
         'Each worktree entry is processed independently; failures do not stop remaining removals.',
       inputSchema: {
         type: 'object' as const,
@@ -1490,7 +1490,7 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
           force: {
             type: 'boolean',
             description:
-              'Fall back to `git worktree remove --force` (with junction removal first) when twig fails. Default: false.',
+              'Fall back to `git worktree remove --force` (with symlink removal first) when twig fails. Default: false.',
           },
         },
         required: ['worktrees'],
@@ -1576,7 +1576,7 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
             type: 'boolean',
             description:
               'If true, run `make wt-setup` after attaching to copy .env, ' +
-              'create junctions, and install git hooks (default: false). ' +
+              'create symlinks, and install git hooks (default: false). ' +
               'Windows-only — ignored on other platforms.',
           },
         },
@@ -2916,8 +2916,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       const lines = worktrees.map((w) => {
-        const nmStatus = w.hasJunctionedNodeModules
-          ? `node_modules: junctioned -> ${w.nodeModulesTarget}`
+        const nmStatus = w.hasLinkedNodeModules
+          ? `node_modules: symlinked -> ${w.nodeModulesTarget}`
           : existsSync(join(w.path, 'node_modules'))
             ? 'node_modules: independent'
             : 'node_modules: missing';
@@ -4748,12 +4748,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const cwd = target.path;
       const log: string[] = [`[cwd: ${cwd}]`, '', 'Post-rebase stabilization:'];
 
-      // Check if node_modules is a junction/symlink — skip install if so
+      // Check if node_modules is a symlink — skip install if so
       const nodeModulesPath = join(cwd, 'node_modules');
-      const nodeModulesIsJunction = isJunction(nodeModulesPath);
+      const nodeModulesIsSymlink = isSymlink(nodeModulesPath);
 
       const steps = [
-        ...(nodeModulesIsJunction
+        ...(nodeModulesIsSymlink
           ? []
           : [
               {
@@ -4774,9 +4774,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         },
       ];
 
-      if (nodeModulesIsJunction) {
+      if (nodeModulesIsSymlink) {
         log.push(
-          '⚠ node_modules is a junction/symlink — skipping make install to avoid mutating shared deps',
+          '⚠ node_modules is a symlink — skipping make install to avoid mutating shared deps',
         );
       }
 
@@ -5030,9 +5030,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
 
     // -----------------------------------------------------------------------
-    // worktree_unjunction
+    // worktree_unlink
     // -----------------------------------------------------------------------
-    case 'worktree_unjunction': {
+    case 'worktree_unlink': {
       const { worktree: wtKey } = args as { worktree?: string };
 
       const target = resolveTargetDir(wtKey);
@@ -5070,11 +5070,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const stat = lstatSync(nmPath);
 
         if (stat.isSymbolicLink()) {
-          // Junction or symlink — remove it
-          // On Windows, junctions appear as symlinks to lstatSync
-          // rmSync with recursive:false safely removes both junctions and symlinks
-          const linkType =
-            process.platform === 'win32' ? 'junction' : 'symlink';
+          // Symlink — remove it
+          // rmSync with recursive:false safely removes symlinks without following them
+          const linkType = 'symlink';
           rmSync(nmPath, { recursive: false });
           return {
             content: [
@@ -5104,7 +5102,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     removed: false,
                     was: 'directory',
                     message:
-                      'node_modules is already a real directory (not a junction). No action needed.',
+                      'node_modules is already a real directory (not a symlink). No action needed.',
                   },
                   null,
                   2,
@@ -5123,7 +5121,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                   removed: false,
                   was: 'unknown',
                   message:
-                    'node_modules exists but is neither a symlink/junction nor a directory.',
+                    'node_modules exists but is neither a symlink nor a directory.',
                 },
                 null,
                 2,
@@ -5137,7 +5135,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [
             {
               type: 'text',
-              text: `Failed to remove node_modules junction/symlink: ${e.message ?? String(err)}`,
+              text: `Failed to remove node_modules symlink: ${e.message ?? String(err)}`,
             },
           ],
           isError: true,
@@ -5189,7 +5187,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
 
         /**
-         * Normalize a path for junction-target comparison on Windows.
+         * Normalize a path for symlink-target comparison on Windows.
          * realpathSync may return paths with different casing or a \\?\ prefix;
          * toLowerCase + prefix stripping ensures consistent comparison.
          */
@@ -5213,7 +5211,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         if (existsSync(nmPath)) {
           const stat = lstatSync(nmPath);
           if (stat.isSymbolicLink()) {
-            // Already a junction/symlink — verify it points to the right target
+            // Already a symlink — verify it points to the right target.
+            // Note: on Windows, lstatSync().isSymbolicLink() returns true for
+            // both directory symlinks and NTFS junctions. Legacy junctions from
+            // older code will pass this check. If that's a concern, recreate
+            // the worktree to get a proper directory symlink.
             let currentTarget: string;
             try {
               currentTarget = realpathSync(nmPath);
@@ -5221,29 +5223,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               currentTarget = readlinkSync(nmPath);
             }
 
-            // Detect if this is a junction (unsafe) vs symlink (safe).
-            // On Windows, lstatSync reports both as isSymbolicLink(). Use
-            // execFileSync to check the actual link type via `dir /AL`.
-            let isJunctionNotSymlink = false;
-            if (process.platform === 'win32') {
-              try {
-                const dirOutput = execFileSync(
-                  'cmd',
-                  ['/c', 'dir', '/AL', dirname(nmPath)],
-                  { encoding: 'utf-8', timeout: 5_000 },
-                );
-                isJunctionNotSymlink =
-                  dirOutput.includes('<JUNCTION>') &&
-                  dirOutput.includes('node_modules');
-              } catch {
-                /* detection failed — assume safe */
-              }
-            }
-
             if (
               normalizeForCompare(currentTarget) ===
-                normalizeForCompare(mainNmPath) &&
-              !isJunctionNotSymlink
+              normalizeForCompare(mainNmPath)
             ) {
               // Correct symlink already exists — verify it's healthy
               const binDir = join(nmPath, '.bin');
@@ -5280,7 +5262,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               }
               // Symlink exists but .bin is empty or nx is missing — remove and recreate
             }
-            // Remove link (wrong target, unhealthy, OR junction needing migration) and recreate
+            // Remove link (wrong target or unhealthy) and recreate
             rmSync(nmPath, { recursive: false });
           } else if (stat.isDirectory()) {
             return {
@@ -5291,8 +5273,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     {
                       success: false,
                       message:
-                        'node_modules is already a real directory (not a junction). ' +
-                        'Delete it manually first if you want to replace it with a junction.',
+                        'node_modules is already a real directory (not a symlink). ' +
+                        'Delete it manually first if you want to replace it with a symlink.',
                     },
                     null,
                     2,
@@ -5311,8 +5293,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     {
                       success: false,
                       message:
-                        `node_modules exists but is not a symlink/junction or directory (type: ${stat.mode.toString(8)}). ` +
-                        'Delete it manually before creating a junction.',
+                        `node_modules exists but is not a symlink or directory (type: ${stat.mode.toString(8)}). ` +
+                        'Delete it manually before creating a symlink.',
                     },
                     null,
                     2,
@@ -5324,18 +5306,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           }
         }
 
-        // Create a directory symlink (not junction) using Node.js path APIs.
+        // Create a directory symlink using Node.js path APIs.
         // Symlinks are NOT followed by recursive-delete tools (PowerShell
         // Remove-Item, Node.js fs.rmSync, git worktree remove), so Claude
         // Code's archive can safely delete the worktree without destroying
-        // the main repo's node_modules through the link. Junctions ARE
-        // followed, causing catastrophic data loss (see claude-code#29249).
+        // the main repo's node_modules through the link.
         // Requires Windows Developer Mode (one-time system setting).
         if (process.platform === 'win32') {
           // Windows: use execFileSync with structured args array to avoid all
           // shell escaping issues. Paths are passed as separate argv elements —
           // no quoting, no backslash doubling, no mangling.
-          // mklink /D = directory symlink (safe); mklink /J = junction (unsafe)
+          // mklink /D = directory symlink (safe, not followed by recursive-delete)
           execFileSync('cmd', ['/c', 'mklink', '/D', nmPath, mainNmPath], {
             encoding: 'utf-8',
             timeout: 15_000,
@@ -6730,7 +6711,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const branch = wt.branch;
       const results: string[] = [];
 
-      // Use twig worktree remove for junction-safe removal (60s timeout).
+      // Use twig worktree remove for symlink-safe removal (60s timeout).
       let twigFailed = false;
       let twigTimedOut = false;
       try {
@@ -6785,13 +6766,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       // Force fallback: use git worktree remove --force when twig fails.
       if (twigFailed && force) {
         try {
-          // Remove junctions first to avoid git deleting through them.
-          for (const junctionName of [
-            'node_modules',
-            '.twig',
-            '.github/skills',
-          ]) {
-            const jPath = join(targetPath, junctionName);
+          // Remove symlinks first to avoid git deleting through them.
+          for (const linkName of ['node_modules', '.twig', '.github/skills']) {
+            const jPath = join(targetPath, linkName);
             try {
               if (existsSync(jPath) && lstatSync(jPath).isSymbolicLink()) {
                 rmSync(jPath, { recursive: false });
@@ -6808,7 +6785,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                         success: false,
                         branch,
                         path: targetPath,
-                        error: `Failed to remove junction '${junctionName}' before force removal: ${linkMsg}. Aborting to avoid deleting through shared junction.`,
+                        error: `Failed to remove symlink '${linkName}' before force removal: ${linkMsg}. Aborting to avoid deleting through shared symlink.`,
                       },
                       null,
                       2,
@@ -7104,7 +7081,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           }
         }
 
-        // Force fallback: resolve worktree path, remove junctions, git worktree remove --force
+        // Force fallback: resolve worktree path, remove symlinks, git worktree remove --force
         if (twigFailed && force) {
           if ('error' in resolved) {
             batchResults.push({
@@ -7116,28 +7093,24 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           }
           const targetPath = resolved.path;
 
-          let junctionError: string | null = null;
-          for (const junctionName of [
-            'node_modules',
-            '.twig',
-            '.github/skills',
-          ]) {
-            const jPath = join(targetPath, junctionName);
+          let linkError: string | null = null;
+          for (const linkName of ['node_modules', '.twig', '.github/skills']) {
+            const jPath = join(targetPath, linkName);
             try {
               if (existsSync(jPath) && lstatSync(jPath).isSymbolicLink()) {
                 rmSync(jPath, { recursive: false });
               }
             } catch (linkErr) {
-              junctionError = `Failed to remove junction '${junctionName}': ${linkErr instanceof Error ? linkErr.message : String(linkErr)}`;
+              linkError = `Failed to remove symlink '${linkName}': ${linkErr instanceof Error ? linkErr.message : String(linkErr)}`;
               break;
             }
           }
 
-          if (junctionError) {
+          if (linkError) {
             batchResults.push({
               worktree: trimmed,
               success: false,
-              message: junctionError,
+              message: linkError,
             });
             continue;
           }
@@ -7801,7 +7774,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     `Worktree is now active — run worktree_set({ key: "${branch}" }) to re-activate after server restart`,
                     setup
                       ? 'Setup complete'
-                      : 'Junction node_modules if needed: worktree_setup_node_modules()',
+                      : 'Symlink node_modules if needed: worktree_setup_node_modules()',
                   ],
                 },
                 null,

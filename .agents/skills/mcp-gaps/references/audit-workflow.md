@@ -289,7 +289,7 @@ These are recurring failure modes observed across sessions. If you encounter the
 | `github_pr_scan`         | 403 on `mergeable`/`statusCheckRollup` fields  | `permission-gap` | Fixed in LS-1903 — falls back to light query in degraded mode                          |
 | `github_resolve_threads` | 403 on workflow dispatch (recheck)             | `permission-gap` | Fixed in LS-1906 — downgraded from error to note                                       |
 | `worktree_unstage`       | Path resolution generates `/` instead of path  | `bug`            | Fixed in LS-1904 — string-to-array normalization on `files` param                      |
-| `worktree_stabilize`     | `make install` fails on junctioned worktrees   | `bug`            | Fixed in LS-1905 — skips install when junction detected                                |
+| `worktree_stabilize`     | `make install` fails on symlinked worktrees    | `bug`            | Fixed in LS-1905 — skips install when symlink detected                                 |
 | `github_manage_labels`   | Response serializes array param as string      | `bug`            | Fixed in LS-1907 — handles JSON-encoded array strings in preprocess                    |
 | `worktree_set`           | Active state silently drops between tool calls | `bug/state-loss` | LS-1946 — `worktree_set` succeeds but subsequent tools report "No active worktree set" |
 | `worktree_clean`         | Times out with `spawnSync ETIMEDOUT`           | `bug/timeout`    | LS-1947 — hangs when worktree has independent node_modules or file locks               |

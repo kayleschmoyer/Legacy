@@ -21,7 +21,7 @@ param(
     [switch]$ForceClean,
 
     [Parameter()]
-    [switch]$SkipJunctionCheck,
+    [switch]$SkipSymlinkCheck,
 
     [Parameter()]
     [string]$RepoRoot
@@ -101,11 +101,11 @@ function Exit-InstallLock {
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
-# Junction guard — refuse to run if node_modules is a junction
+# Symlink guard — refuse to run if node_modules is a symlink
 # ---------------------------------------------------------------------------
-# When a worktree's node_modules is junctioned to the main repo, running
+# When a worktree's node_modules is symlinked to the main repo, running
 # pnpm install here MUTATES the shared directory and breaks every other
-# junctioned worktree simultaneously. Detect this and abort with clear
+# symlinked worktree simultaneously. Detect this and abort with clear
 # instructions instead of silently corrupting the shared state.
 
 $nmPath = Join-Path (Get-Location) "node_modules"
@@ -115,30 +115,30 @@ if (Test-Path $nmPath) {
         $target = $nmItem.Target
         Write-Host ""
         Write-Host "  ============================================================" -ForegroundColor Red
-        Write-Host "  BLOCKED: node_modules is a junction -> $target" -ForegroundColor Red
+        Write-Host "  BLOCKED: node_modules is a symlink -> $target" -ForegroundColor Red
         Write-Host "  ============================================================" -ForegroundColor Red
         Write-Host ""
         Write-Host "  Running pnpm install here would mutate the SHARED node_modules" -ForegroundColor Yellow
-        Write-Host "  and break every other worktree using the same junction." -ForegroundColor Yellow
+        Write-Host "  and break every other worktree using the same symlink." -ForegroundColor Yellow
         Write-Host ""
         $mainRepo = Split-Path $target
         Write-Host "  What to do instead:" -ForegroundColor Cyan
-        Write-Host "    - If node_modules is healthy: do nothing, the junction is working." -ForegroundColor White
+        Write-Host "    - If node_modules is healthy: do nothing, the symlink is working." -ForegroundColor White
         Write-Host "    - If node_modules is broken: run 'make install' in the MAIN REPO" -ForegroundColor White
-        Write-Host "      ($mainRepo) -- all junctioned worktrees share it." -ForegroundColor White
+        Write-Host "      ($mainRepo) -- all symlinked worktrees share it." -ForegroundColor White
         Write-Host "    - If this worktree needs different deps (lockfile diverged):" -ForegroundColor White
-        Write-Host "      1. Remove junction:  cmd /c `"rmdir node_modules`"" -ForegroundColor White
-        Write-Host "      2. Install fresh:    make install" -ForegroundColor White
+        Write-Host "      1. Remove symlink:  cmd /c `"rmdir node_modules`"" -ForegroundColor White
+        Write-Host "      2. Install fresh:   make install" -ForegroundColor White
         Write-Host ""
         exit 1
     }
 }
 
 # ---------------------------------------------------------------------------
-# Main-repo guard — refuse if worktrees have junctions to this node_modules
+# Main-repo guard — refuse if worktrees have symlinks to this node_modules
 # ---------------------------------------------------------------------------
 # When running from the main repo (not a worktree), check if any worktrees
-# have junctions pointing to THIS node_modules. Installing here would
+# have symlinks pointing to THIS node_modules. Installing here would
 # silently mutate the shared directory and break those worktrees.
 
 if (Test-Path $nmPath) {
@@ -150,7 +150,7 @@ if (Test-Path $nmPath) {
             Where-Object { $_ -ne (Get-Location).Path })
     } catch {}
 
-    $junctions = @()
+    $symlinks = @()
     $thisNmResolved = (Resolve-Path $nmPath -ErrorAction SilentlyContinue).Path
     foreach ($wt in $wtDirs) {
         $wtNM = Join-Path $wt 'node_modules'
@@ -159,33 +159,33 @@ if (Test-Path $nmPath) {
             $wtTarget = $null
             try { $wtTarget = (Resolve-Path $wi.Target -ErrorAction SilentlyContinue).Path } catch {}
             if ($wtTarget -eq $thisNmResolved) {
-                $junctions += $wt
+                $symlinks += $wt
             }
         }
     }
 
-    if ($junctions.Count -gt 0) {
-        if ($SkipJunctionCheck) {
+    if ($symlinks.Count -gt 0) {
+        if ($SkipSymlinkCheck) {
             Write-Host ""
-            Write-Host "  WARNING: $($junctions.Count) worktrees have junctions to this node_modules" -ForegroundColor Yellow
-            Write-Host "  Proceeding anyway (SKIP_JUNCTION_CHECK=1)" -ForegroundColor Yellow
+            Write-Host "  WARNING: $($symlinks.Count) worktrees have symlinks to this node_modules" -ForegroundColor Yellow
+            Write-Host "  Proceeding anyway (SKIP_SYMLINK_CHECK=1)" -ForegroundColor Yellow
             Write-Host ""
         } else {
             Write-Host ""
             Write-Host "  ============================================================" -ForegroundColor Red
-            Write-Host "  BLOCKED: worktrees have junctions to this node_modules" -ForegroundColor Red
+            Write-Host "  BLOCKED: worktrees have symlinks to this node_modules" -ForegroundColor Red
             Write-Host "  ============================================================" -ForegroundColor Red
             Write-Host ""
             Write-Host "  Running pnpm install here would silently mutate the shared" -ForegroundColor Yellow
-            Write-Host "  node_modules and break these junctioned worktrees:" -ForegroundColor Yellow
-            foreach ($j in $junctions) {
+            Write-Host "  node_modules and break these symlinked worktrees:" -ForegroundColor Yellow
+            foreach ($j in $symlinks) {
                 Write-Host "    - $j" -ForegroundColor Yellow
             }
             Write-Host ""
             Write-Host "  What to do instead:" -ForegroundColor Cyan
             Write-Host "    - Clean up idle worktrees first:  twig worktree clean" -ForegroundColor White
-            Write-Host "    - Or remove their junctions:  cd <worktree> && cmd /c `"rmdir node_modules`"" -ForegroundColor White
-            Write-Host "    - Or force it:  make install SKIP_JUNCTION_CHECK=1" -ForegroundColor White
+            Write-Host "    - Or remove their symlinks:  cd <worktree> && cmd /c `"rmdir node_modules`"" -ForegroundColor White
+            Write-Host "    - Or force it:  make install SKIP_SYMLINK_CHECK=1" -ForegroundColor White
             Write-Host ""
             exit 1
         }

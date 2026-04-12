@@ -19,7 +19,7 @@ A cloud agent should trigger the teleport protocol when it encounters any of the
 | **Infrastructure**                | `terraform plan/apply`, AWS resource management, Lambda deployment                  | No AWS SSO, no Terraform state access |
 | **Secrets**                       | Rotating or provisioning real secrets in AWS Secrets Manager                        | No AWS credentials                    |
 | **AWS Services**                  | CloudWatch log queries against live environments, S3 operations, SQS/SNS management | No AWS access                         |
-| **Local tooling**                 | Worktree junction management (`twig`), Windows-specific operations                  | Linux sandbox, no twig                |
+| **Local tooling**                 | Worktree symlink management (`twig`), Windows-specific operations                   | Linux sandbox, no twig                |
 | **Integration testing**           | Tests requiring real backend services, live API endpoints                           | Sandboxed network                     |
 
 **Do NOT teleport for:**

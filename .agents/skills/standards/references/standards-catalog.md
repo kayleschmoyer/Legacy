@@ -219,9 +219,9 @@ Same sanitization, parsing, or classification logic copied across multiple files
 
 ### Use platform-appropriate filesystem operations
 
-`unlinkSync()` may fail for Windows directory junctions. Platform-specific behavior differs.
+`unlinkSync()` may fail for Windows directory symlinks. Platform-specific behavior differs.
 
-**Rule**: When writing filesystem operations that may encounter junctions (Windows) or symlinks (Unix), use platform-appropriate methods. Test edge cases on the target platform.
+**Rule**: When writing filesystem operations that may encounter symlinks, use platform-appropriate methods. Test edge cases on the target platform.
 
 ### `withAlpha()` requires hex color format
 

@@ -37,7 +37,7 @@
       "mcp__worktree__worktree_status",
       "mcp__worktree__worktree_rename_branch",
       "mcp__worktree__worktree_setup_node_modules",
-      "mcp__worktree__worktree_unjunction",
+      "mcp__worktree__worktree_unlink",
       "mcp__worktree__worktree_unlock",
       "mcp__worktree__worktree_unstage"
     ]
@@ -60,7 +60,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/cleanup-worktree-junction.sh"
+            "command": ".claude/hooks/cleanup-worktree-symlink.sh"
           }
         ]
       }
@@ -71,7 +71,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/setup-worktree-junction.sh"
+            "command": ".claude/hooks/setup-worktree-symlink.sh"
           },
           {
             "type": "command",

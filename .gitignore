@@ -333,7 +333,7 @@ logs/
 scratch/*
 !scratch/.gitkeep
 
-# Backward-compat junction: .github/skills/ → .agents/skills/
+# Backward-compat symlink: .github/skills/ → .agents/skills/
 # Created by setup scripts; not tracked by git (core.symlinks=false on Windows)
 .github/skills
 

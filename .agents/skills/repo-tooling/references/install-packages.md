@@ -19,9 +19,9 @@ How to correctly install npm packages in the Legacy Sports pnpm monorepo. All de
 
 ## Installing in a Worktree
 
-Worktrees share `node_modules` with the main repo via a Windows junction. To install a new package in a worktree, you must break the junction first and install independently:
+Worktrees share `node_modules` with the main repo via a symlink. To install a new package in a worktree, you must break the symlink first and install independently:
 
-1. **Remove the junction** (does NOT delete the main repo's `node_modules`):
+1. **Remove the symlink** (does NOT delete the main repo's `node_modules`):
 
    ```powershell
    cmd /c "rmdir node_modules"
@@ -38,9 +38,9 @@ Worktrees share `node_modules` with the main repo via a Windows junction. To ins
    make install
    ```
 
-> **Do NOT install in the main repo** while junctioned worktrees exist -- this is unsafe and can corrupt shared junctions. The `preinstall-guard` script only blocks installs when lockfiles are already dirty, and `pnpm add` can sometimes slip through before it dirties the lockfile. Always install in the worktree after removing its junction. Note that `make install` is blocked by `pnpm-install-lock.ps1` when junctioned worktrees are present.
+> **Do NOT install in the main repo** while symlinked worktrees exist -- this is unsafe and can corrupt shared symlinks. The `preinstall-guard` script only blocks installs when lockfiles are already dirty, and `pnpm add` can sometimes slip through before it dirties the lockfile. Always install in the worktree after removing its symlink. Note that `make install` is blocked by `pnpm-install-lock.ps1` when symlinked worktrees are present.
 
-> **After the worktree is cleaned up**, the main repo's junction remains as it was. The next time you create a worktree, `make wt-setup` will re-create a fresh junction.
+> **After the worktree is cleaned up**, the main repo's symlink remains as it was. The next time you create a worktree, `make wt-setup` will re-create a fresh symlink.
 
 ## Prerequisites
 

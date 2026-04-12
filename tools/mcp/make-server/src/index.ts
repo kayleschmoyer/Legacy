@@ -79,16 +79,16 @@ server.tool(
 // --- make_wt_setup ---
 server.tool(
   'make_wt_setup',
-  'Prefer this over `make wt-setup` via shell. Set up a worktree: junction node_modules, copy .env, configure .twig, install hooks. Run after worktree creation.',
+  'Prefer this over `make wt-setup` via shell. Set up a worktree: symlink node_modules, copy .env, configure .twig, install hooks. Run after worktree creation.',
   {
     worktreePath: z
       .string()
       .regex(ABSOLUTE_PATH_REGEX, 'worktreePath must be an absolute path')
       .describe('Absolute worktree path'),
-    removeJunction: z
+    removeSymlink: z
       .boolean()
       .default(false)
-      .describe('Remove junction and install independent node_modules'),
+      .describe('Remove symlink and install independent node_modules'),
     noFrozenLockfile: z
       .boolean()
       .default(false)

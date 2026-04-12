@@ -8,7 +8,7 @@
       1. Lists existing worktrees (via twig) and checks if one already exists.
       2. If it exists, prints the path and exits.
       3. If it does not exist, creates it via `twig worktree create <branch>`.
-      4. Runs `make wt-setup` to junction node_modules, copy .env, and set up .twig.
+      4. Runs `make wt-setup` to symlink node_modules, copy .env, and set up .twig.
       5. Prints the worktree path to stdout (last non-empty line) so callers can
          capture it with: $wt = .\scripts\pr-enter-worktree.ps1 -Branch <branch>
 
@@ -109,7 +109,7 @@ for ($i = 0; $i -lt $lines.Count - 1; $i++) {
 if ($wtPath) {
     Write-Ok "Worktree exists at: $wtPath"
 
-    # Verify the node_modules junction is intact
+    # Verify the node_modules symlink is intact
     $nmPath = Join-Path $wtPath "node_modules"
     if (-not (Test-Path $nmPath)) {
         Write-Step "node_modules missing - running wt-setup..."
@@ -168,7 +168,7 @@ if (-not $wtPath) {
 Write-Ok "Worktree created at: $wtPath"
 
 # ---------------------------------------------------------------------------
-# Step 3: Run wt-setup (junction node_modules, copy .env, .twig)
+# Step 3: Run wt-setup (symlink node_modules, copy .env, .twig)
 # ---------------------------------------------------------------------------
 
 Write-Step "Running wt-setup..."

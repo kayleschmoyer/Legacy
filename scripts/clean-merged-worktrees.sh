@@ -3,7 +3,7 @@
 # Usage: ./scripts/clean-merged-worktrees.sh [--dry-run]
 #
 # Key constraint: NEVER uses `git worktree remove` directly — always goes
-# through `twig worktree clean` to preserve junctions.
+# through `twig worktree clean` to preserve symlinks.
 
 set -euo pipefail
 

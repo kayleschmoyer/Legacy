@@ -17,6 +17,6 @@ This project uses **one worktree per branch** rather than a pool of static, reus
 
 **Disk cost is minimal:**
 
-- `make wt-setup` junctions `node_modules` to the main repo when lockfiles match, so worktrees share the ~1.8 GB `node_modules` with zero extra disk.
+- `make wt-setup` symlinks `node_modules` to the main repo when lockfiles match, so worktrees share the ~1.8 GB `node_modules` with zero extra disk.
 - pnpm's content-addressable store deduplicates packages globally — multiple worktrees don't multiply download or storage costs.
 - The only per-worktree disk cost is the source files themselves (~50 MB), which is negligible.

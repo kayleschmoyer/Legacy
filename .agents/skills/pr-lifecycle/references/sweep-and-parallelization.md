@@ -67,7 +67,7 @@ POST-SWEEP (after outer loop exits):
 
 ## Parallelization Strategy
 
-Each PR lives in its own junctioned worktree. The shared `node_modules` is **read-only** during `make pc`, so parallel validation is safe.
+Each PR lives in its own symlinked worktree. The shared `node_modules` is **read-only** during `make pc`, so parallel validation is safe.
 
 | Phase                            | Parallelizable?           | Reason                                                                       |
 | -------------------------------- | ------------------------- | ---------------------------------------------------------------------------- |
@@ -130,7 +130,7 @@ Review fixes (Pass 2) and CI code fixes (Pass 3) operate on independent PRs in s
 3. Wait for all agents in the batch to complete before spawning the next batch
 4. Collect results from each agent — verify PR state (fixed, blocker commented, or failed)
 
-**Concurrency limit**: max 3 concurrent sub-agents. Each agent runs `make pc` in its own worktree, and junctioned `node_modules` is read-only during validation. More than 3 saturates disk I/O and risks API rate limits.
+**Concurrency limit**: max 3 concurrent sub-agents. Each agent runs `make pc` in its own worktree, and symlinked `node_modules` is read-only during validation. More than 3 saturates disk I/O and risks API rate limits.
 
 **Failure handling**: if a sub-agent fails (crashes, times out), the orchestrator comments the failure on the PR and continues with remaining PRs. Do not label `requires-human-review` for transient agent failures — the issue may succeed on retry. Failed agents do not block the batch.
 
@@ -222,11 +222,11 @@ foreach ($job in $jobs) {
 
 Cache sharing for **task results** (what actually speeds up `make pc`) requires `NX_CACHE_DIRECTORY` to point to a shared path accessible by all worktrees. Each worktree has its own root directory, so their `.nx-cache` directories are isolated by default.
 
-The **shared `node_modules` junction** (created by `make worktree`) co-locates `node_modules/.cache/nx` (the Nx internal module cache) under the shared `node_modules` path — but this is distinct from `.nx-cache` and does **not** satisfy the task result cache requirement.
+The **shared `node_modules` symlink** (created by `make worktree`) co-locates `node_modules/.cache/nx` (the Nx internal module cache) under the shared `node_modules` path — but this is distinct from `.nx-cache` and does **not** satisfy the task result cache requirement.
 
 Without a shared `NX_CACHE_DIRECTORY`, each worktree builds its own isolated `.nx-cache` and warming does not carry over.
 
-**Concurrency limit**: `$maxParallel = 4` (up from 3) is safe **only when caches are shared** (junction or `NX_CACHE_DIRECTORY`) — warming reduces per-job I/O significantly in that case. If worktrees have isolated caches (no junction, no shared `NX_CACHE_DIRECTORY`), keep `$maxParallel = 3` to avoid I/O contention. On machines with ≤4 cores, keep at 3 regardless.
+**Concurrency limit**: `$maxParallel = 4` (up from 3) is safe **only when caches are shared** (symlink or `NX_CACHE_DIRECTORY`) — warming reduces per-job I/O significantly in that case. If worktrees have isolated caches (no symlink, no shared `NX_CACHE_DIRECTORY`), keep `$maxParallel = 3` to avoid I/O contention. On machines with ≤4 cores, keep at 3 regardless.
 
 ### Early CI Failure Detection (Required)
 
@@ -312,7 +312,7 @@ Run once per sweep session, **after** the outer loop exits — never during the 
 
 ### Rules
 
-- **Always use `worktree_clean`** — never `git worktree remove` or manual deletion. `worktree_clean` uses `twig worktree remove` which safely handles junctions.
+- **Always use `worktree_clean`** — never `git worktree remove` or manual deletion. `worktree_clean` uses `twig worktree remove` which safely handles symlinks.
 - **Skip worktrees with no associated PR** — may be in-flight work that hasn't been pushed yet.
 - **Skip open, draft, and closed-unmerged PRs** — only `MERGED` state triggers pruning.
 - **Skip the main repo worktree** — `worktree_list()` already excludes the main checkout from its output, so no explicit filtering is needed.

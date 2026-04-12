@@ -96,14 +96,14 @@ endif
 install: ## Install all dependencies (Node.js and Python)
 	@$(call echo_blue,Installing dependencies...)
 ifeq ($(DETECTED_OS),Windows)
-	@powershell -NoProfile -ExecutionPolicy Bypass -File "$(WORKSPACE_PATH_WIN)\scripts\pnpm-install-lock.ps1" -InstallArgs "--frozen-lockfile" $(if $(SKIP_JUNCTION_CHECK),-SkipJunctionCheck)
+	@powershell -NoProfile -ExecutionPolicy Bypass -File "$(WORKSPACE_PATH_WIN)\scripts\pnpm-install-lock.ps1" -InstallArgs "--frozen-lockfile" $(if $(SKIP_SYMLINK_CHECK),-SkipSymlinkCheck)
 else
 	pnpm install --frozen-lockfile
 endif
 	@$(CHECK_POETRY)
 	@$(MAKE) setup-hooks
 
-refresh: ## Pull latest main and update shared node_modules (safe with junctioned worktrees)
+refresh: ## Pull latest main and update shared node_modules (safe with symlinked worktrees)
 	@$(call echo_blue,Refreshing main repo and shared node_modules...)
 ifeq ($(DETECTED_OS),Windows)
 	@powershell -NoProfile -Command "Get-ChildItem -Path '$(WORKSPACE_PATH_WIN)' -Directory -Filter 'node_modules_DELETE_ME_*' -EA SilentlyContinue | ForEach-Object { $$dir = $$_; try { Remove-Item $$dir.FullName -Recurse -Force -EA Stop; Write-Host ('  Cleaned up ' + $$dir.Name) -ForegroundColor Green } catch { Write-Host ('  Could not remove ' + $$dir.Name + ' (still locked)') -ForegroundColor Yellow } }"
@@ -111,12 +111,12 @@ else
 	@find . -maxdepth 1 -name 'node_modules_DELETE_ME_*' -type d -exec rm -rf {} + 2>/dev/null && echo "  Cleaned up leftover node_modules_DELETE_ME_* directories" || true
 endif
 	@git pull origin main --ff-only
-	@$(MAKE) install SKIP_JUNCTION_CHECK=1
+	@$(MAKE) install SKIP_SYMLINK_CHECK=1
 
 install-force: ## Force install dependencies (handles Windows file locks)
 	@$(call echo_blue,Force installing dependencies...)
 ifeq ($(DETECTED_OS),Windows)
-	@powershell -NoProfile -ExecutionPolicy Bypass -File "$(WORKSPACE_PATH_WIN)\scripts\pnpm-install-lock.ps1" -ForceClean -InstallArgs "--frozen-lockfile" $(if $(SKIP_JUNCTION_CHECK),-SkipJunctionCheck)
+	@powershell -NoProfile -ExecutionPolicy Bypass -File "$(WORKSPACE_PATH_WIN)\scripts\pnpm-install-lock.ps1" -ForceClean -InstallArgs "--frozen-lockfile" $(if $(SKIP_SYMLINK_CHECK),-SkipSymlinkCheck)
 else
 	@$(call echo_yellow,Stopping potential background processes...)
 	@$(KILL_NODE)
@@ -156,7 +156,7 @@ setup-force: install-force ## Setup with force install for Windows file lock iss
 # explicitly so cmd.exe never tries to run the .ps1 directly (which would
 # open it in Notepad via file association). -NonInteractive prevents any
 # interactive prompts from PowerShell itself.
-wt-setup: ## Set up a worktree (node_modules junction, .env, .twig). Usage: make wt-setup WT=<path>
+wt-setup: ## Set up a worktree (node_modules symlink, .env, .twig). Usage: make wt-setup WT=<path>
 ifeq ($(DETECTED_OS),Windows)
 	@powershell -NonInteractive -NoProfile -ExecutionPolicy Bypass -File "$(WORKSPACE_PATH_WIN)\scripts\setup-worktree.ps1" -WorktreePath "$(WT)"
 	@cd "$(WT)" && $(MAKE) setup-hooks
@@ -177,7 +177,7 @@ clean-safe: clean-cache ## Safely clean build artifacts and cache (alias for cle
 clean: ## Clean all build artifacts and dependencies
 ifeq ($(DETECTED_OS),Windows)
 	@powershell -NoProfile -Command "$$nmPath = Join-Path '$(WORKSPACE_PATH_WIN)' 'node_modules'; $$nmEsc = [regex]::Escape($$nmPath); $$procs = Get-Process node -EA SilentlyContinue | Where-Object { try { ($$_.Modules | Where-Object { $$_.FileName -match ($$nmEsc + '.*\.node$$') }).Count -gt 0 } catch { $$false } }; if ($$procs) { Write-Host ''; Write-Host '  BLOCKED: node processes are holding native addon file locks' -ForegroundColor Red; $$procs | ForEach-Object { $$cmd = (Get-CimInstance Win32_Process -Filter ('ProcessId=' + $$_.Id)).CommandLine; Write-Host ('    PID {0}: {1}' -f $$_.Id, $$cmd) -ForegroundColor Yellow }; Write-Host ''; Write-Host '  Run  make kill-stale  to stop them, then retry  make clean' -ForegroundColor Cyan; Write-Host ''; exit 1 }; exit 0"
-	@powershell -NoProfile -Command "$$nmPath = Join-Path '$(WORKSPACE_PATH_WIN)' 'node_modules'; $$nmItem = Get-Item $$nmPath -Force -EA SilentlyContinue; if ($$nmItem -and (($$nmItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)) { Write-Host ''; Write-Host '  BLOCKED: node_modules is a junction' -ForegroundColor Red; Write-Host '  Running make clean here would unlink the junction and break this worktree.' -ForegroundColor Yellow; Write-Host '  Run make clean in the main repo instead.' -ForegroundColor Cyan; Write-Host ''; exit 1 }; if (-not (Test-Path $$nmPath)) { exit 0 }; $$wtDirs = @(); try { $$wtDirs = @(git worktree list --porcelain 2>$$null | Select-String '^worktree ' | ForEach-Object { ($$_ -replace '^worktree ','').Trim() } | Where-Object { $$_ -ne '$(WORKSPACE_PATH_WIN)' }) } catch {}; $$junctions = @(); foreach ($$wt in $$wtDirs) { $$wtNM = Join-Path $$wt 'node_modules'; $$wi = Get-Item $$wtNM -Force -EA SilentlyContinue; if ($$wi -and (($$wi.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)) { $$junctions += $$wt } }; if ($$junctions.Count -gt 0) { Write-Host ''; Write-Host '  WARNING: These worktrees junction to this node_modules:' -ForegroundColor Yellow; $$junctions | ForEach-Object { Write-Host ('    - ' + $$_) -ForegroundColor Yellow }; Write-Host '  make clean will break them. Run twig worktree clean first, or pass FORCE=1.' -ForegroundColor Yellow; Write-Host ''; if ('$(FORCE)' -ne '1' -and '$(SKIP_JUNCTION_CHECK)' -ne '1') { exit 1 } }"
+	@powershell -NoProfile -Command "$$nmPath = Join-Path '$(WORKSPACE_PATH_WIN)' 'node_modules'; $$nmItem = Get-Item $$nmPath -Force -EA SilentlyContinue; if ($$nmItem -and (($$nmItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)) { Write-Host ''; Write-Host '  BLOCKED: node_modules is a symlink' -ForegroundColor Red; Write-Host '  Running make clean here would unlink the symlink and break this worktree.' -ForegroundColor Yellow; Write-Host '  Run make clean in the main repo instead.' -ForegroundColor Cyan; Write-Host ''; exit 1 }; if (-not (Test-Path $$nmPath)) { exit 0 }; $$wtDirs = @(); try { $$wtDirs = @(git worktree list --porcelain 2>$$null | Select-String '^worktree ' | ForEach-Object { ($$_ -replace '^worktree ','').Trim() } | Where-Object { $$_ -ne '$(WORKSPACE_PATH_WIN)' }) } catch {}; $$symlinks = @(); foreach ($$wt in $$wtDirs) { $$wtNM = Join-Path $$wt 'node_modules'; $$wi = Get-Item $$wtNM -Force -EA SilentlyContinue; if ($$wi -and (($$wi.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)) { $$symlinks += $$wt } }; if ($$symlinks.Count -gt 0) { Write-Host ''; Write-Host '  WARNING: These worktrees symlink to this node_modules:' -ForegroundColor Yellow; $$symlinks | ForEach-Object { Write-Host ('    - ' + $$_) -ForegroundColor Yellow }; Write-Host '  make clean will break them. Run twig worktree clean first, or pass FORCE=1.' -ForegroundColor Yellow; Write-Host ''; if ('$(FORCE)' -ne '1' -and '$(SKIP_SYMLINK_CHECK)' -ne '1') { exit 1 } }"
 endif
 	@$(call echo_blue,Cleaning workspace...)
 	pnpm run clean:python $(NULL_REDIRECT) || echo Python clean skipped
@@ -192,8 +192,8 @@ endif
 	@$(call echo_blue,Stopping workspace-affiliated processes...)
 	@$(KILL_WORKSPACE_PROCS)
 ifeq ($(DETECTED_OS),Windows)
-	@$(call echo_blue,Removing node_modules (junction-safe)...)
-	@powershell -NoProfile -ExecutionPolicy Bypass -Command "$$nmPath = 'node_modules'; if (-not (Test-Path $$nmPath)) { Write-Host 'No node_modules to remove'; return } $$item = Get-Item $$nmPath -Force; if (($$item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { cmd /c 'rmdir node_modules'; Write-Host 'node_modules junction removed (target preserved)' } else { try { Remove-Item -Path $$nmPath -Recurse -Force -ErrorAction Stop; Write-Host 'node_modules removed' } catch { $$emptyDir = Join-Path $$env:TEMP ('empty_' + (Get-Random)); New-Item -ItemType Directory -Path $$emptyDir -Force | Out-Null; robocopy $$emptyDir $$nmPath /MIR /NFL /NDL /NJH /NJS /nc /ns /np | Out-Null; Remove-Item -Path $$emptyDir -Force -ErrorAction SilentlyContinue; Remove-Item -Path $$nmPath -Recurse -Force -ErrorAction SilentlyContinue; Write-Host 'node_modules removed using robocopy' } }"
+	@$(call echo_blue,Removing node_modules (symlink-safe)...)
+	@powershell -NoProfile -ExecutionPolicy Bypass -Command "$$nmPath = 'node_modules'; if (-not (Test-Path $$nmPath)) { Write-Host 'No node_modules to remove'; return } $$item = Get-Item $$nmPath -Force; if (($$item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { cmd /c 'rmdir node_modules'; Write-Host 'node_modules symlink removed (target preserved)' } else { try { Remove-Item -Path $$nmPath -Recurse -Force -ErrorAction Stop; Write-Host 'node_modules removed' } catch { $$emptyDir = Join-Path $$env:TEMP ('empty_' + (Get-Random)); New-Item -ItemType Directory -Path $$emptyDir -Force | Out-Null; robocopy $$emptyDir $$nmPath /MIR /NFL /NDL /NJH /NJS /nc /ns /np | Out-Null; Remove-Item -Path $$emptyDir -Force -ErrorAction SilentlyContinue; Remove-Item -Path $$nmPath -Recurse -Force -ErrorAction SilentlyContinue; Write-Host 'node_modules removed using robocopy' } }"
 else
 	@$(call echo_blue,Removing node_modules...)
 	@$(RM_DIR) node_modules $(NULL_REDIRECT) || echo No node_modules to remove

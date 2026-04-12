@@ -32,25 +32,25 @@ The Claude Code session was spawned with the launcher `worktree` checkbox checke
    ```
    worktree_set(key: "<absolute .claude/worktrees/... path from pwd>")
    ```
-7. **Junction `node_modules` from the main repo** (REQUIRED before any pnpm/make command — LS-2903/LS-3003):
+7. **Symlink `node_modules` from the main repo** (REQUIRED before any pnpm/make command — LS-2903/LS-3003):
    ```
    worktree_setup_node_modules()
    ```
-   Uses Node.js path APIs internally — no shell escaping needed. Idempotent (safe to call if junction already exists). Fallback if MCP unavailable: `powershell -Command "New-Item -ItemType Junction -Path '<worktree>\node_modules' -Target 'D:\code\legacy-sports\node_modules'"`
+   Uses Node.js path APIs internally — no shell escaping needed. Idempotent (safe to call if symlink already exists). Fallback if MCP unavailable: `powershell -Command "New-Item -ItemType SymbolicLink -Path '<worktree>\node_modules' -Target 'D:\code\legacy-sports\node_modules'"` (requires Windows Developer Mode: Settings > System > For Developers > Developer Mode)
 8. **Implement** — read the ticket description, investigate, write code + tests. See [work-ticket SKILL.md Step 5](../work-ticket/SKILL.md) for self-review + implementation notes.
 9. **Migrations** — `db_migration_status()` then `db_migrate()`.
 10. **Validate** — `make_run(target: "pc")`. Must pass before pushing.
 11. **Ship** — `worktree_commit` → `worktree_push` → `github_create_pr(draft: true)` → `github_manage_labels([+"agent-in-progress"])` → `github_mark_pr_ready` → `github_request_review` → subscribe to PR activity → `jira_transition("In Review")`.
-    - **Pre-push hook fails with `nx` not found or `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL`**: `node_modules/.bin` is empty or missing (where the pnpm shims live). Use `worktree_push({ skipLint: true })` — do **not** use `SKIP_PREPUSH_LINT=1 git push`. **Important:** `skipLint` bypasses the entire hook after the lockfile checks — conflict-marker and Terraform validations are also skipped, not just formatting. Only use as a last resort; manually run Prettier and check for conflict markers before pushing: `node node_modules/prettier/bin/prettier.cjs --write <files>`. Do not attempt `make install` from the worktree while junctions exist — ask the user to repair the main repo instead.
+    - **Pre-push hook fails with `nx` not found or `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL`**: `node_modules/.bin` is empty or missing (where the pnpm shims live). Use `worktree_push({ skipLint: true })` — do **not** use `SKIP_PREPUSH_LINT=1 git push`. **Important:** `skipLint` bypasses the entire hook after the lockfile checks — conflict-marker and Terraform validations are also skipped, not just formatting. Only use as a last resort; manually run Prettier and check for conflict markers before pushing: `node node_modules/prettier/bin/prettier.cjs --write <files>`. Do not attempt `make install` from the worktree while symlinks exist — ask the user to repair the main repo instead.
 12. **Watch to merge** — monitor CI, fix failures, respond to review comments, rebase as needed.
 13. **After merge** — MCP gap audit, mark tracking tasks complete, cleanup.
 
 ### Native-flow specifics
 
-- **`make_wt_setup` is NOT used** — it's sibling-only. The junction command above replaces it.
+- **`make_wt_setup` is NOT used** — it's sibling-only. The symlink command above replaces it.
 - **`worktree_list` / `make_worktree_create` are NOT used** — you're already in a worktree, Claude Code created it for you.
 - **On exit**, `ExitWorktree(action: "remove")` cleans up the ephemeral worktree. Only call this when explicitly done — the worktree can survive across sessions if kept.
-- **All 9 MCP servers** should connect in every session (`MCP_TIMEOUT=10000` in `.claude/settings.json` ensures startup headroom). If a server is unexpectedly missing, restart the session — do not proceed with shell fallbacks for a missing server. Shell fallbacks elsewhere in this doc (e.g., junction creation, `gh` CLI recovery) are for when MCP is entirely unavailable, not for working around a missing server at startup.
+- **All 9 MCP servers** should connect in every session (`MCP_TIMEOUT=10000` in `.claude/settings.json` ensures startup headroom). If a server is unexpectedly missing, restart the session — do not proceed with shell fallbacks for a missing server. Shell fallbacks elsewhere in this doc (e.g., symlink creation, `gh` CLI recovery) are for when MCP is entirely unavailable, not for working around a missing server at startup.
 
 ## Subagent Dispatch (multi-ticket orchestrators)
 
@@ -111,7 +111,7 @@ original_branch = git branch --show-current
 for each target:
   git fetch origin <branch>
   git checkout <branch>
-  worktree_setup_node_modules()  # idempotent — skips if junction already correct
+  worktree_setup_node_modules()  # idempotent — skips if symlink already correct
   # ... do work, commit, push ...
   # (must commit+push before switching — dirty working tree blocks checkout)
 git checkout $original_branch
@@ -155,7 +155,7 @@ These are loaded by `references/sibling/sibling-worktree-flow.md` and are not re
 - [branch-tree-management.md](references/sibling/branch-tree-management.md) — stacked branches, cascade rebase (sibling-specific)
 - [manual-worktree-setup.md](references/sibling/manual-worktree-setup.md) — alternative to `make wt-setup`
 - [worktree-multi-root-details.md](references/sibling/worktree-multi-root-details.md) — multi-root VS Code workspace for sibling orchestrators
-- [worktree-troubleshooting.md](references/sibling/worktree-troubleshooting.md) — sibling-worktree-specific issues (stale entries, junction repair)
+- [worktree-troubleshooting.md](references/sibling/worktree-troubleshooting.md) — sibling-worktree-specific issues (stale entries, symlink repair)
 - [worktree-design-rationale.md](references/sibling/worktree-design-rationale.md) — historical context for one-worktree-per-branch (sibling flow)
 - [in-place-branching.md](references/sibling/in-place-branching.md) — legacy doc for explicit "no worktree" requests (mostly obsolete — the native flow IS an in-place checkout of sorts, in an ephemeral directory)
 - [client-bug-triage.md](references/sibling/client-bug-triage.md) — `work-bugs` batch entry point (orchestrator)
@@ -167,5 +167,5 @@ These are loaded by `references/sibling/sibling-worktree-flow.md` and are not re
 | **Never commit to the `main` branch**                                 | Always work on a feature branch, in either `.claude/worktrees/<name>/` (native) or `D:\code\legacy-sports-worktrees\<ticket>\` (sibling). |
 | **Never edit `D:\code\legacy-sports` with HEAD on `main`**            | The `.claude/hooks/guard-main-repo.sh` hook enforces this.                                                                                |
 | **MCP-first**                                                         | Prefer worktree MCP tools (`worktree_commit`, `worktree_push`, `worktree_rebase`) over raw `git` commands.                                |
-| **Never manually remove a sibling worktree**                          | Always `twig worktree clean`. `git worktree remove` destroys junctions.                                                                   |
-| **Never `make clean`/`make install`/`pnpm install` in the main repo** | Breaks all junctions.                                                                                                                     |
+| **Never manually remove a sibling worktree**                          | Always `twig worktree clean`. `git worktree remove` destroys symlinks.                                                                    |
+| **Never `make clean`/`make install`/`pnpm install` in the main repo** | Breaks all symlinks.                                                                                                                      |

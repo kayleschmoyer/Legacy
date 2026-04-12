@@ -1,7 +1,6 @@
-import { readFile, readdir, access } from 'node:fs/promises';
+import { readFile, readdir, access, lstat } from 'node:fs/promises';
 import { join } from 'node:path';
-import { platform } from 'node:os';
-import { getRepoRoot, runCommand, runPnpm } from '../run-command.js';
+import { getRepoRoot, runPnpm } from '../run-command.js';
 import type { ToolResult } from '../types.js';
 
 interface PackageHealthParams {
@@ -15,21 +14,11 @@ interface HealthIssue {
   details?: string;
 }
 
-/** Check if node_modules is a junction (Windows reparse point). Always false on non-Windows. */
-async function isJunction(nmPath: string): Promise<boolean> {
-  if (platform() !== 'win32') return false;
+/** Check if node_modules is a symlink. Works cross-platform. */
+async function isSymlink(nmPath: string): Promise<boolean> {
   try {
-    const result = await runCommand(
-      'powershell',
-      [
-        '-NoProfile',
-        '-Command',
-        `[bool]((Get-Item '${nmPath}' -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)`,
-      ],
-      join(nmPath, '..'),
-      10_000,
-    );
-    return result.trim() === 'True';
+    const stat = await lstat(nmPath);
+    return stat.isSymbolicLink();
   } catch {
     return false;
   }
@@ -194,15 +183,15 @@ export async function checkPackageHealth(
   const issues: HealthIssue[] = [];
 
   try {
-    // 1. Check junction status
+    // 1. Check symlink status
     const nmPath = join(cwd, 'node_modules');
-    const junctioned = await isJunction(nmPath);
-    if (junctioned) {
+    const linked = await isSymlink(nmPath);
+    if (linked) {
       issues.push({
         severity: 'info',
-        category: 'junction',
+        category: 'symlink',
         message:
-          'node_modules is a junction to the main repo. Package installs must be done in the main repo, not here.',
+          'node_modules is a symlink to the main repo. Package installs must be done in the main repo, not here.',
       });
     }
 
@@ -295,7 +284,7 @@ export async function checkPackageHealth(
                 errors: errorCount,
                 warnings: warningCount,
                 info: infoCount,
-                junctioned,
+                linked,
                 libPackagesWithDeps: libPkgs.length,
               },
               issues,

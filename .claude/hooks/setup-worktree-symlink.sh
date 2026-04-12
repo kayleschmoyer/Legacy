@@ -8,20 +8,19 @@
 #   2. If missing or invalid, recreate via cmd mklink /D (directory symlink,
 #      preferred) or PowerShell New-Item -ItemType SymbolicLink as fallback.
 #
-# Why symlinks, not junctions:
-#   NTFS junctions are followed by recursive-delete tools (PowerShell
-#   Remove-Item, Node.js fs.rmSync, git worktree remove). When Claude Code's
-#   archive deletes the worktree directory, it follows the junction into the
-#   main repo's node_modules and destroys it. Directory symlinks (mklink /D)
-#   are NOT followed — the recursive delete removes the link itself, leaving
-#   the target intact. Requires Windows Developer Mode (one-time setting).
+# Why symlinks:
+#   Directory symlinks (mklink /D) are NOT followed by recursive-delete tools
+#   (PowerShell Remove-Item, Node.js fs.rmSync, git worktree remove). When
+#   Claude Code's archive deletes the worktree directory, it removes the link
+#   itself, leaving the target intact. Requires Windows Developer Mode
+#   (one-time setting).
 #
 # Windows notes:
 #   - Runs in git-bash (ships with Git for Windows); cygpath is available.
 #   - `cmd //c` is required — git-bash interprets a single /c as a path.
 #   - Path conversion: cygpath -w is the primary method; the sed fallback
 #     uses the repo-specific /d/ prefix that matches this machine's layout.
-#   - The Stop hook (cleanup-worktree-junction.sh) removes the symlink
+#   - The Stop hook (cleanup-worktree-symlink.sh) removes the symlink
 #     when the session ends cleanly.
 
 # Prefer CLAUDE_PROJECT_DIR over pwd — Claude Code may invoke hooks with the
@@ -34,7 +33,7 @@ WORKTREE="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 # Log is capped at 200 lines to prevent unbounded growth.
 if [[ "${CLAUDE_HOOK_DEBUG:-}" == "1" ]]; then
   {
-    echo "--- setup-worktree-junction $(date -u +%Y-%m-%dT%H:%M:%SZ) ---"
+    echo "--- setup-worktree-symlink $(date -u +%Y-%m-%dT%H:%M:%SZ) ---"
     echo "  pwd:                 $(pwd)"
     echo "  CLAUDE_PROJECT_DIR:  ${CLAUDE_PROJECT_DIR:-unset}"
     echo "  WORKTREE (resolved): $WORKTREE"
@@ -73,14 +72,6 @@ if [ ! -e "$NM" ] && [ ! -L "$NM" ]; then
 elif [ ! -d "$BIN" ] || [ -z "$(ls -A "$BIN" 2>/dev/null | head -c1)" ]; then
   # .bin is missing or empty — symlink is broken or stale
   needs_recreate=true
-elif [ -e "$NM" ]; then
-  # node_modules exists and .bin is healthy — check if it's a junction (unsafe)
-  # vs a symlink (safe). Junctions must be migrated to symlinks.
-  # `dir /AL` shows <JUNCTION> vs <SYMLINKD> in its output.
-  WIN_NM_CHECK=$(cygpath -w "$NM" 2>/dev/null || echo "$NM" | sed 's|/d/|D:\\|; s|/|\\|g')
-  if cmd //c "dir /AL \"$(dirname "$WIN_NM_CHECK")\"" 2>/dev/null | grep -q "JUNCTION.*node_modules"; then
-    needs_recreate=true  # migrate junction -> symlink
-  fi
 fi
 
 if [ "$needs_recreate" = "false" ]; then
@@ -92,9 +83,9 @@ WIN_NM=$(cygpath -w "$NM" 2>/dev/null || echo "$NM" | sed 's|/d/|D:\\|; s|/|\\|g
 cmd //c "rmdir \"$WIN_NM\"" >/dev/null 2>&1
 
 # --- 4. Recreate as directory symlink via cmd mklink /D ----------------------
-# mklink /D creates a directory symlink (not a junction). Recursive-delete tools
-# remove the symlink without following it into the target — this is the key
-# protection against Claude Code's archive destroying the main repo's node_modules.
+# mklink /D creates a directory symlink. Recursive-delete tools remove the
+# symlink without following it into the target — this is the key protection
+# against Claude Code's archive destroying the main repo's node_modules.
 WIN_MAIN_NM=$(cygpath -w "$MAIN_NM" 2>/dev/null || echo "$MAIN_NM" | sed 's|/d/|D:\\|; s|/|\\|g')
 cmd //c "mklink /D \"$WIN_NM\" \"$WIN_MAIN_NM\"" >/dev/null 2>&1
 

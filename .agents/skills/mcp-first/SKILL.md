@@ -48,7 +48,7 @@ These are the specific built-in tool substitutions agents should reach for autom
 | `sleep N && gh run view <runId>` (poll loop)                 | `ci_wait_for_run({ runId: "<runId>" })`                                                                                   |
 | `tail ~/.claude/.../tasks/<taskId>.output`                   | `TaskOutput(taskId: "<taskId>")`                                                                                          |
 
-**Glob limitation on Windows worktrees**: `Glob` with `path=` set to an absolute Windows worktree path may silently return empty results due to junction traversal issues. Fall back to `worktree_ls_tree({ ref: "HEAD", path: "<dir>" })` (Git-tracked files only) or `worktree_run(command: "dir <dir>")`.
+**Glob limitation on Windows worktrees**: `Glob` with `path=` set to an absolute Windows worktree path may silently return empty results due to symlink traversal issues. Fall back to `worktree_ls_tree({ ref: "HEAD", path: "<dir>" })` (Git-tracked files only) or `worktree_run(command: "dir <dir>")`.
 
 ## Nx Targets
 
@@ -56,7 +56,7 @@ Prefer the `nx_run` MCP tool over `pnpm exec nx run <project>:<target>`. For aff
 
 ## Make Targets
 
-Prefer `make_run` MCP tool over running `make <target>` via Bash. The MCP tool enforces a target whitelist, sets appropriate timeouts, and provides structured output. For worktree creation use `make_worktree_create`; for worktree setup use `make_wt_setup` (supports junction removal + independent `make install`).
+Prefer `make_run` MCP tool over running `make <target>` via Bash. The MCP tool enforces a target whitelist, sets appropriate timeouts, and provides structured output. For worktree creation use `make_worktree_create`; for worktree setup use `make_wt_setup` (supports symlink removal + independent `make install`).
 
 ## Git Operations in Worktrees
 

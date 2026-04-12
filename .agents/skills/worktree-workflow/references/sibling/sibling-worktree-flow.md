@@ -43,11 +43,11 @@ work and confuses traceability.
 
 ## ⚠️ Concurrent Agent Safety (Shared node_modules)
 
-Junctioned sibling worktrees share the main repo's `node_modules`. Key rules:
+Symlinked sibling worktrees share the main repo's `node_modules`. Key rules:
 
-- **Never `make clean`/`make install`/`pnpm install` in the main repo** while sibling worktrees exist — it breaks all junctions.
-- **Never manually remove worktrees** — always use `twig worktree clean` (unlinks junctions safely).
-- **Broken node_modules?** Check if it's a junction first: `(Get-Item node_modules -Force).Attributes -band [IO.FileAttributes]::ReparsePoint`. If yes, **ask the user** to fix the main repo — never run `make install` autonomously.
+- **Never `make clean`/`make install`/`pnpm install` in the main repo** while sibling worktrees exist — it breaks all symlinks.
+- **Never manually remove worktrees** — always use `twig worktree clean` (unlinks symlinks safely).
+- **Broken node_modules?** Check if it's a symlink first: `(Get-Item node_modules -Force).Attributes -band [IO.FileAttributes]::ReparsePoint`. If yes, **ask the user** to fix the main repo — never run `make install` autonomously.
 - All install ops are serialized via `.pnpm-install.lock`. **Never run raw `pnpm install`** — use Makefile targets.
 
 > 📎 **Full concurrent safety rules, recovery steps, and what's safe in parallel**: see [concurrent-agent-safety.md](../shared/concurrent-agent-safety.md)
@@ -71,12 +71,12 @@ worktree_unlock(worktree: "LS-1234")
 
 ## Key Rules
 
-| Rule                    | Detail                                                                                                  |
-| ----------------------- | ------------------------------------------------------------------------------------------------------- |
-| **Main stays on main**  | Never check out a feature branch in the main repo — it's the base for new worktrees                     |
-| **No edits in main**    | All file edits must happen inside `$wt`. Staging changes in main creates phantom diffs.                 |
-| **Never manual remove** | **Always** `twig worktree clean` — never `git worktree remove` or manual deletion (destroys junctions). |
-| **Run make install**    | `node_modules` is absent in a fresh worktree — always run `make wt-setup` or `make install` inside it   |
+| Rule                    | Detail                                                                                                 |
+| ----------------------- | ------------------------------------------------------------------------------------------------------ |
+| **Main stays on main**  | Never check out a feature branch in the main repo — it's the base for new worktrees                    |
+| **No edits in main**    | All file edits must happen inside `$wt`. Staging changes in main creates phantom diffs.                |
+| **Never manual remove** | **Always** `twig worktree clean` — never `git worktree remove` or manual deletion (destroys symlinks). |
+| **Run make install**    | `node_modules` is absent in a fresh worktree — always run `make wt-setup` or `make install` inside it  |
 
 ## Prerequisites
 
@@ -195,7 +195,7 @@ twig worktree list
 >   origin/main    # or origin/<parent-branch>
 > ```
 >
-> Then run `make_wt_setup` (MCP) or `make wt-setup WT=<path>` as normal to junction
+> Then run `make_wt_setup` (MCP) or `make wt-setup WT=<path>` as normal to symlink
 > `node_modules`, copy `.env`, etc.
 >
 > Note: twig parent registration is skipped with this fallback. For tickets based off
@@ -425,7 +425,7 @@ twig worktree clean
 git branch -d "LS-####/short-description"
 ```
 
-> **🚨 NEVER use `git worktree remove` or manually delete a worktree directory** — it destroys `node_modules` junctions. Always use `twig worktree clean`. See [concurrent-agent-safety.md](../shared/concurrent-agent-safety.md).
+> **🚨 NEVER use `git worktree remove` or manually delete a worktree directory** — it destroys `node_modules` symlinks. Always use `twig worktree clean`. See [concurrent-agent-safety.md](../shared/concurrent-agent-safety.md).
 
 ## Moving an Existing Worktree
 

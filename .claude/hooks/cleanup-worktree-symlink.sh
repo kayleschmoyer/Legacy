@@ -4,12 +4,9 @@
 # symlinks (mklink /D) are NOT followed by recursive-delete tools, so even if this
 # hook doesn't fire (e.g. Claude Code archive), the target is safe.
 #
-# Uses `cmd //c rmdir` (non-recursive) which safely removes both symlinks and
-# junctions without touching the target. Real directories are left untouched.
-#
-# Note: on Windows git-bash, `[ -L ]` returns false for NTFS junctions (only true
-# symlinks), so we always attempt the non-recursive rmdir whenever node_modules exists.
-# cmd rmdir succeeds for symlinks/junctions and fails harmlessly on non-empty real dirs.
+# Uses `cmd //c rmdir` (non-recursive) which safely removes symlinks without
+# touching the target. Real directories are left untouched.
+# cmd rmdir succeeds for symlinks and fails harmlessly on non-empty real dirs.
 
 WORKTREE="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 

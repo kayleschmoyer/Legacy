@@ -27,7 +27,7 @@ Playwright's `webServer` config in `apps/web-e2e/playwright.config.ts` is the **
 
 ## Shutdown Hygiene (Windows Lock Prevention)
 
-Always stop Playwright/static servers when done. Stale processes hold native `.node` addons, blocking `make install` for all junctioned worktrees. Use `make kill-stale` to find and stop them.
+Always stop Playwright/static servers when done. Stale processes hold native `.node` addons, blocking `make install` for all symlinked worktrees. Use `make kill-stale` to find and stop them.
 
 > See [shutdown-hygiene.md](shutdown-hygiene.md) for detection scripts and full details.
 

@@ -10,7 +10,7 @@ Nx build system intelligence for AI agents — project discovery, affected analy
 - **nx_run** — Run an Nx target on a specific project
 - **nx_run_affected** — Run a target on all affected projects
 - **nx_dep_graph** — Query dependency relationships between projects
-- **nx_install_package** — Junction-aware package installation with lock file, duplicate detection, and @types/ companion check
+- **nx_install_package** — Symlink-aware package installation with lock file, duplicate detection, and @types/ companion check
 - **nx_check_package_health** — Scan workspace for nested node_modules, wildcard ranges, missing overrides, and missing @types/ companions
 
 ## How It Works
@@ -21,7 +21,7 @@ Wraps Nx CLI commands (`nx show projects`, `nx show project`, `nx affected`, `nx
 
 `nx_install_package` enforces the monorepo's package installation rules:
 
-1. **Junction detection** — refuses to install if `node_modules` is a junction (shared with other worktrees)
+1. **Symlink detection** — refuses to install if `node_modules` is a symlink (shared with other worktrees)
 2. **Lock file** — uses `pnpm-install-lock.ps1` to acquire an exclusive lock, preventing concurrent installs from corrupting `node_modules`
 3. **Workspace root** — always installs with `-w` flag (all deps are hoisted to the root)
 4. **Post-install scanning** — checks for nested `node_modules` in `lib/` that signal version duplication

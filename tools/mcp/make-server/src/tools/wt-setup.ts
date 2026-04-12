@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { runCommand, runMake, getRepoRoot } from '../run-command.js';
 import type { ToolResult } from '../types.js';
 
-function isJunction(p: string): boolean {
+function isSymlink(p: string): boolean {
   try {
     return lstatSync(p).isSymbolicLink();
   } catch {
@@ -13,19 +13,19 @@ function isJunction(p: string): boolean {
 
 interface WtSetupParams {
   worktreePath: string;
-  removeJunction?: boolean;
+  removeSymlink?: boolean;
   noFrozenLockfile?: boolean;
 }
 
 /**
  * Set up a worktree for development. This runs `make wt-setup WT=<path>` which:
- *   1. Creates a node_modules junction to the main repo (if not already present)
+ *   1. Creates a node_modules symlink to the main repo (if not already present)
  *   2. Copies .env from the main repo
  *   3. Creates .twig config
  *   4. Installs git hooks
  *
- * If removeJunction is true, it will:
- *   1. Remove the node_modules junction
+ * If removeSymlink is true, it will:
+ *   1. Remove the node_modules symlink
  *   2. Run `make install` to create independent node_modules
  *
  * This is needed when the worktree requires different dependencies (e.g.,
@@ -36,7 +36,7 @@ interface WtSetupParams {
 export async function wtSetup(params: WtSetupParams): Promise<ToolResult> {
   const {
     worktreePath,
-    removeJunction = false,
+    removeSymlink = false,
     noFrozenLockfile = false,
   } = params;
 
@@ -66,7 +66,7 @@ export async function wtSetup(params: WtSetupParams): Promise<ToolResult> {
 
   const repoRoot = getRepoRoot();
   const log: string[] = [`[worktree: ${worktreePath}]`];
-  let junctionActuallyRemoved = false;
+  let symlinkActuallyRemoved = false;
 
   try {
     // Step 1: Run make wt-setup from the main repo
@@ -79,18 +79,18 @@ export async function wtSetup(params: WtSetupParams): Promise<ToolResult> {
     log.push(setupOutput);
     log.push('Worktree setup complete.');
 
-    // Step 2: Optionally remove junction and install independent deps
-    if (removeJunction) {
+    // Step 2: Optionally remove symlink and install independent deps
+    if (removeSymlink) {
       const nmPath = join(worktreePath, 'node_modules');
 
-      if (isJunction(nmPath)) {
-        log.push('', 'Removing node_modules junction...');
+      if (isSymlink(nmPath)) {
+        log.push('', 'Removing node_modules symlink...');
 
-        // rmSync with recursive: false removes the junction/symlink itself
+        // rmSync with recursive: false removes the symlink itself
         // without following it or deleting the target directory contents.
         rmSync(nmPath, { recursive: false });
-        junctionActuallyRemoved = true;
-        log.push('Junction removed.');
+        symlinkActuallyRemoved = true;
+        log.push('Symlink removed.');
 
         if (noFrozenLockfile) {
           log.push(
@@ -124,7 +124,7 @@ export async function wtSetup(params: WtSetupParams): Promise<ToolResult> {
       } else if (existsSync(nmPath)) {
         log.push(
           '',
-          'node_modules exists but is not a junction — skipping junction removal.',
+          'node_modules exists but is not a symlink — skipping symlink removal.',
         );
       } else {
         log.push('', 'No node_modules found — running install...');
@@ -166,7 +166,7 @@ export async function wtSetup(params: WtSetupParams): Promise<ToolResult> {
             {
               success: true,
               worktreePath,
-              junctionRemoved: junctionActuallyRemoved,
+              symlinkRemoved: symlinkActuallyRemoved,
               log: log.join('\n'),
             },
             null,

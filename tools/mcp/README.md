@@ -88,7 +88,7 @@ See `.agents/skills/repo-tooling/SKILL.md` for usage.
 
 Git worktree management for parallel ticket work:
 
-- **worktree_list** — List active worktrees with junction status and branch info
+- **worktree_list** — List active worktrees with symlink status and branch info
 - **worktree_set** — Set the active worktree for subsequent commands
 - **worktree_run** — Run a shell command in the active worktree
 - **worktree_guard** — Check whether a path is inside the main repo (warns if worktrees are active)
@@ -144,7 +144,7 @@ Nx build system intelligence — project discovery, affected analysis, target ex
 Makefile target execution with whitelisted targets, appropriate timeouts, and worktree-aware operations:
 
 - **make_run** — Run a whitelisted make target (pc, install, build, test, lint-fix, typecheck, codegen, kill-stale, etc.)
-- **make_wt_setup** — Set up a worktree (node_modules junction, .env, hooks) with optional junction removal and independent install
+- **make_wt_setup** — Set up a worktree (node_modules symlink, .env, hooks) with optional symlink removal and independent install
 - **make_worktree_create** — Create a new git worktree for a Jira ticket (branch + worktree directory + parent registration)
 
 ### browser-server

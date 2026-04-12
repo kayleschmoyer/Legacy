@@ -6,7 +6,7 @@ An MCP (Model Context Protocol) server that tracks the active git worktree and e
 
 ### `worktree_list`
 
-List all active worktrees with junction status and branch info.
+List all active worktrees with symlink status and branch info.
 
 ### `worktree_set`
 
@@ -84,7 +84,7 @@ The server is configured in `.vscode/mcp.json`:
 ## How It Works
 
 1. **Worktree discovery** — uses `git worktree list --porcelain` to enumerate all worktrees, regardless of where they live on disk.
-2. **Junction detection** — checks `node_modules` in each worktree via `fs.lstatSync` to distinguish junctioned (shared) vs independent installs.
+2. **Symlink detection** — checks `node_modules` in each worktree via `fs.lstatSync` to distinguish symlinked (shared) vs independent installs.
 3. **Main-repo guard** — `worktree_run` refuses to execute commands in the main repo when any worktrees are active, preventing accidental mutation of the shared `node_modules` or dirty commits on `main`.
 4. **Active tracking** — `worktree_set` stores the active worktree in memory (session-scoped) so subsequent `worktree_run` calls don't need to specify the target.
 5. **Rebase workflow** — `worktree_rebase` → `worktree_stabilize` → `worktree_push` provides a complete rebase-to-push pipeline with agent-safe defaults (no editor blocking) and main-branch push protection.

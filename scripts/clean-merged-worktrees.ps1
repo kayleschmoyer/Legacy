@@ -6,7 +6,7 @@
     Lists all git worktrees, checks if their branch has a merged PR on GitHub,
     and cleans up merged worktrees using `twig worktree clean`.
     NEVER uses `git worktree remove` directly — always goes through twig to
-    preserve junctions.
+    preserve symlinks.
 .PARAMETER DryRun
     Show what would be cleaned without actually cleaning.
 .EXAMPLE
@@ -53,24 +53,24 @@ if ($commonDir -eq ".git") {
 $cleaned = 0
 $skipped = 0
 
-# Remove all known junctions from a worktree directory before cleanup.
-# Returns $true if all junctions were removed (or didn't exist), $false if any
-# junction could not be removed (twig cleanup should be skipped to avoid data loss).
-function Remove-WorktreeJunctions {
+# Remove all known symlinks from a worktree directory before cleanup.
+# Returns $true if all symlinks were removed (or didn't exist), $false if any
+# symlink could not be removed (twig cleanup should be skipped to avoid data loss).
+function Remove-WorktreeLinks {
     param([string]$WorktreePath)
     $allRemoved = $true
-    foreach ($junctionName in @('node_modules', '.twig', 'certs', '.github\skills')) {
-        $jPath = Join-Path $WorktreePath $junctionName
+    foreach ($linkName in @('node_modules', '.twig', 'certs', '.github\skills')) {
+        $jPath = Join-Path $WorktreePath $linkName
         $jItem = Get-Item $jPath -Force -ErrorAction SilentlyContinue
         if ($jItem -and ($jItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
             cmd /c "rmdir `"$jPath`"" 2>$null | Out-Null
             $stillExists = Get-Item $jPath -Force -ErrorAction SilentlyContinue
             if ($stillExists -and ($stillExists.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
-                Write-Host "          WARNING: Failed to remove junction '$junctionName' — skipping twig cleanup to avoid data loss." -ForegroundColor Red
+                Write-Host "          WARNING: Failed to remove symlink '$linkName' — skipping twig cleanup to avoid data loss." -ForegroundColor Red
                 $allRemoved = $false
                 break
             }
-            Write-Host "          Removed junction: $junctionName" -ForegroundColor Gray
+            Write-Host "          Removed symlink: $linkName" -ForegroundColor Gray
         }
     }
     return $allRemoved
@@ -144,14 +144,14 @@ foreach ($line in $porcelainOutput) {
                 Write-Host "          [dry-run] Would clean via twig" -ForegroundColor DarkYellow
                 $cleaned++
             } else {
-                # Remove junctions BEFORE twig runs. On Windows, git (which twig calls
-                # internally) follows NTFS junctions during recursive directory deletion,
-                # wiping the junction target (e.g. the main repo's node_modules).
-                # cmd /c rmdir (non-recursive) removes the junction link without touching
+                # Remove symlinks BEFORE twig runs. On Windows, git (which twig calls
+                # internally) follows NTFS links during recursive directory deletion,
+                # wiping the symlink target (e.g. the main repo's node_modules).
+                # cmd /c rmdir (non-recursive) removes the symlink without touching
                 # the target. It fails harmlessly on non-empty real directories.
-                $junctionRemovalFailed = -not (Remove-WorktreeJunctions $currentPath)
+                $linkRemovalFailed = -not (Remove-WorktreeLinks $currentPath)
 
-                if ($junctionRemovalFailed) {
+                if ($linkRemovalFailed) {
                     $skipped++
                     Write-Host ""
                     continue
@@ -209,10 +209,10 @@ if ($currentBranch -and $currentPath) {
                 Write-Host "          [dry-run] Would clean via twig" -ForegroundColor DarkYellow
                 $cleaned++
             } else {
-                # Remove junctions BEFORE twig runs (see main loop for rationale).
-                $junctionRemovalFailed = -not (Remove-WorktreeJunctions $currentPath)
+                # Remove symlinks BEFORE twig runs (see main loop for rationale).
+                $linkRemovalFailed = -not (Remove-WorktreeLinks $currentPath)
 
-                if (-not $junctionRemovalFailed) {
+                if (-not $linkRemovalFailed) {
                     Write-Host "          Cleaning via twig..." -ForegroundColor Gray
                     try {
                         Push-Location $mainRepo

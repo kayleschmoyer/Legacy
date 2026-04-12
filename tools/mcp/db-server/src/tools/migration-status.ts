@@ -95,7 +95,7 @@ export async function migrationStatus(
 
     if (isSslError || isConnectError) {
       const reason = isSslError
-        ? 'SSL certificate error — DB_CERT_PATH may be missing or invalid in this worktree. Run make wt-setup to junction certs/ from the main repo.'
+        ? 'SSL certificate error — DB_CERT_PATH may be missing or invalid in this worktree. Run make wt-setup to symlink certs/ from the main repo.'
         : 'DB connection unavailable — the database is unreachable (timeout or ECONNREFUSED). Check network connectivity and DB_HOST in .env.';
 
       return {

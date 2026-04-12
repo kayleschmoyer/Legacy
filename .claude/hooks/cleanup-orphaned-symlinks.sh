@@ -1,9 +1,9 @@
 #!/bin/bash
-# SessionStart hook: remove orphaned node_modules junctions left by crashed sessions.
+# SessionStart hook: remove orphaned node_modules symlinks left by crashed sessions.
 #
-# The Stop hook (cleanup-worktree-junction.sh) removes the node_modules junction
+# The Stop hook (cleanup-worktree-symlink.sh) removes the node_modules symlink
 # when a session ends cleanly. But if a session crashes, the hook never runs and
-# the junction persists. A later git worktree remove can then follow the junction
+# the symlink persists. A later git worktree remove can then follow the link
 # and corrupt the main repo's node_modules.
 #
 # This hook runs at SessionStart and scans two worktree locations:
@@ -11,16 +11,16 @@
 #   2. Sibling agent worktrees under the repo's worktrees parent dir (agents-*)
 #      These are created by make wt-setup for GitHub Copilot coding agent tasks and
 #      are at risk when VS Code archives an agent session — the extension may delete
-#      the worktree directory recursively, following the junction into the main repo.
+#      the worktree directory recursively, following the link into the main repo.
 #
-# cmd //c rmdir (non-recursive) removes junction links and empty real directories,
+# cmd //c rmdir (non-recursive) removes symlinks and empty real directories,
 # but fails harmlessly on non-empty real directories. So a full independent install
-# in a sibling worktree is safe; only junctions and empty dirs are removed.
+# in a sibling worktree is safe; only symlinks and empty dirs are removed.
 #
-# Active-session protection: setup-worktree-junction.sh (also a SessionStart hook,
+# Active-session protection: setup-worktree-symlink.sh (also a SessionStart hook,
 # runs first) writes a .claude-session marker with the current epoch. Sibling
 # worktrees whose marker is < 30 minutes old are skipped. Stale markers (crashed
-# sessions older than 30 minutes) are removed before the junction is cleaned up.
+# sessions older than 30 minutes) are removed before the symlink is cleaned up.
 # For Copilot agents-* worktrees, setup-worktree.ps1 writes the same marker.
 
 WORKTREE="${CLAUDE_PROJECT_DIR:-$(pwd)}"
@@ -30,7 +30,7 @@ if [[ "$WORKTREE" != *"/.claude/worktrees/"* ]]; then
   exit 0
 fi
 
-remove_junction() {
+remove_symlink() {
   local J="$1"
   local WIN_PATH
   local CMD_OUTPUT
@@ -44,15 +44,15 @@ remove_junction() {
     return 0
   fi
   if [ "$CMD_STATUS" -ne 0 ] && [ -n "$CMD_OUTPUT" ]; then
-    printf 'Warning: failed to remove junction "%s" (exit %s): %s\n' "$J" "$CMD_STATUS" "$CMD_OUTPUT" >&2
+    printf 'Warning: failed to remove symlink "%s" (exit %s): %s\n' "$J" "$CMD_STATUS" "$CMD_OUTPUT" >&2
   else
-    printf 'Warning: failed to remove junction "%s"; path still exists after rmdir.\n' "$J" >&2
+    printf 'Warning: failed to remove symlink "%s"; path still exists after rmdir.\n' "$J" >&2
   fi
 }
 
-# Remove all junctions in a worktree directory, respecting the session marker.
-# Junctions created by make wt-setup: node_modules, .twig, certs, .github/skills
-clean_worktree_junctions() {
+# Remove all symlinks in a worktree directory, respecting the session marker.
+# Symlinks created by make wt-setup: node_modules, .twig, certs, .github/skills
+clean_worktree_symlinks() {
   local WORKTREE_DIR="$1"
   local NOW="$2"
 
@@ -66,12 +66,12 @@ clean_worktree_junctions() {
     if [ -n "$MARKER_TIME" ] && [ $((NOW - MARKER_TIME)) -lt 1800 ]; then
       return 0
     fi
-    # Marker is stale (crashed session) — remove it before cleaning the junctions
+    # Marker is stale (crashed session) — remove it before cleaning the symlinks
     rm -f "$MARKER"
   fi
 
-  for junction_name in node_modules .twig certs .github/skills; do
-    remove_junction "$WORKTREE_DIR/$junction_name"
+  for link_name in node_modules .twig certs .github/skills; do
+    remove_symlink "$WORKTREE_DIR/$link_name"
   done
 }
 
@@ -79,13 +79,13 @@ NOW=$(date +%s)
 
 # 1. Scan sibling ephemeral worktrees (.claude/worktrees/*)
 # Skip the current session's own directory — it is always active so its
-# junctions should never be removed by this script.
+# symlinks should never be removed by this script.
 CLAUDE_WORKTREES_DIR=$(dirname "$WORKTREE")
 for SIBLING_DIR in "$CLAUDE_WORKTREES_DIR"/*/; do
   [ -d "$SIBLING_DIR" ] || continue
   # Strip trailing slash for exact comparison
   [[ "${SIBLING_DIR%/}" == "$WORKTREE" ]] && continue
-  clean_worktree_junctions "$SIBLING_DIR" "$NOW"
+  clean_worktree_symlinks "$SIBLING_DIR" "$NOW"
 done
 
 # 2. Scan agents-* worktrees created by make wt-setup for Copilot coding agent tasks.
@@ -100,7 +100,7 @@ AGENTS_WORKTREES_DIR="$PARENT_DIR/${MAIN_REPO_NAME}.worktrees"
 if [ -d "$AGENTS_WORKTREES_DIR" ]; then
   for SIBLING_DIR in "$AGENTS_WORKTREES_DIR"/agents-*/; do
     [ -d "$SIBLING_DIR" ] || continue
-    clean_worktree_junctions "$SIBLING_DIR" "$NOW"
+    clean_worktree_symlinks "$SIBLING_DIR" "$NOW"
   done
 fi
 

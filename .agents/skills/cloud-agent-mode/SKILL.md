@@ -11,7 +11,7 @@ When running as a **cloud coding agent**:
 
 - **No worktrees/twig/acli** — work directly in the repo root. Use `git` for branches, MCP tools for Jira.
 - **No AWS access** — DB MCP server uses local Docker PostgreSQL seeded from `resources/dev-seed.dump`.
-- **Linux** — `bash` shell, `/` paths. No junctions or file locks.
+- **Linux** — `bash` shell, `/` paths. No symlinks or file locks.
 - **Native integrations (Claude Code on the web)** — Claude Code provides built-in GitHub and Atlassian connectors that work without configuring secrets. Prefer these over custom MCP servers when available.
 
 **Cloud workflow (MCP-first):**

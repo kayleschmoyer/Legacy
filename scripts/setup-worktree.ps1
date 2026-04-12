@@ -49,7 +49,7 @@ function Confirm-IndependentInstall {
     param([string]$Reason)
     Write-Host ""
     Write-Warn "Main repo node_modules is unhealthy: $Reason"
-    Write-Warn "Junctioning would propagate the broken state to this worktree."
+    Write-Warn "Symlinking would propagate the broken state to this worktree."
     Write-Host "  Options:" -ForegroundColor Yellow
     Write-Host "    Y - Run pnpm install in this worktree only (independent node_modules)" -ForegroundColor Yellow
     Write-Host "    N - Abort setup (fix main repo first: cd $MainRepoPath ; make install)" -ForegroundColor Yellow
@@ -112,9 +112,9 @@ function Assert-NodeModulesValid {
 }
 
 function Test-IsReparsePoint {
-    # Returns $true for both junctions and directory symlinks (both are reparse points).
+    # Returns $true for directory symlinks (reparse points).
     # Uses Get-Item -LiteralPath to detect the reparse point attribute even when the
-    # target is missing (Test-Path returns $false for broken symlinks/junctions).
+    # target is missing (Test-Path returns $false for broken symlinks).
     param([string]$Path)
     try {
         $item = Get-Item -LiteralPath $Path -Force -ErrorAction Stop
@@ -124,29 +124,16 @@ function Test-IsReparsePoint {
     }
 }
 
-# Test-IsJunction: returns $true for junctions AND symlinks (any reparse point).
+# Test-IsLink: returns $true for symlinks (any reparse point).
 # Callers use this to check "is this a link we created?" before removal or health checks.
-function Test-IsJunction {
+function Test-IsLink {
     param([string]$Path)
     return Test-IsReparsePoint $Path
 }
 
-function Test-IsActualJunction {
-    # Returns $true ONLY for NTFS junctions (not directory symlinks).
-    # Used to detect unsafe junctions that need migration to symlinks.
-    param([string]$Path)
-    if (-not (Test-IsReparsePoint $Path)) { return $false }
-    try {
-        $item = Get-Item -LiteralPath $Path -Force -ErrorAction Stop
-        return $item.LinkType -eq 'Junction'
-    } catch {
-        return $false
-    }
-}
-
-function Remove-JunctionSafe {
-    # Remove a junction or symlink WITHOUT deleting the target contents.
-    # Remove-Item -Recurse on a junction follows it; cmd rmdir does not.
+function Remove-LinkSafe {
+    # Remove a symlink WITHOUT deleting the target contents.
+    # cmd rmdir removes the link itself without following it.
     param([string]$Path)
     if (Test-IsReparsePoint $Path) {
         cmd /c "rmdir `"$Path`"" 2>$null
@@ -158,9 +145,8 @@ function Remove-JunctionSafe {
     }
 }
 
-function New-SymlinkWithFallback {
-    # Create a directory symlink (mklink /D). Falls back to junction (mklink /J)
-    # when Developer Mode is not enabled.
+function New-Symlink {
+    # Create a directory symlink (mklink /D). Requires Windows Developer Mode.
     param(
         [string]$LinkPath,
         [string]$TargetPath,
@@ -168,17 +154,11 @@ function New-SymlinkWithFallback {
     )
     cmd /c "mklink /D `"$LinkPath`" `"$TargetPath`"" | Out-Null
     if ($LASTEXITCODE -ne 0 -or -not (Test-IsReparsePoint $LinkPath)) {
-        Write-Warn "mklink /D failed -- falling back to junction (enable Developer Mode for symlinks)"
-        cmd /c "mklink /J `"$LinkPath`" `"$TargetPath`"" | Out-Null
-        if (-not (Test-IsReparsePoint $LinkPath)) {
-            Write-Error "Failed to create $DisplayName link from $LinkPath to $TargetPath"
-            throw "setup-worktree: $DisplayName link creation failed"
-        }
-        Write-Ok "$DisplayName junctioned (upgrade to symlink by enabling Developer Mode)"
-        return $false  # created as junction
+        Write-Error "Failed to create $DisplayName symlink from $LinkPath to $TargetPath"
+        Write-Error "Directory symlinks require Windows Developer Mode: Settings > System > For Developers > Developer Mode"
+        throw "setup-worktree: $DisplayName symlink creation failed"
     }
     Write-Ok "$DisplayName symlinked"
-    return $true  # created as symlink
 }
 
 function Invoke-PnpmInstallWithRetry {
@@ -233,7 +213,7 @@ Write-Host "  Main repo: $MainRepoPath"
 # ---------------------------------------------------------------------------
 # Serialize concurrent wt-setup calls via file lock
 # ---------------------------------------------------------------------------
-# Multiple agents may run wt-setup simultaneously. The node_modules junction
+# Multiple agents may run wt-setup simultaneously. The node_modules symlink
 # logic reads and mutates the main repo's node_modules directory, so we need
 # exclusive access. We share the same lock used by pnpm-install-lock.ps1 so
 # that wt-setup and make install never run concurrently.
@@ -304,28 +284,28 @@ else {
     $mainNM       = Join-Path $MainRepoPath "node_modules"
     $wtNM         = Join-Path $WorktreePath "node_modules"
 
-    $currentIsJunction = Test-IsJunction $wtNM
+    $currentIsLink = Test-IsLink $wtNM
     $lockfilesMatch    = ($wtLock -eq $mainLock)
 
     if ($Force) {
         # Force mode: always full install
         Write-Warn "Force mode -- running full pnpm install"
-        Remove-JunctionSafe $wtNM
+        Remove-LinkSafe $wtNM
         Invoke-PnpmInstallWithRetry -InstallPath $WorktreePath
         Write-Ok "pnpm install completed (independent node_modules)"
     }
-    elseif ($lockfilesMatch -and (Test-Path $mainNM) -and -not $currentIsJunction) {
-        # Lockfiles match + main has node_modules + worktree has no junction yet
-        # Validate main node_modules BEFORE junctioning to avoid propagating broken state
+    elseif ($lockfilesMatch -and (Test-Path $mainNM) -and -not $currentIsLink) {
+        # Lockfiles match + main has node_modules + worktree has no symlink yet
+        # Validate main node_modules BEFORE symlinking to avoid propagating broken state
         if (-not (Assert-NodeModulesValid $mainNM)) {
             $reason = "main repo node_modules is missing .modules.yaml or .bin"
             if (Confirm-IndependentInstall -Reason $reason) {
                 # If worktree already has a valid independent node_modules, skip reinstall
-                if ((Test-Path $wtNM) -and -not (Test-IsJunction $wtNM) -and (Assert-NodeModulesValid $wtNM)) {
+                if ((Test-Path $wtNM) -and -not (Test-IsLink $wtNM) -and (Assert-NodeModulesValid $wtNM)) {
                     Write-Ok "Worktree already has valid independent node_modules -- skipping reinstall"
                 }
                 else {
-                    Write-Warn "Installing independently in worktree (not junctioning)"
+                    Write-Warn "Installing independently in worktree (not symlinking)"
                     if (Test-Path $wtNM) {
                         cmd /c "rmdir /s /q `"$wtNM`"" 2>$null
                         if (Test-Path $wtNM) { Remove-Item $wtNM -Recurse -Force -ErrorAction SilentlyContinue }
@@ -348,7 +328,7 @@ else {
                     Remove-Item $wtNM -Recurse -Force -ErrorAction SilentlyContinue
                 }
             }
-            # mklink /D creates a directory symlink (not junction). Recursive-delete
+            # mklink /D creates a directory symlink. Recursive-delete
             # tools remove symlinks without following them, preventing Claude Code's
             # archive or Copilot CLI cleanup from destroying main repo's node_modules.
             # Requires Windows Developer Mode (one-time system setting).
@@ -364,13 +344,13 @@ else {
             }
         }
     }
-    elseif ($lockfilesMatch -and $currentIsJunction) {
+    elseif ($lockfilesMatch -and $currentIsLink) {
         # Already linked — verify the target is still healthy
         if (-not (Assert-NodeModulesValid $wtNM)) {
             $reason = "linked node_modules is missing .modules.yaml or .bin"
             if (Confirm-IndependentInstall -Reason $reason) {
                 Write-Warn "Replacing broken link with independent install"
-                Remove-JunctionSafe $wtNM
+                Remove-LinkSafe $wtNM
                 Invoke-PnpmInstallWithRetry -InstallPath $WorktreePath
                 Write-Ok "pnpm install completed (independent node_modules, main repo still needs repair)"
             }
@@ -378,32 +358,19 @@ else {
                 Write-Error "Aborting: fix main repo node_modules first (cd $MainRepoPath ; make install), then re-run wt-setup."
             }
         }
-        elseif (Test-IsActualJunction $wtNM) {
-            # Healthy but is an NTFS junction — migrate to symlink for safety
-            Write-Warn "Migrating node_modules from junction to symlink (prevents cascade deletion)"
-            Remove-JunctionSafe $wtNM
-            cmd /c "mklink /D `"$wtNM`" `"$mainNM`"" | Out-Null
-            if ($LASTEXITCODE -ne 0 -or -not (Test-IsReparsePoint $wtNM)) {
-                Write-Warn "mklink /D failed — falling back to junction (enable Developer Mode for symlinks)"
-                cmd /c "mklink /J `"$wtNM`" `"$mainNM`"" | Out-Null
-                Write-Ok "Re-created as junction (upgrade to symlink by enabling Developer Mode)"
-            } else {
-                Write-Ok "Migrated node_modules junction -> symlink"
-            }
-        }
         else {
             Write-Ok "node_modules already symlinked to main repo (lockfiles still match)"
         }
     }
-    elseif (-not $lockfilesMatch -and $currentIsJunction) {
+    elseif (-not $lockfilesMatch -and $currentIsLink) {
         # Lockfiles diverged -- need independent install
-        Write-Warn "Lockfiles diverged -- removing junction, running pnpm install"
-        Remove-JunctionSafe $wtNM
+        Write-Warn "Lockfiles diverged -- removing symlink, running pnpm install"
+        Remove-LinkSafe $wtNM
         Invoke-PnpmInstallWithRetry -InstallPath $WorktreePath
         Write-Ok "pnpm install completed (independent node_modules)"
     }
     elseif (-not $lockfilesMatch) {
-        # Lockfiles differ, no junction -- normal install
+        # Lockfiles differ, no symlink -- normal install
         Write-Warn "Lockfiles differ from main -- running pnpm install"
         Invoke-PnpmInstallWithRetry -InstallPath $WorktreePath
         Write-Ok "pnpm install completed (independent node_modules)"
@@ -532,22 +499,15 @@ if (-not (Test-Path $mainTwig)) {
     Write-Warn "No .twig in main repo -- skipping"
 }
 elseif (Test-IsReparsePoint $wtTwig) {
-    if (Test-IsActualJunction $wtTwig) {
-        Write-Warn "Migrating .twig from junction to symlink (prevents cascade deletion)"
-        Remove-JunctionSafe $wtTwig
-        New-SymlinkWithFallback -LinkPath $wtTwig -TargetPath $mainTwig -DisplayName ".twig"
-    }
-    else {
-        Write-Ok ".twig symlink already exists"
-    }
+    Write-Ok ".twig symlink already exists"
 }
 elseif (Test-Path $wtTwig) {
     Write-Warn ".twig exists but is not a symlink -- replacing with symlink"
     Remove-Item $wtTwig -Recurse -Force
-    New-SymlinkWithFallback -LinkPath $wtTwig -TargetPath $mainTwig -DisplayName ".twig"
+    New-Symlink -LinkPath $wtTwig -TargetPath $mainTwig -DisplayName ".twig"
 }
 else {
-    New-SymlinkWithFallback -LinkPath $wtTwig -TargetPath $mainTwig -DisplayName ".twig"
+    New-Symlink -LinkPath $wtTwig -TargetPath $mainTwig -DisplayName ".twig"
 }
 
 # ---------------------------------------------------------------------------
@@ -563,23 +523,16 @@ if (-not (Test-Path $wtAgentsSkills)) {
     Write-Warn "No .agents/skills in worktree -- skipping"
 }
 elseif (Test-IsReparsePoint $wtGithubSkills) {
-    if (Test-IsActualJunction $wtGithubSkills) {
-        Write-Warn "Migrating .github/skills from junction to symlink (prevents cascade deletion)"
-        Remove-JunctionSafe $wtGithubSkills
-        New-SymlinkWithFallback -LinkPath $wtGithubSkills -TargetPath $wtAgentsSkills -DisplayName ".github/skills"
-    }
-    else {
-        Write-Ok ".github/skills symlink already exists"
-    }
+    Write-Ok ".github/skills symlink already exists"
 }
 elseif (Test-Path $wtGithubSkills) {
     Write-Warn ".github/skills exists but is not a symlink -- replacing"
     cmd /c "rmdir `"$wtGithubSkills`"" 2>$null
     Remove-Item $wtGithubSkills -Recurse -Force -ErrorAction SilentlyContinue
-    New-SymlinkWithFallback -LinkPath $wtGithubSkills -TargetPath $wtAgentsSkills -DisplayName ".github/skills"
+    New-Symlink -LinkPath $wtGithubSkills -TargetPath $wtAgentsSkills -DisplayName ".github/skills"
 }
 else {
-    New-SymlinkWithFallback -LinkPath $wtGithubSkills -TargetPath $wtAgentsSkills -DisplayName ".github/skills"
+    New-Symlink -LinkPath $wtGithubSkills -TargetPath $wtAgentsSkills -DisplayName ".github/skills"
 }
 
 # ---------------------------------------------------------------------------
@@ -599,14 +552,7 @@ if (-not (Test-Path $mainCerts)) {
     Write-Warn "No certs/ in main repo -- skipping. To create it: mkdir certs in the main repo and save the AWS RDS us-east-1 certificate bundle as certs/us-east-1-bundle.pem, then re-run wt-setup."
 }
 elseif (Test-IsReparsePoint $wtCerts) {
-    if (Test-IsActualJunction $wtCerts) {
-        Write-Warn "Migrating certs/ from junction to symlink (prevents cascade deletion)"
-        Remove-JunctionSafe $wtCerts
-        New-SymlinkWithFallback -LinkPath $wtCerts -TargetPath $mainCerts -DisplayName "certs/"
-    }
-    else {
-        Write-Ok "certs/ symlink already exists"
-    }
+    Write-Ok "certs/ symlink already exists"
 }
 elseif (Test-Path $wtCerts) {
     Write-Warn "certs/ exists but is not a symlink -- replacing with symlink"
@@ -616,10 +562,10 @@ elseif (Test-Path $wtCerts) {
         Write-Error "Failed to remove existing certs/ at $wtCerts before creating symlink"
         throw "setup-worktree: unable to replace existing certs/ with symlink"
     }
-    New-SymlinkWithFallback -LinkPath $wtCerts -TargetPath $mainCerts -DisplayName "certs/"
+    New-Symlink -LinkPath $wtCerts -TargetPath $mainCerts -DisplayName "certs/"
 }
 else {
-    New-SymlinkWithFallback -LinkPath $wtCerts -TargetPath $mainCerts -DisplayName "certs/"
+    New-Symlink -LinkPath $wtCerts -TargetPath $mainCerts -DisplayName "certs/"
 }
 
 # ---------------------------------------------------------------------------

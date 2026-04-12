@@ -4,12 +4,11 @@
 
 ### twig tree / twig branch commands don't work in worktree
 
-`.twig/state.json` is gitignored and absent. The easiest fix is to re-run `make wt-setup WT=$wt`, which handles symlink creation with automatic junction fallback. To create the link manually (substitute `$wt` with the worktree path from `twig worktree list`):
+`.twig/state.json` is gitignored and absent. The easiest fix is to re-run `make wt-setup WT=$wt`, which handles symlink creation. To create the link manually (substitute `$wt` with the worktree path from `twig worktree list`):
 
 ```powershell
-# Symlink (requires Developer Mode); falls back to junction if mklink /D fails
+# Symlink (requires Developer Mode)
 cmd /c mklink /D "$wt\.twig" "D:\code\legacy-sports\.twig"
-# If the above fails: cmd /c mklink /J "$wt\.twig" "D:\code\legacy-sports\.twig"
 ```
 
 Verify it worked:
@@ -47,7 +46,7 @@ acli jira workitem transition --key LS-#### --status "In Progress"
 
 ### node_modules missing in worktree
 
-`node_modules` is gitignored so it is never present in a fresh worktree. Use the smart setup script, which junctions to main when possible:
+`node_modules` is gitignored so it is never present in a fresh worktree. Use the smart setup script, which symlinks to main when possible:
 
 ```powershell
 # From the main repo (recommended — handles .env and .twig too):

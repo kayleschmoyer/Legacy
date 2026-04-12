@@ -271,7 +271,7 @@ pnpm store prune
 make install
 ```
 
-On Windows with multiple worktrees, pnpm typically uses a shared content-addressable store (run `pnpm config get store-dir` to see the actual path on your machine). Treat this as a cache: prefer `pnpm store prune` to clean it, and only delete the store as a last-resort cache reset, understanding that pnpm will need to re-download all packages. If a worktree's `node_modules` is a junction (symlink), break it with `make wt-setup WT=<path>` rather than deleting it manually.
+On Windows with multiple worktrees, pnpm typically uses a shared content-addressable store (run `pnpm config get store-dir` to see the actual path on your machine). Treat this as a cache: prefer `pnpm store prune` to clean it, and only delete the store as a last-resort cache reset, understanding that pnpm will need to re-download all packages. If a worktree's `node_modules` is a symlink, break it with `make wt-setup WT=<path>` rather than deleting it manually.
 
 #### **Stray `package-lock.json`?**
 

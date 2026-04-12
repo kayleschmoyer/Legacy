@@ -79,7 +79,7 @@ server.tool(
 // --- nx_install_package ---
 server.tool(
   'nx_install_package',
-  'Prefer this over running `pnpm add -w` (or `pnpm add -Dw` for dev dependencies) via shell. Refuses if node_modules is a junction. Checks for @types/ companion. Install an npm package at workspace root.',
+  'Prefer this over running `pnpm add -w` (or `pnpm add -Dw` for dev dependencies) via shell. Refuses if node_modules is a symlink. Checks for @types/ companion. Install an npm package at workspace root.',
   {
     name: z
       .string()

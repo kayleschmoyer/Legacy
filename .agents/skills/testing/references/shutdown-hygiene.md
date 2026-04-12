@@ -1,6 +1,6 @@
 # Shutdown Hygiene — Stale Process Detection & Cleanup
 
-When running E2E locally, stale Playwright/static server processes can hold native `.node` addons loaded (`bufferutil.node`, `utf-8-validate.node`). Since worktrees share `node_modules` via junctions, one stale process blocks installs for everyone.
+When running E2E locally, stale Playwright/static server processes can hold native `.node` addons loaded (`bufferutil.node`, `utf-8-validate.node`). Since worktrees share `node_modules` via symlinks, one stale process blocks installs for everyone.
 
 ## Detect stale processes
 

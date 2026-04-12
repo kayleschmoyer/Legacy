@@ -217,6 +217,6 @@ if ($wtPath) {
 }
 Write-Host "  make install"
 Write-Host "  Copy-Item D:\code\legacy-sports\.env .env"
-Write-Host "  cmd /c mklink /J .twig D:\code\legacy-sports\.twig"
+Write-Host "  cmd /c mklink /D .twig D:\code\legacy-sports\.twig"
 Write-Host "  code ."
 Write-Host ""

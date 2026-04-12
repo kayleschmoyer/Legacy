@@ -61,7 +61,7 @@ For **work subagents** dispatched by multi-ticket orchestrators (`/sweep-prs`, `
   1. git fetch origin <branch>                                      # get the target branch
   2. git checkout <branch>                                           # switch to it (for existing PRs)
      OR: (for new tickets) keep local branch name as-is, push normally — Jira links via PR title + commits containing LS-####
-  3. worktree_setup_node_modules()                                    # junction node_modules (fallback: powershell New-Item -ItemType Junction)
+  3. worktree_setup_node_modules()                                    # symlink node_modules (fallback: powershell New-Item -ItemType SymbolicLink)
 
   Tool preferences:
   - Use worktree_commit/worktree_push for commits and pushes

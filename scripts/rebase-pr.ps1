@@ -131,7 +131,7 @@ try {
     if ($LASTEXITCODE -ne 0) {
         Write-Warn "make install returned non-zero ($LASTEXITCODE). Check output:"
         Write-Host $makeResult
-        # Non-fatal for junctioned worktrees — node_modules may be shared
+        # Non-fatal for symlinked worktrees — node_modules may be shared
     } else {
         Write-Ok "make install OK."
     }

@@ -1,7 +1,7 @@
 import { readFile, readdir, access } from 'node:fs/promises';
+import { lstat } from 'node:fs/promises';
 import { join } from 'node:path';
-import { platform } from 'node:os';
-import { getRepoRoot, runCommand, runPnpm } from '../run-command.js';
+import { getRepoRoot, runPnpm } from '../run-command.js';
 import type { ToolResult } from '../types.js';
 
 const INSTALL_TIMEOUT = 300_000; // 5 minutes — installs can be slow with lock contention
@@ -13,21 +13,11 @@ interface InstallPackageParams {
   worktreePath?: string;
 }
 
-/** Check if node_modules is a junction (Windows reparse point). Always false on non-Windows. */
-async function isJunction(cwd: string): Promise<boolean> {
-  if (platform() !== 'win32') return false;
+/** Check if node_modules is a symlink. Works cross-platform. */
+async function isSymlink(cwd: string): Promise<boolean> {
   try {
-    const result = await runCommand(
-      'powershell',
-      [
-        '-NoProfile',
-        '-Command',
-        `[bool]((Get-Item '${join(cwd, 'node_modules')}' -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)`,
-      ],
-      cwd,
-      10_000,
-    );
-    return result.trim() === 'True';
+    const stat = await lstat(join(cwd, 'node_modules'));
+    return stat.isSymbolicLink();
   } catch {
     return false;
   }
@@ -103,9 +93,9 @@ export async function installPackage(
     ? `${params.name}@${params.version}`
     : params.name;
 
-  // --- Safety: detect junctioned node_modules ---
-  const junctioned = await isJunction(cwd);
-  if (junctioned) {
+  // --- Safety: detect symlinked node_modules ---
+  const linked = await isSymlink(cwd);
+  if (linked) {
     return {
       content: [
         {
@@ -113,10 +103,10 @@ export async function installPackage(
           text: JSON.stringify(
             {
               success: false,
-              error: 'JUNCTION_DETECTED',
+              error: 'SYMLINK_DETECTED',
               message:
-                'node_modules is a junction to the main repo. Running pnpm install here would mutate the shared node_modules and break every other worktree. ' +
-                'To install a package: (1) run the install in the main repo directory, or (2) remove the junction first (cmd /c "rmdir node_modules") then run make install.',
+                'node_modules is a symlink to the main repo. Running pnpm install here would mutate the shared node_modules and break every other worktree. ' +
+                'To install a package: (1) run the install in the main repo directory, or (2) remove the symlink first (cmd /c "rmdir node_modules") then run make install.',
               cwd,
             },
             null,
@@ -129,7 +119,7 @@ export async function installPackage(
   }
 
   // --- Install via pnpm add (cross-platform) ---
-  // Junction guard already ran above, so it's safe to call pnpm directly.
+  // Symlink guard already ran above, so it's safe to call pnpm directly.
   const addArgs = ['add', '-w', ...(params.dev ? ['-D'] : []), spec];
 
   try {
