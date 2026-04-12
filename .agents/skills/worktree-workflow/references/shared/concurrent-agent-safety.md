@@ -9,8 +9,10 @@ mutates that directory.
 1. **Never run `make clean`, `make install`, `make install-force`, or `pnpm install` in the
    main repo** (`D:\code\legacy-sports`) while worktrees are active. These mutate or destroy
    the shared `node_modules`, breaking every symlinked worktree mid-build/test.
-2. **Only run install/clean inside your own worktree** — and only when it has independent
-   (non-symlinked) `node_modules` (i.e., lockfiles diverged from main).
+2. **Only run install/clean inside your own worktree** — and only after breaking the symlink
+   so the worktree has independent (non-symlinked) `node_modules`. To break the symlink and
+   install independently: `cmd /c "rmdir node_modules"` → `pnpm add -w <pkg>` (if adding) →
+   `make install`. See [install-packages.md](../../../repo-tooling/references/install-packages.md).
 3. **All install operations are serialized** — `make install`, `make install-force`, `make install-node`,
    and `make wt-setup` all share a file lock (`.pnpm-install.lock`) in the main repo so concurrent
    agents don't race on `node_modules`. If another install is in progress, yours will wait (up to 5 min).
@@ -26,7 +28,11 @@ mutates that directory.
 
 - Reading `node_modules` via symlinks (builds, tests, lint) — multiple readers are fine.
 - Running `make wt-setup` concurrently (serialized by lock).
-- Running `pnpm install` in a worktree with independent `node_modules`.
+- Running `make install` in a worktree with independent `node_modules`
+  (i.e., after breaking the symlink with `cmd /c "rmdir node_modules"`), because the
+  approved Makefile install targets are serialized by lock.
+- Running `pnpm add -w <pkg>` in a worktree with independent `node_modules` as part of the
+  documented package-add flow, followed by `make install`.
 
 ## Never manually remove worktrees
 

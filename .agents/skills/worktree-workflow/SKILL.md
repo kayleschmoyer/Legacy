@@ -33,10 +33,21 @@ The Claude Code session was spawned with the launcher `worktree` checkbox checke
    worktree_set(key: "<absolute .claude/worktrees/... path from pwd>")
    ```
 7. **Symlink `node_modules` from the main repo** (REQUIRED before any pnpm/make command — LS-2903/LS-3003):
+
    ```
    worktree_setup_node_modules()
    ```
+
    Uses Node.js path APIs internally — no shell escaping needed. Idempotent (safe to call if symlink already exists). Fallback if MCP unavailable: `powershell -Command "New-Item -ItemType SymbolicLink -Path '<worktree>\node_modules' -Target 'D:\code\legacy-sports\node_modules'"` (requires Windows Developer Mode: Settings > System > For Developers > Developer Mode)
+
+   > **Installing new packages in a worktree**: while `node_modules` is symlinked to the main repo, you must never run `pnpm add` or `make install` from the worktree. Those commands are unsafe in this setup: the repo's guardrails are meant to stop them, but attempting to run them with the symlink still in place risks corrupting the shared `node_modules` used by every worktree. If your implementation requires adding/removing/updating dependencies, you **must** break the symlink first and install independently:
+   >
+   > 1. `cmd /c "rmdir node_modules"` — removes the symlink only, not the main repo's `node_modules`
+   > 2. `pnpm add -w <package>` — adds the package to root `package.json`
+   > 3. `make install` — creates independent `node_modules` in the worktree
+   >
+   > See [install-packages.md](../repo-tooling/references/install-packages.md) for the full procedure. **Never run `pnpm add` or `make install` while the symlink is still in place** — the `preinstall-guard` is there to catch this unsafe path, but you must not rely on it because even partial execution can damage every other worktree's shared `node_modules`.
+
 8. **Implement** — read the ticket description, investigate, write code + tests. See [work-ticket SKILL.md Step 5](../work-ticket/SKILL.md) for self-review + implementation notes.
 9. **Migrations** — `db_migration_status()` then `db_migrate()`.
 10. **Validate** — `make_run(target: "pc")`. Must pass before pushing.
@@ -77,12 +88,13 @@ for each ticket/PR needing code work:
       2. git checkout <existing-branch>  (for PRs)  OR  stay on the ephemeral branch (for new tickets)
       3. worktree_setup_node_modules()   # or PowerShell fallback if MCP unavailable
       4. <do NOT rename branch — Jira links via PR title + commits containing LS-####>
+      5. If you need to install new packages: cmd /c "rmdir node_modules" first, then pnpm add -w <pkg>, then make install
 
       Work:
-      5. <specific instructions — implement ticket, fix review, rebase, etc.>
-      6. make_run(target: "pc")
-      7. worktree_commit + worktree_push
-      8. github_create_pr (if new) or push to existing PR branch
+      6. <specific instructions — implement ticket, fix review, rebase, etc.>
+      7. make_run(target: "pc")
+      8. worktree_commit + worktree_push
+      9. github_create_pr (if new) or push to existing PR branch
 
       Tool preferences:
       - Use worktree_commit/worktree_push for commits and pushes
