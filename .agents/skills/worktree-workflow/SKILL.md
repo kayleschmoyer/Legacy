@@ -27,10 +27,7 @@ The Claude Code session was spawned with the launcher `worktree` checkbox checke
 2. **Inspect ticket** — `jira_view(key: "LS-####")` / `jira_list_children(key: "LS-####")` for parents.
 3. **Blocker check** — `jira_check_blockers(key: "LS-####")`. Stop if blockers are not In Review/Done.
 4. **Jira → In Progress** — `jira_transition(key: "LS-####", status: "In Progress")`.
-5. **Rename the auto-generated branch** — Claude Code gave you `claude/<random>`. You must rename to include the `LS-####` key **before the first push** (Jira Branch Sync reads the branch name):
-   ```
-   worktree_run(command: "git branch -m claude/LS-####-short-kebab-description")
-   ```
+5. **Do NOT rename the branch** — Claude Code caches the branch name at session start and never refreshes it. Renaming permanently disables PR detection and "Create PR" (anthropics/claude-code#18690). Leave the branch as `claude/<random>`. Jira linking works via PR title and commit messages containing `LS-####` — branch name is not required. See `.agents/skills/branch-naming/SKILL.md`.
 6. **Register the active worktree** — so MCP tools target the right tree:
    ```
    worktree_set(key: "<absolute .claude/worktrees/... path from pwd>")
@@ -79,7 +76,7 @@ for each ticket/PR needing code work:
       1. git fetch origin <branch-or-main>
       2. git checkout <existing-branch>  (for PRs)  OR  stay on the ephemeral branch (for new tickets)
       3. worktree_setup_node_modules()   # or PowerShell fallback if MCP unavailable
-      4. <rename branch if new ticket: git branch -m claude/LS-####-description>
+      4. <do NOT rename branch — Jira links via PR title + commits containing LS-####>
 
       Work:
       5. <specific instructions — implement ticket, fix review, rebase, etc.>

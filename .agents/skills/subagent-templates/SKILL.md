@@ -60,7 +60,7 @@ For **work subagents** dispatched by multi-ticket orchestrators (`/sweep-prs`, `
   Setup (REQUIRED before any pnpm/make command):
   1. git fetch origin <branch>                                      # get the target branch
   2. git checkout <branch>                                           # switch to it (for existing PRs)
-     OR: (for new tickets) keep local branch name as-is, use worktree_push({ remoteBranch: "claude/LS-####-short-description" }) on first push
+     OR: (for new tickets) keep local branch name as-is, push normally — Jira links via PR title + commits containing LS-####
   3. worktree_setup_node_modules()                                    # junction node_modules (fallback: powershell New-Item -ItemType Junction)
 
   Tool preferences:

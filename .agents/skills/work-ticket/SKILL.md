@@ -122,11 +122,7 @@ Follow the full [worktree-workflow skill](../worktree-workflow/SKILL.md):
 1. **Blocker check**: `jira_check_blockers(key: "LS-####")` — STOP if blockers are not In Review/Done
 2. **Jira "In Progress"**: `jira_transition(key: "LS-####", status: "In Progress")`
 3. **Worktree** — two flows:
-   - **Native ephemeral (default)**: if the session was spawned with the launcher's `worktree` checkbox checked, `pwd` should already return `.claude/worktrees/<name>/`. The branch is already set to `claude/<random-name>`. **Rename immediately** before any other git action:
-     ```
-     worktree_run(command: "git branch -m claude/LS-####-short-kebab-description")
-     ```
-     The new name must contain the `LS-####` key (see AGENTS.md Branch Naming). Then call `worktree_set(key: "<absolute .claude/worktrees/... path>")` so the worktree MCP tools target the right tree.
+   - **Native ephemeral (default)**: if the session was spawned with the launcher's `worktree` checkbox checked, `pwd` should already return `.claude/worktrees/<name>/`. The branch is already set to `claude/<random-name>`. **Do not rename it** — Claude Code caches the branch name at session start; renaming breaks PR detection (anthropics/claude-code#18690). Jira links via PR title and commit messages containing `LS-####`. Call `worktree_set(key: "<absolute .claude/worktrees/... path>")` so the worktree MCP tools target the right tree.
    - **Sibling (parallel/batch work only)**: `make_worktree_create(ticket: "####", description: "desc")` (add `parent: "LS-####"` if blocker is In Review). Shell fallback: `make worktree TICKET=#### DESC=description`. Then call `worktree_set(key: "LS-####")`.
 4. **Setup**:
    - **Native flow (REQUIRED before any pnpm/make command)**: `.claude/worktrees/<name>/` has no `node_modules`. Junction from the main repo first (LS-2903/LS-3003):
@@ -227,14 +223,13 @@ Process children in iterative batches until the backlog is empty.
             6. Self-review changes
             7. db_migration_status() + db_migrate()
             8. make_run(target: "pc") — must pass
-            9. worktree_commit(message: "type(scope): description")
-            10. git branch -m claude/LS-<child_key>-short-description
-            11. worktree_push(setUpstream: true)
-            12. github_create_pr(title: "LS-<child_key> ...", draft: true)
-            13. github_manage_labels(add: ["agent-in-progress"])
-            14. github_mark_pr_ready
-            15. github_request_review
-            16. jira_transition(key: "LS-<child_key>", status: "In Review")
+            9. worktree_commit(message: "type(scope): LS-<child_key> description")
+            10. worktree_push(setUpstream: true)
+            11. github_create_pr(title: "LS-<child_key> ...", draft: true)
+            12. github_manage_labels(add: ["agent-in-progress"])
+            13. github_mark_pr_ready
+            14. github_request_review
+            15. jira_transition(key: "LS-<child_key>", status: "In Review")
 
             Return the PR number and any issues encountered.
 
