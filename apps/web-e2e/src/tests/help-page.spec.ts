@@ -307,7 +307,7 @@ test.describe('Help Page — contact and support @regression', () => {
     ).toBeVisible();
   });
 
-  test('Join our Discord option opens discord.gg/legacy-sports', async ({
+  test('Join our Discord option opens discord.gg/JBhRrE8ZtK', async ({
     page,
   }) => {
     // The contact card uses window.open() with noopener — the popup URL is
@@ -326,7 +326,7 @@ test.describe('Help Page — contact and support @regression', () => {
     const openedUrl = await page.evaluate(
       () => (window as unknown as Record<string, string>).__openedUrl,
     );
-    expect(openedUrl).toMatch(/discord\.gg\/legacy-sports/i);
+    expect(openedUrl).toMatch(/discord\.gg\/JBhRrE8ZtK/i);
   });
 
   test('urgent account issues callout links to Discord #urgent-support', async ({
@@ -337,7 +337,7 @@ test.describe('Help Page — contact and support @regression', () => {
     await expect(discordLink).toBeVisible();
     await expect(discordLink).toHaveAttribute(
       'href',
-      /discord\.gg\/legacy-sports/i,
+      /discord\.gg\/JBhRrE8ZtK/i,
     );
     await expect(page.getByText(/#urgent-support/i)).toBeVisible();
   });

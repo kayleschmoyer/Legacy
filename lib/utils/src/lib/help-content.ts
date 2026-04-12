@@ -133,7 +133,7 @@ export const HELP_GETTING_STARTED_STEPS: HelpGettingStartedStep[] = [
 /* ─── Contact / support options ─── */
 
 /** Canonical Discord invite URL — single source of truth for all help UI. */
-export const DISCORD_URL = 'https://discord.gg/legacy-sports';
+export const DISCORD_URL = 'https://discord.gg/JBhRrE8ZtK';
 
 export const HELP_CONTACT_ITEMS: HelpContactItem[] = [
   {
