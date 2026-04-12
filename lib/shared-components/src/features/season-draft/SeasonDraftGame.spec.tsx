@@ -102,7 +102,10 @@ function setupDefaultMocks() {
   jest.mocked(useGetSeasonDraftGameQuery).mockReturnValue({
     data: { seasonDraftGame: mockGameState },
     loading: false,
+    error: undefined,
     refetch: mockRefetch,
+    startPolling: jest.fn(),
+    stopPolling: jest.fn(),
   } as unknown as ReturnType<typeof useGetSeasonDraftGameQuery>);
   jest
     .mocked(useCancelSeasonDraftGameMutation)
@@ -229,6 +232,93 @@ describe('SeasonDraftGame', () => {
     });
   });
 
+  // ── polling behaviour ───────────────────────────────────────────────────
+
+  describe('conditional polling', () => {
+    const mockStartPolling = jest.fn();
+    const mockStopPolling = jest.fn();
+
+    beforeEach(() => {
+      jest.mocked(useGetSeasonDraftGameQuery).mockReturnValue({
+        data: { seasonDraftGame: mockGameState },
+        loading: false,
+        error: undefined,
+        refetch: mockRefetch,
+        startPolling: mockStartPolling,
+        stopPolling: mockStopPolling,
+      } as unknown as ReturnType<typeof useGetSeasonDraftGameQuery>);
+    });
+
+    it('starts polling for active (drafting) games', () => {
+      render(<SeasonDraftGame gameId={1} currentUserId={1} />);
+      expect(mockStartPolling).toHaveBeenCalledWith(5000);
+    });
+
+    it('stops polling for completed games', () => {
+      jest.mocked(useGetSeasonDraftGameQuery).mockReturnValue({
+        data: {
+          seasonDraftGame: { ...mockGameState, status: 'completed' as const },
+        },
+        loading: false,
+        error: undefined,
+        refetch: mockRefetch,
+        startPolling: mockStartPolling,
+        stopPolling: mockStopPolling,
+      } as unknown as ReturnType<typeof useGetSeasonDraftGameQuery>);
+
+      render(<SeasonDraftGame gameId={1} currentUserId={1} />);
+      expect(mockStopPolling).toHaveBeenCalled();
+      expect(mockStartPolling).not.toHaveBeenCalled();
+    });
+
+    it('stops polling for cancelled games', () => {
+      jest.mocked(useGetSeasonDraftGameQuery).mockReturnValue({
+        data: {
+          seasonDraftGame: { ...mockGameState, status: 'cancelled' as const },
+        },
+        loading: false,
+        error: undefined,
+        refetch: mockRefetch,
+        startPolling: mockStartPolling,
+        stopPolling: mockStopPolling,
+      } as unknown as ReturnType<typeof useGetSeasonDraftGameQuery>);
+
+      render(<SeasonDraftGame gameId={1} currentUserId={1} />);
+      expect(mockStopPolling).toHaveBeenCalled();
+      expect(mockStartPolling).not.toHaveBeenCalled();
+    });
+
+    it('stops polling when query errors', () => {
+      jest.mocked(useGetSeasonDraftGameQuery).mockReturnValue({
+        data: { seasonDraftGame: mockGameState },
+        loading: false,
+        error: new Error('Network error'),
+        refetch: mockRefetch,
+        startPolling: mockStartPolling,
+        stopPolling: mockStopPolling,
+      } as unknown as ReturnType<typeof useGetSeasonDraftGameQuery>);
+
+      render(<SeasonDraftGame gameId={1} currentUserId={1} />);
+      expect(mockStopPolling).toHaveBeenCalled();
+      expect(mockStartPolling).not.toHaveBeenCalled();
+    });
+
+    it('stops polling when game is not found', () => {
+      jest.mocked(useGetSeasonDraftGameQuery).mockReturnValue({
+        data: { seasonDraftGame: null },
+        loading: false,
+        error: undefined,
+        refetch: mockRefetch,
+        startPolling: mockStartPolling,
+        stopPolling: mockStopPolling,
+      } as unknown as ReturnType<typeof useGetSeasonDraftGameQuery>);
+
+      render(<SeasonDraftGame gameId={999} currentUserId={1} />);
+      expect(mockStopPolling).toHaveBeenCalled();
+      expect(mockStartPolling).not.toHaveBeenCalled();
+    });
+  });
+
   // ── most_teams mode ─────────────────────────────────────────────────────
 
   describe('most_teams mode', () => {
@@ -257,7 +347,10 @@ describe('SeasonDraftGame', () => {
       jest.mocked(useGetSeasonDraftGameQuery).mockReturnValue({
         data: { seasonDraftGame: mostTeamsGameState },
         loading: false,
+        error: undefined,
         refetch: mockRefetch,
+        startPolling: jest.fn(),
+        stopPolling: jest.fn(),
       } as unknown as ReturnType<typeof useGetSeasonDraftGameQuery>);
 
       // Provide a search result so the player suggestion list renders

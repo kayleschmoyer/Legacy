@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   ActivityIndicator,
@@ -147,17 +153,39 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
   const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Query game state
+  // Query game state — polling is managed via startPolling/stopPolling below
   const {
     data: gameData,
     loading,
+    error: queryError,
     refetch: refetchGame,
+    startPolling,
+    stopPolling,
   } = useGetSeasonDraftGameQuery({
     variables: { gameId },
-    pollInterval: 5000, // Poll every 5s for opponent turns
   });
-  const gameState =
-    (gameData?.seasonDraftGame as GameState | undefined) ?? null;
+  const gameState = useMemo(
+    () => (gameData?.seasonDraftGame as GameState | undefined) ?? null,
+    [gameData?.seasonDraftGame],
+  );
+
+  // Poll only while the game is active (drafting/setup). Stop when the game
+  // ends, is not found, or the query errors persistently. Using
+  // startPolling/stopPolling in an effect avoids stale-ref issues when
+  // gameId changes without unmounting (React Router param change).
+  const gameStatus = gameState?.status;
+  useEffect(() => {
+    const shouldPoll =
+      !queryError &&
+      !!gameState &&
+      (gameStatus === 'drafting' || gameStatus === 'setup');
+    if (shouldPoll) {
+      startPolling(5000);
+    } else {
+      stopPolling();
+    }
+    return () => stopPolling();
+  }, [gameState, gameStatus, queryError, startPolling, stopPolling]);
 
   // Lazy query for player search
   const [searchPlayersQuery, { data: searchData }] =
@@ -920,7 +948,7 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
         {/* Scoreboard */}
         <Card margin="$4" padding="$4">
           <H3 marginBottom="$3">Scoreboard</H3>
-          {gameState.players
+          {[...gameState.players]
             .sort((a, b) => b.totalScore - a.totalScore)
             .map((player, index) => (
               <XStack
