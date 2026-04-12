@@ -62,14 +62,7 @@ The `copilot-auto-approve` workflow automatically requests Copilot review on PR 
 
 Run a structured self-review of all changes before committing. This catches project-rule violations that `make pc` does not — it focuses on **semantic** review.
 
-### Steps
-
-1. **Gather diff**: `git diff origin/main...HEAD` (all branch changes)
-2. **Read changed files in full** — not just diff hunks
-3. **Check project rules**: no `console.*` (use LOGGER), no `@ts-ignore`/`eslint-disable`, prefer `.graphql` + codegen, no `route.continue()` in E2E
-4. **Code quality**: dead code, duplication, complexity, type safety, security
-5. **Reuse check**: existing components in `lib/shared-components`? Existing utils?
-6. **Fix issues directly** — don't just report, apply fixes
+The full self-review checklist (project rules, code quality scan, reuse check, and common Copilot review patterns) lives in [self-review.md](self-review.md) — that is the single source of truth. Invoke it via `Skill(skill: "review")`.
 
 ## Fix Copilot Review Comments
 

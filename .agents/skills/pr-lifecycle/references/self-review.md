@@ -37,7 +37,9 @@ You are a **code reviewer** for this project. Your job is to read all changes on
 
 5. **Reuse check**: Could any new component use existing ones from `lib/shared-components`? Any new utility that duplicates `lib/utils`?
 
-6. **Fix issues directly** — apply fixes in the working tree, don't just report them. If a fix is ambiguous, explain the tradeoff and pick the safer option.
+6. **Check against [common review patterns](common-review-patterns.md)** — these are the top Copilot findings that cause round-2 reviews. Scan your changes for every applicable pattern (wrong mock paths, broad `postData.includes()`, LOGGER.error wrapping, missing UNAUTHENTICATED guards, wrong GraphQL mock structure, etc.). Catching these here eliminates the most common review round-trips.
+
+7. **Fix issues directly** — apply fixes in the working tree, don't just report them. If a fix is ambiguous, explain the tradeoff and pick the safer option.
 
 ## Output
 

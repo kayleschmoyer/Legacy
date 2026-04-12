@@ -150,12 +150,12 @@ Follow the full [worktree-workflow skill](../worktree-workflow/SKILL.md):
    jira_edit_ticket(key: "LS-####", fields: { description: "<existing description>\n\n## Implementation Notes\n\n**Approach:** <1-2 sentences on what was done and why>\n\n**Key files changed:**\n- `path/to/file.ts` — reason\n- ...\n\n**Design decisions / constraints discovered:**\n- <any non-obvious choices, tradeoffs, or codebase constraints the agent found>\n\n**Testing:** <how correctness was verified — unit tests, manual repro, etc.>" })
    ```
    Preserve the original description and only append/refresh the `## Implementation Notes` section at the end. Keep notes factual and brief. Focus on information that is _not_ derivable from reading the diff: constraints, considered alternatives, and context that informs whether a review comment's suggested change is safe or problematic.
-6. **Self-review**: run the [self-review phase](../pr-lifecycle/references/self-review.md) to catch rule violations
+6. **Self-review** (MANDATORY — do not skip): invoke the `/review` skill to catch rule violations and common review patterns before proceeding. This is not optional reading — execute `Skill(skill: "review")` and let it run its full checklist (project rules, code quality scan, reuse check, and common Copilot patterns). Fix all issues it identifies before moving to step 7.
 7. **Validate**: `db_migration_status(worktreePath: "$wt")` + `db_migrate(worktreePath: "$wt")`, then `make_run(target: "pc", worktreePath: "$wt")`. Shell fallback: `make pc`
 
    > **⛔ Do NOT stop here.** `make pc` passing is a checkpoint, not the finish line. If you exit the workflow at this point, the work is unfinished — keep going.
 
-8. **Ship**: `worktree_commit({ message: "type(scope): msg" })` → `worktree_push()` → `github_create_pr(title: "LS-#### type(scope): msg", body: "<markdown>", worktreePath: "$wt", draft: true)` → `github_manage_labels(number: <PR#>, add: ["agent-in-progress"])` → `github_mark_pr_ready(number: <PR#>)` → `github_request_review(number: <PR#>)` → subscribe to PR activity → `jira_transition(key: "LS-####", status: "In Review")`. Apply the label while still a draft so the PR is already labeled when it becomes visible to sweeps. See [create PR](../pr-lifecycle/references/create-pr.md) only for PR body/title formatting and PR mechanics — this skill's step ordering overrides that reference: after PR creation, complete step 9 (watch to merge) first, then run the MCP gap audit in step 10 after merge.
+8. **Ship** (prerequisite: step 6 self-review was executed and all issues fixed — if you skipped step 6, go back now; do NOT create a PR without completing self-review): `worktree_commit({ message: "type(scope): msg" })` → `worktree_push()` → `github_create_pr(title: "LS-#### type(scope): msg", body: "<markdown>", worktreePath: "$wt", draft: true)` → `github_manage_labels(number: <PR#>, add: ["agent-in-progress"])` → `github_mark_pr_ready(number: <PR#>)` → `github_request_review(number: <PR#>)` → subscribe to PR activity → `jira_transition(key: "LS-####", status: "In Review")`. Apply the label while still a draft so the PR is already labeled when it becomes visible to sweeps. See [create PR](../pr-lifecycle/references/create-pr.md) only for PR body/title formatting and PR mechanics — this skill's step ordering overrides that reference: after PR creation, complete step 9 (watch to merge) first, then run the MCP gap audit in step 10 after merge.
    - **Subscribe to PR activity (environment-aware)**: Local agents proceed directly to Step 9's `github_wait_for_pr_event` loop — the blocking call itself serves as the watch mechanism. Cloud agents (Claude Code on the web) call `mcp__github__subscribe_pr_activity({ owner, repo, pullNumber: <PR#> })` to receive real-time `<github-webhook-activity>` messages, then react to incoming messages in Step 9. Do not mix mechanisms — local agents poll via `github_wait_for_pr_event`, cloud agents subscribe via `mcp__github__subscribe_pr_activity`.
 
    > **⛔ Do NOT stop here.** Creating the PR is also not the finish line. Subscribing to PR activity is mandatory — without it, CI failures and review comments do not stream back into the session and the watch-to-merge step in step 9 cannot react. If you exit after `github_create_pr` without subscribing and watching, the ticket is unfinished.
@@ -232,7 +232,10 @@ Process children in iterative batches until the backlog is empty.
             Work:
             4. Read the ticket: jira_view(key: "LS-<child_key>")
             5. Implement the ticket (code + tests)
-            6. Self-review changes
+            6. Self-review changes: read .agents/skills/pr-lifecycle/references/self-review.md
+               and .agents/skills/pr-lifecycle/references/common-review-patterns.md,
+               then run Skill(skill: "review") to execute the full self-review checklist
+               and common review patterns against your changes. Fix all issues before proceeding.
             7. db_migration_status() + db_migrate()
             8. make_run(target: "pc") — must pass
             9. worktree_commit(message: "type(scope): LS-<child_key> description")
