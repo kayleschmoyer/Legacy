@@ -42,6 +42,55 @@ export interface TamaguiAppNavigatorProps {
 }
 
 /**
+ * Checks whether an error is a module-not-found error (Node.js or bundler).
+ * Only these errors should be treated as "navigation library not available".
+ */
+export function isModuleNotFoundError(error: unknown): boolean {
+  if (error instanceof Error) {
+    if (
+      'code' in error &&
+      (error as { code: string }).code === 'MODULE_NOT_FOUND'
+    ) {
+      return true;
+    }
+    if (
+      error.message.includes('Cannot find module') ||
+      error.message.includes('Module not found')
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Fallback component for unmatched web routes.
+ */
+export function NotFound() {
+  return (
+    <div
+      style={{
+        padding: '2rem',
+        textAlign: 'center',
+      }}
+    >
+      <h2
+        style={{
+          color: `var(--color, ${TEXT_PRIMARY})`,
+          fontSize: '2rem',
+          marginBottom: '0.5rem',
+        }}
+      >
+        404 — Page Not Found
+      </h2>
+      <p style={{ color: 'var(--color10, #6C80BA)' }}>
+        The page you are looking for does not exist.
+      </p>
+    </div>
+  );
+}
+
+/**
  * Cross-platform navigation setup using either React Navigation (mobile) or React Router (web)
  */
 function TamaguiAppNavigator({
@@ -122,6 +171,23 @@ function NativeNavigator({
       </NavigationContainer>
     );
   } catch (error) {
+    if (!isModuleNotFoundError(error)) {
+      LOGGER.error(
+        'Navigation initialization failed',
+        error instanceof Error
+          ? {
+              name: error.name,
+              message: error.message,
+              stack: error.stack,
+              ...('code' in error
+                ? { code: (error as { code: unknown }).code }
+                : {}),
+            }
+          : { message: String(error) },
+      );
+      throw error;
+    }
+
     LOGGER.warn('React Navigation not available:', String(error));
 
     if (FallbackComponent) {
@@ -219,11 +285,30 @@ function WebNavigator({ routes }: { routes: NavigationRoute[] }) {
                 element={React.createElement(routes[0].component)}
               />
             )}
+            {/* Catch-all for unmatched URLs */}
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </main>
       </BrowserRouter>
     );
   } catch (error) {
+    if (!isModuleNotFoundError(error)) {
+      LOGGER.error(
+        'Web navigation initialization failed',
+        error instanceof Error
+          ? {
+              name: error.name,
+              message: error.message,
+              stack: error.stack,
+              ...('code' in error
+                ? { code: (error as { code: unknown }).code }
+                : {}),
+            }
+          : { message: String(error) },
+      );
+      throw error;
+    }
+
     LOGGER.warn('React Router not available:', String(error));
 
     // Fallback: render first available route
