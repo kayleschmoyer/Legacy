@@ -2,11 +2,11 @@
 
 This file provides guidance to AI coding agents working with code in this repository.
 
-> **NEVER commit to the `main` branch.** Primary local sessions: spawn Claude Code with the **`worktree` checkbox checked** in the session launcher — the session starts inside an ephemeral worktree at `.claude/worktrees/<name>/` on a new branch, and Claude Code's header, `Create PR` button, and `gitStatus` all reflect that branch natively. For parallel work (sweep, batch, chained branches): `make worktree TICKET=#### DESC=description` creates a sibling worktree. Cloud agents already have an isolated branch checkout.
+> **NEVER commit to the `main` branch.** Local sessions: use the **`worktree` checkbox** in the launcher (starts in `.claude/worktrees/<name>/`, branch tracked in UI). Parallel work: `make worktree TICKET=#### DESC=description`. Cloud agents already have an isolated checkout.
 
 ## Critical Rules
 
-- **NEVER commit to the `main` branch** — every commit must be on a feature branch. Working in `D:\code\legacy-sports` with HEAD on `main` is forbidden.
+- **NEVER commit to the `main` branch** — all commits must be on a feature branch; working in `D:\code\legacy-sports` with HEAD on `main` is forbidden.
 - **Drive to merge** — work is NOT complete until the PR is **merged**, Jira moves to "Done", the MCP gap audit runs, and any tracking tasks are marked completed. Stopping after `make pc`, after `github_create_pr`, or while CI/reviews are still pending are all common agent failure modes.
 - **One ticket = one worktree = one PR** — never add unrelated changes to an existing branch or worktree. Create a **separate Jira ticket and worktree** for unrelated work.
 - **Worktree-first**: every ticket runs in its own worktree. Native ephemeral (launcher checkbox) is default — **do not rename the local branch**, use `worktree_push({ remoteBranch: "claude/LS-####-short-kebab-description" })` on first push so the remote gets the LS key while the local stays unchanged (keeps Claude Code UI in sync). Sibling worktrees (`make_worktree_create`) for parallel work only. Re-attach existing branches with `worktree_attach`. See `.agents/skills/worktree-workflow/SKILL.md`.
@@ -36,7 +36,7 @@ Follow the **Agent Workflow Checklist (Steps 0-16)** in `.agents/skills/workflow
 
 ## Risk Classification
 
-Low (cosmetic/docs) → Medium (business logic/schema) → High (auth/payments/infra). See `.agents/skills/planning/SKILL.md` for the full framework with planning budgets.
+Low (single-file, docs, tests: 2-3 min) · Medium (business logic, multi-file, schema: 5-10 min) · High (auth, payments, infra, migrations: 10-15 min). See `.agents/skills/planning/SKILL.md`.
 
 ## Command Patterns
 
@@ -48,8 +48,6 @@ Subagents do **not** inherit AGENTS.md context. Always include tool preference h
 
 ## Commands
 
-See `.agents/skills/repo-tooling/SKILL.md` for the full command reference. Key targets:
-
 ```bash
 make pc             # full pre-commit (lint + typecheck + test + build)
 make test           # test changed files
@@ -59,8 +57,6 @@ make codegen        # GraphQL codegen
 Use `scratch/` for ad-hoc output (gitignored). On Windows, write scripts to `scratch/<name>.js` instead of `node -e`.
 
 ## Architecture
-
-**Stack**: React Native (Expo) · Next.js · AWS Lambda · GraphQL (Apollo) · PostgreSQL (Drizzle ORM) · Nx monorepo · pnpm
 
 `apps/` (web, mobile, CLI) · `lambdas/` (GraphQL API, game-selection, stats, etc.) · `lib/` (19+ shared libraries) · `terraform/` · `.agents/skills/`
 
