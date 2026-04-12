@@ -332,12 +332,13 @@ jobs:
     name: "Deploy Playwright Report"
     needs: [e2e]
     # Serialize pushes to bkrupa/legacy-sports-deploys gh-pages branch.
-    # Concurrent runs from different PRs would otherwise race: both clone the
-    # same branch HEAD, then the second push fails with "fetch first" because
-    # the first push already advanced the ref. cancel-in-progress: false queues
+    # Multiple workflows (playwright, PR preview, storybook, cleanup) all push
+    # to the same gh-pages branch — they MUST share one concurrency group or
+    # the second push fails with "fetch first" when a different workflow
+    # advanced the ref between clone and push. cancel-in-progress: false queues
     # them instead of cancelling so every PR's report still lands.
     concurrency:
-      group: deploy-playwright-report-gh-pages
+      group: deploy-repo-gh-pages-push
       cancel-in-progress: false
     # Dependabot-triggered runs do not have access to repository secrets, so the
     # GitHub App token mint required to push to bkrupa/legacy-sports-deploys
@@ -401,13 +402,46 @@ jobs:
 
       - name: "Deploy Playwright Report"
         if: steps.check-reports.outputs.has-reports == 'true'
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          personal_token: ${{ steps.app-token.outputs.token }}
-          external_repository: bkrupa/legacy-sports-deploys
-          publish_branch: gh-pages
-          publish_dir: ./playwright-report
-          destination_dir: playwright-report/${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+        env:
+          DEPLOY_TOKEN: ${{ steps.app-token.outputs.token }}
+          DEST_DIR: playwright-report/${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+        run: |
+          set -euo pipefail
+          REPO_URL="https://x-access-token:${DEPLOY_TOKEN}@github.com/bkrupa/legacy-sports-deploys.git"
+
+          git clone --depth 1 --single-branch --branch gh-pages "$REPO_URL" _deploy
+          cd _deploy
+
+          rm -rf "${DEST_DIR}"
+          mkdir -p "${DEST_DIR}"
+          cp -r ../playwright-report/. "${DEST_DIR}/"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .
+
+          if git diff --cached --quiet; then
+            echo "No changes to deploy"
+            exit 0
+          fi
+
+          git commit -m "deploy ${DEST_DIR}"
+
+          # Push with pull-rebase retry to handle races from other workflows
+          # pushing to the same gh-pages branch between our clone and push.
+          MAX_RETRIES=5
+          for attempt in $(seq 1 $MAX_RETRIES); do
+            if git push origin gh-pages; then
+              echo "Push succeeded (attempt ${attempt})"
+              exit 0
+            fi
+            echo "Push failed (attempt ${attempt}) — pulling latest and retrying..."
+            sleep $((attempt * 2))
+            git pull --rebase origin gh-pages
+          done
+
+          echo "Push failed after ${MAX_RETRIES} attempts"
+          exit 1
 
       - name: "Comment Playwright Report URL"
         if: steps.check-reports.outputs.has-reports == 'true' && github.event.pull_request.number
