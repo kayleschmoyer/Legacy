@@ -205,17 +205,18 @@ jobs:
         id: changelog
         if: needs.build-android.result == 'success' && needs.create-release.result == 'success'
         shell: bash
-        env:
-          RELEASE_TAG: android-v${{ needs.build-android.outputs.version }}-${{ needs.build-android.outputs.build_number }}
         run: |
-          PREV_TAG=$(git tag --list 'android-v*' --sort=-version:refname | { grep -v "^${RELEASE_TAG}$" || true; } | head -n 1)
+          BEFORE="${{ github.event.before }}"
 
-          if [ -n "$PREV_TAG" ]; then
-            echo "Commits since ${PREV_TAG}:"
-            COMMITS=$(git log "${PREV_TAG}..HEAD" --pretty=format:'[`%h`](https://github.com/${{ github.repository }}/commit/%H) %s' --first-parent -20)
+          if [ -n "$BEFORE" ] && [ "$BEFORE" != "0000000000000000000000000000000000000000" ]; then
+            # Push event: show only commits in this specific push
+            COMMITS=$(git log "${BEFORE}..HEAD" \
+              --pretty=format:'[`%h`](https://github.com/${{ github.repository }}/commit/%H) %s' \
+              --first-parent)
           else
-            echo "No previous Android release tag found — showing last 20 commits"
-            COMMITS=$(git log --pretty=format:'[`%h`](https://github.com/${{ github.repository }}/commit/%H) %s' --first-parent -20)
+            # workflow_dispatch or first push: fall back to last 20 commits
+            COMMITS=$(git log --pretty=format:'[`%h`](https://github.com/${{ github.repository }}/commit/%H) %s' \
+              --first-parent -20)
           fi
 
           {
