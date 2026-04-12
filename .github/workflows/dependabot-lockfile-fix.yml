@@ -1,0 +1,92 @@
+name: "Fix Dependabot Lockfile"
+
+# LS-3083: Dependabot generates incomplete pnpm-lock.yaml for pnpm workspace
+# monorepos. This workflow regenerates the lockfile after dependabot creates or
+# updates a PR, then pushes the corrected lockfile back to the PR branch.
+#
+# Uses pull_request_target so we get access to BOT_GITHUB_TOKEN (GitHub restricts
+# secrets on pull_request events from dependabot). The actor check ensures this
+# only runs for dependabot PRs.
+
+on:
+  pull_request_target:
+    types: [opened, synchronize]
+    paths:
+      - "package.json"
+      - "apps/*/package.json"
+      - "lib/*/package.json"
+      - "lambdas/*/package.json"
+      - "tools/*/package.json"
+
+concurrency:
+  group: dependabot-lockfile-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  fix-lockfile:
+    name: "Regenerate pnpm-lock.yaml"
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    steps:
+      - name: Validate required secrets
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${BOT_TOKEN:-}" ]; then
+            echo "::error::secrets.BOT_GITHUB_TOKEN is not configured."
+            echo "::error::This workflow needs a token that can push back to PR branches AND retrigger required checks."
+            echo "::error::Add it under repo Settings -> Secrets and variables -> Actions -> New repository secret."
+            exit 1
+          fi
+          echo "BOT_GITHUB_TOKEN is configured."
+
+      - name: Checkout PR branch
+        uses: actions/checkout@v6
+        with:
+          # head.ref is required (not head.sha) so we can push back to the branch.
+          # The concurrency group with cancel-in-progress handles races.
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 1
+          # Bot token so the push triggers downstream CI (GITHUB_TOKEN does not
+          # re-trigger required checks).
+          token: ${{ secrets.BOT_GITHUB_TOKEN }}
+
+      - name: Bootstrap pnpm
+        run: |
+          PNPM_VERSION=$(node -pe "(require('./package.json').packageManager || '').split('@')[1] || '9.12.1'")
+          echo "Installing pnpm@${PNPM_VERSION}"
+          corepack enable
+          corepack prepare "pnpm@${PNPM_VERSION}" --activate
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Regenerate lockfile
+        # --lockfile-only: update pnpm-lock.yaml without writing to node_modules
+        # --ignore-scripts: prevent lifecycle scripts from running (security:
+        #   pull_request_target exposes BOT_GITHUB_TOKEN to the process env)
+        run: pnpm install --no-frozen-lockfile --lockfile-only --ignore-scripts
+
+      - name: Commit and push if changed
+        run: |
+          if git diff --quiet pnpm-lock.yaml; then
+            echo "Lockfile is already correct, nothing to do"
+            exit 0
+          fi
+
+          git config user.name  "legacy-sports-code-bot"
+          git config user.email "legacy-sports-code-bot@users.noreply.github.com"
+          git add pnpm-lock.yaml
+          git commit \
+            -m "chore(deps): regenerate pnpm-lock.yaml" \
+            -m "Dependabot's native pnpm lockfile generation is incomplete for workspace monorepos. Regenerated with pnpm install."
+          git push
+          echo "Lockfile regenerated and pushed"
