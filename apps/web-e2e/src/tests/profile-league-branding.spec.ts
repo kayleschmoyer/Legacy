@@ -325,7 +325,7 @@ test.describe('League Branding — Banner Picker @regression', () => {
     });
     await brandingHeader.click();
     await expect(
-      page.getByRole('heading', { name: /League Branding/i }),
+      page.getByRole('heading', { name: /League Branding/i }).nth(1),
     ).toBeVisible({ timeout: 5000 });
   });
 
@@ -376,7 +376,7 @@ test.describe('League Branding — Color Customization @regression', () => {
     });
     await brandingHeader.click();
     await expect(
-      page.getByRole('heading', { name: /League Branding/i }),
+      page.getByRole('heading', { name: /League Branding/i }).nth(1),
     ).toBeVisible({ timeout: 5000 });
   });
 
@@ -439,7 +439,7 @@ test.describe('League Branding — Color Customization @regression', () => {
     });
     await brandingHeader.click();
     await expect(
-      page.getByRole('heading', { name: /League Branding/i }),
+      page.getByRole('heading', { name: /League Branding/i }).nth(1),
     ).toBeVisible({ timeout: 5000 });
 
     const leaguePage = new LeaguePage(page);

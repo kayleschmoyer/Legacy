@@ -89,10 +89,16 @@ export const getEnvironmentConfig = (): EnvironmentConfig => ({
   googleAnalyticsMeasurementId: import.meta.env.VITE_GA_MEASUREMENT_ID as
     | string
     | undefined,
+  // Same __e2e override pattern as websocketUrl — prevents Vite from
+  // constant-folding the empty string and lets E2E tests inject a proxy URL.
   jiraProxyUrl:
-    import.meta.env.DEV && import.meta.env.VITE_JIRA_PROXY_URL
-      ? '/__jira-proxy'
-      : (import.meta.env.VITE_JIRA_PROXY_URL as string) || '',
+    typeof window !== 'undefined' &&
+    navigator.webdriver === true &&
+    typeof window.__e2eJiraProxyUrl === 'string'
+      ? window.__e2eJiraProxyUrl
+      : import.meta.env.DEV && import.meta.env.VITE_JIRA_PROXY_URL
+        ? '/__jira-proxy'
+        : (import.meta.env.VITE_JIRA_PROXY_URL as string) || '',
   stripeMonthlyPriceId:
     (import.meta.env.VITE_STRIPE_MONTHLY_PRICE_ID as string) || '',
   stripeAnnualPriceId:

@@ -74,10 +74,12 @@ test.describe('Loading state accessibility @regression', () => {
     await page.goto('/baseball/league/1/overview');
     await page.waitForLoadState('networkidle');
 
-    // After loading completes, no element should still be aria-busy="true"
-    const stillBusy = page.locator('[aria-busy="true"]');
-    const count = await stillBusy.count();
-    expect(count).toBe(0);
+    // After loading completes, no element should still be aria-busy="true".
+    // Use auto-retrying assertion to handle cascading GraphQL queries that
+    // may briefly re-enter loading state after the first responses arrive.
+    await expect(page.locator('[aria-busy="true"]')).toHaveCount(0, {
+      timeout: 10_000,
+    });
   });
 });
 
@@ -296,8 +298,12 @@ test.describe('Page accessibility after loading completes @smoke', () => {
     await page.goto('/baseball/league/1/overview');
     await page.waitForLoadState('networkidle');
 
-    // Main content landmark should be present and visible after load
-    await expect(page.getByRole('main')).toBeVisible({ timeout: 15000 });
+    // Main content landmark should be present and visible after load.
+    // Use .first() because the league detail page nests its own role="main"
+    // inside the app shell's role="main", producing two landmarks.
+    await expect(page.getByRole('main').first()).toBeVisible({
+      timeout: 15000,
+    });
 
     // No error state
     await expect(page.locator('body')).not.toContainText(
@@ -312,7 +318,9 @@ test.describe('Page accessibility after loading completes @smoke', () => {
     await page.waitForLoadState('load');
 
     // Main content landmark should be present and visible
-    await expect(page.getByRole('main')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('main').first()).toBeVisible({
+      timeout: 15000,
+    });
 
     // No error state
     await expect(page.locator('body')).not.toContainText(
@@ -341,9 +349,12 @@ test.describe('Page accessibility after loading completes @smoke', () => {
     await page.goto('/baseball/league/1/overview');
     await page.waitForLoadState('networkidle');
 
-    // Critical landmarks should remain after data loads
+    // Critical landmarks should remain after data loads.
+    // Use .first() for main — league detail pages nest a second role="main".
     await expect(page.getByRole('banner')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByRole('main')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('main').first()).toBeVisible({
+      timeout: 15000,
+    });
     await expect(page.getByRole('navigation', { name: 'Primary' })).toBeVisible(
       { timeout: 15000 },
     );

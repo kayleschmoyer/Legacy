@@ -38,9 +38,11 @@ test.describe('League Branding @regression', () => {
       name: /League Branding/i,
     });
     await brandingHeader.click();
-    // Wait for the accordion content to fully render before proceeding
+    // Wait for the accordion content to fully render before proceeding.
+    // Use .nth(1) because the accordion toggle <h4> and the content <h4>
+    // both match — the content heading is the second one.
     await expect(
-      page.getByRole('heading', { name: /League Branding/i }),
+      page.getByRole('heading', { name: /League Branding/i }).nth(1),
     ).toBeVisible({ timeout: 5000 });
   });
 
@@ -182,7 +184,7 @@ test.describe('League Branding @regression', () => {
     await expect(brandingHeader).toBeVisible({ timeout: 10000 });
     await brandingHeader.click();
     await expect(
-      page.getByRole('heading', { name: /League Branding/i }),
+      page.getByRole('heading', { name: /League Branding/i }).nth(1),
     ).toBeVisible();
 
     const leaguePage = new LeaguePage(page);

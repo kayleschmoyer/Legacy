@@ -11,11 +11,27 @@
 
 import { expect, test } from '../fixtures/auth-enhanced';
 
-/** The Jira proxy URL baked in at build time — intercept /bug requests on it. */
-const JIRA_BUG_URL = '**/jira/bug';
+/** Intercept bug submission requests on the injected Jira proxy URL. */
+const JIRA_BUG_URL = '**/__jira-proxy/bug';
+
+/**
+ * In CI the production build has VITE_JIRA_PROXY_URL="" (not set at build
+ * time), so BugReportButton returns null.  Inject a runtime override via
+ * window.__e2eJiraProxyUrl — same pattern as the WebSocket URL override.
+ * environment.ts reads this under navigator.webdriver before falling back
+ * to import.meta.env.
+ */
+const E2E_JIRA_PROXY_URL = 'http://localhost:4280/__jira-proxy';
+
+async function injectJiraProxyUrl(page: import('@playwright/test').Page) {
+  await page.addInitScript((url: string) => {
+    window.__e2eJiraProxyUrl = url;
+  }, E2E_JIRA_PROXY_URL);
+}
 
 test.describe('Bug Report Button @smoke', () => {
   test.beforeEach(async ({ page }) => {
+    await injectJiraProxyUrl(page);
     await page.goto('/about');
     await page.waitForLoadState('load');
   });
@@ -67,6 +83,7 @@ test.describe('Bug Report Button – Mobile @regression', () => {
   test('bug report button is accessible via mobile nav menu', async ({
     page,
   }) => {
+    await injectJiraProxyUrl(page);
     await page.goto('/about');
     await page.waitForLoadState('load');
 
@@ -80,6 +97,7 @@ test.describe('Bug Report Button – Mobile @regression', () => {
   });
 
   test('bug report dialog opens from mobile nav', async ({ page }) => {
+    await injectJiraProxyUrl(page);
     await page.goto('/about');
     await page.waitForLoadState('load');
 
@@ -94,6 +112,7 @@ test.describe('Bug Report Button – Mobile @regression', () => {
   test('dialog stays open and accepts input after opening from mobile nav', async ({
     page,
   }) => {
+    await injectJiraProxyUrl(page);
     await page.goto('/about');
     await page.waitForLoadState('load');
 
@@ -124,6 +143,7 @@ test.describe('Bug Report Button – Mobile @regression', () => {
 
 test.describe('Bug Report Dialog Interactions @regression', () => {
   test.beforeEach(async ({ page }) => {
+    await injectJiraProxyUrl(page);
     await page.goto('/about');
     await page.waitForLoadState('load');
     await page.getByRole('button', { name: /report a bug/i }).click();
@@ -229,6 +249,7 @@ test.describe('Bug Report Dialog Interactions @regression', () => {
 
 test.describe('Bug Report Submission @regression', () => {
   test.beforeEach(async ({ page }) => {
+    await injectJiraProxyUrl(page);
     await page.goto('/about');
     await page.waitForLoadState('load');
     await page.getByRole('button', { name: /report a bug/i }).click();

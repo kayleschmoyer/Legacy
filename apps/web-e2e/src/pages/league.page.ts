@@ -85,10 +85,11 @@ export class LeaguePage {
     });
     this.discoveryFooterCta = page.getByText(/Can't find the right league\?/i);
 
-    // Commissioner branding
-    this.brandingHeading = page.getByRole('heading', {
-      name: /League Branding/i,
-    });
+    // Commissioner branding — the accordion toggle <h4> and the content <h4>
+    // both match, so use .nth(1) to target the content heading inside the panel.
+    this.brandingHeading = page
+      .getByRole('heading', { name: /League Branding/i })
+      .nth(1);
     this.primaryColorInput = page.getByTestId('primary-color');
     this.secondaryColorInput = page.getByTestId('secondary-color');
     this.saveColorsButton = page.getByRole('button', {

@@ -541,6 +541,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                 {/* League Name */}
                 <YStack space="$2">
                   <Label
+                    id="league-name-label"
                     htmlFor="league-name-input"
                     size="$4"
                     fontWeight="600"
@@ -552,6 +553,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                   </Label>
                   <Input
                     id="league-name-input"
+                    aria-labelledby="league-name-label"
                     size="$4"
                     placeholder="Enter your league name"
                     value={formData.leagueName}

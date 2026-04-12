@@ -277,10 +277,24 @@ async function mockGiphy(
   );
 }
 
+/**
+ * In CI the production build has VITE_GIPHY_API_KEY="" (not set at build
+ * time), so GifPicker early-exits with an error.  Inject a runtime override
+ * via window.__e2eGiphyApiKey before any page scripts run.
+ */
+async function injectGiphyApiKey(
+  page: import('@playwright/test').Page,
+): Promise<void> {
+  await page.addInitScript(() => {
+    window.__e2eGiphyApiKey = 'e2e-fake-giphy-key';
+  });
+}
+
 /** Navigate to overview, switch to Chat sub-tab */
 async function goToLeagueChatTab(
   page: import('@playwright/test').Page,
 ): Promise<void> {
+  await injectGiphyApiKey(page);
   await page.goto('/baseball/league/1/overview');
   await page.waitForLoadState('load');
   // Click the "Chat" sub-tab inside the overview card
@@ -297,6 +311,7 @@ test.describe('GIF Picker — navigation to chat @smoke', () => {
   test('opens chat sub-tab without errors', async ({ page }) => {
     await mockGraphQL(page);
     await mockGiphy(page);
+    await injectGiphyApiKey(page);
     await page.goto('/baseball/league/1/overview');
     await page.waitForLoadState('load');
 

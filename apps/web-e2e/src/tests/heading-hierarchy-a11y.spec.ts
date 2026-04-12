@@ -17,8 +17,23 @@
 import { expect, test } from '../fixtures/auth-enhanced';
 
 // ---------------------------------------------------------------------------
-// Helper
+// Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Wait for React.lazy() page content to mount inside the main content area.
+ * The app wraps all routes in `<Suspense fallback={null}>`, so after
+ * navigation the main-content div may be empty until the lazy chunk loads.
+ */
+async function waitForPageContent(page: import('@playwright/test').Page) {
+  await page.waitForFunction(
+    () => {
+      const main = document.getElementById('main-content');
+      return main && main.children.length > 0;
+    },
+    { timeout: 15_000 },
+  );
+}
 
 /**
  * Get all heading elements from a page and validate hierarchy.
@@ -29,10 +44,14 @@ async function getHeadingHierarchy(page: import('@playwright/test').Page) {
     const headingSelectors = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
     const headings = Array.from(
       document.querySelectorAll(headingSelectors.join(', ')),
-    ).map((el) => ({
-      level: parseInt(el.tagName.charAt(1), 10),
-      text: el.textContent?.trim().substring(0, 100) ?? '',
-    }));
+    )
+      // Exclude headings inside modal dialogs — they have their own
+      // heading hierarchy and should not affect the page-level check.
+      .filter((el) => !el.closest('[role="dialog"], dialog'))
+      .map((el) => ({
+        level: parseInt(el.tagName.charAt(1), 10),
+        text: el.textContent?.trim().substring(0, 100) ?? '',
+      }));
 
     const issues: string[] = [];
     let prevLevel = 0;
@@ -60,6 +79,7 @@ test.describe('Heading hierarchy — /about @regression', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/about');
     await page.waitForLoadState('load');
+    await waitForPageContent(page);
   });
 
   test('About page has exactly one h1', async ({ page }) => {
@@ -94,6 +114,7 @@ test.describe('Heading hierarchy — /help @regression', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/help');
     await page.waitForLoadState('load');
+    await waitForPageContent(page);
   });
 
   test('Help page has exactly one h1', async ({ page }) => {
@@ -128,6 +149,7 @@ test.describe('Heading hierarchy — /baseball/league/1/overview @regression', (
   test.beforeEach(async ({ page }) => {
     await page.goto('/baseball/league/1/overview');
     await page.waitForLoadState('networkidle');
+    await waitForPageContent(page);
   });
 
   test('League overview page has exactly one h1 after data loads', async ({
@@ -166,6 +188,7 @@ test.describe('Heading hierarchy — / (home) @regression', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('load');
+    await waitForPageContent(page);
   });
 
   test('Home page has exactly one h1', async ({ page }) => {

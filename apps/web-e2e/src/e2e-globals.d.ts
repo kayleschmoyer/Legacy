@@ -8,4 +8,8 @@
 interface Window {
   /** WebSocket URL override for E2E tests — never set in production. */
   __e2eWsUrl?: string;
+  /** Jira proxy URL override for E2E tests — never set in production. */
+  __e2eJiraProxyUrl?: string;
+  /** Giphy API key override for E2E tests — never set in production. */
+  __e2eGiphyApiKey?: string;
 }
