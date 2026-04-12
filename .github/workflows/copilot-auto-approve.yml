@@ -819,6 +819,10 @@ jobs:
             // superseded — skip thread check entirely.
             if (latest.state === 'APPROVED') {
               core.info('Latest Copilot review is APPROVED — old threads superseded');
+            } else if (latest.body && latest.body.includes("wasn't able to review any files")) {
+              // Copilot couldn't review any files (e.g. only .d.ts or permission
+              // bit changes) — no threads exist, skip thread check. (LS-3090)
+              core.info('Copilot had no reviewable files — skipping thread check');
             } else {
               // Latest Copilot review is not APPROVED — check threads
               // (threads may have been resolved or become outdated since the last review)
@@ -922,13 +926,14 @@ jobs:
             }
 
   delayed-recheck:
-    # After a synchronize event (rebase/force-push), request-review sets
-    # bot-review to PENDING. If the "Copilot code review" workflow doesn't
-    # re-trigger for the new commit, bot-review stays stuck at PENDING forever.
-    # This job waits 3 minutes (giving Copilot time to re-review), then checks
-    # if bot-review is still PENDING and dispatches a recheck if so. If
-    # auto-approve already fired via workflow_run, the status will no longer be
-    # pending and this is a no-op. (See LS-1986)
+    # After a pull_request event, request-review sets bot-review to in_progress.
+    # If the "Copilot code review" workflow doesn't trigger (e.g. Copilot can't
+    # review any files) or doesn't fire a workflow_run completion, bot-review
+    # stays stuck at in_progress forever. This job waits 3 minutes (giving
+    # Copilot time to review), then checks if bot-review is still pending and
+    # dispatches a recheck if so. If auto-approve already fired via
+    # workflow_run, the status will no longer be pending and this is a no-op.
+    # (See LS-1986, LS-3090)
     permissions:
       actions: write
       checks: read
@@ -938,7 +943,6 @@ jobs:
     needs: request-review
     if: >-
       github.event_name == 'pull_request' &&
-      github.event.action == 'synchronize' &&
       !github.event.pull_request.draft &&
       github.event.pull_request.user.login != 'dependabot[bot]' &&
       github.event.pull_request.user.login != 'legacy-sports-code-bot[bot]'
