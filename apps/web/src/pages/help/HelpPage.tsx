@@ -14,10 +14,28 @@ import {
   DISCORD_URL,
   HELP_CONTACT_ITEMS,
   HELP_FAQ_ITEMS,
-  HELP_GETTING_STARTED_STEPS,
   HELP_HISTORICAL_FAQ_ITEMS,
   type HelpFaqItem,
 } from '@legacy-sports/utils/help-content';
+import {
+  AlertTriangle,
+  BarChart3,
+  BookOpen,
+  Bug,
+  ChevronDown,
+  Gamepad2,
+  HelpCircle,
+  History,
+  Lightbulb,
+  Link as LinkIcon,
+  Mail,
+  MessageCircle,
+  Plus,
+  Rocket,
+  Settings,
+  Trophy,
+  Users,
+} from '@tamagui/lucide-icons';
 import { BugReportButton } from '../../components/layout/BugReportButton';
 import { env } from '../../config/environment';
 import { OnboardingTutorial } from '../../components/onboarding';
@@ -27,8 +45,23 @@ import {
   BRAND_GOLD_LIGHT,
   BRAND_NAVY_LIGHT,
   BRAND_SEAM_RED,
+  GRADIENT_NAVY,
+  TEXT_PRIMARY,
   withAlpha,
 } from '../../constants/colors';
+
+/* ─── Icon lookup for contact items (shared data uses emoji strings) ─── */
+
+const CONTACT_ICON_MAP: Record<
+  string,
+  React.ComponentType<{ size?: number; color?: string }>
+> = {
+  // Keyed by the `icon` emoji field in HELP_CONTACT_ITEMS (stable data key)
+  '\uD83D\uDC1B': Bug,
+  '\uD83D\uDCA1': Lightbulb,
+  '\uD83D\uDCAC': MessageCircle,
+  '\uD83C\uDFAE': Gamepad2,
+};
 
 /* ─── Styled Components ─── */
 
@@ -150,9 +183,7 @@ function FaqItem({ question, answer }: FaqItemProps) {
             transition: 'transform 0.2s',
           }}
         >
-          <Paragraph fontSize="$5" color={BRAND_GOLD_LIGHT} lineHeight={20}>
-            ▾
-          </Paragraph>
+          <ChevronDown size={18} color={BRAND_GOLD_LIGHT} />
         </span>
       </FaqQuestion>
       {open && (
@@ -202,6 +233,7 @@ function ContactOption({
     : href
       ? () => window.open(href, '_blank', 'noopener,noreferrer')
       : undefined;
+  const IconComponent = CONTACT_ICON_MAP[icon];
   return (
     <ContactCard
       borderColor="$glassBorder"
@@ -217,15 +249,19 @@ function ContactOption({
           justifyContent="center"
           style={
             {
-              background: `linear-gradient(135deg, ${BRAND_NAVY_LIGHT} 0%, #3a5a9c 100%)`,
+              background: GRADIENT_NAVY,
             } as never
           }
         >
-          <Paragraph fontSize={20} lineHeight={22}>
-            <span role="img" aria-label={iconLabel}>
-              {icon}
-            </span>
-          </Paragraph>
+          {IconComponent ? (
+            <IconComponent size={20} color={BRAND_GOLD_LIGHT} />
+          ) : (
+            <Paragraph fontSize={20} lineHeight={22}>
+              <span role="img" aria-label={iconLabel}>
+                {icon}
+              </span>
+            </Paragraph>
+          )}
         </YStack>
         <YStack flex={1} gap="$1">
           <Paragraph fontWeight="700" color={BRAND_GOLD} fontSize="$4">
@@ -261,7 +297,15 @@ const QuickLinkChip = styled(XStack, {
   },
 });
 
-/* ─── FAQ data (imported from @legacy-sports/utils) ─── */
+/* ─── Quick link data ─── */
+
+const QUICK_LINKS = [
+  { to: '/baseball', icon: Trophy, label: 'My Leagues' },
+  { to: '/players', icon: Users, label: 'Players' },
+  { to: '/players/stats', icon: BarChart3, label: 'Player Stats' },
+  { to: '/baseball/league/create', icon: Plus, label: 'Create League' },
+  { to: '/profile/settings', icon: Settings, label: 'Profile Settings' },
+];
 
 /* ─── Main component ─── */
 
@@ -287,12 +331,7 @@ export default function HelpPage() {
           <ContentContainer>
             {/* ── Page header ── */}
             <PageHeader>
-              <H1 color={BRAND_GOLD}>
-                <span role="img" aria-label="help">
-                  🆘
-                </span>{' '}
-                Help &amp; Support
-              </H1>
+              <H1 color={BRAND_GOLD}>Help &amp; Support</H1>
               <Paragraph color="$colorPress" fontSize="$5" lineHeight={28}>
                 Find answers to common questions and learn how to get the most
                 out of Legacy Sports.
@@ -303,11 +342,7 @@ export default function HelpPage() {
             <SectionCard>
               <SectionHeader>
                 <SectionIconBox>
-                  <Paragraph fontSize={18} lineHeight={20}>
-                    <span role="img" aria-label="book">
-                      📖
-                    </span>
-                  </Paragraph>
+                  <BookOpen size={18} color={BRAND_GOLD_LIGHT} />
                 </SectionIconBox>
                 <YStack flex={1} gap="$1">
                   <H2 color="$color">New to Legacy Sports?</H2>
@@ -343,16 +378,14 @@ export default function HelpPage() {
                     onPress={() => setTutorialOpen(true)}
                     style={
                       {
-                        background: `linear-gradient(135deg, ${BRAND_NAVY_LIGHT} 0%, #C41E3A 100%)`,
-                        color: '#fff',
+                        background: GRADIENT_NAVY,
+                        color: TEXT_PRIMARY,
                         border: 'none',
                       } as never
                     }
                     hoverStyle={{ opacity: 0.9 }}
+                    icon={<Rocket size={16} color={TEXT_PRIMARY} />}
                   >
-                    <span role="img" aria-label="rocket">
-                      🚀
-                    </span>{' '}
                     Launch Tutorial
                   </Button>
                 </XStack>
@@ -363,82 +396,26 @@ export default function HelpPage() {
             <SectionCard>
               <SectionHeader>
                 <SectionIconBox>
-                  <Paragraph fontSize={18} lineHeight={20}>
-                    <span role="img" aria-label="link">
-                      🔗
-                    </span>
-                  </Paragraph>
+                  <LinkIcon size={18} color={BRAND_GOLD_LIGHT} />
                 </SectionIconBox>
                 <H2 color="$color">Quick Links</H2>
               </SectionHeader>
               <SectionBody>
                 <XStack flexWrap="wrap" gap="$3">
-                  <Link to="/baseball" style={{ textDecoration: 'none' }}>
-                    <QuickLinkChip>
-                      <Paragraph fontSize={16} lineHeight={18}>
-                        <span role="img" aria-label="baseball">
-                          ⚾
-                        </span>
-                      </Paragraph>
-                      <Paragraph color="$color" fontWeight="500" fontSize="$3">
-                        My Leagues
-                      </Paragraph>
-                    </QuickLinkChip>
-                  </Link>
-                  <Link to="/players" style={{ textDecoration: 'none' }}>
-                    <QuickLinkChip>
-                      <Paragraph fontSize={16} lineHeight={18}>
-                        <span role="img" aria-label="players">
-                          👥
-                        </span>
-                      </Paragraph>
-                      <Paragraph color="$color" fontWeight="500" fontSize="$3">
-                        Players
-                      </Paragraph>
-                    </QuickLinkChip>
-                  </Link>
-                  <Link to="/players/stats" style={{ textDecoration: 'none' }}>
-                    <QuickLinkChip>
-                      <Paragraph fontSize={16} lineHeight={18}>
-                        <span role="img" aria-label="statistics">
-                          📊
-                        </span>
-                      </Paragraph>
-                      <Paragraph color="$color" fontWeight="500" fontSize="$3">
-                        Player Stats
-                      </Paragraph>
-                    </QuickLinkChip>
-                  </Link>
-                  <Link
-                    to="/baseball/league/create"
-                    style={{ textDecoration: 'none' }}
-                  >
-                    <QuickLinkChip>
-                      <Paragraph fontSize={16} lineHeight={18}>
-                        <span role="img" aria-label="create league">
-                          ➕
-                        </span>
-                      </Paragraph>
-                      <Paragraph color="$color" fontWeight="500" fontSize="$3">
-                        Create League
-                      </Paragraph>
-                    </QuickLinkChip>
-                  </Link>
-                  <Link
-                    to="/profile/settings"
-                    style={{ textDecoration: 'none' }}
-                  >
-                    <QuickLinkChip>
-                      <Paragraph fontSize={16} lineHeight={18}>
-                        <span role="img" aria-label="settings">
-                          ⚙️
-                        </span>
-                      </Paragraph>
-                      <Paragraph color="$color" fontWeight="500" fontSize="$3">
-                        Profile Settings
-                      </Paragraph>
-                    </QuickLinkChip>
-                  </Link>
+                  {QUICK_LINKS.map(({ to, icon: Icon, label }) => (
+                    <Link key={to} to={to} style={{ textDecoration: 'none' }}>
+                      <QuickLinkChip>
+                        <Icon size={16} color={BRAND_GOLD_LIGHT} />
+                        <Paragraph
+                          color="$color"
+                          fontWeight="500"
+                          fontSize="$3"
+                        >
+                          {label}
+                        </Paragraph>
+                      </QuickLinkChip>
+                    </Link>
+                  ))}
                 </XStack>
               </SectionBody>
             </SectionCard>
@@ -447,11 +424,7 @@ export default function HelpPage() {
             <SectionCard>
               <SectionHeader>
                 <SectionIconBox>
-                  <Paragraph fontSize={18} lineHeight={20}>
-                    <span role="img" aria-label="frequently asked questions">
-                      ❓
-                    </span>
-                  </Paragraph>
+                  <HelpCircle size={18} color={BRAND_GOLD_LIGHT} />
                 </SectionIconBox>
                 <H2 color="$color">Frequently Asked Questions</H2>
               </SectionHeader>
@@ -470,11 +443,7 @@ export default function HelpPage() {
             <SectionCard>
               <SectionHeader>
                 <SectionIconBox>
-                  <Paragraph fontSize={18} lineHeight={20}>
-                    <span role="img" aria-label="historical stats">
-                      📜
-                    </span>
-                  </Paragraph>
+                  <History size={18} color={BRAND_GOLD_LIGHT} />
                 </SectionIconBox>
                 <YStack flex={1} gap="$1">
                   <H2 color="$color">Historical Stats — How It Works</H2>
@@ -495,63 +464,11 @@ export default function HelpPage() {
               </SectionBody>
             </SectionCard>
 
-            <SectionCard>
-              <SectionHeader>
-                <SectionIconBox>
-                  <Paragraph fontSize={18} lineHeight={20}>
-                    <span role="img" aria-label="rocket">
-                      🚀
-                    </span>
-                  </Paragraph>
-                </SectionIconBox>
-                <H2 color="$color">Getting Started</H2>
-              </SectionHeader>
-              <SectionBody gap="$5">
-                {HELP_GETTING_STARTED_STEPS.map(({ step, title, body }) => (
-                  <XStack key={step} gap="$4" alignItems="flex-start">
-                    <YStack
-                      width={32}
-                      height={32}
-                      borderRadius="$10"
-                      alignItems="center"
-                      justifyContent="center"
-                      flexShrink={0}
-                      style={
-                        {
-                          background: `linear-gradient(135deg, ${BRAND_NAVY_LIGHT} 0%, #3a5a9c 100%)`,
-                        } as never
-                      }
-                    >
-                      <Paragraph
-                        color={BRAND_GOLD_LIGHT}
-                        fontWeight="700"
-                        fontSize="$3"
-                      >
-                        {step}
-                      </Paragraph>
-                    </YStack>
-                    <YStack flex={1} gap="$1">
-                      <Paragraph fontWeight="700" color="$color" fontSize="$4">
-                        {title}
-                      </Paragraph>
-                      <Paragraph color="$colorPress" lineHeight={22}>
-                        {body}
-                      </Paragraph>
-                    </YStack>
-                  </XStack>
-                ))}
-              </SectionBody>
-            </SectionCard>
-
             {/* ── Contact & support ── */}
             <SectionCard>
               <SectionHeader>
                 <SectionIconBox>
-                  <Paragraph fontSize={18} lineHeight={20}>
-                    <span role="img" aria-label="contact">
-                      📬
-                    </span>
-                  </Paragraph>
+                  <Mail size={18} color={BRAND_GOLD_LIGHT} />
                 </SectionIconBox>
                 <H2 color="$color">Contact &amp; Support</H2>
               </SectionHeader>
@@ -590,16 +507,16 @@ export default function HelpPage() {
                   borderColor={withAlpha(BRAND_SEAM_RED, 0.2)}
                   gap="$2"
                 >
-                  <Paragraph
-                    fontWeight="700"
-                    color={BRAND_SEAM_RED}
-                    fontSize="$3"
-                  >
-                    <span role="img" aria-label="urgent">
-                      🚨
-                    </span>{' '}
-                    Urgent account issues?
-                  </Paragraph>
+                  <XStack alignItems="center" gap="$2">
+                    <AlertTriangle size={16} color={BRAND_SEAM_RED} />
+                    <Paragraph
+                      fontWeight="700"
+                      color={BRAND_SEAM_RED}
+                      fontSize="$3"
+                    >
+                      Urgent account issues?
+                    </Paragraph>
+                  </XStack>
                   <Paragraph color="$colorPress" fontSize="$3" lineHeight={20}>
                     For account access problems or missed draft notifications,
                     join our{' '}

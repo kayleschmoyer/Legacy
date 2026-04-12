@@ -2,8 +2,11 @@
  * Help Page E2E Tests
  *
  * The Help page renders entirely from static content (HELP_FAQ_ITEMS,
- * HELP_HISTORICAL_FAQ_ITEMS, HELP_GETTING_STARTED_STEPS, HELP_CONTACT_ITEMS)
+ * HELP_HISTORICAL_FAQ_ITEMS, HELP_CONTACT_ITEMS)
  * — no GraphQL calls required.  Tests are fast and reliable.
+ *
+ * Note: The "Getting Started" section was removed in LS-2986 (redundant with
+ * the interactive tutorial launcher).
  */
 
 import { expect, test } from '../fixtures/auth-enhanced';
@@ -47,12 +50,6 @@ test.describe('Help Page — header and layout @smoke', () => {
   test('renders the Historical Stats section heading', async ({ page }) => {
     await expect(
       page.getByRole('heading', { name: /historical stats.*how it works/i }),
-    ).toBeVisible();
-  });
-
-  test('renders the Getting Started section heading', async ({ page }) => {
-    await expect(
-      page.getByRole('heading', { name: /getting started/i }),
     ).toBeVisible();
   });
 
@@ -242,29 +239,6 @@ test.describe('Help Page — Historical Stats FAQ @regression', () => {
       .getByRole('button')
       .filter({ hasText: /how does game selection work/i });
     await expect(faqButton).toBeVisible();
-  });
-});
-
-test.describe('Help Page — getting started steps @smoke', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/help');
-    await page.waitForLoadState('load');
-  });
-
-  test('shows step 1: Create or join a league', async ({ page }) => {
-    await expect(page.getByText(/create or join a league/i)).toBeVisible();
-  });
-
-  test('shows step 2: Set your roster', async ({ page }) => {
-    await expect(page.getByText(/set your roster/i)).toBeVisible();
-  });
-
-  test('shows step 3: Follow the season', async ({ page }) => {
-    await expect(page.getByText(/follow the season/i)).toBeVisible();
-  });
-
-  test('shows step 4: Win the championship', async ({ page }) => {
-    await expect(page.getByText(/win the championship/i)).toBeVisible();
   });
 });
 
