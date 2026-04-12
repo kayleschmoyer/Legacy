@@ -11,6 +11,19 @@ import {
 } from 'react-router-dom';
 import { LOGGER } from '@legacy-sports/logging';
 import { Platform } from '../platform-components';
+import { BG_DARK, BLUE, SURFACE_CARD, TEXT_PRIMARY } from '../utils/colors';
+
+// React Navigation screen options and plain HTML inline styles cannot consume
+// Tamagui's $token syntax. For native, we reference the shared dark-theme
+// design-token constants (the app defaults to dark mode). For web, CSS custom
+// properties (set by TamaguiProvider) give full theme awareness.
+const NATIVE_COLORS = {
+  headerBg: BG_DARK, // $background
+  headerTint: TEXT_PRIMARY, // $color
+  drawerBg: SURFACE_CARD, // $color3
+  activeAccent: BLUE, // $blue9
+  mutedText: '#6C80BA', // $color10 — no shared constant yet
+} as const;
 
 export interface NavigationRoute {
   name: string;
@@ -72,8 +85,8 @@ function NativeNavigator({
       <Stack.Navigator
         initialRouteName={initialRoute || routes[0]?.name}
         screenOptions={{
-          headerStyle: { backgroundColor: '#1E1E1E' },
-          headerTintColor: '#FFFFFF',
+          headerStyle: { backgroundColor: NATIVE_COLORS.headerBg },
+          headerTintColor: NATIVE_COLORS.headerTint,
         }}
       >
         {routes.map((route) => (
@@ -95,9 +108,9 @@ function NativeNavigator({
       <NavigationContainer>
         <Drawer.Navigator
           screenOptions={{
-            drawerStyle: { backgroundColor: '#2A2A2A' },
-            drawerActiveTintColor: '#3366FF',
-            drawerInactiveTintColor: '#CCCCCC',
+            drawerStyle: { backgroundColor: NATIVE_COLORS.drawerBg },
+            drawerActiveTintColor: NATIVE_COLORS.activeAccent,
+            drawerInactiveTintColor: NATIVE_COLORS.mutedText,
           }}
         >
           <Drawer.Screen
@@ -130,9 +143,9 @@ function WebNavigator({ routes }: { routes: NavigationRoute[] }) {
     return (
       <nav
         style={{
-          backgroundColor: '#1E1E1E',
+          backgroundColor: `var(--background, ${BG_DARK})`,
           padding: '1rem',
-          borderBottom: '1px solid #333',
+          borderBottom: `1px solid var(--borderColor, #2F3B53)`,
         }}
       >
         <div
@@ -144,7 +157,7 @@ function WebNavigator({ routes }: { routes: NavigationRoute[] }) {
         >
           <h1
             style={{
-              color: '#FFFFFF',
+              color: `var(--color, ${TEXT_PRIMARY})`,
               margin: 0,
               fontSize: '1.5rem',
               fontWeight: 'bold',
@@ -153,29 +166,30 @@ function WebNavigator({ routes }: { routes: NavigationRoute[] }) {
             Fantasy Sports Hub
           </h1>
           <div style={{ display: 'flex', gap: '1rem', marginLeft: '2rem' }}>
-            {routes.map((route) => (
-              <Link
-                key={route.name}
-                to={route.path || `/${route.name.toLowerCase()}`}
-                style={{
-                  color:
-                    location.pathname ===
-                    (route.path || `/${route.name.toLowerCase()}`)
-                      ? '#3366FF'
-                      : '#CCCCCC',
-                  textDecoration: 'none',
-                  padding: '0.5rem 1rem',
-                  borderRadius: '4px',
-                  backgroundColor:
-                    location.pathname ===
-                    (route.path || `/${route.name.toLowerCase()}`)
-                      ? 'rgba(51, 102, 255, 0.1)'
+            {routes.map((route) => {
+              const isActive =
+                location.pathname ===
+                (route.path || `/${route.name.toLowerCase()}`);
+              return (
+                <Link
+                  key={route.name}
+                  to={route.path || `/${route.name.toLowerCase()}`}
+                  style={{
+                    color: isActive
+                      ? `var(--blue9, ${BLUE})`
+                      : 'var(--color10, #6C80BA)',
+                    textDecoration: 'none',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '4px',
+                    backgroundColor: isActive
+                      ? 'var(--blue3, #12316B)'
                       : 'transparent',
-                }}
-              >
-                {route.title}
-              </Link>
-            ))}
+                  }}
+                >
+                  {route.title}
+                </Link>
+              );
+            })}
           </div>
         </div>
       </nav>

@@ -37,13 +37,13 @@ const WebLoadingPanel = () => {
         justifyContent: 'center',
         alignItems: 'center',
         height: '100vh',
-        backgroundColor: 'var(--bg-primary, #1E1E1E)',
+        backgroundColor: 'var(--background, #0A0F1A)',
       }}
     >
       <div
         style={{
-          border: '4px solid #f3f3f3',
-          borderTop: '4px solid var(--color-primary-500, #3366FF)',
+          border: '4px solid var(--borderColor, #2F3B53)',
+          borderTop: '4px solid var(--blue9, #3B82F6)',
           borderRadius: '50%',
           width: '40px',
           height: '40px',
