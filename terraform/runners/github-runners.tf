@@ -48,14 +48,16 @@ module "github_runners" {
   enable_ephemeral_runners    = false # non-ephemeral: instance processes multiple sequential jobs
   enable_jit_config           = false # JIT is ephemeral-only; keep disabled for non-ephemeral mode
 
-  # Reduce webhook event delay from default 30s to 10s. With non-ephemeral runners,
-  # idle runners CAN pick up queued jobs — this delay gives them a chance to do so
-  # before the scale-up Lambda launches a new instance. 10s is low enough to avoid
-  # perceptible queue time while still enabling job reuse on warm runners.
-  delay_webhook_event = 10
-  # TODO: re-enable after adding `actions: read` to the GitHub App permissions.
-  # The app currently lacks this scope, causing 403s on the queued-job check.
-  enable_job_queued_check = false
+  # Delay between receiving a workflow_job webhook and the scale-up Lambda
+  # launching a new instance. 30s (module default) gives idle non-ephemeral
+  # runners time to pick up the queued job before a redundant instance is
+  # launched — especially effective for sequential CI stages where one runner
+  # can claim the next job in the pipeline.
+  delay_webhook_event = 30
+  # Scale-up Lambda checks via the GitHub API whether the job is still queued
+  # before launching. Prevents redundant instance launches when an idle runner
+  # already claimed the job. Requires `actions: read` on the GitHub App.
+  enable_job_queued_check = true
 
   # Spot instances with fleet diversification across types and AZs.
   # capacity-optimized-prioritized picks from the pools with the most
@@ -70,16 +72,10 @@ module "github_runners" {
   scale_down_schedule_expression = "cron(* * * * ? *)"
   runners_maximum_count          = var.github_runners_max_count
 
-  # Keep 1 warm runner during business hours (Mon–Fri 12pm–7:59pm ET) so the first
-  # job of a burst doesn't incur a cold-boot penalty.
-  idle_config = [
-    {
-      cron             = "* 12-19 * * 1-5"
-      timeZone         = "America/New_York"
-      idleCount        = 1
-      evictionStrategy = "oldest_first"
-    }
-  ]
+  # No warm pool — scale to zero any time there are no running jobs. The first
+  # job of a burst incurs a ~30s cold-boot penalty (pre-baked AMI), but
+  # enable_job_queued_check + delay_webhook_event ensure subsequent jobs in the
+  # same burst reuse the runner that just booted instead of launching duplicates.
 
   # Allow 5 concurrent scale-up Lambda invocations (default: 1). The default
   # serializes all scale-up decisions, bottlenecking burst throughput — observed
