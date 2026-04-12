@@ -1,37 +1,38 @@
 {
+  "version": 1,
   "hooks": {
-    "SessionStart": [
+    "sessionStart": [
       {
         "type": "command",
-        "command": ".github/copilot/hooks/setup-worktree-symlink.sh",
-        "windows": ".github/copilot/hooks/setup-worktree-symlink.ps1",
+        "bash": ".github/copilot/hooks/setup-worktree-symlink.sh",
+        "powershell": ".github/copilot/hooks/setup-worktree-symlink.ps1",
         "cwd": ".",
-        "timeout": 15
+        "timeoutSec": 15
       },
       {
         "type": "command",
-        "command": ".github/copilot/hooks/cleanup-orphaned-symlinks.sh",
-        "windows": ".github/copilot/hooks/cleanup-orphaned-symlinks.ps1",
+        "bash": ".github/copilot/hooks/cleanup-orphaned-symlinks.sh",
+        "powershell": ".github/copilot/hooks/cleanup-orphaned-symlinks.ps1",
         "cwd": ".",
-        "timeout": 15
+        "timeoutSec": 15
       }
     ],
-    "Stop": [
+    "sessionEnd": [
       {
         "type": "command",
-        "command": ".github/copilot/hooks/cleanup-worktree-symlink.sh",
-        "windows": ".github/copilot/hooks/cleanup-worktree-symlink.ps1",
+        "bash": ".github/copilot/hooks/cleanup-worktree-symlink.sh",
+        "powershell": ".github/copilot/hooks/cleanup-worktree-symlink.ps1",
         "cwd": ".",
-        "timeout": 15
+        "timeoutSec": 15
       }
     ],
-    "PreToolUse": [
+    "preToolUse": [
       {
         "type": "command",
-        "command": ".github/copilot/hooks/guard-main-repo.sh",
-        "windows": ".github/copilot/hooks/guard-main-repo.ps1",
+        "bash": ".github/copilot/hooks/guard-main-repo.sh",
+        "powershell": ".github/copilot/hooks/guard-main-repo.ps1",
         "cwd": ".",
-        "timeout": 10
+        "timeoutSec": 10
       }
     ]
   }

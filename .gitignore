@@ -342,3 +342,6 @@ scratch/*
 
 # Claude Code built-in worktrees (ephemeral, not ticket-tracked)
 .claude/worktrees/
+
+# Copilot CLI session marker (runtime file written by session-start hook)
+.copilot-session
