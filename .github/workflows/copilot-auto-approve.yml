@@ -53,12 +53,19 @@ jobs:
       !github.event.pull_request.draft
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     steps:
-      - name: Auto-pass bot-review for dependabot PRs
-        if: github.event.pull_request.user.login == 'dependabot[bot]'
+      # Auto-pass bot-review for PRs authored by bots that Copilot will not
+      # review. Copilot silently declines to review PRs authored by GitHub
+      # Apps (dependabot, legacy-sports-code-bot, etc.), so without this
+      # exception the `bot-review` required check hangs forever.
+      - name: Auto-pass bot-review for bot-authored PRs
+        if: >-
+          github.event.pull_request.user.login == 'dependabot[bot]' ||
+          github.event.pull_request.user.login == 'legacy-sports-code-bot[bot]'
         uses: actions/github-script@v8
         with:
           script: |
             const sha = context.payload.pull_request.head.sha;
+            const author = context.payload.pull_request.user.login;
             await github.rest.checks.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -68,13 +75,15 @@ jobs:
               conclusion: 'success',
               output: {
                 title: 'Copilot review skipped',
-                summary: 'Copilot review skipped for dependabot PRs',
+                summary: `Copilot review skipped for ${author} PRs`,
               },
             });
-            core.info(`Auto-passed bot-review for dependabot PR #${context.payload.pull_request.number}`);
+            core.info(`Auto-passed bot-review for ${author} PR #${context.payload.pull_request.number}`);
 
       - name: Generate bot token
-        if: github.event.pull_request.user.login != 'dependabot[bot]'
+        if: >-
+          github.event.pull_request.user.login != 'dependabot[bot]' &&
+          github.event.pull_request.user.login != 'legacy-sports-code-bot[bot]'
         id: bot-token
         uses: actions/create-github-app-token@v3
         with:
@@ -86,7 +95,9 @@ jobs:
       # No explicit requestReviewers call is needed.
 
       - name: Set bot-review status
-        if: github.event.pull_request.user.login != 'dependabot[bot]'
+        if: >-
+          github.event.pull_request.user.login != 'dependabot[bot]' &&
+          github.event.pull_request.user.login != 'legacy-sports-code-bot[bot]'
         uses: actions/github-script@v8
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -264,7 +275,8 @@ jobs:
     if: >-
       github.event_name == 'pull_request_review' &&
       !github.event.pull_request.draft &&
-      github.event.pull_request.user.login != 'dependabot[bot]'
+      github.event.pull_request.user.login != 'dependabot[bot]' &&
+      github.event.pull_request.user.login != 'legacy-sports-code-bot[bot]'
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     steps:
       - name: Generate bot token
@@ -869,7 +881,8 @@ jobs:
       github.event_name == 'pull_request' &&
       github.event.action == 'synchronize' &&
       !github.event.pull_request.draft &&
-      github.event.pull_request.user.login != 'dependabot[bot]'
+      github.event.pull_request.user.login != 'dependabot[bot]' &&
+      github.event.pull_request.user.login != 'legacy-sports-code-bot[bot]'
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     steps:
       - name: Wait for Copilot to potentially re-review

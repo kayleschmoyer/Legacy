@@ -369,11 +369,12 @@ interface TabDef {
   commissionerOnly?: boolean;
 }
 
-// Weekly/in-season tabs come first; archival and settings tabs at the end.
+// Overview is the league's primary entry point and sits furthest left;
+// weekly/in-season tabs follow, with archival and settings tabs at the end.
 const TABS: TabDef[] = [
+  { id: 'overview', label: 'Overview', icon: <LayoutGrid size={16} /> },
   { id: 'matchup', label: 'Matchup', icon: <Swords size={16} /> },
   { id: 'roster', label: 'My Roster', icon: <ClipboardList size={16} /> },
-  { id: 'overview', label: 'Overview', icon: <LayoutGrid size={16} /> },
   { id: 'free-agents', label: 'Free Agents', icon: <UserPlus size={16} /> },
   { id: 'standings', label: 'Standings', icon: <Trophy size={16} /> },
   { id: 'trades', label: 'Trades', icon: <ArrowLeftRight size={16} /> },
