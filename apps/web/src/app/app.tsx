@@ -29,7 +29,6 @@ import {
   Users,
   X,
 } from '@tamagui/lucide-icons';
-import HomePage from '../pages/home/HomePage';
 import { UserProfileDropdown } from '../components/layout/UserProfileDropdown';
 import { SportsDropdown } from '../components/layout/SportsDropdown';
 import { PlayersDropdown } from '../components/layout/PlayersDropdown';
@@ -37,19 +36,7 @@ import { HelpDropdown } from '../components/layout/HelpDropdown';
 import { MyLeaguesDropdown } from '../components/layout/MyLeaguesDropdown';
 import { BugReportButton } from '../components/layout/BugReportButton';
 import { NotificationDropdown } from '../components/layout/NotificationDropdown';
-import { BaseballScreen } from '../components/baseball';
-
-import {
-  PlayerDetailPage,
-  PlayerStatsPage,
-} from '../pages/players/PlayerStatsPage';
-import LeagueCreatePage from '../pages/baseball/LeagueCreatePage';
-import LeagueDetailPage from '../pages/baseball/LeagueDetailPage';
-import { TeamDetailPage } from '../pages/baseball/TeamDetailPage';
-import JoinLeagueByCodePage from '../pages/baseball/JoinLeagueByCodePage';
-import { LeagueDiscoveryPage } from '../pages/baseball/LeagueDiscoveryPage';
 import { GlobalAnnouncer } from '../components/a11y/GlobalAnnouncer';
-import { MatchupDetailPage } from '../pages/matchup/MatchupDetailPage';
 import { usePageTracking } from '../hooks/usePageTracking';
 import { useRouteAnnouncer } from '../hooks/useRouteAnnouncer';
 import { useAnalyticsIdentify } from '../hooks/useAnalyticsIdentify';
@@ -64,9 +51,49 @@ import { NAV_BUTTON_MIN_WIDTH, NAV_Z_INDEX } from '../constants/dimensions';
  * Lazy-loaded routes — these pages are split into separate
  * chunks and only downloaded when the user navigates to them.
  * ──────────────────────────────────────────────────────── */
+const HomePage = React.lazy(() => import('../pages/home/HomePage'));
+const BaseballScreen = React.lazy(() =>
+  import('../components/baseball').then((m) => ({
+    default: m.BaseballScreen,
+  })),
+);
+const PlayerStatsPage = React.lazy(() =>
+  import('../pages/players/PlayerStatsPage').then((m) => ({
+    default: m.PlayerStatsPage,
+  })),
+);
+const PlayerDetailPage = React.lazy(() =>
+  import('../pages/players/PlayerStatsPage').then((m) => ({
+    default: m.PlayerDetailPage,
+  })),
+);
 const PlayerComparisonPage = React.lazy(() =>
   import('../pages/players/PlayerComparisonPage').then((m) => ({
     default: m.PlayerComparisonPage,
+  })),
+);
+const LeagueCreatePage = React.lazy(
+  () => import('../pages/baseball/LeagueCreatePage'),
+);
+const LeagueDetailPage = React.lazy(
+  () => import('../pages/baseball/LeagueDetailPage'),
+);
+const TeamDetailPage = React.lazy(() =>
+  import('../pages/baseball/TeamDetailPage').then((m) => ({
+    default: m.TeamDetailPage,
+  })),
+);
+const JoinLeagueByCodePage = React.lazy(
+  () => import('../pages/baseball/JoinLeagueByCodePage'),
+);
+const LeagueDiscoveryPage = React.lazy(() =>
+  import('../pages/baseball/LeagueDiscoveryPage').then((m) => ({
+    default: m.LeagueDiscoveryPage,
+  })),
+);
+const MatchupDetailPage = React.lazy(() =>
+  import('../pages/matchup/MatchupDetailPage').then((m) => ({
+    default: m.MatchupDetailPage,
   })),
 );
 const ManagementPage = React.lazy(
@@ -592,7 +619,19 @@ function App() {
         role="main"
         tabIndex={-1}
       >
-        <Suspense fallback={null}>
+        <Suspense
+          fallback={
+            <YStack
+              alignItems="center"
+              justifyContent="center"
+              paddingVertical="$6"
+              role="status"
+              aria-busy="true"
+            >
+              <Paragraph color="$colorPress">Loading...</Paragraph>
+            </YStack>
+          }
+        >
           <Routes>
             {/* All routes are now authenticated by default */}
             <Route path="/" element={<NavigableHomeScreen />} />

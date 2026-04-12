@@ -165,17 +165,39 @@ export default defineConfig(({ mode }) => {
       // the JS bundles so browsers never request the deleted map files
       // (preventing the "Failed to load resource: 404" console errors).
       sourcemap: isDeployBuild ? 'hidden' : false,
+      // Vite's chunk size warning is generated independently from Rollup's
+      // onwarn — it can only be controlled via this limit. The tamagui-vendor
+      // chunk (~1.6 MB: Tamagui + react-native-web + lucide-react) has
+      // circular internal deps preventing further splitting. All other
+      // chunks are under 500 kB.
+      chunkSizeWarningLimit: 1700,
       commonjsOptions: {
         transformMixedEsModules: true,
       },
       rollupOptions: {
         output: {
-          // Better chunk splitting for deploy builds
-          manualChunks: isDeployBuild
-            ? {
-                'react-vendor': ['react', 'react-dom'],
-                'apollo-vendor': ['@apollo/client'],
-                'tamagui-vendor': ['tamagui', '@tamagui/core'],
+          manualChunks: isProduction
+            ? (id: string) => {
+                if (!id.includes('node_modules')) return undefined;
+                // React core + Apollo + GraphQL + router (co-located to
+                // avoid circular chunk deps between React and Apollo)
+                if (
+                  /[\\/](react-dom|react[\\/]|scheduler|react-router|@apollo[\\/]client|graphql|zen-observable|optimism|ts-invariant)/.test(
+                    id,
+                  )
+                )
+                  return 'react-vendor';
+                // Tamagui UI framework + react-native-web shims.
+                // lucide-react is included because @tamagui/lucide-icons
+                // wraps it — without this, those modules land in the main
+                // index chunk instead of the vendor bundle.
+                if (
+                  /[\\/](tamagui|@tamagui|react-native-web|lucide-react)/.test(
+                    id,
+                  )
+                )
+                  return 'tamagui-vendor';
+                return undefined;
               }
             : undefined,
         },
