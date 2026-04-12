@@ -520,6 +520,7 @@ These checks are not configured as _required_ branch protection rules, but they 
 
 - [pr-lifecycle](../pr-lifecycle/SKILL.md) -- PR creation, self-review, Copilot fix workflow
 - [rebase](../rebase/SKILL.md) -- Rebase branches and resolve conflicts
-- [debug-ci-failure](../debug-ci-failure/SKILL.md) -- Investigate and fix CI failures
+- [debugging](../debugging/SKILL.md) -- Investigate and fix CI failures and code defects
 - [worktree-workflow](../worktree-workflow/SKILL.md) -- Worktree creation and management
 - [repo-tooling](../repo-tooling/SKILL.md) -- Make targets, Nx commands, migration scripts
+- [error-recovery](references/error-recovery.md) -- Decision trees for the top 10 failure scenarios

@@ -6,23 +6,51 @@ This file provides guidance to AI coding agents working with code in this reposi
 
 ## Critical Rules
 
+Rules are grouped by category and tiered by severity. **Tier 1** violations are catastrophic or irreversible. **Tier 2** violations are costly (wasted CI time, stuck PRs, rework cycles). **Tier 3** violations are quality issues caught in review.
+
+### Safety (Tier 1)
+
 - **NEVER commit to the `main` branch** — all commits must be on a feature branch; working in `D:\code\legacy-sports` with HEAD on `main` is forbidden.
-- **Drive to merge** — work is NOT complete until the PR is **merged**, Jira moves to "Done", the MCP gap audit runs, and any tracking tasks are marked completed. Stopping after `make pc`, after `github_create_pr`, or while CI/reviews are still pending are all common agent failure modes.
+- **Never embed secrets in tool calls** — never put raw secret values in `Edit`, `Write`, or `Bash` arguments. See `.agents/skills/secrets-handling/SKILL.md`.
 - **One ticket = one worktree = one PR** — never add unrelated changes to an existing branch or worktree. Create a **separate Jira ticket and worktree** for unrelated work.
+
+### Workflow Discipline (Tier 2)
+
+- **Drive to merge** — work is NOT complete until the PR is **merged**, Jira moves to "Done", the MCP gap audit runs, and any tracking tasks are marked completed. Stopping after `make pc`, after `github_create_pr`, or while CI/reviews are still pending are all common agent failure modes. See [Task Completion Signal](#task-completion-signal) for the mechanically checkable definition.
 - **Worktree-first**: every ticket runs in its own worktree. Native ephemeral (launcher checkbox) is default — **do not rename the local branch** (Claude Code caches it at session start; renaming breaks PR detection). Push as-is; Jira links via PR title + commit messages containing `LS-####`. Sibling worktrees (`make_worktree_create`) for parallel work only. Re-attach existing branches with `worktree_attach`. See `.agents/skills/worktree-workflow/SKILL.md`.
 - **Claude Code's `isolation: "worktree"` Agent parameter** (Agent tool only): creates ephemeral worktrees for subagents. MCP tools work inside them — `worktree_set(key: "<absolute .claude/worktrees/... path>")` accepts absolute paths. Always prefer MCP tools over raw `git -C` even in ephemeral worktrees.
-- **Shared node_modules** — never `make clean`/`make install`/`pnpm install` in the main repo while worktrees exist. Always use `make install` (never raw `pnpm install`). **To install new packages in a worktree**: (1) remove the symlink: `cmd /c "rmdir node_modules"`, (2) add the package: `pnpm add -w <pkg>`, (3) run `make install`. This gives the worktree its own independent `node_modules`. See `.agents/skills/repo-tooling/references/install-packages.md` and `.agents/skills/worktree-workflow/SKILL.md`.
-- **MCP-first, then Make**: always prefer MCP tools over shell commands — `make_run` over `make`, `nx_run`/`nx_run_affected` over `pnpm exec nx`. Shell equivalents are fallbacks only. See `.agents/skills/mcp-first/SKILL.md` for the full tool mapping and substitution table.
-- **Tool-first for file operations**: use `Glob` (not `find`/`ls`), `Grep` (not `grep`/`rg`), and `Read` (not `cat`/`head`/`tail`). See `.agents/skills/mcp-first/SKILL.md` for the complete substitution table.
-- **No `console.*`** — use `LOGGER` from `@legacy-sports/logging`. Exceptions: `lib/logging/`, `apps/cli/`, migration files, and build-time scripts.
-- **No suppression** — fix root causes; never use `@ts-ignore` or `eslint-disable` (see `.agents/skills/standards/SKILL.md`)
-- **Never embed secrets in tool calls** — never put raw secret values in `Edit`, `Write`, or `Bash` arguments. See `.agents/skills/secrets-handling/SKILL.md`.
-- **E2E tests are hermetic** — never use `route.continue()` in E2E tests. Use `route.fulfill()` for unmatched operations. See `.agents/skills/testing/SKILL.md`.
-- **Prefer `.graphql` + codegen over inline `gql`** — for new code in `apps/web` and `lib/shared-components`, define queries in `.graphql` files and import generated hooks from `graphql.generated.ts`.
+- **Shared node_modules** — if any worktree still symlinks to the main repo's `node_modules`, **never run `make clean`, `make install`, or `pnpm install` in the main repo**. **Never use raw `pnpm install` anywhere**. Use **`make install` only in a safe context**: either in a worktree after removing its `node_modules` symlink, or in the main repo after no worktrees are linked to that shared `node_modules`. **To install new packages in a worktree**: (1) remove the symlink: `cmd /c "rmdir node_modules"`, (2) add the package: `pnpm add -w <pkg>`, (3) run `make install` from that worktree. This gives the worktree its own independent `node_modules`. See `.agents/skills/repo-tooling/references/install-packages.md` and `.agents/skills/worktree-workflow/SKILL.md`.
 - **Never manually remove worktrees**: always `twig worktree clean` — never `git worktree remove` or manual deletion (destroys symlinks).
 - **Kill background servers when done** — stop all `isBackground=true` processes before workflow ends. Run `make kill-stale` to find stale node processes. Call `browser_cleanup` to close Playwright browsers.
-- **Jira — auth-aware routing**: call `jira_auth_status` first. If `configured: true`, use custom MCP tools (`jira_view`, `jira_create_ticket`, `jira_transition`, `jira_check_blockers`). If `configured: false` or API calls fail, **stop and tell the user**. On Claude Code on the web, use the Atlassian plugin (`mcp__claude_ai_Atlassian__*`, cloud ID `fb294606-6c8f-4b52-9a41-11fe45b77528`). See `.agents/skills/cloud-agent-mode/SKILL.md` for known quirks.
 - **Resolve PR review threads**: after fixing review comments, resolve threads via `github_resolve_threads({ threadIds: [...] })`. See `.agents/skills/pr-lifecycle/SKILL.md`.
+
+### Tool Usage (Tier 2)
+
+- **MCP-first, then Make**: always prefer MCP tools over shell commands — `make_run` over `make`, `nx_run`/`nx_run_affected` over `pnpm exec nx`. Shell equivalents are fallbacks only. See `.agents/skills/mcp-first/SKILL.md` for the full tool mapping and substitution table.
+- **Tool-first for file operations**: use `Glob` (not `find`/`ls`), `Grep` (not `grep`/`rg`), and `Read` (not `cat`/`head`/`tail`). See `.agents/skills/mcp-first/SKILL.md` for the complete substitution table.
+- **Jira — auth-aware routing**: call `jira_auth_status` first. If `configured: true`, use custom MCP tools (`jira_view`, `jira_create_ticket`, `jira_transition`, `jira_check_blockers`). If `configured: false` or API calls fail, **stop and tell the user**. On Claude Code on the web, use the Atlassian plugin (`mcp__claude_ai_Atlassian__*`, cloud ID `fb294606-6c8f-4b52-9a41-11fe45b77528`). See `.agents/skills/cloud-agent-mode/SKILL.md` for known quirks.
+
+### Code Quality (Tier 3)
+
+- **No `console.*`** — use `LOGGER` from `@legacy-sports/logging`. Exceptions: `lib/logging/`, `apps/cli/`, migration files, and build-time scripts.
+- **No suppression** — fix root causes; never use `@ts-ignore` or `eslint-disable` (see `.agents/skills/standards/SKILL.md`)
+- **E2E tests are hermetic** — never use `route.continue()` in E2E tests. Use `route.fulfill()` for unmatched operations. See `.agents/skills/testing/SKILL.md`.
+- **Prefer `.graphql` + codegen over inline `gql`** — for new code in `apps/web` and `lib/shared-components`, define queries in `.graphql` files and import generated hooks from `graphql.generated.ts`.
+
+## Task Completion Signal
+
+A task is complete when **all** of the following are true:
+
+1. `github_view_pr` returns `state: "MERGED"` (or `mergedAt` is populated)
+2. Jira ticket is "Done" (usually auto-transitioned by Jira Branch Sync on merge)
+3. MCP gap audit has run (see `.agents/skills/mcp-gaps/SKILL.md`)
+4. All tracking tasks are marked completed (`TaskUpdate(taskId: <id>, status: "completed")`)
+
+If any condition is false, the task is **not done** — keep working. When in doubt, check condition 1 first.
+
+## Role Taxonomy
+
+Each skill's `SKILL.md` frontmatter includes a `role` field (executor, analyst, or orchestrator) that defines its behavioral profile — error handling, output style, and creativity level. See `.agents/ROLES.md` for the full taxonomy and behavioral defaults per role.
 
 ## Branch Naming & Jira Linking
 
@@ -30,9 +58,11 @@ Jira's GitHub integration links PRs to tickets via **PR title**, **commit messag
 
 ## Workflow
 
-Follow the **Agent Workflow Checklist (Steps 0-16)** in `.agents/skills/workflow-overview/SKILL.md`. Summary:
+Follow the **Agent Workflow Checklist (Steps 0-16)** in `.agents/skills/workflow-overview/SKILL.md` — it is the single source of truth for procedure. Summary:
 
 0. Epic check → 1. Create/identify ticket → 2. Dependency check → 3. Jira "In Progress" → 4. Worktree setup → 5. node_modules symlink → 6. Work in worktree → 7. Code & test → 8. Commit → 9. Rebase → 10. Migrations → 11. `make pc` + self-review → 12. Ship (draft PR → label → mark ready → Copilot review → Jira "In Review") → 13. Watch PR to merge → 14. MCP gap audit → 15. Complete tracking tasks → 16. Cleanup
+
+For PR creation, review fixing, and thread resolution details, see `.agents/skills/pr-lifecycle/SKILL.md`. For error recovery during any step, see `.agents/skills/workflow-overview/references/error-recovery.md`.
 
 ## Risk Classification
 
@@ -80,10 +110,24 @@ See `.agents/skills/mcp-first/SKILL.md` for the full server list, per-server too
 
 When running as a cloud coding agent (Claude Code on the web, Copilot Coding Agent): no worktrees/twig/acli, work directly in repo root; Linux/bash; Docker PostgreSQL; no AWS access. See `.agents/skills/cloud-agent-mode/SKILL.md` for the complete cloud workflow, GitHub + Jira auth setup, token configuration tables, Jira tool mapping, review lifecycle, known quirks, and available MCP servers.
 
+## Shell Resolution
+
+Different contexts use different shells. Use the correct syntax for each:
+
+| Context                                    | Shell                        | Syntax         | Notes                                                                              |
+| ------------------------------------------ | ---------------------------- | -------------- | ---------------------------------------------------------------------------------- |
+| **Bash tool** (Claude Code, local Windows) | Git Bash                     | Unix           | Default shell for local Bash tool calls                                            |
+| **`worktree_run`** (local Windows)         | Git Bash (fallback: cmd.exe) | Unix preferred | Avoid PowerShell-specific syntax; `ls` unavailable in cmd.exe fallback — use `dir` |
+| **Cloud agent shell**                      | bash                         | Unix           | Cloud coding agents run on Linux; do not assume Git Bash                           |
+| **User's terminal**                        | PowerShell                   | PowerShell     | `;` to chain, `$env:` for vars                                                     |
+| **CI** (GitHub Actions)                    | bash                         | Unix           | Standard POSIX                                                                     |
+
+When writing commands for the local Bash tool, always use Unix syntax (forward slashes, `&&`, `/dev/null`). Cloud agents also use Unix `bash` syntax on Linux. When giving the user commands to run in their terminal, use PowerShell syntax.
+
 ## Environment Notes
 
 - **Local**: Windows - PowerShell (`;` to chain commands, `$env:` for vars) - twig for branch management
 - **Cloud**: Ubuntu Linux - bash - no worktrees/twig - Docker PostgreSQL (no AWS access)
 - Package manager: pnpm 9.12.1 (enforced via corepack — never use npm or yarn)
-- Commit format: `type(scope): message` (e.g. `feat(auth): add oauth`)
+- Commit format: `type(scope): message` (e.g. `feat(auth): add oauth`). Always include the ticket key somewhere in the commit message for Jira linking (e.g. `feat(auth): add oauth (LS-1234)` or `LS-1234 feat(auth): add oauth` when a tool requires a prefixed key).
 - **`jq` is NOT available on Windows** — use Python with explicit UTF-8 encoding for JSON parsing. Write scripts to `scratch/<name>.py` to avoid quoting issues.

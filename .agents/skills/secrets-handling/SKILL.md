@@ -11,11 +11,11 @@ description: 'How agents should handle secrets without exposing values in conver
 
 This means:
 
-- ❌ `Edit(file: "secrets.auto.tfvars", new_string: 'my_api_key = "sk-abc123..."')`
-- ❌ `Bash(command: 'echo "sk-abc123..." >> secrets.auto.tfvars')`
-- ❌ Asking the user to paste a secret value into chat (it ends up in conversation history)
-- ✅ Reading from a file the user placed on disk and copying it to the target
-- ✅ Asking the user to write the value to a file path, then referencing that path
+- **DO NOT**: `Edit(file: "secrets.auto.tfvars", new_string: 'my_api_key = "sk-abc123..."')`
+- **DO NOT**: `Bash(command: 'echo "sk-abc123..." >> secrets.auto.tfvars')`
+- **DO NOT**: Ask the user to paste a secret value into chat (it ends up in conversation history)
+- **SAFE**: Reading from a file the user placed on disk and copying it to the target
+- **SAFE**: Asking the user to write the value to a file path, then referencing that path
 
 ---
 

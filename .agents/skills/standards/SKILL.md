@@ -92,8 +92,6 @@ Run `make pc` before pushing. Skipping saves 5 min but each CI failure costs 40-
 ## Related Skills
 
 - [planning](../planning/SKILL.md) -- risk classification informed by these standards
-- [review](../review/SKILL.md) -- self-review checklist (references this skill)
-- [fix-copilot-reviews](../fix-copilot-reviews/SKILL.md) -- batch-fix Copilot review comments
-- [codegen](../codegen/SKILL.md) -- codegen workflow details
-- [create-lib](../create-lib/SKILL.md) -- step-by-step library creation
-- [create-lambda](../create-lambda/SKILL.md) -- step-by-step lambda creation
+- [pr-lifecycle](../pr-lifecycle/SKILL.md) -- self-review checklist and Copilot review fix workflow
+- [create](../create/SKILL.md) -- scaffold new projects (apps, libs, lambdas, MCP servers)
+- [repo-tooling](../repo-tooling/SKILL.md) -- codegen workflow, Make targets, Nx commands
