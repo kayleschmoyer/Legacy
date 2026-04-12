@@ -1,4 +1,17 @@
-// Comprehensive Tamagui type augmentations to fix missing properties
+/**
+ * Tamagui module augmentations
+ *
+ * Extends type definitions for Tamagui packages to include properties used
+ * across the codebase but missing from upstream types:
+ *
+ * - @tamagui/core    — StackStyleBase (layout, sizing, position, shorthands),
+ *                      TextStylePropsBase (text alignment, font shorthands),
+ *                      TamaguiCustomConfig (mono font, alt2 theme)
+ * - @tamagui/stacks  — StackProps / YStackProps / XStackProps
+ * - @tamagui/text    — TextProps
+ * - @tamagui/select  — SelectScrollButtonProps
+ * - @tamagui/separator — SeparatorProps
+ */
 
 // Extend Tamagui's core style base interfaces to include missing properties
 declare module '@tamagui/core' {
@@ -118,42 +131,6 @@ declare module '@tamagui/separator' {
   interface SeparatorProps {
     marginBottom?: string | number;
     mb?: string | number;
-  }
-}
-
-export {};
-
-// Extend specific Tamagui component props
-declare module '@tamagui/stacks' {
-  interface StackProps {
-    justifyContent?: string;
-    alignItems?: string;
-    padding?: string | number;
-    minWidth?: string | number;
-    maxWidth?: string | number;
-    backgroundColor?: string;
-    marginBottom?: string | number;
-    right?: string | number;
-    jc?: string;
-    ai?: string;
-  }
-}
-
-declare module '@tamagui/text' {
-  interface TextProps {
-    textAlign?: string;
-    fontFamily?: string;
-  }
-}
-
-// Add support for select component props
-declare module '@tamagui/select' {
-  interface SelectScrollButtonProps {
-    alignItems?: string;
-    justifyContent?: string;
-    position?: string;
-    width?: number;
-    height?: string;
   }
 }
 
