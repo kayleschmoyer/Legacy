@@ -1,10 +1,18 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Button, Card, Input, ScrollView, Text, XStack, YStack } from 'tamagui';
-import { DraftState, DraftTeam, Filter, Player } from '../../types';
+import {
+  DraftState,
+  DraftTeam,
+  Filter,
+  Player,
+  SportPosition,
+} from '../../types';
 import { SPORT_CONFIGS } from '../../config/sports';
 
 // Utility function for position colors
-const getPositionColor = (position: string, sport: string): string => {
+const DEFAULT_POSITION_COLOR = '#6B7280';
+
+const getPositionColor = (position: SportPosition, sport: string): string => {
   const colors = [
     '#3B82F6',
     '#10B981',
@@ -14,8 +22,8 @@ const getPositionColor = (position: string, sport: string): string => {
     '#F97316',
   ];
   const sportConfig = SPORT_CONFIGS[sport];
-  const index = sportConfig?.positions.indexOf(position) ?? 0;
-  return colors[index % colors.length];
+  const index = sportConfig?.positions.indexOf(position) ?? -1;
+  return index >= 0 ? colors[index % colors.length] : DEFAULT_POSITION_COLOR;
 };
 
 /**
@@ -338,8 +346,7 @@ function DraftBoard({
 
   // Filter players
   const filteredPlayers = availablePlayers.filter((player) => {
-    const playerName =
-      player.player || `${player.firstName} ${player.lastName}`;
+    const playerName = `${player.firstName} ${player.lastName}`;
     const matchesSearch =
       searchText === '' ||
       playerName.toLowerCase().includes(searchText.toLowerCase());

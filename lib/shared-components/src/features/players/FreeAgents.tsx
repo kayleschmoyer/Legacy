@@ -10,7 +10,7 @@ import {
   YStack,
 } from 'tamagui';
 import { Animated, Dimensions, FlatList } from '../../platform-components';
-import { Filter, Player } from '../../types';
+import { Filter, Player, SportPosition, TrendingInfo } from '../../types';
 import { SPORT_CONFIGS } from '../../config/sports';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -19,7 +19,7 @@ const IS_TABLET = SCREEN_WIDTH > 768;
 // Extended Player interface for free agents
 export interface FreeAgentPlayer extends Player {
   ownership: number;
-  trending: 'up' | 'down' | 'stable';
+  trending: TrendingInfo;
   injury: 'healthy' | 'questionable' | 'doubtful' | 'out';
   projections: Record<string, number>;
   isWatched: boolean;
@@ -34,7 +34,9 @@ export interface WaiverClaim {
 }
 
 // Utility functions
-const getPositionColor = (position: string, sport: string): string => {
+const DEFAULT_POSITION_COLOR = '#6B7280';
+
+const getPositionColor = (position: SportPosition, sport: string): string => {
   const colors = [
     '#3B82F6',
     '#10B981',
@@ -44,12 +46,12 @@ const getPositionColor = (position: string, sport: string): string => {
     '#F97316',
   ];
   const sportConfig = SPORT_CONFIGS[sport];
-  const index = sportConfig?.positions.indexOf(position) ?? 0;
-  return colors[index % colors.length];
+  const index = sportConfig?.positions.indexOf(position) ?? -1;
+  return index >= 0 ? colors[index % colors.length] : DEFAULT_POSITION_COLOR;
 };
 
 const getTrendingIcon = (trending: FreeAgentPlayer['trending']): string => {
-  switch (trending) {
+  switch (trending.direction) {
     case 'up':
       return '📈';
     case 'down':
@@ -187,9 +189,9 @@ const FreeAgentCard: React.FC<FreeAgentCardProps> = ({
             <Text
               fontSize="$3"
               color={
-                player.trending === 'up'
+                player.trending.direction === 'up'
                   ? '$green10'
-                  : player.trending === 'down'
+                  : player.trending.direction === 'down'
                     ? '$red10'
                     : '$gray10'
               }
@@ -573,7 +575,7 @@ function FreeAgents({
         filters.position === 'ALL' || player.position === filters.position;
       const matchesTrending =
         filters.trending === 'ALL' ||
-        player.trending === filters.trending?.toLowerCase();
+        player.trending.direction === filters.trending?.toLowerCase();
 
       return matchesSearch && matchesPosition && matchesTrending;
     });

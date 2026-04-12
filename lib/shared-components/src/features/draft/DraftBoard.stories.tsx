@@ -8,14 +8,12 @@ const makePlayer = (
     id: string;
     firstName: string;
     lastName: string;
-    position: string;
+    position: Player['position'];
     team: string;
     adp: number;
     rank: number;
   },
 ): Player => ({
-  player: `${overrides.firstName} ${overrides.lastName}`,
-  pos: overrides.position,
   hr: 0,
   avg: 0,
   rbi: 0,

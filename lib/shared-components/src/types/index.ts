@@ -1,16 +1,70 @@
 // Common types for the fantasy sports application
 
+/**
+ * Position codes across all supported sports.
+ *
+ * Baseball: C, 1B, 2B, 3B, SS, LF, CF, RF, OF, IF, DH, P, SP, RP
+ * Football: QB, RB, WR, TE, K, DEF
+ * Basketball: PG, SG, SF, PF, C
+ * Hockey: C, LW, RW, D, G
+ *
+ * Note: 'C' is shared by baseball (Catcher), basketball (Center), and hockey (Center).
+ */
+export type SportPosition =
+  // Baseball
+  | 'SP'
+  | 'RP'
+  | 'C'
+  | '1B'
+  | '2B'
+  | '3B'
+  | 'SS'
+  | 'RF'
+  | 'LF'
+  | 'CF'
+  | 'DH'
+  | 'P'
+  | 'IF'
+  | 'OF'
+  // Football
+  | 'QB'
+  | 'RB'
+  | 'WR'
+  | 'TE'
+  | 'K'
+  | 'DEF'
+  // Basketball
+  | 'PG'
+  | 'SG'
+  | 'SF'
+  | 'PF'
+  // Hockey
+  | 'LW'
+  | 'RW'
+  | 'D'
+  | 'G';
+
+/** Trending direction for a player's value movement. */
+export type TrendingDirection = 'up' | 'down' | 'stable';
+
+/** Structured trending info with optional magnitude. */
+export interface TrendingInfo {
+  direction: TrendingDirection;
+  changePercent?: number;
+}
+
+/** Typed stats bucket — narrows the previous `Record<string, unknown>`. */
+export type PlayerStats = Record<string, number | string>;
+
 export interface Player {
   id: string;
   firstName: string;
   lastName: string;
-  position: string;
+  position: SportPosition;
   team: string;
   adp: number;
   rank: number;
-  stats?: Record<string, unknown>;
-  player: string;
-  pos: string;
+  stats?: PlayerStats;
   hr: number;
   avg: number;
   rbi: number;
@@ -23,7 +77,7 @@ export interface Player {
   strikeouts: number;
   walks: number;
   obp: number;
-  trending?: 'up' | 'down' | 'stable';
+  trending?: TrendingInfo;
 }
 
 export interface Filter {
@@ -70,7 +124,7 @@ export interface SportConfig {
     primary: string;
     secondary: string;
   };
-  positions: string[];
+  positions: SportPosition[];
   statLabels: string[];
   sortOptions?: string[];
   stats?: string[];
