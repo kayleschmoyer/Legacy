@@ -18,6 +18,8 @@ import {
   HELP_HISTORICAL_FAQ_ITEMS,
   type HelpFaqItem,
 } from '@legacy-sports/utils/help-content';
+import { BugReportButton } from '../../components/layout/BugReportButton';
+import { env } from '../../config/environment';
 import { OnboardingTutorial } from '../../components/onboarding';
 import { PageMeta } from '../../components/PageMeta';
 import {
@@ -184,6 +186,7 @@ interface ContactOptionProps {
   title: string;
   description: string;
   href?: string;
+  onPress?: () => void;
 }
 
 function ContactOption({
@@ -192,16 +195,18 @@ function ContactOption({
   title,
   description,
   href,
+  onPress,
 }: ContactOptionProps) {
+  const handlePress = onPress
+    ? onPress
+    : href
+      ? () => window.open(href, '_blank', 'noopener,noreferrer')
+      : undefined;
   return (
     <ContactCard
       borderColor="$glassBorder"
-      onPress={
-        href
-          ? () => window.open(href, '_blank', 'noopener,noreferrer')
-          : undefined
-      }
-      cursor={href ? ('pointer' as never) : undefined}
+      onPress={handlePress}
+      cursor={handlePress ? ('pointer' as never) : undefined}
     >
       <XStack alignItems="center" gap="$3">
         <YStack
@@ -262,12 +267,17 @@ const QuickLinkChip = styled(XStack, {
 
 export default function HelpPage() {
   const [tutorialOpen, setTutorialOpen] = useState(false);
+  const [bugReportOpen, setBugReportOpen] = useState(false);
 
   return (
     <>
       {tutorialOpen && (
         <OnboardingTutorial onClose={() => setTutorialOpen(false)} />
       )}
+      <BugReportButton
+        controlledOpen={bugReportOpen}
+        onDialogOpenChange={setBugReportOpen}
+      />
       <PageContainer>
         <PageMeta
           title="Help & Support"
@@ -547,16 +557,23 @@ export default function HelpPage() {
               </SectionHeader>
               <SectionBody>
                 <YStack gap="$3">
-                  {HELP_CONTACT_ITEMS.map((item) => (
-                    <ContactOption
-                      key={item.title}
-                      icon={item.icon}
-                      iconLabel={item.title.toLowerCase()}
-                      title={item.title}
-                      description={item.description}
-                      href={item.url}
-                    />
-                  ))}
+                  {HELP_CONTACT_ITEMS.map((item) => {
+                    const useAction =
+                      item.action === 'bug-report' && env.jiraProxyUrl;
+                    return (
+                      <ContactOption
+                        key={item.title}
+                        icon={item.icon}
+                        iconLabel={item.title.toLowerCase()}
+                        title={item.title}
+                        description={item.description}
+                        href={useAction ? undefined : item.url}
+                        onPress={
+                          useAction ? () => setBugReportOpen(true) : undefined
+                        }
+                      />
+                    );
+                  })}
                 </YStack>
 
                 <Separator marginVertical="$2" />

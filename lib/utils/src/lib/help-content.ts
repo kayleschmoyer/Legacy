@@ -21,6 +21,8 @@ export interface HelpContactItem {
   title: string;
   description: string;
   url?: string;
+  /** When set, the item triggers an in-app action (with `url` as fallback). */
+  action?: 'bug-report';
 }
 
 /* ─── General FAQ ─── */
@@ -138,8 +140,9 @@ export const HELP_CONTACT_ITEMS: HelpContactItem[] = [
     icon: '🐛',
     title: 'Report a Bug',
     description:
-      "Found something broken? Open a GitHub issue and we'll prioritize a fix.",
+      "Found something broken? Let us know and we'll prioritize a fix.",
     url: 'https://github.com/bkrupa/legacy-sports/issues/new?labels=bug&template=bug_report.md',
+    action: 'bug-report',
   },
   {
     icon: '💡',

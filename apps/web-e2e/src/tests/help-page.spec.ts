@@ -290,15 +290,19 @@ test.describe('Help Page — contact and support @regression', () => {
     await expect(page.getByText(/urgent account issues/i)).toBeVisible();
   });
 
-  test('Report a Bug option opens GitHub issues in a new tab', async ({
-    page,
-  }) => {
-    const [popup] = await Promise.all([
-      page.waitForEvent('popup'),
-      page.getByText('Report a Bug').click(),
-    ]);
-    await expect(popup).toHaveURL(/github\.com.*issues.*labels=bug/i);
-    await popup.close();
+  test('Report a Bug option opens the bug report dialog', async ({ page }) => {
+    // The BugReportButton requires jiraProxyUrl — inject it and reload
+    await page.addInitScript(() => {
+      window.__e2eJiraProxyUrl = 'http://localhost:4280/__jira-proxy';
+    });
+    await page.goto('/help');
+    await page.waitForLoadState('load');
+
+    await page.getByText('Report a Bug').click();
+    await expect(
+      page.getByRole('dialog').getByText('Report a Bug'),
+    ).toBeVisible();
+    await expect(page.getByText(/describe what happened/i)).toBeVisible();
   });
 
   test('Suggest a Feature option opens GitHub issues in a new tab', async ({

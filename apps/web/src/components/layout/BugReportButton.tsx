@@ -69,12 +69,23 @@ const SEARCH_MIN_LENGTH = 10;
 /** Maximum query length sent to the backend search endpoint. */
 const SEARCH_MAX_LENGTH = 200;
 
-interface BugReportButtonProps {
-  /** Called whenever the dialog opens or closes. Lets the parent (e.g. the
-   *  mobile nav) suppress its own outside-click handler while the dialog is
-   *  mounted so the dialog portal does not register as an "outside" click. */
+/** Uncontrolled mode — renders its own trigger button. */
+interface BugReportButtonUncontrolledProps {
+  controlledOpen?: undefined;
   onDialogOpenChange?: (open: boolean) => void;
 }
+
+/** Controlled mode — dialog open state is managed externally, no trigger
+ *  button rendered. `onDialogOpenChange` is required so internal close
+ *  actions (overlay click, close button) propagate back to the parent. */
+interface BugReportButtonControlledProps {
+  controlledOpen: boolean;
+  onDialogOpenChange: (open: boolean) => void;
+}
+
+type BugReportButtonProps =
+  | BugReportButtonUncontrolledProps
+  | BugReportButtonControlledProps;
 
 /**
  * A minimal "Report a Bug" button that opens a small dialog.
@@ -82,9 +93,12 @@ interface BugReportButtonProps {
  */
 export const BugReportButton: React.FC<BugReportButtonProps> = ({
   onDialogOpenChange,
+  controlledOpen,
 }) => {
   const auth = useAuth();
-  const [open, setOpen] = useState(false);
+  const isControlled = controlledOpen !== undefined;
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = isControlled ? controlledOpen : internalOpen;
   const [description, setDescription] = useState('');
   const [submitState, setSubmitState] = useState<SubmitState>({
     status: 'idle',
@@ -111,11 +125,11 @@ export const BugReportButton: React.FC<BugReportButtonProps> = ({
 
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
-      setOpen(nextOpen);
+      if (!isControlled) setInternalOpen(nextOpen);
       onDialogOpenChange?.(nextOpen);
       if (!nextOpen) resetForm();
     },
-    [resetForm, onDialogOpenChange],
+    [resetForm, onDialogOpenChange, isControlled],
   );
 
   const handleSearchSimilar = useCallback(() => {
@@ -300,21 +314,23 @@ export const BugReportButton: React.FC<BugReportButtonProps> = ({
 
   return (
     <Dialog modal open={open} onOpenChange={handleOpenChange}>
-      <Dialog.Trigger asChild>
-        <Button
-          size="$3"
-          borderRadius="$10"
-          backgroundColor="transparent"
-          borderWidth={0}
-          paddingHorizontal="$2"
-          hoverStyle={{ backgroundColor: '$color3' }}
-          pressStyle={{ backgroundColor: '$color4', scale: 0.97 }}
-          aria-label="Report a bug"
-          title="Report a bug"
-        >
-          <Bug size={18} />
-        </Button>
-      </Dialog.Trigger>
+      {!isControlled && (
+        <Dialog.Trigger asChild>
+          <Button
+            size="$3"
+            borderRadius="$10"
+            backgroundColor="transparent"
+            borderWidth={0}
+            paddingHorizontal="$2"
+            hoverStyle={{ backgroundColor: '$color3' }}
+            pressStyle={{ backgroundColor: '$color4', scale: 0.97 }}
+            aria-label="Report a bug"
+            title="Report a bug"
+          >
+            <Bug size={18} />
+          </Button>
+        </Dialog.Trigger>
+      )}
 
       <Dialog.Portal>
         <Dialog.Overlay
