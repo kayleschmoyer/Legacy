@@ -7,6 +7,7 @@ import {
   Clock,
   X,
 } from '@tamagui/lucide-icons';
+import { to12Hour, to24Hour } from './dateTimePickerUtils';
 import { Platform } from '../platform-components';
 
 export interface DateTimePickerProps {
@@ -47,9 +48,9 @@ export function DateTimePicker({
     value ? new Date(value.getFullYear(), value.getMonth(), 1) : new Date(),
   );
   const [selectedDate, setSelectedDate] = useState<Date | null>(value || null);
-  const [hour, setHour] = useState(value ? value.getHours() : 12);
+  const [hour, setHour] = useState(value ? to12Hour(value.getHours()) : 12);
   const [minute, setMinute] = useState(value ? value.getMinutes() : 0);
-  const [ampm, setAmpm] = useState(
+  const [ampm, setAmpm] = useState<'AM' | 'PM'>(
     value ? (value.getHours() >= 12 ? 'PM' : 'AM') : 'PM',
   );
 
@@ -144,8 +145,7 @@ export function DateTimePicker({
   const applyDateTime = () => {
     if (selectedDate) {
       const newDateTime = new Date(selectedDate);
-      const adjustedHour =
-        ampm === 'AM' ? (hour === 12 ? 0 : hour) : hour === 12 ? 12 : hour + 12;
+      const adjustedHour = to24Hour(hour, ampm);
 
       newDateTime.setHours(adjustedHour, minute, 0, 0);
 
