@@ -447,11 +447,7 @@ export function MatchupNavigationControls({
                           fontSize="$2"
                           fontWeight="800"
                           fontVariant={['tabular-nums']}
-                          color={
-                            (m.team1Score ?? 0) >= (m.team2Score ?? 0)
-                              ? '$color'
-                              : '$textMuted'
-                          }
+                          color={isActive ? BRAND_GOLD_LIGHT : '$color'}
                         >
                           {(m.team1Score ?? 0).toFixed(1)}
                         </Text>
@@ -459,11 +455,7 @@ export function MatchupNavigationControls({
                           fontSize="$2"
                           fontWeight="800"
                           fontVariant={['tabular-nums']}
-                          color={
-                            (m.team2Score ?? 0) >= (m.team1Score ?? 0)
-                              ? '$color'
-                              : '$textMuted'
-                          }
+                          color={isActive ? BRAND_GOLD_LIGHT : '$color'}
                         >
                           {(m.team2Score ?? 0).toFixed(1)}
                         </Text>
