@@ -48,6 +48,14 @@ The Claude Code session was spawned with the launcher `worktree` checkbox checke
    >
    > See [install-packages.md](../repo-tooling/references/install-packages.md) for the full procedure. **Never run `pnpm add` or `make install` while the symlink is still in place** — the `preinstall-guard` is there to catch this unsafe path, but you must not rely on it because even partial execution can damage every other worktree's shared `node_modules`.
 
+   > **Broken or missing `node_modules` symlink recovery**: if the symlink is broken, missing, or pointing to the wrong location:
+   >
+   > 1. If `node_modules` exists as a broken symlink or points to the wrong location, remove it with `cmd /c "rmdir node_modules"`. If `node_modules` is already missing, skip this step.
+   > 2. Run `make install` from the worktree — this creates an independent `node_modules`
+   > 3. **Never** recreate a junction or symlink to the main repo's `node_modules` manually (e.g., `mklink /J`, `New-Item -ItemType Junction`, `New-Item -ItemType SymbolicLink`) — that is exclusively the job of `worktree_setup_node_modules()` (native flow) or `make_wt_setup` (sibling flow). Manual junctions cause `.modules.yaml` path mismatches and Nx graph failures.
+   >
+   > See also [workflow-recovery-procedures.md](references/shared/workflow-recovery-procedures.md).
+
 8. **Implement** — read the ticket description, investigate, write code + tests. See [work-ticket SKILL.md Step 5](../work-ticket/SKILL.md) for self-review + implementation notes.
 9. **Migrations** — `db_migration_status()` then `db_migrate()`.
 10. **Validate** — `make_run(target: "pc")`. Must pass before pushing.

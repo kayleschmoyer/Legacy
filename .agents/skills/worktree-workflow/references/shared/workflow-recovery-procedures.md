@@ -49,3 +49,25 @@ github_create_pr(title: "LS-1234 fix(scope): description", body: <markdown>, dra
 > **Why revert instead of force-push?** `git revert` adds a new commit and never
 > rewrites history. Force-pushing main can strip commits that others have already
 > pulled or that CI has built against.
+
+## If the Worktree `node_modules` Symlink Is Broken or Missing
+
+When a worktree's `node_modules` symlink is missing, dangling, or pointing to the wrong location, **do not recreate the symlink manually**. Manual junctions to the main repo's `node_modules` cause `.modules.yaml` path mismatches and Nx graph failures.
+
+### Recovery Steps
+
+```text
+# 1. Remove the broken symlink (safe — only removes the link, not the target)
+# Skip this step if node_modules is already missing.
+cmd /c "rmdir node_modules"
+
+# 2. Install independently in the worktree
+make install
+```
+
+This gives the worktree its own independent `node_modules`. The worktree will no longer share with the main repo, which is safe and avoids cross-contamination.
+
+### What NOT to Do
+
+- **Never** create a Windows junction or symlink to the main repo's `node_modules` manually (e.g., `mklink /J`, `New-Item -ItemType Junction`, `New-Item -ItemType SymbolicLink`). Only `worktree_setup_node_modules()` (native flow) or `make_wt_setup` (sibling flow) should create the symlink — they handle `.modules.yaml` path consistency.
+- **Never** run `pnpm install` directly — always use `make install`, which includes the correct flags and lockfile handling.
