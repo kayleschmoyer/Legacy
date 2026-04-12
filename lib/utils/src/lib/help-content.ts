@@ -139,21 +139,21 @@ export const HELP_CONTACT_ITEMS: HelpContactItem[] = [
     title: 'Report a Bug',
     description:
       "Found something broken? Open a GitHub issue and we'll prioritize a fix.",
-    url: 'https://github.com/bbarclay/legacy-sports/issues/new?labels=bug&template=bug_report.md',
+    url: 'https://github.com/bkrupa/legacy-sports/issues/new?labels=bug&template=bug_report.md',
   },
   {
     icon: '💡',
     title: 'Suggest a Feature',
     description:
       "Have an idea that would make Legacy Sports better? We'd love to hear it.",
-    url: 'https://github.com/bbarclay/legacy-sports/issues/new?labels=enhancement&template=feature_request.md',
+    url: 'https://github.com/bkrupa/legacy-sports/issues/new?labels=enhancement&template=feature_request.md',
   },
   {
     icon: '💬',
     title: 'Community Discussions',
     description:
       'Chat with other managers, share tips, and get advice from the community.',
-    url: 'https://github.com/bbarclay/legacy-sports/discussions',
+    url: 'https://github.com/bkrupa/legacy-sports/discussions',
   },
   {
     icon: '🎮',
