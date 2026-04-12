@@ -341,8 +341,19 @@ jobs:
         id: changelog
         shell: bash
         run: |
-          COMMITS=$(git log --pretty=format:'[`%h`](https://github.com/${{ github.repository }}/commit/%H) %s' \
-            --no-merges -10)
+          BEFORE="${{ github.event.before }}"
+
+          if [ -n "$BEFORE" ] && [ "$BEFORE" != "0000000000000000000000000000000000000000" ]; then
+            # Push event: show only commits in this specific push
+            COMMITS=$(git log "${BEFORE}..HEAD" \
+              --pretty=format:'[`%h`](https://github.com/${{ github.repository }}/commit/%H) %s' \
+              --first-parent)
+          else
+            # workflow_dispatch or first push: fall back to last 10 commits
+            COMMITS=$(git log --pretty=format:'[`%h`](https://github.com/${{ github.repository }}/commit/%H) %s' \
+              --first-parent -10)
+          fi
+
           {
             echo "commits<<CHANGELOG_EOF"
             echo "$COMMITS"

@@ -414,15 +414,49 @@ jobs:
         id: deploy-changelog
         if: always()
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          # Get recent commits touching lambdas/ or terraform/ (last 15 non-merge commits)
-          COMMITS=$(git log --pretty=format:'[`%h`](https://github.com/${{ github.repository }}/commit/%H) %s' \
-            --no-merges -15 -- lambdas/ terraform/)
+          BASE_SHA=""
+          # Use the triggering workflow's SHA as the range endpoint — checkout
+          # may land on a newer main commit if pushes arrive between trigger
+          # and this job starting.
+          RANGE_END="${{ github.event.workflow_run.head_sha || github.sha }}"
 
-          if [ -z "$COMMITS" ]; then
-            # Fallback: last 10 commits on main
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            # Find the previous successful Deploy workflow run's head SHA.
+            # Filter by run id (not head_sha) so re-runs on the same commit
+            # don't accidentally skip all runs for that SHA.
+            TRIGGER_RUN_ID="${{ github.event.workflow_run.id }}"
+            PREV_SHA=$(gh api "repos/${{ github.repository }}/actions/workflows/deploy.yml/runs?status=success&branch=main&per_page=5" \
+              --jq "[.workflow_runs[] | select(.id != ${TRIGGER_RUN_ID})][0].head_sha // empty")
+
+            if [ -n "$PREV_SHA" ] && git merge-base --is-ancestor "$PREV_SHA" "$RANGE_END" 2>/dev/null; then
+              BASE_SHA="$PREV_SHA"
+            fi
+          fi
+
+          if [ -n "$BASE_SHA" ]; then
+            # Show commits since the previous deploy, filtered to lambda/terraform paths
+            COMMITS=$(git log "${BASE_SHA}..${RANGE_END}" \
+              --pretty=format:'[`%h`](https://github.com/${{ github.repository }}/commit/%H) %s' \
+              --first-parent -- lambdas/ terraform/)
+
+            if [ -z "$COMMITS" ]; then
+              # No lambda/terraform changes — show all commits in the range
+              COMMITS=$(git log "${BASE_SHA}..${RANGE_END}" \
+                --pretty=format:'[`%h`](https://github.com/${{ github.repository }}/commit/%H) %s' \
+                --first-parent)
+            fi
+          else
+            # Fallback: last 10 commits touching lambdas/ or terraform/
             COMMITS=$(git log --pretty=format:'[`%h`](https://github.com/${{ github.repository }}/commit/%H) %s' \
-              --no-merges -10)
+              --first-parent -10 -- lambdas/ terraform/)
+
+            if [ -z "$COMMITS" ]; then
+              COMMITS=$(git log --pretty=format:'[`%h`](https://github.com/${{ github.repository }}/commit/%H) %s' \
+                --first-parent -10)
+            fi
           fi
 
           {
