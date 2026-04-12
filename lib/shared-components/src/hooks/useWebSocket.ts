@@ -33,20 +33,6 @@ function useLatestRef<T>(value: T): React.RefObject<T> {
   return ref;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- callback data shape varies by event type
-type AnyCallback = (data: any) => void;
-
-/**
- * Declarative mapping from notification type → ref + optional debug label.
- * The effect loop subscribes to every entry; cleanup unsubscribes them all.
- */
-interface NotificationBinding {
-  type: string;
-  ref: React.RefObject<AnyCallback | undefined>;
-  /** When set, `LOGGER.info('[useWebSocket] received <label>', data)` is emitted. */
-  debugLabel?: string;
-}
-
 /**
  * SECURITY NOTE: Token Handling
  *
@@ -157,6 +143,7 @@ export function useWebSocket({
   onError,
 }: UseWebSocketOptions = {}) {
   const clientRef = useRef<WebSocketClient | null>(null);
+  const hasLoggedInit = useRef(false);
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -185,8 +172,10 @@ export function useWebSocket({
   // In Node/CLI contexts this falls back to process.env.VITE_WEBSOCKET_URL.
   const wsUrl = url || process.env.VITE_WEBSOCKET_URL;
 
-  // Log connection parameters on mount for debugging
+  // Log connection parameters once on mount
   useEffect(() => {
+    if (hasLoggedInit.current) return;
+    hasLoggedInit.current = true;
     LOGGER.info('[useWebSocket] init', {
       url: wsUrl ? `${wsUrl.substring(0, 30)}...` : 'NOT SET',
       hasToken: !!token,
@@ -195,7 +184,7 @@ export function useWebSocket({
       viewContext,
       autoConnect,
     });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- one-time mount log, deps intentionally empty
+  }, [wsUrl, token, leagueId, matchupId, viewContext, autoConnect]);
 
   const connect = useCallback(() => {
     if (!wsUrl) {
@@ -351,69 +340,86 @@ export function useWebSocket({
       onMessageRef.current?.(msg);
     });
 
-    // Declarative notification bindings — keeps subscription logic DRY.
-    const bindings: NotificationBinding[] = [
-      {
-        type: ClientNotificationType.DRAFT_COMPLETED,
-        ref: onDraftCompletedRef,
-      },
-      { type: ClientNotificationType.DRAFT_STARTED, ref: onDraftStartedRef },
-      { type: ClientNotificationType.DRAFT_PICK_MADE, ref: onDraftPickMadeRef },
-      {
-        type: ClientNotificationType.DRAFT_PICK_UNDONE,
-        ref: onDraftPickUndoneRef,
-        debugLabel: 'draft-pick-undone',
-      },
-      { type: ClientNotificationType.DRAFT_PAUSED, ref: onDraftPausedRef },
-      { type: ClientNotificationType.DRAFT_RESUMED, ref: onDraftResumedRef },
-      {
-        type: ClientNotificationType.PLAYER_STATS_LOADING,
-        ref: onPlayerStatsLoadingRef,
-      },
-      {
-        type: ClientNotificationType.PLAYER_STATS_UPDATED,
-        ref: onPlayerStatsUpdatedRef,
-      },
-      {
-        type: ClientNotificationType.MATCHUP_STATS_COMPLETE,
-        ref: onMatchupStatsCompleteRef,
-        debugLabel: 'matchup-stats-complete',
-      },
-      {
-        type: ClientNotificationType.ROSTER_UPDATE,
-        ref: onRosterUpdateRef,
-        debugLabel: 'roster-update',
-      },
-      {
-        type: ClientNotificationType.LEAGUE_CHAT_MESSAGE,
-        ref: onLeagueChatMessageRef,
-        debugLabel: 'league-chat-message',
-      },
-      {
-        type: ClientNotificationType.USER_JOINED,
-        ref: onUserJoinedRef,
-        debugLabel: 'user-joined',
-      },
-      {
-        type: ClientNotificationType.USER_LEFT,
-        ref: onUserLeftRef,
-        debugLabel: 'user-left',
-      },
-      {
-        type: ClientNotificationType.USER_LIST,
-        ref: onUserListRef,
-        debugLabel: 'user-list',
-      },
-    ];
-
-    const unsubscribeBindings = bindings.map(({ type, ref, debugLabel }) =>
-      client.on(type, (notification: NotificationData) => {
-        if (debugLabel) {
-          LOGGER.info(`[useWebSocket] received ${debugLabel}`, notification);
-        }
-        ref.current?.(notification);
+    // Individual notification subscriptions — each callback is type-safe
+    // via an explicit narrowing cast from NotificationData.
+    const unsubscribeNotifications = [
+      client.on(
+        ClientNotificationType.DRAFT_COMPLETED,
+        (n: NotificationData) => {
+          onDraftCompletedRef.current?.(n as DraftCompletedNotification);
+        },
+      ),
+      client.on(ClientNotificationType.DRAFT_STARTED, (n: NotificationData) => {
+        onDraftStartedRef.current?.(n as DraftStartedNotification);
       }),
-    );
+      client.on(
+        ClientNotificationType.DRAFT_PICK_MADE,
+        (n: NotificationData) => {
+          onDraftPickMadeRef.current?.(n as DraftPickNotification);
+        },
+      ),
+      client.on(
+        ClientNotificationType.DRAFT_PICK_UNDONE,
+        (n: NotificationData) => {
+          LOGGER.info('[useWebSocket] received draft-pick-undone', n);
+          onDraftPickUndoneRef.current?.(n as DraftPickUndoneNotification);
+        },
+      ),
+      client.on(ClientNotificationType.DRAFT_PAUSED, (n: NotificationData) => {
+        onDraftPausedRef.current?.(n as DraftPausedNotification);
+      }),
+      client.on(ClientNotificationType.DRAFT_RESUMED, (n: NotificationData) => {
+        onDraftResumedRef.current?.(n as DraftResumedNotification);
+      }),
+      client.on(
+        ClientNotificationType.PLAYER_STATS_LOADING,
+        (n: NotificationData) => {
+          onPlayerStatsLoadingRef.current?.(
+            n as PlayerStatsLoadingNotification,
+          );
+        },
+      ),
+      client.on(
+        ClientNotificationType.PLAYER_STATS_UPDATED,
+        (n: NotificationData) => {
+          onPlayerStatsUpdatedRef.current?.(
+            n as PlayerStatsUpdatedNotification,
+          );
+        },
+      ),
+      client.on(
+        ClientNotificationType.MATCHUP_STATS_COMPLETE,
+        (n: NotificationData) => {
+          LOGGER.info('[useWebSocket] received matchup-stats-complete', n);
+          onMatchupStatsCompleteRef.current?.(
+            n as MatchupStatsCompleteNotification,
+          );
+        },
+      ),
+      client.on(ClientNotificationType.ROSTER_UPDATE, (n: NotificationData) => {
+        LOGGER.info('[useWebSocket] received roster-update', n);
+        onRosterUpdateRef.current?.(n as RosterUpdateNotification);
+      }),
+      client.on(
+        ClientNotificationType.LEAGUE_CHAT_MESSAGE,
+        (n: NotificationData) => {
+          LOGGER.info('[useWebSocket] received league-chat-message', n);
+          onLeagueChatMessageRef.current?.(n as LeagueChatMessageNotification);
+        },
+      ),
+      client.on(ClientNotificationType.USER_JOINED, (n: NotificationData) => {
+        LOGGER.info('[useWebSocket] received user-joined', n);
+        onUserJoinedRef.current?.(n as UserJoinedNotification);
+      }),
+      client.on(ClientNotificationType.USER_LEFT, (n: NotificationData) => {
+        LOGGER.info('[useWebSocket] received user-left', n);
+        onUserLeftRef.current?.(n as UserLeftNotification);
+      }),
+      client.on(ClientNotificationType.USER_LIST, (n: NotificationData) => {
+        LOGGER.info('[useWebSocket] received user-list', n);
+        onUserListRef.current?.(n as UserListNotification);
+      }),
+    ];
 
     // Cleanup on unmount
     return () => {
@@ -422,14 +428,38 @@ export function useWebSocket({
       unsubscribeDisconnected();
       unsubscribeError();
       unsubscribeMessage();
-      unsubscribeBindings.forEach((unsub) => unsub());
+      unsubscribeNotifications.forEach((unsub) => unsub());
       client.dispose();
     };
     // Only reconnect when connection parameters change — NOT when callbacks
-    // change.  Callbacks are accessed via refs so the subscriptions above
-    // always invoke the latest version without tearing down the socket.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- callbacks accessed via refs, not deps
-  }, [wsUrl, token, leagueId, matchupId, viewContext, autoConnect]);
+    // change.  Callbacks are accessed via refs (stable identity from useRef)
+    // so the subscriptions above always invoke the latest version without
+    // tearing down the socket.  Refs are included in deps for linter
+    // completeness but never trigger re-runs.
+  }, [
+    wsUrl,
+    token,
+    leagueId,
+    matchupId,
+    viewContext,
+    autoConnect,
+    onDraftStartedRef,
+    onDraftCompletedRef,
+    onDraftPickMadeRef,
+    onDraftPickUndoneRef,
+    onDraftPausedRef,
+    onDraftResumedRef,
+    onPlayerStatsLoadingRef,
+    onPlayerStatsUpdatedRef,
+    onMatchupStatsCompleteRef,
+    onRosterUpdateRef,
+    onLeagueChatMessageRef,
+    onUserJoinedRef,
+    onUserLeftRef,
+    onUserListRef,
+    onMessageRef,
+    onErrorRef,
+  ]);
 
   return {
     connected,

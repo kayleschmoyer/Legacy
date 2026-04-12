@@ -1,3 +1,4 @@
+import type { ComponentProps } from 'react';
 import type { Meta, StoryObj } from '@storybook/react';
 import { expect, fn, userEvent, within } from '@storybook/test';
 import {
@@ -247,9 +248,9 @@ export const TabManyItems: TabStory = {
     currentRoute: '/teams',
     onNavigate: fn(),
   },
-  // Storybook args typing requires cast for proper component props spreading
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Storybook args typing requires cast
-  render: (args) => <TabNavigation {...(args as any)} />,
+  render: (args) => (
+    <TabNavigation {...(args as ComponentProps<typeof TabNavigation>)} />
+  ),
 };
 
 // Interactive tab test
@@ -259,9 +260,9 @@ export const TabWithInteraction: TabStory = {
     currentRoute: '/roster',
     onNavigate: fn(),
   },
-  // Storybook args typing requires cast for proper component props spreading
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Storybook args typing requires cast
-  render: (args) => <TabNavigation {...(args as any)} />,
+  render: (args) => (
+    <TabNavigation {...(args as ComponentProps<typeof TabNavigation>)} />
+  ),
   play: async ({ args, canvasElement }) => {
     if (!args) return;
     const canvas = within(canvasElement);
@@ -287,9 +288,11 @@ export const BreadcrumbDefault: BreadcrumbStory = {
     ],
     onNavigate: fn(),
   },
-  // Storybook args typing requires cast for proper component props spreading
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Storybook args typing requires cast
-  render: (args) => <BreadcrumbNavigation {...(args as any)} />,
+  render: (args) => (
+    <BreadcrumbNavigation
+      {...(args as ComponentProps<typeof BreadcrumbNavigation>)}
+    />
+  ),
 };
 
 export const BreadcrumbShort: BreadcrumbStory = {
@@ -300,9 +303,11 @@ export const BreadcrumbShort: BreadcrumbStory = {
     ],
     onNavigate: fn(),
   },
-  // Storybook args typing requires cast for proper component props spreading
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Storybook args typing requires cast
-  render: (args) => <BreadcrumbNavigation {...(args as any)} />,
+  render: (args) => (
+    <BreadcrumbNavigation
+      {...(args as ComponentProps<typeof BreadcrumbNavigation>)}
+    />
+  ),
 };
 
 export const BreadcrumbSingle: BreadcrumbStory = {
@@ -310,9 +315,11 @@ export const BreadcrumbSingle: BreadcrumbStory = {
     items: [{ title: 'Home', route: '/' }],
     onNavigate: fn(),
   },
-  // Storybook args typing requires cast for proper component props spreading
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Storybook args typing requires cast
-  render: (args) => <BreadcrumbNavigation {...(args as any)} />,
+  render: (args) => (
+    <BreadcrumbNavigation
+      {...(args as ComponentProps<typeof BreadcrumbNavigation>)}
+    />
+  ),
 };
 
 export const BreadcrumbLong: BreadcrumbStory = {
@@ -331,9 +338,11 @@ export const BreadcrumbLong: BreadcrumbStory = {
     ],
     onNavigate: fn(),
   },
-  // Storybook args typing requires cast for proper component props spreading
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Storybook args typing requires cast
-  render: (args) => <BreadcrumbNavigation {...(args as any)} />,
+  render: (args) => (
+    <BreadcrumbNavigation
+      {...(args as ComponentProps<typeof BreadcrumbNavigation>)}
+    />
+  ),
 };
 
 // Combined navigation showcase

@@ -1,11 +1,17 @@
 import React from 'react';
-import { styled, Button as TamaguiButton, Text, YStack } from 'tamagui';
+import type { ButtonProps as TamaguiButtonProps } from 'tamagui';
+import { Button as TamaguiButton, Text, YStack } from 'tamagui';
+import { tamaguiStyled } from './utils/tamaguiStyled';
 import { Icon } from './platform-components';
-import type { IconButtonProps } from './types/IconButton.types';
+import type {
+  IconButtonColorScheme,
+  IconButtonProps,
+  IconButtonSize,
+  IconButtonVariant,
+} from './types/IconButton.types';
 
 // Styled button with gradient shadow effects
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- Tamagui styled() returns loosely typed
-const StyledIconButton = styled(TamaguiButton, {
+const StyledIconButton = tamaguiStyled(TamaguiButton, {
   name: 'IconButton',
   borderRadius: 16,
   borderWidth: 0,
@@ -108,11 +114,16 @@ const StyledIconButton = styled(TamaguiButton, {
     variant: 'default',
     showGradient: true,
   },
-});
+}) as React.ComponentType<
+  Omit<TamaguiButtonProps, 'size' | 'variant'> & {
+    size?: IconButtonSize;
+    variant?: IconButtonVariant;
+    showGradient?: boolean;
+  }
+>;
 
 // Gradient overlay component for enhanced visual effects
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- Tamagui styled() returns loosely typed
-const GradientOverlay = styled(YStack, {
+const GradientOverlay = tamaguiStyled(YStack, {
   name: 'GradientOverlay',
   position: 'absolute',
   top: 0,
@@ -148,7 +159,10 @@ const GradientOverlay = styled(YStack, {
   },
 
   animation: 'quick',
-});
+}) as React.ComponentType<{
+  colorScheme?: IconButtonColorScheme;
+  children?: React.ReactNode;
+}>;
 
 function IconButton({
   icon,

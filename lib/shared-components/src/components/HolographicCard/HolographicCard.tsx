@@ -1,5 +1,6 @@
 import React from 'react';
-import { Card, styled } from 'tamagui';
+import { Card } from 'tamagui';
+import { tamaguiStyled } from '../../utils/tamaguiStyled';
 import './HolographicCard.css';
 
 export interface HolographicCardProps {
@@ -20,8 +21,7 @@ export interface HolographicCardProps {
   style?: React.CSSProperties;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- Tamagui styled() returns loosely typed
-const StyledCard = styled(Card, {
+const StyledCard = tamaguiStyled(Card, {
   position: 'relative',
   cursor: 'pointer',
   borderRadius: '$6',
@@ -52,7 +52,12 @@ const StyledCard = styled(Card, {
     intensity: 'normal',
     variant: 'rainbow',
   },
-});
+}) as React.ComponentType<
+  Omit<React.ComponentProps<typeof Card>, 'variant'> & {
+    intensity?: 'subtle' | 'normal' | 'intense';
+    variant?: 'default' | 'rainbow' | 'chrome' | 'aurora';
+  }
+>;
 
 /**
  * HolographicCard - A stunning holographic card component with rainbow effects

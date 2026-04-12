@@ -8,10 +8,15 @@
  * Works cross-platform with Tamagui.
  */
 import React from 'react';
-import { Card, styled } from 'tamagui';
+import { Card } from 'tamagui';
+import { tamaguiStyled } from '../utils/tamaguiStyled';
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- Tamagui styled() returns loosely typed
-export const PanelCard = styled(Card, {
+type PanelCardVariants = {
+  interactive?: boolean;
+  compact?: boolean;
+};
+
+export const PanelCard = tamaguiStyled(Card, {
   backgroundColor: '$surfacePanel',
   borderColor: '$surfacePanelBorder',
   borderWidth: 1,
@@ -37,6 +42,9 @@ export const PanelCard = styled(Card, {
       },
     },
   } as const,
-});
+}) as React.ComponentType<
+  React.ComponentProps<typeof Card> & PanelCardVariants
+>;
 
-export type PanelCardProps = React.ComponentProps<typeof PanelCard>;
+export type PanelCardProps = React.ComponentProps<typeof Card> &
+  PanelCardVariants;
