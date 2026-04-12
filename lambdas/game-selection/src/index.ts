@@ -27,6 +27,8 @@ import {
   MIN_SEASON_WITH_GAME_DATA,
 } from '@legacy-sports/utils';
 import { and, eq, gte, inArray, isNotNull, sql } from 'drizzle-orm';
+import { withDb } from './utils/db';
+import { selectGamesForMatchup as selectGames } from './services/season-game-selector';
 import { handler as selectGameHandler } from './handlers/select-game';
 
 // Initialize Rollbar
@@ -295,8 +297,6 @@ async function selectGameForMatchup(
   const totalPlayers = Number(matchupPlayersCount[0]?.count || 0);
 
   // 3. Delegate to season-game-selector which uses game_identifier-based selection
-  const { selectGamesForMatchup: selectGames } =
-    await import('./services/season-game-selector');
   const result = await selectGames(db, matchupId, gameNumber);
 
   // 4. Queue stats loading for uncached players
@@ -862,9 +862,6 @@ const baseGameSelectionHandler = async (
 
           LOGGER.info(`Creating matchup for league ${league}, week ${week}`);
 
-          // Use existing database connection utility
-          const { withDb } = await import('./utils/db');
-
           try {
             const result = await withDb(async (db) => {
               return await createMatchupForLeagueWeek(db, league, week);
@@ -919,9 +916,6 @@ const baseGameSelectionHandler = async (
           };
 
           LOGGER.info(`Selecting game ${gameNumber} for matchup ${matchupId}`);
-
-          // Use existing database connection utility
-          const { withDb } = await import('./utils/db');
 
           try {
             const result = await withDb(async (db) => {
