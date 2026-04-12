@@ -72,7 +72,7 @@ For **work subagents** dispatched by multi-ticket orchestrators (`/sweep-prs`, `
   - Use Read (not cat/head/tail) for reading files
 ```
 
-Work subagents inherit all MCP connections from the parent session (all 9 servers), so `github_create_pr`, `worktree_commit`, `make_run`, `jira_transition` etc. are all available without the LS-2902 first-N cap that affects session-launcher worktrees. This is why multi-ticket orchestrators should always use `Agent(isolation: "worktree")` rather than session-launcher worktrees for each ticket.
+Work subagents inherit all MCP connections from the parent session (all 9 servers), so `github_create_pr`, `worktree_commit`, `make_run`, `jira_transition` etc. are all available. Multi-ticket orchestrators should always use `Agent(isolation: "worktree")` rather than session-launcher worktrees for each ticket.
 
 ## Parent-Agent Recovery
 

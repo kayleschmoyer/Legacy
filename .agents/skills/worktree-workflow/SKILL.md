@@ -53,7 +53,7 @@ The Claude Code session was spawned with the launcher `worktree` checkbox checke
 - **`make_wt_setup` is NOT used** — it's sibling-only. The junction command above replaces it.
 - **`worktree_list` / `make_worktree_create` are NOT used** — you're already in a worktree, Claude Code created it for you.
 - **On exit**, `ExitWorktree(action: "remove")` cleans up the ephemeral worktree. Only call this when explicitly done — the worktree can survive across sessions if kept.
-- **If MCP servers are missing** from the session (LS-2902 — Claude Code connects only the first few servers from `.mcp.json` in worktree-spawned sessions), the critical ticket-work servers (`worktree`, `github`, `make`, `nx`) are now at the top of `.mcp.json` so they load first. Fallback for missing ones: `gh` CLI, raw `git`, `pnpm exec nx` — all work from Bash.
+- **All 9 MCP servers** should connect in every session (`MCP_TIMEOUT=10000` in `.claude/settings.json` ensures startup headroom). If a server is unexpectedly missing, restart the session — do not proceed with shell fallbacks for a missing server. Shell fallbacks elsewhere in this doc (e.g., junction creation, `gh` CLI recovery) are for when MCP is entirely unavailable, not for working around a missing server at startup.
 
 ## Subagent Dispatch (multi-ticket orchestrators)
 
@@ -62,7 +62,7 @@ Multi-ticket commands (`/sweep-prs`, `/work-bugs`, `/work-mcp-gaps`, `/work-tick
 **Why subagents?**
 
 - Each subagent gets its own ephemeral worktree — no contamination between tickets
-- Subagents **inherit the parent's MCP connections** (all 9 servers), bypassing the LS-2902 first-N loading cap that affects session-launcher worktrees
+- Subagents **inherit the parent's MCP connections** (all 9 servers)
 - Automatic cleanup — ephemeral worktrees are discarded after the subagent returns
 - **Session-type-agnostic** — works identically whether the orchestrator was launched with the worktree checkbox, from the main repo, or from a cloud environment
 

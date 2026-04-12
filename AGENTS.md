@@ -78,6 +78,8 @@ Detailed how-to docs live in `.agents/skills/<name>/SKILL.md`. The `description`
 
 See `.agents/skills/mcp-first/SKILL.md` for the full server list, per-server tool mapping, and load-order notes. Always prefer MCP tools over equivalent shell commands.
 
+> **All 9 MCP servers** should connect in every session. `MCP_TIMEOUT=10000` in `.claude/settings.json` ensures enough startup headroom. If a server is unexpectedly missing, check `MCP_TIMEOUT` is set and restart the session — do not proceed with shell fallbacks for a missing server. Only use shell when MCP is entirely unavailable, and treat that as a failure mode rather than the normal workflow.
+
 ## Cloud Agent Mode
 
 When running as a cloud coding agent (Claude Code on the web, Copilot Coding Agent): no worktrees/twig/acli, work directly in repo root; Linux/bash; Docker PostgreSQL; no AWS access. See `.agents/skills/cloud-agent-mode/SKILL.md` for the complete cloud workflow, GitHub + Jira auth setup, token configuration tables, Jira tool mapping, review lifecycle, known quirks, and available MCP servers.
