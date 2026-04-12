@@ -281,6 +281,7 @@ const ProfileSettingsPage: React.FC = () => {
     void updateUsername({
       variables: { username: trimmed },
       onCompleted: () => {
+        auth.updateUserProfile({ username: trimmed });
         setIsEditingUsername((editing) => {
           if (editing) void refetchUser();
           return false;
@@ -293,7 +294,13 @@ const ProfileSettingsPage: React.FC = () => {
         });
       },
     });
-  }, [editedUsername, dbUsername, updateUsername, refetchUser]);
+  }, [
+    editedUsername,
+    dbUsername,
+    updateUsername,
+    refetchUser,
+    auth.updateUserProfile,
+  ]);
 
   const handleConnectDiscord = useCallback(() => {
     const clientId = auth.config.discordClientId;

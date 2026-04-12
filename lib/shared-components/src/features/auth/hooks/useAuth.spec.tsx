@@ -1,5 +1,11 @@
 import React from 'react';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { AuthProvider, useAuth } from './useAuth';
 import type { OAuthConfig } from '../../../platform-components/types';
 import { AuthService } from '../services/AuthService';
@@ -13,12 +19,18 @@ const testConfig: OAuthConfig = {
 
 /** Simple consumer that renders auth state for assertions. */
 function AuthConsumer() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, updateUserProfile } = useAuth();
   if (isLoading) return <div data-testid="loading">loading</div>;
   if (!user) return <div data-testid="no-user">no user</div>;
   return (
-    <div data-testid="user-info">
-      {user.username}|{user.accessLevel}
+    <div>
+      <div data-testid="user-info">
+        {user.username}|{user.accessLevel}
+      </div>
+      <button
+        data-testid="update-username"
+        onClick={() => updateUserProfile({ username: 'NewName' })}
+      />
     </div>
   );
 }
@@ -162,5 +174,135 @@ describe('AuthProvider – auth:token-refreshed event', () => {
     expect(mockInstance.storeUserProfile).toHaveBeenCalledWith(
       expect.objectContaining({ accessLevel: 'admin' }),
     );
+  });
+});
+
+describe('AuthProvider – updateUserProfile', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('updates username in auth state and persists to stored profile', async () => {
+    const MockedAuthService = jest.mocked(AuthService);
+    const storedProfile = {
+      id: 1,
+      email: 'test@test.com',
+      username: 'OldName',
+      accessLevel: 'user' as const,
+    };
+    const mockInstance = {
+      getStoredUserProfile: jest.fn(() => storedProfile),
+      getStoredTokenExpiry: jest.fn(() => Math.floor(Date.now() / 1000) + 3600),
+      getStoredAdminProfile: jest.fn(() => null),
+      storeUserProfile: jest.fn(),
+      storeAdminProfile: jest.fn(),
+      clearAdminProfile: jest.fn(),
+      clearTokens: jest.fn(),
+      verifyToken: jest.fn(() => false),
+      refreshJwt: jest.fn(() => Promise.resolve(null)),
+      authenticateWithEmail: jest.fn(),
+      authenticateWithOAuth: jest.fn(),
+      requestLogout: jest.fn(() => Promise.resolve()),
+      getStoredToken: jest.fn(() => null),
+      getCurrentToken: jest.fn(() => null),
+    };
+    MockedAuthService.mockImplementation(
+      () => mockInstance as unknown as AuthService,
+    );
+
+    render(
+      <AuthProvider config={testConfig}>
+        <AuthConsumer />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('user-info').textContent).toBe('OldName|user');
+    });
+
+    act(() => {
+      fireEvent.click(screen.getByTestId('update-username'));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('user-info').textContent).toBe('NewName|user');
+    });
+
+    expect(mockInstance.storeUserProfile).toHaveBeenCalledWith(
+      expect.objectContaining({ username: 'NewName', id: 1 }),
+    );
+  });
+
+  it('skips persistence during impersonation', async () => {
+    const MockedAuthService = jest.mocked(AuthService);
+    const adminProfile = {
+      id: 99,
+      email: 'admin@test.com',
+      username: 'AdminUser',
+      accessLevel: 'admin' as const,
+    };
+    // Base64-encode a fake JWT payload for the impersonation token
+    const payload = {
+      id: 5,
+      email: 'target@test.com',
+      username: 'TargetUser',
+      accessLevel: 'user',
+      impersonatedBy: { id: 99, username: 'AdminUser' },
+    };
+    const b64Payload = btoa(JSON.stringify(payload))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+    const fakeJwt = `eyJ0eXAiOiJKV1QifQ.${b64Payload}.fakesig`;
+
+    // Simulate impersonation: auth_jwt in localStorage
+    localStorage.setItem('auth_jwt', fakeJwt);
+
+    const mockInstance = {
+      getStoredUserProfile: jest.fn(() => null),
+      getStoredTokenExpiry: jest.fn(() => null),
+      getStoredAdminProfile: jest.fn(() => adminProfile),
+      storeUserProfile: jest.fn(),
+      storeAdminProfile: jest.fn(),
+      clearAdminProfile: jest.fn(),
+      clearTokens: jest.fn(),
+      verifyToken: jest.fn(() => true),
+      refreshJwt: jest.fn(() => Promise.resolve(null)),
+      authenticateWithEmail: jest.fn(),
+      authenticateWithOAuth: jest.fn(),
+      requestLogout: jest.fn(() => Promise.resolve()),
+      getStoredToken: jest.fn(() => null),
+      getCurrentToken: jest.fn(() => null),
+    };
+    MockedAuthService.mockImplementation(
+      () => mockInstance as unknown as AuthService,
+    );
+
+    render(
+      <AuthProvider config={testConfig}>
+        <AuthConsumer />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('user-info').textContent).toBe(
+        'TargetUser|user',
+      );
+    });
+
+    // Clear mock calls from initialization
+    mockInstance.storeUserProfile.mockClear();
+
+    act(() => {
+      fireEvent.click(screen.getByTestId('update-username'));
+    });
+
+    // UI should update even during impersonation
+    await waitFor(() => {
+      expect(screen.getByTestId('user-info').textContent).toBe('NewName|user');
+    });
+
+    // But storeUserProfile should NOT have been called (impersonation guard)
+    expect(mockInstance.storeUserProfile).not.toHaveBeenCalled();
   });
 });

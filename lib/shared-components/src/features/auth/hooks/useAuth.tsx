@@ -64,6 +64,10 @@ interface AuthContextType {
   impersonateUser: (impersonationToken: string) => void;
   /** Restore the original admin session. */
   stopImpersonating: () => void;
+  /** Update the current user's profile fields (e.g. after a username change). */
+  updateUserProfile: (
+    updates: Partial<Pick<User, 'username' | 'picture'>>,
+  ) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -120,6 +124,10 @@ type AuthAction =
   | { type: 'CLEAR_ERROR' }
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'TOKEN_UPDATED'; payload: string | null }
+  | {
+      type: 'USER_PROFILE_UPDATED';
+      payload: Partial<Pick<User, 'username' | 'picture'>>;
+    }
   | {
       type: 'IMPERSONATE_START';
       payload: { adminUser: User; targetUser: User };
@@ -187,6 +195,11 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         isLoading: action.payload,
       };
     }
+
+    case 'USER_PROFILE_UPDATED':
+      return state.user
+        ? { ...state, user: { ...state.user, ...action.payload } }
+        : state;
 
     case 'IMPERSONATE_START':
       return {
@@ -648,6 +661,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
     void onUserSwitch?.();
   }, [authService, onUserSwitch]);
 
+  const updateUserProfile = useCallback(
+    (updates: Partial<Pick<User, 'username' | 'picture'>>) => {
+      dispatchAuth({ type: 'USER_PROFILE_UPDATED', payload: updates });
+
+      // Persist only for the active non-impersonated user so we never
+      // overwrite a cached admin profile with impersonated-user updates.
+      if (!user || isImpersonating) {
+        return;
+      }
+
+      const current = authService.getStoredUserProfile() ?? user;
+      if (current.id === user.id) {
+        authService.storeUserProfile({ ...current, ...updates });
+      }
+    },
+    [authService, isImpersonating, user],
+  );
+
   const loginWithProvider = useCallback(async (): Promise<void> => {
     dispatchAuth({ type: 'AUTH_START' });
 
@@ -683,6 +714,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
       adminUser,
       impersonateUser,
       stopImpersonating,
+      updateUserProfile,
     }),
     [
       user,
@@ -699,6 +731,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
       adminUser,
       impersonateUser,
       stopImpersonating,
+      updateUserProfile,
     ],
   );
 
