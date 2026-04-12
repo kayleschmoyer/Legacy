@@ -44,6 +44,18 @@ After `jira_view` returns, **rename the current session** to include the ticket 
 worktree_rename_session(title: "LS-#### <summary, truncated to 80 chars>")
 ```
 
+**⚠️ Critical — read the full description before continuing.** The ticket summary is never sufficient. Immediately after the rename, extract and internalize the following from the `jira_view` response body:
+
+- **Problem / Context** — why does this work need to happen?
+- **Acceptance Criteria** — what conditions must be true for the ticket to be Done?
+- **Technical Approach** — what files, systems, or APIs are involved?
+- **Out of Scope** — what explicitly should _not_ change?
+- **Open Questions** — anything still unresolved?
+
+If the `jira_view` response truncates the description, call `jira_get_comments(key: "LS-####")` as well — implementation details are sometimes clarified there.
+
+> **Do NOT proceed to Step 1b until you can answer:** "What specifically must be true when this ticket is Done, and what must I build or change to get there?" If you cannot answer that from the ticket body alone, the ticket is underspecified — go to Step 1c for clarification **before planning begins**.
+
 Determine the ticket type and whether it has children:
 
 ```
@@ -85,7 +97,7 @@ jira_create_ticket(
 
 ### Step 1c: Completeness check — auto-enrich if the ticket is underspecified
 
-After the planning phase, assess whether the ticket contains enough structure to implement safely. A ticket is considered **complete** if it has all three of:
+Assess whether the ticket contains enough structure to implement safely. This step runs before or after planning — if the Step 1 gate redirected you here, the ticket needs enrichment before planning can begin. A ticket is considered **complete** if it has all three of:
 
 1. **Acceptance Criteria** — at least one testable `- [ ]` condition (or equivalent prose that is unambiguously verifiable)
 2. **Technical Approach** — a description of _what_ to change and _where_ (file paths, systems, APIs), even if brief
@@ -131,7 +143,7 @@ Follow the full [worktree-workflow skill](../worktree-workflow/SKILL.md):
      ```
      Idempotent, no escaping needed. Fallback if MCP unavailable: `powershell -Command "New-Item -ItemType Junction -Path '<worktree>\node_modules' -Target 'D:\code\legacy-sports\node_modules'"`. After that `pnpm exec nx`, `make typecheck`, `make pc` all work. Do NOT call `make_wt_setup` — it's sibling-only.
    - **Sibling flow**: `make_wt_setup(worktreePath: "$wt")`. Shell fallback: `make wt-setup WT=$wt`.
-5. **Implement**: read the ticket description, investigate the codebase, write code + tests
+5. **Implement**: Before writing any code, re-read the **full ticket description** from the `jira_view` response (not just the summary). Confirm you are implementing against the Acceptance Criteria — if you cannot cite at least one AC from the description, stop and return to Step 1c. Then investigate the codebase and write code + tests.
    - **Bug tickets**: follow the [bug verification workflow](../debugging/SKILL.md#verification-by-bug-type) — reproduce the bug **before** writing any fix, then verify the fix resolves the reported behavior **after**. Include before/after evidence in the PR body under a `## Verification` section (appended after the standard template). `make pc` passing is necessary but not sufficient for bugs. The `## Verification` section is not part of the standard PR template -- add it manually for bug-fix PRs.
      5a. **Write implementation notes to Jira**: after completing the implementation (before committing), append an `## Implementation Notes` section to the Jira ticket description so sweep agents have context when fixing review feedback later. First read the current description via `jira_view`, then append:
    ```
