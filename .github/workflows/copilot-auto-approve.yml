@@ -324,8 +324,9 @@ jobs:
         # GitHub Actions expressions have no toLower/toLowerCase function — match
         # the two known Copilot bot logins explicitly. The unknown function name
         # poisons workflow validation and registers the file as path-named.
+        # Observed propagation lag: ~12s (PR #2556). 30s provides a safe buffer.
         if: github.event.review.user.login == 'copilot-pull-request-reviewer[bot]' || github.event.review.user.login == 'Copilot'
-        run: sleep 10
+        run: sleep 30
 
       - name: Check threads and approve if clean
         uses: actions/github-script@v8
@@ -558,6 +559,18 @@ jobs:
           app-id: 3142924
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
+      - name: Wait for Copilot review to propagate
+        if: >-
+          steps.pr.outputs.number != '' &&
+          github.event.workflow_run.conclusion == 'success'
+        run: |
+          # The workflow_run event fires when the "Copilot code review" workflow
+          # completes, but Copilot's PR review (pull_request_review) may not be
+          # posted yet. Without this delay, the check step sees 0 reviews and 0
+          # threads and incorrectly auto-approves. Observed propagation lag: ~12s
+          # (see PR #2556). 30s provides a safe buffer.
+          sleep 30
+
       - name: Check for review comments and review state
         if: >-
           steps.pr.outputs.number != '' &&
@@ -572,20 +585,38 @@ jobs:
             const copilotReviewLogins = ['copilot-pull-request-reviewer[bot]', 'Copilot'];
             const copilotLogins = ['copilot-pull-request-reviewer', 'copilot-pull-request-reviewer[bot]', 'Copilot'];
 
-            // Check if the latest Copilot review already signals a clean pass.
-            // When Copilot re-reviews after a fix-push, it may submit a new
-            // APPROVED review — or it may not submit a new review at all (the
-            // workflow just completes successfully). In either case, old
-            // unresolved threads from a prior CHANGES_REQUESTED review are
-            // superseded and should not block bot-review.
-            const reviews = await github.rest.pulls.listReviews({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: prNumber,
-            });
-            const copilotReviews = reviews.data
-              .filter(r => copilotReviewLogins.includes(r.user.login))
-              .sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at));
+            // Poll for Copilot's PR review to appear. The workflow_run event
+            // fires before the review is posted — retry up to 6 times with
+            // 10s intervals between attempts (~50s of waiting, plus API time).
+            const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+            let copilotReviews = [];
+            for (let attempt = 0; attempt < 6; attempt++) {
+              const reviews = await github.rest.pulls.listReviews({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber,
+              });
+              copilotReviews = reviews.data
+                .filter(r => copilotReviewLogins.includes(r.user.login))
+                .sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at));
+
+              if (copilotReviews.length > 0) {
+                core.info(`Found ${copilotReviews.length} Copilot review(s) on attempt ${attempt + 1}`);
+                break;
+              }
+              if (attempt < 5) {
+                core.info(`No Copilot reviews yet (attempt ${attempt + 1}/6) — waiting 10s`);
+                await sleep(10000);
+              }
+            }
+
+            if (copilotReviews.length === 0) {
+              // After ~80s total (30s sleep + ~50s polling) with no Copilot review,
+              // the workflow likely completed without posting one (clean pass).
+              core.info('No Copilot reviews found after polling — assuming clean pass');
+              core.setOutput('has_comments', 'false');
+              return;
+            }
 
             if (copilotReviews.length > 0) {
               const latest = copilotReviews[0];
