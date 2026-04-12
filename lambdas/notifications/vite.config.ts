@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv } from 'vite';
 import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
 import { resolve } from 'path';
+import { dep0169UrlShimPlugin } from '../../tools/vite-configs';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, resolve(__dirname, '../../'), '');
@@ -11,7 +12,7 @@ export default defineConfig(({ mode }) => {
     root: __dirname,
     envDir: resolve(__dirname, '../../'),
 
-    plugins: [nxViteTsPaths()],
+    plugins: [dep0169UrlShimPlugin(), nxViteTsPaths()],
 
     build: {
       emptyOutDir: true,

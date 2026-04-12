@@ -1,6 +1,9 @@
 import { defineConfig } from 'vite';
 import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
-import { rollbarSourcemapPlugin } from '../../tools/vite-configs';
+import {
+  rollbarSourcemapPlugin,
+  dep0169UrlShimPlugin,
+} from '../../tools/vite-configs';
 
 // Determine if this is a production deployment build
 const isProduction = process.env.NODE_ENV === 'production';
@@ -9,6 +12,7 @@ export default defineConfig({
   cacheDir: '../../node_modules/.vite/lambdas/oauth-proxy',
 
   plugins: [
+    dep0169UrlShimPlugin(),
     nxViteTsPaths(),
     ...(isProduction && process.env.ROLLBAR_ACCESS_TOKEN
       ? [

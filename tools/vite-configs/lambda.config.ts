@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
 import { builtinModules } from 'module';
+import { dep0169UrlShimPlugin } from './dep0169-url-shim-plugin';
 
 // Cache the built-in modules set for performance
 const nodeBuiltins = new Set([
@@ -18,7 +19,7 @@ export function createLambdaConfig(projectName: string, entryFile?: string) {
     cacheDir: `../../node_modules/.vite/lambdas/${projectName}`,
     root: process.cwd(),
 
-    plugins: [nxViteTsPaths()],
+    plugins: [dep0169UrlShimPlugin(), nxViteTsPaths()],
 
     // Optimize dependency scanning to prevent timeouts
     optimizeDeps: {

@@ -1,10 +1,11 @@
 import { defineConfig } from 'vite';
 import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
+import { dep0169UrlShimPlugin } from '../../tools/vite-configs';
 
 export default defineConfig({
   cacheDir: '../../node_modules/.vite/lambdas/rollbar-discord',
 
-  plugins: [nxViteTsPaths()],
+  plugins: [dep0169UrlShimPlugin(), nxViteTsPaths()],
 
   // Configure for Node.js/SSR mode
   ssr: {

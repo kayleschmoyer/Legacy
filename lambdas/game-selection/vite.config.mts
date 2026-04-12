@@ -1,7 +1,10 @@
 import { defineConfig, loadEnv } from 'vite';
 import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
 import { resolve } from 'path';
-import { rollbarSourcemapPlugin } from '../../tools/vite-configs';
+import {
+  rollbarSourcemapPlugin,
+  dep0169UrlShimPlugin,
+} from '../../tools/vite-configs';
 
 export default defineConfig(({ mode }) => {
   // Load environment variables from workspace root and merge with process.env
@@ -21,6 +24,7 @@ export default defineConfig(({ mode }) => {
     envDir: resolve(__dirname, '../../'),
 
     plugins: [
+      dep0169UrlShimPlugin(),
       nxViteTsPaths(),
       ...(isProduction && process.env.ROLLBAR_ACCESS_TOKEN
         ? [
