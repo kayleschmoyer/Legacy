@@ -23,10 +23,7 @@ import {
   SURFACE_PANEL,
   withAlpha,
 } from '../../constants/colors';
-import {
-  useAdminGetUsersQuery,
-  useImpersonateUserMutation,
-} from '../../api/db/graphql.generated';
+import { useAdminGetUsersQuery } from '../../api/db/graphql.generated';
 
 // ─── JWT Helpers ──────────────────────────────────────────────────────────────
 
@@ -239,8 +236,6 @@ export function AdminPage(): React.JSX.Element {
     skip: !auth.isAuthenticated,
   });
 
-  const [impersonateMutation] = useImpersonateUserMutation();
-
   // Redirect non-admins
   if (!auth.isLoading && auth.user?.accessLevel !== 'admin') {
     void navigate('/');
@@ -250,12 +245,8 @@ export function AdminPage(): React.JSX.Element {
   const handleImpersonate = async (userId: number) => {
     setImpersonatingId(userId);
     try {
-      const result = await impersonateMutation({ variables: { userId } });
-      const token = result.data?.impersonateUser?.token;
-      if (token) {
-        auth.impersonateUser(token);
-        void navigate('/');
-      }
+      await auth.impersonateUser(userId);
+      void navigate('/');
     } catch (err) {
       LOGGER.error('Impersonation failed:', String(err));
     } finally {

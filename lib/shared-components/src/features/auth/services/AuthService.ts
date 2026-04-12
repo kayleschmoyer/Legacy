@@ -23,6 +23,7 @@ const USER_PROFILE_KEY = 'ls_user_profile';
 const TOKEN_EXPIRY_KEY = 'ls_token_expiry';
 /** localStorage key for admin profile during impersonation. */
 const ADMIN_PROFILE_KEY = 'ls_admin_profile';
+const IMPERSONATED_USER_KEY = 'ls_impersonated_user';
 
 interface SecureOAuthResponse {
   jwt: string;
@@ -553,19 +554,12 @@ export class AuthService {
    * Get stored JWT token.
    *
    * On web, the JWT is in an HttpOnly cookie (not accessible to JS).
-   * This method only returns a token if one was manually stored in
-   * localStorage (e.g. during admin impersonation).
+   * Admin impersonation also uses an HttpOnly cookie (ls_imp_jwt).
+   * This method returns null on web — use getCurrentToken() for the
+   * in-memory JWT set after login/refresh.
    */
   getStoredToken(): string | null {
-    try {
-      if (typeof localStorage !== 'undefined') {
-        return localStorage.getItem('auth_jwt');
-      }
-      return null;
-    } catch (error) {
-      LOGGER.error('Failed to retrieve stored token:', String(error));
-      return null;
-    }
+    return null;
   }
 
   /**
@@ -588,11 +582,12 @@ export class AuthService {
     this.currentJwt = null;
     try {
       if (typeof localStorage !== 'undefined') {
-        localStorage.removeItem('auth_jwt');
+        localStorage.removeItem('auth_jwt'); // legacy cleanup
         localStorage.removeItem('auth_refresh_token');
         localStorage.removeItem(USER_PROFILE_KEY);
         localStorage.removeItem(TOKEN_EXPIRY_KEY);
         localStorage.removeItem(ADMIN_PROFILE_KEY);
+        localStorage.removeItem(IMPERSONATED_USER_KEY);
         localStorage.removeItem('ls_csrf_token');
       }
       // Also clear the cross-origin CSRF token from sessionStorage
@@ -610,7 +605,7 @@ export class AuthService {
    * Verify if current token is still valid (local validation only for better performance)
    */
   verifyToken(token?: string): boolean {
-    const jwt = token || this.getStoredToken();
+    const jwt = token || this.getCurrentToken();
     if (!jwt) return false;
 
     try {
@@ -627,7 +622,7 @@ export class AuthService {
    * is otherwise valid (i.e. it is refreshable).
    */
   isTokenExpired(token?: string): boolean {
-    const jwt = token || this.getStoredToken();
+    const jwt = token || this.getCurrentToken();
     if (!jwt) return false;
 
     try {
@@ -656,18 +651,12 @@ export class AuthService {
    */
   async refreshJwt(): Promise<string | null> {
     try {
-      // During impersonation, send the impersonation JWT as Authorization header
-      const impersonationToken =
-        typeof localStorage !== 'undefined'
-          ? localStorage.getItem('auth_jwt')
-          : null;
-
+      // The JWT is in the HttpOnly ls_jwt cookie (sent via credentials: 'include').
+      // During impersonation, the server also reads the ls_imp_jwt cookie
+      // and refreshes it alongside the admin's token — no Bearer header needed.
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
       };
-      if (impersonationToken) {
-        headers['Authorization'] = `Bearer ${impersonationToken}`;
-      }
 
       // Attach CSRF double-submit header so the server can validate the request
       const csrf = this.getCsrfToken();
@@ -718,7 +707,7 @@ export class AuthService {
    * Verify if current token is still valid (remote verification - use for critical operations)
    */
   async verifyTokenRemote(token?: string): Promise<boolean> {
-    const jwt = token || this.getStoredToken();
+    const jwt = token || this.getCurrentToken();
     if (!jwt) return false;
 
     try {
@@ -857,6 +846,114 @@ export class AuthService {
     } catch {
       // ignore
     }
+  }
+
+  // ─── Impersonated user profile ─────────────────────────────────────────
+
+  storeImpersonatedUserProfile(user: {
+    id: number;
+    email: string;
+    username: string;
+    accessLevel: 'none' | 'user' | 'admin';
+  }): void {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(IMPERSONATED_USER_KEY, JSON.stringify(user));
+      }
+    } catch (error) {
+      LOGGER.error('Failed to store impersonated user profile:', String(error));
+    }
+  }
+
+  getStoredImpersonatedUserProfile(): User | null {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const raw = localStorage.getItem(IMPERSONATED_USER_KEY);
+        if (raw) return JSON.parse(raw) as User;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  clearImpersonatedUserProfile(): void {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(IMPERSONATED_USER_KEY);
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  // ─── Server-side impersonation management ──────────────────────────────
+
+  /**
+   * Call POST /oauth/stop-impersonate to clear the HttpOnly impersonation
+   * cookie (ls_imp_jwt) server-side.
+   */
+  async stopImpersonation(): Promise<void> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    const csrf = this.getCsrfToken();
+    if (csrf) {
+      headers['X-CSRF-Token'] = csrf;
+    }
+
+    const response = await fetch(`${this.oauthProxyUrl}/stop-impersonate`, {
+      method: 'POST',
+      headers,
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Stop impersonation failed: ${response.status}`);
+    }
+  }
+
+  /**
+   * Call POST /oauth/impersonate to start an impersonation session.
+   * Sets the HttpOnly ls_imp_jwt cookie and returns the target user profile.
+   */
+  async startImpersonation(userId: number): Promise<{
+    id: number;
+    email: string;
+    username: string;
+    accessLevel: 'none' | 'user' | 'admin';
+  }> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    const csrf = this.getCsrfToken();
+    if (csrf) {
+      headers['X-CSRF-Token'] = csrf;
+    }
+
+    const response = await fetch(`${this.oauthProxyUrl}/impersonate`, {
+      method: 'POST',
+      headers,
+      credentials: 'include',
+      body: JSON.stringify({ userId }),
+    });
+
+    if (!response.ok) {
+      const body = (await response.json().catch(() => ({}))) as {
+        error?: string;
+      };
+      throw new Error(body.error || `Impersonation failed: ${response.status}`);
+    }
+
+    const result = (await response.json()) as {
+      user: {
+        id: number;
+        email: string;
+        username: string;
+        accessLevel: 'none' | 'user' | 'admin';
+      };
+    };
+    return result.user;
   }
 
   // ─── Server-side logout ─────────────────────────────────────────────────

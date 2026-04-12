@@ -7,6 +7,14 @@ import { randomBytes } from 'crypto';
 export const JWT_COOKIE = 'ls_jwt';
 
 /**
+ * Cookie name for the HttpOnly impersonation JWT cookie.
+ * Set when an admin starts impersonating a user; cleared when impersonation
+ * stops or the admin logs out. Server-side middleware checks this cookie
+ * before ls_jwt so the impersonated identity takes precedence.
+ */
+export const IMP_JWT_COOKIE = 'ls_imp_jwt';
+
+/**
  * Cookie name for the CSRF double-submit token.
  * This cookie IS accessible to JavaScript so the frontend can read it
  * and send it as a request header for CSRF validation.
@@ -77,6 +85,7 @@ export function buildAuthCookies(jwt: string, csrfToken: string): string[] {
 
 /**
  * Build Set-Cookie headers that clear the JWT and CSRF cookies (on logout).
+ * Also clears the impersonation cookie if present.
  */
 export function buildClearAuthCookies(): string[] {
   const domain = process.env['COOKIE_DOMAIN'] || undefined;
@@ -84,7 +93,53 @@ export function buildClearAuthCookies(): string[] {
   return [
     `${JWT_COOKIE}=; HttpOnly; ${attrs}; Max-Age=0`,
     `${CSRF_COOKIE}=; ${attrs}; Max-Age=0`,
+    `${IMP_JWT_COOKIE}=; HttpOnly; ${attrs}; Max-Age=0`,
   ];
+}
+
+/**
+ * Build a Set-Cookie header for the impersonation JWT cookie.
+ * Uses the same security attributes as ls_jwt (HttpOnly, Secure, etc.)
+ * but with a shorter Max-Age matching the impersonation TTL.
+ */
+export function buildImpersonationCookie(
+  jwt: string,
+  ttlSeconds: number,
+): string[] {
+  const domain = process.env['COOKIE_DOMAIN'] || undefined;
+  const attrs = cookieAttrs(domain);
+  return [
+    `${IMP_JWT_COOKIE}=${jwt}; HttpOnly; ${attrs}; Max-Age=${ttlSeconds}`,
+  ];
+}
+
+/**
+ * Build a Set-Cookie header that clears the impersonation JWT cookie.
+ */
+export function buildClearImpersonationCookie(): string[] {
+  const domain = process.env['COOKIE_DOMAIN'] || undefined;
+  const attrs = cookieAttrs(domain);
+  return [`${IMP_JWT_COOKIE}=; HttpOnly; ${attrs}; Max-Age=0`];
+}
+
+/**
+ * Parse the impersonation JWT from the Cookie header string.
+ * Returns null if the ls_imp_jwt cookie is not present.
+ */
+export function parseImpersonationJwtFromCookies(
+  cookieHeader: string | undefined,
+): string | null {
+  if (!cookieHeader) return null;
+
+  const cookies = cookieHeader.split(';');
+  for (const cookie of cookies) {
+    const [name, ...valueParts] = cookie.trim().split('=');
+    if (name === IMP_JWT_COOKIE) {
+      const value = valueParts.join('='); // JWT contains '=' in base64
+      return value || null;
+    }
+  }
+  return null;
 }
 
 /**

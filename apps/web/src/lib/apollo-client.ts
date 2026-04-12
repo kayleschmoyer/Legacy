@@ -30,27 +30,18 @@ const httpLink = createHttpLink({
 
 // Authentication link — sends the CSRF double-submit token so the server
 // can validate that the request originated from our frontend.
-// JWT auth is now carried by the HttpOnly cookie (credentials: 'include').
-// Falls back to localStorage only for admin impersonation sessions.
+// JWT auth is carried by HttpOnly cookies (credentials: 'include'):
+//   - ls_jwt:     regular user session
+//   - ls_imp_jwt: admin impersonation session (takes priority server-side)
+// No tokens are stored in localStorage — both cookies are HttpOnly and
+// inaccessible to JavaScript, preventing XSS-based token theft.
 const authLink = setContext((_, { headers }) => {
   const csrfToken = getCsrfToken();
-
-  // Admin impersonation still stores a token in localStorage because the
-  // server-side cookie can't be overridden from JS (HttpOnly).
-  // When an impersonation token is present, send it as a Bearer header.
-  // TODO: When the impersonation token expires, the refresh endpoint will
-  // refresh the *real* user's cookie — not the impersonation session. A
-  // dedicated impersonation refresh flow is needed if long-lived
-  // impersonation sessions are required.
-  const impersonationToken = localStorage.getItem('auth_jwt');
 
   return {
     headers: {
       ...headers,
       ...(csrfToken ? { [CSRF_HEADER]: csrfToken } : {}),
-      ...(impersonationToken
-        ? { authorization: `Bearer ${impersonationToken}` }
-        : {}),
     },
   };
 });
@@ -170,14 +161,10 @@ async function silentlyRefreshJwt(): Promise<string | null> {
 
       // Sync the cached user profile and notify the AuthProvider so the UI
       // immediately reflects any claim changes (e.g. accessLevel promotion).
-      // Skip profile sync during admin impersonation — the refreshed JWT
-      // belongs to the real admin, not the impersonated user.
-      const hasImpersonationToken =
-        typeof window !== 'undefined' &&
-        !!window.localStorage?.getItem('auth_jwt');
-      if (!hasImpersonationToken) {
-        syncUserProfileFromJwt(result.jwt);
-      }
+      // The refreshed JWT is always the admin's real token (ls_jwt cookie).
+      // During impersonation, the server also refreshes ls_imp_jwt in the
+      // same response — no client-side coordination needed.
+      syncUserProfileFromJwt(result.jwt);
 
       // The server also sets updated cookies automatically.
       // Return the token so the retry flow knows refresh succeeded.

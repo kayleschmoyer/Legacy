@@ -44,15 +44,27 @@ jest.mock('../services/AuthService', () => {
       getStoredUserProfile: jest.fn(() => null),
       getStoredTokenExpiry: jest.fn(() => null),
       getStoredAdminProfile: jest.fn(() => null),
+      getStoredImpersonatedUserProfile: jest.fn(() => null),
       storeUserProfile: jest.fn(),
       storeAdminProfile: jest.fn(),
+      storeImpersonatedUserProfile: jest.fn(),
       clearAdminProfile: jest.fn(),
+      clearImpersonatedUserProfile: jest.fn(),
       clearTokens: jest.fn(),
       verifyToken: jest.fn(() => false),
       refreshJwt: jest.fn(() => Promise.resolve(null)),
       authenticateWithEmail: jest.fn(),
       authenticateWithOAuth: jest.fn(),
       requestLogout: jest.fn(() => Promise.resolve()),
+      startImpersonation: jest.fn(() =>
+        Promise.resolve({
+          id: 99,
+          email: 'impersonated@test.com',
+          username: 'ImpersonatedUser',
+          accessLevel: 'user' as const,
+        }),
+      ),
+      stopImpersonation: jest.fn(() => Promise.resolve()),
       getStoredToken: jest.fn(() => null),
       getCurrentToken: jest.fn(() => null),
     })),
@@ -117,15 +129,27 @@ describe('AuthProvider – auth:token-refreshed event', () => {
       })),
       getStoredTokenExpiry: jest.fn(() => Math.floor(Date.now() / 1000) + 3600),
       getStoredAdminProfile: jest.fn(() => null),
+      getStoredImpersonatedUserProfile: jest.fn(() => null),
       storeUserProfile: jest.fn(),
       storeAdminProfile: jest.fn(),
+      storeImpersonatedUserProfile: jest.fn(),
       clearAdminProfile: jest.fn(),
+      clearImpersonatedUserProfile: jest.fn(),
       clearTokens: jest.fn(),
       verifyToken: jest.fn(() => false),
       refreshJwt: jest.fn(() => Promise.resolve(null)),
       authenticateWithEmail: jest.fn(),
       authenticateWithOAuth: jest.fn(),
       requestLogout: jest.fn(() => Promise.resolve()),
+      startImpersonation: jest.fn(() =>
+        Promise.resolve({
+          id: 99,
+          email: 'impersonated@test.com',
+          username: 'ImpersonatedUser',
+          accessLevel: 'user' as const,
+        }),
+      ),
+      stopImpersonation: jest.fn(() => Promise.resolve()),
       getStoredToken: jest.fn(() => null),
       getCurrentToken: jest.fn(() => null),
     };
@@ -194,15 +218,27 @@ describe('AuthProvider – updateUserProfile', () => {
       getStoredUserProfile: jest.fn(() => storedProfile),
       getStoredTokenExpiry: jest.fn(() => Math.floor(Date.now() / 1000) + 3600),
       getStoredAdminProfile: jest.fn(() => null),
+      getStoredImpersonatedUserProfile: jest.fn(() => null),
       storeUserProfile: jest.fn(),
       storeAdminProfile: jest.fn(),
+      storeImpersonatedUserProfile: jest.fn(),
       clearAdminProfile: jest.fn(),
+      clearImpersonatedUserProfile: jest.fn(),
       clearTokens: jest.fn(),
       verifyToken: jest.fn(() => false),
       refreshJwt: jest.fn(() => Promise.resolve(null)),
       authenticateWithEmail: jest.fn(),
       authenticateWithOAuth: jest.fn(),
       requestLogout: jest.fn(() => Promise.resolve()),
+      startImpersonation: jest.fn(() =>
+        Promise.resolve({
+          id: 99,
+          email: 'impersonated@test.com',
+          username: 'ImpersonatedUser',
+          accessLevel: 'user' as const,
+        }),
+      ),
+      stopImpersonation: jest.fn(() => Promise.resolve()),
       getStoredToken: jest.fn(() => null),
       getCurrentToken: jest.fn(() => null),
     };
@@ -241,29 +277,22 @@ describe('AuthProvider – updateUserProfile', () => {
       username: 'AdminUser',
       accessLevel: 'admin' as const,
     };
-    // Base64-encode a fake JWT payload for the impersonation token
-    const payload = {
+    const impersonatedUser = {
       id: 5,
       email: 'target@test.com',
       username: 'TargetUser',
-      accessLevel: 'user',
-      impersonatedBy: { id: 99, username: 'AdminUser' },
+      accessLevel: 'user' as const,
     };
-    const b64Payload = btoa(JSON.stringify(payload))
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=+$/, '');
-    const fakeJwt = `eyJ0eXAiOiJKV1QifQ.${b64Payload}.fakesig`;
-
-    // Simulate impersonation: auth_jwt in localStorage
-    localStorage.setItem('auth_jwt', fakeJwt);
 
     const mockInstance = {
       getStoredUserProfile: jest.fn(() => null),
       getStoredTokenExpiry: jest.fn(() => null),
       getStoredAdminProfile: jest.fn(() => adminProfile),
+      getStoredImpersonatedUserProfile: jest.fn(() => impersonatedUser),
+      clearImpersonatedUserProfile: jest.fn(),
       storeUserProfile: jest.fn(),
       storeAdminProfile: jest.fn(),
+      storeImpersonatedUserProfile: jest.fn(),
       clearAdminProfile: jest.fn(),
       clearTokens: jest.fn(),
       verifyToken: jest.fn(() => true),
@@ -271,6 +300,8 @@ describe('AuthProvider – updateUserProfile', () => {
       authenticateWithEmail: jest.fn(),
       authenticateWithOAuth: jest.fn(),
       requestLogout: jest.fn(() => Promise.resolve()),
+      startImpersonation: jest.fn(() => Promise.resolve(impersonatedUser)),
+      stopImpersonation: jest.fn(() => Promise.resolve()),
       getStoredToken: jest.fn(() => null),
       getCurrentToken: jest.fn(() => null),
     };

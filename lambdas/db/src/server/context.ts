@@ -88,9 +88,10 @@ export function parseUserFromJwtPayload(payload: JWTPayload): User {
 }
 
 /**
- * Cookie name for the HttpOnly JWT cookie set by the OAuth proxy.
+ * Cookie names for the HttpOnly JWT cookies set by the OAuth proxy.
  */
 const JWT_COOKIE = 'ls_jwt';
+const IMP_JWT_COOKIE = 'ls_imp_jwt';
 const CSRF_COOKIE = 'ls_csrf';
 const CSRF_HEADER = 'x-csrf-token';
 
@@ -121,20 +122,39 @@ export async function extractUserFromEvent(
 }
 
 /**
- * Parse the JWT value from a Cookie header string.
+ * Parse a named cookie value from a Cookie header string.
  */
-function parseJwtFromCookieHeader(
+function parseCookieValue(
   cookieHeader: string | undefined,
+  cookieName: string,
 ): string | null {
   if (!cookieHeader) return null;
   const cookies = cookieHeader.split(';');
   for (const cookie of cookies) {
     const [name, ...valueParts] = cookie.trim().split('=');
-    if (name === JWT_COOKIE) {
+    if (name === cookieName) {
       return valueParts.join('=') || null;
     }
   }
   return null;
+}
+
+/**
+ * Parse the JWT value from a Cookie header string.
+ */
+function parseJwtFromCookieHeader(
+  cookieHeader: string | undefined,
+): string | null {
+  return parseCookieValue(cookieHeader, JWT_COOKIE);
+}
+
+/**
+ * Parse the impersonation JWT from a Cookie header string.
+ */
+function parseImpersonationJwtFromCookieHeader(
+  cookieHeader: string | undefined,
+): string | null {
+  return parseCookieValue(cookieHeader, IMP_JWT_COOKIE);
 }
 
 /**
@@ -171,7 +191,8 @@ function timingSafeEqual(a: string, b: string): boolean {
  *
  * Auth sources (checked in order):
  * 1. Authorization: Bearer <jwt> header — used by mobile, CLI, system callers
- * 2. ls_jwt HttpOnly cookie — used by the web frontend (requires valid CSRF)
+ * 2. ls_imp_jwt HttpOnly cookie — impersonation session (requires valid CSRF)
+ * 3. ls_jwt HttpOnly cookie — used by the web frontend (requires valid CSRF)
  *
  * When auth comes from a cookie, the X-CSRF-Token header must match the
  * ls_csrf cookie value (double-submit cookie pattern).
@@ -186,9 +207,12 @@ export async function extractUserFromApiEvent(
     return extractUserFromEvent(authorization);
   }
 
-  // 2. Try HttpOnly cookie
+  // 2. Try HttpOnly cookies (impersonation cookie takes priority over regular JWT)
   const cookieHeader = event.headers.Cookie ?? event.headers.cookie;
-  const cookieJwt = parseJwtFromCookieHeader(cookieHeader);
+
+  // Check for impersonation cookie first, fall back to regular JWT
+  const impersonationJwt = parseImpersonationJwtFromCookieHeader(cookieHeader);
+  const cookieJwt = impersonationJwt ?? parseJwtFromCookieHeader(cookieHeader);
   if (!cookieJwt) return null;
 
   // Validate CSRF double-submit: header must match cookie

@@ -1,5 +1,5 @@
 import { APIGatewayEvent, APIGatewayProxyResult } from 'aws-lambda';
-import { verify } from 'jsonwebtoken';
+import { sign, verify } from 'jsonwebtoken';
 import { LOGGER } from '@legacy-sports/logging';
 import { readSecret } from '@legacy-sports/aws-utils';
 import { getUserById } from '@legacy-sports/db-client';
@@ -7,8 +7,10 @@ import { Secret, SECRET_CONFIG } from '../util';
 import { createJwt } from '../util/jwt';
 import {
   buildAuthCookies,
+  buildImpersonationCookie,
   CSRF_HEADER,
   generateCsrfToken,
+  parseImpersonationJwtFromCookies,
   parseJwtFromCookies,
   validateCsrf,
 } from '../util/jwt-cookie';
@@ -21,8 +23,16 @@ interface RefreshJwtPayload {
   picture?: string;
   exp?: number;
   iat?: number;
+  impersonatedBy?: {
+    id: number;
+    email: string;
+    username: string;
+  };
   [key: string]: unknown;
 }
+
+/** Impersonation tokens expire after 2 hours. */
+const IMPERSONATION_TTL_SECONDS = 2 * 60 * 60;
 
 /**
  * Maximum time (in seconds) after a JWT has expired that a refresh is still allowed.
@@ -133,6 +143,22 @@ export const handleRefreshJwt = async (
     }
   }
 
+  // Check for an active impersonation session (ls_imp_jwt cookie).
+  // When present, refresh both the impersonation token and the admin's token.
+  const impersonationJwt = parseImpersonationJwtFromCookies(cookieHeader);
+  let impPayload: RefreshJwtPayload | null = null;
+  if (impersonationJwt) {
+    try {
+      impPayload = verify(impersonationJwt, jwtKey, {
+        algorithms: ['HS256'],
+        ignoreExpiration: true,
+      }) as RefreshJwtPayload;
+    } catch {
+      // Impersonation token is invalid — ignore and let it expire
+      LOGGER.warn('handleRefreshJwt: impersonation JWT verification failed');
+    }
+  }
+
   // Look up the user in the database to confirm they still exist
   return await withDbClient(async (db) => {
     const user = await getUserById(db, payload.id as number);
@@ -157,11 +183,51 @@ export const handleRefreshJwt = async (
     // Set updated HttpOnly cookie + CSRF cookie
     const csrfToken = generateCsrfToken();
     const authCookies = buildAuthCookies(newJwt, csrfToken);
+    const allCookies = [...authCookies];
+
+    // If impersonation is active, also refresh the impersonation token
+    if (impPayload?.impersonatedBy && impPayload.id) {
+      const impUser = await getUserById(db, impPayload.id);
+      if (impUser && impUser.accessLevel !== 'admin') {
+        // Verify the admin (the person doing the impersonating) is still an admin
+        // and that the impersonation cookie belongs to this admin session
+        if (
+          user.accessLevel === 'admin' &&
+          impPayload.impersonatedBy.id === Number(user.id)
+        ) {
+          const refreshedImpPayload = {
+            id: Number(impUser.id),
+            email: impUser.email,
+            username: impUser.username ?? '',
+            accessLevel: impUser.accessLevel ?? 'none',
+            impersonatedBy: impPayload.impersonatedBy,
+          };
+          const refreshedImpJwt = sign(refreshedImpPayload, jwtKey, {
+            expiresIn: IMPERSONATION_TTL_SECONDS,
+          });
+          allCookies.push(
+            ...buildImpersonationCookie(
+              refreshedImpJwt,
+              IMPERSONATION_TTL_SECONDS,
+            ),
+          );
+          LOGGER.info('handleRefreshJwt: refreshed impersonation JWT', {
+            adminId: impPayload.impersonatedBy.id,
+            targetId: impUser.id,
+          });
+        } else {
+          LOGGER.warn(
+            'handleRefreshJwt: admin lost admin access, not refreshing impersonation',
+            { userId: user.id },
+          );
+        }
+      }
+    }
 
     return {
       statusCode: 200,
       multiValueHeaders: {
-        'Set-Cookie': authCookies,
+        'Set-Cookie': allCookies,
       },
       body: JSON.stringify({ jwt: newJwt, csrfToken }),
     };

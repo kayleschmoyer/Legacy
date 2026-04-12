@@ -26,8 +26,9 @@ export function ImpersonationBanner(): React.JSX.Element | null {
     auth.adminUser?.username || auth.adminUser?.email || 'Admin';
 
   const handleStop = () => {
-    auth.stopImpersonating();
-    void navigate('/admin');
+    void auth.stopImpersonating().then(() => {
+      void navigate('/admin');
+    });
   };
 
   return (

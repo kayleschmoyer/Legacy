@@ -60,10 +60,10 @@ interface AuthContextType {
   isImpersonating: boolean;
   /** The original admin user who initiated impersonation. */
   adminUser: User | null;
-  /** Begin impersonating another user using the given JWT. */
-  impersonateUser: (impersonationToken: string) => void;
-  /** Restore the original admin session. */
-  stopImpersonating: () => void;
+  /** Begin impersonating another user. Sets HttpOnly cookie server-side. */
+  impersonateUser: (userId: number) => Promise<void>;
+  /** Restore the original admin session. Clears HttpOnly cookie server-side. */
+  stopImpersonating: () => Promise<void>;
   /** Update the current user's profile fields (e.g. after a username change). */
   updateUserProfile: (
     updates: Partial<Pick<User, 'username' | 'picture'>>,
@@ -207,6 +207,10 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         isImpersonating: true,
         adminUser: action.payload.adminUser,
         user: action.payload.targetUser,
+        // Clear in-memory token so WebSocket and other consumers that pass
+        // token via query string don't accidentally authenticate as the admin
+        // instead of the impersonated user (auth uses HttpOnly cookies now).
+        token: null,
       };
 
     case 'IMPERSONATE_STOP':
@@ -358,10 +362,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
 
       // Ignore token-refreshed events during admin impersonation — the
       // refreshed JWT belongs to the real admin, not the impersonated user.
-      const hasImpersonationToken =
-        typeof localStorage !== 'undefined' &&
-        !!localStorage.getItem('auth_jwt');
-      if (hasImpersonationToken) return;
+      // Check stored admin profile instead of state to avoid stale closures.
+      if (authService.getStoredAdminProfile()) return;
 
       dispatchAuth({ type: 'AUTH_SUCCESS', payload: detail.user });
       authService.storeUserProfile(detail.user);
@@ -384,38 +386,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
 
     const initializeAuth = async () => {
       try {
-        // Check if we're in impersonation mode (impersonation JWT in localStorage)
-        const impersonationToken =
-          typeof localStorage !== 'undefined'
-            ? localStorage.getItem('auth_jwt')
-            : null;
+        // Check if we're in impersonation mode by looking for a stored admin
+        // profile. The actual impersonation JWT is in an HttpOnly cookie
+        // (ls_imp_jwt) — not accessible to JavaScript.
+        const adminProfile = authService.getStoredAdminProfile();
+        const impersonatedUserProfile =
+          authService.getStoredImpersonatedUserProfile();
 
-        if (impersonationToken) {
-          // Impersonation mode — decode the impersonation JWT
-          const isValid = authService.verifyToken(impersonationToken);
-          if (isValid) {
-            const targetUser = decodeUserFromToken(impersonationToken);
-            const adminProfile = authService.getStoredAdminProfile();
-
-            if (targetUser && adminProfile && isMounted) {
-              dispatchAuth({
-                type: 'IMPERSONATE_START',
-                payload: { adminUser: adminProfile, targetUser },
-              });
-              // Keep the in-memory token in sync with the impersonation JWT
-              // so the WebSocket authenticates as the impersonated user.
-              dispatchAuth({
-                type: 'TOKEN_UPDATED',
-                payload: impersonationToken,
-              });
-              return;
-            }
-          }
-          // Impersonation token invalid — clear it and fall through
-          if (typeof localStorage !== 'undefined') {
-            localStorage.removeItem('auth_jwt');
-          }
+        if (adminProfile && impersonatedUserProfile && isMounted) {
+          // Impersonation was active before the page reload.
+          // Restore the UI state from cached profiles; the HttpOnly
+          // ls_imp_jwt cookie authenticates requests automatically.
+          dispatchAuth({
+            type: 'IMPERSONATE_START',
+            payload: {
+              adminUser: adminProfile,
+              targetUser: impersonatedUserProfile,
+            },
+          });
+          return;
+        } else if (adminProfile) {
+          // Admin profile stored but no impersonated user — stale state.
+          // Clear it and fall through to normal auth.
           authService.clearAdminProfile();
+          authService.clearImpersonatedUserProfile();
         }
 
         // Normal flow — restore session from cached user profile.
@@ -583,13 +577,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
 
   /**
    * Begin impersonating another user.  The calling user must be an admin.
-   * Stores the current admin profile so impersonation can be reverted.
-   * The admin's actual JWT stays safely in the HttpOnly cookie.
-   *
-   * @param impersonationToken - A signed JWT returned by the `impersonateUser` GraphQL mutation.
+   * Calls POST /oauth/impersonate to set an HttpOnly cookie (ls_imp_jwt),
+   * then updates client state with the impersonated user profile.
    */
   const impersonateUser = useCallback(
-    (impersonationToken: string) => {
+    async (userId: number) => {
       // Use current auth state for admin info (can't read HttpOnly cookie JWT)
       const currentAdminUser = authState.user;
       if (!currentAdminUser) {
@@ -597,40 +589,34 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
         return;
       }
 
-      const targetUser = decodeUserFromToken(impersonationToken);
-      if (!targetUser) {
-        LOGGER.error('impersonateUser: could not decode impersonation token');
-        return;
-      }
+      // Call server to set the HttpOnly impersonation cookie
+      const targetUser = await authService.startImpersonation(userId);
 
       // Save admin profile for restoration when impersonation ends
       authService.storeAdminProfile(currentAdminUser);
 
-      // Store impersonation JWT in localStorage — Apollo sends it as Bearer
-      // header, which takes priority over the HttpOnly cookie on the server.
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('auth_jwt', impersonationToken);
-      }
+      // Store the impersonated user profile so we can restore the UI state
+      // on page reload. No JWT is stored — auth uses the HttpOnly cookie.
+      authService.storeImpersonatedUserProfile(targetUser);
 
       dispatchAuth({
         type: 'IMPERSONATE_START',
         payload: { adminUser: currentAdminUser, targetUser },
       });
 
-      // Keep the in-memory token in sync so the WebSocket (and other callers
-      // of authState.token) authenticate as the impersonated user rather than
-      // the admin.
-      dispatchAuth({ type: 'TOKEN_UPDATED', payload: impersonationToken });
-
       // Flush any user-scoped caches (e.g. Apollo InMemoryCache) so the new
       // identity never receives another user's cached responses.
       void onUserSwitch?.();
     },
-    [authService, authState.user, decodeUserFromToken, onUserSwitch],
+    [authService, authState.user, onUserSwitch],
   );
 
-  /** Restore the original admin session, ending impersonation. */
-  const stopImpersonating = useCallback(() => {
+  /**
+   * Restore the original admin session, ending impersonation.
+   * Calls POST /oauth/stop-impersonate to clear the ls_imp_jwt cookie
+   * server-side, then updates client state.
+   */
+  const stopImpersonating = useCallback(async () => {
     // Restore admin profile from cache
     const adminProfile = authService.getStoredAdminProfile();
 
@@ -639,22 +625,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
       return;
     }
 
-    // Remove impersonation JWT from localStorage — requests will now use
-    // the admin's HttpOnly cookie JWT automatically.
+    // Clear the impersonation cookie server-side
+    try {
+      await authService.stopImpersonation();
+    } catch (err) {
+      LOGGER.error(
+        'stopImpersonating: failed to clear server cookie; keeping impersonation state active',
+        String(err),
+      );
+      throw err;
+    }
+
+    // Clean up legacy localStorage keys if present
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem('auth_jwt');
-      localStorage.removeItem('admin_original_jwt'); // legacy cleanup
+      localStorage.removeItem('admin_original_jwt');
     }
     authService.clearAdminProfile();
+    authService.clearImpersonatedUserProfile();
 
     // Restore admin user profile for UI
     authService.storeUserProfile(adminProfile);
 
     dispatchAuth({ type: 'IMPERSONATE_STOP', payload: adminProfile });
-
-    // Clear the impersonation token from in-memory state so the WebSocket
-    // falls back to the admin's HttpOnly cookie for subsequent connections.
-    dispatchAuth({ type: 'TOKEN_UPDATED', payload: null });
 
     // Flush any user-scoped caches (e.g. Apollo InMemoryCache) so the restored
     // admin session never gets stale impersonated-user data.

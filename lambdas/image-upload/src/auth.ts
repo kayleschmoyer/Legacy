@@ -79,11 +79,12 @@ export async function getAuthenticatedUserId(
     return id;
   }
 
-  // 2. Fall back to ls_jwt cookie (web frontend — requires CSRF validation)
+  // 2. Fall back to cookies (web frontend — requires CSRF validation)
+  // Check ls_imp_jwt (impersonation) first, then ls_jwt (regular auth)
   const cookieHeader = event.headers['cookie'] ?? event.headers['Cookie'] ?? '';
   if (cookieHeader) {
     const cookies = parseCookies(cookieHeader);
-    const token = cookies['ls_jwt'];
+    const token = cookies['ls_imp_jwt'] ?? cookies['ls_jwt'];
     if (token) {
       // Validate CSRF double-submit: X-CSRF-Token header must match ls_csrf cookie
       const csrfHeader =

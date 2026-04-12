@@ -115,17 +115,44 @@ async function validateToken(
   event: APIGatewayProxyWebsocketEventV2,
 ): Promise<{ valid: boolean; userId?: number; payload?: JwtPayload }> {
   try {
-    // Extract JWT from query string (?token=...) or Authorization header (Bearer ...)
-    const queryParams = event.queryStringParameters as
+    // Extract JWT — impersonation cookie takes highest priority so that
+    // WebSocket connections authenticate as the impersonated user even when
+    // the client also passes the admin JWT via query string.
+    const headers = event.headers as
       | Record<string, string | undefined>
       | undefined;
-    let token: string | undefined = queryParams?.['token'];
+    let token: string | undefined;
 
-    // If not in query string, check Authorization header
+    // 1. Check HttpOnly cookies first (ls_imp_jwt > ls_jwt)
+    const cookieHeader = headers?.['cookie'] || headers?.['Cookie'];
+    if (cookieHeader) {
+      const cookies = cookieHeader.split(';');
+      let regularToken: string | undefined;
+      for (const cookie of cookies) {
+        const [name, ...valueParts] = cookie.trim().split('=');
+        if (name === 'ls_imp_jwt') {
+          token = valueParts.join('=') || undefined;
+          break;
+        }
+        if (name === JWT_COOKIE) {
+          regularToken = valueParts.join('=') || undefined;
+        }
+      }
+      if (!token && regularToken) {
+        token = regularToken;
+      }
+    }
+
+    // 2. Fall back to query string (?token=...)
     if (!token) {
-      const headers = event.headers as
+      const queryParams = event.queryStringParameters as
         | Record<string, string | undefined>
         | undefined;
+      token = queryParams?.['token'];
+    }
+
+    // 3. Fall back to Authorization header (Bearer ...)
+    if (!token) {
       const authHeader =
         headers?.['authorization'] || headers?.['Authorization'];
 
@@ -133,21 +160,6 @@ async function validateToken(
         const match = authHeader.match(/^Bearer\s+(.+)$/i);
         if (match?.[1]) {
           token = match[1];
-        }
-      }
-
-      // If not in Authorization header, check HttpOnly cookie
-      if (!token) {
-        const cookieHeader = headers?.['cookie'] || headers?.['Cookie'];
-        if (cookieHeader) {
-          const cookies = cookieHeader.split(';');
-          for (const cookie of cookies) {
-            const [name, ...valueParts] = cookie.trim().split('=');
-            if (name === JWT_COOKIE) {
-              token = valueParts.join('=') || undefined;
-              break;
-            }
-          }
         }
       }
     }

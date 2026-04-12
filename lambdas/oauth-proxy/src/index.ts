@@ -31,6 +31,10 @@ import {
   handleDiscordLink,
   handleDiscordUnlink,
 } from './handlers/Discord';
+import {
+  handleImpersonate,
+  handleStopImpersonate,
+} from './handlers/Impersonate';
 
 // Initialize Rollbar
 const rollbarConfig = getRollbarConfigFromEnv();
@@ -238,6 +242,8 @@ const baseOAuthHandler = async (
               '/oauth/device/token (CLI device flow)',
               '/oauth/device/verify (CLI device flow)',
               '/oauth/device/complete-local (CLI device flow with local auth)',
+              '/oauth/impersonate (start admin impersonation session)',
+              '/oauth/stop-impersonate (end admin impersonation session)',
               '/oauth/discord (Discord OAuth login)',
               '/oauth/discord/link (link Discord to existing account)',
               '/oauth/discord/unlink (unlink Discord from account)',
@@ -363,6 +369,21 @@ const baseOAuthHandler = async (
         }
         break;
 
+      case '/oauth/impersonate':
+      case '/dev/oauth/impersonate':
+        if (event.httpMethod === 'POST') {
+          const result = await handleImpersonate(event);
+          return cors(result);
+        }
+        break;
+
+      case '/oauth/stop-impersonate':
+      case '/dev/oauth/stop-impersonate':
+        if (event.httpMethod === 'POST') {
+          return cors(handleStopImpersonate(event));
+        }
+        break;
+
       case '/oauth/discord':
       case '/dev/oauth/discord':
         if (event.httpMethod === 'POST') {
@@ -433,3 +454,4 @@ export * from './handlers/Local';
 export * from './handlers/Verify';
 export * from './handlers/DeviceFlow';
 export * from './handlers/RefreshJwt';
+export * from './handlers/Impersonate';
