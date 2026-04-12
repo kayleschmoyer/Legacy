@@ -22,9 +22,9 @@ import { expect, test } from '../fixtures/auth-enhanced';
 /** localStorage key shared by ThemeContext and PreferencesPage */
 const LS_PREFS_KEY = 'ls_user_preferences';
 
-/** Expected computed background-color strings for each theme (from AppProvider.tsx) */
+/** Expected computed background-color strings for each theme (from tamagui-config themes) */
 const DARK_BG_CSS = 'rgb(10, 15, 26)'; // #0A0F1A
-const LIGHT_BG_CSS = 'rgb(247, 249, 252)'; // #F7F9FC
+const LIGHT_BG_CSS = 'rgb(255, 255, 255)'; // #FFFFFF
 
 /* ── Helper: read theme from localStorage ───────────────────────────────── */
 

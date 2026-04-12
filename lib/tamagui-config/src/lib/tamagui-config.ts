@@ -168,11 +168,11 @@ const brandLight = {
   backgroundStrong: '#E6EAF2',
   backgroundTransparent: 'rgba(255, 255, 255, 0.85)',
 
-  // Surfaces
-  color1: '#FFFFFF',
-  color2: '#F7FAFC',
-  color3: '#EFF3F8',
-  color4: '#E6EBF2',
+  // Surfaces — offset from #FFFFFF background so cards/panels are visually distinct
+  color1: '#F5F7FA',
+  color2: '#EDF1F7',
+  color3: '#E4EAF2',
+  color4: '#D9E1EC',
   color5: '#D5DDE8',
   color6: '#C3CDDA',
   color7: '#9CAAC5',
@@ -183,17 +183,17 @@ const brandLight = {
   color12: '#0B1220', // strongest text
 
   // Extended surfaces for dashboards & roster layouts
-  surfacePanel: '#F7FAFF',
+  surfacePanel: '#EFF4FB',
   surfacePanelBorder: '#D0DAE8',
-  surfaceCard: '#FFFFFF',
-  surfaceSubtle: '#EFF3F8',
+  surfaceCard: '#F5F7FA',
+  surfaceSubtle: '#EDF1F7',
   surfaceInteractive: 'rgba(27, 58, 92, 0.06)',
   accentMuted: 'rgba(27, 58, 92, 0.10)',
   successMuted: 'rgba(34, 197, 94, 0.12)',
   warningMuted: 'rgba(245, 158, 11, 0.14)',
   outlineSubtle: '#E1E7F0',
   outlineStrong: '#C3CDDA',
-  textMuted: '#5F7295',
+  textMuted: '#4A6080',
   textOnAccent: '#FFFFFF',
 
   // Glass surface tokens — for glassmorphism overlays & cards
@@ -214,9 +214,9 @@ const brandLight = {
   brandNavyDark: '#143050',
   brandSeamRed: '#C41E3A',
   brandSeamRedLight: '#E63950',
-  brandGold: '#A68B3E',
-  brandGoldLight: '#C5A55A',
-  brandGoldDark: '#8A7232',
+  brandGold: '#B8942B',
+  brandGoldLight: '#D4B24A',
+  brandGoldDark: '#967828',
 
   // Text
   color: '#0B1220',
@@ -304,7 +304,7 @@ const brandLight = {
   positionCatcher: '#5A6670', // steel gray
   positionInfield: '#7C5B3D', // warm brown — dirt
   positionOutfield: '#2D6A4F', // field green
-  positionUtility: '#A68B3E', // aged gold
+  positionUtility: '#B8942B', // aged gold
 
   focusRing: '#2563EB',
 };

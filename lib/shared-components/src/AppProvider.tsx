@@ -7,6 +7,8 @@ import { Platform } from './platform-components';
 import { LoadingPanel } from './LazyLoadingPanel';
 import { ConditionalProviders } from './ConditionalProviders';
 
+const DEFAULT_COLOR_SCHEME = 'dark' as const;
+
 interface AppProviderProps {
   children: React.ReactNode;
   apolloClient: ApolloClient; // Apollo client instance
@@ -20,7 +22,7 @@ const NativeLayout = ({
   children,
   apolloClient,
   tamaguiConfig,
-  colorScheme,
+  colorScheme = DEFAULT_COLOR_SCHEME,
   isLoading,
 }: AppProviderProps) => {
   if (isLoading) {
@@ -30,12 +32,12 @@ const NativeLayout = ({
   try {
     return (
       <TamaguiProvider
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Tamagui's config prop resolves as error type; createTamagui() return is always correct at runtime
         config={tamaguiConfig}
-        defaultTheme={colorScheme === 'dark' ? 'dark' : 'light'}
+        defaultTheme={colorScheme}
       >
         {/* Theme wrapper ensures live re-renders pick up the active theme */}
-        <Theme name={colorScheme === 'dark' ? 'dark' : 'light'}>
+        <Theme name={colorScheme}>
           <ConditionalProviders>
             <ApolloProvider client={apolloClient}>{children}</ApolloProvider>
           </ConditionalProviders>
@@ -53,7 +55,7 @@ const WebLayout = ({
   children,
   apolloClient,
   tamaguiConfig,
-  colorScheme,
+  colorScheme = DEFAULT_COLOR_SCHEME,
   isLoading,
 }: AppProviderProps) => {
   if (isLoading) {
@@ -63,19 +65,19 @@ const WebLayout = ({
   try {
     return (
       <TamaguiProvider
-        /* eslint-disable-next-line @typescript-eslint/no-unsafe-assignment */
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Tamagui's config prop resolves as error type; createTamagui() return is always correct at runtime
         config={tamaguiConfig}
-        defaultTheme={colorScheme === 'dark' ? 'dark' : 'light'}
+        defaultTheme={colorScheme}
       >
         {/* Theme wrapper ensures live re-renders pick up the active theme */}
-        <Theme name={colorScheme === 'dark' ? 'dark' : 'light'}>
+        <Theme name={colorScheme}>
           <div
-            className={`app-container ${colorScheme || 'dark'}`}
+            className={`app-container ${colorScheme}`}
             data-testid="app-container"
             style={{
               minHeight: '100vh',
-              backgroundColor: colorScheme === 'light' ? '#F7F9FC' : '#0A0F1A',
-              color: colorScheme === 'light' ? '#222B45' : '#F8FAFC',
+              backgroundColor: 'var(--background)',
+              color: 'var(--color)',
             }}
           >
             <ConditionalProviders>
