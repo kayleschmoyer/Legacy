@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "type": "command",
+        "bash": ".github/copilot/hooks/setup-worktree-symlink.sh",
+        "powershell": ".github/copilot/hooks/setup-worktree-symlink.ps1",
+        "cwd": ".",
+        "timeoutSec": 15,
+        "comment": "Create/validate node_modules symlink pointing to main repo"
+      },
+      {
+        "type": "command",
+        "bash": ".github/copilot/hooks/cleanup-orphaned-symlinks.sh",
+        "powershell": ".github/copilot/hooks/cleanup-orphaned-symlinks.ps1",
+        "cwd": ".",
+        "timeoutSec": 15,
+        "comment": "Remove stale node_modules symlinks from crashed sibling sessions"
+      }
+    ],
+    "sessionEnd": [
+      {
+        "type": "command",
+        "bash": ".github/copilot/hooks/cleanup-worktree-symlink.sh",
+        "powershell": ".github/copilot/hooks/cleanup-worktree-symlink.ps1",
+        "cwd": ".",
+        "timeoutSec": 15,
+        "comment": "Remove node_modules symlink on clean session exit"
+      }
+    ],
+    "preToolUse": [
+      {
+        "type": "command",
+        "bash": ".github/copilot/hooks/guard-main-repo.sh",
+        "powershell": ".github/copilot/hooks/guard-main-repo.ps1",
+        "cwd": ".",
+        "timeoutSec": 10,
+        "comment": "Block writes to main repo while worktrees exist"
+      }
+    ]
+  }
+}
