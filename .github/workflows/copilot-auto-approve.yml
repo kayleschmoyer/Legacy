@@ -4,9 +4,10 @@ name: Copilot Auto-Approve
 # 1. request-review: sets bot-review status when a PR is opened or updated.
 #    Copilot review is triggered automatically by the repository ruleset
 #    ("Copilot review for default branch" with review_on_push: true).
-#    The requestReviewers REST API silently drops Copilot when called with
-#    any installation token (App or GITHUB_TOKEN) — only user OAuth tokens
-#    work, so we rely on the ruleset instead.
+#    The ruleset's review_on_push only auto-triggers on force-pushes, not
+#    incremental commits. To close this gap, the request-review job
+#    explicitly re-requests Copilot as a reviewer on every synchronize event
+#    via GITHUB_TOKEN (tested in LS-3073).
 # 2. auto-approve: approves the PR when Copilot's review has no unresolved comments
 # 3. delayed-recheck: on synchronize events, waits 3 min then dispatches a recheck
 #    if bot-review is still PENDING (guards against Copilot not re-reviewing)
@@ -266,6 +267,33 @@ jobs:
                 summary: 'Waiting for Copilot review to complete',
               },
             });
+
+      # On synchronize (new push), the native "Copilot code review" workflow
+      # (triggered by the copilot_code_review ruleset's review_on_push: true)
+      # only auto-triggers on force-pushes, not incremental commits. This leaves
+      # the copilot_code_review ruleset unsatisfied and the PR permanently blocked.
+      #
+      # Fix: explicitly re-request Copilot as a reviewer on every synchronize.
+      # Tested in LS-3073: GITHUB_TOKEN works for this call.
+      - name: Re-request Copilot review for native ruleset
+        if: |
+          github.event.action == 'synchronize' &&
+          github.event.pull_request.user.login != 'dependabot[bot]'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            try {
+              await github.rest.pulls.requestReviewers({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber,
+                reviewers: ['copilot-pull-request-reviewer[bot]'],
+              });
+              core.info(`Re-requested Copilot review for PR #${prNumber}`);
+            } catch (error) {
+              core.warning(`Copilot re-request failed: ${error.message}`);
+            }
 
   review-check:
     # Runs when any review is submitted (including Copilot). Checks thread state
