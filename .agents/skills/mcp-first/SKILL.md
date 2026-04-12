@@ -23,6 +23,8 @@ description: Per-server MCP-first operation mapping — which MCP tools to prefe
 | `claude_ai_Stripe`      | Claude Code built-in Stripe integration                                           |
 | `claude_ai_Atlassian`   | Jira + Confluence via OAuth 2.1. Cloud ID: `fb294606-6c8f-4b52-9a41-11fe45b77528` |
 
+> **Server load order matters in native-worktree sessions**: Claude Code's worktree-spawned sessions only connect the first few servers from `.mcp.json` at session start (LS-2902). The ordering prioritizes ticket-work tools (`worktree`, `legacy-sports-github`, `legacy-sports-make`, `legacy-sports-nx`). If a native session is missing a server, fall back to shell or move to a sibling worktree.
+
 ## Tool-First Concrete Substitutions
 
 These are the specific built-in tool substitutions agents should reach for automatically instead of the Bash equivalents:

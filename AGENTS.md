@@ -26,7 +26,7 @@ This file provides guidance to AI coding agents working with code in this reposi
 
 ## Branch Naming
 
-All pushed branches must contain `LS-####` — Jira Branch Sync reads the branch name for "In Progress" transitions. Humans: `LS-####/kebab-desc`. Agents: `<agent>/LS-####-kebab-desc` (prefix: `claude/`, `copilot/`, `bot/`; separator after LS key is `-` not `/`; max 5 words). Native-checkbox sessions: local stays `claude/<random>`, use `worktree_push({ remoteBranch: "claude/LS-####-desc" })` on first push — do **not** use `worktree_rename_branch` (breaks CC branch detection). If on a branch without `LS-####`, include ticket keys in PR title/body as backstop.
+All pushed branches must contain `LS-####` — Jira reads the branch name for transitions. See `.agents/skills/branch-naming/SKILL.md` for patterns by driver (human, launcher checkbox, cloud agent) and full rules.
 
 ## Workflow
 
@@ -36,13 +36,7 @@ Follow the **Agent Workflow Checklist (Steps 0-16)** in `.agents/skills/workflow
 
 ## Risk Classification
 
-| Level      | Scope                                  | Planning Budget | Examples                           |
-| ---------- | -------------------------------------- | --------------- | ---------------------------------- |
-| **Low**    | Cosmetic, docs, test-only, single-file | 2-3 min         | Typo fix, add test, update README  |
-| **Medium** | Business logic, multi-file, schema     | 5-10 min        | New resolver, UI feature, refactor |
-| **High**   | Auth, payments, infra, migrations      | 10-15 min       | OAuth, Stripe webhook, Terraform   |
-
-See `.agents/skills/planning/SKILL.md` for the full framework.
+Low (cosmetic/docs) → Medium (business logic/schema) → High (auth/payments/infra). See `.agents/skills/planning/SKILL.md` for the full framework with planning budgets.
 
 ## Command Patterns
 
@@ -57,33 +51,20 @@ Subagents do **not** inherit AGENTS.md context. Always include tool preference h
 See `.agents/skills/repo-tooling/SKILL.md` for the full command reference. Key targets:
 
 ```bash
-make pc             # full pre-commit validation (lint + typecheck + test + build)
-make build          # build affected projects
+make pc             # full pre-commit (lint + typecheck + test + build)
 make test           # test changed files
-make typecheck      # type-check all projects
-make lint-fix       # lint with auto-fix
-make format         # format code
 make codegen        # GraphQL codegen
-make dev            # start all dev services
-make worktree TICKET=#### DESC=description   # sibling worktree (parallel work only)
-make kill-stale                              # kill stale node processes
-pnpm exec nx run <project>:<target>          # project-specific targets
 ```
 
-Use `scratch/` for ad-hoc output (gitignored). On Windows, write scripts to `scratch/<name>.js` instead of `node -e "..."`.
+Use `scratch/` for ad-hoc output (gitignored). On Windows, write scripts to `scratch/<name>.js` instead of `node -e`.
 
 ## Architecture
 
 **Stack**: React Native (Expo) · Next.js · AWS Lambda · GraphQL (Apollo) · PostgreSQL (Drizzle ORM) · Nx monorepo · pnpm
 
-| Directory    | Contents                                                                                                                   |
-| ------------ | -------------------------------------------------------------------------------------------------------------------------- |
-| `apps/`      | React Native app, Next.js web, CLI, E2E suites                                                                             |
-| `lambdas/`   | GraphQL API (`db`), game-selection, stats, draft-processor, websocket, oauth-proxy, stripe-webhook, apple-iap              |
-| `lib/`       | 19+ shared libraries (shared-components, db-client, scoring, data-loaders, logging, api, utils, aws-utils, analytics, ...) |
-| `terraform/` | Infrastructure-as-Code                                                                                                     |
+`apps/` (web, mobile, CLI) · `lambdas/` (GraphQL API, game-selection, stats, etc.) · `lib/` (19+ shared libraries) · `terraform/` · `.agents/skills/`
 
-GraphQL API lives in `lambdas/db` — schema changes need Drizzle migrations + `make codegen`. Cross-platform splits use `.native.ts` auto-resolution and `__PLATFORM_COMPONENTS__` magic string in `lib/shared-components/src/platform-components/`. Database schema in `lib/db-client` — always run `db_migration_status` + `db_migrate` before `make pc`.
+See `.agents/skills/architecture/SKILL.md` for directory structure, build system, cross-platform resolution, database schema, GraphQL services, and deployment patterns.
 
 ## Design Context
 
@@ -95,7 +76,7 @@ Detailed how-to docs live in `.agents/skills/<name>/SKILL.md`. The `description`
 
 ## MCP Servers
 
-9 custom servers + 2 built-in plugins: `worktree`, `legacy-sports-github`, `legacy-sports-make`, `legacy-sports-nx`, `legacy-sports-jira`, `legacy-sports-db`, `legacy-sports-ci`, `legacy-sports-aws`, `legacy-sports-browser`. Built-ins: `claude_ai_Stripe`, `claude_ai_Atlassian` (cloud ID: `fb294606-6c8f-4b52-9a41-11fe45b77528`). Native-worktree sessions may only load a subset of servers (LS-2902) — fall back to shell or use a sibling worktree. See `.agents/skills/mcp-first/SKILL.md` for the full per-server tool mapping.
+See `.agents/skills/mcp-first/SKILL.md` for the full server list, per-server tool mapping, and load-order notes. Always prefer MCP tools over equivalent shell commands.
 
 ## Cloud Agent Mode
 

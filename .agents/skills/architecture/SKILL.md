@@ -185,6 +185,16 @@ cd ..
 9. **Always `await` notification service calls** — never fire-and-forget. Lambda freezes the execution context after the handler returns; unawaited async work is silently killed. Wrap in try/catch so notification failure doesn't break the primary operation. See [WebSocket Notifications](../../docs/guides/websocket-notifications.md#critical-rules).
 10. **Never use inline `gql` tags** — define queries/mutations in `src/api/db/**/*.graphql` files and run codegen. Inline `gql` bypasses codegen, producing `any` types and requiring unsafe casts. An ESLint rule enforces this. See [codegen.md](../codegen/SKILL.md#-critical-never-use-inline-gql-tags).
 
+## Quick Reference (from AGENTS.md)
+
+These summaries were previously inline in AGENTS.md:
+
+- **GraphQL API**: Lives in `lambdas/db` (Apollo Server on Lambda). Schema changes require Drizzle migrations in `lib/db-client/migrations/` and regenerating types via `make codegen`.
+- **Cross-platform components**: `lib/shared-components/src/platform-components/` -- `.native.ts` files are auto-resolved by Metro. The `__PLATFORM_COMPONENTS__` magic string is used for build-time resolution of more complex platform splits.
+- **Database**: Drizzle ORM with PostgreSQL. Schema lives in `lib/db-client`. Always run `db_migration_status` and `db_migrate` MCP tools before `make pc`.
+- **Logging**: Import `LOGGER` from `@legacy-sports/logging`. ESLint enforces `no-console`.
+- **Testing**: Unit/integration: Jest (`make test`). Web E2E: Playwright (hermetic -- `route.fulfill()` only). Mobile E2E: WebdriverIO.
+
 ## Related Skills
 
 - [database](../database/SKILL.md) — Database schema, queries, migrations
