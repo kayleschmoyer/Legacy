@@ -182,6 +182,7 @@ jobs:
           VITE_BASE_PATH: /legacy-sports-deploys/pr-${{ steps.pr.outputs.number }}/
           VITE_OAUTH_PROXY_URL: ${{ secrets.VITE_OAUTH_PROXY_URL }}
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+          VITE_DISCORD_CLIENT_ID: ${{ secrets.VITE_DISCORD_CLIENT_ID }}
           VITE_GRAPHQL_HOST: ${{ secrets.VITE_GRAPHQL_HOST }}
           VITE_WEBSOCKET_URL: ${{ secrets.VITE_WEBSOCKET_URL }}
           VITE_GA_MEASUREMENT_ID: ""

@@ -265,6 +265,9 @@ export default defineConfig(({ mode }) => {
       'import.meta.env.VITE_GOOGLE_CLIENT_ID': JSON.stringify(
         env.VITE_GOOGLE_CLIENT_ID || 'placeholder-google-client-id',
       ),
+      'import.meta.env.VITE_DISCORD_CLIENT_ID': JSON.stringify(
+        env.VITE_DISCORD_CLIENT_ID || '',
+      ),
       'import.meta.env.VITE_GRAPHQL_HOST': JSON.stringify(
         env.VITE_GRAPHQL_HOST || 'http://localhost:5000/graphql',
       ),

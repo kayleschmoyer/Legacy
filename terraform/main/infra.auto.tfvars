@@ -40,3 +40,13 @@ enable_ci_runner_db_access = true
 # To use the free mlb-statsapi for local dev only, override this value in your
 # local secrets.auto.tfvars: mlb_data_provider = "mlb-statsapi"
 mlb_data_provider = "balldontlie"
+
+# ── Discord OAuth ─────────────────────────────────────────────────────────────
+# Discord Application ID (public — visible in every OAuth redirect URL).
+# Used by the oauth-proxy Lambda as DISCORD_CLIENT_ID for token exchange.
+# The corresponding client secret is sensitive and lives in secrets.auto.tfvars.
+discord_client_id = "1493368154972487800"
+
+# Discord OAuth redirect URI — must match exactly what's registered in
+# the Discord Developer Portal under OAuth2 → Redirects.
+discord_redirect_uri = "https://legacy-fantasy.com/auth/discord/callback"
