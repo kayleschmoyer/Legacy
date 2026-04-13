@@ -978,6 +978,11 @@ export function LeagueDetailPage(): React.JSX.Element {
   const [teamSecondaryColor, setTeamSecondaryColor] = useState('');
   const [teamColorSuccess, setTeamColorSuccess] = useState(false);
   const [teamColorError, setTeamColorError] = useState<string | null>(null);
+  const [logoSuccess, setLogoSuccess] = useState(false);
+  const [logoError, setLogoError] = useState<string | null>(null);
+  const logoSuccessTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
   // Pre-populate color inputs with the team's existing saved colors so that
   // opening Team Settings and saving without editing does not clear them.
@@ -3064,12 +3069,43 @@ export function LeagueDetailPage(): React.JSX.Element {
               username={leagueTeams.find((t) => t.id === userTeamId)?.name}
               onSelect={(url) => {
                 if (!userTeamId) return;
-                void updateTeamBranding({
+                setLogoSuccess(false);
+                setLogoError(null);
+                updateTeamBranding({
                   variables: { teamId: userTeamId, leagueId, logoUrl: url },
-                });
+                })
+                  .then(() => {
+                    if (logoSuccessTimeoutRef.current)
+                      clearTimeout(logoSuccessTimeoutRef.current);
+                    setLogoSuccess(true);
+                    logoSuccessTimeoutRef.current = setTimeout(
+                      () => setLogoSuccess(false),
+                      4000,
+                    );
+                  })
+                  .catch((err: unknown) => {
+                    setLogoError(
+                      err instanceof Error
+                        ? err.message
+                        : 'Failed to save logo',
+                    );
+                  });
               }}
               loading={teamBrandingLoading}
             />
+            {logoSuccess && (
+              <XStack alignItems="center" gap="$1">
+                <Check size={14} color="var(--green10)" />
+                <Text color="$green10" fontSize="$2">
+                  Saved
+                </Text>
+              </XStack>
+            )}
+            {logoError && (
+              <Text color="$red10" fontSize="$2">
+                {logoError}
+              </Text>
+            )}
           </YStack>
 
           <Separator />
