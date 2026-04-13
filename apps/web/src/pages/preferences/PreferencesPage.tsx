@@ -221,10 +221,22 @@ const SaveBanner = styled(XStack, {
   alignItems: 'center',
   gap: '$3',
   padding: '$3',
+  paddingHorizontal: '$4',
   borderRadius: '$5',
   borderWidth: 1,
   borderColor: '$successMuted',
   backgroundColor: '$successMuted',
+  // Fixed-position toast: taken out of document flow so changing prefs
+  // no longer shifts page content up/down (LS-3100).
+  position: 'fixed' as const,
+  bottom: 24,
+  right: 24,
+  zIndex: 1000,
+  shadowColor: '$shadowColor',
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.15,
+  shadowRadius: 8,
+  elevation: 8,
 });
 
 /* ─── Background style helpers ─── */
