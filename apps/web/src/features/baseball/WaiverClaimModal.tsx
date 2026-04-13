@@ -6,6 +6,7 @@ import {
   ScrollView,
   Separator,
   Spinner,
+  styled,
   Text,
   XStack,
   YStack,
@@ -29,6 +30,19 @@ import {
   BRAND_NAVY_LIGHT,
   withAlpha,
 } from '../../constants/colors';
+
+/* ── Styled ────────────────────────────────────────────────────────────────── */
+
+const PositionBadge = styled(XStack, {
+  backgroundColor: withAlpha(BRAND_NAVY_LIGHT, 0.12),
+  borderColor: withAlpha(BRAND_NAVY_LIGHT, 0.35),
+  borderWidth: 1,
+  borderRadius: '$2',
+  paddingHorizontal: '$2',
+  paddingVertical: '$0.5',
+  alignItems: 'center',
+  justifyContent: 'center',
+});
 
 /* ── Types ─────────────────────────────────────────────────────────────────── */
 
@@ -236,9 +250,19 @@ export const WaiverClaimModal: React.FC<WaiverClaimModalProps> = ({
                   </Text>
                   {player.eligiblePositions &&
                     player.eligiblePositions.length > 0 && (
-                      <Text fontSize="$2" color={BRAND_NAVY_LIGHT}>
-                        {player.eligiblePositions.join(', ')}
-                      </Text>
+                      <XStack flexWrap="wrap" gap="$1">
+                        {player.eligiblePositions.map((pos) => (
+                          <PositionBadge key={pos}>
+                            <Text
+                              fontSize={10}
+                              fontWeight="700"
+                              color={BRAND_GOLD_LIGHT}
+                            >
+                              {pos}
+                            </Text>
+                          </PositionBadge>
+                        ))}
+                      </XStack>
                     )}
                 </YStack>
                 <Text
@@ -328,20 +352,56 @@ export const WaiverClaimModal: React.FC<WaiverClaimModalProps> = ({
                             )}
                           </XStack>
 
-                          <YStack flex={1}>
-                            <Text
-                              fontWeight="600"
-                              fontSize="$3"
-                              color={isSelected ? '$red11' : '$color12'}
+                          <YStack flex={1} gap="$0.5">
+                            <XStack
+                              alignItems="center"
+                              gap="$2"
+                              flexWrap="wrap"
                             >
-                              {memberName}
-                            </Text>
-                            {mp.eligiblePositions &&
-                              mp.eligiblePositions.length > 0 && (
-                                <Text fontSize={11} color="$color8">
-                                  {mp.eligiblePositions.join(', ')}
+                              <Text
+                                fontWeight="600"
+                                fontSize="$3"
+                                color={isSelected ? '$red11' : '$color12'}
+                              >
+                                {memberName}
+                              </Text>
+                              {mp.eligiblePositions &&
+                                mp.eligiblePositions.length > 0 && (
+                                  <XStack flexWrap="wrap" gap="$0.5">
+                                    {mp.eligiblePositions.map((pos) => (
+                                      <PositionBadge key={pos}>
+                                        <Text
+                                          fontSize={9}
+                                          fontWeight="700"
+                                          color={BRAND_GOLD_LIGHT}
+                                        >
+                                          {pos}
+                                        </Text>
+                                      </PositionBadge>
+                                    ))}
+                                  </XStack>
+                                )}
+                            </XStack>
+                            <XStack gap="$2">
+                              {mp.seasonsPlayed != null && (
+                                <Text fontSize={10} color="$color8">
+                                  {mp.seasonsPlayed}{' '}
+                                  {mp.seasonsPlayed === 1
+                                    ? 'season'
+                                    : 'seasons'}
                                 </Text>
                               )}
+                              {mp.careerBatting?.games != null && (
+                                <Text fontSize={10} color="$color8">
+                                  {mp.careerBatting.games} career G
+                                </Text>
+                              )}
+                              {member.salary != null && member.salary > 0 && (
+                                <Text fontSize={10} color="$color8">
+                                  ${member.salary.toLocaleString()}
+                                </Text>
+                              )}
+                            </XStack>
                           </YStack>
 
                           {isSelected && (
