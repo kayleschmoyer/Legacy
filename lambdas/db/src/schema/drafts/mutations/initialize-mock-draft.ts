@@ -221,7 +221,13 @@ builder.mutationField('initializeMockDraft', (t) =>
         );
 
         // ── 6. Set league status to in-progress and initial pick deadline ───
-        const initialDeadline = new Date(Date.now() + pickTimeLimit * 1000);
+        // If the first pick belongs to a CPU team (human is not in slot 1),
+        // immediately expire the deadline so autoProcessDraftPicks fires as
+        // soon as the client nudges (~2 s after loading the draft board).
+        const firstPickIsCpu = userPickPosition !== 1;
+        const initialDeadline = firstPickIsCpu
+          ? new Date(Date.now() - 1)
+          : new Date(Date.now() + pickTimeLimit * 1000);
         await context.db
           .update(PublicSchema.drafts)
           .set({ currentPickDeadline: initialDeadline })
