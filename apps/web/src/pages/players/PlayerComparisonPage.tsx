@@ -489,6 +489,8 @@ function SeasonBattingTable({
               <Text
                 key={h}
                 flex={h === 'Year' ? 1.2 : 1}
+                minWidth={0}
+                numberOfLines={1}
                 fontSize="$2"
                 fontWeight="700"
                 color={BRAND_GOLD_LIGHT}
@@ -529,6 +531,8 @@ function SeasonBattingTable({
               <Text
                 key={ci}
                 flex={ci === 0 ? 1.2 : 1}
+                minWidth={0}
+                numberOfLines={1}
                 fontSize="$2"
                 fontWeight={ci === 0 ? '600' : '400'}
                 color={ci === 0 ? accent : WHITE}
@@ -587,6 +591,8 @@ function SeasonPitchingTable({
             <Text
               key={h}
               flex={h === 'Year' ? 1.2 : 1}
+              minWidth={0}
+              numberOfLines={1}
               fontSize="$2"
               fontWeight="700"
               color={BRAND_GOLD_LIGHT}
@@ -622,6 +628,8 @@ function SeasonPitchingTable({
               <Text
                 key={ci}
                 flex={ci === 0 ? 1.2 : 1}
+                minWidth={0}
+                numberOfLines={1}
                 fontSize="$2"
                 fontWeight={ci === 0 ? '600' : '400'}
                 color={ci === 0 ? accent : WHITE}
