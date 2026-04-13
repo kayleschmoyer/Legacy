@@ -411,12 +411,45 @@ describe('resolveCurrentBugEpicKey', () => {
     expect(result).toBe('LS-FALLBACK2');
   });
 
-  it('returns undefined when lookup fails and no fallback env var is set', async () => {
+  it('falls back to JQL search when property lookup and env var both fail', async () => {
+    const base = uniqueApiBase('jql-fallback');
+    delete process.env['BUG_EPIC_FALLBACK_KEY'];
+    fetchSpy
+      .mockResolvedValueOnce(new Response('Not Found', { status: 404 })) // property lookup fails
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ issues: [{ key: 'LS-3000' }] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ); // JQL search succeeds
+
+    const result = await resolveCurrentBugEpicKey(
+      ACCESS_TOKEN,
+      base,
+      PROJECT_KEY,
+    );
+
+    expect(result).toBe('LS-3000');
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    // Verify JQL search URL contains the correct search params
+    const jqlUrl = fetchSpy.mock.calls[1][0] as string;
+    expect(jqlUrl).toContain('/rest/api/3/search');
+    expect(jqlUrl).toContain('bucket%3Aclient-bugs');
+  });
+
+  it('returns undefined when all fallbacks fail', async () => {
     const base = uniqueApiBase('no-fallback');
     delete process.env['BUG_EPIC_FALLBACK_KEY'];
-    fetchSpy.mockResolvedValueOnce(
-      new Response('Internal Server Error', { status: 500 }),
-    );
+    fetchSpy
+      .mockResolvedValueOnce(
+        new Response('Internal Server Error', { status: 500 }),
+      ) // property lookup fails
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ issues: [] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ); // JQL search returns no results
 
     const result = await resolveCurrentBugEpicKey(
       ACCESS_TOKEN,
@@ -425,6 +458,52 @@ describe('resolveCurrentBugEpicKey', () => {
     );
 
     expect(result).toBeUndefined();
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not attempt JQL search when env var fallback succeeds', async () => {
+    const base = uniqueApiBase('env-skips-jql');
+    process.env['BUG_EPIC_FALLBACK_KEY'] = 'LS-ENVKEY';
+    fetchSpy.mockResolvedValueOnce(new Response('Not Found', { status: 404 })); // property lookup fails
+
+    const result = await resolveCurrentBugEpicKey(
+      ACCESS_TOKEN,
+      base,
+      PROJECT_KEY,
+    );
+
+    expect(result).toBe('LS-ENVKEY');
+    // Only 1 fetch call — property lookup; no JQL search needed
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('caches JQL fallback result within TTL', async () => {
+    const base = uniqueApiBase('jql-cache');
+    delete process.env['BUG_EPIC_FALLBACK_KEY'];
+    fetchSpy
+      .mockResolvedValueOnce(new Response('Not Found', { status: 404 })) // property lookup fails
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ issues: [{ key: 'LS-JQL-CACHED' }] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ); // JQL search succeeds
+
+    const first = await resolveCurrentBugEpicKey(
+      ACCESS_TOKEN,
+      base,
+      PROJECT_KEY,
+    );
+    const second = await resolveCurrentBugEpicKey(
+      ACCESS_TOKEN,
+      base,
+      PROJECT_KEY,
+    );
+
+    expect(first).toBe('LS-JQL-CACHED');
+    expect(second).toBe('LS-JQL-CACHED');
+    // Second call hits cache — no additional fetch
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 
   it('returns cached value within TTL without re-fetching', async () => {

@@ -6,9 +6,54 @@ import { getAccessToken, getApiBaseUrl, getSiteUrl } from './oauth';
 const bugEpicCache = new Map<string, { key: string; expiresAt: number }>();
 const BUG_EPIC_CACHE_TTL_MS = 5 * 60 * 1000;
 
+const BUG_BUCKET_LABEL = 'bucket:client-bugs';
+
+/**
+ * Last-resort fallback: search Jira for the most-recently-created open epic
+ * labelled `bucket:client-bugs`. This makes epic resolution self-healing when
+ * the project property is unset and the env-var fallback is stale.
+ */
+async function findCurrentBugEpicViaJql(
+  accessToken: string,
+  apiBaseUrl: string,
+  projectKey: string,
+): Promise<string | undefined> {
+  try {
+    const jql = `project = "${projectKey}" AND issuetype = Epic AND labels = "${BUG_BUCKET_LABEL}" AND statusCategory != Done ORDER BY created DESC`;
+    const params = new URLSearchParams({
+      jql,
+      maxResults: '1',
+      fields: 'none',
+    });
+    const response = await fetch(
+      `${apiBaseUrl}/rest/api/3/search?${params.toString()}`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          Accept: 'application/json',
+        },
+      },
+    );
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const data = (await response.json()) as {
+      issues: Array<{ key: string }>;
+    };
+    return data.issues[0]?.key ?? undefined;
+  } catch (err) {
+    LOGGER.warn('Failed to find bug epic via JQL fallback', { err });
+    return undefined;
+  }
+}
+
 /**
  * Resolve the current bug epic key from Jira project property bucket.client-bugs.
- * Falls back to BUG_EPIC_FALLBACK_KEY env var on lookup failure.
+ *
+ * Fallback chain:
+ *   1. Jira project property `bucket.client-bugs`
+ *   2. `BUG_EPIC_FALLBACK_KEY` env var
+ *   3. JQL search for the latest open epic labelled `bucket:client-bugs`
  */
 export async function resolveCurrentBugEpicKey(
   accessToken: string,
@@ -44,7 +89,29 @@ export async function resolveCurrentBugEpicKey(
       `Failed to resolve current bug epic from project property: ${String(err)}`,
     );
   }
-  return process.env['BUG_EPIC_FALLBACK_KEY']?.trim() || undefined;
+
+  // Fallback 1: env var
+  const envKey = process.env['BUG_EPIC_FALLBACK_KEY']?.trim();
+  if (envKey) return envKey;
+
+  // Fallback 2: JQL search for the latest open bucket epic
+  LOGGER.info(
+    'Project property and env-var fallback both unavailable; trying JQL search',
+  );
+  const jqlKey = await findCurrentBugEpicViaJql(
+    accessToken,
+    apiBaseUrl,
+    projectKey,
+  );
+  if (jqlKey) {
+    bugEpicCache.set(cacheKey, {
+      key: jqlKey,
+      expiresAt: now + BUG_EPIC_CACHE_TTL_MS,
+    });
+    return jqlKey;
+  }
+
+  return undefined;
 }
 
 interface JiraIssueFields {
