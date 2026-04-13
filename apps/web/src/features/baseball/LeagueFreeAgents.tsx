@@ -33,6 +33,9 @@ import { NAV_HEIGHT_PX } from '../../constants/dimensions';
 
 const PAGE_SIZE = 50;
 
+/** .impeccable.md editorial typography: Big Shoulders Display for headings & stat labels */
+const FONT_DISPLAY = "'Big Shoulders Display', sans-serif";
+
 type PlayerType = 'hitters' | 'pitchers';
 
 const HITTER_POSITIONS = [
@@ -306,10 +309,10 @@ const DataRow = styled(XStack, {
   cursor: 'default',
   minWidth: 900,
   hoverStyle: {
-    backgroundColor: '$color2',
+    backgroundColor: withAlpha(BRAND_NAVY_LIGHT, 0.08),
   },
   pressStyle: {
-    backgroundColor: '$color3',
+    backgroundColor: withAlpha(BRAND_NAVY_LIGHT, 0.14),
   },
 });
 
@@ -453,10 +456,11 @@ const SortableHeader: React.FC<{
         fontSize={11}
         fontWeight="700"
         textTransform="uppercase"
-        letterSpacing={0.5}
+        letterSpacing={1}
         color={isSorted ? BRAND_GOLD_LIGHT : '$color9'}
         numberOfLines={1}
         whiteSpace="nowrap"
+        fontFamily={FONT_DISPLAY}
       >
         {label}
       </Text>
@@ -611,9 +615,12 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
               onPress={() => handlePlayerTypeChange('hitters')}
             >
               <Text
-                fontSize={13}
-                fontWeight={playerType === 'hitters' ? '700' : '500'}
+                fontSize={14}
+                fontWeight={playerType === 'hitters' ? '800' : '600'}
+                letterSpacing={1.5}
+                textTransform="uppercase"
                 color={playerType === 'hitters' ? BRAND_GOLD_LIGHT : '$color10'}
+                fontFamily={FONT_DISPLAY}
               >
                 Hitters
               </Text>
@@ -623,11 +630,14 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
               onPress={() => handlePlayerTypeChange('pitchers')}
             >
               <Text
-                fontSize={13}
-                fontWeight={playerType === 'pitchers' ? '700' : '500'}
+                fontSize={14}
+                fontWeight={playerType === 'pitchers' ? '800' : '600'}
+                letterSpacing={1.5}
+                textTransform="uppercase"
                 color={
                   playerType === 'pitchers' ? BRAND_GOLD_LIGHT : '$color10'
                 }
+                fontFamily={FONT_DISPLAY}
               >
                 Pitchers
               </Text>
@@ -673,7 +683,9 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
                 <Text
                   fontSize={12}
                   fontWeight={positionFilter === pos ? '700' : '500'}
+                  letterSpacing={0.5}
                   color={positionFilter === pos ? BRAND_GOLD_LIGHT : '$color10'}
+                  fontFamily={FONT_DISPLAY}
                 >
                   {pos}
                 </Text>
@@ -700,9 +712,10 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
           fontSize={11}
           fontWeight="700"
           textTransform="uppercase"
-          letterSpacing={0.5}
+          letterSpacing={1}
           color="$color9"
           textAlign="center"
+          fontFamily={FONT_DISPLAY}
         >
           Pos
         </Text>
@@ -769,8 +782,14 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
         {error ? (
           <EmptyState>
             <AlertCircle size={32} color="$red10" />
-            <Text color="$red10" fontWeight="600" fontSize="$4">
-              Unable to load players
+            <Text
+              color="$red10"
+              fontWeight="700"
+              fontSize={18}
+              letterSpacing={0.5}
+              fontFamily={FONT_DISPLAY}
+            >
+              Unable to Load Players
             </Text>
             <Text color="$color9" fontSize="$3" textAlign="center">
               Check your connection and try refreshing.
@@ -779,15 +798,26 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
         ) : isLoading && displayPlayers.length === 0 ? (
           <EmptyState>
             <Spinner size="large" color={BRAND_NAVY_LIGHT} />
-            <Text color="$color9" fontSize="$3">
-              Loading free agents…
+            <Text
+              color="$color9"
+              fontSize="$3"
+              letterSpacing={0.3}
+              fontFamily={FONT_DISPLAY}
+            >
+              Loading Free Agents…
             </Text>
           </EmptyState>
         ) : displayPlayers.length === 0 ? (
           <EmptyState>
             <Users size={32} color="$color8" />
-            <Text color="$color10" fontWeight="600" fontSize="$4">
-              No players found
+            <Text
+              color="$color10"
+              fontWeight="700"
+              fontSize={18}
+              letterSpacing={0.5}
+              fontFamily={FONT_DISPLAY}
+            >
+              No Players Found
             </Text>
             <Text color="$color9" fontSize="$3" textAlign="center">
               Try adjusting your search or position filter.
@@ -805,7 +835,13 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
                 gap="$2"
               >
                 <Spinner size="small" color={BRAND_NAVY_LIGHT} />
-                <Text fontSize={12} color={BRAND_GOLD_LIGHT}>
+                <Text
+                  fontSize={12}
+                  fontWeight="600"
+                  letterSpacing={0.5}
+                  color={BRAND_GOLD_LIGHT}
+                  fontFamily={FONT_DISPLAY}
+                >
                   Updating…
                 </Text>
               </XStack>
@@ -1181,7 +1217,13 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
 
       {/* ── Pagination ───────────────────────────────────────────── */}
       <PaginationBar>
-        <Text fontSize={12} color="$color9">
+        <Text
+          fontSize={12}
+          fontWeight="600"
+          letterSpacing={0.5}
+          color="$color9"
+          fontFamily={FONT_DISPLAY}
+        >
           {displayPlayers.length > 0
             ? `Showing ${page * PAGE_SIZE + 1}–${page * PAGE_SIZE + displayPlayers.length}`
             : 'No results'}
@@ -1198,7 +1240,13 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
             opacity={page === 0 ? 0.4 : 1}
             aria-label="Previous page"
           />
-          <Text fontSize="$2" fontWeight="600" color="$color11">
+          <Text
+            fontSize={15}
+            fontWeight="700"
+            color="$color11"
+            fontFamily={FONT_DISPLAY}
+            letterSpacing={0.5}
+          >
             {page + 1}
           </Text>
           <Button
