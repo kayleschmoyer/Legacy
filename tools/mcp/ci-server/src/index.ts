@@ -350,6 +350,7 @@ server.tool(
     'Auto-detects the current session and project when no parameters are provided. ' +
     'Default output: structured JSON report with full command details. ' +
     'Pass gapsOnly:true for a compact plain-text frequency-table summary that separates potential MCP gaps from already-covered commands. ' +
+    'Pass auditMode:true for a structured JSON audit report with pre-classified gaps, confidence scores, draft ticket summaries, and noise filtering — minimizes LLM reasoning by pre-doing the classification. ' +
     'Pass scanScratch:true to also scan scratch/*.py files for subprocess shell patterns (subprocess.run, Popen, os.system, etc.).',
   {
     sessionId: z
@@ -390,6 +391,15 @@ server.tool(
           'Results appear under "scratch_subprocess_calls" in JSON output, or as a ' +
           '"=== scratch/*.py subprocess calls ===" section in text/gaps-only output. ' +
           'Default: false.',
+      ),
+    auditMode: coercedBoolean
+      .default(false)
+      .describe(
+        'Structured audit mode: returns a JSON report with pre-classified gaps, ' +
+          'confidence scores (high/medium/low), draft Jira ticket summaries, ' +
+          'noise filtering, and overflow/failure triage. Designed to minimize LLM ' +
+          'reasoning — review and approve rather than classify from scratch. ' +
+          'Implies includeMcp:true. Use this instead of gapsOnly for the full audit workflow.',
       ),
   },
   async (params) => auditSessionBash(params),

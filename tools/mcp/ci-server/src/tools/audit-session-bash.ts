@@ -10,6 +10,7 @@ export interface AuditSessionBashParams {
   pid?: number;
   gapsOnly?: boolean;
   scanScratch?: boolean;
+  auditMode?: boolean;
 }
 
 /** Resolve the Python interpreter: prefer python3, fall back to python / py (Windows). */
@@ -35,7 +36,9 @@ export async function auditSessionBash(
   const python = resolvePythonInterpreter();
 
   const args = [scriptPath];
-  if (params.gapsOnly) {
+  if (params.auditMode) {
+    args.push('--audit');
+  } else if (params.gapsOnly) {
     args.push('--gaps-only');
   } else {
     args.push('--format', 'json');
@@ -65,7 +68,7 @@ export async function auditSessionBash(
             });
             return;
           }
-          if (params.gapsOnly) {
+          if (params.gapsOnly && !params.auditMode) {
             // --gaps-only returns plain text, not JSON
             done({ content: [{ type: 'text', text: stdout.trim() }] });
             return;

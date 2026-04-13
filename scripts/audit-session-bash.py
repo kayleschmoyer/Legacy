@@ -419,7 +419,7 @@ _MCP_COVERED_PREFIXES: list[tuple[str, str]] = [
 
 def _classify_command(cmd: str) -> tuple[str, str]:
     """Return ('covered', tool_name) or ('gap', '')."""
-    stripped = cmd.strip()
+    stripped = _strip_cd_prefix(cmd.strip())
     for prefix, tool in _MCP_COVERED_PREFIXES:
         for candidate in (stripped, stripped.lower()):
             p = prefix if candidate is stripped else prefix.lower()
@@ -435,15 +435,324 @@ def _classify_command(cmd: str) -> tuple[str, str]:
     return "gap", ""
 
 
+def _strip_cd_prefix(cmd: str) -> str:
+    """Strip leading 'cd <dir> &&' prefix to get the actual command."""
+    stripped = cmd.strip()
+    # Match: cd <path> && <actual command> or cd <path> ; <actual command>
+    # Supports quoted paths (single/double), escaped spaces, and unquoted paths.
+    m = re.match(
+        r'cd\s+'
+        r'(?:"[^"]*"|\'[^\']*\'|\S+)'  # quoted or unquoted path
+        r'\s*(?:&&|;)\s*(.*)',
+        stripped,
+    )
+    if m:
+        return m.group(1).strip()
+    return stripped
+
+
 def _command_pattern(cmd: str) -> str:
     """Normalise a command to a short scannable pattern (first 3 tokens max)."""
-    parts = cmd.strip().split()
+    actual = _strip_cd_prefix(cmd)
+    parts = actual.split()
     if not parts:
         return "(empty)"
     # For pnpm exec nx keep 4 tokens (pnpm exec nx <target>)
     if parts[:3] == ["pnpm", "exec", "nx"] and len(parts) > 3:
         return " ".join(parts[:4])
     return " ".join(parts[:3])
+
+
+# Patterns that are almost always one-off investigative commands (noise).
+# Matched against the normalized command pattern (first 3 tokens).
+_NOISE_PATTERNS: set[str] = {
+    "ls",
+    "ls -la",
+    "ls -l",
+    "ls -1",
+    "dir",
+    "pwd",
+    "echo",
+    "cat",
+    "head",
+    "tail",
+    "wc -l",
+    "type",
+    "which",
+    "where",
+    "whoami",
+    "hostname",
+    "date",
+    "env",
+    "set",
+    "printenv",
+}
+
+# Patterns that look investigative but are actually recurring workflow gaps.
+# These should NOT be filtered as noise.
+_RECURRING_INVESTIGATIVE: dict[str, dict[str, str]] = {
+    "git show origin": {
+        "gap_type": "missing-tool",
+        "server": "worktree",
+        "reason": "Remote ref:path reads have no MCP equivalent",
+    },
+    "git ls-tree": {
+        "gap_type": "missing-tool",
+        "server": "worktree",
+        "reason": "Listing files on remote branches has no MCP equivalent",
+    },
+    "find .": {
+        "gap_type": "missing-awareness",
+        "server": "n/a",
+        "reason": "Should use Glob tool instead of find",
+    },
+    "find $wt": {
+        "gap_type": "missing-awareness",
+        "server": "n/a",
+        "reason": "Should use Glob tool instead of find",
+    },
+    "grep -r": {
+        "gap_type": "missing-awareness",
+        "server": "n/a",
+        "reason": "Should use Grep tool instead of grep",
+    },
+    "grep -rl": {
+        "gap_type": "missing-awareness",
+        "server": "n/a",
+        "reason": "Should use Grep tool instead of grep",
+    },
+}
+
+def _is_recurring_investigative(pattern: str, sample: str) -> bool:
+    """Check if a pattern matches any recurring investigative prefix."""
+    stripped = _strip_cd_prefix(sample.strip())
+    for rec_pat in _RECURRING_INVESTIGATIVE:
+        if pattern.startswith(rec_pat) or stripped.startswith(rec_pat):
+            return True
+    return False
+
+
+# Gap type to Jira summary prefix mapping.
+_SUMMARY_PREFIX: dict[str, str] = {
+    "missing-tool": "feat(mcp):",
+    "missing-feature": "feat(mcp):",
+    "missing-awareness": "docs(skills):",
+}
+
+
+def _classify_gap_type(cmd: str, pattern: str) -> dict[str, Any]:
+    """Classify a gap command into a gap type with confidence and draft ticket info.
+
+    Returns a dict with:
+      - gap_type: missing-tool | missing-feature | missing-awareness
+      - confidence: high | medium | low
+      - server: target MCP server name
+      - reason: why this is a gap
+      - draft_summary: draft Jira ticket summary
+    """
+    stripped = _strip_cd_prefix(cmd.strip())
+
+    # Check recurring investigative patterns first (high confidence)
+    for rec_pat, info in _RECURRING_INVESTIGATIVE.items():
+        if pattern.startswith(rec_pat) or stripped.startswith(rec_pat):
+            prefix = _SUMMARY_PREFIX.get(info["gap_type"], "feat(mcp):")
+            if info["gap_type"] == "missing-awareness":
+                tool_name = "Glob" if "find" in rec_pat else "Grep"
+                draft = f'{prefix} guide agents to use {tool_name} instead of `{pattern}`'
+            else:
+                draft = f'{prefix} add `{pattern.replace(" ", "_")}` support to {info["server"]}'
+            return {
+                "gap_type": info["gap_type"],
+                "confidence": "high",
+                "server": info["server"],
+                "reason": info["reason"],
+                "draft_summary": draft,
+            }
+
+    # Heuristic classification based on command structure
+    # Commands that invoke tools we have MCP servers for but with uncovered subcommands
+    if stripped.startswith("gh "):
+        return {
+            "gap_type": "missing-feature",
+            "confidence": "medium",
+            "server": "legacy-sports-github or legacy-sports-ci",
+            "reason": f"gh subcommand not covered by MCP: `{pattern}`",
+            "draft_summary": f"feat(mcp): add support for `{pattern}`",
+        }
+
+    if stripped.startswith("pnpm ") and "nx" not in stripped:
+        return {
+            "gap_type": "missing-tool",
+            "confidence": "medium",
+            "server": "legacy-sports-make or legacy-sports-nx",
+            "reason": f"pnpm command not covered by MCP: `{pattern}`",
+            "draft_summary": f"feat(mcp): add support for `{pattern}`",
+        }
+
+    if stripped.startswith("terraform "):
+        return {
+            "gap_type": "missing-tool",
+            "confidence": "medium",
+            "server": "legacy-sports-aws",
+            "reason": f"Terraform command not covered by MCP: `{pattern}`",
+            "draft_summary": f"feat(mcp): add `terraform` support to aws MCP server",
+        }
+
+    if stripped.startswith("docker "):
+        return {
+            "gap_type": "missing-tool",
+            "confidence": "low",
+            "server": "new server or legacy-sports-ci",
+            "reason": f"Docker command not covered by MCP: `{pattern}`",
+            "draft_summary": f"feat(mcp): add `docker` support",
+        }
+
+    # Generic fallback — low confidence, needs human review
+    return {
+        "gap_type": "missing-tool",
+        "confidence": "low",
+        "server": "unknown",
+        "reason": f"Uncategorized Bash command: `{pattern}`",
+        "draft_summary": f"feat(mcp): investigate MCP coverage for `{pattern}`",
+    }
+
+
+def format_audit(
+    bash_calls: list[dict],
+    mcp_issues: list[dict],
+    session_id: str,
+    scratch_calls: list[dict] | None = None,
+) -> str:
+    """Produce a structured JSON audit report with pre-classifications.
+
+    The output is designed to minimize LLM reasoning — the agent only needs to
+    review items flagged as uncertain and approve/reject proposed tickets.
+    """
+    pattern_counts: Counter[str] = Counter()
+    pattern_sample: dict[str, str] = {}
+    pattern_classification: dict[str, tuple[str, str]] = {}
+
+    for call in bash_calls:
+        cmd = call["command"]
+        pat = _command_pattern(cmd)
+        pattern_counts[pat] += 1
+        pattern_sample.setdefault(pat, cmd)
+        if pat not in pattern_classification:
+            pattern_classification[pat] = _classify_command(cmd)
+
+    # Build gap items with full classification
+    gaps: list[dict[str, Any]] = []
+    covered: list[dict[str, Any]] = []
+    noise: list[dict[str, Any]] = []
+
+    for pat, count in pattern_counts.most_common():
+        status, tool = pattern_classification[pat]
+        sample = pattern_sample[pat]
+
+        if status == "covered":
+            covered.append({
+                "pattern": pat,
+                "count": count,
+                "mcp_tool": tool,
+                "sample": sample[:120],
+            })
+            continue
+
+        # Check if this is a known noise pattern (curated allowlist only).
+        # Singletons (count==1) are NOT auto-filtered — they become low-confidence
+        # gaps so the reviewer can decide. Recurring investigative patterns are
+        # always promoted to gaps regardless of count.
+        is_recurring = _is_recurring_investigative(pat, sample)
+
+        if pat in _NOISE_PATTERNS and not is_recurring:
+            noise.append({
+                "pattern": pat,
+                "count": count,
+                "sample": sample[:120],
+                "reason": "known noise pattern",
+            })
+            continue
+
+        # Classify the gap
+        gap_info = _classify_gap_type(sample, pat)
+        gaps.append({
+            "pattern": pat,
+            "count": count,
+            "sample": sample[:120],
+            **gap_info,
+        })
+
+    # Classify MCP overflows and failures
+    overflow_items: list[dict[str, Any]] = []
+    failure_items: list[dict[str, Any]] = []
+
+    for issue in mcp_issues:
+        if issue.get("is_overflow"):
+            overflow_items.append({
+                "tool": issue["name"],
+                "snippet": issue.get("overflow_snippet", "")[:200],
+                "params": _summarize_params(issue.get("input", {})),
+                "fix_type": "needs-review",
+                "note": "Check if agent should have used limiting params (agent-error) or if tool lacks them (missing-parameter/bad-default)",
+            })
+        elif issue.get("is_error"):
+            failure_items.append({
+                "tool": issue["name"],
+                "error": issue.get("error_snippet", "")[:200],
+                "params": _summarize_params(issue.get("input", {})),
+                "fix_type": "needs-review",
+                "note": "Classify as permission-gap, bug, config-issue, or expected-limitation",
+            })
+
+    report: dict[str, Any] = {
+        "session_id": session_id,
+        "summary": {
+            "total_bash_commands": sum(pattern_counts.values()),
+            "unique_patterns": len(pattern_counts),
+            "gaps_found": len(gaps),
+            "noise_filtered": len(noise),
+            "covered_patterns": len(covered),
+            "mcp_overflows": len(overflow_items),
+            "mcp_failures": len(failure_items),
+        },
+        "action_required": {
+            "gaps_to_review": [g for g in gaps if g["confidence"] != "high"],
+            "gaps_auto_classified": [g for g in gaps if g["confidence"] == "high"],
+            "overflows": overflow_items,
+            "failures": failure_items,
+        },
+        "informational": {
+            "noise_filtered": noise,
+            "covered_commands": covered,
+        },
+    }
+
+    if scratch_calls is not None:
+        report["scratch_subprocess_calls"] = scratch_calls
+
+    # Add instructions for the reviewing agent
+    report["instructions"] = (
+        "Review 'action_required' section. For 'gaps_to_review' (medium/low confidence): "
+        "verify the gap_type and draft_summary, then approve or skip. "
+        "For 'gaps_auto_classified' (high confidence): these are pre-approved unless you disagree. "
+        "For overflows/failures: classify the fix_type. "
+        "Then create Jira tickets for approved gaps under the current MCP gaps bucket epic."
+    )
+
+    return json.dumps(report, indent=2)
+
+
+def _summarize_params(params: dict[str, Any]) -> str:
+    """Produce a compact one-line summary of tool parameters."""
+    if not params:
+        return "(none)"
+    parts = []
+    for k, v in params.items():
+        val_str = str(v)
+        if len(val_str) > 40:
+            val_str = val_str[:37] + "..."
+        parts.append(f"{k}={val_str}")
+    return ", ".join(parts)
 
 
 def format_gaps_only(
@@ -556,6 +865,16 @@ def main() -> None:
         ),
     )
     parser.add_argument(
+        "--audit",
+        action="store_true",
+        help=(
+            "Structured audit mode: produces a JSON report with pre-classified gaps, "
+            "confidence scores, draft ticket summaries, noise filtering, and overflow/failure "
+            "triage. Designed to minimize LLM reasoning — the agent reviews and approves "
+            "rather than doing the full classification. Implies --include-mcp."
+        ),
+    )
+    parser.add_argument(
         "--scan-scratch",
         action="store_true",
         help=(
@@ -589,6 +908,10 @@ def main() -> None:
     if not session_id:
         session_id = find_latest_session(project_dir)
 
+    # --audit implies --include-mcp
+    if args.audit:
+        args.include_mcp = True
+
     # Parse parent JSONL
     parent_jsonl = project_dir / f"{session_id}.jsonl"
     bash_calls = extract_bash_calls(parent_jsonl, source="parent")
@@ -617,7 +940,9 @@ def main() -> None:
         scratch_calls = extract_scratch_subprocess_calls(repo_root)
 
     # Output
-    if args.gaps_only:
+    if args.audit:
+        print(format_audit(bash_calls, mcp_issues, session_id, scratch_calls=scratch_calls))
+    elif args.gaps_only:
         print(format_gaps_only(bash_calls, session_id, scratch_calls=scratch_calls))
     elif args.format == "json":
         output = {

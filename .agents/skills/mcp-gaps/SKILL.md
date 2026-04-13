@@ -32,22 +32,14 @@ This skill enforces the **MCP-first principle** from AGENTS.md: shell commands a
 
 > Full procedure: [`references/audit-workflow.md`](references/audit-workflow.md)
 
-1. **Collect** Bash and PowerShell commands and MCP tool issues from the session using `ci_audit_session_bash({ includeMcp: true, gapsOnly: true })` (parses the full JSONL transcript — survives context compaction; currently extracts `Bash` tool invocations; `includeMcp: true` also captures overflows and failures used in steps 6/6b). **Current limitation:** `ci_audit_session_bash` and `scripts/audit-session-bash.py` do not yet extract `powershell` tool invocations from Copilot CLI transcripts — review those separately in the conversation history. Shell fallback if the CI MCP server is unavailable: `python scripts/audit-session-bash.py --include-mcp --gaps-only`. Fallback without any script: manually review conversation history for both `Bash` and `powershell` tool invocations. Skip one-off investigative commands and commands already covered by MCP tools. **Include documented Bash/PowerShell exceptions** — patterns marked as "shell fallback" or "no Nx target equivalent" in AGENTS.md/skill docs are acknowledged gaps, not permanent exemptions
-2. **Classify** each as `missing-tool`, `missing-feature`, or `missing-awareness`. Documented exceptions should be classified as `missing-tool` or `missing-feature` as appropriate, with a note that they are currently documented
-3. **File `missing-awareness` gaps as doc-fix tickets** — use summary prefix `docs(skills):`, type `Task`, and set parent epic to the current bucket epic (get key via `jira_get_bucket_epic({ bucket: 'mcp-gaps' })`). Without a ticket, the same awareness gap recurs across sessions
-4. **Check** for existing tickets under the current bucket epic (`jira_list_children` or JQL `parent = <currentBucketEpicKey>`)
-5. **Create** tickets for new gaps using the template in the reference doc
-6. **Audit overflows** — review MCP tool calls that exceeded token limits; classify as `agent-error`, `bad-default`, or `missing-parameter`
-   6b. **Audit failures** — review MCP tool calls that returned errors (403, path bugs, timeouts, state loss, etc.); classify as `permission-gap`, `bug`, `config-issue`, or `expected-limitation`. **Do NOT dismiss failures as "environmental" or "known" without checking for an existing ticket first.**
-   6c. **Audit sweep logic gaps** (after any `sweep-prs` session) — review the sweep for incorrect assumptions or skipped verification steps that caused missed or incorrectly settled PRs:
-   - PRs that remained CONFLICTING after rebase — was mergeability actually checked (e.g., by locally merging the base branch into the PR branch and confirming no conflicts) or just assumed to be cache lag?
-   - Bot-authored PRs with Copilot `COMMENTED` reviews and 0 unresolved threads — was a fresh Copilot review re-requested?
-   - PRs where `statusCheckRollup` had < 3 entries — was a warning raised that CI may not have run on the current SHA?
-   - PRs labeled `merge-when-ready` but still showing `reviewDecision: null` — were they checked for the auto-approve chain?
+1. **Run** `ci_audit_session_bash({ auditMode: true })` — produces a structured JSON report with pre-classified gaps, confidence scores, draft ticket summaries, and noise filtering for Bash activity. Shell fallback: `python scripts/audit-session-bash.py --audit`
+2. **Manually review** conversation history for Copilot CLI `powershell` tool invocations — `ci_audit_session_bash` does **not** currently extract them, so inspect those commands separately and include any gaps they reveal in the audit
+3. **Review** the `action_required` section — accept high-confidence gaps, verify medium/low-confidence ones, classify overflow/failure fix types
+4. **Check** for existing tickets under the current bucket epic (`jira_list_children`)
+5. **Create** tickets for approved gaps using the draft summaries from the report plus any manually identified `powershell` gaps
+6. **Report** findings to the user
 
-   For each gap found: check if a child ticket under the current bucket epic already exists, file one if not (use gap type `missing-awareness` for doc-only fixes, `missing-feature` for behavioral fixes).
-
-7. **Report** findings to the user
+The script handles Bash classification, noise filtering, and ticket drafting automatically. The agent's role is to review and approve, not classify from scratch; `powershell` command review is still manual until extraction support is added.
 
 ---
 
