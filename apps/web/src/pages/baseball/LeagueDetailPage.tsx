@@ -94,6 +94,7 @@ import {
   BRAND_GOLD_LIGHT,
   BRAND_NAVY,
   BRAND_NAVY_LIGHT,
+  GRAY,
   WHITE,
   withAlpha,
 } from '../../constants/colors';
@@ -3163,18 +3164,28 @@ export function LeagueDetailPage(): React.JSX.Element {
                         Primary Color
                       </Label>
                       <XStack gap="$2" alignItems="center">
-                        <YStack
-                          width={32}
-                          height={32}
-                          borderRadius="$2"
-                          borderWidth={1}
-                          borderColor="$gray6"
-                          backgroundColor={
+                        <input
+                          type="color"
+                          aria-label="Pick primary color"
+                          value={
                             HEX_RE.test(teamPrimaryColor)
                               ? teamPrimaryColor
-                              : '$gray4'
+                              : GRAY
                           }
-                          flexShrink={0}
+                          onChange={(e) => {
+                            setTeamPrimaryColor(e.target.value);
+                            setTeamColorError(null);
+                          }}
+                          style={{
+                            width: 32,
+                            height: 32,
+                            padding: 0,
+                            border: `1px solid ${withAlpha(BRAND_NAVY_LIGHT, 0.5)}`,
+                            borderRadius: 4,
+                            cursor: 'pointer',
+                            flexShrink: 0,
+                            backgroundColor: 'transparent',
+                          }}
                         />
                         <Input
                           id="team-primary-color"
@@ -3206,18 +3217,28 @@ export function LeagueDetailPage(): React.JSX.Element {
                         Secondary Color
                       </Label>
                       <XStack gap="$2" alignItems="center">
-                        <YStack
-                          width={32}
-                          height={32}
-                          borderRadius="$2"
-                          borderWidth={1}
-                          borderColor="$gray6"
-                          backgroundColor={
+                        <input
+                          type="color"
+                          aria-label="Pick secondary color"
+                          value={
                             HEX_RE.test(teamSecondaryColor)
                               ? teamSecondaryColor
-                              : '$gray4'
+                              : GRAY
                           }
-                          flexShrink={0}
+                          onChange={(e) => {
+                            setTeamSecondaryColor(e.target.value);
+                            setTeamColorError(null);
+                          }}
+                          style={{
+                            width: 32,
+                            height: 32,
+                            padding: 0,
+                            border: `1px solid ${withAlpha(BRAND_NAVY_LIGHT, 0.5)}`,
+                            borderRadius: 4,
+                            cursor: 'pointer',
+                            flexShrink: 0,
+                            backgroundColor: 'transparent',
+                          }}
                         />
                         <Input
                           id="team-secondary-color"
