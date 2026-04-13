@@ -218,7 +218,7 @@ export class PlayerService {
   }
 
   /**
-   * Search players by name (searches both first and last names)
+   * Search players by name (searches first name, last name, and full name)
    */
   async searchPlayers(searchTerm: string, limit = 10): Promise<Player[]> {
     return runWithPublicClient(this.options, async (db) => {
@@ -229,6 +229,7 @@ export class PlayerService {
           or(
             ilike(PublicSchema.players.firstName, `%${searchTerm}%`),
             ilike(PublicSchema.players.lastName, `%${searchTerm}%`),
+            sql`(${PublicSchema.players.firstName} || ' ' || ${PublicSchema.players.lastName}) ILIKE ${'%' + searchTerm + '%'}`,
           ),
         )
         .limit(limit);
@@ -269,7 +270,12 @@ export class PlayerService {
         PublicSchema.players.lastName,
         `%${filters.fullNameLike}%`,
       );
-      const nameCondition = or(firstNameCondition, lastNameCondition);
+      const fullNameCondition = sql`(${PublicSchema.players.firstName} || ' ' || ${PublicSchema.players.lastName}) ILIKE ${'%' + filters.fullNameLike + '%'}`;
+      const nameCondition = or(
+        firstNameCondition,
+        lastNameCondition,
+        fullNameCondition,
+      );
       if (nameCondition) {
         conditions.push(nameCondition);
       }
@@ -440,6 +446,7 @@ export class PlayerService {
             sql`(
               p.first_name ILIKE ${'%' + term + '%'}
               OR p.last_name ILIKE ${'%' + term + '%'}
+              OR (p.first_name || ' ' || p.last_name) ILIKE ${'%' + term + '%'}
             )`,
           );
         }

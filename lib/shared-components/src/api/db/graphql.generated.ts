@@ -2977,7 +2977,7 @@ export type ScoreboardGame = {
   outs?: Maybe<Scalars['Int']['output']>;
   /** Scheduled start time (ISO 8601) */
   startTime?: Maybe<Scalars['String']['output']>;
-  /** Game status: "Preview", "Live", or "Final" */
+  /** Game status: "Preview", "Live", "Final", "Postponed", or "Suspended" */
   status: Scalars['String']['output'];
 };
 
