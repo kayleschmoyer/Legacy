@@ -4,14 +4,18 @@ import {
   Button,
   Dialog,
   Input,
+  Label,
   ScrollView,
+  Separator,
   Sheet,
   Text,
   VisuallyHidden,
   XStack,
   YStack,
 } from 'tamagui';
-import { Alert, Platform } from '../../platform-components';
+import { X } from '@tamagui/lucide-icons';
+import { Platform } from '../../platform-components';
+import { Dropdown, DropdownItem } from '../../Dropdown';
 import {
   DIVISION_COUNTS,
   DRAFT_MODES,
@@ -50,6 +54,74 @@ export interface CreateLeagueModalProps {
   error?: string | null;
 }
 
+const sportItems: readonly DropdownItem[] = Object.entries(SPORT_CONFIGS).map(
+  ([key, config]) => ({ text: config.name, value: key }),
+);
+
+const teamCountItems: readonly DropdownItem[] = DROPDOWN_TEAM_COUNT_ITEMS.map(
+  (item) => ({ text: `${item.text} Teams`, value: item.value }),
+);
+
+const playerPoolItems: readonly DropdownItem[] = PLAYER_POOLS.map((p) => ({
+  text: p.label,
+  value: p.value,
+}));
+
+const draftModeItems: readonly DropdownItem[] = DRAFT_MODES.map((m) => ({
+  text: m.label,
+  value: m.value,
+}));
+
+const selectionMethodItems: readonly DropdownItem[] = SELECTION_METHODS.map(
+  (s) => ({ text: s.label, value: s.value }),
+);
+
+const draftOrderItems: readonly DropdownItem[] = DRAFT_ORDERS.map((o) => ({
+  text: o.label,
+  value: o.value,
+}));
+
+const divisionCountItems: readonly DropdownItem[] = DIVISION_COUNTS.map(
+  (d) => ({ text: d.label, value: d.value }),
+);
+
+const schedulingStrategyItems: readonly DropdownItem[] =
+  SCHEDULING_STRATEGIES.map((s) => ({ text: s.label, value: s.value }));
+
+function SectionHeader({ children }: { children: string }) {
+  return (
+    <Text
+      fontSize="$3"
+      fontWeight="700"
+      color="$gray11"
+      textTransform="uppercase"
+      letterSpacing={1}
+    >
+      {children}
+    </Text>
+  );
+}
+
+function FieldLabel({
+  children,
+  htmlFor,
+}: {
+  children: string;
+  htmlFor?: string;
+}) {
+  return (
+    <Label
+      htmlFor={htmlFor}
+      fontSize="$3"
+      fontWeight="500"
+      color="$gray11"
+      marginBottom="$1"
+    >
+      {children}
+    </Label>
+  );
+}
+
 function CreateLeagueModal({
   visible,
   onClose,
@@ -69,44 +141,23 @@ function CreateLeagueModal({
     schedulingStrategy: 'divisional',
   });
 
-  const [showSportDropdown, setShowSportDropdown] = useState(false);
-  const [showTeamCountDropdown, setShowTeamCountDropdown] = useState(false);
-  const [showPlayerPoolDropdown, setShowPlayerPoolDropdown] = useState(false);
-  const [showDraftModeDropdown, setShowDraftModeDropdown] = useState(false);
-  const [showSelectionMethodDropdown, setShowSelectionMethodDropdown] =
-    useState(false);
-  const [showDraftOrderDropdown, setShowDraftOrderDropdown] = useState(false);
-  const [showDivisionCountDropdown, setShowDivisionCountDropdown] =
-    useState(false);
-  const [showSchedulingStrategyDropdown, setShowSchedulingStrategyDropdown] =
-    useState(false);
-
-  const sportOptions = Object.keys(SPORT_CONFIGS);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (error) {
-      if (Platform.OS === 'web') {
-        alert(error);
-      } else {
-        Alert.alert('Error', error);
-      }
+    if (!visible) {
+      setValidationError(null);
     }
-  }, [error]);
+  }, [visible]);
 
   const handleSubmit = async () => {
     if (!formData.leagueName.trim()) {
-      const message = 'Please enter a league name';
-      if (Platform.OS === 'web') {
-        alert(message);
-      } else {
-        Alert.alert('Error', message);
-      }
+      setValidationError('Please enter a league name');
       return;
     }
+    setValidationError(null);
 
     try {
       await onSubmit(formData);
-      // Reset form on success
       setFormData({
         leagueName: '',
         sport: 'baseball',
@@ -122,6 +173,8 @@ function CreateLeagueModal({
       // Error handling is done via the error prop
     }
   };
+
+  const displayError = validationError || error;
 
   return (
     <Dialog modal open={visible} onOpenChange={(open) => !open && onClose()}>
@@ -142,13 +195,16 @@ function CreateLeagueModal({
         <Dialog.Overlay
           key="overlay"
           animation="slow"
-          opacity={0.7}
+          opacity={0.5}
           enterStyle={{ opacity: 0 }}
           exitStyle={{ opacity: 0 }}
         />
         <Dialog.Content
+          bordered
           elevate
           key="content"
+          backgroundColor="$color2"
+          borderColor="$borderColor"
           animateOnly={['transform', 'opacity']}
           animation={[
             'quick',
@@ -161,659 +217,253 @@ function CreateLeagueModal({
           enterStyle={{ x: 0, y: -20, opacity: 0, scale: 0.9 }}
           exitStyle={{ x: 0, y: 10, opacity: 0, scale: 0.95 }}
           gap="$4"
-          padding="$6"
-          width={Platform.OS === 'web' ? 400 : '90%'}
-          maxHeight="80%"
+          padding="$5"
+          width={Platform.OS === 'web' ? 480 : '90%'}
+          maxHeight={Platform.OS === 'web' ? '85vh' : '85%'}
           overflow="hidden"
-          borderWidth={1}
-          borderColor="$borderColor"
-          borderRadius="$4"
         >
-          <Dialog.Title
-            fontSize="$6"
-            fontWeight="bold"
-            color="$gray12"
-            marginBottom="$5"
-            textAlign="center"
-          >
-            Create New League
-          </Dialog.Title>
+          {/* Header */}
+          <XStack alignItems="center" justifyContent="space-between">
+            <Dialog.Title fontSize="$7" fontWeight="bold" color="$color12">
+              Create New League
+            </Dialog.Title>
+            <Dialog.Close asChild>
+              <Button
+                size="$2"
+                circular
+                variant="outlined"
+                backgroundColor="$color1"
+                borderColor="$borderColor"
+                icon={X}
+              />
+            </Dialog.Close>
+          </XStack>
           <VisuallyHidden>
             <Dialog.Description>
               Fill in the form to create a new fantasy league.
             </Dialog.Description>
           </VisuallyHidden>
 
+          <Separator borderColor="$borderColor" />
+
+          {/* Error Display */}
+          {displayError && (
+            <XStack
+              backgroundColor="$red2"
+              borderColor="$red6"
+              borderWidth={1}
+              borderRadius="$3"
+              paddingHorizontal="$3"
+              paddingVertical="$2"
+              alignItems="center"
+            >
+              <Text fontSize="$3" color="$red11" flex={1}>
+                {displayError}
+              </Text>
+            </XStack>
+          )}
+
           <ScrollView showsVerticalScrollIndicator={false} flex={1}>
-            {/* League Name Input */}
-            <YStack marginBottom="$4">
-              <Text
-                fontSize="$3"
-                fontWeight="600"
-                color="$gray12"
-                marginBottom="$2"
-              >
-                League Name
-              </Text>
-              <Input
-                width="100%"
-                backgroundColor="$gray1"
-                borderRadius="$2"
-                padding="$3"
-                fontSize="$4"
-                borderWidth={1}
-                borderColor="$gray6"
-                value={formData.leagueName}
-                onChangeText={(text: string) =>
-                  setFormData((prev) => ({ ...prev, leagueName: text }))
-                }
-                placeholder="Enter league name"
-                editable={!loading}
-              />
-            </YStack>
+            <YStack gap="$5" paddingBottom="$2">
+              {/* League Info Section */}
+              <YStack gap="$3">
+                <SectionHeader>League Info</SectionHeader>
 
-            {/* Sport Selection */}
-            <YStack marginBottom="$4">
-              <Text
-                fontSize="$3"
-                fontWeight="600"
-                color="$gray12"
-                marginBottom="$2"
-              >
-                Sport
-              </Text>
-              <Button
-                backgroundColor="$gray1"
-                borderRadius="$2"
-                borderWidth={1}
-                borderColor="$gray6"
-                paddingHorizontal="$3"
-                paddingVertical="$3"
-                justifyContent="space-between"
-                onPress={() => setShowSportDropdown(!showSportDropdown)}
-                disabled={loading}
-                unstyled
-                flexDirection="row"
-                alignItems="center"
-              >
-                <Text fontSize="$4" color="$gray12">
-                  {SPORT_CONFIGS[formData.sport].name}
-                </Text>
-                <Text fontSize="$3" color="$gray10" marginLeft="auto">
-                  ▼
-                </Text>
-              </Button>
+                <YStack gap="$1">
+                  <FieldLabel htmlFor="league-name">League Name</FieldLabel>
+                  <Input
+                    id="league-name"
+                    width="100%"
+                    placeholder="Enter league name"
+                    value={formData.leagueName}
+                    onChangeText={(text: string) => {
+                      setFormData((prev) => ({ ...prev, leagueName: text }));
+                      if (validationError) setValidationError(null);
+                    }}
+                    editable={!loading}
+                  />
+                </YStack>
 
-              {showSportDropdown && (
-                <YStack
-                  backgroundColor="white"
-                  borderRadius="$2"
-                  borderWidth={1}
-                  borderColor="$gray6"
-                  marginTop="$1"
-                >
-                  {sportOptions.map((sport) => (
-                    <Button
-                      key={sport}
-                      padding="$3"
-                      borderBottomWidth={1}
-                      borderBottomColor="$gray4"
-                      backgroundColor="transparent"
-                      justifyContent="flex-start"
-                      onPress={() => {
+                <YStack gap="$1">
+                  <FieldLabel>Sport</FieldLabel>
+                  <Dropdown
+                    value={formData.sport}
+                    onChange={(value) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        sport: value as CreateLeagueFormData['sport'],
+                      }))
+                    }
+                    items={sportItems}
+                    disabled={loading}
+                    aria-label="Sport"
+                  />
+                </YStack>
+              </YStack>
+
+              <Separator borderColor="$borderColor" />
+
+              {/* League Structure Section */}
+              <YStack gap="$3">
+                <SectionHeader>League Structure</SectionHeader>
+
+                <XStack gap="$3" flexWrap="wrap">
+                  <YStack gap="$1" flex={1} minWidth={140}>
+                    <FieldLabel>Teams</FieldLabel>
+                    <Dropdown
+                      value={formData.numberOfTeams.toString()}
+                      onChange={(value) =>
                         setFormData((prev) => ({
                           ...prev,
-                          sport: sport as
-                            | 'baseball'
-                            | 'football'
-                            | 'basketball'
-                            | 'hockey',
-                        }));
-                        setShowSportDropdown(false);
-                      }}
-                      unstyled
-                      borderRadius={0}
-                    >
-                      <Text fontSize="$4" color="$gray12">
-                        {SPORT_CONFIGS[sport].name}
-                      </Text>
-                    </Button>
-                  ))}
-                </YStack>
-              )}
-            </YStack>
+                          numberOfTeams: parseInt(value, 10),
+                        }))
+                      }
+                      items={teamCountItems}
+                      disabled={loading}
+                      aria-label="Number of teams"
+                    />
+                  </YStack>
 
-            {/* Number of Teams */}
-            <YStack marginBottom="$4">
-              <Text
-                fontSize="$3"
-                fontWeight="600"
-                color="$gray12"
-                marginBottom="$2"
-              >
-                Number of Teams
-              </Text>
-              <Button
-                backgroundColor="$gray1"
-                borderRadius="$2"
-                borderWidth={1}
-                borderColor="$gray6"
-                paddingHorizontal="$3"
-                paddingVertical="$3"
-                justifyContent="space-between"
-                onPress={() => setShowTeamCountDropdown(!showTeamCountDropdown)}
-                disabled={loading}
-                unstyled
-                flexDirection="row"
-                alignItems="center"
-              >
-                <Text fontSize="$4" color="$gray12">
-                  {formData.numberOfTeams} Teams
-                </Text>
-                <Text fontSize="$3" color="$gray10" marginLeft="auto">
-                  ▼
-                </Text>
-              </Button>
-
-              {showTeamCountDropdown && (
-                <YStack
-                  backgroundColor="white"
-                  borderRadius="$2"
-                  borderWidth={1}
-                  borderColor="$gray6"
-                  marginTop="$1"
-                >
-                  {DROPDOWN_TEAM_COUNT_ITEMS.map((item) => (
-                    <Button
-                      key={item.value}
-                      padding="$3"
-                      borderBottomWidth={1}
-                      borderBottomColor="$gray4"
-                      backgroundColor="transparent"
-                      justifyContent="flex-start"
-                      onPress={() => {
+                  <YStack gap="$1" flex={1} minWidth={140}>
+                    <FieldLabel>Divisions</FieldLabel>
+                    <Dropdown
+                      value={formData.numberOfDivisions.toString()}
+                      onChange={(value) =>
                         setFormData((prev) => ({
                           ...prev,
-                          numberOfTeams: parseInt(item.value, 10),
-                        }));
-                        setShowTeamCountDropdown(false);
-                      }}
-                      unstyled
-                      borderRadius={0}
-                    >
-                      <Text fontSize="$4" color="$gray12">
-                        {item.text}
-                      </Text>
-                    </Button>
-                  ))}
-                </YStack>
-              )}
-            </YStack>
+                          numberOfDivisions: parseInt(value, 10),
+                        }))
+                      }
+                      items={divisionCountItems}
+                      disabled={loading}
+                      aria-label="Number of divisions"
+                    />
+                  </YStack>
+                </XStack>
 
-            {/* Player Pool */}
-            <YStack marginBottom="$4">
-              <Text
-                fontSize="$3"
-                fontWeight="600"
-                color="$gray12"
-                marginBottom="$2"
-              >
-                Player Pool
-              </Text>
-              <Button
-                backgroundColor="$gray1"
-                borderRadius="$2"
-                borderWidth={1}
-                borderColor="$gray6"
-                paddingHorizontal="$3"
-                paddingVertical="$3"
-                justifyContent="space-between"
-                onPress={() =>
-                  setShowPlayerPoolDropdown(!showPlayerPoolDropdown)
-                }
-                disabled={loading}
-                unstyled
-                flexDirection="row"
-                alignItems="center"
-              >
-                <Text fontSize="$4" color="$gray12">
-                  {PLAYER_POOLS.find(
-                    (p) => p.value === (formData.playerPool as string),
-                  )?.label || 'All MLB'}
-                </Text>
-                <Text fontSize="$3" color="$gray10" marginLeft="auto">
-                  ▼
-                </Text>
-              </Button>
-
-              {showPlayerPoolDropdown && (
-                <YStack
-                  backgroundColor="white"
-                  borderRadius="$2"
-                  borderWidth={1}
-                  borderColor="$gray6"
-                  marginTop="$1"
-                >
-                  {PLAYER_POOLS.map((pool) => (
-                    <Button
-                      key={pool.value}
-                      padding="$3"
-                      borderBottomWidth={1}
-                      borderBottomColor="$gray4"
-                      backgroundColor="transparent"
-                      justifyContent="flex-start"
-                      onPress={() => {
+                <XStack gap="$3" flexWrap="wrap">
+                  <YStack gap="$1" flex={1} minWidth={140}>
+                    <FieldLabel>Player Pool</FieldLabel>
+                    <Dropdown
+                      value={formData.playerPool as string}
+                      onChange={(value) =>
                         setFormData((prev) => ({
                           ...prev,
-                          playerPool: pool.value as PlayerPool,
-                        }));
-                        setShowPlayerPoolDropdown(false);
-                      }}
-                      unstyled
-                      borderRadius={0}
-                    >
-                      <Text fontSize="$4" color="$gray12">
-                        {pool.label}
-                      </Text>
-                    </Button>
-                  ))}
-                </YStack>
-              )}
-            </YStack>
+                          playerPool: value as PlayerPool,
+                        }))
+                      }
+                      items={playerPoolItems}
+                      disabled={loading}
+                      aria-label="Player pool"
+                    />
+                  </YStack>
 
-            {/* Draft Mode */}
-            <YStack marginBottom="$4">
-              <Text
-                fontSize="$3"
-                fontWeight="600"
-                color="$gray12"
-                marginBottom="$2"
-              >
-                Draft Mode
-              </Text>
-              <Button
-                backgroundColor="$gray1"
-                borderRadius="$2"
-                borderWidth={1}
-                borderColor="$gray6"
-                paddingHorizontal="$3"
-                paddingVertical="$3"
-                justifyContent="space-between"
-                onPress={() => setShowDraftModeDropdown(!showDraftModeDropdown)}
-                disabled={loading}
-                unstyled
-                flexDirection="row"
-                alignItems="center"
-              >
-                <Text fontSize="$4" color="$gray12">
-                  {DRAFT_MODES.find(
-                    (m) => m.value === (formData.draftMode as string),
-                  )?.label ?? 'Live Draft'}
-                </Text>
-                <Text fontSize="$3" color="$gray10" marginLeft="auto">
-                  ▼
-                </Text>
-              </Button>
-
-              {showDraftModeDropdown && (
-                <YStack
-                  backgroundColor="white"
-                  borderRadius="$2"
-                  borderWidth={1}
-                  borderColor="$gray6"
-                  marginTop="$1"
-                >
-                  {DRAFT_MODES.map((mode) => (
-                    <Button
-                      key={mode.value}
-                      padding="$3"
-                      borderBottomWidth={1}
-                      borderBottomColor="$gray4"
-                      backgroundColor="transparent"
-                      justifyContent="flex-start"
-                      onPress={() => {
-                        const newMode = mode.value as DraftMode;
+                  <YStack gap="$1" flex={1} minWidth={140}>
+                    <FieldLabel>Schedule</FieldLabel>
+                    <Dropdown
+                      value={formData.schedulingStrategy}
+                      onChange={(value) =>
                         setFormData((prev) => ({
                           ...prev,
-                          draftMode: newMode,
-                          // Automated drafts only support random selection
-                          selectionMethod:
-                            newMode === DraftMode.AUTOMATED
-                              ? SelectionMethod.RANDOM
-                              : prev.selectionMethod,
-                        }));
-                        setShowDraftModeDropdown(false);
-                      }}
-                      unstyled
-                      borderRadius={0}
-                    >
-                      <Text fontSize="$4" color="$gray12">
-                        {mode.label}
-                      </Text>
-                    </Button>
-                  ))}
+                          schedulingStrategy:
+                            value as CreateLeagueFormData['schedulingStrategy'],
+                        }))
+                      }
+                      items={schedulingStrategyItems}
+                      disabled={loading}
+                      aria-label="Scheduling strategy"
+                    />
+                  </YStack>
+                </XStack>
+              </YStack>
+
+              <Separator borderColor="$borderColor" />
+
+              {/* Draft Settings Section */}
+              <YStack gap="$3">
+                <SectionHeader>Draft Settings</SectionHeader>
+
+                <YStack gap="$1">
+                  <FieldLabel>Draft Mode</FieldLabel>
+                  <Dropdown
+                    value={formData.draftMode as string}
+                    onChange={(value) => {
+                      const newMode = value as DraftMode;
+                      setFormData((prev) => ({
+                        ...prev,
+                        draftMode: newMode,
+                        selectionMethod:
+                          newMode === DraftMode.AUTOMATED
+                            ? SelectionMethod.RANDOM
+                            : prev.selectionMethod,
+                      }));
+                    }}
+                    items={draftModeItems}
+                    disabled={loading}
+                    aria-label="Draft mode"
+                  />
                 </YStack>
-              )}
-            </YStack>
 
-            {/* Selection Method */}
-            <YStack marginBottom="$4">
-              <Text
-                fontSize="$3"
-                fontWeight="600"
-                color="$gray12"
-                marginBottom="$2"
-              >
-                Selection Method
-              </Text>
-              <Button
-                backgroundColor="$gray1"
-                borderRadius="$2"
-                borderWidth={1}
-                borderColor="$gray6"
-                paddingHorizontal="$3"
-                paddingVertical="$3"
-                justifyContent="space-between"
-                onPress={() =>
-                  setShowSelectionMethodDropdown(!showSelectionMethodDropdown)
-                }
-                disabled={loading || formData.draftMode === DraftMode.AUTOMATED}
-                opacity={formData.draftMode === DraftMode.AUTOMATED ? 0.5 : 1}
-                unstyled
-                flexDirection="row"
-                alignItems="center"
-              >
-                <Text fontSize="$4" color="$gray12">
-                  {SELECTION_METHODS.find(
-                    (s) => s.value === (formData.selectionMethod as string),
-                  )?.label ?? 'Standard'}
-                </Text>
-                <Text fontSize="$3" color="$gray10" marginLeft="auto">
-                  ▼
-                </Text>
-              </Button>
-
-              {showSelectionMethodDropdown && (
-                <YStack
-                  backgroundColor="white"
-                  borderRadius="$2"
-                  borderWidth={1}
-                  borderColor="$gray6"
-                  marginTop="$1"
-                >
-                  {SELECTION_METHODS.map((method) => (
-                    <Button
-                      key={method.value}
-                      padding="$3"
-                      borderBottomWidth={1}
-                      borderBottomColor="$gray4"
-                      backgroundColor="transparent"
-                      justifyContent="flex-start"
-                      onPress={() => {
+                <XStack gap="$3" flexWrap="wrap">
+                  <YStack gap="$1" flex={1} minWidth={140}>
+                    <FieldLabel>Selection Method</FieldLabel>
+                    <Dropdown
+                      value={formData.selectionMethod as string}
+                      onChange={(value) =>
                         setFormData((prev) => ({
                           ...prev,
-                          selectionMethod: method.value as SelectionMethod,
-                        }));
-                        setShowSelectionMethodDropdown(false);
-                      }}
-                      unstyled
-                      borderRadius={0}
-                    >
-                      <Text fontSize="$4" color="$gray12">
-                        {method.label}
-                      </Text>
-                    </Button>
-                  ))}
-                </YStack>
-              )}
-            </YStack>
+                          selectionMethod: value as SelectionMethod,
+                        }))
+                      }
+                      items={selectionMethodItems}
+                      disabled={
+                        loading || formData.draftMode === DraftMode.AUTOMATED
+                      }
+                      aria-label="Selection method"
+                    />
+                  </YStack>
 
-            {/* Draft Order */}
-            <YStack marginBottom="$4">
-              <Text
-                fontSize="$3"
-                fontWeight="600"
-                color="$gray12"
-                marginBottom="$2"
-              >
-                Draft Order
-              </Text>
-              <Button
-                backgroundColor="$gray1"
-                borderRadius="$2"
-                borderWidth={1}
-                borderColor="$gray6"
-                paddingHorizontal="$3"
-                paddingVertical="$3"
-                justifyContent="space-between"
-                onPress={() =>
-                  setShowDraftOrderDropdown(!showDraftOrderDropdown)
-                }
-                disabled={loading}
-                unstyled
-                flexDirection="row"
-                alignItems="center"
-              >
-                <Text fontSize="$4" color="$gray12">
-                  {DRAFT_ORDERS.find(
-                    (o) => o.value === (formData.draftOrder as string),
-                  )?.label ?? 'Snake'}
-                </Text>
-                <Text fontSize="$3" color="$gray10" marginLeft="auto">
-                  ▼
-                </Text>
-              </Button>
-
-              {showDraftOrderDropdown && (
-                <YStack
-                  backgroundColor="white"
-                  borderRadius="$2"
-                  borderWidth={1}
-                  borderColor="$gray6"
-                  marginTop="$1"
-                >
-                  {DRAFT_ORDERS.map((order) => (
-                    <Button
-                      key={order.value}
-                      padding="$3"
-                      borderBottomWidth={1}
-                      borderBottomColor="$gray4"
-                      backgroundColor="transparent"
-                      justifyContent="flex-start"
-                      onPress={() => {
+                  <YStack gap="$1" flex={1} minWidth={140}>
+                    <FieldLabel>Draft Order</FieldLabel>
+                    <Dropdown
+                      value={formData.draftOrder as string}
+                      onChange={(value) =>
                         setFormData((prev) => ({
                           ...prev,
-                          draftOrder: order.value as DraftOrder,
-                        }));
-                        setShowDraftOrderDropdown(false);
-                      }}
-                      unstyled
-                      borderRadius={0}
-                    >
-                      <Text fontSize="$4" color="$gray12">
-                        {order.label}
-                      </Text>
-                    </Button>
-                  ))}
-                </YStack>
-              )}
-            </YStack>
-
-            {/* Number of Divisions */}
-            <YStack marginBottom="$4">
-              <Text
-                fontSize="$3"
-                fontWeight="600"
-                color="$gray12"
-                marginBottom="$2"
-              >
-                Number of Divisions
-              </Text>
-              <Button
-                backgroundColor="$gray1"
-                borderRadius="$2"
-                borderWidth={1}
-                borderColor="$gray6"
-                paddingHorizontal="$3"
-                paddingVertical="$3"
-                justifyContent="space-between"
-                onPress={() =>
-                  setShowDivisionCountDropdown(!showDivisionCountDropdown)
-                }
-                disabled={loading}
-                unstyled
-                flexDirection="row"
-                alignItems="center"
-              >
-                <Text fontSize="$4" color="$gray12">
-                  {DIVISION_COUNTS.find(
-                    (d) => d.value === formData.numberOfDivisions.toString(),
-                  )?.label ?? '2 Divisions'}
-                </Text>
-                <Text fontSize="$3" color="$gray10" marginLeft="auto">
-                  ▼
-                </Text>
-              </Button>
-
-              {showDivisionCountDropdown && (
-                <YStack
-                  backgroundColor="white"
-                  borderRadius="$2"
-                  borderWidth={1}
-                  borderColor="$gray6"
-                  marginTop="$1"
-                >
-                  {DIVISION_COUNTS.map((division) => (
-                    <Button
-                      key={division.value}
-                      padding="$3"
-                      borderBottomWidth={1}
-                      borderBottomColor="$gray4"
-                      backgroundColor="transparent"
-                      justifyContent="flex-start"
-                      onPress={() => {
-                        setFormData((prev) => ({
-                          ...prev,
-                          numberOfDivisions: parseInt(division.value, 10),
-                        }));
-                        setShowDivisionCountDropdown(false);
-                      }}
-                      unstyled
-                      borderRadius={0}
-                    >
-                      <Text fontSize="$4" color="$gray12">
-                        {division.label}
-                      </Text>
-                    </Button>
-                  ))}
-                </YStack>
-              )}
-            </YStack>
-
-            {/* Scheduling Strategy */}
-            <YStack marginBottom="$4">
-              <Text
-                fontSize="$3"
-                fontWeight="600"
-                color="$gray12"
-                marginBottom="$2"
-              >
-                Scheduling Strategy
-              </Text>
-              <Button
-                backgroundColor="$gray1"
-                borderRadius="$2"
-                borderWidth={1}
-                borderColor="$gray6"
-                paddingHorizontal="$3"
-                paddingVertical="$3"
-                justifyContent="space-between"
-                onPress={() =>
-                  setShowSchedulingStrategyDropdown(
-                    !showSchedulingStrategyDropdown,
-                  )
-                }
-                disabled={loading}
-                unstyled
-                flexDirection="row"
-                alignItems="center"
-              >
-                <Text fontSize="$4" color="$gray12">
-                  {SCHEDULING_STRATEGIES.find(
-                    (s) => s.value === formData.schedulingStrategy,
-                  )?.label ?? 'Divisional'}
-                </Text>
-                <Text fontSize="$3" color="$gray10" marginLeft="auto">
-                  ▼
-                </Text>
-              </Button>
-
-              {showSchedulingStrategyDropdown && (
-                <YStack
-                  backgroundColor="white"
-                  borderRadius="$2"
-                  borderWidth={1}
-                  borderColor="$gray6"
-                  marginTop="$1"
-                >
-                  {SCHEDULING_STRATEGIES.map((strategy) => (
-                    <Button
-                      key={strategy.value}
-                      padding="$3"
-                      borderBottomWidth={1}
-                      borderBottomColor="$gray4"
-                      backgroundColor="transparent"
-                      justifyContent="flex-start"
-                      onPress={() => {
-                        setFormData((prev) => ({
-                          ...prev,
-                          schedulingStrategy: strategy.value as
-                            | 'divisional'
-                            | 'round-robin'
-                            | 'random',
-                        }));
-                        setShowSchedulingStrategyDropdown(false);
-                      }}
-                      unstyled
-                      borderRadius={0}
-                    >
-                      <Text fontSize="$4" color="$gray12">
-                        {strategy.label}
-                      </Text>
-                    </Button>
-                  ))}
-                </YStack>
-              )}
+                          draftOrder: value as DraftOrder,
+                        }))
+                      }
+                      items={draftOrderItems}
+                      disabled={loading}
+                      aria-label="Draft order"
+                    />
+                  </YStack>
+                </XStack>
+              </YStack>
             </YStack>
           </ScrollView>
 
+          <Separator borderColor="$borderColor" />
+
           {/* Action Buttons */}
-          <XStack gap="$3" marginTop="$4">
+          <XStack gap="$3" justifyContent="flex-end">
             <Dialog.Close asChild>
               <Button
-                flex={1}
-                backgroundColor="$gray6"
-                borderRadius="$2"
-                onPress={onClose}
+                variant="outlined"
+                borderColor="$borderColor"
                 disabled={loading}
               >
-                <Text fontWeight="600" color="$gray12">
-                  Cancel
-                </Text>
+                Cancel
               </Button>
             </Dialog.Close>
 
             <Button
-              flex={1}
-              backgroundColor="$blue10"
-              borderRadius="$2"
+              theme="blue"
               onPress={() => void handleSubmit()}
               disabled={loading}
               opacity={loading ? 0.6 : 1}
             >
-              <Text fontWeight="600" color="white">
-                {loading ? 'Creating...' : 'Create League'}
-              </Text>
+              {loading ? 'Creating...' : 'Create League'}
             </Button>
           </XStack>
         </Dialog.Content>

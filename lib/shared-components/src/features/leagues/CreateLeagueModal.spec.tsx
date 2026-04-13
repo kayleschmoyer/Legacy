@@ -50,4 +50,21 @@ describe('CreateLeagueModal', () => {
     const input = getByPlaceholderText('Enter league name');
     expect(input).toHaveAttribute('readonly');
   });
+
+  it('renders inline error banner when error prop is set', () => {
+    const { getByText } = render(
+      <CreateLeagueModal {...defaultProps} error="Failed to create league" />,
+    );
+    expect(getByText('Failed to create league')).toBeTruthy();
+  });
+
+  it('does not call onSubmit when league name is empty', () => {
+    const onSubmit = jest.fn().mockResolvedValue(undefined);
+    const { getByText } = render(
+      <CreateLeagueModal {...defaultProps} onSubmit={onSubmit} />,
+    );
+    const createButton = getByText('Create League');
+    createButton.click();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
 });

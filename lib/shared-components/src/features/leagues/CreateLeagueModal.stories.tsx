@@ -1,4 +1,3 @@
-import React, { useEffect } from 'react';
 import type { Meta, StoryObj } from '@storybook/react';
 import { fn } from '@storybook/test';
 import { CreateLeagueModal } from './CreateLeagueModal';
@@ -52,24 +51,10 @@ export const WithError: Story = {
     onSubmit: fn(),
     error: 'Failed to create league',
   },
-  decorators: [
-    (Story) => {
-      // Suppress window.alert in Storybook — the component calls alert() on
-      // web when the error prop is set.
-      useEffect(() => {
-        const original = window.alert;
-        window.alert = fn() as typeof window.alert;
-        return () => {
-          window.alert = original;
-        };
-      }, []);
-      return <Story />;
-    },
-  ],
   parameters: {
     docs: {
       description: {
-        story: 'Error state that triggers an alert with the error message.',
+        story: 'Error state showing an inline error banner.',
       },
     },
   },
