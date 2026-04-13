@@ -257,7 +257,15 @@ export const Error: Story = { args: { variant: 'error', label: 'Out' } };
 
 ## Checklist When Adding a Story
 
-- [ ] File is co-located with the component (`Component.stories.tsx`)
+**Scaffolding shortcut:** Generate a boilerplate story file with the correct structure:
+
+```bash
+make scaffold-story COMPONENT=lib/shared-components/src/components/MyButton.tsx
+# or: node scripts/scaffold-story.js lib/shared-components/src/components/MyButton.tsx
+```
+
+This creates `MyButton.stories.tsx` with Meta, StoryObj types, and variant stubs. Then customize it:
+
 - [ ] `title` follows the `Category/ComponentName` hierarchy
 - [ ] `tags: ['autodocs']` present on `meta`
 - [ ] At least one variant story exported (default state)

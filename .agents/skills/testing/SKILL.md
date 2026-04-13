@@ -120,3 +120,14 @@ make pc
 ## Integration with Workflow
 
 Testing is part of the pre-commit sequence: typecheck -> lint -> test -> build. Run the full suite with `make pc`. See [repo-tooling](../repo-tooling/SKILL.md) for all targets.
+
+### E2E Pre-Commit Scope Detection
+
+Before running E2E tests, determine the minimum scope needed based on changed files:
+
+```bash
+make e2e-scope
+# or: node scripts/e2e-pre-commit.js --json
+```
+
+This classifies changes and recommends: **targeted** (specific test files changed), **critical** (@critical suite for fixture/helper changes), or **none** (no E2E-relevant changes). Use `--run` to execute the recommended tests directly.

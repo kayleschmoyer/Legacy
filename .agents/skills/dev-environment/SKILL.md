@@ -69,6 +69,17 @@ See [references/docker-local.md](references/docker-local.md) for full details (s
 
 ## Common Prerequisites
 
+Before starting any dev service, run the automated health check:
+
+```bash
+make dev-env-health
+# or: node scripts/dev-env-health-check.js --json  (for structured output)
+```
+
+This checks node_modules, .env files, pnpm version, Nx, Docker, ports, and migration status in one pass.
+
+**Manual checklist** (if you prefer step-by-step):
+
 1. **Install dependencies**: `make install` (never raw `pnpm install` in worktrees)
 2. **Sync environment variables**: `make sync-env` or `.\scripts\sync-env.ps1`
 3. **Database accessible**: local PostgreSQL running or Docker Compose stack up

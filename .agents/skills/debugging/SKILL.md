@@ -53,7 +53,8 @@ Every bug fix requires verification that matches the bug's category. Choose the 
 What type of failure are you debugging?
 │
 ├── CI pipeline failure (GitHub Actions)
-│   → Load references/ci-failure.md
+│   → Run `make ci-classify-failure LOG="<error text>"` first (auto-classifies 15+ patterns)
+│   → If unclassified: Load references/ci-failure.md
 │   → Advanced: references/ci-pipeline-architecture.md, references/ci-troubleshooting-advanced.md
 │
 ├── Distributed system failure (Lambda / SQS / EventBridge / WebSocket)

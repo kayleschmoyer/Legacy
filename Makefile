@@ -16,7 +16,8 @@
 	fix-windows-locks diagnose kill-stale \
 	branch-tree cleanup-merged-branches clean-merged squash-branch rebase-tree rebase-tree-auto rebase-tree-skip resolve-conflicts \
 	pre-commit pc quick-check format-commit \
-	wt-setup
+	wt-setup \
+	stabilize-after-rebase lint-review-patterns ci-classify-failure dev-env-health e2e-scope scaffold-story scan-secret
 .DEFAULT_GOAL := help
 
 # Platform detection and commands
@@ -885,3 +886,25 @@ quick-check: ## Quick validation (typecheck + lint only)
 	@pnpm exec nx affected -t typecheck --base=main
 	@pnpm exec nx affected -t lint --fix --base=main
 	@$(call echo_green,✓ Quick checks passed!)
+
+# Agent workflow automation scripts
+stabilize-after-rebase: ## Post-rebase stabilization (install → schema → codegen → pc)
+	@node scripts/stabilize-after-rebase.js
+
+lint-review-patterns: ## Run mechanical self-review checks against git diff
+	@node scripts/lint-review-patterns.js
+
+ci-classify-failure: ## Classify CI failure from log text. Usage: make ci-classify-failure LOG="error text"
+	@node scripts/ci-classify-failure.js --log="$(LOG)"
+
+dev-env-health: ## Check dev environment prerequisites
+	@node scripts/dev-env-health-check.js
+
+e2e-scope: ## Detect E2E test scope from changed files
+	@node scripts/e2e-pre-commit.js
+
+scaffold-story: ## Generate a story file for a component. Usage: make scaffold-story COMPONENT=path/to/Component.tsx
+	@node scripts/scaffold-story.js $(COMPONENT)
+
+scan-secret: ## Scan all locations for a secret/env var. Usage: make scan-secret VAR=MY_SECRET
+	@node scripts/secret-location-scanner.js $(VAR)

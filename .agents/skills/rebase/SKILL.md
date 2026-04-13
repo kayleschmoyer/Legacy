@@ -38,16 +38,16 @@ git push --force-with-lease origin HEAD
 
 ## Decision Tree
 
-| Situation                                   | Action                                                                                                   |
-| ------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| No conflicts after rebase                   | Go straight to post-rebase stabilization                                                                 |
-| Generated files (`*.generated.ts`) conflict | Regenerate -- never manually merge. `.\scripts\resolve-generated-conflicts.ps1`                          |
-| Lock file (`pnpm-lock.yaml`) conflicts      | Accept either side, then `pnpm install --no-frozen-lockfile` after rebase                                |
-| Migration files conflict (duplicate)        | `git rebase --skip`                                                                                      |
-| Source/config files conflict                | Read both sides, synthesize. See [conflict-resolution-guide.md](references/conflict-resolution-guide.md) |
-| Many files conflict across many commits     | See [rebase-conflict-strategies.md](references/rebase-conflict-strategies.md)                            |
-| Stacked/dependent branches need rebasing    | `make rebase-tree` or `make rebase-tree-auto`                                                            |
-| Stuck mid-rebase or need recovery           | See [rebase-interactive-and-recovery.md](references/rebase-interactive-and-recovery.md)                  |
+| Situation                                   | Action                                                                                                       |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| No conflicts after rebase                   | Go straight to post-rebase stabilization                                                                     |
+| Generated files (`*.generated.ts`) conflict | Regenerate -- never manually merge. `.\scripts\resolve-generated-conflicts.ps1`                              |
+| Lock file (`pnpm-lock.yaml`) conflicts      | Now handled by `.\scripts\resolve-generated-conflicts.ps1` (accepts theirs, regenerates via `make install`)  |
+| Migration files conflict (duplicate)        | Handled by `.\scripts\resolve-generated-conflicts.ps1` (accepts theirs; skip dupes with `git rebase --skip`) |
+| Source/config files conflict                | Read both sides, synthesize. See [conflict-resolution-guide.md](references/conflict-resolution-guide.md)     |
+| Many files conflict across many commits     | See [rebase-conflict-strategies.md](references/rebase-conflict-strategies.md)                                |
+| Stacked/dependent branches need rebasing    | `make rebase-tree` or `make rebase-tree-auto`                                                                |
+| Stuck mid-rebase or need recovery           | See [rebase-interactive-and-recovery.md](references/rebase-interactive-and-recovery.md)                      |
 
 ## Check for Conflicts After Rebase
 
@@ -66,6 +66,15 @@ If `worktree_conflict_info` returns no conflicts, all merge conflicts are resolv
 > Do NOT push until `make pc` passes. This is the #1 cause of post-rebase CI failures.
 >
 > **Why**: rebasing can silently break type compatibility, schema alignment, and lock file integrity even when no conflicts are reported. The stabilization step catches these invisible breakages before they become CI failures that cost 40-60 minutes each.
+
+**Automated (preferred):** Run the stabilization script, which auto-detects your node_modules mode and only runs the steps needed:
+
+```bash
+make stabilize-after-rebase
+# or: node scripts/stabilize-after-rebase.js
+```
+
+**Manual steps** (if you need to run individually):
 
 ```bash
 make install

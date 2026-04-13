@@ -20,7 +20,14 @@ This skill walks through every required location in the correct order.
 
 ## Full Checklist
 
-Work through all steps in order. Detailed code examples for each step: [references/step-by-step-guide.md](references/step-by-step-guide.md)
+**Quick scan first:** Before manually checking all locations, run the automated scanner to see which ones already have the variable:
+
+```bash
+make scan-secret VAR=MY_SECRET_NAME
+# or: node scripts/secret-location-scanner.js --json MY_SECRET_NAME
+```
+
+Then work through all steps in order. Detailed code examples for each step: [references/step-by-step-guide.md](references/step-by-step-guide.md)
 
 | #   | Location                                        | Plain Env Var |         Secret         |
 | --- | ----------------------------------------------- | :-----------: | :--------------------: |
