@@ -16,7 +16,7 @@ export function runCommand(
   args: string[],
   cwd: string,
   timeoutMs = COMMAND_TIMEOUT,
-  opts?: { shell?: boolean },
+  opts?: { shell?: boolean; env?: Record<string, string> },
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     execFile(
@@ -27,6 +27,7 @@ export function runCommand(
         timeout: timeoutMs,
         maxBuffer: 10 * 1024 * 1024,
         shell: opts?.shell ?? false,
+        ...(opts?.env ? { env: { ...process.env, ...opts.env } } : {}),
       },
       (err, stdout, stderr) => {
         if (err) {
@@ -52,6 +53,7 @@ export function runPnpm(
   args: string[],
   cwd: string,
   timeoutMs?: number,
+  env?: Record<string, string>,
 ): Promise<string> {
-  return runCommand('pnpm', args, cwd, timeoutMs, { shell: true });
+  return runCommand('pnpm', args, cwd, timeoutMs, { shell: true, env });
 }

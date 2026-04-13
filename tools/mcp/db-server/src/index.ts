@@ -5,6 +5,7 @@ import { checkHealth } from './tools/check-health.js';
 import { codegen } from './tools/codegen.js';
 import { getUser } from './tools/get-user.js';
 import { migrate } from './tools/migrate.js';
+import { migrateTunnel } from './tools/migrate-tunnel.js';
 import { migrationStatus } from './tools/migration-status.js';
 import { printSchema } from './tools/print-schema.js';
 import { query } from './tools/query.js';
@@ -48,7 +49,7 @@ server.tool(
 // --- db_migrate ---
 server.tool(
   'db_migrate',
-  'Prefer this over `pnpm --prefix lib/db-client run db:up` via shell. Apply pending database migrations.',
+  'Prefer this over `pnpm --prefix lib/db-client run db:up` via shell. Apply pending database migrations. NOTE: use db_migrate_tunnel instead when DATABASE_URL / DB_HOST is not directly reachable (e.g. in the standard dev setup where DB_HOST points to a VPC-private RDS endpoint).',
   {
     worktreePath: z
       .string()
@@ -56,6 +57,19 @@ server.tool(
       .describe('Worktree path (default: repo root)'),
   },
   async (params) => migrate(params),
+);
+
+// --- db_migrate_tunnel ---
+server.tool(
+  'db_migrate_tunnel',
+  'Apply pending database migrations via an SSM port-forward tunnel. Use this instead of db_migrate when DATABASE_URL / DB_HOST is not directly reachable (e.g. VPC-private RDS in the standard dev environment). Discovers the NAT instance via `aws ssm describe-instance-information`, opens a localhost tunnel to RDS, runs migrations, then tears down the tunnel.',
+  {
+    worktreePath: z
+      .string()
+      .optional()
+      .describe('Worktree path (default: repo root)'),
+  },
+  async (params) => migrateTunnel(params),
 );
 
 // --- db_migration_status ---

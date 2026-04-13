@@ -21,7 +21,7 @@ interface MigrateResult {
  *   [...] INFO: 📋 No new migrations to apply
  *   [...] INFO: ✅ Applied N new migrations
  */
-function parseUpOutput(output: string): MigrateResult {
+export function parseUpOutput(output: string): MigrateResult {
   const appliedNames: string[] = [];
   const lines = output.split('\n');
 
