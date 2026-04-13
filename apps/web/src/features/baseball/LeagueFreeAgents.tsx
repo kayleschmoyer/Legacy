@@ -778,7 +778,36 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
       </HeaderRow>
 
       {/* ── Body ─────────────────────────────────────────────────── */}
-      <YStack flex={1} minHeight={200}>
+      <YStack flex={1} minHeight={200} position="relative">
+        {/* Inline loading indicator for background refetches — overlaid so it doesn't push rows */}
+        {isLoading && displayPlayers.length > 0 && (
+          <XStack
+            role="status"
+            aria-live="polite"
+            position="absolute"
+            top={0}
+            left={0}
+            right={0}
+            zIndex={10}
+            pointerEvents="none"
+            paddingVertical="$1"
+            paddingHorizontal="$4"
+            backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.12)}
+            alignItems="center"
+            gap="$2"
+          >
+            <Spinner size="small" color="$brandNavyLight" />
+            <Text
+              fontSize={12}
+              fontWeight="600"
+              letterSpacing={0.5}
+              color="$brandGoldLight"
+              fontFamily={FONT_DISPLAY}
+            >
+              Updating…
+            </Text>
+          </XStack>
+        )}
         {error ? (
           <EmptyState>
             <AlertCircle size={32} color="$red10" />
@@ -825,28 +854,6 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
           </EmptyState>
         ) : (
           <>
-            {/* Inline loading indicator for background refetches */}
-            {isLoading && (
-              <XStack
-                paddingVertical="$1"
-                paddingHorizontal="$4"
-                backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.12)}
-                alignItems="center"
-                gap="$2"
-              >
-                <Spinner size="small" color={BRAND_NAVY_LIGHT} />
-                <Text
-                  fontSize={12}
-                  fontWeight="600"
-                  letterSpacing={0.5}
-                  color={BRAND_GOLD_LIGHT}
-                  fontFamily={FONT_DISPLAY}
-                >
-                  Updating…
-                </Text>
-              </XStack>
-            )}
-
             {displayPlayers.map((player, index) => {
               const battingStats = player.careerBatting;
               const pitchingStats = player.careerPitching;
