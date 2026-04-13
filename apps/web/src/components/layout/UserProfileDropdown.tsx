@@ -24,6 +24,7 @@ import {
   Sun,
   User,
 } from '@tamagui/lucide-icons';
+import { GRADIENT_AVATAR } from '../../constants/colors';
 import { formatDisplayName } from '../../lib/formatDisplayName';
 import {
   type ThemePreference,
@@ -229,7 +230,7 @@ export const UserProfileDropdown: React.FC = () => {
         <XStack alignItems="center" gap="$2">
           <ProfileImage
             style={{
-              background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
+              background: GRADIENT_AVATAR,
             }}
           >
             {userImage && !imageError ? (
@@ -285,7 +286,7 @@ export const UserProfileDropdown: React.FC = () => {
               width={40}
               height={40}
               style={{
-                background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
+                background: GRADIENT_AVATAR,
               }}
             >
               {userImage && !imageError ? (
