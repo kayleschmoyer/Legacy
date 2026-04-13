@@ -199,7 +199,10 @@ resource "aws_lambda_function" "draft_processor" {
       DB_SECRET_NAME        = aws_secretsmanager_secret.database_credentials.name
       DB_HOST               = var.enable_rds_proxy ? aws_db_proxy.main[0].endpoint : aws_db_instance.postgres.endpoint
       USE_LOCAL_CREDENTIALS = "false"
-      DB_CERT_PATH          = "/opt/certs/us-east-1-bundle.pem"
+      # DB_CERT_PATH intentionally omitted: the Lambda layer that mounted
+      # /opt/certs/us-east-1-bundle.pem was removed. Modern RDS instances
+      # (rds-ca-rsa2048-g1 or later) use Amazon Root CA certs trusted by
+      # Node.js built-in CAs, so no explicit cert path is needed. See LS-3166.
 
       # Legacy support - keep DB_CREDS_PATH as fallback
       DB_CREDS_PATH = aws_secretsmanager_secret.database_credentials.name
