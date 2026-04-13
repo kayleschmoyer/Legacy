@@ -191,6 +191,59 @@ On **Claude Code on the web**, Claude's native Atlassian plugin (`mcp__claude_ai
 | `jira_link_issues`     | No native equivalent (use custom `legacy-sports-jira` MCP or `acli`)                                                                                                                                                                                                  |
 | `jira_list_children`   | `searchJiraIssuesUsingJql` with `parent = LS-####`                                                                                                                                                                                                                    |
 
+## Copilot Coding Agent: Custom MCP Server Setup
+
+Copilot Coding Agent **does** support custom stdio MCP servers via the Settings → Copilot → Cloud agent → MCP configuration UI. This is separate from Claude Code on the web.
+
+### How it works
+
+1. **Environment bootstrap**: `.github/copilot-setup-steps.yml` runs before every Copilot agent task. It sets up Node/pnpm, installs dependencies, starts Docker PostgreSQL, seeds the DB, and exports env vars (`GH_TOKEN`, `DATABASE_URL`, `USE_LOCAL_CREDENTIALS`, and optionally Jira credentials) to `$GITHUB_ENV` so MCP server subprocesses inherit them.
+
+2. **MCP config**: paste the contents of the `mcpServers` object from `.github/copilot/copilot-cloud-mcp-config.json` into Settings → Copilot → Cloud agent → MCP configuration (JSON editor in the GitHub Settings UI — not a file in the repo). Do not paste the entire file including `_instructions`.
+
+3. **Secrets**: add the following to Settings → Environments → `copilot` → Environment secrets:
+
+   | Secret               | When required                                      | Purpose                      |
+   | -------------------- | -------------------------------------------------- | ---------------------------- |
+   | `JIRA_CLIENT_ID`     | OAuth 2.0 (preferred; all three together)          | Jira OAuth 2.0 client ID     |
+   | `JIRA_CLIENT_SECRET` | OAuth 2.0 (preferred; all three together)          | Jira OAuth 2.0 client secret |
+   | `JIRA_CLOUD_ID`      | OAuth 2.0 (preferred; all three together)          | Jira cloud ID                |
+   | `JIRA_SITE_URL`      | Never (defaults to `https://bkrupa.atlassian.net`) | Override Jira site URL       |
+   | `JIRA_EMAIL`         | Basic Auth only (fallback when OAuth absent)       | Jira account email           |
+   | `JIRA_API_TOKEN`     | Basic Auth only (fallback when OAuth absent)       | Jira API token               |
+
+   > **Not needed as secrets**: `GH_TOKEN` (generated from the Agent Author GitHub App by copilot-setup-steps.yml), `GITHUB_TOKEN` (standard GitHub-provided Actions token), `DATABASE_URL` (exported by copilot-setup-steps.yml), `USE_LOCAL_CREDENTIALS` (also exported automatically).
+
+### Available MCP servers in Copilot cloud
+
+| Server                  | Available          | Notes                                                                                                                                                                 |
+| ----------------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `legacy-sports-github`  | ✅                 | `GH_TOKEN` set by copilot-setup-steps.yml                                                                                                                             |
+| `legacy-sports-ci`      | ✅                 | `GH_TOKEN` set by copilot-setup-steps.yml                                                                                                                             |
+| `legacy-sports-jira`    | ✅ (needs secrets) | OAuth: `JIRA_CLIENT_ID` + `JIRA_CLIENT_SECRET` + `JIRA_CLOUD_ID`; Basic Auth fallback: `JIRA_EMAIL` + `JIRA_API_TOKEN`                                                |
+| `legacy-sports-nx`      | ✅                 | pnpm install run by copilot-setup-steps.yml                                                                                                                           |
+| `legacy-sports-make`    | ✅                 | Same as above                                                                                                                                                         |
+| `legacy-sports-db`      | ✅                 | `DATABASE_URL` exported by copilot-setup-steps.yml                                                                                                                    |
+| `legacy-sports-browser` | ⚠️ needs setup     | Not included by default; to enable: add `npx playwright install chromium` to copilot-setup-steps.yml then add the server entry to the cloud MCP config                |
+| `worktree`              | ✅                 | git/run tools work (ping/run/push/stabilize); twig-dependent tools (worktree_rebase, worktree_clean, worktree_remove_batch) excluded from cloud config via allow-list |
+| `legacy-sports-aws`     | ❌                 | No AWS SSO or OIDC credentials in cloud; use `ci_get_logs` instead                                                                                                    |
+
+> **Jira note**: egress to `api.atlassian.com` _may_ be blocked at the cloud-session proxy layer (see [Known cloud-environment quirks](#known-cloud-environment-quirks) below). If `jira_auth_status` reports `configured: true` but all `jira_*` calls return `fetch failed`, the proxy is blocking outbound HTTPS. On Claude Code on the web, fall back to the native Atlassian plugin. On Copilot Coding Agent, there is no plugin fallback — raise with the repo admin to unblock the proxy or use Jira REST API via `make_run` shell commands.
+
+### Verifying auth in a Copilot session
+
+After the agent starts, verify MCP servers are connected by calling these status tools:
+
+```
+github_auth_status()      # legacy-sports-github
+ci_auth_status()          # legacy-sports-ci
+jira_auth_status()        # legacy-sports-jira (configured: true means creds loaded, not necessarily reachable)
+make_ping()               # legacy-sports-make
+nx_check_package_health() # legacy-sports-nx (doubles as health check)
+db_check_health()         # legacy-sports-db
+worktree_ping()           # worktree
+```
+
 ## Known cloud-environment quirks
 
 These are environment behaviors that look like bugs but are not — they cost real time on every fresh cloud session that touches Jira. If you hit either symptom below, recognize it immediately and switch strategy without declaring yourself blocked.

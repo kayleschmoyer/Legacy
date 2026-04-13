@@ -130,11 +130,59 @@ steps:
 
       echo "Dev seed restored (exit code: $RESTORE_EXIT)"
 
+  - name: Export DATABASE_URL for MCP servers
+    run: |
+      # Define once here — all subsequent steps (including migrations) inherit from $GITHUB_ENV
+      {
+        echo "DATABASE_URL=postgresql://legacy_sports:legacy_sports_dev@localhost:5432/legacy_sports_dev"
+        echo "USE_LOCAL_CREDENTIALS=true"
+      } >> "$GITHUB_ENV"
+
+  - name: Export Jira credentials for MCP servers
+    run: |
+      # OAuth 2.0 (preferred) — all three vars must be present
+      if [ -n "$JIRA_CLIENT_ID" ] && [ -n "$JIRA_CLIENT_SECRET" ] && [ -n "$JIRA_CLOUD_ID" ]; then
+        {
+          echo "JIRA_CLIENT_ID<<EOF"
+          echo "$JIRA_CLIENT_ID"
+          echo "EOF"
+          echo "JIRA_CLIENT_SECRET<<EOF"
+          echo "$JIRA_CLIENT_SECRET"
+          echo "EOF"
+          echo "JIRA_CLOUD_ID<<EOF"
+          echo "$JIRA_CLOUD_ID"
+          echo "EOF"
+          echo "JIRA_SITE_URL<<EOF"
+          echo "${JIRA_SITE_URL:-https://bkrupa.atlassian.net}"
+          echo "EOF"
+        } >> "$GITHUB_ENV"
+        echo "Jira OAuth credentials exported"
+      # Basic Auth fallback — both vars must be present
+      elif [ -n "$JIRA_EMAIL" ] && [ -n "$JIRA_API_TOKEN" ]; then
+        {
+          echo "JIRA_EMAIL<<EOF"
+          echo "$JIRA_EMAIL"
+          echo "EOF"
+          echo "JIRA_API_TOKEN<<EOF"
+          echo "$JIRA_API_TOKEN"
+          echo "EOF"
+        } >> "$GITHUB_ENV"
+        echo "Jira Basic Auth credentials exported"
+      else
+        echo "WARNING: No complete Jira credentials found — jira_auth_status will report configured: false"
+        echo "Add JIRA_CLIENT_ID + JIRA_CLIENT_SECRET + JIRA_CLOUD_ID (OAuth) or JIRA_EMAIL + JIRA_API_TOKEN (Basic Auth) to the copilot environment"
+      fi
+    env:
+      JIRA_CLIENT_ID: ${{ secrets.JIRA_CLIENT_ID }}
+      JIRA_CLIENT_SECRET: ${{ secrets.JIRA_CLIENT_SECRET }}
+      JIRA_CLOUD_ID: ${{ secrets.JIRA_CLOUD_ID }}
+      JIRA_SITE_URL: ${{ secrets.JIRA_SITE_URL }}
+      JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+      JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+
   - name: Apply database migrations
     run: cd lib/db-client && pnpm run db:migrate
-    env:
-      USE_LOCAL_CREDENTIALS: "true"
-      DATABASE_URL: postgresql://legacy_sports:legacy_sports_dev@localhost:5432/legacy_sports_dev
+    # DATABASE_URL and USE_LOCAL_CREDENTIALS are inherited from $GITHUB_ENV above
 
   - name: Create local .env for MCP servers
     run: |
@@ -142,13 +190,14 @@ steps:
         echo ".env already exists — skipping creation"
         exit 0
       fi
-      cat > .env <<'EOF'
-      USE_LOCAL_CREDENTIALS=true
+      # DATABASE_URL and USE_LOCAL_CREDENTIALS are already in $GITHUB_ENV from the export step above
+      cat > .env <<EOF
+      USE_LOCAL_CREDENTIALS=${USE_LOCAL_CREDENTIALS}
       DB_HOST=localhost:5432
       DB_USER=legacy_sports
       DB_PASSWORD=legacy_sports_dev
       DB_NAME=legacy_sports_dev
-      DATABASE_URL=postgresql://legacy_sports:legacy_sports_dev@localhost:5432/legacy_sports_dev
+      DATABASE_URL=${DATABASE_URL}
       DB_CERT_PATH=
       DB_SECRET_NAME=
       JWT_SECRET=cloud-agent-jwt-secret-not-for-production

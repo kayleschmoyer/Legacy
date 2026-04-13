@@ -1,0 +1,129 @@
+{
+  "_instructions": [
+    "Paste the contents of the 'mcpServers' object into:",
+    "  Settings → Copilot → Cloud agent → MCP configuration (in the JSON editor)",
+    "",
+    "Secrets required in the 'copilot' GitHub environment",
+    "(Settings → Environments → copilot → Environment secrets):",
+    "",
+    "  OAuth 2.0 (preferred — all three required together):",
+    "    JIRA_CLIENT_ID, JIRA_CLIENT_SECRET, JIRA_CLOUD_ID",
+    "  Optional OAuth override:",
+    "    JIRA_SITE_URL (defaults to https://bkrupa.atlassian.net)",
+    "  Basic Auth (fallback — only used if OAuth vars are absent):",
+    "    JIRA_EMAIL, JIRA_API_TOKEN",
+    "",
+    "All Jira env vars are picked up from $GITHUB_ENV by the MCP server subprocess —",
+    "they do NOT need to be listed in the env block of this config.",
+    "",
+    "The following are NOT needed as secrets here — set automatically by copilot-setup-steps.yml:",
+    "  GH_TOKEN              — generated from the Agent Author GitHub App by copilot-setup-steps.yml",
+    "  GITHUB_TOKEN          — standard GitHub-provided token (available in all Actions runs automatically)",
+    "  DATABASE_URL           — postgresql://legacy_sports:...",
+    "  USE_LOCAL_CREDENTIALS  — true",
+    "",
+    "Servers NOT included by default (require additional setup to enable in Copilot cloud):",
+    "  legacy-sports-aws    — requires interactive AWS SSO login (unavailable in cloud)",
+    "  legacy-sports-browser — not included by default; to enable: add 'npx playwright install chromium'",
+    "                          to copilot-setup-steps.yml, then add the server entry to this config",
+    "",
+    "This file is the canonical source committed to the repo. Do NOT duplicate the mcpServers",
+    "JSON into other committed files or embed secrets here — secrets are configured separately",
+    "via GitHub Settings → Environments → copilot → Environment secrets."
+  ],
+  "mcpServers": {
+    "legacy-sports-github": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        ".github/copilot/hooks/mcp-bootstrap.mjs",
+        "node",
+        "--import",
+        "tsx",
+        "tools/mcp/github-server/src/index.ts"
+      ],
+      "tools": ["*"]
+    },
+    "legacy-sports-ci": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        ".github/copilot/hooks/mcp-bootstrap.mjs",
+        "node",
+        "--import",
+        "tsx",
+        "tools/mcp/ci-server/src/index.ts"
+      ],
+      "tools": ["*"]
+    },
+    "legacy-sports-jira": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        ".github/copilot/hooks/mcp-bootstrap.mjs",
+        "node",
+        "--import",
+        "tsx",
+        "tools/mcp/jira-server/src/index.ts"
+      ],
+      "tools": ["*"]
+    },
+    "worktree": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        ".github/copilot/hooks/mcp-bootstrap.mjs",
+        "node",
+        "--import",
+        "tsx",
+        "tools/mcp/worktree-server/src/index.ts"
+      ],
+      "tools": [
+        "worktree_ping",
+        "worktree_list",
+        "worktree_set",
+        "worktree_run",
+        "worktree_guard",
+        "worktree_rebase_continue",
+        "worktree_stabilize",
+        "worktree_push"
+      ]
+    },
+    "legacy-sports-nx": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        ".github/copilot/hooks/mcp-bootstrap.mjs",
+        "node",
+        "--import",
+        "tsx",
+        "tools/mcp/nx-server/src/index.ts"
+      ],
+      "tools": ["*"]
+    },
+    "legacy-sports-make": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        ".github/copilot/hooks/mcp-bootstrap.mjs",
+        "node",
+        "--import",
+        "tsx",
+        "tools/mcp/make-server/src/index.ts"
+      ],
+      "tools": ["*"]
+    },
+    "legacy-sports-db": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        ".github/copilot/hooks/mcp-bootstrap.mjs",
+        "node",
+        "--import",
+        "tsx",
+        "tools/mcp/db-server/src/index.ts"
+      ],
+      "tools": ["*"]
+    }
+  }
+}
