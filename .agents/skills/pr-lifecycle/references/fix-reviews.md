@@ -32,10 +32,11 @@ This aims to keep most PRs to ≤ 2 review rounds by avoiding unnecessary re-rev
 6. **Commit & push once**: one commit covering all fixes from this round, conventional commit message describing the fixes
 7. **Resolve threads (MANDATORY)**: After pushing, immediately resolve every thread you addressed:
    - Collect all thread `id` values from the threads you fixed in step 3
-   - Call `github_resolve_threads({ threadIds: [...] })` with all IDs in a single batch
+   - Call `github_resolve_threads({ threadIds: [...], prNumber: <PR#> })` for up to 100 thread IDs per call; if you have more than 100 threads to resolve, split the IDs into multiple calls until all addressed threads are resolved
    - GitHub does NOT auto-resolve threads when code changes — you must explicitly resolve them
    - For threads you chose not to fix (disagreed / out of scope), reply with an explanation, then resolve
    - **Never leave addressed threads unresolved** — this blocks the merge queue and triggers re-review
+   - **Always invoke `github_resolve_threads` directly — never reach for raw GraphQL mutations or shell commands without first calling this tool and getting a connection error or tool-not-found response. Assuming the tool is unavailable without trying it is not acceptable.**
 8. Copilot re-reviews automatically on push; new threads from the re-review are a separate round
 
 ## Two-Round Cap
@@ -69,7 +70,7 @@ On Claude Code on the web, use the **custom `legacy-sports-github` MCP server** 
 | ------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Fetch threads       | `github_get_review_threads({ number: <PR#>, unresolvedOnly: true })` ✅ returns GraphQL `id` | `mcp__github__pull_request_read({ method: "get_review_comments", owner, repo, pullNumber })` ⚠️ no thread node IDs — resolve step will fail      |
 | Reply to thread     | ⚠️ may post under user's GitHub username                                                     | `mcp__github__add_reply_to_pull_request_comment({ owner, repo, pullNumber, commentId, body })` ✅ bot identity                                   |
-| Resolve threads     | `github_resolve_threads({ threadIds })` ✅ batch                                             | `mcp__github__resolve_review_thread({ threadId })` per thread ⚠️ requires node IDs — only viable if threads were fetched via custom server above |
+| Resolve threads     | `github_resolve_threads({ threadIds, prNumber: <PR#> })` ✅ batch                            | `mcp__github__resolve_review_thread({ threadId })` per thread ⚠️ requires node IDs — only viable if threads were fetched via custom server above |
 | Re-request Copilot  | ⚠️ app tokens silently fail for Copilot                                                      | `mcp__github__request_copilot_review({ owner, repo, pullNumber })` ✅ platform auth                                                              |
 | Subscribe to events | N/A                                                                                          | `mcp__github__subscribe_pr_activity({ owner, repo, pullNumber })` ✅                                                                             |
 

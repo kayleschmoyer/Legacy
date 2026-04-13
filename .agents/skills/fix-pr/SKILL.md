@@ -66,7 +66,7 @@ Build a triage list:
 4. **Validate**: `make pc` (minimum: `make format && make lint-fix && make typecheck`)
 5. **Self-review fix code**: re-read every file you changed in full. Check fixes against `skills/pr-lifecycle/references/common-review-patterns.md` — fix code often introduces the same anti-patterns that triggered the original review. This prevents another review cycle.
 6. **Commit + push once**: single commit covering all fixes.
-7. **Resolve threads immediately after push**: `github_resolve_threads({ threadIds: [...], prNumber: <PR#> })` — include all addressed threads. GitHub does NOT auto-resolve threads.
+7. **Resolve threads immediately after push**: call `github_resolve_threads({ threadIds: [...], prNumber: <PR#> })` — include all addressed threads. GitHub does NOT auto-resolve threads. **Always invoke this MCP tool directly — do not reach for raw GraphQL mutations or shell commands (`Invoke-RestMethod`, `curl`) without first attempting the tool and receiving a connection error or explicit tool-not-found response.** Assuming the tool is unavailable without trying it is not acceptable.
 8. **Re-request Copilot review**: `github_request_review({ number: <PR#> })`
 
 **Two-round cap**: Round 1 fixes security/bugs/type safety. Round 2 fixes remaining actionable comments. After round 2, resolve remaining threads as "acknowledged" and proceed.
