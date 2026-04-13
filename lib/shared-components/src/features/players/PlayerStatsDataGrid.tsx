@@ -311,7 +311,7 @@ export const CAREER_STATS_COLUMNS: readonly GridColumn[] = [
     align: 'center',
     priority: 'high',
     description:
-      'Offensive WAR (batting runs + baserunning + positional adj). Shown as — for players with fewer than 10 career plate appearances.',
+      'Offensive WAR from Baseball Reference. Shown as — for players with fewer than 10 career plate appearances.',
     formatter: (v: unknown) => (v != null ? (v as number).toFixed(1) : '—'),
   },
   {

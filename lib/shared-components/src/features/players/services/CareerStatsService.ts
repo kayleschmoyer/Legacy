@@ -107,7 +107,7 @@ export interface PlayerCareerStats {
   readonly formattedOnBasePercentage: string;
   readonly formattedSluggingPercentage: string;
   readonly formattedOPS: string;
-  /** Approximate offensive WAR (lWAR) — computed server-side from counting stats */
+  /** Offensive WAR (oWAR) — sourced from Baseball Reference's per-season bwar */
   readonly offensiveWAR: number | null;
   /** Fantasy points (batting) computed using default scoring settings */
   readonly fantasyPoints: number;

@@ -313,16 +313,15 @@ CareerBattingRef.implement({
       },
     }),
     /**
-     * Offensive WAR — read from the career_batting view's computed column.
-     * Formula: (wRAA + BsR + posAdj + replRuns) / 10, computed in SQL.
+     * Offensive WAR — summed from Baseball Reference's per-season bwar values
+     * stored in season_batting.
      */
     offensiveWAR: t.field({
       type: 'Float',
       nullable: true,
       description:
-        'Approximate offensive WAR computed from career counting stats. ' +
-        'Includes wOBA-based batting runs, SB/CS baserunning, positional adjustment, ' +
-        'and replacement level. Excludes fielding value.',
+        'Offensive WAR (oWAR) from Baseball Reference. ' +
+        'Career total is the sum of per-season bwar values, rounded to one decimal.',
       resolve: (stats) => stats.offensiveWar ?? null,
     }),
     // Player relationship

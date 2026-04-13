@@ -250,7 +250,7 @@ export type CareerBatting = {
   hits?: Maybe<Scalars['Int']['output']>;
   homeRuns?: Maybe<Scalars['Int']['output']>;
   intentionalBaseOnBalls?: Maybe<Scalars['Int']['output']>;
-  /** Approximate offensive WAR computed from career counting stats. Includes wOBA-based batting runs, SB/CS baserunning, positional adjustment, and replacement level. Excludes fielding value. */
+  /** Offensive WAR (oWAR) from Baseball Reference. Career total is the sum of per-season bwar values, rounded to one decimal. */
   offensiveWAR?: Maybe<Scalars['Float']['output']>;
   onBasePercentage?: Maybe<Scalars['Float']['output']>;
   plateAppearances?: Maybe<Scalars['Int']['output']>;
