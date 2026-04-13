@@ -27,6 +27,21 @@ jira_list_children(key: <currentKey>, status: "To Do")
 
 Select the first unblocked ticket. Check blockers with `jira_check_blockers`.
 
+### 1b. Claim the ticket (MANDATORY)
+
+Before any investigation, check and claim the ticket to prevent other agents from picking it up:
+
+1. Call `jira_view(key: "LS-####")` to check the current status.
+2. If already `"In Progress"`, call `github_list_prs(search: "LS-####")`.
+   - If an open PR exists, **STOP** — another agent is already working the ticket.
+   - If no open PR exists, inspect `jira_view.updated`. If the ticket was updated within the last 60 minutes, **STOP** — assume another agent just claimed it and has not opened a PR yet.
+   - Only proceed without re-claiming if `jira_view.updated` is more than 60 minutes old (the ticket appears orphaned).
+3. If `"In Review"` or `"Done"`, **STOP** — do not regress completed/reviewing work.
+4. If `"To Do"`, call `jira_transition(key: "LS-####", status: "In Progress")`.
+5. Verify with `jira_view(key: "LS-####")` that the status is now `"In Progress"`. If verification fails or errors, retry once. If the retry also fails, **STOP** — do not proceed without a confirmed claim.
+
+> **Why this step exists**: without it, the ticket stays "To Do" during investigation and reproduction (steps 2-3), which can take several minutes — long enough for another agent scanning the backlog to claim the same ticket, leading to duplicated work. The same risk exists for tickets that are already "In Progress" but were updated only moments ago and do not yet have a PR.
+
 ### 2. Understand the bug
 
 Read the ticket description thoroughly. Client bug reports typically include:

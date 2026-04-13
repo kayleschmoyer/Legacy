@@ -46,7 +46,11 @@ REPEAT:
      - in_flight_prs is empty (every previously-shipped PR has merged or been escalated)
      → If both true → EXIT loop. If only the To Do list is empty but PRs are still in-flight, loop back to step 1 and keep draining.
   5. Select batch: pick up to 5 unblocked To Do tickets (skip this step if there are no To Do tickets and you are only draining).
-  6. Claim batch upfront: transition every selected ticket to "In Progress" before starting work.
+  6. Claim batch with verification (prevents duplicate work across concurrent agents):
+     a. For each selected ticket, call `jira_view` to re-check its current status. If a ticket's current status is not exactly "To Do" (for example, another agent already moved it to "In Progress", "In Review", or "Done" between your listing and now), **drop it from the batch** — do not transition it, do not work it.
+     b. Transition only the remaining revalidated "To Do" tickets to "In Progress": `jira_bulk_transition(keys: [...], status: "In Progress")` (or individual `jira_transition` calls if bulk is unavailable).
+     c. Verify: call `jira_view` on each claimed ticket to confirm the transition succeeded. Drop any that failed.
+     d. If the entire batch was dropped (all tickets were no longer "To Do"), loop back to step 2 to find more work.
   7. Work each ticket: Leaf Mode flow (worktree → reproduce bug → implement fix → verify → validate → PR → github_mark_pr_ready → github_request_review → mcp__github__subscribe_pr_activity → Jira "In Review"). Append the new PR to in_flight_prs as { ticket, prNumber, branch, reviewRounds: 0 }.
   8. Clean up: after each ticket's PR is created, clean up its worktree (the PR is now tracked in in_flight_prs and will be drained in the next iteration's step 1).
   9. Release uncompleted: any claimed ticket that did not reach "In Review":

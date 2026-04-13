@@ -132,7 +132,10 @@ Then continue to Step 2 with the enriched description.
 Follow the full [worktree-workflow skill](../worktree-workflow/SKILL.md):
 
 1. **Blocker check**: `jira_check_blockers(key: "LS-####")` — STOP if blockers are not In Review/Done
-2. **Jira "In Progress"**: `jira_transition(key: "LS-####", status: "In Progress")`
+2. **Claim and verify** (prevents duplicate work when multiple agents scan the same backlog):
+   a. Check current status with `jira_view`. If it already shows `status: "In Progress"`, another agent likely claimed it. Search for existing PRs (`github_list_prs(search: "LS-####")`). If a PR exists, **STOP** — the ticket is already being worked. If no PR exists, inspect `jira_view.updated`: if it is within the last 60 minutes, **STOP** — assume another agent just claimed it. Only proceed if `jira_view.updated` is more than 60 minutes old (orphaned ticket) — note in the PR body that you picked up an apparently-abandoned ticket, and continue without re-transitioning the Jira issue. If the current status is anything other than `"In Progress"`, proceed to step (b) to claim it.
+   b. Transition only if step (a) found the current status is not already `"In Progress"`: `jira_transition(key: "LS-####", status: "In Progress")`
+   c. Verify with `jira_view(key: "LS-####")`. If step (b) performed a transition, confirm `status == "In Progress"`; if the transition failed silently (status unchanged), retry once. If it still fails, **STOP** and report the failure — do not proceed without the claim. If step (a) already found `"In Progress"` and you decided it was orphaned, just confirm it is still `"In Progress"` and continue.
 3. **Worktree** — two flows:
    - **Native ephemeral (default)**: if the session was spawned with the launcher's `worktree` checkbox checked, `pwd` should already return `.claude/worktrees/<name>/`. The branch is already set to `claude/<random-name>`. **Do not rename it** — Claude Code caches the branch name at session start; renaming breaks PR detection (anthropics/claude-code#18690). Jira links via PR title and commit messages containing `LS-####`. Call `worktree_set(key: "<absolute .claude/worktrees/... path>")` so the worktree MCP tools target the right tree.
    - **Sibling (parallel/batch work only)**: `make_worktree_create(ticket: "####", description: "desc")` (add `parent: "LS-####"` if blocker is In Review). Shell fallback: `make worktree TICKET=#### DESC=description`. Then call `worktree_set(key: "LS-####")`.
@@ -211,10 +214,11 @@ Process children in iterative batches until the backlog is empty.
           batch loop. If remaining children are blocked, report them. If
           some are already In Progress (e.g., being worked by another
           agent), skip and report those keys.
-     d. Claim batch upfront: transition ALL selected tickets to "In Progress"
-        before starting work on any of them. Use a single bulk call:
-        jira_bulk_transition(keys: [...batch keys], status: "In Progress")
-        Do not call jira_transition per ticket — one bulk call saves N round-trips.
+     d. Claim batch with verification (prevents duplicate work across concurrent agents):
+        - First, re-check each candidate: call `jira_view` for each selected ticket. If any are not exactly "To Do" (another agent moved them to "In Progress", "In Review", or "Done" between listing and now), drop them from the batch.
+        - Transition remaining To Do tickets: `jira_bulk_transition(keys: [...batch keys], status: "In Progress")` (one bulk call saves N round-trips).
+        - Verify: call `jira_view` on each claimed ticket to confirm transition succeeded. Drop any that failed.
+        - If the entire batch was dropped, loop back to step a.
      e. **Dispatch a subagent for each child ticket** — do NOT modify the orchestrator's
         own working tree. Each child gets its own isolated ephemeral worktree:
 
@@ -227,7 +231,7 @@ Process children in iterative batches until the backlog is empty.
             Setup:
             1. git fetch origin main
             2. worktree_setup_node_modules()
-            3. jira_transition(key: "LS-<child_key>", status: "In Progress")
+            3. Skip jira_transition — the orchestrator already claimed this ticket in step d.
 
             Work:
             4. Read the ticket: jira_view(key: "LS-<child_key>")
