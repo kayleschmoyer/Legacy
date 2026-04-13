@@ -11,11 +11,11 @@ import {
   BRAND_SEAM_RED,
   EMERALD,
   GRADIENT_BOARD_BG,
-  GRADIENT_WHITE_CARD,
   OVERLAY_WHITE_10,
   SLATE_300,
   SLATE_400,
   SLATE_500,
+  SURFACE_CARD,
   withAlpha,
 } from '../../constants/colors';
 
@@ -113,7 +113,7 @@ function SetupScreen({
         {/* Settings Card */}
         <div
           style={{
-            background: GRADIENT_WHITE_CARD,
+            background: SURFACE_CARD,
             borderRadius: '20px',
             padding: '32px',
             border: `1px solid ${OVERLAY_WHITE_10}`,
