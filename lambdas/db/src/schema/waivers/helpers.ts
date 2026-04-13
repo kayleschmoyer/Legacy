@@ -13,12 +13,13 @@ import {
   SEASON_MATCHUP_MULTIPLIER,
 } from '@legacy-sports/utils';
 import { and, eq, gte, isNotNull, or, sql } from 'drizzle-orm';
+import { UserInputError } from '../graphql-errors';
 
 /**
  * Validate that a team has sufficient FAAB budget for a bid, accounting for
  * all currently pending (committed) bids.
  *
- * Throws an Error if the bid exceeds available budget.
+ * Throws a UserInputError (BAD_USER_INPUT) if the bid exceeds available budget.
  * Used at both submission time (mutations.ts) and processing time
  * (waiver-processor.ts) to ensure consistent validation.
  *
@@ -49,7 +50,7 @@ export async function validateFaabBudget(
   const alreadyCommitted = Number(result[0]?.committedBids ?? 0);
 
   if (faabBid > remainingBudget - alreadyCommitted) {
-    throw new Error(
+    throw UserInputError(
       `Insufficient FAAB budget. You have $${remainingBudget - alreadyCommitted} available (total: $${remainingBudget}, committed: $${alreadyCommitted}).`,
     );
   }

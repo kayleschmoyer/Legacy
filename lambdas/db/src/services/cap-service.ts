@@ -8,6 +8,8 @@
 import { type GenericDatabase, PublicSchema } from '@legacy-sports/db-client';
 import { and, eq, inArray, notInArray, sql, sum } from 'drizzle-orm';
 
+import { UserInputError } from '../schema/graphql-errors';
+
 // ── computeTeamPayroll ─────────────────────────────────────────────────────
 
 /**
@@ -120,7 +122,7 @@ export function assertCapSpace(
   const projectedPayroll = currentPayroll + incomingSalary - outgoingSalary;
   if (projectedPayroll > salaryCap) {
     const over = projectedPayroll - salaryCap;
-    throw new Error(
+    throw UserInputError(
       `This transaction would put the team $${over} over the salary cap ` +
         `(cap: $${salaryCap}, projected payroll: $${projectedPayroll})`,
     );

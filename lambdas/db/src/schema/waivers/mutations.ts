@@ -18,7 +18,11 @@ import { WaiverClaimProcessor } from '../../services/waiver-processor';
 import { assertAuthorized } from '../matchups/scheduled-mutations';
 import { builder } from '../builder';
 import { insertActivityLog } from '../../services/activity-log';
-import { AuthenticationError, ForbiddenError } from '../graphql-errors';
+import {
+  AuthenticationError,
+  ForbiddenError,
+  UserInputError,
+} from '../graphql-errors';
 
 // ── Mutation resolvers ─────────────────────────────────────────────────────
 
@@ -45,7 +49,7 @@ builder.mutationField('cancelWaiverClaim', (t) =>
         .limit(1);
 
       if (existing.length === 0) {
-        throw new Error('Waiver claim not found');
+        throw UserInputError('Waiver claim not found');
       }
 
       const claim = existing[0];
@@ -55,7 +59,7 @@ builder.mutationField('cancelWaiverClaim', (t) =>
       }
 
       if (claim.status !== 'pending') {
-        throw new Error(
+        throw UserInputError(
           `Cannot cancel a waiver claim with status "${claim.status}"`,
         );
       }
@@ -78,7 +82,7 @@ builder.mutationField('cancelWaiverClaim', (t) =>
         .returning();
 
       if (updated.length === 0) {
-        throw new Error(
+        throw UserInputError(
           'This claim is already being processed and can no longer be cancelled',
         );
       }
@@ -156,28 +160,30 @@ builder.mutationField('claimFreeAgent', (t) =>
         .limit(1);
 
       if (leagueRow.length === 0) {
-        throw new Error('League not found');
+        throw UserInputError('League not found');
       }
 
       if (leagueRow[0].draftStatus !== 'completed') {
-        throw new Error(
+        throw UserInputError(
           'Free agent claims are not available until the draft has been completed',
         );
       }
 
       if (leagueRow[0].leaguePhase !== 'active') {
-        throw new Error(
+        throw UserInputError(
           'Free agent claims are only available during the active season',
         );
       }
 
       if (!leagueRow[0].waiverEnabled) {
-        throw new Error('Waivers are not enabled for this league');
+        throw UserInputError('Waivers are not enabled for this league');
       }
 
       // 3. Check the player is not already on a team in this league
       if (await isPlayerOnRoster(db, leagueId, playerId)) {
-        throw new Error('This player is already on a roster in this league');
+        throw UserInputError(
+          'This player is already on a roster in this league',
+        );
       }
 
       // 4. Check for existing pending claim for this player in this league
@@ -195,7 +201,9 @@ builder.mutationField('claimFreeAgent', (t) =>
         .limit(1);
 
       if (existingClaim.length > 0) {
-        throw new Error('You already have a pending claim for this player');
+        throw UserInputError(
+          'You already have a pending claim for this player',
+        );
       }
 
       // 5. Validate roster capacity, salary cap, and FAAB requirements
@@ -204,7 +212,7 @@ builder.mutationField('claimFreeAgent', (t) =>
       let resolvedFaabBid: number | null = null;
       if (leagueWaiverType === 'faab') {
         if (faabBid == null || faabBid < 0) {
-          throw new Error(
+          throw UserInputError(
             'A FAAB bid amount is required for this league (must be >= 0)',
           );
         }
@@ -236,7 +244,9 @@ builder.mutationField('claimFreeAgent', (t) =>
             ? salaryRow[0].currentSalary
             : leagueRow[0].minSalary;
         if (resolvedFaabBid < minBid) {
-          throw new Error(`Minimum FAAB bid for this player is $${minBid}`);
+          throw UserInputError(
+            `Minimum FAAB bid for this player is $${minBid}`,
+          );
         }
       }
 
@@ -264,7 +274,7 @@ builder.mutationField('claimFreeAgent', (t) =>
       );
 
       if (rosterFull && !dropPlayerId) {
-        throw new Error(
+        throw UserInputError(
           'Roster is full. You must drop a player to add a free agent.',
         );
       }
@@ -284,7 +294,7 @@ builder.mutationField('claimFreeAgent', (t) =>
           .limit(1);
 
         if (dropMember.length === 0) {
-          throw new Error(
+          throw UserInputError(
             'The player you are trying to drop is not on your roster',
           );
         }
@@ -303,7 +313,7 @@ builder.mutationField('claimFreeAgent', (t) =>
           .limit(1);
 
         if (conflictingDrop.length > 0) {
-          throw new Error(
+          throw UserInputError(
             'You already have a pending claim that drops this player. Cancel it first or choose a different player to drop.',
           );
         }
