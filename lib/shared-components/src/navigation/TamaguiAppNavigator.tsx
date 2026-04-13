@@ -5,13 +5,14 @@ import { createStackNavigator } from '@react-navigation/stack';
 import {
   BrowserRouter,
   Link,
-  Route,
+  Route as RouterRoute,
   Routes,
   useLocation,
 } from 'react-router-dom';
 import { LOGGER } from '@legacy-sports/logging';
 import { Platform } from '../platform-components';
 import { BG_DARK, BLUE, SURFACE_CARD, TEXT_PRIMARY } from '../utils/colors';
+import type { Route } from '../types';
 
 // React Navigation screen options and plain HTML inline styles cannot consume
 // Tamagui's $token syntax. For native, we reference the shared dark-theme
@@ -25,17 +26,8 @@ const NATIVE_COLORS = {
   mutedText: '#6C80BA', // $color10 — no shared constant yet
 } as const;
 
-export interface NavigationRoute {
-  name: string;
-  component: React.ComponentType;
-  title: string;
-  path?: string; // For web routing
-  icon?: string;
-  isProtected?: boolean; // Requires authentication
-}
-
 export interface TamaguiAppNavigatorProps {
-  routes: NavigationRoute[];
+  routes: Route[];
   initialRoute?: string;
   isAuthenticated?: boolean;
   fallbackComponent?: React.ComponentType;
@@ -101,7 +93,7 @@ function TamaguiAppNavigator({
 }: TamaguiAppNavigatorProps) {
   // Filter routes based on authentication status
   const availableRoutes = routes.filter(
-    (route) => !route.isProtected || isAuthenticated,
+    (route) => !route.requiresAuth || isAuthenticated,
   );
 
   if (Platform.OS === 'web') {
@@ -123,7 +115,7 @@ function NativeNavigator({
   initialRoute,
   fallbackComponent: FallbackComponent,
 }: {
-  routes: NavigationRoute[];
+  routes: Route[];
   initialRoute?: string;
   fallbackComponent?: React.ComponentType;
 }) {
@@ -143,7 +135,7 @@ function NativeNavigator({
             key={route.name}
             name={route.name}
             component={route.component}
-            options={{ title: route.title }}
+            options={{ title: route.title ?? route.name }}
           />
         ))}
       </Stack.Navigator>
@@ -201,7 +193,7 @@ function NativeNavigator({
 }
 
 // Web Navigation (React Router)
-function WebNavigator({ routes }: { routes: NavigationRoute[] }) {
+function WebNavigator({ routes }: { routes: Route[] }) {
   // Move function declaration outside try block
   function NavBar() {
     const location = useLocation();
@@ -233,13 +225,11 @@ function WebNavigator({ routes }: { routes: NavigationRoute[] }) {
           </h1>
           <div style={{ display: 'flex', gap: '1rem', marginLeft: '2rem' }}>
             {routes.map((route) => {
-              const isActive =
-                location.pathname ===
-                (route.path || `/${route.name.toLowerCase()}`);
+              const isActive = location.pathname === route.path;
               return (
                 <Link
                   key={route.name}
-                  to={route.path || `/${route.name.toLowerCase()}`}
+                  to={route.path}
                   style={{
                     color: isActive
                       ? `var(--blue9, ${BLUE})`
@@ -252,7 +242,7 @@ function WebNavigator({ routes }: { routes: NavigationRoute[] }) {
                       : 'transparent',
                   }}
                 >
-                  {route.title}
+                  {route.title ?? route.name}
                 </Link>
               );
             })}
@@ -271,22 +261,22 @@ function WebNavigator({ routes }: { routes: NavigationRoute[] }) {
             {routes.map((route) => {
               const Component = route.component;
               return (
-                <Route
+                <RouterRoute
                   key={route.name}
-                  path={route.path || `/${route.name.toLowerCase()}`}
+                  path={route.path}
                   element={<Component />}
                 />
               );
             })}
             {/* Default route */}
             {routes.length > 0 && (
-              <Route
+              <RouterRoute
                 path="/"
                 element={React.createElement(routes[0].component)}
               />
             )}
             {/* Catch-all for unmatched URLs */}
-            <Route path="*" element={<NotFound />} />
+            <RouterRoute path="*" element={<NotFound />} />
           </Routes>
         </main>
       </BrowserRouter>

@@ -223,6 +223,7 @@ export interface Route {
   name: string;
   path: string;
   component: React.ComponentType;
+  title?: string;
   icon?: string;
   requiresAuth?: boolean;
 }

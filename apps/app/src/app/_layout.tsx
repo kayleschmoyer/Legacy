@@ -17,7 +17,7 @@ import {
   TamaguiAppNavigator,
   useAuth,
 } from '@legacy-sports/shared-components';
-import type { NavigationRoute } from '@legacy-sports/shared-components';
+import type { Route } from '@legacy-sports/shared-components';
 import { tamaguiConfig } from '@legacy-sports/tamagui-config';
 import type { OAuthConfig } from '@legacy-sports/shared-components';
 import { LOGGER } from '@legacy-sports/logging';
@@ -49,19 +49,22 @@ function MobileHomeScreen() {
 }
 
 // Define your app routes
-const routes: NavigationRoute[] = [
+const routes: Route[] = [
   {
     name: 'Home',
+    path: '/home',
     component: MobileHomeScreen,
     title: 'Fantasy Sports Hub',
   },
   {
     name: 'Football',
+    path: '/football',
     component: FootballScreen,
     title: 'Football',
   },
   {
     name: 'Baseball',
+    path: '/baseball',
     component: BaseballScreen,
     title: 'Baseball',
   },

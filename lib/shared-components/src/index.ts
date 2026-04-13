@@ -60,6 +60,8 @@ export {
   type TrendingDirection,
   type TrendingInfo,
   type PlayerStats,
+  type Route,
+  type NavigationConfig,
 } from './types/index';
 
 // Stats components
