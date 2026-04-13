@@ -232,6 +232,16 @@ export const PITCHING_STATS_COLUMNS: readonly PitchingGridColumn[] = [
     priority: 'low',
     description: 'Earned runs',
   },
+  {
+    key: 'pitchingWAR',
+    label: 'WAR',
+    sortable: true,
+    width: '70px',
+    align: 'center',
+    priority: 'high',
+    description: 'Pitching Wins Above Replacement',
+    formatter: (v: unknown) => (v != null ? (v as number).toFixed(1) : '—'),
+  },
 ] as const;
 
 const COLUMN_TO_SORT_FIELD_MAP: Record<string, string> = {
@@ -248,7 +258,7 @@ const COLUMN_TO_SORT_FIELD_MAP: Record<string, string> = {
   baseOnBalls: 'baseOnBalls',
   hits: 'hits',
   earnedRuns: 'earnedRuns',
-  homeRuns: 'homeRuns',
+  pitchingWAR: 'pitchingWAR',
 };
 
 // =============================================================================
