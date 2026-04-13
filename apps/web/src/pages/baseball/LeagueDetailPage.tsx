@@ -151,6 +151,9 @@ import {
   setUserTeamId,
   updateTeamMember,
 } from '../../store/leagueSlice';
+
+/** .impeccable.md editorial typography: Big Shoulders Display for headings & stat values */
+const FONT_DISPLAY = "'Big Shoulders Display', sans-serif";
 const DraftOrderControl = React.lazy(() =>
   import('../../components/commissioner/DraftOrderControl').then((m) => ({
     default: m.DraftOrderControl,
@@ -234,15 +237,15 @@ const SnapshotBar = styled(XStack, {
   borderWidth: 1,
   borderColor: '$surfacePanelBorder',
   backgroundColor: '$surfacePanel',
-  paddingVertical: '$4',
-  paddingHorizontal: '$5',
-  gap: '$4',
+  paddingVertical: '$5',
+  paddingHorizontal: '$6',
+  gap: '$5',
   alignItems: 'center',
   justifyContent: 'space-around',
   flexWrap: 'wrap',
   $sm: {
     paddingHorizontal: '$3',
-    paddingVertical: '$3',
+    paddingVertical: '$4',
     gap: '$3',
   },
 });
@@ -255,8 +258,9 @@ const SnapshotStat = styled(YStack, {
 
 const SnapshotDivider = styled(YStack, {
   width: 1,
-  height: 36,
+  height: 44,
   backgroundColor: '$outlineSubtle',
+  opacity: 0.5,
   $sm: {
     display: 'none' as never,
   },
@@ -1643,7 +1647,7 @@ export function LeagueDetailPage(): React.JSX.Element {
 
   const renderOverview = () => (
     <YStack
-      gap="$5"
+      gap="$6"
       role="tabpanel"
       id="panel-overview"
       aria-labelledby="tab-overview"
@@ -1672,7 +1676,14 @@ export function LeagueDetailPage(): React.JSX.Element {
                 />
               </XStack>
               <YStack gap="$1" flex={1}>
-                <Text fontSize="$5" fontWeight="800" color={BRAND_GOLD_LIGHT}>
+                <Text
+                  fontSize="$6"
+                  fontWeight="800"
+                  color={BRAND_GOLD_LIGHT}
+                  fontFamily={FONT_DISPLAY}
+                  textTransform="uppercase"
+                  letterSpacing={0.6}
+                >
                   Draft Is Live!
                 </Text>
                 <Text fontSize="$3" color={BRAND_GOLD_LIGHT}>
@@ -1720,12 +1731,18 @@ export function LeagueDetailPage(): React.JSX.Element {
             fontSize="$2"
             color="$textMuted"
             textTransform="uppercase"
-            letterSpacing={1}
+            letterSpacing={1.2}
             fontWeight="600"
           >
             Teams
           </Text>
-          <Text fontSize="$8" fontWeight="800" color={BRAND_GOLD_LIGHT}>
+          <Text
+            fontSize="$9"
+            fontWeight="800"
+            color={BRAND_GOLD_LIGHT}
+            fontFamily={FONT_DISPLAY}
+            style={{ fontVariantNumeric: 'tabular-nums' }}
+          >
             {leagueTeamsLoading ||
             (teamCount === 0 && leagueTeamsData?.leagueTeams === undefined)
               ? '\u2014'
@@ -1738,12 +1755,18 @@ export function LeagueDetailPage(): React.JSX.Element {
             fontSize="$2"
             color="$textMuted"
             textTransform="uppercase"
-            letterSpacing={1}
+            letterSpacing={1.2}
             fontWeight="600"
           >
             Roster Size
           </Text>
-          <Text fontSize="$8" fontWeight="800" color="$color">
+          <Text
+            fontSize="$9"
+            fontWeight="800"
+            color="$color"
+            fontFamily={FONT_DISPLAY}
+            style={{ fontVariantNumeric: 'tabular-nums' }}
+          >
             {league.maxRosterSize}
           </Text>
         </SnapshotStat>
@@ -1753,12 +1776,18 @@ export function LeagueDetailPage(): React.JSX.Element {
             fontSize="$2"
             color="$textMuted"
             textTransform="uppercase"
-            letterSpacing={1}
+            letterSpacing={1.2}
             fontWeight="600"
           >
             My Starters
           </Text>
-          <Text fontSize="$8" fontWeight="800" color="$green11">
+          <Text
+            fontSize="$9"
+            fontWeight="800"
+            color="$green11"
+            fontFamily={FONT_DISPLAY}
+            style={{ fontVariantNumeric: 'tabular-nums' }}
+          >
             {teamMembersLoading ||
             positionsLoading ||
             (!userTeamId && assignedCount === 0)
@@ -1772,12 +1801,18 @@ export function LeagueDetailPage(): React.JSX.Element {
             fontSize="$2"
             color="$textMuted"
             textTransform="uppercase"
-            letterSpacing={1}
+            letterSpacing={1.2}
             fontWeight="600"
           >
             On Bench
           </Text>
-          <Text fontSize="$8" fontWeight="800" color="$amber11">
+          <Text
+            fontSize="$9"
+            fontWeight="800"
+            color="$amber11"
+            fontFamily={FONT_DISPLAY}
+            style={{ fontVariantNumeric: 'tabular-nums' }}
+          >
             {teamMembersLoading ||
             positionsLoading ||
             (!userTeamId && benchCount === 0)
@@ -1791,12 +1826,18 @@ export function LeagueDetailPage(): React.JSX.Element {
             fontSize="$2"
             color="$textMuted"
             textTransform="uppercase"
-            letterSpacing={1}
+            letterSpacing={1.2}
             fontWeight="600"
           >
             Week
           </Text>
-          <Text fontSize="$8" fontWeight="800" color="$color">
+          <Text
+            fontSize="$9"
+            fontWeight="800"
+            color="$color"
+            fontFamily={FONT_DISPLAY}
+            style={{ fontVariantNumeric: 'tabular-nums' }}
+          >
             {currentWeek || '\u2014'}
           </Text>
         </SnapshotStat>
@@ -1806,12 +1847,18 @@ export function LeagueDetailPage(): React.JSX.Element {
             fontSize="$2"
             color="$textMuted"
             textTransform="uppercase"
-            letterSpacing={1}
+            letterSpacing={1.2}
             fontWeight="600"
           >
             Positions
           </Text>
-          <Text fontSize="$8" fontWeight="800" color="$color">
+          <Text
+            fontSize="$9"
+            fontWeight="800"
+            color="$color"
+            fontFamily={FONT_DISPLAY}
+            style={{ fontVariantNumeric: 'tabular-nums' }}
+          >
             {positionsLoading && positions.length === 0
               ? '\u2014'
               : positions.length}
@@ -1844,9 +1891,16 @@ export function LeagueDetailPage(): React.JSX.Element {
                 alignItems="center"
                 marginBottom="$3"
               >
-                <XStack alignItems="center" gap="$2">
+                <XStack alignItems="center" gap="$2.5">
                   <Swords size={18} color={BRAND_GOLD_LIGHT} />
-                  <Text fontSize="$5" fontWeight="700" color="$color">
+                  <Text
+                    fontSize="$5"
+                    fontWeight="700"
+                    color="$color"
+                    fontFamily={FONT_DISPLAY}
+                    textTransform="uppercase"
+                    letterSpacing={0.8}
+                  >
                     Current Matchup
                   </Text>
                 </XStack>
@@ -1859,7 +1913,14 @@ export function LeagueDetailPage(): React.JSX.Element {
                   color={BRAND_GOLD_LIGHT}
                   onPress={() => changeTab('matchup')}
                 >
-                  <Text fontSize="$2" fontWeight="600" color={BRAND_GOLD_LIGHT}>
+                  <Text
+                    fontSize="$2"
+                    fontWeight="600"
+                    color={BRAND_GOLD_LIGHT}
+                    fontFamily={FONT_DISPLAY}
+                    textTransform="uppercase"
+                    letterSpacing={0.6}
+                  >
                     View Details
                   </Text>
                 </Button>
@@ -1928,9 +1989,12 @@ export function LeagueDetailPage(): React.JSX.Element {
                       {st.icon}
                     </XStack>
                     <Text
-                      fontSize="$3"
-                      fontWeight={isActive ? '700' : '500'}
+                      fontSize="$2"
+                      fontWeight={isActive ? '700' : '600'}
                       color={isActive ? BRAND_GOLD_LIGHT : '$textMuted'}
+                      fontFamily={FONT_DISPLAY}
+                      textTransform="uppercase"
+                      letterSpacing={1}
                     >
                       {st.label}
                     </Text>
@@ -1999,9 +2063,16 @@ export function LeagueDetailPage(): React.JSX.Element {
         <YStack flex={1} minWidth={240} maxWidth={380} gap="$5">
           {/* League Status — compact info strip */}
           <SidebarCard>
-            <XStack alignItems="center" gap="$2" marginBottom="$3">
+            <XStack alignItems="center" gap="$2.5" marginBottom="$3">
               <Info size={18} color={BRAND_GOLD_LIGHT} />
-              <Text fontSize="$5" fontWeight="700" color="$color">
+              <Text
+                fontSize="$5"
+                fontWeight="700"
+                color="$color"
+                fontFamily={FONT_DISPLAY}
+                textTransform="uppercase"
+                letterSpacing={0.8}
+              >
                 League Status
               </Text>
             </XStack>
@@ -2010,7 +2081,14 @@ export function LeagueDetailPage(): React.JSX.Element {
                 backgroundColor={draftColors.bg}
                 borderColor={draftColors.border}
               >
-                <Text fontSize="$2" fontWeight="700" color={draftColors.text}>
+                <Text
+                  fontSize="$2"
+                  fontWeight="700"
+                  color={draftColors.text}
+                  fontFamily={FONT_DISPLAY}
+                  textTransform="uppercase"
+                  letterSpacing={0.5}
+                >
                   {formatDraftStatus(String(league.draftStatus))}
                 </Text>
               </DraftBadge>
@@ -2023,7 +2101,13 @@ export function LeagueDetailPage(): React.JSX.Element {
                   paddingHorizontal="$3"
                   paddingVertical="$1.5"
                 >
-                  <Text fontSize="$2" fontWeight="700" color="$color">
+                  <Text
+                    fontSize="$2"
+                    fontWeight="700"
+                    color="$color"
+                    fontFamily={FONT_DISPLAY}
+                    letterSpacing={0.5}
+                  >
                     Week {currentWeek}
                   </Text>
                 </XStack>
@@ -2037,7 +2121,14 @@ export function LeagueDetailPage(): React.JSX.Element {
                   paddingHorizontal="$3"
                   paddingVertical="$1.5"
                 >
-                  <Text fontSize="$2" fontWeight="700" color="$amber11">
+                  <Text
+                    fontSize="$2"
+                    fontWeight="700"
+                    color="$amber11"
+                    fontFamily={FONT_DISPLAY}
+                    textTransform="uppercase"
+                    letterSpacing={0.5}
+                  >
                     Commissioner
                   </Text>
                 </XStack>
@@ -2053,9 +2144,16 @@ export function LeagueDetailPage(): React.JSX.Element {
                 alignItems="center"
                 marginBottom="$3"
               >
-                <XStack alignItems="center" gap="$2">
-                  <Trophy size={18} color="var(--color)" />
-                  <Text fontSize="$5" fontWeight="700" color="$color">
+                <XStack alignItems="center" gap="$2.5">
+                  <Trophy size={18} color={BRAND_GOLD_LIGHT} />
+                  <Text
+                    fontSize="$5"
+                    fontWeight="700"
+                    color="$color"
+                    fontFamily={FONT_DISPLAY}
+                    textTransform="uppercase"
+                    letterSpacing={0.8}
+                  >
                     Teams
                   </Text>
                 </XStack>
@@ -2068,7 +2166,14 @@ export function LeagueDetailPage(): React.JSX.Element {
                   color={BRAND_GOLD_LIGHT}
                   onPress={() => changeTab('standings')}
                 >
-                  <Text fontSize="$2" fontWeight="600" color={BRAND_GOLD_LIGHT}>
+                  <Text
+                    fontSize="$2"
+                    fontWeight="600"
+                    color={BRAND_GOLD_LIGHT}
+                    fontFamily={FONT_DISPLAY}
+                    textTransform="uppercase"
+                    letterSpacing={0.6}
+                  >
                     Full Standings
                   </Text>
                 </Button>
@@ -2107,14 +2212,19 @@ export function LeagueDetailPage(): React.JSX.Element {
                   >
                     <XStack alignItems="center" gap="$2.5">
                       <YStack
-                        width={24}
-                        height={24}
-                        borderRadius={12}
+                        width={26}
+                        height={26}
+                        borderRadius={13}
                         backgroundColor="$surfaceSubtle"
                         alignItems="center"
                         justifyContent="center"
                       >
-                        <Text fontSize="$2" fontWeight="700" color="$textMuted">
+                        <Text
+                          fontSize="$3"
+                          fontWeight="700"
+                          color="$textMuted"
+                          fontFamily={FONT_DISPLAY}
+                        >
                           {idx + 1}
                         </Text>
                       </YStack>
@@ -2138,6 +2248,8 @@ export function LeagueDetailPage(): React.JSX.Element {
                           fontSize="$1"
                           fontWeight="700"
                           color={BRAND_GOLD_LIGHT}
+                          fontFamily={FONT_DISPLAY}
+                          letterSpacing={1}
                         >
                           YOU
                         </Text>
@@ -2184,9 +2296,16 @@ export function LeagueDetailPage(): React.JSX.Element {
 
           {/* Invite Friends */}
           <InviteCard>
-            <XStack alignItems="center" gap="$2" marginBottom="$4">
+            <XStack alignItems="center" gap="$2.5" marginBottom="$4">
               <UserPlus size={18} color={BRAND_GOLD_LIGHT} />
-              <Text fontSize="$5" fontWeight="700" color="$color">
+              <Text
+                fontSize="$5"
+                fontWeight="700"
+                color="$color"
+                fontFamily={FONT_DISPLAY}
+                textTransform="uppercase"
+                letterSpacing={0.8}
+              >
                 Invite Friends
               </Text>
             </XStack>
@@ -2198,7 +2317,8 @@ export function LeagueDetailPage(): React.JSX.Element {
                   color="$textMuted"
                   fontWeight="600"
                   textTransform="uppercase"
-                  letterSpacing={0.5}
+                  letterSpacing={1}
+                  fontFamily={FONT_DISPLAY}
                 >
                   Share Link
                 </Text>
@@ -2258,7 +2378,8 @@ export function LeagueDetailPage(): React.JSX.Element {
                   color="$textMuted"
                   fontWeight="600"
                   textTransform="uppercase"
-                  letterSpacing={0.5}
+                  letterSpacing={1}
+                  fontFamily={FONT_DISPLAY}
                 >
                   Manual Code
                 </Text>
@@ -2310,7 +2431,8 @@ export function LeagueDetailPage(): React.JSX.Element {
                     color="$textMuted"
                     fontWeight="600"
                     textTransform="uppercase"
-                    letterSpacing={0.5}
+                    letterSpacing={1}
+                    fontFamily={FONT_DISPLAY}
                   >
                     QR Code
                   </Text>
@@ -3553,10 +3675,12 @@ export function LeagueDetailPage(): React.JSX.Element {
               <H1
                 id="league-title"
                 data-testid="league-title"
-                fontSize="$8"
+                fontSize="$9"
                 fontWeight="800"
                 color="white"
-                lineHeight="$8"
+                lineHeight="$9"
+                fontFamily={FONT_DISPLAY}
+                letterSpacing={0.5}
               >
                 {league.name}
               </H1>
@@ -3819,8 +3943,11 @@ export function LeagueDetailPage(): React.JSX.Element {
                   <YStack opacity={isActive ? 1 : 0.5}>{icon}</YStack>
                   <Text
                     fontSize="$3"
-                    fontWeight={isActive ? '700' : '500'}
+                    fontWeight={isActive ? '700' : '600'}
                     color={isActive ? BRAND_GOLD_LIGHT : '$textMuted'}
+                    fontFamily={FONT_DISPLAY}
+                    textTransform="uppercase"
+                    letterSpacing={0.8}
                   >
                     {label}
                   </Text>
