@@ -9,7 +9,7 @@ const DEFAULT_APP_ID = '3158619';
 const DEFAULT_INSTALLATION_ID = '118260223';
 
 /** Truncate API error bodies and redact potential auth tokens. */
-function sanitizeErrorBody(text: string, maxLen = 500): string {
+export function sanitizeErrorBody(text: string, maxLen = 500): string {
   let sanitized = text
     .replace(/Bearer\s+[A-Za-z0-9_\-.]+/gi, 'Bearer ***')
     .replace(/Basic\s+[A-Za-z0-9+/=]+/gi, 'Basic ***')

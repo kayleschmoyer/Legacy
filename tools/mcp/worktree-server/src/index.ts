@@ -1729,6 +1729,16 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
         required: ['branch'],
       },
     },
+    {
+      name: 'worktree_ping',
+      description:
+        'Check connectivity and state of the worktree server. Returns git version, main repo path, active worktree, and total worktree count. Use this to verify the server is running correctly before using other worktree_* tools.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {},
+        required: [],
+      },
+    },
   ],
 }));
 
@@ -8550,6 +8560,63 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           isError: true,
         };
       }
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_ping
+    // -----------------------------------------------------------------------
+    case 'worktree_ping': {
+      const cmd = 'git';
+
+      let gitVersion: string | undefined;
+      let gitError: string | undefined;
+      try {
+        gitVersion = execFileSync(cmd, ['--version'], {
+          encoding: 'utf-8',
+          timeout: 5_000,
+        }).trim();
+      } catch (err) {
+        gitError = err instanceof Error ? err.message : String(err);
+      }
+
+      let worktreeCount = 0;
+      let worktreeListOk = false;
+      let worktreeListError: string | undefined;
+      try {
+        const out = execFileSync(cmd, ['worktree', 'list', '--porcelain'], {
+          encoding: 'utf-8',
+          cwd: MAIN_REPO,
+          timeout: 5_000,
+        });
+        worktreeCount = (out.match(/^worktree /gm) ?? []).length;
+        worktreeListOk = true;
+      } catch (err) {
+        worktreeListError = err instanceof Error ? err.message : String(err);
+      }
+
+      const mainRepoExists = existsSync(MAIN_REPO);
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                ready: !gitError && mainRepoExists && worktreeListOk,
+                gitVersion,
+                mainRepo: MAIN_REPO,
+                mainRepoExists,
+                activeWorktree: activeWorktree ?? null,
+                worktreeCount,
+                ...(gitError ? { gitError } : {}),
+                ...(worktreeListError ? { worktreeListError } : {}),
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+      };
     }
 
     default:

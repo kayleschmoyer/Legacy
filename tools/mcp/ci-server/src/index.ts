@@ -19,6 +19,7 @@ import {
   workflowEnable,
   workflowState,
 } from './tools/workflow-state.js';
+import { getToken, buildHeaders, sanitizeErrorBody } from './github-api.js';
 
 /**
  * Shared Zod schema for boolean parameters. Accepts a real boolean OR a
@@ -467,6 +468,193 @@ server.tool(
       ),
   },
   async (params) => sessionStats(params),
+);
+
+server.tool(
+  'ci_auth_status',
+  'Check if the CI server is authenticated with GitHub. Returns token source (GH_TOKEN, GITHUB_TOKEN, github-app, or gh-cli), authenticated user login, and rate limit info. Call this first to verify credentials are working before using other ci_* tools.',
+  {},
+  async () => {
+    const GITHUB_API = 'https://api.github.com';
+
+    // Detect which source the *resolved* token actually came from.
+    // Comparing the token value to env vars is more reliable than checking
+    // which env vars are set — getToken() can fall back (e.g. if App key is
+    // set but JWT signing fails it falls back to gh-cli).
+    const detectSource = (
+      resolvedToken: string,
+    ): 'GH_TOKEN' | 'GITHUB_TOKEN' | 'github-app' | 'gh-cli' => {
+      const ghToken = process.env['GH_TOKEN']?.trim();
+      if (ghToken && resolvedToken === ghToken) return 'GH_TOKEN';
+      const githubToken = process.env['GITHUB_TOKEN']?.trim();
+      if (githubToken && resolvedToken === githubToken) return 'GITHUB_TOKEN';
+      // GitHub App installation tokens start with ghs_
+      if (resolvedToken.startsWith('ghs_')) return 'github-app';
+      return 'gh-cli';
+    };
+
+    let token: string;
+    let source: 'GH_TOKEN' | 'GITHUB_TOKEN' | 'github-app' | 'gh-cli' =
+      'gh-cli';
+    try {
+      token = await getToken();
+      source = detectSource(token);
+    } catch (err) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                configured: false,
+                source,
+                error: err instanceof Error ? err.message : String(err),
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+      };
+    }
+
+    try {
+      // Use allSettled so a rate_limit timeout/failure doesn't mask auth status.
+      const [userSettled, rlSettled] = await Promise.allSettled([
+        fetch(`${GITHUB_API}/user`, {
+          headers: buildHeaders(token),
+          signal: AbortSignal.timeout(10_000),
+        }),
+        fetch(`${GITHUB_API}/rate_limit`, {
+          headers: buildHeaders(token),
+          signal: AbortSignal.timeout(10_000),
+        }),
+      ]);
+
+      if (userSettled.status === 'rejected') {
+        throw userSettled.reason;
+      }
+      const userRes = userSettled.value;
+      const rlRes =
+        rlSettled.status === 'fulfilled' ? rlSettled.value : undefined;
+      const rateLimitError =
+        rlSettled.status === 'rejected'
+          ? rlSettled.reason instanceof Error
+            ? rlSettled.reason.message
+            : String(rlSettled.reason)
+          : undefined;
+
+      if (!userRes.ok) {
+        // GitHub App installation tokens are app-scoped and return 403 for /user
+        // — this is expected and does NOT mean the token is invalid.
+        if (userRes.status === 403 && source === 'github-app') {
+          const rlData = rlRes?.ok
+            ? ((await rlRes.json()) as {
+                rate?: { limit: number; remaining: number; reset: number };
+              })
+            : undefined;
+          const rateLimit = rlData?.rate;
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(
+                  {
+                    configured: true,
+                    source,
+                    login: null,
+                    note: 'GitHub App installation token — no user identity available',
+                    rateLimit: rateLimit
+                      ? {
+                          limit: rateLimit.limit,
+                          remaining: rateLimit.remaining,
+                          resetsAt: new Date(
+                            rateLimit.reset * 1000,
+                          ).toISOString(),
+                        }
+                      : undefined,
+                  },
+                  null,
+                  2,
+                ),
+              },
+            ],
+          };
+        }
+        const body = await userRes.text();
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  configured: false,
+                  source,
+                  error: `GitHub API ${userRes.status}: ${sanitizeErrorBody(body)}`,
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      }
+
+      const user = (await userRes.json()) as {
+        login?: string;
+        id?: number;
+      };
+      const rlData = rlRes?.ok
+        ? ((await rlRes.json()) as {
+            rate?: { limit: number; remaining: number; reset: number };
+          })
+        : undefined;
+      const rateLimit = rlData?.rate;
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                configured: true,
+                source,
+                login: user.login,
+                userId: user.id,
+                rateLimit: rateLimit
+                  ? {
+                      limit: rateLimit.limit,
+                      remaining: rateLimit.remaining,
+                      resetsAt: new Date(rateLimit.reset * 1000).toISOString(),
+                    }
+                  : undefined,
+                ...(rateLimitError ? { rateLimitError } : {}),
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+      };
+    } catch (err) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                configured: false,
+                source,
+                error: err instanceof Error ? err.message : String(err),
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+      };
+    }
+  },
 );
 
 const transport = new StdioServerTransport();

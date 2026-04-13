@@ -556,6 +556,52 @@ server.tool(
   },
 );
 
+// --- make_ping ---
+server.tool(
+  'make_ping',
+  'Check if the make server can locate make, the repo root, and the Makefile. Returns ready status, make version, repo root path, and whether the Makefile exists. Use this to verify the server is operational before using other make_* tools.',
+  {
+    worktreePath: z
+      .string()
+      .regex(ABSOLUTE_PATH_REGEX, 'worktreePath must be an absolute path')
+      .optional()
+      .describe('Worktree or working directory (default: repo root)'),
+  },
+  async (params) => {
+    const repoRoot = params.worktreePath || getRepoRoot();
+    const makefileExists = existsSync(join(repoRoot, 'Makefile'));
+
+    let makeVersion: string | undefined;
+    let makeError: string | undefined;
+    try {
+      const out = await runCommand('make', ['--version'], repoRoot, 10_000);
+      makeVersion = out.split('\n')[0]?.trim();
+    } catch (err) {
+      makeError = err instanceof Error ? err.message : String(err);
+    }
+
+    const ready = !makeError && makefileExists;
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(
+            {
+              ready,
+              repoRoot,
+              makefileExists,
+              makeVersion,
+              ...(makeError ? { makeError } : {}),
+            },
+            null,
+            2,
+          ),
+        },
+      ],
+    };
+  },
+);
+
 // Start the server
 const transport = new StdioServerTransport();
 await server.connect(transport);
