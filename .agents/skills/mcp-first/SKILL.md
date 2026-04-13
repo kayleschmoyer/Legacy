@@ -29,24 +29,24 @@ description: Per-server MCP-first operation mapping — which MCP tools to prefe
 
 These are the specific built-in tool substitutions agents should reach for automatically instead of the Bash equivalents:
 
-| Shell command                                                | Built-in tool replacement                                                                                                 |
-| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
-| `grep -r "pattern" dir/`                                     | `Grep(pattern: "pattern", path: "dir", output_mode: "content")`                                                           |
-| `grep -rl "pattern" dir/`                                    | `Grep(pattern: "pattern", path: "dir", output_mode: "files_with_matches")`                                                |
-| `grep -rl "pattern" dir/ --include="*.ts"`                   | `Grep(pattern: "pattern", path: "dir", glob: "**/*.ts", output_mode: "files_with_matches")`                               |
-| `cat file`                                                   | `Read(file_path: "...")`                                                                                                  |
-| `head -N file`                                               | `Read(file_path: "...", limit: N)`                                                                                        |
-| `tail -N file`                                               | `Read` to determine `total_lines`, then `Read(offset: <total_lines - N>, limit: N)`                                       |
-| `find . -name "*.ts"`                                        | `Glob(pattern: "**/*.ts")`                                                                                                |
-| `git checkout HEAD -- <file>`                                | `worktree_checkout_file(files: ["..."], worktree: "...")`                                                                 |
-| `git show <ref>:<file>` or `git -C <wt> show <sha>:"<path>"` | `worktree_show_file(path: "...", ref: "<ref>")` — `ref` accepts any git ref (HEAD, SHA, branch, tag)                      |
-| `git push -u origin HEAD` (first push)                       | `worktree_push({ setUpstream: true })` — push as-is, no `remoteBranch` override needed; Jira links via PR title + commits |
-| `git branch -m <newName>` (sibling worktrees only)           | `worktree_rename_branch({ newName: "..." })` — **do not use in native-checkbox sessions** (breaks PR detection)           |
-| `git add <file> && git commit -m "..."`                      | `worktree_commit({ files: ["<file>"], message: "..." })`                                                                  |
-| `git diff HEAD`                                              | `worktree_diff({ base: "HEAD" })`                                                                                         |
-| `git branch --show-current` / `git status`                   | `worktree_status()`                                                                                                       |
-| `sleep N && gh run view <runId>` (poll loop)                 | `ci_wait_for_run({ runId: "<runId>" })`                                                                                   |
-| `tail ~/.claude/.../tasks/<taskId>.output`                   | `TaskOutput(taskId: "<taskId>")`                                                                                          |
+| Shell command                                                | Built-in tool replacement                                                                                                   |
+| ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| `grep -r "pattern" dir/`                                     | `Grep(pattern: "pattern", path: "dir", output_mode: "content")`                                                             |
+| `grep -rl "pattern" dir/`                                    | `Grep(pattern: "pattern", path: "dir", output_mode: "files_with_matches")`                                                  |
+| `grep -rl "pattern" dir/ --include="*.ts"`                   | `Grep(pattern: "pattern", path: "dir", glob: "**/*.ts", output_mode: "files_with_matches")`                                 |
+| `cat file`                                                   | `Read(file_path: "...")`                                                                                                    |
+| `head -N file`                                               | `Read(file_path: "...", limit: N)`                                                                                          |
+| `tail -N file`                                               | `Read` to determine `total_lines`, then `Read(offset: <total_lines - N>, limit: N)`                                         |
+| `find . -name "*.ts"`                                        | `Glob(pattern: "**/*.ts")`                                                                                                  |
+| `git checkout -- <file>` / `git checkout HEAD -- <file>`     | `worktree_checkout_file(files: ["..."], worktree: "...")` — restores from HEAD, discarding both staged and unstaged changes |
+| `git show <ref>:<file>` or `git -C <wt> show <sha>:"<path>"` | `worktree_show_file(path: "...", ref: "<ref>")` — `ref` accepts any git ref (HEAD, SHA, branch, tag)                        |
+| `git push -u origin HEAD` (first push)                       | `worktree_push({ setUpstream: true })` — push as-is, no `remoteBranch` override needed; Jira links via PR title + commits   |
+| `git branch -m <newName>` (sibling worktrees only)           | `worktree_rename_branch({ newName: "..." })` — **do not use in native-checkbox sessions** (breaks PR detection)             |
+| `git add <file> && git commit -m "..."`                      | `worktree_commit({ files: ["<file>"], message: "..." })`                                                                    |
+| `git diff HEAD`                                              | `worktree_diff({ base: "HEAD" })`                                                                                           |
+| `git branch --show-current` / `git status`                   | `worktree_status()`                                                                                                         |
+| `sleep N && gh run view <runId>` (poll loop)                 | `ci_wait_for_run({ runId: "<runId>" })`                                                                                     |
+| `tail ~/.claude/.../tasks/<taskId>.output`                   | `TaskOutput(taskId: "<taskId>")`                                                                                            |
 
 **Glob limitation on Windows worktrees**: `Glob` with `path=` set to an absolute Windows worktree path may silently return empty results due to symlink traversal issues. Fall back to `worktree_ls_tree({ ref: "HEAD", path: "<dir>" })` (Git-tracked files only) or `worktree_run(command: "dir <dir>")`.
 
@@ -60,7 +60,7 @@ Prefer `make_run` MCP tool over running `make <target>` via Bash. The MCP tool e
 
 ## Git Operations in Worktrees
 
-Use `worktree_commit` instead of `git add`/`git commit` via Bash — it handles staging and committing in one operation and refuses to stage likely credential/secret files (e.g., `.env`, `credentials.*`, `*.pem`, `*.key`). Use `worktree_push` (supports `setUpstream`) instead of `git push`, `worktree_rebase` instead of `git fetch && twig rebase`, and `worktree_run` as the **catch-all for any git command not covered by a dedicated tool** (e.g., `git rm`, `git ls-files`, `git status --short`, `git stash`). These tools auto-resolve the worktree directory, refuse dangerous operations (pushing `main`, pushing during rebase), and require no manual `cd` or `-C` flags. Never use `git -C $wt <command>` via Bash when `worktree_run` can handle it.
+Use `worktree_commit` instead of `git add`/`git commit` via Bash — it handles staging and committing in one operation and refuses to stage likely credential/secret files (e.g., `.env`, `credentials.*`, `*.pem`, `*.key`). Use `worktree_checkout_file` instead of `git checkout [HEAD] -- <file>` to restore files to HEAD (discarding both staged and unstaged changes). Use `worktree_push` (supports `setUpstream`) instead of `git push`, `worktree_rebase` instead of `git fetch && twig rebase`, and `worktree_run` as the **catch-all for any git command not covered by a dedicated tool** (e.g., `git rm`, `git ls-files`, `git status --short`, `git stash`). These tools auto-resolve the worktree directory, refuse dangerous operations (pushing `main`, pushing during rebase), and require no manual `cd` or `-C` flags. Never use `git -C $wt <command>` via Bash when `worktree_run` can handle it.
 
 **`worktree_run` shell on Windows**: uses Git Bash (`bash.exe` from Git for Windows) when available, falling back to `cmd.exe`. When Git Bash is used, common Unix shell idioms and utilities such as `&&`, `|`, `head`, and `grep` are available. When it falls back to `cmd.exe`, only cmd built-ins and operators like `&&` and `|` are supported — do not rely on Unix utilities (`head`, `grep`, etc.). Avoid PowerShell-specific syntax in `worktree_run` commands.
 
