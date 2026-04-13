@@ -272,6 +272,7 @@ const FAQQuestion = styled(XStack, {
 });
 
 const FAQAnswer = styled(YStack, {
+  paddingTop: '$4',
   paddingHorizontal: '$5',
   paddingBottom: '$5',
   gap: '$2',
