@@ -18,6 +18,14 @@ jest.mock('@legacy-sports/logging', () => ({
   },
 }));
 
+/** Build a fake JWT with the given payload. The signature is garbage but the
+ *  client only reads the payload for expiry checks. */
+function fakeJwt(payload: Record<string, unknown>): string {
+  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+  const body = btoa(JSON.stringify(payload));
+  return `${header}.${body}.fake-signature`;
+}
+
 describe('WebSocketClient', () => {
   const mockUrl = 'ws://localhost:8080';
   let mockServer: Server;
@@ -570,6 +578,153 @@ describe('WebSocketClient', () => {
       jest.advanceTimersByTime(5000);
 
       expect(client.getState()).toBe('disconnected');
+      client.dispose();
+    });
+  });
+
+  describe('token expiration', () => {
+    it('should skip connection when token is expired', () => {
+      const logging = jest.requireMock<{
+        LOGGER: { warn: jest.Mock };
+      }>('@legacy-sports/logging');
+
+      const expiredToken = fakeJwt({
+        id: 1,
+        exp: Math.floor(Date.now() / 1000) - 60, // expired 60 s ago
+      });
+
+      const client = new WebSocketClient({
+        url: mockUrl,
+        token: expiredToken,
+        leagueId: 123,
+        autoConnect: false,
+      });
+
+      const errorHandler = jest.fn();
+      client.on('error', errorHandler);
+
+      client.connect();
+      jest.advanceTimersByTime(100);
+
+      expect(client.getState()).toBe('disconnected');
+      expect(errorHandler).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'Token expired' }),
+      );
+      expect(logging.LOGGER.warn).toHaveBeenCalledWith(
+        expect.stringContaining('token expired'),
+      );
+
+      client.dispose();
+    });
+
+    it('should skip connection when token expires within 30 s buffer', () => {
+      const almostExpiredToken = fakeJwt({
+        id: 1,
+        exp: Math.floor(Date.now() / 1000) + 10, // expires in 10 s (within 30 s buffer)
+      });
+
+      const client = new WebSocketClient({
+        url: mockUrl,
+        token: almostExpiredToken,
+        leagueId: 123,
+        autoConnect: false,
+      });
+
+      const errorHandler = jest.fn();
+      client.on('error', errorHandler);
+
+      client.connect();
+      jest.advanceTimersByTime(100);
+
+      expect(client.getState()).toBe('disconnected');
+      expect(errorHandler).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'Token expired' }),
+      );
+
+      client.dispose();
+    });
+
+    it('should connect normally when token is still valid', (done) => {
+      mockServer = new Server(mockUrl);
+
+      const validToken = fakeJwt({
+        id: 1,
+        exp: Math.floor(Date.now() / 1000) + 3600, // expires in 1 hour
+      });
+
+      // mock-socket matches URLs with query params, so we need to accept any
+      const client = new WebSocketClient({
+        url: mockUrl,
+        token: validToken,
+        leagueId: 123,
+        autoConnect: false,
+      });
+
+      client.on('connected', () => {
+        expect(client.getState()).toBe('connected');
+        client.dispose();
+        done();
+      });
+
+      client.connect();
+      jest.advanceTimersByTime(100);
+    });
+
+    it('should stop reconnecting when token expires during reconnect cycle', () => {
+      mockServer = new Server(mockUrl);
+
+      // Token expires in 60 s — valid at creation (past the 30 s buffer)
+      // but will be treated as expired after ~31 s of clock advancement.
+      const shortLivedToken = fakeJwt({
+        id: 1,
+        exp: Math.floor(Date.now() / 1000) + 60,
+      });
+
+      const client = new WebSocketClient({
+        url: mockUrl,
+        token: shortLivedToken,
+        leagueId: 123,
+        reconnect: true,
+        reconnectDelay: 1000,
+        autoConnect: true,
+      });
+
+      jest.advanceTimersByTime(100);
+      expect(client.getState()).toBe('connected');
+
+      // Drop the connection — triggers reconnect cycle
+      mockServer.close();
+      jest.advanceTimersByTime(100);
+      expect(client.getState()).toBe('disconnected');
+
+      const errorHandler = jest.fn();
+      client.on('error', errorHandler);
+
+      // Advance past the 30 s buffer window (1 s reconnect delay + 31 s clock)
+      // so the next connect() call detects the token as expired.
+      jest.advanceTimersByTime(35_000);
+
+      expect(errorHandler).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'Token expired' }),
+      );
+
+      client.dispose();
+    });
+
+    it('should allow connection without token (cookie-based auth)', () => {
+      mockServer = new Server(mockUrl);
+
+      const client = new WebSocketClient({
+        url: mockUrl,
+        // No token — cookie-based auth
+        leagueId: 123,
+        autoConnect: true,
+      });
+
+      jest.advanceTimersByTime(100);
+
+      // Should connect normally — no expiration check for cookie auth
+      expect(client.getState()).toBe('connected');
       client.dispose();
     });
   });

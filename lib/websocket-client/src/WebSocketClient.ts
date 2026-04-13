@@ -97,14 +97,22 @@ export class WebSocketClient {
       return;
     }
 
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      LOGGER.debug('Already connected');
+      return;
+    }
+
     if (!this.options.token) {
       LOGGER.debug(
         'No auth token provided — connection will rely on cookie-based auth.',
       );
-    }
-
-    if (this.ws?.readyState === WebSocket.OPEN) {
-      LOGGER.debug('Already connected');
+    } else if (this.isTokenExpired()) {
+      LOGGER.warn(
+        'WebSocket token expired — skipping connection attempt. ' +
+          'Recreate the client or provide a fresh token before reconnecting.',
+      );
+      this.cancelReconnect();
+      this.emitError(new Error('Token expired'));
       return;
     }
 
@@ -332,6 +340,35 @@ export class WebSocketClient {
     url.searchParams.set('viewContext', this.options.viewContext);
 
     return url.toString();
+  }
+
+  /**
+   * Check if the JWT token has expired (or will within 30 s).
+   * Decodes the payload without signature verification — the server
+   * will do full verification. This is a client-side guard to avoid
+   * futile reconnection attempts with a known-expired token.
+   */
+  private isTokenExpired(): boolean {
+    const token = this.options.token;
+    if (!token) return false; // No token → cookie-based auth, can't check
+
+    try {
+      const parts = token.split('.');
+      if (parts.length !== 3) return false;
+
+      const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
+      const payload = JSON.parse(atob(padded)) as { exp?: number };
+
+      if (!payload.exp) return false;
+
+      // Treat the token as expired 30 s before actual expiry to avoid
+      // races where the connection handshake starts just before expiry.
+      const BUFFER_MS = 30_000;
+      return Date.now() >= payload.exp * 1000 - BUFFER_MS;
+    } catch {
+      return false; // Can't decode → don't block the connection
+    }
   }
 
   /**
