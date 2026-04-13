@@ -137,16 +137,17 @@ const FAAB_BUDGET_OPTIONS = [50, 100, 150, 200, 250, 500];
 
 const SectionHeaderRow = styled(XStack, {
   paddingHorizontal: '$4',
-  paddingVertical: '$3',
+  paddingVertical: '$3.5',
   alignItems: 'center',
   justifyContent: 'space-between',
-  backgroundColor: '$color1',
+  backgroundColor: '$color2',
   borderRadius: '$4',
   borderWidth: 1,
   borderColor: '$borderColor',
   cursor: 'pointer' as never,
   hoverStyle: {
-    backgroundColor: '$color2',
+    backgroundColor: '$color3',
+    borderColor: '$borderColorHover',
   },
 });
 
@@ -182,7 +183,13 @@ function CollapsibleSection({
         borderBottomRightRadius={open ? 0 : '$4'}
         borderBottomWidth={open ? 0 : 1}
       >
-        <Text fontWeight="700" fontSize="$4" color="$color">
+        <Text
+          fontWeight="700"
+          fontSize="$5"
+          color="$color"
+          textTransform="uppercase"
+          letterSpacing={1.2}
+        >
           {title}
         </Text>
         <span
@@ -208,8 +215,8 @@ function CollapsibleSection({
           borderBottomLeftRadius="$4"
           borderBottomRightRadius="$4"
           backgroundColor="$color1"
-          padding="$4"
-          space="$5"
+          padding="$5"
+          space="$6"
         >
           {children}
         </YStack>
@@ -500,14 +507,11 @@ export function LeagueCreatePage(): React.JSX.Element {
       >
         {/* Header */}
         <YStack alignItems="center" space="$3">
-          <H1 size="$8" color="$color" textAlign="center">
-            <span role="img" aria-label="baseball">
-              ⚾
-            </span>{' '}
+          <H1 size="$9" color="$color" textAlign="center" letterSpacing={0.5}>
             Create Baseball League
           </H1>
-          <Text size="$4" color="$gray11" textAlign="center">
-            Set up your fantasy baseball league with custom settings
+          <Text size="$4" color="$gray10" textAlign="center">
+            Configure your league settings and draft rules
           </Text>
         </YStack>
 
@@ -1057,14 +1061,14 @@ export function LeagueCreatePage(): React.JSX.Element {
                           disabled={loading}
                           backgroundColor={
                             formData.eraFilter === option.value
-                              ? '$orange8'
+                              ? '$brandNavyLight'
                               : isLocked
                                 ? '$color1'
                                 : '$color2'
                           }
                           borderColor={
                             formData.eraFilter === option.value
-                              ? '$orange8'
+                              ? '$brandNavyLight'
                               : '$borderColor'
                           }
                           borderWidth={
@@ -1074,7 +1078,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                           hoverStyle={{
                             backgroundColor:
                               formData.eraFilter === option.value
-                                ? '$orange9'
+                                ? '$brandNavy'
                                 : '$color3',
                           }}
                           pressStyle={{ scale: 0.95 }}
@@ -1082,7 +1086,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                           <Text
                             color={
                               formData.eraFilter === option.value
-                                ? '$orange12'
+                                ? '$brandGold'
                                 : '$color'
                             }
                             fontWeight={
@@ -1130,7 +1134,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                           }}
                           keyboardType="numeric"
                           disabled={loading}
-                          borderColor="$orange8"
+                          borderColor="$brandNavyLight"
                         />
                       </YStack>
                       <Text color="$gray10" marginTop="$4">
@@ -1157,7 +1161,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                           }}
                           keyboardType="numeric"
                           disabled={loading}
-                          borderColor="$orange8"
+                          borderColor="$brandNavyLight"
                         />
                       </YStack>
                     </XStack>
@@ -1178,21 +1182,21 @@ export function LeagueCreatePage(): React.JSX.Element {
                       disabled={loading}
                       flex={1}
                       backgroundColor={
-                        formData.hofOnly ? '$yellow8' : '$color2'
+                        formData.hofOnly ? '$brandNavyLight' : '$color2'
                       }
                       borderColor={
-                        formData.hofOnly ? '$yellow8' : '$borderColor'
+                        formData.hofOnly ? '$brandNavyLight' : '$borderColor'
                       }
                       borderWidth={formData.hofOnly ? 2 : 1}
                       hoverStyle={{
                         backgroundColor: formData.hofOnly
-                          ? '$yellow9'
+                          ? '$brandNavy'
                           : '$color3',
                       }}
                       pressStyle={{ scale: 0.95 }}
                     >
                       <Text
-                        color={formData.hofOnly ? '$yellow12' : '$color'}
+                        color={formData.hofOnly ? '$brandGold' : '$color'}
                         fontWeight={formData.hofOnly ? '600' : '400'}
                       >
                         {formData.hofOnly
@@ -1541,12 +1545,12 @@ export function LeagueCreatePage(): React.JSX.Element {
                         flex={1}
                         backgroundColor={
                           formData.waiverType === option.value
-                            ? '$purple8'
+                            ? '$brandNavyLight'
                             : '$color2'
                         }
                         borderColor={
                           formData.waiverType === option.value
-                            ? '$purple8'
+                            ? '$brandNavyLight'
                             : '$borderColor'
                         }
                         borderWidth={
@@ -1555,25 +1559,25 @@ export function LeagueCreatePage(): React.JSX.Element {
                         hoverStyle={{
                           backgroundColor:
                             formData.waiverType === option.value
-                              ? '$purple9'
+                              ? '$brandNavy'
                               : '$color3',
                           borderColor:
                             formData.waiverType === option.value
-                              ? '$purple9'
+                              ? '$brandNavy'
                               : '$borderColorHover',
                         }}
                         pressStyle={{
                           scale: 0.95,
                           backgroundColor:
                             formData.waiverType === option.value
-                              ? '$purple7'
+                              ? '$brandNavyDark'
                               : '$color4',
                         }}
                       >
                         <Text
                           color={
                             formData.waiverType === option.value
-                              ? '$purple12'
+                              ? '$brandGold'
                               : '$color'
                           }
                           fontWeight={
@@ -1629,12 +1633,12 @@ export function LeagueCreatePage(): React.JSX.Element {
                             minWidth="$5"
                             backgroundColor={
                               formData.faabBudgetDefault === amount
-                                ? '$purple8'
+                                ? '$brandNavyLight'
                                 : '$color2'
                             }
                             borderColor={
                               formData.faabBudgetDefault === amount
-                                ? '$purple8'
+                                ? '$brandNavyLight'
                                 : '$borderColor'
                             }
                             borderWidth={
@@ -1643,25 +1647,25 @@ export function LeagueCreatePage(): React.JSX.Element {
                             hoverStyle={{
                               backgroundColor:
                                 formData.faabBudgetDefault === amount
-                                  ? '$purple9'
+                                  ? '$brandNavy'
                                   : '$color3',
                               borderColor:
                                 formData.faabBudgetDefault === amount
-                                  ? '$purple9'
+                                  ? '$brandNavy'
                                   : '$borderColorHover',
                             }}
                             pressStyle={{
                               scale: 0.95,
                               backgroundColor:
                                 formData.faabBudgetDefault === amount
-                                  ? '$purple7'
+                                  ? '$brandNavyDark'
                                   : '$color4',
                             }}
                           >
                             <Text
                               color={
                                 formData.faabBudgetDefault === amount
-                                  ? '$purple12'
+                                  ? '$brandGold'
                                   : '$color'
                               }
                               fontWeight={
@@ -1834,16 +1838,16 @@ export function LeagueCreatePage(): React.JSX.Element {
             </H2>
           </Card.Header>
           <YStack padding="$4" space="$3">
-            <Text size="$3" color="$brandGold">
+            <Text size="$3" color="$color11">
               • Your league will be created with the specified number of teams
             </Text>
-            <Text size="$3" color="$brandGold">
+            <Text size="$3" color="$color11">
               • You'll be set as the league commissioner
             </Text>
-            <Text size="$3" color="$brandGold">
+            <Text size="$3" color="$color11">
               • Teams will be auto-generated and ready for member assignment
             </Text>
-            <Text size="$3" color="$brandGold">
+            <Text size="$3" color="$color11">
               • You can invite friends to join your league after creation
             </Text>
           </YStack>
