@@ -1202,6 +1202,12 @@ export class StatisticsService {
       );
     }
 
+    if (filters.position && filters.position !== 'P') {
+      conditions.push(
+        sql`${PublicSchema.careerPitching.playerId} IN (SELECT player_id FROM public.player_eligible_positions WHERE position = ${filters.position})`,
+      );
+    }
+
     return conditions;
   }
 

@@ -21,7 +21,18 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Button, H2, H3, Input, Spinner, Text, XStack, YStack } from 'tamagui';
+import {
+  Button,
+  H2,
+  H3,
+  Input,
+  Select,
+  Spinner,
+  Text,
+  XStack,
+  YStack,
+} from 'tamagui';
+import { PITCHING_POSITIONS } from '@legacy-sports/utils';
 import { getPageRange } from './paginationUtils';
 import { formatPositionsPlayed } from './services/CareerStatsService';
 import {
@@ -296,6 +307,9 @@ export function PitchingStatsDataGrid({
     minWins: initialParams.minWins ?? 0,
     minStrikeouts: initialParams.minStrikeouts ?? 0,
   });
+  const [positionFilter, setPositionFilter] = useState(
+    (initialParams.position as string) ?? '',
+  );
 
   // =============================================================================
   // Data Fetching
@@ -316,6 +330,7 @@ export function PitchingStatsDataGrid({
       minWins: queryParams.minWins,
       minStrikeouts: queryParams.minStrikeouts,
       searchTerm: queryParams.searchTerm,
+      position: queryParams.position,
     },
     errorPolicy: 'all',
     fetchPolicy: 'cache-and-network',
@@ -378,6 +393,17 @@ export function PitchingStatsDataGrid({
       updateQueryParams({ ...newFilters, offset: 0 });
     },
     [localFilters, updateQueryParams],
+  );
+
+  const handlePositionFilterChange = useCallback(
+    (value: string) => {
+      setPositionFilter(value);
+      updateQueryParams({
+        position: value || undefined,
+        offset: 0,
+      });
+    },
+    [updateQueryParams],
   );
 
   const handlePageChange = useCallback(
@@ -532,7 +558,8 @@ export function PitchingStatsDataGrid({
             ))}
             {(localFilters.minGames > 0 ||
               localFilters.minWins > 0 ||
-              localFilters.minStrikeouts > 0) && (
+              localFilters.minStrikeouts > 0 ||
+              positionFilter.length > 0) && (
               <Button
                 size="$2"
                 onPress={() => {
@@ -542,7 +569,12 @@ export function PitchingStatsDataGrid({
                     minStrikeouts: 0,
                   };
                   setLocalFilters(cleared);
-                  updateQueryParams({ ...cleared, offset: 0 });
+                  setPositionFilter('');
+                  updateQueryParams({
+                    ...cleared,
+                    position: undefined,
+                    offset: 0,
+                  });
                 }}
                 style={{
                   background: `rgba(197,165,90,0.12)`,
@@ -554,6 +586,43 @@ export function PitchingStatsDataGrid({
                 Clear Filters
               </Button>
             )}
+            <XStack alignItems="center" gap="$1">
+              <Text fontSize="$2" style={{ color: TEXT_MUTED }}>
+                Pos:
+              </Text>
+              <Select
+                value={positionFilter || '__all__'}
+                onValueChange={(value) =>
+                  handlePositionFilterChange(value === '__all__' ? '' : value)
+                }
+              >
+                <Select.Trigger
+                  width={80}
+                  size="$2"
+                  backgroundColor="rgba(10,15,26,0.6)"
+                  borderWidth={1}
+                  borderColor="rgba(44,74,124,0.4)"
+                  borderRadius={8}
+                  aria-label="Position"
+                >
+                  <Select.Value placeholder="All" color={TEXT_HIGH_CONTRAST} />
+                </Select.Trigger>
+                <Select.Content zIndex={200000}>
+                  <Select.Viewport>
+                    <Select.Item index={0} value="__all__">
+                      <Select.ItemText>All</Select.ItemText>
+                    </Select.Item>
+                    {[...PITCHING_POSITIONS]
+                      .filter((pos) => pos !== 'P')
+                      .map((pos, idx) => (
+                        <Select.Item key={pos} index={idx + 1} value={pos}>
+                          <Select.ItemText>{pos}</Select.ItemText>
+                        </Select.Item>
+                      ))}
+                  </Select.Viewport>
+                </Select.Content>
+              </Select>
+            </XStack>
           </XStack>
         )}
 
@@ -725,10 +794,12 @@ export function PitchingStatsDataGrid({
             <Button
               onPress={() => {
                 setLocalFilters({ minGames: 0, minWins: 0, minStrikeouts: 0 });
+                setPositionFilter('');
                 updateQueryParams({
                   minGames: 0,
                   minWins: 0,
                   minStrikeouts: 0,
+                  position: undefined,
                   offset: 0,
                 });
               }}

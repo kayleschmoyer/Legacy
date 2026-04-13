@@ -16,12 +16,12 @@ The merge queue is a **label-based automated merge system** implemented as a Git
 
 The merge queue runs in response to:
 
-| Event | When |
-|---|---|
-| **Label added/removed** | `merge-when-ready` or `merge-to-parent` label is toggled |
-| **Review submitted** | Someone approves or requests changes |
-| **CI completes** | The CI Orchestrator workflow finishes on a PR branch |
-| **Manual dispatch** | Triggered via the GitHub Actions UI (supports `dry_run` and `force_check` modes) |
+| Event                   | When                                                                             |
+| ----------------------- | -------------------------------------------------------------------------------- |
+| **Label added/removed** | `merge-when-ready` or `merge-to-parent` label is toggled                         |
+| **Review submitted**    | Someone approves or requests changes                                             |
+| **CI completes**        | The CI Orchestrator workflow finishes on a PR branch                             |
+| **Manual dispatch**     | Triggered via the GitHub Actions UI (supports `dry_run` and `force_check` modes) |
 
 ### Concurrency and Debounce
 
@@ -72,12 +72,12 @@ Since `bot-review` is a commit status, the merge queue's status check validation
 
 Beyond `bot-review`, every other check run registered on the PR's HEAD SHA must also pass:
 
-| Check state | Result |
-|---|---|
-| `completed` + `success` | Passing |
-| `completed` + `skipped`, `neutral`, `action_required` | Ignored (not a failure) |
-| `completed` + `failure`, `cancelled`, `timed_out` | **Blocking** |
-| `in_progress`, `queued` | **Pending** — queue waits and retries |
+| Check state                                           | Result                                |
+| ----------------------------------------------------- | ------------------------------------- |
+| `completed` + `success`                               | Passing                               |
+| `completed` + `skipped`, `neutral`, `action_required` | Ignored (not a failure)               |
+| `completed` + `failure`, `cancelled`, `timed_out`     | **Blocking**                          |
+| `in_progress`, `queued`                               | **Pending** — queue waits and retries |
 
 Commit statuses (the older status API, which includes `bot-review`) follow the same logic: `success` passes, `failure`/`error` blocks, `pending` waits. When multiple statuses exist for the same context, only the most recent (by timestamp) is used.
 
@@ -98,6 +98,7 @@ Note: while human review **approvals** are not required (see below), unresolved 
 ### 6. Non-main branch: `merge-to-parent` label required
 
 For PRs targeting a branch other than `main` (e.g., stacked PRs), **both** labels are required:
+
 - `merge-when-ready`
 - `merge-to-parent`
 
@@ -139,10 +140,12 @@ The comment is updated in place on subsequent runs rather than creating new comm
 ### Adding to the queue
 
 **Via GitHub UI:**
+
 1. Open your PR
 2. Add the `merge-when-ready` label in the sidebar
 
 **Via CLI:**
+
 ```bash
 gh pr edit <number> --add-label "merge-when-ready"
 ```
@@ -158,6 +161,7 @@ Remove the `merge-when-ready` label. The queue posts a confirmation comment.
 Go to **Actions > Enhanced Merge Queue > Run workflow** in the GitHub UI.
 
 Options:
+
 - **dry_run** — shows what would happen without actually merging
 - **force_check** — checks all labeled PRs even if the trigger event doesn't match
 
@@ -166,6 +170,7 @@ Options:
 ### "PR has merge conflicts"
 
 Rebase or merge main into your branch:
+
 ```bash
 git fetch origin main
 git rebase origin/main
@@ -201,10 +206,10 @@ Remove the label and merge manually via the GitHub UI or `gh pr merge`.
 
 Two GitHub Apps are involved:
 
-| App | ID | Purpose | Secrets |
-|---|---|---|---|
-| **Merge Queue App** | `MERGE_QUEUE_APP_ID` | Merges PRs, posts comments, deletes branches, re-targets dependent PRs | `MERGE_QUEUE_APP_ID`, `MERGE_QUEUE_APP_PRIVATE_KEY` |
-| **Review Bot** (`legacy-sports-review-bot`) | `3142924` | Sets `bot-review` status, approves PRs after clean Copilot review | `BOT_APP_PRIVATE_KEY` |
+| App                                         | ID                   | Purpose                                                                | Secrets                                             |
+| ------------------------------------------- | -------------------- | ---------------------------------------------------------------------- | --------------------------------------------------- |
+| **Merge Queue App**                         | `MERGE_QUEUE_APP_ID` | Merges PRs, posts comments, deletes branches, re-targets dependent PRs | `MERGE_QUEUE_APP_ID`, `MERGE_QUEUE_APP_PRIVATE_KEY` |
+| **Review Bot** (`legacy-sports-review-bot`) | `3142924`            | Sets `bot-review` status, approves PRs after clean Copilot review      | `BOT_APP_PRIVATE_KEY`                               |
 
 Both use dedicated app tokens (not `GITHUB_TOKEN`) to ensure their actions trigger downstream workflows (e.g., the CI Orchestrator integration build on main). The separation of duties ensures the same app never both authors and approves code.
 

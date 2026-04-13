@@ -2345,12 +2345,14 @@ type Query {
     offset: Int
     orderBy: String
     orderDirection: String
+    position: String
     searchTerm: String
   ): [CareerPitching!]
   careerPitchingStatsCount(
     minGames: Int
     minStrikeouts: Int
     minWins: Int
+    position: String
     searchTerm: String
   ): Int
 

@@ -2443,6 +2443,7 @@ export type QueryCareerPitchingStatsArgs = {
   offset?: InputMaybe<Scalars['Int']['input']>;
   orderBy?: InputMaybe<Scalars['String']['input']>;
   orderDirection?: InputMaybe<Scalars['String']['input']>;
+  position?: InputMaybe<Scalars['String']['input']>;
   searchTerm?: InputMaybe<Scalars['String']['input']>;
 };
 
@@ -2450,6 +2451,7 @@ export type QueryCareerPitchingStatsCountArgs = {
   minGames?: InputMaybe<Scalars['Int']['input']>;
   minStrikeouts?: InputMaybe<Scalars['Int']['input']>;
   minWins?: InputMaybe<Scalars['Int']['input']>;
+  position?: InputMaybe<Scalars['String']['input']>;
   searchTerm?: InputMaybe<Scalars['String']['input']>;
 };
 
@@ -4415,6 +4417,7 @@ export type GetCareerPitchingStatsQueryVariables = Exact<{
   minWins?: InputMaybe<Scalars['Int']['input']>;
   minStrikeouts?: InputMaybe<Scalars['Int']['input']>;
   searchTerm?: InputMaybe<Scalars['String']['input']>;
+  position?: InputMaybe<Scalars['String']['input']>;
 }>;
 
 export type GetCareerPitchingStatsQuery = {
@@ -4462,6 +4465,7 @@ export type GetCareerPitchingStatsCountQueryVariables = Exact<{
   minWins?: InputMaybe<Scalars['Int']['input']>;
   minStrikeouts?: InputMaybe<Scalars['Int']['input']>;
   searchTerm?: InputMaybe<Scalars['String']['input']>;
+  position?: InputMaybe<Scalars['String']['input']>;
 }>;
 
 export type GetCareerPitchingStatsCountQuery = {
@@ -9536,6 +9540,7 @@ export const GetCareerPitchingStats = gql`
     $minWins: Int
     $minStrikeouts: Int
     $searchTerm: String
+    $position: String
   ) {
     careerPitchingStats(
       limit: $limit
@@ -9546,6 +9551,7 @@ export const GetCareerPitchingStats = gql`
       minWins: $minWins
       minStrikeouts: $minStrikeouts
       searchTerm: $searchTerm
+      position: $position
     ) {
       ...CareerPitching
     }
@@ -9573,6 +9579,7 @@ export const GetCareerPitchingStats = gql`
  *      minWins: // value for 'minWins'
  *      minStrikeouts: // value for 'minStrikeouts'
  *      searchTerm: // value for 'searchTerm'
+ *      position: // value for 'position'
  *   },
  * });
  */
@@ -9644,12 +9651,14 @@ export const GetCareerPitchingStatsCount = gql`
     $minWins: Int
     $minStrikeouts: Int
     $searchTerm: String
+    $position: String
   ) {
     careerPitchingStatsCount(
       minGames: $minGames
       minWins: $minWins
       minStrikeouts: $minStrikeouts
       searchTerm: $searchTerm
+      position: $position
     )
   }
 `;
@@ -9670,6 +9679,7 @@ export const GetCareerPitchingStatsCount = gql`
  *      minWins: // value for 'minWins'
  *      minStrikeouts: // value for 'minStrikeouts'
  *      searchTerm: // value for 'searchTerm'
+ *      position: // value for 'position'
  *   },
  * });
  */

@@ -2437,6 +2437,7 @@ export type QueryCareerPitchingStatsArgs = {
   offset?: InputMaybe<Scalars['Int']['input']>;
   orderBy?: InputMaybe<Scalars['String']['input']>;
   orderDirection?: InputMaybe<Scalars['String']['input']>;
+  position?: InputMaybe<Scalars['String']['input']>;
   searchTerm?: InputMaybe<Scalars['String']['input']>;
 };
 
@@ -2444,6 +2445,7 @@ export type QueryCareerPitchingStatsCountArgs = {
   minGames?: InputMaybe<Scalars['Int']['input']>;
   minStrikeouts?: InputMaybe<Scalars['Int']['input']>;
   minWins?: InputMaybe<Scalars['Int']['input']>;
+  position?: InputMaybe<Scalars['String']['input']>;
   searchTerm?: InputMaybe<Scalars['String']['input']>;
 };
 

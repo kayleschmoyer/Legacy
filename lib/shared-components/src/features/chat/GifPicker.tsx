@@ -352,7 +352,8 @@ export function GifPicker({
         alignItems="center"
       >
         <Text fontSize="$1" color="$textMuted">
-          Powered by GIPHY \u00b7 {rating.toUpperCase()} rated \u00b7 click to send
+          Powered by GIPHY \u00b7 {rating.toUpperCase()} rated \u00b7 click to
+          send
         </Text>
         <Button
           size="$2"
