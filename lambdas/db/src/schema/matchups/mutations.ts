@@ -545,20 +545,29 @@ export async function adjustMatchupsForNewTotal(
     const gamesPerMatchup = league.gamesPerMatchup ?? 5;
     const spStartsPerMatchup = league.spStartsPerMatchup ?? 1;
 
-    // Generate schedule for the additional weeks
+    // Generate the full schedule for the total number of weeks so the
+    // round-robin cycle continues seamlessly from the existing schedule.
+    // Only insert matchups for weeks beyond what already exists.
     const scheduleResult = await MatchupService.generateSchedule(db, {
       leagueId,
-      numberOfWeeks: weeksToAdd,
+      numberOfWeeks: newTotal,
       strategyType: league.schedulingStrategy ?? 'round-robin',
     });
 
-    // Remap week numbers: generated schedule starts at 1, we need highestWeek+1
+    const newMatchups = scheduleResult.matchups.filter(
+      (m) => m.weekNumber > highestWeek,
+    );
+
+    if (newMatchups.length === 0) {
+      return { added: 0, removed: 0 };
+    }
+
     const insertedMatchups = await db
       .insert(PublicSchema.matchups)
       .values(
-        scheduleResult.matchups.map((matchup) => ({
+        newMatchups.map((matchup) => ({
           leagueId,
-          weekNumber: highestWeek + matchup.weekNumber,
+          weekNumber: matchup.weekNumber,
           team1Id: matchup.team1Id,
           team2Id: matchup.team2Id,
           gamesPerMatchup,

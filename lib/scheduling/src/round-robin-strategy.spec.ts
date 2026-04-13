@@ -191,4 +191,104 @@ describe('RoundRobinStrategy', () => {
     // Total matchups should be 12 weeks * 2 = 24
     expect(pairings.length).toBe(24);
   });
+
+  it('should not cluster the same pair 3+ times in any 5-week window', () => {
+    // Regression test: when weeks are added by generating a full schedule and
+    // extracting the tail, the round-robin cycle must remain evenly distributed.
+    // This covers team counts 3-10 across various season lengths.
+    const pairKey = (t1: number, t2: number): string =>
+      t1 < t2 ? `${t1}-${t2}` : `${t2}-${t1}`;
+
+    for (let teamCount = 3; teamCount <= 10; teamCount++) {
+      const teams: TeamInfo[] = Array.from({ length: teamCount }, (_, i) => ({
+        id: i + 1,
+        name: `Team ${i + 1}`,
+        leagueId: 1,
+      }));
+
+      for (const numberOfWeeks of [5, 10, 15, 20, 25]) {
+        const pairings = strategy.generatePairings(teams, numberOfWeeks);
+
+        // Build week -> pair keys map
+        const weekPairs = new Map<number, string[]>();
+        for (const p of pairings) {
+          const key = pairKey(p.team1Id, p.team2Id);
+          if (!weekPairs.has(p.weekNumber)) weekPairs.set(p.weekNumber, []);
+          const weekList = weekPairs.get(p.weekNumber);
+          if (weekList) weekList.push(key);
+        }
+
+        // Sliding 5-week window: no pair should appear 3+ times
+        for (let start = 1; start <= numberOfWeeks - 4; start++) {
+          const pairCounts = new Map<string, number>();
+          for (let w = start; w < start + 5; w++) {
+            for (const pair of weekPairs.get(w) ?? []) {
+              pairCounts.set(pair, (pairCounts.get(pair) ?? 0) + 1);
+            }
+          }
+          for (const [pair, count] of pairCounts) {
+            if (count >= 3) {
+              throw new Error(
+                `${teamCount} teams, ${numberOfWeeks} weeks: pair ${pair} ` +
+                  `appears ${count}x in weeks ${start}-${start + 4}`,
+              );
+            }
+          }
+        }
+      }
+    }
+  });
+
+  it('should not repeat boundary pairings when the full schedule tail is used for added weeks', () => {
+    // Regression: adjustMatchupsForNewTotal generates a full N-week schedule
+    // and inserts only weeks > highestWeek. This verifies the tail of the full
+    // schedule doesn't duplicate pairings from the last existing week, and that
+    // a fresh M-week generation (old approach) would produce different pairings
+    // than the correct full-schedule tail.
+    const teams: TeamInfo[] = [
+      { id: 1, name: 'Team 1', leagueId: 1 },
+      { id: 2, name: 'Team 2', leagueId: 1 },
+      { id: 3, name: 'Team 3', leagueId: 1 },
+      { id: 4, name: 'Team 4', leagueId: 1 },
+    ];
+
+    const initialWeeks = 4;
+    const totalWeeks = 7;
+    const addedWeeks = totalWeeks - initialWeeks;
+
+    const pairKey = (t1: number, t2: number): string =>
+      t1 < t2 ? `${t1}-${t2}` : `${t2}-${t1}`;
+
+    // Correct approach: generate full schedule, extract tail
+    const fullPairings = strategy.generatePairings(teams, totalWeeks);
+    const tailPairings = fullPairings.filter(
+      (p) => p.weekNumber > initialWeeks,
+    );
+
+    // Old (buggy) approach: generate fresh schedule for just the added weeks
+    const freshPairings = strategy.generatePairings(teams, addedWeeks);
+
+    // The fresh generation restarts from round 0, so week 1 of fresh == week 1
+    // of full — that's different from the correct tail (weeks 5-7).
+    const freshWeek1Pairs = freshPairings
+      .filter((p) => p.weekNumber === 1)
+      .map((p) => pairKey(p.team1Id, p.team2Id))
+      .sort();
+    const tailWeek5Pairs = tailPairings
+      .filter((p) => p.weekNumber === initialWeeks + 1)
+      .map((p) => pairKey(p.team1Id, p.team2Id))
+      .sort();
+
+    expect(freshWeek1Pairs).not.toEqual(tailWeek5Pairs);
+
+    // Boundary check: no pair in the last original week should appear in the
+    // first added week of the correct tail
+    const lastOriginalWeekPairs = fullPairings
+      .filter((p) => p.weekNumber === initialWeeks)
+      .map((p) => pairKey(p.team1Id, p.team2Id));
+
+    for (const pair of tailWeek5Pairs) {
+      expect(lastOriginalWeekPairs).not.toContain(pair);
+    }
+  });
 });

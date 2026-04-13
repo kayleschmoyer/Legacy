@@ -33,7 +33,7 @@ import {
   isNegroLeague,
   SEASON_MATCHUP_MULTIPLIER,
 } from '@legacy-sports/utils';
-import { and, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
 
 import { type GenericDatabase } from './client/abstract/BaseDbClient';
 import { PublicSchema } from './client/PublicDbClient';
@@ -264,7 +264,8 @@ export class MatchupService {
         divisionId: PublicSchema.teams.divisionId,
       })
       .from(PublicSchema.teams)
-      .where(eq(PublicSchema.teams.leagueId, leagueId));
+      .where(eq(PublicSchema.teams.leagueId, leagueId))
+      .orderBy(asc(PublicSchema.teams.id));
 
     const teams: TeamInfo[] = teamsResult.map((t) => ({
       id: t.id,
