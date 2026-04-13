@@ -29,63 +29,18 @@ function levelToColor(level: string | undefined): number {
 
 /**
  * Format a Rollbar webhook event into a Discord embed.
- * Returns `null` for events without actionable data (e.g. deploy events
- * missing a deploy payload, or events with no item/occurrence).
+ * Returns `null` for either intentionally ignored event types (deploy
+ * events) or events with insufficient payload (no item/occurrence).
+ *
+ * Deploy events are always skipped by policy — CI workflows already send
+ * deploy notifications to the correct Discord channel via discord-notify.
  */
 export function formatRollbarEmbed(event: RollbarEvent): DiscordEmbed | null {
-  const { item, occurrence, deploy } = event.data;
+  const { item, occurrence } = event.data;
 
-  // Deploy events have a distinct payload shape — handle them separately.
-  if (event.event_name === 'deploy') {
-    // Drop deploy events without a deploy payload — they produce empty embeds.
-    if (!deploy) return null;
-    const environment = deploy.environment ?? 'unknown';
-    const status = deploy.status ?? 'unknown';
-    const fields: DiscordEmbed['fields'] = [
-      { name: 'Event', value: event.event_name, inline: true },
-      { name: 'Status', value: status.toUpperCase(), inline: true },
-      { name: 'Environment', value: environment, inline: true },
-    ];
-
-    if (deploy.revision) {
-      fields.push({
-        name: 'Revision',
-        value: deploy.revision.slice(0, 8),
-        inline: true,
-      });
-    }
-
-    if (deploy.local_username) {
-      fields.push({
-        name: 'Deployed by',
-        value: deploy.local_username,
-        inline: true,
-      });
-    }
-
-    const normalizedStatus = status.toLowerCase();
-    const color =
-      normalizedStatus === 'failed'
-        ? COLOR_ERROR
-        : normalizedStatus === 'started'
-          ? COLOR_WARNING
-          : normalizedStatus === 'succeeded'
-            ? COLOR_OK
-            : COLOR_INFO; // unknown/unrecognized status → neutral blurple
-
-    return {
-      title: `Deploy to ${environment}`,
-      description: deploy.comment || 'No comment provided',
-      color,
-      fields,
-      footer: { text: 'Rollbar' },
-      ...(deploy.finish_time
-        ? { timestamp: new Date(deploy.finish_time * 1000).toISOString() }
-        : deploy.start_time
-          ? { timestamp: new Date(deploy.start_time * 1000).toISOString() }
-          : {}),
-    };
-  }
+  // Skip deploy events entirely — deploy notifications are handled by
+  // CI workflow discord-notify steps routed to the deploy channel.
+  if (event.event_name === 'deploy') return null;
 
   // Drop events without any usable payload — they produce generic embeds.
   if (!item && !occurrence) return null;

@@ -79,7 +79,7 @@ describe('formatRollbarEmbed', () => {
     );
   });
 
-  it('formats a deploy event with succeeded status', () => {
+  it('skips deploy events (handled by CI discord-notify)', () => {
     const event: RollbarEvent = {
       event_name: 'deploy',
       data: {
@@ -95,99 +95,7 @@ describe('formatRollbarEmbed', () => {
       },
     };
 
-    const embed = formatRollbarEmbed(event);
-
-    expect(embed).not.toBeNull();
-    expect(embed!.title).toBe('Deploy to production');
-    expect(embed!.description).toBe('deploying webs');
-    expect(embed!.color).toBe(0x57f287); // green for succeeded
-    expect(embed!.fields).toEqual(
-      expect.arrayContaining([
-        { name: 'Event', value: 'deploy', inline: true },
-        { name: 'Status', value: 'SUCCEEDED', inline: true },
-        { name: 'Environment', value: 'production', inline: true },
-        { name: 'Revision', value: 'e4b9b7db', inline: true },
-        { name: 'Deployed by', value: 'brian', inline: true },
-      ]),
-    );
-    expect(embed!.timestamp).toBe(new Date(1382656039 * 1000).toISOString());
-    expect(embed!.footer).toEqual({ text: 'Rollbar' });
-  });
-
-  it('formats a deploy event with failed status as red', () => {
-    const event: RollbarEvent = {
-      event_name: 'deploy',
-      data: {
-        deploy: {
-          environment: 'production',
-          status: 'failed',
-        },
-      },
-    };
-
-    const embed = formatRollbarEmbed(event);
-
-    expect(embed).not.toBeNull();
-    expect(embed!.color).toBe(0xed4245); // red for failed
-    expect(embed!.title).toBe('Deploy to production');
-  });
-
-  it('formats a deploy event with started status as yellow', () => {
-    const event: RollbarEvent = {
-      event_name: 'deploy',
-      data: {
-        deploy: {
-          environment: 'staging',
-          status: 'started',
-          start_time: 1382656038,
-        },
-      },
-    };
-
-    const embed = formatRollbarEmbed(event);
-
-    expect(embed).not.toBeNull();
-    expect(embed!.color).toBe(0xfee75c); // yellow for started
-    expect(embed!.timestamp).toBe(new Date(1382656038 * 1000).toISOString());
-  });
-
-  it('formats a deploy event with missing optional fields gracefully', () => {
-    const event: RollbarEvent = {
-      event_name: 'deploy',
-      data: {
-        deploy: {},
-      },
-    };
-
-    const embed = formatRollbarEmbed(event);
-
-    expect(embed).not.toBeNull();
-    expect(embed!.title).toBe('Deploy to unknown');
-    expect(embed!.description).toBe('No comment provided');
-    expect(embed!.color).toBe(0x5865f2); // neutral blurple for unknown status
-    expect(embed!.fields).toEqual(
-      expect.arrayContaining([
-        { name: 'Environment', value: 'unknown', inline: true },
-        { name: 'Status', value: 'UNKNOWN', inline: true },
-      ]),
-    );
-  });
-
-  it('handles uppercase/mixed-case deploy status', () => {
-    const event: RollbarEvent = {
-      event_name: 'deploy',
-      data: {
-        deploy: {
-          environment: 'production',
-          status: 'SUCCEEDED',
-        },
-      },
-    };
-
-    const embed = formatRollbarEmbed(event);
-
-    expect(embed).not.toBeNull();
-    expect(embed!.color).toBe(0x57f287); // green for succeeded regardless of casing
+    expect(formatRollbarEmbed(event)).toBeNull();
   });
 
   it('truncates long titles', () => {
