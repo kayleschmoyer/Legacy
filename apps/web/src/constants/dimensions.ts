@@ -53,6 +53,13 @@ export const NAV_BUTTON_MIN_WIDTH = 120;
 export const TICKER_HEIGHT_PX = 32;
 
 /**
+ * Z-index for nav dropdown menus (e.g. PlayersDropdown, HelpDropdown).
+ * Sits just below NAV_Z_INDEX so dropdowns render above page content
+ * (CONTENT_STICKY_Z_INDEX) but do not overlap the nav bar itself.
+ */
+export const NAV_DROPDOWN_Z_INDEX = NAV_Z_INDEX - 1;
+
+/**
  * Z-index for the live scores ticker strip.
  * Must be below NAV_Z_INDEX so the nav bar always renders on top,
  * but above CONTENT_STICKY_Z_INDEX so the ticker overlays page content.

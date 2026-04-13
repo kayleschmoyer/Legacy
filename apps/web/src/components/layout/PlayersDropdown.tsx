@@ -16,6 +16,10 @@ import {
   Users,
 } from '@tamagui/lucide-icons';
 import { BRAND_NAVY_LIGHT } from '../../constants/colors';
+import {
+  NAV_BUTTON_MIN_WIDTH,
+  NAV_DROPDOWN_Z_INDEX,
+} from '../../constants/dimensions';
 
 const DropdownButton = styled(Button, {
   size: '$3',
@@ -24,7 +28,7 @@ const DropdownButton = styled(Button, {
   borderWidth: 0,
   borderRadius: '$10',
   paddingHorizontal: '$4',
-  minWidth: 100,
+  minWidth: NAV_BUTTON_MIN_WIDTH,
   hoverStyle: {
     backgroundColor: '$color3',
   },
@@ -185,7 +189,7 @@ export const PlayersDropdown: React.FC = () => {
           top="100%"
           left={0}
           marginTop="$2"
-          zIndex={100}
+          zIndex={NAV_DROPDOWN_Z_INDEX}
           role="menu"
           id={menuId}
           aria-labelledby={buttonId}
