@@ -3,6 +3,7 @@
  */
 
 import { PublicSchema } from '@legacy-sports/db-client';
+import { LOGGER } from '@legacy-sports/logging';
 import {
   generateMatchupRecap,
   type MatchupContext,
@@ -558,27 +559,39 @@ builder.objectType(MatchupPlayer, {
       description:
         'Number of games this player is expected to play in this matchup (SP uses spStartsPerMatchup, others use gamesPerMatchup)',
       resolve: async (matchupPlayer, _args, context) => {
-        const matchup = await context.loaders.matchupsById.load(
-          matchupPlayer.matchupId,
-        );
-        if (!matchup) return 0;
+        try {
+          const matchup = await context.loaders.matchupsById.load(
+            matchupPlayer.matchupId,
+          );
+          if (!matchup) return 0;
 
-        const gamesPerMatchup = matchup.gamesPerMatchup ?? 0;
+          const gamesPerMatchup = matchup.gamesPerMatchup ?? 0;
 
-        // If no position assigned or no spStarts setting, use full games
-        if (!matchupPlayer.positionId || matchup.spStartsPerMatchup == null) {
+          // If no position assigned or no spStarts setting, use full games
+          if (!matchupPlayer.positionId || matchup.spStartsPerMatchup == null) {
+            return gamesPerMatchup;
+          }
+
+          // Look up the position type to check if SP
+          const position = await context.loaders.leaguePositionById.load(
+            matchupPlayer.positionId,
+          );
+          if (position?.positionType === 'SP') {
+            return matchup.spStartsPerMatchup;
+          }
+
           return gamesPerMatchup;
+        } catch (err) {
+          LOGGER.error(
+            'Failed to resolve numberOfGames',
+            err instanceof Error ? err : new Error(String(err)),
+            {
+              matchupPlayerId: matchupPlayer.id,
+              matchupId: matchupPlayer.matchupId,
+            },
+          );
+          return 0;
         }
-
-        // Look up the position type to check if SP
-        const position = await context.loaders.leaguePositionById.load(
-          matchupPlayer.positionId,
-        );
-        if (position?.positionType === 'SP') {
-          return matchup.spStartsPerMatchup;
-        }
-
-        return gamesPerMatchup;
       },
     }),
     // Player details
@@ -586,7 +599,19 @@ builder.objectType(MatchupPlayer, {
       type: 'Player',
       nullable: true,
       resolve: async (matchupPlayer, _args, context) => {
-        return context.loaders.players.load(matchupPlayer.playerId);
+        try {
+          return await context.loaders.players.load(matchupPlayer.playerId);
+        } catch (err) {
+          LOGGER.error(
+            'Failed to resolve player',
+            err instanceof Error ? err : new Error(String(err)),
+            {
+              matchupPlayerId: matchupPlayer.id,
+              playerId: matchupPlayer.playerId,
+            },
+          );
+          return null;
+        }
       },
     }),
     // Season stats
@@ -595,8 +620,21 @@ builder.objectType(MatchupPlayer, {
       nullable: true,
       resolve: async (matchupPlayer, _args, context) => {
         if (!matchupPlayer.season) return null;
-        const key = `${matchupPlayer.playerId}-${matchupPlayer.season}`;
-        return context.loaders.seasonBatting.load(key);
+        try {
+          const key = `${matchupPlayer.playerId}-${matchupPlayer.season}`;
+          return await context.loaders.seasonBatting.load(key);
+        } catch (err) {
+          LOGGER.error(
+            'Failed to resolve seasonBatting',
+            err instanceof Error ? err : new Error(String(err)),
+            {
+              matchupPlayerId: matchupPlayer.id,
+              playerId: matchupPlayer.playerId,
+              season: matchupPlayer.season,
+            },
+          );
+          return null;
+        }
       },
     }),
     seasonPitching: t.field({
@@ -604,8 +642,21 @@ builder.objectType(MatchupPlayer, {
       nullable: true,
       resolve: async (matchupPlayer, _args, context) => {
         if (!matchupPlayer.season) return null;
-        const key = `${matchupPlayer.playerId}-${matchupPlayer.season}`;
-        return context.loaders.seasonPitching.load(key);
+        try {
+          const key = `${matchupPlayer.playerId}-${matchupPlayer.season}`;
+          return await context.loaders.seasonPitching.load(key);
+        } catch (err) {
+          LOGGER.error(
+            'Failed to resolve seasonPitching',
+            err instanceof Error ? err : new Error(String(err)),
+            {
+              matchupPlayerId: matchupPlayer.id,
+              playerId: matchupPlayer.playerId,
+              season: matchupPlayer.season,
+            },
+          );
+          return null;
+        }
       },
     }),
     seasonFielding: t.field({
@@ -613,8 +664,21 @@ builder.objectType(MatchupPlayer, {
       nullable: true,
       resolve: async (matchupPlayer, _args, context) => {
         if (!matchupPlayer.season) return null;
-        const key = `${matchupPlayer.playerId}-${matchupPlayer.season}`;
-        return context.loaders.seasonFielding.load(key);
+        try {
+          const key = `${matchupPlayer.playerId}-${matchupPlayer.season}`;
+          return await context.loaders.seasonFielding.load(key);
+        } catch (err) {
+          LOGGER.error(
+            'Failed to resolve seasonFielding',
+            err instanceof Error ? err : new Error(String(err)),
+            {
+              matchupPlayerId: matchupPlayer.id,
+              playerId: matchupPlayer.playerId,
+              season: matchupPlayer.season,
+            },
+          );
+          return null;
+        }
       },
     }),
 
@@ -622,7 +686,20 @@ builder.objectType(MatchupPlayer, {
     games: t.field({
       type: [MatchupPlayerGameRef],
       resolve: async (matchupPlayer, _args, context) => {
-        return context.loaders.matchupPlayerGames.load(matchupPlayer.id);
+        try {
+          return await context.loaders.matchupPlayerGames.load(
+            matchupPlayer.id,
+          );
+        } catch (err) {
+          LOGGER.error(
+            'Failed to resolve matchup player games',
+            err instanceof Error ? err : new Error(String(err)),
+            {
+              matchupPlayerId: matchupPlayer.id,
+            },
+          );
+          return [];
+        }
       },
     }),
   }),
@@ -660,22 +737,35 @@ MatchupPlayerGameRef.implement({
       resolve: async (game, _args, context) => {
         if (!game.gameIdentifier) return null;
 
-        // Use DataLoaders to resolve the 3-step chain (MP → matchup → season)
-        const mp = await context.loaders.matchupPlayersById.load(
-          game.matchupPlayerId,
-        );
-        if (!mp) return null;
+        try {
+          // Use DataLoaders to resolve the 3-step chain (MP → matchup → season)
+          const mp = await context.loaders.matchupPlayersById.load(
+            game.matchupPlayerId,
+          );
+          if (!mp) return null;
 
-        const matchup = await context.loaders.matchupsById.load(mp.matchupId);
-        if (!matchup) return null;
+          const matchup = await context.loaders.matchupsById.load(mp.matchupId);
+          if (!matchup) return null;
 
-        const seasonKey = `${matchup.leagueId}-${matchup.weekNumber}-${mp.playerId}`;
-        const season =
-          await context.loaders.leagueWeekPlayerSeasons.load(seasonKey);
-        if (season === null) return null;
+          const seasonKey = `${matchup.leagueId}-${matchup.weekNumber}-${mp.playerId}`;
+          const season =
+            await context.loaders.leagueWeekPlayerSeasons.load(seasonKey);
+          if (season === null) return null;
 
-        const statKey = `${mp.playerId}-${season}-${game.gameIdentifier}`;
-        return context.loaders.gameBatting.load(statKey);
+          const statKey = `${mp.playerId}-${season}-${game.gameIdentifier}`;
+          return await context.loaders.gameBatting.load(statKey);
+        } catch (err) {
+          LOGGER.error(
+            'Failed to resolve battingGame',
+            err instanceof Error ? err : new Error(String(err)),
+            {
+              matchupPlayerGameId: game.id,
+              matchupPlayerId: game.matchupPlayerId,
+              gameIdentifier: game.gameIdentifier,
+            },
+          );
+          return null;
+        }
       },
     }),
 
@@ -687,21 +777,34 @@ MatchupPlayerGameRef.implement({
         // (gameIdentifier will be null for skipped SP slots or unselected games)
         if (!game.gameIdentifier) return null;
 
-        const mp = await context.loaders.matchupPlayersById.load(
-          game.matchupPlayerId,
-        );
-        if (!mp) return null;
+        try {
+          const mp = await context.loaders.matchupPlayersById.load(
+            game.matchupPlayerId,
+          );
+          if (!mp) return null;
 
-        const matchup = await context.loaders.matchupsById.load(mp.matchupId);
-        if (!matchup) return null;
+          const matchup = await context.loaders.matchupsById.load(mp.matchupId);
+          if (!matchup) return null;
 
-        const seasonKey = `${matchup.leagueId}-${matchup.weekNumber}-${mp.playerId}`;
-        const season =
-          await context.loaders.leagueWeekPlayerSeasons.load(seasonKey);
-        if (season === null) return null;
+          const seasonKey = `${matchup.leagueId}-${matchup.weekNumber}-${mp.playerId}`;
+          const season =
+            await context.loaders.leagueWeekPlayerSeasons.load(seasonKey);
+          if (season === null) return null;
 
-        const statKey = `${mp.playerId}-${season}-${game.gameIdentifier}`;
-        return context.loaders.gamePitching.load(statKey);
+          const statKey = `${mp.playerId}-${season}-${game.gameIdentifier}`;
+          return await context.loaders.gamePitching.load(statKey);
+        } catch (err) {
+          LOGGER.error(
+            'Failed to resolve pitchingGame',
+            err instanceof Error ? err : new Error(String(err)),
+            {
+              matchupPlayerGameId: game.id,
+              matchupPlayerId: game.matchupPlayerId,
+              gameIdentifier: game.gameIdentifier,
+            },
+          );
+          return null;
+        }
       },
     }),
 
@@ -711,42 +814,55 @@ MatchupPlayerGameRef.implement({
       resolve: async (game, _args, context) => {
         if (!game.gameIdentifier) return null;
 
-        const mp = await context.loaders.matchupPlayersById.load(
-          game.matchupPlayerId,
-        );
-        if (!mp) return null;
+        try {
+          const mp = await context.loaders.matchupPlayersById.load(
+            game.matchupPlayerId,
+          );
+          if (!mp) return null;
 
-        const matchup = await context.loaders.matchupsById.load(mp.matchupId);
-        if (!matchup) return null;
+          const matchup = await context.loaders.matchupsById.load(mp.matchupId);
+          if (!matchup) return null;
 
-        const seasonKey = `${matchup.leagueId}-${matchup.weekNumber}-${mp.playerId}`;
-        const season =
-          await context.loaders.leagueWeekPlayerSeasons.load(seasonKey);
-        if (season === null) return null;
+          const seasonKey = `${matchup.leagueId}-${matchup.weekNumber}-${mp.playerId}`;
+          const season =
+            await context.loaders.leagueWeekPlayerSeasons.load(seasonKey);
+          if (season === null) return null;
 
-        // Use the raw game fielding loader; augment with fieldingGamePos after
-        const statKey = `${mp.playerId}-${season}-${game.gameIdentifier}`;
-        const fieldingStat = await context.loaders.gameFielding.load(statKey);
-        if (!fieldingStat) return null;
+          // Use the raw game fielding loader; augment with fieldingGamePos after
+          const statKey = `${mp.playerId}-${season}-${game.gameIdentifier}`;
+          const fieldingStat = await context.loaders.gameFielding.load(statKey);
+          if (!fieldingStat) return null;
 
-        // Map DB column names to the GraphQL GameFielding type shape
-        return {
-          playerId: fieldingStat.playerId,
-          season: fieldingStat.season,
-          gameNum: fieldingStat.gameNum,
-          gameIdentifier: fieldingStat.gameIdentifier,
-          pos: game.fieldingGamePos ?? 'UT',
-          g: null,
-          gs: null,
-          inn: fieldingStat.innDef,
-          po: fieldingStat.po,
-          a: fieldingStat.a,
-          e: fieldingStat.eDef,
-          dp: fieldingStat.dpDef,
-          pb: null,
-          sb: null,
-          cs: null,
-        };
+          // Map DB column names to the GraphQL GameFielding type shape
+          return {
+            playerId: fieldingStat.playerId,
+            season: fieldingStat.season,
+            gameNum: fieldingStat.gameNum,
+            gameIdentifier: fieldingStat.gameIdentifier,
+            pos: game.fieldingGamePos ?? 'UT',
+            g: null,
+            gs: null,
+            inn: fieldingStat.innDef,
+            po: fieldingStat.po,
+            a: fieldingStat.a,
+            e: fieldingStat.eDef,
+            dp: fieldingStat.dpDef,
+            pb: null,
+            sb: null,
+            cs: null,
+          };
+        } catch (err) {
+          LOGGER.error(
+            'Failed to resolve fieldingGame',
+            err instanceof Error ? err : new Error(String(err)),
+            {
+              matchupPlayerGameId: game.id,
+              matchupPlayerId: game.matchupPlayerId,
+              gameIdentifier: game.gameIdentifier,
+            },
+          );
+          return null;
+        }
       },
     }),
   }),
