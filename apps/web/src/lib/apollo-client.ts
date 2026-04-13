@@ -317,9 +317,139 @@ export const errorLink = new ErrorLink(({ error, operation, forward }) => {
   }
 });
 
+// ─── Apollo InMemoryCache type policies ──────────────────────────────────────
+// By default, Apollo derives a normalized cache ID from `__typename` plus
+// `id` (or `_id`) when those fields are present. Types without those fields
+// are typically embedded unless explicit keyFields are configured, which can
+// otherwise lead to "Cache data may be lost" warnings, incorrect identity,
+// and stale UI after mutations.
+//
+// Categories:
+//   keyFields: [...]   → entity with a non-standard or composite key
+//   keyFields: false    → not a normalizable entity (response wrapper,
+//                         aggregate, embedded object, or pagination type)
+// Types with an `id` field use Apollo's default and are omitted here.
+
+const typePolicies = {
+  // ── Entity types with non-standard identity ───────────────────────────
+
+  // Join table: one membership per (league, user)
+  LeagueMember: { keyFields: ['leagueId', 'userId'] },
+
+  // Badge catalog: unique by key string
+  BadgeDefinition: { keyFields: ['key'] },
+
+  // Career/season stat types are queried as nested player data and many
+  // operations do not select the fields needed to build stable cache IDs
+  // (e.g. GetPlayersWithStats omits playerId, TeamMember selects only
+  // games). Keep them embedded under the parent cache entry.
+  CareerBatting: { keyFields: false as const },
+  CareerFielding: { keyFields: false as const },
+  CareerPitching: { keyFields: false as const },
+  SeasonBatting: { keyFields: false as const },
+  SeasonFielding: { keyFields: false as const },
+  SeasonPitching: { keyFields: false as const },
+
+  // Game-level stats: per player per game (fielding adds position since a
+  // player can field multiple positions in one game)
+  GameBatting: { keyFields: ['playerId', 'gameIdentifier'] },
+  GameFielding: { keyFields: ['playerId', 'gameIdentifier', 'position'] },
+  GamePitching: { keyFields: ['playerId', 'gameIdentifier'] },
+
+  // League composite records
+  AllTimeRecord: {
+    keyFields: ['leagueId', 'recordType', 'teamId', 'seasonNumber'],
+  },
+  LeagueSeasonSummary: { keyFields: ['leagueId', 'seasonNumber'] },
+
+  // Draft-scoped singletons
+  AuctionState: { keyFields: ['draftId'] },
+  CurrentDraftPick: { keyFields: ['draftId'] },
+
+  // Head-to-head: unique per team pair
+  HeadToHeadRecord: { keyFields: ['team1Id', 'team2Id'] },
+
+  // Per-league contextual data
+  LeagueAnalytics: { keyFields: ['leagueId'] },
+  InviteCodeInfo: { keyFields: ['leagueId'] },
+  SeasonResults: { keyFields: ['leagueId', 'season'] },
+
+  // On-this-day entries: per player per game per entry type (batting/pitching)
+  OnThisDayEntry: { keyFields: ['playerId', 'gameIdentifier', 'entryType'] },
+
+  // ── Non-normalizable types (responses, aggregates, embedded) ──────────
+  // These have no stable identity and should not be cached as separate
+  // normalized entries. Setting keyFields: false stores them inline within
+  // the parent cache entry.
+
+  AdminRevenueStats: { keyFields: false as const },
+  AdvanceLeagueWeekResponse: { keyFields: false as const },
+  AppleVerifyResult: { keyFields: false as const },
+  AutoAdvanceMatchupsResult: { keyFields: false as const },
+  AutoProcessDraftPicksResult: { keyFields: false as const },
+  AutoSelectGamesResult: { keyFields: false as const },
+  AutoStartScheduledDraftsResult: { keyFields: false as const },
+  AuctionBudget: { keyFields: false as const },
+  AverageSeasonBatting: { keyFields: false as const },
+  BillingPortalSessionResult: { keyFields: false as const },
+  CareerAchievements: { keyFields: false as const },
+  CareerBattingConnection: { keyFields: false as const },
+  CareerBattingEdge: { keyFields: false as const },
+  CheckoutSessionResult: { keyFields: false as const },
+  CommissionerActionResult: { keyFields: false as const },
+  CreateLeagueAndTeamsPayload: { keyFields: false as const },
+  DisclosureClue: { keyFields: false as const },
+  DisclosureGuessResult: { keyFields: false as const },
+  DraftRecommendation: { keyFields: false as const },
+  DraftRecommendationStat: { keyFields: false as const },
+  DraftTeamAutoPickStatus: { keyFields: false as const },
+  DraftTeamOrderEntry: { keyFields: false as const },
+  EvaluateBadgesResult: { keyFields: false as const },
+  GiveUpDisclosureGameResult: { keyFields: false as const },
+  GoogleVerifyResult: { keyFields: false as const },
+  ImpersonateUserResult: { keyFields: false as const },
+  JoinLeaguePayload: { keyFields: false as const },
+  MatchupMessageConnection: { keyFields: false as const },
+  MatchupRecap: { keyFields: false as const },
+  MatchupStatusCounts: { keyFields: false as const },
+  MergeAccountsResult: { keyFields: false as const },
+  MockDraftInit: { keyFields: false as const },
+  PageInfo: { keyFields: false as const },
+  PlayerScoring: { keyFields: false as const },
+  PlayoffProjection: { keyFields: false as const },
+  PlayoffQualification: { keyFields: false as const },
+  PowerRanking: { keyFields: false as const },
+  PrivacyPolicyStatus: { keyFields: false as const },
+  ProcessWaiverClaimsResult: { keyFields: false as const },
+  RecalculateMatchupScoresResult: { keyFields: false as const },
+  // ScoringConfig is fetched per league but the query doesn't select
+  // leagueId, so it cannot be normalized by composite key.
+  ScoringConfig: { keyFields: false as const },
+  Scoreboard: { keyFields: false as const },
+  ScoreboardGame: { keyFields: false as const },
+  ScoreboardTeam: { keyFields: false as const },
+  ScoringMultiplierEntry: { keyFields: false as const },
+  ScoringRule: { keyFields: false as const },
+  ScoringRuleGroup: { keyFields: false as const },
+  SeasonDraftGamePickHistory: { keyFields: false as const },
+  SeasonDraftPick: { keyFields: false as const },
+  SendDiscordLineupRemindersResult: { keyFields: false as const },
+  SendDiscordScoreAlertsResult: { keyFields: false as const },
+  SendDiscordWeeklyRecapsResult: { keyFields: false as const },
+  SendDuesRemindersResult: { keyFields: false as const },
+  StartDisclosureGameResult: { keyFields: false as const },
+  SubscriberGrowthPoint: { keyFields: false as const },
+  SubscriptionInfo: { keyFields: false as const },
+  SubscriptionStatusCount: { keyFields: false as const },
+  TeamStanding: { keyFields: false as const },
+  TeamStatistics: { keyFields: false as const },
+  UserDataExport: { keyFields: false as const },
+  VersionInfo: { keyFields: false as const },
+} as const;
+
 export const apolloClient = new ApolloClient({
   link: from([retryLink, errorLink, authLink, httpLink]),
-  cache: new InMemoryCache(),
+  cache: new InMemoryCache({ typePolicies }),
   defaultOptions: {
     watchQuery: {
       errorPolicy: 'all',
