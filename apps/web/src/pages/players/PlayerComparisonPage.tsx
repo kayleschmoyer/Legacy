@@ -52,6 +52,10 @@ interface SelectedPlayer {
 // Up to 4 player slots
 const MAX_PLAYERS = 4;
 
+// Typography
+const FONT_DISPLAY = "'Big Shoulders Display', sans-serif";
+const FONT_BODY = "'Literata', serif";
+
 // Accent palette for each player column
 const PLAYER_ACCENTS = [BRAND_GOLD, '#60A5FA', '#34D399', '#F87171'] as const;
 
@@ -115,11 +119,22 @@ function StatCell({
         fontSize="$3"
         fontWeight={isBest ? '700' : '400'}
         color={isBest ? accentColor : WHITE}
+        style={{ fontVariantNumeric: 'tabular-nums' }}
       >
         {value}
       </Text>
       {isBest && (
-        <Text fontSize="$1" color={accentColor} fontWeight="600" marginTop={1}>
+        <Text
+          fontSize={11}
+          color={accentColor}
+          fontWeight="700"
+          marginTop={2}
+          style={{
+            fontFamily: FONT_DISPLAY,
+            letterSpacing: 0.5,
+            textTransform: 'uppercase',
+          }}
+        >
           ▲ best
         </Text>
       )}
@@ -143,18 +158,24 @@ function ComparisonRow({
   return (
     <XStack
       borderBottomWidth={1}
-      borderBottomColor={withAlpha(BRAND_NAVY_LIGHT, 0.18)}
+      borderBottomColor={withAlpha(BRAND_NAVY_LIGHT, 0.12)}
       paddingVertical="$1"
       paddingHorizontal="$3"
+      hoverStyle={{ backgroundColor: withAlpha(BRAND_NAVY_LIGHT, 0.06) }}
     >
       {/* Stat label */}
       <YStack
-        width={130}
+        width={140}
         justifyContent="center"
         paddingVertical="$2"
         flexShrink={0}
       >
-        <Text fontSize="$2" color={TEXT_MUTED} fontWeight="600">
+        <Text
+          fontSize={14}
+          color={TEXT_MUTED}
+          fontWeight="400"
+          style={{ fontFamily: FONT_BODY }}
+        >
           {label}
         </Text>
       </YStack>
@@ -177,28 +198,39 @@ function ComparisonHeader({ players }: { players: SelectedPlayer[] }) {
   return (
     <XStack
       paddingHorizontal="$3"
-      paddingVertical="$3"
+      paddingVertical="$4"
       backgroundColor={withAlpha(BRAND_NAVY_DARK, 0.6)}
       borderTopLeftRadius="$4"
       borderTopRightRadius="$4"
+      borderBottomWidth={1}
+      borderBottomColor={withAlpha(BRAND_NAVY_LIGHT, 0.2)}
     >
       {/* Spacer for label column */}
-      <YStack width={130} flexShrink={0} />
+      <YStack width={140} flexShrink={0} />
       {players.map((p, i) => (
-        <YStack key={p.id} flex={1} alignItems="center" gap="$1">
+        <YStack key={p.id} flex={1} alignItems="center" gap={4}>
           <Text
-            fontSize="$3"
+            fontSize={16}
             fontWeight="700"
             color={PLAYER_ACCENTS[i] ?? BRAND_GOLD}
             textAlign="center"
             numberOfLines={2}
+            style={{
+              fontFamily: FONT_DISPLAY,
+              letterSpacing: 0.5,
+            }}
           >
             {p.name}
           </Text>
           <Text
-            fontSize="$1"
+            fontSize={11}
             color={withAlpha(PLAYER_ACCENTS[i] ?? BRAND_GOLD, 0.7)}
             fontWeight="600"
+            style={{
+              fontFamily: FONT_DISPLAY,
+              letterSpacing: 1,
+              textTransform: 'uppercase',
+            }}
           >
             {p.position}
           </Text>
@@ -213,10 +245,22 @@ function SectionHeader({ title }: { title: string }) {
   return (
     <XStack
       paddingHorizontal="$3"
-      paddingVertical="$2"
-      backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.12)}
+      paddingVertical={10}
+      backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.1)}
+      alignItems="center"
+      borderTopWidth={1}
+      borderTopColor={withAlpha(BRAND_NAVY_LIGHT, 0.15)}
     >
-      <Text fontSize="$2" fontWeight="700" color={BRAND_GOLD_LIGHT}>
+      <Text
+        fontSize={13}
+        fontWeight="700"
+        color={BRAND_GOLD_LIGHT}
+        style={{
+          fontFamily: FONT_DISPLAY,
+          letterSpacing: 1.5,
+          textTransform: 'uppercase',
+        }}
+      >
         {title}
       </Text>
     </XStack>
@@ -355,16 +399,30 @@ function PlayerSearchInput({
                 gap="$3"
               >
                 <YStack flex={1}>
-                  <Text fontSize="$3" color={WHITE} fontWeight="600">
+                  <Text
+                    fontSize="$3"
+                    color={WHITE}
+                    fontWeight="600"
+                    style={{ fontFamily: FONT_DISPLAY, letterSpacing: 0.3 }}
+                  >
                     {name}
                   </Text>
-                  <Text fontSize="$2" color={TEXT_MUTED}>
+                  <Text
+                    fontSize="$2"
+                    color={TEXT_MUTED}
+                    style={{ fontFamily: FONT_BODY }}
+                  >
                     {pos}
                   </Text>
                 </YStack>
                 {p.scoring?.avgPointsPerGame != null && (
                   <YStack alignItems="flex-end">
-                    <Text fontSize="$2" color={BRAND_GOLD} fontWeight="700">
+                    <Text
+                      fontSize="$2"
+                      color={BRAND_GOLD}
+                      fontWeight="700"
+                      style={{ fontVariantNumeric: 'tabular-nums' }}
+                    >
                       {p.scoring.avgPointsPerGame.toFixed(1)} pts/g
                     </Text>
                   </YStack>
@@ -411,10 +469,24 @@ function PlayerChip({
         backgroundColor={accent}
       />
       <YStack flex={1}>
-        <Text fontSize="$3" color={WHITE} fontWeight="600" numberOfLines={1}>
+        <Text
+          fontSize="$3"
+          color={WHITE}
+          fontWeight="600"
+          numberOfLines={1}
+          style={{ fontFamily: FONT_DISPLAY, letterSpacing: 0.3 }}
+        >
           {player.name}
         </Text>
-        <Text fontSize="$2" color={withAlpha(accent, 0.8)}>
+        <Text
+          fontSize={11}
+          color={withAlpha(accent, 0.8)}
+          style={{
+            fontFamily: FONT_DISPLAY,
+            letterSpacing: 1,
+            textTransform: 'uppercase',
+          }}
+        >
           {player.position}
         </Text>
       </YStack>
@@ -466,7 +538,12 @@ function SeasonBattingTable({
 
   return (
     <YStack marginBottom="$4">
-      <H4 color={accent} fontSize="$4" marginBottom="$2">
+      <H4
+        color={accent}
+        fontSize="$4"
+        marginBottom="$2"
+        style={{ fontFamily: FONT_DISPLAY, letterSpacing: 0.5 }}
+      >
         {name} — Batting by Season
       </H4>
       <YStack
@@ -495,6 +572,10 @@ function SeasonBattingTable({
                 fontWeight="700"
                 color={BRAND_GOLD_LIGHT}
                 textAlign={h === 'Year' ? 'left' : 'center'}
+                style={{
+                  fontFamily: FONT_DISPLAY,
+                  letterSpacing: 1,
+                }}
               >
                 {h}
               </Text>
@@ -537,6 +618,7 @@ function SeasonBattingTable({
                 fontWeight={ci === 0 ? '600' : '400'}
                 color={ci === 0 ? accent : WHITE}
                 textAlign={ci === 0 ? 'left' : 'center'}
+                style={{ fontVariantNumeric: 'tabular-nums' }}
               >
                 {val}
               </Text>
@@ -570,7 +652,12 @@ function SeasonPitchingTable({
 
   return (
     <YStack marginBottom="$4">
-      <H4 color={accent} fontSize="$4" marginBottom="$2">
+      <H4
+        color={accent}
+        fontSize="$4"
+        marginBottom="$2"
+        style={{ fontFamily: FONT_DISPLAY, letterSpacing: 0.5 }}
+      >
         {name} — Pitching by Season
       </H4>
       <YStack
@@ -597,6 +684,10 @@ function SeasonPitchingTable({
               fontWeight="700"
               color={BRAND_GOLD_LIGHT}
               textAlign={h === 'Year' ? 'left' : 'center'}
+              style={{
+                fontFamily: FONT_DISPLAY,
+                letterSpacing: 1,
+              }}
             >
               {h}
             </Text>
@@ -638,6 +729,7 @@ function SeasonPitchingTable({
                 fontWeight={ci === 0 ? '600' : '400'}
                 color={ci === 0 ? accent : WHITE}
                 textAlign={ci === 0 ? 'left' : 'center'}
+                style={{ fontVariantNumeric: 'tabular-nums' }}
               >
                 {val}
               </Text>
@@ -885,10 +977,23 @@ export function PlayerComparisonPage() {
             <XStack alignItems="center" gap="$3" paddingTop="$2">
               <BarChart2 size={28} color={BRAND_GOLD} />
               <YStack>
-                <H2 color={WHITE} fontSize="$8" fontWeight="700" margin={0}>
+                <H2
+                  color={WHITE}
+                  fontSize={28}
+                  fontWeight="700"
+                  margin={0}
+                  style={{
+                    fontFamily: FONT_DISPLAY,
+                    letterSpacing: 1,
+                  }}
+                >
                   Player Comparison
                 </H2>
-                <Text color={TEXT_MUTED} fontSize="$3">
+                <Text
+                  color={TEXT_MUTED}
+                  fontSize={14}
+                  style={{ fontFamily: FONT_BODY }}
+                >
                   Compare up to 4 players side-by-side — career stats, scoring
                   projections, and season breakdowns.
                 </Text>
@@ -899,7 +1004,16 @@ export function PlayerComparisonPage() {
 
             {/* ── Player selection ── */}
             <YStack gap="$3">
-              <Text color={BRAND_GOLD_LIGHT} fontWeight="700" fontSize="$4">
+              <Text
+                color={BRAND_GOLD_LIGHT}
+                fontWeight="700"
+                fontSize={14}
+                style={{
+                  fontFamily: FONT_DISPLAY,
+                  letterSpacing: 1.5,
+                  textTransform: 'uppercase',
+                }}
+              >
                 Select Players ({activePlayers.length}/{MAX_PLAYERS})
               </Text>
 
@@ -946,7 +1060,7 @@ export function PlayerComparisonPage() {
                   <ComparisonHeader players={activePlayers} />
 
                   {/* Fantasy Scoring Projections */}
-                  <SectionHeader title="⚡ Fantasy Scoring Projections" />
+                  <SectionHeader title="Fantasy Scoring Projections" />
                   {scoringRows.map((row) => (
                     <ComparisonRow
                       key={row.label}
@@ -958,7 +1072,7 @@ export function PlayerComparisonPage() {
                   ))}
 
                   {/* Career Batting */}
-                  <SectionHeader title="🏏 Career Batting" />
+                  <SectionHeader title="Career Batting" />
                   {careerBattingRows.map((row) => (
                     <ComparisonRow
                       key={row.label}
@@ -972,7 +1086,7 @@ export function PlayerComparisonPage() {
                   {/* Career Pitching (if any player is a pitcher) */}
                   {careerPitchingRows.length > 0 && (
                     <>
-                      <SectionHeader title="⚾ Career Pitching" />
+                      <SectionHeader title="Career Pitching" />
                       {careerPitchingRows.map((row) => (
                         <ComparisonRow
                           key={row.label}
@@ -986,7 +1100,7 @@ export function PlayerComparisonPage() {
                   )}
 
                   {/* Achievements */}
-                  <SectionHeader title="🏆 Career Achievements" />
+                  <SectionHeader title="Career Achievements" />
                   {achievementRows.map((row) => (
                     <ComparisonRow
                       key={row.label}
@@ -1000,7 +1114,15 @@ export function PlayerComparisonPage() {
 
                 {/* ── Season-by-season breakdown ── */}
                 <YStack gap="$2">
-                  <H3 color={WHITE} fontSize="$6" fontWeight="700">
+                  <H3
+                    color={WHITE}
+                    fontSize={22}
+                    fontWeight="700"
+                    style={{
+                      fontFamily: FONT_DISPLAY,
+                      letterSpacing: 1,
+                    }}
+                  >
                     Season-by-Season Breakdown
                   </H3>
                   <Separator borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.2)} />
@@ -1024,10 +1146,26 @@ export function PlayerComparisonPage() {
                             borderRadius={6}
                             backgroundColor={accent}
                           />
-                          <Text fontSize="$5" fontWeight="700" color={accent}>
+                          <Text
+                            fontSize={18}
+                            fontWeight="700"
+                            color={accent}
+                            style={{
+                              fontFamily: FONT_DISPLAY,
+                              letterSpacing: 0.5,
+                            }}
+                          >
                             {player.name}
                           </Text>
-                          <Text fontSize="$3" color={TEXT_MUTED}>
+                          <Text
+                            fontSize="$3"
+                            color={TEXT_MUTED}
+                            style={{
+                              fontFamily: FONT_DISPLAY,
+                              letterSpacing: 1,
+                              textTransform: 'uppercase',
+                            }}
+                          >
                             {player.position}
                           </Text>
                         </XStack>
@@ -1065,13 +1203,22 @@ export function PlayerComparisonPage() {
               >
                 <BarChart2 size={48} color={withAlpha(BRAND_GOLD, 0.4)} />
                 <YStack alignItems="center" gap="$2">
-                  <Text fontSize="$5" color={TEXT_MUTED} fontWeight="600">
+                  <Text
+                    fontSize={18}
+                    color={TEXT_MUTED}
+                    fontWeight="600"
+                    style={{
+                      fontFamily: FONT_DISPLAY,
+                      letterSpacing: 0.5,
+                    }}
+                  >
                     No players selected
                   </Text>
                   <Text
-                    fontSize="$3"
+                    fontSize={14}
                     color={withAlpha(TEXT_MUTED, 0.6)}
                     textAlign="center"
+                    style={{ fontFamily: FONT_BODY }}
                   >
                     Search for players above to start comparing side-by-side.
                     {'\n'}Great for draft preparation and free agent evaluation.
