@@ -11,6 +11,10 @@
 import * as React from 'react';
 import { LOGGER } from '@legacy-sports/logging';
 import {
+  computeScoring,
+  DEFAULT_BATTING_SCORING,
+} from '@legacy-sports/scoring';
+import {
   CareerBattingFragment,
   GetAllPlayers,
   GetCareerBattingStats,
@@ -105,6 +109,10 @@ export interface PlayerCareerStats {
   readonly formattedOPS: string;
   /** Approximate offensive WAR (lWAR) — computed server-side from counting stats */
   readonly offensiveWAR: number | null;
+  /** Fantasy points (batting) computed using default scoring settings */
+  readonly fantasyPoints: number;
+  /** Fantasy points per game using default scoring settings */
+  readonly fantasyPointsPerGame: number;
   // Fielding statistics
   readonly fieldingGames?: number;
   readonly fieldingPercentage?: number;
@@ -273,6 +281,22 @@ export function transformCareerStats(
   const lastName = playerData?.lastName ?? '';
   const displayName = `${firstName} ${lastName}`.trim() || `Player ${playerId}`;
 
+  // Compute fantasy points using the canonical scoring function and default settings.
+  const battingRecord = {
+    h: hits,
+    doubles,
+    triples,
+    hr: homeRuns,
+    r: runs,
+    rbi,
+    sb: stolenBases,
+    cs: caughtStealing,
+    hbp: hitByPitch,
+    so: strikeouts,
+  };
+  const fantasyPoints = computeScoring(battingRecord, DEFAULT_BATTING_SCORING);
+  const fantasyPointsPerGame = games > 0 ? fantasyPoints / games : 0;
+
   return {
     id: `player-${playerId}`,
     playerId,
@@ -307,6 +331,8 @@ export function transformCareerStats(
     formattedSluggingPercentage: formatStatistic(sluggingPercentage),
     formattedOPS: formatStatistic(ops),
     offensiveWAR: rawStats.offensiveWAR ?? null,
+    fantasyPoints,
+    fantasyPointsPerGame,
     // Parse positions played from the new field
     positionsPlayed: parsePositionsPlayed(rawStats.positionsPlayed),
     formattedPositions: formatPositionsPlayed(rawStats.positionsPlayed),

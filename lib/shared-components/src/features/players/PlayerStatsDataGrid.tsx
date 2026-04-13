@@ -284,6 +284,28 @@ export const CAREER_STATS_COLUMNS: readonly GridColumn[] = [
     description: 'On-base plus slugging',
   },
   {
+    key: 'fantasyPoints',
+    label: 'FPTS',
+    sortable: false,
+    width: '80px',
+    align: 'center',
+    priority: 'high',
+    description: 'Career fantasy points using default scoring settings',
+    formatter: (v: unknown) =>
+      v != null ? Math.round(v as number).toLocaleString() : '—',
+  },
+  {
+    key: 'fantasyPointsPerGame',
+    label: 'FPTS/G',
+    sortable: false,
+    width: '80px',
+    align: 'center',
+    priority: 'high',
+    description:
+      'Average fantasy points per game using default scoring settings',
+    formatter: (v: unknown) => (v != null ? (v as number).toFixed(1) : '—'),
+  },
+  {
     key: 'offensiveWAR',
     label: 'oWAR',
     sortable: true,
