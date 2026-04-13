@@ -619,7 +619,11 @@ function SeasonPitchingTable({
               String(r?.games ?? '—'),
               String(r?.wins ?? '—'),
               String(r?.losses ?? '—'),
-              r?.earnedRunAverage ?? '—',
+              (() => {
+                if (r?.earnedRunAverage == null) return '—';
+                const n = parseFloat(r.earnedRunAverage);
+                return Number.isFinite(n) ? n.toFixed(2) : '—';
+              })(),
               r?.inningsPitched != null ? r.inningsPitched.toFixed(1) : '—',
               String(r?.strikeouts ?? '—'),
               String(r?.baseOnBalls ?? '—'),
@@ -785,7 +789,11 @@ export function PlayerComparisonPage() {
     const eraRows = activePlayers.map(
       (p) => p.summary.careerPitching?.era ?? null,
     );
-    const eraRowNums = eraRows.map((s) => (s ? parseFloat(s) : null));
+    const eraRowNums = eraRows.map((s) => {
+      if (!s) return null;
+      const n = parseFloat(s);
+      return Number.isFinite(n) ? n : null;
+    });
 
     return [
       ...defs.map(([label, lowerIsBetter, extractor]) => {
@@ -800,7 +808,7 @@ export function PlayerComparisonPage() {
       {
         label: 'ERA',
         lowerIsBetter: true,
-        vals: eraRows.map((s) => s ?? '—'),
+        vals: eraRowNums.map((n) => (n != null ? n.toFixed(2) : '—')),
         nums: eraRowNums,
       },
     ];
