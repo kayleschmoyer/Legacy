@@ -831,3 +831,87 @@ export const leagueSeasonAwards = pgTable(
     };
   },
 );
+
+/**
+ * Voting periods for season awards.
+ *
+ * When a commissioner opens voting for a season, a row is created with
+ * status='open' and the selected award types. Closing voting sets
+ * status='closed' and closed_at. One voting period per league per season.
+ */
+export const leagueAwardVotingPeriods = pgTable(
+  'league_award_voting_periods',
+  {
+    id: serial('id').primaryKey().notNull(),
+    leagueId: integer('league_id').notNull(),
+    season: integer('season').notNull(),
+    status: varchar('status', { length: 20 }).notNull().default('open'),
+    awardTypes: jsonb('award_types').notNull().$type<string[]>().default([]),
+    openedAt: timestamp('opened_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    closedAt: timestamp('closed_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => {
+    return {
+      lavpLeagueFk: foreignKey({
+        columns: [table.leagueId],
+        foreignColumns: [leagues.id],
+        name: 'league_award_voting_periods_league_fk',
+      }).onDelete('cascade'),
+      lavpUk: unique('league_award_voting_periods_uk').on(
+        table.leagueId,
+        table.season,
+      ),
+    };
+  },
+);
+
+/**
+ * Individual anonymous votes for season awards.
+ *
+ * Each league member can cast one vote per award type per season.
+ * The voter_user_id is stored for uniqueness enforcement but is never
+ * exposed to other users (anonymous voting).
+ */
+export const leagueSeasonAwardVotes = pgTable(
+  'league_season_award_votes',
+  {
+    id: serial('id').primaryKey().notNull(),
+    leagueId: integer('league_id').notNull(),
+    season: integer('season').notNull(),
+    awardType: varchar('award_type', { length: 50 }).notNull(),
+    voterUserId: integer('voter_user_id').notNull(),
+    playerId: integer('player_id').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => {
+    return {
+      lsavLeagueFk: foreignKey({
+        columns: [table.leagueId],
+        foreignColumns: [leagues.id],
+        name: 'league_season_award_votes_league_fk',
+      }).onDelete('cascade'),
+      lsavUk: unique('league_season_award_votes_uk').on(
+        table.leagueId,
+        table.season,
+        table.awardType,
+        table.voterUserId,
+      ),
+      lsavLeagueSeasonIdx: index(
+        'league_season_award_votes_league_season_idx',
+      ).on(table.leagueId, table.season),
+    };
+  },
+);

@@ -17,12 +17,16 @@ describe('season-awards resolver', () => {
     where: jest.Mock;
     innerJoin: jest.Mock;
     orderBy: jest.Mock;
+    groupBy: jest.Mock;
     limit: jest.Mock;
     insert: jest.Mock;
     values: jest.Mock;
     onConflictDoUpdate: jest.Mock;
     returning: jest.Mock;
     delete: jest.Mock;
+    update: jest.Mock;
+    set: jest.Mock;
+    transaction: jest.Mock;
     then: jest.Mock;
   };
   let mockContext: {
@@ -39,12 +43,18 @@ describe('season-awards resolver', () => {
       where: jest.fn().mockReturnThis(),
       innerJoin: jest.fn().mockReturnThis(),
       orderBy: jest.fn().mockReturnThis(),
+      groupBy: jest.fn().mockReturnThis(),
       limit: jest.fn().mockReturnThis(),
       insert: jest.fn().mockReturnThis(),
       values: jest.fn().mockReturnThis(),
       onConflictDoUpdate: jest.fn().mockReturnThis(),
       returning: jest.fn().mockReturnThis(),
       delete: jest.fn().mockReturnThis(),
+      update: jest.fn().mockReturnThis(),
+      set: jest.fn().mockReturnThis(),
+      // Default: transaction calls the callback with mockDb itself as tx
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      transaction: jest.fn((fn: (tx: any) => Promise<unknown>) => fn(mockDb)),
       // Make the mock thenable - used when no explicit terminal call (e.g. orderBy is last)
       then: jest.fn((resolve) => resolve([])),
     };
@@ -137,6 +147,27 @@ describe('season-awards resolver', () => {
           occurredAt: 'occurredAt',
         },
         leagueActivityEventType: { enumValues: [] },
+        leagueAwardVotingPeriods: {
+          id: 'id',
+          leagueId: 'leagueId',
+          season: 'season',
+          status: 'status',
+          awardTypes: 'awardTypes',
+          openedAt: 'openedAt',
+          closedAt: 'closedAt',
+          createdAt: 'createdAt',
+          updatedAt: 'updatedAt',
+        },
+        leagueSeasonAwardVotes: {
+          id: 'id',
+          leagueId: 'leagueId',
+          season: 'season',
+          awardType: 'awardType',
+          voterUserId: 'voterUserId',
+          playerId: 'playerId',
+          createdAt: 'createdAt',
+          updatedAt: 'updatedAt',
+        },
       },
       InternalSchema: {
         usersInAppInternal: {
@@ -484,6 +515,677 @@ describe('season-awards resolver', () => {
 
       expect(result).toBe(true);
       expect(mockDb.delete).toHaveBeenCalled();
+    });
+  });
+
+  // ── awardVotingPeriod query ────────────────────────────────────────────────
+
+  describe('awardVotingPeriod query', () => {
+    function getResolver() {
+      const queryType = schema.getQueryType();
+      const field = queryType?.getFields().awardVotingPeriod;
+      if (!field?.resolve)
+        throw new Error('awardVotingPeriod resolver not found');
+      return field.resolve.bind(field);
+    }
+
+    it('throws UNAUTHENTICATED when no user is in context', async () => {
+      mockContext.user = null;
+
+      await expect(
+        getResolver()(
+          {},
+          { leagueId: 1, season: 2024 },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({ extensions: { code: 'UNAUTHENTICATED' } });
+    });
+
+    it('throws FORBIDDEN when user is not a league member', async () => {
+      mockDb.limit.mockResolvedValueOnce([]); // verifyLeagueMembership → not a member
+
+      await expect(
+        getResolver()(
+          {},
+          { leagueId: 1, season: 2024 },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({ extensions: { code: 'FORBIDDEN' } });
+    });
+
+    it('returns null when no voting period exists', async () => {
+      mockDb.limit
+        .mockResolvedValueOnce([
+          { leagueId: 1, userId: 1, teamId: null, permissionLevel: 'member' },
+        ]) // membership check
+        .mockResolvedValueOnce([]); // no voting period
+
+      const result = await getResolver()(
+        {},
+        { leagueId: 1, season: 2024 },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(result).toBeNull();
+    });
+
+    it('returns the voting period when one exists', async () => {
+      const now = new Date('2024-06-01T00:00:00Z');
+      mockDb.limit
+        .mockResolvedValueOnce([
+          { leagueId: 1, userId: 1, teamId: null, permissionLevel: 'member' },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: 1,
+            leagueId: 1,
+            season: 2024,
+            status: 'open',
+            awardTypes: ['mvp', 'cy_young'],
+            openedAt: now.toISOString(),
+            closedAt: null,
+          },
+        ]);
+
+      const result = await getResolver()(
+        {},
+        { leagueId: 1, season: 2024 },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(result).toMatchObject({ id: 1, status: 'open', season: 2024 });
+    });
+  });
+
+  // ── openAwardVoting mutation ───────────────────────────────────────────────
+
+  describe('openAwardVoting mutation', () => {
+    function getResolver() {
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().openAwardVoting;
+      if (!field?.resolve)
+        throw new Error('openAwardVoting resolver not found');
+      return field.resolve.bind(field);
+    }
+
+    it('throws UNAUTHENTICATED when no user is in context', async () => {
+      mockContext.user = null;
+
+      await expect(
+        getResolver()(
+          {},
+          { leagueId: 1, season: 2024, awardTypes: ['mvp'] },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({ extensions: { code: 'UNAUTHENTICATED' } });
+    });
+
+    it('throws FORBIDDEN when user is not a commissioner', async () => {
+      mockDb.limit.mockResolvedValueOnce([
+        { leagueId: 1, userId: 1, teamId: null, permissionLevel: 'member' },
+      ]);
+
+      await expect(
+        getResolver()(
+          {},
+          { leagueId: 1, season: 2024, awardTypes: ['mvp'] },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({ extensions: { code: 'FORBIDDEN' } });
+    });
+
+    it('throws UserInputError for an invalid awardType', async () => {
+      mockDb.limit.mockResolvedValueOnce([
+        {
+          leagueId: 1,
+          userId: 1,
+          teamId: null,
+          permissionLevel: 'commissioner',
+        },
+      ]);
+
+      await expect(
+        getResolver()(
+          {},
+          { leagueId: 1, season: 2024, awardTypes: ['invalid_award'] },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow(/Invalid awardType/);
+    });
+
+    it('throws UserInputError when no awardTypes are provided', async () => {
+      mockDb.limit.mockResolvedValueOnce([
+        {
+          leagueId: 1,
+          userId: 1,
+          teamId: null,
+          permissionLevel: 'commissioner',
+        },
+      ]);
+
+      await expect(
+        getResolver()(
+          {},
+          { leagueId: 1, season: 2024, awardTypes: [] },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow(/At least one award type/);
+    });
+
+    it('opens a voting period and returns it for a commissioner', async () => {
+      const now = new Date('2024-06-01T00:00:00Z');
+      const row = {
+        id: 1,
+        leagueId: 1,
+        season: 2024,
+        status: 'open',
+        awardTypes: ['mvp', 'cy_young'],
+        openedAt: now.toISOString(),
+        closedAt: null,
+      };
+
+      mockDb.limit.mockResolvedValueOnce([
+        {
+          leagueId: 1,
+          userId: 1,
+          teamId: null,
+          permissionLevel: 'commissioner',
+        },
+      ]);
+      mockDb.returning.mockResolvedValueOnce([row]);
+
+      const result = (await getResolver()(
+        {},
+        { leagueId: 1, season: 2024, awardTypes: ['mvp', 'cy_young'] },
+        mockContext,
+        undefined as never,
+      )) as { id: number; status: string; awardTypes: string[] };
+
+      expect(result.id).toBe(1);
+      expect(result.status).toBe('open');
+      expect(result.awardTypes).toEqual(['mvp', 'cy_young']);
+      expect(mockDb.insert).toHaveBeenCalled();
+    });
+  });
+
+  // ── castAwardVote mutation ─────────────────────────────────────────────────
+
+  describe('castAwardVote mutation', () => {
+    function getResolver() {
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().castAwardVote;
+      if (!field?.resolve) throw new Error('castAwardVote resolver not found');
+      return field.resolve.bind(field);
+    }
+
+    it('throws UNAUTHENTICATED when no user is in context', async () => {
+      mockContext.user = null;
+
+      await expect(
+        getResolver()(
+          {},
+          { leagueId: 1, season: 2024, awardType: 'mvp', playerId: 42 },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({ extensions: { code: 'UNAUTHENTICATED' } });
+    });
+
+    it('throws FORBIDDEN when user is not a league member', async () => {
+      mockDb.limit.mockResolvedValueOnce([]); // not a member
+
+      await expect(
+        getResolver()(
+          {},
+          { leagueId: 1, season: 2024, awardType: 'mvp', playerId: 42 },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({ extensions: { code: 'FORBIDDEN' } });
+    });
+
+    it('throws UserInputError for an invalid awardType', async () => {
+      mockDb.limit.mockResolvedValueOnce([
+        { leagueId: 1, userId: 1, teamId: null, permissionLevel: 'member' },
+      ]);
+
+      await expect(
+        getResolver()(
+          {},
+          { leagueId: 1, season: 2024, awardType: 'invalid', playerId: 42 },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow(/Invalid awardType/);
+    });
+
+    it('throws UserInputError when the player does not exist', async () => {
+      mockDb.limit
+        .mockResolvedValueOnce([
+          { leagueId: 1, userId: 1, teamId: null, permissionLevel: 'member' },
+        ])
+        .mockResolvedValueOnce([]); // player not found
+
+      await expect(
+        getResolver()(
+          {},
+          { leagueId: 1, season: 2024, awardType: 'mvp', playerId: 9999 },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow(/does not exist/);
+    });
+
+    it('casts a vote successfully and returns true', async () => {
+      mockDb.limit
+        .mockResolvedValueOnce([
+          { leagueId: 1, userId: 1, teamId: null, permissionLevel: 'member' },
+        ])
+        .mockResolvedValueOnce([{ id: 42 }]) // player exists
+        .mockResolvedValueOnce([
+          { id: 5, status: 'open', awardTypes: ['mvp'] },
+        ]); // voting period open
+
+      const result = await getResolver()(
+        {},
+        { leagueId: 1, season: 2024, awardType: 'mvp', playerId: 42 },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(result).toBe(true);
+      expect(mockDb.insert).toHaveBeenCalled();
+      expect(mockDb.onConflictDoUpdate).toHaveBeenCalled();
+    });
+
+    it('allows changing an existing vote (upsert path)', async () => {
+      mockDb.limit
+        .mockResolvedValueOnce([
+          { leagueId: 1, userId: 1, teamId: null, permissionLevel: 'member' },
+        ])
+        .mockResolvedValueOnce([{ id: 7 }]) // new player exists
+        .mockResolvedValueOnce([
+          { id: 5, status: 'open', awardTypes: ['mvp'] },
+        ]);
+
+      const result = await getResolver()(
+        {},
+        { leagueId: 1, season: 2024, awardType: 'mvp', playerId: 7 },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(result).toBe(true);
+      // onConflictDoUpdate handles the update; insert is always called first
+      expect(mockDb.insert).toHaveBeenCalled();
+    });
+  });
+
+  // ── closeAwardVoting mutation ──────────────────────────────────────────────
+
+  describe('closeAwardVoting mutation', () => {
+    function getResolver() {
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().closeAwardVoting;
+      if (!field?.resolve)
+        throw new Error('closeAwardVoting resolver not found');
+      return field.resolve.bind(field);
+    }
+
+    it('throws UNAUTHENTICATED when no user is in context', async () => {
+      mockContext.user = null;
+
+      await expect(
+        getResolver()(
+          {},
+          { leagueId: 1, season: 2024 },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({ extensions: { code: 'UNAUTHENTICATED' } });
+    });
+
+    it('throws FORBIDDEN when user is not a commissioner', async () => {
+      mockDb.limit.mockResolvedValueOnce([
+        { leagueId: 1, userId: 1, teamId: null, permissionLevel: 'member' },
+      ]);
+
+      await expect(
+        getResolver()(
+          {},
+          { leagueId: 1, season: 2024 },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({ extensions: { code: 'FORBIDDEN' } });
+    });
+
+    it('throws UserInputError when no voting period exists', async () => {
+      mockDb.limit
+        .mockResolvedValueOnce([
+          {
+            leagueId: 1,
+            userId: 1,
+            teamId: null,
+            permissionLevel: 'commissioner',
+          },
+        ])
+        .mockResolvedValueOnce([]); // no period
+
+      await expect(
+        getResolver()(
+          {},
+          { leagueId: 1, season: 2024 },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow(/No voting period found/);
+    });
+
+    it('throws UserInputError when voting is already closed', async () => {
+      mockDb.limit
+        .mockResolvedValueOnce([
+          {
+            leagueId: 1,
+            userId: 1,
+            teamId: null,
+            permissionLevel: 'commissioner',
+          },
+        ])
+        .mockResolvedValueOnce([
+          { id: 1, status: 'closed', awardTypes: ['mvp'] },
+        ]);
+
+      await expect(
+        getResolver()(
+          {},
+          { leagueId: 1, season: 2024 },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow(/already closed/);
+    });
+
+    it('tallies votes and closes the voting period', async () => {
+      const now = new Date('2024-06-01T00:00:00Z');
+      const closedRow = {
+        id: 1,
+        leagueId: 1,
+        season: 2024,
+        status: 'closed',
+        awardTypes: ['mvp'],
+        openedAt: now.toISOString(),
+        closedAt: now.toISOString(),
+      };
+
+      // tx mock used inside the transaction callback
+      const tx = {
+        select: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        innerJoin: jest.fn().mockReturnThis(),
+        groupBy: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        limit: jest
+          .fn()
+          .mockResolvedValueOnce([{ playerId: 42, voteCount: '3' }]),
+        insert: jest.fn().mockReturnThis(),
+        values: jest.fn().mockReturnThis(),
+        onConflictDoUpdate: jest.fn().mockResolvedValue(undefined),
+        update: jest.fn().mockReturnThis(),
+        set: jest.fn().mockReturnThis(),
+        returning: jest.fn().mockResolvedValueOnce([closedRow]),
+        delete: jest.fn().mockReturnThis(),
+        then: jest.fn((resolve: (v: unknown) => void) => resolve([])),
+      };
+
+      mockDb.limit
+        .mockResolvedValueOnce([
+          {
+            leagueId: 1,
+            userId: 1,
+            teamId: null,
+            permissionLevel: 'commissioner',
+          },
+        ])
+        .mockResolvedValueOnce([
+          { id: 1, status: 'open', awardTypes: ['mvp'] },
+        ]);
+
+      mockDb.transaction = jest.fn(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (fn: (tx: any) => Promise<unknown>) => fn(tx),
+      );
+
+      const result = (await getResolver()(
+        {},
+        { leagueId: 1, season: 2024 },
+        mockContext,
+        undefined as never,
+      )) as { status: string; season: number };
+
+      expect(result.status).toBe('closed');
+      expect(result.season).toBe(2024);
+      // Winner was upserted into league_season_awards
+      expect(tx.insert).toHaveBeenCalled();
+      // Voting period was updated to closed
+      expect(tx.update).toHaveBeenCalled();
+    });
+
+    it('handles tie votes — lowest playerId wins due to ORDER BY', async () => {
+      const now = new Date('2024-06-01T00:00:00Z');
+      const closedRow = {
+        id: 1,
+        leagueId: 1,
+        season: 2024,
+        status: 'closed',
+        awardTypes: ['mvp'],
+        openedAt: now.toISOString(),
+        closedAt: now.toISOString(),
+      };
+
+      // DB returns playerId 7 first (lowest ID among tied players)
+      const tx = {
+        select: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        innerJoin: jest.fn().mockReturnThis(),
+        groupBy: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        limit: jest
+          .fn()
+          .mockResolvedValueOnce([{ playerId: 7, voteCount: '2' }]),
+        insert: jest.fn().mockReturnThis(),
+        values: jest.fn().mockReturnThis(),
+        onConflictDoUpdate: jest.fn().mockResolvedValue(undefined),
+        update: jest.fn().mockReturnThis(),
+        set: jest.fn().mockReturnThis(),
+        returning: jest.fn().mockResolvedValueOnce([closedRow]),
+        delete: jest.fn().mockReturnThis(),
+        then: jest.fn((resolve: (v: unknown) => void) => resolve([])),
+      };
+
+      mockDb.limit
+        .mockResolvedValueOnce([
+          {
+            leagueId: 1,
+            userId: 1,
+            teamId: null,
+            permissionLevel: 'commissioner',
+          },
+        ])
+        .mockResolvedValueOnce([
+          { id: 1, status: 'open', awardTypes: ['mvp'] },
+        ]);
+
+      mockDb.transaction = jest.fn(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (fn: (tx: any) => Promise<unknown>) => fn(tx),
+      );
+
+      const result = (await getResolver()(
+        {},
+        { leagueId: 1, season: 2024 },
+        mockContext,
+        undefined as never,
+      )) as { status: string };
+
+      expect(result.status).toBe('closed');
+      // Verify the upsert was called with the tie-winner (playerId 7)
+      expect(tx.values).toHaveBeenCalledWith(
+        expect.objectContaining({ playerId: 7 }),
+      );
+    });
+  });
+
+  // ── awardVoteResults query ─────────────────────────────────────────────────
+
+  describe('awardVoteResults query', () => {
+    function getResolver() {
+      const queryType = schema.getQueryType();
+      const field = queryType?.getFields().awardVoteResults;
+      if (!field?.resolve)
+        throw new Error('awardVoteResults resolver not found');
+      return field.resolve.bind(field);
+    }
+
+    it('throws UNAUTHENTICATED when no user is in context', async () => {
+      mockContext.user = null;
+
+      await expect(
+        getResolver()(
+          {},
+          { leagueId: 1, season: 2024 },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({ extensions: { code: 'UNAUTHENTICATED' } });
+    });
+
+    it('throws FORBIDDEN when user is not a league member', async () => {
+      mockDb.limit.mockResolvedValueOnce([]);
+
+      await expect(
+        getResolver()(
+          {},
+          { leagueId: 1, season: 2024 },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({ extensions: { code: 'FORBIDDEN' } });
+    });
+
+    it('returns aggregated vote counts grouped by award type', async () => {
+      const rows = [
+        {
+          awardType: 'mvp',
+          playerId: 42,
+          playerFirstName: 'Mike',
+          playerLastName: 'Trout',
+          voteCount: '3',
+        },
+        {
+          awardType: 'mvp',
+          playerId: 7,
+          playerFirstName: 'Aaron',
+          playerLastName: 'Judge',
+          voteCount: '1',
+        },
+      ];
+
+      mockDb.limit.mockResolvedValueOnce([
+        { leagueId: 1, userId: 1, teamId: null, permissionLevel: 'member' },
+      ]);
+      // orderBy is the last chain call — mockDb.then resolves with the rows
+      mockDb.then = jest.fn((resolve) => resolve(rows));
+
+      const result = (await getResolver()(
+        {},
+        { leagueId: 1, season: 2024 },
+        mockContext,
+        undefined as never,
+      )) as { awardType: string; playerId: number; voteCount: number }[];
+
+      expect(result).toHaveLength(2);
+      expect(result[0].awardType).toBe('mvp');
+      expect(result[0].playerId).toBe(42);
+      // voteCount is coerced to a number by the resolver
+      expect(result[0].voteCount).toBe(3);
+      expect(result[1].voteCount).toBe(1);
+    });
+  });
+
+  // ── myAwardVotes query ────────────────────────────────────────────────────
+
+  describe('myAwardVotes query', () => {
+    function getResolver() {
+      const queryType = schema.getQueryType();
+      const field = queryType?.getFields().myAwardVotes;
+      if (!field?.resolve) throw new Error('myAwardVotes resolver not found');
+      return field.resolve.bind(field);
+    }
+
+    it('throws UNAUTHENTICATED when no user is in context', async () => {
+      mockContext.user = null;
+
+      await expect(
+        getResolver()(
+          {},
+          { leagueId: 1, season: 2024 },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({ extensions: { code: 'UNAUTHENTICATED' } });
+    });
+
+    it('throws FORBIDDEN when user is not a league member', async () => {
+      mockDb.limit.mockResolvedValueOnce([]);
+
+      await expect(
+        getResolver()(
+          {},
+          { leagueId: 1, season: 2024 },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({ extensions: { code: 'FORBIDDEN' } });
+    });
+
+    it("returns the current user's votes with player names", async () => {
+      const rows = [
+        {
+          awardType: 'mvp',
+          playerId: 42,
+          playerFirstName: 'Mike',
+          playerLastName: 'Trout',
+        },
+      ];
+
+      mockDb.limit.mockResolvedValueOnce([
+        { leagueId: 1, userId: 1, teamId: null, permissionLevel: 'member' },
+      ]);
+      // where() is the last chain call — mockDb.then resolves with the rows
+      mockDb.then = jest.fn((resolve) => resolve(rows));
+
+      const result = (await getResolver()(
+        {},
+        { leagueId: 1, season: 2024 },
+        mockContext,
+        undefined as never,
+      )) as { awardType: string; playerId: number; playerFirstName: string }[];
+
+      expect(result).toHaveLength(1);
+      expect(result[0].awardType).toBe('mvp');
+      expect(result[0].playerId).toBe(42);
+      expect(result[0].playerFirstName).toBe('Mike');
     });
   });
 });

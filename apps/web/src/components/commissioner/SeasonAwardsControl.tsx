@@ -20,15 +20,20 @@ import { Award, Check, Trash2 } from '@tamagui/lucide-icons';
 import {
   BRAND_GOLD,
   BRAND_NAVY_LIGHT,
+  GREEN,
   SURFACE_CARD,
   SURFACE_PANEL,
   withAlpha,
 } from '../../constants/colors';
 import {
   LeagueSeasonAwardFragment,
+  useCloseAwardVotingMutation,
   useDeleteLeagueSeasonAwardMutation,
+  useGetAwardVoteResultsQuery,
+  useGetAwardVotingPeriodQuery,
   useGetLeagueSeasonAwardsQuery,
   useGetPlayersWithStatsQuery,
+  useOpenAwardVotingMutation,
   useUpsertLeagueSeasonAwardMutation,
 } from '../../api/db/graphql.generated';
 
@@ -405,7 +410,7 @@ function AwardRow({
             saving ? (
               <Spinner size="small" />
             ) : justSaved ? (
-              <Check size={14} color="rgb(34,197,94)" />
+              <Check size={14} color={GREEN} />
             ) : undefined
           }
           backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.85)}
@@ -456,6 +461,112 @@ export function SeasonAwardsControl({
     variables: { leagueId, season },
   });
 
+  // Voting period state
+  const { data: votingData, loading: votingLoading } =
+    useGetAwardVotingPeriodQuery({ variables: { leagueId, season } });
+  const { data: resultsData } = useGetAwardVoteResultsQuery({
+    variables: { leagueId, season },
+  });
+  const votingPeriod = votingData?.awardVotingPeriod ?? null;
+  const isVotingOpen = votingPeriod?.status === 'open';
+  const isVotingClosed = votingPeriod?.status === 'closed';
+
+  // Voting controls state
+  const [selectedAwardTypes, setSelectedAwardTypes] = useState<Set<string>>(
+    () => new Set(SEASON_AWARD_TYPES.map((a) => a.key)),
+  );
+  const [openingVote, setOpeningVote] = useState(false);
+  const [closingVote, setClosingVote] = useState(false);
+
+  const [openVoting] = useOpenAwardVotingMutation({
+    refetchQueries: [
+      'GetAwardVotingPeriod',
+      'GetLeagueSeasonAwards',
+      'GetAwardVoteResults',
+    ],
+    awaitRefetchQueries: true,
+  });
+  const [closeVoting] = useCloseAwardVotingMutation({
+    refetchQueries: [
+      'GetAwardVotingPeriod',
+      'GetLeagueSeasonAwards',
+      'GetAwardVoteResults',
+    ],
+    awaitRefetchQueries: true,
+  });
+
+  const handleOpenVoting = useCallback(async () => {
+    const types = [...selectedAwardTypes];
+    if (types.length === 0) return;
+    setOpeningVote(true);
+    try {
+      await openVoting({
+        variables: { leagueId, season, awardTypes: types },
+      });
+      onSuccess?.('Voting is now open for this season');
+    } catch (err) {
+      onError?.(err instanceof Error ? err : new Error(String(err)));
+    } finally {
+      setOpeningVote(false);
+    }
+  }, [selectedAwardTypes, leagueId, season, openVoting, onSuccess, onError]);
+
+  const handleCloseVoting = useCallback(async () => {
+    setClosingVote(true);
+    try {
+      await closeVoting({ variables: { leagueId, season } });
+      onSuccess?.('Voting closed — winners have been tallied');
+    } catch (err) {
+      onError?.(err instanceof Error ? err : new Error(String(err)));
+    } finally {
+      setClosingVote(false);
+    }
+  }, [leagueId, season, closeVoting, onSuccess, onError]);
+
+  const handleReopenVoting = useCallback(async () => {
+    const types = votingPeriod?.awardTypes ?? [];
+    if (types.length === 0) return;
+    setOpeningVote(true);
+    try {
+      await openVoting({
+        variables: { leagueId, season, awardTypes: types },
+      });
+      onSuccess?.('Voting is now open for this season');
+    } catch (err) {
+      onError?.(err instanceof Error ? err : new Error(String(err)));
+    } finally {
+      setOpeningVote(false);
+    }
+  }, [votingPeriod, leagueId, season, openVoting, onSuccess, onError]);
+
+  const toggleAwardType = useCallback((key: string) => {
+    setSelectedAwardTypes((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
+  // Vote results grouped by award type
+  const resultsByType = useMemo(() => {
+    const map = new Map<
+      string,
+      { playerId: number; name: string; voteCount: number }[]
+    >();
+    for (const r of resultsData?.awardVoteResults ?? []) {
+      if (!r.awardType || r.playerId == null) continue;
+      const list = map.get(r.awardType) ?? [];
+      list.push({
+        playerId: r.playerId,
+        name: `${r.playerFirstName ?? ''} ${r.playerLastName ?? ''}`.trim(),
+        voteCount: r.voteCount ?? 0,
+      });
+      map.set(r.awardType, list);
+    }
+    return map;
+  }, [resultsData]);
+
   const existingByType = useMemo(() => {
     const map = new Map<string, LeagueSeasonAwardFragment>();
     for (const award of data?.leagueSeasonAwards ?? []) {
@@ -484,8 +595,8 @@ export function SeasonAwardsControl({
           <YStack flex={1}>
             <H4 margin={0}>Season Awards</H4>
             <Text fontSize="$2" color="$gray10">
-              Assign end-of-season fantasy awards to recognize standout players
-              in your league. These awards are based on in-league performance.
+              Assign awards directly or open voting for league members to
+              decide.
             </Text>
           </YStack>
         </XStack>
@@ -521,7 +632,185 @@ export function SeasonAwardsControl({
 
         <Separator />
 
-        {/* Award rows */}
+        {/* ─── Voting Controls ─────────────────────────────────────────── */}
+        {!votingLoading && (
+          <Card
+            backgroundColor={
+              isVotingOpen
+                ? withAlpha(GREEN, 0.06)
+                : isVotingClosed
+                  ? withAlpha(BRAND_NAVY_LIGHT, 0.04)
+                  : '$surfaceCard'
+            }
+            borderColor={
+              isVotingOpen ? withAlpha(GREEN, 0.3) : '$surfacePanelBorder'
+            }
+            borderWidth={1}
+            padding="$4"
+            borderRadius="$5"
+          >
+            <YStack gap="$3">
+              <Text fontSize="$3" fontWeight="700" color="$color">
+                {isVotingOpen
+                  ? 'Voting is Open'
+                  : isVotingClosed
+                    ? 'Voting Closed'
+                    : 'League Voting'}
+              </Text>
+
+              {/* Open voting: show award type checkboxes */}
+              {!votingPeriod && (
+                <>
+                  <Text fontSize="$2" color="$gray10">
+                    Select which awards to put to a league-wide vote. Members
+                    vote anonymously — no one sees who voted for whom.
+                  </Text>
+                  <YStack gap="$2">
+                    {SEASON_AWARD_TYPES.map((meta) => (
+                      <XStack
+                        key={meta.key}
+                        alignItems="center"
+                        gap="$2"
+                        cursor="pointer"
+                        onPress={() => toggleAwardType(meta.key)}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedAwardTypes.has(meta.key)}
+                          onChange={() => toggleAwardType(meta.key)}
+                          onClick={(event) => event.stopPropagation()}
+                          style={{ cursor: 'pointer' }}
+                          aria-label={`Include ${meta.label} in vote`}
+                        />
+                        <Text fontSize="$2" color="$color">
+                          {meta.icon} {meta.label}
+                        </Text>
+                      </XStack>
+                    ))}
+                  </YStack>
+                  <Button
+                    size="$3"
+                    onPress={() => void handleOpenVoting()}
+                    disabled={selectedAwardTypes.size === 0 || openingVote}
+                    icon={openingVote ? <Spinner size="small" /> : undefined}
+                    backgroundColor={withAlpha(GREEN, 0.85)}
+                    borderColor="$green10"
+                    color="white"
+                    alignSelf="flex-start"
+                  >
+                    Open Voting
+                  </Button>
+                </>
+              )}
+
+              {/* Voting is open: show status + close button */}
+              {isVotingOpen && (
+                <>
+                  <Text fontSize="$2" color="$gray10">
+                    League members can now vote on:{' '}
+                    {(votingPeriod?.awardTypes ?? [])
+                      .map(
+                        (key) =>
+                          SEASON_AWARD_TYPES.find((a) => a.key === key)
+                            ?.label ?? key,
+                      )
+                      .join(', ')}
+                    . Votes are anonymous.
+                  </Text>
+                  {/* Show current vote tallies */}
+                  {resultsByType.size > 0 && (
+                    <YStack gap="$2">
+                      <Text fontSize="$2" fontWeight="600" color="$color">
+                        Current Results
+                      </Text>
+                      {(votingPeriod?.awardTypes ?? []).map((awardKey) => {
+                        const results = resultsByType.get(awardKey);
+                        const meta = SEASON_AWARD_TYPES.find(
+                          (a) => a.key === awardKey,
+                        );
+                        if (!meta) return null;
+                        return (
+                          <YStack key={awardKey} gap="$1">
+                            <Text fontSize="$2" color="$gray10">
+                              {meta.icon} {meta.label}
+                            </Text>
+                            {results && results.length > 0 ? (
+                              results.map((r) => (
+                                <XStack
+                                  key={r.playerId}
+                                  paddingLeft="$4"
+                                  gap="$2"
+                                >
+                                  <Text fontSize="$2" color="$color" flex={1}>
+                                    {r.name}
+                                  </Text>
+                                  <Text
+                                    fontSize="$2"
+                                    color="$brandGold"
+                                    fontWeight="600"
+                                  >
+                                    {r.voteCount}{' '}
+                                    {r.voteCount === 1 ? 'vote' : 'votes'}
+                                  </Text>
+                                </XStack>
+                              ))
+                            ) : (
+                              <Text
+                                fontSize="$1"
+                                color="$gray8"
+                                paddingLeft="$4"
+                              >
+                                No votes yet
+                              </Text>
+                            )}
+                          </YStack>
+                        );
+                      })}
+                    </YStack>
+                  )}
+                  <Button
+                    size="$3"
+                    onPress={() => void handleCloseVoting()}
+                    disabled={closingVote}
+                    icon={closingVote ? <Spinner size="small" /> : undefined}
+                    backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.85)}
+                    borderColor="$brandNavyLight"
+                    color="white"
+                    alignSelf="flex-start"
+                  >
+                    Close Voting &amp; Tally Results
+                  </Button>
+                </>
+              )}
+
+              {/* Voting is closed: show summary + reopen option */}
+              {isVotingClosed && (
+                <>
+                  <Text fontSize="$2" color="$gray10">
+                    Voting was completed and winners have been assigned below.
+                    You can reopen voting or directly adjust awards as needed.
+                  </Text>
+                  <Button
+                    size="$3"
+                    onPress={() => void handleReopenVoting()}
+                    disabled={openingVote}
+                    icon={openingVote ? <Spinner size="small" /> : undefined}
+                    backgroundColor={withAlpha(GREEN, 0.85)}
+                    borderColor="$green10"
+                    color="white"
+                    alignSelf="flex-start"
+                  >
+                    Reopen Voting
+                  </Button>
+                </>
+              )}
+            </YStack>
+          </Card>
+        )}
+
+        <Separator />
+
+        {/* Award rows (direct assignment) */}
         {loading ? (
           <XStack alignItems="center" gap="$3">
             <Spinner size="small" />
@@ -529,6 +818,9 @@ export function SeasonAwardsControl({
           </XStack>
         ) : (
           <YStack gap="$4">
+            <Text fontSize="$2" color="$gray10" fontWeight="600">
+              Direct Assignment
+            </Text>
             {SEASON_AWARD_TYPES.map((meta) => (
               <AwardRow
                 key={meta.key}

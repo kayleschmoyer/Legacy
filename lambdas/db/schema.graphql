@@ -148,6 +148,37 @@ type AverageSeasonBatting {
 }
 
 """
+Aggregated vote count for a player in an award category
+"""
+type AwardVoteResult {
+  awardType: String
+  playerFirstName: String
+  playerId: Int
+  playerLastName: String
+  voteCount: Int
+}
+
+"""
+A voting period for season awards in a league
+"""
+type AwardVotingPeriod {
+  """
+  Award type keys included in this vote
+  """
+  awardTypes: [String!]
+  closedAt: String
+  id: Int
+  leagueId: Int
+  openedAt: String
+  season: Int
+
+  """
+  "open" or "closed"
+  """
+  status: String
+}
+
+"""
 Metadata for a badge that can be earned in the system
 """
 type BadgeDefinition {
@@ -1466,12 +1497,27 @@ type Mutation {
   """
   cancelTrade(tradeId: Int!): TradeOffer
   cancelWaiverClaim(claimId: Int!): WaiverClaim
+
+  """
+  Cast or update a vote for a season award. League membership required. Voting must be open.
+  """
+  castAwardVote(
+    awardType: String!
+    leagueId: Int!
+    playerId: Int!
+    season: Int!
+  ): Boolean
   claimFreeAgent(
     dropPlayerId: Int
     faabBid: Int
     leagueId: Int!
     playerId: Int!
   ): WaiverClaim
+
+  """
+  Close voting and tally results. Winners are stored in league_season_awards. Commissioner access required.
+  """
+  closeAwardVoting(leagueId: Int!, season: Int!): AwardVotingPeriod
   commissionerPick(draftId: Int!, playerId: Int!): DraftPick
 
   """
@@ -1651,6 +1697,15 @@ type Mutation {
   """
   nextClue(sessionId: Int!): DisclosureClue
   nominatePlayer(draftId: Int!, playerId: Int!): AuctionState
+
+  """
+  Open a voting period for season awards. Commissioner access required.
+  """
+  openAwardVoting(
+    awardTypes: [String!]!
+    leagueId: Int!
+    season: Int!
+  ): AwardVotingPeriod
   pauseDraft(leagueId: Int!): Draft
   placeBid(amount: Int!, draftId: Int!): AuctionState
   postLeagueAnnouncement(
@@ -1977,6 +2032,16 @@ type Mutation {
   Commissioner-only: veto an accepted trade, reversing the player swap.
   """
   vetoTrade(tradeId: Int!): TradeOffer
+}
+
+"""
+The current user's vote for a specific award type
+"""
+type MyAwardVote {
+  awardType: String
+  playerFirstName: String
+  playerId: Int
+  playerLastName: String
 }
 
 type NotificationHistoryItem {
@@ -2318,6 +2383,16 @@ type Query {
   allBadgeDefinitions: [BadgeDefinition!]
   auctionBudgets(draftId: Int!): [AuctionBudget!]
   auctionState(draftId: Int!): AuctionState
+
+  """
+  Aggregated vote results for a league season. No voter identity is exposed.
+  """
+  awardVoteResults(leagueId: Int!, season: Int!): [AwardVoteResult!]
+
+  """
+  Get the voting period for a league and season (if any)
+  """
+  awardVotingPeriod(leagueId: Int!, season: Int!): AwardVotingPeriod
   careerBattingStats(
     after: String
     first: Int
@@ -2512,6 +2587,11 @@ type Query {
   """
   leagueTradeBlock(leagueId: Int!): [TeamMember!]
   leagueTradeOffers(leagueId: Int!, status: String): [TradeOffer!]
+
+  """
+  Get the current user's votes for a league season
+  """
+  myAwardVotes(leagueId: Int!, season: Int!): [MyAwardVote!]
 
   """
   Get all consent records for the authenticated user

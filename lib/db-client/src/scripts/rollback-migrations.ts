@@ -121,13 +121,31 @@ async function runRollbackCommand(command: Command, _options: string[] = []) {
       `📡 Connected to database: ${dbConfig.host}:${dbConfig.port || 5432}/${dbConfig.database}`,
     );
 
+    // Use URL parsing to safely split host and port — handles IPv6 bracket
+    // notation (e.g. "[::1]:5432") as well as plain "hostname:port" strings.
+    let resolvedHost: string;
+    let resolvedPort: number;
+    try {
+      const parsed = new URL(`postgresql://${dbConfig.host}`);
+      resolvedHost = parsed.hostname;
+      resolvedPort = parsed.port
+        ? parseInt(parsed.port, 10)
+        : (dbConfig.port ?? 5432);
+    } catch {
+      resolvedHost = dbConfig.host;
+      resolvedPort = dbConfig.port ?? 5432;
+    }
+
     // Create postgres connection string
-    const connectionString = `postgresql://${dbConfig.user}:${dbConfig.password}@${dbConfig.host}:${dbConfig.port || 5432}/${dbConfig.database}${dbConfig.ssl ? '?sslmode=require' : ''}`;
+    const connectionString = `postgresql://${dbConfig.user}:${encodeURIComponent(dbConfig.password)}@${resolvedHost}:${resolvedPort}/${dbConfig.database}`;
 
     // Create postgres client - disable prepared statements for DDL operations
+    const sslSelfSigned = process.env['DB_SSL_SELF_SIGNED'] === 'true';
     const migrationClient = postgres(connectionString, {
       max: 1, // Use single connection for migrations
       prepare: false, // Disable prepared statements - they don't work with DDL that references user-defined functions
+      ssl:
+        dbConfig.ssl || (sslSelfSigned ? { rejectUnauthorized: false } : false),
     });
 
     // Create Drizzle instance

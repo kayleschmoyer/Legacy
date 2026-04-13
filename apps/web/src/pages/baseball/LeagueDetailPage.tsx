@@ -53,7 +53,10 @@ import {
   computeScoring,
   type SeasonStats,
 } from '@legacy-sports/scoring';
-import { LeagueScoringSummary } from '@legacy-sports/shared-components/leagues';
+import {
+  AwardVotingPanel,
+  LeagueScoringSummary,
+} from '@legacy-sports/shared-components/leagues';
 import { MatchupNavigationControls } from '@legacy-sports/shared-components/matchup';
 import {
   PendingTradeOffers,
@@ -1724,6 +1727,16 @@ export function LeagueDetailPage(): React.JSX.Element {
       <CommissionerAnnouncementsPanel
         leagueId={leagueId}
         isCommissioner={isCommissioner}
+      />
+
+      {/* Award Voting (LS-3126) — shown when voting is open */}
+      <AwardVotingPanel
+        leagueId={leagueId}
+        season={new Date().getFullYear()}
+        onSuccess={showMatchupSuccess}
+        onError={(err) => {
+          setMatchupErrorMessage(err.message);
+        }}
       />
 
       {/* League Snapshot — unified glass stats bar */}

@@ -11,11 +11,54 @@ fragment LeagueSeasonAward on LeagueSeasonAward {
   updatedAt
 }
 
+fragment AwardVotingPeriodFields on AwardVotingPeriod {
+  id
+  leagueId
+  season
+  status
+  awardTypes
+  openedAt
+  closedAt
+}
+
+fragment AwardVoteResultFields on AwardVoteResult {
+  awardType
+  playerId
+  playerFirstName
+  playerLastName
+  voteCount
+}
+
+fragment MyAwardVoteFields on MyAwardVote {
+  awardType
+  playerId
+  playerFirstName
+  playerLastName
+}
+
 # ── Queries ────────────────────────────────────────────────────────────────
 
 query GetLeagueSeasonAwards($leagueId: Int!, $season: Int) {
   leagueSeasonAwards(leagueId: $leagueId, season: $season) {
     ...LeagueSeasonAward
+  }
+}
+
+query GetAwardVotingPeriod($leagueId: Int!, $season: Int!) {
+  awardVotingPeriod(leagueId: $leagueId, season: $season) {
+    ...AwardVotingPeriodFields
+  }
+}
+
+query GetAwardVoteResults($leagueId: Int!, $season: Int!) {
+  awardVoteResults(leagueId: $leagueId, season: $season) {
+    ...AwardVoteResultFields
+  }
+}
+
+query GetMyAwardVotes($leagueId: Int!, $season: Int!) {
+  myAwardVotes(leagueId: $leagueId, season: $season) {
+    ...MyAwardVoteFields
   }
 }
 
@@ -36,5 +79,39 @@ mutation DeleteLeagueSeasonAward(
     leagueId: $leagueId
     season: $season
     awardType: $awardType
+  )
+}
+
+mutation OpenAwardVoting(
+  $leagueId: Int!
+  $season: Int!
+  $awardTypes: [String!]!
+) {
+  openAwardVoting(
+    leagueId: $leagueId
+    season: $season
+    awardTypes: $awardTypes
+  ) {
+    ...AwardVotingPeriodFields
+  }
+}
+
+mutation CloseAwardVoting($leagueId: Int!, $season: Int!) {
+  closeAwardVoting(leagueId: $leagueId, season: $season) {
+    ...AwardVotingPeriodFields
+  }
+}
+
+mutation CastAwardVote(
+  $leagueId: Int!
+  $season: Int!
+  $awardType: String!
+  $playerId: Int!
+) {
+  castAwardVote(
+    leagueId: $leagueId
+    season: $season
+    awardType: $awardType
+    playerId: $playerId
   )
 }

@@ -1,9 +1,27 @@
 import { execFile, spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import * as net from 'node:net';
 import { resolve } from 'node:path';
+import { config as loadDotenv } from 'dotenv';
 import { getRepoRoot, runPnpm } from '../run-command.js';
 import { parseUpOutput } from './migrate.js';
 import type { ToolResult } from '../types.js';
+
+/**
+ * Walk up from startDir looking for a .env file (max 6 levels).
+ * Handles both the main-repo case and worktrees nested under .claude/worktrees/.
+ */
+function findDotEnv(startDir: string): string | null {
+  let dir = startDir;
+  for (let i = 0; i < 6; i++) {
+    const candidate = resolve(dir, '.env');
+    if (existsSync(candidate)) return candidate;
+    const parent = resolve(dir, '..');
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return null;
+}
 
 interface MigrateTunnelParams {
   worktreePath?: string;
@@ -142,6 +160,13 @@ export async function migrateTunnel(
 ): Promise<ToolResult> {
   const repoRoot = params.worktreePath || getRepoRoot();
   const dbClientDir = resolve(repoRoot, 'lib', 'db-client');
+
+  // Load .env so DB_HOST_DIRECT / DB_HOST are available when the MCP server
+  // process wasn't started with these vars in its environment. Walk up from the
+  // server root since worktrees are nested under .claude/worktrees/ and don't
+  // have their own .env.
+  const dotEnvPath = findDotEnv(getRepoRoot());
+  if (dotEnvPath) loadDotenv({ path: dotEnvPath, override: false });
 
   // Prefer DB_HOST_DIRECT (RDS endpoint) over DB_HOST (may be localhost in dev)
   const dbHostEnv = process.env['DB_HOST_DIRECT'] || process.env['DB_HOST'];

@@ -165,6 +165,30 @@ export type AverageSeasonBatting = {
   stolenBases?: Maybe<Scalars['Float']['output']>;
 };
 
+/** Aggregated vote count for a player in an award category */
+export type AwardVoteResult = {
+  __typename?: 'AwardVoteResult';
+  awardType?: Maybe<Scalars['String']['output']>;
+  playerFirstName?: Maybe<Scalars['String']['output']>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  playerLastName?: Maybe<Scalars['String']['output']>;
+  voteCount?: Maybe<Scalars['Int']['output']>;
+};
+
+/** A voting period for season awards in a league */
+export type AwardVotingPeriod = {
+  __typename?: 'AwardVotingPeriod';
+  /** Award type keys included in this vote */
+  awardTypes?: Maybe<Array<Scalars['String']['output']>>;
+  closedAt?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  openedAt?: Maybe<Scalars['String']['output']>;
+  season?: Maybe<Scalars['Int']['output']>;
+  /** "open" or "closed" */
+  status?: Maybe<Scalars['String']['output']>;
+};
+
 /** Metadata for a badge that can be earned in the system */
 export type BadgeDefinition = {
   __typename?: 'BadgeDefinition';
@@ -1237,7 +1261,11 @@ export type Mutation = {
   /** Cancel a pending trade offer as the team that proposed it. */
   cancelTrade?: Maybe<TradeOffer>;
   cancelWaiverClaim?: Maybe<WaiverClaim>;
+  /** Cast or update a vote for a season award. League membership required. Voting must be open. */
+  castAwardVote?: Maybe<Scalars['Boolean']['output']>;
   claimFreeAgent?: Maybe<WaiverClaim>;
+  /** Close voting and tally results. Winners are stored in league_season_awards. Commissioner access required. */
+  closeAwardVoting?: Maybe<AwardVotingPeriod>;
   commissionerPick?: Maybe<DraftPick>;
   /** Commissioner: enable or disable auto-pick for the entire draft (LS-481). When disabled, autoProcessDraftPicks will not fire and teams cannot opt in to auto-pick. */
   commissionerSetDraftAutoPickDisabled?: Maybe<Draft>;
@@ -1296,6 +1324,8 @@ export type Mutation = {
   /** Reveal the next clue for the given session. Increments clues-revealed counter. */
   nextClue?: Maybe<DisclosureClue>;
   nominatePlayer?: Maybe<AuctionState>;
+  /** Open a voting period for season awards. Commissioner access required. */
+  openAwardVoting?: Maybe<AwardVotingPeriod>;
   pauseDraft?: Maybe<Draft>;
   placeBid?: Maybe<AuctionState>;
   postLeagueAnnouncement?: Maybe<LeagueChatMessage>;
@@ -1464,11 +1494,23 @@ export type MutationCancelWaiverClaimArgs = {
   claimId: Scalars['Int']['input'];
 };
 
+export type MutationCastAwardVoteArgs = {
+  awardType: Scalars['String']['input'];
+  leagueId: Scalars['Int']['input'];
+  playerId: Scalars['Int']['input'];
+  season: Scalars['Int']['input'];
+};
+
 export type MutationClaimFreeAgentArgs = {
   dropPlayerId?: InputMaybe<Scalars['Int']['input']>;
   faabBid?: InputMaybe<Scalars['Int']['input']>;
   leagueId: Scalars['Int']['input'];
   playerId: Scalars['Int']['input'];
+};
+
+export type MutationCloseAwardVotingArgs = {
+  leagueId: Scalars['Int']['input'];
+  season: Scalars['Int']['input'];
 };
 
 export type MutationCommissionerPickArgs = {
@@ -1658,6 +1700,12 @@ export type MutationNextClueArgs = {
 export type MutationNominatePlayerArgs = {
   draftId: Scalars['Int']['input'];
   playerId: Scalars['Int']['input'];
+};
+
+export type MutationOpenAwardVotingArgs = {
+  awardTypes: Array<Scalars['String']['input']>;
+  leagueId: Scalars['Int']['input'];
+  season: Scalars['Int']['input'];
 };
 
 export type MutationPauseDraftArgs = {
@@ -1968,6 +2016,15 @@ export type MutationVetoTradeArgs = {
   tradeId: Scalars['Int']['input'];
 };
 
+/** The current user's vote for a specific award type */
+export type MyAwardVote = {
+  __typename?: 'MyAwardVote';
+  awardType?: Maybe<Scalars['String']['output']>;
+  playerFirstName?: Maybe<Scalars['String']['output']>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  playerLastName?: Maybe<Scalars['String']['output']>;
+};
+
 export type NotificationHistoryItem = {
   __typename?: 'NotificationHistoryItem';
   body?: Maybe<Scalars['String']['output']>;
@@ -2249,6 +2306,10 @@ export type Query = {
   allBadgeDefinitions?: Maybe<Array<BadgeDefinition>>;
   auctionBudgets?: Maybe<Array<AuctionBudget>>;
   auctionState?: Maybe<AuctionState>;
+  /** Aggregated vote results for a league season. No voter identity is exposed. */
+  awardVoteResults?: Maybe<Array<AwardVoteResult>>;
+  /** Get the voting period for a league and season (if any) */
+  awardVotingPeriod?: Maybe<AwardVotingPeriod>;
   careerBattingStats?: Maybe<CareerBattingConnection>;
   careerFieldingStats?: Maybe<Array<CareerFielding>>;
   careerPitchingStats?: Maybe<Array<CareerPitching>>;
@@ -2327,6 +2388,8 @@ export type Query = {
   /** Returns all roster entries explicitly listed on the trade block for the given league. */
   leagueTradeBlock?: Maybe<Array<TeamMember>>;
   leagueTradeOffers?: Maybe<Array<TradeOffer>>;
+  /** Get the current user's votes for a league season */
+  myAwardVotes?: Maybe<Array<MyAwardVote>>;
   /** Get all consent records for the authenticated user */
   myConsents?: Maybe<Array<UserConsent>>;
   /** Get all data export/deletion requests for the authenticated user */
@@ -2406,6 +2469,16 @@ export type QueryAuctionBudgetsArgs = {
 
 export type QueryAuctionStateArgs = {
   draftId: Scalars['Int']['input'];
+};
+
+export type QueryAwardVoteResultsArgs = {
+  leagueId: Scalars['Int']['input'];
+  season: Scalars['Int']['input'];
+};
+
+export type QueryAwardVotingPeriodArgs = {
+  leagueId: Scalars['Int']['input'];
+  season: Scalars['Int']['input'];
 };
 
 export type QueryCareerBattingStatsArgs = {
@@ -2704,6 +2777,11 @@ export type QueryLeagueTradeOffersArgs = {
   status?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type QueryMyAwardVotesArgs = {
+  leagueId: Scalars['Int']['input'];
+  season: Scalars['Int']['input'];
+};
+
 export type QueryOnThisDayArgs = {
   day: Scalars['Int']['input'];
   limit?: InputMaybe<Scalars['Int']['input']>;
@@ -2971,7 +3049,7 @@ export type ScoreboardGame = {
   outs?: Maybe<Scalars['Int']['output']>;
   /** Scheduled start time (ISO 8601) */
   startTime?: Maybe<Scalars['String']['output']>;
-  /** Game status: "Preview", "Live", or "Final" */
+  /** Game status: "Preview", "Live", "Final", "Postponed", or "Suspended" */
   status: Scalars['String']['output'];
 };
 
