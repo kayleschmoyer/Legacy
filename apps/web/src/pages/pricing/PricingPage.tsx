@@ -163,6 +163,7 @@ const ActionButton = styled(Button, {
   fontSize: '$3',
   fontWeight: '700',
   paddingHorizontal: '$5',
+  whiteSpace: 'nowrap',
   backgroundColor: BRAND_NAVY_LIGHT,
   color: '$color1',
   borderColor: 'transparent',
@@ -873,7 +874,7 @@ export default function PricingPage() {
             <XStack gap="$4" flexWrap="wrap" justifyContent="center">
               <ActionButton
                 onPress={() => navigate('/profile/subscription')}
-                width={200}
+                minWidth={200}
               >
                 Upgrade to Premium
               </ActionButton>
