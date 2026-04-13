@@ -925,9 +925,12 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
                       if (a.rookieOfTheYear)
                         chips.push({ label: 'ROY', value: '' });
                       if (chips.length === 0 && !player.primaryEra) return null;
+                      const MAX_VISIBLE_CHIPS = 3;
+                      const visibleChips = chips.slice(0, MAX_VISIBLE_CHIPS);
+                      const overflowChips = chips.slice(MAX_VISIBLE_CHIPS);
                       return (
                         <XStack flexWrap="wrap" gap="$1" paddingTop="$0.5">
-                          {chips.map((chip) => (
+                          {visibleChips.map((chip) => (
                             <AccoladeChip key={chip.label}>
                               <Award size={9} color={BRAND_GOLD_LIGHT} />
                               <Text
@@ -941,6 +944,60 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
                               </Text>
                             </AccoladeChip>
                           ))}
+                          {overflowChips.length > 0 && (
+                            <Tooltip placement="top">
+                              <Tooltip.Trigger>
+                                <Text
+                                  fontSize={9}
+                                  color="$color8"
+                                  cursor="pointer"
+                                >
+                                  +{overflowChips.length}
+                                </Text>
+                              </Tooltip.Trigger>
+                              <Tooltip.Content
+                                enterStyle={{
+                                  x: 0,
+                                  y: -5,
+                                  opacity: 0,
+                                  scale: 0.9,
+                                }}
+                                exitStyle={{
+                                  x: 0,
+                                  y: -5,
+                                  opacity: 0,
+                                  scale: 0.9,
+                                }}
+                                scale={1}
+                                x={0}
+                                y={0}
+                                opacity={1}
+                                animation={[
+                                  'quick',
+                                  {
+                                    opacity: {
+                                      overshootClamping: true,
+                                    },
+                                  },
+                                ]}
+                              >
+                                <Tooltip.Arrow />
+                                <XStack flexWrap="wrap" gap="$1">
+                                  {overflowChips.map((chip) => (
+                                    <Text
+                                      key={chip.label}
+                                      fontSize={11}
+                                      fontWeight="600"
+                                      color={BRAND_GOLD_LIGHT}
+                                    >
+                                      {chip.label}
+                                      {chip.value}
+                                    </Text>
+                                  ))}
+                                </XStack>
+                              </Tooltip.Content>
+                            </Tooltip>
+                          )}
                           {player.primaryEra != null && (
                             <XStack
                               backgroundColor="$orange3"
