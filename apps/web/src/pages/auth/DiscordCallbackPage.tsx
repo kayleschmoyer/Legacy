@@ -50,8 +50,9 @@ export function DiscordCallbackPage(): React.JSX.Element {
     }
 
     if (!code || !state || state !== storedState) {
-      // Invalid or missing state — send back to profile settings
-      navigate('/profile/settings', { replace: true });
+      setErrorMessage(
+        'Discord authorization failed: the security check did not pass. Please try again from your profile settings.',
+      );
       return;
     }
 

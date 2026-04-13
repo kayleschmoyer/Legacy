@@ -572,9 +572,10 @@ const ProfileSettingsPage: React.FC = () => {
                 </Paragraph>
                 <Paragraph size="$3" color="$colorPress" flex={1}>
                   You can change your username above. Email and profile photo
-                  are managed through your Google account. Link Discord in the
-                  Connected Accounts section below for an additional sign-in
-                  option.
+                  are managed through your Google account.
+                  {auth.config.discordClientId
+                    ? ' Link Discord in the Connected Accounts section below for an additional sign-in option.'
+                    : null}
                 </Paragraph>
               </InfoBanner>
             </SectionBody>
