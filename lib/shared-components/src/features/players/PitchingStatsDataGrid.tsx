@@ -87,7 +87,6 @@ export interface PitchingStatsDataGridProps {
   showFilters?: boolean;
   showPagination?: boolean;
   showSorting?: boolean;
-  maxHeight?: number | string;
   className?: string;
   testId?: string;
   /** Stats display format: 'standard' shows high-priority columns only, 'expanded' shows all */
@@ -273,7 +272,6 @@ export function PitchingStatsDataGrid({
   showFilters = true,
   showPagination = true,
   showSorting = true,
-  maxHeight = '600px',
   className,
   testId = 'pitching-stats-data-grid',
   statsFormat = 'expanded',
@@ -690,11 +688,7 @@ export function PitchingStatsDataGrid({
         })}
       </XStack>
 
-      <YStack
-        flex={1}
-        maxHeight={maxHeight}
-        style={{ overflowY: 'auto', scrollbarGutter: 'stable' }}
-      >
+      <YStack flex={1} style={{ overflowX: 'auto' }}>
         {loading ? (
           <XStack
             justifyContent="center"

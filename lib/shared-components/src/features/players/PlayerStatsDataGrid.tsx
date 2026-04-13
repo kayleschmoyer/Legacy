@@ -113,8 +113,6 @@ export interface PlayerStatsDataGridProps {
   showPagination?: boolean;
   /** Whether to show sorting controls */
   showSorting?: boolean;
-  /** Maximum height of the grid (for virtualization) */
-  maxHeight?: number | string;
   /** Custom CSS class name */
   className?: string;
   /** Test ID for automated testing */
@@ -368,7 +366,6 @@ export function PlayerStatsDataGrid({
   showFilters = true,
   showPagination = true,
   showSorting = true,
-  maxHeight = '600px',
   className,
   testId = 'player-stats-data-grid',
   statsFormat = 'expanded',
@@ -923,11 +920,7 @@ export function PlayerStatsDataGrid({
       </XStack>
 
       {/* Table Body */}
-      <YStack
-        flex={1}
-        maxHeight={maxHeight}
-        style={{ overflowY: 'auto', scrollbarGutter: 'stable' }}
-      >
+      <YStack flex={1} style={{ overflowX: 'auto' }}>
         {loading ? (
           <XStack
             justifyContent="center"

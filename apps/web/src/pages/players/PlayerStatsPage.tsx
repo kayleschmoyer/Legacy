@@ -232,7 +232,7 @@ export function PlayerStatsPage() {
   return (
     <div
       style={{
-        minHeight: '100vh',
+        flex: 1,
         backgroundColor: `var(--background, ${BG_DARK})`,
         color: `var(--color, ${TEXT_HIGH_CONTRAST})`,
         padding: 0, // Remove default padding as PlayerStatsPage handles its own

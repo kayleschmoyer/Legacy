@@ -94,7 +94,6 @@ export function PlayerStatsPage({
       flex={1}
       style={{
         background: `linear-gradient(160deg, ${BG_DARK} 0%, ${SURFACE_PANEL} 60%, ${BRAND_NAVY_DARK} 100%)`,
-        minHeight: '100vh',
       }}
     >
       {/* ── CSS Keyframes ───────────────────────────────────────── */}
