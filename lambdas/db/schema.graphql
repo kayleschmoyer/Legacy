@@ -2820,7 +2820,7 @@ type ScoreboardGame {
   startTime: String
 
   """
-  Game status: "Preview", "Live", or "Final"
+  Game status: "Preview", "Live", "Final", "Postponed", or "Suspended"
   """
   status: String!
 }

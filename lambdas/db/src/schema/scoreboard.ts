@@ -6,13 +6,60 @@
  * Frontend component: apps/web/src/components/scoreboard/Scoreboard.tsx (LS-1867)
  * MLB client library: lib/mlb-client (LS-1864)
  */
+import { GraphQLError } from 'graphql';
 import { createMlbDataProvider } from '@legacy-sports/mlb-client';
+import type { MlbDataProvider } from '@legacy-sports/mlb-client';
+import { retrieveSecretParameterValue } from '@legacy-sports/aws-utils';
+import { LOGGER } from '@legacy-sports/logging';
 import { builder } from './builder';
 
-// Singleton provider — created once at module load so the in-memory cache and
-// rate-limiting inside the provider are preserved across Lambda invocations
-// within the same container lifetime.
-const mlbDataProvider = createMlbDataProvider();
+// Read env vars at module load so they are stable for the container lifetime.
+const MLB_DATA_API_KEY_LOCAL = process.env['MLB_DATA_API_KEY'] ?? '';
+const MLB_DATA_API_KEY_SECRET_NAME =
+  process.env['MLB_DATA_API_KEY_SECRET_NAME'] ?? '';
+
+// Lazy singleton — initialised on first resolver call (like the Stripe client)
+// so the in-memory cache inside the provider is preserved across Lambda
+// invocations within the same container lifetime, and so the secret fetch only
+// occurs once regardless of how many concurrent requests arrive at cold start.
+let mlbDataProviderPromise: Promise<MlbDataProvider> | null = null;
+
+function getMlbDataProvider(): Promise<MlbDataProvider> {
+  if (!mlbDataProviderPromise) {
+    mlbDataProviderPromise = initMlbDataProvider().catch((error) => {
+      // Reset so the next request retries initialisation (e.g. transient SM outage).
+      mlbDataProviderPromise = null;
+      throw error;
+    });
+  }
+  return mlbDataProviderPromise;
+}
+
+async function initMlbDataProvider(): Promise<MlbDataProvider> {
+  let apiKey: string | undefined;
+
+  if (MLB_DATA_API_KEY_LOCAL) {
+    apiKey = MLB_DATA_API_KEY_LOCAL;
+  } else if (MLB_DATA_API_KEY_SECRET_NAME) {
+    apiKey = await retrieveSecretParameterValue(MLB_DATA_API_KEY_SECRET_NAME);
+  }
+
+  return createMlbDataProvider({ apiKey });
+}
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Returns true only for real calendar dates (rejects 2024-02-31, 2024-13-01, etc.). */
+function isValidDate(date: string): boolean {
+  if (!DATE_RE.test(date)) return false;
+  const [y, m, d] = date.split('-').map(Number) as [number, number, number];
+  const parsed = new Date(y, m - 1, d);
+  return (
+    parsed.getFullYear() === y &&
+    parsed.getMonth() === m - 1 &&
+    parsed.getDate() === d
+  );
+}
 
 // ─── ScoreboardTeam ───────────────────────────────────────────────────────────
 
@@ -80,7 +127,8 @@ ScoreboardGameRef.implement({
     }),
     status: t.exposeString('status', {
       nullable: false,
-      description: 'Game status: "Preview", "Live", or "Final"',
+      description:
+        'Game status: "Preview", "Live", "Final", "Postponed", or "Suspended"',
     }),
     startTime: t.exposeString('startTime', {
       nullable: true,
@@ -159,7 +207,30 @@ builder.queryField('scoreboard', (t) =>
         new Date().toLocaleDateString('en-CA', {
           timeZone: 'America/New_York',
         });
-      return mlbDataProvider.getScoreboard(date);
+
+      if (!isValidDate(date)) {
+        throw new GraphQLError(
+          'Invalid date format. Use YYYY-MM-DD (e.g. "2024-07-04").',
+          { extensions: { code: 'BAD_USER_INPUT' } },
+        );
+      }
+
+      try {
+        const provider = await getMlbDataProvider();
+        return await provider.getScoreboard(date);
+      } catch (err) {
+        LOGGER.error('Scoreboard provider error', {
+          date,
+          error:
+            err instanceof Error
+              ? { message: err.message, stack: err.stack }
+              : String(err),
+        });
+        throw new GraphQLError(
+          'Failed to fetch scoreboard data. Please try again.',
+          { extensions: { code: 'INTERNAL_SERVER_ERROR' } },
+        );
+      }
     },
   }),
 );
