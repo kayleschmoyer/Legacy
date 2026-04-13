@@ -38,6 +38,11 @@ export function isPitcherPositionType(posType: string): boolean {
   return PITCHER_POSITION_TYPES.has(posType.toUpperCase());
 }
 
+/** Returns true when the matchup's stats loading status indicates an active load. */
+export function isStatsLoading(status: string | null | undefined): boolean {
+  return status === 'loading' || status === 'queued' || status === 'retry';
+}
+
 /** Returns Tamagui color tokens for a position badge. Uses only design-system tokens. */
 export function getPositionColors(position: string | null | undefined): {
   bg: string;

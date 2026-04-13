@@ -6,6 +6,7 @@ import {
   computeScoring,
   type SeasonStats,
 } from '@legacy-sports/scoring';
+import { isStatsLoading } from '@legacy-sports/shared-components/roster';
 import { PlayerSeasonStatsModal } from './PlayerSeasonStatsModal';
 import { PlayerMatchupStatsModal } from './PlayerMatchupStatsModal';
 import {
@@ -1030,10 +1031,6 @@ export function MatchupRosterComparison({
     );
   }
 
-  if (loading) {
-    return <SkeletonLoading team1Name={team1Name} team2Name={team2Name} />;
-  }
-
   if (error) {
     return (
       <Card backgroundColor="$red2" borderColor="$red6" padding="$4">
@@ -1042,6 +1039,10 @@ export function MatchupRosterComparison({
         </Text>
       </Card>
     );
+  }
+
+  if (loading || isStatsLoading(matchup.statsLoadingStatus)) {
+    return <SkeletonLoading team1Name={team1Name} team2Name={team2Name} />;
   }
 
   const maxBullpenRows = Math.max(team1Bullpen.length, team2Bullpen.length);

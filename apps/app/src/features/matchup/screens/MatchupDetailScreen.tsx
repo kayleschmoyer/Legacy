@@ -185,6 +185,7 @@ export default function MatchupDetailScreen() {
                 leagueId={leagueId}
                 userTeamId={userTeamId}
                 matchupStatus={matchup.status ?? MatchupStatus.Completed}
+                statsLoadingStatus={matchup.statsLoadingStatus}
                 locked={matchup.status === MatchupStatus.InProgress}
               />
             ) : (

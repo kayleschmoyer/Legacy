@@ -1,8 +1,13 @@
 import React, { useMemo, useState } from 'react';
 import { Card, H4, Separator, Spinner, Text, XStack, YStack } from 'tamagui';
 import { Users } from '@tamagui/lucide-icons';
-import { getPositionColors, POSITION_SLOT_ORDER } from './rosterUtils';
 import {
+  getPositionColors,
+  isStatsLoading,
+  POSITION_SLOT_ORDER,
+} from './rosterUtils';
+import {
+  type StatsLoadingStatus,
   useGetLeagueTeamsQuery,
   useGetMatchupPlayersQuery,
   useGetPositionsForLeagueQuery,
@@ -31,6 +36,7 @@ export interface MatchupRosterComparisonProps {
         leagueId?: number | null;
         team1Id?: number | null;
         team2Id?: number | null;
+        statsLoadingStatus?: StatsLoadingStatus | null;
       }
     | null
     | undefined;
@@ -257,22 +263,22 @@ export function MatchupRosterComparison({
 
   if (!matchup) return null;
 
-  if (playersLoading) {
-    return (
-      <Card padding="$4" bordered borderRadius="$6">
-        <XStack alignItems="center" gap="$2" justifyContent="center">
-          <Spinner size="small" />
-          <Text color="$gray11">Loading rosters...</Text>
-        </XStack>
-      </Card>
-    );
-  }
-
   if (queryError) {
     return (
       <Card padding="$4" bordered borderRadius="$6">
         <XStack alignItems="center" gap="$2" justifyContent="center">
           <Text color="$red10">Failed to load roster data.</Text>
+        </XStack>
+      </Card>
+    );
+  }
+
+  if (playersLoading || isStatsLoading(matchup?.statsLoadingStatus)) {
+    return (
+      <Card padding="$4" bordered borderRadius="$6">
+        <XStack alignItems="center" gap="$2" justifyContent="center">
+          <Spinner size="small" />
+          <Text color="$gray11">Loading rosters...</Text>
         </XStack>
       </Card>
     );

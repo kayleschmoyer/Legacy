@@ -3,12 +3,14 @@ import { Alert } from 'react-native';
 import { Spinner, Text, XStack, YStack } from 'tamagui';
 import { LOGGER } from '@legacy-sports/logging';
 import {
+  isStatsLoading,
   type MatchupPlayerData,
   MatchupRosterEditorView,
   POSITION_SLOT_ORDER,
 } from '@legacy-sports/shared-components';
 import {
   MatchupStatus,
+  type StatsLoadingStatus,
   useGetMatchupPlayersQuery,
   useGetPositionsForLeagueQuery,
   useSwapMatchupPlayerPositionsMutation,
@@ -26,6 +28,7 @@ export interface MatchupRosterEditorProps {
   leagueId: number;
   userTeamId: number;
   matchupStatus: MatchupStatus;
+  statsLoadingStatus?: StatsLoadingStatus | null;
   locked?: boolean;
 }
 
@@ -39,6 +42,7 @@ export function MatchupRosterEditor({
   leagueId,
   userTeamId,
   matchupStatus,
+  statsLoadingStatus,
   locked = false,
 }: MatchupRosterEditorProps) {
   const {
@@ -195,15 +199,6 @@ export function MatchupRosterEditor({
     );
   }
 
-  if (playersLoading) {
-    return (
-      <XStack alignItems="center" justifyContent="center" padding="$4" gap="$2">
-        <Spinner size="small" />
-        <Text color="$gray11">Loading roster...</Text>
-      </XStack>
-    );
-  }
-
   if (playersError) {
     return (
       <YStack padding="$4" alignItems="center">
@@ -212,6 +207,15 @@ export function MatchupRosterEditor({
           {playersError.message}
         </Text>
       </YStack>
+    );
+  }
+
+  if (playersLoading || isStatsLoading(statsLoadingStatus)) {
+    return (
+      <XStack alignItems="center" justifyContent="center" padding="$4" gap="$2">
+        <Spinner size="small" />
+        <Text color="$gray11">Loading roster...</Text>
+      </XStack>
     );
   }
 
