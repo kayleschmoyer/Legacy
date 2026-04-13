@@ -38,7 +38,15 @@ Example: `LS-1234 feat(auth): add OAuth2 PKCE flow`
 
 ### PR Body Template
 
+> **This description is read by Copilot as a prompt — not just by humans.** When reviewers use "Fix with Copilot" or `@copilot` on a review comment, Copilot's entire context is the PR title, this description, and the diff. A thin description produces repeated, incomplete, or misaligned fixes. Write it as if you are briefing an engineer who has never seen the ticket.
+
 ```markdown
+## Context
+
+**Jira:** [LS-####](https://bkrupa.atlassian.net/browse/LS-####)
+
+<1-2 sentences on the problem this PR solves and why the change is needed. Include any design decisions or constraints that a reviewer — or Copilot when fixing review comments — needs to understand the intent.>
+
 ## Summary
 
 - <1-3 bullet points describing what changed and why>
@@ -55,6 +63,12 @@ Example: `LS-1234 feat(auth): add OAuth2 PKCE flow`
 If the branch name contains `fix(` or the Jira ticket type is Bug, use this extended template instead. The `## Verification` section is **required** — do not create the PR without it.
 
 ```markdown
+## Context
+
+**Jira:** [LS-####](https://bkrupa.atlassian.net/browse/LS-####)
+
+<1-2 sentences describing the bug, its root cause, and why the chosen fix is correct. Copilot reads this when addressing review comments — include any constraints that affect how the fix should be applied.>
+
 ## Summary
 
 - <1-3 bullet points describing the bug and the fix>
@@ -96,5 +110,7 @@ If the branch name contains `fix(` or the Jira ticket type is Bug, use this exte
 - **Never** create a PR from the `main` branch
 - **Never** skip `make pc` — each CI failure costs 40-60 min
 - **Never** inline `--body` in PowerShell — always use `--body-file` or MCP tool
+- **Never** create a PR body without a `## Context` section that includes a Jira link and problem statement — Copilot reads the PR description when fixing review comments; omitting context causes repeated, misaligned fixes
 - **Never** create a bug-fix PR without a `## Verification` section — `make pc` passing does not prove the bug is fixed
+- **Batch review comments** via "Start a review" before clicking "Fix with Copilot" — submitting each comment individually spawns a separate Copilot agent session per comment, causing duplicate or conflicting fixes
 - If prerequisites fail, stop and report the failure — do not create the PR anyway

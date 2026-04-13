@@ -48,6 +48,10 @@ Verify prerequisites (`make pc`, migrations, branch pushed), create the PR **as 
 
 When a planning phase was run (see [planning skill](../planning/SKILL.md)), include its output in the PR body: the **Context** (why) and **Risk Assessment** sections help reviewers focus on the right areas.
 
+> **A rich PR description is required for Copilot to fix review comments correctly.** When reviewers use "Fix with Copilot" or `@copilot` to address a review thread, Copilot's only context is the PR title, description, and diff. A thin description (e.g., 1-2 summary bullets with no context) causes Copilot to make repeated, incomplete, or misaligned fixes — leading to 3-4 redundant agent runs per review round. Always include a `## Context` section with the Jira link and a clear problem statement. Write the description as a prompt to a capable engineer who has never seen the ticket.
+
+> **Batch review comments before "Fix with Copilot".** Submitting individual review comments (one at a time) and clicking "Fix with Copilot" on each one spawns a separate Copilot agent session per comment. These sessions race each other and frequently produce conflicting patches. Always use "Start a review" to batch all comments, then submit the review in a single action before requesting Copilot fixes.
+
 > Details: [references/create-pr.md](references/create-pr.md)
 
 ### Phase 2b: Watch PR to Merge
