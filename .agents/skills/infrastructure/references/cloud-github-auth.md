@@ -62,10 +62,12 @@ More secure than PATs — tokens are short-lived (1 hour) and scoped to the app'
 
 The repo uses two GitHub Apps for separation of duties:
 
-| App                | ID        | Purpose               | Secret                         |
-| ------------------ | --------- | --------------------- | ------------------------------ |
-| **Agent Author**   | `3158619` | Push code, create PRs | `AGENT_AUTHOR_APP_PRIVATE_KEY` |
-| **Agent Reviewer** | `3142924` | Approve PRs, merge    | `BOT_APP_PRIVATE_KEY`          |
+| App                | ID        | Purpose                             | Secret                         |
+| ------------------ | --------- | ----------------------------------- | ------------------------------ |
+| **Agent Author**   | `3158619` | Push code, create PRs               | `AGENT_AUTHOR_APP_PRIVATE_KEY` |
+| **Agent Reviewer** | `3142924` | Approve PRs, set `bot-review` check | `BOT_APP_PRIVATE_KEY`          |
+
+> **Full permissions:** See the Separation of Duties table in `.agents/skills/workflow-overview/SKILL.md`.
 
 **For Copilot Coding Agent**, this is already automated — `copilot-setup-steps.yml` generates a 1-hour token from the Agent Author app via `actions/create-github-app-token@v2` and exports it as `GH_TOKEN`.
 

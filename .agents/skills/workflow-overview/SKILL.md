@@ -434,13 +434,15 @@ After merge, the merge queue deletes the source branch. Locally:
 
 Three GitHub Apps handle distinct roles to ensure no single identity both authors and approves code:
 
-| App                                   | ID                                | Role                                                                      | Permissions                                                              |
-| ------------------------------------- | --------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| Agent Author                          | 3158619                           | Pushes code, creates PRs                                                  | Contents (rw), Pull requests (rw)                                        |
-| Review Bot (legacy-sports-review-bot) | 3142924                           | Approves PRs after Copilot review passes, manages `bot-review` status     | Pull requests (rw), Statuses (rw)                                        |
-| Merge Queue Bot                       | (via `MERGE_QUEUE_APP_ID` secret) | Processes merge queue, merges PRs, retargets dependents, deletes branches | Contents (rw), Pull requests (rw), Issues (rw), Checks (r), Statuses (r) |
+| App                                   | ID                                | Role                                                                               | Permissions                                                              |
+| ------------------------------------- | --------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Agent Author                          | 3158619                           | Pushes code, creates PRs                                                           | Contents (rw), Pull requests (rw)                                        |
+| Review Bot (legacy-sports-review-bot) | 3142924                           | Approves PRs after Copilot review passes, manages `bot-review` status, adds labels | Pull requests (rw), Statuses (rw), Checks (rw), Issues (rw)              |
+| Merge Queue Bot                       | (via `MERGE_QUEUE_APP_ID` secret) | Processes merge queue, merges PRs, retargets dependents, deletes branches          | Contents (rw), Pull requests (rw), Issues (rw), Checks (r), Statuses (r) |
 
 **Key constraint:** The Agent Author app never approves PRs. The Review Bot never pushes code. This ensures separation between code authoring and code approval.
+
+> **Canonical reference:** This table is the single source of truth for GitHub App permissions. When changing an app's permissions, update this table first, then update the app's settings in GitHub, accept the new permissions on the installation, and finally update the workflow file header comments. Other docs (merge-queue-guide, cloud-github-auth) reference these apps but should link here rather than duplicate the full permission set.
 
 ## Required vs Advisory Checks
 

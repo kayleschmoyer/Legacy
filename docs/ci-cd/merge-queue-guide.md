@@ -206,12 +206,14 @@ Remove the label and merge manually via the GitHub UI or `gh pr merge`.
 
 Two GitHub Apps are involved:
 
-| App                                         | ID                   | Purpose                                                                | Secrets                                             |
-| ------------------------------------------- | -------------------- | ---------------------------------------------------------------------- | --------------------------------------------------- |
-| **Merge Queue App**                         | `MERGE_QUEUE_APP_ID` | Merges PRs, posts comments, deletes branches, re-targets dependent PRs | `MERGE_QUEUE_APP_ID`, `MERGE_QUEUE_APP_PRIVATE_KEY` |
-| **Review Bot** (`legacy-sports-review-bot`) | `3142924`            | Sets `bot-review` status, approves PRs after clean Copilot review      | `BOT_APP_PRIVATE_KEY`                               |
+| App                                         | ID                   | Purpose                                                                            | Secrets                                             |
+| ------------------------------------------- | -------------------- | ---------------------------------------------------------------------------------- | --------------------------------------------------- |
+| **Merge Queue App**                         | `MERGE_QUEUE_APP_ID` | Merges PRs, posts comments, deletes branches, re-targets dependent PRs             | `MERGE_QUEUE_APP_ID`, `MERGE_QUEUE_APP_PRIVATE_KEY` |
+| **Review Bot** (`legacy-sports-review-bot`) | `3142924`            | Sets `bot-review` status (via Checks API), approves PRs after clean Copilot review | `BOT_APP_PRIVATE_KEY`                               |
 
 Both use dedicated app tokens (not `GITHUB_TOKEN`) to ensure their actions trigger downstream workflows (e.g., the CI Orchestrator integration build on main). The separation of duties ensures the same app never both authors and approves code.
+
+> **Canonical permissions reference:** See the Separation of Duties table in `.agents/skills/workflow-overview/SKILL.md` for the full permission set per app.
 
 ## Related Documentation
 
