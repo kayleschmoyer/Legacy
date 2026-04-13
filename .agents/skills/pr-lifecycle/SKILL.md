@@ -22,9 +22,11 @@ Prefer MCP tools; use `gh pr view --json` only when MCP is unavailable or the us
 
 Work through these phases sequentially. Each phase links to a detailed reference doc.
 
-### Phase 1: Self-Review Before Push
+### Phase 1: Self-Review Before Push (MANDATORY GATE)
 
-Run a structured review of all branch changes before committing/pushing. Catches project-rule violations that `make pc` does not check (semantic issues, dead code, reuse opportunities).
+Run a structured review of all branch changes before pushing. This is a **Tier 2 workflow rule** — do NOT push without completing it. Catches project-rule violations, common Copilot review patterns, and code quality issues that `make pc` does not check (semantic issues, dead code, reuse opportunities).
+
+You must produce a **structured Self-Review Summary** (see the template in the reference doc) listing files reviewed, patterns checked, and issues fixed. This summary is your proof of thoroughness — without it, self-review did not happen.
 
 > Self-review is a verification step, not a planning step. If you find yourself making significant design changes during self-review, you may have skipped the [planning phase](../planning/SKILL.md) — consider stopping and re-planning.
 
@@ -86,7 +88,7 @@ When `bot-review` CI check fails or Copilot posts review comments, use this MCP-
 
 ## Critical Rules
 
-1. **Always self-review before pushing** -- Phase 1 is not optional. It prevents CI failures and reduces Copilot review rounds.
+1. **Always self-review before pushing (Tier 2 gate)** -- Phase 1 is mandatory. Read every changed file in full, check all 20 common review patterns, and produce a Self-Review Summary before calling `worktree_push()`. Skipping this is the #1 cause of avoidable Copilot review cycles.
 2. **2-round cap on Copilot fix iterations** -- Round 1: security/bugs/type safety. Round 2: remaining actionable comments. After round 2: resolve and move on.
 3. **Resolve threads after fixing** -- use `github_resolve_threads({ threadIds: [...], prNumber: <PR#> })` after pushing fixes. Thread IDs come from `github_get_review_threads({ number: <PR#>, unresolvedOnly: true })`. The `prNumber` parameter triggers a bot-review recheck attempt when all thread resolutions succeed; if the app token lacks `actions: write` the dispatch is skipped/non-fatal and the tool returns a `recheckNote` instead of erroring — threads are still resolved and the recheck fires automatically on the next push. Add `merge-when-ready` label after all threads are resolved. **Do NOT use `gh api graphql`** to resolve — `github_resolve_threads` works with both user and GitHub App tokens and handles batching. Fall back to `gh api graphql` only if the custom server is confirmed unavailable after retry.
 4. **Never skip `make pc`** -- each CI failure costs 40-60 min. Minimum alternative: `make format && make lint-fix && make typecheck`.

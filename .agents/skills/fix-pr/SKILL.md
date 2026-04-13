@@ -64,9 +64,10 @@ Build a triage list:
 2. **Read ALL unresolved threads** before making any changes — collect every `path`, `line`, `body`, and `id`.
 3. **Apply all fixes in one pass** — do not commit between individual fixes. If a comment is unclear or contradicts ticket AC, reply explaining the conflict but still queue the thread for resolution.
 4. **Validate**: `make pc` (minimum: `make format && make lint-fix && make typecheck`)
-5. **Commit + push once**: single commit covering all fixes.
-6. **Resolve threads immediately after push**: `github_resolve_threads({ threadIds: [...], prNumber: <PR#> })` — include all addressed threads. GitHub does NOT auto-resolve threads.
-7. **Re-request Copilot review**: `github_request_review({ number: <PR#> })`
+5. **Self-review fix code**: re-read every file you changed in full. Check fixes against `skills/pr-lifecycle/references/common-review-patterns.md` — fix code often introduces the same anti-patterns that triggered the original review. This prevents another review cycle.
+6. **Commit + push once**: single commit covering all fixes.
+7. **Resolve threads immediately after push**: `github_resolve_threads({ threadIds: [...], prNumber: <PR#> })` — include all addressed threads. GitHub does NOT auto-resolve threads.
+8. **Re-request Copilot review**: `github_request_review({ number: <PR#> })`
 
 **Two-round cap**: Round 1 fixes security/bugs/type safety. Round 2 fixes remaining actionable comments. After round 2, resolve remaining threads as "acknowledged" and proceed.
 
@@ -80,8 +81,9 @@ Build a triage list:
 4. **Read logs**: `ci_get_logs({ runId, failedOnly: true })` to pull failing-job logs, or after `ci_view_run({ runId })` identify a failing `jobId` and use `ci_get_logs({ jobId })` — find the actual error, not just the job name.
 5. **Fix the code** based on the error evidence.
 6. **Validate locally**: `make pc` — the whole point is to catch issues before pushing, not after.
-7. **Commit + push**.
-8. **Wait for CI**: `ci_wait_for_run({ runId })` or `github_wait_for_pr_event({ number: <PR#> })` — confirm CI passes before declaring done.
+7. **Self-review fix code**: re-read changed files in full and check against `skills/pr-lifecycle/references/common-review-patterns.md` before pushing.
+8. **Commit + push**.
+9. **Wait for CI**: `ci_wait_for_run({ runId })` or `github_wait_for_pr_event({ number: <PR#> })` — confirm CI passes before declaring done.
 
 ### Step 4: Final Verification
 

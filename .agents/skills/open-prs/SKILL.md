@@ -117,6 +117,7 @@ If either returns `configured: false`, **stop and prompt the user** before proce
 - **One worktree per PR** — never mix fixes for different PRs in the same worktree
 - **All file edits happen in the worktree**, never in `D:\code\legacy-sports`
 - **Always `make pc` before pushing** — do not push broken code. **Every agent that modifies code must validate before pushing. Skipping saves 5 min but each CI failure costs 40-60 min in re-dispatch + CI queue time.**
+- **Always self-review before pushing** — after `make pc` passes, re-read changed files in full and check against `skills/pr-lifecycle/references/common-review-patterns.md`. Fix code is new code that Copilot will review — skipping self-review here is the #1 cause of review round-trip cycles in sweeps.
 - **Dirty-tree guard before push** — after `make pc` passes, check `worktree_status(worktree: "LS-####")`. If the working tree is dirty (formatting auto-amend may leave changes on Windows), commit with `worktree_commit(message: "style: apply formatting", worktree: "LS-####")` and re-run `make pc` before pushing.
 - **Always `--force-with-lease`** when pushing rebased branches — `worktree_push` uses this by default
 

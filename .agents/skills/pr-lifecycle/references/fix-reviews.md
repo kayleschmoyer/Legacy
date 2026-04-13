@@ -28,14 +28,15 @@ This aims to keep most PRs to ≤ 2 review rounds by avoiding unnecessary re-rev
 3. **Fix ALL threads before modifying files**: read every thread's `path`, `line`, and `body` first, then apply all fixes in one pass. Do not commit or push until all threads are addressed.
    - If a comment is unclear or incorrect, note it for a reply — but do not stop, continue fixing the other threads
 4. **Validate**: `make pc` (or at minimum `make typecheck && make lint-fix`)
-5. **Commit & push once**: one commit covering all fixes from this round, conventional commit message describing the fixes
-6. **Resolve threads (MANDATORY)**: After pushing, immediately resolve every thread you addressed:
+5. **Self-review fix code (BEFORE push)**: re-read every file you changed in full (not just the lines you edited). Check your fixes against [common-review-patterns.md](common-review-patterns.md) — fix code frequently introduces the same anti-patterns that triggered the original review (e.g., wrong mock paths, `LOGGER.error({ error })` wrapping, missing null checks). A 2-minute scan here prevents another 30–60 min review cycle.
+6. **Commit & push once**: one commit covering all fixes from this round, conventional commit message describing the fixes
+7. **Resolve threads (MANDATORY)**: After pushing, immediately resolve every thread you addressed:
    - Collect all thread `id` values from the threads you fixed in step 3
    - Call `github_resolve_threads({ threadIds: [...] })` with all IDs in a single batch
    - GitHub does NOT auto-resolve threads when code changes — you must explicitly resolve them
    - For threads you chose not to fix (disagreed / out of scope), reply with an explanation, then resolve
    - **Never leave addressed threads unresolved** — this blocks the merge queue and triggers re-review
-7. Copilot re-reviews automatically on push; new threads from the re-review are a separate round
+8. Copilot re-reviews automatically on push; new threads from the re-review are a separate round
 
 ## Two-Round Cap
 
@@ -75,13 +76,14 @@ On Claude Code on the web, use the **custom `legacy-sports-github` MCP server** 
 ### Cloud workflow steps
 
 1. **Subscribe**: `mcp__github__subscribe_pr_activity({ owner, repo, pullNumber: <PR#> })` — receive `<github-webhook-activity>` messages when Copilot posts comments or CI completes
-2. **Fetch threads**: `github_get_review_threads({ number: <PR#>, unresolvedOnly: true })` — the custom server returns GraphQL thread `id` values needed for step 6. If the first call fails with a connection error, wait 10s and retry (server may still be starting). Only fall back to `mcp__github__pull_request_read({ method: "get_review_comments", owner, repo, pullNumber })` if the custom server is confirmed unavailable — but note: the built-in does **not** return thread node IDs, so step 6 cannot use `mcp__github__resolve_review_thread` without them.
+2. **Fetch threads**: `github_get_review_threads({ number: <PR#>, unresolvedOnly: true })` — the custom server returns GraphQL thread `id` values needed for step 7. If the first call fails with a connection error, wait 10s and retry (server may still be starting). Only fall back to `mcp__github__pull_request_read({ method: "get_review_comments", owner, repo, pullNumber })` if the custom server is confirmed unavailable — but note: the built-in does **not** return thread node IDs, so step 7 cannot use `mcp__github__resolve_review_thread` without them.
 3. **Fix code & validate**: same as local workflow (`make pc`)
-4. **Commit & push**: `worktree_commit({ message: "..." })` + `worktree_push()` (or `git commit` + `git push`)
-5. **Reply to threads**: `mcp__github__add_reply_to_pull_request_comment({ owner, repo, pullNumber, commentId: <numeric>, body: "explanation" })` — use the built-in tool so replies appear under bot identity, not the user's GitHub username
-6. **Resolve threads**: `github_resolve_threads({ threadIds: [...], prNumber: <PR#> })` — thread IDs from step 2. If step 2 used the built-in fallback and thread IDs are unavailable, make one more attempt with `github_get_review_threads` (server may be up by now) before surfacing the blocker to the user.
-7. **Re-request review**: `mcp__github__request_copilot_review({ owner, repo, pullNumber })` — platform handles auth natively; the custom server's app token is silently dropped by GitHub for Copilot requests
-8. **Loop**: wait for new `<github-webhook-activity>` events, cap at 2 rounds
+4. **Self-review fix code**: same as local workflow step 5 — re-read changed files in full, check fixes against common-review-patterns.md before pushing.
+5. **Commit & push**: `worktree_commit({ message: "..." })` + `worktree_push()` (or `git commit` + `git push`)
+6. **Reply to threads**: `mcp__github__add_reply_to_pull_request_comment({ owner, repo, pullNumber, commentId: <numeric>, body: "explanation" })` — use the built-in tool so replies appear under bot identity, not the user's GitHub username
+7. **Resolve threads**: `github_resolve_threads({ threadIds: [...], prNumber: <PR#> })` — thread IDs from step 2. If step 2 used the built-in fallback and thread IDs are unavailable, make one more attempt with `github_get_review_threads` (server may be up by now) before surfacing the blocker to the user.
+8. **Re-request review**: `mcp__github__request_copilot_review({ owner, repo, pullNumber })` — platform handles auth natively; the custom server's app token is silently dropped by GitHub for Copilot requests
+9. **Loop**: wait for new `<github-webhook-activity>` events, cap at 2 rounds
 
 > **Why split tools?** Fetching/resolving threads uses the custom server (only source of GraphQL thread node IDs). Replying and requesting review uses built-in tools (platform auth ensures bot identity, not user's personal token).
 

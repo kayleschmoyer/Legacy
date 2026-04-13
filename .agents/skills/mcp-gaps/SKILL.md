@@ -63,7 +63,8 @@ This skill enforces the **MCP-first principle** from AGENTS.md: shell commands a
      For `missing-tool` and `missing-feature` gaps, run the [planning skill](../planning/SKILL.md) before implementation to understand the MCP server's existing patterns, conventions, and tool registration approach. Changes to auth-related tools or tools that make external API calls are **High risk**.
 3. **Implement** following the target MCP server's conventions
 4. **Validate** with `make pc`
-5. **Ship** — commit, push, create PR, transition Jira to "In Review"
+5. **Self-review** — run `/review` (or the self-review steps in `skills/pr-lifecycle/references/self-review.md`) and check against `skills/pr-lifecycle/references/common-review-patterns.md` before pushing. MCP tool code is especially prone to patterns #11 (silent error swallowing), #12 (argument injection), #14 (`shell: true`), and #20 (unbounded output).
+6. **Ship** — commit, push, create PR, transition Jira to "In Review"
 
 ---
 

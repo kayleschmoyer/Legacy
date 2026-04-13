@@ -176,7 +176,7 @@ If CI is failing:
 2. Check if it's a flaky test — `ci_rerun(runId: <id>, failedOnly: true)` if it looks transient
 3. If persistent, get logs: `ci_get_logs(runId: <id>, errorSummary: true)`
 4. Load debugging skill if code changes are needed: read `skills/debugging/SKILL.md`
-5. Fix, validate with `make pc`, commit, push
+5. Fix, validate with `make pc`, self-review fix code against `skills/pr-lifecycle/references/common-review-patterns.md`, then commit and push
 
 #### Priority 3: Review comments
 
@@ -185,7 +185,7 @@ If there are unresolved review threads:
 1. Fetch threads: `github_get_review_threads(number: <PR#>, unresolvedOnly: true)`
 2. For each thread, read the comment's path/line/body
 3. Cross-reference with Jira ticket context (don't apply suggestions that contradict AC)
-4. Fix the code, validate with `make pc`, commit, push
+4. Fix the code, validate with `make pc`, self-review fix code against `skills/pr-lifecycle/references/common-review-patterns.md`, then commit and push
 5. Resolve threads: `github_resolve_threads(threadIds: [...], prNumber: <PR#>)`
 6. Re-request review: `github_request_review(number: <PR#>)`
 

@@ -76,6 +76,8 @@ make pc
 
 If `make pc` fails: fix issues, commit (`fix: post-rebase stabilization`), re-run until clean.
 
+**Self-review after conflict resolution**: if the rebase required manual conflict resolution, re-read every file you resolved in full and check against `skills/pr-lifecycle/references/common-review-patterns.md` before pushing. Conflict resolution code is new code that Copilot will review — catching issues here prevents a review round-trip.
+
 ## Worktree Rebase
 
 **MCP:** `worktree_rebase` (preferred). **Shell:**

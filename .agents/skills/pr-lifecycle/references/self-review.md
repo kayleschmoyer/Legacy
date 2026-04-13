@@ -1,11 +1,13 @@
 ---
 name: review
-description: 'Self-review all code changes on the current branch before committing. Load when the user says "review", "check my changes", or before creating a PR.'
+description: 'Self-review all code changes on the current branch before pushing. This is a MANDATORY quality gate (Tier 2) — never push without completing it. Load when the user says "review", "check my changes", or before creating a PR.'
 ---
 
 # Skill: Self-Review
 
-You are a **code reviewer** for this project. Your job is to read all changes on the current branch, check them against project rules, identify issues, and fix them directly. Be thorough but practical — focus on issues that would fail CI or cause bugs, not style preferences.
+You are a **code reviewer** for this project. Your job is to read all changes on the current branch, check them against project rules and known Copilot review patterns, identify issues, and fix them directly.
+
+> **This is a mandatory gate.** Do NOT push until self-review is complete. Every issue you miss here becomes a Copilot review comment that costs 30–60 min to fix in a review round-trip. Thoroughness here directly eliminates review cycles.
 
 ## Steps (chain-of-thought)
 
@@ -37,17 +39,37 @@ You are a **code reviewer** for this project. Your job is to read all changes on
 
 5. **Reuse check**: Could any new component use existing ones from `lib/shared-components`? Any new utility that duplicates `lib/utils`?
 
-6. **Check against [common review patterns](common-review-patterns.md)** — these are the top Copilot findings that cause round-2 reviews. Scan your changes for every applicable pattern (wrong mock paths, broad `postData.includes()`, LOGGER.error wrapping, missing UNAUTHENTICATED guards, wrong GraphQL mock structure, etc.). Catching these here eliminates the most common review round-trips.
+6. **Check against [common review patterns](common-review-patterns.md) (MANDATORY)** — open `common-review-patterns.md` and walk through **every pattern (#1–#20)**. For each pattern, ask: "Does my diff contain code that matches this anti-pattern?" This is not a skim — read each pattern description and actively search your changed files for matches. The top patterns that cause review round-trips:
+   - **#1**: `jest.doMock` targeting wrong module path (`@legacy-sports/utils` vs `@legacy-sports/utils/node`)
+   - **#2**: Broad `postData.includes()` matching (use quoted `'"operationName"'` or `extractOperationName()`)
+   - **#3**: Header comment overclaiming test coverage
+   - **#4**: Missing UNAUTHENTICATED guard test for resolvers
+   - **#5**: `route.fallback()`/`route.continue()` leaking to real network in E2E
+   - **#6**: `LOGGER.error({ error })` wrapping — Rollbar needs `LOGGER.error('msg', error)`
+   - **#7**: `data: null` mock response — Apollo expects `{ data: { queryName: ... } }`
+   - **#8**: Wrong GraphQL field names in mocks (check actual `.graphql` files)
+   - **#11**: Silent error swallowing in catch blocks
+   - **#12**: Argument injection via refs/args starting with `-`
+   - **#14**: `shell: true` with user input
+   - **#19**: Dev/prod ternary that forgets staging
+   - **#20**: Unbounded tool output without truncation
 
 7. **Fix issues directly** — apply fixes in the working tree, don't just report them. If a fix is ambiguous, explain the tradeoff and pick the safer option.
 
-## Output
+## Output (required before pushing)
 
-After reviewing, produce a brief summary:
+After reviewing, produce a structured summary. This summary is your proof that self-review was thorough — not a formality.
 
-- Issues found and fixed (with file:line references)
-- Issues that need human decision (if any)
-- "No issues found" if the code is clean
+```
+## Self-Review Summary
+- **Files reviewed**: <list of files read in full>
+- **Common patterns checked**: #1–#20 (list any that matched and were fixed)
+- **Project rule violations**: <list, or "None">
+- **Code quality issues fixed**: <list with file:line, or "None">
+- **Issues needing human decision**: <list, or "None">
+```
+
+If the summary is empty or says only "No issues found" without listing the files reviewed, the self-review was not thorough enough — go back and read the files.
 
 ## Guardrails
 
