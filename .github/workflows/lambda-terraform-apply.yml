@@ -491,7 +491,7 @@ jobs:
         if: steps.apply.outcome == 'success'
         uses: ./.github/actions/discord-notify
         with:
-          webhook-url: ${{ secrets.DISCORD_ERRORS_WEBHOOK_URL }}
+          webhook-url: ${{ secrets.DISCORD_DEPLOY_WEBHOOK_URL }}
           status: success
           title: "Lambda Infrastructure Deploy"
           environment: ${{ env.AWS_STAGE }}
@@ -502,7 +502,7 @@ jobs:
         if: always() && steps.apply.outcome == 'failure'
         uses: ./.github/actions/discord-notify
         with:
-          webhook-url: ${{ secrets.DISCORD_ERRORS_WEBHOOK_URL }}
+          webhook-url: ${{ secrets.DISCORD_DEPLOY_WEBHOOK_URL }}
           status: failure
           title: "Lambda Infrastructure Deploy"
           environment: ${{ env.AWS_STAGE }}
