@@ -549,7 +549,20 @@ jobs:
           set -euo pipefail
           REPO_URL="https://x-access-token:${DEPLOY_TOKEN}@github.com/bkrupa/legacy-sports-deploys.git"
 
-          git clone --depth 1 --single-branch --branch gh-pages "$REPO_URL" _deploy
+          # Retry clone to handle transient GitHub App token propagation delays.
+          # The token mint and clone race — GitHub's auth backend may not have
+          # propagated the new installation token by the time git clone fires,
+          # causing a spurious "repository not found" (~once per PR).
+          CLONE_RETRIES=5
+          for attempt in $(seq 1 $CLONE_RETRIES); do
+            rm -rf _deploy
+            if git clone --depth 1 --single-branch --branch gh-pages "$REPO_URL" _deploy; then
+              break
+            fi
+            [ "$attempt" -eq "$CLONE_RETRIES" ] && { echo "Clone failed after ${CLONE_RETRIES} attempts"; exit 1; }
+            echo "Clone attempt ${attempt} failed — retrying in ${attempt}s..."
+            sleep "$attempt"
+          done
           cd _deploy
 
           rm -rf "${DEST_DIR}"
