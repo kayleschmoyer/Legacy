@@ -158,6 +158,15 @@ test.describe('Loading spinner accessibility @regression', () => {
     await page.goto('/baseball/league/1/overview');
     await page.waitForLoadState('networkidle');
 
+    // networkidle fires before React.lazy() code-splitting finishes, so the
+    // app-level Suspense fallback may still be visible. Wait for real page
+    // content inside the main landmark to confirm the lazy route has rendered.
+    await page
+      .getByRole('main')
+      .getByRole('heading')
+      .first()
+      .waitFor({ state: 'visible', timeout: 15000 });
+
     // After load, no spinner with role="status" should be visible
     const visibleSpinners = page.locator('[role="status"]:visible');
     const count = await visibleSpinners.count();

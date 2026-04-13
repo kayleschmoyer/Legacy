@@ -288,24 +288,26 @@ test.describe
       );
     });
 
-    await test.step('Auto-advance the completed matchup', async () => {
-      await gqlFetch<{
-        autoAdvanceMatchups: { leaguesAdvanced: number } | null;
-      }>(
-        commissionerJwt,
-        `mutation AutoAdvance($leagueId: Int) {
-             autoAdvanceMatchups(leagueId: $leagueId) { leaguesAdvanced }
-           }`,
-        { leagueId: state.leagueId },
-      );
-    });
-
-    await test.step('Poll until season is complete (currentMatchup = null)', async () => {
-      // The season is complete when: draftStatus = 'completed', frozenAt = null,
-      // league has no currentMatchup, and highestWeek >= totalMatchups (1).
+    await test.step('Auto-advance and poll until season is complete', async () => {
+      // autoSelectGames sends an SQS message and returns immediately.
+      // The Lambda processing game selection may not finish before we call
+      // autoAdvanceMatchups, so we call autoAdvanceMatchups inside the poll
+      // loop — it is idempotent and will succeed once games are selected.
       await expect
         .poll(
           async () => {
+            // Try to advance (idempotent — safe to call repeatedly)
+            await gqlFetch<{
+              autoAdvanceMatchups: { leaguesAdvanced: number } | null;
+            }>(
+              commissionerJwt,
+              `mutation AutoAdvance($leagueId: Int) {
+                   autoAdvanceMatchups(leagueId: $leagueId) { leaguesAdvanced }
+                 }`,
+              { leagueId: state.leagueId },
+            );
+
+            // Check completion
             const result = await gqlFetch<{
               league: {
                 draftStatus: string;
@@ -332,7 +334,7 @@ test.describe
           },
           {
             timeout: 60_000,
-            intervals: [2_000, 5_000],
+            intervals: [3_000, 5_000],
             message: 'Season did not reach completion state',
           },
         )

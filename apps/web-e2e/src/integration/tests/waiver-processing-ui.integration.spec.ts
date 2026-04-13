@@ -32,6 +32,7 @@
 import { expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { createLeagueViaUI } from '../helpers/create-league';
+import { waitForJoinPageValidation } from '../helpers/wait-for-join-page';
 import { switchUser, test } from '../fixtures/ui';
 
 // ---------------------------------------------------------------------------
@@ -273,9 +274,7 @@ test.describe
       await switchUser(page, jwt, `/baseball/league/join/${state.inviteCode}`);
       await page.waitForLoadState('load');
 
-      await expect(page.getByText(/spot(s)?\s+available/i).first()).toBeVisible(
-        { timeout: 30000 },
-      );
+      await waitForJoinPageValidation(page);
 
       await page.locator('#team-name').fill(teamName);
       const joinBtn = page.getByRole('button', { name: /Join League/i });

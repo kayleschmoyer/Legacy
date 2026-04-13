@@ -100,6 +100,7 @@ test.describe
           input: {
             leagueName: 'Season Lifecycle Integration Test',
             numberOfTeams: 3,
+            numberOfDivisions: 1,
             maxRosterSize: 4,
             playerPool: 'all',
           },

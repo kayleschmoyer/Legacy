@@ -289,11 +289,23 @@ test.describe
           .catch(() => false);
 
         if (isMyTurn) {
-          // Find the first available "Draft X now" button for a player we
-          // haven't already drafted this session.
+          // Wait for at least one "Draft ... now" button to appear.
+          // "YOUR PICK" in the header can render before the PlayerCard
+          // components re-render with isMyPick=true (which changes the
+          // aria-label from "Waiting for your turn..." to "Draft X now").
+          // Without this wait, the button count can be 0 on every iteration
+          // until the server auto-processes the pick (30 s timer), causing
+          // pickCount to stay at 0.
           const allDraftBtns = page.getByRole('button', {
             name: /Draft .* now/i,
           });
+          await allDraftBtns
+            .first()
+            .waitFor({ state: 'visible', timeout: 10_000 })
+            .catch(() => {
+              // If no draft button appears within 10 s, fall through to the
+              // "no undrafted button found" path below.
+            });
           const btnCount = await allDraftBtns.count().catch(() => 0);
           let draftBtnIdx = -1;
           let ariaLabel: string | null = null;
