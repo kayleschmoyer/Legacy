@@ -63,13 +63,10 @@ jobs:
     needs: [check-runner-access]
     runs-on: ${{ needs.check-runner-access.outputs.runner-label }}
     timeout-minutes: 15
-    # Serialize pushes to the deploy repo to prevent race conditions when
-    # multiple workflows (storybook, PR preview, cleanup) push to gh-pages.
-    # PR runs never deploy, so they get a unique group to avoid blocking on
-    # unrelated gh-pages pushes.
-    concurrency:
-      group: ${{ github.event_name == 'pull_request' && format('deploy-repo-gh-pages-push-pr-{0}', github.run_id) || 'deploy-repo-gh-pages-push' }}
-      cancel-in-progress: false
+    # Push conflicts with other workflows deploying to the same gh-pages branch
+    # are handled by the retry-with-rebase loop in the deploy step. No shared
+    # concurrency group — GitHub only queues one pending job per group, so a
+    # burst of deploys cancels intermediate pending jobs instead of queuing them.
 
     steps:
       - name: Checkout Repository
@@ -96,6 +93,60 @@ jobs:
           fi
           echo "Storybook build output:"
           ls -la dist/storybook/
+
+      # ── Deploy to GitHub Pages (non-PR only: workflow_call or dispatch) ──
+      - name: Generate App Token
+        id: app-token
+        if: github.event_name != 'pull_request'
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.PREVIEW_APP_ID }}
+          private-key: ${{ secrets.PREVIEW_APP_PRIVATE_KEY }}
+          owner: bkrupa
+          repositories: legacy-sports-deploys
+
+      - name: Deploy Storybook
+        if: github.event_name != 'pull_request'
+        env:
+          DEPLOY_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          REPO_URL="https://x-access-token:${DEPLOY_TOKEN}@github.com/${{ env.DEPLOY_REPO }}.git"
+
+          git clone --depth 1 --single-branch --branch gh-pages "$REPO_URL" _deploy
+          cd _deploy
+
+          rm -rf storybook
+          mkdir -p storybook
+          cp -r ../dist/storybook/. storybook/
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .
+
+          if git diff --cached --quiet; then
+            echo "No changes to deploy"
+            exit 0
+          fi
+
+          git commit -m "deploy storybook"
+
+          # Push with pull-rebase retry to handle races from other workflows
+          # pushing to the same gh-pages branch between our clone and push.
+          MAX_RETRIES=7
+          for attempt in $(seq 1 $MAX_RETRIES); do
+            if git push origin gh-pages; then
+              echo "Push succeeded (attempt ${attempt})"
+              exit 0
+            fi
+            JITTER=$((RANDOM % 5))
+            echo "Push failed (attempt ${attempt}) — retrying in $((attempt * 2 + JITTER))s..."
+            sleep $((attempt * 2 + JITTER))
+            git pull --rebase origin gh-pages
+          done
+
+          echo "Push failed after ${MAX_RETRIES} attempts"
+          exit 1
 
       # ── Sticky PR Comment (only on pull requests) ─────────────────────────
       - name: Comment Storybook URL

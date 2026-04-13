@@ -331,15 +331,13 @@ jobs:
   deploy-playwright-report:
     name: "Deploy Playwright Report"
     needs: [e2e]
-    # Serialize pushes to bkrupa/legacy-sports-deploys gh-pages branch.
-    # Multiple workflows (playwright, PR preview, storybook, cleanup) all push
-    # to the same gh-pages branch — they MUST share one concurrency group or
-    # the second push fails with "fetch first" when a different workflow
-    # advanced the ref between clone and push. cancel-in-progress: false queues
-    # them instead of cancelling so every PR's report still lands.
-    concurrency:
-      group: deploy-repo-gh-pages-push
-      cancel-in-progress: false
+    # Each deploy workflow pushes to a unique subdirectory of the gh-pages branch
+    # on bkrupa/legacy-sports-deploys. Push conflicts are handled by the retry-
+    # with-rebase loop in the deploy step below. A shared concurrency group is
+    # NOT used because GitHub only queues one pending job per group — a third
+    # job cancels the pending one, which was causing Playwright deploys to be
+    # cancelled during bursts of PR preview deploys.
+    #
     # Dependabot-triggered runs do not have access to repository secrets, so the
     # GitHub App token mint required to push to bkrupa/legacy-sports-deploys
     # always fails ("appId option is required"). The Playwright HTML report is
@@ -429,14 +427,16 @@ jobs:
 
           # Push with pull-rebase retry to handle races from other workflows
           # pushing to the same gh-pages branch between our clone and push.
-          MAX_RETRIES=5
+          # Jitter avoids thundering-herd when multiple deploys retry together.
+          MAX_RETRIES=7
           for attempt in $(seq 1 $MAX_RETRIES); do
             if git push origin gh-pages; then
               echo "Push succeeded (attempt ${attempt})"
               exit 0
             fi
-            echo "Push failed (attempt ${attempt}) — pulling latest and retrying..."
-            sleep $((attempt * 2))
+            JITTER=$((RANDOM % 5))
+            echo "Push failed (attempt ${attempt}) — retrying in $((attempt * 2 + JITTER))s..."
+            sleep $((attempt * 2 + JITTER))
             git pull --rebase origin gh-pages
           done
 

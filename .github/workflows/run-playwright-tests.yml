@@ -477,13 +477,10 @@ jobs:
     name: "Deploy Playwright Report"
     needs: [run-tests]
     if: ${{ !cancelled() && needs.run-tests.result != 'skipped' }}
-    # Serialize pushes to bkrupa/legacy-sports-deploys gh-pages branch.
-    # Must share the same group as PR preview, storybook, and CI pipeline
-    # deploys — all push to the same branch and a regular git push fails
-    # with "fetch first" if another workflow advanced the ref first.
-    concurrency:
-      group: deploy-repo-gh-pages-push
-      cancel-in-progress: false
+    # Push conflicts with other workflows deploying to the same gh-pages branch
+    # are handled by the retry-with-rebase loop in the deploy step. No shared
+    # concurrency group — GitHub only queues one pending job per group, so a
+    # burst of deploys cancels intermediate pending jobs instead of queuing them.
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
     outputs:
@@ -572,14 +569,16 @@ jobs:
 
           # Push with pull-rebase retry to handle races from other workflows
           # pushing to the same gh-pages branch between our clone and push.
-          MAX_RETRIES=5
+          # Jitter avoids thundering-herd when multiple deploys retry together.
+          MAX_RETRIES=7
           for attempt in $(seq 1 $MAX_RETRIES); do
             if git push origin gh-pages; then
               echo "Push succeeded (attempt ${attempt})"
               exit 0
             fi
-            echo "Push failed (attempt ${attempt}) — pulling latest and retrying..."
-            sleep $((attempt * 2))
+            JITTER=$((RANDOM % 5))
+            echo "Push failed (attempt ${attempt}) — retrying in $((attempt * 2 + JITTER))s..."
+            sleep $((attempt * 2 + JITTER))
             git pull --rebase origin gh-pages
           done
 

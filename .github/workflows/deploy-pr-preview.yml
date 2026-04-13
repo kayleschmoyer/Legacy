@@ -39,9 +39,10 @@ on:
       - ".github/workflows/deploy-pr-preview.yml"
 
 concurrency:
-  # workflow_run: group by head branch (unique per PR)
-  # pull_request: group by PR number
-  group: pr-preview-${{ github.event.workflow_run.head_branch || github.event.pull_request.number || github.run_id }}
+  # Use PR number for both event types so deploy (workflow_run) and cleanup
+  # (pull_request:closed) serialize per PR — prevents races where cleanup
+  # removes the directory while a late-arriving deploy is still pushing.
+  group: pr-preview-${{ github.event.workflow_run.pull_requests[0].number || github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
 permissions:
@@ -72,10 +73,10 @@ jobs:
       pr_skip: ${{ steps.pr.outputs.skip }}
       head_sha: ${{ steps.pr.outputs.head_sha }}
       head_branch: ${{ steps.pr.outputs.head_branch }}
-    # Serialize pushes to the deploy repo to prevent race conditions
-    concurrency:
-      group: deploy-repo-gh-pages-push
-      cancel-in-progress: false
+    # Push conflicts with other workflows deploying to the same gh-pages branch
+    # are handled by the retry-with-rebase loop in the deploy step. No shared
+    # concurrency group — GitHub only queues one pending job per group, so a
+    # burst of deploys cancels intermediate pending jobs instead of queuing them.
     env:
       NX_DAEMON: false
       NX_SKIP_NX_CACHE: false
@@ -214,13 +215,47 @@ jobs:
 
       - name: Deploy to Preview Repo
         if: steps.pr.outputs.skip != 'true'
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          personal_token: ${{ steps.app-token.outputs.token }}
-          external_repository: bkrupa/legacy-sports-deploys
-          publish_branch: gh-pages
-          publish_dir: ./dist/apps/web
-          destination_dir: pr-${{ steps.pr.outputs.number }}
+        env:
+          DEPLOY_TOKEN: ${{ steps.app-token.outputs.token }}
+          DEST_DIR: pr-${{ steps.pr.outputs.number }}
+        run: |
+          set -euo pipefail
+          REPO_URL="https://x-access-token:${DEPLOY_TOKEN}@github.com/${{ env.DEPLOY_REPO }}.git"
+
+          git clone --depth 1 --single-branch --branch gh-pages "$REPO_URL" _deploy
+          cd _deploy
+
+          rm -rf "${DEST_DIR}"
+          mkdir -p "${DEST_DIR}"
+          cp -r ../dist/apps/web/. "${DEST_DIR}/"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .
+
+          if git diff --cached --quiet; then
+            echo "No changes to deploy"
+            exit 0
+          fi
+
+          git commit -m "deploy pr-${{ steps.pr.outputs.number }} preview"
+
+          # Push with pull-rebase retry to handle races from other workflows
+          # pushing to the same gh-pages branch between our clone and push.
+          MAX_RETRIES=7
+          for attempt in $(seq 1 $MAX_RETRIES); do
+            if git push origin gh-pages; then
+              echo "Push succeeded (attempt ${attempt})"
+              exit 0
+            fi
+            JITTER=$((RANDOM % 5))
+            echo "Push failed (attempt ${attempt}) — retrying in $((attempt * 2 + JITTER))s..."
+            sleep $((attempt * 2 + JITTER))
+            git pull --rebase origin gh-pages
+          done
+
+          echo "Push failed after ${MAX_RETRIES} attempts"
+          exit 1
 
       - name: Comment Preview URL
         if: steps.pr.outputs.skip != 'true'
@@ -242,11 +277,7 @@ jobs:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
-    # Serialize pushes to the deploy repo to prevent race conditions.
-    # Cleanup is lightweight so job-level concurrency is acceptable here.
-    concurrency:
-      group: deploy-repo-gh-pages-push
-      cancel-in-progress: false
+    # Push conflicts handled by retry-with-rebase in the deploy step below.
 
     steps:
       - name: Generate App Token
@@ -262,6 +293,7 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
+          set -euo pipefail
           PR_NUM="${{ github.event.pull_request.number }}"
 
           git clone --depth 1 --branch gh-pages \
@@ -278,8 +310,23 @@ jobs:
             git config user.email "github-actions[bot]@users.noreply.github.com"
             git add -A
             git commit -m "cleanup: remove pr-$PR_NUM preview" || { echo "Nothing to commit"; exit 0; }
-            git push origin gh-pages
-            echo "✅ Cleaned up preview for PR #$PR_NUM"
+
+            # Push with pull-rebase retry to handle races from other workflows
+            MAX_RETRIES=7
+            for attempt in $(seq 1 $MAX_RETRIES); do
+              if git push origin gh-pages; then
+                echo "Push succeeded (attempt ${attempt})"
+                echo "Cleaned up preview for PR #$PR_NUM"
+                exit 0
+              fi
+              JITTER=$((RANDOM % 5))
+              echo "Push failed (attempt ${attempt}) — retrying in $((attempt * 2 + JITTER))s..."
+              sleep $((attempt * 2 + JITTER))
+              git pull --rebase origin gh-pages
+            done
+
+            echo "Push failed after ${MAX_RETRIES} attempts"
+            exit 1
           else
             echo "No preview found for PR #$PR_NUM, skipping"
           fi
