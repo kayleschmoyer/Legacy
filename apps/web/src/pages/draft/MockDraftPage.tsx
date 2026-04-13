@@ -243,6 +243,9 @@ function SetupScreen({
                   style={{
                     width: '44px',
                     height: '44px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                     borderRadius: '10px',
                     border: `2px solid ${userPickPosition === pos ? BRAND_GOLD : OVERLAY_WHITE_10}`,
                     background:
