@@ -57,7 +57,7 @@ interface PRBatchNode {
   reviewThreads: {
     totalCount: number;
     pageInfo: { hasNextPage: boolean };
-    nodes: Array<{ isResolved: boolean }>;
+    nodes: Array<{ isResolved: boolean; isOutdated: boolean }>;
   };
 }
 
@@ -126,7 +126,7 @@ function buildBatchPRQuery(numbers: number[]): string {
       reviewThreads(first: 100) {
         totalCount
         pageInfo { hasNextPage }
-        nodes { isResolved }
+        nodes { isResolved isOutdated }
       }
     }`,
   );
@@ -182,7 +182,7 @@ export async function prBatchStatus(
 
       const totalThreads = pr.reviewThreads.totalCount;
       const unresolvedThreads = pr.reviewThreads.nodes.filter(
-        (t) => !t.isResolved,
+        (t) => !t.isResolved && !t.isOutdated,
       ).length;
       const threadCountTruncated = pr.reviewThreads.pageInfo.hasNextPage;
 

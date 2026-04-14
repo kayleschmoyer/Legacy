@@ -67,7 +67,7 @@ interface BatchReviewThreadsResponse {
       reviewThreads: {
         totalCount: number;
         pageInfo: { hasNextPage: boolean };
-        nodes: Array<{ isResolved: boolean }>;
+        nodes: Array<{ isResolved: boolean; isOutdated: boolean }>;
       };
     };
   };
@@ -119,7 +119,7 @@ function buildBatchReviewThreadsQuery(prNumbers: number[]): string {
       reviewThreads(first: 100) {
         totalCount
         pageInfo { hasNextPage }
-        nodes { isResolved }
+        nodes { isResolved isOutdated }
       }
     }`,
   );
@@ -153,7 +153,9 @@ async function fetchReviewThreadCounts(
         const threadData = result.data.repository[alias];
         if (threadData) {
           const threads = threadData.reviewThreads;
-          const unresolved = threads.nodes.filter((t) => !t.isResolved).length;
+          const unresolved = threads.nodes.filter(
+            (t) => !t.isResolved && !t.isOutdated,
+          ).length;
           counts[num] = {
             total: threads.totalCount,
             unresolved,
