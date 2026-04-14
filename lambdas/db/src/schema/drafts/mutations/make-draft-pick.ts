@@ -385,14 +385,29 @@ builder.mutationField('makeDraftPick', (t) =>
         // Uses the same smart FPG × positional-scarcity selection algorithm
         // as autoProcessDraftPicks in scheduled-mutations.ts.
         if (!effectiveDraftComplete && chainedNextPickInfo) {
-          const MAX_CHAINED_AUTO_PICKS = 50; // safety cap to stay within Lambda timeout
+          // Cap at 10 picks and bail out after 20 s so we respond well within
+          // API Gateway's 29-second integration timeout. Any remaining
+          // consecutive auto-picks are handled by the EventBridge timer
+          // (fires within 60 s). LS-3119
+          const MAX_CHAINED_AUTO_PICKS = 10;
+          const CHAIN_TIME_BUDGET_MS = 20_000;
+          const chainStartTime = Date.now();
           let chainCount = 0;
+          let stoppedByTimeBudget = false;
 
           while (
             chainCount < MAX_CHAINED_AUTO_PICKS &&
             !effectiveDraftComplete &&
             chainedNextPickInfo
           ) {
+            // Guard before every iteration — the while condition doesn't
+            // re-evaluate the budget after the cheap auto-pick check below,
+            // so check again here before starting the expensive transaction.
+            if (Date.now() - chainStartTime >= CHAIN_TIME_BUDGET_MS) {
+              stoppedByTimeBudget = true;
+              break;
+            }
+
             // Check if the upcoming team has auto-pick enabled
             const [upcomingTeamEntry] = await context.db
               .select({ autoPick: PublicSchema.draftTeams.autoPick })
@@ -409,6 +424,13 @@ builder.mutationField('makeDraftPick', (t) =>
               .limit(1);
 
             if (!upcomingTeamEntry?.autoPick) break;
+
+            // Re-check budget after the cheap DB query above — we're about to
+            // start a multi-query transaction that can take hundreds of ms.
+            if (Date.now() - chainStartTime >= CHAIN_TIME_BUDGET_MS) {
+              stoppedByTimeBudget = true;
+              break;
+            }
 
             // Capture the expected team ID before the async closure to avoid
             // non-null assertions inside the transaction callback.
@@ -769,11 +791,14 @@ builder.mutationField('makeDraftPick', (t) =>
             chainedNextPickInfo = autoPickResult.nextPickInfo;
           }
 
-          if (chainCount > 0) {
+          if (chainCount > 0 || stoppedByTimeBudget) {
+            const chainElapsedMs = Date.now() - chainStartTime;
             LOGGER.info('[LS-440] Auto-pick chain complete', {
               draftId,
               chainCount,
               effectiveDraftComplete,
+              chainElapsedMs,
+              stoppedByTimeBudget,
             });
           }
         }
