@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { GestureResponderEvent } from 'react-native';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -11,15 +11,10 @@ import {
   YStack,
 } from '@legacy-sports/shared-components/ui';
 import { useAuth } from '@legacy-sports/shared-components/auth';
-import {
-  ScrollView,
-  Separator,
-  Spinner,
-  styled,
-  Text,
-  H2 as TH2,
-} from 'tamagui';
+import { ScrollView, Spinner, styled, Text, H2 as TH2 } from 'tamagui';
 import { OnThisDayFeed } from '@legacy-sports/shared-components/leagues';
+import { formatDraftDate } from '@legacy-sports/utils';
+import { formatDraftStatusForCard } from '@legacy-sports/shared-components/utils';
 import { formatDisplayName } from '../../lib/formatDisplayName';
 import { OnboardingTutorial } from '../../components/onboarding';
 import {
@@ -28,7 +23,11 @@ import {
   type BrandIconName,
 } from '../../components/icons';
 import { PageMeta } from '../../components/PageMeta';
-import { useGetUserLeaguesQuery } from '../../api/db/graphql.generated';
+import {
+  useGetArchivedUserLeagueSummariesLazyQuery,
+  useGetUserLeagueSummariesQuery,
+  type UserLeagueSummaryFragment,
+} from '../../api/db/graphql.generated';
 import {
   BG_DARK,
   BRAND_GOLD,
@@ -37,13 +36,38 @@ import {
   BRAND_NAVY_DARK,
   BRAND_NAVY_LIGHT,
   BRAND_SEAM_RED,
+  GREEN,
   GREEN_DEEP,
+  GREEN_LIGHTER,
   withAlpha,
 } from '../../constants/colors';
 
 /* ─── Constants ─── */
 
 const CREATE_BASEBALL_LEAGUE_ROUTE = '/baseball/league/create';
+
+/* ─── Urgency sort ─── */
+
+/**
+ * Returns a numeric urgency key for sorting league summaries.
+ * Lower = more urgent / shown first.
+ *   0 – live draft
+ *   1 – active season
+ *   2 – pre-draft
+ *   3 – everything else
+ */
+function urgencyKey(s: UserLeagueSummaryFragment): number {
+  if (s.draftStatus === 'in-progress') return 0;
+  if (s.leaguePhase === 'active') return 1;
+  if (s.leaguePhase === 'pre-draft') return 2;
+  return 3;
+}
+
+function sortByUrgency(
+  summaries: UserLeagueSummaryFragment[],
+): UserLeagueSummaryFragment[] {
+  return [...summaries].sort((a, b) => urgencyKey(a) - urgencyKey(b));
+}
 
 /* ─── Styled Components ─── */
 
@@ -79,19 +103,6 @@ const HeroSection = styled(YStack, {
   },
 });
 
-const HeroBadge = styled(XStack, {
-  alignItems: 'center',
-  gap: '$2',
-  paddingHorizontal: '$4',
-  paddingVertical: '$1.5',
-  borderRadius: '$10',
-  backgroundColor: '$surfaceInteractive',
-  borderWidth: 1,
-  borderColor: '$accentMuted',
-  animation: 'medium',
-  enterStyle: { opacity: 0, y: -10 },
-});
-
 const SportCard = styled(YStack, {
   position: 'relative',
   overflow: 'hidden',
@@ -121,36 +132,6 @@ const SportIcon = styled(YStack, {
   borderRadius: '$5',
   alignItems: 'center',
   justifyContent: 'center',
-});
-
-const FeatureCard = styled(YStack, {
-  flex: 1,
-  minWidth: 220,
-  borderRadius: '$6',
-  borderWidth: 1,
-  borderColor: '$glassBorder',
-  padding: '$5',
-  gap: '$3',
-  animation: 'medium',
-  hoverStyle: {
-    borderColor: '$glassBorderHover',
-    transform: 'translateY(-2px)',
-  },
-  $sm: {
-    minWidth: '100%',
-    padding: '$4',
-  },
-});
-
-const FeatureIconCircle = styled(YStack, {
-  width: 44,
-  height: 44,
-  borderRadius: 9999,
-  alignItems: 'center',
-  justifyContent: 'center',
-  backgroundColor: '$surfaceInteractive',
-  borderWidth: 1,
-  borderColor: '$accentMuted',
 });
 
 const ActionButton = styled(Button, {
@@ -196,12 +177,13 @@ const SectionTitle = styled(TH2, {
   color: '$color',
 });
 
-const DashboardCard = styled(YStack, {
+/* ─── League Summary Card ─── */
+
+const LeagueSummaryCard = styled(YStack, {
   borderRadius: '$7',
   borderWidth: 1,
   borderColor: '$glassBorder',
-  padding: '$5',
-  gap: '$3',
+  overflow: 'hidden',
   cursor: 'pointer',
   animation: 'medium',
   hoverStyle: {
@@ -211,17 +193,252 @@ const DashboardCard = styled(YStack, {
   pressStyle: {
     scale: 0.98,
   },
-  $sm: {
-    padding: '$4',
-  },
 });
 
-const StatBox = styled(YStack, {
-  alignItems: 'center',
-  gap: '$1',
-  flex: 1,
-  minWidth: 80,
-});
+interface PhaseBadgeProps {
+  phase: string | null | undefined;
+  draftStatus: string | null | undefined;
+}
+
+function PhaseBadge({ phase, draftStatus }: PhaseBadgeProps) {
+  const isDraftLive = draftStatus === 'in-progress';
+  const isActive = phase === 'active';
+  const isPreDraft = phase === 'pre-draft';
+
+  let label: string;
+  let bg: string;
+  let textColor: string;
+
+  if (isDraftLive) {
+    label = 'Draft Live';
+    bg = withAlpha(BRAND_GOLD, 0.18);
+    textColor = BRAND_GOLD_LIGHT;
+  } else if (isActive) {
+    label = 'Active';
+    bg = withAlpha(GREEN, 0.12);
+    textColor = GREEN_LIGHTER;
+  } else if (isPreDraft) {
+    label = 'Pre-Draft';
+    bg = withAlpha(BRAND_NAVY_LIGHT, 0.22);
+    textColor = BRAND_NAVY_LIGHT;
+  } else {
+    label = 'Offseason';
+    bg = withAlpha(BG_DARK, 0.4);
+    textColor = '$textMuted';
+  }
+
+  return (
+    <YStack
+      borderRadius="$3"
+      paddingHorizontal="$2"
+      paddingVertical={3}
+      style={{ background: bg }}
+    >
+      <Text
+        fontSize="$1"
+        fontWeight="700"
+        letterSpacing={0.6}
+        color={textColor}
+        style={{ textTransform: 'uppercase' }}
+      >
+        {label}
+      </Text>
+    </YStack>
+  );
+}
+
+interface LeagueSummaryCardItemProps {
+  summary: UserLeagueSummaryFragment;
+  onPress: () => void;
+}
+
+function LeagueSummaryCardItem({
+  summary,
+  onPress,
+}: LeagueSummaryCardItemProps) {
+  const isDraftLive = summary.draftStatus === 'in-progress';
+  const isActive = summary.leaguePhase === 'active';
+  const isPreDraft = summary.leaguePhase === 'pre-draft';
+  const hasMatchup =
+    summary.matchupId != null && summary.matchupStatus === 'in_progress';
+
+  const wins = summary.wins ?? 0;
+  const losses = summary.losses ?? 0;
+  const ties = summary.ties ?? 0;
+  const record = ties > 0 ? `${wins}-${losses}-${ties}` : `${wins}-${losses}`;
+  const rank = summary.rank;
+  const totalTeams = summary.totalTeams;
+
+  return (
+    <LeagueSummaryCard
+      onPress={onPress}
+      accessibilityLabel={`View league ${summary.leagueName}`}
+      style={
+        isDraftLive ? { borderColor: withAlpha(BRAND_GOLD, 0.7) } : undefined
+      }
+    >
+      {/* Header zone */}
+      <XStack
+        paddingHorizontal="$4"
+        paddingTop="$4"
+        paddingBottom="$3"
+        alignItems="center"
+        justifyContent="space-between"
+        gap="$2"
+      >
+        <H3
+          fontSize="$6"
+          fontWeight="700"
+          color="$color"
+          flex={1}
+          numberOfLines={1}
+        >
+          {summary.leagueName}
+        </H3>
+        <PhaseBadge
+          phase={summary.leaguePhase}
+          draftStatus={summary.draftStatus}
+        />
+      </XStack>
+
+      {/* Score / status zone */}
+      <YStack
+        paddingHorizontal="$4"
+        paddingBottom="$3"
+        gap="$2"
+        style={{
+          background: isDraftLive
+            ? withAlpha(BRAND_GOLD, 0.06)
+            : withAlpha(BG_DARK, 0.35),
+        }}
+      >
+        {isDraftLive && (
+          <YStack gap="$1" paddingVertical="$2">
+            <Text fontSize="$5" fontWeight="700" color={BRAND_GOLD_LIGHT}>
+              Draft in progress
+            </Text>
+            {summary.draftMode && (
+              <Text fontSize="$3" color="$textMuted">
+                {summary.draftMode === 'snake'
+                  ? 'Snake draft'
+                  : summary.draftMode}
+                {summary.selectionMethod === 'auto' ? ' · Auto-pick' : ''}
+              </Text>
+            )}
+          </YStack>
+        )}
+
+        {!isDraftLive && hasMatchup && (
+          <YStack gap="$1" paddingVertical="$2">
+            <XStack gap="$2" alignItems="baseline">
+              <Text fontSize="$8" fontWeight="800" color={BRAND_GOLD_LIGHT}>
+                {summary.userScore?.toFixed(1) ?? '—'}
+              </Text>
+              <Text fontSize="$4" color="$textMuted" fontWeight="600">
+                vs
+              </Text>
+              <Text fontSize="$8" fontWeight="800" color="$textMuted">
+                {summary.opponentScore?.toFixed(1) ?? '—'}
+              </Text>
+            </XStack>
+            {summary.opponentTeamName && (
+              <Text fontSize="$3" color="$textMuted">
+                vs {summary.opponentTeamName}
+              </Text>
+            )}
+          </YStack>
+        )}
+
+        {!isDraftLive && !hasMatchup && (isActive || isPreDraft) && (
+          <XStack gap="$5" alignItems="center" paddingVertical="$2">
+            <YStack gap="$1">
+              <Text fontSize="$7" fontWeight="800" color={BRAND_GOLD_LIGHT}>
+                {record}
+              </Text>
+              <Text
+                fontSize="$2"
+                color="$textMuted"
+                fontWeight="600"
+                textTransform="uppercase"
+                letterSpacing={0.5}
+              >
+                Record
+              </Text>
+            </YStack>
+            {rank != null && totalTeams != null && (
+              <YStack gap="$1">
+                <Text fontSize="$7" fontWeight="800" color="$color">
+                  {rank}
+                  <Text fontSize="$4" color="$textMuted">
+                    /{totalTeams}
+                  </Text>
+                </Text>
+                <Text
+                  fontSize="$2"
+                  color="$textMuted"
+                  fontWeight="600"
+                  textTransform="uppercase"
+                  letterSpacing={0.5}
+                >
+                  Rank
+                </Text>
+              </YStack>
+            )}
+          </XStack>
+        )}
+
+        {!isDraftLive && !hasMatchup && !isActive && !isPreDraft && (
+          <XStack gap="$5" alignItems="center" paddingVertical="$2">
+            <YStack gap="$1">
+              <Text fontSize="$7" fontWeight="800" color="$textMuted">
+                {record}
+              </Text>
+              <Text
+                fontSize="$2"
+                color="$textMuted"
+                fontWeight="600"
+                textTransform="uppercase"
+                letterSpacing={0.5}
+              >
+                Final Record
+              </Text>
+            </YStack>
+          </XStack>
+        )}
+      </YStack>
+
+      {/* Footer zone */}
+      <XStack
+        paddingHorizontal="$4"
+        paddingVertical="$3"
+        gap="$4"
+        alignItems="center"
+        flexWrap="wrap"
+      >
+        {summary.currentWeekNumber != null && summary.totalMatchups != null && (
+          <Text fontSize="$2" color="$textMuted">
+            Week {summary.currentWeekNumber}/{summary.totalMatchups}
+          </Text>
+        )}
+        {isPreDraft && summary.draftScheduledAt && (
+          <Text fontSize="$2" color={BRAND_GOLD_LIGHT}>
+            Draft: {formatDraftDate(summary.draftScheduledAt)}
+          </Text>
+        )}
+        {!isPreDraft && summary.draftStatus && !isDraftLive && (
+          <Text fontSize="$2" color="$textMuted">
+            Draft: {formatDraftStatusForCard(summary.draftStatus)}
+          </Text>
+        )}
+        {summary.teamCount != null && (
+          <Text fontSize="$2" color="$textMuted">
+            {summary.teamCount} teams
+          </Text>
+        )}
+      </XStack>
+    </LeagueSummaryCard>
+  );
+}
 
 /* ─── Page Background ─── */
 
@@ -241,10 +458,6 @@ const heroGradientStyle: React.CSSProperties = {
 const sportCardStyle = (accentColor: string): React.CSSProperties => ({
   background: `linear-gradient(135deg, ${BG_DARK} 0%, ${accentColor} 100%)`,
 });
-
-const featureCardStyle: React.CSSProperties = {
-  background: `linear-gradient(135deg, ${BG_DARK} 0%, ${BRAND_NAVY} 100%)`,
-};
 
 /* ─── Sport Config ─── */
 
@@ -281,43 +494,6 @@ const SPORTS: SportConfig[] = [
   },
 ];
 
-const FEATURES = [
-  {
-    icon: 'stats' as const,
-    label: 'stats',
-    title: 'Live Stats',
-    description:
-      'Real-time player statistics, projections, and performance trends.',
-  },
-  {
-    icon: 'draft' as const,
-    label: 'draft',
-    title: 'Draft Tools',
-    description:
-      'Snake and auction drafts with smart rankings and position analysis.',
-  },
-  {
-    icon: 'live' as const,
-    label: 'realtime',
-    title: 'Instant Updates',
-    description:
-      'WebSocket-powered live scoring and lineup lock notifications.',
-  },
-  {
-    icon: 'secure' as const,
-    label: 'secure',
-    title: 'Secure Leagues',
-    description:
-      'Private invite codes, commissioner controls, and fair waiver rules.',
-  },
-];
-
-/**
- * Home Page — Landing page for the web application.
- *
- * Modernized with gradient backgrounds, glassmorphism cards,
- * and entrance animations for a polished user experience.
- */
 const PREFS_STORAGE_KEY = 'ls_user_preferences';
 
 function readDefaultSport(): 'baseball' | 'football' {
@@ -331,11 +507,18 @@ function readDefaultSport(): 'baseball' | 'football' {
   }
 }
 
+/**
+ * Home Page — Landing page for the web application.
+ *
+ * Renders one of three states: loading, returning-user dashboard,
+ * or getting-started view for users with no leagues yet.
+ */
 export function HomePage(): React.JSX.Element {
   const navigate = useNavigate();
   const auth = useAuth();
   const userId = auth?.user?.id;
   const [tutorialOpen, setTutorialOpen] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
 
   const defaultSport = useMemo(() => readDefaultSport(), []);
   const orderedSports = useMemo(
@@ -349,36 +532,40 @@ export function HomePage(): React.JSX.Element {
   const defaultSportRoute = primarySport.route;
 
   const {
-    data: leagueData,
-    loading: leaguesLoading,
-    error: leaguesError,
-    refetch: refetchLeagues,
-  } = useGetUserLeaguesQuery({
+    data: summaryData,
+    loading: summariesLoading,
+    error: summariesError,
+    refetch: refetchSummaries,
+  } = useGetUserLeagueSummariesQuery({
     skip: !auth?.user,
     fetchPolicy: 'cache-and-network',
   });
 
-  const leagues = leagueData?.userLeagues ?? [];
-  const hasLeagues = leagues.length > 0;
+  const [fetchArchived, { data: archivedData, loading: archivedLoading }] =
+    useGetArchivedUserLeagueSummariesLazyQuery({
+      fetchPolicy: 'cache-and-network',
+    });
+
+  const handleShowArchived = useCallback(() => {
+    setShowArchived(true);
+    void fetchArchived();
+  }, [fetchArchived]);
+
+  const summaries = summaryData?.getUserLeagueSummaries ?? [];
+  const hasLeagues = summaries.length > 0;
+  const sortedSummaries = useMemo(() => sortByUrgency(summaries), [summaries]);
+  const archivedSummaries = archivedData?.getArchivedUserLeagueSummaries ?? [];
+
   const userName = formatDisplayName(auth?.user?.username || 'Manager');
 
-  const upcomingDrafts = leagues.filter((l) =>
-    l.draftStatus
-      ? ['not-started', 'queued', 'scheduled'].includes(l.draftStatus)
-      : false,
-  ).length;
-
   // Auto-show tutorial once per user for first-time visitors who have no leagues.
-  // Key is scoped to the user ID so each user gets their own tutorial state.
   const getOnboardingKey = (uid: number) => `ls_onboarding_complete_${uid}`;
 
   useEffect(() => {
     if (!userId) return;
-    if (!hasLeagues && !leaguesLoading) {
+    if (!hasLeagues && !summariesLoading) {
       const key = getOnboardingKey(userId);
       try {
-        // Migrate previously-onboarded users from the legacy global key so they
-        // don't see the tutorial again after upgrading to the per-user key.
         const legacyDone = window.localStorage.getItem(
           'ls_onboarding_complete',
         );
@@ -397,7 +584,7 @@ export function HomePage(): React.JSX.Element {
         setTutorialOpen(true);
       }
     }
-  }, [userId, hasLeagues, leaguesLoading]);
+  }, [userId, hasLeagues, summariesLoading]);
 
   const handleTutorialClose = () => {
     setTutorialOpen(false);
@@ -413,15 +600,10 @@ export function HomePage(): React.JSX.Element {
     }
   };
 
-  /* ─── Loading state — prevents unauthenticated hero flash ─── */
-  // Also guard the one-render window between auth resolving and Apollo
-  // starting the leagues query (skip: !auth.user flips to false).  In that
-  // window leaguesLoading is still false but leagueData is undefined — without
-  // this, returning users briefly see the first-time onboarding layout (LS-1269).
-  // Exclude the error case so the error UI below can render when the query fails.
+  /* ─── Loading state ─── */
   if (
     auth.isLoading ||
-    (!!auth.user && (leaguesLoading || (!leagueData && !leaguesError)))
+    (!!auth.user && (summariesLoading || (!summaryData && !summariesError)))
   ) {
     return (
       <ScrollView>
@@ -443,8 +625,12 @@ export function HomePage(): React.JSX.Element {
     );
   }
 
-  /* ─── Error state: league query failed with no usable cached data ─── */
-  if (leaguesError && !leaguesLoading && !leagueData?.userLeagues) {
+  /* ─── Error state ─── */
+  if (
+    summariesError &&
+    !summariesLoading &&
+    !summaryData?.getUserLeagueSummaries
+  ) {
     return (
       <ScrollView>
         <PageMeta
@@ -487,7 +673,7 @@ export function HomePage(): React.JSX.Element {
               color="$textOnAccent"
               pressStyle={{ backgroundColor: '$brandNavyDark' }}
               hoverStyle={{ backgroundColor: '$brandNavy' }}
-              onPress={() => void refetchLeagues()}
+              onPress={() => void refetchSummaries()}
             >
               Retry
             </Button>
@@ -506,167 +692,115 @@ export function HomePage(): React.JSX.Element {
           description="Your personalized fantasy sports dashboard."
         />
         <PageContainer style={pageBackgroundStyle}>
-          {/* ─── Welcome Hero ─── */}
-          <HeroSection style={heroGradientStyle}>
-            <HeroBadge>
-              <Text fontSize="$2" fontWeight="600" color={BRAND_GOLD_LIGHT}>
-                {new Date().getFullYear()} Season
-              </Text>
-            </HeroBadge>
-
-            <H1
-              fontSize="$12"
-              fontWeight="800"
-              color="$color"
-              textAlign="center"
-              letterSpacing={-0.5}
-              animation="medium"
-              enterStyle={{ opacity: 0, y: 20 }}
-              $sm={{ fontSize: '$10' }}
-            >
-              Welcome back, {userName}
-            </H1>
-
-            <Paragraph
-              fontSize="$6"
-              color="$textMuted"
-              textAlign="center"
-              maxWidth={560}
-              lineHeight="$7"
-              animation="medium"
-              enterStyle={{ opacity: 0, y: 15 }}
-            >
-              You&apos;re managing {leagues.length}{' '}
-              {leagues.length === 1 ? 'league' : 'leagues'}. Jump into your
-              season dashboard to check matchups, rosters, and drafts.
-            </Paragraph>
-
-            <XStack
-              gap="$3"
-              marginTop="$2"
-              flexWrap="wrap"
-              justifyContent="center"
-              animation="medium"
-              enterStyle={{ opacity: 0, y: 10 }}
-            >
-              <ActionButton
-                onPress={() => {
-                  navigate(defaultSportRoute);
-                }}
-                accessibilityLabel={`Go to ${defaultSport} dashboard`}
-              >
-                <Text fontWeight="700">My Dashboard</Text>
-              </ActionButton>
-              <OutlineButton
-                onPress={() => {
-                  navigate('/players/stats');
-                }}
-                accessibilityLabel="Browse player statistics"
-              >
-                <Text fontWeight="700">Browse Stats</Text>
-              </OutlineButton>
-              <OutlineButton
-                onPress={() => {
-                  navigate('/preferences');
-                }}
-                accessibilityLabel="Open preferences"
-              >
-                <XStack alignItems="center" gap="$2">
-                  <BrandIcon name="settings" size={16} />
-                  <Text fontWeight="700">Preferences</Text>
-                </XStack>
-              </OutlineButton>
-            </XStack>
-          </HeroSection>
-
-          <ContentContainer>
-            {/* ─── Season Snapshot ─── */}
-            <YStack gap="$5">
+          <ContentContainer paddingTop="$8">
+            {/* ─── Compact header ─── */}
+            <YStack gap="$4">
               <YStack gap="$2">
-                <SectionTitle>Season Snapshot</SectionTitle>
-                <Paragraph fontSize="$4" color="$textMuted" maxWidth={480}>
-                  A quick look at where things stand across your leagues.
+                <H1
+                  fontSize="$11"
+                  fontWeight="800"
+                  color="$color"
+                  letterSpacing={-0.5}
+                  animation="medium"
+                  enterStyle={{ opacity: 0, y: 16 }}
+                  $sm={{ fontSize: '$9' }}
+                >
+                  {userName}
+                </H1>
+                <Paragraph fontSize="$5" color="$textMuted" lineHeight="$6">
+                  {summaries.length}{' '}
+                  {summaries.length === 1 ? 'league' : 'leagues'}
+                  {sortedSummaries.some((s) => s.leaguePhase === 'active') && (
+                    <>
+                      {' '}
+                      ·{' '}
+                      {sortedSummaries
+                        .filter((s) => s.leaguePhase === 'active')
+                        .reduce((acc, s) => acc + (s.wins ?? 0), 0)}
+                      -
+                      {sortedSummaries
+                        .filter((s) => s.leaguePhase === 'active')
+                        .reduce((acc, s) => acc + (s.losses ?? 0), 0)}{' '}
+                      overall
+                    </>
+                  )}
                 </Paragraph>
               </YStack>
 
-              <XStack
-                gap="$4"
-                flexWrap="wrap"
-                borderRadius="$7"
-                borderWidth={1}
-                borderColor="$glassBorder"
-                padding="$5"
-                style={{
-                  background: `linear-gradient(135deg, ${BG_DARK} 0%, ${BRAND_NAVY} 100%)`,
-                }}
-              >
-                <StatBox>
-                  <Text fontSize="$9" fontWeight="800" color={BRAND_GOLD_LIGHT}>
-                    {leagues.length}
-                  </Text>
-                  <Text fontSize="$2" color="$textMuted" fontWeight="600">
-                    Active Leagues
-                  </Text>
-                </StatBox>
-                <StatBox>
-                  <Text fontSize="$9" fontWeight="800" color={BRAND_GOLD_LIGHT}>
-                    {upcomingDrafts}
-                  </Text>
-                  <Text fontSize="$2" color="$textMuted" fontWeight="600">
-                    Upcoming Drafts
-                  </Text>
-                </StatBox>
+              <XStack gap="$3" alignItems="center">
+                <ActionButton
+                  onPress={() => navigate(defaultSportRoute)}
+                  accessibilityLabel={`Go to ${defaultSport} dashboard`}
+                >
+                  <Text fontWeight="700">My Dashboard</Text>
+                </ActionButton>
+                <Text
+                  fontSize="$3"
+                  fontWeight="600"
+                  color="$textMuted"
+                  cursor="pointer"
+                  onPress={() => navigate('/players/stats')}
+                  accessibilityRole="link"
+                  hoverStyle={{ color: '$color' }}
+                >
+                  Browse Stats
+                </Text>
               </XStack>
             </YStack>
 
-            {/* ─── Your Leagues ─── */}
+            {/* ─── League Summary Cards ─── */}
             <YStack gap="$5">
-              <YStack gap="$2">
-                <SectionTitle>Your Leagues</SectionTitle>
-                <Paragraph fontSize="$4" color="$textMuted" maxWidth={480}>
-                  Jump into a league to manage rosters, review matchups, and
-                  prep for drafts.
-                </Paragraph>
-              </YStack>
+              <SectionTitle>Your Leagues</SectionTitle>
 
-              <XStack gap="$4" flexWrap="wrap">
-                {leagues.map((league) => (
-                  <DashboardCard
-                    key={league.id}
-                    flex={1}
-                    minWidth={280}
-                    style={{
-                      background: `linear-gradient(135deg, ${BG_DARK} 0%, ${BRAND_NAVY} 100%)`,
-                    }}
-                    onPress={() => {
-                      navigate(`/baseball/league/${league.id}`);
-                    }}
-                    accessibilityLabel={`View league ${league.name}`}
-                  >
-                    <H3 fontSize="$6" fontWeight="700" color="$color">
-                      {league.name}
-                    </H3>
-                    <XStack gap="$4">
-                      {league.currentWeekNumber != null && (
-                        <Text fontSize="$3" color="$textMuted">
-                          Week {league.currentWeekNumber}
-                        </Text>
-                      )}
-                      {league.draftStatus && (
-                        <Text fontSize="$3" color={BRAND_GOLD_LIGHT}>
-                          Draft:{' '}
-                          {league.draftStatus === 'completed'
-                            ? 'Done'
-                            : league.draftStatus}
-                        </Text>
-                      )}
-                    </XStack>
-                  </DashboardCard>
+              <YStack gap="$4">
+                {sortedSummaries.map((summary) => (
+                  <LeagueSummaryCardItem
+                    key={summary.leagueId}
+                    summary={summary}
+                    onPress={() =>
+                      navigate(`/baseball/league/${summary.leagueId}`)
+                    }
+                  />
                 ))}
-              </XStack>
-            </YStack>
+              </YStack>
 
-            <Separator backgroundColor="$glassBorder" />
+              {/* ─── Archived leagues toggle ─── */}
+              {!showArchived ? (
+                <Text
+                  fontSize="$3"
+                  color="$textMuted"
+                  cursor="pointer"
+                  alignSelf="flex-start"
+                  onPress={handleShowArchived}
+                  hoverStyle={{ color: '$color' }}
+                  accessibilityRole="button"
+                >
+                  Show archived leagues
+                </Text>
+              ) : archivedLoading ? (
+                <XStack gap="$2" alignItems="center">
+                  <Spinner size="small" color="$brandGoldLight" />
+                  <Text fontSize="$3" color="$textMuted">
+                    Loading archived leagues…
+                  </Text>
+                </XStack>
+              ) : archivedSummaries.length > 0 ? (
+                <YStack gap="$3">
+                  <Text fontSize="$4" fontWeight="600" color="$textMuted">
+                    Archived
+                  </Text>
+                  {archivedSummaries.map((summary) => (
+                    <LeagueSummaryCardItem
+                      key={summary.leagueId}
+                      summary={summary}
+                      onPress={() =>
+                        navigate(`/baseball/league/${summary.leagueId}`)
+                      }
+                    />
+                  ))}
+                </YStack>
+              ) : null}
+            </YStack>
 
             {/* ─── Sports Navigation ─── */}
             <YStack gap="$5">
@@ -685,9 +819,7 @@ export function HomePage(): React.JSX.Element {
                     flex={1}
                     minWidth={300}
                     style={sportCardStyle(sport.accent)}
-                    onPress={() => {
-                      navigate(sport.route);
-                    }}
+                    onPress={() => navigate(sport.route)}
                     accessibilityLabel={`Navigate to ${sport.title}`}
                     role="link"
                   >
@@ -753,12 +885,6 @@ export function HomePage(): React.JSX.Element {
         <PageContainer style={pageBackgroundStyle}>
           {/* ─── Hero ─── */}
           <HeroSection style={heroGradientStyle}>
-            <HeroBadge>
-              <Text fontSize="$2" fontWeight="600" color={BRAND_GOLD_LIGHT}>
-                {new Date().getFullYear()} Season
-              </Text>
-            </HeroBadge>
-
             <H1
               fontSize="$12"
               fontWeight="800"
@@ -786,48 +912,47 @@ export function HomePage(): React.JSX.Element {
               all-time dynasty.
             </Paragraph>
 
-            <XStack
+            <YStack
               gap="$3"
               marginTop="$2"
-              flexWrap="wrap"
-              justifyContent="center"
+              alignItems="center"
               animation="medium"
               enterStyle={{ opacity: 0, y: 10 }}
             >
               <ActionButton
-                onPress={() => {
-                  navigate(CREATE_BASEBALL_LEAGUE_ROUTE);
-                }}
+                onPress={() => navigate(CREATE_BASEBALL_LEAGUE_ROUTE)}
                 accessibilityLabel="Create a new baseball league"
               >
                 <Text fontWeight="700">Create a League</Text>
               </ActionButton>
-              <OutlineButton
-                onPress={() => {
-                  navigate('/baseball/league/join');
-                }}
-                accessibilityLabel="Join an existing league with an invite code"
-              >
-                <Text fontWeight="700">Join a League</Text>
-              </OutlineButton>
-              <OutlineButton
-                onPress={() => {
-                  navigate('/players/stats');
-                }}
-                accessibilityLabel="Browse player statistics"
-              >
-                <Text fontWeight="700">Browse Stats</Text>
-              </OutlineButton>
-              <OutlineButton
-                onPress={() => setTutorialOpen(true)}
-                accessibilityLabel="How historical stats work — open tutorial"
-              >
-                <XStack alignItems="center" gap="$2">
-                  <BrandIcon name="book" size={16} />
-                  <Text fontWeight="700">How It Works</Text>
-                </XStack>
-              </OutlineButton>
-            </XStack>
+              <XStack gap="$4" alignItems="center">
+                <Text
+                  fontSize="$3"
+                  fontWeight="600"
+                  color="$textMuted"
+                  cursor="pointer"
+                  onPress={() => navigate('/baseball/league/join')}
+                  accessibilityRole="link"
+                  hoverStyle={{ color: '$color' }}
+                >
+                  Join a League
+                </Text>
+                <Text fontSize="$3" color="$glassBorder" selectable={false}>
+                  ·
+                </Text>
+                <Text
+                  fontSize="$3"
+                  fontWeight="600"
+                  color="$textMuted"
+                  cursor="pointer"
+                  onPress={() => setTutorialOpen(true)}
+                  accessibilityRole="link"
+                  hoverStyle={{ color: '$color' }}
+                >
+                  How It Works
+                </Text>
+              </XStack>
+            </YStack>
           </HeroSection>
 
           <ContentContainer>
@@ -850,9 +975,7 @@ export function HomePage(): React.JSX.Element {
                     style={sportCardStyle(sport.accent)}
                     {...(sport.available
                       ? {
-                          onPress: () => {
-                            navigate(sport.route);
-                          },
+                          onPress: () => navigate(sport.route),
                           role: 'link' as const,
                         }
                       : {})}
@@ -932,43 +1055,6 @@ export function HomePage(): React.JSX.Element {
               </XStack>
             </YStack>
 
-            <Separator backgroundColor="$glassBorder" />
-
-            {/* ─── Features ─── */}
-            <YStack gap="$5">
-              <YStack gap="$2">
-                <SectionTitle>Platform Features</SectionTitle>
-                <Paragraph fontSize="$4" color="$textMuted" maxWidth={480}>
-                  Everything you need to run a competitive fantasy league.
-                </Paragraph>
-              </YStack>
-
-              <XStack gap="$4" flexWrap="wrap">
-                {FEATURES.map((feature) => (
-                  <FeatureCard key={feature.label} style={featureCardStyle}>
-                    <FeatureIconCircle>
-                      <BrandIcon
-                        name={feature.icon}
-                        size={22}
-                        title={feature.title}
-                        decorative={false}
-                      />
-                    </FeatureIconCircle>
-                    <H3 fontSize="$6" fontWeight="700" color="$color">
-                      {feature.title}
-                    </H3>
-                    <Paragraph
-                      fontSize="$3"
-                      color="$glassTextSubdued"
-                      lineHeight="$4"
-                    >
-                      {feature.description}
-                    </Paragraph>
-                  </FeatureCard>
-                ))}
-              </XStack>
-            </YStack>
-
             {/* ─── On This Day (baseball-only) ─── */}
             {defaultSport === 'baseball' && (
               <YStack gap="$5">
@@ -998,7 +1084,7 @@ export function HomePage(): React.JSX.Element {
                 borderColor: '$glassBorderHover',
               }}
               style={{
-                background: `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BG_DARK} 100%)`,
+                background: `linear-gradient(160deg, ${withAlpha(BRAND_NAVY, 0.6)} 0%, ${BG_DARK} 65%)`,
               }}
             >
               <BrandIconBadge
@@ -1028,9 +1114,7 @@ export function HomePage(): React.JSX.Element {
               </Paragraph>
               <ActionButton
                 marginTop="$2"
-                onPress={() => {
-                  navigate('/players/stats');
-                }}
+                onPress={() => navigate('/players/stats')}
               >
                 <Text fontWeight="700">View All Stats</Text>
               </ActionButton>

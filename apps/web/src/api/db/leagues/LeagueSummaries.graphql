@@ -1,0 +1,36 @@
+fragment UserLeagueSummary on UserLeagueSummary {
+  leagueId
+  leagueName
+  leaguePhase
+  seasonNumber
+  draftStatus
+  draftScheduledAt
+  draftMode
+  selectionMethod
+  teamCount
+  wins
+  losses
+  ties
+  rank
+  totalTeams
+  pointsFor
+  currentWeekNumber
+  totalMatchups
+  matchupId
+  matchupStatus
+  userScore
+  opponentScore
+  opponentTeamName
+}
+
+query GetUserLeagueSummaries {
+  getUserLeagueSummaries {
+    ...UserLeagueSummary
+  }
+}
+
+query GetArchivedUserLeagueSummaries {
+  getArchivedUserLeagueSummaries {
+    ...UserLeagueSummary
+  }
+}

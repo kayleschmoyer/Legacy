@@ -7,7 +7,7 @@
  */
 import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import { and, count, eq, ilike, sql, SQL } from 'drizzle-orm';
+import { and, count, eq, ilike, inArray, ne, sql, SQL } from 'drizzle-orm';
 import { GraphQLError } from 'graphql';
 import {
   League,
@@ -1100,6 +1100,389 @@ builder.queryField('leagueTradeBlock', (t) =>
         });
         throw new Error('Failed to fetch league trade block');
       }
+    },
+  }),
+);
+
+// ── UserLeagueSummary type ────────────────────────────────────────────────────
+
+type UserLeagueSummaryShape = {
+  leagueId: number;
+  leagueName: string;
+  leaguePhase: string | null;
+  seasonNumber: number | null;
+  draftStatus: string | null;
+  draftScheduledAt: string | null;
+  draftMode: string | null;
+  selectionMethod: string | null;
+  teamCount: number;
+  wins: number | null;
+  losses: number | null;
+  ties: number | null;
+  rank: number | null;
+  totalTeams: number | null;
+  pointsFor: number | null;
+  currentWeekNumber: number | null;
+  totalMatchups: number | null;
+  matchupId: number | null;
+  matchupStatus: string | null;
+  userScore: number | null;
+  opponentScore: number | null;
+  opponentTeamName: string | null;
+};
+
+const UserLeagueSummary =
+  builder.objectRef<UserLeagueSummaryShape>('UserLeagueSummary');
+
+builder.objectType(UserLeagueSummary, {
+  description:
+    'Dashboard summary combining league phase, draft state, standings, and current matchup for a single league.',
+  fields: (t) => ({
+    leagueId: t.exposeInt('leagueId'),
+    leagueName: t.exposeString('leagueName'),
+    leaguePhase: t.exposeString('leaguePhase', { nullable: true }),
+    seasonNumber: t.exposeInt('seasonNumber', { nullable: true }),
+    draftStatus: t.exposeString('draftStatus', { nullable: true }),
+    draftScheduledAt: t.exposeString('draftScheduledAt', { nullable: true }),
+    draftMode: t.exposeString('draftMode', { nullable: true }),
+    selectionMethod: t.exposeString('selectionMethod', { nullable: true }),
+    teamCount: t.exposeInt('teamCount'),
+    wins: t.exposeInt('wins', { nullable: true }),
+    losses: t.exposeInt('losses', { nullable: true }),
+    ties: t.exposeInt('ties', { nullable: true }),
+    rank: t.exposeInt('rank', { nullable: true }),
+    totalTeams: t.exposeInt('totalTeams', { nullable: true }),
+    pointsFor: t.exposeFloat('pointsFor', { nullable: true }),
+    currentWeekNumber: t.exposeInt('currentWeekNumber', { nullable: true }),
+    totalMatchups: t.exposeInt('totalMatchups', { nullable: true }),
+    matchupId: t.exposeInt('matchupId', { nullable: true }),
+    matchupStatus: t.exposeString('matchupStatus', { nullable: true }),
+    userScore: t.exposeFloat('userScore', { nullable: true }),
+    opponentScore: t.exposeFloat('opponentScore', { nullable: true }),
+    opponentTeamName: t.exposeString('opponentTeamName', { nullable: true }),
+  }),
+});
+
+// ── getUserLeagueSummaries ────────────────────────────────────────────────────
+
+builder.queryField('getUserLeagueSummaries', (t) =>
+  t.field({
+    type: [UserLeagueSummary],
+    nullable: false,
+    resolve: async (_parent, _args, context) => {
+      if (!context.user) {
+        throw AuthenticationError(
+          'Authentication required to fetch league summaries',
+        );
+      }
+
+      const userId = context.user.id;
+
+      // 1. Fetch all non-offseason leagues the user belongs to
+      const leagues = await context.db
+        .select({
+          id: PublicSchema.leagues.id,
+          name: PublicSchema.leagues.name,
+          leaguePhase: PublicSchema.leagues.leaguePhase,
+          draftStatus: PublicSchema.leagues.draftStatus,
+          currentMatchup: PublicSchema.leagues.currentMatchup,
+          currentWeek: PublicSchema.leagues.currentWeek,
+          totalMatchups: PublicSchema.leagues.totalMatchups,
+          seasonNumber: PublicSchema.leagues.seasonNumber,
+          userTeamId: PublicSchema.leagueMembers.teamId,
+        })
+        .from(PublicSchema.leagues)
+        .innerJoin(
+          PublicSchema.leagueMembers,
+          eq(PublicSchema.leagues.id, PublicSchema.leagueMembers.leagueId),
+        )
+        .where(
+          and(
+            eq(PublicSchema.leagueMembers.userId, userId),
+            ne(PublicSchema.leagues.leaguePhase, 'offseason'),
+          ),
+        )
+        .orderBy(PublicSchema.leagues.id);
+
+      if (leagues.length === 0) return [];
+
+      const leagueIds = leagues.map((l) => l.id);
+
+      // 2. Batch: team counts per league
+      const teamCountRows = await context.db
+        .select({
+          leagueId: PublicSchema.leagueMembers.leagueId,
+          cnt: count(),
+        })
+        .from(PublicSchema.leagueMembers)
+        .where(inArray(PublicSchema.leagueMembers.leagueId, leagueIds))
+        .groupBy(PublicSchema.leagueMembers.leagueId);
+
+      const teamCountMap = new Map(
+        teamCountRows.map((r) => [r.leagueId, Number(r.cnt)]),
+      );
+
+      // 3. Batch secondary data: drafts, matchups, and standings
+      const { StandingsService } =
+        await import('../../services/standings-service');
+
+      const activeLeagueIds = leagues
+        .filter((l) => l.leaguePhase === 'active')
+        .map((l) => l.id);
+      const draftLeagueIds = leagues
+        .filter((l) => l.draftStatus !== 'completed')
+        .map((l) => l.id);
+      const matchupIdsToFetch = leagues
+        .filter((l) => l.leaguePhase === 'active' && l.currentMatchup != null)
+        .map((l) => l.currentMatchup!);
+
+      const [draftRows, matchupRows, standingsResults] = await Promise.all([
+        draftLeagueIds.length > 0
+          ? context.db
+              .select()
+              .from(PublicSchema.drafts)
+              .where(inArray(PublicSchema.drafts.leagueId, draftLeagueIds))
+          : Promise.resolve([]),
+        matchupIdsToFetch.length > 0
+          ? context.db
+              .select()
+              .from(PublicSchema.matchups)
+              .where(inArray(PublicSchema.matchups.id, matchupIdsToFetch))
+          : Promise.resolve([]),
+        Promise.all(
+          activeLeagueIds.map(async (leagueId) => ({
+            leagueId,
+            standings: await StandingsService.getStandings(context.db, {
+              leagueId,
+            }),
+          })),
+        ),
+      ]);
+
+      const draftMap = new Map(draftRows.map((d) => [d.leagueId, d]));
+      const matchupMap = new Map(matchupRows.map((m) => [m.id, m]));
+      const standingsMap = new Map(
+        standingsResults.map((s) => [s.leagueId, s.standings]),
+      );
+
+      // First pass: compute scores and collect all opponent team IDs
+      type PartialSummary = {
+        league: (typeof leagues)[number];
+        userScore: number | null;
+        opponentScore: number | null;
+        opponentTeamId: number | null;
+        matchupId: number | null;
+        matchupStatus: string | null;
+      };
+
+      const partials: PartialSummary[] = leagues.map((league) => {
+        const matchupRow =
+          league.currentMatchup != null
+            ? (matchupMap.get(league.currentMatchup) ?? null)
+            : null;
+
+        let userScore: number | null = null;
+        let opponentScore: number | null = null;
+        let opponentTeamId: number | null = null;
+        let matchupId: number | null = null;
+        let matchupStatus: string | null = null;
+
+        if (matchupRow && league.userTeamId != null) {
+          matchupId = matchupRow.id;
+          matchupStatus = matchupRow.status;
+          const isTeam1 = matchupRow.team1Id === league.userTeamId;
+          userScore = isTeam1
+            ? matchupRow.team1Score != null
+              ? parseFloat(matchupRow.team1Score)
+              : null
+            : matchupRow.team2Score != null
+              ? parseFloat(matchupRow.team2Score)
+              : null;
+          opponentScore = isTeam1
+            ? matchupRow.team2Score != null
+              ? parseFloat(matchupRow.team2Score)
+              : null
+            : matchupRow.team1Score != null
+              ? parseFloat(matchupRow.team1Score)
+              : null;
+          opponentTeamId = isTeam1 ? matchupRow.team2Id : matchupRow.team1Id;
+        }
+
+        return {
+          league,
+          userScore,
+          opponentScore,
+          opponentTeamId,
+          matchupId,
+          matchupStatus,
+        };
+      });
+
+      // Batch opponent team name lookup
+      const opponentTeamIds = [
+        ...new Set(
+          partials
+            .map((p) => p.opponentTeamId)
+            .filter((id): id is number => id != null),
+        ),
+      ];
+      const teamNameRows =
+        opponentTeamIds.length > 0
+          ? await context.db
+              .select({
+                id: PublicSchema.teams.id,
+                name: PublicSchema.teams.name,
+              })
+              .from(PublicSchema.teams)
+              .where(inArray(PublicSchema.teams.id, opponentTeamIds))
+          : [];
+      const teamNameMap = new Map(teamNameRows.map((t) => [t.id, t.name]));
+
+      // Final assembly
+      return partials.map((partial) => {
+        const {
+          league,
+          userScore,
+          opponentScore,
+          opponentTeamId,
+          matchupId,
+          matchupStatus,
+        } = partial;
+        const draftRow = draftMap.get(league.id) ?? null;
+        const standings = standingsMap.get(league.id) ?? null;
+        const userStanding =
+          standings?.find((s) => s.teamId === league.userTeamId) ?? null;
+        const opponentTeamName =
+          opponentTeamId != null
+            ? (teamNameMap.get(opponentTeamId) ?? null)
+            : null;
+
+        return {
+          leagueId: league.id,
+          leagueName: league.name,
+          leaguePhase: league.leaguePhase,
+          seasonNumber: league.seasonNumber,
+          draftStatus: league.draftStatus,
+          draftScheduledAt:
+            draftRow?.scheduledAt != null
+              ? draftRow.scheduledAt.toISOString()
+              : null,
+          draftMode: draftRow?.draftMode ?? null,
+          selectionMethod: draftRow?.selectionMethod ?? null,
+          teamCount: teamCountMap.get(league.id) ?? 0,
+          wins: userStanding?.wins ?? null,
+          losses: userStanding?.losses ?? null,
+          ties: userStanding?.ties ?? null,
+          rank: userStanding?.rank ?? null,
+          totalTeams: standings?.length ?? null,
+          pointsFor: userStanding?.pointsFor ?? null,
+          currentWeekNumber: league.currentWeek,
+          totalMatchups: league.totalMatchups,
+          matchupId,
+          matchupStatus,
+          userScore,
+          opponentScore,
+          opponentTeamName,
+        } satisfies UserLeagueSummaryShape;
+      });
+    },
+  }),
+);
+
+// ── getArchivedUserLeagueSummaries ────────────────────────────────────────────
+
+builder.queryField('getArchivedUserLeagueSummaries', (t) =>
+  t.field({
+    type: [UserLeagueSummary],
+    nullable: false,
+    resolve: async (_parent, _args, context) => {
+      if (!context.user) {
+        throw AuthenticationError(
+          'Authentication required to fetch archived league summaries',
+        );
+      }
+
+      const userId = context.user.id;
+
+      const leagues = await context.db
+        .select({
+          id: PublicSchema.leagues.id,
+          name: PublicSchema.leagues.name,
+          leaguePhase: PublicSchema.leagues.leaguePhase,
+          draftStatus: PublicSchema.leagues.draftStatus,
+          currentMatchup: PublicSchema.leagues.currentMatchup,
+          currentWeek: PublicSchema.leagues.currentWeek,
+          totalMatchups: PublicSchema.leagues.totalMatchups,
+          seasonNumber: PublicSchema.leagues.seasonNumber,
+          userTeamId: PublicSchema.leagueMembers.teamId,
+        })
+        .from(PublicSchema.leagues)
+        .innerJoin(
+          PublicSchema.leagueMembers,
+          eq(PublicSchema.leagues.id, PublicSchema.leagueMembers.leagueId),
+        )
+        .where(
+          and(
+            eq(PublicSchema.leagueMembers.userId, userId),
+            eq(PublicSchema.leagues.leaguePhase, 'offseason'),
+          ),
+        )
+        .orderBy(PublicSchema.leagues.id);
+
+      if (leagues.length === 0) return [];
+
+      const leagueIds = leagues.map((l) => l.id);
+
+      const teamCountRows = await context.db
+        .select({
+          leagueId: PublicSchema.leagueMembers.leagueId,
+          cnt: count(),
+        })
+        .from(PublicSchema.leagueMembers)
+        .where(inArray(PublicSchema.leagueMembers.leagueId, leagueIds))
+        .groupBy(PublicSchema.leagueMembers.leagueId);
+
+      const teamCountMap = new Map(
+        teamCountRows.map((r) => [r.leagueId, Number(r.cnt)]),
+      );
+
+      const { StandingsService } =
+        await import('../../services/standings-service');
+
+      return Promise.all(
+        leagues.map(async (league) => {
+          const standings = await StandingsService.getStandings(context.db, {
+            leagueId: league.id,
+          });
+          const userStanding =
+            standings.find((s) => s.teamId === league.userTeamId) ?? null;
+
+          return {
+            leagueId: league.id,
+            leagueName: league.name,
+            leaguePhase: league.leaguePhase,
+            seasonNumber: league.seasonNumber,
+            draftStatus: league.draftStatus,
+            draftScheduledAt: null,
+            draftMode: null,
+            selectionMethod: null,
+            teamCount: teamCountMap.get(league.id) ?? 0,
+            wins: userStanding?.wins ?? null,
+            losses: userStanding?.losses ?? null,
+            ties: userStanding?.ties ?? null,
+            rank: userStanding?.rank ?? null,
+            totalTeams: standings.length,
+            pointsFor: userStanding?.pointsFor ?? null,
+            currentWeekNumber: league.currentWeek,
+            totalMatchups: league.totalMatchups,
+            matchupId: null,
+            matchupStatus: null,
+            userScore: null,
+            opponentScore: null,
+            opponentTeamName: null,
+          } satisfies UserLeagueSummaryShape;
+        }),
+      );
     },
   }),
 );

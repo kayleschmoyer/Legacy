@@ -2326,6 +2326,7 @@ export type Query = {
   game?: Maybe<ScoreboardGame>;
   /** Get all-time records across all seasons in a league's history (most wins, highest score, longest win streak, most points in a season). */
   getAllTimeRecords?: Maybe<Array<AllTimeRecord>>;
+  getArchivedUserLeagueSummaries: Array<UserLeagueSummary>;
   getAvailableDraftPlayers?: Maybe<Array<DraftPlayer>>;
   getChampionshipTrophies?: Maybe<Array<ChampionTrophy>>;
   getCurrentDraftPick?: Maybe<CurrentDraftPick>;
@@ -2371,6 +2372,7 @@ export type Query = {
   getTiebreakerRules?: Maybe<TiebreakerRule>;
   getUnreadNotificationCount?: Maybe<Scalars['Int']['output']>;
   getUserDeviceTokens?: Maybe<Array<DeviceToken>>;
+  getUserLeagueSummaries: Array<UserLeagueSummary>;
   getUserNotificationPreferences?: Maybe<NotificationPreference>;
   hello?: Maybe<Scalars['String']['output']>;
   league?: Maybe<League>;
@@ -3741,6 +3743,33 @@ export type UserDataExport = {
   userCreatedAt?: Maybe<Scalars['String']['output']>;
   userEmail?: Maybe<Scalars['String']['output']>;
   userUsername?: Maybe<Scalars['String']['output']>;
+};
+
+/** Dashboard summary combining league phase, draft state, standings, and current matchup for a single league. */
+export type UserLeagueSummary = {
+  __typename?: 'UserLeagueSummary';
+  currentWeekNumber?: Maybe<Scalars['Int']['output']>;
+  draftMode?: Maybe<Scalars['String']['output']>;
+  draftScheduledAt?: Maybe<Scalars['String']['output']>;
+  draftStatus?: Maybe<Scalars['String']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  leagueName?: Maybe<Scalars['String']['output']>;
+  leaguePhase?: Maybe<Scalars['String']['output']>;
+  losses?: Maybe<Scalars['Int']['output']>;
+  matchupId?: Maybe<Scalars['Int']['output']>;
+  matchupStatus?: Maybe<Scalars['String']['output']>;
+  opponentScore?: Maybe<Scalars['Float']['output']>;
+  opponentTeamName?: Maybe<Scalars['String']['output']>;
+  pointsFor?: Maybe<Scalars['Float']['output']>;
+  rank?: Maybe<Scalars['Int']['output']>;
+  seasonNumber?: Maybe<Scalars['Int']['output']>;
+  selectionMethod?: Maybe<Scalars['String']['output']>;
+  teamCount?: Maybe<Scalars['Int']['output']>;
+  ties?: Maybe<Scalars['Int']['output']>;
+  totalMatchups?: Maybe<Scalars['Int']['output']>;
+  totalTeams?: Maybe<Scalars['Int']['output']>;
+  userScore?: Maybe<Scalars['Float']['output']>;
+  wins?: Maybe<Scalars['Int']['output']>;
 };
 
 /** Version and deployment information for the GraphQL API */

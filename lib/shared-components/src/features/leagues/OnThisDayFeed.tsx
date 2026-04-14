@@ -262,9 +262,8 @@ export function OnThisDayFeed({
   const dateLabel = `${MONTH_NAMES[month - 1]} ${ordinal(day)}`;
 
   const containerStyle: React.CSSProperties = {
-    background: `linear-gradient(145deg, ${withAlpha(BG_DARK, 0.88)} 0%, ${withAlpha(BRAND_NAVY, 0.28)} 100%)`,
-    backdropFilter: 'blur(20px)',
-    WebkitBackdropFilter: 'blur(20px)',
+    background: BG_DARK,
+    borderTop: `2px solid ${withAlpha(BRAND_GOLD, 0.55)}`,
   };
 
   return (

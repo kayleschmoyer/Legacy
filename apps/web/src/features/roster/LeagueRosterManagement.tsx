@@ -736,17 +736,19 @@ function RosterSection({
         position="relative"
         overflow="hidden"
       >
-        {/* Fill progress bar */}
+        {/* Fill progress bar — scaleX avoids layout-thrashing width animation */}
         <YStack
           position="absolute"
           left={0}
           top={0}
           bottom={0}
-          width={`${fillPct}%`}
+          width="100%"
           opacity={0.08}
           style={{
             background: `linear-gradient(90deg, ${withAlpha(GREEN, 0.6)}, ${withAlpha(BRAND_NAVY_LIGHT, 0.4)})`,
-            transition: 'width 0.5s ease-out',
+            transform: `scaleX(${fillPct / 100})`,
+            transformOrigin: 'left center',
+            transition: 'transform 0.5s ease-out',
           }}
         />
         <Text

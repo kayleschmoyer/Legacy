@@ -2465,6 +2465,7 @@ type Query {
   Get all-time records across all seasons in a league's history (most wins, highest score, longest win streak, most points in a season).
   """
   getAllTimeRecords(leagueId: Int!): [AllTimeRecord!]
+  getArchivedUserLeagueSummaries: [UserLeagueSummary!]!
   getAvailableDraftPlayers(
     draftId: Int!
     limit: Int
@@ -2551,6 +2552,7 @@ type Query {
   getTiebreakerRules(leagueId: Int!): TiebreakerRule
   getUnreadNotificationCount: Int
   getUserDeviceTokens: [DeviceToken!]
+  getUserLeagueSummaries: [UserLeagueSummary!]!
   getUserNotificationPreferences: NotificationPreference
   hello: String
   league(id: Int!): League
@@ -3667,6 +3669,34 @@ type UserDataExport {
   userCreatedAt: String
   userEmail: String
   userUsername: String
+}
+
+"""
+Dashboard summary combining league phase, draft state, standings, and current matchup for a single league.
+"""
+type UserLeagueSummary {
+  currentWeekNumber: Int
+  draftMode: String
+  draftScheduledAt: String
+  draftStatus: String
+  leagueId: Int
+  leagueName: String
+  leaguePhase: String
+  losses: Int
+  matchupId: Int
+  matchupStatus: String
+  opponentScore: Float
+  opponentTeamName: String
+  pointsFor: Float
+  rank: Int
+  seasonNumber: Int
+  selectionMethod: String
+  teamCount: Int
+  ties: Int
+  totalMatchups: Int
+  totalTeams: Int
+  userScore: Float
+  wins: Int
 }
 
 """
