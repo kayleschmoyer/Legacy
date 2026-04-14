@@ -28,6 +28,19 @@ Before submitting your review, confirm you have checked:
 
 If any box would be unchecked, keep reviewing — do not submit until you have covered everything.
 
+## Authoring Workflow — Pre-Push Self-Review Gate
+
+When you are **writing or modifying code** in a Copilot environment, do **not** push immediately after tests or `make pc` pass. A strong self-review is a mandatory gate before every push and PR update.
+
+1. Run the mechanical checks first: `make lint-review-patterns`
+2. Read **every changed file in full** — not just diff hunks
+3. Manually check the judgment-requiring patterns from `.agents/skills/pr-lifecycle/references/common-review-patterns.md`: **#3, #4, #7, #8, #9, #19, #20**
+4. Scan for the issues that generate repeat Copilot review cycles: dead code, missing/null guards, unsafe casts, async correctness, stale comments, misleading success logs, and missing tests for changed behavior
+5. Fix everything you can directly, then re-run the relevant validation
+6. Produce a **Self-Review Summary** listing the files reviewed, the patterns checked, and any issues fixed
+
+> **Copilot Coding Agent note:** if repo-specific slash skills are unavailable, inline the checklist from `.agents/skills/pr-lifecycle/references/self-review.md` yourself. Lack of slash-command support is **not** a reason to skip self-review.
+
 ## Priority Tiers
 
 Focus your review budget on high-impact issues. If you must limit comments, prioritize by tier:

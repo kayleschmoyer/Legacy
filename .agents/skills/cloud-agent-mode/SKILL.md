@@ -22,11 +22,13 @@ When running as a **cloud coding agent**:
 3. **Validate**: `make_run({ target: "typecheck" })`, `make_run({ target: "lint-fix" })`, `make_run({ target: "test" })`
 4. **DB**: `db_migration_status()` → `db_migrate()`
 5. **Pre-commit**: `make_run({ target: "pc" })`
-6. **Ship**: `worktree_commit({ message: "type(scope): msg" })` → `worktree_push()`
-7. **PR**: `github_create_pr({ title: "...", body: "...", draft: true })` → `github_manage_labels({ number: <PR#>, add: ["agent-in-progress"] })` → `github_mark_pr_ready({ number: <PR#> })` (apply label while still a draft, before marking ready — see [Review Lifecycle in Cloud](#review-lifecycle-in-cloud))
-8. **Jira**: `jira_transition({ key: "LS-####", status: "In Review" })`
+6. **Self-review (MANDATORY gate)**: `make_run({ target: "lint-review-patterns" })`, then read every changed file in full and manually check patterns **#3, #4, #7, #8, #9, #19, #20** from `../pr-lifecycle/references/common-review-patterns.md`. Also scan for dead code, unsafe casts, missing/null guards, async correctness, stale comments, misleading success logs, and missing tests for changed behavior. Produce a **Self-Review Summary** before proceeding. If you find issues, fix them, re-run Step 5, then repeat this Step 6 on the updated diff and update the **Self-Review Summary** before proceeding.
+   - **Copilot Coding Agent note**: there may be no `/review` slash-command support in this environment. That does **not** waive the gate — inline the checklist from `../pr-lifecycle/references/self-review.md` yourself.
+7. **Ship**: `worktree_commit({ message: "type(scope): msg" })` → `worktree_push()`
+8. **PR**: `github_create_pr({ title: "...", body: "...", draft: true })` → `github_manage_labels({ number: <PR#>, add: ["agent-in-progress"] })` → `github_mark_pr_ready({ number: <PR#> })` (apply label while still a draft, before marking ready — see [Review Lifecycle in Cloud](#review-lifecycle-in-cloud))
+9. **Jira**: `jira_transition({ key: "LS-####", status: "In Review" })`
 
-9. **Review lifecycle**: monitor PR → fix Copilot comments → reply → resolve threads → re-request review (see [Review Lifecycle in Cloud](#review-lifecycle-in-cloud) below)
+10. **Review lifecycle**: monitor PR → fix Copilot comments → self-review changed files → fix code → validate before every push → reply → resolve threads → re-request review (see [Review Lifecycle in Cloud](#review-lifecycle-in-cloud) below)
 
 Shell fallbacks (only if MCP server is unavailable): `make <target>`, `git commit`, `git push`, `gh pr create`.
 
@@ -63,7 +65,7 @@ On **Claude Code on the web**, use the built-in `mcp__github__*` tools for autho
 4. Subscribe to events   → mcp__github__subscribe_pr_activity({ owner, repo, pullNumber })
 5. [Copilot posts comments — delivered via <github-webhook-activity> messages]
 6. Read review threads   → github_get_review_threads({ number: <PR#>, unresolvedOnly: true })  ← custom server (returns GraphQL thread node IDs)
-7. Fix code, validate (make pc), commit & push
+7. Fix code, validate (`make pc`), self-review the changed files, commit & push
 8. Reply to threads      → mcp__github__add_reply_to_pull_request_comment({ owner, repo, pullNumber, commentId, body })  ← built-in (bot identity)
 9. Resolve threads       → github_resolve_threads({ threadIds: [...], prNumber: <PR#> })  ← custom server (batch; prNumber triggers bot-review recheck — may 403 on app tokens but threads are still resolved)
 10. Re-request review    → mcp__github__request_copilot_review({ owner, repo, pullNumber })
@@ -105,6 +107,8 @@ The built-in `mcp__github__pull_request_read({ method: "get_review_comments" })`
 | Resolve threads      | `github_resolve_threads({ threadIds, prNumber })` (batch + recheck)                                | `mcp__github__resolve_review_thread({ threadId })` — works but one thread at a time, no prNumber recheck; requires node IDs from `github_get_review_threads` |
 
 > **Custom server startup patience**: the `legacy-sports-github` MCP server may take a few seconds to initialize in cloud environments. If a call returns a connection error on first attempt, wait ~10 seconds and retry once before concluding the server is unavailable and falling back to built-in tools.
+
+> **Before every push in cloud/Copilot sessions**: after `make pc`, run the self-review gate from `../pr-lifecycle/references/self-review.md` (or the equivalent inline checklist if slash skills are unavailable). Do not rely on CI or Copilot review to catch issues you can catch locally first.
 
 **Which operations can use either** (no visible authorship / read-only):
 
