@@ -65,6 +65,23 @@ if (!JWT_SECRET_NAME) {
   throw new Error(errorMsg);
 }
 
+/**
+ * Coerce an unknown caught value to an Error instance.
+ * Plain objects are JSON-serialised into the message so their content is
+ * visible in Rollbar rather than collapsing to "[object Object]".
+ */
+function toError(error: unknown): Error {
+  if (error instanceof Error) return error;
+  if (typeof error === 'object' && error !== null) {
+    try {
+      return new Error(JSON.stringify(error));
+    } catch {
+      return new Error('[unserializable error]');
+    }
+  }
+  return new Error(String(error));
+}
+
 // Cache JWT secret to avoid repeated Secrets Manager calls
 let cachedJwtSecret: string | null = null;
 
@@ -195,7 +212,7 @@ async function validateToken(
       return { valid: false };
     }
   } catch (error) {
-    LOGGER.error('Error validating token', { error });
+    LOGGER.error('Error validating token', toError(error));
     return { valid: false };
   }
 }
@@ -212,29 +229,20 @@ async function validateLeagueAccess(
   userId: number,
   leagueId: number,
 ): Promise<boolean> {
-  try {
-    return await runWithPublicClient(getDbOptions(), async (db: PublicDb) => {
-      const membership = await db
-        .select()
-        .from(PublicSchema.leagueMembers)
-        .where(
-          and(
-            eq(PublicSchema.leagueMembers.leagueId, leagueId),
-            eq(PublicSchema.leagueMembers.userId, userId),
-          ),
-        )
-        .limit(1);
+  return runWithPublicClient(getDbOptions(), async (db: PublicDb) => {
+    const membership = await db
+      .select()
+      .from(PublicSchema.leagueMembers)
+      .where(
+        and(
+          eq(PublicSchema.leagueMembers.leagueId, leagueId),
+          eq(PublicSchema.leagueMembers.userId, userId),
+        ),
+      )
+      .limit(1);
 
-      return membership.length > 0;
-    });
-  } catch (error) {
-    LOGGER.error('Error validating league access', { error, userId, leagueId });
-    captureError(error instanceof Error ? error : new Error(String(error)), {
-      tags: { lambda: 'websocket', operation: 'validateLeagueAccess' },
-      extra: { userId, leagueId },
-    });
-    throw error;
-  }
+    return membership.length > 0;
+  });
 }
 
 /**
@@ -245,47 +253,34 @@ async function validateMatchupAccess(
   userId: number,
   matchupId: number,
 ): Promise<{ hasAccess: boolean; leagueId?: number }> {
-  try {
-    return await runWithPublicClient(getDbOptions(), async (db: PublicDb) => {
-      // Fetch matchup's league in single query
-      const matchup = await db
-        .select({ leagueId: PublicSchema.matchups.leagueId })
-        .from(PublicSchema.matchups)
-        .where(eq(PublicSchema.matchups.id, matchupId))
-        .limit(1);
+  return runWithPublicClient(getDbOptions(), async (db: PublicDb) => {
+    // Fetch matchup's league in single query
+    const matchup = await db
+      .select({ leagueId: PublicSchema.matchups.leagueId })
+      .from(PublicSchema.matchups)
+      .where(eq(PublicSchema.matchups.id, matchupId))
+      .limit(1);
 
-      if (matchup.length === 0) {
-        return { hasAccess: false };
-      }
+    if (matchup.length === 0) {
+      return { hasAccess: false };
+    }
 
-      const leagueId = matchup[0].leagueId;
+    const leagueId = matchup[0].leagueId;
 
-      // Check league membership in same DB session (avoids nested runWithPublicClient)
-      const membership = await db
-        .select()
-        .from(PublicSchema.leagueMembers)
-        .where(
-          and(
-            eq(PublicSchema.leagueMembers.leagueId, leagueId),
-            eq(PublicSchema.leagueMembers.userId, userId),
-          ),
-        )
-        .limit(1);
+    // Check league membership in same DB session (avoids nested runWithPublicClient)
+    const membership = await db
+      .select()
+      .from(PublicSchema.leagueMembers)
+      .where(
+        and(
+          eq(PublicSchema.leagueMembers.leagueId, leagueId),
+          eq(PublicSchema.leagueMembers.userId, userId),
+        ),
+      )
+      .limit(1);
 
-      return { hasAccess: membership.length > 0, leagueId };
-    });
-  } catch (error) {
-    LOGGER.error('Error validating matchup access', {
-      error,
-      userId,
-      matchupId,
-    });
-    captureError(error instanceof Error ? error : new Error(String(error)), {
-      tags: { lambda: 'websocket', operation: 'validateMatchupAccess' },
-      extra: { userId, matchupId },
-    });
-    throw error;
-  }
+    return { hasAccess: membership.length > 0, leagueId };
+  });
 }
 
 /**
@@ -498,11 +493,7 @@ async function handleConnect(
 
     return { statusCode: 200, body: 'Connected' };
   } catch (error) {
-    LOGGER.error('Error handling connect', { error });
-    captureError(error instanceof Error ? error : new Error(String(error)), {
-      tags: { lambda: 'websocket', operation: 'connect' },
-      extra: { connectionId },
-    });
+    LOGGER.error('Error handling connect', toError(error), { connectionId });
 
     return { statusCode: 500, body: 'Failed to connect' };
   }
@@ -644,11 +635,7 @@ async function handleDisconnect(
 
     return { statusCode: 200, body: 'Disconnected' };
   } catch (error) {
-    LOGGER.error('Error handling disconnect', { error });
-    captureError(error instanceof Error ? error : new Error(String(error)), {
-      tags: { lambda: 'websocket', operation: 'disconnect' },
-      extra: { connectionId },
-    });
+    LOGGER.error('Error handling disconnect', toError(error), { connectionId });
 
     return { statusCode: 500, body: 'Failed to disconnect' };
   }
@@ -913,10 +900,9 @@ async function handleDefault(
 
     return { statusCode: 200, body: 'Message received' };
   } catch (error) {
-    LOGGER.error('Error handling message', { error });
-    captureError(error instanceof Error ? error : new Error(String(error)), {
-      tags: { lambda: 'websocket', operation: 'default' },
-      extra: { connectionId, bodyLength: body.length },
+    LOGGER.error('Error handling message', toError(error), {
+      connectionId,
+      bodyLength: body.length,
     });
 
     return { statusCode: 500, body: 'Failed to process message' };
@@ -952,10 +938,9 @@ const baseWebSocketHandler = async (
         return { statusCode: 400, body: 'Unknown route' };
     }
   } catch (error) {
-    LOGGER.error('WebSocket handler error', { error });
-    captureError(error instanceof Error ? error : new Error(String(error)), {
-      tags: { lambda: 'websocket', operation: 'handler' },
-      extra: { connectionId, routeKey },
+    LOGGER.error('WebSocket handler error', toError(error), {
+      connectionId,
+      routeKey,
     });
 
     return { statusCode: 500, body: 'Internal server error' };
@@ -1106,10 +1091,8 @@ export async function broadcastMessage(
       sent: targetConnections.length,
     });
   } catch (error) {
-    LOGGER.error('Error broadcasting message', { error });
-    captureError(error instanceof Error ? error : new Error(String(error)), {
-      tags: { lambda: 'websocket', operation: 'broadcast' },
-      extra: { filterLeagueId },
+    LOGGER.error('Error broadcasting message', toError(error), {
+      filterLeagueId,
     });
     throw error;
   }

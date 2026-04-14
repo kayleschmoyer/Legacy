@@ -92,12 +92,15 @@ process.env['CONNECTIONS_TABLE_NAME'] = 'test-connections';
 process.env['JWT_SECRET_NAME'] = 'test-jwt-secret-name';
 
 import { verify } from 'jsonwebtoken';
+import { LOGGER } from '@legacy-sports/logging';
 import {
   __resetCachedJwtSecret,
   broadcastMessage,
   handler,
   sendMessageToConnection,
 } from './index';
+
+const mockLogger = LOGGER as { error: jest.Mock };
 
 const mockVerify = verify as jest.MockedFunction<typeof verify>;
 
@@ -350,6 +353,28 @@ describe('WebSocket Lambda Handler', () => {
 
       const result = asResult(await handler(event));
       expect(result.statusCode).toBe(400);
+    });
+
+    it('calls LOGGER.error with a direct Error argument when DB access check fails', async () => {
+      mockValidJwt();
+      const dbError = new Error('DB connection failed');
+      mockRunWithPublicClient.mockRejectedValue(dbError);
+
+      const event = makeEvent({
+        routeKey: '$connect',
+        queryStringParameters: { token: 'valid-jwt', leagueId: '5' },
+      });
+
+      const result = asResult(await handler(event));
+      expect(result.statusCode).toBe(500);
+
+      // LOGGER.error must receive the Error as a direct argument, not wrapped in
+      // an object like { error }, so RollbarOutputDestination can find it.
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(Error),
+        expect.anything(),
+      );
     });
 
     it('broadcasts USER_JOINED and sends USER_LIST when leagueId is present', async () => {
