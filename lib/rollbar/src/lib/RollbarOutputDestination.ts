@@ -28,11 +28,20 @@ export class RollbarOutputDestination implements OutputDestination {
     if (this.capturing) return;
     this.capturing = true;
     try {
-      // Use the first Error argument if present; synthesise one from the
-      // message otherwise so every error/fatal log reaches Rollbar.
-      const errorArg = entry.args.find(
-        (arg): arg is Error => arg instanceof Error,
-      );
+      // Use the first Error argument if present; also search inside plain
+      // objects for an Error value (handles the common LOGGER.error('msg',
+      // { error }) pattern); synthesise one from the message otherwise so
+      // every error/fatal log reaches Rollbar.
+      const errorArg =
+        entry.args.find((arg): arg is Error => arg instanceof Error) ??
+        entry.args
+          .filter((arg): arg is Record<string, unknown> => {
+            if (typeof arg !== 'object' || arg === null) return false;
+            const proto = Object.getPrototypeOf(arg) as unknown;
+            return proto === Object.prototype || proto === null;
+          })
+          .flatMap((arg) => Object.values(arg))
+          .find((v): v is Error => v instanceof Error);
       const error = errorArg ?? new Error(entry.message);
 
       const context: Record<string, unknown> = {

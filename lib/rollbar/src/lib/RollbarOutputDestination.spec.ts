@@ -54,6 +54,40 @@ describe('RollbarOutputDestination', () => {
       expect(calledContext['logMessage']).toBe('something failed');
     });
 
+    it('uses an Error found inside a plain object arg', () => {
+      const captureError = jest.fn();
+      const dest = new RollbarOutputDestination(captureError);
+      const err = new Error('wrapped error');
+      dest.write(makeEntry('error', 'something failed', [{ error: err }]));
+
+      expect(captureError).toHaveBeenCalledTimes(1);
+      const [calledError] = captureError.mock.calls[0] as [
+        Error,
+        Record<string, unknown>,
+      ];
+      expect(calledError).toBe(err);
+    });
+
+    it('uses an Error found inside a plain object among mixed args', () => {
+      const captureError = jest.fn();
+      const dest = new RollbarOutputDestination(captureError);
+      const err = new Error('wrapped with context');
+      dest.write(
+        makeEntry('error', 'op failed', [
+          'extra-info',
+          { requestId: 'req-123' },
+          { error: err, userId: 42 },
+        ]),
+      );
+
+      expect(captureError).toHaveBeenCalledTimes(1);
+      const [calledError] = captureError.mock.calls[0] as [
+        Error,
+        Record<string, unknown>,
+      ];
+      expect(calledError).toBe(err);
+    });
+
     it('synthesises an Error from message when no Error arg is present', () => {
       const captureError = jest.fn();
       const dest = new RollbarOutputDestination(captureError);
