@@ -10,7 +10,8 @@ name: Copilot Auto-Approve
 #    via GITHUB_TOKEN (tested in LS-3073).
 # 2. auto-approve: approves the PR when Copilot's review has no unresolved comments
 # 3. delayed-recheck: on synchronize events, waits 3 min then dispatches a recheck
-#    if bot-review is still PENDING (guards against Copilot not re-reviewing)
+#    if bot-review is still PENDING or FAILED (guards against Copilot not re-reviewing,
+#    and catches the case where threads became outdated after a failure was recorded)
 #
 # The auto-approve job uses workflow_run to chain off the built-in "Copilot code review"
 # workflow. This bypasses GitHub's anti-recursion rule which prevents events from
@@ -956,7 +957,7 @@ jobs:
       - name: Wait for Copilot to potentially re-review
         run: sleep 180
 
-      - name: Check if bot-review is still pending
+      - name: Check if bot-review is still pending or failed
         id: check
         uses: actions/github-script@v8
         with:
@@ -974,16 +975,24 @@ jobs:
             const isPending = botReview
               ? botReview.status === 'in_progress' || botReview.status === 'queued'
               : false;
-            const state = isPending ? 'pending' : (botReview ? botReview.status : 'unknown');
+            // Also recheck when bot-review failed — threads may have become outdated
+            // since the failure was recorded (e.g. new commits were pushed after
+            // Copilot left comments). The recheck job filters out isOutdated threads
+            // and will flip bot-review to success if no active threads remain.
+            const isFailed = botReview
+              ? botReview.status === 'completed' && botReview.conclusion === 'failure'
+              : false;
+            const state = isPending ? 'pending' : (isFailed ? 'failure' : (botReview ? botReview.conclusion ?? botReview.status : 'unknown'));
             core.setOutput('state', state);
             core.info(`Current bot-review state: ${state}`);
 
       - name: Dispatch recheck
-        if: steps.check.outputs.state == 'pending'
+        if: steps.check.outputs.state == 'pending' || steps.check.outputs.state == 'failure'
         uses: actions/github-script@v8
         with:
           script: |
             const prNumber = context.payload.pull_request.number;
+            const state = '${{ steps.check.outputs.state }}';
             await github.rest.actions.createWorkflowDispatch({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -991,4 +1000,4 @@ jobs:
               ref: context.payload.pull_request.base.ref,
               inputs: { pr_number: prNumber.toString() },
             });
-            core.info(`Dispatched recheck for PR #${prNumber} (bot-review was still pending after 3m)`);
+            core.info(`Dispatched recheck for PR #${prNumber} (bot-review was ${state} after 3m)`);
