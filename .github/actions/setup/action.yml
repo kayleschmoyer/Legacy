@@ -260,7 +260,7 @@ runs:
 
     - name: Set NX SHAs
       if: inputs.set-nx-shas == 'true'
-      uses: nrwl/nx-set-shas@v4
+      uses: nrwl/nx-set-shas@v5.0.1
       with:
         main-branch-name: "main"
         error-on-no-successful-workflow: false
