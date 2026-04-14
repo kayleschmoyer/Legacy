@@ -145,6 +145,15 @@ jobs:
 
           $NX_CMD build web --configuration=deploy
 
+      # SPA fallback: GitHub Pages serves 404.html for unknown paths.
+      # Overriding 404.html with the built index.html lets React Router handle
+      # deep links directly without the extra redirect round-trip that the
+      # redirect-based public/404.html produces. Mirrors what deploy-pr-preview.yml
+      # already does. HTTP status is still 404 (a GitHub Pages constraint), but
+      # the correct app content is served immediately on the first request.
+      - name: Add SPA Fallback
+        run: cp ./dist/apps/web/index.html ./dist/apps/web/404.html
+
       # Add CNAME file for custom domain
       # Required when using actions/deploy-pages (artifact-based deployment)
       # GitHub can't auto-create this since we're not using a branch
