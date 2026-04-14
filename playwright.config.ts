@@ -32,6 +32,8 @@ export default defineConfig({
     trace: 'on-first-retry',
     /* Take screenshot on failure */
     screenshot: 'only-on-failure',
+    /* Emulate prefers-reduced-motion: reduce; animated UI is only stabilized where the app respects that preference. */
+    reducedMotion: 'reduce',
   },
 
   /* Configure projects for major browsers */

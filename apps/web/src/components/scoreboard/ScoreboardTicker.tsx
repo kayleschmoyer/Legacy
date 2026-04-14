@@ -162,6 +162,12 @@ export function ScoreboardTicker() {
   const games: TickerGame[] = (data?.scoreboard?.games ?? []) as TickerGame[];
   const isAnyGameLive = games.some((g) => g.status === 'Live');
 
+  // Detect reduced-motion preference once on mount (synchronous so there is no
+  // flash of the animated layout before switching to the static one).
+  const prefersReducedMotion =
+    typeof window !== 'undefined' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
   useEffect(() => {
     if (isAnyGameLive) {
       startPolling(LIVE_POLL_MS);
@@ -174,8 +180,10 @@ export function ScoreboardTicker() {
   const [paused, setPaused] = useState(false);
   const innerRef = useRef<HTMLDivElement>(null);
 
-  // Inject keyframes once per document lifecycle
+  // Inject keyframes once per document lifecycle (only needed for the animated
+  // path; no-op when reduced motion is active since the animation is not used).
   useEffect(() => {
+    if (prefersReducedMotion) return;
     const styleId = 'scoreboard-ticker-keyframes';
     if (document.getElementById(styleId)) return;
     const style = document.createElement('style');
@@ -190,7 +198,7 @@ export function ScoreboardTicker() {
     return () => {
       document.getElementById(styleId)?.remove();
     };
-  }, []);
+  }, [prefersReducedMotion]);
 
   // Don't render when no games — no ticker strip and no spacer
   if (games.length === 0) return null;
@@ -201,26 +209,6 @@ export function ScoreboardTicker() {
       {idx < games.length - 1 && <Separator />}
     </React.Fragment>
   ));
-
-  // Duplicate chips for seamless loop
-  const allChips = [
-    ...chips,
-    ...games.map((game, idx) => (
-      <React.Fragment key={`dup-${game.gamePk}`}>
-        <GameChip game={game} />
-        {idx < games.length - 1 && <Separator />}
-      </React.Fragment>
-    )),
-  ];
-
-  const animationStyle: React.CSSProperties = {
-    display: 'flex',
-    alignItems: 'center',
-    flexShrink: 0,
-    willChange: 'transform',
-    animation: `ticker-scroll ${SCROLL_DURATION_S}s linear infinite`,
-    animationPlayState: paused ? 'paused' : 'running',
-  };
 
   return (
     <>
@@ -243,12 +231,51 @@ export function ScoreboardTicker() {
         {/* "MLB" label */}
         <TickerLabel>MLB</TickerLabel>
 
-        {/* Scrolling area */}
-        <ScrollOuter>
-          <div ref={innerRef} style={animationStyle}>
-            {allChips}
-          </div>
-        </ScrollOuter>
+        {prefersReducedMotion ? (
+          /*
+           * Reduced-motion layout: static, horizontally scrollable strip so
+           * every game is reachable without animation. No chip duplication.
+           */
+          <ScrollOuter style={{ overflowX: 'auto' } as React.CSSProperties}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                flexShrink: 0,
+              }}
+            >
+              {chips}
+            </div>
+          </ScrollOuter>
+        ) : (
+          /*
+           * Animated layout: chips are duplicated so the scroll loops
+           * seamlessly. The outer container clips the content.
+           */
+          <ScrollOuter>
+            <div
+              ref={innerRef}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                flexShrink: 0,
+                willChange: 'transform',
+                animation: `ticker-scroll ${SCROLL_DURATION_S}s linear infinite`,
+                animationPlayState: paused ? 'paused' : 'running',
+              }}
+              data-ticker-inner
+            >
+              {/* Duplicate chips for seamless loop */}
+              {chips}
+              {games.map((game, idx) => (
+                <React.Fragment key={`dup-${game.gamePk}`}>
+                  <GameChip game={game} />
+                  {idx < games.length - 1 && <Separator />}
+                </React.Fragment>
+              ))}
+            </div>
+          </ScrollOuter>
+        )}
       </TickerStrip>
     </>
   );

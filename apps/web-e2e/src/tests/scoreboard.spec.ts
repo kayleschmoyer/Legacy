@@ -395,4 +395,29 @@ test.describe('ScoreboardTicker — global ticker visibility @regression', () =>
     const spacer = page.locator('[aria-hidden="true"][style*="height: 32px"]');
     await expect(spacer).not.toBeVisible();
   });
+
+  test('scoreboard link in ticker is clickable from /players @regression', async ({
+    page,
+  }) => {
+    // Regression for LS-3330: GameChip links inside the scrolling ticker were
+    // flagged as "not stable" by Playwright because the CSS animation continuously
+    // translates the inner container.  The fix adds prefers-reduced-motion support
+    // to the ticker and sets reducedMotion:'reduce' in playwright.config.ts so the
+    // animation is paused during all tests.
+    await mockScoreboardGraphQL(page, {
+      games: [MOCK_FINAL_GAME],
+    });
+    await page.goto('/players');
+    await page.waitForLoadState('load');
+
+    const ticker = page.getByTestId('scoreboard-ticker');
+    await expect(ticker).toBeVisible();
+
+    // The link inside the ticker should be stable and clickable
+    const scoreboardLink = ticker.getByRole('link').first();
+    await expect(scoreboardLink).toBeVisible();
+    await scoreboardLink.click();
+
+    await expect(page).toHaveURL('/scoreboard');
+  });
 });
