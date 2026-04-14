@@ -20,6 +20,7 @@ import {
   validateCsrf,
 } from '../util/jwt-cookie';
 import { withDbClient } from '../util/db';
+import { notifyNewUserSignup } from '../util/discord';
 import { DiscordEnv, Secret, SECRET_CONFIG } from '../util';
 
 // ── Discord OAuth2 constants ─────────────────────────────────────────────────
@@ -203,7 +204,8 @@ export const handleDiscordAuth = async (
   // email is guaranteed non-null by the checks above
   const email = discordUser.email;
 
-  return await withDbClient(async (db) => {
+  let newUserId: number | null = null;
+  const result = await withDbClient(async (db) => {
     // First check if a user with this Discord ID already exists
     let user = await getUserByDiscordId(db, discordUser.id);
 
@@ -216,6 +218,7 @@ export const handleDiscordAuth = async (
       // Create new user
       user = await createUser(db, email);
       LOGGER.info('Created new user via Discord OAuth', { userId: user.id });
+      newUserId = user.id;
     }
 
     // Link Discord account if not already linked
@@ -245,6 +248,13 @@ export const handleDiscordAuth = async (
       },
     };
   });
+
+  // Best-effort Discord notification — sent after DB connection is released
+  if (newUserId !== null) {
+    await notifyNewUserSignup(email, newUserId, 'discord');
+  }
+
+  return result;
 };
 
 /**

@@ -18,7 +18,7 @@ const COLOR_NEW_USER = 0x57f287; // Green
 export function formatNewUserEmbed(
   email: string,
   userId: number,
-  signupMethod: 'local' | 'google',
+  signupMethod: 'local' | 'google' | 'discord',
 ): DiscordEmbed {
   const [localPart, domain] = email.split('@');
   const maskedLocal = localPart.length <= 1 ? '***' : `${localPart[0]}***`;
@@ -47,7 +47,7 @@ export function formatNewUserEmbed(
 export async function notifyNewUserSignup(
   email: string,
   userId: number,
-  signupMethod: 'local' | 'google',
+  signupMethod: 'local' | 'google' | 'discord',
 ): Promise<void> {
   const webhookUrl = process.env['DISCORD_USER_SIGNUP_WEBHOOK_URL'];
 
