@@ -1,0 +1,110 @@
+name: "Check Merge Conflicts"
+
+# Lightweight check that fails if the PR branch has merge conflicts with the
+# base branch. GitHub computes mergeability lazily, so this polls the API up
+# to 10 times (50 s total) before giving up.
+#
+# The "No Merge Conflicts" job name is registered as a required status check
+# in .github/ruleset.json. Apply changes with scripts/apply-ruleset.sh.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: check-conflicts-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  check-conflicts:
+    name: "No Merge Conflicts"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: "Detect merge conflicts"
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+            const prNumber = context.payload.pull_request.number;
+
+            // GitHub computes mergeability lazily and returns null until ready.
+            // Poll until we get a definitive true/false (up to ~50 s).
+            let pr;
+            let mergeable = null;
+            for (let attempt = 1; attempt <= 10; attempt++) {
+              ({ data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: prNumber }));
+              mergeable = pr.mergeable;
+              if (mergeable !== null) break;
+              core.info(`Mergeability not yet computed (attempt ${attempt}/10) — waiting 5 s…`);
+              await new Promise(r => setTimeout(r, 5000));
+            }
+
+            // Label management helpers
+            const label = 'CI: Conflicts';
+            const existingLabels = pr.labels.map(l => l.name);
+            const hasLabel = existingLabels.includes(label);
+
+            async function withRetry(fn, retries = 3) {
+              for (let i = 0; i < retries; i++) {
+                try { return await fn(); }
+                catch (e) {
+                  const rateLimited =
+                    e.status === 429 ||
+                    (e.status === 403 && /secondary rate limit/i.test(e.message ?? ''));
+                  if (rateLimited && i < retries - 1) {
+                    const delay = Math.pow(2, i) * 1000;
+                    core.warning(`Rate limited (${e.status}), retrying in ${delay} ms…`);
+                    await new Promise(r => setTimeout(r, delay));
+                  } else throw e;
+                }
+              }
+            }
+
+            if (mergeable === false) {
+              // Add conflict label if not already present
+              if (!hasLabel) {
+                await withRetry(() => github.rest.issues.addLabels({
+                  owner, repo, issue_number: prNumber, labels: [label],
+                }));
+                core.info(`Label added: ${label}`);
+              }
+              core.setFailed(
+                'This PR has merge conflicts with the base branch. ' +
+                'Rebase or merge the base branch into your branch to resolve them.'
+              );
+            } else {
+              // Remove stale conflict label if present.
+              // Guard against 404: another workflow or manual action may have removed
+              // the label between when we fetched pr.labels and now.
+              if (hasLabel) {
+                try {
+                  await withRetry(() => github.rest.issues.removeLabel({
+                    owner, repo, issue_number: prNumber, name: label,
+                  }));
+                  core.info(`Label removed: ${label}`);
+                } catch (e) {
+                  if (e.status === 404) {
+                    core.warning(`Label already absent, skipping removal: ${label}`);
+                  } else {
+                    throw e;
+                  }
+                }
+              }
+              if (mergeable === null) {
+                // GitHub did not compute mergeability within the polling window.
+                // Fail conservatively — re-running the check (push an empty commit
+                // or re-trigger manually) will resolve this once GitHub catches up.
+                core.setFailed(
+                  'Mergeability could not be determined after 10 attempts (~50 s). ' +
+                  'Re-run this check once GitHub has computed the merge status.'
+                );
+              } else {
+                core.info('No merge conflicts detected.');
+              }
+            }

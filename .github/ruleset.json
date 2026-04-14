@@ -47,6 +47,10 @@
           {
             "_comment": "Copilot / bot review gate — set by copilot-auto-approve.yml. Ensures every PR has been reviewed by the bot reviewer before merge.",
             "context": "bot-review"
+          },
+          {
+            "_comment": "Fails if the PR branch has merge conflicts with the base branch (check-conflicts.yml).",
+            "context": "No Merge Conflicts"
           }
         ]
       }
