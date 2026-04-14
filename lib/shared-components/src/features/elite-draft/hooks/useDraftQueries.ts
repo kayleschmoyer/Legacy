@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LOGGER } from '@legacy-sports/logging';
 import { useApolloClient, useQuery } from '@apollo/client/react';
+import { isPitcherPosition } from './usePlayerData';
 import type {
   AvailableDraftPlayer,
   CurrentDraftPickInfo,
@@ -222,6 +223,14 @@ export function useDraftQueries({
 
   // ---- Available Players (server-side search) ----
   const client = useApolloClient();
+  // Derive the sort key from the active position filter. Used for both the
+  // initial query and load-more so pagination stays on the same sort order.
+  const playerSortOrderBy = isPitcherPosition(selectedPosition)
+    ? 'pitchingAvgPointsPerGame'
+    : selectedPosition === 'ALL'
+      ? 'avgPointsPerGame'
+      : 'hitterAvgPointsPerGame';
+
   const {
     data: availablePlayersData,
     loading: availablePlayersLoading,
@@ -235,10 +244,7 @@ export function useDraftQueries({
       draftId: draftId ?? 0,
       search: playerSearch || null,
       position: selectedPosition !== 'ALL' ? selectedPosition : null,
-      orderBy:
-        selectedPosition === 'P'
-          ? 'pitchingAvgPointsPerGame'
-          : 'hitterAvgPointsPerGame',
+      orderBy: playerSortOrderBy,
       limit: PLAYER_PAGE_SIZE,
     },
     skip: !draftId || isAuctionDraft,
@@ -455,10 +461,7 @@ export function useDraftQueries({
           draftId: draftId ?? 0,
           search: playerSearch || null,
           position: selectedPosition !== 'ALL' ? selectedPosition : null,
-          orderBy:
-            selectedPosition === 'P'
-              ? 'pitchingAvgPointsPerGame'
-              : 'hitterAvgPointsPerGame',
+          orderBy: playerSortOrderBy,
           limit: PLAYER_PAGE_SIZE,
           offset: allRawPlayers.length,
         },
@@ -485,6 +488,7 @@ export function useDraftQueries({
     client,
     playerSearch,
     selectedPosition,
+    playerSortOrderBy,
     allRawPlayers.length,
   ]);
 
