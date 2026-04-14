@@ -423,7 +423,7 @@ export function LeagueDetailPage(): React.JSX.Element {
     tab?: string;
     matchupId?: string;
   }>();
-  const leagueId = /^\d+$/.test(id ?? '') ? parseInt(id!, 10) : NaN;
+  const leagueId = /^\d+$/.test(id ?? '') ? parseInt(id ?? '', 10) : NaN;
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
 
@@ -887,7 +887,14 @@ export function LeagueDetailPage(): React.JSX.Element {
     } catch (err) {
       setSpectatorJoinError((err as Error).message || 'Failed to join league');
     }
-  }, [spectatorTeamName, joinPublicLeague, leagueId, refetchLeague, navigate]);
+  }, [
+    spectatorTeamName,
+    joinPublicLeague,
+    leagueId,
+    refetchLeague,
+    navigate,
+    getUserTeamId,
+  ]);
 
   const {
     data: teamMembersData,

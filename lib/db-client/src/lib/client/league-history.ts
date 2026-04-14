@@ -362,10 +362,12 @@ export async function getAllTimeRecords(
   // Group matchups by league, then for each team compute streaks
   const matchupsByLeague = new Map<number, typeof matchups>();
   for (const m of matchups) {
-    if (!matchupsByLeague.has(m.leagueId)) {
-      matchupsByLeague.set(m.leagueId, []);
+    let leagueList = matchupsByLeague.get(m.leagueId);
+    if (!leagueList) {
+      leagueList = [];
+      matchupsByLeague.set(m.leagueId, leagueList);
     }
-    matchupsByLeague.get(m.leagueId)!.push(m);
+    leagueList.push(m);
   }
 
   for (const [lid, leagueMatchups] of matchupsByLeague) {

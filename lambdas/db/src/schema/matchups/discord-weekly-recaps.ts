@@ -287,8 +287,9 @@ builder.mutationField('sendDiscordWeeklyRecaps', (t) =>
             if (!records.has(m.team2Id))
               records.set(m.team2Id, { wins: 0, losses: 0, ties: 0, pf: 0 });
 
-            const r1 = records.get(m.team1Id)!;
-            const r2 = records.get(m.team2Id)!;
+            const r1 = records.get(m.team1Id);
+            const r2 = records.get(m.team2Id);
+            if (!r1 || !r2) continue;
 
             r1.pf += t1Score;
             r2.pf += t2Score;

@@ -1,0 +1,23 @@
+{
+  "name": "@legacy-sports/video",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "start": "remotion studio",
+    "render": "remotion render TutorialVideo --output out/tutorial.mp4",
+    "render:gif": "remotion render TutorialVideo --codec=gif --output out/tutorial.gif",
+    "build": "remotion render TutorialVideo --output out/tutorial.mp4"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.448",
+    "@remotion/google-fonts": "4.0.448",
+    "react": "*",
+    "react-dom": "*",
+    "remotion": "4.0.448"
+  },
+  "devDependencies": {
+    "@types/react": "*",
+    "@types/react-dom": "*",
+    "typescript": "*"
+  }
+}

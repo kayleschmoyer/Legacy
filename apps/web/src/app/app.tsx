@@ -126,11 +126,15 @@ const EliteDraftBoardScreen = React.lazy(() =>
 );
 /** Route-level guard for admin pages — redirects non-admins to home.
  *  Defense-in-depth alongside the in-page accessLevel check in AdminPage. */
-function AdminGuard({ children }: { children: React.ReactNode }) {
+function AdminGuard({
+  children,
+}: {
+  children: React.ReactNode;
+}): React.ReactNode {
   const { user, isLoading } = useAuth();
   if (isLoading) return null;
   if (user?.accessLevel !== 'admin') return <Navigate to="/" replace />;
-  return <>{children}</>;
+  return children;
 }
 
 const AdminPage = React.lazy(() =>

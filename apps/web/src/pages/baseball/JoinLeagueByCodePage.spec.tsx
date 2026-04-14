@@ -185,7 +185,7 @@ describe('JoinLeagueByCodePage', () => {
 
     // Should not throw when the form submit event fires
     act(() => {
-      fireEvent.submit(form!);
+      fireEvent.submit(form as Element);
     });
     // If we reach this line the ReferenceError regression is not present
   });
@@ -240,7 +240,7 @@ describe('JoinLeagueByCodePage', () => {
 
     // Clicking must not throw a ReferenceError (LS-1007 regression check)
     act(() => {
-      fireEvent.click(joinButton!);
+      fireEvent.click(joinButton as Element);
     });
 
     // handleJoin was invoked — the mutation was called, proving onPress is
@@ -273,7 +273,7 @@ describe('JoinLeagueByCodePage', () => {
     renderPage();
 
     act(() => {
-      fireEvent.submit(document.querySelector('form')!);
+      fireEvent.submit(document.querySelector('form') as Element);
     });
 
     expect(
@@ -308,7 +308,7 @@ describe('JoinLeagueByCodePage', () => {
     fireEvent.change(codeInput, { target: { value: 'ABC12XYZ' } });
 
     act(() => {
-      fireEvent.submit(document.querySelector('form')!);
+      fireEvent.submit(document.querySelector('form') as Element);
     });
 
     expect(screen.getByText(/Please enter a team name/i)).toBeInTheDocument();
@@ -344,7 +344,7 @@ describe('JoinLeagueByCodePage', () => {
     fireEvent.change(nameInput, { target: { value: 'My Team' } });
 
     act(() => {
-      fireEvent.submit(document.querySelector('form')!);
+      fireEvent.submit(document.querySelector('form') as Element);
     });
 
     expect(
@@ -387,7 +387,7 @@ describe('JoinLeagueByCodePage', () => {
     });
 
     act(() => {
-      fireEvent.submit(document.querySelector('form')!);
+      fireEvent.submit(document.querySelector('form') as Element);
     });
 
     await waitFor(() => {
@@ -495,7 +495,7 @@ describe('JoinLeagueByCodePage', () => {
     });
 
     act(() => {
-      fireEvent.submit(document.querySelector('form')!);
+      fireEvent.submit(document.querySelector('form') as Element);
     });
 
     expect(mockJoinLeague).not.toHaveBeenCalled();
@@ -513,7 +513,7 @@ describe('JoinLeagueByCodePage', () => {
     });
 
     act(() => {
-      fireEvent.submit(document.querySelector('form')!);
+      fireEvent.submit(document.querySelector('form') as Element);
     });
 
     expect(mockJoinLeague).not.toHaveBeenCalled();
@@ -596,7 +596,7 @@ describe('JoinLeagueByCodePage', () => {
     });
 
     act(() => {
-      fireEvent.submit(document.querySelector('form')!);
+      fireEvent.submit(document.querySelector('form') as Element);
     });
 
     await waitFor(() => {
@@ -658,7 +658,7 @@ describe('JoinLeagueByCodePage', () => {
     });
 
     act(() => {
-      fireEvent.submit(document.querySelector('form')!);
+      fireEvent.submit(document.querySelector('form') as Element);
     });
 
     await waitFor(() => {

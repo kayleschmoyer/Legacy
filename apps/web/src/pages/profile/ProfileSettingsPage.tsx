@@ -294,13 +294,7 @@ const ProfileSettingsPage: React.FC = () => {
         });
       },
     });
-  }, [
-    editedUsername,
-    dbUsername,
-    updateUsername,
-    refetchUser,
-    auth.updateUserProfile,
-  ]);
+  }, [editedUsername, dbUsername, updateUsername, refetchUser, auth]);
 
   const handleConnectDiscord = useCallback(() => {
     const clientId = auth.config.discordClientId;

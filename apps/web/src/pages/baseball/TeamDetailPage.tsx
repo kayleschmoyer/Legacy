@@ -50,7 +50,7 @@ export function TeamDetailPage() {
   const { teamId } = useParams<{ teamId: string }>();
   const navigate = useNavigate();
   const isValidTeamId = /^\d+$/.test(teamId ?? '');
-  const teamIdNum = isValidTeamId ? parseInt(teamId!, 10) : 0;
+  const teamIdNum = isValidTeamId ? parseInt(teamId ?? '', 10) : 0;
 
   // Local state for branding form
   const [avatarInput, setAvatarInput] = useState('');

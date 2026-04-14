@@ -18,12 +18,14 @@ export function useAnalyticsIdentify(): void {
     skip: !user?.id,
   });
 
-  useEffect(() => {
-    if (!user?.id || !data?.user) return;
+  const subscriptionTier = data?.user?.subscriptionTier;
 
-    const tier = data.user.subscriptionTier === 'premium' ? 'premium' : 'free';
+  useEffect(() => {
+    if (!user?.id || subscriptionTier == null) return;
+
+    const tier = subscriptionTier === 'premium' ? 'premium' : 'free';
 
     setUserId(user.id);
     setUserProperties({ userId: user.id, subscriptionTier: tier });
-  }, [user?.id, data?.user?.subscriptionTier]);
+  }, [user?.id, subscriptionTier]);
 }

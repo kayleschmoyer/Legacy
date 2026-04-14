@@ -5,6 +5,13 @@
   "projectType": "library",
   "tags": ["platform:shared", "scope:lib", "type:data"],
   "targets": {
-    "typecheck": {}
+    "typecheck": {},
+    "lint": {
+      "options": {
+        "env": {
+          "NODE_OPTIONS": "--max-old-space-size=4096"
+        }
+      }
+    }
   }
 }

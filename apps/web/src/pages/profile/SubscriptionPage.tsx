@@ -535,7 +535,7 @@ const SubscriptionPage: React.FC = () => {
       // Remove query params to prevent re-tracking on refresh/back/forward
       navigate('/profile/subscription', { replace: true });
     }
-  }, [searchParams, navigate]);
+  }, [searchParams, navigate, ANNUAL_TOTAL, MONTHLY_PRICE]);
 
   const { data, loading } = useGetMySubscriptionQuery();
   const subscription = data?.mySubscription ?? null;

@@ -153,7 +153,9 @@ describe('OBFUSCATION_CONFIG', () => {
   it.each(categoriesWithConfig)(
     '%s rule ends with a vague tier (null minValue)',
     (category) => {
-      const rule = OBFUSCATION_CONFIG[category]!;
+      const rule = OBFUSCATION_CONFIG[category];
+      expect(rule).toBeDefined();
+      if (!rule) return;
       const lastTier = rule.tiers[rule.tiers.length - 1];
       expect(lastTier.minValue).toBeNull();
       expect(lastTier.tier).toBe('vague');
@@ -163,11 +165,15 @@ describe('OBFUSCATION_CONFIG', () => {
   it.each(categoriesWithConfig)(
     '%s rule has tiers in descending minValue order (most specific first)',
     (category) => {
-      const rule = OBFUSCATION_CONFIG[category]!;
-      const nonNullTiers = rule.tiers.filter((t) => t.minValue !== null);
+      const rule = OBFUSCATION_CONFIG[category];
+      expect(rule).toBeDefined();
+      if (!rule) return;
+      const nonNullTiers = rule.tiers.filter(
+        (t): t is typeof t & { minValue: number } => t.minValue !== null,
+      );
       for (let i = 1; i < nonNullTiers.length; i++) {
-        expect(nonNullTiers[i - 1].minValue!).toBeGreaterThan(
-          nonNullTiers[i].minValue!,
+        expect(nonNullTiers[i - 1].minValue).toBeGreaterThan(
+          nonNullTiers[i].minValue,
         );
       }
     },

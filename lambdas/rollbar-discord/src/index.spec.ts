@@ -122,14 +122,14 @@ describe('parsePlainTextBudgetNotification', () => {
     const noForecast = fullMessage.replace('FORECASTED Amount: $250.00\n', '');
     const result = parsePlainTextBudgetNotification(noForecast);
     expect(result).not.toBeNull();
-    expect(result!.forecastedSpend).toBeUndefined();
+    expect(result?.forecastedSpend).toBeUndefined();
   });
 
   it('handles integer threshold percentages', () => {
     const intThreshold = fullMessage.replace('(100.0%)', '(80%)');
     const result = parsePlainTextBudgetNotification(intThreshold);
     expect(result).not.toBeNull();
-    expect(result!.thresholdPercentage).toBe('80');
+    expect(result?.thresholdPercentage).toBe('80');
   });
 
   it('returns null for non-budget text', () => {

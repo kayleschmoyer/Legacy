@@ -1232,9 +1232,11 @@ builder.queryField('getUserLeagueSummaries', (t) =>
       const draftLeagueIds = leagues
         .filter((l) => l.draftStatus !== 'completed')
         .map((l) => l.id);
-      const matchupIdsToFetch = leagues
-        .filter((l) => l.leaguePhase === 'active' && l.currentMatchup != null)
-        .map((l) => l.currentMatchup!);
+      const matchupIdsToFetch = leagues.flatMap((l) =>
+        l.leaguePhase === 'active' && l.currentMatchup != null
+          ? [l.currentMatchup]
+          : [],
+      );
 
       const [draftRows, matchupRows, standingsResults] = await Promise.all([
         draftLeagueIds.length > 0

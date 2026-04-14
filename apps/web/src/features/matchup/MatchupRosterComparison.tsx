@@ -1008,7 +1008,6 @@ export function MatchupRosterComparison({
     gamesPerMatchup,
     seasonStatsMap,
     scoringSettings,
-    positionMap,
     positionsData,
   ]);
 

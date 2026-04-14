@@ -578,7 +578,10 @@ export function HomePage(): React.JSX.Element {
 
   const summaries = summaryData?.getUserLeagueSummaries ?? [];
   const hasLeagues = summaries.length > 0;
-  const sortedSummaries = useMemo(() => sortByUrgency(summaries), [summaries]);
+  const sortedSummaries = useMemo(
+    () => sortByUrgency(summaryData?.getUserLeagueSummaries ?? []),
+    [summaryData?.getUserLeagueSummaries],
+  );
   const archivedSummaries = archivedData?.getArchivedUserLeagueSummaries ?? [];
 
   const userName = formatDisplayName(auth?.user?.username || 'Manager');

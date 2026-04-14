@@ -53,7 +53,7 @@ export function PremiumGate({
   featureName,
   featureDescription,
   children,
-}: PremiumGateProps) {
+}: PremiumGateProps): React.ReactNode {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   useEffect(() => {
@@ -63,7 +63,7 @@ export function PremiumGate({
   }, [featureName, isPremium]);
 
   if (isPremium) {
-    return <>{children}</>;
+    return children;
   }
 
   function handleUpgradeClick() {

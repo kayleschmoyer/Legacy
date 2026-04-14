@@ -1635,8 +1635,10 @@ export type MutationInitializeDraftArgs = {
 };
 
 export type MutationInitializeMockDraftArgs = {
+  draftOrder?: InputMaybe<Scalars['String']['input']>;
   numTeams: Scalars['Int']['input'];
   pickTimeLimitSeconds?: InputMaybe<Scalars['Int']['input']>;
+  playerPool?: InputMaybe<Scalars['String']['input']>;
   rosterSize: Scalars['Int']['input'];
   userPickPosition: Scalars['Int']['input'];
 };
