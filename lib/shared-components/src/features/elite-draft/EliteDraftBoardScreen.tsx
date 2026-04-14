@@ -374,6 +374,8 @@ export function EliteDraftBoardScreen({
           }}
           onShowToast={ui.showToast}
           teamNameById={queries.teamNameById}
+          onDraftPlayer={(id) => void actions.handleMakePick(id)}
+          onCommissionerPick={(id) => void actions.handleCommissionerPick(id)}
         />
 
         {/* Mobile sticky banner */}

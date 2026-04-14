@@ -18,6 +18,7 @@ export function DraftIntelligence({
   draftId,
   teamId,
   currentOverallPick,
+  onDraft,
 }: {
   /** The active draft ID. Panel is hidden when null. */
   draftId: number | null;
@@ -25,6 +26,8 @@ export function DraftIntelligence({
   teamId: number | null;
   /** Increments each time a pick is made; triggers a refetch. */
   currentOverallPick: number;
+  /** Called with the recommended player's ID when the user clicks "Draft". */
+  onDraft?: (playerId: number) => void;
 }) {
   const skip = !draftId || !teamId;
 
@@ -98,6 +101,18 @@ export function DraftIntelligence({
                 </div>
               </div>
               <div className="d-intel-reason">{rec.reason}</div>
+              {onDraft && rec.playerId != null && rec.playerName != null && (
+                <button
+                  className="d-intel-draft-btn"
+                  onClick={() => {
+                    const pid = rec.playerId;
+                    if (pid != null && onDraft) onDraft(pid);
+                  }}
+                  aria-label={`Draft ${rec.playerName} now`}
+                >
+                  <span aria-hidden="true">⚡</span> Draft
+                </button>
+              )}
             </div>
           );
         })}

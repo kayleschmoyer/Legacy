@@ -1121,6 +1121,26 @@ export const CSS = `
   font-size: 10px; color: var(--d-text-secondary);
   font-style: italic; line-height: 1.3;
 }
+.d-intel-draft-btn {
+  margin-top: 6px; width: 100%; padding: 5px 10px;
+  border-radius: var(--d-radius-sm); border: none;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.4px;
+  cursor: pointer; font-family: inherit;
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  color: #fff;
+  transition: opacity 0.15s, transform 0.15s;
+}
+.d-intel-draft-btn:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+.d-intel-draft-btn:focus-visible {
+  outline: 2px solid var(--d-success);
+  outline-offset: 2px;
+}
+.d-intel-draft-btn:active {
+  transform: translateY(0) scale(0.97);
+}
 
 /* ===== Pick Announcement Commentary ===== */
 .d-announce-commentary {

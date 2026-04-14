@@ -69,6 +69,8 @@ interface DraftSidebarProps {
   onRetryCurrentPick: () => void;
   onShowToast: (msg: string) => void;
   teamNameById: (teamId: number | null | undefined) => string;
+  onDraftPlayer: (playerId: number) => void;
+  onCommissionerPick: (playerId: number) => void;
 }
 
 export function DraftSidebar({
@@ -114,6 +116,8 @@ export function DraftSidebar({
   onRetryCurrentPick,
   onShowToast,
   teamNameById,
+  onDraftPlayer,
+  onCommissionerPick,
 }: DraftSidebarProps): React.JSX.Element {
   return (
     <aside className="d-side d-side-l" aria-label="My team and draft controls">
@@ -274,6 +278,9 @@ export function DraftSidebar({
             draftId={draftId}
             teamId={myTeamId}
             currentOverallPick={currentPickInfo?.overallPick ?? 0}
+            onDraft={
+              commPickMode && isOwner ? onCommissionerPick : onDraftPlayer
+            }
           />
         </PremiumGate>
       )}
