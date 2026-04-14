@@ -1,4 +1,4 @@
-import { StrictMode } from 'react';
+import { type ReactNode, StrictMode } from 'react';
 import * as ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { Provider as ReduxProvider } from 'react-redux';
@@ -82,6 +82,21 @@ function ThemeAwareApp() {
   );
 }
 
+/**
+ * Reads the resolved theme from ThemeContext and passes it to the outer
+ * TamaguiProvider as defaultTheme, so Tamagui components rendered during
+ * the auth-guard loading phase match the user's actual theme preference
+ * instead of always falling back to a hardcoded value.
+ */
+function ThemedTamaguiProvider({ children }: { children: ReactNode }) {
+  const { resolvedTheme } = useThemeContext();
+  return (
+    <TamaguiProvider config={tamaguiConfig} defaultTheme={resolvedTheme}>
+      {children}
+    </TamaguiProvider>
+  );
+}
+
 const rootElement = document.getElementById('root');
 if (!rootElement) {
   throw new Error('Root element not found');
@@ -96,7 +111,7 @@ try {
     <StrictMode>
       <ErrorBoundary>
         <ThemeProvider>
-          <TamaguiProvider config={tamaguiConfig}>
+          <ThemedTamaguiProvider>
             <AuthProvider
               config={authConfig}
               onUserSwitch={async () => {
@@ -121,7 +136,7 @@ try {
                 </GrowthBookProvider>
               </EnhancedAuthGuard>
             </AuthProvider>
-          </TamaguiProvider>
+          </ThemedTamaguiProvider>
         </ThemeProvider>
       </ErrorBoundary>
     </StrictMode>,
