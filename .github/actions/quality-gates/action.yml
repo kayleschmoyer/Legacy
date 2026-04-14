@@ -197,7 +197,7 @@ runs:
         # the Nx execSync maxBuffer crash (ERR_CHILD_PROCESS_STDIO_MAXBUFFER)
         # that occurs when large files like pnpm-lock.yaml are in the
         # affected set. Direct prettier respects .prettierignore properly.
-        echo "::notice::To reproduce locally: pnpm exec prettier --check ."
+        echo "::notice::To fix locally — Humans: make fmt  |  Agents: make_run({ target: 'fmt' })"
         echo "🔍 Checking formatting for affected files..."
         echo "Base ref: ${{ inputs.base-ref }}"
         echo "Head ref: ${{ inputs.head-ref }}"
@@ -232,7 +232,7 @@ runs:
           else
             echo "❌ Code formatting issues detected"
             echo "::error::Code formatting check failed."
-            echo "::error::Run 'pnpm exec nx format:write' to fix."
+            echo "::error::Run 'make fmt' to fix (agents: make_run({ target: 'fmt' }))."
 
             echo "Files requiring formatting:"
             grep -E "^\[warn\]" format-check.log || true
@@ -318,7 +318,8 @@ runs:
           echo "  Typecheck: $([ "$TYPECHECK_SUCCESS" = true ] && echo '✅' || echo '❌')"
           echo "  Tests:     $([ "$TEST_SUCCESS"      = true ] && echo '✅' || echo '❌')"
           echo "To reproduce locally:"
-          echo "  pnpm exec nx affected -t lint typecheck test --parallel=$PARALLEL"
+          echo "  Humans: make pc"
+          echo "  Agents: nx_run_affected({ target: 'lint' }) / nx_run_affected({ target: 'typecheck' }) / nx_run_affected({ target: 'test' })"
           exit 1
         fi
 

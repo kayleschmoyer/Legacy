@@ -89,8 +89,8 @@ module.exports = async ({ github, context, core }) => {
 
   // Determine specific failure context and provide targeted guidance
   let failureReason = 'CI pipeline failure detected';
-  let reproCommand =
-    'pnpm exec nx affected -t lint,typecheck,test,build --parallel=4';
+  let reproCommand = 'make pc';
+  let agentCommand = 'make_run({ target: "pc" })';
   let debugSection =
     'A CI step failed. Run the reproduction command to identify the specific issue.';
 
@@ -98,37 +98,45 @@ module.exports = async ({ github, context, core }) => {
   const stepAnalysis = {
     'format-check': {
       reason: 'Code formatting check failed',
-      command: 'pnpm exec nx format:write',
+      command: 'make fmt',
+      agentCommand: 'make_run({ target: "fmt" })',
       debug:
         'Code formatting issues detected. Run the command above to auto-fix formatting, then commit the changes.',
     },
     'quality-gates': {
       reason: 'Code quality validation failed',
-      command: 'pnpm exec nx affected -t lint,typecheck,test --parallel=4',
+      command: 'make pc',
+      agentCommand: 'make_run({ target: "pc" })',
       debug:
         'Quality gates failed. This typically means ESLint errors, TypeScript compilation issues, or failing tests.',
       subsections: {
         formatting: {
           reason: 'Code formatting check failed',
-          command: 'pnpm exec nx format:write',
+          command: 'make fmt',
+          agentCommand: 'make_run({ target: "fmt" })',
           debug:
             'Code is not properly formatted. Run the command above to auto-fix formatting issues.',
         },
         lint: {
           reason: 'ESLint validation failed',
-          command: 'pnpm exec nx affected -t lint --fix',
+          command: 'make lint-fix',
+          agentCommand:
+            'nx_run_affected({ target: "lint", fix: true })  // or: make lint-fix',
           debug:
             'ESLint found code quality issues. Run the command above to attempt automatic fixes.',
         },
         typecheck: {
           reason: 'TypeScript type checking failed',
-          command: 'pnpm exec nx affected -t typecheck',
+          command: 'make typecheck',
+          agentCommand:
+            'nx_run_affected({ target: "typecheck" })  // or: make typecheck',
           debug:
             'TypeScript compilation errors detected. Fix type errors in the affected files.',
         },
         test: {
           reason: 'Unit tests failed',
-          command: 'pnpm exec nx affected -t test',
+          command: 'make test',
+          agentCommand: 'nx_run_affected({ target: "test" })  // or: make test',
           debug:
             'One or more unit tests are failing. Review test output and fix the failing tests.',
         },
@@ -136,13 +144,15 @@ module.exports = async ({ github, context, core }) => {
     },
     'build-validation': {
       reason: 'Build validation failed',
-      command: 'pnpm exec nx affected -t build --parallel=4',
+      command: 'make build',
+      agentCommand: 'nx_run_affected({ target: "build" })  // or: make build',
       debug:
         'Build validation failed. Check for compilation errors, missing dependencies, or configuration issues.',
     },
     'e2e-testing': {
       reason: 'End-to-end tests failed',
-      command: 'cd apps/web-e2e && pnpm exec playwright test --ui',
+      command: 'make test-e2e',
+      agentCommand: 'make_run({ target: "test-e2e" })',
       debug:
         'E2E tests are failing. Check for UI changes, API issues, or test environment problems.',
     },
@@ -176,6 +186,7 @@ module.exports = async ({ github, context, core }) => {
                     stepAnalysis['quality-gates'].subsections[subsection];
                   failureReason = subsectionInfo.reason;
                   reproCommand = subsectionInfo.command;
+                  agentCommand = subsectionInfo.agentCommand;
                   debugSection = subsectionInfo.debug;
                   detailedFailureReason = failureReason;
 
@@ -201,12 +212,21 @@ module.exports = async ({ github, context, core }) => {
                       failureReason += ` in ${failedProjects.length} project${failedProjects.length > 1 ? 's' : ''}`;
                       detailedFailureReason = failureReason;
 
-                      // Update repro command to target specific projects
+                      // Update repro commands to target specific projects
+                      const projectList = failedProjects.join(',');
                       const target =
+                        subsection === 'formatting' ? 'fmt' : subsection;
+                      const makeTarget =
                         subsection === 'formatting'
-                          ? 'format:check'
-                          : subsection;
-                      reproCommand = `pnpm exec nx run-many -t ${target} --projects=${failedProjects.join(',')}`;
+                          ? 'fmt'
+                          : subsection === 'lint'
+                            ? 'lint-fix'
+                            : subsection;
+                      reproCommand = `make ${makeTarget}`;
+                      agentCommand =
+                        subsection === 'formatting'
+                          ? 'make_run({ target: "fmt" })'
+                          : `nx_run_affected({ target: "${target}"${subsection === 'lint' ? ', fix: true' : ''} })  // targets: ${projectList}`;
 
                       debugSection += `\n\n**Failed Projects**: ${failedProjects.map((p) => '`' + p + '`').join(', ')}`;
                     }
@@ -225,12 +245,14 @@ module.exports = async ({ github, context, core }) => {
             qgInfo.reason +
             ' (subsection details unavailable — runner may have been interrupted)';
           reproCommand = qgInfo.command;
+          agentCommand = qgInfo.agentCommand;
           debugSection = qgInfo.debug;
         }
-      } else if (stepAnalysis[step] && !reproCommand.includes('format')) {
+      } else if (stepAnalysis[step] && !reproCommand.includes('make fmt')) {
         failureReason = stepAnalysis[step].reason;
         detailedFailureReason = failureReason;
         reproCommand = stepAnalysis[step].command;
+        agentCommand = stepAnalysis[step].agentCommand;
         debugSection = stepAnalysis[step].debug;
       }
     }
@@ -360,13 +382,21 @@ module.exports = async ({ github, context, core }) => {
     debugSection +
     '\n\n' +
     stepStatusTable +
-    '### How to Fix Locally\n' +
+    '### How to Fix\n' +
+    '**Humans** (shell):\n' +
     '```bash\n' +
     '# Reproduce the failure:\n' +
     reproCommand +
     '\n\n' +
     '# Full local CI simulation:\n' +
-    'pnpm run ci:local  # Run full CI pipeline locally\n' +
+    'make pc\n' +
+    '```\n\n' +
+    '**Agents** (use MCP tools — do not run raw `pnpm exec nx` commands):\n' +
+    '```\n' +
+    agentCommand +
+    '\n\n' +
+    '# Full pre-commit check:\n' +
+    'make_run({ target: "pc" })\n' +
     '```\n\n' +
     executionContext +
     '\n' +
