@@ -240,14 +240,16 @@ const TableRow = styled(XStack, {
 });
 
 const TableCell = styled(XStack, {
-  flex: 1,
+  width: '25%',
+  flexShrink: 0,
   minWidth: 0,
   alignItems: 'center',
   justifyContent: 'center',
 });
 
 const TableFeatureCell = styled(YStack, {
-  flex: 2,
+  width: '50%',
+  flexShrink: 0,
   minWidth: 0,
   justifyContent: 'center',
 });
