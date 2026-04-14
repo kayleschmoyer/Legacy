@@ -77,12 +77,15 @@ module "github_runners" {
   # enable_job_queued_check + delay_webhook_event ensure subsequent jobs in the
   # same burst reuse the runner that just booted instead of launching duplicates.
 
-  # Allow 5 concurrent scale-up Lambda invocations (default: 1). The default
-  # serializes all scale-up decisions, bottlenecking burst throughput — observed
-  # peak of only 10 runners despite max 20 during a 7-PR burst. Each invocation
-  # still checks runners_maximum_count before launching, so this cannot
-  # over-provision beyond the configured max.
-  scale_up_reserved_concurrent_executions = 5
+  # Limit scale-up Lambda to 1 concurrent invocation (module default). Allowing
+  # multiple simultaneous invocations widens the EC2 tag propagation race window:
+  # each invocation reads the current runner count before newly launched instances
+  # have their tags fully propagated, causing all concurrent Lambdas to conclude
+  # that launching is safe and collectively exceed runners_maximum_count. Observed
+  # currentRunners: 23 vs maximumRunners: 20 on Apr 9. Serializing scale-up
+  # decisions eliminates the race at the cost of slightly slower burst response
+  # (acceptable given delay_webhook_event = 30 and enable_job_queued_check = true).
+  scale_up_reserved_concurrent_executions = 1
 
   # Runner OS and labels
   runner_os           = "linux"
@@ -131,8 +134,10 @@ module "github_runners" {
 
   # Time for the instance to boot and register as a runner (~30s with pre-baked AMI
   # plus userdata_pre_install). Scale-down Lambda won't terminate instances younger
-  # than this even if they appear idle.
-  runner_boot_time_in_minutes = 10
+  # than this even if they appear idle. 2 minutes provides ample protection — actual
+  # boot time is ~30s — and makes minimum_running_time_in_minutes = 5 the effective
+  # billing floor (max(2, 5) = 5), halving the previous 10-minute minimum per runner.
+  runner_boot_time_in_minutes = 2
 
   # Minimum runtime before the scale-down Lambda considers a runner eligible for
   # termination. 5 minutes is enough for a warm runner to pick up a follow-on
