@@ -76,7 +76,6 @@ const MOCK_QUERY_DATA = {
         node: {
           playerId: 1,
           player: { id: 1, firstName: 'Mike', lastName: 'Trout' },
-          primaryPosition: 'OF',
           games: 1500,
           hits: 1600,
           homeRuns: 360,
@@ -94,7 +93,6 @@ const MOCK_QUERY_DATA = {
         node: {
           playerId: 2,
           player: { id: 2, firstName: 'Aaron', lastName: 'Judge' },
-          primaryPosition: 'OF',
           games: 800,
           hits: 900,
           homeRuns: 250,

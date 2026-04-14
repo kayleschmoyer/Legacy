@@ -293,10 +293,16 @@ export function useDraftQueries({
   );
 
   // ---- Career Batting Stats ----
+  // first capped at 5 000 to match the server-side MAX_CAREER_BATTING_LIMIT
+  // (LS-3113). primaryPosition is intentionally omitted from the query to avoid
+  // the expensive careerFielding DataLoader call; position is derived from
+  // eligiblePositions in usePlayerData. player { firstName lastName } is retained
+  // so the statsLookup fallback in useDraftWebSocket resolves correctly for picks
+  // arriving via WebSocket before the available-players refetch completes.
   const { data: statsData } = useQuery<GetDraftPlayerStatsQuery>(
     GET_DRAFT_PLAYER_STATS,
     {
-      variables: { first: 30000, minGames: 1 },
+      variables: { first: 5000, minGames: 1 },
       skip: isAuctionDraft,
       errorPolicy: 'all',
     },
@@ -315,7 +321,7 @@ export function useDraftQueries({
         playerId: pid,
         firstName: n.player?.firstName ?? '',
         lastName: n.player?.lastName ?? '',
-        position: n.primaryPosition ?? 'UTIL',
+        position: 'UTIL',
         games: n.games ?? 0,
         hits: n.hits ?? 0,
         hr: n.homeRuns ?? 0,

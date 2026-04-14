@@ -321,7 +321,13 @@ query GetDraftPitcherStats($limit: Int, $minGames: Int) {
   }
 }
 
-# Fetch career batting stats for player cards (uses existing connection that works on deployed server)
+# Fetch career batting stats for player cards.
+# NOTE: primaryPosition is intentionally omitted to avoid triggering an expensive
+# careerFielding DataLoader call (WHERE player_id IN (...) for thousands of IDs)
+# that caused 502 timeouts (LS-3113). Position is derived from eligiblePositions
+# in the client. player { firstName lastName } is retained (lightweight players
+# DataLoader) so the statsLookup fallback in useDraftWebSocket resolves correctly
+# for picks that arrive via WebSocket before the available-players refetch completes.
 query GetDraftPlayerStats($first: Int, $searchTerm: String, $minGames: Int) {
   careerBattingStats(
     first: $first
@@ -331,7 +337,6 @@ query GetDraftPlayerStats($first: Int, $searchTerm: String, $minGames: Int) {
     edges {
       node {
         playerId
-        primaryPosition
         games
         atBats
         hits

@@ -874,6 +874,12 @@ SeasonFieldingRef.implement({
   }),
 });
 
+// Maximum number of rows the careerBattingStats resolver will return per request.
+// Without this cap a client can request tens-of-thousands of rows, triggering
+// expensive DataLoader calls (WHERE id IN (...)) that exhaust the Lambda timeout
+// and return a 502 (LS-3113).
+const MAX_CAREER_BATTING_LIMIT = 5_000;
+
 // Career batting statistics with relay-style pagination and totalCount
 builder.queryField('careerBattingStats', (t) =>
   t.field({
@@ -891,8 +897,15 @@ builder.queryField('careerBattingStats', (t) =>
       position: t.arg.string({ required: false }),
     },
     resolve: async (root, args) => {
-      // Convert relay pagination args to offset/limit
-      const limit = args.first || 25;
+      // Convert relay pagination args to offset/limit, capping at MAX_CAREER_BATTING_LIMIT
+      // to prevent runaway queries that cause Lambda timeouts (LS-3113).
+      // Math.max(0, ...) guards against a negative `first` value (GraphQL Int allows it)
+      // which would otherwise produce an invalid LIMIT in the SQL query.
+      const requestedLimit = args.first ?? 25;
+      const limit = Math.max(
+        0,
+        Math.min(requestedLimit, MAX_CAREER_BATTING_LIMIT),
+      );
       const offset = args.after
         ? parseInt(Buffer.from(args.after, 'base64').toString())
         : 0;

@@ -5849,7 +5849,6 @@ export type GetDraftPlayerStatsQuery = {
       node?: {
         __typename?: 'CareerBatting';
         playerId?: number | null;
-        primaryPosition?: string | null;
         games?: number | null;
         atBats?: number | null;
         hits?: number | null;
@@ -13718,7 +13717,6 @@ export const GetDraftPlayerStats = gql`
       edges {
         node {
           playerId
-          primaryPosition
           games
           atBats
           hits

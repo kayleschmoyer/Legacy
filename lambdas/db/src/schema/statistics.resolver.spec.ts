@@ -174,6 +174,42 @@ describe('Statistics Resolver', () => {
         }),
       );
     });
+
+    it('caps first at MAX_CAREER_BATTING_LIMIT (5000) when client requests more', async () => {
+      mockStatistics.getCareerBattingStats.mockResolvedValueOnce([]);
+      mockStatistics.getCareerBattingStatsCount.mockResolvedValueOnce(0);
+
+      const resolver = getQuery('careerBattingStats');
+      await resolver({}, { first: 30000 }, emptyCtx, undefined as never);
+
+      expect(mockStatistics.getCareerBattingStats).toHaveBeenCalledWith(
+        expect.objectContaining({ limit: 5000 }),
+      );
+    });
+
+    it('clamps negative first to 0', async () => {
+      mockStatistics.getCareerBattingStats.mockResolvedValueOnce([]);
+      mockStatistics.getCareerBattingStatsCount.mockResolvedValueOnce(0);
+
+      const resolver = getQuery('careerBattingStats');
+      await resolver({}, { first: -1 }, emptyCtx, undefined as never);
+
+      expect(mockStatistics.getCareerBattingStats).toHaveBeenCalledWith(
+        expect.objectContaining({ limit: 0 }),
+      );
+    });
+
+    it('uses default limit of 25 when first is omitted', async () => {
+      mockStatistics.getCareerBattingStats.mockResolvedValueOnce([]);
+      mockStatistics.getCareerBattingStatsCount.mockResolvedValueOnce(0);
+
+      const resolver = getQuery('careerBattingStats');
+      await resolver({}, {}, emptyCtx, undefined as never);
+
+      expect(mockStatistics.getCareerBattingStats).toHaveBeenCalledWith(
+        expect.objectContaining({ limit: 25 }),
+      );
+    });
   });
 
   // ── careerPitchingStats ────────────────────────────────────────────────────
