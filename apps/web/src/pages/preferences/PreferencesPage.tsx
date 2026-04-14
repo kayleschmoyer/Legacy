@@ -13,6 +13,7 @@ import {
   YStack,
 } from '@legacy-sports/shared-components/ui';
 import { useAuth } from '@legacy-sports/shared-components/auth';
+import { ChevronDown, ChevronUp } from '@tamagui/lucide-icons';
 import { ScrollView, Spinner, styled } from 'tamagui';
 import { PageMeta } from '../../components/PageMeta';
 import {
@@ -30,9 +31,10 @@ import {
   useUpdateNotificationPreferencesMutation,
 } from '../../api/db/graphql.generated';
 
-/* ─── Storage key ─── */
+/* ─── Storage keys ─── */
 
 const PREFS_STORAGE_KEY = 'ls_user_preferences';
+const COLLAPSED_SECTIONS_KEY = 'ls_prefs_sections_collapsed';
 
 /* ─── Types ─── */
 
@@ -71,6 +73,38 @@ function loadPrefs(): UserPreferences {
 
 function savePrefs(prefs: UserPreferences): void {
   localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify(prefs));
+}
+
+/* ─── Collapsible section helpers ─── */
+
+type SectionId = 'appearance' | 'sports' | 'notifications';
+
+const DEFAULT_COLLAPSED: Record<SectionId, boolean> = {
+  appearance: false,
+  sports: false,
+  notifications: false,
+};
+
+function loadCollapsedSections(): Record<SectionId, boolean> {
+  try {
+    const raw = localStorage.getItem(COLLAPSED_SECTIONS_KEY);
+    if (!raw) return { ...DEFAULT_COLLAPSED };
+    return {
+      ...DEFAULT_COLLAPSED,
+      ...(JSON.parse(raw) as Partial<Record<SectionId, boolean>>),
+    };
+  } catch {
+    return { ...DEFAULT_COLLAPSED };
+  }
+}
+
+/** Persists section collapsed states. Errors are silently ignored (private mode, quota exceeded). */
+function persistCollapsedSections(sections: Record<SectionId, boolean>): void {
+  try {
+    localStorage.setItem(COLLAPSED_SECTIONS_KEY, JSON.stringify(sections));
+  } catch {
+    // Best-effort persistence; ignore storage errors (e.g. quota exceeded, private mode)
+  }
 }
 
 /* ─── Styled Components ─── */
@@ -114,9 +148,32 @@ const SectionHeader = styled(XStack, {
   paddingVertical: '$4',
   alignItems: 'center',
   gap: '$3',
-  borderBottomWidth: 1,
-  borderBottomColor: '$glassBorder',
+  cursor: 'pointer',
+  userSelect: 'none',
+  hoverStyle: { opacity: 0.85 },
+  pressStyle: { opacity: 0.75 },
+  focusStyle: {
+    outlineWidth: 2,
+    outlineColor: '$brandNavyLight',
+    outlineStyle: 'solid',
+  },
+  variants: {
+    expanded: {
+      true: {
+        borderBottomWidth: 1,
+        borderBottomColor: '$glassBorder',
+      },
+      false: {},
+    },
+  } as const,
+  defaultVariants: { expanded: true },
 });
+
+/** Shared accessibility props applied to every SectionHeader toggle. */
+const sectionToggleA11yProps = {
+  role: 'button' as const,
+  tabIndex: 0,
+};
 
 const SectionIconBox = styled(YStack, {
   width: 36,
@@ -270,6 +327,55 @@ function getCardStyle(isDark: boolean, navyStop = 100): React.CSSProperties {
 
 /* ─── Sub-components ─── */
 
+function CollapseChevron({ isCollapsed }: { isCollapsed: boolean }) {
+  return isCollapsed ? (
+    <ChevronDown size={18} color="$colorPress" />
+  ) : (
+    <ChevronUp size={18} color="$colorPress" />
+  );
+}
+
+function CollapsibleBody({
+  isCollapsed,
+  children,
+}: {
+  isCollapsed: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      aria-hidden={isCollapsed}
+      style={{
+        display: 'grid',
+        gridTemplateRows: isCollapsed ? '0fr' : '1fr',
+        transition: 'grid-template-rows 0.3s ease-out',
+      }}
+    >
+      <div
+        style={{
+          overflow: 'hidden',
+          minHeight: 0,
+          visibility: isCollapsed ? 'hidden' : 'visible',
+          pointerEvents: isCollapsed ? 'none' : 'auto',
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function onToggleKeyDown(
+  toggle: () => void,
+): React.KeyboardEventHandler<Element> {
+  return (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      toggle();
+    }
+  };
+}
+
 interface ToggleProps {
   value: boolean;
   onChange: (v: boolean) => void;
@@ -344,9 +450,13 @@ function ChipGroup<T extends string>({
 function NotificationPreferencesSection({
   cardStyle,
   isDark,
+  isCollapsed,
+  onToggleCollapse,
 }: {
   cardStyle: React.CSSProperties;
   isDark: boolean;
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
 }) {
   const { data, loading, error } = useGetUserNotificationPreferencesQuery();
   const [updatePrefs] = useUpdateNotificationPreferencesMutation();
@@ -405,7 +515,13 @@ function NotificationPreferencesSection({
   if (loading) {
     return (
       <SectionCard style={cardStyle}>
-        <SectionHeader>
+        <SectionHeader
+          expanded={!isCollapsed}
+          onPress={onToggleCollapse}
+          onKeyDown={onToggleKeyDown(onToggleCollapse)}
+          {...sectionToggleA11yProps}
+          aria-expanded={!isCollapsed}
+        >
           <SectionIconBox>
             <Paragraph fontSize={16} lineHeight={18}>
               <span role="img" aria-label="notifications">
@@ -421,15 +537,18 @@ function NotificationPreferencesSection({
               Push and email notification settings
             </Paragraph>
           </YStack>
+          <CollapseChevron isCollapsed={isCollapsed} />
         </SectionHeader>
-        <SectionBody>
-          <XStack justifyContent="center" padding="$4">
-            <Spinner
-              size="small"
-              color={isDark ? BRAND_GOLD_LIGHT : BRAND_NAVY}
-            />
-          </XStack>
-        </SectionBody>
+        <CollapsibleBody isCollapsed={isCollapsed}>
+          <SectionBody>
+            <XStack justifyContent="center" padding="$4">
+              <Spinner
+                size="small"
+                color={isDark ? BRAND_GOLD_LIGHT : BRAND_NAVY}
+              />
+            </XStack>
+          </SectionBody>
+        </CollapsibleBody>
       </SectionCard>
     );
   }
@@ -437,7 +556,13 @@ function NotificationPreferencesSection({
   if (error && !loading) {
     return (
       <SectionCard style={cardStyle}>
-        <SectionHeader>
+        <SectionHeader
+          expanded={!isCollapsed}
+          onPress={onToggleCollapse}
+          onKeyDown={onToggleKeyDown(onToggleCollapse)}
+          {...sectionToggleA11yProps}
+          aria-expanded={!isCollapsed}
+        >
           <SectionIconBox>
             <Paragraph fontSize={16} lineHeight={18}>
               <span role="img" aria-label="notifications">
@@ -453,16 +578,19 @@ function NotificationPreferencesSection({
               Push and email notification settings
             </Paragraph>
           </YStack>
+          <CollapseChevron isCollapsed={isCollapsed} />
         </SectionHeader>
-        <SectionBody>
-          <Paragraph size="$4" fontWeight="600" color="$color">
-            Unable to load notification preferences
-          </Paragraph>
-          <Paragraph size="$3" color="$colorPress">
-            There was a problem fetching your notification settings. Please try
-            again later.
-          </Paragraph>
-        </SectionBody>
+        <CollapsibleBody isCollapsed={isCollapsed}>
+          <SectionBody>
+            <Paragraph size="$4" fontWeight="600" color="$color">
+              Unable to load notification preferences
+            </Paragraph>
+            <Paragraph size="$3" color="$colorPress">
+              There was a problem fetching your notification settings. Please
+              try again later.
+            </Paragraph>
+          </SectionBody>
+        </CollapsibleBody>
       </SectionCard>
     );
   }
@@ -476,7 +604,13 @@ function NotificationPreferencesSection({
 
   return (
     <SectionCard style={cardStyle}>
-      <SectionHeader>
+      <SectionHeader
+        expanded={!isCollapsed}
+        onPress={onToggleCollapse}
+        onKeyDown={onToggleKeyDown(onToggleCollapse)}
+        {...sectionToggleA11yProps}
+        aria-expanded={!isCollapsed}
+      >
         <SectionIconBox>
           <Paragraph fontSize={16} lineHeight={18}>
             <span role="img" aria-label="notifications">
@@ -492,74 +626,77 @@ function NotificationPreferencesSection({
             Push and email notification settings
           </Paragraph>
         </YStack>
+        <CollapseChevron isCollapsed={isCollapsed} />
       </SectionHeader>
 
-      <SectionBody>
-        <Paragraph size="$3" color="$colorPress" fontWeight="600">
-          Delivery channels
-        </Paragraph>
+      <CollapsibleBody isCollapsed={isCollapsed}>
+        <SectionBody>
+          <Paragraph size="$3" color="$colorPress" fontWeight="600">
+            Delivery channels
+          </Paragraph>
 
-        <PrefToggle
-          value={pushEnabled}
-          onChange={(v) => handleToggle('pushEnabled', v)}
-          label="Push notifications"
-          description="Receive push notifications on your devices"
-        />
+          <PrefToggle
+            value={pushEnabled}
+            onChange={(v) => handleToggle('pushEnabled', v)}
+            label="Push notifications"
+            description="Receive push notifications on your devices"
+          />
 
-        <Separator />
+          <Separator />
 
-        <PrefToggle
-          value={emailEnabled}
-          onChange={(v) => handleToggle('emailEnabled', v)}
-          label="Email notifications"
-          description="Receive notifications via email"
-        />
+          <PrefToggle
+            value={emailEnabled}
+            onChange={(v) => handleToggle('emailEnabled', v)}
+            label="Email notifications"
+            description="Receive notifications via email"
+          />
 
-        <Separator />
+          <Separator />
 
-        <Paragraph
-          size="$3"
-          color="$colorPress"
-          fontWeight="600"
-          paddingTop="$2"
-        >
-          Matchup alerts
-        </Paragraph>
+          <Paragraph
+            size="$3"
+            color="$colorPress"
+            fontWeight="600"
+            paddingTop="$2"
+          >
+            Matchup alerts
+          </Paragraph>
 
-        <PrefToggle
-          value={matchupStartedEnabled}
-          onChange={(v) => handleToggle('matchupStartedEnabled', v)}
-          label="Matchup started"
-          description="Get notified when a new matchup period begins"
-        />
+          <PrefToggle
+            value={matchupStartedEnabled}
+            onChange={(v) => handleToggle('matchupStartedEnabled', v)}
+            label="Matchup started"
+            description="Get notified when a new matchup period begins"
+          />
 
-        <Separator />
+          <Separator />
 
-        <PrefToggle
-          value={matchupEndedEnabled}
-          onChange={(v) => handleToggle('matchupEndedEnabled', v)}
-          label="Matchup ended"
-          description="Get notified when a matchup period ends with final results"
-        />
+          <PrefToggle
+            value={matchupEndedEnabled}
+            onChange={(v) => handleToggle('matchupEndedEnabled', v)}
+            label="Matchup ended"
+            description="Get notified when a matchup period ends with final results"
+          />
 
-        <Separator />
+          <Separator />
 
-        <PrefToggle
-          value={matchupCloseGameEnabled}
-          onChange={(v) => handleToggle('matchupCloseGameEnabled', v)}
-          label="Close game alerts"
-          description="Get notified when your matchup is within the close-game threshold"
-        />
+          <PrefToggle
+            value={matchupCloseGameEnabled}
+            onChange={(v) => handleToggle('matchupCloseGameEnabled', v)}
+            label="Close game alerts"
+            description="Get notified when your matchup is within the close-game threshold"
+          />
 
-        <Separator />
+          <Separator />
 
-        <PrefToggle
-          value={matchupReminderEnabled}
-          onChange={(v) => handleToggle('matchupReminderEnabled', v)}
-          label="Matchup reminders"
-          description="Receive reminders about upcoming matchup deadlines"
-        />
-      </SectionBody>
+          <PrefToggle
+            value={matchupReminderEnabled}
+            onChange={(v) => handleToggle('matchupReminderEnabled', v)}
+            label="Matchup reminders"
+            description="Receive reminders about upcoming matchup deadlines"
+          />
+        </SectionBody>
+      </CollapsibleBody>
     </SectionCard>
   );
 }
@@ -584,6 +721,17 @@ const PreferencesPage: React.FC = () => {
   }));
   const [saved, setSaved] = useState(false);
   const isInitialRender = useRef(true);
+  const [collapsedSections, setCollapsedSections] = useState<
+    Record<SectionId, boolean>
+  >(() => loadCollapsedSections());
+
+  const toggleSection = useCallback((id: SectionId) => {
+    setCollapsedSections((prev) => {
+      const next = { ...prev, [id]: !prev[id] };
+      persistCollapsedSections(next);
+      return next;
+    });
+  }, []);
 
   // Keep local mirror in sync when context changes (e.g. system preference)
   useEffect(() => {
@@ -659,7 +807,13 @@ const PreferencesPage: React.FC = () => {
 
           {/* ── Appearance ── */}
           <SectionCard style={cardStyle}>
-            <SectionHeader>
+            <SectionHeader
+              expanded={!collapsedSections.appearance}
+              onPress={() => toggleSection('appearance')}
+              onKeyDown={onToggleKeyDown(() => toggleSection('appearance'))}
+              {...sectionToggleA11yProps}
+              aria-expanded={!collapsedSections.appearance}
+            >
               <SectionIconBox>
                 <Paragraph fontSize={16} lineHeight={18}>
                   <span role="img" aria-label="appearance">
@@ -675,44 +829,53 @@ const PreferencesPage: React.FC = () => {
                   Display theme and visual settings
                 </Paragraph>
               </YStack>
+              <CollapseChevron isCollapsed={collapsedSections.appearance} />
             </SectionHeader>
 
-            <SectionBody>
-              <PrefRow>
-                <PrefLabel>
-                  <Paragraph size="$4" color="$color" fontWeight="500">
-                    Theme
-                  </Paragraph>
-                  <Paragraph size="$3" color="$colorPress">
-                    Choose your preferred color scheme. Changes apply
-                    immediately.
-                  </Paragraph>
-                </PrefLabel>
-                <ChipGroup<ThemePreference>
-                  value={prefs.theme}
-                  options={[
-                    { value: 'system', label: 'System' },
-                    { value: 'light', label: 'Light' },
-                    { value: 'dark', label: 'Dark' },
-                  ]}
-                  onChange={(v) => update('theme', v)}
+            <CollapsibleBody isCollapsed={collapsedSections.appearance}>
+              <SectionBody>
+                <PrefRow>
+                  <PrefLabel>
+                    <Paragraph size="$4" color="$color" fontWeight="500">
+                      Theme
+                    </Paragraph>
+                    <Paragraph size="$3" color="$colorPress">
+                      Choose your preferred color scheme. Changes apply
+                      immediately.
+                    </Paragraph>
+                  </PrefLabel>
+                  <ChipGroup<ThemePreference>
+                    value={prefs.theme}
+                    options={[
+                      { value: 'system', label: 'System' },
+                      { value: 'light', label: 'Light' },
+                      { value: 'dark', label: 'Dark' },
+                    ]}
+                    onChange={(v) => update('theme', v)}
+                  />
+                </PrefRow>
+
+                <Separator />
+
+                <PrefToggle
+                  value={prefs.enableAnimations}
+                  onChange={(v) => update('enableAnimations', v)}
+                  label="Enable animations"
+                  description="Show transition animations throughout the app"
                 />
-              </PrefRow>
-
-              <Separator />
-
-              <PrefToggle
-                value={prefs.enableAnimations}
-                onChange={(v) => update('enableAnimations', v)}
-                label="Enable animations"
-                description="Show transition animations throughout the app"
-              />
-            </SectionBody>
+              </SectionBody>
+            </CollapsibleBody>
           </SectionCard>
 
           {/* ── Sports & Stats ── */}
           <SectionCard style={cardStyleAlt}>
-            <SectionHeader>
+            <SectionHeader
+              expanded={!collapsedSections.sports}
+              onPress={() => toggleSection('sports')}
+              onKeyDown={onToggleKeyDown(() => toggleSection('sports'))}
+              {...sectionToggleA11yProps}
+              aria-expanded={!collapsedSections.sports}
+            >
               <SectionIconBox>
                 <Paragraph fontSize={16} lineHeight={18}>
                   <span role="img" aria-label="sports">
@@ -728,58 +891,61 @@ const PreferencesPage: React.FC = () => {
                   Default view and statistics display preferences
                 </Paragraph>
               </YStack>
+              <CollapseChevron isCollapsed={collapsedSections.sports} />
             </SectionHeader>
 
-            <SectionBody>
-              <PrefRow>
-                <PrefLabel>
-                  <Paragraph size="$4" color="$color" fontWeight="500">
-                    Default sport
-                  </Paragraph>
-                  <Paragraph size="$3" color="$colorPress">
-                    Your preferred sport shown on the home screen
-                  </Paragraph>
-                </PrefLabel>
-                <ChipGroup<DefaultSportView>
-                  value={prefs.defaultSport}
-                  options={[
-                    { value: 'baseball', label: 'Baseball' },
-                    { value: 'football', label: 'Football' },
-                  ]}
-                  onChange={(v) => update('defaultSport', v)}
+            <CollapsibleBody isCollapsed={collapsedSections.sports}>
+              <SectionBody>
+                <PrefRow>
+                  <PrefLabel>
+                    <Paragraph size="$4" color="$color" fontWeight="500">
+                      Default sport
+                    </Paragraph>
+                    <Paragraph size="$3" color="$colorPress">
+                      Your preferred sport shown on the home screen
+                    </Paragraph>
+                  </PrefLabel>
+                  <ChipGroup<DefaultSportView>
+                    value={prefs.defaultSport}
+                    options={[
+                      { value: 'baseball', label: 'Baseball' },
+                      { value: 'football', label: 'Football' },
+                    ]}
+                    onChange={(v) => update('defaultSport', v)}
+                  />
+                </PrefRow>
+
+                <Separator />
+
+                <PrefRow>
+                  <PrefLabel>
+                    <Paragraph size="$4" color="$color" fontWeight="500">
+                      Stats format
+                    </Paragraph>
+                    <Paragraph size="$3" color="$colorPress">
+                      How statistics are presented in player and team views
+                    </Paragraph>
+                  </PrefLabel>
+                  <ChipGroup<StatsFormat>
+                    value={prefs.statsFormat}
+                    options={[
+                      { value: 'standard', label: 'Standard' },
+                      { value: 'expanded', label: 'Expanded' },
+                    ]}
+                    onChange={(v) => update('statsFormat', v)}
+                  />
+                </PrefRow>
+
+                <Separator />
+
+                <PrefToggle
+                  value={prefs.showSeasonTotals}
+                  onChange={(v) => update('showSeasonTotals', v)}
+                  label="Show season totals"
+                  description="Display cumulative season stats alongside per-game stats"
                 />
-              </PrefRow>
-
-              <Separator />
-
-              <PrefRow>
-                <PrefLabel>
-                  <Paragraph size="$4" color="$color" fontWeight="500">
-                    Stats format
-                  </Paragraph>
-                  <Paragraph size="$3" color="$colorPress">
-                    How statistics are presented in player and team views
-                  </Paragraph>
-                </PrefLabel>
-                <ChipGroup<StatsFormat>
-                  value={prefs.statsFormat}
-                  options={[
-                    { value: 'standard', label: 'Standard' },
-                    { value: 'expanded', label: 'Expanded' },
-                  ]}
-                  onChange={(v) => update('statsFormat', v)}
-                />
-              </PrefRow>
-
-              <Separator />
-
-              <PrefToggle
-                value={prefs.showSeasonTotals}
-                onChange={(v) => update('showSeasonTotals', v)}
-                label="Show season totals"
-                description="Display cumulative season stats alongside per-game stats"
-              />
-            </SectionBody>
+              </SectionBody>
+            </CollapsibleBody>
           </SectionCard>
 
           {/* ── Notifications ── */}
@@ -787,6 +953,8 @@ const PreferencesPage: React.FC = () => {
             <NotificationPreferencesSection
               cardStyle={cardStyle}
               isDark={isDark}
+              isCollapsed={collapsedSections.notifications}
+              onToggleCollapse={() => toggleSection('notifications')}
             />
           )}
         </ContentContainer>
