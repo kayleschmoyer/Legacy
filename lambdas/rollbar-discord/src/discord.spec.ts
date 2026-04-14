@@ -98,6 +98,26 @@ describe('formatRollbarEmbed', () => {
     expect(formatRollbarEmbed(event)).toBeNull();
   });
 
+  it('handles numeric level without crashing (LS-3171)', () => {
+    const event: RollbarEvent = {
+      event_name: 'new_item',
+      data: {
+        item: {
+          title: 'Some error',
+          level: 50, // Rollbar sends numeric levels in some payloads
+          environment: 'production',
+        },
+      },
+    };
+
+    const embed = formatRollbarEmbed(event);
+
+    expect(embed).not.toBeNull();
+    expect(embed!.fields).toEqual(
+      expect.arrayContaining([{ name: 'Level', value: '50', inline: true }]),
+    );
+  });
+
   it('truncates long titles', () => {
     const event: RollbarEvent = {
       event_name: 'new_item',

@@ -15,7 +15,7 @@ export interface RollbarEvent {
       id?: number;
       counter?: number;
       title?: string;
-      level?: string;
+      level?: string | number;
       environment?: string;
       framework?: string;
       language?: string;
@@ -26,7 +26,7 @@ export interface RollbarEvent {
     };
     occurrence?: {
       environment?: string;
-      level?: string;
+      level?: string | number;
       body?: {
         message?: { body?: string };
         trace?: {

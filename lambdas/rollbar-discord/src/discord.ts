@@ -45,7 +45,7 @@ export function formatRollbarEmbed(event: RollbarEvent): DiscordEmbed | null {
   // Drop events without any usable payload — they produce generic embeds.
   if (!item && !occurrence) return null;
 
-  const level = item?.level ?? occurrence?.level ?? 'error';
+  const level = String(item?.level ?? occurrence?.level ?? 'error');
   const environment = item?.environment ?? occurrence?.environment ?? 'unknown';
 
   const title =
