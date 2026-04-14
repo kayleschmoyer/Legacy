@@ -191,39 +191,27 @@ export function PlayerStatsPage() {
 
   // Handle share functionality
   const handleShare = useCallback((url: string) => {
+    setLiveMsg('');
     void (async () => {
       try {
         if (navigator.share) {
-          // Use native Web Share API if available
           await navigator.share({
             title: 'Player Statistics - Legacy Sports',
             text: 'Check out these player statistics from Legacy Sports',
             url: url,
           });
         } else {
-          // Fallback to clipboard
           await navigator.clipboard.writeText(url);
-
-          // Show user feedback (you could replace this with a toast notification)
-          const originalTitle = document.title;
-          document.title = '📋 Link copied to clipboard!';
-          setTimeout(() => {
-            document.title = originalTitle;
-          }, 2000);
           setLiveMsg('Link copied to clipboard.');
         }
       } catch (error) {
         LOGGER.error('Error sharing:', String(error));
-        // Fallback - try to copy to clipboard
         try {
           await navigator.clipboard.writeText(url);
-          alert('Link copied to clipboard!');
           setLiveMsg('Link copied to clipboard.');
         } catch (clipboardError) {
           LOGGER.error('Clipboard error:', String(clipboardError));
-          // Ultimate fallback - show the URL
-          prompt('Copy this link to share:', url);
-          setLiveMsg('Showing a prompt with a sharable link.');
+          setLiveMsg('Could not share link. Please copy the URL manually.');
         }
       }
     })();
@@ -309,16 +297,19 @@ export function PlayerDetailPage() {
         description="View detailed career statistics and performance history for this MLB player on Legacy Sports."
       />
       <button
+        className="player-back-btn"
         onClick={handleBack}
         style={{
           marginBottom: '1rem',
           padding: '0.5rem 1rem',
           backgroundColor: BRAND_NAVY_LIGHT,
           color: WHITE,
-          border: 'none',
+          border: '1px solid rgba(197,165,90,0.2)',
           borderRadius: '6px',
           cursor: 'pointer',
           fontWeight: 600,
+          fontFamily: "'Big Shoulders Display', sans-serif",
+          letterSpacing: '0.3px',
         }}
       >
         ← Back

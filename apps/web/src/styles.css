@@ -84,6 +84,12 @@ body {
   color: inherit;
 }
 
+/* ── Player back button hover / focus ───────────────────────────────────── */
+.player-back-btn:hover,
+.player-back-btn:focus-visible {
+  filter: brightness(1.2);
+}
+
 /* ── Shared animation keyframes ─────────────────────────────────────────── */
 
 @keyframes skeleton-pulse {
