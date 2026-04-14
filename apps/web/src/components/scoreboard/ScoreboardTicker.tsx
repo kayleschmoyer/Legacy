@@ -193,6 +193,11 @@ export function ScoreboardTicker() {
         0%   { transform: translateX(0); }
         100% { transform: translateX(-50%); }
       }
+      @media (prefers-reduced-motion: reduce) {
+        .scoreboard-ticker-inner {
+          animation: none !important;
+        }
+      }
     `;
     document.head.appendChild(style);
     return () => {
@@ -255,6 +260,7 @@ export function ScoreboardTicker() {
           <ScrollOuter>
             <div
               ref={innerRef}
+              className="scoreboard-ticker-inner"
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -263,7 +269,6 @@ export function ScoreboardTicker() {
                 animation: `ticker-scroll ${SCROLL_DURATION_S}s linear infinite`,
                 animationPlayState: paused ? 'paused' : 'running',
               }}
-              data-ticker-inner
             >
               {/* Duplicate chips for seamless loop */}
               {chips}

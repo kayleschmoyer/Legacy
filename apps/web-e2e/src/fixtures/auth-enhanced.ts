@@ -9,10 +9,13 @@ import {
   BASELINE_GRAPHQL_RESPONSES,
   extractOperationName,
 } from './shared-mocks';
-import { E2E_SIGNING_SECRET, signE2EJwt } from '../utils/jwt';
+import { E2E_SIGNING_SECRET, E2EJwtUtil, signE2EJwt } from '../utils/jwt';
 
 /** Read the base URL that Playwright is actually using (set in playwright.config.ts). */
 const E2E_ORIGIN = `http://localhost:${process.env.E2E_PORT || 4280}`;
+
+/** Single source of truth for the hermetic CSRF token used across all E2E fixtures. */
+const E2E_CSRF_TOKEN = 'e2e-csrf-token';
 
 function signTestJwt(overrides: Record<string, unknown> = {}): string {
   return signE2EJwt(
@@ -71,7 +74,7 @@ function buildAuthStorageState(
       },
       {
         name: 'ls_csrf',
-        value: 'e2e-csrf-token',
+        value: E2E_CSRF_TOKEN,
         domain: 'localhost',
         path: '/',
         httpOnly: false,
@@ -217,7 +220,69 @@ const isolated = base.extend<{ _apiIsolation: void }>({
             return;
           }
 
-          // Any non-GraphQL external request: reject outright.
+          // OAuth JWT refresh — only return a fresh hermetic JWT when the
+          // request looks authenticated and the token is not yet expired.
+          // This mirrors oauth-proxy behavior closely enough for E2E flows:
+          //   • No token → fall through to the 401 catch-all below.
+          //   • Expired token → 401 (session-expiry tests expect this).
+          //   • Valid cookie token, wrong CSRF → 403.
+          //   • Valid cookie token + correct CSRF → fresh JWT.
+          //   • Bearer token (no CSRF needed) → fresh JWT.
+          if (reqUrl.includes('/refresh-jwt')) {
+            const headers = route.request().headers();
+            const cookieHeader = headers['cookie'] ?? '';
+            const authHeader = headers['authorization'] ?? '';
+            const csrfHeader =
+              headers['x-csrf-token'] ?? headers['x-xsrf-token'] ?? '';
+
+            // Extract ls_jwt cookie value (if present).
+            const lsJwtPart = cookieHeader
+              .split(';')
+              .map((p) => p.trim())
+              .find((p) => p.startsWith('ls_jwt='));
+            const cookieToken = lsJwtPart
+              ? lsJwtPart.slice('ls_jwt='.length)
+              : '';
+
+            // Decode the JWT payload and check expiry — expired tokens must 401
+            // so session-expiry E2E tests can assert the landing page is shown.
+            let cookieTokenValid = false;
+            if (cookieToken) {
+              try {
+                const payload = E2EJwtUtil.decodeJwtPayload(cookieToken);
+                const exp = typeof payload.exp === 'number' ? payload.exp : 0;
+                cookieTokenValid = exp > Math.floor(Date.now() / 1000);
+              } catch {
+                cookieTokenValid = false;
+              }
+            }
+
+            const hasBearerToken = /^Bearer\s+\S+$/i.test(authHeader);
+
+            if (cookieTokenValid && csrfHeader !== E2E_CSRF_TOKEN) {
+              await route.fulfill({
+                status: 403,
+                contentType: 'application/json',
+                body: JSON.stringify({ error: 'CSRF validation failed' }),
+              });
+              return;
+            }
+
+            if (cookieTokenValid || hasBearerToken) {
+              const freshJwt = signTestJwt();
+              await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                  jwt: freshJwt,
+                  csrfToken: E2E_CSRF_TOKEN,
+                }),
+              });
+              return;
+            }
+          }
+
+          // Any other non-GraphQL external request: reject outright.
           await route.fulfill({
             status: 401,
             contentType: 'application/json',
