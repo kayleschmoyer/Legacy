@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { CSS } from './styles';
 import { DraftCompleteView } from './DraftCompleteView';
 import { DraftPlayerBoard } from './DraftPlayerBoard';
@@ -213,6 +213,38 @@ export function EliteDraftBoardScreen({
   const currentPick =
     queries.currentPickInfo?.overallPick ?? queries.pickHistory.length + 1;
   const filteredPlayers = playerData.enrichedPlayers;
+
+  // ---- Stable callbacks for DraftPlayerBoard (prevent re-renders on each timer tick) ----
+  // Destructure stable useCallback refs before using them as hook deps — the actions/queries
+  // objects are recreated each render, but the individual methods inside are stable.
+  const {
+    handleMakePick,
+    handleCommissionerPick: commissionerPick,
+    handleToggleQueue,
+  } = actions;
+  const { handleLoadMorePlayers } = queries;
+
+  const handleDraftPlayer = useCallback(
+    (id: number) => {
+      void handleMakePick(id);
+    },
+    [handleMakePick],
+  );
+  const handleCommissionerPick = useCallback(
+    (id: number) => {
+      void commissionerPick(id);
+    },
+    [commissionerPick],
+  );
+  const handleToggleQueuePlayer = useCallback(
+    (id: number) => {
+      void handleToggleQueue(id);
+    },
+    [handleToggleQueue],
+  );
+  const handleLoadMore = useCallback(() => {
+    void handleLoadMorePlayers();
+  }, [handleLoadMorePlayers]);
 
   // ---- Early returns for special states ----
   if (!leagueId) return <NoLeagueScreen onNavigate={onNavigate} />;
@@ -436,10 +468,10 @@ export function EliteDraftBoardScreen({
           onSetSelectedPosition={ui.setSelectedPosition}
           onSetViewMode={ui.setViewMode}
           onSetWatchlist={ui.setWatchlist}
-          onDraftPlayer={(id) => void actions.handleMakePick(id)}
-          onCommissionerPick={(id) => void actions.handleCommissionerPick(id)}
-          onToggleQueue={(id) => void actions.handleToggleQueue(id)}
-          onLoadMore={() => void queries.handleLoadMorePlayers()}
+          onDraftPlayer={handleDraftPlayer}
+          onCommissionerPick={handleCommissionerPick}
+          onToggleQueue={handleToggleQueuePlayer}
+          onLoadMore={handleLoadMore}
         />
       </div>
 

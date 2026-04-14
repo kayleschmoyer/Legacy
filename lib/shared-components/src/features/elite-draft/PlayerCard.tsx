@@ -6,7 +6,7 @@ import { getPositionColor } from './utils';
 // Player Card Sub-component
 // ---------------------------------------------------------------------------
 
-export function PlayerCard({
+export const PlayerCard = React.memo(function PlayerCard({
   player,
   index,
   isMyPick,
@@ -22,9 +22,9 @@ export function PlayerCard({
   isMyPick: boolean;
   isWatched: boolean;
   isQueued?: boolean;
-  onDraft: () => void;
-  onToggleWatch: () => void;
-  onToggleQueue?: () => void;
+  onDraft: (playerId: number) => void;
+  onToggleWatch: (playerId: number) => void;
+  onToggleQueue?: (playerId: number) => void;
   onPlayerClick?: (playerId: number) => void;
 }) {
   const posColor = getPositionColor(player.position);
@@ -200,7 +200,7 @@ export function PlayerCard({
         <div className="d-card-actions">
           <button
             className={`d-draft-btn ${isMyPick ? 'can-draft' : 'waiting'}`}
-            onClick={onDraft}
+            onClick={() => onDraft(player.id)}
             disabled={!isMyPick}
             aria-disabled={!isMyPick}
             aria-label={
@@ -213,7 +213,7 @@ export function PlayerCard({
           </button>
           <button
             className={`d-watch-btn ${isWatched ? 'active' : ''}`}
-            onClick={onToggleWatch}
+            onClick={() => onToggleWatch(player.id)}
             aria-pressed={isWatched}
             aria-label={
               isWatched
@@ -226,7 +226,7 @@ export function PlayerCard({
           {onToggleQueue && (
             <button
               className={`d-queue-card-btn ${isQueued ? 'active' : ''}`}
-              onClick={onToggleQueue}
+              onClick={() => onToggleQueue(player.id)}
               aria-pressed={Boolean(isQueued)}
               aria-label={
                 isQueued
@@ -242,4 +242,4 @@ export function PlayerCard({
       </div>
     </div>
   );
-}
+});

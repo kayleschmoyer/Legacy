@@ -11,7 +11,6 @@ export {
 export { CircularTimer } from './CircularTimer';
 export { DraftGrid } from './DraftGrid';
 export { PickAnnouncement } from './PickAnnouncement';
-export { PlayerCard as DraftPlayerCard } from './PlayerCard';
 export { SkeletonCard as DraftSkeletonCard } from './SkeletonCard';
 
 // Chat overlay types for render prop

@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import type {
   CurrentDraftPickInfo,
   DraftPickRecord,
@@ -97,16 +97,50 @@ export function DraftPlayerBoard({
   const [detailPlayerPos, setDetailPlayerPos] = useState<string | undefined>();
   const [detailOpen, setDetailOpen] = useState(false);
 
+  // O(1) watchlist lookup — avoids O(n) Array.includes per card per render
+  const watchlistSet = useMemo(() => new Set(watchlist), [watchlist]);
+
+  // Stable callbacks passed to PlayerCard to prevent re-renders via React.memo
+  const handleDraftPlayer = useCallback(
+    (playerId: number) => {
+      if (commPickMode && isOwner) {
+        onCommissionerPick(playerId);
+      } else {
+        onDraftPlayer(playerId);
+      }
+    },
+    [commPickMode, isOwner, onCommissionerPick, onDraftPlayer],
+  );
+
+  const handleToggleWatch = useCallback(
+    (playerId: number) => {
+      onSetWatchlist((prev) =>
+        prev.includes(playerId)
+          ? prev.filter((id) => id !== playerId)
+          : [...prev, playerId],
+      );
+    },
+    [onSetWatchlist],
+  );
+
+  const handleToggleQueuePlayer = useCallback(
+    (playerId: number) => {
+      onToggleQueue(playerId);
+    },
+    [onToggleQueue],
+  );
+
+  // Use statsLookup (O(1) Map) instead of filteredPlayers.find() (O(n))
   const handlePlayerClick = useCallback(
     (playerId: number) => {
-      const player = filteredPlayers.find((p) => p.id === playerId);
+      const player = statsLookup.get(playerId);
       if (!player) return;
       setDetailPlayerId(player.id);
       setDetailPlayerName(player.name);
       setDetailPlayerPos(player.position);
       setDetailOpen(true);
     },
-    [filteredPlayers],
+    [statsLookup],
   );
 
   return (
@@ -320,25 +354,13 @@ export function DraftPlayerBoard({
                   player={player}
                   index={idx}
                   isMyPick={commPickMode ? isOwner : isMyPick}
-                  isWatched={watchlist.includes(player.id)}
+                  isWatched={watchlistSet.has(player.id)}
                   isQueued={queuedPlayerIds.has(player.id)}
-                  onDraft={() => {
-                    if (commPickMode && isOwner) {
-                      onCommissionerPick(player.id);
-                    } else {
-                      onDraftPlayer(player.id);
-                    }
-                  }}
-                  onToggleWatch={() =>
-                    onSetWatchlist((prev) =>
-                      prev.includes(player.id)
-                        ? prev.filter((id) => id !== player.id)
-                        : [...prev, player.id],
-                    )
-                  }
+                  onDraft={handleDraftPlayer}
+                  onToggleWatch={handleToggleWatch}
                   onToggleQueue={
                     myTeamId !== null && draftId
-                      ? () => onToggleQueue(player.id)
+                      ? handleToggleQueuePlayer
                       : undefined
                   }
                   onPlayerClick={handlePlayerClick}
