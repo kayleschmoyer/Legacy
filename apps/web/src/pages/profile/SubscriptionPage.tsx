@@ -35,7 +35,6 @@ import {
   SURFACE_PANEL,
   withAlpha,
 } from '../../constants/colors';
-import { env } from '../../config/environment';
 import { useStripePrices } from '../../hooks/useStripePrices';
 import {
   trackBeginCheckout,
@@ -514,6 +513,8 @@ const SubscriptionPage: React.FC = () => {
     annualPriceDisplay: ANNUAL_PRICE_DISPLAY,
     annualMonthlyEquivalent: ANNUAL_MONTHLY_EQUIVALENT,
     annualSavingsPct: ANNUAL_SAVINGS_PCT,
+    monthlyPriceId,
+    annualPriceId,
   } = useStripePrices();
 
   useEffect(() => {
@@ -553,10 +554,7 @@ const SubscriptionPage: React.FC = () => {
   const cancelAtPeriodEnd = subscription?.cancelAtPeriodEnd ?? false;
 
   const handleUpgrade = async () => {
-    const priceId =
-      billingCycle === 'annual'
-        ? env.stripeAnnualPriceId
-        : env.stripeMonthlyPriceId;
+    const priceId = billingCycle === 'annual' ? annualPriceId : monthlyPriceId;
 
     if (!priceId || !priceId.startsWith('price_')) {
       alert(

@@ -10,7 +10,8 @@
  * - SubscriptionPage (/profile/subscription): renders for active premium tier
  * - SubscriptionPage (/profile/subscription): shows past-due banner
  * - SubscriptionPage (/profile/subscription): shows canceled state
- * - Upgrade flow: client-side price-ID validation guard fires when Stripe env vars are missing
+ * - Upgrade flow: guard fires when GetStripePrices returns null
+ * - Upgrade flow: createCheckoutSession called when price IDs are available
  */
 
 import { expect } from '../fixtures/auth-enhanced';
@@ -271,12 +272,90 @@ test.describe('SubscriptionPage — canceled @regression', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('Subscription upgrade flow @critical', () => {
-  // The E2E build does not include real Stripe price IDs (VITE_STRIPE_ANNUAL_PRICE_ID /
-  // VITE_STRIPE_MONTHLY_PRICE_ID are empty in the test build). The new client-side
-  // validation guard introduced in LS-2313 catches this and shows an alert instead of
-  // calling createCheckoutSession.  We stub window.alert to prevent the native dialog
-  // from blocking Playwright and assert the guard fires with the expected message.
-  test('upgrade button on subscription page triggers price-ID validation guard when Stripe env vars are not configured', async ({
+  // With price IDs now fetched from the backend via the GetStripePrices query
+  // (LS-3102), the client-side guard triggers when the query returns null
+  // (e.g. Stripe is not configured on the server), not when env vars are missing.
+
+  test('upgrade button calls createCheckoutSession when GetStripePrices returns price IDs', async ({
+    page,
+  }) => {
+    await page.route(isGraphQLEndpoint, async (route) => {
+      const op = route.request().postData()?.toLowerCase() ?? '';
+      if (op.includes('mysubscription') || op.includes('getmysubscription')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(myFreeSubscriptionResponse()),
+        });
+        return;
+      }
+      if (op.includes('getstripeprices') || op.includes('stripeprices')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: {
+              stripePrices: {
+                monthlyPriceCents: 499,
+                annualTotalCents: 3999,
+                monthlyPriceId: 'price_monthly_test',
+                annualPriceId: 'price_annual_test',
+              },
+            },
+          }),
+        });
+        return;
+      }
+      if (op.includes('createcheckoutsession')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(createCheckoutSessionResponse()),
+        });
+        return;
+      }
+      await unmockedGraphQLFallback(route);
+    });
+
+    // Register both waiters BEFORE navigating so we don't miss the responses.
+    // stripePricesDone resolves once we've confirmed actual price IDs landed in
+    // the browser — this guarantees they're in the Apollo cache before we click.
+    const stripePricesDone = page.waitForResponse(async (response) => {
+      if (!isGraphQLEndpoint(new URL(response.url()))) return false;
+      const body: unknown = await response.json().catch(() => null);
+      return (
+        typeof body === 'object' &&
+        body !== null &&
+        'data' in body &&
+        typeof body.data === 'object' &&
+        body.data !== null &&
+        'stripePrices' in body.data &&
+        body.data.stripePrices != null
+      );
+    });
+    // checkoutSent resolves as soon as the browser fires the mutation — no
+    // polling needed and no risk of missing the request.
+    const checkoutSent = page.waitForRequest(
+      (req) =>
+        isGraphQLEndpoint(new URL(req.url())) &&
+        (req.postData()?.toLowerCase() ?? '').includes('createcheckoutsession'),
+      { timeout: 10_000 },
+    );
+
+    await page.goto('/profile/subscription');
+    await stripePricesDone;
+
+    await page
+      .getByRole('button', { name: /upgrade|get premium/i })
+      .first()
+      .click();
+
+    // Verify createCheckoutSession was called with the correct price ID.
+    const checkoutRequest = await checkoutSent;
+    expect(checkoutRequest.postData()).toContain('price_annual_test');
+  });
+
+  test('upgrade button shows unavailable alert when GetStripePrices returns null', async ({
     page,
   }) => {
     // Capture alert messages before page scripts run so the guard cannot block.
@@ -302,9 +381,16 @@ test.describe('Subscription upgrade flow @critical', () => {
         });
         return;
       }
+      // Return null for stripePrices to trigger the guard.
+      if (op.includes('getstripeprices') || op.includes('stripeprices')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { stripePrices: null } }),
+        });
+        return;
+      }
       // createCheckoutSession should NOT be called when the guard fires.
-      // If it is called (e.g. because real price IDs are configured), fulfill
-      // it to avoid an unmocked-operation error.
       if (op.includes('createcheckoutsession')) {
         await route.fulfill({
           status: 200,

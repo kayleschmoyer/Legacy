@@ -137,12 +137,16 @@ SubscriptionInfoRef.implement({
 const StripePriceInfoRef = builder.objectRef<{
   monthlyPriceCents: number;
   annualTotalCents: number;
+  monthlyPriceId: string;
+  annualPriceId: string;
 }>('StripePriceInfo');
 
 StripePriceInfoRef.implement({
   fields: (t) => ({
     monthlyPriceCents: t.exposeInt('monthlyPriceCents', { nullable: false }),
     annualTotalCents: t.exposeInt('annualTotalCents', { nullable: false }),
+    monthlyPriceId: t.exposeString('monthlyPriceId', { nullable: false }),
+    annualPriceId: t.exposeString('annualPriceId', { nullable: false }),
   }),
 });
 
@@ -150,6 +154,8 @@ StripePriceInfoRef.implement({
 let cachedPrices: {
   monthlyPriceCents: number;
   annualTotalCents: number;
+  monthlyPriceId: string;
+  annualPriceId: string;
 } | null = null;
 let cachedPricesExpiresAt = 0;
 const PRICE_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -157,6 +163,8 @@ const PRICE_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 async function fetchStripePrices(): Promise<{
   monthlyPriceCents: number;
   annualTotalCents: number;
+  monthlyPriceId: string;
+  annualPriceId: string;
 }> {
   const now = Date.now();
   if (cachedPrices && now < cachedPricesExpiresAt) {
@@ -190,6 +198,8 @@ async function fetchStripePrices(): Promise<{
   const result = {
     monthlyPriceCents: monthlyPrice.unit_amount,
     annualTotalCents: annualPrice.unit_amount,
+    monthlyPriceId,
+    annualPriceId,
   };
 
   cachedPrices = result;

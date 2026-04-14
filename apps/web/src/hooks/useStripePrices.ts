@@ -17,6 +17,9 @@ const fallbackPricing = derivePricing(
  * Fetches live subscription prices from Stripe via GraphQL
  * and derives all display values. Falls back to hardcoded
  * constants when the query fails or returns null.
+ *
+ * Also exposes `monthlyPriceId` and `annualPriceId` (Stripe price IDs)
+ * so the checkout flow does not depend on build-time env vars.
  */
 export function useStripePrices() {
   const { data, loading, error } = useGetStripePricesQuery({
@@ -59,12 +62,20 @@ export function useStripePrices() {
     }
   }, [hasNullPrices]);
 
+  // All StripePriceInfo fields are non-nullable in the schema, so
+  // monthlyPriceId/annualPriceId are null iff stripePrices itself is null —
+  // already captured by the hasNullPrices warning above.
+  const monthlyPriceId = stripePrices?.monthlyPriceId ?? null;
+  const annualPriceId = stripePrices?.annualPriceId ?? null;
+
   if (typeof monthly !== 'number' || typeof annual !== 'number') {
-    return { ...fallbackPricing, loading };
+    return { ...fallbackPricing, loading, monthlyPriceId, annualPriceId };
   }
 
   return {
     ...derivePricing(monthly, annual),
     loading: false,
+    monthlyPriceId,
+    annualPriceId,
   };
 }

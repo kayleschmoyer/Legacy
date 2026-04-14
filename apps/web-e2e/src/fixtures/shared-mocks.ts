@@ -88,7 +88,12 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = {
   getmysubscription: { data: { mySubscription: null } },
   getstripeprices: {
     data: {
-      stripePrices: { monthlyPriceCents: 499, annualTotalCents: 3999 },
+      stripePrices: {
+        monthlyPriceCents: 499,
+        annualTotalCents: 3999,
+        monthlyPriceId: 'price_monthly_test',
+        annualPriceId: 'price_annual_test',
+      },
     },
   },
 

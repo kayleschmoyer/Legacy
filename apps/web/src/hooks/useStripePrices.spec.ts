@@ -25,7 +25,12 @@ describe('useStripePrices', () => {
   it('returns live Stripe prices when query succeeds', () => {
     useGetStripePricesQuery.mockReturnValue({
       data: {
-        stripePrices: { monthlyPriceCents: 599, annualTotalCents: 4999 },
+        stripePrices: {
+          monthlyPriceCents: 599,
+          annualTotalCents: 4999,
+          monthlyPriceId: 'price_monthly123',
+          annualPriceId: 'price_annual456',
+        },
       },
       loading: false,
       error: undefined,
@@ -38,6 +43,8 @@ describe('useStripePrices', () => {
     expect(result.current.monthlyPriceDisplay).toBe('$5.99');
     expect(result.current.annualPriceDisplay).toBe('$49.99');
     expect(result.current.loading).toBe(false);
+    expect(result.current.monthlyPriceId).toBe('price_monthly123');
+    expect(result.current.annualPriceId).toBe('price_annual456');
   });
 
   it('returns hardcoded fallbacks when query returns null', () => {
@@ -54,6 +61,8 @@ describe('useStripePrices', () => {
     expect(result.current.monthlyPriceDisplay).toBe('$4.99');
     expect(result.current.annualPriceDisplay).toBe('$39.99');
     expect(result.current.annualSavingsPct).toBe('33%');
+    expect(result.current.monthlyPriceId).toBeNull();
+    expect(result.current.annualPriceId).toBeNull();
   });
 
   it('returns hardcoded fallbacks while loading', () => {
@@ -108,7 +117,12 @@ describe('useStripePrices', () => {
   it('computes annualMonthlyEquivalent correctly from live prices', () => {
     useGetStripePricesQuery.mockReturnValue({
       data: {
-        stripePrices: { monthlyPriceCents: 999, annualTotalCents: 8388 },
+        stripePrices: {
+          monthlyPriceCents: 999,
+          annualTotalCents: 8388,
+          monthlyPriceId: 'price_monthly789',
+          annualPriceId: 'price_annual012',
+        },
       },
       loading: false,
       error: undefined,
