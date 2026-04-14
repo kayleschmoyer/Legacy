@@ -117,7 +117,7 @@ jobs:
   # ---------------------------------------------------------------------------
   prepare:
     name: "Prepare Matrix"
-    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 1
     outputs:
       matrix: ${{ steps.set.outputs.matrix }}
@@ -151,7 +151,7 @@ jobs:
     name: "Nightly Start"
     needs: [prepare]
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 3
     outputs:
       thread-id: ${{ steps.notify.outputs.thread-id }}
@@ -481,7 +481,7 @@ jobs:
     # are handled by the retry-with-rebase loop in the deploy step. No shared
     # concurrency group — GitHub only queues one pending job per group, so a
     # burst of deploys cancels intermediate pending jobs instead of queuing them.
-    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
       has-report: ${{ steps.merge.outputs.has-report }}
@@ -618,7 +618,7 @@ jobs:
     name: "Nightly Results"
     needs: [run-tests, deploy-report, notify-nightly-start]
     if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
-    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
       - name: "Checkout Repository"

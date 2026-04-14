@@ -344,7 +344,7 @@ jobs:
     # cosmetic for dep bumps anyway — skip the job entirely so dependabot PRs
     # do not show a stuck failed required check.
     if: "!cancelled() && needs.e2e.result != 'skipped' && (github.event_name != 'pull_request' || github.event.pull_request.user.login != 'dependabot[bot]')"
-    runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: "Checkout Repository"
@@ -479,7 +479,7 @@ jobs:
     name: "Summarize & Report"
     needs: [detect-changes, quality-gates, build-validation, e2e]
     if: "!cancelled() && !contains(github.event.pull_request.labels.*.name, 'skip-ci')"
-    runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
       overall-status: ${{ steps.collect-results.outputs.overall-status }}
