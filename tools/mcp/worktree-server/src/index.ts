@@ -1051,7 +1051,7 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
           remoteBranch: {
             type: 'string',
             description:
-              'Push to this remote branch name instead of the local branch name. Must contain an LS-#### Jira key. Use on first push from native ephemeral worktrees to set an LS-keyed remote ref without renaming the local branch (keeps Claude Code UI in sync). Sets upstream (-u) automatically. On subsequent pushes the stored upstream is detected and reused — omit this param.',
+              'Push to this remote branch name instead of the local branch name. Must contain an LS-#### Jira key; pushes are refused otherwise. Providing remoteBranch also implies upstream is set (-u). ⚠️ Do NOT use this in native ephemeral (launcher-checkbox) sessions — local/remote name mismatch confuses PR association in the Claude Code UI (anthropics/claude-code#18690). Jira linking for native ephemeral sessions is done via PR title and commit messages containing LS-####, not the branch name. See .agents/skills/branch-naming/SKILL.md.',
           },
         },
       },
