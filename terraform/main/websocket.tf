@@ -239,10 +239,14 @@ resource "aws_lambda_function" "websocket" {
       CONNECTIONS_TABLE_NAME              = aws_dynamodb_table.websocket_connections.name
       JWT_SECRET_NAME                     = aws_secretsmanager_secret.jwt_secret.arn
       NODE_ENV                            = var.environment
-      DB_HOST                             = aws_db_instance.postgres.address
+      DB_HOST                             = var.enable_rds_proxy ? aws_db_proxy.main[0].endpoint : aws_db_instance.postgres.address
       DB_PORT                             = tostring(aws_db_instance.postgres.port)
       DB_NAME                             = aws_db_instance.postgres.db_name
       DB_SECRET_NAME                      = aws_secretsmanager_secret.database_credentials.arn
+      # DB_CERT_PATH intentionally omitted: when the RDS proxy is enabled it
+      # presents an ACM certificate trusted by Node.js built-in CAs. When
+      # connecting directly to RDS (proxy disabled), the instance uses
+      # rds-ca-rsa2048-g1 which is also trusted. See LS-3168.
       AWS_NODEJS_CONNECTION_REUSE_ENABLED = "1"
 
       # Rollbar error tracking

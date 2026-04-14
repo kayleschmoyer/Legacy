@@ -47,6 +47,12 @@ resource "aws_db_instance" "postgres" {
   performance_insights_enabled = false # Disabled for dev
   monitoring_interval          = 0     # Disabled enhanced monitoring
 
+  # SSL/TLS certificate — rds-ca-rsa2048-g1 uses Amazon Root CA which is
+  # trusted by Node.js built-in CAs, avoiding "self-signed certificate in
+  # certificate chain" errors (LS-3168). Applied at next maintenance window
+  # (no apply_immediately) to avoid an unplanned reboot.
+  ca_cert_identifier = "rds-ca-rsa2048-g1"
+
   # Deletion protection
   deletion_protection = false
   skip_final_snapshot = true
