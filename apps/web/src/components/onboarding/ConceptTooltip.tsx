@@ -2,12 +2,15 @@ import React, { useRef, useState } from 'react';
 import ReactDOM from 'react-dom';
 import { Paragraph, XStack, YStack } from '@legacy-sports/shared-components/ui';
 import {
+  BG_LIGHT,
   BLACK,
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,
   BRAND_NAVY_LIGHT,
+  SURFACE_SUBTLE,
   withAlpha,
 } from '../../constants/colors';
+import { useThemeContext } from '../../context/ThemeContext';
 
 interface ConceptTooltipProps {
   /** The text to highlight with the tooltip anchor */
@@ -42,6 +45,8 @@ export function ConceptTooltip({ term, explanation }: ConceptTooltipProps) {
   const [visible, setVisible] = useState(false);
   const anchorRef = useRef<HTMLSpanElement>(null);
   const [pos, setPos] = useState<TooltipPos>({ top: 0, left: 0, hOffset: 0 });
+  const { resolvedTheme } = useThemeContext();
+  const isLight = resolvedTheme === 'light';
 
   const computePos = () => {
     if (!anchorRef.current) return;
@@ -117,7 +122,9 @@ export function ConceptTooltip({ term, explanation }: ConceptTooltipProps) {
               transform: 'translate(-50%, -100%)',
               zIndex: 99999,
               width: TOOLTIP_WIDTH,
-              background: `linear-gradient(135deg, #0D1526 0%, ${BRAND_NAVY_LIGHT} 100%)`,
+              background: isLight
+                ? `linear-gradient(135deg, ${BG_LIGHT} 0%, ${withAlpha(BRAND_NAVY_LIGHT, 0.25)} 100%)`
+                : `linear-gradient(135deg, ${SURFACE_SUBTLE} 0%, ${BRAND_NAVY_LIGHT} 100%)`,
               border: `1px solid ${withAlpha(BRAND_GOLD, 0.35)}`,
               borderRadius: 10,
               padding: '10px 14px',

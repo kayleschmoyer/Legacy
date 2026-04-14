@@ -1,4 +1,15 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  BRAND_SEAM_RED,
+  ERROR_BG_DARK,
+  ERROR_BG_LIGHT,
+  ERROR_TEXT_DARK,
+  ERROR_TEXT_LIGHT,
+  OVERLAY_BLACK_12,
+  OVERLAY_BLACK_40,
+  withAlpha,
+} from '../../constants/colors';
+import { useThemeContext } from '../../context/ThemeContext';
 
 interface ApolloErrorEvent extends CustomEvent {
   detail: { message: string };
@@ -16,6 +27,8 @@ const DISMISS_MS = 5000;
 export function ApolloErrorToast(): React.JSX.Element | null {
   const [message, setMessage] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const { resolvedTheme } = useThemeContext();
+  const isLight = resolvedTheme === 'light';
 
   const dismiss = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -62,10 +75,12 @@ export function ApolloErrorToast(): React.JSX.Element | null {
         gap: 12,
         padding: '12px 16px',
         borderRadius: 10,
-        background: '#1E0A0A',
-        border: '1px solid rgba(196, 30, 58, 0.6)',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-        color: '#f8d7da',
+        background: isLight ? ERROR_BG_LIGHT : ERROR_BG_DARK,
+        border: `1px solid ${withAlpha(BRAND_SEAM_RED, 0.6)}`,
+        boxShadow: isLight
+          ? `0 8px 32px ${OVERLAY_BLACK_12}`
+          : `0 8px 32px ${OVERLAY_BLACK_40}`,
+        color: isLight ? ERROR_TEXT_LIGHT : ERROR_TEXT_DARK,
         fontSize: 13,
         fontWeight: 500,
         lineHeight: 1.5,
@@ -91,7 +106,7 @@ export function ApolloErrorToast(): React.JSX.Element | null {
           background: 'none',
           border: 'none',
           cursor: 'pointer',
-          color: '#f8d7da',
+          color: isLight ? ERROR_TEXT_LIGHT : ERROR_TEXT_DARK,
           fontSize: 16,
           lineHeight: '20px',
           padding: 0,

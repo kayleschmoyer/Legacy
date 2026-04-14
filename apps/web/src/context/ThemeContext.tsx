@@ -12,6 +12,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useState,
 } from 'react';
@@ -93,6 +94,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const resolvedTheme: ResolvedTheme =
     preference === 'system' ? systemTheme : preference;
+
+  // Sync Tamagui theme class to <html> so CSS vars (--background, --color, etc.)
+  // are available outside the Theme wrapper div (e.g. on html, body).
+  // useLayoutEffect runs synchronously before paint to prevent a flash of
+  // incorrect CSS variables when the theme changes.
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    root.classList.remove('t_light', 't_dark');
+    root.classList.add(`t_${resolvedTheme}`);
+  }, [resolvedTheme]);
 
   const setThemePreference = useCallback((pref: ThemePreference) => {
     setPreference(pref);

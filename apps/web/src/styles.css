@@ -11,9 +11,11 @@ body {
   margin: 0;
   padding: 0;
   overflow-x: clip;
-  /* Use Tamagui theme colors for body background */
-  background-color: var(--background, #0a0f1a);
-  color: var(--color, #f8fafc);
+  /* Use Tamagui theme colors for body background.
+   * Fallbacks match the configured defaultTheme ('light') so the
+   * pre-hydration flash is light rather than the old dark value. */
+  background-color: var(--background, #ffffff);
+  color: var(--color, #0b1220);
   font-family:
     'Playfair Display',
     system-ui,
@@ -48,8 +50,8 @@ body {
   left: 12px;
   top: 12px;
   z-index: 1000;
-  background: var(--background, #0f0f23);
-  color: var(--color, #ffffff);
+  background: var(--background, #ffffff);
+  color: var(--color, #0b1220);
   padding: 8px 12px;
   border-radius: 6px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);

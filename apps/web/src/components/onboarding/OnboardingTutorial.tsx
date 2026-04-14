@@ -10,6 +10,7 @@ import {
 import { ConceptTooltip } from './ConceptTooltip';
 import {
   BG_DARK,
+  BG_LIGHT,
   BLACK,
   BRAND_GOLD,
   BRAND_GOLD_DARK,
@@ -17,8 +18,10 @@ import {
   BRAND_NAVY,
   BRAND_NAVY_LIGHT,
   BRAND_SEAM_RED,
+  SURFACE_SUBTLE,
   withAlpha,
 } from '../../constants/colors';
+import { useThemeContext } from '../../context/ThemeContext';
 
 interface OnboardingTutorialProps {
   /** Called when the user completes or explicitly skips the tutorial */
@@ -34,6 +37,189 @@ interface TutorialStep {
   title: string;
   body: React.ReactNode | ((ctx: { onClose: () => void }) => React.ReactNode);
   accentColor: string;
+}
+
+/** Game slots example table — adapts background to current theme */
+function GameSlotsExample() {
+  const { resolvedTheme } = useThemeContext();
+  const isLight = resolvedTheme === 'light';
+  return (
+    <YStack
+      borderRadius="$5"
+      borderWidth={1}
+      borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.5)}
+      overflow="hidden"
+      style={{
+        background: isLight
+          ? withAlpha(BG_LIGHT, 0.95)
+          : withAlpha(BG_DARK, 0.8),
+      }}
+    >
+      <XStack
+        padding="$3"
+        borderBottomWidth={1}
+        borderBottomColor={withAlpha(BRAND_NAVY_LIGHT, 0.3)}
+        style={{ background: withAlpha(BRAND_NAVY_LIGHT, 0.15) }}
+      >
+        <Paragraph fontWeight="700" color="$brandGold" fontSize="$3">
+          Example — Week 7 Game Slots (5 games)
+        </Paragraph>
+      </XStack>
+      <YStack padding="$3" gap="$2">
+        {[
+          { slot: 'Game 1', matchup: 'PHI @ NYM', date: 'Aug 5, 2019' },
+          { slot: 'Game 2', matchup: 'CHC @ STL', date: 'Aug 7, 2019' },
+          { slot: 'Game 3', matchup: 'BOS @ NYY', date: 'Aug 9, 2019' },
+          { slot: 'Game 4', matchup: 'LAD @ SF', date: 'Aug 12, 2019' },
+          { slot: 'Game 5', matchup: 'HOU @ OAK', date: 'Aug 14, 2019' },
+        ].map(({ slot, matchup, date }) => (
+          <XStack
+            key={slot}
+            justifyContent="space-between"
+            alignItems="center"
+            padding="$2"
+            borderRadius="$3"
+            style={{ background: withAlpha(BRAND_NAVY_LIGHT, 0.08) }}
+          >
+            <XStack gap="$2" alignItems="center">
+              <Paragraph
+                color="$brandGold"
+                fontSize="$2"
+                fontWeight="700"
+                style={{ minWidth: 52 }}
+              >
+                {slot}
+              </Paragraph>
+              <Paragraph color="$colorPress" fontSize="$3">
+                {matchup}
+              </Paragraph>
+            </XStack>
+            <Paragraph color="$brandGoldLight" fontSize="$2" fontWeight="700">
+              {date} ✓
+            </Paragraph>
+          </XStack>
+        ))}
+      </YStack>
+    </YStack>
+  );
+}
+
+/** Sample matchup card — adapts background to current theme */
+function SampleMatchupCard() {
+  const { resolvedTheme } = useThemeContext();
+  const isLight = resolvedTheme === 'light';
+  return (
+    <YStack
+      borderRadius="$6"
+      borderWidth={1}
+      borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.5)}
+      overflow="hidden"
+      style={{
+        background: isLight
+          ? `linear-gradient(135deg, ${withAlpha(BG_LIGHT, 0.95)} 0%, ${withAlpha(BRAND_NAVY, 0.08)} 100%)`
+          : `linear-gradient(135deg, ${withAlpha(BG_DARK, 0.9)} 0%, ${withAlpha(BRAND_NAVY, 0.5)} 100%)`,
+      }}
+    >
+      {/* Header */}
+      <XStack
+        justifyContent="center"
+        padding="$3"
+        borderBottomWidth={1}
+        borderBottomColor={withAlpha(BRAND_NAVY_LIGHT, 0.3)}
+        style={{ background: withAlpha(BRAND_NAVY_LIGHT, 0.15) }}
+      >
+        <Paragraph color="$brandGoldLight" fontWeight="700" fontSize="$3">
+          Week 7 · Aug 5–7, 2019
+        </Paragraph>
+      </XStack>
+
+      {/* Teams */}
+      <XStack justifyContent="space-around" alignItems="center" padding="$4">
+        <YStack alignItems="center" gap="$2">
+          <Paragraph fontSize={32} lineHeight={36}>
+            <span role="img" aria-label="sloth">
+              🦥
+            </span>
+          </Paragraph>
+          <Paragraph fontWeight="700" color="$color" fontSize="$4">
+            Your Team
+          </Paragraph>
+          <Paragraph
+            fontWeight="800"
+            fontSize={28}
+            lineHeight={32}
+            color="$brandGoldLight"
+          >
+            87.5
+          </Paragraph>
+        </YStack>
+
+        <YStack alignItems="center" gap="$1">
+          <Paragraph color="$brandSeamRed" fontWeight="800" fontSize="$5">
+            VS
+          </Paragraph>
+          <Paragraph color="$colorPress" fontSize="$2">
+            Week matchup
+          </Paragraph>
+        </YStack>
+
+        <YStack alignItems="center" gap="$2">
+          <Paragraph fontSize={32} lineHeight={36}>
+            <span role="img" aria-label="bear">
+              🐻
+            </span>
+          </Paragraph>
+          <Paragraph fontWeight="700" color="$color" fontSize="$4">
+            Opponent
+          </Paragraph>
+          <Paragraph
+            fontWeight="800"
+            fontSize={28}
+            lineHeight={32}
+            color="$colorPress"
+          >
+            72.0
+          </Paragraph>
+        </YStack>
+      </XStack>
+
+      {/* Top performers */}
+      <YStack
+        borderTopWidth={1}
+        borderTopColor={withAlpha(BRAND_NAVY_LIGHT, 0.3)}
+        padding="$3"
+        gap="$2"
+      >
+        <Paragraph
+          fontSize="$2"
+          fontWeight="700"
+          color="$brandGold"
+          textTransform="uppercase"
+          letterSpacing={1}
+        >
+          Top Performers This Week
+        </Paragraph>
+        {[
+          { name: 'Mike Trout', stats: '2 HR, 1 SB, 5 R', pts: '+18' },
+          { name: 'Gerrit Cole', stats: 'W, 8 K, 1 ER', pts: '+14' },
+        ].map(({ name, stats, pts }) => (
+          <XStack key={name} justifyContent="space-between" alignItems="center">
+            <YStack>
+              <Paragraph fontWeight="600" color="$color" fontSize="$3">
+                {name}
+              </Paragraph>
+              <Paragraph color="$colorPress" fontSize="$2">
+                {stats}
+              </Paragraph>
+            </YStack>
+            <Paragraph fontWeight="700" color="$brandGoldLight" fontSize="$4">
+              {pts} pts
+            </Paragraph>
+          </XStack>
+        ))}
+      </YStack>
+    </YStack>
+  );
 }
 
 const STEPS: TutorialStep[] = [
@@ -72,7 +258,7 @@ const STEPS: TutorialStep[] = [
           }}
           gap="$2"
         >
-          <Paragraph fontWeight="700" color={BRAND_GOLD} fontSize="$3">
+          <Paragraph fontWeight="700" color="$brandGold" fontSize="$3">
             <span role="img" aria-label="light bulb">
               💡
             </span>{' '}
@@ -167,63 +353,7 @@ const STEPS: TutorialStep[] = [
         </Paragraph>
 
         {/* Visual example */}
-        <YStack
-          borderRadius="$5"
-          borderWidth={1}
-          borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.5)}
-          overflow="hidden"
-          style={{ background: withAlpha(BG_DARK, 0.8) }}
-        >
-          <XStack
-            padding="$3"
-            borderBottomWidth={1}
-            borderBottomColor={withAlpha(BRAND_NAVY_LIGHT, 0.3)}
-            style={{ background: withAlpha(BRAND_NAVY_LIGHT, 0.15) }}
-          >
-            <Paragraph fontWeight="700" color={BRAND_GOLD} fontSize="$3">
-              Example — Week 7 Game Slots (5 games)
-            </Paragraph>
-          </XStack>
-          <YStack padding="$3" gap="$2">
-            {[
-              { slot: 'Game 1', matchup: 'PHI @ NYM', date: 'Aug 5, 2019' },
-              { slot: 'Game 2', matchup: 'CHC @ STL', date: 'Aug 7, 2019' },
-              { slot: 'Game 3', matchup: 'BOS @ NYY', date: 'Aug 9, 2019' },
-              { slot: 'Game 4', matchup: 'LAD @ SF', date: 'Aug 12, 2019' },
-              { slot: 'Game 5', matchup: 'HOU @ OAK', date: 'Aug 14, 2019' },
-            ].map(({ slot, matchup, date }) => (
-              <XStack
-                key={slot}
-                justifyContent="space-between"
-                alignItems="center"
-                padding="$2"
-                borderRadius="$3"
-                style={{ background: withAlpha(BRAND_NAVY_LIGHT, 0.08) }}
-              >
-                <XStack gap="$2" alignItems="center">
-                  <Paragraph
-                    color={BRAND_GOLD}
-                    fontSize="$2"
-                    fontWeight="700"
-                    style={{ minWidth: 52 }}
-                  >
-                    {slot}
-                  </Paragraph>
-                  <Paragraph color="$colorPress" fontSize="$3">
-                    {matchup}
-                  </Paragraph>
-                </XStack>
-                <Paragraph
-                  color={BRAND_GOLD_LIGHT}
-                  fontSize="$2"
-                  fontWeight="700"
-                >
-                  {date} ✓
-                </Paragraph>
-              </XStack>
-            ))}
-          </YStack>
-        </YStack>
+        <GameSlotsExample />
       </YStack>
     ),
   },
@@ -258,7 +388,7 @@ const STEPS: TutorialStep[] = [
             borderBottomWidth={1}
             borderBottomColor={withAlpha(BRAND_GOLD, 0.2)}
           >
-            <Paragraph fontWeight="700" color={BRAND_GOLD} fontSize="$3">
+            <Paragraph fontWeight="700" color="$brandGold" fontSize="$3">
               Default Scoring Values
             </Paragraph>
           </XStack>
@@ -318,126 +448,7 @@ const STEPS: TutorialStep[] = [
         </Paragraph>
 
         {/* Sample matchup card */}
-        <YStack
-          borderRadius="$6"
-          borderWidth={1}
-          borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.5)}
-          overflow="hidden"
-          style={{
-            background: `linear-gradient(135deg, ${withAlpha(BG_DARK, 0.9)} 0%, ${withAlpha(BRAND_NAVY, 0.5)} 100%)`,
-          }}
-        >
-          {/* Header */}
-          <XStack
-            justifyContent="center"
-            padding="$3"
-            borderBottomWidth={1}
-            borderBottomColor={withAlpha(BRAND_NAVY_LIGHT, 0.3)}
-            style={{ background: withAlpha(BRAND_NAVY_LIGHT, 0.15) }}
-          >
-            <Paragraph color={BRAND_GOLD_LIGHT} fontWeight="700" fontSize="$3">
-              Week 7 · Aug 5–7, 2019
-            </Paragraph>
-          </XStack>
-
-          {/* Teams */}
-          <XStack
-            justifyContent="space-around"
-            alignItems="center"
-            padding="$4"
-          >
-            <YStack alignItems="center" gap="$2">
-              <Paragraph fontSize={32} lineHeight={36}>
-                <span role="img" aria-label="eagle">
-                  🦥
-                </span>
-              </Paragraph>
-              <Paragraph fontWeight="700" color="$color" fontSize="$4">
-                Your Team
-              </Paragraph>
-              <Paragraph
-                fontWeight="800"
-                fontSize={28}
-                lineHeight={32}
-                color={BRAND_GOLD_LIGHT}
-              >
-                87.5
-              </Paragraph>
-            </YStack>
-
-            <YStack alignItems="center" gap="$1">
-              <Paragraph color={BRAND_SEAM_RED} fontWeight="800" fontSize="$5">
-                VS
-              </Paragraph>
-              <Paragraph color="$colorPress" fontSize="$2">
-                Week matchup
-              </Paragraph>
-            </YStack>
-
-            <YStack alignItems="center" gap="$2">
-              <Paragraph fontSize={32} lineHeight={36}>
-                <span role="img" aria-label="bear">
-                  🐻
-                </span>
-              </Paragraph>
-              <Paragraph fontWeight="700" color="$color" fontSize="$4">
-                Opponent
-              </Paragraph>
-              <Paragraph
-                fontWeight="800"
-                fontSize={28}
-                lineHeight={32}
-                color="$colorPress"
-              >
-                72.0
-              </Paragraph>
-            </YStack>
-          </XStack>
-
-          {/* Top performers */}
-          <YStack
-            borderTopWidth={1}
-            borderTopColor={withAlpha(BRAND_NAVY_LIGHT, 0.3)}
-            padding="$3"
-            gap="$2"
-          >
-            <Paragraph
-              fontSize="$2"
-              fontWeight="700"
-              color={BRAND_GOLD}
-              textTransform="uppercase"
-              letterSpacing={1}
-            >
-              Top Performers This Week
-            </Paragraph>
-            {[
-              { name: 'Mike Trout', stats: '2 HR, 1 SB, 5 R', pts: '+18' },
-              { name: 'Gerrit Cole', stats: 'W, 8 K, 1 ER', pts: '+14' },
-            ].map(({ name, stats, pts }) => (
-              <XStack
-                key={name}
-                justifyContent="space-between"
-                alignItems="center"
-              >
-                <YStack>
-                  <Paragraph fontWeight="600" color="$color" fontSize="$3">
-                    {name}
-                  </Paragraph>
-                  <Paragraph color="$colorPress" fontSize="$2">
-                    {stats}
-                  </Paragraph>
-                </YStack>
-                <Paragraph
-                  fontWeight="700"
-                  color={BRAND_GOLD_LIGHT}
-                  fontSize="$4"
-                >
-                  {pts} pts
-                </Paragraph>
-              </XStack>
-            ))}
-          </YStack>
-        </YStack>
+        <SampleMatchupCard />
 
         <Paragraph color="$colorPress" fontSize="$3" lineHeight={22}>
           Live matchup scores update as our system processes each archived game
@@ -492,11 +503,11 @@ const STEPS: TutorialStep[] = [
                 justifyContent="center"
                 flexShrink={0}
                 style={{
-                  background: `linear-gradient(135deg, ${BRAND_NAVY_LIGHT} 0%, #3a5a9c 100%)`,
+                  background: `linear-gradient(135deg, ${BRAND_NAVY_LIGHT} 0%, ${BRAND_NAVY} 100%)`,
                 }}
               >
                 <Paragraph
-                  color={BRAND_GOLD_LIGHT}
+                  color="$brandGoldLight"
                   fontWeight="800"
                   fontSize="$3"
                 >
@@ -549,6 +560,8 @@ const STEPS: TutorialStep[] = [
  */
 export function OnboardingTutorial({ onClose }: OnboardingTutorialProps) {
   const [currentStep, setCurrentStep] = React.useState(0);
+  const { resolvedTheme } = useThemeContext();
+  const isLight = resolvedTheme === 'light';
   const step = STEPS[currentStep];
   const isFirst = currentStep === 0;
   const isLast = currentStep === STEPS.length - 1;
@@ -594,7 +607,9 @@ export function OnboardingTutorial({ onClose }: OnboardingTutorialProps) {
         borderWidth={1}
         borderColor={withAlpha(BRAND_GOLD, 0.3)}
         style={{
-          background: `linear-gradient(145deg, #0D1526 0%, ${BRAND_NAVY} 100%)`,
+          background: isLight
+            ? `linear-gradient(145deg, ${BG_LIGHT} 0%, ${withAlpha(BRAND_NAVY, 0.1)} 100%)`
+            : `linear-gradient(145deg, ${SURFACE_SUBTLE} 0%, ${BRAND_NAVY} 100%)`,
           width: '100%',
           maxWidth: 560,
           maxHeight: '90vh',
@@ -644,7 +659,7 @@ export function OnboardingTutorial({ onClose }: OnboardingTutorialProps) {
               <Paragraph
                 fontSize="$2"
                 fontWeight="600"
-                color={BRAND_GOLD}
+                color="$brandGold"
                 textTransform="uppercase"
                 letterSpacing={1}
               >

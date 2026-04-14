@@ -30,6 +30,7 @@ import {
 } from '../../api/db/graphql.generated';
 import {
   BG_DARK,
+  BG_LIGHT,
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,
   BRAND_NAVY,
@@ -41,6 +42,7 @@ import {
   GREEN_LIGHTER,
   withAlpha,
 } from '../../constants/colors';
+import { useThemeContext } from '../../context/ThemeContext';
 
 /* ─── Constants ─── */
 
@@ -201,6 +203,8 @@ interface PhaseBadgeProps {
 }
 
 function PhaseBadge({ phase, draftStatus }: PhaseBadgeProps) {
+  const { resolvedTheme } = useThemeContext();
+  const isLight = resolvedTheme === 'light';
   const isDraftLive = draftStatus === 'in-progress';
   const isActive = phase === 'active';
   const isPreDraft = phase === 'pre-draft';
@@ -223,7 +227,7 @@ function PhaseBadge({ phase, draftStatus }: PhaseBadgeProps) {
     textColor = BRAND_NAVY_LIGHT;
   } else {
     label = 'Offseason';
-    bg = withAlpha(BG_DARK, 0.4);
+    bg = isLight ? withAlpha(BRAND_NAVY, 0.08) : withAlpha(BG_DARK, 0.4);
     textColor = '$textMuted';
   }
 
@@ -256,6 +260,8 @@ function LeagueSummaryCardItem({
   summary,
   onPress,
 }: LeagueSummaryCardItemProps) {
+  const { resolvedTheme } = useThemeContext();
+  const isLight = resolvedTheme === 'light';
   const isDraftLive = summary.draftStatus === 'in-progress';
   const isActive = summary.leaguePhase === 'active';
   const isPreDraft = summary.leaguePhase === 'pre-draft';
@@ -309,7 +315,9 @@ function LeagueSummaryCardItem({
         style={{
           background: isDraftLive
             ? withAlpha(BRAND_GOLD, 0.06)
-            : withAlpha(BG_DARK, 0.35),
+            : isLight
+              ? withAlpha(BRAND_NAVY, 0.06)
+              : withAlpha(BG_DARK, 0.35),
         }}
       >
         {isDraftLive && (
@@ -455,10 +463,6 @@ const heroGradientStyle: React.CSSProperties = {
   background: `linear-gradient(180deg, ${withAlpha(BRAND_NAVY, 0.15)} 0%, transparent 70%)`,
 };
 
-const sportCardStyle = (accentColor: string): React.CSSProperties => ({
-  background: `linear-gradient(135deg, ${BG_DARK} 0%, ${accentColor} 100%)`,
-});
-
 /* ─── Sport Config ─── */
 
 interface SportConfig {
@@ -467,7 +471,10 @@ interface SportConfig {
   title: string;
   description: string;
   route: string;
-  accent: string;
+  /** Raw hex base color — alpha applied at render time so light/dark can use different opacity. */
+  accentBase: string;
+  /** Alpha applied when rendering accent-based gradients and icon sprite/background treatments. */
+  accentAlpha: number;
   available: boolean;
 }
 
@@ -479,7 +486,8 @@ const SPORTS: SportConfig[] = [
     description:
       'Build your roster, dominate the draft, and track real-time stats across every matchup.',
     route: '/baseball',
-    accent: withAlpha(BRAND_NAVY, 0.55),
+    accentBase: BRAND_NAVY,
+    accentAlpha: 0.55,
     available: true,
   },
   {
@@ -489,7 +497,8 @@ const SPORTS: SportConfig[] = [
     description:
       'Manage lineups, trade players, and lead your team through every game week.',
     route: '/football',
-    accent: withAlpha(GREEN_DEEP, 0.35),
+    accentBase: GREEN_DEEP,
+    accentAlpha: 0.35,
     available: false,
   },
 ];
@@ -519,6 +528,22 @@ export function HomePage(): React.JSX.Element {
   const userId = auth?.user?.id;
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const { resolvedTheme } = useThemeContext();
+  const isLight = resolvedTheme === 'light';
+
+  // Theme-aware card gradient — applies subtle (0.18) alpha in light, original accentAlpha in dark.
+  const sportCardStyleFn = (
+    accentBase: string,
+    accentAlpha: number,
+  ): React.CSSProperties => ({
+    background: isLight
+      ? `linear-gradient(135deg, ${BG_LIGHT} 0%, ${withAlpha(accentBase, 0.18)} 100%)`
+      : `linear-gradient(135deg, ${BG_DARK} 0%, ${withAlpha(accentBase, accentAlpha)} 100%)`,
+  });
+
+  const navyPanelGradientReversed = isLight
+    ? `linear-gradient(135deg, ${withAlpha(BRAND_NAVY, 0.12)} 0%, ${BG_LIGHT} 100%)`
+    : `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BG_DARK} 100%)`;
 
   const defaultSport = useMemo(() => readDefaultSport(), []);
   const orderedSports = useMemo(
@@ -818,7 +843,10 @@ export function HomePage(): React.JSX.Element {
                     key={sport.key}
                     flex={1}
                     minWidth={300}
-                    style={sportCardStyle(sport.accent)}
+                    style={sportCardStyleFn(
+                      sport.accentBase,
+                      sport.accentAlpha,
+                    )}
                     onPress={() => navigate(sport.route)}
                     accessibilityLabel={`Navigate to ${sport.title}`}
                     role="link"
@@ -826,7 +854,7 @@ export function HomePage(): React.JSX.Element {
                     <XStack gap="$4" alignItems="center">
                       <SportIcon
                         style={{
-                          background: `linear-gradient(135deg, ${sport.accent}, ${withAlpha(BRAND_NAVY_LIGHT, 0.08)})`,
+                          background: `linear-gradient(135deg, ${withAlpha(sport.accentBase, sport.accentAlpha)}, ${withAlpha(BRAND_NAVY_LIGHT, 0.08)})`,
                         }}
                       >
                         <BrandIcon
@@ -972,7 +1000,10 @@ export function HomePage(): React.JSX.Element {
                     key={sport.key}
                     flex={1}
                     minWidth={300}
-                    style={sportCardStyle(sport.accent)}
+                    style={sportCardStyleFn(
+                      sport.accentBase,
+                      sport.accentAlpha,
+                    )}
                     {...(sport.available
                       ? {
                           onPress: () => navigate(sport.route),
@@ -990,7 +1021,7 @@ export function HomePage(): React.JSX.Element {
                     <XStack gap="$4" alignItems="center">
                       <SportIcon
                         style={{
-                          background: `linear-gradient(135deg, ${sport.accent}, ${withAlpha(BRAND_NAVY_LIGHT, 0.08)})`,
+                          background: `linear-gradient(135deg, ${withAlpha(sport.accentBase, sport.accentAlpha)}, ${withAlpha(BRAND_NAVY_LIGHT, 0.08)})`,
                         }}
                       >
                         <BrandIcon
@@ -1084,7 +1115,7 @@ export function HomePage(): React.JSX.Element {
                 borderColor: '$glassBorderHover',
               }}
               style={{
-                background: `linear-gradient(160deg, ${withAlpha(BRAND_NAVY, 0.6)} 0%, ${BG_DARK} 65%)`,
+                background: navyPanelGradientReversed,
               }}
             >
               <BrandIconBadge

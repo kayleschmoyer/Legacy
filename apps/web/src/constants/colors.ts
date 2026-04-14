@@ -26,6 +26,8 @@ export function withAlpha(hex: string, alpha: number): string {
 // ─── Backgrounds & Surfaces ────────────────────────────────
 
 export const BG_DARK = '#0A0F1A';
+/** Light-mode page/panel surface. Mirrors brandLight.surfacePanel in tamagui-config. */
+export const BG_LIGHT = '#EFF4FB';
 export const SURFACE_SUBTLE = '#0D1526';
 export const SURFACE_PANEL = '#111B2F';
 export const SURFACE_CARD = '#16223A';
@@ -97,6 +99,13 @@ export const EMERALD_LIGHTER = '#34D399';
 export const RED = '#DC2626';
 export const RED_DARK = '#991B1B';
 
+/** Error toast / alert surface colors. Mirrors Tamagui `red1` in both themes. */
+export const ERROR_BG_LIGHT = 'var(--red1)';
+export const ERROR_BG_DARK = 'var(--red1)';
+/** Text colors on error surfaces. Mirrors Tamagui `red11` in both themes. */
+export const ERROR_TEXT_LIGHT = 'var(--red11)';
+export const ERROR_TEXT_DARK = 'var(--red11)';
+
 // ─── Ambers & Golds (warning) ──────────────────────────────
 
 export const AMBER = '#F59E0B'; // $amber9
@@ -154,6 +163,7 @@ export const GRADIENT_AVATAR = `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${VIOL
 
 // ─── Semi-transparent Overlays ─────────────────────────────
 
+export const OVERLAY_BLACK_12 = 'rgba(0, 0, 0, 0.12)';
 export const OVERLAY_BLACK_30 = 'rgba(0, 0, 0, 0.3)';
 export const OVERLAY_BLACK_40 = 'rgba(0, 0, 0, 0.4)';
 export const OVERLAY_WHITE_05 = 'rgba(255, 255, 255, 0.05)';
