@@ -164,7 +164,7 @@ Follow the full [worktree-workflow skill](../worktree-workflow/SKILL.md):
    > **⛔ Do NOT stop here.** Creating the PR is also not the finish line. Subscribing to PR activity is mandatory — without it, CI failures and review comments do not stream back into the session and the watch-to-merge step in step 9 cannot react. If you exit after `github_create_pr` without subscribing and watching, the ticket is unfinished.
 
 9. **Watch the PR through to merge** (REQUIRED — this step replaces "stop after PR"):
-   - Call `github_wait_for_pr_event({ number: <PR#> })`. It blocks until something agent-actionable occurs and returns `{ event, pr, ... }`. Handle the event, then call it again. This covers both Check Runs (Actions jobs) and Commit Statuses (bot/external CI like `bot-review`) — no polling loop needed.
+   - Call `github_wait_for_pr_event({ number: <PR#> })`. It blocks until something agent-actionable occurs and returns `{ event, pr, ... }`. Handle the event, then call it again. This covers both Check Runs (Actions jobs) and Commit Statuses (bot/external CI like `bot-review`) — no polling loop needed. ⛔ Never use `Start-Sleep`, `sleep`, or any polling loop while waiting for CI or Copilot re-review; see [mcp-first CI substitution table](../mcp-first/SKILL.md).
    - **`checks_failed`**: the event payload gives you `failedChecks` (name/type/url) but not a runId. Get the runId with `ci_list_runs({ branch: "<headRefName>", limit: 1 })`, then `ci_get_logs({ runId, errorSummary: true })` to grab failed-step output. Common fixes:
      - Lint / format / type errors → fix, push (`worktree_commit` + `worktree_push`)
      - Branch behind `main` → run the [rebase skill](../rebase/SKILL.md) (`worktree_rebase` → `worktree_stabilize` → `make pc` → push)

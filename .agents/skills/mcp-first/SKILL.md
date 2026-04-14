@@ -119,11 +119,13 @@ Use `ci_list_runs`, `ci_view_run`, `ci_get_logs`, `ci_search_logs`, and `ci_reru
 
 **Waiting for a specific CI run**: use `ci_wait_for_run({ runId: "<id>" })` when you have a specific run ID (e.g. after `ci_rerun`). After it resolves, return to the `github_wait_for_pr_event` loop for the next event.
 
-| Shell pattern (do NOT use)                                       | MCP tool (use this)                                                                                                 |
-| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `sleep N && gh run view <runId> --json status,conclusion` (loop) | `ci_wait_for_run({ runId: "<id>" })`                                                                                |
-| `sleep N && gh pr view <pr> --json statusCheckRollup` (loop)     | `github_wait_for_pr_event({ number: <PR#> })` — blocks for any agent-actionable event including CI + review threads |
-| `github_view_pr` in a loop waiting for merge/review/CI           | `github_wait_for_pr_event({ number: <PR#> })` — single blocking call replaces the whole loop                        |
+| Shell/polling pattern (⛔ NEVER use)                                             | MCP tool (use this instead)                                                                                         |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `sleep N && gh run view <runId> --json status,conclusion` (loop)                 | `ci_wait_for_run({ runId: "<id>" })`                                                                                |
+| `sleep N && gh pr view <pr> --json statusCheckRollup` (loop)                     | `github_wait_for_pr_event({ number: <PR#> })` — blocks for any agent-actionable event including CI + review threads |
+| `Start-Sleep -Seconds N; Write-Host "..."` (waiting for CI or Copilot re-review) | `github_wait_for_pr_event({ number: <PR#> })` — push-based; no sleep needed                                         |
+| `Start-Sleep -Seconds N; ci_list_runs(...)` (polling for a run)                  | `ci_wait_for_run({ runId: "<id>" })` — blocks until the run completes                                               |
+| `github_view_pr` in a loop waiting for merge/review/CI                           | `github_wait_for_pr_event({ number: <PR#> })` — single blocking call replaces the whole loop                        |
 
 ## Database Operations
 

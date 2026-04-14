@@ -206,6 +206,8 @@ worktree_push()
 
 After fixing all known issues, enter the event loop:
 
+> ⛔ **Never use `Start-Sleep`, `sleep`, or any polling loop here.** `github_wait_for_pr_event` is push-based and blocks until an event fires — no sleep needed. See [mcp-first CI substitution table](../mcp-first/SKILL.md).
+
 ```
 github_wait_for_pr_event({ number: <PR#> })
 ```

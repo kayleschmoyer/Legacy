@@ -83,7 +83,7 @@ Build a triage list:
 6. **Validate locally**: `make pc` — the whole point is to catch issues before pushing, not after.
 7. **Self-review fix code**: re-read changed files in full and check against `skills/pr-lifecycle/references/common-review-patterns.md` before pushing.
 8. **Commit + push**.
-9. **Wait for CI**: `ci_wait_for_run({ runId })` or `github_wait_for_pr_event({ number: <PR#> })` — confirm CI passes before declaring done.
+9. **Wait for CI**: `ci_wait_for_run({ runId })` or `github_wait_for_pr_event({ number: <PR#> })` — confirm CI passes before declaring done. ⛔ Never use `Start-Sleep`, `sleep`, or any polling loop; see [mcp-first CI substitution table](../mcp-first/SKILL.md).
 
 ### Step 4: Final Verification
 
