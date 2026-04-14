@@ -19,9 +19,28 @@ import { LOGGER } from '@legacy-sports/logging';
 import { and, count, eq, gte } from 'drizzle-orm';
 
 import { builder } from '../../builder';
-import { AuthenticationError } from '../../graphql-errors';
+import {
+  AuthenticationError,
+  PremiumRequiredError,
+  UserInputError,
+} from '../../graphql-errors';
 import { getSubscriptionTier } from '../../authorization';
-import { PremiumRequiredError } from '../../graphql-errors';
+
+// ── Allowed values ───────────────────────────────────────────────────────────
+
+const VALID_DRAFT_ORDERS = ['snake', 'linear'] as const;
+const VALID_PLAYER_POOLS = ['all', 'nl', 'al'] as const;
+
+type DraftOrder = (typeof VALID_DRAFT_ORDERS)[number];
+type PlayerPool = (typeof VALID_PLAYER_POOLS)[number];
+
+function isValidDraftOrder(v: string): v is DraftOrder {
+  return (VALID_DRAFT_ORDERS as readonly string[]).includes(v);
+}
+
+function isValidPlayerPool(v: string): v is PlayerPool {
+  return (VALID_PLAYER_POOLS as readonly string[]).includes(v);
+}
 
 // ── Response type ────────────────────────────────────────────────────────────
 
@@ -76,6 +95,15 @@ builder.mutationField('initializeMockDraft', (t) =>
         required: false,
         description: 'Seconds per pick (default: 30 for mock drafts)',
       }),
+      draftOrder: t.arg.string({
+        required: false,
+        description: 'Draft order style: "snake" (default) or "linear"',
+      }),
+      playerPool: t.arg.string({
+        required: false,
+        description:
+          'Player pool to draft from: "all" (default), "nl" (NL only), or "al" (AL only)',
+      }),
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
@@ -89,21 +117,33 @@ builder.mutationField('initializeMockDraft', (t) =>
         rosterSize,
         userPickPosition,
         pickTimeLimitSeconds: rawTimeLimit,
+        draftOrder: rawDraftOrder,
+        playerPool: rawPlayerPool,
       } = args;
       const userId = context.user.id;
       // Mock drafts use a shorter default timer (30 s) so practice sessions
       // complete quickly.  The caller can override via pickTimeLimitSeconds.
       const pickTimeLimit = rawTimeLimit ?? 30;
+      const draftOrder = rawDraftOrder ?? 'snake';
+      const playerPool = rawPlayerPool ?? 'all';
 
       // Validate inputs
       if (numTeams < 2 || numTeams > 12) {
-        throw new Error('numTeams must be between 2 and 12');
+        throw UserInputError('numTeams must be between 2 and 12');
       }
       if (rosterSize < 1 || rosterSize > 50) {
-        throw new Error('rosterSize must be between 1 and 50');
+        throw UserInputError('rosterSize must be between 1 and 50');
       }
       if (userPickPosition < 1 || userPickPosition > numTeams) {
-        throw new Error(`userPickPosition must be between 1 and ${numTeams}`);
+        throw UserInputError(
+          `userPickPosition must be between 1 and ${numTeams}`,
+        );
+      }
+      if (!isValidDraftOrder(draftOrder)) {
+        throw UserInputError('draftOrder must be "snake" or "linear"');
+      }
+      if (!isValidPlayerPool(playerPool)) {
+        throw UserInputError('playerPool must be "all", "nl", or "al"');
       }
 
       // ── Premium feature gating: max 2 mock drafts/week for free tier ────
@@ -135,6 +175,8 @@ builder.mutationField('initializeMockDraft', (t) =>
         numTeams,
         rosterSize,
         userPickPosition,
+        draftOrder,
+        playerPool,
       });
 
       try {
@@ -152,20 +194,21 @@ builder.mutationField('initializeMockDraft', (t) =>
           inviteCode = generateInviteCode();
         }
 
+        // No career-game/season restrictions for mock drafts — all players eligible
+        const leagueValues = {
+          name: 'Mock Draft Practice',
+          owner: userId,
+          playerPool,
+          maxRosterSize: rosterSize,
+          draftStatus: 'not-started' as const,
+          inviteCode,
+          minCareerGames: 0,
+          minCareerSeasons: 0,
+          isMockDraft: true,
+        };
         const [league] = await context.db
           .insert(PublicSchema.leagues)
-          .values({
-            name: 'Mock Draft Practice',
-            owner: userId,
-            maxRosterSize: rosterSize,
-            draftStatus: 'not-started',
-            inviteCode,
-            playerPool: 'all',
-            // No career-game/season restrictions for mock drafts — all players eligible
-            minCareerGames: 0,
-            minCareerSeasons: 0,
-            isMockDraft: true,
-          })
+          .values(leagueValues)
           .returning();
 
         LOGGER.info('Mock draft league created', { leagueId: league.id });
@@ -201,7 +244,7 @@ builder.mutationField('initializeMockDraft', (t) =>
             leagueId: league.id,
             draftMode: 'live',
             selectionMethod: 'standard',
-            draftOrder: 'snake',
+            draftOrder,
             currentPick: 0,
             pickTimeLimitSeconds: pickTimeLimit,
             draftStartedAt: new Date(),
@@ -244,7 +287,7 @@ builder.mutationField('initializeMockDraft', (t) =>
           await context.notificationService.notifyDraftStarted(
             league.id,
             draft.id,
-            'snake',
+            draftOrder,
             numTeams,
             pickTimeLimit,
             initialDeadline.toISOString(),
@@ -258,6 +301,8 @@ builder.mutationField('initializeMockDraft', (t) =>
           rosterSize,
           userPickPosition,
           humanTeamId,
+          draftOrder,
+          playerPool,
         });
 
         return { leagueId: league.id, draftId: draft.id };

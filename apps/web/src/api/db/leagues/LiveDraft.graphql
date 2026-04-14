@@ -400,12 +400,16 @@ mutation InitializeMockDraft(
   $rosterSize: Int!
   $userPickPosition: Int!
   $pickTimeLimitSeconds: Int
+  $draftOrder: String
+  $playerPool: String
 ) {
   initializeMockDraft(
     numTeams: $numTeams
     rosterSize: $rosterSize
     userPickPosition: $userPickPosition
     pickTimeLimitSeconds: $pickTimeLimitSeconds
+    draftOrder: $draftOrder
+    playerPool: $playerPool
   ) {
     leagueId
     draftId

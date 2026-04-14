@@ -1638,6 +1638,11 @@ type Mutation {
   """
   initializeMockDraft(
     """
+    Draft order style: "snake" (default) or "linear"
+    """
+    draftOrder: String
+
+    """
     Total number of teams in the mock draft (2–12)
     """
     numTeams: Int!
@@ -1646,6 +1651,11 @@ type Mutation {
     Seconds per pick (default: 30 for mock drafts)
     """
     pickTimeLimitSeconds: Int
+
+    """
+    Player pool to draft from: "all" (default), "nl" (NL only), or "al" (AL only)
+    """
+    playerPool: String
 
     """
     Number of roster slots per team

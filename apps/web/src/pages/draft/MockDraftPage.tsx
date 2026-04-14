@@ -16,6 +16,7 @@ import {
   SLATE_400,
   SLATE_500,
   SURFACE_CARD,
+  TEXT_PRIMARY,
   withAlpha,
 } from '../../constants/colors';
 
@@ -25,6 +26,57 @@ interface MockDraftSettings {
   numTeams: number;
   rosterSize: number;
   userPickPosition: number;
+  draftOrder: 'snake' | 'linear';
+  playerPool: 'all' | 'nl' | 'al';
+}
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const DRAFT_ORDER_OPTIONS: { label: string; value: 'snake' | 'linear' }[] = [
+  { label: 'Snake', value: 'snake' },
+  { label: 'Linear', value: 'linear' },
+];
+
+const PLAYER_POOL_OPTIONS: {
+  label: string;
+  value: 'all' | 'nl' | 'al';
+}[] = [
+  { label: 'All MLB', value: 'all' },
+  { label: 'NL Only', value: 'nl' },
+  { label: 'AL Only', value: 'al' },
+];
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function renderOptionButtons<T extends string>(
+  options: { label: string; value: T }[],
+  selectedValue: T,
+  onSelect: (value: T) => void,
+): React.ReactNode {
+  return options.map((opt) => (
+    <button
+      key={opt.value}
+      aria-pressed={selectedValue === opt.value}
+      onClick={() => onSelect(opt.value)}
+      style={{
+        padding: '10px 20px',
+        borderRadius: '10px',
+        border: `2px solid ${selectedValue === opt.value ? BRAND_GOLD : OVERLAY_WHITE_10}`,
+        background:
+          selectedValue === opt.value
+            ? withAlpha(BRAND_GOLD, 0.15)
+            : 'transparent',
+        color: selectedValue === opt.value ? TEXT_PRIMARY : SLATE_400,
+        fontSize: '15px',
+        fontWeight: selectedValue === opt.value ? '700' : '400',
+        cursor: 'pointer',
+        transition:
+          'background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease',
+      }}
+    >
+      {opt.label}
+    </button>
+  ));
 }
 
 // ─── Setup Screen ─────────────────────────────────────────────────────────────
@@ -44,9 +96,13 @@ function SetupScreen({
   const [numTeams, setNumTeams] = React.useState(8);
   const [rosterSize, setRosterSize] = React.useState(10);
   const [userPickPosition, setUserPickPosition] = React.useState(1);
+  const [draftOrder, setDraftOrder] =
+    React.useState<MockDraftSettings['draftOrder']>('snake');
+  const [playerPool, setPlayerPool] =
+    React.useState<MockDraftSettings['playerPool']>('all');
 
   const handleStart = () => {
-    onStart({ numTeams, rosterSize, userPickPosition });
+    onStart({ numTeams, rosterSize, userPickPosition, draftOrder, playerPool });
   };
 
   return (
@@ -54,7 +110,7 @@ function SetupScreen({
       style={{
         minHeight: '100vh',
         background: GRADIENT_BOARD_BG,
-        color: '#ffffff',
+        color: TEXT_PRIMARY,
         fontFamily: "'Inter', 'SF Pro Display', system-ui, sans-serif",
         display: 'flex',
         alignItems: 'center',
@@ -156,11 +212,12 @@ function SetupScreen({
                       numTeams === n
                         ? withAlpha(BRAND_SEAM_RED, 0.15)
                         : 'transparent',
-                    color: numTeams === n ? '#ffffff' : SLATE_400,
+                    color: numTeams === n ? TEXT_PRIMARY : SLATE_400,
                     fontSize: '15px',
                     fontWeight: numTeams === n ? '700' : '400',
                     cursor: 'pointer',
-                    transition: 'all 0.15s ease',
+                    transition:
+                      'background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease',
                   }}
                 >
                   {n}
@@ -202,11 +259,12 @@ function SetupScreen({
                       rosterSize === n
                         ? withAlpha(EMERALD, 0.15)
                         : 'transparent',
-                    color: rosterSize === n ? '#ffffff' : SLATE_400,
+                    color: rosterSize === n ? TEXT_PRIMARY : SLATE_400,
                     fontSize: '15px',
                     fontWeight: rosterSize === n ? '700' : '400',
                     cursor: 'pointer',
-                    transition: 'all 0.15s ease',
+                    transition:
+                      'background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease',
                   }}
                 >
                   {n}
@@ -257,7 +315,8 @@ function SetupScreen({
                     fontSize: '15px',
                     fontWeight: userPickPosition === pos ? '700' : '400',
                     cursor: 'pointer',
-                    transition: 'all 0.15s ease',
+                    transition:
+                      'background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease',
                   }}
                 >
                   {pos}
@@ -271,13 +330,71 @@ function SetupScreen({
                 color: SLATE_500,
               }}
             >
-              Snake draft — you pick{' '}
-              {userPickPosition === 1
-                ? 'first every odd round'
-                : userPickPosition === numTeams
-                  ? 'first every even round'
-                  : `at position ${userPickPosition}`}
+              {draftOrder === 'snake' ? 'Snake' : 'Linear'} draft — you pick{' '}
+              {draftOrder === 'snake'
+                ? userPickPosition === 1
+                  ? 'first every odd round'
+                  : userPickPosition === numTeams
+                    ? 'first every even round'
+                    : `at position ${userPickPosition}`
+                : `at position ${userPickPosition} every round`}
             </p>
+          </section>
+
+          {/* Draft Order */}
+          <section
+            aria-labelledby="draft-order-label"
+            style={{ marginBottom: '28px' }}
+          >
+            <label
+              id="draft-order-label"
+              style={{
+                display: 'block',
+                fontSize: '13px',
+                fontWeight: '600',
+                color: SLATE_300,
+                textTransform: 'uppercase',
+                letterSpacing: '1px',
+                marginBottom: '12px',
+              }}
+            >
+              Draft Order
+            </label>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {renderOptionButtons(
+                DRAFT_ORDER_OPTIONS,
+                draftOrder,
+                setDraftOrder,
+              )}
+            </div>
+          </section>
+
+          {/* Player Pool */}
+          <section
+            aria-labelledby="player-pool-label"
+            style={{ marginBottom: '36px' }}
+          >
+            <label
+              id="player-pool-label"
+              style={{
+                display: 'block',
+                fontSize: '13px',
+                fontWeight: '600',
+                color: SLATE_300,
+                textTransform: 'uppercase',
+                letterSpacing: '1px',
+                marginBottom: '12px',
+              }}
+            >
+              Player Pool
+            </label>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {renderOptionButtons(
+                PLAYER_POOL_OPTIONS,
+                playerPool,
+                setPlayerPool,
+              )}
+            </div>
           </section>
 
           {/* Actions */}
@@ -306,7 +423,7 @@ function SetupScreen({
                 borderRadius: '12px',
                 border: 'none',
                 background: BRAND_SEAM_RED,
-                color: '#ffffff',
+                color: TEXT_PRIMARY,
                 fontSize: '17px',
                 fontWeight: '700',
                 cursor: loading ? 'not-allowed' : 'pointer',
@@ -382,6 +499,8 @@ export function MockDraftPage(): React.JSX.Element {
         rosterSize: s.rosterSize,
         userPickPosition: s.userPickPosition,
         pickTimeLimitSeconds: 90,
+        draftOrder: s.draftOrder,
+        playerPool: s.playerPool,
       },
     });
     const leagueId = result.data?.initializeMockDraft?.leagueId;

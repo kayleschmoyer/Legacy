@@ -272,6 +272,80 @@ test.describe('Mock Draft Simulator @regression', () => {
     ).toBeVisible();
   });
 
+  test('setup screen shows draft order options', async ({ page }) => {
+    await setupGraphQL(page);
+    await page.goto('/baseball/mock-draft');
+    await page.waitForLoadState('load');
+
+    await expect(
+      page.getByRole('heading', { name: /Mock Draft Simulator/i }),
+    ).toBeVisible();
+
+    // Draft order label is visible
+    await expect(page.getByText(/Draft Order/i).first()).toBeVisible();
+
+    // Both draft order buttons are visible
+    await expect(
+      page.getByRole('button', { name: 'Snake', exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Linear', exact: true }),
+    ).toBeVisible();
+
+    // Snake is selected by default
+    const snakeBtn = page.getByRole('button', { name: 'Snake', exact: true });
+    await expect(snakeBtn).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('selecting linear draft order updates description', async ({ page }) => {
+    await setupGraphQL(page);
+    await page.goto('/baseball/mock-draft');
+    await page.waitForLoadState('load');
+
+    await expect(
+      page.getByRole('heading', { name: /Mock Draft Simulator/i }),
+    ).toBeVisible();
+
+    // Switch to linear draft order
+    await page.getByRole('button', { name: 'Linear', exact: true }).click();
+
+    // Description should update for linear draft
+    await expect(
+      page.getByText(/Linear draft.*at position \d+ every round/i),
+    ).toBeVisible();
+  });
+
+  test('setup screen shows player pool options', async ({ page }) => {
+    await setupGraphQL(page);
+    await page.goto('/baseball/mock-draft');
+    await page.waitForLoadState('load');
+
+    await expect(
+      page.getByRole('heading', { name: /Mock Draft Simulator/i }),
+    ).toBeVisible();
+
+    // Player pool label is visible
+    await expect(page.getByText(/Player Pool/i).first()).toBeVisible();
+
+    // All three player pool buttons are visible
+    await expect(
+      page.getByRole('button', { name: 'All MLB', exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'NL Only', exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'AL Only', exact: true }),
+    ).toBeVisible();
+
+    // All MLB is selected by default
+    const allMlbBtn = page.getByRole('button', {
+      name: 'All MLB',
+      exact: true,
+    });
+    await expect(allMlbBtn).toHaveAttribute('aria-pressed', 'true');
+  });
+
   test('cancel button is present on setup screen', async ({ page }) => {
     await setupGraphQL(page);
     await page.goto('/baseball/mock-draft');
