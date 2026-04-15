@@ -6,13 +6,14 @@ import {
   YStack,
 } from '@legacy-sports/shared-components/ui';
 import { useAuth } from '@legacy-sports/shared-components/auth';
-import { ScrollView, Spinner, styled, Text } from 'tamagui';
+import { ScrollView, Spinner, styled, Text, Theme } from 'tamagui';
 import { BrandIcon, type BrandIconName } from '../../components/icons';
 import { PageMeta } from '../../components/PageMeta';
 import { storeCsrfToken } from '../../lib/csrf';
 import {
   BG_DARK,
   BRAND_GOLD,
+  BRAND_GOLD_DARK,
   BRAND_GOLD_LIGHT,
   BRAND_NAVY,
   BRAND_NAVY_DARK,
@@ -185,7 +186,7 @@ const heroHeadingStyle: React.CSSProperties = {
   letterSpacing: -1,
   lineHeight: 1.1,
   fontSize: 'clamp(2.5rem, 6vw, 4rem)',
-  color: BRAND_GOLD,
+  color: BRAND_GOLD_DARK,
 };
 
 const featureCardStyle: React.CSSProperties = {
@@ -599,7 +600,7 @@ export function PublicLandingPage(): React.JSX.Element {
               <BrandIcon name="baseball" size={16} />
               <Text
                 fontSize="$2"
-                color="$accentPrimary"
+                color="$color11"
                 fontWeight="600"
                 letterSpacing={0.5}
               >
@@ -727,28 +728,30 @@ export function PublicLandingPage(): React.JSX.Element {
               </Text>
             </YStack>
 
-            <XStack flexWrap="wrap" gap="$4" justifyContent="center">
-              {FEATURES.map((feature) => (
-                <FeatureCard key={feature.label} style={featureCardStyle}>
-                  <FeatureIconCircle>
-                    <BrandIcon
-                      name={feature.icon}
-                      size={22}
-                      title={feature.title}
-                      decorative={false}
-                    />
-                  </FeatureIconCircle>
-                  <YStack gap="$1">
-                    <Text fontSize="$4" fontWeight="700" color="$color">
-                      {feature.title}
-                    </Text>
-                    <Text fontSize="$3" color="$color11" lineHeight="$5">
-                      {feature.description}
-                    </Text>
-                  </YStack>
-                </FeatureCard>
-              ))}
-            </XStack>
+            <Theme name="dark">
+              <XStack flexWrap="wrap" gap="$4" justifyContent="center">
+                {FEATURES.map((feature) => (
+                  <FeatureCard key={feature.label} style={featureCardStyle}>
+                    <FeatureIconCircle>
+                      <BrandIcon
+                        name={feature.icon}
+                        size={22}
+                        title={feature.title}
+                        decorative={false}
+                      />
+                    </FeatureIconCircle>
+                    <YStack gap="$1">
+                      <Text fontSize="$4" fontWeight="700" color="$color">
+                        {feature.title}
+                      </Text>
+                      <Text fontSize="$3" color="$color11" lineHeight="$5">
+                        {feature.description}
+                      </Text>
+                    </YStack>
+                  </FeatureCard>
+                ))}
+              </XStack>
+            </Theme>
           </ContentContainer>
         </YStack>
 
@@ -782,81 +785,83 @@ export function PublicLandingPage(): React.JSX.Element {
               </Text>
             </YStack>
 
-            <XStack flexWrap="wrap" gap="$5" justifyContent="center">
-              {SPORTS.map((sport) => (
-                <SportCard
-                  key={sport.label}
-                  style={sportCardStyle(sport.accent)}
-                >
-                  <XStack alignItems="center" gap="$3">
-                    <YStack
-                      width={56}
-                      height={56}
-                      borderRadius="$5"
-                      alignItems="center"
-                      justifyContent="center"
-                      backgroundColor="$surfaceInteractive"
-                      borderWidth={1}
-                      borderColor="$glassBorder"
-                    >
-                      <BrandIcon
-                        name={sport.icon}
-                        size={28}
-                        title={sport.title}
-                        decorative={false}
-                      />
-                    </YStack>
-                    <YStack gap="$1" flex={1}>
-                      <XStack alignItems="center" gap="$2">
-                        <Text fontSize="$5" fontWeight="800" color="$color">
-                          {sport.title}
+            <Theme name="dark">
+              <XStack flexWrap="wrap" gap="$5" justifyContent="center">
+                {SPORTS.map((sport) => (
+                  <SportCard
+                    key={sport.label}
+                    style={sportCardStyle(sport.accent)}
+                  >
+                    <XStack alignItems="center" gap="$3">
+                      <YStack
+                        width={56}
+                        height={56}
+                        borderRadius="$5"
+                        alignItems="center"
+                        justifyContent="center"
+                        backgroundColor="$surfaceInteractive"
+                        borderWidth={1}
+                        borderColor="$glassBorder"
+                      >
+                        <BrandIcon
+                          name={sport.icon}
+                          size={28}
+                          title={sport.title}
+                          decorative={false}
+                        />
+                      </YStack>
+                      <YStack gap="$1" flex={1}>
+                        <XStack alignItems="center" gap="$2">
+                          <Text fontSize="$5" fontWeight="800" color="$color">
+                            {sport.title}
+                          </Text>
+                          {!sport.available && (
+                            <XStack
+                              paddingHorizontal="$2"
+                              paddingVertical="$0.5"
+                              borderRadius="$4"
+                              backgroundColor="$surfaceInteractive"
+                              borderWidth={1}
+                              borderColor="$glassBorder"
+                            >
+                              <Text
+                                fontSize={11}
+                                color="$color11"
+                                fontWeight="600"
+                              >
+                                Coming Soon
+                              </Text>
+                            </XStack>
+                          )}
+                          {sport.available && (
+                            <XStack
+                              paddingHorizontal="$2"
+                              paddingVertical="$0.5"
+                              borderRadius="$4"
+                              style={{
+                                background: withAlpha(BRAND_NAVY_LIGHT, 0.5),
+                                border: `1px solid ${withAlpha(BRAND_NAVY_LIGHT, 0.6)}`,
+                              }}
+                            >
+                              <Text
+                                fontSize={11}
+                                fontWeight="600"
+                                style={{ color: BRAND_GOLD_LIGHT }}
+                              >
+                                Live Now
+                              </Text>
+                            </XStack>
+                          )}
+                        </XStack>
+                        <Text fontSize="$3" color="$color11" lineHeight="$5">
+                          {sport.description}
                         </Text>
-                        {!sport.available && (
-                          <XStack
-                            paddingHorizontal="$2"
-                            paddingVertical="$0.5"
-                            borderRadius="$4"
-                            backgroundColor="$surfaceInteractive"
-                            borderWidth={1}
-                            borderColor="$glassBorder"
-                          >
-                            <Text
-                              fontSize={11}
-                              color="$color11"
-                              fontWeight="600"
-                            >
-                              Coming Soon
-                            </Text>
-                          </XStack>
-                        )}
-                        {sport.available && (
-                          <XStack
-                            paddingHorizontal="$2"
-                            paddingVertical="$0.5"
-                            borderRadius="$4"
-                            style={{
-                              background: withAlpha(BRAND_NAVY_LIGHT, 0.5),
-                              border: `1px solid ${withAlpha(BRAND_NAVY_LIGHT, 0.6)}`,
-                            }}
-                          >
-                            <Text
-                              fontSize={11}
-                              fontWeight="600"
-                              style={{ color: BRAND_GOLD_LIGHT }}
-                            >
-                              Live Now
-                            </Text>
-                          </XStack>
-                        )}
-                      </XStack>
-                      <Text fontSize="$3" color="$color11" lineHeight="$5">
-                        {sport.description}
-                      </Text>
-                    </YStack>
-                  </XStack>
-                </SportCard>
-              ))}
-            </XStack>
+                      </YStack>
+                    </XStack>
+                  </SportCard>
+                ))}
+              </XStack>
+            </Theme>
           </ContentContainer>
         </YStack>
 
