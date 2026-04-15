@@ -28,9 +28,16 @@ Before submitting your review, confirm you have checked:
 
 If any box would be unchecked, keep reviewing — do not submit until you have covered everything.
 
-## Authoring Workflow — Pre-Push Self-Review Gate
+## Authoring Workflow
 
-When you are **writing or modifying code** in a Copilot environment, do **not** push immediately after tests or `make pc` pass. A strong self-review is a mandatory gate before every push and PR update.
+When writing or modifying code as a Copilot Coding Agent, two rules apply before any other procedure:
+
+- **Implement only what was asked** — no extra features, refactors, error handling for impossible cases, or speculative abstractions beyond the ticket scope
+- **Done means merged** — a task is not complete at `make pc` or after opening a PR; complete = PR merged + Jira transitioned to Done + MCP gap audit run + tracking tasks completed
+
+### Pre-Push Self-Review Gate
+
+Do **not** push immediately after tests or `make pc` pass. A strong self-review is a mandatory gate before every push and PR update.
 
 1. Run the mechanical checks first: `make lint-review-patterns`
 2. Read **every changed file in full** — not just diff hunks
