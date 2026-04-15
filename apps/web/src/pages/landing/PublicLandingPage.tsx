@@ -543,6 +543,7 @@ export function PublicLandingPage(): React.JSX.Element {
       />
       {/* ─── Navigation Bar ─── */}
       <XStack
+        tag="header"
         position="sticky"
         top={0}
         zIndex={100}
@@ -592,67 +593,322 @@ export function PublicLandingPage(): React.JSX.Element {
       </XStack>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* ─── Hero Section ─── */}
-        <HeroSection style={heroGradientStyle}>
-          <ContentContainer alignItems="center" gap="$6">
-            {/* Badge */}
-            <HeroBadge>
-              <BrandIcon name="baseball" size={16} />
-              <Text
-                fontSize="$2"
-                color="$color11"
-                fontWeight="600"
-                letterSpacing={0.5}
-              >
-                Fantasy Baseball · Season 2026
-              </Text>
-            </HeroBadge>
+        <YStack tag="main">
+          {/* ─── Hero Section ─── */}
+          <HeroSection style={heroGradientStyle}>
+            <ContentContainer alignItems="center" gap="$6">
+              {/* Badge */}
+              <HeroBadge>
+                <BrandIcon name="baseball" size={16} />
+                <Text
+                  fontSize="$2"
+                  color="$color11"
+                  fontWeight="600"
+                  letterSpacing={0.5}
+                >
+                  Fantasy Baseball · Season 2026
+                </Text>
+              </HeroBadge>
 
-            {/* Hero heading */}
-            <YStack alignItems="center" gap="$3" maxWidth={680}>
-              <h1 style={heroHeadingStyle}>
-                Build Your Dynasty.
-                <br />
-                Dominate Your League.
-              </h1>
+              {/* Hero heading */}
+              <YStack alignItems="center" gap="$3" maxWidth={680}>
+                <h1 style={heroHeadingStyle}>
+                  Build Your Dynasty.
+                  <br />
+                  Dominate Your League.
+                </h1>
+                <Text
+                  fontSize="$5"
+                  color="$color11"
+                  textAlign="center"
+                  maxWidth={520}
+                  lineHeight="$7"
+                  $sm={{ fontSize: '$4' }}
+                >
+                  The only fantasy baseball platform powered by real MLB history
+                  — draft legends across every era and compete on archived
+                  statistics.
+                </Text>
+              </YStack>
+
+              {/* CTA Buttons */}
+              <XStack gap="$3" flexWrap="wrap" justifyContent="center">
+                <SignInButton
+                  onPress={() => {
+                    void handleSignIn();
+                  }}
+                  role="button"
+                  aria-label="Get started with Google"
+                >
+                  <XStack
+                    alignItems="center"
+                    gap="$2.5"
+                    minWidth={200}
+                    justifyContent="center"
+                  >
+                    {isLoading ? (
+                      <Spinner size="small" color="$color1" />
+                    ) : (
+                      <>
+                        <BrandIcon name="google" size={18} />
+                        <Text fontSize="$4" color="$color1" fontWeight="700">
+                          Continue with Google
+                        </Text>
+                      </>
+                    )}
+                  </XStack>
+                </SignInButton>
+                {config.discordClientId ? (
+                  <SignInButton
+                    onPress={handleDiscordSignIn}
+                    role="button"
+                    aria-label="Get started with Discord"
+                    backgroundColor={DISCORD_BLURPLE}
+                    hoverStyle={{
+                      backgroundColor: DISCORD_BLURPLE_DARK,
+                      transform: 'translateY(-2px)',
+                    }}
+                  >
+                    <XStack
+                      alignItems="center"
+                      gap="$2.5"
+                      minWidth={200}
+                      justifyContent="center"
+                    >
+                      {isDiscordLoading ? (
+                        <Spinner size="small" color="$color1" />
+                      ) : (
+                        <>
+                          <BrandIcon name="discord" size={18} />
+                          <Text fontSize="$4" color="$color1" fontWeight="700">
+                            Continue with Discord
+                          </Text>
+                        </>
+                      )}
+                    </XStack>
+                  </SignInButton>
+                ) : null}
+              </XStack>
+
+              {displayError ? (
+                <Text fontSize="$3" color="$red9" textAlign="center">
+                  {displayError}
+                </Text>
+              ) : null}
+
+              {/* Social proof */}
+              <Text fontSize="$2" color="$color10" textAlign="center">
+                Free to play · No credit card required
+              </Text>
+            </ContentContainer>
+          </HeroSection>
+
+          {/* ─── Features Section ─── */}
+          <YStack
+            paddingVertical="$10"
+            paddingHorizontal="$5"
+            $sm={{ paddingHorizontal: '$3' }}
+          >
+            <ContentContainer gap="$6">
+              <YStack alignItems="center" gap="$2">
+                <Text
+                  fontSize="$8"
+                  fontWeight="800"
+                  color="$color"
+                  textAlign="center"
+                  letterSpacing={-0.5}
+                >
+                  Everything you need to win
+                </Text>
+                <Text
+                  fontSize="$4"
+                  color="$color11"
+                  textAlign="center"
+                  maxWidth={440}
+                >
+                  Powerful tools that give you an edge every single week.
+                </Text>
+              </YStack>
+
+              <Theme name="dark">
+                <XStack flexWrap="wrap" gap="$4" justifyContent="center">
+                  {FEATURES.map((feature) => (
+                    <FeatureCard key={feature.label} style={featureCardStyle}>
+                      <FeatureIconCircle>
+                        <BrandIcon
+                          name={feature.icon}
+                          size={22}
+                          title={feature.title}
+                          decorative={false}
+                        />
+                      </FeatureIconCircle>
+                      <YStack gap="$1">
+                        <Text fontSize="$4" fontWeight="700" color="$color">
+                          {feature.title}
+                        </Text>
+                        <Text fontSize="$3" color="$color11" lineHeight="$5">
+                          {feature.description}
+                        </Text>
+                      </YStack>
+                    </FeatureCard>
+                  ))}
+                </XStack>
+              </Theme>
+            </ContentContainer>
+          </YStack>
+
+          {/* ─── Sports Section ─── */}
+          <YStack
+            paddingVertical="$10"
+            paddingHorizontal="$5"
+            style={{
+              background: `linear-gradient(180deg, transparent 0%, ${withAlpha(BRAND_NAVY, 0.12)} 50%, transparent 100%)`,
+            }}
+            $sm={{ paddingHorizontal: '$3' }}
+          >
+            <ContentContainer gap="$6">
+              <YStack alignItems="center" gap="$2">
+                <Text
+                  fontSize="$8"
+                  fontWeight="800"
+                  color="$color"
+                  textAlign="center"
+                  letterSpacing={-0.5}
+                >
+                  Pick your sport
+                </Text>
+                <Text
+                  fontSize="$4"
+                  color="$color11"
+                  textAlign="center"
+                  maxWidth={400}
+                >
+                  Baseball is live now. Football is coming soon.
+                </Text>
+              </YStack>
+
+              <Theme name="dark">
+                <XStack flexWrap="wrap" gap="$5" justifyContent="center">
+                  {SPORTS.map((sport) => (
+                    <SportCard
+                      key={sport.label}
+                      style={sportCardStyle(sport.accent)}
+                    >
+                      <XStack alignItems="center" gap="$3">
+                        <YStack
+                          width={56}
+                          height={56}
+                          borderRadius="$5"
+                          alignItems="center"
+                          justifyContent="center"
+                          backgroundColor="$surfaceInteractive"
+                          borderWidth={1}
+                          borderColor="$glassBorder"
+                        >
+                          <BrandIcon
+                            name={sport.icon}
+                            size={28}
+                            title={sport.title}
+                            decorative={false}
+                          />
+                        </YStack>
+                        <YStack gap="$1" flex={1}>
+                          <XStack alignItems="center" gap="$2">
+                            <Text fontSize="$5" fontWeight="800" color="$color">
+                              {sport.title}
+                            </Text>
+                            {!sport.available && (
+                              <XStack
+                                paddingHorizontal="$2"
+                                paddingVertical="$0.5"
+                                borderRadius="$4"
+                                backgroundColor="$surfaceInteractive"
+                                borderWidth={1}
+                                borderColor="$glassBorder"
+                              >
+                                <Text
+                                  fontSize={11}
+                                  color="$color11"
+                                  fontWeight="600"
+                                >
+                                  Coming Soon
+                                </Text>
+                              </XStack>
+                            )}
+                            {sport.available && (
+                              <XStack
+                                paddingHorizontal="$2"
+                                paddingVertical="$0.5"
+                                borderRadius="$4"
+                                style={{
+                                  background: withAlpha(BRAND_NAVY_LIGHT, 0.5),
+                                  border: `1px solid ${withAlpha(BRAND_NAVY_LIGHT, 0.6)}`,
+                                }}
+                              >
+                                <Text
+                                  fontSize={11}
+                                  fontWeight="600"
+                                  style={{ color: BRAND_GOLD_LIGHT }}
+                                >
+                                  Live Now
+                                </Text>
+                              </XStack>
+                            )}
+                          </XStack>
+                          <Text fontSize="$3" color="$color11" lineHeight="$5">
+                            {sport.description}
+                          </Text>
+                        </YStack>
+                      </XStack>
+                    </SportCard>
+                  ))}
+                </XStack>
+              </Theme>
+            </ContentContainer>
+          </YStack>
+
+          {/* ─── Bottom CTA ─── */}
+          <YStack
+            paddingVertical="$12"
+            paddingHorizontal="$5"
+            alignItems="center"
+            gap="$5"
+            $sm={{ paddingHorizontal: '$3', paddingVertical: '$8' }}
+          >
+            <YStack alignItems="center" gap="$3" maxWidth={500}>
               <Text
-                fontSize="$5"
-                color="$color11"
+                fontSize="$8"
+                fontWeight="800"
+                color="$color"
                 textAlign="center"
-                maxWidth={520}
-                lineHeight="$7"
-                $sm={{ fontSize: '$4' }}
+                letterSpacing={-0.5}
               >
-                The only fantasy baseball platform powered by real MLB history —
-                draft legends across every era and compete on archived
-                statistics.
+                Ready to play?
+              </Text>
+              <Text fontSize="$4" color="$color11" textAlign="center">
+                Join your league, draft your team, and start competing today.
               </Text>
             </YStack>
 
-            {/* CTA Buttons */}
             <XStack gap="$3" flexWrap="wrap" justifyContent="center">
               <SignInButton
                 onPress={() => {
                   void handleSignIn();
                 }}
                 role="button"
-                aria-label="Get started with Google"
               >
                 <XStack
                   alignItems="center"
                   gap="$2.5"
-                  minWidth={200}
+                  minWidth={180}
                   justifyContent="center"
                 >
                   {isLoading ? (
                     <Spinner size="small" color="$color1" />
                   ) : (
-                    <>
-                      <BrandIcon name="google" size={18} />
-                      <Text fontSize="$4" color="$color1" fontWeight="700">
-                        Continue with Google
-                      </Text>
-                    </>
+                    <Text fontSize="$4" color="$color1" fontWeight="700">
+                      Get Started Free
+                    </Text>
                   )}
                 </XStack>
               </SignInButton>
@@ -662,15 +918,12 @@ export function PublicLandingPage(): React.JSX.Element {
                   role="button"
                   aria-label="Get started with Discord"
                   backgroundColor={DISCORD_BLURPLE}
-                  hoverStyle={{
-                    backgroundColor: DISCORD_BLURPLE_DARK,
-                    transform: 'translateY(-2px)',
-                  }}
+                  hoverStyle={{ backgroundColor: DISCORD_BLURPLE_DARK }}
                 >
                   <XStack
                     alignItems="center"
                     gap="$2.5"
-                    minWidth={200}
+                    minWidth={180}
                     justifyContent="center"
                   >
                     {isDiscordLoading ? (
@@ -687,268 +940,11 @@ export function PublicLandingPage(): React.JSX.Element {
                 </SignInButton>
               ) : null}
             </XStack>
-
-            {displayError ? (
-              <Text fontSize="$3" color="$red9" textAlign="center">
-                {displayError}
-              </Text>
-            ) : null}
-
-            {/* Social proof */}
-            <Text fontSize="$2" color="$color10" textAlign="center">
-              Free to play · No credit card required
-            </Text>
-          </ContentContainer>
-        </HeroSection>
-
-        {/* ─── Features Section ─── */}
-        <YStack
-          paddingVertical="$10"
-          paddingHorizontal="$5"
-          $sm={{ paddingHorizontal: '$3' }}
-        >
-          <ContentContainer gap="$6">
-            <YStack alignItems="center" gap="$2">
-              <Text
-                fontSize="$8"
-                fontWeight="800"
-                color="$color"
-                textAlign="center"
-                letterSpacing={-0.5}
-              >
-                Everything you need to win
-              </Text>
-              <Text
-                fontSize="$4"
-                color="$color11"
-                textAlign="center"
-                maxWidth={440}
-              >
-                Powerful tools that give you an edge every single week.
-              </Text>
-            </YStack>
-
-            <Theme name="dark">
-              <XStack flexWrap="wrap" gap="$4" justifyContent="center">
-                {FEATURES.map((feature) => (
-                  <FeatureCard key={feature.label} style={featureCardStyle}>
-                    <FeatureIconCircle>
-                      <BrandIcon
-                        name={feature.icon}
-                        size={22}
-                        title={feature.title}
-                        decorative={false}
-                      />
-                    </FeatureIconCircle>
-                    <YStack gap="$1">
-                      <Text fontSize="$4" fontWeight="700" color="$color">
-                        {feature.title}
-                      </Text>
-                      <Text fontSize="$3" color="$color11" lineHeight="$5">
-                        {feature.description}
-                      </Text>
-                    </YStack>
-                  </FeatureCard>
-                ))}
-              </XStack>
-            </Theme>
-          </ContentContainer>
-        </YStack>
-
-        {/* ─── Sports Section ─── */}
-        <YStack
-          paddingVertical="$10"
-          paddingHorizontal="$5"
-          style={{
-            background: `linear-gradient(180deg, transparent 0%, ${withAlpha(BRAND_NAVY, 0.12)} 50%, transparent 100%)`,
-          }}
-          $sm={{ paddingHorizontal: '$3' }}
-        >
-          <ContentContainer gap="$6">
-            <YStack alignItems="center" gap="$2">
-              <Text
-                fontSize="$8"
-                fontWeight="800"
-                color="$color"
-                textAlign="center"
-                letterSpacing={-0.5}
-              >
-                Pick your sport
-              </Text>
-              <Text
-                fontSize="$4"
-                color="$color11"
-                textAlign="center"
-                maxWidth={400}
-              >
-                Baseball is live now. Football is coming soon.
-              </Text>
-            </YStack>
-
-            <Theme name="dark">
-              <XStack flexWrap="wrap" gap="$5" justifyContent="center">
-                {SPORTS.map((sport) => (
-                  <SportCard
-                    key={sport.label}
-                    style={sportCardStyle(sport.accent)}
-                  >
-                    <XStack alignItems="center" gap="$3">
-                      <YStack
-                        width={56}
-                        height={56}
-                        borderRadius="$5"
-                        alignItems="center"
-                        justifyContent="center"
-                        backgroundColor="$surfaceInteractive"
-                        borderWidth={1}
-                        borderColor="$glassBorder"
-                      >
-                        <BrandIcon
-                          name={sport.icon}
-                          size={28}
-                          title={sport.title}
-                          decorative={false}
-                        />
-                      </YStack>
-                      <YStack gap="$1" flex={1}>
-                        <XStack alignItems="center" gap="$2">
-                          <Text fontSize="$5" fontWeight="800" color="$color">
-                            {sport.title}
-                          </Text>
-                          {!sport.available && (
-                            <XStack
-                              paddingHorizontal="$2"
-                              paddingVertical="$0.5"
-                              borderRadius="$4"
-                              backgroundColor="$surfaceInteractive"
-                              borderWidth={1}
-                              borderColor="$glassBorder"
-                            >
-                              <Text
-                                fontSize={11}
-                                color="$color11"
-                                fontWeight="600"
-                              >
-                                Coming Soon
-                              </Text>
-                            </XStack>
-                          )}
-                          {sport.available && (
-                            <XStack
-                              paddingHorizontal="$2"
-                              paddingVertical="$0.5"
-                              borderRadius="$4"
-                              style={{
-                                background: withAlpha(BRAND_NAVY_LIGHT, 0.5),
-                                border: `1px solid ${withAlpha(BRAND_NAVY_LIGHT, 0.6)}`,
-                              }}
-                            >
-                              <Text
-                                fontSize={11}
-                                fontWeight="600"
-                                style={{ color: BRAND_GOLD_LIGHT }}
-                              >
-                                Live Now
-                              </Text>
-                            </XStack>
-                          )}
-                        </XStack>
-                        <Text fontSize="$3" color="$color11" lineHeight="$5">
-                          {sport.description}
-                        </Text>
-                      </YStack>
-                    </XStack>
-                  </SportCard>
-                ))}
-              </XStack>
-            </Theme>
-          </ContentContainer>
-        </YStack>
-
-        {/* ─── Bottom CTA ─── */}
-        <YStack
-          paddingVertical="$12"
-          paddingHorizontal="$5"
-          alignItems="center"
-          gap="$5"
-          $sm={{ paddingHorizontal: '$3', paddingVertical: '$8' }}
-        >
-          <YStack alignItems="center" gap="$3" maxWidth={500}>
-            <Text
-              fontSize="$8"
-              fontWeight="800"
-              color="$color"
-              textAlign="center"
-              letterSpacing={-0.5}
-            >
-              Ready to play?
-            </Text>
-            <Text fontSize="$4" color="$color11" textAlign="center">
-              Join your league, draft your team, and start competing today.
-            </Text>
           </YStack>
-
-          <XStack gap="$3" flexWrap="wrap" justifyContent="center">
-            <SignInButton
-              onPress={() => {
-                void handleSignIn();
-              }}
-              role="button"
-              aria-label="Get started"
-            >
-              <XStack
-                alignItems="center"
-                gap="$2.5"
-                minWidth={180}
-                justifyContent="center"
-              >
-                {isLoading ? (
-                  <Spinner size="small" color="$color1" />
-                ) : (
-                  <Text fontSize="$4" color="$color1" fontWeight="700">
-                    Get Started Free
-                  </Text>
-                )}
-              </XStack>
-            </SignInButton>
-            {config.discordClientId ? (
-              <SignInButton
-                onPress={handleDiscordSignIn}
-                role="button"
-                aria-label="Get started with Discord"
-                style={{ backgroundColor: DISCORD_BLURPLE }}
-                hoverStyle={{ backgroundColor: DISCORD_BLURPLE_DARK }}
-              >
-                <XStack
-                  alignItems="center"
-                  gap="$2.5"
-                  minWidth={180}
-                  justifyContent="center"
-                >
-                  {isDiscordLoading ? (
-                    <Spinner size="small" color="$color1" />
-                  ) : (
-                    <>
-                      <BrandIcon name="discord" size={18} />
-                      <Text fontSize="$4" color="$color1" fontWeight="700">
-                        Continue with Discord
-                      </Text>
-                    </>
-                  )}
-                </XStack>
-              </SignInButton>
-            ) : null}
-          </XStack>
-
-          {errorMessage ? (
-            <Text fontSize="$3" color="$red9" textAlign="center">
-              {errorMessage}
-            </Text>
-          ) : null}
         </YStack>
-
         {/* ─── Footer ─── */}
         <YStack
+          tag="footer"
           paddingVertical="$5"
           paddingHorizontal="$5"
           borderTopWidth={1}
