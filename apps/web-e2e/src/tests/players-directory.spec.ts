@@ -6,7 +6,6 @@
  */
 
 import { expect, test } from '../fixtures/auth-enhanced';
-import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -75,7 +74,7 @@ async function mockPlayersGraphQL(
           body: JSON.stringify({ data: { players } }),
         });
       } else {
-        await unmockedGraphQLFallback(route);
+        await route.fallback();
       }
     },
   );

@@ -226,9 +226,19 @@ const isolated = base.extend<{ _apiIsolation: void }>({
           //   • No token → fall through to the 401 catch-all below.
           //   • Expired token → 401 (session-expiry tests expect this).
           //   • Valid cookie token, wrong CSRF → 403.
-          //   • Valid cookie token + correct CSRF → fresh JWT.
+          //   • Valid cookie token + correct CSRF → fresh JWT (same identity).
           //   • Bearer token (no CSRF needed) → fresh JWT.
-          if (reqUrl.includes('/refresh-jwt')) {
+          const isRefreshJwtRequest = (() => {
+            if (route.request().method() !== 'POST') {
+              return false;
+            }
+            try {
+              return new URL(reqUrl).pathname === '/oauth/refresh-jwt';
+            } catch {
+              return false;
+            }
+          })();
+          if (isRefreshJwtRequest) {
             const headers = route.request().headers();
             const cookieHeader = headers['cookie'] ?? '';
             const authHeader = headers['authorization'] ?? '';
@@ -244,14 +254,26 @@ const isolated = base.extend<{ _apiIsolation: void }>({
               ? lsJwtPart.slice('ls_jwt='.length)
               : '';
 
-            // Decode the JWT payload and check expiry — expired tokens must 401
-            // so session-expiry E2E tests can assert the landing page is shown.
+            // Decode the JWT payload: check expiry and extract claims.
+            // Expired tokens must 401 so session-expiry tests pass.
+            // Non-expired tokens are re-signed with the same claims to
+            // preserve adminTest/createCustomAuthTest session identities.
             let cookieTokenValid = false;
+            let cookieClaims: Record<string, unknown> = {};
             if (cookieToken) {
               try {
                 const payload = E2EJwtUtil.decodeJwtPayload(cookieToken);
                 const exp = typeof payload.exp === 'number' ? payload.exp : 0;
                 cookieTokenValid = exp > Math.floor(Date.now() / 1000);
+                if (cookieTokenValid) {
+                  const {
+                    iat: _iat,
+                    exp: _exp,
+                    nbf: _nbf,
+                    ...claims
+                  } = payload;
+                  cookieClaims = claims;
+                }
               } catch {
                 cookieTokenValid = false;
               }
@@ -259,7 +281,13 @@ const isolated = base.extend<{ _apiIsolation: void }>({
 
             const hasBearerToken = /^Bearer\s+\S+$/i.test(authHeader);
 
-            if (cookieTokenValid && csrfHeader !== E2E_CSRF_TOKEN) {
+            // Bearer auth bypasses CSRF (mirrors real oauth-proxy behaviour).
+            // Only enforce CSRF for cookie-only authenticated requests.
+            if (
+              cookieTokenValid &&
+              !hasBearerToken &&
+              csrfHeader !== E2E_CSRF_TOKEN
+            ) {
               await route.fulfill({
                 status: 403,
                 contentType: 'application/json',
@@ -269,7 +297,9 @@ const isolated = base.extend<{ _apiIsolation: void }>({
             }
 
             if (cookieTokenValid || hasBearerToken) {
-              const freshJwt = signTestJwt();
+              const freshJwt = cookieTokenValid
+                ? signE2EJwt(cookieClaims, E2E_SIGNING_SECRET, '1h')
+                : signTestJwt();
               await route.fulfill({
                 status: 200,
                 contentType: 'application/json',
