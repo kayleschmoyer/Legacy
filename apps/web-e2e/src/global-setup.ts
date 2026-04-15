@@ -262,6 +262,9 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** Single source of truth for the hermetic CSRF token in global-setup storageState. */
+const E2E_CSRF_TOKEN = 'e2e-csrf-token';
+
 function writeStorageState(origin: string, jwt: string) {
   fs.mkdirSync(AUTH_DIR, { recursive: true });
 
@@ -300,7 +303,7 @@ function writeStorageState(origin: string, jwt: string) {
       },
       {
         name: 'ls_csrf',
-        value: 'e2e-csrf-token',
+        value: E2E_CSRF_TOKEN,
         domain: url.hostname,
         path: '/',
         httpOnly: false,
@@ -320,6 +323,13 @@ function writeStorageState(origin: string, jwt: string) {
           {
             name: 'ls_token_expiry',
             value: String(expiry),
+          },
+          {
+            // getCsrfToken() checks ls_csrf_token in localStorage first (before
+            // document.cookie). Pre-seeding this key ensures the CSRF header is
+            // always sent correctly without falling back to cookie parsing.
+            name: 'ls_csrf_token',
+            value: E2E_CSRF_TOKEN,
           },
         ],
       },

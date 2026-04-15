@@ -89,6 +89,10 @@ function buildAuthStorageState(
         localStorage: [
           { name: 'ls_user_profile', value: JSON.stringify(userProfile) },
           { name: 'ls_token_expiry', value: String(expiry) },
+          // getCsrfToken() checks ls_csrf_token in localStorage first (before
+          // document.cookie). Pre-seeding this key ensures the CSRF header is
+          // always sent correctly without falling back to cookie parsing.
+          { name: 'ls_csrf_token', value: E2E_CSRF_TOKEN },
         ],
       },
     ],
@@ -239,7 +243,10 @@ const isolated = base.extend<{ _apiIsolation: void }>({
             }
           })();
           if (isRefreshJwtRequest) {
-            const headers = route.request().headers();
+            // Use allHeaders() instead of headers() — Playwright excludes security-related
+            // headers (including Cookie) from the synchronous headers() result. allHeaders()
+            // returns the full set, which is required to read the ls_jwt cookie.
+            const headers = await route.request().allHeaders();
             const cookieHeader = headers['cookie'] ?? '';
             const authHeader = headers['authorization'] ?? '';
             const csrfHeader =
