@@ -263,6 +263,8 @@ The CI pipeline automatically labels PRs with failure reasons. Labels are added 
 | `CI: Schema Drift`           | `schema.graphql` out of sync with Pothos implementation                     |
 | `CI: Migration`              | Migrations not applied to production DB                                     |
 
+> **Per-check details** (what each check validates, why it fails, fix commands): see [pr-lifecycle/references/ci-checks-reference.md](../pr-lifecycle/references/ci-checks-reference.md).
+
 ## Phase 4: Copilot Review
 
 ### Flow

@@ -159,6 +159,7 @@ gh pr ready <PR#>
 | [references/sweep-and-parallelization.md](references/sweep-and-parallelization.md)             | Sweep loop algorithm and parallel validation                                |
 | [references/agent-screenshots.md](references/agent-screenshots.md)                             | Capture before/after screenshots for UI PRs using browser MCP               |
 | [references/bug-verification-templates.md](references/bug-verification-templates.md)           | PR body templates for proving bug fixes (screenshots, tests, queries, logs) |
+| [references/ci-checks-reference.md](references/ci-checks-reference.md)                         | Every PR check: what it validates, why it fails, and how to fix it locally  |
 | [workflow-overview (PR Preview section)](../workflow-overview/SKILL.md#pr-preview-deployments) | PR preview URL pattern and how to verify deployment (do not list branches)  |
 
 ## Parent-Agent PR Recovery
