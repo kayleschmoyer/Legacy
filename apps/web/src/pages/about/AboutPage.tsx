@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Button,
   H1,
@@ -68,6 +69,7 @@ const LinkValue = styled(Text, {
 });
 
 export default function AboutPage() {
+  const navigate = useNavigate();
   // Read build-time environment variables from centralized config
   const { appVersion, commitSha, buildDate } = env;
 
@@ -185,6 +187,17 @@ export default function AboutPage() {
             </Button>
           )}
         </YStack>
+      </InfoCard>
+
+      <InfoCard>
+        <H2 marginBottom="$2">Get Started</H2>
+        <Text color="$gray11" fontSize="$4" marginBottom="$3">
+          Ready to manage your fantasy sports league? Join Legacy Sports for
+          free.
+        </Text>
+        <Button onPress={() => navigate('/')} size="$4">
+          Get Started Free
+        </Button>
       </InfoCard>
 
       <YStack marginTop="$4" alignItems="center">
