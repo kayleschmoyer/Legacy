@@ -68,6 +68,19 @@ export class OAuthServiceError extends Error {
 }
 
 /**
+ * Thrown by `refreshJwt()` when the server returns HTTP 401 or 403, indicating
+ * that the session cookie is absent, invalid, revoked, or failed CSRF
+ * validation — not a transient network error. Callers should log the user out
+ * immediately instead of silently retrying.
+ */
+export class AuthSessionExpiredError extends Error {
+  constructor() {
+    super('Session expired — please sign in again');
+    this.name = 'AuthSessionExpiredError';
+  }
+}
+
+/**
  * Modern authentication service with secure user pre-authorization.
  *
  * This service now uses a single secure OAuth lambda that:
@@ -671,6 +684,13 @@ export class AuthService {
       });
 
       if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          // The server explicitly rejected the session cookie — it is absent,
+          // expired, revoked, or failed CSRF validation. This is not a
+          // transient network failure. Throw so callers can distinguish it
+          // from other failures and log the user out instead of silently ignoring.
+          throw new AuthSessionExpiredError();
+        }
         LOGGER.warn(
           'AuthService: JWT refresh failed with status',
           response.status,
@@ -698,6 +718,9 @@ export class AuthService {
 
       return result.jwt;
     } catch (error) {
+      // Re-throw AuthSessionExpiredError so callers can detect 401/403 specifically
+      // and log the user out rather than silently retrying.
+      if (error instanceof AuthSessionExpiredError) throw error;
       LOGGER.error('AuthService: JWT refresh request failed:', String(error));
       return null;
     }

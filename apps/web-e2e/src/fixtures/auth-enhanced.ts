@@ -237,7 +237,12 @@ const isolated = base.extend<{ _apiIsolation: void }>({
               return false;
             }
             try {
-              return new URL(reqUrl).pathname === '/oauth/refresh-jwt';
+              // The app uses oauthProxyUrl = 'http://localhost:5001' (no /oauth prefix),
+              // so the actual path is /refresh-jwt. Accept both to be future-proof.
+              const pathname = new URL(reqUrl).pathname;
+              return (
+                pathname === '/refresh-jwt' || pathname === '/oauth/refresh-jwt'
+              );
             } catch {
               return false;
             }

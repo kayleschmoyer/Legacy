@@ -39,7 +39,12 @@ function AuthConsumer() {
 
 // Mock AuthService so no real network calls happen
 jest.mock('../services/AuthService', () => {
+  // Re-export the real error class so instanceof checks in useAuth.tsx work
+  const actual = jest.requireActual<typeof import('../services/AuthService')>(
+    '../services/AuthService',
+  );
   return {
+    AuthSessionExpiredError: actual.AuthSessionExpiredError,
     AuthService: jest.fn().mockImplementation(() => ({
       getStoredUserProfile: jest.fn(() => null),
       getStoredTokenExpiry: jest.fn(() => null),
@@ -401,5 +406,139 @@ describe('AuthProvider – updateUserProfile', () => {
 
     // But storeUserProfile should NOT have been called (impersonation guard)
     expect(mockInstance.storeUserProfile).not.toHaveBeenCalled();
+  });
+});
+
+describe('AuthProvider – background refresh 401 during initializeAuth', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('logs out the user when the background refresh returns AuthSessionExpiredError (401)', async () => {
+    const { AuthSessionExpiredError: SessionExpiredError } = jest.requireActual<
+      typeof import('../services/AuthService')
+    >('../services/AuthService');
+
+    const MockedAuthService = jest.mocked(AuthService);
+    const mockInstance = {
+      getStoredUserProfile: jest.fn(() => ({
+        id: 1,
+        email: 'user@test.com',
+        username: 'CachedUser',
+        accessLevel: 'user' as const,
+      })),
+      getStoredTokenExpiry: jest.fn(() => Math.floor(Date.now() / 1000) + 3600),
+      getStoredAdminProfile: jest.fn(() => null),
+      getStoredImpersonatedUserProfile: jest.fn(() => null),
+      storeUserProfile: jest.fn(),
+      storeAdminProfile: jest.fn(),
+      storeImpersonatedUserProfile: jest.fn(),
+      clearAdminProfile: jest.fn(),
+      clearImpersonatedUserProfile: jest.fn(),
+      clearTokens: jest.fn(),
+      verifyToken: jest.fn(() => false),
+      // Simulate a 401 from the /refresh-jwt endpoint
+      refreshJwt: jest.fn(() => Promise.reject(new SessionExpiredError())),
+      authenticateWithEmail: jest.fn(),
+      authenticateWithOAuth: jest.fn(),
+      requestLogout: jest.fn(() => Promise.resolve()),
+      startImpersonation: jest.fn(),
+      stopImpersonation: jest.fn(),
+      getStoredToken: jest.fn(() => null),
+      getCurrentToken: jest.fn(() => null),
+    };
+    MockedAuthService.mockImplementation(
+      () => mockInstance as unknown as AuthService,
+    );
+
+    render(
+      <AuthProvider config={testConfig}>
+        <AuthConsumer />
+      </AuthProvider>,
+    );
+
+    // The background refresh fails with 401 — the user should be logged out
+    // rather than remaining in a broken authenticated state.
+    await waitFor(() => {
+      expect(screen.getByTestId('no-user')).toBeTruthy();
+    });
+
+    expect(mockInstance.clearTokens).toHaveBeenCalled();
+  });
+});
+
+describe('AuthProvider – proactive refresh 401 during scheduleProactiveRefresh', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('logs out the user when the proactive refresh timer fires and returns AuthSessionExpiredError', async () => {
+    const { AuthSessionExpiredError: SessionExpiredError } = jest.requireActual<
+      typeof import('../services/AuthService')
+    >('../services/AuthService');
+
+    const MockedAuthService = jest.mocked(AuthService);
+    // Token expires in 4 minutes (within the 5-minute proactive window → timer fires immediately)
+    const nowSec = Math.floor(Date.now() / 1000);
+    const expirySec = nowSec + 4 * 60;
+    const mockInstance = {
+      getStoredUserProfile: jest.fn(() => ({
+        id: 1,
+        email: 'user@test.com',
+        username: 'CachedUser',
+        accessLevel: 'user' as const,
+      })),
+      getStoredTokenExpiry: jest.fn(() => expirySec),
+      getStoredAdminProfile: jest.fn(() => null),
+      getStoredImpersonatedUserProfile: jest.fn(() => null),
+      storeUserProfile: jest.fn(),
+      storeAdminProfile: jest.fn(),
+      storeImpersonatedUserProfile: jest.fn(),
+      clearAdminProfile: jest.fn(),
+      clearImpersonatedUserProfile: jest.fn(),
+      clearTokens: jest.fn(),
+      verifyToken: jest.fn(() => true),
+      refreshJwt: jest.fn(() => Promise.reject(new SessionExpiredError())),
+      authenticateWithEmail: jest.fn(),
+      authenticateWithOAuth: jest.fn(),
+      requestLogout: jest.fn(() => Promise.resolve()),
+      startImpersonation: jest.fn(),
+      stopImpersonation: jest.fn(),
+      getStoredToken: jest.fn(() => null),
+      getCurrentToken: jest.fn(() => null),
+    };
+    MockedAuthService.mockImplementation(
+      () => mockInstance as unknown as AuthService,
+    );
+
+    render(
+      <AuthProvider config={testConfig}>
+        <AuthConsumer />
+      </AuthProvider>,
+    );
+
+    // Wait for initialization to complete (user visible from cache)
+    await waitFor(() => {
+      expect(screen.getByTestId('user-info')).toBeTruthy();
+    });
+
+    // Fire the proactive refresh timer — token expires in 4 min, which is
+    // within the 5-minute window, so the timer fires at msUntilRefresh=0.
+    await act(async () => {
+      jest.runAllTimers();
+      await Promise.resolve();
+    });
+
+    // The proactive refresh returned AuthSessionExpiredError → user logged out
+    await waitFor(() => {
+      expect(screen.getByTestId('no-user')).toBeTruthy();
+    });
+
+    expect(mockInstance.clearTokens).toHaveBeenCalled();
   });
 });

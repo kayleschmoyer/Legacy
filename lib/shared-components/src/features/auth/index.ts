@@ -2,7 +2,7 @@
 export { LoginPage } from './LoginPage';
 export { AuthProvider, useAuth } from './hooks/useAuth';
 export type { UseAuthResult } from './hooks/useAuth';
-export { AuthService } from './services/AuthService';
+export { AuthService, AuthSessionExpiredError } from './services/AuthService';
 export * from './EnhancedAuthGuard';
 
 // Platform types (convenience re-exports)

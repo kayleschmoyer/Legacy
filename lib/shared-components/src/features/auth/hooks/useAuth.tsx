@@ -8,7 +8,7 @@ import React, {
   useRef,
 } from 'react';
 import { LOGGER } from '@legacy-sports/logging';
-import { AuthService } from '../services/AuthService';
+import { AuthService, AuthSessionExpiredError } from '../services/AuthService';
 import type {
   OAuthConfig,
   OAuthResponse,
@@ -337,8 +337,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
             // Reschedule using the ref so we always call the latest version
             scheduleProactiveRefreshRef.current?.(newToken);
           })
-          .catch(() => {
-            // Silently ignore — the error link is the safety net
+          .catch((err: unknown) => {
+            if (err instanceof AuthSessionExpiredError) {
+              authService.clearTokens();
+              dispatchAuth({ type: 'AUTH_LOGOUT' });
+              return;
+            }
+            // Transient network errors: silently ignore — the error link is the safety net
           });
       }, msUntilRefresh);
     },
@@ -469,8 +474,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
                     });
                   }
                 })
-                .catch(() => {
-                  // Silently ignore — the cached profile is still valid
+                .catch((err: unknown) => {
+                  if (err instanceof AuthSessionExpiredError && isMounted) {
+                    clearRefreshTimer();
+                    authService.clearTokens();
+                    dispatchAuth({ type: 'AUTH_LOGOUT' });
+                    return;
+                  }
+                  // Transient network errors: silently ignore — cached profile is still valid
                 });
             } else {
               // Token may be expired — attempt a silent refresh
@@ -498,8 +509,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
         }
         // No cached profile — user is not logged in (or never was on this device)
       } catch (error) {
-        LOGGER.error('Auth initialization failed:', String(error));
-        authService.clearTokens();
+        if (error instanceof AuthSessionExpiredError) {
+          // Server definitively rejected the session (401/403) — force logout
+          clearRefreshTimer();
+          authService.clearTokens();
+          if (isMounted) {
+            dispatchAuth({ type: 'AUTH_LOGOUT' });
+          }
+        } else {
+          LOGGER.error('Auth initialization failed:', String(error));
+          authService.clearTokens();
+        }
       } finally {
         if (isMounted) {
           dispatchAuth({ type: 'SET_LOADING', payload: false });
