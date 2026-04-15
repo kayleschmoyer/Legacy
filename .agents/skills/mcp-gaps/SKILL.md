@@ -32,6 +32,16 @@ This skill enforces the **MCP-first principle** from AGENTS.md: shell commands a
 
 > Full procedure: [`references/audit-workflow.md`](references/audit-workflow.md)
 
+### Minimum threshold — skip shallow sessions
+
+Before running the audit, check session depth. If **all three** of the following are true, skip the audit entirely (report "session too shallow for gap audit"):
+
+1. Fewer than 10 Bash tool calls in the session
+2. No MCP tool call failures or overflows observed
+3. No new shell patterns (novel `find`, `grep`, `ls`, `cat` usage not already tracked)
+
+The audit adds ~850K tokens to a session. On short sessions (ticket triage, single Jira transition, quick investigation), it contributes noise without actionable signal. Save it for sessions where real tool friction occurred.
+
 1. **Run** `ci_audit_session_bash({ auditMode: true })` — produces a structured JSON report with pre-classified gaps, confidence scores, draft ticket summaries, and noise filtering for Bash activity. Shell fallback: `python scripts/audit-session-bash.py --audit`
 2. **Manually review** conversation history for Copilot CLI `powershell` tool invocations — `ci_audit_session_bash` does **not** currently extract them, so inspect those commands separately and include any gaps they reveal in the audit
 3. **Review** the `action_required` section — accept high-confidence gaps, verify medium/low-confidence ones, classify overflow/failure fix types

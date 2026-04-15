@@ -19,11 +19,13 @@ Rules are grouped by category and tiered by severity. **Tier 1** violations are 
 - **Drive to merge** — work is NOT complete until the PR is **merged**, Jira moves to "Done", the MCP gap audit runs, and any tracking tasks are marked completed. Stopping after `make pc`, after `github_create_pr`, or while CI/reviews are still pending are all common agent failure modes. See [Task Completion Signal](#task-completion-signal) for the mechanically checkable definition.
 - **Worktree-first**: every ticket runs in its own worktree. Native ephemeral (launcher checkbox) is default — **do not rename the local branch** (Claude Code caches it at session start; renaming breaks PR detection). Push as-is; Jira links via PR title + commit messages containing `LS-####`. Sibling worktrees (`make_worktree_create`) for parallel work only. Re-attach existing branches with `worktree_attach`. See `.agents/skills/worktree-workflow/SKILL.md`.
 - **Claude Code's `isolation: "worktree"` Agent parameter** (Agent tool only): creates ephemeral worktrees for subagents. MCP tools work inside them — `worktree_set(key: "<absolute .claude/worktrees/... path>")` accepts absolute paths. Always prefer MCP tools over raw `git -C` even in ephemeral worktrees.
-- **Shared node_modules** — if any worktree still symlinks to the main repo's `node_modules`, **never run `make clean`, `make install`, or `pnpm install` in the main repo**. **Never use raw `pnpm install` anywhere**. Use **`make install` only in a safe context**: either in a worktree after removing its `node_modules` symlink, or in the main repo after no worktrees are linked to that shared `node_modules`. **To install new packages in a worktree**: (1) remove the symlink: `cmd /c "rmdir node_modules"`, (2) add the package: `pnpm add -w <pkg>`, (3) run `make install` from that worktree. This gives the worktree its own independent `node_modules`. See `.agents/skills/repo-tooling/references/install-packages.md` and `.agents/skills/worktree-workflow/SKILL.md`. If a worktree's `node_modules` symlink is broken, remove it (`cmd /c "rmdir node_modules"`) and run `make install` from the worktree. If `node_modules` is already missing, skip the removal step and just run `make install` — **never** recreate the symlink manually; only `worktree_setup_node_modules()` or `make_wt_setup` may do that.
+- **Shared node_modules** — never `pnpm install` directly; never `make install` in the main repo while any worktree symlinks to its `node_modules`. Use `worktree_setup_node_modules()` (native flow) or `make_wt_setup` (sibling flow) to set up a worktree. To add packages in a worktree: remove symlink → `pnpm add -w <pkg>` → `make install`. See `.agents/skills/repo-tooling/references/install-packages.md` for the full safe procedure.
 - **Never manually remove worktrees**: always `twig worktree clean` — never `git worktree remove` or manual deletion (destroys symlinks).
 - **Kill background servers when done** — stop all `isBackground=true` processes before workflow ends. Run `make kill-stale` to find stale node processes. Call `browser_cleanup` to close Playwright browsers.
 - **Resolve PR review threads**: after fixing review comments, call `github_resolve_threads({ threadIds: [...], prNumber: <PR#> })` directly. Never reach for raw GraphQL mutations or shell commands without first invoking this tool and receiving a connection error or tool-not-found response — assuming it is unavailable without trying is not acceptable. See `.agents/skills/pr-lifecycle/SKILL.md`.
 - **Self-review before every push (mandatory gate)** — after `make pc` passes and before `worktree_push()`, run `/review` (or the self-review steps in `.agents/skills/pr-lifecycle/references/self-review.md`). Read every changed file in full, check against all patterns in `.agents/skills/pr-lifecycle/references/common-review-patterns.md`, and fix issues directly. Every Copilot review round costs 30–60 min of agent time — a thorough self-review eliminates most of them. Do NOT push until self-review is complete. See Step 11b of the [workflow](#workflow).
+- **`make pc` is the validation command — never substitute individual targets** — always call `make_run(target: "pc")` to validate; never chain `format` → `lint` → `typecheck` separately. `make pc` handles formatter auto-commits internally. If it fails, read the `steps[]` JSON, fix the failing step, then re-run `make_run(target: "pc")`. See workflow Step 11.
+- **CI watching uses blocking wait tools — never polling loops** — use `github_wait_for_pr_event` (blocks until an actionable event fires) and `ci_wait_for_run` (blocks on a specific run). `ci_list_runs`, `ci_view_run`, and `github_view_pr` are ONE-SHOT snapshots; calling them in a loop burns 1–2M tokens per session. See `.agents/skills/pr-lifecycle/SKILL.md` Rule 9.
 
 ### Tool Usage (Tier 2)
 
@@ -44,7 +46,7 @@ A task is complete when **all** of the following are true:
 
 1. `github_view_pr` returns `state: "MERGED"` (or `mergedAt` is populated)
 2. Jira ticket is "Done" (usually auto-transitioned by Jira Branch Sync on merge)
-3. MCP gap audit has run (see `.agents/skills/mcp-gaps/SKILL.md`)
+3. MCP gap audit has run or was skipped because the session was below the minimum threshold (see `.agents/skills/mcp-gaps/SKILL.md`)
 4. All tracking tasks are marked completed (`TaskUpdate(taskId: <id>, status: "completed")`)
 
 If any condition is false, the task is **not done** — keep working. When in doubt, check condition 1 first.
@@ -91,7 +93,7 @@ Use `scratch/` for ad-hoc output (gitignored). On Windows, write scripts to `scr
 
 `apps/` (web, mobile, CLI) · `lambdas/` (GraphQL API, game-selection, stats, etc.) · `lib/` (19+ shared libraries) · `terraform/` · `.agents/skills/`
 
-See `.agents/skills/architecture/SKILL.md` for directory structure, build system, cross-platform resolution, database schema, GraphQL services, and deployment patterns.
+See `.agents/skills/architecture/SKILL.md` for system overview. For a fast capability → file path lookup (use before Glob sweeps): **`.agents/skills/architecture/FILE-MAP.md`**.
 
 ## Design Context
 

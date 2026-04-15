@@ -103,6 +103,19 @@ When `bot-review` CI check fails or Copilot posts review comments, use this MCP-
 9. **Use `github_wait_for_pr_event` for PR shepherding — never polling loops** -- after marking a PR ready, call `github_wait_for_pr_event({ number: <PR#> })` to block until something agent-actionable happens (CI fails/passes, new review thread, review decision, conflicts, merged, closed). It returns a structured `{ event, pr, ... }` payload so you immediately know what to do next. This covers both Check Runs (Actions jobs) and Commit Statuses (bot/external CI like `bot-review`) in a single call.
    - **When you already have a specific run ID** (e.g. after `ci_rerun`): use `ci_wait_for_run({ runId: "<id>" })` to block until that exact run completes, then continue the `github_wait_for_pr_event` loop.
    - **Never use `sleep` + polling loops** — no `sleep N && gh run view`, no `sleep N && gh pr view --json statusCheckRollup`, no `ci_view_run every ~60s` loops. These waste context and shell round-trips.
+   - **`ci_list_runs`, `ci_view_run`, `github_view_pr`, `github_list_prs` are instant snapshots — NOT wait tools.** Calling them in a loop to poll for CI completion burns 1–2M tokens per session (each call re-reads the full conversation context). Use them exactly once for a targeted lookup, then hand off to a blocking wait tool.
+
+   **CI tool reference — blocking waits vs instant snapshots:**
+
+   | Tool                       | Type              | Correct usage                                                                             |
+   | -------------------------- | ----------------- | ----------------------------------------------------------------------------------------- |
+   | `github_wait_for_pr_event` | **Blocking wait** | Primary loop: call after PR ready; call again after each event is handled                 |
+   | `ci_wait_for_run`          | **Blocking wait** | After `ci_rerun` — blocks on that specific run, then return to `github_wait_for_pr_event` |
+   | `ci_list_runs`             | Instant snapshot  | ONE-SHOT: get the runId after a `checks_failed` event — never loop                        |
+   | `ci_get_logs`              | Instant snapshot  | ONE-SHOT: read failed-step output after getting runId — never loop                        |
+   | `ci_view_run`              | Instant snapshot  | ONE-SHOT: inspect a specific run — never loop                                             |
+   | `github_view_pr`           | Instant snapshot  | ONE-SHOT: verify merge state or read PR metadata — never loop                             |
+   | `github_list_prs`          | Instant snapshot  | ONE-SHOT: find an existing PR — never loop                                                |
 
 ## Quick Commands
 

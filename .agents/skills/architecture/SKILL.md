@@ -195,6 +195,10 @@ These summaries were previously inline in AGENTS.md:
 - **Logging**: Import `LOGGER` from `@legacy-sports/logging`. ESLint enforces `no-console`.
 - **Testing**: Unit/integration: Jest (`make test`). Web E2E: Playwright (hermetic -- `route.fulfill()` only). Mobile E2E: WebdriverIO.
 
+## Quick File Lookup
+
+For a machine-readable capability → path index (use before running Glob sweeps): **[FILE-MAP.md](FILE-MAP.md)**
+
 ## Related Skills
 
 - [cli-usage](../cli-usage/SKILL.md) — CLI for database operations and admin tasks
