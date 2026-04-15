@@ -159,7 +159,7 @@ export const GRADIENT_GOLD = `linear-gradient(135deg, ${BRAND_GOLD} 0%, ${BRAND_
 export const GRADIENT_WHITE_CARD = `linear-gradient(135deg, ${WHITE} 0%, ${SLATE_100} 100%)`;
 export const GRADIENT_BUTTON_PRIMARY = `linear-gradient(135deg, ${BLUE}, ${INDIGO})`;
 export const GRADIENT_BUTTON_SAVE = `linear-gradient(135deg, ${BLUE}, ${BLUE_DEEP})`;
-export const GRADIENT_AVATAR = `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${VIOLET} 100%)`;
+export const GRADIENT_AVATAR = `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAND_GOLD} 100%)`;
 
 // ─── Semi-transparent Overlays ─────────────────────────────
 

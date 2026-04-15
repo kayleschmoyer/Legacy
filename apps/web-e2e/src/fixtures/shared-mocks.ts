@@ -47,6 +47,10 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = {
   getuserleagues: { data: { userLeagues: [] } },
 
   // ── Home page ─────────────────────────────────────────────────────
+  getuserleaguesummaries: { data: { getUserLeagueSummaries: [] } },
+  getarchiveduserleaguesummaries: {
+    data: { getArchivedUserLeagueSummaries: [] },
+  },
   getonthisday: { data: { onThisDay: [] } },
   getonthisdayevents: { data: { onThisDayEvents: [] } },
 

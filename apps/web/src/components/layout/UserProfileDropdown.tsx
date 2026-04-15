@@ -22,6 +22,7 @@ import {
   Settings2,
   Shield,
   Sun,
+  Tag,
   User,
 } from '@tamagui/lucide-icons';
 import { GRADIENT_AVATAR } from '../../constants/colors';
@@ -372,6 +373,22 @@ export const UserProfileDropdown: React.FC = () => {
                 </MenuIconBox>
                 <Paragraph size="$3" color="$color" fontWeight="500">
                   Subscription
+                </Paragraph>
+              </XStack>
+            </MenuItem>
+
+            <MenuItem
+              onPress={() => {
+                void navigate('/pricing');
+                setIsOpen(false);
+              }}
+            >
+              <XStack alignItems="center" gap="$3" flex={1}>
+                <MenuIconBox>
+                  <Tag size={18} color="$color" />
+                </MenuIconBox>
+                <Paragraph size="$3" color="$color" fontWeight="500">
+                  Pricing
                 </Paragraph>
               </XStack>
             </MenuItem>

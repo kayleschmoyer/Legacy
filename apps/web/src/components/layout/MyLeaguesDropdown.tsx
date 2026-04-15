@@ -18,7 +18,7 @@ const DropdownButton = styled(Button, {
   gap: '$2',
   backgroundColor: 'transparent',
   borderWidth: 0,
-  borderRadius: '$10',
+  borderRadius: '$2',
   paddingHorizontal: '$4',
   minWidth: NAV_BUTTON_MIN_WIDTH,
   hoverStyle: {

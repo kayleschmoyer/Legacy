@@ -32,7 +32,7 @@ import {
 import { UserProfileDropdown } from '../components/layout/UserProfileDropdown';
 import { SportsDropdown } from '../components/layout/SportsDropdown';
 import { PlayersDropdown } from '../components/layout/PlayersDropdown';
-import { HelpDropdown } from '../components/layout/HelpDropdown';
+
 import { MyLeaguesDropdown } from '../components/layout/MyLeaguesDropdown';
 import { BugReportButton } from '../components/layout/BugReportButton';
 import { NotificationDropdown } from '../components/layout/NotificationDropdown';
@@ -44,7 +44,7 @@ import { useWebPushRegistration } from '../hooks/useWebPushRegistration';
 import { ImpersonationBanner } from '../components/ImpersonationBanner';
 import { ApolloErrorToast } from '../components/layout/ApolloErrorToast';
 import { ScoreboardTicker } from '../components/scoreboard/ScoreboardTicker';
-import { BRAND_GOLD } from '../constants/colors';
+
 import { NAV_BUTTON_MIN_WIDTH, NAV_Z_INDEX } from '../constants/dimensions';
 
 /* ────────────────────────────────────────────────────────
@@ -207,12 +207,14 @@ const NavLinks = styled(XStack, {
   overflow: 'visible',
 });
 
-/** Pill-shaped nav link button with active indicator dot */
+/** Square-edged nav link button with active bottom-border indicator */
 const NavLinkButton = styled(Button, {
   size: '$3',
-  borderRadius: '$10',
+  borderRadius: '$2',
   backgroundColor: 'transparent',
   borderWidth: 0,
+  borderBottomWidth: 2,
+  borderBottomColor: 'transparent',
   paddingHorizontal: '$4',
   gap: '$2',
   flexShrink: 0,
@@ -227,7 +229,7 @@ const NavLinkButton = styled(Button, {
   variants: {
     active: {
       true: {
-        backgroundColor: '$color3',
+        borderBottomColor: '$brandNavy',
         fontWeight: '600',
       },
     },
@@ -251,7 +253,7 @@ const MobileMenuButton = styled(Button, {
 const MobileNavPanel = styled(YStack, {
   display: 'flex',
   $gtMd: { display: 'none' },
-  backgroundColor: '$background',
+  backgroundColor: '$surfacePanel',
   borderBottomWidth: 1,
   borderBottomColor: '$borderColor',
   paddingHorizontal: '$5',
@@ -366,11 +368,12 @@ function Navigation() {
                 <Paragraph
                   marginBottom={0}
                   fontWeight="700"
-                  fontSize={18}
-                  color={BRAND_GOLD}
-                  letterSpacing={0.5}
+                  fontSize={22}
+                  color="$color12"
+                  letterSpacing={1}
                   userSelect="none"
                   data-testid="brand-text"
+                  style={{ fontFamily: "'Big Shoulders Display', sans-serif" }}
                 >
                   Legacy Sports
                 </Paragraph>
@@ -404,8 +407,6 @@ function Navigation() {
                 </XStack>
               </NavLinkButton>
             </Link>
-
-            <HelpDropdown />
           </NavLinks>
 
           {/* ── Right section ── */}

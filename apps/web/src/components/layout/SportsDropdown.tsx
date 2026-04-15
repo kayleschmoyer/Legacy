@@ -14,18 +14,19 @@ import {
   ChevronUp,
   Circle,
   Globe,
-  Trophy,
+  Grid2x2,
 } from '@tamagui/lucide-icons';
 import { BRAND_NAVY_LIGHT } from '../../constants/colors';
+import { NAV_BUTTON_MIN_WIDTH } from '../../constants/dimensions';
 
 const DropdownButton = styled(Button, {
   size: '$3',
   gap: '$2',
   backgroundColor: 'transparent',
   borderWidth: 0,
-  borderRadius: '$10',
+  borderRadius: '$2',
   paddingHorizontal: '$4',
-  minWidth: 100,
+  minWidth: NAV_BUTTON_MIN_WIDTH,
   hoverStyle: {
     backgroundColor: '$color3',
   },
@@ -170,7 +171,7 @@ export const SportsDropdown: React.FC = () => {
         aria-expanded={isOpen}
         aria-controls={menuId}
       >
-        <Trophy size={15} />
+        <Grid2x2 size={15} />
         <Text>Sports</Text>
         {isOpen ? (
           <ChevronUp size={14} color="$colorPress" />

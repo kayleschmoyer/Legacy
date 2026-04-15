@@ -43,12 +43,13 @@ exports[`App FootballScreen should match complete football page layout snapshot 
                 style="height: 38px; width: auto; display: block;"
               />
               <p
-                color="#C5A55A"
+                color="$color12"
                 data-testid="brand-text"
-                font-size="18"
+                font-size="22"
                 font-weight="700"
-                letter-spacing="0.5"
+                letter-spacing="1"
                 marginbottom="0"
+                style="font-family: 'Big Shoulders Display', sans-serif;"
                 userselect="none"
               >
                 Legacy Sports
@@ -89,9 +90,6 @@ exports[`App FootballScreen should match complete football page layout snapshot 
               </div>
             </button>
           </a>
-          <div>
-            Help Dropdown
-          </div>
         </div>
         <div
           alignitems="center"
@@ -180,12 +178,13 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
                 style="height: 38px; width: auto; display: block;"
               />
               <p
-                color="#C5A55A"
+                color="$color12"
                 data-testid="brand-text"
-                font-size="18"
+                font-size="22"
                 font-weight="700"
-                letter-spacing="0.5"
+                letter-spacing="1"
                 marginbottom="0"
+                style="font-family: 'Big Shoulders Display', sans-serif;"
                 userselect="none"
               >
                 Legacy Sports
@@ -226,9 +225,6 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
               </div>
             </button>
           </a>
-          <div>
-            Help Dropdown
-          </div>
         </div>
         <div
           alignitems="center"
@@ -315,12 +311,13 @@ exports[`App Navigation should render navigation with correct links 1`] = `
                 style="height: 38px; width: auto; display: block;"
               />
               <p
-                color="#C5A55A"
+                color="$color12"
                 data-testid="brand-text"
-                font-size="18"
+                font-size="22"
                 font-weight="700"
-                letter-spacing="0.5"
+                letter-spacing="1"
                 marginbottom="0"
+                style="font-family: 'Big Shoulders Display', sans-serif;"
                 userselect="none"
               >
                 Legacy Sports
@@ -361,9 +358,6 @@ exports[`App Navigation should render navigation with correct links 1`] = `
               </div>
             </button>
           </a>
-          <div>
-            Help Dropdown
-          </div>
         </div>
         <div
           alignitems="center"

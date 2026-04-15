@@ -37,7 +37,7 @@ export const CONTENT_STICKY_Z_INDEX = 100;
 
 /**
  * Minimum width (px) applied to every desktop nav button — both NavLinkButton
- * in app.tsx and DropdownButton components (MyLeaguesDropdown, HelpDropdown).
+ * in app.tsx and DropdownButton components (MyLeaguesDropdown, PlayersDropdown).
  *
  * Sized to the widest label (\"My Leagues\" + trophy icon + chevron) so all
  * buttons share a consistent width and do not shift when the active font-weight
@@ -53,7 +53,7 @@ export const NAV_BUTTON_MIN_WIDTH = 120;
 export const TICKER_HEIGHT_PX = 32;
 
 /**
- * Z-index for nav dropdown menus (e.g. PlayersDropdown, HelpDropdown).
+ * Z-index for nav dropdown menus (e.g. PlayersDropdown, MyLeaguesDropdown).
  * Sits just below NAV_Z_INDEX so dropdowns render above page content
  * (CONTENT_STICKY_Z_INDEX) but do not overlap the nav bar itself.
  */
