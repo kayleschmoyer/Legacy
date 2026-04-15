@@ -146,7 +146,18 @@ async function silentlyRefreshJwt(): Promise<string | null> {
         credentials: 'include',
       });
 
-      if (!response.ok) return null;
+      if (!response.ok) {
+        // A 401 or 403 from the refresh endpoint is a definitive server-side
+        // rejection — the session is invalid, not merely expired on the clock.
+        // Signal the AuthProvider to clear local state so the user is prompted
+        // to re-authenticate rather than being stuck in a 401 retry loop.
+        // Other non-OK statuses (5xx, rate limits) are transient; do not force
+        // logout for those.
+        if (response.status === 401 || response.status === 403) {
+          window.dispatchEvent(new CustomEvent('auth:session-expired'));
+        }
+        return null;
+      }
 
       const result = (await response.json()) as {
         jwt?: string;

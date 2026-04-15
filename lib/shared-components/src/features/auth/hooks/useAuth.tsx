@@ -380,6 +380,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
     };
   }, [authService, scheduleProactiveRefresh]);
 
+  // ─── Listen for session-expired events from Apollo error link ───────────────
+  // When silentlyRefreshJwt() receives a 401/403 from the refresh endpoint,
+  // it dispatches auth:session-expired to signal that the server has definitively
+  // rejected the session. Clear local state so the user is prompted to log in
+  // again rather than being stuck in a 401 retry loop with stale credentials.
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      // Cancel any scheduled proactive refresh so it cannot fire after logout
+      // and inadvertently re-trigger network requests or update auth state.
+      clearRefreshTimer();
+      authService.clearTokens();
+      dispatchAuth({ type: 'AUTH_LOGOUT' });
+    };
+
+    window.addEventListener('auth:session-expired', handleSessionExpired);
+    return () => {
+      window.removeEventListener('auth:session-expired', handleSessionExpired);
+    };
+  }, [authService, clearRefreshTimer]);
+
   // Initialize auth state on mount
   useEffect(() => {
     let isMounted = true;

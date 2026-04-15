@@ -318,4 +318,90 @@ describe('errorLink', () => {
       expect.objectContaining({ method: 'POST' }),
     );
   });
+
+  it('dispatches auth:session-expired when refresh endpoint returns 401', async () => {
+    // Simulate /refresh-jwt responding with 401 (server definitively rejects session)
+    const fetchMock = jest.fn().mockResolvedValue({ ok: false, status: 401 });
+    global.fetch = fetchMock;
+
+    const dispatchSpy = jest.spyOn(window, 'dispatchEvent');
+
+    const unauthError = new CombinedGraphQLErrors(
+      {
+        errors: [
+          { message: 'Unauthorized', extensions: { code: 'UNAUTHENTICATED' } },
+        ],
+      },
+      [{ message: 'Unauthorized', extensions: { code: 'UNAUTHENTICATED' } }],
+    );
+
+    await runWithError(unauthError, {});
+
+    const sessionExpiredEvents = dispatchSpy.mock.calls
+      .map(([event]) => event)
+      .filter(
+        (e): e is CustomEvent =>
+          e instanceof CustomEvent && e.type === 'auth:session-expired',
+      );
+    expect(sessionExpiredEvents).toHaveLength(1);
+
+    dispatchSpy.mockRestore();
+  });
+
+  it('dispatches auth:session-expired when refresh endpoint returns 403', async () => {
+    const fetchMock = jest.fn().mockResolvedValue({ ok: false, status: 403 });
+    global.fetch = fetchMock;
+
+    const dispatchSpy = jest.spyOn(window, 'dispatchEvent');
+
+    const unauthError = new CombinedGraphQLErrors(
+      {
+        errors: [
+          { message: 'Unauthorized', extensions: { code: 'UNAUTHENTICATED' } },
+        ],
+      },
+      [{ message: 'Unauthorized', extensions: { code: 'UNAUTHENTICATED' } }],
+    );
+
+    await runWithError(unauthError, {});
+
+    const sessionExpiredEvents = dispatchSpy.mock.calls
+      .map(([event]) => event)
+      .filter(
+        (e): e is CustomEvent =>
+          e instanceof CustomEvent && e.type === 'auth:session-expired',
+      );
+    expect(sessionExpiredEvents).toHaveLength(1);
+
+    dispatchSpy.mockRestore();
+  });
+
+  it('does NOT dispatch auth:session-expired when refresh endpoint returns 500', async () => {
+    // Server errors (5xx) are transient — do not force logout
+    const fetchMock = jest.fn().mockResolvedValue({ ok: false, status: 500 });
+    global.fetch = fetchMock;
+
+    const dispatchSpy = jest.spyOn(window, 'dispatchEvent');
+
+    const unauthError = new CombinedGraphQLErrors(
+      {
+        errors: [
+          { message: 'Unauthorized', extensions: { code: 'UNAUTHENTICATED' } },
+        ],
+      },
+      [{ message: 'Unauthorized', extensions: { code: 'UNAUTHENTICATED' } }],
+    );
+
+    await runWithError(unauthError, {});
+
+    const sessionExpiredEvents = dispatchSpy.mock.calls
+      .map(([event]) => event)
+      .filter(
+        (e): e is CustomEvent =>
+          e instanceof CustomEvent && e.type === 'auth:session-expired',
+      );
+    expect(sessionExpiredEvents).toHaveLength(0);
+
+    dispatchSpy.mockRestore();
+  });
 });

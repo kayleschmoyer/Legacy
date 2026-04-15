@@ -201,6 +201,72 @@ describe('AuthProvider – auth:token-refreshed event', () => {
   });
 });
 
+describe('AuthProvider – auth:session-expired event', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('clears tokens and logs out when auth:session-expired is dispatched', async () => {
+    const MockedAuthService = jest.mocked(AuthService);
+    const mockInstance = {
+      getStoredUserProfile: jest.fn(() => ({
+        id: 42,
+        email: 'user@test.com',
+        username: 'ActiveUser',
+        accessLevel: 'user' as const,
+      })),
+      getStoredTokenExpiry: jest.fn(() => Math.floor(Date.now() / 1000) + 3600),
+      getStoredAdminProfile: jest.fn(() => null),
+      getStoredImpersonatedUserProfile: jest.fn(() => null),
+      storeUserProfile: jest.fn(),
+      storeAdminProfile: jest.fn(),
+      storeImpersonatedUserProfile: jest.fn(),
+      clearAdminProfile: jest.fn(),
+      clearImpersonatedUserProfile: jest.fn(),
+      clearTokens: jest.fn(),
+      verifyToken: jest.fn(() => false),
+      refreshJwt: jest.fn(() => Promise.resolve(null)),
+      authenticateWithEmail: jest.fn(),
+      authenticateWithOAuth: jest.fn(),
+      requestLogout: jest.fn(() => Promise.resolve()),
+      startImpersonation: jest.fn(),
+      stopImpersonation: jest.fn(),
+      getStoredToken: jest.fn(() => null),
+      getCurrentToken: jest.fn(() => null),
+    };
+    MockedAuthService.mockImplementation(
+      () => mockInstance as unknown as AuthService,
+    );
+
+    render(
+      <AuthProvider config={testConfig}>
+        <AuthConsumer />
+      </AuthProvider>,
+    );
+
+    // Wait for the cached session to restore the user
+    await waitFor(() => {
+      expect(screen.getByTestId('user-info').textContent).toBe(
+        'ActiveUser|user',
+      );
+    });
+
+    // Simulate the Apollo error link signalling that the server definitively
+    // rejected the JWT refresh (401/403 from /oauth/refresh-jwt)
+    act(() => {
+      window.dispatchEvent(new CustomEvent('auth:session-expired'));
+    });
+
+    // The user should now be logged out
+    await waitFor(() => {
+      expect(screen.getByTestId('no-user')).toBeTruthy();
+    });
+
+    // clearTokens must be called to remove stale localStorage state
+    expect(mockInstance.clearTokens).toHaveBeenCalled();
+  });
+});
+
 describe('AuthProvider – updateUserProfile', () => {
   beforeEach(() => {
     localStorage.clear();
