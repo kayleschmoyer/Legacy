@@ -10,7 +10,7 @@ The self-hosted GitHub Actions runners use a pre-baked Ubuntu 22.04 AMI built wi
 | --------------------- | --------------------------------------------- | --------------------------------------------------- |
 | Node.js               | 22                                            | JS runtime                                          |
 | pnpm                  | 9.12.1                                        | Package manager                                     |
-| Playwright + Chromium | 1.58.2                                        | E2E tests (installed at `/opt/playwright-browsers`) |
+| Playwright + Chromium | 1.59.1                                        | E2E tests (installed at `/opt/playwright-browsers`) |
 | serve                 | 14.2.4                                        | Static file server for Playwright shards            |
 | Terraform             | 1.14.0                                        | Infrastructure-as-code                              |
 | uv                    | latest                                        | Python package manager (skill linting)              |
@@ -125,14 +125,14 @@ Build takes ~10-15 minutes (Android NDK alone is ~8 GB uncompressed). Packer wil
 
 ### Optional variables
 
-| Variable             | Default    | Description                                   |
-| -------------------- | ---------- | --------------------------------------------- |
-| `region`             | us-east-1  | AWS region                                    |
-| `node_version`       | 22         | Node.js major version                         |
-| `pnpm_version`       | 9.12.1     | pnpm version                                  |
-| `runner_version`     | 2.333.0    | GitHub Actions runner version                 |
-| `playwright_version` | 1.58.2     | Must match `@playwright/test` in package.json |
-| `instance_type`      | c7a.xlarge | Build instance type                           |
+| Variable             | Default    | Description                                                                                                                                                                                                                                     |
+| -------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `region`             | us-east-1  | AWS region                                                                                                                                                                                                                                      |
+| `node_version`       | 22         | Node.js major version                                                                                                                                                                                                                           |
+| `pnpm_version`       | 9.12.1     | pnpm version                                                                                                                                                                                                                                    |
+| `runner_version`     | 2.333.1    | Runner release used only to run `./bin/installdependencies.sh` during the Packer build — runner release artifacts/versions are managed by the `runner-binaries-syncer` Lambda, and the EC2 instance installs the runner binary during bootstrap |
+| `playwright_version` | 1.59.1     | Must match the resolved `playwright-core` version in `pnpm-lock.yaml` (CI enforces this via runner-ami-drift-check)                                                                                                                             |
+| `instance_type`      | c7a.xlarge | Build instance type                                                                                                                                                                                                                             |
 
 ## Post-Build
 

@@ -14,7 +14,7 @@ variable "region" {
 
 variable "runner_version" {
   type    = string
-  default = "2.333.0"
+  default = "2.333.1"
 }
 
 variable "node_version" {
