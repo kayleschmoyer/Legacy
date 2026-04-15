@@ -390,13 +390,18 @@ export function useDraftQueries({
   }, [pitchingStatsData]);
 
   // ---- Auto-pick statuses ----
+  // No pollInterval here — statuses are refetched via explicit calls after
+  // pick events (useDraftWebSocket) and after the user toggles their own
+  // auto-pick (useDraftActions). Polling every 5 s caused excessive API calls
+  // (LS-3114). Use cache-and-network so the board shows cached data immediately
+  // but still refreshes once on load when polling is disabled.
   const { data: allAutoPickData, refetch: refetchAutoPickStatuses } = useQuery<
     GetDraftTeamAutoPickStatusesQuery,
     GetDraftTeamAutoPickStatusesQueryVariables
   >(GET_DRAFT_TEAM_AUTO_PICK_STATUSES, {
     variables: { draftId: draftId ?? 0 },
     skip: !draftId || isAuctionDraft,
-    pollInterval: isAuctionDraft ? 0 : 5000,
+    fetchPolicy: 'cache-and-network',
   });
 
   // ---- Draft team order ----

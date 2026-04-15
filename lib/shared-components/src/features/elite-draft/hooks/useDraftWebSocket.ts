@@ -50,12 +50,13 @@ interface UseDraftWebSocketParams {
   setPickTimeLimitSeconds: (v: number) => void;
   setLiveMessage: (v: string) => void;
   setOnlineUserIds: Dispatch<SetStateAction<ReadonlySet<number>>>;
-  refetchDraft: () => unknown;
-  refetchLeague: () => unknown;
-  refetchCurrentPick: (vars: { draftId: number }) => unknown;
-  refetchPickHistory: () => unknown;
-  refetchAvailablePlayers: () => unknown;
+  refetchDraft: () => Promise<unknown>;
+  refetchLeague: () => Promise<unknown>;
+  refetchCurrentPick: (vars: { draftId: number }) => Promise<unknown>;
+  refetchPickHistory: () => Promise<unknown>;
+  refetchAvailablePlayers: () => Promise<unknown>;
   refetchQueue: () => Promise<unknown>;
+  refetchAutoPickStatuses: () => Promise<unknown>;
   websocketUrl: string;
   /** Auth token for WebSocket authentication. */
   token?: string;
@@ -87,6 +88,7 @@ export function useDraftWebSocket({
   refetchPickHistory,
   refetchAvailablePlayers,
   refetchQueue,
+  refetchAutoPickStatuses,
   websocketUrl,
   token,
   onPlayerDrafted,
@@ -176,6 +178,9 @@ export function useDraftWebSocket({
       void refetchCurrentPick({ draftId: notification.draftId });
       void refetchPickHistory();
       void refetchAvailablePlayers();
+      void refetchAutoPickStatuses().catch((e: unknown) =>
+        LOGGER.warn('Auto-pick statuses refetch failed:', String(e)),
+      );
       void refetchQueue().catch((e: unknown) =>
         LOGGER.warn('Queue refetch failed:', String(e)),
       );
@@ -194,6 +199,7 @@ export function useDraftWebSocket({
       refetchCurrentPick,
       refetchPickHistory,
       refetchAvailablePlayers,
+      refetchAutoPickStatuses,
       refetchQueue,
       onPlayerDrafted,
     ],
@@ -325,10 +331,36 @@ export function useDraftWebSocket({
   const wsWasConnected = useRef(false);
   useEffect(() => {
     if (wsConnected && wsWasConnected.current && draftId) {
-      void refetchCurrentPick({ draftId });
-      void refetchPickHistory();
-      void refetchAvailablePlayers();
-      void refetchDraft();
+      void refetchCurrentPick({ draftId }).catch((e: unknown) => {
+        LOGGER.error(
+          'Failed to refetch current pick after websocket reconnect',
+          String(e),
+        );
+      });
+      void refetchPickHistory().catch((e: unknown) => {
+        LOGGER.error(
+          'Failed to refetch pick history after websocket reconnect',
+          String(e),
+        );
+      });
+      void refetchAvailablePlayers().catch((e: unknown) => {
+        LOGGER.error(
+          'Failed to refetch available players after websocket reconnect',
+          String(e),
+        );
+      });
+      void refetchAutoPickStatuses().catch((e: unknown) => {
+        LOGGER.error(
+          'Failed to refetch auto-pick statuses after websocket reconnect',
+          String(e),
+        );
+      });
+      void refetchDraft().catch((e: unknown) => {
+        LOGGER.error(
+          'Failed to refetch draft after websocket reconnect',
+          String(e),
+        );
+      });
     }
     wsWasConnected.current = wsConnected;
   }, [
@@ -337,6 +369,7 @@ export function useDraftWebSocket({
     refetchCurrentPick,
     refetchPickHistory,
     refetchAvailablePlayers,
+    refetchAutoPickStatuses,
     refetchDraft,
   ]);
 

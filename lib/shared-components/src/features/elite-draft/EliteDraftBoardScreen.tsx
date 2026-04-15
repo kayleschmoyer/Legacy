@@ -132,6 +132,7 @@ export function EliteDraftBoardScreen({
     refetchPickHistory: queries.refetchPickHistory,
     refetchAvailablePlayers: queries.refetchAvailablePlayers,
     refetchQueue: queries.refetchQueue,
+    refetchAutoPickStatuses: queries.refetchAutoPickStatuses,
     websocketUrl,
     token,
     onPlayerDrafted,
