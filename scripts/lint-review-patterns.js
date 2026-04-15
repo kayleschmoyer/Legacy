@@ -1,8 +1,11 @@
 #!/usr/bin/env node
 // Automated self-review: checks changed files against mechanical review patterns.
-// Runs 13 regex checks against the git diff — 7 from common-review-patterns.md
+// Runs 18 regex checks against the git diff — 7 from common-review-patterns.md
 // (#5, #6, #11, #12, #14, #19, #20) plus 6 project-standard rules (console.*,
-// @ts-ignore, eslint-disable, any type, inline gql, hardcoded localhost).
+// @ts-ignore, eslint-disable, any type, inline gql, hardcoded localhost), plus
+// 5 UI/component patterns (#22, #24, #25, #26, #27 from common-review-patterns.md).
+//
+// Patterns requiring judgment (no regex): #1–#4, #7–#10, #13, #15–#18, #21, #23, #28
 //
 // Usage:
 //   node scripts/lint-review-patterns.js                    # diff vs origin/main
@@ -183,6 +186,62 @@ const PATTERNS = [
     severity: 'warning',
     description:
       'Cap unbounded output: { lines: [...].slice(0, N), truncated: true, totalLines }',
+  },
+  // --- UI & Component Patterns (#21–#27) ---
+  {
+    id: 'role-button-no-tabindex',
+    name: '#22 — role="button" without tabIndex on same line (keyboard inaccessible)',
+    regex: /^(?=.*role\s*=\s*["']button["'])(?!.*\btabIndex\b).*$/,
+    fileFilter: (f) => /\.(tsx|jsx)$/.test(f),
+    severity: 'error',
+    description:
+      'Non-button elements with role="button" need tabIndex={0} on the same element to be keyboard-focusable. Prefer native <button>.',
+  },
+  {
+    id: 'transition-all',
+    name: '#24 — transition: "all" (animates unintended properties)',
+    regex: /transition\s*:\s*['"]all\b/,
+    fileFilter: (f) => /\.(ts|tsx|js|jsx)$/.test(f),
+    severity: 'warning',
+    description:
+      'Use specific CSS properties in transition (e.g. "background-color 0.15s ease") instead of "all".',
+  },
+  {
+    id: 'inline-hex-color',
+    name: '#25 — Inline hex color literal (use colors.ts constant)',
+    regex: /['"]#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?\b['"]/,
+    fileFilter: (f) =>
+      /\.(tsx|jsx)$/.test(f) &&
+      !f.includes('colors.ts') &&
+      !f.includes('colors.js') &&
+      !f.endsWith('.config.ts') &&
+      !f.endsWith('.config.js'),
+    severity: 'warning',
+    description:
+      'Import named constants from apps/web/src/constants/colors.ts instead of inline hex values.',
+  },
+  {
+    id: 'graphql-resolver-plain-error',
+    name: '#26 — throw new Error() in GraphQL resolver (use UserInputError)',
+    regex: /throw new Error\s*\(/,
+    fileFilter: (f) =>
+      /\.ts$/.test(f) &&
+      f.includes('lambdas/db/src/schema/') &&
+      !/\.spec\.ts$/.test(f) &&
+      !f.includes('__snapshots__/') &&
+      !/\.snap$/.test(f),
+    severity: 'warning',
+    description:
+      'Use UserInputError from lambdas/db/src/schema/graphql-errors.ts for input validation so clients receive BAD_USER_INPUT instead of INTERNAL_SERVER_ERROR.',
+  },
+  {
+    id: 'storage-write',
+    name: '#27 — localStorage/sessionStorage write (review try/catch)',
+    regex: /(?:localStorage|sessionStorage)\.(?:setItem|removeItem|clear)\s*\(/,
+    fileFilter: (f) => /\.(ts|tsx|js|jsx)$/.test(f),
+    severity: 'warning',
+    description:
+      'Review storage writes — usually wrap in try/catch as they throw in private browsing mode and when quota is exceeded.',
   },
 ];
 

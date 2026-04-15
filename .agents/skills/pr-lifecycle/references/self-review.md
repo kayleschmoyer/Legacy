@@ -18,14 +18,14 @@ You are a **code reviewer** for this project. Your job is to read all changes on
    git diff origin/main...HEAD
    ```
 
-2. **Run mechanical review checks** (automated — catches 13 of 20 patterns):
+2. **Run mechanical review checks** (automated — catches 19 of 28 patterns):
 
    ```bash
    make lint-review-patterns
    # or: node scripts/lint-review-patterns.js --json  (for structured output)
    ```
 
-   This script checks for console.\*, @ts-ignore, eslint-disable, route.continue(), LOGGER.error wrapping, empty catch blocks, git ref injection, shell:true, any types, hardcoded localhost, inline gql, and dev/prod ternaries — covering common-review-patterns.md #5, #6, #11, #12, #14, #19, #20 plus project rules. Fix any violations it reports before proceeding.
+   This script checks for console.\*, @ts-ignore, eslint-disable, route.continue(), LOGGER.error wrapping, empty catch blocks, git ref injection, shell:true, any types, hardcoded localhost, inline gql, dev/prod ternaries, unbounded output, plus UI patterns: role=button without tabIndex (#22), transition:all (#24), inline hex colors (#25), plain Error in GraphQL resolvers (#26), and localStorage writes (#27). This covers 18 of 28 patterns from `common-review-patterns.md`. Fix any violations it reports before proceeding.
 
 3. **Read changed files in full** — not just diff hunks. Context matters for identifying dead code, missing imports, and type mismatches.
 
@@ -48,14 +48,15 @@ You are a **code reviewer** for this project. Your job is to read all changes on
 
 6. **Reuse check**: Could any new component use existing ones from `lib/shared-components`? Any new utility that duplicates `lib/utils`?
 
-7. **Check against [common review patterns](common-review-patterns.md) (judgment-requiring patterns only)** — Step 2's `make lint-review-patterns` already caught the 13 regex-checkable patterns. Now manually check the 7 patterns that require semantic understanding:
+7. **Check against [common review patterns](common-review-patterns.md) (judgment-requiring patterns only)** — Step 2's `make lint-review-patterns` already caught the regex-checkable patterns. Now manually check the patterns that require semantic understanding:
    - **#3**: Header comment overclaiming test coverage
    - **#4**: Missing UNAUTHENTICATED guard test for resolvers
    - **#7**: `data: null` mock response — Apollo expects `{ data: { queryName: ... } }`
    - **#8**: Wrong GraphQL field names in mocks (check actual `.graphql` files)
-   - **#19**: Dev/prod ternary that forgets staging
-   - **#20**: Unbounded tool output without truncation
    - **#9**: Test name doesn't match assertion
+   - **#21**: Nullable GraphQL field interpolated in strings or `aria-label` — check `.graphql` file: is the field `String!` or `String`? If nullable, add a null guard or fallback
+   - **#23**: Collapsed/hidden content — does it use `aria-hidden` and disable `pointerEvents` when hidden? Animating height/opacity alone leaves content in the tab order
+   - **#28**: Unsafe `as 'literal-union'` cast on GraphQL args or external data — should be a type guard with an allowed-values array
 
 8. **Fix issues directly** — apply fixes in the working tree, don't just report them. If a fix is ambiguous, explain the tradeoff and pick the safer option.
 
