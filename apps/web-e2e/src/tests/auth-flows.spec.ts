@@ -129,7 +129,6 @@ unauthTest.describe('Protected Routes @critical', () => {
     '/management',
     '/profile/settings',
     '/preferences',
-    '/about',
     '/help',
   ];
 
@@ -146,6 +145,24 @@ unauthTest.describe('Protected Routes @critical', () => {
       },
     );
   }
+});
+
+// ---------------------------------------------------------------------------
+// Public Routes — accessible without authentication (LS-3566)
+// ---------------------------------------------------------------------------
+
+unauthTest.describe('Public Routes @critical', () => {
+  unauthTest(
+    'shows About page content on /about when not authenticated',
+    async ({ page }) => {
+      await page.goto('/about');
+      await page.waitForLoadState('load');
+
+      await expect(
+        page.getByRole('heading', { name: /about legacy sports/i }),
+      ).toBeVisible({ timeout: 15000 });
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------

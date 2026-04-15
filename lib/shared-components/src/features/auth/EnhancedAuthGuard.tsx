@@ -41,6 +41,17 @@ export interface EnhancedAuthGuardProps {
    * Called when logout is successful
    */
   onLogoutSuccess?: () => void;
+  /**
+   * Paths that are accessible without authentication.
+   * Matched against window.location.pathname as an exact path or as a prefix when
+   * the current pathname continues with a trailing slash.
+   * Entries must not include a trailing slash (for example, use '/about', not
+   * '/about/'), otherwise prefix matching will not work as expected.
+   * Entries must include the router basename/base-path prefix when deployed under
+   * a sub-path (for example, '/pr-123/about' in a preview deploy with BASE_URL='/pr-123/').
+   * Web-only: ignored in React Native where window is undefined.
+   */
+  publicPaths?: string[];
 }
 
 export function EnhancedAuthGuard({
@@ -53,11 +64,27 @@ export function EnhancedAuthGuard({
   onLoginSuccess,
   onLoginFailure,
   onLogoutSuccess: _onLogoutSuccess,
+  publicPaths = [],
 }: EnhancedAuthGuardProps) {
   const { isAuthenticated, isLoading, config, loginWithOAuth } = useAuth();
 
   // In test mode, bypass authentication and show content directly
   if (testMode) {
+    return children;
+  }
+
+  // Public paths bypass the auth gate entirely (no login wall, no loading spinner).
+  // On web, window.location.pathname is already restored by the companion script in
+  // index.html before React renders, so this check works for direct-URL navigation.
+  // In React Native, window is undefined, so skip the check entirely.
+  const currentPath =
+    typeof window !== 'undefined' ? window.location.pathname : null;
+  const isPublicPath =
+    currentPath !== null &&
+    publicPaths.some(
+      (p) => currentPath === p || currentPath.startsWith(p + '/'),
+    );
+  if (isPublicPath) {
     return children;
   }
 

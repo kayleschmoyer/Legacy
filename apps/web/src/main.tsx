@@ -123,6 +123,9 @@ try {
                 loginSubtitle="Sign in to access your fantasy leagues and stats"
                 loginComponent={<PublicLandingPage />}
                 testMode={env.authTestMode}
+                publicPaths={[
+                  `${import.meta.env.BASE_URL.replace(/\/$/, '')}/about`,
+                ]}
                 onLoginSuccess={() => {
                   LOGGER.info('Web app login successful!');
                   trackLogin('google');
