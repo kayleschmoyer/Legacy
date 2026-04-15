@@ -105,8 +105,29 @@ export function runPnpm(
   return runCommand('pnpm', args, cwd, timeoutMs, env, includeStderr);
 }
 
-/** Run an Nx command via pnpm exec. */
-export function runNx(
+/**
+ * Patterns that indicate the Nx daemon crashed due to a startup race.
+ * This happens when two `nx` invocations start simultaneously and both
+ * try to bind the same daemon socket (EADDRINUSE). The losing process
+ * exits immediately; retrying after a short delay lets the winning
+ * daemon finish initialising.
+ */
+const DAEMON_RACE_PATTERNS = [
+  /daemon process terminated and closed the connection/i,
+  /this process is no longer the current daemon/i,
+  /EADDRINUSE/,
+];
+
+function isDaemonRaceError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return DAEMON_RACE_PATTERNS.some((re) => re.test(msg));
+}
+
+const DAEMON_RETRY_DELAY_MS = 2_000;
+const DAEMON_MAX_RETRIES = 3;
+
+/** Run an Nx command via pnpm exec. Retries on daemon race errors. */
+export async function runNx(
   args: string[],
   cwd: string,
   opts?: {
@@ -115,11 +136,27 @@ export function runNx(
     includeStderr?: boolean;
   },
 ): Promise<string> {
-  return runPnpm(
-    ['exec', 'nx', ...args],
-    cwd,
-    opts?.timeoutMs ?? COMMAND_TIMEOUT,
-    opts?.env,
-    opts?.includeStderr ?? false,
-  );
+  for (let attempt = 0; attempt <= DAEMON_MAX_RETRIES; attempt++) {
+    if (attempt > 0) {
+      await new Promise((r) => setTimeout(r, DAEMON_RETRY_DELAY_MS));
+    }
+    try {
+      return await runPnpm(
+        ['exec', 'nx', ...args],
+        cwd,
+        opts?.timeoutMs ?? COMMAND_TIMEOUT,
+        opts?.env,
+        opts?.includeStderr ?? false,
+      );
+    } catch (err) {
+      if (isDaemonRaceError(err) && attempt < DAEMON_MAX_RETRIES) {
+        continue;
+      }
+      throw err;
+    }
+  }
+  // Unreachable: the loop always returns or throws, but TypeScript requires
+  // an exhaustive return path.
+  /* istanbul ignore next */
+  throw new Error('runNx: exceeded retry limit');
 }
