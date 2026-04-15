@@ -14,11 +14,7 @@ import { sessionStats } from './tools/session-stats.js';
 import { viewRun } from './tools/view-run.js';
 import { waitForRun } from './tools/wait-for-run.js';
 import { workflowInfo } from './tools/workflow-info.js';
-import {
-  workflowDisable,
-  workflowEnable,
-  workflowState,
-} from './tools/workflow-state.js';
+import { workflowSetState } from './tools/workflow-state.js';
 import { getToken, buildHeaders, sanitizeErrorBody } from './github-api.js';
 
 /**
@@ -254,39 +250,20 @@ server.tool(
 );
 
 server.tool(
-  'ci_workflow_state',
-  'Get the current state of a single workflow (active, disabled_manually, disabled_inactivity). Read-only — does not modify state. Use ci_workflow_enable / ci_workflow_disable to change it.',
+  'ci_workflow_set_state',
+  'Enable or disable a GitHub Actions workflow. Wraps `gh workflow enable/disable <workflow>` via the REST API. Returns the workflow state after the change. Use "enable" to restore a disabled workflow, "disable" to halt automatic runs (e.g. during incident recovery). To read state without modifying it, use ci_workflow_info with a specific workflow.',
   {
     workflow: z
       .union([z.string(), z.number().int()])
       .transform(String)
       .describe('Workflow filename (e.g. "deploy.yml") or numeric ID'),
+    action: z
+      .enum(['enable', 'disable'])
+      .describe(
+        '"enable" restores a disabled workflow; "disable" halts automatic runs',
+      ),
   },
-  async (params) => workflowState(params),
-);
-
-server.tool(
-  'ci_workflow_enable',
-  'Enable a manually-disabled GitHub Actions workflow. Wraps `gh workflow enable <workflow>` via the REST API. Returns the workflow state after the change.',
-  {
-    workflow: z
-      .union([z.string(), z.number().int()])
-      .transform(String)
-      .describe('Workflow filename (e.g. "deploy.yml") or numeric ID'),
-  },
-  async (params) => workflowEnable(params),
-);
-
-server.tool(
-  'ci_workflow_disable',
-  'Disable a GitHub Actions workflow. Wraps `gh workflow disable <workflow>` via the REST API. Returns the workflow state after the change. Use during incident recovery to halt automatic runs.',
-  {
-    workflow: z
-      .union([z.string(), z.number().int()])
-      .transform(String)
-      .describe('Workflow filename (e.g. "deploy.yml") or numeric ID'),
-  },
-  async (params) => workflowDisable(params),
+  async (params) => workflowSetState(params),
 );
 
 server.tool(
@@ -482,7 +459,7 @@ server.tool(
 
 server.tool(
   'ci_auth_status',
-  'Check if the CI server is authenticated with GitHub. Returns token source (GH_TOKEN, GITHUB_TOKEN, github-app, or gh-cli), authenticated user login, and rate limit info. Call this first to verify credentials are working before using other ci_* tools.',
+  'Check if the CI server is authenticated with GitHub. Returns token source (GH_TOKEN, GITHUB_TOKEN, github-app, or gh-cli), authenticated user login, and rate limit info. Call this first to verify credentials are working before using other ci_* tools. Also see github_auth_status for basic GitHub auth status without rate limit info.',
   {},
   async () => {
     const GITHUB_API = 'https://api.github.com';

@@ -159,14 +159,14 @@ After Passes 1-3, batch-check all modified PRs for new Copilot review threads in
 
 1. Check each modified PR for new unresolved threads: `github_get_review_threads(number: <PR#>, unresolvedOnly: true)`
 2. Queue PRs with new threads for the next Pass 2 iteration
-3. For bot-authored PRs with all threads resolved, request Copilot re-review: `github_request_review(number: <PR#>)`
+3. For bot-authored PRs with all threads resolved, request Copilot re-review: `github_request_review(prs: [<PR#>])`
 
 ### Verify Clean PRs Are Labeled
 
 After all fixes, verify that clean PRs have been labeled by the `copilot-auto-approve` bot. If any PRs are missing the label, request a Copilot review to trigger the auto-approve flow:
 
 ```
-github_request_review(number: <PR#>, copilot: true)
+github_request_review(prs: [<PR#>], copilot: true)
 ```
 
 > **Only the bot should add `merge-when-ready`**. Do **not** manually add or remove `merge-to-parent` — that label is managed manually for stacked PRs targeting non-main branches.
@@ -235,7 +235,7 @@ The response includes a `summary` object with counts and a `prs` array with per-
 The `copilot-auto-approve` workflow automatically requests Copilot reviews and adds `merge-when-ready` when clean. If any clean PRs are missing the label:
 
 ```
-github_request_review(number: <PR#>, copilot: true)
+github_request_review(prs: [<PR#>], copilot: true)
 ```
 
 ### Cloud Step 3: Re-run Flaky / Failed CI
@@ -260,7 +260,7 @@ ci_search_logs(runId: <runId>, pattern: "error|FAIL|Error:", context: 5)
 Find PRs without a Copilot review and request one:
 
 ```
-github_request_review(number: <PR#>, copilot: true)
+github_request_review(prs: [<PR#>], copilot: true)
 ```
 
 ### Cloud Step 5: Resolve Process / Meta Review Threads

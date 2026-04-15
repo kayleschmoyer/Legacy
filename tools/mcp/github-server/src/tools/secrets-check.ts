@@ -49,6 +49,7 @@ export async function secretsCheck(
             return {
               name,
               exists: true,
+              createdAt: secret.created_at,
               updatedAt: secret.updated_at,
             };
           } catch {
@@ -75,7 +76,11 @@ export async function secretsCheck(
     }
 
     // No specific names — paginate through all secrets (GitHub returns max 100 per page)
-    const allSecrets: Array<{ name: string; updatedAt: string }> = [];
+    const allSecrets: Array<{
+      name: string;
+      createdAt: string;
+      updatedAt: string;
+    }> = [];
     let page = 1;
     let totalCount = 0;
     for (;;) {
@@ -86,7 +91,11 @@ export async function secretsCheck(
       });
       totalCount = data.total_count;
       for (const s of data.secrets) {
-        allSecrets.push({ name: s.name, updatedAt: s.updated_at });
+        allSecrets.push({
+          name: s.name,
+          createdAt: s.created_at,
+          updatedAt: s.updated_at,
+        });
       }
       if (allSecrets.length >= totalCount || data.secrets.length === 0) {
         break;

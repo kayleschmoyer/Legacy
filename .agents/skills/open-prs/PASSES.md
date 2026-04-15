@@ -121,7 +121,7 @@ Ensure every open PR has a Copilot review. The repository ruleset (`review_on_pu
 For each PR without a Copilot review (check `github_pr_batch_status(numbers: [...], compact: false)` results — the `reviews` field is available in `github_pr_batch_status` and `scan-prs.ps1` output, not in `github_pr_dashboard` rows). **Note**: `github_pr_batch_status` accepts at most 50 PR numbers per call — chunk larger lists into batches of ≤50 before calling.
 
 ```
-github_request_review(number: <PR#>)
+github_request_review(prs: [<PR#>])
 ```
 
 The MCP tool uses a user OAuth token (via `gh auth token`) for Copilot requests, bypassing the default app token that would silently fail.
@@ -159,7 +159,7 @@ After posting a rebase command, the PR enters a "commanded" state. Dependabot ha
 Any PR that is already mergeable, CI passing, and has no unresolved threads can be labeled immediately — no git operation needed:
 
 ```
-github_manage_labels(number: <PR#>, add: ["merge-when-ready"])
+github_manage_labels(prs: [<PR#>], add: ["merge-when-ready"])
 ```
 
 Add these PRs to `settled` immediately.
@@ -259,7 +259,7 @@ For each PR in the review-comments bucket from Step 1's `github_pr_dashboard` re
 3. After pushing, re-check for new threads (Copilot re-reviews on push)
 4. If a review fix sub-agent **cannot complete the task but runs successfully**, analyze why, and optionally do **one** orchestrator-driven retry with a different approach (e.g., read the module source, check related files for patterns, try an alternative implementation). If it still cannot resolve the comments, comment on the PR with the diagnosed blocker. Only label `requires-human-review` if the blocker is outside agent reach (needs credentials, product decisions, or external dependencies) — otherwise leave it unlabeled for a future sweep attempt. If the sub-agent **execution itself fails** (crash, timeout, or tool error), do not retry — comment on the PR with the failure details and continue to the next PR (do not label, as the failure may be transient).
 
-> **Re-request Copilot review after resolving threads on bot-authored PRs**: for each bot-authored PR where review threads were resolved in this pass (either by code fix + push or by resolving meta threads), call `github_request_review(number: <PR#>)`. This only asks Copilot to review again; it does **not** itself emit a `pull_request_review` event. When Copilot actually submits a new review, GitHub emits `pull_request_review: submitted`, which triggers the `review-check` job; on successful completion, the `auto-approve` job (configured in `.github/workflows/copilot-auto-approve.yml` to run on `workflow_run`) can then approve and label the PR. If you skip the explicit re-request, Copilot never re-reviews, so no new `pull_request_review` event is fired and the auto-approve flow never runs, leaving approvals stuck.
+> **Re-request Copilot review after resolving threads on bot-authored PRs**: for each bot-authored PR where review threads were resolved in this pass (either by code fix + push or by resolving meta threads), call `github_request_review(prs: [<PR#>])`. This only asks Copilot to review again; it does **not** itself emit a `pull_request_review` event. When Copilot actually submits a new review, GitHub emits `pull_request_review: submitted`, which triggers the `review-check` job; on successful completion, the `auto-approve` job (configured in `.github/workflows/copilot-auto-approve.yml` to run on `workflow_run`) can then approve and label the PR. If you skip the explicit re-request, Copilot never re-reviews, so no new `pull_request_review` event is fired and the auto-approve flow never runs, leaving approvals stuck.
 
 > **No manual labeling needed.** The `copilot-auto-approve` bot labels clean PRs automatically after Copilot re-reviews the pushed fixes.
 >
@@ -364,7 +364,7 @@ After Passes 1-3, Copilot may have re-reviewed pushed changes. Instead of waitin
 2. If new threads appeared, queue the PR for the next Pass 2 iteration
 3. For bot-authored PRs where all threads are now resolved, explicitly request Copilot re-review to trigger auto-approve:
    ```
-   github_request_review(number: <PR#>)
+   github_request_review(prs: [<PR#>])
    ```
 
 This decouples Copilot review from the critical path — the sweep continues working while Copilot reviews asynchronously, and catches up in a batch at the end of each pass cycle.
@@ -376,7 +376,7 @@ This decouples Copilot review from the critical path — the sweep continues wor
 After each pass, proactively label PRs that have no unresolved review threads with `merge-when-ready`:
 
 ```
-github_manage_labels(number: <PR#>, add: ["merge-when-ready"])
+github_manage_labels(prs: [<PR#>], add: ["merge-when-ready"])
 ```
 
 This is safe to do even if CI is still running or pending — failing CI will automatically remove the label. Do not wait for the `copilot-auto-approve` bot; label immediately when reviews are clean.
@@ -461,11 +461,11 @@ REPEAT (max 10 passes):
       - Bot-authored PRs need explicit request (uses user OAuth token via gh auth)
     - 0b: Handle Dependabot PRs (comment-only, no worktree needed)
       - For each pr in dependabot_prs:
-          - Claim PR via github_manage_labels(number: <pr.number>, add: ["sweep-claimed"]) before acting
+          - Claim PR via github_manage_labels(prs: [<pr.number>], add: ["sweep-claimed"]) before acting
           - IF pr is conflicting or has failing/stale CI → gh pr comment <pr.number> --body "@dependabot rebase"
-          - IF pr is clean (no conflicts, CI passing)   → github_manage_labels(number: <pr.number>, add: ["merge-when-ready"])
-          - IF pr has unresolved review threads         → github_manage_labels(number: <pr.number>, add: ["requires-human-review"])
-          - Release claim via github_manage_labels(number: <pr.number>, remove: ["sweep-claimed"]) after acting
+          - IF pr is clean (no conflicts, CI passing)   → github_manage_labels(prs: [<pr.number>], add: ["merge-when-ready"])
+          - IF pr has unresolved review threads         → github_manage_labels(prs: [<pr.number>], add: ["requires-human-review"])
+          - Release claim via github_manage_labels(prs: [<pr.number>], remove: ["sweep-claimed"]) after acting
       - After acting, add pr to settled (Dependabot handles rebase asynchronously)
     - 0c: Label already-clean PRs with merge-when-ready → add to settled
     - 0d: Re-run transient CI failures early (flaky tests, infra timeouts) so CI runs during later passes
@@ -575,12 +575,12 @@ For each PR marked as settled in this sweep, verify:
    github_view_pr(number: <PR#>)
    ```
 
-   If `reviewDecision` is `null` and, based on the latest `github_pr_dashboard` / `github_pr_batch_status` data, Copilot's last review is `COMMENTED` with 0 unresolved threads → re-request Copilot review via `github_request_review(number: <PR#>)`.
+   If `reviewDecision` is `null` and, based on the latest `github_pr_dashboard` / `github_pr_batch_status` data, Copilot's last review is `COMMENTED` with 0 unresolved threads → re-request Copilot review via `github_request_review(prs: [<PR#>])`.
 
 3. **If CI appears not to have run** (e.g., `statusCheckRollup` is empty, has fewer than 3 entries, _or_ the dashboard-computed CI status / `summarizeCIStatus` reports `ciStatus === "none"`): flag as "CI may not have run", then:
    - Use `ci_list_runs` to discover the latest run (if any) for the PR's branch.
    - Dispatch the CI orchestrator via `ci_rerun(runId: <latest-run-id>, failedOnly: false)` as appropriate.
 
-4. **If stale CI failure labels exist** (any `CI:`-prefixed failure labels present: `CI: Lint Failure`, `CI: Type Error`, `CI: Test Failure`, `CI: Build Failure`, `CI: E2E Failure`, `CI: Schema Drift`, `CI: Migration`, `CI: Security`, `CI: Quality Gates`) but the corresponding check(s) now pass: compute the subset that are both currently applied and stale, then strip only those via `github_manage_labels(number: <PR#>, remove: [<stale-labels-only>])`.
+4. **If stale CI failure labels exist** (any `CI:`-prefixed failure labels present: `CI: Lint Failure`, `CI: Type Error`, `CI: Test Failure`, `CI: Build Failure`, `CI: E2E Failure`, `CI: Schema Drift`, `CI: Migration`, `CI: Security`, `CI: Quality Gates`) but the corresponding check(s) now pass: compute the subset that are both currently applied and stale, then strip only those via `github_manage_labels(prs: [<PR#>], remove: [<stale-labels-only>])`.
 
 This pass runs **once at the end of the sweep**, not in the per-PR loop, to keep it lightweight. If any PR requires another rebase or re-review, update the final summary accordingly.

@@ -96,7 +96,7 @@ export async function getReviewThreads(
         createdAt: t.comments.nodes[0]?.createdAt ?? null,
         commentCount: t.comments.nodes.length,
         comments: t.comments.nodes.map((c) => ({
-          databaseId: c.databaseId, // null if GitHub didn't return an ID; use non-null IDs with github_add_review_reply
+          databaseId: c.databaseId, // null if GitHub didn't return an ID; use non-null IDs with github_reply_to_review
           author: c.author?.login ?? 'unknown',
           body: c.body,
           path: c.path,

@@ -160,7 +160,7 @@ Follow the full [worktree-workflow skill](../worktree-workflow/SKILL.md):
 
    > **⛔ Do NOT stop here.** `make pc` passing is a checkpoint, not the finish line. If you exit the workflow at this point, the work is unfinished — keep going.
 
-8. **Ship** (prerequisite: step 6 self-review was executed and all issues fixed — if you skipped step 6, go back now; do NOT create a PR without completing self-review): `worktree_commit({ message: "type(scope): msg" })` → `worktree_push()` → `github_create_pr(title: "LS-#### type(scope): msg", body: "<markdown>", worktreePath: "$wt", draft: true)` → `github_manage_labels(number: <PR#>, add: ["agent-in-progress"])` → `github_mark_pr_ready(number: <PR#>)` → `github_request_review(number: <PR#>)` → subscribe to PR activity → `jira_transition(key: "LS-####", status: "In Review")`. Apply the label while still a draft so the PR is already labeled when it becomes visible to sweeps. See [create PR](../pr-lifecycle/references/create-pr.md) only for PR body/title formatting and PR mechanics — this skill's step ordering overrides that reference: after PR creation, complete step 9 (watch to merge) first, then run the MCP gap audit in step 10 after merge.
+8. **Ship** (prerequisite: step 6 self-review was executed and all issues fixed — if you skipped step 6, go back now; do NOT create a PR without completing self-review): `worktree_commit({ message: "type(scope): msg" })` → `worktree_push()` → `github_create_pr(title: "LS-#### type(scope): msg", body: "<markdown>", worktreePath: "$wt", draft: true)` → `github_manage_labels(prs: [<PR#>], add: ["agent-in-progress"])` → `github_mark_pr_ready(number: <PR#>)` → `github_request_review(prs: [<PR#>])` → subscribe to PR activity → `jira_transition(key: "LS-####", status: "In Review")`. Apply the label while still a draft so the PR is already labeled when it becomes visible to sweeps. See [create PR](../pr-lifecycle/references/create-pr.md) only for PR body/title formatting and PR mechanics — this skill's step ordering overrides that reference: after PR creation, complete step 9 (watch to merge) first, then run the MCP gap audit in step 10 after merge.
    - **Subscribe to PR activity (environment-aware)**: Local agents proceed directly to Step 9's `github_wait_for_pr_event` loop — the blocking call itself serves as the watch mechanism. Cloud agents (Claude Code on the web) call `mcp__github__subscribe_pr_activity({ owner, repo, pullNumber: <PR#> })` to receive real-time `<github-webhook-activity>` messages, then react to incoming messages in Step 9. Do not mix mechanisms — local agents poll via `github_wait_for_pr_event`, cloud agents subscribe via `mcp__github__subscribe_pr_activity`.
 
    > **⛔ Do NOT stop here.** Creating the PR is also not the finish line. Subscribing to PR activity is mandatory — without it, CI failures and review comments do not stream back into the session and the watch-to-merge step in step 9 cannot react. If you exit after `github_create_pr` without subscribing and watching, the ticket is unfinished.
@@ -173,7 +173,7 @@ Follow the full [worktree-workflow skill](../worktree-workflow/SKILL.md):
      - Branch behind `main` → run the [rebase skill](../rebase/SKILL.md) (`worktree_rebase` → `worktree_stabilize` → `make pc` → push)
      - Flaky tests → re-run via `ci_rerun({ runId, failedOnly: true })`; if persistent, dig in
      - `failedChecks.type === "check_run"` → retrigger with `github_retrigger_check`; `type === "commit_status"` → push a new commit or dispatch the workflow
-   - **`new_review_thread`**: the event payload includes thread body/path/line. Do **not** fix just that single thread and push immediately. Re-fetch **all** unresolved threads with `github_get_review_threads({ number: <PR#>, unresolvedOnly: true })`, batch the whole review round (plus any already-known CI/root-cause fixes), then push once, reply via `github_reply_to_thread({ threadId, body: "addressed in <sha>" })`, and resolve via `github_resolve_threads({ threadIds: [...], prNumber: <PR#> })`. Re-request review with `github_request_review({ number: <PR#> })` when the round is done. Cap at 2 review rounds before escalating to the user. (Copilot feedback always arrives as `new_review_thread` — never as `review_changes_requested`.)
+   - **`new_review_thread`**: the event payload includes thread body/path/line. Do **not** fix just that single thread and push immediately. Re-fetch **all** unresolved threads with `github_get_review_threads({ number: <PR#>, unresolvedOnly: true })`, batch the whole review round (plus any already-known CI/root-cause fixes), then push once, reply via `github_reply_to_review({ threadId, body: "addressed in <sha>" })`, and resolve via `github_resolve_threads({ threadIds: [...], prNumber: <PR#> })`. Re-request review with `github_request_review({ prs: [<PR#>] })` when the round is done. Cap at 2 review rounds before escalating to the user. (Copilot feedback always arrives as `new_review_thread` — never as `review_changes_requested`.)
    - **`conflicts`**: re-run the rebase skill — do not just label it for the sweep.
    - **`review_approved`** + checks passing → merge.
    - **`merged`**: proceed to step 10.
@@ -219,7 +219,7 @@ Process children in iterative batches until the backlog is empty.
           agent), skip and report those keys.
      d. Claim batch with verification (prevents duplicate work across concurrent agents):
         - First, re-check each candidate: call `jira_view` for each selected ticket. If any are not exactly "To Do" (another agent moved them to "In Progress", "In Review", or "Done" between listing and now), drop them from the batch.
-        - Transition remaining To Do tickets: `jira_bulk_transition(keys: [...batch keys], status: "In Progress")` (one bulk call saves N round-trips).
+        - Transition remaining To Do tickets: `jira_transition(key: [...batch keys], status: "In Progress")` (one call saves N round-trips).
         - Verify: call `jira_view` on each claimed ticket to confirm transition succeeded. Drop any that failed.
         - If the entire batch was dropped, loop back to step a.
      e. **Dispatch a subagent for each child ticket** — do NOT modify the orchestrator's
@@ -277,8 +277,8 @@ Process children in iterative batches until the backlog is empty.
         symlink node_modules, do the work, push, create PR, then
         `git checkout <original-branch>`. Commit and push before every switch.
      f. Release uncompleted: any claimed ticket that did not reach "In Review":
-        - If no PR exists → transition back to "To Do" via individual jira_transition
-          (note: jira_bulk_transition does not support "To Do"; use single calls here)
+        - If no PR exists → transition back to "To Do" via the Jira REST API directly
+          (note: jira_transition only supports "In Progress", "In Review", "Done" — "To Do" is not a valid target status under any circumstances)
         - If a PR/branch exists → keep "In Progress" and report for manual follow-up
      g. Append results to all_worked / all_released.
      → Loop back to step a.

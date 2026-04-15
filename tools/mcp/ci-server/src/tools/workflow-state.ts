@@ -5,6 +5,11 @@ interface WorkflowStateParams {
   workflow: string | number;
 }
 
+interface WorkflowSetStateParams {
+  workflow: string | number;
+  action: 'enable' | 'disable';
+}
+
 interface GitHubWorkflow {
   id: number;
   name: string;
@@ -59,11 +64,16 @@ export async function workflowState(
   }
 }
 
-async function setWorkflowState(
-  workflow: string | number,
-  action: 'enable' | 'disable',
+/**
+ * Enable or disable a workflow. Wraps
+ * `PUT /repos/{owner}/{repo}/actions/workflows/{workflow}/enable` or `.../disable`.
+ * Equivalent to `gh workflow enable <workflow>` or `gh workflow disable <workflow>`.
+ */
+export async function workflowSetState(
+  params: WorkflowSetStateParams,
 ): Promise<ToolResult> {
-  const workflowStr = String(workflow);
+  const workflowStr = String(params.workflow);
+  const { action } = params;
   try {
     await githubPut(
       `/actions/workflows/${encodeURIComponent(workflowStr)}/${action}`,
@@ -104,26 +114,4 @@ async function setWorkflowState(
       ],
     };
   }
-}
-
-/**
- * Enable a manually-disabled workflow. Wraps
- * `PUT /repos/{owner}/{repo}/actions/workflows/{workflow}/enable`.
- * Equivalent to `gh workflow enable <workflow>`.
- */
-export async function workflowEnable(
-  params: WorkflowStateParams,
-): Promise<ToolResult> {
-  return setWorkflowState(params.workflow, 'enable');
-}
-
-/**
- * Disable a workflow. Wraps
- * `PUT /repos/{owner}/{repo}/actions/workflows/{workflow}/disable`.
- * Equivalent to `gh workflow disable <workflow>`.
- */
-export async function workflowDisable(
-  params: WorkflowStateParams,
-): Promise<ToolResult> {
-  return setWorkflowState(params.workflow, 'disable');
 }

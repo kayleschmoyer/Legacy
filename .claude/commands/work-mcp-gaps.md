@@ -48,7 +48,7 @@ REPEAT:
   5. Select batch: pick up to 5 unblocked To Do tickets (skip this step if there are no To Do tickets and you are only draining).
   6. Claim batch with verification (prevents duplicate work across concurrent agents):
      a. For each selected ticket, call `jira_view` to re-check its current status. If a ticket's current status is not exactly "To Do" (for example, another agent already moved it to "In Progress", "In Review", or it is already "Done"), **drop it from the batch** — do not transition it, do not work it.
-     b. Transition only the tickets still confirmed as "To Do" to "In Progress": `jira_bulk_transition(keys: [...], status: "In Progress")` (or individual `jira_transition` calls if bulk is unavailable).
+     b. Transition only the tickets still confirmed as "To Do" to "In Progress": `jira_transition(key: [...], status: "In Progress")`.
      c. Verify: call `jira_view` on each claimed ticket to confirm the transition succeeded. Drop any that failed.
      d. If the entire batch was dropped (all selected tickets were no longer exactly "To Do"), loop back to step 2 to find more work.
   7. Work each ticket: Leaf Mode flow (worktree → implement → validate → PR → github_mark_pr_ready → github_request_review → mcp__github__subscribe_pr_activity → Jira "In Review"). Append the new PR to in_flight_prs as { ticket, prNumber, branch, reviewRounds: 0 }.

@@ -107,7 +107,7 @@ Quick-reference decision trees for the most common failure scenarios agents enco
 1. Determine what state you're in:
    - **Code committed, not pushed**: `worktree_push({ setUpstream: true })`, then continue from step 12 (Ship).
    - **Pushed, no PR**: `github_create_pr({ title: "<pr title>", body: "<pr body>", draft: true })`, then continue from step 12a.
-   - **PR exists, not marked ready**: `github_manage_labels({ number: <PR#>, add: ["agent-in-progress"] })`, then `github_mark_pr_ready({ number: <PR#> })`, then continue.
+   - **PR exists, not marked ready**: `github_manage_labels({ prs: [<PR#>], add: ["agent-in-progress"] })`, then `github_mark_pr_ready({ number: <PR#> })`, then continue.
    - **PR ready, Jira not transitioned**: `jira_transition({ key: "LS-####", status: "In Review" })`, then continue to step 13 (Watch).
    - **PR merged, no gap audit**: run the gap audit (step 14), then complete tracking tasks (step 15).
 2. The workflow is designed to be resumable from any step — find where you stopped and pick up from there.

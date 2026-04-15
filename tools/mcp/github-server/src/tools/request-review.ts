@@ -4,7 +4,7 @@ import { githubRest } from '../github-api.js';
 import type { ToolResult } from '../types.js';
 
 interface RequestReviewParams {
-  number: number;
+  prs: number[];
   reviewers?: string[];
   copilot?: boolean;
 }
@@ -113,93 +113,146 @@ async function requestCopilotReview(
       'App-authored PRs via the API. Try requesting from the GitHub UI.',
   };
 }
+
+/** Request reviewers on one or more PRs. Accepts a single PR number or an array. */
 export async function requestReview(
   params: RequestReviewParams,
 ): Promise<ToolResult> {
-  const results: Array<{ reviewer: string; success: boolean; error?: string }> =
-    [];
+  const uniquePrs = [...new Set(params.prs)];
+  const wantsCopilot = params.copilot !== false;
+  const humanReviewers = [
+    ...new Set((params.reviewers ?? []).map((r) => r.trim()).filter(Boolean)),
+  ];
+
+  if (!wantsCopilot && humanReviewers.length === 0) {
+    return {
+      isError: true,
+      content: [
+        {
+          type: 'text',
+          text: 'No reviewers specified. Provide at least one reviewer or enable copilot.',
+        },
+      ],
+    };
+  }
+
+  const perPrResults: Array<{
+    prNumber: number;
+    reviewers: Array<{ reviewer: string; success: boolean; error?: string }>;
+  }> = [];
 
   try {
     const repo = await getRepoOwnerName();
-    const path = `/repos/${repo.owner}/${repo.name}/pulls/${params.number}/requested_reviewers`;
 
-    // Separate Copilot from other reviewers — Copilot needs special handling
-    const wantsCopilot = params.copilot !== false;
-    const humanReviewers = params.reviewers?.length
-      ? [...params.reviewers]
-      : [];
+    // Process PRs in parallel batches of 10
+    const BATCH_SIZE = 10;
+    for (let i = 0; i < uniquePrs.length; i += BATCH_SIZE) {
+      const batch = uniquePrs.slice(i, i + BATCH_SIZE);
+      const batchResults = await Promise.all(
+        batch.map(async (prNumber) => {
+          const reviewerResults: Array<{
+            reviewer: string;
+            success: boolean;
+            error?: string;
+          }> = [];
+          const path = `/repos/${repo.owner}/${repo.name}/pulls/${prNumber}/requested_reviewers`;
 
-    if (!wantsCopilot && humanReviewers.length === 0) {
-      return {
-        isError: true,
-        content: [
-          {
-            type: 'text',
-            text: `No reviewers specified for PR #${params.number}. Provide at least one reviewer or enable copilot.`,
-          },
-        ],
-      };
-    }
-
-    // Handle Copilot separately — requires a user OAuth token
-    if (wantsCopilot) {
-      const copilotResult = await requestCopilotReview(
-        repo.owner,
-        repo.name,
-        params.number,
-      );
-      results.push({
-        reviewer: COPILOT_BOT,
-        success: copilotResult.success,
-        ...(copilotResult.error ? { error: copilotResult.error } : {}),
-      });
-    }
-
-    // Handle human reviewers via the default token (app tokens work fine here)
-    if (humanReviewers.length > 0) {
-      try {
-        const response = await githubRest<PullResponse>({
-          method: 'POST',
-          path,
-          body: { reviewers: humanReviewers },
-        });
-        const addedLogins = new Set(
-          response.requested_reviewers?.map((r) => r.login) ?? [],
-        );
-        for (const reviewer of humanReviewers) {
-          results.push({
-            reviewer,
-            success: addedLogins.has(reviewer),
-            ...(!addedLogins.has(reviewer)
-              ? {
-                  error:
-                    'Reviewer was silently dropped by the API. They may not have access to this repository.',
-                }
-              : {}),
-          });
-        }
-      } catch (error) {
-        // If batch fails, try individually
-        for (const reviewer of humanReviewers) {
-          try {
-            await githubRest({
-              method: 'POST',
-              path,
-              body: { reviewers: [reviewer] },
-            });
-            results.push({ reviewer, success: true });
-          } catch (individualError) {
-            results.push({
-              reviewer,
-              success: false,
-              error:
-                individualError instanceof Error
-                  ? individualError.message
-                  : String(individualError),
+          // Handle Copilot separately — requires a user OAuth token
+          if (wantsCopilot) {
+            const copilotResult = await requestCopilotReview(
+              repo.owner,
+              repo.name,
+              prNumber,
+            );
+            reviewerResults.push({
+              reviewer: COPILOT_BOT,
+              success: copilotResult.success,
+              ...(copilotResult.error ? { error: copilotResult.error } : {}),
             });
           }
-        }
-      }
+
+          // Handle human reviewers via the default token
+          if (humanReviewers.length > 0) {
+            try {
+              const response = await githubRest<PullResponse>({
+                method: 'POST',
+                path,
+                body: { reviewers: humanReviewers },
+              });
+              const addedLogins = new Set(
+                response.requested_reviewers?.map((r) => r.login) ?? [],
+              );
+              for (const reviewer of humanReviewers) {
+                reviewerResults.push({
+                  reviewer,
+                  success: addedLogins.has(reviewer),
+                  ...(!addedLogins.has(reviewer)
+                    ? {
+                        error:
+                          'Reviewer was silently dropped by the API. They may not have access to this repository.',
+                      }
+                    : {}),
+                });
+              }
+            } catch (error) {
+              // Only fall back to per-reviewer requests for HTTP 422 (validation errors,
+              // e.g. a reviewer not having repo access). For auth/rate-limit/5xx errors,
+              // record the batch error for all reviewers without amplifying API traffic.
+              const isValidationError =
+                error instanceof Error && /\(422\)/.test(error.message);
+              if (isValidationError) {
+                for (const reviewer of humanReviewers) {
+                  try {
+                    const individualResponse = await githubRest<PullResponse>({
+                      method: 'POST',
+                      path,
+                      body: { reviewers: [reviewer] },
+                    });
+                    const added = new Set(
+                      individualResponse.requested_reviewers?.map(
+                        (r) => r.login,
+                      ) ?? [],
+                    );
+                    reviewerResults.push({
+                      reviewer,
+                      success: added.has(reviewer),
+                      ...(!added.has(reviewer)
+                        ? {
+                            error:
+                              'Reviewer was silently dropped by the API. They may not have access to this repository.',
+                          }
+                        : {}),
+                    });
+                  } catch (individualError) {
+                    reviewerResults.push({
+                      reviewer,
+                      success: false,
+                      error:
+                        individualError instanceof Error
+                          ? individualError.message
+                          : String(individualError),
+                    });
+                  }
+                }
+              } else {
+                // Non-422 error (rate limit, auth, 5xx) — report for all reviewers
+                const errorMsg =
+                  error instanceof Error ? error.message : String(error);
+                for (const reviewer of humanReviewers) {
+                  reviewerResults.push({
+                    reviewer,
+                    success: false,
+                    error: errorMsg,
+                  });
+                }
+              }
+            }
+          }
+
+          return { prNumber, reviewers: reviewerResults };
+        }),
+      );
+      perPrResults.push(...batchResults);
     }
   } catch (error) {
     return {
@@ -207,19 +260,46 @@ export async function requestReview(
       content: [
         {
           type: 'text',
-          text: `Failed to request reviewers on PR #${params.number}: ${error instanceof Error ? error.message : String(error)}`,
+          text: `Failed to get repo info: ${error instanceof Error ? error.message : String(error)}`,
         },
       ],
     };
   }
 
-  const allSucceeded = results.every((r) => r.success);
+  const allSucceeded = perPrResults.every((pr) =>
+    pr.reviewers.every((r) => r.success),
+  );
+
+  // For single-PR calls, flatten to match the legacy per-reviewer output shape
+  if (uniquePrs.length === 1) {
+    return {
+      isError: !allSucceeded ? true : undefined,
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(
+            { prNumber: uniquePrs[0], results: perPrResults[0].reviewers },
+            null,
+            2,
+          ),
+        },
+      ],
+    };
+  }
+
   return {
     isError: !allSucceeded ? true : undefined,
     content: [
       {
         type: 'text',
-        text: JSON.stringify({ prNumber: params.number, results }, null, 2),
+        text: JSON.stringify(
+          {
+            total: uniquePrs.length,
+            results: perPrResults,
+          },
+          null,
+          2,
+        ),
       },
     ],
   };

@@ -156,14 +156,13 @@ All tools accept:
 - `dir` — terraform working directory, relative to repo root (e.g. `"terraform/main"`, `"terraform/runners"`) or an absolute path
 - `worktreePath` (optional) — repo/worktree root for resolving relative `dir` values (defaults to repo root)
 
-| Tool                       | Equivalent CLI                                | When to use                                                                                                                               |
-| -------------------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `terraform_state_pull`     | `terraform -chdir=<dir> state pull`           | Inspect current state JSON; always pull before a push to get the latest serial number                                                     |
-| `terraform_state_push`     | `terraform -chdir=<dir> state push <file>`    | Restore or overwrite remote state; use after manual repairs. Pass `force: true` only when the serial number mismatch is intentional       |
-| `terraform_state_mv`       | `terraform -chdir=<dir> state mv <src> <dst>` | Rename a single resource or move it to a different module without destroying real infrastructure                                          |
-| `terraform_state_list`     | `terraform -chdir=<dir> state list [<addr>]`  | List all tracked resources; optionally filter by address prefix (e.g. `"module.github_runners"`)                                          |
-| `terraform_state_rm`       | `terraform -chdir=<dir> state rm <addr>`      | Remove a resource from state tracking without deleting the real AWS resource. Always run with `dryRun: true` first to confirm the address |
-| `terraform_state_mv_batch` | multiple `terraform state mv` calls           | Rename or restructure many resources at once (up to 200 pairs). Runs sequentially and returns per-pair success/failure                    |
+| Tool                       | Equivalent CLI                               | When to use                                                                                                                                                                                      |
+| -------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `terraform_state_pull`     | `terraform -chdir=<dir> state pull`          | Inspect current state JSON; always pull before a push to get the latest serial number                                                                                                            |
+| `terraform_state_push`     | `terraform -chdir=<dir> state push <file>`   | Restore or overwrite remote state; use after manual repairs. Pass `force: true` only when the serial number mismatch is intentional                                                              |
+| `terraform_state_list`     | `terraform -chdir=<dir> state list [<addr>]` | List all tracked resources; optionally filter by address prefix (e.g. `"module.github_runners"`)                                                                                                 |
+| `terraform_state_rm`       | `terraform -chdir=<dir> state rm <addr>`     | Remove a resource from state tracking without deleting the real AWS resource. Always run with `dryRun: true` first to confirm the address                                                        |
+| `terraform_state_mv_batch` | multiple `terraform state mv` calls          | Rename or restructure many resources at once (up to 200 pairs). Pass `moves: [{ from, to }]` — single-element works for one resource too. Runs sequentially and returns per-pair success/failure |
 
 > **Caution:** Terraform state JSON often includes sensitive values (provider credentials, secrets). Do not share or paste tool output from `terraform_state_pull`.
 
@@ -178,10 +177,9 @@ terraform_state_list({ dir: "terraform/main" })
 **Rename a resource (e.g. after a .tf refactor):**
 
 ```
-terraform_state_mv({
+terraform_state_mv_batch({
   dir: "terraform/main",
-  source: "aws_lambda_function.old_name",
-  destination: "aws_lambda_function.new_name"
+  moves: [{ from: "aws_lambda_function.old_name", to: "aws_lambda_function.new_name" }]
 })
 ```
 

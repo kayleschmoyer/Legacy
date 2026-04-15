@@ -14,24 +14,19 @@ import { listReviews } from './tools/list-reviews.js';
 import { clearCiFailureLabels } from './tools/clear-ci-failure-labels.js';
 import { manageLabels } from './tools/manage-labels.js';
 import { markPRReady } from './tools/mark-pr-ready.js';
-import { manageLabelsBatch } from './tools/manage-labels-batch.js';
 import { mergePR } from './tools/merge-pr.js';
-import { prBatchStatus } from './tools/pr-batch-status.js';
 import { prDashboard } from './tools/pr-dashboard.js';
 import { prScan } from './tools/pr-scan.js';
 import { rebasePR } from './tools/rebase-pr.js';
-import { addReviewReply } from './tools/add-review-reply.js';
-import { replyToThread } from './tools/reply-to-thread.js';
+import { replyToReview } from './tools/reply-to-review.js';
 import { commentPR } from './tools/comment-pr.js';
 import { editPR } from './tools/edit-pr.js';
 import { listCommitStatuses } from './tools/list-commit-statuses.js';
 import { retriggerCheck } from './tools/retrigger-check.js';
 import { secretDelete } from './tools/secret-delete.js';
-import { secretList } from './tools/secret-list.js';
 import { setCommitStatus } from './tools/set-commit-status.js';
 import { secretSet } from './tools/secret-set.js';
 import { requestReview } from './tools/request-review.js';
-import { requestReviewBatch } from './tools/request-review-batch.js';
 import { resolveThreads } from './tools/resolve-threads.js';
 import { secretsCheck } from './tools/secrets-check.js';
 import { ensureSweepLabels } from './tools/ensure-sweep-labels.js';
@@ -41,6 +36,7 @@ import { listRunners } from './tools/list-runners.js';
 import { webhookList, webhookUpdate, webhookPing } from './tools/webhooks.js';
 import { prCommits } from './tools/pr-commits.js';
 import { waitForPREvent, ALL_PR_EVENTS } from './tools/wait-for-pr-event.js';
+import { prBatchStatus } from './tools/pr-batch-status.js';
 
 /**
  * Shared Zod schema for generic string arrays. Accepts a real array OR a
@@ -242,7 +238,7 @@ const server = new McpServer({
 // --- github_auth_status ---
 server.tool(
   'github_auth_status',
-  'Check GitHub API authentication status (passive check only — does not trigger interactive auth). Call this first in any GitHub workflow to verify API access is available.',
+  'Check GitHub API authentication status (passive check only — does not trigger interactive auth). Call this first in any GitHub workflow to verify API access is available. Also see ci_auth_status for GitHub rate limit info.',
   {},
   async (): Promise<ToolResult> => {
     const auth = await tryGetGitHubAuth();
@@ -508,47 +504,74 @@ server.tool(
   async (params) => listReviews(params),
 );
 
-// --- github_add_review_reply ---
+// --- github_reply_to_review ---
 server.tool(
-  'github_add_review_reply',
-  'Post a reply to a PR review comment using the numeric comment ID (from github_get_review_threads). Uses REST POST /pulls/{number}/comments with in_reply_to. Complements github_reply_to_thread (which uses GraphQL thread IDs).',
+  'github_reply_to_review',
+  'Post a reply to a PR review thread. Provide EITHER threadId (GraphQL node ID) OR both commentId AND number (REST) — not both paths at once.',
   {
-    number: z.coerce.number().int().positive().describe('PR number'),
-    commentId: z.coerce
-      .number()
-      .int()
-      .positive()
-      .describe(
-        'Numeric REST comment ID — use `comments[].databaseId` from `github_get_review_threads` output',
-      ),
-    body: z.string().trim().min(1).describe('Reply text (markdown)'),
-  },
-  async (params) => addReviewReply(params),
-);
-
-// --- github_reply_to_thread ---
-server.tool(
-  'github_reply_to_thread',
-  'Post a reply comment on a PR review thread via GraphQL mutation. Use after reviewing feedback to respond before resolving. Get thread IDs from github_get_review_threads.',
-  {
-    threadId: z
-      .string()
-      .describe(
-        'GraphQL node ID of the review thread to reply to (from github_get_review_threads)',
-      ),
     body: z
       .string()
       .trim()
       .min(1, 'Reply body cannot be empty')
       .describe('Markdown body of the reply comment'),
+    threadId: z
+      .string()
+      .optional()
+      .describe(
+        'GraphQL node ID of the review thread (from github_get_review_threads). Use this OR commentId+number, never both.',
+      ),
+    commentId: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        'Numeric REST comment ID (databaseId from github_get_review_threads). Requires "number" param. Use this OR threadId, never both.',
+      ),
+    number: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('PR number. Required when using commentId.'),
   },
-  async (params) => replyToThread(params),
+  async (params) => {
+    const hasThreadId = !!params.threadId;
+    const hasRestPath =
+      params.commentId !== undefined && params.number !== undefined;
+    if (
+      hasThreadId &&
+      (params.commentId !== undefined || params.number !== undefined)
+    ) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: 'Provide EITHER threadId OR (commentId + number) — not both paths at once.',
+          },
+        ],
+      };
+    }
+    if (!hasThreadId && !hasRestPath) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: 'Provide either threadId (GraphQL node ID) or both commentId and number (REST path).',
+          },
+        ],
+      };
+    }
+    return replyToReview(params);
+  },
 );
 
 // --- github_comment_pr ---
 server.tool(
   'github_comment_pr',
-  'Post a general (top-level) comment on a PR. Use for diagnostic notes, blocker explanations, and status updates — distinct from review thread replies (use github_reply_to_thread for those). Maps to POST /repos/{owner}/{repo}/issues/{number}/comments.',
+  'Post a general (top-level) comment on a PR. Use for diagnostic notes, blocker explanations, and status updates — distinct from review thread replies (use github_reply_to_review for those). Maps to POST /repos/{owner}/{repo}/issues/{number}/comments.',
   {
     number: z.coerce.number().int().positive().describe('PR number'),
     body: z
@@ -585,33 +608,26 @@ server.tool(
 // --- github_manage_labels ---
 server.tool(
   'github_manage_labels',
-  'Prefer this over `gh pr edit --add-label` via shell. Add or remove labels on a PR.',
+  'Prefer this over `gh pr edit --add-label` via shell. Add or remove labels on one or more PRs. Pass a single PR number or an array. When multiple PRs are given, all get the same label changes.',
   {
-    number: z.coerce.number().int().positive().describe('PR number'),
+    prs: z
+      .preprocess((v) => {
+        if (Array.isArray(v)) return v;
+        if (typeof v === 'string' && v.trimStart().startsWith('[')) {
+          try {
+            const parsed = JSON.parse(v);
+            if (Array.isArray(parsed)) return parsed;
+          } catch {
+            // Not valid JSON — fall through to wrap as single element
+          }
+        }
+        return [v];
+      }, z.array(z.coerce.number().int().positive()).min(1).max(100))
+      .describe('PR number or array of PR numbers'),
     add: labelList.optional().describe('Labels to add'),
     remove: labelList.optional().describe('Labels to remove'),
   },
   async (params) => manageLabels(params),
-);
-
-// --- github_manage_labels_batch ---
-server.tool(
-  'github_manage_labels_batch',
-  'Apply the same add/remove labels to multiple PRs in one call. ' +
-    'Pass PR numbers in `prs` (array of integers) and shared label lists in `add`/`remove`. ' +
-    'Example: prs=[1,2,3], add=["merge-when-ready"], remove=["ci-failure-lint"]',
-  {
-    prs: z
-      .array(z.coerce.number().int().positive())
-      .min(1)
-      .max(100)
-      .describe('PR numbers to apply labels to'),
-    add: labelList.optional().describe('Labels to add to every PR in `prs`'),
-    remove: labelList
-      .optional()
-      .describe('Labels to remove from every PR in `prs`'),
-  },
-  async (params) => manageLabelsBatch(params),
 );
 
 // --- github_merge_pr ---
@@ -733,9 +749,22 @@ server.tool(
 // --- github_request_review ---
 server.tool(
   'github_request_review',
-  'Request reviewers on a PR. Requests Copilot by default.',
+  'Request reviewers on one or more PRs. Accepts a single PR number or an array. Requests Copilot by default.',
   {
-    number: z.coerce.number().int().positive().describe('PR number'),
+    prs: z
+      .preprocess((v) => {
+        if (Array.isArray(v)) return v;
+        if (typeof v === 'string' && v.trimStart().startsWith('[')) {
+          try {
+            const parsed = JSON.parse(v);
+            if (Array.isArray(parsed)) return parsed;
+          } catch {
+            // Not valid JSON — fall through to wrap as single element
+          }
+        }
+        return [v];
+      }, z.array(z.coerce.number().int().positive()).min(1).max(100))
+      .describe('PR number or array of PR numbers'),
     reviewers: z
       .array(z.string())
       .optional()
@@ -745,27 +774,6 @@ server.tool(
       .describe('Request Copilot review (default: true)'),
   },
   async (params) => requestReview(params),
-);
-
-// --- github_request_review_batch ---
-server.tool(
-  'github_request_review_batch',
-  'Request reviewers on multiple PRs in one call. Requests Copilot by default. Useful for bulk PR sweeps.',
-  {
-    prs: z
-      .array(z.coerce.number().int().positive())
-      .min(1)
-      .max(100)
-      .describe('PR numbers'),
-    reviewers: z
-      .array(z.string())
-      .optional()
-      .describe('Human reviewer usernames'),
-    copilot: coercedBoolean
-      .default(true)
-      .describe('Request Copilot review (default: true)'),
-  },
-  async (params) => requestReviewBatch(params),
 );
 
 // --- github_resolve_threads ---
@@ -791,7 +799,7 @@ server.tool(
 // --- github_secrets_check ---
 server.tool(
   'github_secrets_check',
-  'Check whether required repository secrets exist. Returns secret names (never values) and last updated timestamps. If specific names are provided, returns a boolean exists field for each.',
+  'List all repo secret names or check specific secrets exist. Returns names, createdAt, updatedAt (never values). When names are omitted, lists all; when provided, returns per-secret exists status.',
   {
     names: z
       .array(z.string())
@@ -829,14 +837,6 @@ server.tool(
     number: z.coerce.number().int().positive().describe('PR number'),
   },
   async (params) => viewPR(params),
-);
-
-// --- github_secret_list ---
-server.tool(
-  'github_secret_list',
-  'List GitHub Actions secret names (not values) for the repository.',
-  {},
-  async () => secretList(),
 );
 
 // --- github_secret_delete ---

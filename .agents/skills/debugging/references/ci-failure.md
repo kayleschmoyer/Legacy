@@ -593,7 +593,7 @@ For extra-verbose CI logs, add the `ci-debug` label to your PR:
 **MCP (preferred):**
 
 ```
-github_manage_labels(prNumber: PR_NUMBER, add: ["ci-debug"])
+github_manage_labels(prs: [PR_NUMBER], add: ["ci-debug"])
 ```
 
 **Shell fallback:**

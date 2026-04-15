@@ -188,10 +188,10 @@ For threads you classified as **Clarify**, **Outdated/stale**, or **Disagree**, 
 
 ```
 # Preferred — reply by numeric comment id:
-github_add_review_reply({ commentId: <numeric>, body: "explanation" })
+github_reply_to_review({ commentId: <numeric>, number: <PR#>, body: "explanation" })
 
 # Alternative — reply by thread id:
-github_reply_to_thread({ threadId: "<thread-id>", body: "explanation" })
+github_reply_to_review({ threadId: "<thread-id>", body: "explanation" })
 ```
 
 **Shell fallback:**
@@ -229,7 +229,7 @@ gh api graphql -f query='mutation($id:ID!) { resolveReviewThread(input:{threadId
 After resolving all threads, add the label:
 
 ```
-github_manage_labels(number: <PR#>, add: ["merge-when-ready"])
+github_manage_labels(prs: [<PR#>], add: ["merge-when-ready"])
 ```
 
 Shell: `gh pr edit <PR#> --add-label "merge-when-ready"`

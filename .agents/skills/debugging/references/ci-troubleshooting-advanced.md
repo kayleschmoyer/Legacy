@@ -254,8 +254,8 @@ gh run view RUN_ID --log-failed | Select-String "HttpError|not accessible|No che
 **MCP (preferred):**
 
 ```
-github_manage_labels(prNumber: PR_NUMBER, remove: ["merge-when-ready"])
-github_manage_labels(prNumber: PR_NUMBER, add: ["merge-when-ready"])
+github_manage_labels(prs: [PR_NUMBER], remove: ["merge-when-ready"])
+github_manage_labels(prs: [PR_NUMBER], add: ["merge-when-ready"])
 ```
 
 **Shell fallback:**

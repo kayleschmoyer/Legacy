@@ -299,24 +299,73 @@ server.tool(
 // --- jira_transition ---
 server.tool(
   'jira_transition',
-  'Transition a ticket to a new status. On Done, warns about open subtasks; use cascade=true to auto-transition them.',
+  'Transition one or more tickets to a new status. Accepts a single key or an array of keys. ' +
+    'When using a single key, cascade=true auto-transitions open subtasks to Done. ' +
+    'On Done, warns about open subtasks.',
   {
     key: z
-      .string()
-      .regex(
-        /^[A-Z][A-Z0-9_]+-\d+$/,
-        'Must be a valid Jira issue key (e.g., LS-1137)',
+      .preprocess(
+        (v) => {
+          if (typeof v === 'string') {
+            try {
+              const parsed = JSON.parse(v);
+              if (Array.isArray(parsed)) return parsed;
+            } catch {
+              // not JSON — treat as single key string
+            }
+          }
+          return v;
+        },
+        z.union([
+          z
+            .string()
+            .regex(
+              /^[A-Z][A-Z0-9_]+-\d+$/,
+              'Must be a valid Jira issue key (e.g., LS-1137)',
+            ),
+          z
+            .array(
+              z
+                .string()
+                .regex(
+                  /^[A-Z][A-Z0-9_]+-\d+$/,
+                  'Each key must be a valid Jira issue key (e.g., LS-1137)',
+                ),
+            )
+            .min(1)
+            .max(50),
+        ]),
       )
-      .describe('Ticket key'),
-    status: z
-      .enum(['In Progress', 'In Review', 'Done'])
-      .describe('Target status'),
+      .describe('Ticket key (string) or array of ticket keys'),
+    status: z.enum(VALID_STATUSES).describe('Target status'),
     cascade: z
       .boolean()
       .default(false)
-      .describe('Auto-transition open subtasks to Done (default: false)'),
+      .describe(
+        'Auto-transition open subtasks to Done (default: false). Only applies when key is a single string.',
+      ),
   },
-  async (params) => transition(params),
+  async (params) => {
+    if (Array.isArray(params.key)) {
+      if (params.cascade) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: 'cascade=true is not supported when transitioning multiple keys. Set cascade=false or pass a single key.',
+            },
+          ],
+        };
+      }
+      return bulkTransition({ keys: params.key, status: params.status });
+    }
+    return transition({
+      key: params.key,
+      status: params.status,
+      cascade: params.cascade,
+    });
+  },
 );
 
 // --- jira_view ---
@@ -327,23 +376,6 @@ server.tool(
     key: z.string().describe('Ticket key'),
   },
   async (params) => view(params),
-);
-
-// --- jira_bulk_transition ---
-server.tool(
-  'jira_bulk_transition',
-  'Transition multiple Jira tickets to a new status in one call. Returns per-key success/failure results. Use for batch operations like closing all subtasks of a done parent.',
-  {
-    keys: z
-      .array(z.string())
-      .min(1)
-      .max(50)
-      .describe(
-        'Array of Jira ticket keys to transition (e.g. ["LS-1410", "LS-1413"])',
-      ),
-    status: z.enum(VALID_STATUSES).describe('Target status for all tickets'),
-  },
-  async (params) => bulkTransition(params),
 );
 
 // --- jira_delete_ticket ---

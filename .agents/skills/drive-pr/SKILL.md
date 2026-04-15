@@ -187,7 +187,7 @@ If there are unresolved review threads:
 3. Cross-reference with Jira ticket context (don't apply suggestions that contradict AC)
 4. Fix the code, validate with `make pc`, self-review fix code against `skills/pr-lifecycle/references/common-review-patterns.md`, then commit and push
 5. Resolve threads: `github_resolve_threads(threadIds: [...], prNumber: <PR#>)`
-6. Re-request review: `github_request_review(number: <PR#>)`
+6. Re-request review: `github_request_review(prs: [<PR#>])`
 
 Cap at **2 fix-review rounds**. After round 2, resolve remaining threads as "acknowledged" and proceed.
 
@@ -235,7 +235,7 @@ This blocks until an agent-actionable event fires. Handle each event:
 - PR is mergeable
 
 ```
-github_manage_labels(number: <PR#>, add: ["merge-when-ready"])
+github_manage_labels(prs: [<PR#>], add: ["merge-when-ready"])
 ```
 
 This triggers the repo's label-driven merge queue (`.github/workflows/merge-queue.yml`). Do **not** call `github_merge_pr` directly — it may bypass or conflict with branch protection and merge-queue enforcement. Continue the `github_wait_for_pr_event` loop after labeling; the merge queue will produce a `merged` event when the PR lands.
@@ -257,7 +257,7 @@ After the PR merges:
 2. **Remove `agent-in-progress` label** (if present):
 
    ```
-   github_manage_labels(number: <PR#>, remove: ["agent-in-progress"])
+   github_manage_labels(prs: [<PR#>], remove: ["agent-in-progress"])
    ```
 
 3. **Clean up worktree** (if one was created/attached): follow the standard cleanup in AGENTS.md Step 16.

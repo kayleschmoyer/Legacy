@@ -10,7 +10,6 @@ import { wtSetup } from './tools/wt-setup.js';
 import {
   terraformStatePull,
   terraformStatePush,
-  terraformStateMv,
   terraformStateList,
   terraformStateRm,
   terraformStateMvBatch,
@@ -392,45 +391,6 @@ server.tool(
   },
 );
 
-// --- terraform_state_mv ---
-server.tool(
-  'terraform_state_mv',
-  'Move a resource in Terraform state. ' +
-    'Equivalent to `terraform -chdir=<dir> state mv <source> <destination>`. ' +
-    'Use to rename resources or move them between modules without destroying/recreating.',
-  {
-    dir: z
-      .string()
-      .describe(
-        'Terraform working directory, e.g. "terraform/main" or "terraform/runners".',
-      ),
-    source: z
-      .string()
-      .describe(
-        'Source resource address, e.g. "aws_lambda_function.old_name".',
-      ),
-    destination: z
-      .string()
-      .describe(
-        'Destination resource address, e.g. "aws_lambda_function.new_name".',
-      ),
-    worktreePath: z
-      .string()
-      .regex(ABSOLUTE_PATH_REGEX, 'worktreePath must be an absolute path')
-      .optional()
-      .describe('Repo or worktree root (default: repo root).'),
-  },
-  async (params) => {
-    const repoRoot = params.worktreePath || getRepoRoot();
-    return terraformStateMv({
-      dir: params.dir,
-      source: params.source,
-      destination: params.destination,
-      repoRoot,
-    });
-  },
-);
-
 // --- terraform_state_list ---
 server.tool(
   'terraform_state_list',
@@ -509,8 +469,9 @@ server.tool(
 // --- terraform_state_mv_batch ---
 server.tool(
   'terraform_state_mv_batch',
-  'Batch-move resources in Terraform state. ' +
-    'Accepts up to 200 { from, to } pairs and runs them sequentially. ' +
+  'Move one or more resources in Terraform state. ' +
+    'Accepts 1–200 { from, to } pairs and runs them sequentially. ' +
+    'Pass a single-element array to move one resource. ' +
     'All pairs are attempted even if earlier ones fail; returns per-pair success/error results. ' +
     'Use for bulk module renames or resource restructuring.',
   {

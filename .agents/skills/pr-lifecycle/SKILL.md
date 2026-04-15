@@ -88,7 +88,7 @@ When `bot-review` CI check fails or Copilot posts review comments, use this MCP-
 2. **Inspect the returned comments and fix the code** in the flagged files/lines
 3. **Commit and push** the fix
 4. **Resolve threads**: `github_resolve_threads({ threadIds: [<thread-id>, ...], prNumber: PR# })`
-5. **Re-request review**: `github_request_review({ number: PR# })`
+5. **Re-request review**: `github_request_review({ prs: [PR#] })`
 
 Before the next push, also check whether any other blockers are already known on the PR (conflicts, non-review failing checks). Batch all currently known fixes into one validation + push round whenever possible. Do **not** push a CI-only change while known review threads remain unresolved, or vice versa, unless one blocker must be cleared first to reveal the next.
 
@@ -127,7 +127,7 @@ Before the next push, also check whether any other blockers are already known on
 ```
 # MCP (preferred) — create as draft, label, then mark ready
 github_create_pr(title: "LS-#### type(scope): msg", body: <markdown>, draft: true, worktreePath: <path>)
-github_manage_labels(number: <PR#>, add: ["agent-in-progress"])
+github_manage_labels(prs: [<PR#>], add: ["agent-in-progress"])
 github_mark_pr_ready(number: <PR#>)
 ```
 
@@ -183,13 +183,13 @@ github_create_pr(
 )
 
 # 3. Apply the agent-in-progress label
-github_manage_labels(number: <PR#>, add: ["agent-in-progress"])
+github_manage_labels(prs: [<PR#>], add: ["agent-in-progress"])
 
 # 4. Mark ready for review
 github_mark_pr_ready(number: <PR#>)
 
 # 5. Request Copilot review
-github_request_review(number: <PR#>)
+github_request_review(prs: [<PR#>])
 ```
 
 **Prefer MCP; use `gh` only when MCP is unavailable.** The `legacy-sports-github` MCP server exposes all required operations as first-class tools (`github_create_pr`, `github_mark_pr_ready`, `github_manage_labels`, `github_request_review`) and should always be preferred. `gh pr create` / `gh pr ready` / `gh pr edit --add-label` are shell-level fallbacks for when MCP servers are unavailable. Using `gh` CLI in a recovery context can also silently use the wrong working directory, bypasses the `worktreePath` parameter that routes the PR to the correct branch, and produces shell-history noise that MCP gap audits flag.

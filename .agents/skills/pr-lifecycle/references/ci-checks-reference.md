@@ -338,7 +338,7 @@ These produce GitHub check runs or commit statuses but are **not** required by b
 Add the `ci-debug` label to a PR to enable `NX_VERBOSE_LOGGING` and extended error context for the `quality-gates` and `build-validation` jobs in `ci-pipeline.yml`:
 
 ```
-github_manage_labels(number: PR#, add: ["ci-debug"])
+github_manage_labels(prs: [PR#], add: ["ci-debug"])
 ```
 
 ---

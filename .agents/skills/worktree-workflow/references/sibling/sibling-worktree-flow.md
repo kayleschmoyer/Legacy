@@ -392,7 +392,7 @@ See the [pr-lifecycle skill](../../../pr-lifecycle/SKILL.md) for the full PR tem
 
 ```
 github_create_pr(title: "LS-#### type(scope): description", body: <markdown>, draft: true, worktreePath: <path>)
-github_manage_labels(number: <PR#>, add: ["agent-in-progress"])
+github_manage_labels(prs: [<PR#>], add: ["agent-in-progress"])
 github_mark_pr_ready(number: <PR#>)
 ```
 
@@ -475,7 +475,7 @@ make -C $wt pc
 
 # 6. PR + Jira (DO NOT stop at make pc) — MCP tools primary
 github_create_pr(title: "LS-#### type(scope): msg", body: <markdown>, draft: true, worktreePath: $wt)
-github_manage_labels(number: <PR#>, add: ["agent-in-progress"])  # apply while still draft
+github_manage_labels(prs: [<PR#>], add: ["agent-in-progress"])  # apply while still draft
 github_mark_pr_ready(number: <PR#>)
 jira_transition(key: "LS-####", status: "In Review")
 # Shell fallback (only if MCP unavailable): gh pr create --draft --title "..." --body-file ".github/tmp-pr-body.md" --base main

@@ -1313,8 +1313,9 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
       name: 'worktree_setup_node_modules',
       description:
         "Create a node_modules symlink from the worktree to the main repo's " +
-        'node_modules. Required in every native ephemeral worktree before running ' +
-        'pnpm/make commands. Idempotent — skips creation if a valid symlink already ' +
+        'node_modules. Required in native ephemeral worktrees before running ' +
+        'pnpm/make commands. Sibling worktrees use make_wt_setup instead. ' +
+        'Idempotent — skips creation if a valid symlink already ' +
         'exists. Uses directory symlink (mklink /D) to prevent cascade deletion ' +
         'when Claude Code archives the worktree.',
       inputSchema: {

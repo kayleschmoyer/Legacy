@@ -29,7 +29,7 @@ For detailed inspection of specific PRs, use `github_pr_batch_status` with an ar
 Proactively add `merge-when-ready` to any PR with no unresolved review threads:
 
 ```
-github_manage_labels(number: <PR#>, add: ["merge-when-ready"])
+github_manage_labels(prs: [<PR#>], add: ["merge-when-ready"])
 ```
 
 This is safe even if CI is pending — failing CI will automatically remove the label. Do not wait for the `copilot-auto-approve` bot.
@@ -68,7 +68,7 @@ After re-running, the PR moves to `ciPending`. Track these for the final report.
 Find PRs without a Copilot review and request one. This is **required** for bot-authored PRs (e.g. `legacy-sports-code-bot`) — the repository ruleset only auto-triggers Copilot review for user-authored PRs. The `requestReviewers` REST API silently drops Copilot when called with GitHub App installation tokens (`ghs_*`); only user OAuth tokens work.
 
 ```
-github_request_review(number: <PR#>, copilot: true)
+github_request_review(prs: [<PR#>], copilot: true)
 ```
 
 > **Note**: The MCP tool automatically uses a user OAuth token (via `gh auth token`) for Copilot requests, bypassing the default app token. If no user token is available, it will report an error instead of silently failing.
