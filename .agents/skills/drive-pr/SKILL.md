@@ -155,7 +155,7 @@ worktree_setup_node_modules()
 
 ### Step 5: Fix blocking issues
 
-Work through blockers in priority order. After each fix, commit, push, and re-enter the wait loop.
+Work through blockers in priority order. Treat each pass through Step 5 as a **remediation round**: gather the blockers that are already known, apply the needed fixes, validate once, push once, then re-enter the wait loop. Do not split already-known review and CI fixes into separate pushes unless the first push is required to reveal the next blocker.
 
 #### Priority 1: Merge conflicts
 
@@ -191,6 +191,8 @@ If there are unresolved review threads:
 
 Cap at **2 fix-review rounds**. After round 2, resolve remaining threads as "acknowledged" and proceed.
 
+**Batching rule**: if CI failures and unresolved review threads coexist, collect both the thread set and CI evidence before editing. The default unit of work is one remediation round -> one validation -> one push, not separate pushes for already-known issues.
+
 #### Priority 4: Stale branch
 
 If the branch is behind `main` but not conflicting, rebase to pick up the latest:
@@ -214,16 +216,16 @@ github_wait_for_pr_event({ number: <PR#> })
 
 This blocks until an agent-actionable event fires. Handle each event:
 
-| Event                      | Action                                                                                    |
-| -------------------------- | ----------------------------------------------------------------------------------------- |
-| `checks_failed`            | Get run ID via `ci_list_runs`, inspect logs, fix or re-run (return to Step 5, Priority 2) |
-| `checks_passed`            | CI is green — if reviews are also clear, add `merge-when-ready` label                     |
-| `new_review_thread`        | Fix the review comment (return to Step 5, Priority 3)                                     |
-| `review_approved`          | If CI is also passing, add `merge-when-ready` label                                       |
-| `review_changes_requested` | Inspect the review, fix issues (return to Step 5, Priority 3)                             |
-| `conflicts`                | Rebase (return to Step 5, Priority 1)                                                     |
-| `merged`                   | Success — proceed to Step 7                                                               |
-| `closed`                   | PR was closed externally — report and stop                                                |
+| Event                      | Action                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `checks_failed`            | If the failed check is `bot-review` or otherwise looks review-related by name/context, first inspect the status details (for example via `github_list_commit_statuses({ number: <PR#> })` or the failed check URL) to confirm it is an unresolved-comments/review-threads blocker, then return to Step 5, Priority 3. Otherwise get run ID via `ci_list_runs`, inspect logs, fix or re-run (return to Step 5, Priority 2) |
+| `checks_passed`            | CI is green — if reviews are also clear, add `merge-when-ready` label                                                                                                                                                                                                                                                                                                                                                     |
+| `new_review_thread`        | Fix the review comment (return to Step 5, Priority 3)                                                                                                                                                                                                                                                                                                                                                                     |
+| `review_approved`          | If CI is also passing, add `merge-when-ready` label                                                                                                                                                                                                                                                                                                                                                                       |
+| `review_changes_requested` | Inspect the review, fix issues (return to Step 5, Priority 3)                                                                                                                                                                                                                                                                                                                                                             |
+| `conflicts`                | Rebase (return to Step 5, Priority 1)                                                                                                                                                                                                                                                                                                                                                                                     |
+| `merged`                   | Success — proceed to Step 7                                                                                                                                                                                                                                                                                                                                                                                               |
+| `closed`                   | PR was closed externally — report and stop                                                                                                                                                                                                                                                                                                                                                                                |
 
 **Merge conditions** — add `merge-when-ready` label when ALL of:
 

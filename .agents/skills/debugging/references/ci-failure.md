@@ -16,6 +16,13 @@ Step-by-step playbook for triaging and fixing a failed CI run in the Legacy Spor
 - You need to understand **why** CI failed and how to fix it
 - A merge-queue run was rejected
 
+## Not for
+
+- `bot-review` / Statuses API failures that only say `Copilot review blocked` or `Copilot review has unresolved comments`
+- PRs whose only blocker is unresolved Copilot review threads
+
+Those are **review-fix** workflows, not CI-log debugging. Fetch unresolved threads with `github_get_review_threads`, batch all current review fixes, resolve the threads, and re-request review. If real CI failures exist alongside review failures, collect both the review threads and CI evidence before the next push so the round lands in a single commit.
+
 ## CRITICAL: Evidence-First Debugging
 
 **NEVER guess at the problem.** Extract the actual error text from CI logs before attempting any fix.

@@ -44,6 +44,8 @@ Build a triage list:
 
 **Order matters**: always rebase first (Step 1), then fix reviews (Step 2), then fix CI (Step 3). Rebasing can resolve outdated review comments and change CI results.
 
+**Single-round batching rule**: before touching code, take a complete snapshot of the PR's current blockers. If unresolved review threads and CI failures coexist, read **all** unresolved threads and collect CI evidence **before** deciding what to edit. Batch all addressable fixes into one remediation pass and one push; only split pushes when the first push is strictly required to surface the next blocker.
+
 ### Step 1: Rebase (if conflicting)
 
 > Reference: load [rebase skill](../rebase/SKILL.md) for the full decision framework and conflict resolution patterns.
@@ -65,7 +67,7 @@ Build a triage list:
 3. **Apply all fixes in one pass** — do not commit between individual fixes. If a comment is unclear or contradicts ticket AC, reply explaining the conflict but still queue the thread for resolution.
 4. **Validate**: `make pc` (minimum: `make format && make lint-fix && make typecheck`)
 5. **Self-review fix code**: re-read every file you changed in full. Check fixes against `skills/pr-lifecycle/references/common-review-patterns.md` — fix code often introduces the same anti-patterns that triggered the original review. This prevents another review cycle.
-6. **Commit + push once**: single commit covering all fixes.
+6. **Commit + push once**: single commit covering all review fixes and any already-identified CI/root-cause fixes you intentionally batched into the same round.
 7. **Resolve threads immediately after push**: call `github_resolve_threads({ threadIds: [...], prNumber: <PR#> })` — include all addressed threads. GitHub does NOT auto-resolve threads. **Always invoke this MCP tool directly — do not reach for raw GraphQL mutations or shell commands (`Invoke-RestMethod`, `curl`) without first attempting the tool and receiving a connection error or explicit tool-not-found response.** Assuming the tool is unavailable without trying it is not acceptable.
 8. **Re-request Copilot review**: `github_request_review({ number: <PR#> })`
 
@@ -75,15 +77,16 @@ Build a triage list:
 
 > Reference: load [debugging skill](../debugging/SKILL.md) and its [CI failure reference](../debugging/references/ci-failure.md) for evidence-first methodology and pipeline architecture.
 
-1. **Get the PR branch**: `github_view_pr({ number: <PR#> })` and capture `headRefName`.
-2. **Resolve the latest CI run**: `ci_list_runs({ branch: <headRefName>, limit: 1 })` and capture the returned `runId`.
-3. **Inspect failure details**: `ci_view_run({ runId })` to identify failing jobs; `github_pr_batch_status({ numbers: [<PR#>] })` is fine for high-level check status but does not provide a CI `runId`.
-4. **Read logs**: `ci_get_logs({ runId, failedOnly: true })` to pull failing-job logs, or after `ci_view_run({ runId })` identify a failing `jobId` and use `ci_get_logs({ jobId })` — find the actual error, not just the job name.
-5. **Fix the code** based on the error evidence.
-6. **Validate locally**: `make pc` — the whole point is to catch issues before pushing, not after.
-7. **Self-review fix code**: re-read changed files in full and check against `skills/pr-lifecycle/references/common-review-patterns.md` before pushing.
-8. **Commit + push**.
-9. **Wait for CI**: `ci_wait_for_run({ runId })` or `github_wait_for_pr_event({ number: <PR#> })` — confirm CI passes before declaring done. ⛔ Never use `Start-Sleep`, `sleep`, or any polling loop; see [mcp-first CI substitution table](../mcp-first/SKILL.md).
+1. **Route `bot-review` correctly before reading logs**: if the failing check is `bot-review`, or otherwise looks review-related by name/context, this is **not** a CI-logs-first problem. First inspect the status/check details — for example via `github_list_commit_statuses({ number: <PR#> })` or by opening the failed check URL — to confirm it is actually reporting unresolved comments, review threads, or `Copilot review blocked`. Once confirmed, re-evaluate unresolved review threads now — whether Step 2 was skipped earlier because none existed yet, or new threads appeared after a prior push — and fold any current review fixes into this remediation round before reading Actions logs for the remaining non-review failures.
+2. **Get the PR branch**: `github_view_pr({ number: <PR#> })` and capture `headRefName`.
+3. **Resolve the latest CI run**: `ci_list_runs({ branch: "<headRefName>", limit: 1 })` and capture the returned `runId`.
+4. **Inspect failure details**: `ci_view_run({ runId })` to identify failing jobs; `github_pr_batch_status({ numbers: [<PR#>] })` is fine for high-level check status but does not provide a CI `runId`.
+5. **Read logs**: `ci_get_logs({ runId, failedOnly: true })` to pull failing-job logs, or after `ci_view_run({ runId })` identify a failing `jobId` and use `ci_get_logs({ jobId })` — find the actual error, not just the job name.
+6. **Fix the code** based on the error evidence. If you already collected unresolved review threads in the current round, batch those fixes into the same working pass rather than pushing twice.
+7. **Validate locally**: `make pc` — the whole point is to catch issues before pushing, not after.
+8. **Self-review fix code**: re-read changed files in full and check against `skills/pr-lifecycle/references/common-review-patterns.md` before pushing.
+9. **Commit + push once for the round**.
+10. **Wait for CI**: `ci_wait_for_run({ runId })` or `github_wait_for_pr_event({ number: <PR#> })` — confirm CI passes before declaring done. ⛔ Never use `Start-Sleep`, `sleep`, or any polling loop; see [mcp-first CI substitution table](../mcp-first/SKILL.md).
 
 ### Step 4: Final Verification
 
@@ -106,6 +109,7 @@ After all fixes are applied and pushed:
 - **Rebase before reviews**: outdated review threads may auto-resolve after rebase — always rebase first to avoid fixing stale comments.
 - **`mergeable: UNKNOWN`** does not mean blocked — GitHub may still be computing. Call `github_view_pr` and check `state` + `mergedAt` to confirm actual status.
 - **Check Runs vs Commit Statuses**: `github_retrigger_check` only works on Check Runs. `bot-review` uses the Statuses API — push a new commit or dispatch the workflow to clear it. See [pr-lifecycle skill](../pr-lifecycle/SKILL.md) rule 8.
+- **Route `bot-review` to reviews, not CI debugging** — if the failure text is about unresolved comments or blocked Copilot review, fetch unresolved threads first instead of digging through Actions logs.
 - **Always `make pc` before pushing** — every push that fails CI costs 40-60 min of pipeline time.
 - **Batch review fixes** — push once per round, not once per comment. Each push triggers Copilot re-review.
 
