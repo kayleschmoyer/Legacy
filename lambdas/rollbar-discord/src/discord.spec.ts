@@ -98,13 +98,13 @@ describe('formatRollbarEmbed', () => {
     expect(formatRollbarEmbed(event)).toBeNull();
   });
 
-  it('handles numeric level without crashing (LS-3171)', () => {
+  it('handles numeric item.level and maps to name (LS-3171)', () => {
     const event: RollbarEvent = {
       event_name: 'new_item',
       data: {
         item: {
           title: 'Some error',
-          level: 50, // Rollbar sends numeric levels in some payloads
+          level: 50, // Rollbar sends numeric levels in some payloads; 50 = critical
           environment: 'production',
         },
       },
@@ -114,7 +114,31 @@ describe('formatRollbarEmbed', () => {
 
     expect(embed).not.toBeNull();
     expect(embed?.fields).toEqual(
-      expect.arrayContaining([{ name: 'Level', value: '50', inline: true }]),
+      expect.arrayContaining([
+        { name: 'Level', value: 'CRITICAL', inline: true },
+      ]),
+    );
+  });
+
+  it('handles numeric occurrence.level and maps to name (LS-3170)', () => {
+    const event: RollbarEvent = {
+      event_name: 'occurrence',
+      data: {
+        occurrence: {
+          level: 40, // 40 = error
+          environment: 'production',
+          body: {
+            message: { body: 'Something went wrong' },
+          },
+        },
+      },
+    };
+
+    const embed = formatRollbarEmbed(event);
+
+    expect(embed).not.toBeNull();
+    expect(embed?.fields).toEqual(
+      expect.arrayContaining([{ name: 'Level', value: 'ERROR', inline: true }]),
     );
   });
 

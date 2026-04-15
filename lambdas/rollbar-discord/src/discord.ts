@@ -12,6 +12,27 @@ const COLOR_WARNING = 0xfee75c; // Yellow
 const COLOR_OK = 0x57f287; // Green
 const COLOR_INFO = 0x5865f2; // Blurple
 
+/**
+ * Normalise a Rollbar level value (string or integer) to a lowercase name.
+ * Rollbar's integer levels follow a well-known scale:
+ *   debug=10, info=20, warning=30, error=40, critical=50
+ * Integer levels are bucketed by range so that values outside the exact set
+ * (e.g. 45 or 60) still resolve to the nearest named level rather than
+ * being stringified. String levels are lowercased and trimmed so that
+ * capitalised variants (e.g. "ERROR", " warning ") are handled correctly.
+ */
+function normalizeLevel(level: string | number | undefined): string {
+  if (typeof level === 'number') {
+    if (level >= 50) return 'critical';
+    if (level >= 40) return 'error';
+    if (level >= 30) return 'warning';
+    if (level >= 20) return 'info';
+    if (level >= 10) return 'debug';
+    return String(level);
+  }
+  return level?.toLowerCase().trim() ?? 'error';
+}
+
 function levelToColor(level: string | undefined): number {
   switch (level) {
     case 'critical':
@@ -45,7 +66,7 @@ export function formatRollbarEmbed(event: RollbarEvent): DiscordEmbed | null {
   // Drop events without any usable payload — they produce generic embeds.
   if (!item && !occurrence) return null;
 
-  const level = String(item?.level ?? occurrence?.level ?? 'error');
+  const level = normalizeLevel(item?.level ?? occurrence?.level);
   const environment = item?.environment ?? occurrence?.environment ?? 'unknown';
 
   const title =
