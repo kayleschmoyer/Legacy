@@ -35,6 +35,8 @@ applyTo: '**/schema.graphql'
 
 Never use the merge editor to resolve conflicts in schema.graphql. Accept either side, then regenerate:
 
+In agent workflows, prefer `worktree_rebase_continue` after staging the regenerated files so Git stays non-interactive.
+
 ```powershell
 git checkout --theirs -- lambdas/db/schema.graphql
 pnpm exec nx run db:print-schema

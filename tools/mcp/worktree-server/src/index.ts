@@ -43,6 +43,16 @@ function getMainRepoPath(): string {
 }
 
 const MAIN_REPO = getMainRepoPath();
+// Use Node as a cross-platform no-op editor so Git never blocks on an editor
+// prompt during agent-driven rebases or commit flows.
+const NOOP_GIT_EDITOR_CMD = 'node -e "process.exit(0)"';
+const NON_INTERACTIVE_GIT_ENV = {
+  GIT_EDITOR: NOOP_GIT_EDITOR_CMD,
+  GIT_SEQUENCE_EDITOR: NOOP_GIT_EDITOR_CMD,
+};
+const NON_INTERACTIVE_COMMIT_ENV = {
+  GIT_EDITOR: NOOP_GIT_EDITOR_CMD,
+};
 
 /** Session-scoped active worktree (set via worktree_set). */
 let activeWorktree: string | null = null;
@@ -635,9 +645,9 @@ function grepContent(
 }
 
 /**
- * Perform a single rebase-continue step: stage files, run `git rebase --continue`,
- * and return structured state. Shared by `worktree_rebase` (auto-continue loop)
- * and `worktree_rebase_continue` tool.
+ * Perform a single rebase-continue step: stage files, run `git rebase --continue`
+ * with a non-interactive editor, and return structured state. Shared by
+ * `worktree_rebase` (auto-continue loop) and `worktree_rebase_continue` tool.
  */
 function rebaseContinueStep(
   cwd: string,
@@ -647,11 +657,6 @@ function rebaseContinueStep(
   conflicted: string[];
   error?: string;
 } {
-  const agentEnv = {
-    GIT_EDITOR: 'true',
-    GIT_SEQUENCE_EDITOR: 'true',
-  };
-
   const getConflictedFiles = (): string[] => {
     try {
       return run('git diff --name-only --diff-filter=U', cwd)
@@ -671,9 +676,9 @@ function rebaseContinueStep(
   }
 
   // Continue rebase — may throw if new conflicts arise
-  run('git rebase --continue', cwd, {
+  runGit(['rebase', '--continue'], cwd, {
     timeout: 120_000,
-    env: agentEnv,
+    env: NON_INTERACTIVE_GIT_ENV,
   });
 
   // Check if rebase is still in progress
@@ -2387,7 +2392,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           writeFileSync(msgPath, fullMessage, 'utf-8');
           try {
             runGit(['commit', '--amend', '-F', msgPath], cwd, {
-              env: { GIT_EDITOR: 'true' },
+              env: NON_INTERACTIVE_COMMIT_ENV,
             });
           } finally {
             try {
@@ -2398,7 +2403,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           }
         } else if (amend) {
           runGit(['commit', '--amend', '--no-edit'], cwd, {
-            env: { GIT_EDITOR: 'true' },
+            env: NON_INTERACTIVE_COMMIT_ENV,
           });
         } else {
           const fullMessage =
@@ -2410,7 +2415,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           writeFileSync(msgPath, fullMessage, 'utf-8');
           try {
             runGit(['commit', '-F', msgPath], cwd, {
-              env: { GIT_EDITOR: 'true' },
+              env: NON_INTERACTIVE_COMMIT_ENV,
             });
           } finally {
             try {
@@ -3929,11 +3934,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const log: string[] = [`[cwd: ${cwd}]`];
 
       // Agent-safe: prevent Git from opening an editor
-      const agentEnv = {
-        GIT_EDITOR: 'true',
-        GIT_SEQUENCE_EDITOR: 'true',
-      };
-
       try {
         if (abort && skip) {
           return {
@@ -3984,13 +3984,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
 
         if (abort) {
-          const out = runGit(['rebase', '--abort'], cwd, { env: agentEnv });
+          const out = runGit(['rebase', '--abort'], cwd, {
+            env: NON_INTERACTIVE_GIT_ENV,
+          });
           log.push('$ git rebase --abort', out);
           return { content: [{ type: 'text', text: log.join('\n') }] };
         }
 
         if (skip) {
-          const out = runGit(['rebase', '--skip'], cwd, { env: agentEnv });
+          const out = runGit(['rebase', '--skip'], cwd, {
+            env: NON_INTERACTIVE_GIT_ENV,
+          });
           log.push('$ git rebase --skip', out);
           return { content: [{ type: 'text', text: log.join('\n') }] };
         }
@@ -4036,14 +4040,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           log.push(`$ git rebase ${base}`);
           rebaseOut = runGit(['rebase', base], cwd, {
             timeout: 120_000,
-            env: agentEnv,
+            env: NON_INTERACTIVE_GIT_ENV,
           });
         } else {
           try {
             log.push('$ twig rebase');
             rebaseOut = run('twig rebase', cwd, {
               timeout: 120_000,
-              env: agentEnv,
+              env: NON_INTERACTIVE_GIT_ENV,
             });
           } catch (twigErr: unknown) {
             const twigMsg =
@@ -4063,7 +4067,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               log.push('$ git rebase origin/main');
               rebaseOut = run('git rebase origin/main', cwd, {
                 timeout: 120_000,
-                env: agentEnv,
+                env: NON_INTERACTIVE_GIT_ENV,
               });
             } else {
               throw twigErr;
@@ -4095,7 +4099,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               log.push('$ git rebase origin/main');
               const directRebase = run('git rebase origin/main', cwd, {
                 timeout: 120_000,
-                env: agentEnv,
+                env: NON_INTERACTIVE_GIT_ENV,
               });
               log.push(directRebase.trim());
             } else {

@@ -19,13 +19,13 @@ Rebasing is inherently a **Medium-risk** operation — it modifies git history a
 
 ## Quick Start: Simple Rebase
 
-**Preferred (MCP):** `worktree_rebase` -- fetches, rebases, sets `GIT_EDITOR=true` automatically.
+**Preferred (MCP):** `worktree_rebase` -- fetches, rebases, and injects a cross-platform no-op Git editor automatically.
 
 **Shell fallback:**
 
 ```bash
 git fetch origin
-GIT_EDITOR=true git rebase origin/main
+GIT_EDITOR='node -e "process.exit(0)"' git rebase origin/main
 # Resolve any conflicts (see Decision Tree below)
 make install
 pnpm exec nx run db:print-schema
@@ -34,7 +34,7 @@ make pc                          # MUST pass before pushing
 git push --force-with-lease origin HEAD
 ```
 
-> Always set `GIT_EDITOR=true` and `GIT_SEQUENCE_EDITOR=true` in automated/agent workflows to prevent Git from blocking on editor prompts.
+> Always use a cross-platform no-op editor in automated/agent workflows to prevent Git from blocking on editor prompts. `GIT_EDITOR=true` and `GIT_SEQUENCE_EDITOR=true` are Unix-specific; prefer the MCP tools or `GIT_EDITOR='node -e "process.exit(0)"'` (and `GIT_SEQUENCE_EDITOR='node -e "process.exit(0)"'` when a sequenced rebase step needs it).
 
 ## Decision Tree
 
@@ -93,7 +93,7 @@ If `make pc` fails: fix issues, commit (`fix: post-rebase stabilization`), re-ru
 
 ```bash
 git -C $wt fetch origin
-GIT_EDITOR=true git -C $wt rebase origin/main
+GIT_EDITOR='node -e "process.exit(0)"' git -C $wt rebase origin/main
 make -C $wt install
 make -C $wt pc
 git -C $wt push --force-with-lease origin HEAD

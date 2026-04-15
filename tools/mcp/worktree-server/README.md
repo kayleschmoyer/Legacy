@@ -36,7 +36,7 @@ Check whether a path is inside the main repo and warn if worktrees are active.
 
 ### `worktree_rebase`
 
-Fetch origin and rebase the active worktree branch onto its parent (via `twig rebase`). Sets `GIT_EDITOR` to prevent blocking in agent workflows.
+Fetch origin and rebase the active worktree branch onto its parent (via `twig rebase`). Injects a cross-platform no-op Git editor so agent workflows never block on commit-message prompts.
 
 | Parameter  | Type    | Required | Description                                    |
 | ---------- | ------- | -------- | ---------------------------------------------- |
@@ -87,4 +87,4 @@ The server is configured in `.vscode/mcp.json`:
 2. **Symlink detection** — checks `node_modules` in each worktree via `fs.lstatSync` to distinguish symlinked (shared) vs independent installs.
 3. **Main-repo guard** — `worktree_run` refuses to execute commands in the main repo when any worktrees are active, preventing accidental mutation of the shared `node_modules` or dirty commits on `main`.
 4. **Active tracking** — `worktree_set` stores the active worktree in memory (session-scoped) so subsequent `worktree_run` calls don't need to specify the target.
-5. **Rebase workflow** — `worktree_rebase` → `worktree_stabilize` → `worktree_push` provides a complete rebase-to-push pipeline with agent-safe defaults (no editor blocking) and main-branch push protection.
+5. **Rebase workflow** — `worktree_rebase` → `worktree_rebase_continue` → `worktree_stabilize` → `worktree_push` provides a complete rebase-to-push pipeline with agent-safe defaults (including a non-interactive Git editor) and main-branch push protection.

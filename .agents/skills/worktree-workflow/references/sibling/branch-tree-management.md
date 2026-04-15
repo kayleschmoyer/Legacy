@@ -33,7 +33,7 @@ make rebase-tree-auto
 make rebase-tree-skip SKIP_COMMITS_FILE="skip-commits.txt"
 ```
 
-> Always prepend `GIT_EDITOR=true GIT_SEQUENCE_EDITOR=true` to `git rebase` commands so git never opens a text editor. Prefer the `worktree_rebase` MCP tool which handles this automatically.
+> Always prepend a cross-platform no-op editor to `git rebase` commands so git never opens a text editor. `GIT_EDITOR=true` and `GIT_SEQUENCE_EDITOR=true` are Unix-specific; prefer the `worktree_rebase` MCP tool or `GIT_EDITOR='node -e "process.exit(0)"' GIT_SEQUENCE_EDITOR='node -e "process.exit(0)"'`.
 
 ## Cascade Rebase
 

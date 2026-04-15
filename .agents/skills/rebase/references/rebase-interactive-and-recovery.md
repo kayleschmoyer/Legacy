@@ -12,7 +12,7 @@ git rebase -i HEAD~N
 git rebase -i origin/main
 ```
 
-> **Note:** For interactive rebases, only `GIT_SEQUENCE_EDITOR=true` is needed to prevent the todo-list editor from blocking. However, `GIT_EDITOR=true` should also be set for `--continue` steps (see below).
+> **Note:** For interactive rebases, only `GIT_SEQUENCE_EDITOR` is needed to prevent the todo-list editor from blocking. However, `GIT_EDITOR` should also be set for `--continue` steps (see below). Use a cross-platform no-op editor such as `node -e "process.exit(0)"` rather than literal `true`, which is Unix-specific.
 
 In the editor, change `pick` to:
 
@@ -25,7 +25,7 @@ In the editor, change `pick` to:
 After saving, resolve any conflicts that arise (same process as above), then:
 
 ```bash
-GIT_EDITOR=true git rebase --continue
+GIT_EDITOR='node -e "process.exit(0)"' git rebase --continue
 ```
 
 ---
@@ -54,7 +54,7 @@ if (Test-Path .git/rebase-merge) {
 
    ```bash
    git diff --name-only --diff-filter=U   # should be empty
-   GIT_EDITOR=true git rebase --continue
+   GIT_EDITOR='node -e "process.exit(0)"' git rebase --continue
    ```
 
 2. **Skip this commit** (if it's a duplicate or no longer needed):

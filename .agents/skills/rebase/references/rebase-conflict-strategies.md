@@ -29,13 +29,13 @@ When the automated scripts can't fully resolve conflicts, an agent can help. Her
 
 #### 2a. Start the Rebase
 
-**Preferred (MCP):** Use `worktree_rebase` — it fetches, rebases, and sets `GIT_EDITOR=true` automatically.
+**Preferred (MCP):** Use `worktree_rebase` — it fetches, rebases, and injects a cross-platform no-op Git editor automatically.
 
 **Shell fallback:**
 
 ```bash
 git fetch origin
-GIT_EDITOR=true git rebase origin/main
+GIT_EDITOR='node -e "process.exit(0)"' git rebase origin/main
 ```
 
 #### 2b. Check What Conflicted
@@ -81,8 +81,8 @@ For each conflicted source file, the agent should:
 #### 2e. Continue Through All Commits
 
 ```bash
-# Set GIT_EDITOR=true to avoid blocking on commit-message prompts
-GIT_EDITOR=true git rebase --continue
+# Set a cross-platform no-op GIT_EDITOR to avoid blocking on commit-message prompts
+GIT_EDITOR='node -e "process.exit(0)"' git rebase --continue
 ```
 
 Repeat 2b–2d for each commit that conflicts.
@@ -154,7 +154,7 @@ The lockfile should never be manually merged. Regenerate it:
 # Accept either side first to clear the conflict
 git checkout --theirs pnpm-lock.yaml
 git add pnpm-lock.yaml
-GIT_EDITOR=true git rebase --continue
+GIT_EDITOR='node -e "process.exit(0)"' git rebase --continue
 
 # After rebase completes, regenerate the lockfile
 pnpm install --no-frozen-lockfile

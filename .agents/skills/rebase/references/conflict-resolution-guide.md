@@ -16,13 +16,13 @@ git stash --include-untracked
 
 ### Step 2: Fetch Latest and Start Rebase
 
-**Preferred (MCP):** Use `worktree_rebase` -- it fetches, rebases, and sets `GIT_EDITOR=true` automatically.
+**Preferred (MCP):** Use `worktree_rebase` -- it fetches, rebases, and injects a cross-platform no-op Git editor automatically.
 
 **Shell fallback:**
 
 ```bash
 git fetch origin
-GIT_EDITOR=true git rebase origin/main
+GIT_EDITOR='node -e "process.exit(0)"' git rebase origin/main
 ```
 
 If it says "Already up to date" -- you're done.
@@ -68,7 +68,7 @@ For source file conflicts, **never** blindly run `git checkout --ours` or `--the
 ```bash
 git add <resolved-file>
 # After ALL conflicts in this commit are resolved:
-GIT_EDITOR=true git rebase --continue
+GIT_EDITOR='node -e "process.exit(0)"' git rebase --continue
 ```
 
 If more commits have conflicts, Git will pause again. Repeat Steps 3-5 for each commit.
@@ -158,14 +158,14 @@ Write-Host "Total conflicting: $($conflicting.Count) of $(($raw | ConvertFrom-Js
 
 When working in a worktree (see [worktree-workflow skill](../../worktree-workflow/SKILL.md)):
 
-**Preferred (MCP):** Use `worktree_rebase` -- it targets the active worktree, fetches, rebases, and sets `GIT_EDITOR=true` automatically.
+**Preferred (MCP):** Use `worktree_rebase` -- it targets the active worktree, fetches, rebases, and injects a cross-platform no-op Git editor automatically.
 
 **Shell fallback:**
 
 ```bash
 # Fetch and rebase (use -C to target the worktree without cd)
 git -C $wt fetch origin
-GIT_EDITOR=true git -C $wt rebase origin/main
+GIT_EDITOR='node -e "process.exit(0)"' git -C $wt rebase origin/main
 
 # Resolve conflicts (same process as above)
 
@@ -217,13 +217,13 @@ If the automated scripts fail, cascade manually:
 # 1. Rebase parent onto main
 git checkout LS-100/parent-branch
 git fetch origin
-GIT_EDITOR=true git rebase origin/main
+GIT_EDITOR='node -e "process.exit(0)"' git rebase origin/main
 # (resolve conflicts, continue)
 git push --force-with-lease origin HEAD
 
 # 2. Rebase child onto updated parent
 git checkout LS-101/child-branch
-GIT_EDITOR=true git rebase LS-100/parent-branch
+GIT_EDITOR='node -e "process.exit(0)"' git rebase LS-100/parent-branch
 # (resolve conflicts, continue)
 git push --force-with-lease origin HEAD
 
@@ -238,7 +238,7 @@ git push --force-with-lease origin HEAD
 
 ```bash
 git stash --include-untracked
-GIT_EDITOR=true git rebase origin/main
+GIT_EDITOR='node -e "process.exit(0)"' git rebase origin/main
 # after rebase:
 git stash pop
 ```
@@ -286,5 +286,5 @@ git reset --hard <hash>
 grep -rn '^<<<<<<<\|^=======\|^>>>>>>>' --include='*.ts' --include='*.tsx'
 # If found: edit the files to remove markers, then:
 git add <file>
-GIT_EDITOR=true git rebase --continue
+GIT_EDITOR='node -e "process.exit(0)"' git rebase --continue
 ```

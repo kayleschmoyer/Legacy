@@ -34,56 +34,60 @@ $ErrorActionPreference = "Continue"
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $resolveConflictsScript = Join-Path $scriptDir "resolve-generated-conflicts.ps1"
 
-# Ensure git rebase never opens a text editor (non-interactive mode for agents/CI)
-$env:GIT_EDITOR = "true"
-$env:GIT_SEQUENCE_EDITOR = "true"
+# Ensure git rebase never opens a text editor (non-interactive mode for agents/CI).
+# `true` is Unix-specific and does not work reliably for local Windows agents.
+$previousGitEditor = $env:GIT_EDITOR
+$previousGitSequenceEditor = $env:GIT_SEQUENCE_EDITOR
+$env:GIT_EDITOR = 'node -e "process.exit(0)"'
+$env:GIT_SEQUENCE_EDITOR = 'node -e "process.exit(0)"'
 
-# Parse skip-commits
-$skipCommitList = @()
-if ($SkipCommits) {
-    $skipCommitList = $SkipCommits -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ }
-    Write-Host "[->] Will skip commits: $($skipCommitList -join ', ')" -ForegroundColor Yellow
-}
-if ($SkipCommitsFile) {
-    if (Test-Path $SkipCommitsFile) {
-        $fileCommits = Get-Content $SkipCommitsFile | ForEach-Object {
-            $line = $_.Trim()
-            # Skip empty lines and comments
-            if ($line -and -not $line.StartsWith('#')) {
-                # Extract commit hash (before any comment)
-                if ($line -match '^([0-9a-f]{7,64})') {
-                    $matches[1]
+try {
+    # Parse skip-commits
+    $skipCommitList = @()
+    if ($SkipCommits) {
+        $skipCommitList = $SkipCommits -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+        Write-Host "[->] Will skip commits: $($skipCommitList -join ', ')" -ForegroundColor Yellow
+    }
+    if ($SkipCommitsFile) {
+        if (Test-Path $SkipCommitsFile) {
+            $fileCommits = Get-Content $SkipCommitsFile | ForEach-Object {
+                $line = $_.Trim()
+                # Skip empty lines and comments
+                if ($line -and -not $line.StartsWith('#')) {
+                    # Extract commit hash (before any comment)
+                    if ($line -match '^([0-9a-f]{7,64})') {
+                        $matches[1]
+                    }
                 }
-            }
-        } | Where-Object { $_ }
-        $skipCommitList += $fileCommits
-        Write-Host "[->] Loaded skip-commits from file: $($fileCommits -join ', ')" -ForegroundColor Yellow
-    } else {
-        Write-Host "[X] Skip-commits file not found: $SkipCommitsFile" -ForegroundColor Red
-        exit 1
+            } | Where-Object { $_ }
+            $skipCommitList += $fileCommits
+            Write-Host "[->] Loaded skip-commits from file: $($fileCommits -join ', ')" -ForegroundColor Yellow
+        } else {
+            Write-Host "[X] Skip-commits file not found: $SkipCommitsFile" -ForegroundColor Red
+            exit 1
+        }
     }
-}
 
-# Get current branch if not specified
-if (-not $StartBranch) {
-    $StartBranch = git branch --show-current
+    # Get current branch if not specified
     if (-not $StartBranch) {
-        Write-Host "[X] Could not determine current branch" -ForegroundColor Red
-        exit 1
+        $StartBranch = git branch --show-current
+        if (-not $StartBranch) {
+            Write-Host "[X] Could not determine current branch" -ForegroundColor Red
+            exit 1
+        }
     }
-}
 
-Write-Host "[TREE] Rebasing branch tree starting from: $StartBranch" -ForegroundColor Cyan
-Write-Host ""
+    Write-Host "[TREE] Rebasing branch tree starting from: $StartBranch" -ForegroundColor Cyan
+    Write-Host ""
 
-# Get the branch tree
-$treeOutput = twig tree 2>&1 | Out-String
-Write-Host $treeOutput
+    # Get the branch tree
+    $treeOutput = twig tree 2>&1 | Out-String
+    Write-Host $treeOutput
 
-# Parse branches from tree (simplified - you may need to adjust)
-$currentBranch = $StartBranch
-$rebasedCount = 0
-$failedBranches = @()
+    # Parse branches from tree (simplified - you may need to adjust)
+    $currentBranch = $StartBranch
+    $rebasedCount = 0
+    $failedBranches = @()
 
 function Rebase-Branch {
     param([string]$branch)
@@ -205,47 +209,60 @@ function Rebase-Branch {
     return $false
 }
 
-# Try to rebase current branch
-$success = Rebase-Branch $currentBranch
+    # Try to rebase current branch
+    $success = Rebase-Branch $currentBranch
 
-if ($success) {
-    $rebasedCount++
-    Write-Host "`n[OK] Branch tree rebase completed successfully!" -ForegroundColor Green
-    Write-Host "  Rebased: $rebasedCount branch(es)" -ForegroundColor Cyan
-} else {
-    Write-Host "`n[X] Failed to rebase $currentBranch" -ForegroundColor Red
-    exit 1
+    if ($success) {
+        $rebasedCount++
+        Write-Host "`n[OK] Branch tree rebase completed successfully!" -ForegroundColor Green
+        Write-Host "  Rebased: $rebasedCount branch(es)" -ForegroundColor Cyan
+    } else {
+        Write-Host "`n[X] Failed to rebase $currentBranch" -ForegroundColor Red
+        exit 1
+    }
+
+    Write-Host "`n[->] Running validation checks..." -ForegroundColor Yellow
+    Write-Host "  (typecheck -> lint -> test -> build)" -ForegroundColor Gray
+
+    # Run validation
+    $validationFailed = $false
+
+    Write-Host "`n[1] Type checking..." -ForegroundColor Cyan
+    pnpm exec nx affected -t typecheck 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "  [X] Type check failed" -ForegroundColor Red
+        $validationFailed = $true
+    } else {
+        Write-Host "  [OK] Type check passed" -ForegroundColor Green
+    }
+
+    Write-Host "`n[2] Linting..." -ForegroundColor Cyan
+    pnpm exec nx affected -t lint --fix 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "  [X] Lint failed" -ForegroundColor Red
+        $validationFailed = $true
+    } else {
+        Write-Host "  [OK] Lint passed" -ForegroundColor Green
+    }
+
+    if ($validationFailed) {
+        Write-Host "`n[!] Validation failed. Run the following to see errors:" -ForegroundColor Yellow
+        Write-Host "  pnpm exec nx affected -t typecheck" -ForegroundColor Gray
+        Write-Host "  pnpm exec nx affected -t lint --fix" -ForegroundColor Gray
+        exit 1
+    }
+
+    Write-Host "`n[DONE] All done! Your branch tree is rebased and validated." -ForegroundColor Green
+} finally {
+    if ($null -ne $previousGitEditor) {
+        $env:GIT_EDITOR = $previousGitEditor
+    } else {
+        Remove-Item Env:GIT_EDITOR -ErrorAction SilentlyContinue
+    }
+
+    if ($null -ne $previousGitSequenceEditor) {
+        $env:GIT_SEQUENCE_EDITOR = $previousGitSequenceEditor
+    } else {
+        Remove-Item Env:GIT_SEQUENCE_EDITOR -ErrorAction SilentlyContinue
+    }
 }
-
-Write-Host "`n[->] Running validation checks..." -ForegroundColor Yellow
-Write-Host "  (typecheck -> lint -> test -> build)" -ForegroundColor Gray
-
-# Run validation
-$validationFailed = $false
-
-Write-Host "`n[1] Type checking..." -ForegroundColor Cyan
-pnpm exec nx affected -t typecheck 2>&1 | Out-Null
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "  [X] Type check failed" -ForegroundColor Red
-    $validationFailed = $true
-} else {
-    Write-Host "  [OK] Type check passed" -ForegroundColor Green
-}
-
-Write-Host "`n[2] Linting..." -ForegroundColor Cyan
-pnpm exec nx affected -t lint --fix 2>&1 | Out-Null
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "  [X] Lint failed" -ForegroundColor Red
-    $validationFailed = $true
-} else {
-    Write-Host "  [OK] Lint passed" -ForegroundColor Green
-}
-
-if ($validationFailed) {
-    Write-Host "`n[!] Validation failed. Run the following to see errors:" -ForegroundColor Yellow
-    Write-Host "  pnpm exec nx affected -t typecheck" -ForegroundColor Gray
-    Write-Host "  pnpm exec nx affected -t lint --fix" -ForegroundColor Gray
-    exit 1
-}
-
-Write-Host "`n[DONE] All done! Your branch tree is rebased and validated." -ForegroundColor Green

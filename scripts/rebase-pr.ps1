@@ -17,8 +17,8 @@
            - pnpm exec nx affected -t codegen --base=origin/main
       5. Does NOT run `make pc` — the agent does that next.
 
-    The GIT_EDITOR and GIT_SEQUENCE_EDITOR env vars are set to "true" to
-    suppress editor prompts during automated rebases.
+    The GIT_EDITOR and GIT_SEQUENCE_EDITOR env vars are set to a cross-platform
+    no-op editor command to suppress editor prompts during automated rebases.
 
 .PARAMETER Branch
     The branch name to rebase (e.g. "LS-1234/my-feature").
@@ -82,9 +82,10 @@ try {
     git fetch origin *>&1 | ForEach-Object { Write-Info $_ }
     Write-Ok "Fetch complete."
 
-    # Suppress all interactive editor prompts
-    $env:GIT_EDITOR = "true"
-    $env:GIT_SEQUENCE_EDITOR = "true"
+    # Suppress all interactive editor prompts with a cross-platform no-op editor.
+    # `true` is Unix-specific and does not work reliably for local Windows agents.
+    $env:GIT_EDITOR = 'node -e "process.exit(0)"'
+    $env:GIT_SEQUENCE_EDITOR = 'node -e "process.exit(0)"'
 
     Write-Step "Running twig rebase (branch: $Branch)..."
     $rebaseOutput = twig rebase 2>&1
@@ -109,7 +110,9 @@ try {
         Write-Warn "Resolve the conflicts, then run:"
         Write-Warn "  cd $wt"
         Write-Warn ('  git add <resolved-files>')
-        Write-Warn "  git rebase --continue"
+        Write-Warn "  worktree_rebase_continue    # preferred for agent workflows"
+        Write-Warn "  # or in PowerShell:"
+        Write-Warn '  $env:GIT_EDITOR = ''node -e "process.exit(0)"''; $env:GIT_SEQUENCE_EDITOR = ''node -e "process.exit(0)"''; git rebase --continue'
         Write-Warn "Then re-run this script with -SkipStabilize if rebase was completed."
         exit 1
     }

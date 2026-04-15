@@ -41,6 +41,11 @@ const PR_QUERY = `
 
 const GIT_CMD = process.platform === 'win32' ? 'git.exe' : 'git';
 const MAX_BUFFER = 10 * 1024 * 1024;
+const NOOP_GIT_EDITOR_CMD = 'node -e "process.exit(0)"';
+const NON_INTERACTIVE_GIT_ENV = {
+  GIT_EDITOR: NOOP_GIT_EDITOR_CMD,
+  GIT_SEQUENCE_EDITOR: NOOP_GIT_EDITOR_CMD,
+};
 
 function runGit(args: string[], cwd: string, timeout = 120_000): string {
   try {
@@ -51,8 +56,7 @@ function runGit(args: string[], cwd: string, timeout = 120_000): string {
       maxBuffer: MAX_BUFFER,
       env: {
         ...process.env,
-        GIT_EDITOR: 'true',
-        GIT_SEQUENCE_EDITOR: 'true',
+        ...NON_INTERACTIVE_GIT_ENV,
       },
     });
   } catch (err: unknown) {
