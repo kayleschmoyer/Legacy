@@ -1,6 +1,6 @@
 ---
 name: mcp-gaps
-description: 'Identify and implement MCP tooling gaps. Phase 1 (Audit): run after shipping a PR to review Bash and PowerShell commands and MCP overflows from the session, filing tickets under the current MCP gaps bucket epic. Phase 2 (Triage): pick up and implement backlog tickets from the current MCP gaps bucket epic. Load when finishing ticket work (audit) or working through the AI Workspace Improvements backlog (triage).'
+description: 'Identify and implement MCP tooling gaps. Phase 1 (Audit): run after merge (workflow step 14) to review Bash and PowerShell commands and MCP overflows from the session, filing tickets under the current MCP gaps bucket epic. Phase 2 (Triage): pick up and implement backlog tickets from the current MCP gaps bucket epic. Load when the PR has merged (audit) or working through the AI Workspace Improvements backlog (triage).'
 ---
 
 # Skill: MCP Gaps
@@ -9,7 +9,7 @@ description: 'Identify and implement MCP tooling gaps. Phase 1 (Audit): run afte
 
 Three-phase workflow for closing MCP tooling gaps:
 
-1. **Audit** — after every agent session, review Bash and PowerShell commands, MCP tool overflows, and MCP tool failures to identify gaps, then file tickets under the **current MCP gaps bucket epic** (get key via `jira_get_bucket_epic({ bucket: 'mcp-gaps' })`).
+1. **Audit** — after merge (workflow step 14), review Bash and PowerShell commands, MCP tool overflows, and MCP tool failures to identify gaps, then file tickets under the **current MCP gaps bucket epic** (get key via `jira_get_bucket_epic({ bucket: 'mcp-gaps' })`).
 2. **Triage** — pick up tickets from the current bucket epic backlog, implement the fix, validate, and ship a PR.
 
 This skill enforces the **MCP-first principle** from AGENTS.md: shell commands are fallbacks, not defaults.
@@ -20,7 +20,7 @@ This skill enforces the **MCP-first principle** from AGENTS.md: shell commands a
 
 | Trigger                                         | Phase  |
 | ----------------------------------------------- | ------ |
-| End of any agent session (workflow step 12b)    | Audit  |
+| After merge (workflow step 14)                  | Audit  |
 | User asks to audit MCP coverage                 | Audit  |
 | User asks to work on MCP tooling improvements   | Triage |
 | Processing the current bucket epic backlog      | Triage |
