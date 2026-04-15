@@ -846,7 +846,7 @@ const SignOutButton = styled(YStack, {
   animation: 'quick',
 });
 
-const EditButton = styled(YStack, {
+const EditButtonBase = styled(YStack, {
   paddingHorizontal: '$3',
   paddingVertical: '$1.5',
   borderRadius: '$4',
@@ -863,5 +863,29 @@ const EditButton = styled(YStack, {
   },
   animation: 'quick',
 });
+
+function EditButton({
+  onPress,
+  disabled,
+  ...props
+}: React.ComponentProps<typeof EditButtonBase>) {
+  return (
+    <EditButtonBase
+      {...props}
+      role="button"
+      tabIndex={disabled ? -1 : 0}
+      aria-disabled={Boolean(disabled)}
+      onPress={onPress}
+      disabled={disabled}
+      onKeyDown={(e: React.KeyboardEvent<HTMLDivElement>) => {
+        if (e.repeat || disabled) return;
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault(); // prevent native click (Enter) and scroll (Space)
+          (e.currentTarget as HTMLElement).click();
+        }
+      }}
+    />
+  );
+}
 
 export default ProfileSettingsPage;
