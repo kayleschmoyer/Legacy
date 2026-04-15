@@ -11,7 +11,12 @@ import {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const LIVE_POLL_MS = 15_000;
-const SCROLL_DURATION_S = 40;
+const BIG_SHOULDERS = "'Big Shoulders Display', system-ui, sans-serif";
+
+/** Scale scroll speed with game count so 3 games and 15 games both feel natural. */
+function scrollDurationSecs(gameCount: number): number {
+  return Math.max(20, Math.min(80, gameCount * 5));
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -40,7 +45,7 @@ interface TickerGame {
   awayTeam: { abbreviation: string; runs: number };
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// ─── Styled components ────────────────────────────────────────────────────────
 
 const TickerStrip = styled(XStack, {
   position: 'fixed' as never,
@@ -55,13 +60,21 @@ const TickerStrip = styled(XStack, {
   zIndex: TICKER_Z_INDEX,
 } as never);
 
+// Container that provides the right border separating the label from the scroll area
+const TickerLabelContainer = styled(XStack, {
+  paddingHorizontal: '$3',
+  alignItems: 'center',
+  alignSelf: 'stretch',
+  flexShrink: 0,
+  borderRightWidth: 1,
+  borderRightColor: '$borderColor',
+} as never);
+
 const TickerLabel = styled(Text, {
   fontSize: '$2',
   fontWeight: '700',
-  color: '$color11',
-  paddingHorizontal: '$3',
-  letterSpacing: 1,
-  flexShrink: 0,
+  color: '$brandGold',
+  letterSpacing: 2,
 });
 
 const ScrollOuter = styled(XStack, {
@@ -71,69 +84,148 @@ const ScrollOuter = styled(XStack, {
   height: TICKER_HEIGHT_PX,
 } as never);
 
-// ─── Game chip ────────────────────────────────────────────────────────────────
+// ─── Status text ──────────────────────────────────────────────────────────────
 
+/**
+ * Human-readable status string.
+ * Live:    "TOP 7 · 2 OUT"
+ * Final:   "FINAL"
+ * Preview: "7:05 PM"
+ */
 function gameStatusText(game: TickerGame): string {
   const { status, inning, inningHalf, outs, startTime } = game;
   if (status === 'Live') {
-    const half = inningHalf ? `${inningHalf.charAt(0).toUpperCase()}.` : '';
-    const inn = inning ?? '';
-    const outsStr = outs !== null && outs !== undefined ? ` ${outs}O` : '';
-    return `${half}${inn}${outsStr}`;
+    const half = inningHalf?.toLowerCase().startsWith('t')
+      ? 'TOP'
+      : inningHalf?.toLowerCase().startsWith('b')
+        ? 'BOT'
+        : null;
+    const inn = inning != null ? String(inning) : null;
+    const outsLabel = outs != null ? `${outs} OUT` : null;
+    // Filter nulls so we never produce leading/double spaces
+    return [half, inn, outsLabel ? `· ${outsLabel}` : null]
+      .filter(Boolean)
+      .join(' ');
   }
-  if (status === 'Final') return 'Final';
+  if (status === 'Final') return 'FINAL';
   return formatStartTime(startTime);
 }
+
+// ─── Game chip ────────────────────────────────────────────────────────────────
 
 function GameChip({ game }: { game: TickerGame }) {
   const isLive = game.status === 'Live';
   const isFinal = game.status === 'Final';
   const isPreview = !isLive && !isFinal;
 
-  const statusColor = isLive ? '$green10' : isFinal ? '$color10' : '$brandNavy';
+  // Leading score gets heritage gold; trailing score gets muted; tied gets neutral.
+  const awayLeading = !isPreview && game.awayTeam.runs > game.homeTeam.runs;
+  const homeLeading = !isPreview && game.homeTeam.runs > game.awayTeam.runs;
+  const awayScoreColor = awayLeading
+    ? '$brandGold'
+    : homeLeading
+      ? '$color9'
+      : '$color12';
+  const homeScoreColor = homeLeading
+    ? '$brandGold'
+    : awayLeading
+      ? '$color9'
+      : '$color12';
+
+  // Status: green pulse for live, muted for everything else
+  const statusColor = isLive ? '$green8' : '$color10';
+  const statusText = gameStatusText(game);
+
+  const ariaLabel = isPreview
+    ? `${game.awayTeam.abbreviation} at ${game.homeTeam.abbreviation}, ${statusText}`
+    : `${game.awayTeam.abbreviation} ${game.awayTeam.runs}, ${game.homeTeam.abbreviation} ${game.homeTeam.runs} — ${statusText}`;
 
   return (
-    <Link to="/scoreboard" style={{ textDecoration: 'none', flexShrink: 0 }}>
+    <Link
+      to="/scoreboard"
+      style={{ textDecoration: 'none', flexShrink: 0 }}
+      aria-label={ariaLabel}
+    >
       <XStack
         alignItems="center"
-        gap="$2"
+        gap="$1"
         paddingHorizontal="$3"
-        paddingVertical="$1"
-        marginHorizontal="$2"
+        marginHorizontal="$1"
         borderRadius="$3"
         hoverStyle={{ backgroundColor: '$color4' }}
         cursor="pointer"
         flexShrink={0}
       >
-        {/* Away */}
-        <Text fontSize="$2" fontWeight="600" color="$color12">
+        {/* Away team abbreviation */}
+        <Text
+          fontSize="$1"
+          fontWeight="500"
+          color="$color11"
+          letterSpacing={0.5}
+        >
           {game.awayTeam.abbreviation}
         </Text>
+
+        {/* Away score — visually dominant */}
         {!isPreview && (
-          <Text fontSize="$2" fontWeight="700" color="$color12">
+          <Text
+            fontSize="$4"
+            fontWeight="800"
+            color={awayScoreColor}
+            style={{ fontVariantNumeric: 'tabular-nums' }}
+          >
             {game.awayTeam.runs}
           </Text>
         )}
 
-        {/* Divider */}
-        <Text fontSize="$2" color="$color9">
-          –
+        {/* Score divider */}
+        <Text fontSize="$1" color="$color8" paddingHorizontal="$1">
+          {isPreview ? 'vs' : '–'}
         </Text>
 
-        {/* Home */}
+        {/* Home score — visually dominant */}
         {!isPreview && (
-          <Text fontSize="$2" fontWeight="700" color="$color12">
+          <Text
+            fontSize="$4"
+            fontWeight="800"
+            color={homeScoreColor}
+            style={{ fontVariantNumeric: 'tabular-nums' }}
+          >
             {game.homeTeam.runs}
           </Text>
         )}
-        <Text fontSize="$2" fontWeight="600" color="$color12">
+
+        {/* Home team abbreviation */}
+        <Text
+          fontSize="$1"
+          fontWeight="500"
+          color="$color11"
+          letterSpacing={0.5}
+        >
           {game.homeTeam.abbreviation}
         </Text>
 
-        {/* Status */}
-        <Text fontSize="$1" color={statusColor} fontWeight="700">
-          {gameStatusText(game)}
-        </Text>
+        {/* Status — includes pulsing dot for live games */}
+        <XStack alignItems="center" gap="$1" marginLeft="$1">
+          {isLive && (
+            <Text
+              className="scoreboard-ticker-live-dot"
+              fontSize="$1"
+              color="$green8"
+            >
+              ●
+            </Text>
+          )}
+          <Text
+            fontSize="$1"
+            color={statusColor}
+            fontWeight={isLive ? '700' : '400'}
+            letterSpacing={isLive ? 0.5 : 0}
+            fontFamily={isLive ? BIG_SHOULDERS : undefined}
+          >
+            {statusText}
+          </Text>
+        </XStack>
       </XStack>
     </Link>
   );
@@ -141,7 +233,13 @@ function GameChip({ game }: { game: TickerGame }) {
 
 function Separator() {
   return (
-    <Text fontSize="$2" color="$color7" flexShrink={0} paddingHorizontal="$1">
+    <Text
+      fontSize="$2"
+      color="$color8"
+      fontWeight="500"
+      flexShrink={0}
+      paddingHorizontal="$1"
+    >
       ·
     </Text>
   );
@@ -180,8 +278,8 @@ export function ScoreboardTicker() {
   const [paused, setPaused] = useState(false);
   const innerRef = useRef<HTMLDivElement>(null);
 
-  // Inject keyframes once per document lifecycle (only needed for the animated
-  // path; no-op when reduced motion is active since the animation is not used).
+  // Inject keyframes once per document lifecycle. No-op when reduced motion is
+  // active since the animation class is not applied in that path.
   useEffect(() => {
     if (prefersReducedMotion) return;
     const styleId = 'scoreboard-ticker-keyframes';
@@ -193,8 +291,16 @@ export function ScoreboardTicker() {
         0%   { transform: translateX(0); }
         100% { transform: translateX(-50%); }
       }
+      @keyframes ticker-live-pulse {
+        0%, 100% { opacity: 1; }
+        50%       { opacity: 0.3; }
+      }
+      .scoreboard-ticker-live-dot {
+        animation: ticker-live-pulse 1.5s ease-in-out infinite;
+      }
       @media (prefers-reduced-motion: reduce) {
-        .scoreboard-ticker-inner {
+        .scoreboard-ticker-inner,
+        .scoreboard-ticker-live-dot {
           animation: none !important;
         }
       }
@@ -207,6 +313,8 @@ export function ScoreboardTicker() {
 
   // Don't render when no games — no ticker strip and no spacer
   if (games.length === 0) return null;
+
+  const scrollDuration = scrollDurationSecs(games.length);
 
   const chips = games.map((game, idx) => (
     <React.Fragment key={game.gamePk}>
@@ -228,13 +336,17 @@ export function ScoreboardTicker() {
         style={{ height: TICKER_HEIGHT_PX, flexShrink: 0 }}
       />
       <TickerStrip
+        role="region"
+        aria-label="MLB Scores"
         style={{ top: NAV_HEIGHT_PX } as React.CSSProperties}
         onMouseEnter={() => setPaused(true)}
         onMouseLeave={() => setPaused(false)}
         data-testid="scoreboard-ticker"
       >
-        {/* "MLB" label */}
-        <TickerLabel>MLB</TickerLabel>
+        {/* "MLB" identity label — Big Shoulders Display, heritage gold */}
+        <TickerLabelContainer>
+          <TickerLabel fontFamily={BIG_SHOULDERS}>MLB</TickerLabel>
+        </TickerLabelContainer>
 
         {prefersReducedMotion ? (
           /*
@@ -256,6 +368,7 @@ export function ScoreboardTicker() {
           /*
            * Animated layout: chips are duplicated so the scroll loops
            * seamlessly. The outer container clips the content.
+           * Duplicate chips are aria-hidden to avoid screen-reader repetition.
            */
           <ScrollOuter>
             <div
@@ -266,18 +379,19 @@ export function ScoreboardTicker() {
                 alignItems: 'center',
                 flexShrink: 0,
                 willChange: 'transform',
-                animation: `ticker-scroll ${SCROLL_DURATION_S}s linear infinite`,
+                animation: `ticker-scroll ${scrollDuration}s linear infinite`,
                 animationPlayState: paused ? 'paused' : 'running',
               }}
             >
-              {/* Duplicate chips for seamless loop */}
               {chips}
-              {games.map((game, idx) => (
-                <React.Fragment key={`dup-${game.gamePk}`}>
-                  <GameChip game={game} />
-                  {idx < games.length - 1 && <Separator />}
-                </React.Fragment>
-              ))}
+              <div aria-hidden="true" style={{ display: 'contents' }}>
+                {games.map((game, idx) => (
+                  <React.Fragment key={`dup-${game.gamePk}`}>
+                    <GameChip game={game} />
+                    {idx < games.length - 1 && <Separator />}
+                  </React.Fragment>
+                ))}
+              </div>
             </div>
           </ScrollOuter>
         )}
