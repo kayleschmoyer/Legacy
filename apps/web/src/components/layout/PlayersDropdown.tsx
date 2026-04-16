@@ -15,7 +15,6 @@ import {
   ChevronUp,
   Users,
 } from '@tamagui/lucide-icons';
-import { BRAND_NAVY_LIGHT } from '../../constants/colors';
 import {
   NAV_BUTTON_MIN_WIDTH,
   NAV_DROPDOWN_Z_INDEX,
@@ -193,6 +192,10 @@ export const PlayersDropdown: React.FC = () => {
           role="menu"
           id={menuId}
           aria-labelledby={buttonId}
+          style={{
+            animation:
+              'navDropdownIn 150ms cubic-bezier(0.16, 1, 0.3, 1) forwards',
+          }}
         >
           <Link
             to="/players"
@@ -208,21 +211,18 @@ export const PlayersDropdown: React.FC = () => {
                   <Users size={20} color="$color" />
                 </MenuIconBox>
                 <YStack flex={1} gap="$1">
-                  <Paragraph size="$4" color="$color" fontWeight="500">
+                  <Paragraph
+                    size="$4"
+                    color="$color"
+                    fontWeight="500"
+                    marginBottom={0}
+                  >
                     All Players
                   </Paragraph>
-                  <Paragraph size="$2" color="$colorPress">
+                  <Paragraph size="$2" color="$colorPress" marginBottom={0}>
                     Browse the full roster
                   </Paragraph>
                 </YStack>
-                {location.pathname === '/players' && (
-                  <YStack
-                    width={6}
-                    height={6}
-                    borderRadius={3}
-                    backgroundColor={BRAND_NAVY_LIGHT}
-                  />
-                )}
               </XStack>
             </MenuItem>
           </Link>
@@ -241,21 +241,18 @@ export const PlayersDropdown: React.FC = () => {
                   <BarChart2 size={20} color="$color" />
                 </MenuIconBox>
                 <YStack flex={1} gap="$1">
-                  <Paragraph size="$4" color="$color" fontWeight="500">
+                  <Paragraph
+                    size="$4"
+                    color="$color"
+                    fontWeight="500"
+                    marginBottom={0}
+                  >
                     Player Stats
                   </Paragraph>
-                  <Paragraph size="$2" color="$colorPress">
+                  <Paragraph size="$2" color="$colorPress" marginBottom={0}>
                     Rankings &amp; performance
                   </Paragraph>
                 </YStack>
-                {location.pathname === '/players/stats' && (
-                  <YStack
-                    width={6}
-                    height={6}
-                    borderRadius={3}
-                    backgroundColor={BRAND_NAVY_LIGHT}
-                  />
-                )}
               </XStack>
             </MenuItem>
           </Link>
@@ -274,21 +271,18 @@ export const PlayersDropdown: React.FC = () => {
                   <ArrowLeftRight size={20} color="$color" />
                 </MenuIconBox>
                 <YStack flex={1} gap="$1">
-                  <Paragraph size="$4" color="$color" fontWeight="500">
+                  <Paragraph
+                    size="$4"
+                    color="$color"
+                    fontWeight="500"
+                    marginBottom={0}
+                  >
                     Compare Players
                   </Paragraph>
-                  <Paragraph size="$2" color="$colorPress">
+                  <Paragraph size="$2" color="$colorPress" marginBottom={0}>
                     Side-by-side stat comparison
                   </Paragraph>
                 </YStack>
-                {location.pathname === '/players/compare' && (
-                  <YStack
-                    width={6}
-                    height={6}
-                    borderRadius={3}
-                    backgroundColor={BRAND_NAVY_LIGHT}
-                  />
-                )}
               </XStack>
             </MenuItem>
           </Link>

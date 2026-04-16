@@ -8,16 +8,12 @@ import {
 } from '@legacy-sports/shared-components/ui';
 import { Text } from '@legacy-sports/ui-abstractions';
 import { styled } from 'tamagui';
+import { ChevronDown, ChevronUp, Globe, Grid2x2 } from '@tamagui/lucide-icons';
 import {
-  Activity,
-  ChevronDown,
-  ChevronUp,
-  Circle,
-  Globe,
-  Grid2x2,
-} from '@tamagui/lucide-icons';
-import { BRAND_NAVY_LIGHT } from '../../constants/colors';
-import { NAV_BUTTON_MIN_WIDTH } from '../../constants/dimensions';
+  NAV_BUTTON_MIN_WIDTH,
+  NAV_DROPDOWN_Z_INDEX,
+} from '../../constants/dimensions';
+import { BaseballIcon, FootballIcon } from '../icons/SportIcons';
 
 const DropdownButton = styled(Button, {
   size: '$3',
@@ -51,7 +47,7 @@ const DropdownContent = styled(YStack, {
   borderColor: '$borderColor',
   padding: '$4',
   gap: '$2',
-  minWidth: 260,
+  minWidth: 220,
   shadowColor: '$shadowColor',
   shadowOffset: { width: 0, height: 8 },
   shadowOpacity: 0.2,
@@ -127,13 +123,11 @@ export const SportsDropdown: React.FC = () => {
   const onKeyDown: React.KeyboardEventHandler<HTMLDivElement> = (e) => {
     if (e.key === 'Escape') {
       setIsOpen(false);
-      // Return focus to the trigger button
       const btn = document.getElementById(buttonId);
       btn?.focus();
       return;
     }
     if (!isOpen) return;
-    // Arrow key navigation within menu items
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault();
       const menu = document.getElementById(menuId);
@@ -186,10 +180,14 @@ export const SportsDropdown: React.FC = () => {
           top="100%"
           left={0}
           marginTop="$2"
-          zIndex={100}
+          zIndex={NAV_DROPDOWN_Z_INDEX}
           role="menu"
           id={menuId}
           aria-labelledby={buttonId}
+          style={{
+            animation:
+              'navDropdownIn 150ms cubic-bezier(0.16, 1, 0.3, 1) forwards',
+          }}
         >
           <Link
             to="/football"
@@ -202,24 +200,16 @@ export const SportsDropdown: React.FC = () => {
             >
               <XStack alignItems="center" gap="$3" flex={1}>
                 <MenuIconBox>
-                  <Activity size={20} color="$color" />
+                  <FootballIcon size={20} color="var(--color)" />
                 </MenuIconBox>
-                <YStack flex={1} gap="$1">
-                  <Paragraph size="$4" color="$color" fontWeight="500">
-                    Football
-                  </Paragraph>
-                  <Paragraph size="$2" color="$colorPress">
-                    NFL fantasy leagues
-                  </Paragraph>
-                </YStack>
-                {location.pathname === '/football' && (
-                  <YStack
-                    width={6}
-                    height={6}
-                    borderRadius={3}
-                    backgroundColor={BRAND_NAVY_LIGHT}
-                  />
-                )}
+                <Paragraph
+                  size="$4"
+                  color="$color"
+                  fontWeight="500"
+                  marginBottom={0}
+                >
+                  Football
+                </Paragraph>
               </XStack>
             </MenuItem>
           </Link>
@@ -235,24 +225,16 @@ export const SportsDropdown: React.FC = () => {
             >
               <XStack alignItems="center" gap="$3" flex={1}>
                 <MenuIconBox>
-                  <Circle size={20} color="$color" />
+                  <BaseballIcon size={20} color="var(--color)" />
                 </MenuIconBox>
-                <YStack flex={1} gap="$1">
-                  <Paragraph size="$4" color="$color" fontWeight="500">
-                    Baseball
-                  </Paragraph>
-                  <Paragraph size="$2" color="$colorPress">
-                    MLB fantasy leagues
-                  </Paragraph>
-                </YStack>
-                {location.pathname.startsWith('/baseball') && (
-                  <YStack
-                    width={6}
-                    height={6}
-                    borderRadius={3}
-                    backgroundColor={BRAND_NAVY_LIGHT}
-                  />
-                )}
+                <Paragraph
+                  size="$4"
+                  color="$color"
+                  fontWeight="500"
+                  marginBottom={0}
+                >
+                  Baseball
+                </Paragraph>
               </XStack>
             </MenuItem>
           </Link>
@@ -271,21 +253,18 @@ export const SportsDropdown: React.FC = () => {
                   <Globe size={20} color="$color" />
                 </MenuIconBox>
                 <YStack flex={1} gap="$1">
-                  <Paragraph size="$4" color="$color" fontWeight="500">
+                  <Paragraph
+                    size="$4"
+                    color="$color"
+                    fontWeight="500"
+                    marginBottom={0}
+                  >
                     Browse Leagues
                   </Paragraph>
-                  <Paragraph size="$2" color="$colorPress">
+                  <Paragraph size="$2" color="$colorPress" marginBottom={0}>
                     Join a public league
                   </Paragraph>
                 </YStack>
-                {location.pathname === '/baseball/leagues' && (
-                  <YStack
-                    width={6}
-                    height={6}
-                    borderRadius={3}
-                    backgroundColor={BRAND_NAVY_LIGHT}
-                  />
-                )}
               </XStack>
             </MenuItem>
           </Link>

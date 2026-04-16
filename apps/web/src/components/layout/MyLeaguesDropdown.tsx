@@ -11,7 +11,11 @@ import { Text } from '@legacy-sports/ui-abstractions';
 import { styled } from 'tamagui';
 import { ChevronDown, ChevronUp, Trophy } from '@tamagui/lucide-icons';
 import { useGetUserLeaguesQuery } from '../../api/db/graphql.generated';
-import { NAV_BUTTON_MIN_WIDTH } from '../../constants/dimensions';
+import {
+  NAV_BUTTON_MIN_WIDTH,
+  NAV_DROPDOWN_Z_INDEX,
+} from '../../constants/dimensions';
+import { BaseballIcon, FootballIcon } from '../icons/SportIcons';
 
 const DropdownButton = styled(Button, {
   size: '$3',
@@ -45,7 +49,7 @@ const DropdownContent = styled(YStack, {
   borderColor: '$borderColor',
   padding: '$2',
   gap: '$1',
-  minWidth: 220,
+  minWidth: 240,
   maxWidth: 320,
   maxHeight: 360,
   shadowColor: '$shadowColor',
@@ -55,7 +59,6 @@ const DropdownContent = styled(YStack, {
   elevation: 12,
   overflow: 'hidden',
   overflowY: 'auto',
-  zIndex: 100,
 });
 
 const MenuItem = styled(Button, {
@@ -81,6 +84,63 @@ const MenuItem = styled(Button, {
     },
   } as const,
 });
+
+const MenuIconBox = styled(YStack, {
+  width: 38,
+  height: 38,
+  borderRadius: '$3',
+  alignItems: 'center',
+  justifyContent: 'center',
+  backgroundColor: '$color2',
+  flexShrink: 0,
+});
+
+/**
+ * Returns "Baseball", "Football", or null based on playerPool value.
+ * Baseball playerPool values are "all", "al", "nl" (MLB pool filters).
+ */
+function getSportLabel(playerPool: string | null | undefined): string | null {
+  if (!playerPool) return null;
+  const pool = playerPool.toLowerCase();
+  // Baseball pools: "all" (all of MLB), "al" (American League), "nl" (National League)
+  if (
+    pool === 'all' ||
+    pool === 'al' ||
+    pool === 'nl' ||
+    pool.includes('baseball') ||
+    pool === 'mlb'
+  )
+    return 'Baseball';
+  if (pool.includes('football') || pool === 'nfl') return 'Football';
+  return null;
+}
+
+/** Returns a secondary context string like "Week 3", "Active", or "Pre-Draft". */
+function getLeagueContext(
+  leaguePhase: string | null | undefined,
+  currentWeekNumber: number | null | undefined,
+): string {
+  if (!leaguePhase) return '';
+  if (leaguePhase === 'pre-draft') return 'Pre-Draft';
+  if (leaguePhase === 'active') {
+    return currentWeekNumber ? `Week ${currentWeekNumber}` : 'Active';
+  }
+  if (leaguePhase === 'offseason') return 'Offseason';
+  return leaguePhase;
+}
+
+interface SportIconInBoxProps {
+  playerPool: string | null | undefined;
+}
+
+function SportIconInBox({ playerPool }: SportIconInBoxProps) {
+  const pool = (playerPool ?? '').toLowerCase();
+  if (pool.includes('football') || pool === 'nfl') {
+    return <FootballIcon size={20} color="var(--color)" />;
+  }
+  // Default to baseball (primary sport)
+  return <BaseballIcon size={20} color="var(--color)" />;
+}
 
 export const MyLeaguesDropdown: React.FC = () => {
   const auth = useAuth();
@@ -182,9 +242,14 @@ export const MyLeaguesDropdown: React.FC = () => {
           top="100%"
           left={0}
           marginTop="$2"
+          zIndex={NAV_DROPDOWN_Z_INDEX}
           role="menu"
           id={menuId}
           aria-labelledby={buttonId}
+          style={{
+            animation:
+              'navDropdownIn 150ms cubic-bezier(0.16, 1, 0.3, 1) forwards',
+          }}
         >
           {loading && (
             <XStack justifyContent="center" alignItems="center" padding="$4">
@@ -234,6 +299,15 @@ export const MyLeaguesDropdown: React.FC = () => {
               if (!league.id) return null;
               const href = `/baseball/league/${league.id}`;
               const isLeagueActive = location.pathname.startsWith(href);
+              const sportLabel = getSportLabel(league.playerPool);
+              const phaseContext = getLeagueContext(
+                league.leaguePhase,
+                league.currentWeekNumber,
+              );
+              const secondaryLine = [sportLabel, phaseContext]
+                .filter(Boolean)
+                .join(' · ');
+
               return (
                 <Link
                   key={league.id}
@@ -248,28 +322,46 @@ export const MyLeaguesDropdown: React.FC = () => {
                   >
                     <XStack
                       alignItems="center"
-                      gap="$2"
+                      gap="$3"
                       flex={1}
                       overflow="hidden"
                     >
-                      <Paragraph
-                        marginBottom={0}
-                        fontSize={14}
-                        numberOfLines={1}
-                        ellipsizeMode="tail"
-                      >
-                        {league.name ?? `League ${league.id}`}
-                      </Paragraph>
-                      {league.draftStatus === 'in-progress' && (
-                        <Paragraph
-                          marginBottom={0}
-                          fontSize={11}
-                          color="$green10"
-                          fontWeight="600"
-                        >
-                          LIVE
-                        </Paragraph>
-                      )}
+                      <MenuIconBox>
+                        <SportIconInBox playerPool={league.playerPool} />
+                      </MenuIconBox>
+                      <YStack flex={1} gap="$1" overflow="hidden">
+                        <XStack alignItems="center" gap="$2">
+                          <Paragraph
+                            marginBottom={0}
+                            size="$4"
+                            color="$color"
+                            fontWeight="500"
+                            numberOfLines={1}
+                            ellipsizeMode="tail"
+                          >
+                            {league.name ?? `League ${league.id}`}
+                          </Paragraph>
+                          {league.draftStatus === 'in-progress' && (
+                            <Paragraph
+                              marginBottom={0}
+                              fontSize={11}
+                              color="$green10"
+                              fontWeight="600"
+                            >
+                              LIVE
+                            </Paragraph>
+                          )}
+                        </XStack>
+                        {secondaryLine ? (
+                          <Paragraph
+                            marginBottom={0}
+                            size="$2"
+                            color="$colorPress"
+                          >
+                            {secondaryLine}
+                          </Paragraph>
+                        ) : null}
+                      </YStack>
                     </XStack>
                   </MenuItem>
                 </Link>

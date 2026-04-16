@@ -22,7 +22,6 @@ import {
   Settings2,
   Shield,
   Sun,
-  Tag,
   User,
 } from '@tamagui/lucide-icons';
 import { GRADIENT_AVATAR } from '../../constants/colors';
@@ -31,6 +30,7 @@ import {
   type ThemePreference,
   useThemeContext,
 } from '../../context/ThemeContext';
+import { NAV_DROPDOWN_Z_INDEX } from '../../constants/dimensions';
 
 const UserMenuButton = styled(Button, {
   backgroundColor: 'transparent',
@@ -87,8 +87,8 @@ const MenuItem = styled(Button, {
 });
 
 const MenuIconBox = styled(YStack, {
-  width: 34,
-  height: 34,
+  width: 38,
+  height: 38,
   borderRadius: '$3',
   alignItems: 'center',
   justifyContent: 'center',
@@ -191,17 +191,14 @@ export const UserProfileDropdown: React.FC = () => {
     }
   }, [isOpen]);
 
-  // Extract user data from auth context (with fallback values)
   const userName = formatDisplayName(auth?.user?.username || '');
   const userEmail = auth?.user?.email || '';
   const userImage = auth?.user?.picture || null;
 
-  // Reset image error state when user image changes
   useEffect(() => {
     setImageError(false);
   }, [userImage]);
 
-  // Don't render anything if user is not authenticated
   if (!auth?.isAuthenticated || !auth.user) {
     return null;
   }
@@ -212,7 +209,6 @@ export const UserProfileDropdown: React.FC = () => {
       if (auth?.logout) {
         await auth.logout();
       } else {
-        // Fallback logout logic
         window.location.reload();
       }
     } catch (error) {
@@ -279,46 +275,26 @@ export const UserProfileDropdown: React.FC = () => {
           top="100%"
           right={0}
           marginTop="$2"
-          zIndex={100}
+          zIndex={NAV_DROPDOWN_Z_INDEX}
+          style={{
+            animation:
+              'navDropdownIn 150ms cubic-bezier(0.16, 1, 0.3, 1) forwards',
+          }}
         >
-          {/* User Info Section */}
-          <XStack padding="$2" gap="$3" alignItems="center">
-            <ProfileImage
-              width={40}
-              height={40}
-              style={{
-                background: GRADIENT_AVATAR,
-              }}
+          {/* User Info — name + email only; avatar is in the trigger button above */}
+          <YStack padding="$2" paddingBottom="$3">
+            <Paragraph
+              size="$4"
+              color="$color"
+              fontWeight="600"
+              marginBottom={0}
             >
-              {userImage && !imageError ? (
-                <img
-                  src={userImage}
-                  alt={userName}
-                  referrerPolicy="no-referrer"
-                  crossOrigin="anonymous"
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    borderRadius: '50%',
-                    objectFit: 'cover',
-                  }}
-                  onError={() => setImageError(true)}
-                />
-              ) : (
-                <Paragraph size="$5" color="white" fontWeight="700">
-                  {userName.charAt(0).toUpperCase()}
-                </Paragraph>
-              )}
-            </ProfileImage>
-            <YStack flex={1}>
-              <Paragraph size="$4" color="$color" fontWeight="600">
-                {userName}
-              </Paragraph>
-              <Paragraph size="$2" color="$colorPress">
-                {userEmail}
-              </Paragraph>
-            </YStack>
-          </XStack>
+              {userName}
+            </Paragraph>
+            <Paragraph size="$2" color="$colorPress" marginBottom={0}>
+              {userEmail}
+            </Paragraph>
+          </YStack>
 
           <Separator />
 
@@ -327,7 +303,7 @@ export const UserProfileDropdown: React.FC = () => {
 
           <Separator />
 
-          {/* Menu Items */}
+          {/* Account items */}
           <YStack gap="$1" paddingTop="$2">
             <MenuItem
               onPress={() => {
@@ -379,22 +355,6 @@ export const UserProfileDropdown: React.FC = () => {
 
             <MenuItem
               onPress={() => {
-                void navigate('/pricing');
-                setIsOpen(false);
-              }}
-            >
-              <XStack alignItems="center" gap="$3" flex={1}>
-                <MenuIconBox>
-                  <Tag size={18} color="$color" />
-                </MenuIconBox>
-                <Paragraph size="$3" color="$color" fontWeight="500">
-                  Pricing
-                </Paragraph>
-              </XStack>
-            </MenuItem>
-
-            <MenuItem
-              onPress={() => {
                 void navigate('/help');
                 setIsOpen(false);
               }}
@@ -422,7 +382,7 @@ export const UserProfileDropdown: React.FC = () => {
                   <Settings2 size={18} color="$color" />
                 </MenuIconBox>
                 <Paragraph size="$3" color="$color" fontWeight="500">
-                  Management
+                  League Management
                 </Paragraph>
               </XStack>
             </MenuItem>

@@ -92,6 +92,19 @@ body {
   filter: brightness(1.2);
 }
 
+/* ── Nav dropdown entrance animation ───────────────────────────────────── */
+
+@keyframes navDropdownIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* ── Shared animation keyframes ─────────────────────────────────────────── */
 
 @keyframes skeleton-pulse {
