@@ -39,15 +39,15 @@ This is the step-by-step checklist agents follow for every ticket. See the detai
 
       > **Note**: The `setup-worktree-symlink.sh` SessionStart hook automatically validates and recreates the symlink at session start. Call `worktree_setup_node_modules()` explicitly if you suspect the symlink became stale mid-session (e.g. after a concurrent agent ran `make install` in the main repo).
 
-      If `worktree_setup_node_modules` is unavailable (MCP server not loaded), use the **PowerShell fallback**:
+      If `worktree_setup_node_modules` is unavailable (MCP server not loaded), use the **cmd fallback** (run from your terminal, not from bash):
 
-      ```bash
-      powershell -Command "New-Item -ItemType SymbolicLink -Path 'D:\code\legacy-sports\.claude\worktrees\<name>\node_modules' -Target 'D:\code\legacy-sports\node_modules'"
+      ```bat
+      cd D:\code\legacy-sports\.claude\worktrees\WORKTREE_NAME && cmd /c "mklink /D node_modules D:\code\legacy-sports\node_modules"
       ```
 
-      > **Note**: Directory symlinks require **Windows Developer Mode** (Settings > System > For Developers > Developer Mode). Without it, symlink creation will fail.
+      > **Note**: `mklink /D` creates a directory symlink and requires Windows Developer Mode or an elevated/admin Command Prompt. Do NOT use `mklink /J` (junction) — junctions are followed by recursive-delete operations.
 
-      > **Warning**: Never use `worktree_run(command: "cmd //c mklink //D ...")` or `cmd //c mklink //D node_modules D:\\code\\...` directly in bash — both approaches require fragile backslash escaping that silently creates symlinks to wrong paths. Use `worktree_setup_node_modules()` (MCP) or the PowerShell fallback above. Verify the symlink after creation: `test -d node_modules/nx && echo ok || echo broken`.
+      > **Warning**: Never use `worktree_run(command: "cmd //c mklink //D ...")` or `cmd //c mklink //D node_modules D:\\code\\...` directly in bash — both approaches require fragile backslash escaping that silently creates symlinks to wrong paths. Use `worktree_setup_node_modules()` (MCP) or the cmd fallback above. Verify the symlink after creation: `test -d node_modules/nx && echo ok || echo broken`.
 
     - 5b. **Agent multi-root access** (optional, parallel flow): `make sync-worktrees` then `code legacy-sports.code-workspace` — gives agents search access across all sibling worktrees in one window.
 

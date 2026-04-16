@@ -38,7 +38,7 @@ The Claude Code session was spawned with the launcher `worktree` checkbox checke
    worktree_setup_node_modules()
    ```
 
-   Uses Node.js path APIs internally — no shell escaping needed. Idempotent (safe to call if symlink already exists). Fallback if MCP unavailable: `powershell -Command "New-Item -ItemType SymbolicLink -Path '<worktree>\node_modules' -Target 'D:\code\legacy-sports\node_modules'"` (requires Windows Developer Mode: Settings > System > For Developers > Developer Mode)
+   Uses Node.js path APIs internally — no shell escaping needed. Idempotent (safe to call if symlink already exists). Fallback if MCP unavailable (run from the worktree root): `cmd /c "mklink /D node_modules D:\code\legacy-sports\node_modules"` (uses a directory symlink — do NOT use `mklink /J` or `New-Item -ItemType Junction`, which are followed by recursive-delete operations)
 
    > **Installing new packages in a worktree**: while `node_modules` is symlinked to the main repo, you must never run `pnpm add` or `make install` from the worktree. Those commands are unsafe in this setup: the repo's guardrails are meant to stop them, but attempting to run them with the symlink still in place risks corrupting the shared `node_modules` used by every worktree. If your implementation requires adding/removing/updating dependencies, you **must** break the symlink first and install independently:
    >
@@ -52,7 +52,7 @@ The Claude Code session was spawned with the launcher `worktree` checkbox checke
    >
    > 1. If `node_modules` exists as a broken symlink or points to the wrong location, remove it with `cmd /c "rmdir node_modules"`. If `node_modules` is already missing, skip this step.
    > 2. Run `make install` from the worktree — this creates an independent `node_modules`
-   > 3. **Never** recreate a junction or symlink to the main repo's `node_modules` manually (e.g., `mklink /J`, `New-Item -ItemType Junction`, `New-Item -ItemType SymbolicLink`) — that is exclusively the job of `worktree_setup_node_modules()` (native flow) or `make_wt_setup` (sibling flow). Manual junctions cause `.modules.yaml` path mismatches and Nx graph failures.
+   > 3. **Never** use `mklink /J` or `New-Item -ItemType Junction` to recreate the link — junctions are followed by recursive-delete operations and can cause `.modules.yaml` path mismatches and Nx graph failures. If you must recreate the link without MCP, `cd` into the worktree root and run `cmd /c "mklink /D node_modules D:\code\legacy-sports\node_modules"` (directory symlink). Prefer `worktree_setup_node_modules()` (native flow) or `make_wt_setup` (sibling flow) — they handle all edge cases.
    >
    > See also [workflow-recovery-procedures.md](references/shared/workflow-recovery-procedures.md).
 
