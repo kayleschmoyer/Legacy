@@ -12,27 +12,25 @@ import {
   MenuItem,
   NAV_DROPDOWN_ANIMATION,
 } from './NavDropdownShared';
-import { BRAND_GOLD, TEXT_MUTED, TEXT_PRIMARY } from '../../constants/colors';
+import { BRAND_GOLD, TEXT_MUTED } from '../../constants/colors';
 import { NAV_DROPDOWN_Z_INDEX } from '../../constants/dimensions';
 import { BaseballIcon, FootballIcon } from '../icons/SportIcons';
 
-const titleStyle = (active: boolean): React.CSSProperties => ({
+// Color passed separately via Tamagui `color` prop so it adapts to theme.
+const titleStyle: React.CSSProperties = {
   fontFamily: FONT_DISPLAY,
   fontWeight: '700',
   fontSize: 12,
   letterSpacing: '0.06em',
   textTransform: 'uppercase',
-  color: active ? BRAND_GOLD : TEXT_PRIMARY,
-  lineHeight: 1.1,
   marginBottom: 0,
-});
+};
 
 const descStyle: React.CSSProperties = {
   fontFamily: FONT_BODY,
   fontStyle: 'italic',
   fontSize: 11,
   color: TEXT_MUTED,
-  lineHeight: 1.4,
   marginTop: 3,
   marginBottom: 0,
 };
@@ -156,7 +154,12 @@ export const SportsDropdown: React.FC = () => {
                   />
                 </YStack>
                 <YStack flex={1} gap={0}>
-                  <Paragraph style={titleStyle(isFootball)}>Football</Paragraph>
+                  <Paragraph
+                    color={isFootball ? BRAND_GOLD : '$color'}
+                    style={titleStyle}
+                  >
+                    Football
+                  </Paragraph>
                   <Paragraph style={descStyle}>NFL fantasy leagues</Paragraph>
                 </YStack>
               </XStack>
@@ -180,7 +183,12 @@ export const SportsDropdown: React.FC = () => {
                   />
                 </YStack>
                 <YStack flex={1} gap={0}>
-                  <Paragraph style={titleStyle(isBaseball)}>Baseball</Paragraph>
+                  <Paragraph
+                    color={isBaseball ? BRAND_GOLD : '$color'}
+                    style={titleStyle}
+                  >
+                    Baseball
+                  </Paragraph>
                   <Paragraph style={descStyle}>MLB fantasy leagues</Paragraph>
                 </YStack>
               </XStack>
@@ -203,7 +211,10 @@ export const SportsDropdown: React.FC = () => {
                   style={{ flexShrink: 0, marginTop: 1 }}
                 />
                 <YStack flex={1} gap={0}>
-                  <Paragraph style={titleStyle(isLeagues)}>
+                  <Paragraph
+                    color={isLeagues ? BRAND_GOLD : '$color'}
+                    style={titleStyle}
+                  >
                     Browse Leagues
                   </Paragraph>
                   <Paragraph style={descStyle}>Join a public league</Paragraph>

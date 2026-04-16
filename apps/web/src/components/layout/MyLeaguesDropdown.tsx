@@ -14,7 +14,7 @@ import {
   NAV_DROPDOWN_ANIMATION,
 } from './NavDropdownShared';
 import { useGetUserLeaguesQuery } from '../../api/db/graphql.generated';
-import { BRAND_SEAM_RED, TEXT_PRIMARY } from '../../constants/colors';
+import { BRAND_SEAM_RED } from '../../constants/colors';
 import { NAV_DROPDOWN_Z_INDEX } from '../../constants/dimensions';
 import { BaseballIcon, FootballIcon } from '../icons/SportIcons';
 
@@ -203,10 +203,10 @@ export const MyLeaguesDropdown: React.FC = () => {
             <YStack padding="$3" gap="$2">
               <Paragraph
                 marginBottom={0}
+                color="$color"
                 style={
                   {
                     fontSize: 12,
-                    color: TEXT_PRIMARY,
                     textAlign: 'center',
                     fontFamily: FONT_DISPLAY,
                     opacity: 0.6,
@@ -304,14 +304,12 @@ export const MyLeaguesDropdown: React.FC = () => {
                             marginBottom={0}
                             numberOfLines={1}
                             ellipsizeMode="tail"
+                            color={isLeagueActive ? '#C5A55A' : '$color'}
                             style={
                               {
                                 fontFamily: FONT_DISPLAY,
                                 fontWeight: '600',
                                 fontSize: 13,
-                                color: isLeagueActive
-                                  ? '#C5A55A'
-                                  : TEXT_PRIMARY,
                                 flex: 1,
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis',

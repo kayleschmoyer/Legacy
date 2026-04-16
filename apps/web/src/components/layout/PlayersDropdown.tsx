@@ -18,20 +18,19 @@ import {
   MenuItem,
   NAV_DROPDOWN_ANIMATION,
 } from './NavDropdownShared';
-import { BRAND_GOLD, TEXT_MUTED, TEXT_PRIMARY } from '../../constants/colors';
+import { BRAND_GOLD, TEXT_MUTED } from '../../constants/colors';
 import { NAV_DROPDOWN_Z_INDEX } from '../../constants/dimensions';
 
-// Item title style — Big Shoulders Display uppercase, gold when active
-const titleStyle = (active: boolean): React.CSSProperties => ({
+// Item title style — Big Shoulders Display uppercase.
+// Color passed separately via Tamagui `color` prop so it adapts to theme.
+const titleStyle: React.CSSProperties = {
   fontFamily: FONT_DISPLAY,
   fontWeight: '700',
   fontSize: 12,
   letterSpacing: '0.06em',
   textTransform: 'uppercase',
-  color: active ? BRAND_GOLD : TEXT_PRIMARY,
-  lineHeight: 1.1,
   marginBottom: 0,
-});
+};
 
 // Item description style — Literata italic, always muted
 const descStyle: React.CSSProperties = {
@@ -39,7 +38,6 @@ const descStyle: React.CSSProperties = {
   fontStyle: 'italic',
   fontSize: 11,
   color: TEXT_MUTED,
-  lineHeight: 1.4,
   marginTop: 3,
   marginBottom: 0,
 };
@@ -162,7 +160,10 @@ export const PlayersDropdown: React.FC = () => {
                 />
                 <YStack flex={1} gap={0}>
                   <Paragraph
-                    style={titleStyle(location.pathname === '/players')}
+                    color={
+                      location.pathname === '/players' ? BRAND_GOLD : '$color'
+                    }
+                    style={titleStyle}
                   >
                     All Players
                   </Paragraph>
@@ -195,7 +196,12 @@ export const PlayersDropdown: React.FC = () => {
                 />
                 <YStack flex={1} gap={0}>
                   <Paragraph
-                    style={titleStyle(location.pathname === '/players/stats')}
+                    color={
+                      location.pathname === '/players/stats'
+                        ? BRAND_GOLD
+                        : '$color'
+                    }
+                    style={titleStyle}
                   >
                     Player Stats
                   </Paragraph>
@@ -228,7 +234,12 @@ export const PlayersDropdown: React.FC = () => {
                 />
                 <YStack flex={1} gap={0}>
                   <Paragraph
-                    style={titleStyle(location.pathname === '/players/compare')}
+                    color={
+                      location.pathname === '/players/compare'
+                        ? BRAND_GOLD
+                        : '$color'
+                    }
+                    style={titleStyle}
                   >
                     Compare Players
                   </Paragraph>
