@@ -98,6 +98,7 @@ export const MenuItem = styled(Button, {
   paddingVertical: 10,
   borderRadius: '$3',
   width: '100%',
+  height: 'auto',
   gap: '$3',
   hoverStyle: {
     backgroundColor: '$color3',
