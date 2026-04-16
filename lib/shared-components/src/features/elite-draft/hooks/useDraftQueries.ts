@@ -276,6 +276,8 @@ export function useDraftQueries({
             lastName: string;
             brefId: string;
             eligiblePositions?: string[] | null;
+            hitterAvgPointsPerGame?: number | null;
+            pitchingAvgPointsPerGame?: number | null;
           } =>
             p.id != null &&
             p.firstName != null &&
@@ -288,6 +290,8 @@ export function useDraftQueries({
           lastName: p.lastName,
           brefId: p.brefId,
           eligiblePositions: p.eligiblePositions ?? undefined,
+          hitterAvgPointsPerGame: p.hitterAvgPointsPerGame ?? null,
+          pitchingAvgPointsPerGame: p.pitchingAvgPointsPerGame ?? null,
         })),
     [allRawPlayers],
   );

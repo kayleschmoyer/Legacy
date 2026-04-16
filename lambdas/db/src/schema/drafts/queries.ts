@@ -291,39 +291,8 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
       const limitVal = Math.min(Math.max(1, resultLimit ?? 50), 1000);
       const offsetVal = Math.max(0, resultOffset ?? 0);
 
-      // ---- Determine ORDER BY strategy ----
-      // Scoring column expressions reference the 'cs' alias from compute_career_scores
-      // Scoring ORDER BY expressions — reference SELECT aliases defined below (LS-696).
-      // cs_league = league-specific cache; cs_default = default (NULL) cache fallback.
-      const scoringColMap: Record<string, string> = {
-        hitterAvgPointsPerGame:
-          'CASE WHEN COALESCE(cs_league.career_games, cs_default.career_games, 0) > 0' +
-          ' THEN (COALESCE(cs_league.batting_score, cs_default.batting_score, 0)' +
-          '      + COALESCE(cs_league.fielding_score, cs_default.fielding_score, 0))' +
-          '     / COALESCE(cs_league.career_games, cs_default.career_games, 0)' +
-          ' ELSE 0 END',
-        pitchingAvgPointsPerGame:
-          'CASE WHEN COALESCE(cs_league.career_games, cs_default.career_games, 0) > 0' +
-          ' THEN COALESCE(cs_league.pitching_score, cs_default.pitching_score, 0)' +
-          '     / COALESCE(cs_league.career_games, cs_default.career_games, 0)' +
-          ' ELSE 0 END',
-        hitterScore:
-          'COALESCE(cs_league.batting_score, cs_default.batting_score, 0)' +
-          ' + COALESCE(cs_league.fielding_score, cs_default.fielding_score, 0)',
-        pitchingScore:
-          'COALESCE(cs_league.pitching_score, cs_default.pitching_score, 0)',
-        battingScore:
-          'COALESCE(cs_league.batting_score, cs_default.batting_score, 0)',
-        fieldingScore:
-          'COALESCE(cs_league.fielding_score, cs_default.fielding_score, 0)',
-        totalScore:
-          'COALESCE(cs_league.total_score, cs_default.total_score, 0)',
-        avgPointsPerGame: 'COALESCE(cs_league.avg_ppg, cs_default.avg_ppg, 0)',
-      };
-
-      // Base SELECT joined against player_scoring_cache (LS-696).
-      // cs_league matches league-specific rows; cs_default is the NULL-league fallback
-      // for leagues without a custom scoring profile.
+      // ---- Build SELECT fragments ----
+      // Base SELECT — no scoring join (used for non-scoring sorts).
       const basePlayerSelect = sql`
         SELECT
           p.id, p.first_name, p.last_name, p.bref_id,
@@ -333,18 +302,25 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
         FROM public.players p
       `;
 
-      // Scoring-joined SELECT used for all scoring-based sorts.
+      // Scoring-joined SELECT: joins only the default (NULL league) scoring cache (LS-3115).
+      // Computes hitter/pitching PPG as (category score) / career_games, matching the field
+      // descriptions on DraftPlayer and including fielding in the hitter figure.
       const basePlayerSelectWithScoring = sql`
         SELECT
           p.id, p.first_name, p.last_name, p.bref_id,
           p.stats_last_fetched_at, p.all_star_selections, p.gold_gloves,
           p.silver_sluggers, p.mvp_awards, p.cy_young_awards,
-          p.world_series_rings, p.hall_of_fame, p.rookie_of_the_year
+          p.world_series_rings, p.hall_of_fame, p.rookie_of_the_year,
+          COALESCE(
+            (COALESCE(cs.batting_score, 0) + COALESCE(cs.fielding_score, 0))
+            / NULLIF(cs.career_games, 0), 0
+          ) AS hitter_avg_ppg,
+          COALESCE(
+            COALESCE(cs.pitching_score, 0) / NULLIF(cs.career_games, 0), 0
+          ) AS pitching_avg_ppg
         FROM public.players p
-        LEFT JOIN public.player_scoring_cache cs_league
-          ON cs_league.player_id = p.id AND cs_league.league_id = ${draft.leagueId}
-        LEFT JOIN public.player_scoring_cache cs_default
-          ON cs_default.player_id = p.id AND cs_default.league_id IS NULL
+        LEFT JOIN public.player_scoring_cache cs
+          ON cs.player_id = p.id AND cs.league_id IS NULL
       `;
 
       type RawPlayerRow = {
@@ -361,6 +337,9 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
         world_series_rings: number;
         hall_of_fame: boolean;
         rookie_of_the_year: boolean;
+        // Present only for scoring-joined queries
+        hitter_avg_ppg?: string | null;
+        pitching_avg_ppg?: string | null;
       };
 
       const mapRow = (row: RawPlayerRow) => ({
@@ -379,6 +358,10 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
         worldSeriesRings: row.world_series_rings ?? 0,
         hallOfFame: row.hall_of_fame ?? false,
         rookieOfTheYear: row.rookie_of_the_year ?? false,
+        hitterAvgPointsPerGame:
+          row.hitter_avg_ppg != null ? Number(row.hitter_avg_ppg) : null,
+        pitchingAvgPointsPerGame:
+          row.pitching_avg_ppg != null ? Number(row.pitching_avg_ppg) : null,
       });
 
       const orderByKey = orderBy ?? 'hitterAvgPointsPerGame';
@@ -407,6 +390,27 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
         const result = await context.db.execute(rawQuery);
         return (result.rows as unknown as RawPlayerRow[]).map(mapRow);
       }
+
+      // ---- Determine ORDER BY strategy ----
+      // Scoring ORDER BY expressions reference the 'cs' alias (default scoring cache,
+      // league_id IS NULL). The draft board always uses default scoring settings (LS-3115)
+      // so players sort consistently regardless of league-specific profile customisation.
+      // hitterAvgPointsPerGame = (batting_score + fielding_score) / career_games
+      // pitchingAvgPointsPerGame = pitching_score / career_games
+      // Both divide by career_games (consistent with the DraftPlayer field descriptions).
+      const scoringColMap: Record<string, string> = {
+        hitterScore:
+          'COALESCE(cs.batting_score, 0) + COALESCE(cs.fielding_score, 0)',
+        pitchingScore: 'COALESCE(cs.pitching_score, 0)',
+        battingScore: 'COALESCE(cs.batting_score, 0)',
+        fieldingScore: 'COALESCE(cs.fielding_score, 0)',
+        totalScore: 'COALESCE(cs.total_score, 0)',
+        careerGames: 'COALESCE(cs.career_games, 0)',
+        avgPointsPerGame: 'COALESCE(cs.avg_ppg, 0)',
+        // Aliases defined in basePlayerSelectWithScoring; avoids duplication.
+        hitterAvgPointsPerGame: 'hitter_avg_ppg',
+        pitchingAvgPointsPerGame: 'pitching_avg_ppg',
+      };
 
       // Scoring sorts: join player_scoring_cache (LS-696 — replaces compute_career_scores)
       // Validate orderByKey against the explicit allowlist before calling sql.raw().

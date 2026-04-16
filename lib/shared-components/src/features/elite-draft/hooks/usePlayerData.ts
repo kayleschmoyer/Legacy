@@ -80,8 +80,12 @@ export function usePlayerData({
       // from eligiblePositions (authoritative, from player_eligible_positions
       // materialized view) and fall back to the stats entry when absent.
       const pos = ap.eligiblePositions?.[0] ?? s?.position ?? 'UTIL';
+      // Determine pitcher status using eligiblePositions (authoritative) first,
+      // then pitchingStatsMap presence, then position — covers pure pitchers that
+      // are absent from playerStatsMap (no career batting row) (LS-3115).
       const pitcher =
         (ap.eligiblePositions?.some(isPitcherPosition) ?? false) ||
+        pitchingStatsMap.has(ap.id) ||
         isPitcherPosition(pos);
       const ps = pitcher ? pitchingStatsMap.get(ap.id) : undefined;
       map.set(ap.id, {
@@ -107,6 +111,9 @@ export function usePlayerData({
         whip: ps?.whip,
         winPct: ps?.winPct,
         gamesStarted: ps?.gamesStarted,
+        ppg: pitcher
+          ? (ap.pitchingAvgPointsPerGame ?? null)
+          : (ap.hitterAvgPointsPerGame ?? null),
       });
     }
     // Seed from pick history for drafted players absent from stats
@@ -154,8 +161,12 @@ export function usePlayerData({
       // Derive position from eligiblePositions (authoritative) since primaryPosition
       // is no longer fetched in GetDraftPlayerStats (LS-3113).
       const pos = ap.eligiblePositions?.[0] ?? s?.position ?? 'UTIL';
+      // Determine pitcher status using eligiblePositions (authoritative) first,
+      // then pitchingStatsMap presence, then position — covers pure pitchers that
+      // are absent from playerStatsMap (no career batting row) (LS-3115).
       const pitcher =
         (ap.eligiblePositions?.some(isPitcherPosition) ?? false) ||
+        pitchingStatsMap.has(ap.id) ||
         isPitcherPosition(pos);
       const ps = pitcher ? pitchingStatsMap.get(ap.id) : undefined;
       return {
@@ -181,6 +192,9 @@ export function usePlayerData({
         whip: ps?.whip,
         winPct: ps?.winPct,
         gamesStarted: ps?.gamesStarted,
+        ppg: pitcher
+          ? (ap.pitchingAvgPointsPerGame ?? null)
+          : (ap.hitterAvgPointsPerGame ?? null),
       };
     });
   }, [availablePlayers, playerStatsMap, pitchingStatsMap]);
