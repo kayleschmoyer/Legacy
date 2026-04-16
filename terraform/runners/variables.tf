@@ -85,9 +85,9 @@ variable "github_runners_instance_types" {
 }
 
 variable "github_runners_max_count" {
-  description = "Maximum number of concurrent runner instances"
+  description = "Maximum number of concurrent runner instances. Set to 30 to prevent job queuing when the fleet peaks — live data confirmed the fleet hits 20 (the previous cap) for 3+ consecutive minutes during agent bursts, extending burst duration and increasing total idle billing."
   type        = number
-  default     = 20
+  default     = 30
 }
 
 # ── Runner AMI version pinning (LS-2429) ──────────────────────────────────────

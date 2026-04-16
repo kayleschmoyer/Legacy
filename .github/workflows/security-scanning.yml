@@ -35,7 +35,8 @@ env:
 jobs:
   security-scan-plan:
     name: "Security Scan Planning"
-    runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    # ubuntu-latest: no pnpm/Node env needed — pure bash/shell only (LS-3572)
+    runs-on: ubuntu-latest
     timeout-minutes: 3
 
     outputs:
@@ -347,7 +348,8 @@ jobs:
 
   secret-detection:
     name: "Secret Detection Scan"
-    runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    # ubuntu-latest: no pnpm/Node env needed — pure bash/shell only (LS-3572)
+    runs-on: ubuntu-latest
     timeout-minutes: 8
     needs: security-scan-plan
     if: needs.security-scan-plan.outputs.run-secret-scan == 'true'
@@ -734,7 +736,8 @@ jobs:
 
   security-summary:
     name: "Security Scan Summary"
-    runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    # ubuntu-latest: no pnpm/Node env needed — pure bash/shell only (LS-3572)
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     needs: [security-scan-plan, dependency-scan, secret-detection, sast-scan]
     if: always()
@@ -841,7 +844,8 @@ jobs:
 
   security-gate:
     name: "Security Gate"
-    runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    # ubuntu-latest: no pnpm/monorepo setup needed — runs github-script (Node) only (LS-3572)
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     needs: [security-scan-plan, dependency-scan, secret-detection, sast-scan]
     if: always()

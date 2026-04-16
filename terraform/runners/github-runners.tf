@@ -17,7 +17,7 @@ locals {
 #   GitHub webhook (workflow_job) → API Gateway → Lambda → EC2 spot (non-ephemeral)
 #   Runner boots once, processes jobs from queue, scale-down Lambda terminates after idle timeout
 #
-# Cost: ~$48/month (scale-to-zero, spot instances) vs ~$1,370/month on
+# Cost: ~$175-215/month (pre-optimization; target ~$140-180/month after LS-3572) (scale-to-zero, spot instances) vs ~$1,370/month on
 #        GitHub-hosted runners (~96% savings).
 # =============================================================================
 
@@ -135,15 +135,18 @@ module "github_runners" {
   # Time for the instance to boot and register as a runner (~30s with pre-baked AMI
   # plus userdata_pre_install). Scale-down Lambda won't terminate instances younger
   # than this even if they appear idle. 2 minutes provides ample protection — actual
-  # boot time is ~30s — and makes minimum_running_time_in_minutes = 5 the effective
-  # billing floor (max(2, 5) = 5), halving the previous 10-minute minimum per runner.
+  # boot time is ~30s — and makes minimum_running_time_in_minutes = 2 the effective
+  # billing floor (max(2, 2) = 2).
   runner_boot_time_in_minutes = 2
 
   # Minimum runtime before the scale-down Lambda considers a runner eligible for
-  # termination. 5 minutes is enough for a warm runner to pick up a follow-on
-  # job in a burst, while avoiding the cost of keeping 10+ parallel runners
-  # idle for 15 minutes after lightweight jobs complete (LS-cost-optimization).
-  minimum_running_time_in_minutes = 5
+  # termination. Reduced from 5 → 2 minutes (LS-3572): live data showed short
+  # self-hosted jobs (detect-changes: 22s, security-scan-plan: 10s, secret-detection: 11s)
+  # were each billing a full 5-minute floor despite running in under 30 seconds.
+  # 2 minutes is still sufficient for a warm runner to pick up a follow-on stage
+  # in a burst — confirmed by scale-down logs showing zero idle terminations
+  # during active bursts, meaning chaining happens in seconds not minutes.
+  minimum_running_time_in_minutes = 2
 
   # ── AMI (pre-baked via Packer — see terraform/packer/runner-ami.pkr.hcl) ──
   # Ubuntu 22.04 with Node.js 22, pnpm, Playwright deps, runner deps pre-installed.
