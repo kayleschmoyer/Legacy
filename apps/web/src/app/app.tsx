@@ -681,6 +681,7 @@ function App() {
             <Route path="/players/:id" element={<PlayerDetailPage />} />
             <Route path="/about" element={<AboutPage />} />
             <Route path="/help" element={<HelpPage />} />
+            <Route path="/faq" element={<Navigate to="/help" replace />} />
             <Route path="/pricing" element={<PricingPage />} />
             <Route
               path="/admin"
