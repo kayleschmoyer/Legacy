@@ -1,6 +1,6 @@
 ---
 name: drive-pr
-description: 'Pick up an existing PR by number and shepherd it to merge. Inspects current state (CI, reviews, conflicts), fixes whatever is blocking, and loops through github_wait_for_pr_event until the PR merges. Handles CI failures, review comments, merge conflicts, and stale branches. Extracts the linked Jira ticket and manages status transitions. Works in both local (worktree) and cloud (API-only) modes. Use when given a PR number/URL and asked to drive it to merge, land it, ship it, or get it merged.'
+description: 'Pick up an existing PR by number and shepherd it to merge. Inspects current state (CI, reviews, conflicts), fixes whatever is blocking, and handles events until the PR merges. Handles CI failures, review comments, merge conflicts, and stale branches. Extracts the linked Jira ticket and manages status transitions. Works in both local (worktree) and cloud (API-only) modes. Use when given a PR number/URL and asked to drive it to merge, land it, ship it, or get it merged.'
 ---
 
 # Skill: Drive PR
@@ -204,17 +204,13 @@ make_run(target: "pc")
 worktree_push()
 ```
 
-### Step 6: Wait-for-event loop
+### Step 6: Event handling loop
 
-After fixing all known issues, enter the event loop:
+After fixing all known issues, Claude Code will surface PR events natively — no wait tool needed.
 
-> ⛔ **Never use `Start-Sleep`, `sleep`, or any polling loop here.** `github_wait_for_pr_event` is push-based and blocks until an event fires — no sleep needed. See [mcp-first CI substitution table](../mcp-first/SKILL.md).
+> ⛔ **Never use `Start-Sleep`, `sleep`, or any polling loop.** Claude Code surfaces PR events (CI fail/pass, review threads, conflicts, merged) automatically. See the [mcp-first CI Operations section](../mcp-first/SKILL.md#ci-operations).
 
-```
-github_wait_for_pr_event({ number: <PR#> })
-```
-
-This blocks until an agent-actionable event fires. Handle each event:
+React to each event as it arrives. Handle each event:
 
 | Event                      | Action                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -238,9 +234,9 @@ This blocks until an agent-actionable event fires. Handle each event:
 github_manage_labels(prs: [<PR#>], add: ["merge-when-ready"])
 ```
 
-This triggers the repo's label-driven merge queue (`.github/workflows/merge-queue.yml`). Do **not** call `github_merge_pr` directly — it may bypass or conflict with branch protection and merge-queue enforcement. Continue the `github_wait_for_pr_event` loop after labeling; the merge queue will produce a `merged` event when the PR lands.
+This triggers the repo's label-driven merge queue (`.github/workflows/merge-queue.yml`). Do **not** call `github_merge_pr` directly — it may bypass or conflict with branch protection and merge-queue enforcement. Continue handling events after labeling; the merge queue will produce a `merged` event when the PR lands.
 
-After handling an event, call `github_wait_for_pr_event({ number: <PR#> })` again. Continue until `merged` or `closed`.
+After handling an event, continue until `merged` or `closed`.
 
 ### Step 7: Post-merge
 

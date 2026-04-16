@@ -86,7 +86,7 @@ Build a triage list:
 7. **Validate locally**: `make pc` — the whole point is to catch issues before pushing, not after.
 8. **Self-review fix code**: re-read changed files in full and check against `skills/pr-lifecycle/references/common-review-patterns.md` before pushing.
 9. **Commit + push once for the round**.
-10. **Wait for CI**: `ci_wait_for_run({ runId })` or `github_wait_for_pr_event({ number: <PR#> })` — confirm CI passes before declaring done. ⛔ Never use `Start-Sleep`, `sleep`, or any polling loop; see [mcp-first CI substitution table](../mcp-first/SKILL.md).
+10. **Wait for CI**: Claude Code surfaces CI results natively — confirm CI passes before declaring done. ⛔ Never use `Start-Sleep`, `sleep`, or any polling loop; see [mcp-first CI Operations](../mcp-first/SKILL.md#ci-operations).
 
 ### Step 4: Final Verification
 

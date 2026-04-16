@@ -56,12 +56,11 @@ When a planning phase was run (see [planning skill](../planning/SKILL.md)), incl
 
 ### Phase 2b: Watch PR to Merge
 
-After creating the PR and transitioning Jira, enter the event loop to shepherd the PR through CI and reviews — do **not** treat PR creation as the end of the task.
+After creating the PR and transitioning Jira, shepherd the PR through CI and reviews — do **not** treat PR creation as the end of the task.
 
-- **Local agents**: call `github_wait_for_pr_event({ number: <PR#> })` — it blocks until an agent-actionable event fires (CI fail/pass, new review thread, review decision, conflicts, merged, closed) and returns `{ event, pr, ... }`. Handle the event (fixing code, resolving threads, re-running CI), then call it again. Continue until `merged` or `closed`.
-- **Cloud agents (Claude Code on the web)**: call `mcp__github__subscribe_pr_activity({ owner, repo, pullNumber: <PR#> })` to receive real-time `<github-webhook-activity>` messages, then react to incoming messages as they arrive. Do not also call `github_wait_for_pr_event` — the webhook subscription replaces the polling loop.
+Claude Code surfaces CI results and review events natively. After marking the PR ready, Claude Code will automatically receive and surface CI failures, new review threads, and other agent-actionable events. Handle each event as it arrives (fixing code, resolving threads, re-running CI) and continue until merged or closed.
 
-See [drive-pr](../drive-pr/SKILL.md) Step 6 for the full event-handling table. See Critical Rule 9 below for the tool details.
+See [drive-pr](../drive-pr/SKILL.md) Step 6 for the full event-handling table.
 
 ### Phase 3: Fix Copilot Review Comments
 
@@ -104,23 +103,20 @@ Before the next push, also check whether any other blockers are already known on
 6. **Never create a PR from `main`** -- branch name must contain a Jira ticket key.
 7. **Always create PRs as drafts** -- use `draft: true` in `github_create_pr` MCP tool. Apply the `agent-in-progress` label while still a draft, then mark ready. This closes the race window — the PR becomes visible to sweeps already labeled. See [create-pr.md](references/create-pr.md) for the canonical step order.
 8. **Check Runs ≠ Commit Statuses** -- `github_retrigger_check` only works on **Check Runs** (Checks API). `bot-review` and other bot-set statuses use the **Statuses API** and will NOT be found by `github_retrigger_check`. If you get "No check run named 'X' found", use `github_list_commit_statuses({ number: <PR#> })` to see commit statuses instead. To clear a stale commit status: push a new commit (re-triggers the workflow) or dispatch via `ci_dispatch_workflow`. Note: `github_merge_pr(strategy: "direct")` does NOT bypass required commit statuses — it uses the standard merge API which still enforces branch protection rules.
-9. **Use `github_wait_for_pr_event` for PR shepherding — never polling loops** -- after marking a PR ready, call `github_wait_for_pr_event({ number: <PR#> })` to block until something agent-actionable happens (CI fails/passes, new review thread, review decision, conflicts, merged, closed). It returns a structured `{ event, pr, ... }` payload so you immediately know what to do next. This covers both Check Runs (Actions jobs) and Commit Statuses (bot/external CI like `bot-review`) in a single call.
-   - **When you already have a specific run ID** (e.g. after `ci_rerun`): use `ci_wait_for_run({ runId: "<id>" })` to block until that exact run completes, then continue the `github_wait_for_pr_event` loop.
+9. **Claude Code surfaces PR events natively — never use polling loops** -- after marking a PR ready, Claude Code automatically surfaces CI results, review threads, and other agent-actionable events. No wait tool needed. React to each event as it arrives and handle it.
    - **Never use `sleep` + polling loops** — no `sleep N && gh run view`, no `sleep N && gh pr view --json statusCheckRollup`, no `ci_view_run every ~60s` loops. These waste context and shell round-trips.
 10. **Batch known PR fixes into one push** -- when a PR simultaneously has unresolved review threads and failing checks, gather both the thread set and CI evidence before editing. The default remediation unit is one review/CI round -> one validation -> one push. Multiple pushes for already-known issues create avoidable Copilot re-reviews and CI cycles.
-11. **`ci_list_runs`, `ci_view_run`, `github_view_pr`, `github_list_prs` are instant snapshots — NOT wait tools.** Calling them in a loop to poll for CI completion burns 1–2M tokens per session (each call re-reads the full conversation context). Use them exactly once for a targeted lookup, then hand off to a blocking wait tool.
+11. **`ci_list_runs`, `ci_view_run`, `github_view_pr`, `github_list_prs` are instant snapshots — use for targeted lookups only.** Calling them in a loop burns 1–2M tokens per session (each call re-reads the full conversation context). Use them exactly once for a targeted lookup.
 
-    **CI tool reference — blocking waits vs instant snapshots:**
+    **CI tool reference — instant snapshots:**
 
-| Tool                       | Type              | Correct usage                                                                             |
-| -------------------------- | ----------------- | ----------------------------------------------------------------------------------------- |
-| `github_wait_for_pr_event` | **Blocking wait** | Primary loop: call after PR ready; call again after each event is handled                 |
-| `ci_wait_for_run`          | **Blocking wait** | After `ci_rerun` — blocks on that specific run, then return to `github_wait_for_pr_event` |
-| `ci_list_runs`             | Instant snapshot  | ONE-SHOT: get the runId after a `checks_failed` event — never loop                        |
-| `ci_get_logs`              | Instant snapshot  | ONE-SHOT: read failed-step output after getting runId — never loop                        |
-| `ci_view_run`              | Instant snapshot  | ONE-SHOT: inspect a specific run — never loop                                             |
-| `github_view_pr`           | Instant snapshot  | ONE-SHOT: verify merge state or read PR metadata — never loop                             |
-| `github_list_prs`          | Instant snapshot  | ONE-SHOT: find an existing PR — never loop                                                |
+| Tool              | Correct usage                                                      |
+| ----------------- | ------------------------------------------------------------------ |
+| `ci_list_runs`    | ONE-SHOT: get the runId for a failing CI run — never loop          |
+| `ci_get_logs`     | ONE-SHOT: read failed-step output after getting runId — never loop |
+| `ci_view_run`     | ONE-SHOT: inspect a specific run — never loop                      |
+| `github_view_pr`  | ONE-SHOT: verify merge state or read PR metadata — never loop      |
+| `github_list_prs` | ONE-SHOT: find an existing PR — never loop                         |
 
 ## Quick Commands
 

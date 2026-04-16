@@ -106,8 +106,8 @@ Use this as the **first stop** before running Glob/Grep exploration. If the conc
 
 | Server   | Root path                        | Key tools                                                                       |
 | -------- | -------------------------------- | ------------------------------------------------------------------------------- |
-| GitHub   | `tools/mcp/github-server/src/`   | `github_create_pr`, `github_wait_for_pr_event`, `github_resolve_threads`, …     |
-| CI       | `tools/mcp/ci-server/src/`       | `ci_wait_for_run`, `ci_list_runs`, `ci_get_logs`, `ci_audit_session_bash`, …    |
+| GitHub   | `tools/mcp/github-server/src/`   | `github_create_pr`, `github_resolve_threads`, `github_get_review_threads`, …    |
+| CI       | `tools/mcp/ci-server/src/`       | `ci_list_runs`, `ci_get_logs`, `ci_audit_session_bash`, `ci_rerun`, …           |
 | Worktree | `tools/mcp/worktree-server/src/` | `worktree_commit`, `worktree_push`, `worktree_set`, …                           |
 | Make     | `tools/mcp/make-server/src/`     | `make_run`, `make_worktree_create`, `make_wt_setup`, …                          |
 | Jira     | `tools/mcp/jira-server/src/`     | `jira_view`, `jira_create_ticket`, `jira_transition`, `jira_get_bucket_epic`, … |

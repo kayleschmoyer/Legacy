@@ -62,14 +62,13 @@ On **Claude Code on the web**, use the built-in `mcp__github__*` tools for autho
 1. Create PR (draft)     → mcp__github__create_pull_request({ owner, repo, title, head, base, draft: true })
 2. Mark ready            → mcp__github__update_pull_request({ owner, repo, pullNumber, draft: false })
 3. Request Copilot       → mcp__github__request_copilot_review({ owner, repo, pullNumber })
-4. Subscribe to events   → mcp__github__subscribe_pr_activity({ owner, repo, pullNumber })
-5. [Copilot posts comments — delivered via <github-webhook-activity> messages]
-6. Read review threads   → github_get_review_threads({ number: <PR#>, unresolvedOnly: true })  ← custom server (returns GraphQL thread node IDs)
-7. Fix code, validate (`make pc`), self-review the changed files, commit & push
-8. Reply to threads      → mcp__github__add_reply_to_pull_request_comment({ owner, repo, pullNumber, commentId, body })  ← built-in (bot identity)
-9. Resolve threads       → github_resolve_threads({ threadIds: [...], prNumber: <PR#> })  ← custom server (batch; prNumber triggers bot-review recheck — may 403 on app tokens but threads are still resolved)
-10. Re-request review    → mcp__github__request_copilot_review({ owner, repo, pullNumber })
-11. [Loop back to 5 if new comments arrive, cap at 2 rounds]
+4. [Claude Code surfaces PR events natively — CI results, Copilot comments, merge status]
+5. Read review threads   → github_get_review_threads({ number: <PR#>, unresolvedOnly: true })  ← custom server (returns GraphQL thread node IDs)
+6. Fix code, validate (`make pc`), self-review the changed files, commit & push
+7. Reply to threads      → mcp__github__add_reply_to_pull_request_comment({ owner, repo, pullNumber, commentId, body })  ← built-in (bot identity)
+8. Resolve threads       → github_resolve_threads({ threadIds: [...], prNumber: <PR#> })  ← custom server (batch; prNumber triggers bot-review recheck — may 403 on app tokens but threads are still resolved)
+9. Re-request review     → mcp__github__request_copilot_review({ owner, repo, pullNumber })
+10. [Loop back to 4 if new comments arrive, cap at 2 rounds]
 ```
 
 ### Thread ID resolution
@@ -112,10 +111,9 @@ The built-in `mcp__github__pull_request_read({ method: "get_review_comments" })`
 
 **Which operations can use either** (no visible authorship / read-only):
 
-| Operation              | Custom MCP tool  | Built-in tool                                   |
-| ---------------------- | ---------------- | ----------------------------------------------- |
-| Read PR details        | `github_view_pr` | `mcp__github__pull_request_read(method: "get")` |
-| Subscribe to PR events | N/A              | `mcp__github__subscribe_pr_activity`            |
+| Operation       | Custom MCP tool  | Built-in tool                                   |
+| --------------- | ---------------- | ----------------------------------------------- |
+| Read PR details | `github_view_pr` | `mcp__github__pull_request_read(method: "get")` |
 
 ### Tool mapping (custom → built-in)
 

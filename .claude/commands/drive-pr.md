@@ -12,7 +12,7 @@ Drive PR to merge: $ARGUMENTS
 4. Extract the Jira ticket key from the PR title or branch name and transition to "In Progress" if needed
 5. Enter a worktree for the PR's branch (activate existing, checkout in launcher worktree, or create sibling via `worktree_attach`)
 6. Fix blockers in priority order: conflicts (rebase) → CI failures → review comments → stale branch
-7. Enter the `github_wait_for_pr_event` loop — handle each event (CI fail, new review, conflicts, approved) and keep looping until the PR merges
+7. Handle events as they arrive (CI fail, new review, conflicts, approved) — Claude Code surfaces these natively — keep handling events until the PR merges
 8. Post-merge: transition Jira to "Done", clean up labels, clean up worktree
 9. **MCP gap audit** (mandatory): run `mcp-gap-audit` Phase 1 to identify and ticket any MCP tooling gaps from this session
 

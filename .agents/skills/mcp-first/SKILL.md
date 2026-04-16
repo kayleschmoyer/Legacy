@@ -45,7 +45,6 @@ These are the specific built-in tool substitutions agents should reach for autom
 | `git add <file> && git commit -m "..."`                      | `worktree_commit({ files: ["<file>"], message: "..." })`                                                                    |
 | `git diff HEAD`                                              | `worktree_diff({ base: "HEAD" })`                                                                                           |
 | `git branch --show-current` / `git status`                   | `worktree_status()`                                                                                                         |
-| `sleep N && gh run view <runId>` (poll loop)                 | `ci_wait_for_run({ runId: "<runId>" })`                                                                                     |
 | `tail ~/.claude/.../tasks/<taskId>.output`                   | `TaskOutput(taskId: "<taskId>")`                                                                                            |
 
 **Glob limitation on Windows worktrees**: `Glob` with `path=` set to an absolute Windows worktree path may silently return empty results due to symlink traversal issues. Fall back to `worktree_ls_tree({ ref: "HEAD", path: "<dir>" })` (Git-tracked files only) or `worktree_run(command: "dir <dir>")`.
@@ -94,20 +93,18 @@ Use the MCP tools below instead of `gh` CLI. These tools handle temp file body e
 
 On Claude Code on the web, Claude provides built-in `mcp__github__*` tools that authenticate via the platform's own token. **Prefer these for operations where authorship is visible** (replying to threads, requesting Copilot review) — the custom `legacy-sports-github` MCP server's token fallback chain can inadvertently use the user's personal OAuth token, causing agent actions to appear under the user's GitHub username.
 
-| Custom MCP tool                                           | Built-in equivalent (Claude Code on the web)                                                                                                                                                                                                                                                               |
-| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `github_create_pr`                                        | `mcp__github__create_pull_request({ owner, repo, title, head, base, body, draft })`                                                                                                                                                                                                                        |
-| `github_mark_pr_ready`                                    | `mcp__github__update_pull_request({ owner, repo, pullNumber, draft: false })`                                                                                                                                                                                                                              |
-| `github_view_pr`                                          | `mcp__github__pull_request_read({ method: "get", owner, repo, pullNumber })`                                                                                                                                                                                                                               |
-| `github_get_review_threads`                               | `mcp__github__pull_request_read({ method: "get_review_comments", owner, repo, pullNumber })`                                                                                                                                                                                                               |
-| `github_reply_to_review`                                  | `mcp__github__add_reply_to_pull_request_comment({ owner, repo, pullNumber, commentId, body })`                                                                                                                                                                                                             |
-| `github_resolve_thread`                                   | `mcp__github__resolve_review_thread({ threadId })`                                                                                                                                                                                                                                                         |
-| `github_resolve_threads` (batch)                          | Loop: `mcp__github__resolve_review_thread({ threadId })` per thread                                                                                                                                                                                                                                        |
-| `github_request_review({ prs: [number], copilot: true })` | `mcp__github__request_copilot_review({ owner, repo, pullNumber })`                                                                                                                                                                                                                                         |
-| `github_list_prs`                                         | `mcp__github__list_pull_requests({ owner, repo })`                                                                                                                                                                                                                                                         |
-| `github_list_reviews`                                     | `mcp__github__pull_request_read({ method: "get_reviews", owner, repo, pullNumber })`                                                                                                                                                                                                                       |
-| N/A (polling)                                             | `mcp__github__subscribe_pr_activity({ owner, repo, pullNumber })` — real-time events                                                                                                                                                                                                                       |
-| N/A (polling loop)                                        | `github_wait_for_pr_event({ number, waitFor?, timeoutMs? })` — **preferred for single-PR shepherding**: blocks until an agent-actionable event fires (CI fail/pass, new review thread, review decision, conflicts, merged, closed); covers both Check Runs (Actions) and Commit Statuses (bot/external CI) |
+| Custom MCP tool                                           | Built-in equivalent (Claude Code on the web)                                                   |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `github_create_pr`                                        | `mcp__github__create_pull_request({ owner, repo, title, head, base, body, draft })`            |
+| `github_mark_pr_ready`                                    | `mcp__github__update_pull_request({ owner, repo, pullNumber, draft: false })`                  |
+| `github_view_pr`                                          | `mcp__github__pull_request_read({ method: "get", owner, repo, pullNumber })`                   |
+| `github_get_review_threads`                               | `mcp__github__pull_request_read({ method: "get_review_comments", owner, repo, pullNumber })`   |
+| `github_reply_to_review`                                  | `mcp__github__add_reply_to_pull_request_comment({ owner, repo, pullNumber, commentId, body })` |
+| `github_resolve_thread`                                   | `mcp__github__resolve_review_thread({ threadId })`                                             |
+| `github_resolve_threads` (batch)                          | Loop: `mcp__github__resolve_review_thread({ threadId })` per thread                            |
+| `github_request_review({ prs: [number], copilot: true })` | `mcp__github__request_copilot_review({ owner, repo, pullNumber })`                             |
+| `github_list_prs`                                         | `mcp__github__list_pull_requests({ owner, repo })`                                             |
+| `github_list_reviews`                                     | `mcp__github__pull_request_read({ method: "get_reviews", owner, repo, pullNumber })`           |
 
 > **Note:** Built-in `mcp__github__*` tools are NOT available on Copilot Coding Agent — use the custom `legacy-sports-github` MCP server there. See [`cloud-agent-mode/SKILL.md`](../cloud-agent-mode/SKILL.md) for the full cloud review lifecycle workflow.
 
@@ -115,17 +112,7 @@ On Claude Code on the web, Claude provides built-in `mcp__github__*` tools that 
 
 Use `ci_list_runs`, `ci_view_run`, `ci_get_logs`, `ci_search_logs`, and `ci_rerun` instead of `gh run` commands via Bash. These tools parse and structure log output for agent consumption.
 
-**Waiting for PR events (preferred)**: use `github_wait_for_pr_event({ number: <PR#> })` to block until something agent-actionable happens on the PR — CI failing/passing, new review thread (Copilot or human), review decision, conflicts, merged, or closed. Returns `{ event, pr, ... }` so the agent immediately knows what to do next. This replaces the pattern of orchestrating `ci_wait_for_run` + `github_view_pr` in a loop.
-
-**Waiting for a specific CI run**: use `ci_wait_for_run({ runId: "<id>" })` when you have a specific run ID (e.g. after `ci_rerun`). After it resolves, return to the `github_wait_for_pr_event` loop for the next event.
-
-| Shell/polling pattern (⛔ NEVER use)                                             | MCP tool (use this instead)                                                                                         |
-| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `sleep N && gh run view <runId> --json status,conclusion` (loop)                 | `ci_wait_for_run({ runId: "<id>" })`                                                                                |
-| `sleep N && gh pr view <pr> --json statusCheckRollup` (loop)                     | `github_wait_for_pr_event({ number: <PR#> })` — blocks for any agent-actionable event including CI + review threads |
-| `Start-Sleep -Seconds N; Write-Host "..."` (waiting for CI or Copilot re-review) | `github_wait_for_pr_event({ number: <PR#> })` — push-based; no sleep needed                                         |
-| `Start-Sleep -Seconds N; ci_list_runs(...)` (polling for a run)                  | `ci_wait_for_run({ runId: "<id>" })` — blocks until the run completes                                               |
-| `github_view_pr` in a loop waiting for merge/review/CI                           | `github_wait_for_pr_event({ number: <PR#> })` — single blocking call replaces the whole loop                        |
+**CI status and PR events are surfaced natively by Claude Code** — no wait tool needed. After pushing, Claude Code automatically receives and surfaces CI failures, review events, and merge status. Never use `sleep` + polling loops (`sleep N && gh run view`, `sleep N && gh pr view`, `ci_view_run` in a loop, `github_view_pr` in a loop) — these waste context and shell round-trips.
 
 ## Database Operations
 

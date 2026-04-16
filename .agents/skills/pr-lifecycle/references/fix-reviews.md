@@ -66,25 +66,23 @@ On Claude Code on the web, use the **custom `legacy-sports-github` MCP server** 
 
 ### Cloud tool substitutions
 
-| Step                | Custom MCP tool (preferred)                                                                  | Built-in fallback (only if custom unavailable)                                                                                                   |
-| ------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Fetch threads       | `github_get_review_threads({ number: <PR#>, unresolvedOnly: true })` ✅ returns GraphQL `id` | `mcp__github__pull_request_read({ method: "get_review_comments", owner, repo, pullNumber })` ⚠️ no thread node IDs — resolve step will fail      |
-| Reply to thread     | ⚠️ may post under user's GitHub username                                                     | `mcp__github__add_reply_to_pull_request_comment({ owner, repo, pullNumber, commentId, body })` ✅ bot identity                                   |
-| Resolve threads     | `github_resolve_threads({ threadIds, prNumber: <PR#> })` ✅ batch                            | `mcp__github__resolve_review_thread({ threadId })` per thread ⚠️ requires node IDs — only viable if threads were fetched via custom server above |
-| Re-request Copilot  | ⚠️ app tokens silently fail for Copilot                                                      | `mcp__github__request_copilot_review({ owner, repo, pullNumber })` ✅ platform auth                                                              |
-| Subscribe to events | N/A                                                                                          | `mcp__github__subscribe_pr_activity({ owner, repo, pullNumber })` ✅                                                                             |
+| Step               | Custom MCP tool (preferred)                                                                  | Built-in fallback (only if custom unavailable)                                                                                                   |
+| ------------------ | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Fetch threads      | `github_get_review_threads({ number: <PR#>, unresolvedOnly: true })` ✅ returns GraphQL `id` | `mcp__github__pull_request_read({ method: "get_review_comments", owner, repo, pullNumber })` ⚠️ no thread node IDs — resolve step will fail      |
+| Reply to thread    | ⚠️ may post under user's GitHub username                                                     | `mcp__github__add_reply_to_pull_request_comment({ owner, repo, pullNumber, commentId, body })` ✅ bot identity                                   |
+| Resolve threads    | `github_resolve_threads({ threadIds, prNumber: <PR#> })` ✅ batch                            | `mcp__github__resolve_review_thread({ threadId })` per thread ⚠️ requires node IDs — only viable if threads were fetched via custom server above |
+| Re-request Copilot | ⚠️ app tokens silently fail for Copilot                                                      | `mcp__github__request_copilot_review({ owner, repo, pullNumber })` ✅ platform auth                                                              |
 
 ### Cloud workflow steps
 
-1. **Subscribe**: `mcp__github__subscribe_pr_activity({ owner, repo, pullNumber: <PR#> })` — receive `<github-webhook-activity>` messages when Copilot posts comments or CI completes
-2. **Fetch threads**: `github_get_review_threads({ number: <PR#>, unresolvedOnly: true })` — the custom server returns GraphQL thread `id` values needed for step 7. If the first call fails with a connection error, wait 10s and retry (server may still be starting). Only fall back to `mcp__github__pull_request_read({ method: "get_review_comments", owner, repo, pullNumber })` if the custom server is confirmed unavailable — but note: the built-in does **not** return thread node IDs, so step 7 cannot use `mcp__github__resolve_review_thread` without them.
-3. **Fix code & validate**: same as local workflow (`make pc`)
-4. **Self-review fix code**: same as local workflow step 5 — re-read changed files in full, check fixes against common-review-patterns.md before pushing.
-5. **Commit & push**: `worktree_commit({ message: "..." })` + `worktree_push()` (or `git commit` + `git push`)
-6. **Reply to threads**: `mcp__github__add_reply_to_pull_request_comment({ owner, repo, pullNumber, commentId: <numeric>, body: "explanation" })` — use the built-in tool so replies appear under bot identity, not the user's GitHub username
-7. **Resolve threads**: `github_resolve_threads({ threadIds: [...], prNumber: <PR#> })` — thread IDs from step 2. If step 2 used the built-in fallback and thread IDs are unavailable, make one more attempt with `github_get_review_threads` (server may be up by now) before surfacing the blocker to the user.
-8. **Re-request review**: `mcp__github__request_copilot_review({ owner, repo, pullNumber })` — platform handles auth natively; the custom server's app token is silently dropped by GitHub for Copilot requests
-9. **Loop**: wait for new `<github-webhook-activity>` events, cap at 2 rounds
+1. **Fetch threads**: `github_get_review_threads({ number: <PR#>, unresolvedOnly: true })` — the custom server returns GraphQL thread `id` values needed for step 7. If the first call fails with a connection error, wait 10s and retry (server may still be starting). Only fall back to `mcp__github__pull_request_read({ method: "get_review_comments", owner, repo, pullNumber })` if the custom server is confirmed unavailable — but note: the built-in does **not** return thread node IDs, so step 7 cannot use `mcp__github__resolve_review_thread` without them.
+2. **Fix code & validate**: same as local workflow (`make pc`)
+3. **Self-review fix code**: same as local workflow step 5 — re-read changed files in full, check fixes against common-review-patterns.md before pushing.
+4. **Commit & push**: `worktree_commit({ message: "..." })` + `worktree_push()` (or `git commit` + `git push`)
+5. **Reply to threads**: `mcp__github__add_reply_to_pull_request_comment({ owner, repo, pullNumber, commentId: <numeric>, body: "explanation" })` — use the built-in tool so replies appear under bot identity, not the user's GitHub username
+6. **Resolve threads**: `github_resolve_threads({ threadIds: [...], prNumber: <PR#> })` — thread IDs from step 2. If step 2 used the built-in fallback and thread IDs are unavailable, make one more attempt with `github_get_review_threads` (server may be up by now) before surfacing the blocker to the user.
+7. **Re-request review**: `mcp__github__request_copilot_review({ owner, repo, pullNumber })` — platform handles auth natively; the custom server's app token is silently dropped by GitHub for Copilot requests
+8. **Loop**: after each push/re-review request, rely on Claude Code's native PR activity surfacing and, if needed, re-run `github_get_review_threads` to check for newly created unresolved threads; cap at 2 rounds
 
 > **Why split tools?** Fetching/resolving threads uses the custom server (only source of GraphQL thread node IDs). Replying and requesting review uses built-in tools (platform auth ensures bot identity, not user's personal token).
 

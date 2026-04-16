@@ -156,7 +156,7 @@ Follow the [work-ticket](../work-ticket/SKILL.md) leaf mode workflow from Step 2
 
 9. **Ship** — `worktree_commit` -> `worktree_push` -> `github_create_pr` (draft, title includes `LS-####`) and save the returned PR as `pr` -> `github_manage_labels(prs: [pr.number], add: ["agent-in-progress"])` -> `github_mark_pr_ready(number: pr.number)` -> `github_request_review(prs: [pr.number])` -> transition the Jira ticket to **In Review** using the same Jira path selected in Phase 3a (`jira_transition` when custom Jira MCP is available; otherwise use the Atlassian plugin equivalent from `cloud-agent-mode`).
 
-10. **Watch to merge** — call `github_wait_for_pr_event({ number: pr.number })` and handle CI failures, review comments, and conflicts until the PR merges. Use the actual Jira ticket key created earlier in the workflow in place of `LS-####`. Do not stop at PR creation.
+10. **Watch to merge** — Claude Code surfaces CI failures, review comments, and conflicts natively. Handle each event as it arrives until the PR merges. Use the actual Jira ticket key created earlier in the workflow in place of `LS-####`. Do not stop at PR creation.
 
 11. **MCP gap audit** — after merge, run the [mcp-gaps skill](../mcp-gaps/SKILL.md) Phase 1.
 

@@ -62,7 +62,7 @@ Quick-reference decision trees for the most common failure scenarios agents enco
 
 ## Scenario 5: CI Fails After Push
 
-**Symptom**: `github_wait_for_pr_event` returns `checks_failed`.
+**Symptom**: CI fails after push (`checks_failed` event).
 
 **Decision tree**:
 
@@ -73,7 +73,7 @@ Quick-reference decision trees for the most common failure scenarios agents enco
    - **E2E test failure**: check if it's flaky by looking at other recent runs first (`ci_list_runs` for the branch or relevant PRs, then inspect each run with `ci_get_logs` / `ci_search_logs` for the test name within that run/job). If it has failed intermittently across recent runs, `ci_rerun({ runId, failedOnly: true })`. If persistent after 2 reruns, investigate the test.
    - **Schema drift / migration check**: run `make codegen` or `db_migrate`, push the results.
    - **Branch behind main**: rebase with `worktree_rebase`, stabilize, `make pc`, push.
-4. After pushing fixes, return to the `github_wait_for_pr_event` loop.
+4. After pushing fixes, continue handling PR events until CI passes.
 
 ## Scenario 6: Copilot Review Loops
 

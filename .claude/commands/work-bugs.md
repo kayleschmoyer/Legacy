@@ -51,7 +51,7 @@ REPEAT:
      b. Transition only the remaining revalidated "To Do" tickets to "In Progress": `jira_transition(key: [...], status: "In Progress")`.
      c. Verify: call `jira_view` on each claimed ticket to confirm the transition succeeded. Drop any that failed.
      d. If the entire batch was dropped (all tickets were no longer "To Do"), loop back to step 2 to find more work.
-  7. Work each ticket: Leaf Mode flow (worktree → reproduce bug → implement fix → verify → validate → PR → github_mark_pr_ready → github_request_review → mcp__github__subscribe_pr_activity → Jira "In Review"). Append the new PR to in_flight_prs as { ticket, prNumber, branch, reviewRounds: 0 }.
+  7. Work each ticket: Leaf Mode flow (worktree → reproduce bug → implement fix → verify → validate → PR → github_mark_pr_ready → github_request_review → Jira "In Review"). Append the new PR to in_flight_prs as { ticket, prNumber, branch, reviewRounds: 0 }.
   8. Clean up: after each ticket's PR is created, clean up its worktree (the PR is now tracked in in_flight_prs and will be drained in the next iteration's step 1).
   9. Release uncompleted: any claimed ticket that did not reach "In Review":
      - If no PR exists → transition back to "To Do"

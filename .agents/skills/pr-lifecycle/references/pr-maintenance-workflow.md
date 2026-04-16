@@ -149,9 +149,9 @@ PRs in `$scan.ciPending` are NOT skipped — continue with other work and circle
 
 #### Early CI Failure Detection (Required)
 
-**Single-PR shepherding** (work-ticket skill): use `github_wait_for_pr_event({ number: <PR#> })` — it blocks until CI fails/passes (covering both Check Runs and Commit Statuses), then returns structured `failedChecks` data. No polling loop needed.
+**Single-PR shepherding** (work-ticket skill): Claude Code surfaces PR events natively — CI results, review threads, and merge status arrive automatically. No wait tool or polling loop needed.
 
-**Multi-PR sweep** (this skill): after pushing any rebased or fixed branch, interleave CI polling with other pass work using `ci_view_run(runId, includeJobs: true)`. When any job fails, fetch logs and begin triage immediately. This saves ~5-8 min per PR. (`github_wait_for_pr_event` is not appropriate here because it blocks on a single PR — use it only when shepherding one PR at a time.)
+**Multi-PR sweep** (this skill): after pushing any rebased or fixed branch, interleave CI polling with other pass work using `ci_view_run(runId, includeJobs: true)`. When any job fails, fetch logs and begin triage immediately. This saves ~5-8 min per PR.
 
 ### Copilot Review Catch-Up
 
