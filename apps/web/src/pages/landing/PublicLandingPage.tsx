@@ -283,6 +283,7 @@ export function PublicLandingPage(): React.JSX.Element {
   const [isLoading, setIsLoading] = useState(false);
   const [isDiscordLoading, setIsDiscordLoading] = useState(false);
   const [isConfigured, setIsConfigured] = useState(false);
+  const [isConfiguring, setIsConfiguring] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
 
   // Prefer locally-set error (from catch blocks in this component) but fall
@@ -443,6 +444,8 @@ export function PublicLandingPage(): React.JSX.Element {
           'Failed to configure OAuth on landing page:',
           String(error),
         );
+      } finally {
+        setIsConfiguring(false);
       }
     };
     void configure();
@@ -482,7 +485,7 @@ export function PublicLandingPage(): React.JSX.Element {
   }, [loginWithOAuth]);
 
   const handleSignIn = useCallback(async () => {
-    if (!isConfigured || isLoading) return;
+    if (!isConfigured || isLoading || isConfiguring) return;
     setIsLoading(true);
     setErrorMessage('');
     try {
@@ -498,7 +501,7 @@ export function PublicLandingPage(): React.JSX.Element {
     } finally {
       setIsLoading(false);
     }
-  }, [isConfigured, isLoading, loginWithOAuth]);
+  }, [isConfigured, isConfiguring, isLoading, loginWithOAuth]);
 
   const handleDiscordSignIn = useCallback(() => {
     const clientId = config.discordClientId;
@@ -646,7 +649,7 @@ export function PublicLandingPage(): React.JSX.Element {
                     minWidth={200}
                     justifyContent="center"
                   >
-                    {isLoading ? (
+                    {isLoading || isConfiguring ? (
                       <Spinner size="small" color="$color1" />
                     ) : (
                       <>
@@ -896,6 +899,7 @@ export function PublicLandingPage(): React.JSX.Element {
                   void handleSignIn();
                 }}
                 role="button"
+                aria-label="Get started free"
               >
                 <XStack
                   alignItems="center"
@@ -903,7 +907,7 @@ export function PublicLandingPage(): React.JSX.Element {
                   minWidth={180}
                   justifyContent="center"
                 >
-                  {isLoading ? (
+                  {isLoading || isConfiguring ? (
                     <Spinner size="small" color="$color1" />
                   ) : (
                     <Text fontSize="$4" color="$color1" fontWeight="700">

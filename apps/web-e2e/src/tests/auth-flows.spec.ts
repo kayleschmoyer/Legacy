@@ -130,6 +130,7 @@ unauthTest.describe('Protected Routes @critical', () => {
     '/profile/settings',
     '/preferences',
     '/help',
+    '/scoreboard',
   ];
 
   for (const route of routes) {
@@ -145,6 +146,56 @@ unauthTest.describe('Protected Routes @critical', () => {
       },
     );
   }
+});
+
+// ---------------------------------------------------------------------------
+// Scoreboard Landing CTA — regression for LS-3565
+// Button must show a spinner during OAuth init, then become interactive.
+// ---------------------------------------------------------------------------
+
+unauthTest.describe('Scoreboard Landing CTA @regression', () => {
+  unauthTest(
+    'Get Started Free button shows spinner during OAuth init then CTA text after configure',
+    async ({ page }) => {
+      // Block the GSI script so we can observe the spinner before configure
+      // resolves. We fulfill with an empty script body — the finally block in
+      // PublicLandingPage ensures isConfiguring becomes false regardless of
+      // whether the GSI library initialised successfully.
+      let fulfillGSI!: () => void;
+      const gsiBlocked = new Promise<void>((resolve) => {
+        fulfillGSI = resolve;
+      });
+
+      await page.route('**/accounts.google.com/gsi/client**', async (route) => {
+        await gsiBlocked;
+        await route.fulfill({
+          contentType: 'application/javascript',
+          body: '',
+        });
+      });
+
+      await page.goto('/scoreboard');
+      await page.waitForLoadState('load');
+
+      // While the GSI script is still loading the button shows a spinner —
+      // the "Get Started Free" text must NOT be visible yet.
+      await expect(page.locator('[aria-label="Get started free"]')).toBeVisible(
+        { timeout: 15000 },
+      );
+      await expect(
+        page.locator('[role="button"]', { hasText: /get started free/i }),
+      ).not.toBeVisible();
+
+      // Unblock the GSI script — configure completes (success or failure) and
+      // isConfiguring becomes false via the finally block.
+      fulfillGSI();
+
+      // Button must now show the "Get Started Free" label.
+      await expect(
+        page.locator('[role="button"]', { hasText: /get started free/i }),
+      ).toBeVisible({ timeout: 15000 });
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------
