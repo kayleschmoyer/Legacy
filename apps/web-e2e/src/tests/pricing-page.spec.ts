@@ -156,3 +156,40 @@ test.describe('Pricing page — FAQ section @regression', () => {
     });
   });
 });
+
+// LS-3562: /faq is a common alias that users and crawlers reach.
+// It must redirect to /pricing (which contains the FAQ accordion + CTA buttons)
+// so that "Get Started Free" is always reachable via a valid route.
+test.describe('/faq redirect @regression', () => {
+  test('redirects /faq to /pricing', async ({ page }) => {
+    await page.goto('/faq');
+    await page.waitForLoadState('load');
+
+    await expect(page).toHaveURL(/\/pricing/);
+  });
+
+  test('"Get Started Free" button is visible after /faq redirect', async ({
+    page,
+  }) => {
+    await page.goto('/faq');
+    await page.waitForLoadState('load');
+
+    await expect(
+      page.getByRole('button', { name: /get started free/i }).first(),
+    ).toBeVisible({ timeout: 10_000 });
+  });
+
+  test('"Get Started Free" button is clickable after /faq redirect', async ({
+    page,
+  }) => {
+    await page.goto('/faq');
+    await page.waitForLoadState('load');
+
+    // Click the button — it should not throw and should navigate to sign-up
+    // or stay on the pricing page depending on auth state.
+    const btn = page.getByRole('button', { name: /get started free/i }).first();
+    await expect(btn).toBeVisible({ timeout: 10_000 });
+    await btn.click();
+    // No Playwright CSS-selector error should occur — the test passing is the assertion.
+  });
+});

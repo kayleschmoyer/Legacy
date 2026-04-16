@@ -724,6 +724,9 @@ function App() {
               element={<SeasonDraftGamePage />}
             />
             <Route path="/games/disclosure" element={<DisclosureGamePage />} />
+            {/* /faq is a common alias that users and crawlers reach — redirect to the
+                pricing page which contains the FAQ accordion section. */}
+            <Route path="/faq" element={<Navigate to="/pricing" replace />} />
           </Routes>
         </Suspense>
       </YStack>
