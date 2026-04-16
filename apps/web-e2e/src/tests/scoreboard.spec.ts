@@ -235,8 +235,8 @@ test.describe('Scoreboard — page structure @regression', () => {
   test('shows dash for preview game score instead of 0', async ({ page }) => {
     const previewCard = page.getByTestId('game-card-1003');
     await expect(previewCard).toBeVisible();
-    // Preview games show '-' not numeric 0
-    await expect(previewCard).toContainText('-');
+    // Preview games show '–' (en-dash) not numeric 0
+    await expect(previewCard).toContainText('–');
   });
 });
 
@@ -297,6 +297,77 @@ test.describe('Scoreboard — date change triggers new query @regression', () =>
 
     // The second request should carry the new date.
     expect(capturedDates).toContain('2026-04-02');
+  });
+});
+
+test.describe('Scoreboard — DateNav arrow buttons @regression', () => {
+  test('clicking Previous day sends GetScoreboard query with the preceding date', async ({
+    page,
+  }) => {
+    const capturedDates: string[] = [];
+
+    await page.route(isGraphQLEndpoint, async (route) => {
+      const opName = extractOperationName(route).toLowerCase();
+      if (opName !== 'getscoreboard') {
+        await route.fallback();
+        return;
+      }
+
+      try {
+        const body = JSON.parse(route.request().postData() ?? '{}') as {
+          variables?: { date?: string };
+        };
+        if (body.variables?.date) {
+          capturedDates.push(body.variables.date);
+        }
+      } catch {
+        // ignore parse errors
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            scoreboard: {
+              __typename: 'Scoreboard',
+              date: '2026-04-01',
+              lastUpdated: new Date().toISOString(),
+              games: [MOCK_LIVE_GAME, MOCK_FINAL_GAME, MOCK_PREVIEW_GAME],
+            },
+          },
+        }),
+      });
+    });
+
+    await page.goto('/scoreboard');
+    await page.waitForLoadState('load');
+    await expect(page.getByTestId('scoreboard-heading')).toBeVisible();
+
+    // Set a known starting date via the input first.
+    const picker = page.getByTestId('scoreboard-date-picker');
+    await picker.fill('2026-04-10');
+    await picker.dispatchEvent('change');
+    await page.waitForTimeout(300);
+
+    // Click Previous day — the outgoing query must carry the preceding date.
+    await page.getByRole('button', { name: 'Previous day' }).click();
+    await page.waitForTimeout(300);
+
+    expect(capturedDates).toContain('2026-04-09');
+  });
+
+  test('Next day button is disabled when the selected date is today', async ({
+    page,
+  }) => {
+    await mockScoreboardGraphQL(page);
+    await page.goto('/scoreboard');
+    await page.waitForLoadState('load');
+    await expect(page.getByTestId('scoreboard-heading')).toBeVisible();
+
+    // Scoreboard initialises to today — Next day must be disabled.
+    const nextBtn = page.getByRole('button', { name: 'Next day' });
+    await expect(nextBtn).toBeDisabled();
   });
 });
 

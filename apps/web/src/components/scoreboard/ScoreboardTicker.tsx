@@ -7,11 +7,12 @@ import {
   TICKER_HEIGHT_PX,
   TICKER_Z_INDEX,
 } from '../../constants/dimensions';
+import { FONT_DISPLAY } from '../../constants/typography';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const LIVE_POLL_MS = 15_000;
-const BIG_SHOULDERS = "'Big Shoulders Display', system-ui, sans-serif";
+const BIG_SHOULDERS = FONT_DISPLAY;
 
 /** Scale scroll speed with game count so 3 games and 15 games both feel natural. */
 function scrollDurationSecs(gameCount: number): number {
@@ -157,8 +158,15 @@ function GameChip({ game }: { game: TickerGame }) {
         cursor="pointer"
         flexShrink={0}
       >
+        {/*
+         * All child elements are aria-hidden — the wrapping Link's aria-label
+         * provides the full accessible announcement. Without this, screen readers
+         * double-announce scores and abbreviations.
+         */}
+
         {/* Away team abbreviation */}
         <Text
+          aria-hidden="true"
           fontSize="$1"
           fontWeight="500"
           color="$color11"
@@ -170,6 +178,7 @@ function GameChip({ game }: { game: TickerGame }) {
         {/* Away score — visually dominant */}
         {!isPreview && (
           <Text
+            aria-hidden="true"
             fontSize="$4"
             fontWeight="800"
             color={awayScoreColor}
@@ -180,13 +189,19 @@ function GameChip({ game }: { game: TickerGame }) {
         )}
 
         {/* Score divider */}
-        <Text fontSize="$1" color="$color8" paddingHorizontal="$1">
+        <Text
+          aria-hidden="true"
+          fontSize="$1"
+          color="$color8"
+          paddingHorizontal="$1"
+        >
           {isPreview ? 'vs' : '–'}
         </Text>
 
         {/* Home score — visually dominant */}
         {!isPreview && (
           <Text
+            aria-hidden="true"
             fontSize="$4"
             fontWeight="800"
             color={homeScoreColor}
@@ -198,6 +213,7 @@ function GameChip({ game }: { game: TickerGame }) {
 
         {/* Home team abbreviation */}
         <Text
+          aria-hidden="true"
           fontSize="$1"
           fontWeight="500"
           color="$color11"
@@ -207,7 +223,7 @@ function GameChip({ game }: { game: TickerGame }) {
         </Text>
 
         {/* Status — includes pulsing dot for live games */}
-        <XStack alignItems="center" gap="$1" marginLeft="$1">
+        <XStack aria-hidden="true" alignItems="center" gap="$1" marginLeft="$1">
           {isLive && (
             <Text
               className="scoreboard-ticker-live-dot"

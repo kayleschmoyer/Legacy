@@ -1,5 +1,6 @@
 import React from 'react';
 import { Text, XStack, YStack } from 'tamagui';
+import { FONT_DISPLAY } from '../../constants/typography';
 
 export interface LinescoreProps {
   homeInnings: number[];
@@ -13,6 +14,11 @@ export interface LinescoreProps {
  * Shows up to 9 innings (or more for extra innings) with per-inning runs and
  * a total runs (R) column. Hits and errors are not rendered here; they appear
  * in the GameCard footer.
+ *
+ * Typography:
+ *  - Team abbreviations: Big Shoulders Display 700 — matches GameCard treatment
+ *  - All numeric values: tabular-nums so columns align cleanly
+ *  - Totals (R column): Big Shoulders Display 700 — visually closes the row
  */
 export function Linescore({
   homeInnings,
@@ -41,14 +47,26 @@ export function Linescore({
         <YStack width={40} />
         {inningNumbers.map((n) => (
           <YStack key={n} style={headerStyle}>
-            <Text fontSize="$1" color="$gray10" fontWeight="600">
+            <Text
+              fontSize="$1"
+              color="$gray10"
+              fontWeight="600"
+              fontFamily={FONT_DISPLAY}
+              style={{ fontVariantNumeric: 'tabular-nums' }}
+            >
               {n}
             </Text>
           </YStack>
         ))}
         <YStack width={8} />
         <YStack style={headerStyle}>
-          <Text fontSize="$1" color="$gray10" fontWeight="600">
+          <Text
+            fontSize="$1"
+            color="$gray10"
+            fontWeight="700"
+            fontFamily={FONT_DISPLAY}
+            letterSpacing={0.5}
+          >
             R
           </Text>
         </YStack>
@@ -57,20 +75,36 @@ export function Linescore({
       {/* Away team row */}
       <XStack gap="$1" alignItems="center">
         <YStack width={40}>
-          <Text fontSize="$2" color="$gray12" fontWeight="600">
+          <Text
+            fontSize="$2"
+            color="$gray12"
+            fontWeight="700"
+            fontFamily={FONT_DISPLAY}
+            letterSpacing={0.5}
+          >
             {awayAbbr}
           </Text>
         </YStack>
         {inningNumbers.map((_, i) => (
           <YStack key={i} style={cellStyle}>
-            <Text fontSize="$2" color="$gray11">
-              {awayInnings[i] !== undefined ? awayInnings[i] : '-'}
+            <Text
+              fontSize="$2"
+              color="$gray11"
+              style={{ fontVariantNumeric: 'tabular-nums' }}
+            >
+              {awayInnings[i] !== undefined ? awayInnings[i] : '–'}
             </Text>
           </YStack>
         ))}
         <YStack width={8} />
         <YStack style={cellStyle}>
-          <Text fontSize="$2" color="$gray12" fontWeight="700">
+          <Text
+            fontSize="$3"
+            color="$gray12"
+            fontWeight="700"
+            fontFamily={FONT_DISPLAY}
+            style={{ fontVariantNumeric: 'tabular-nums' }}
+          >
             {awayInnings.reduce((a, b) => a + b, 0)}
           </Text>
         </YStack>
@@ -79,20 +113,36 @@ export function Linescore({
       {/* Home team row */}
       <XStack gap="$1" alignItems="center">
         <YStack width={40}>
-          <Text fontSize="$2" color="$gray12" fontWeight="600">
+          <Text
+            fontSize="$2"
+            color="$gray12"
+            fontWeight="700"
+            fontFamily={FONT_DISPLAY}
+            letterSpacing={0.5}
+          >
             {homeAbbr}
           </Text>
         </YStack>
         {inningNumbers.map((_, i) => (
           <YStack key={i} style={cellStyle}>
-            <Text fontSize="$2" color="$gray11">
-              {homeInnings[i] !== undefined ? homeInnings[i] : '-'}
+            <Text
+              fontSize="$2"
+              color="$gray11"
+              style={{ fontVariantNumeric: 'tabular-nums' }}
+            >
+              {homeInnings[i] !== undefined ? homeInnings[i] : '–'}
             </Text>
           </YStack>
         ))}
         <YStack width={8} />
         <YStack style={cellStyle}>
-          <Text fontSize="$2" color="$gray12" fontWeight="700">
+          <Text
+            fontSize="$3"
+            color="$gray12"
+            fontWeight="700"
+            fontFamily={FONT_DISPLAY}
+            style={{ fontVariantNumeric: 'tabular-nums' }}
+          >
             {homeInnings.reduce((a, b) => a + b, 0)}
           </Text>
         </YStack>

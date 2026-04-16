@@ -16,14 +16,7 @@ body {
    * pre-hydration flash is light rather than the old dark value. */
   background-color: var(--background, #ffffff);
   color: var(--color, #0b1220);
-  font-family:
-    'Playfair Display',
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    Roboto,
-    sans-serif;
+  font-family: 'Literata', Georgia, 'Times New Roman', serif;
 }
 
 /* Respect reduced motion preference */
@@ -115,106 +108,6 @@ body {
   50% {
     opacity: 0.4;
   }
-}
-
-/* Animation keyframes for league cards */
-@keyframes slideInUp {
-  from {
-    opacity: 0;
-    transform: translateY(30px) scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes holographicShimmer {
-  0%,
-  100% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-}
-
-@keyframes holographicMove {
-  0%,
-  100% {
-    transform: translateX(0) translateY(0) rotate(0deg);
-    opacity: 0.6;
-  }
-  25% {
-    transform: translateX(5px) translateY(-3px) rotate(1deg);
-    opacity: 0.8;
-  }
-  50% {
-    transform: translateX(-3px) translateY(5px) rotate(-1deg);
-    opacity: 0.7;
-  }
-  75% {
-    transform: translateX(7px) translateY(2px) rotate(0.5deg);
-    opacity: 0.9;
-  }
-}
-
-@keyframes rotateSlow {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes holographicText {
-  0%,
-  100% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-}
-
-/* Fallback styles for league cards if CSS modules don't work */
-.league-card-fallback {
-  background: linear-gradient(
-    135deg,
-    rgba(15, 15, 35, 0.8) 0%,
-    rgba(26, 26, 46, 0.7) 25%,
-    rgba(22, 33, 62, 0.8) 50%,
-    rgba(30, 30, 63, 0.7) 75%,
-    rgba(42, 42, 74, 0.8) 100%
-  ) !important;
-  border: 1px solid rgba(255, 165, 0, 0.4) !important;
-  animation: slideInUp 0.6s ease-out forwards !important;
-  opacity: 0;
-  transform: translateY(20px);
-}
-
-.app-container.light .league-card-fallback {
-  background: linear-gradient(
-    135deg,
-    rgba(239, 244, 251, 0.9) 0%,
-    rgba(228, 234, 242, 0.85) 25%,
-    rgba(217, 225, 236, 0.9) 50%,
-    rgba(228, 234, 242, 0.85) 75%,
-    rgba(239, 244, 251, 0.9) 100%
-  ) !important;
-  border: 1px solid rgba(184, 148, 43, 0.35) !important;
 }
 
 /* ────────────────────────────────────────────────────────
@@ -328,4 +221,77 @@ input.draft-schedule-input[type='datetime-local']::-webkit-datetime-edit-ampm-fi
   background-color: var(--brandNavyLight, #2c4a7c);
   color: var(--textOnAccent, #fff);
   outline: none;
+}
+
+/* ────────────────────────────────────────────────────────
+ * Date navigation buttons (Scoreboard DateNav)
+ * CSS-only hover/disabled states — no imperative DOM style mutation.
+ * Fallbacks are light-theme values to avoid a pre-hydration flash.
+ * Dark-theme overrides are applied via .app-container.dark.
+ * ──────────────────────────────────────────────────────── */
+.date-nav-btn {
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--borderColor, #d0d7de);
+  border-radius: 6px;
+  color: var(--color11, #0b1220);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease;
+}
+
+.date-nav-btn:hover:not(:disabled) {
+  background: var(--color4, #f0f2f4);
+}
+
+.date-nav-btn:focus-visible {
+  outline: 3px solid var(--focusRing, #2684ff);
+  outline-offset: 2px;
+}
+
+.date-nav-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* Dark-theme overrides */
+.app-container.dark .date-nav-btn {
+  border-color: var(--borderColor, #2f3b53);
+  color: var(--color11, #dee6ff);
+}
+
+.app-container.dark .date-nav-btn:hover:not(:disabled) {
+  background: var(--color4, #1c2a47);
+}
+
+/* ────────────────────────────────────────────────────────
+ * Scoreboard date input
+ * Moved out of inline styles so light/dark theming is handled here.
+ * Light defaults match the pre-hydration body defaults.
+ * color-scheme switches to dark inside .app-container.dark so the
+ * native calendar picker matches the active theme.
+ * ──────────────────────────────────────────────────────── */
+input.scoreboard-date-input[type='date'] {
+  background: var(--color2, #ffffff);
+  border: 1px solid var(--borderColor, #d0d7de);
+  border-radius: 6px;
+  color: var(--color, #0b1220);
+  padding: 0 8px;
+  font-size: 14px;
+  font-family: inherit;
+  color-scheme: light;
+  min-height: 44px;
+  min-width: 140px;
+  cursor: pointer;
+}
+
+.app-container.dark input.scoreboard-date-input[type='date'] {
+  color-scheme: dark;
 }

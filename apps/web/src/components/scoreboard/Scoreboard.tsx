@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { H3, Spinner, Text, XStack, YStack } from 'tamagui';
-import { Input } from 'tamagui';
+import { H3, Separator, Spinner, Text, XStack, YStack } from 'tamagui';
+import { FONT_BODY, FONT_DISPLAY } from '../../constants/typography';
 import { GameCard } from './GameCard';
 import { useGetScoreboardQuery } from '../../api/db/graphql.generated';
 
@@ -49,6 +49,129 @@ function formatDisplayDate(iso: string): string {
   }
 }
 
+// ─── Date navigation ──────────────────────────────────────────────────────────
+
+/** Shift an ISO date string by ±N calendar days. */
+function offsetDate(iso: string, days: number): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + days);
+  const ny = dt.getFullYear();
+  const nm = String(dt.getMonth() + 1).padStart(2, '0');
+  const nd = String(dt.getDate()).padStart(2, '0');
+  return `${ny}-${nm}-${nd}`;
+}
+
+/**
+ * DateNav — prev-day / date-input / next-day navigation control.
+ *
+ * - Arrow buttons are min 44×44px for WCAG touch-target compliance.
+ * - Next-day button is disabled when the selected date is today.
+ * - The date input carries an aria-label and is capped at today (max attribute).
+ * - Uses native input[type=date] so the platform's accessible calendar widget
+ *   is available to keyboard and screen-reader users.
+ */
+function DateNav({
+  date,
+  onChange,
+}: {
+  date: string;
+  onChange: (d: string) => void;
+}) {
+  const today = todayISO();
+  const isToday = date >= today;
+
+  return (
+    <XStack
+      alignItems="center"
+      gap="$2"
+      role="group"
+      aria-label="Scoreboard date navigation"
+    >
+      <button
+        type="button"
+        aria-label="Previous day"
+        onClick={() => onChange(offsetDate(date, -1))}
+        className="date-nav-btn"
+      >
+        ←
+      </button>
+
+      <input
+        type="date"
+        value={date}
+        max={today}
+        onChange={(e) => {
+          const val = e.target.value;
+          if (val) onChange(val <= today ? val : today);
+        }}
+        aria-label="Scoreboard date"
+        data-testid="scoreboard-date-picker"
+        className="scoreboard-date-input"
+      />
+
+      <button
+        type="button"
+        aria-label="Next day"
+        disabled={isToday}
+        onClick={() => !isToday && onChange(offsetDate(date, 1))}
+        className="date-nav-btn"
+      >
+        →
+      </button>
+    </XStack>
+  );
+}
+
+// ─── Section label ────────────────────────────────────────────────────────────
+
+/**
+ * SectionLabel — a rule + label divider between game groups.
+ *
+ * Live section uses heritage gold; others use muted gray.
+ * Uses a hairline + text pattern (no border-left stripe).
+ */
+function SectionLabel({
+  label,
+  count,
+  isLive = false,
+}: {
+  label: string;
+  count: number;
+  isLive?: boolean;
+}) {
+  return (
+    <XStack alignItems="center" gap="$3" paddingTop="$2" paddingBottom="$1">
+      <XStack alignItems="baseline" gap="$2" flexShrink={0}>
+        <Text
+          fontSize="$2"
+          fontWeight="700"
+          fontFamily={FONT_DISPLAY}
+          letterSpacing={2}
+          color={isLive ? '$brandGold' : '$gray9'}
+          textTransform="uppercase"
+        >
+          {label}
+        </Text>
+        <Text
+          fontSize="$1"
+          color={isLive ? '$brandGold' : '$gray10'}
+          fontFamily={FONT_BODY}
+          opacity={0.7}
+        >
+          {count}
+        </Text>
+      </XStack>
+      {/* Hairline rule — pulls to the right of the label */}
+      <Separator
+        flex={1}
+        borderColor={isLive ? '$brandGold' : '$borderColor'}
+        opacity={isLive ? 0.4 : 0.6}
+      />
+    </XStack>
+  );
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const LIVE_POLL_MS = 15_000;
@@ -57,6 +180,11 @@ const LIVE_POLL_MS = 15_000;
  * Scoreboard — displays all MLB games for a selected date.
  * Auto-polls every 15 seconds while any game is live.
  * Provider-agnostic: talks only to our GraphQL API (resolver implemented in LS-1865).
+ *
+ * Layout:
+ *  - Centered column, maxWidth 900px
+ *  - Games split into explicit Live / Upcoming / Final sections with labeled dividers
+ *  - Live section uses heritage gold labels; others use muted treatment
  */
 export function Scoreboard() {
   const [date, setDate] = useState(todayISO());
@@ -67,17 +195,12 @@ export function Scoreboard() {
       fetchPolicy: 'cache-and-network',
     });
 
-  // games array items match ScoreboardGame after codegen tightened nullability on
-  // gamePk, status, homeTeam, awayTeam and their required primitives.
   const games: ScoreboardGame[] = (data?.scoreboard?.games ??
     []) as ScoreboardGame[];
   const lastUpdated = data?.scoreboard?.lastUpdated;
 
   const isAnyGameLive = games.some((g) => g.status === 'Live');
 
-  // Start/stop polling based on whether any game is currently live.
-  // Depends on the stable boolean `isAnyGameLive` rather than the games array
-  // reference so that re-renders don't trigger repeated startPolling() calls.
   useEffect(() => {
     if (isAnyGameLive) {
       startPolling(LIVE_POLL_MS);
@@ -87,75 +210,87 @@ export function Scoreboard() {
     return () => stopPolling();
   }, [isAnyGameLive, startPolling, stopPolling]);
 
-  const liveCount = games.filter(
-    (g: ScoreboardGame) => g.status === 'Live',
-  ).length;
-  const finalCount = games.filter(
-    (g: ScoreboardGame) => g.status === 'Final',
-  ).length;
-  const upcomingCount = games.filter(
-    (g: ScoreboardGame) => g.status !== 'Live' && g.status !== 'Final',
-  ).length;
+  // Partition into sections — order: Live → Upcoming → Final
+  const liveGames = games.filter((g) => g.status === 'Live');
+  const upcomingGames = games.filter(
+    (g) => g.status !== 'Live' && g.status !== 'Final',
+  );
+  const finalGames = games.filter((g) => g.status === 'Final');
 
   return (
     <YStack
       flex={1}
       padding="$4"
-      gap="$4"
       maxWidth={900}
-      alignSelf="center"
       width="100%"
+      alignSelf="center"
     >
-      {/* Header */}
-      <XStack
-        justifyContent="space-between"
-        alignItems="center"
-        flexWrap="wrap"
-        gap="$2"
-      >
-        <H3 data-testid="scoreboard-heading">MLB Scoreboard</H3>
-
-        {/* Date picker */}
-        <Input
-          type="date"
-          value={date}
-          onChangeText={setDate}
-          size="$3"
-          width={160}
-          data-testid="scoreboard-date-picker"
-        />
-      </XStack>
-
-      {/* Date label + summary */}
-      <XStack gap="$3" flexWrap="wrap" alignItems="center">
-        <Text color="$gray11">{formatDisplayDate(date)}</Text>
-        {liveCount > 0 && (
-          <Text color="$green10" fontWeight="600">
-            {liveCount} Live
-          </Text>
-        )}
-        {finalCount > 0 && <Text color="$gray10">{finalCount} Final</Text>}
-        {upcomingCount > 0 && (
-          <Text color="$blue10">{upcomingCount} Upcoming</Text>
-        )}
-        {liveCount > 0 && (
-          <Text fontSize="$2" color="$gray9">
-            Auto-refreshing every 15s
-          </Text>
-        )}
-      </XStack>
-
-      {lastUpdated && (
-        <Text
-          fontSize="$2"
-          color="$gray9"
-          data-testid="scoreboard-last-updated"
+      {/* ── Page header block ─────────────────────────────────────────────── */}
+      <YStack gap="$2" marginBottom="$5">
+        <XStack
+          justifyContent="space-between"
+          alignItems="center"
+          flexWrap="wrap"
+          gap="$2"
         >
-          Updated {new Date(lastUpdated).toLocaleTimeString()}
-        </Text>
-      )}
+          <H3
+            data-testid="scoreboard-heading"
+            fontFamily={FONT_DISPLAY}
+            letterSpacing={1}
+          >
+            MLB Scoreboard
+          </H3>
 
-      {/* States */}
+          <DateNav date={date} onChange={setDate} />
+        </XStack>
+
+        {/* Date label + game count summary */}
+        <XStack gap="$3" flexWrap="wrap" alignItems="center">
+          <Text color="$gray11" fontFamily={FONT_BODY}>
+            {formatDisplayDate(date)}
+          </Text>
+          {liveGames.length > 0 && (
+            <Text
+              color="$green10"
+              fontWeight="700"
+              fontFamily={FONT_DISPLAY}
+              letterSpacing={0.5}
+            >
+              {liveGames.length} Live
+            </Text>
+          )}
+          {finalGames.length > 0 && (
+            <Text color="$gray10" fontFamily={FONT_DISPLAY} letterSpacing={0.5}>
+              {finalGames.length} Final
+            </Text>
+          )}
+          {upcomingGames.length > 0 && (
+            <Text color="$blue10" fontFamily={FONT_DISPLAY} letterSpacing={0.5}>
+              {upcomingGames.length} Upcoming
+            </Text>
+          )}
+        </XStack>
+
+        {(lastUpdated || isAnyGameLive) && (
+          <Text
+            fontSize="$2"
+            color="$gray9"
+            fontFamily={FONT_BODY}
+            data-testid="scoreboard-last-updated"
+          >
+            {[
+              lastUpdated
+                ? `Updated ${new Date(lastUpdated).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+                : null,
+              isAnyGameLive ? 'Auto-refreshing every 15s' : null,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </Text>
+        )}
+      </YStack>
+
+      {/* ── Loading state ─────────────────────────────────────────────────── */}
       {loading && !data && (
         <YStack
           flex={1}
@@ -164,12 +299,13 @@ export function Scoreboard() {
           padding="$8"
         >
           <Spinner size="large" color="$blue10" />
-          <Text color="$gray10" marginTop="$3">
+          <Text color="$gray10" marginTop="$3" fontFamily={FONT_BODY}>
             Loading scoreboard...
           </Text>
         </YStack>
       )}
 
+      {/* ── Error state ───────────────────────────────────────────────────── */}
       {error && (
         <YStack
           padding="$4"
@@ -177,17 +313,24 @@ export function Scoreboard() {
           backgroundColor="$red3"
           borderWidth={1}
           borderColor="$red8"
+          role="alert"
           data-testid="scoreboard-error"
         >
-          <Text color="$red11" fontWeight="600">
+          <Text color="$red11" fontWeight="600" fontFamily={FONT_DISPLAY}>
             Error loading scoreboard
           </Text>
-          <Text color="$red10" fontSize="$3" marginTop="$1">
-            {error.message}
+          <Text
+            color="$red10"
+            fontSize="$3"
+            marginTop="$1"
+            fontFamily={FONT_BODY}
+          >
+            Unable to load games. Please try refreshing the page.
           </Text>
         </YStack>
       )}
 
+      {/* ── No data state ─────────────────────────────────────────────────── */}
       {!loading && !error && data && data.scoreboard === null && (
         <YStack
           flex={1}
@@ -196,12 +339,13 @@ export function Scoreboard() {
           padding="$8"
           data-testid="scoreboard-unavailable"
         >
-          <Text color="$gray10" fontSize="$5">
+          <Text color="$gray10" fontSize="$5" fontFamily={FONT_BODY}>
             Scoreboard data is not yet available
           </Text>
         </YStack>
       )}
 
+      {/* ── Empty state ───────────────────────────────────────────────────── */}
       {!loading && !error && data?.scoreboard != null && games.length === 0 && (
         <YStack
           flex={1}
@@ -210,25 +354,44 @@ export function Scoreboard() {
           padding="$8"
           data-testid="scoreboard-empty"
         >
-          <Text color="$gray10" fontSize="$5">
+          <Text color="$gray10" fontSize="$5" fontFamily={FONT_BODY}>
             No games scheduled for {formatDisplayDate(date)}
           </Text>
         </YStack>
       )}
 
-      {/* Game cards — live first, then upcoming, then final */}
+      {/* ── Game sections ─────────────────────────────────────────────────── */}
       {games.length > 0 && (
-        <YStack gap="$3">
-          {[...games]
-            .sort((a: ScoreboardGame, b: ScoreboardGame) => {
-              const order: Record<string, number> = { Live: 0, Final: 2 };
-              const aOrder = order[a.status] ?? 1;
-              const bOrder = order[b.status] ?? 1;
-              return aOrder - bOrder;
-            })
-            .map((game) => (
-              <GameCard key={game.gamePk} game={game} />
-            ))}
+        <YStack gap="$5">
+          {/* Live section — heritage gold label */}
+          {liveGames.length > 0 && (
+            <YStack gap="$3">
+              <SectionLabel label="Live Now" count={liveGames.length} isLive />
+              {liveGames.map((game) => (
+                <GameCard key={game.gamePk} game={game} />
+              ))}
+            </YStack>
+          )}
+
+          {/* Upcoming section */}
+          {upcomingGames.length > 0 && (
+            <YStack gap="$3">
+              <SectionLabel label="Upcoming" count={upcomingGames.length} />
+              {upcomingGames.map((game) => (
+                <GameCard key={game.gamePk} game={game} />
+              ))}
+            </YStack>
+          )}
+
+          {/* Final section */}
+          {finalGames.length > 0 && (
+            <YStack gap="$3">
+              <SectionLabel label="Final" count={finalGames.length} />
+              {finalGames.map((game) => (
+                <GameCard key={game.gamePk} game={game} />
+              ))}
+            </YStack>
+          )}
         </YStack>
       )}
     </YStack>
