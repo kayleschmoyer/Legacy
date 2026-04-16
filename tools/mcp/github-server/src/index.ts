@@ -448,7 +448,7 @@ server.tool(
 // --- github_get_review_threads ---
 server.tool(
   'github_get_review_threads',
-  'Fetch review threads on a PR via GraphQL. Includes resolved threads by default — set unresolvedOnly: true to filter to open threads only. Each thread includes isResolved, isOutdated, createdAt (thread-level, for chronological sorting), and per-comment createdAt. Use for fix-reviews workflows (unresolvedOnly: true) or historical analysis of all review rounds (unresolvedOnly: false). Pagination is capped at 100 threads and 50 comments per thread; truncated: true is set when results are paginated.',
+  'Fetch review threads on a PR via GraphQL. Includes resolved threads by default — set unresolvedOnly: true to filter to open threads only (outdated threads are treated as resolved and excluded). Each thread includes isResolved, isOutdated, createdAt (thread-level, for chronological sorting), and per-comment createdAt. Use for fix-reviews workflows (unresolvedOnly: true) or historical analysis of all review rounds (unresolvedOnly: false). Pagination is capped at 100 threads and 50 comments per thread; truncated: true is set when results are paginated.',
   {
     number: z.coerce.number().int().positive().describe('PR number'),
     unresolvedOnly: coercedBoolean

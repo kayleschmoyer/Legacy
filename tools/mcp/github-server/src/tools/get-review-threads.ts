@@ -76,7 +76,7 @@ export async function getReviewThreads(
     let threads = reviewThreads.nodes;
 
     if (params.unresolvedOnly) {
-      threads = threads.filter((t) => !t.isResolved);
+      threads = threads.filter((t) => !t.isResolved && !t.isOutdated);
     }
 
     const truncated =
