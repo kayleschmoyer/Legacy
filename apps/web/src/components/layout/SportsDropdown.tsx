@@ -1,93 +1,41 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import {
-  Button,
-  Paragraph,
-  XStack,
-  YStack,
-} from '@legacy-sports/shared-components/ui';
+import { Paragraph, XStack, YStack } from '@legacy-sports/shared-components/ui';
 import { Text } from '@legacy-sports/ui-abstractions';
-import { styled } from 'tamagui';
 import { ChevronDown, ChevronUp, Globe, Grid2x2 } from '@tamagui/lucide-icons';
 import {
-  NAV_BUTTON_MIN_WIDTH,
-  NAV_DROPDOWN_Z_INDEX,
-} from '../../constants/dimensions';
+  DROPDOWN_BORDER,
+  DropdownButton,
+  DropdownContent,
+  FONT_BODY,
+  FONT_DISPLAY,
+  MenuItem,
+  NAV_DROPDOWN_ANIMATION,
+} from './NavDropdownShared';
+import { BRAND_GOLD, TEXT_MUTED, TEXT_PRIMARY } from '../../constants/colors';
+import { NAV_DROPDOWN_Z_INDEX } from '../../constants/dimensions';
 import { BaseballIcon, FootballIcon } from '../icons/SportIcons';
 
-const DropdownButton = styled(Button, {
-  size: '$3',
-  gap: '$2',
-  backgroundColor: 'transparent',
-  borderWidth: 0,
-  borderRadius: '$2',
-  paddingHorizontal: '$4',
-  minWidth: NAV_BUTTON_MIN_WIDTH,
-  hoverStyle: {
-    backgroundColor: '$color3',
-  },
-  pressStyle: {
-    backgroundColor: '$color4',
-    scale: 0.97,
-  },
-  variants: {
-    highlight: {
-      true: {
-        backgroundColor: '$color3',
-        fontWeight: '600',
-      },
-    },
-  } as const,
+const titleStyle = (active: boolean): React.CSSProperties => ({
+  fontFamily: FONT_DISPLAY,
+  fontWeight: '700',
+  fontSize: 12,
+  letterSpacing: '0.06em',
+  textTransform: 'uppercase',
+  color: active ? BRAND_GOLD : TEXT_PRIMARY,
+  lineHeight: 1.1,
+  marginBottom: 0,
 });
 
-const DropdownContent = styled(YStack, {
-  backgroundColor: '$background',
-  borderRadius: '$5',
-  borderWidth: 1,
-  borderColor: '$borderColor',
-  padding: '$4',
-  gap: '$2',
-  minWidth: 220,
-  shadowColor: '$shadowColor',
-  shadowOffset: { width: 0, height: 8 },
-  shadowOpacity: 0.2,
-  shadowRadius: 24,
-  elevation: 12,
-});
-
-const MenuItem = styled(Button, {
-  justifyContent: 'flex-start',
-  backgroundColor: 'transparent',
-  borderWidth: 0,
-  paddingHorizontal: '$3',
-  paddingVertical: '$3',
-  borderRadius: '$4',
-  width: '100%',
-  gap: '$3',
-  hoverStyle: {
-    backgroundColor: '$color3',
-  },
-  pressStyle: {
-    backgroundColor: '$color4',
-  },
-  variants: {
-    active: {
-      true: {
-        backgroundColor: '$color2',
-      },
-    },
-  } as const,
-});
-
-const MenuIconBox = styled(YStack, {
-  width: 38,
-  height: 38,
-  borderRadius: '$3',
-  alignItems: 'center',
-  justifyContent: 'center',
-  backgroundColor: '$color2',
-  flexShrink: 0,
-});
+const descStyle: React.CSSProperties = {
+  fontFamily: FONT_BODY,
+  fontStyle: 'italic',
+  fontSize: 11,
+  color: TEXT_MUTED,
+  lineHeight: 1.4,
+  marginTop: 3,
+  marginBottom: 0,
+};
 
 export const SportsDropdown: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -101,7 +49,6 @@ export const SportsDropdown: React.FC = () => {
     location.pathname.startsWith('/baseball');
   const isHighlighted = isActive || isOpen;
 
-  // Click outside handler
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -111,20 +58,17 @@ export const SportsDropdown: React.FC = () => {
         setIsOpen(false);
       }
     };
-
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside);
-      return () => {
+      return () =>
         document.removeEventListener('mousedown', handleClickOutside);
-      };
     }
   }, [isOpen]);
 
   const onKeyDown: React.KeyboardEventHandler<HTMLDivElement> = (e) => {
     if (e.key === 'Escape') {
       setIsOpen(false);
-      const btn = document.getElementById(buttonId);
-      btn?.focus();
+      document.getElementById(buttonId)?.focus();
       return;
     }
     if (!isOpen) return;
@@ -140,15 +84,21 @@ export const SportsDropdown: React.FC = () => {
         (el) =>
           el === document.activeElement || el.contains(document.activeElement),
       );
-      let nextIndex: number;
-      if (e.key === 'ArrowDown') {
-        nextIndex = currentIndex < items.length - 1 ? currentIndex + 1 : 0;
-      } else {
-        nextIndex = currentIndex > 0 ? currentIndex - 1 : items.length - 1;
-      }
+      const nextIndex =
+        e.key === 'ArrowDown'
+          ? currentIndex < items.length - 1
+            ? currentIndex + 1
+            : 0
+          : currentIndex > 0
+            ? currentIndex - 1
+            : items.length - 1;
       items[nextIndex]?.focus();
     }
   };
+
+  const isFootball = location.pathname === '/football';
+  const isBaseball = location.pathname.startsWith('/baseball');
+  const isLeagues = location.pathname === '/baseball/leagues';
 
   return (
     <YStack
@@ -185,8 +135,8 @@ export const SportsDropdown: React.FC = () => {
           id={menuId}
           aria-labelledby={buttonId}
           style={{
-            animation:
-              'navDropdownIn 150ms cubic-bezier(0.16, 1, 0.3, 1) forwards',
+            borderColor: DROPDOWN_BORDER,
+            animation: NAV_DROPDOWN_ANIMATION,
           }}
         >
           <Link
@@ -196,20 +146,19 @@ export const SportsDropdown: React.FC = () => {
             <MenuItem
               onPress={() => setIsOpen(false)}
               role="menuitem"
-              active={location.pathname === '/football'}
+              active={isFootball}
             >
-              <XStack alignItems="center" gap="$3" flex={1}>
-                <MenuIconBox>
-                  <FootballIcon size={20} color="var(--color)" />
-                </MenuIconBox>
-                <Paragraph
-                  size="$4"
-                  color="$color"
-                  fontWeight="500"
-                  marginBottom={0}
-                >
-                  Football
-                </Paragraph>
+              <XStack alignItems="flex-start" gap={12} flex={1}>
+                <YStack flexShrink={0} marginTop={1}>
+                  <FootballIcon
+                    size={17}
+                    color={isFootball ? BRAND_GOLD : TEXT_MUTED}
+                  />
+                </YStack>
+                <YStack flex={1} gap={0}>
+                  <Paragraph style={titleStyle(isFootball)}>Football</Paragraph>
+                  <Paragraph style={descStyle}>NFL fantasy leagues</Paragraph>
+                </YStack>
               </XStack>
             </MenuItem>
           </Link>
@@ -221,20 +170,19 @@ export const SportsDropdown: React.FC = () => {
             <MenuItem
               onPress={() => setIsOpen(false)}
               role="menuitem"
-              active={location.pathname.startsWith('/baseball')}
+              active={isBaseball}
             >
-              <XStack alignItems="center" gap="$3" flex={1}>
-                <MenuIconBox>
-                  <BaseballIcon size={20} color="var(--color)" />
-                </MenuIconBox>
-                <Paragraph
-                  size="$4"
-                  color="$color"
-                  fontWeight="500"
-                  marginBottom={0}
-                >
-                  Baseball
-                </Paragraph>
+              <XStack alignItems="flex-start" gap={12} flex={1}>
+                <YStack flexShrink={0} marginTop={1}>
+                  <BaseballIcon
+                    size={17}
+                    color={isBaseball ? BRAND_GOLD : TEXT_MUTED}
+                  />
+                </YStack>
+                <YStack flex={1} gap={0}>
+                  <Paragraph style={titleStyle(isBaseball)}>Baseball</Paragraph>
+                  <Paragraph style={descStyle}>MLB fantasy leagues</Paragraph>
+                </YStack>
               </XStack>
             </MenuItem>
           </Link>
@@ -246,24 +194,19 @@ export const SportsDropdown: React.FC = () => {
             <MenuItem
               onPress={() => setIsOpen(false)}
               role="menuitem"
-              active={location.pathname === '/baseball/leagues'}
+              active={isLeagues}
             >
-              <XStack alignItems="center" gap="$3" flex={1}>
-                <MenuIconBox>
-                  <Globe size={20} color="$color" />
-                </MenuIconBox>
-                <YStack flex={1} gap="$1">
-                  <Paragraph
-                    size="$4"
-                    color="$color"
-                    fontWeight="500"
-                    marginBottom={0}
-                  >
+              <XStack alignItems="flex-start" gap={12} flex={1}>
+                <Globe
+                  size={17}
+                  color={isLeagues ? BRAND_GOLD : TEXT_MUTED}
+                  style={{ flexShrink: 0, marginTop: 1 }}
+                />
+                <YStack flex={1} gap={0}>
+                  <Paragraph style={titleStyle(isLeagues)}>
                     Browse Leagues
                   </Paragraph>
-                  <Paragraph size="$2" color="$colorPress" marginBottom={0}>
-                    Join a public league
-                  </Paragraph>
+                  <Paragraph style={descStyle}>Join a public league</Paragraph>
                 </YStack>
               </XStack>
             </MenuItem>

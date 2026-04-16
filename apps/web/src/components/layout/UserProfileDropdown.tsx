@@ -24,6 +24,11 @@ import {
   Sun,
   User,
 } from '@tamagui/lucide-icons';
+import {
+  DROPDOWN_BORDER,
+  FONT_DISPLAY,
+  NAV_DROPDOWN_ANIMATION,
+} from './NavDropdownShared';
 import { GRADIENT_AVATAR } from '../../constants/colors';
 import { formatDisplayName } from '../../lib/formatDisplayName';
 import {
@@ -57,18 +62,18 @@ const ProfileImage = styled(YStack, {
 });
 
 const DropdownContent = styled(YStack, {
-  backgroundColor: '$background',
-  borderRadius: '$5',
+  backgroundColor: '$color2',
+  borderRadius: 10,
   borderWidth: 1,
   borderColor: '$borderColor',
   padding: '$4',
   gap: '$2',
   minWidth: 240,
   shadowColor: '$shadowColor',
-  shadowOffset: { width: 0, height: 8 },
-  shadowOpacity: 0.2,
-  shadowRadius: 24,
-  elevation: 12,
+  shadowOffset: { width: 0, height: 12 },
+  shadowOpacity: 0.5,
+  shadowRadius: 36,
+  elevation: 14,
 });
 
 const MenuItem = styled(Button, {
@@ -277,8 +282,8 @@ export const UserProfileDropdown: React.FC = () => {
           marginTop="$2"
           zIndex={NAV_DROPDOWN_Z_INDEX}
           style={{
-            animation:
-              'navDropdownIn 150ms cubic-bezier(0.16, 1, 0.3, 1) forwards',
+            borderColor: DROPDOWN_BORDER,
+            animation: NAV_DROPDOWN_ANIMATION,
           }}
         >
           {/* User Info — name + email only; avatar is in the trigger button above */}
@@ -315,7 +320,17 @@ export const UserProfileDropdown: React.FC = () => {
                 <MenuIconBox>
                   <User size={18} color="$color" />
                 </MenuIconBox>
-                <Paragraph size="$3" color="$color" fontWeight="500">
+                <Paragraph
+                  size="$3"
+                  color="$color"
+                  fontWeight="600"
+                  style={
+                    {
+                      fontFamily: FONT_DISPLAY,
+                      letterSpacing: '0.01em',
+                    } as React.CSSProperties
+                  }
+                >
                   Profile Settings
                 </Paragraph>
               </XStack>
@@ -331,7 +346,17 @@ export const UserProfileDropdown: React.FC = () => {
                 <MenuIconBox>
                   <Settings size={18} color="$color" />
                 </MenuIconBox>
-                <Paragraph size="$3" color="$color" fontWeight="500">
+                <Paragraph
+                  size="$3"
+                  color="$color"
+                  fontWeight="600"
+                  style={
+                    {
+                      fontFamily: FONT_DISPLAY,
+                      letterSpacing: '0.01em',
+                    } as React.CSSProperties
+                  }
+                >
                   Preferences
                 </Paragraph>
               </XStack>
@@ -347,7 +372,17 @@ export const UserProfileDropdown: React.FC = () => {
                 <MenuIconBox>
                   <CreditCard size={18} color="$color" />
                 </MenuIconBox>
-                <Paragraph size="$3" color="$color" fontWeight="500">
+                <Paragraph
+                  size="$3"
+                  color="$color"
+                  fontWeight="600"
+                  style={
+                    {
+                      fontFamily: FONT_DISPLAY,
+                      letterSpacing: '0.01em',
+                    } as React.CSSProperties
+                  }
+                >
                   Subscription
                 </Paragraph>
               </XStack>
@@ -363,7 +398,17 @@ export const UserProfileDropdown: React.FC = () => {
                 <MenuIconBox>
                   <HelpCircle size={18} color="$color" />
                 </MenuIconBox>
-                <Paragraph size="$3" color="$color" fontWeight="500">
+                <Paragraph
+                  size="$3"
+                  color="$color"
+                  fontWeight="600"
+                  style={
+                    {
+                      fontFamily: FONT_DISPLAY,
+                      letterSpacing: '0.01em',
+                    } as React.CSSProperties
+                  }
+                >
                   Help &amp; Support
                 </Paragraph>
               </XStack>
@@ -381,7 +426,17 @@ export const UserProfileDropdown: React.FC = () => {
                 <MenuIconBox>
                   <Settings2 size={18} color="$color" />
                 </MenuIconBox>
-                <Paragraph size="$3" color="$color" fontWeight="500">
+                <Paragraph
+                  size="$3"
+                  color="$color"
+                  fontWeight="600"
+                  style={
+                    {
+                      fontFamily: FONT_DISPLAY,
+                      letterSpacing: '0.01em',
+                    } as React.CSSProperties
+                  }
+                >
                   League Management
                 </Paragraph>
               </XStack>
@@ -398,7 +453,17 @@ export const UserProfileDropdown: React.FC = () => {
                   <MenuIconBox>
                     <Shield size={18} color="$color" />
                   </MenuIconBox>
-                  <Paragraph size="$3" color="$color" fontWeight="500">
+                  <Paragraph
+                    size="$3"
+                    color="$color"
+                    fontWeight="600"
+                    style={
+                      {
+                        fontFamily: FONT_DISPLAY,
+                        letterSpacing: '0.01em',
+                      } as React.CSSProperties
+                    }
+                  >
                     Admin
                   </Paragraph>
                 </XStack>
@@ -412,7 +477,17 @@ export const UserProfileDropdown: React.FC = () => {
                 <MenuIconBox backgroundColor="$red3">
                   <LogOut size={18} color="$red10" />
                 </MenuIconBox>
-                <Paragraph size="$3" color="$red10" fontWeight="600">
+                <Paragraph
+                  size="$3"
+                  color="$red10"
+                  fontWeight="700"
+                  style={
+                    {
+                      fontFamily: FONT_DISPLAY,
+                      letterSpacing: '0.01em',
+                    } as React.CSSProperties
+                  }
+                >
                   Sign Out
                 </Paragraph>
               </XStack>

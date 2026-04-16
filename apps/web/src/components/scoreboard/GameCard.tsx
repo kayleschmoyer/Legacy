@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Card, Separator, Text, XStack, YStack } from 'tamagui';
-import { FONT_BODY, FONT_DISPLAY } from '../../constants/typography';
 import { Linescore } from './Linescore';
 import type { ScoreboardGame } from './Scoreboard';
+import { FONT_BODY, FONT_DISPLAY } from '../../constants/typography';
 
 export interface GameCardProps {
   game: ScoreboardGame;

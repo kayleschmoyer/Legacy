@@ -5,6 +5,7 @@ import { Paragraph, XStack, YStack } from '@legacy-sports/shared-components/ui';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import { Button, Spinner, styled } from 'tamagui';
 import { Bell, CheckCheck, Eye } from '@tamagui/lucide-icons';
+import { DROPDOWN_BORDER, NAV_DROPDOWN_ANIMATION } from './NavDropdownShared';
 import {
   useGetNotificationHistoryQuery,
   useGetUnreadNotificationCountQuery,
@@ -38,17 +39,17 @@ const BadgeContainer = styled(YStack, {
 });
 
 const DropdownContent = styled(YStack, {
-  backgroundColor: '$background',
-  borderRadius: '$5',
+  backgroundColor: '$color2',
+  borderRadius: 10,
   borderWidth: 1,
   borderColor: '$borderColor',
   minWidth: 360,
   maxWidth: 400,
   shadowColor: '$shadowColor',
-  shadowOffset: { width: 0, height: 8 },
-  shadowOpacity: 0.2,
-  shadowRadius: 24,
-  elevation: 12,
+  shadowOffset: { width: 0, height: 12 },
+  shadowOpacity: 0.5,
+  shadowRadius: 36,
+  elevation: 14,
   overflow: 'hidden',
 });
 
@@ -214,6 +215,10 @@ export const NotificationDropdown: React.FC = () => {
           role="menu"
           id={menuId}
           aria-labelledby={buttonId}
+          style={{
+            borderColor: DROPDOWN_BORDER,
+            animation: NAV_DROPDOWN_ANIMATION,
+          }}
         >
           <DropdownHeader>
             <Paragraph size="$4" fontWeight="600" color="$color">

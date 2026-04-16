@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { H3, Separator, Spinner, Text, XStack, YStack } from 'tamagui';
-import { FONT_BODY, FONT_DISPLAY } from '../../constants/typography';
 import { GameCard } from './GameCard';
+import { FONT_BODY, FONT_DISPLAY } from '../../constants/typography';
 import { useGetScoreboardQuery } from '../../api/db/graphql.generated';
 
 // ─── Types ───────────────────────────────────────────────────────────────────

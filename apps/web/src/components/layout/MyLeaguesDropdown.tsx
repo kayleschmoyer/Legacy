@@ -1,89 +1,22 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import {
-  Button,
-  Paragraph,
-  XStack,
-  YStack,
-} from '@legacy-sports/shared-components/ui';
+import { Paragraph, XStack, YStack } from '@legacy-sports/shared-components/ui';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import { Text } from '@legacy-sports/ui-abstractions';
 import { styled } from 'tamagui';
 import { ChevronDown, ChevronUp, Trophy } from '@tamagui/lucide-icons';
-import { useGetUserLeaguesQuery } from '../../api/db/graphql.generated';
 import {
-  NAV_BUTTON_MIN_WIDTH,
-  NAV_DROPDOWN_Z_INDEX,
-} from '../../constants/dimensions';
+  DROPDOWN_BORDER,
+  DropdownButton,
+  DropdownContent,
+  FONT_DISPLAY,
+  MenuItem,
+  NAV_DROPDOWN_ANIMATION,
+} from './NavDropdownShared';
+import { useGetUserLeaguesQuery } from '../../api/db/graphql.generated';
+import { BRAND_SEAM_RED, TEXT_PRIMARY } from '../../constants/colors';
+import { NAV_DROPDOWN_Z_INDEX } from '../../constants/dimensions';
 import { BaseballIcon, FootballIcon } from '../icons/SportIcons';
-
-const DropdownButton = styled(Button, {
-  size: '$3',
-  gap: '$2',
-  backgroundColor: 'transparent',
-  borderWidth: 0,
-  borderRadius: '$2',
-  paddingHorizontal: '$4',
-  minWidth: NAV_BUTTON_MIN_WIDTH,
-  hoverStyle: {
-    backgroundColor: '$color3',
-  },
-  pressStyle: {
-    backgroundColor: '$color4',
-    scale: 0.97,
-  },
-  variants: {
-    highlight: {
-      true: {
-        backgroundColor: '$color3',
-        fontWeight: '600',
-      },
-    },
-  } as const,
-});
-
-const DropdownContent = styled(YStack, {
-  backgroundColor: '$background',
-  borderRadius: '$5',
-  borderWidth: 1,
-  borderColor: '$borderColor',
-  padding: '$2',
-  gap: '$1',
-  minWidth: 240,
-  maxWidth: 320,
-  maxHeight: 360,
-  shadowColor: '$shadowColor',
-  shadowOffset: { width: 0, height: 8 },
-  shadowOpacity: 0.2,
-  shadowRadius: 24,
-  elevation: 12,
-  overflow: 'hidden',
-  overflowY: 'auto',
-});
-
-const MenuItem = styled(Button, {
-  justifyContent: 'flex-start',
-  backgroundColor: 'transparent',
-  borderWidth: 0,
-  paddingHorizontal: '$3',
-  paddingVertical: '$3',
-  borderRadius: '$4',
-  width: '100%',
-  gap: '$3',
-  hoverStyle: {
-    backgroundColor: '$color3',
-  },
-  pressStyle: {
-    backgroundColor: '$color4',
-  },
-  variants: {
-    active: {
-      true: {
-        backgroundColor: '$color2',
-      },
-    },
-  } as const,
-});
 
 const MenuIconBox = styled(YStack, {
   width: 38,
@@ -136,10 +69,10 @@ interface SportIconInBoxProps {
 function SportIconInBox({ playerPool }: SportIconInBoxProps) {
   const pool = (playerPool ?? '').toLowerCase();
   if (pool.includes('football') || pool === 'nfl') {
-    return <FootballIcon size={20} color="var(--color)" />;
+    return <FootballIcon size={18} color="currentColor" />;
   }
   // Default to baseball (primary sport)
-  return <BaseballIcon size={20} color="var(--color)" />;
+  return <BaseballIcon size={18} color="currentColor" />;
 }
 
 export const MyLeaguesDropdown: React.FC = () => {
@@ -160,7 +93,6 @@ export const MyLeaguesDropdown: React.FC = () => {
   const isActive = location.pathname.startsWith('/baseball/league/');
   const isHighlighted = isActive || isOpen;
 
-  // Click outside handler
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -170,20 +102,17 @@ export const MyLeaguesDropdown: React.FC = () => {
         setIsOpen(false);
       }
     };
-
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside);
-      return () => {
+      return () =>
         document.removeEventListener('mousedown', handleClickOutside);
-      };
     }
   }, [isOpen]);
 
   const onKeyDown: React.KeyboardEventHandler<HTMLDivElement> = (e) => {
     if (e.key === 'Escape') {
       setIsOpen(false);
-      const btn = document.getElementById(buttonId);
-      btn?.focus();
+      document.getElementById(buttonId)?.focus();
       return;
     }
     if (!isOpen) return;
@@ -199,17 +128,18 @@ export const MyLeaguesDropdown: React.FC = () => {
         (el) =>
           el === document.activeElement || el.contains(document.activeElement),
       );
-      let nextIndex: number;
-      if (e.key === 'ArrowDown') {
-        nextIndex = currentIndex < items.length - 1 ? currentIndex + 1 : 0;
-      } else {
-        nextIndex = currentIndex > 0 ? currentIndex - 1 : items.length - 1;
-      }
+      const nextIndex =
+        e.key === 'ArrowDown'
+          ? currentIndex < items.length - 1
+            ? currentIndex + 1
+            : 0
+          : currentIndex > 0
+            ? currentIndex - 1
+            : items.length - 1;
       items[nextIndex]?.focus();
     }
   };
 
-  // Don't render if user is not logged in
   if (!isLoggedIn) return null;
 
   return (
@@ -243,17 +173,27 @@ export const MyLeaguesDropdown: React.FC = () => {
           left={0}
           marginTop="$2"
           zIndex={NAV_DROPDOWN_Z_INDEX}
+          minWidth={220}
+          maxWidth={320}
+          maxHeight={360}
+          overflow="hidden"
           role="menu"
           id={menuId}
           aria-labelledby={buttonId}
           style={{
-            animation:
-              'navDropdownIn 150ms cubic-bezier(0.16, 1, 0.3, 1) forwards',
+            borderColor: DROPDOWN_BORDER,
+            animation: NAV_DROPDOWN_ANIMATION,
+            overflowY: 'auto',
           }}
         >
           {loading && (
             <XStack justifyContent="center" alignItems="center" padding="$4">
-              <Paragraph marginBottom={0} fontSize={13} color="$color10">
+              <Paragraph
+                marginBottom={0}
+                style={
+                  { fontSize: 13, color: '$color10' } as React.CSSProperties
+                }
+              >
                 Loading…
               </Paragraph>
             </XStack>
@@ -262,12 +202,18 @@ export const MyLeaguesDropdown: React.FC = () => {
           {!loading && leagues.length === 0 && (
             <YStack padding="$3" gap="$2">
               <Paragraph
-                fontSize={13}
-                color="$color10"
-                textAlign="center"
                 marginBottom={0}
+                style={
+                  {
+                    fontSize: 12,
+                    color: TEXT_PRIMARY,
+                    textAlign: 'center',
+                    fontFamily: FONT_DISPLAY,
+                    opacity: 0.6,
+                  } as React.CSSProperties
+                }
               >
-                You are not in any leagues yet.
+                No leagues yet
               </Paragraph>
               <Link
                 to="/baseball"
@@ -275,7 +221,18 @@ export const MyLeaguesDropdown: React.FC = () => {
                 onClick={() => setIsOpen(false)}
               >
                 <MenuItem role="menuitem">
-                  <Paragraph marginBottom={0} fontSize={14}>
+                  <Paragraph
+                    marginBottom={0}
+                    style={
+                      {
+                        fontFamily: FONT_DISPLAY,
+                        fontWeight: '600',
+                        fontSize: 12,
+                        letterSpacing: '0.04em',
+                        textTransform: 'uppercase',
+                      } as React.CSSProperties
+                    }
+                  >
                     Browse Leagues
                   </Paragraph>
                 </MenuItem>
@@ -286,7 +243,18 @@ export const MyLeaguesDropdown: React.FC = () => {
                 onClick={() => setIsOpen(false)}
               >
                 <MenuItem role="menuitem">
-                  <Paragraph marginBottom={0} fontSize={14}>
+                  <Paragraph
+                    marginBottom={0}
+                    style={
+                      {
+                        fontFamily: FONT_DISPLAY,
+                        fontWeight: '600',
+                        fontSize: 12,
+                        letterSpacing: '0.04em',
+                        textTransform: 'uppercase',
+                      } as React.CSSProperties
+                    }
+                  >
                     Create a League
                   </Paragraph>
                 </MenuItem>
@@ -307,6 +275,7 @@ export const MyLeaguesDropdown: React.FC = () => {
               const secondaryLine = [sportLabel, phaseContext]
                 .filter(Boolean)
                 .join(' · ');
+              const isLive = league.draftStatus === 'in-progress';
 
               return (
                 <Link
@@ -333,23 +302,48 @@ export const MyLeaguesDropdown: React.FC = () => {
                         <XStack alignItems="center" gap="$2">
                           <Paragraph
                             marginBottom={0}
-                            size="$4"
-                            color="$color"
-                            fontWeight="500"
                             numberOfLines={1}
                             ellipsizeMode="tail"
+                            style={
+                              {
+                                fontFamily: FONT_DISPLAY,
+                                fontWeight: '600',
+                                fontSize: 13,
+                                color: isLeagueActive
+                                  ? '#C5A55A'
+                                  : TEXT_PRIMARY,
+                                flex: 1,
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              } as React.CSSProperties
+                            }
                           >
                             {league.name ?? `League ${league.id}`}
                           </Paragraph>
-                          {league.draftStatus === 'in-progress' && (
-                            <Paragraph
-                              marginBottom={0}
-                              fontSize={11}
-                              color="$green10"
-                              fontWeight="600"
+                          {isLive && (
+                            <XStack
+                              backgroundColor={BRAND_SEAM_RED}
+                              paddingHorizontal={5}
+                              paddingVertical={2}
+                              borderRadius={3}
+                              flexShrink={0}
                             >
-                              LIVE
-                            </Paragraph>
+                              <Paragraph
+                                marginBottom={0}
+                                style={
+                                  {
+                                    fontFamily: FONT_DISPLAY,
+                                    fontWeight: '700',
+                                    fontSize: 9,
+                                    color: '#FFFFFF',
+                                    letterSpacing: '0.08em',
+                                  } as React.CSSProperties
+                                }
+                              >
+                                LIVE
+                              </Paragraph>
+                            </XStack>
                           )}
                         </XStack>
                         {secondaryLine ? (
