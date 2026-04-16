@@ -115,6 +115,38 @@ unauthTest.describe('Login Flow @critical', () => {
       ).not.toBeVisible();
     },
   );
+
+  unauthTest(
+    'Continue with Google button is clickable on /scoreboard when unauthenticated (LS-3564)',
+    async ({ page }) => {
+      // /scoreboard is a protected route — unauthenticated users see the landing
+      // page.  Verify the CTA button is present and can be clicked without errors.
+      // The GSI library is mocked in the test environment so the auth flow does
+      // not complete, but clicking the button must not throw or crash the page.
+      await page.goto('/scoreboard');
+      await page.waitForLoadState('load');
+
+      // The hero "Continue with Google" button has aria-label="Get started with
+      // Google".  Use getByRole so this test does not depend on CSS selector
+      // syntax — the automated functional tester that filed this ticket used an
+      // invalid grouped CSS selector `(button:visible, [role="button"]:visible)`
+      // which Playwright rejects.
+      const ctaButton = page.getByRole('button', {
+        name: /get started with google/i,
+      });
+
+      await expect(ctaButton).toBeVisible({ timeout: 15000 });
+
+      // Click the button — the GSI mock's requestCode() is a no-op so the auth
+      // popup never opens, but the handler must fire and the page must remain
+      // stable (no crash, no error boundary).
+      await ctaButton.click();
+
+      await expect(page.locator('body')).not.toContainText(
+        'Unexpected Application Error',
+      );
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------
