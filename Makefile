@@ -49,6 +49,19 @@ else
 	KILL_WORKSPACE_PROCS := workspace='$(WORKSPACE_PATH)'; pids=$$(pgrep -f "$$workspace" || true); if [ -n "$$pids" ]; then echo "Stopping workspace processes: $$pids"; kill $$pids || true; else echo "No workspace processes running"; fi
 endif
 
+# Base ref for Nx affected commands.
+# Prefers origin/main so it works in cloud agents (no local main branch) and
+# locally (origin/main is always present after a fetch). Falls back to main on
+# non-Windows if origin/main is somehow unavailable. Override via env var or
+# command line: make pc NX_BASE=my-custom-base
+ifndef NX_BASE
+ifeq ($(OS),Windows_NT)
+NX_BASE := origin/main
+else
+NX_BASE := $(shell git rev-parse --verify origin/main >/dev/null 2>&1 && echo origin/main || echo main)
+endif # OS check
+endif # NX_BASE override guard
+
 # LS-102: Prevent console windows from spawning on Windows
 # NODE_OPTIONS loads a monkey-patch that adds windowsHide: true to all
 # child_process calls (spawn, fork, exec, etc.). Uses an absolute path
@@ -831,20 +844,20 @@ endif
 
 # Codegen command varies by platform (needs env var for schema path)
 ifeq ($(DETECTED_OS),Windows)
-_PC_CODEGEN_CMD = set "GRAPHQL_SCHEMA=$(WORKSPACE_PATH_WIN)\lambdas\db\schema.graphql" && pnpm exec nx affected -t codegen --base=main
+_PC_CODEGEN_CMD = set "GRAPHQL_SCHEMA=$(WORKSPACE_PATH_WIN)\lambdas\db\schema.graphql" && pnpm exec nx affected -t codegen --base=$(NX_BASE)
 else
-_PC_CODEGEN_CMD = GRAPHQL_SCHEMA=$(WORKSPACE_PATH)/lambdas/db/schema.graphql pnpm exec nx affected -t codegen --base=main
+_PC_CODEGEN_CMD = GRAPHQL_SCHEMA=$(WORKSPACE_PATH)/lambdas/db/schema.graphql pnpm exec nx affected -t codegen --base=$(NX_BASE)
 endif
 
-pre-commit: _PC_FLAGS := $(shell node scripts/classify-changes.js)
+pre-commit: _PC_FLAGS := $(shell node scripts/classify-changes.js --base $(NX_BASE))
 pre-commit: ## Run all pre-commit validation checks
 	@$(call echo_blue,Running pre-commit validation...)
 	@$(call echo_plain,Classifying changed files...)
-	@node scripts/classify-changes.js --print-summary
+	@node scripts/classify-changes.js --print-summary --base $(NX_BASE)
 	$(if $(findstring PC_HAS_DB=1,$(_PC_FLAGS)),@$(call echo_plain,1/9 Migration immutability check...) && node scripts/check-migration-immutability.js --branch,@$(call echo_yellow,1/9 Migration immutability check... SKIPPED (no db changes)))
 	$(if $(findstring PC_HAS_DB=1,$(_PC_FLAGS)),@$(call echo_plain,2/9 Schema generation...) && pnpm exec nx run db:print-schema,@$(call echo_yellow,2/9 Schema generation... SKIPPED (no db changes)))
 	$(if $(findstring PC_HAS_DB=1,$(_PC_FLAGS)),@$(call echo_plain,3/9 Code generation...) && $(_PC_CODEGEN_CMD),@$(call echo_yellow,3/9 Code generation... SKIPPED (no db changes)))
-	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,4/9 Type checking...) && pnpm exec nx affected -t typecheck --base=main,@$(call echo_yellow,4/9 Type checking... SKIPPED (docs-only changes)))
+	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,4/9 Type checking...) && pnpm exec nx affected -t typecheck --base=$(NX_BASE),@$(call echo_yellow,4/9 Type checking... SKIPPED (docs-only changes)))
 	@$(call echo_plain,5/9 Formatting...)
 ifeq ($(DETECTED_OS),Windows)
 	@powershell -NoProfile -Command "$$preState = @(git status --porcelain -uno); pnpm exec nx format:write; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }; $$changed = @(git status --porcelain -uno); $$newChanges = @(); foreach ($$line in $$changed) { if (-not ($$preState -contains $$line)) { $$newChanges += $$line } }; if ($$newChanges.Count -eq 0) { $$diffFiles = @(git diff --name-only); if ($$diffFiles.Count -gt 0) { $$newChanges = $$diffFiles | ForEach-Object { '?? ' + $$_ } } }; if ($$newChanges.Count -gt 0) { if ($$preState.Count -gt 0) { Write-Host ''; Write-Host 'ERROR: Formatting rewrote the following files:' -ForegroundColor Red; $$newChanges | ForEach-Object { Write-Host ('  ' + $$_.Substring(3)) -ForegroundColor Yellow }; Write-Host ''; Write-Host 'You have other uncommitted changes alongside the format fixes. Commit or stash them first, then re-run make pc.' -ForegroundColor Red; exit 1 } else { Write-Host '  Formatting changed files; auto-amending last commit...' -ForegroundColor Yellow; git add -A; git commit --amend --no-edit; Write-Host '  ✓ Format fixes folded into previous commit.' -ForegroundColor Green } }"
@@ -873,18 +886,18 @@ else
 		fi; \
 	fi
 endif
-	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,6/9 Linting...) && pnpm exec nx affected -t lint --fix --base=main,@$(call echo_yellow,6/9 Linting... SKIPPED (docs-only changes)))
+	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,6/9 Linting...) && pnpm exec nx affected -t lint --fix --base=$(NX_BASE),@$(call echo_yellow,6/9 Linting... SKIPPED (docs-only changes)))
 	$(if $(findstring PC_HAS_WORKFLOWS=1,$(_PC_FLAGS)),@$(call echo_plain,7/9 Workflow validation...) && node scripts/validate-workflows.js,@$(call echo_yellow,7/9 Workflow validation... SKIPPED (no workflow changes)))
-	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,8/9 Testing...) && pnpm exec nx affected -t test --base=main,@$(call echo_yellow,8/9 Testing... SKIPPED (docs-only changes)))
-	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,9/9 Building...) && pnpm exec nx affected -t build --base=main,@$(call echo_yellow,9/9 Building... SKIPPED (docs-only changes)))
+	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,8/9 Testing...) && pnpm exec nx affected -t test --base=$(NX_BASE),@$(call echo_yellow,8/9 Testing... SKIPPED (docs-only changes)))
+	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,9/9 Building...) && pnpm exec nx affected -t build --base=$(NX_BASE),@$(call echo_yellow,9/9 Building... SKIPPED (docs-only changes)))
 	@$(call echo_green,✓ All pre-commit checks passed!)
 
 pc: pre-commit ## Alias for pre-commit
 
 quick-check: ## Quick validation (typecheck + lint only)
 	@$(call echo_blue,Running quick checks...)
-	@pnpm exec nx affected -t typecheck --base=main
-	@pnpm exec nx affected -t lint --fix --base=main
+	@pnpm exec nx affected -t typecheck --base=$(NX_BASE)
+	@pnpm exec nx affected -t lint --fix --base=$(NX_BASE)
 	@$(call echo_green,✓ Quick checks passed!)
 
 # Agent workflow automation scripts

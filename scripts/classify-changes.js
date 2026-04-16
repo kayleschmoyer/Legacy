@@ -2,7 +2,7 @@
 /**
  * Classify changed files for make pc optimization.
  *
- * Compares the current branch against a base ref (default: main) and outputs
+ * Compares the current branch against a base ref (default: origin/main) and outputs
  * Make-compatible variable assignments that the pre-commit target uses to skip
  * irrelevant steps.
  *
@@ -27,7 +27,7 @@ function parseBaseRef(argv) {
   if (idx !== -1 && idx + 1 < argv.length) {
     return argv[idx + 1];
   }
-  return 'main';
+  return 'origin/main';
 }
 
 function classify(baseRef) {
