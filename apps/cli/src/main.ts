@@ -53,6 +53,7 @@ import { handleLoadBrParkFactors } from './commands/loadBrParkFactors';
 import { handleLoadPositionalAdjustments } from './commands/loadPositionalAdjustments';
 import { handleLoadOnThisDayEvents } from './commands/loadOnThisDayEvents';
 import { handleCleanupTestLeagues } from './commands/cleanupTestLeagues';
+import { handleReportToJiraEpic } from './commands/reportToJiraEpic';
 
 // Initialize Rollbar for CLI
 const rollbarConfig = getRollbarConfigFromEnv();
@@ -587,6 +588,43 @@ async function run(): Promise<void> {
         delay?: number;
         upsert?: boolean;
       }) => handleLoadOnThisDayEvents(options),
+    );
+
+  program
+    .command('report-to-jira-epic <report>')
+    .description(
+      'Fetch a Playwright report and create a Jira epic with one child ticket per failing test. ' +
+        '<report> can be a report name (nightly-12345, pr-42, manual-7) or a full GitHub Pages URL. ' +
+        'Requires JIRA_BASE_URL, JIRA_EMAIL, and JIRA_API_TOKEN env vars unless --dry-run is used.',
+    )
+    .option(
+      '-p, --project <key>',
+      'Jira project key (default: JIRA_PROJECT_KEY env var or LS)',
+    )
+    .option('--epic-summary <text>', 'Override the auto-generated epic summary')
+    .option(
+      '--issue-type <type>',
+      'Issue type for child tickets (default: Bug)',
+      'Bug',
+    )
+    .option('--dry-run', 'Preview what would be created without calling Jira')
+    .action(
+      (
+        report: string,
+        options: {
+          project?: string;
+          epicSummary?: string;
+          issueType?: string;
+          dryRun?: boolean;
+        },
+      ) =>
+        handleReportToJiraEpic({
+          report,
+          project: options.project ?? process.env['JIRA_PROJECT_KEY'] ?? 'LS',
+          issueType: options.issueType ?? 'Bug',
+          epicSummary: options.epicSummary,
+          dryRun: options.dryRun,
+        }),
     );
 
   program

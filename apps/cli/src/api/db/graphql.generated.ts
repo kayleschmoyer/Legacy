@@ -3417,8 +3417,10 @@ export enum StatsLoadingStatus {
 
 export type StripePriceInfo = {
   __typename?: 'StripePriceInfo';
+  annualPriceId: Scalars['String']['output'];
   annualTotalCents: Scalars['Int']['output'];
   monthlyPriceCents: Scalars['Int']['output'];
+  monthlyPriceId: Scalars['String']['output'];
 };
 
 export type SubscriberGrowthPoint = {
