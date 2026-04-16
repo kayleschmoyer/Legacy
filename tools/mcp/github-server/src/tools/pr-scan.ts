@@ -556,6 +556,7 @@ export async function prScan(params: PRScanParams): Promise<ToolResult> {
           number: p.number,
           branch: p.headRefName,
           threadCount: p.threads.length,
+          threadIds: p.threads.map((t) => t.id),
           ...(p.threadsTruncated ? { threadsTruncated: true } : {}),
         })),
         ciFailing: ciFailing.map((p) => ({

@@ -57,7 +57,7 @@ interface PRBatchNode {
   reviewThreads: {
     totalCount: number;
     pageInfo: { hasNextPage: boolean };
-    nodes: Array<{ isResolved: boolean; isOutdated: boolean }>;
+    nodes: Array<{ id: string; isResolved: boolean; isOutdated: boolean }>;
   };
 }
 
@@ -126,7 +126,7 @@ function buildBatchPRQuery(numbers: number[]): string {
       reviewThreads(first: 100) {
         totalCount
         pageInfo { hasNextPage }
-        nodes { isResolved isOutdated }
+        nodes { id isResolved isOutdated }
       }
     }`,
   );
@@ -181,9 +181,11 @@ export async function prBatchStatus(
       const ciSummary = summarizeCIStatus(ciJobs);
 
       const totalThreads = pr.reviewThreads.totalCount;
-      const unresolvedThreads = pr.reviewThreads.nodes.filter(
+      const unresolvedThreadNodes = pr.reviewThreads.nodes.filter(
         (t) => !t.isResolved && !t.isOutdated,
-      ).length;
+      );
+      const unresolvedThreads = unresolvedThreadNodes.length;
+      const unresolvedThreadIds = unresolvedThreadNodes.map((t) => t.id);
       const threadCountTruncated = pr.reviewThreads.pageInfo.hasNextPage;
 
       // Compact mode: omit verbose fields (ciJobs, reviews, labels, url)
@@ -199,6 +201,7 @@ export async function prBatchStatus(
           ciSummary,
           ...(failedJobs.length > 0 ? { failedJobs } : {}),
           unresolvedThreads,
+          ...(unresolvedThreadIds.length > 0 ? { unresolvedThreadIds } : {}),
           ...(threadCountTruncated ? { threadCountTruncated: true } : {}),
         };
       }
@@ -222,6 +225,7 @@ export async function prBatchStatus(
         reviewDecision: pr.reviewDecision,
         reviews,
         unresolvedThreads,
+        ...(unresolvedThreadIds.length > 0 ? { unresolvedThreadIds } : {}),
         totalThreads,
         threadCountTruncated,
         labels: pr.labels.nodes.map((l) => l.name),
