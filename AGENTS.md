@@ -108,7 +108,7 @@ Detailed how-to docs live in `.agents/skills/<name>/SKILL.md`. The `description`
 
 See `.agents/skills/mcp-first/SKILL.md` for the full server list, per-server tool mapping, and load-order notes. Always prefer MCP tools over equivalent shell commands.
 
-> **All 9 MCP servers** should connect in every session. `MCP_TIMEOUT=10000` in `.claude/settings.json` ensures enough startup headroom. If a server is unexpectedly missing, check `MCP_TIMEOUT` is set and restart the session — do not proceed with shell fallbacks for a missing server. Only use shell when MCP is entirely unavailable, and treat that as a failure mode rather than the normal workflow.
+> **All 9 MCP servers** should connect in every session. `MCP_TIMEOUT=10000` in `.claude/settings.json` ensures enough startup headroom. If a server is unexpectedly missing or timing out, **first check that the `node_modules` symlink exists** — all MCP servers start with `pnpm exec tsx ...` and will time out immediately if `node_modules/.bin/tsx` is missing. Run `powershell -File scripts/mklink-symlink.ps1 -Link <worktree>\node_modules -Target D:\code\legacy-sports\node_modules -Check` (PowerShell) to inspect the link, or check with `test -x node_modules/.bin/tsx`. If missing or broken, recreate it: `worktree_setup_node_modules()` (MCP, only if already connected) or `powershell -File scripts/mklink-symlink.ps1 -Link <worktree>\node_modules -Target D:\code\legacy-sports\node_modules` from an admin/Developer-Mode shell. The `SessionStart` hook attempts to create this symlink automatically but may not fire in all session types (e.g., Copilot CLI). After verifying or recreating the symlink, restart the session. Do not proceed with shell fallbacks for a persistently missing server.
 
 ## Cloud Agent Mode
 

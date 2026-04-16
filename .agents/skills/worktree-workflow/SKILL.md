@@ -70,7 +70,7 @@ The Claude Code session was spawned with the launcher `worktree` checkbox checke
 - **`make_wt_setup` is NOT used** — it's sibling-only. The symlink command above replaces it.
 - **`worktree_list` / `make_worktree_create` are NOT used** — you're already in a worktree, Claude Code created it for you.
 - **On exit**, `ExitWorktree(action: "remove")` cleans up the ephemeral worktree. Only call this when explicitly done — the worktree can survive across sessions if kept.
-- **All 9 MCP servers** should connect in every session (`MCP_TIMEOUT=10000` in `.claude/settings.json` ensures startup headroom). If a server is unexpectedly missing, restart the session — do not proceed with shell fallbacks for a missing server. Shell fallbacks elsewhere in this doc (e.g., symlink creation, `gh` CLI recovery) are for when MCP is entirely unavailable, not for working around a missing server at startup.
+- **All 9 MCP servers** should connect in every session (`MCP_TIMEOUT=10000` in `.claude/settings.json` ensures startup headroom). If a server is unexpectedly missing or timing out, **first verify the `node_modules` symlink exists** — all MCP servers use `pnpm exec tsx` and will time out immediately if the symlink is absent. If this is happening at startup and the worktree MCP server is unavailable, use the existing cmd/PowerShell fallback (e.g., `mklink /D`) to create or repair the symlink, then restart the session. If MCP is already available, run `worktree_setup_node_modules()` to repair it in-session. The `SessionStart` hook attempts this automatically but may not fire in all session types (e.g., Copilot CLI).
 
 ## Subagent Dispatch (multi-ticket orchestrators)
 

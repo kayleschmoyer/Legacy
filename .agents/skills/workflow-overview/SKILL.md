@@ -37,7 +37,7 @@ This is the step-by-step checklist agents follow for every ticket. See the detai
 
       This is instant (no disk copy), the main repo's `node_modules` is untouched, and `pnpm exec nx`, `make typecheck`, `make pc` all work after it. The tool is idempotent — safe to call even if the symlink already exists, and will auto-repair a broken symlink (empty `.bin`). Skip `make wt-setup` — that's sibling-only.
 
-      > **Note**: The `setup-worktree-symlink.sh` SessionStart hook automatically validates and recreates the symlink at session start. Call `worktree_setup_node_modules()` explicitly if you suspect the symlink became stale mid-session (e.g. after a concurrent agent ran `make install` in the main repo).
+      > **Note**: The `setup-worktree-symlink.sh` SessionStart hook attempts to create the symlink at session start, but it may not fire in all session types (e.g., Copilot CLI). Always call `worktree_setup_node_modules()` explicitly at step 5 — it is idempotent and safe to call even if the symlink already exists. If MCP servers are timing out at startup, the most common cause is a missing symlink (all servers use `pnpm exec tsx` and will fail immediately without `node_modules/.bin`). In that startup-timeout case the worktree MCP server is itself unavailable, so use the **cmd fallback below first** to recreate the symlink, then restart the session. `worktree_setup_node_modules()` only works once the worktree MCP server is already connected.
 
       If `worktree_setup_node_modules` is unavailable (MCP server not loaded), use the **cmd fallback** (run from your terminal, not from bash):
 
