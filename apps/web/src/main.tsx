@@ -125,6 +125,7 @@ try {
                 testMode={env.authTestMode}
                 publicPaths={[
                   `${import.meta.env.BASE_URL.replace(/\/$/, '')}/about`,
+                  `${import.meta.env.BASE_URL.replace(/\/$/, '')}/scoreboard`,
                 ]}
                 onLoginSuccess={() => {
                   LOGGER.info('Web app login successful!');

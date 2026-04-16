@@ -6,7 +6,7 @@
  * and error state.
  */
 
-import { expect, test } from '../fixtures/auth-enhanced';
+import { expect, test, unauthTest } from '../fixtures/auth-enhanced';
 import { extractOperationName } from '../fixtures/shared-mocks';
 
 function isGraphQLEndpoint(url: URL): boolean {
@@ -362,6 +362,60 @@ test.describe('Scoreboard — error state @regression', () => {
       'Unexpected Application Error',
     );
   });
+});
+
+// ─── Public access — unauthenticated user can view /scoreboard (LS-3563) ──────
+
+unauthTest.describe('Scoreboard — unauthenticated access @critical', () => {
+  unauthTest(
+    'shows MLB Scoreboard heading without requiring login',
+    async ({ page }) => {
+      await mockScoreboardGraphQL(page);
+      await page.goto('/scoreboard');
+      await page.waitForLoadState('load');
+
+      await expect(page.getByTestId('scoreboard-heading')).toBeVisible({
+        timeout: 15000,
+      });
+      await expect(page.getByTestId('scoreboard-heading')).toContainText(
+        'MLB Scoreboard',
+      );
+    },
+  );
+
+  unauthTest(
+    'does not show landing-page login CTA on /scoreboard',
+    async ({ page }) => {
+      await mockScoreboardGraphQL(page);
+      await page.goto('/scoreboard');
+      await page.waitForLoadState('load');
+
+      await expect(page.locator('body')).not.toContainText(
+        'Build Your Dynasty',
+      );
+      await expect(page.locator('body')).not.toContainText('Get Started Free');
+    },
+  );
+
+  unauthTest(
+    'navigating from /scoreboard to a protected route shows the login gate',
+    async ({ page }) => {
+      await mockScoreboardGraphQL(page);
+      await page.goto('/scoreboard');
+      await page.waitForLoadState('load');
+      await expect(page.getByTestId('scoreboard-heading')).toBeVisible();
+
+      // Navigate to a protected route — the auth guard must gate it even after
+      // the user started on a public path.
+      await page.goto('/baseball');
+      await page.waitForLoadState('load');
+
+      // The auth guard must now show the landing page, not the baseball hub.
+      await expect(
+        page.getByRole('button', { name: /get started with google/i }),
+      ).toBeVisible({ timeout: 15000 });
+    },
+  );
 });
 
 // ─── Global ticker (ScoreboardTicker in app shell) ────────────────────────────

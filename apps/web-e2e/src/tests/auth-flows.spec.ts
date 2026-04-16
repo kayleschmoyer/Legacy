@@ -115,38 +115,6 @@ unauthTest.describe('Login Flow @critical', () => {
       ).not.toBeVisible();
     },
   );
-
-  unauthTest(
-    'Continue with Google button is clickable on /scoreboard when unauthenticated (LS-3564)',
-    async ({ page }) => {
-      // /scoreboard is a protected route — unauthenticated users see the landing
-      // page.  Verify the CTA button is present and can be clicked without errors.
-      // The GSI library is mocked in the test environment so the auth flow does
-      // not complete, but clicking the button must not throw or crash the page.
-      await page.goto('/scoreboard');
-      await page.waitForLoadState('load');
-
-      // The hero "Continue with Google" button has aria-label="Get started with
-      // Google".  Use getByRole so this test does not depend on CSS selector
-      // syntax — the automated functional tester that filed this ticket used an
-      // invalid grouped CSS selector `(button:visible, [role="button"]:visible)`
-      // which Playwright rejects.
-      const ctaButton = page.getByRole('button', {
-        name: /get started with google/i,
-      });
-
-      await expect(ctaButton).toBeVisible({ timeout: 15000 });
-
-      // Click the button — the GSI mock's requestCode() is a no-op so the auth
-      // popup never opens, but the handler must fire and the page must remain
-      // stable (no crash, no error boundary).
-      await ctaButton.click();
-
-      await expect(page.locator('body')).not.toContainText(
-        'Unexpected Application Error',
-      );
-    },
-  );
 });
 
 // ---------------------------------------------------------------------------
@@ -162,7 +130,6 @@ unauthTest.describe('Protected Routes @critical', () => {
     '/profile/settings',
     '/preferences',
     '/help',
-    '/scoreboard',
   ];
 
   for (const route of routes) {
@@ -181,57 +148,7 @@ unauthTest.describe('Protected Routes @critical', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Scoreboard Landing CTA — regression for LS-3565
-// Button must show a spinner during OAuth init, then become interactive.
-// ---------------------------------------------------------------------------
-
-unauthTest.describe('Scoreboard Landing CTA @regression', () => {
-  unauthTest(
-    'Get Started Free button shows spinner during OAuth init then CTA text after configure',
-    async ({ page }) => {
-      // Block the GSI script so we can observe the spinner before configure
-      // resolves. We fulfill with an empty script body — the finally block in
-      // PublicLandingPage ensures isConfiguring becomes false regardless of
-      // whether the GSI library initialised successfully.
-      let fulfillGSI!: () => void;
-      const gsiBlocked = new Promise<void>((resolve) => {
-        fulfillGSI = resolve;
-      });
-
-      await page.route('**/accounts.google.com/gsi/client**', async (route) => {
-        await gsiBlocked;
-        await route.fulfill({
-          contentType: 'application/javascript',
-          body: '',
-        });
-      });
-
-      await page.goto('/scoreboard');
-      await page.waitForLoadState('load');
-
-      // While the GSI script is still loading the button shows a spinner —
-      // the "Get Started Free" text must NOT be visible yet.
-      await expect(page.locator('[aria-label="Get started free"]')).toBeVisible(
-        { timeout: 15000 },
-      );
-      await expect(
-        page.locator('[role="button"]', { hasText: /get started free/i }),
-      ).not.toBeVisible();
-
-      // Unblock the GSI script — configure completes (success or failure) and
-      // isConfiguring becomes false via the finally block.
-      fulfillGSI();
-
-      // Button must now show the "Get Started Free" label.
-      await expect(
-        page.locator('[role="button"]', { hasText: /get started free/i }),
-      ).toBeVisible({ timeout: 15000 });
-    },
-  );
-});
-
-// ---------------------------------------------------------------------------
-// Public Routes — accessible without authentication (LS-3566)
+// Public Routes — accessible without authentication (LS-3566, LS-3563)
 // ---------------------------------------------------------------------------
 
 unauthTest.describe('Public Routes @critical', () => {
@@ -244,6 +161,18 @@ unauthTest.describe('Public Routes @critical', () => {
       await expect(
         page.getByRole('heading', { name: /about legacy sports/i }),
       ).toBeVisible({ timeout: 15000 });
+    },
+  );
+
+  unauthTest(
+    'shows Scoreboard page content on /scoreboard when not authenticated',
+    async ({ page }) => {
+      await page.goto('/scoreboard');
+      await page.waitForLoadState('load');
+
+      await expect(page.getByTestId('scoreboard-heading')).toBeVisible({
+        timeout: 15000,
+      });
     },
   );
 });
