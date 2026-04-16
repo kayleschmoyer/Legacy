@@ -48,9 +48,24 @@ export const NAV_BUTTON_MIN_WIDTH = 120;
 /**
  * Height of the live scores ticker strip in pixels.
  * Rendered just below the sticky nav bar when today's MLB games are available.
- * Zero-height when hidden (ticker returns null when no games exist).
+ * Not rendered at all (returns null) when no games exist — no element or spacer
+ * is present in the DOM on those days.
+ *
+ * Secondary sticky elements inside page content (e.g. roster header, free-agent
+ * toolbar) must use SECONDARY_STICKY_TOP as their `top` offset so they stack
+ * directly below the ticker rather than sliding behind it.
  */
-export const TICKER_HEIGHT_PX = 32;
+export const TICKER_HEIGHT_PX = 40;
+
+/**
+ * `top` offset for secondary sticky elements inside page content.
+ *
+ * When the score ticker is visible these elements must clear both the nav bar
+ * AND the ticker strip. On days with no games the ticker is not rendered at all,
+ * so these elements will have a small extra gap below the nav — an acceptable
+ * trade-off over adding context-dependent dynamic detection.
+ */
+export const SECONDARY_STICKY_TOP = NAV_HEIGHT_PX + TICKER_HEIGHT_PX;
 
 /**
  * Z-index for nav dropdown menus (e.g. PlayersDropdown, MyLeaguesDropdown).

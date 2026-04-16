@@ -39,7 +39,7 @@ import {
 } from '../../constants/colors';
 import {
   CONTENT_STICKY_Z_INDEX,
-  NAV_HEIGHT_PX,
+  SECONDARY_STICKY_TOP,
 } from '../../constants/dimensions';
 import { trackRosterAction } from '../../utils/analytics';
 
@@ -174,9 +174,9 @@ function ensureFlashStyle(): void {
 
 const StickyRosterHeader = styled(XStack, {
   position: 'sticky' as const,
-  // Offset by the nav bar height so this sticks directly below the nav,
-  // not overlapping it. zIndex must stay below NAV_Z_INDEX.
-  top: NAV_HEIGHT_PX,
+  // Offset below the nav bar AND the score ticker so this sticks directly below
+  // both without overlapping either. zIndex must stay below NAV_Z_INDEX.
+  top: SECONDARY_STICKY_TOP,
   zIndex: CONTENT_STICKY_Z_INDEX,
   backgroundColor: '$surfacePanel',
   paddingVertical: '$3',

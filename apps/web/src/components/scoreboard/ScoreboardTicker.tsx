@@ -49,6 +49,7 @@ interface TickerGame {
 
 const TickerStrip = styled(XStack, {
   position: 'fixed' as never,
+  top: NAV_HEIGHT_PX,
   left: 0,
   right: 0,
   height: TICKER_HEIGHT_PX,
@@ -338,7 +339,6 @@ export function ScoreboardTicker() {
       <TickerStrip
         role="region"
         aria-label="MLB Scores"
-        style={{ top: NAV_HEIGHT_PX } as React.CSSProperties}
         onMouseEnter={() => setPaused(true)}
         onMouseLeave={() => setPaused(false)}
         data-testid="scoreboard-ticker"

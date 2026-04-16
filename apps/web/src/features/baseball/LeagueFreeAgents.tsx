@@ -27,7 +27,7 @@ import {
   BRAND_NAVY_LIGHT,
   withAlpha,
 } from '../../constants/colors';
-import { NAV_HEIGHT_PX } from '../../constants/dimensions';
+import { SECONDARY_STICKY_TOP } from '../../constants/dimensions';
 
 /* ── Constants ─────────────────────────────────────────────────────────────── */
 
@@ -244,9 +244,9 @@ const PITCHER_SCORING_COLUMNS: {
 
 const ToolbarContainer = styled(YStack, {
   position: 'sticky',
-  // Offset by the nav bar height so this sticks directly below the nav,
-  // not overlapping it.
-  top: NAV_HEIGHT_PX,
+  // Offset below the nav bar AND the score ticker so this sticks directly below
+  // both without overlapping either.
+  top: SECONDARY_STICKY_TOP,
   zIndex: 100,
   backgroundColor: '$background',
   paddingVertical: '$3',
