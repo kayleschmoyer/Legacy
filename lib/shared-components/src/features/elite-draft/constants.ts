@@ -2,17 +2,23 @@
 // Shared constants for EliteDraftBoard
 // ---------------------------------------------------------------------------
 
+import {
+  BRAND_GOLD,
+  BRAND_NAVY_LIGHT,
+  BRAND_SEAM_RED,
+} from '../../utils/colors';
+
 export const POSITION_COLORS: Record<string, string> = {
-  C: '#ef4444',
-  '1B': '#f97316',
-  '2B': '#eab308',
-  '3B': '#22c55e',
-  SS: '#3b82f6',
-  OF: '#8b5cf6',
-  P: '#06b6d4',
-  SP: '#06b6d4',
-  RP: '#14b8a6',
-  DH: '#ec4899',
+  C: BRAND_SEAM_RED, // seam red
+  '1B': '#B5651D', // warm amber
+  '2B': BRAND_GOLD, // heritage gold
+  '3B': '#2D6A4F', // forest green
+  SS: BRAND_NAVY_LIGHT, // navy blue
+  OF: '#64748B', // slate — replaces banned purple
+  P: '#4A708B', // steel blue — replaces banned cyan
+  SP: '#4A708B', // steel blue — replaces banned cyan
+  RP: '#2E7D6E', // forest teal
+  DH: '#8B2635', // burgundy
 };
 
 export const TIMER_RADIUS = 50;

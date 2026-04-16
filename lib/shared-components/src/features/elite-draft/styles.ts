@@ -46,18 +46,9 @@ export const CSS = `
   0%   { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
-@keyframes pulseGlow {
-  0%, 100% { box-shadow: 0 0 20px rgba(197, 165, 90, 0.12); }
-  50%      { box-shadow: 0 0 40px rgba(197, 165, 90, 0.28); }
-}
 @keyframes liveDot {
   0%, 100% { opacity: 1; transform: scale(1); }
   50%      { opacity: 0.4; transform: scale(0.7); }
-}
-@keyframes floatOrb {
-  0%, 100% { transform: translate(0,0) scale(1); }
-  33%      { transform: translate(30px,-20px) scale(1.05); }
-  66%      { transform: translate(-20px,15px) scale(0.95); }
 }
 @keyframes timerWarn {
   0%, 100% { transform: scale(1); }
@@ -91,27 +82,13 @@ export const CSS = `
   0%, 100% { box-shadow: 0 0 0 0 rgba(197, 165, 90, 0.35); }
   50%      { box-shadow: 0 0 0 12px rgba(197, 165, 90, 0); }
 }
-@keyframes gradientShift {
-  0%   { background-position: 0% 50%; }
-  50%  { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
 @keyframes glowPulse {
   0%, 100% { box-shadow: 0 0 15px rgba(197, 165, 90, 0.1), 0 0 30px rgba(27, 58, 92, 0.08); }
   50%      { box-shadow: 0 0 25px rgba(197, 165, 90, 0.25), 0 0 50px rgba(27, 58, 92, 0.15); }
 }
-@keyframes borderGlow {
-  0%, 100% { border-color: rgba(255, 255, 255, 0.06); }
-  50%      { border-color: rgba(197, 165, 90, 0.2); }
-}
 @keyframes draftBtnGlow {
   0%, 100% { box-shadow: 0 4px 16px rgba(5, 150, 105, 0.25), 0 0 0 0 rgba(5, 150, 105, 0.3); }
   50%      { box-shadow: 0 6px 24px rgba(5, 150, 105, 0.4), 0 0 0 8px rgba(5, 150, 105, 0); }
-}
-@keyframes statShine {
-  0%   { opacity: 0; left: -30%; }
-  50%  { opacity: 1; }
-  100% { opacity: 0; left: 130%; }
 }
 @keyframes slideInLeft {
   from { opacity: 0; transform: translateX(-16px); }
@@ -131,7 +108,7 @@ export const CSS = `
   z-index: ${NAV_Z_INDEX + 1};
   background: var(--d-bg);
   color: var(--d-text);
-  font-family: 'Playfair Display', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Literata', Georgia, 'Times New Roman', serif;
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
   animation: 0.25s ease 0s 1 normal forwards running fadeSlideIn;
@@ -149,7 +126,6 @@ export const CSS = `
     radial-gradient(ellipse 80% 50% at 15% 15%, rgba(197, 165, 90, 0.06) 0%, transparent 60%),
     radial-gradient(ellipse 60% 40% at 85% 80%, rgba(27, 58, 92, 0.08) 0%, transparent 60%),
     radial-gradient(ellipse 40% 30% at 50% 50%, rgba(59, 130, 246, 0.04) 0%, transparent 60%);
-  animation: floatOrb 25s ease-in-out infinite;
 }
 .d-layout {
   position: relative; z-index: 1;
@@ -161,9 +137,7 @@ export const CSS = `
 
 /* ===== Sidebar ===== */
 .d-side {
-  background: linear-gradient(180deg, rgba(17, 27, 47, 0.92) 0%, rgba(10, 15, 26, 0.96) 100%);
-  backdrop-filter: blur(32px) saturate(1.4);
-  -webkit-backdrop-filter: blur(32px) saturate(1.4);
+  background: #0D1526;
   padding: 20px;
   overflow-y: auto;
   scrollbar-width: thin;
@@ -184,8 +158,6 @@ export const CSS = `
 /* ===== Draft Status Card ===== */
 .d-status {
   background: linear-gradient(135deg, var(--d-accent) 0%, var(--d-accent-dark, #A68B3E) 60%, var(--d-navy, #1B3A5C) 100%);
-  background-size: 200% 200%;
-  animation: gradientShift 6s ease-in-out infinite;
   padding: 14px 16px;
   border-radius: var(--d-radius-md);
   margin-bottom: 16px;
@@ -245,7 +217,8 @@ export const CSS = `
 }
 .d-timer-text {
   fill: white; font-size: 26px; font-weight: 800;
-  font-family: 'Inter', monospace; text-anchor: middle;
+  font-family: 'Big Shoulders Display', sans-serif; text-anchor: middle;
+  font-variant-numeric: tabular-nums;
 }
 .d-timer-label {
   fill: rgba(255,255,255,0.65); font-size: 8px; font-weight: 700;
@@ -255,15 +228,12 @@ export const CSS = `
 
 /* ===== Panel ===== */
 .d-panel {
-  background: linear-gradient(165deg, rgba(22, 34, 58, 0.7) 0%, rgba(17, 27, 47, 0.5) 100%);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: var(--d-panel, #111B2F);
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: var(--d-radius-lg);
   padding: 16px;
   margin-bottom: 14px;
   transition: border-color 0.4s ease, box-shadow 0.4s ease;
-  animation: borderGlow 8s ease-in-out infinite;
 }
 .d-panel:hover {
   border-color: rgba(255, 255, 255, 0.1);
@@ -284,8 +254,7 @@ export const CSS = `
   gap: 5px; margin-bottom: 12px;
 }
 .d-roster-cell {
-  background: linear-gradient(165deg, rgba(13, 21, 38, 0.6) 0%, rgba(10, 15, 26, 0.4) 100%);
-  backdrop-filter: blur(6px);
+  background: rgba(13, 21, 38, 0.8);
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: var(--d-radius-sm);
   padding: 7px 5px; text-align: center; font-size: 11px;
@@ -300,8 +269,7 @@ export const CSS = `
 .d-roster-player {
   display: flex; align-items: center; justify-content: space-between;
   padding: 10px;
-  background: linear-gradient(165deg, rgba(13, 21, 38, 0.5) 0%, rgba(10, 15, 26, 0.3) 100%);
-  backdrop-filter: blur(6px);
+  background: rgba(13, 21, 38, 0.7);
   border: 1px solid rgba(255, 255, 255, 0.04);
   border-radius: var(--d-radius-sm);
   margin-bottom: 5px;
@@ -317,9 +285,7 @@ export const CSS = `
 /* ===== Glass Button ===== */
 .d-btn-glass {
   display: block; width: 100%;
-  background: linear-gradient(135deg, rgba(27, 58, 92, 0.18) 0%, rgba(27, 58, 92, 0.12) 100%);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(27, 58, 92, 0.18);
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: var(--d-radius-md); padding: 11px 14px;
   color: var(--d-text); font-size: 13px; font-weight: 600;
@@ -357,9 +323,7 @@ export const CSS = `
 
 /* ===== Controls Bar ===== */
 .d-controls {
-  background: linear-gradient(135deg, rgba(22, 34, 58, 0.7) 0%, rgba(17, 27, 47, 0.5) 100%);
-  backdrop-filter: blur(24px) saturate(1.3);
-  -webkit-backdrop-filter: blur(24px) saturate(1.3);
+  background: #111B2F;
   border: 1px solid rgba(255, 255, 255, 0.07);
   padding: 14px 18px;
   border-radius: var(--d-radius-lg);
@@ -388,8 +352,7 @@ export const CSS = `
   padding: 9px 14px 9px 38px;
   border-radius: var(--d-radius-md);
   border: 1px solid rgba(255, 255, 255, 0.06);
-  background: linear-gradient(135deg, rgba(13, 21, 38, 0.8) 0%, rgba(10, 15, 26, 0.6) 100%);
-  backdrop-filter: blur(8px);
+  background: rgba(13, 21, 38, 0.9);
   color: var(--d-text); font-size: 13px;
   outline: none; transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
   font-family: inherit;
@@ -409,7 +372,6 @@ export const CSS = `
   color: var(--d-text-secondary); font-size: 12px; font-weight: 600;
   cursor: pointer; transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
   font-family: inherit; position: relative; overflow: hidden;
-  backdrop-filter: blur(8px);
 }
 .d-pill:hover {
   background: rgba(27, 58, 92, 0.32); color: var(--d-text);
@@ -432,8 +394,7 @@ export const CSS = `
 /* ===== View Modes ===== */
 .d-views {
   display: flex; gap: 2px;
-  background: rgba(13, 21, 38, 0.5);
-  backdrop-filter: blur(8px);
+  background: rgba(13, 21, 38, 0.8);
   border: 1px solid rgba(255, 255, 255, 0.04);
   border-radius: var(--d-radius-sm); padding: 2px;
 }
@@ -456,9 +417,7 @@ export const CSS = `
 /* ===== Player Card ===== */
 .d-card {
   position: relative; border-radius: var(--d-radius-lg); overflow: hidden;
-  background: linear-gradient(165deg, rgba(22, 34, 58, 0.85) 0%, rgba(17, 27, 47, 0.6) 100%);
-  backdrop-filter: blur(16px) saturate(1.2);
-  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  background: #16223A;
   border: 1px solid rgba(255, 255, 255, 0.07);
   transition: all 0.4s cubic-bezier(0.4,0,0.2,1);
   animation: fadeSlideUp 0.45s ease-out both;
@@ -505,10 +464,7 @@ export const CSS = `
   position: relative; overflow: hidden;
 }
 .d-rank-badge::after {
-  content: '';
-  position: absolute; top: 0; left: -30%; width: 30%; height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-  animation: statShine 3s ease-in-out infinite;
+  content: none;
 }
 .d-pos-badge {
   padding: 2px 8px; border-radius: var(--d-radius-sm);
@@ -522,9 +478,7 @@ export const CSS = `
 .d-stats {
   display: grid; grid-template-columns: repeat(4, 1fr);
   gap: 6px;
-  background: linear-gradient(135deg, rgba(13, 21, 38, 0.65) 0%, rgba(10, 15, 26, 0.5) 100%);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(13, 21, 38, 0.65);
   border: 1px solid rgba(255, 255, 255, 0.04);
   border-radius: var(--d-radius-md); padding: 10px; margin-bottom: 10px;
   position: relative; overflow: hidden;
@@ -546,8 +500,7 @@ export const CSS = `
 
 /* News */
 .d-news {
-  background: linear-gradient(135deg, rgba(13, 21, 38, 0.5) 0%, rgba(10, 15, 26, 0.3) 100%);
-  backdrop-filter: blur(4px);
+  background: rgba(13, 21, 38, 0.5);
   border: 1px solid rgba(255, 255, 255, 0.03);
   padding: 8px 10px;
   border-radius: var(--d-radius-sm); margin-bottom: 12px;
@@ -576,9 +529,8 @@ export const CSS = `
 }
 .d-draft-btn.can-draft {
   background: linear-gradient(135deg, #059669 0%, #047857 60%, #065f46 100%);
-  background-size: 200% 200%;
   color: white;
-  animation: draftBtnGlow 2s ease-in-out infinite, gradientShift 4s ease-in-out infinite;
+  animation: draftBtnGlow 2s ease-in-out infinite;
   box-shadow: 0 4px 16px rgba(5,150,105,0.3);
 }
 .d-draft-btn.can-draft::before {
@@ -598,7 +550,6 @@ export const CSS = `
 }
 .d-draft-btn.waiting {
   background: rgba(107,114,128,0.2);
-  backdrop-filter: blur(4px);
   border: 1px solid rgba(107,114,128,0.15);
   color: var(--d-text-muted);
   cursor: not-allowed;
@@ -606,7 +557,6 @@ export const CSS = `
 .d-watch-btn {
   padding: 9px 12px; border-radius: var(--d-radius-md); border: none;
   background: rgba(27, 58, 92, 0.18);
-  backdrop-filter: blur(8px);
   border: 1px solid rgba(255, 255, 255, 0.06);
   color: var(--d-text);
   font-size: 15px; cursor: pointer; transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
@@ -635,8 +585,7 @@ export const CSS = `
   gap: 16px; width: 100%; max-width: 1100px;
 }
 .d-skel-card {
-  background: linear-gradient(165deg, rgba(27, 58, 92, 0.15) 0%, rgba(17, 27, 47, 0.1) 100%);
-  backdrop-filter: blur(8px);
+  background: rgba(27, 58, 92, 0.15);
   border: 1px solid rgba(255, 255, 255, 0.04);
   border-radius: var(--d-radius-lg); padding: 20px;
   animation: fadeSlideUp 0.5s ease-out both;
@@ -663,10 +612,10 @@ export const CSS = `
   animation: fadeSlideUp 0.5s ease-out both;
 }
 .d-state-title {
-  font-size: 22px; font-weight: 700;
-  background: linear-gradient(135deg, var(--d-text) 0%, var(--d-accent-light, #D4BB78) 100%);
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-  background-clip: text;
+  font-size: 36px; font-weight: 800;
+  color: var(--d-accent);
+  font-family: 'Big Shoulders Display', sans-serif;
+  letter-spacing: 0.02em;
 }
 .d-state-desc {
   font-size: 14px; color: var(--d-text-secondary);
@@ -710,8 +659,8 @@ export const CSS = `
     flex-shrink: 0; width: 48px; height: 48px;
     display: flex; align-items: center; justify-content: center;
     border-radius: 50%;
-    font-size: 16px; font-weight: 800; font-family: 'Inter', monospace;
-    color: #fff;
+    font-size: 16px; font-weight: 800; font-family: 'Big Shoulders Display', sans-serif;
+    font-variant-numeric: tabular-nums; color: #fff;
   }
   .d-mobile-timer.safe  { background: linear-gradient(135deg,#10b981,#059669); }
   .d-mobile-timer.warn  { background: linear-gradient(135deg,#f59e0b,#d97706); }
@@ -759,7 +708,7 @@ export const CSS = `
   border: 1px solid rgba(255,255,255,0.1);
   border-radius: var(--d-radius-xl);
   overflow: hidden;
-  animation: announceIn 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation: announceIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
   box-shadow: 0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.05), 0 0 60px rgba(197, 165, 90, 0.08);
 }
 .d-announce.leaving {
@@ -824,9 +773,7 @@ export const CSS = `
 .d-announce-stats {
   display: flex; gap: 20px; margin-top: 6px;
   padding: 12px 20px;
-  background: linear-gradient(135deg, rgba(13, 21, 38, 0.65) 0%, rgba(10, 15, 26, 0.5) 100%);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(13, 21, 38, 0.65);
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: var(--d-radius-md);
 }
@@ -874,7 +821,7 @@ export const CSS = `
   padding: 40px 48px;
   text-align: center;
   box-shadow: 0 32px 80px rgba(0,0,0,0.5), 0 0 80px rgba(245,158,11,0.08), inset 0 1px 0 rgba(255,255,255,0.06);
-  animation: announceIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation: announceIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 .d-paused-icon { font-size: 56px; margin-bottom: 12px; }
 .d-paused-title {
@@ -888,39 +835,29 @@ export const CSS = `
 
 /* ===== Commissioner Controls ===== */
 .d-comm-controls {
-  background: linear-gradient(135deg, rgba(139,92,246,0.08) 0%, rgba(59,130,246,0.04) 100%);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(139,92,246,0.15);
+  background: rgba(27, 58, 92, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--d-radius-md);
   padding: 12px;
   margin-bottom: 14px;
-  position: relative;
-  overflow: hidden;
-}
-.d-comm-controls::before {
-  content: '';
-  position: absolute; inset: 0;
-  background: radial-gradient(ellipse at 0% 0%, rgba(139,92,246,0.06) 0%, transparent 60%);
-  pointer-events: none;
 }
 .d-comm-title {
   font-size: 10px; font-weight: 700; letter-spacing: 1.5px;
-  text-transform: uppercase; color: #a78bfa;
+  text-transform: uppercase; color: var(--d-text-secondary);
   margin-bottom: 8px;
 }
 .d-comm-btn {
   display: block; width: 100%;
   padding: 8px 12px; border-radius: var(--d-radius-sm);
-  border: 1px solid rgba(139,92,246,0.25);
-  background: rgba(139,92,246,0.1);
-  color: #c4b5fd; font-size: 12px; font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(27, 58, 92, 0.15);
+  color: var(--d-text); font-size: 12px; font-weight: 600;
   cursor: pointer; transition: all 0.2s;
   font-family: inherit; margin-bottom: 6px; text-align: left;
 }
 .d-comm-btn:hover {
-  background: rgba(139,92,246,0.2);
-  border-color: rgba(139,92,246,0.4);
+  background: rgba(27, 58, 92, 0.3);
+  border-color: rgba(255, 255, 255, 0.18);
 }
 .d-comm-btn:disabled {
   opacity: 0.5; cursor: not-allowed;
@@ -954,8 +891,7 @@ export const CSS = `
 .d-draft-grid-header {
   font-size: 11px; font-weight: 700; text-align: center;
   padding: 8px 6px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%);
-  backdrop-filter: blur(4px);
+  background: rgba(255,255,255,0.04);
   border-radius: var(--d-radius-sm) var(--d-radius-sm) 0 0;
   color: var(--d-text-secondary); letter-spacing: 0.5px;
   border-bottom: 2px solid var(--d-border);
@@ -1360,6 +1296,8 @@ export const CSS = `
   font-weight: 700;
   text-align: right;
   line-height: 1.3;
+  font-family: 'Big Shoulders Display', sans-serif;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Brand micro-text */
@@ -1389,6 +1327,8 @@ export const CSS = `
   font-weight: 700;
   letter-spacing: 0.3px;
   margin-bottom: 1px;
+  font-family: 'Big Shoulders Display', sans-serif;
+  font-variant-numeric: tabular-nums;
 }
 
 .bc-name {
@@ -1400,6 +1340,7 @@ export const CSS = `
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-family: 'Big Shoulders Display', sans-serif;
 }
 
 .bc-elig {
@@ -1451,6 +1392,8 @@ export const CSS = `
   font-weight: 800;
   color: var(--d-text);
   line-height: 1;
+  font-family: 'Big Shoulders Display', sans-serif;
+  font-variant-numeric: tabular-nums;
 }
 
 .bc-stat-lbl {
@@ -1484,5 +1427,7 @@ export const CSS = `
   font-size: 10px;
   font-weight: 800;
   color: var(--d-accent);
+  font-family: 'Big Shoulders Display', sans-serif;
+  font-variant-numeric: tabular-nums;
 }
 `;

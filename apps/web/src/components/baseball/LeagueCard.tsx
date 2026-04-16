@@ -2,7 +2,6 @@ import React from 'react';
 import {
   Button,
   H3,
-  HolographicCard,
   Paragraph,
   XStack,
   YStack,
@@ -18,7 +17,9 @@ import {
   BLUE,
   BLUE_DEEP,
   SLATE_400,
+  SURFACE_CARD,
   SURFACE_SUBTLE,
+  WHITE,
   withAlpha,
 } from '../../constants/colors';
 
@@ -85,13 +86,26 @@ export function LeagueCard({
 
   return (
     <YStack minWidth={320} maxWidth={440} flexShrink={0}>
-      <HolographicCard
-        variant="aurora"
-        intensity="normal"
-        enableHover
-        className="league-card"
-        onPress={handleViewLeague}
-        animationDelay={animationDelay}
+      <YStack
+        role="button"
+        tabIndex={0}
+        aria-label={`View ${league.name || 'Unnamed League'}`}
+        onClick={handleViewLeague}
+        onKeyDown={(e: React.KeyboardEvent) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleViewLeague();
+          }
+        }}
+        style={{
+          backgroundColor: SURFACE_CARD,
+          border: `1px solid ${withAlpha(WHITE, 0.08)}`,
+          borderRadius: 16,
+          overflow: 'hidden',
+          cursor: 'pointer',
+          animationDelay: `${animationDelay}ms`,
+          transition: 'background-color 0.2s ease, border-color 0.2s ease',
+        }}
       >
         <YStack space="$5" padding="$5">
           <YStack space="$3">
@@ -189,7 +203,7 @@ export function LeagueCard({
             </Paragraph>
 
             <Button
-              onPress={handleViewLeague}
+              tabIndex={-1}
               size="$4"
               borderRadius="$6"
               paddingHorizontal="$5"
@@ -197,9 +211,6 @@ export function LeagueCard({
               borderColor={withAlpha(BLUE, 0.45)}
               borderWidth={1}
               color="$blue11"
-              accessible
-              accessibilityLabel={`View ${league.name || 'Unnamed League'}`}
-              accessibilityRole="button"
               hoverStyle={{
                 backgroundColor: withAlpha(BLUE_DEEP, 0.22),
                 borderColor: withAlpha(BLUE, 0.6),
@@ -217,7 +228,7 @@ export function LeagueCard({
             </Button>
           </XStack>
         </YStack>
-      </HolographicCard>
+      </YStack>
     </YStack>
   );
 }

@@ -187,12 +187,7 @@ export function DraftSidebar({
       {/* Commissioner Controls */}
       {isCommissioner && draftId && (
         <div className="d-comm-controls">
-          <div className="d-comm-title">
-            <span role="img" aria-label="crown">
-              👑
-            </span>{' '}
-            Commissioner
-          </div>
+          <div className="d-comm-title">Commissioner Controls</div>
           {!draftPaused ? (
             <button
               className="d-comm-btn danger"
@@ -288,9 +283,6 @@ export function DraftSidebar({
       {/* My Roster */}
       <div className="d-panel">
         <h3 className="d-panel-title a-orange" id="my-roster-heading">
-          <span role="img" aria-label="trophy">
-            🏆
-          </span>{' '}
           MY ROSTER ({myTeam.length})
         </h3>
 
@@ -378,9 +370,6 @@ export function DraftSidebar({
       {pickHistory.length > 0 && (
         <div className="d-panel">
           <h3 className="d-panel-title a-green" id="pick-history-heading">
-            <span role="img" aria-label="clipboard">
-              📋
-            </span>{' '}
             PICK HISTORY ({pickHistory.length})
           </h3>
           <div style={{ maxHeight: 200, overflowY: 'auto' }}>
@@ -428,16 +417,10 @@ export function DraftSidebar({
         aria-pressed={chatOpen}
         aria-label={`League chat ${chatOpen ? 'open' : 'closed'}`}
       >
-        <span role="img" aria-label="chat">
-          💬
-        </span>
-        &ensp;League Chat
+        League Chat
       </button>
       <button className="d-btn-glass" onClick={onRefresh}>
-        <span role="img" aria-label="refresh">
-          🔄
-        </span>
-        &ensp;Refresh
+        Refresh
       </button>
 
       {draftId && myTeamId !== null && (
@@ -463,10 +446,7 @@ export function DraftSidebar({
               : undefined
           }
         >
-          <span role="img" aria-label="auto-pick">
-            🤖
-          </span>
-          &ensp;{isMyTeamAutoPick ? 'Auto-Pick ON' : 'Enable Auto-Pick'}
+          {isMyTeamAutoPick ? 'Auto-Pick ON' : 'Enable Auto-Pick'}
         </button>
       )}
     </aside>

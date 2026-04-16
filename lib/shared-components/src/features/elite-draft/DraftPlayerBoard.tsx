@@ -25,6 +25,14 @@ const viewModes: Array<'grid' | 'list' | 'compact' | 'board'> = [
   'board',
 ];
 
+const VIEW_MODE_TITLES: Record<'grid' | 'list' | 'compact' | 'board', string> =
+  {
+    grid: 'Grid view',
+    list: 'List view',
+    compact: 'Compact view',
+    board: 'Board view',
+  };
+
 interface DraftPlayerBoardProps {
   viewMode: 'grid' | 'list' | 'compact' | 'board';
   selectedPosition: string;
@@ -283,7 +291,7 @@ export function DraftPlayerBoard({
                   title={
                     isUserAutoPick
                       ? 'Board view — your team is on auto-pick'
-                      : undefined
+                      : VIEW_MODE_TITLES[mode]
                   }
                   style={{ position: 'relative' }}
                 >

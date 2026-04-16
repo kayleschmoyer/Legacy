@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useQuery } from '@apollo/client/react';
 import { getPositionColor } from './utils';
 import {
@@ -50,18 +50,21 @@ export function DraftIntelligence({
 
   const recommendations = data?.getDraftRecommendations ?? [];
 
+  // Track which player ID is staged for confirmation (null = none pending)
+  const [pendingConfirm, setPendingConfirm] = useState<number | null>(null);
+
+  // Clear pending confirmation when picks change (new pick = new round = stale confirm)
+  useEffect(() => {
+    setPendingConfirm(null);
+  }, [currentOverallPick]);
+
   // Show nothing while the very first load is in-flight (no cached data yet).
   if (loading && recommendations.length === 0) return null;
   if (recommendations.length === 0) return null;
 
   return (
     <div className="d-intel-panel">
-      <div className="d-intel-title">
-        <span role="img" aria-label="lightning">
-          ⚡
-        </span>{' '}
-        DRAFT INTELLIGENCE
-      </div>
+      <div className="d-intel-title">BEST AVAILABLE</div>
       <div className="d-intel-list">
         {recommendations.map((rec, i) => {
           if (!rec) return null;
@@ -101,18 +104,53 @@ export function DraftIntelligence({
                 </div>
               </div>
               <div className="d-intel-reason">{rec.reason}</div>
-              {onDraft && rec.playerId != null && rec.playerName != null && (
-                <button
-                  className="d-intel-draft-btn"
-                  onClick={() => {
-                    const pid = rec.playerId;
-                    if (pid != null && onDraft) onDraft(pid);
-                  }}
-                  aria-label={`Draft ${rec.playerName} now`}
-                >
-                  <span aria-hidden="true">⚡</span> Draft
-                </button>
-              )}
+              {onDraft &&
+                rec.playerId != null &&
+                rec.playerName != null &&
+                (pendingConfirm === rec.playerId ? (
+                  <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
+                    <button
+                      className="d-intel-draft-btn"
+                      style={{ flex: 1 }}
+                      onClick={() => {
+                        const pid = rec.playerId;
+                        if (pid != null && onDraft) {
+                          onDraft(pid);
+                          setPendingConfirm(null);
+                        }
+                      }}
+                      aria-label={`Confirm draft ${rec.playerName}`}
+                    >
+                      ✓ Confirm
+                    </button>
+                    <button
+                      style={{
+                        padding: '5px 10px',
+                        borderRadius: 'var(--d-radius-sm)',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        background: 'rgba(255,255,255,0.05)',
+                        color: 'var(--d-text-secondary)',
+                        fontSize: 11,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                        flexShrink: 0,
+                      }}
+                      onClick={() => setPendingConfirm(null)}
+                      aria-label="Cancel"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    className="d-intel-draft-btn"
+                    onClick={() => setPendingConfirm(rec.playerId ?? null)}
+                    aria-label={`Draft ${rec.playerName}`}
+                  >
+                    <span aria-hidden="true">⚡</span> Draft
+                  </button>
+                ))}
             </div>
           );
         })}
