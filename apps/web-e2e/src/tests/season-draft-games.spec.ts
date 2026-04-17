@@ -10,8 +10,7 @@
  * All GraphQL queries are mocked so these tests run without a live backend.
  */
 
-import { expect } from '../fixtures/auth-enhanced';
-import { test } from '../fixtures/auth-enhanced';
+import { expect, test, unauthTest } from '../fixtures/auth-enhanced';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -303,3 +302,56 @@ test.describe('Season Draft Game Create Page @critical', () => {
     ).toBeVisible();
   });
 });
+
+// ---------------------------------------------------------------------------
+// LS-3540: /games/season-draft is a protected route. Unauthenticated users
+// visiting it are intercepted by EnhancedAuthGuard and shown PublicLandingPage
+// with the "Continue with Google" sign-in CTA and a "Get Started Free" CTA.
+// An automated audit crawler reported this as a 404 (the evidence shows the
+// landing page content — "Build Your Dynasty" — instead of the expected
+// season-draft lobby). These tests lock in that the sign-in CTAs are located
+// via getByRole (accessible name) so unauthenticated visitors can initiate
+// sign-in / sign-up from /games/season-draft.
+// ---------------------------------------------------------------------------
+
+unauthTest.describe(
+  'Season Draft Games — unauthenticated visitor @regression',
+  () => {
+    unauthTest(
+      '"Continue with Google" button is visible and enabled on /games/season-draft when unauthenticated',
+      async ({ page }) => {
+        await page.goto('/games/season-draft');
+        await page.waitForLoadState('load');
+
+        // Located via getByRole (accessible name) — locking in interactivity
+        // (not just visibility) so the sign-in CTA remains clickable for
+        // unauthenticated visitors on this protected route.
+        const googleBtn = page.getByRole('button', {
+          name: /continue with google/i,
+        });
+        await expect(googleBtn).toBeVisible({ timeout: 15_000 });
+        await expect(googleBtn).toBeEnabled();
+      },
+    );
+
+    unauthTest(
+      '"Get Started Free" CTA is visible and interactive on /games/season-draft for unauthenticated users',
+      async ({ page }) => {
+        await page.goto('/games/season-draft');
+        await page.waitForLoadState('load');
+
+        // The auth guard shows the PublicLandingPage on /games/season-draft
+        // for unauthenticated users. The CTA (aria-label="Get started free")
+        // must be present and enabled so visitors can initiate sign-up from
+        // /games/season-draft. No .first() — the landing page exposes a single
+        // "Get started free" CTA, so Playwright strictness will catch
+        // accidental duplicates.
+        const getStartedBtn = page.getByRole('button', {
+          name: /get started free/i,
+        });
+        await expect(getStartedBtn).toBeVisible({ timeout: 15_000 });
+        await expect(getStartedBtn).toBeEnabled();
+      },
+    );
+  },
+);
