@@ -1224,6 +1224,9 @@ importers:
       '@aws-sdk/client-secrets-manager':
         specifier: '*'
         version: 3.1025.0
+      '@legacy-sports/aws-utils':
+        specifier: workspace:*
+        version: link:../../lib/aws-utils
       '@legacy-sports/db-client':
         specifier: workspace:*
         version: link:../../lib/db-client

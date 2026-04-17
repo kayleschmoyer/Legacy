@@ -1,4 +1,33 @@
 import { LOGGER } from '@legacy-sports/logging';
+import { readSecret } from '@legacy-sports/aws-utils';
+
+/**
+ * Cached promise for the Stripe-event Discord webhook URL. Resolved on first
+ * use and reused for subsequent invocations of the same warm Lambda
+ * container. If the fetch rejects, the cache is cleared so the next caller
+ * retries (transient Secrets Manager / IAM failures should not permanently
+ * poison the container).
+ */
+let webhookUrlPromise: Promise<string> | null = null;
+
+function getWebhookUrl(): Promise<string> {
+  if (!webhookUrlPromise) {
+    // Treat an empty-string local env var as "unset" so a blank value in the
+    // environment doesn't short-circuit the Secrets Manager fallback.
+    const localWebhookUrl = process.env['DISCORD_STRIPE_WEBHOOK_URL'];
+    const pending = readSecret({
+      localEnvVar: localWebhookUrl ? 'DISCORD_STRIPE_WEBHOOK_URL' : undefined,
+      secretPathEnvVar: 'DISCORD_STRIPE_WEBHOOK_URL_SECRET_NAME',
+    });
+    pending.catch(() => {
+      if (webhookUrlPromise === pending) {
+        webhookUrlPromise = null;
+      }
+    });
+    webhookUrlPromise = pending;
+  }
+  return webhookUrlPromise;
+}
 
 /** Discord embed object sent via webhook. */
 interface DiscordEmbed {
@@ -116,17 +145,30 @@ function eventToEmbed(info: StripeEventInfo): DiscordEmbed | null {
  * so they cannot affect Stripe webhook processing.
  */
 export async function notifyStripeEvent(info: StripeEventInfo): Promise<void> {
-  const webhookUrl = process.env['DISCORD_STRIPE_WEBHOOK_URL'];
-
-  if (!webhookUrl) {
+  if (
+    !process.env['DISCORD_STRIPE_WEBHOOK_URL'] &&
+    !process.env['DISCORD_STRIPE_WEBHOOK_URL_SECRET_NAME']
+  ) {
     LOGGER.debug(
-      'DISCORD_STRIPE_WEBHOOK_URL not set — skipping Stripe Discord notification',
+      'Discord Stripe webhook not configured — skipping notification',
     );
     return;
   }
 
   const embed = eventToEmbed(info);
   if (!embed) return;
+
+  let webhookUrl: string;
+  try {
+    webhookUrl = await getWebhookUrl();
+  } catch (err) {
+    LOGGER.error('Failed to retrieve Discord Stripe webhook URL', {
+      eventType: info.eventType,
+      errorMessage: err instanceof Error ? err.message : String(err),
+    });
+    return;
+  }
+  if (!webhookUrl) return;
 
   try {
     const body = JSON.stringify({ embeds: [embed] });

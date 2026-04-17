@@ -52,7 +52,9 @@ resource "aws_iam_policy" "stripe_webhook_lambda_secrets" {
         ]
         Resource = [
           aws_secretsmanager_secret.stripe_secret_key.arn,
-          aws_secretsmanager_secret.stripe_webhook_secret.arn
+          aws_secretsmanager_secret.stripe_webhook_secret.arn,
+          aws_secretsmanager_secret.discord_stripe_webhook_url.arn,
+          aws_secretsmanager_secret.ga_api_secret.arn
         ]
       }
     ]
@@ -169,15 +171,16 @@ resource "aws_lambda_function" "stripe_webhook" {
       DB_PORT                             = "5432"
       DB_NAME                             = "legacy_sports"
 
-      # Discord notifications for Stripe events
-      DISCORD_STRIPE_WEBHOOK_URL = var.discord_stripe_webhook_url
+      # Discord notifications for Stripe events (fetched from Secrets Manager at cold start)
+      DISCORD_STRIPE_WEBHOOK_URL_SECRET_NAME = aws_secretsmanager_secret.discord_stripe_webhook_url.name
 
       # Rollbar error tracking
       ROLLBAR_ACCESS_TOKEN = var.rollbar_access_token
 
-      # Google Analytics 4 Measurement Protocol (server-side events)
-      GA_MEASUREMENT_ID = var.ga_measurement_id
-      GA_API_SECRET     = var.ga_api_secret
+      # Google Analytics 4 Measurement Protocol (server-side events).
+      # GA_MEASUREMENT_ID is not sensitive; the API secret is fetched from Secrets Manager.
+      GA_MEASUREMENT_ID         = var.ga_measurement_id
+      GA_API_SECRET_SECRET_NAME = aws_secretsmanager_secret.ga_api_secret.name
     }
   }
 

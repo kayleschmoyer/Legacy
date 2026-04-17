@@ -1,4 +1,35 @@
 import { LOGGER } from '@legacy-sports/logging';
+import { readSecret } from '@legacy-sports/aws-utils';
+
+/**
+ * Cached promise for the new-user signup Discord webhook URL. Resolved on
+ * first use and reused for subsequent invocations of the same warm Lambda
+ * container. If the fetch rejects, the cache is cleared so the next caller
+ * retries (transient Secrets Manager / IAM failures should not permanently
+ * poison the container).
+ */
+let webhookUrlPromise: Promise<string> | null = null;
+
+function getWebhookUrl(): Promise<string> {
+  if (!webhookUrlPromise) {
+    // Treat an empty-string local env var as "unset" so a blank value in the
+    // environment doesn't short-circuit the Secrets Manager fallback.
+    const localWebhookUrl = process.env['DISCORD_USER_SIGNUP_WEBHOOK_URL'];
+    const pending = readSecret({
+      localEnvVar: localWebhookUrl
+        ? 'DISCORD_USER_SIGNUP_WEBHOOK_URL'
+        : undefined,
+      secretPathEnvVar: 'DISCORD_USER_SIGNUP_WEBHOOK_URL_SECRET_NAME',
+    });
+    pending.catch(() => {
+      if (webhookUrlPromise === pending) {
+        webhookUrlPromise = null;
+      }
+    });
+    webhookUrlPromise = pending;
+  }
+  return webhookUrlPromise;
+}
 
 /** Discord embed object sent via webhook. */
 interface DiscordEmbed {
@@ -49,14 +80,29 @@ export async function notifyNewUserSignup(
   userId: number,
   signupMethod: 'local' | 'google' | 'discord',
 ): Promise<void> {
-  const webhookUrl = process.env['DISCORD_USER_SIGNUP_WEBHOOK_URL'];
-
-  if (!webhookUrl) {
+  if (
+    !process.env['DISCORD_USER_SIGNUP_WEBHOOK_URL'] &&
+    !process.env['DISCORD_USER_SIGNUP_WEBHOOK_URL_SECRET_NAME']
+  ) {
     LOGGER.debug(
-      'DISCORD_USER_SIGNUP_WEBHOOK_URL not set — skipping new-user notification',
+      'Discord new-user signup webhook not configured — skipping notification',
     );
     return;
   }
+
+  let webhookUrl: string;
+  try {
+    webhookUrl = await getWebhookUrl();
+  } catch (err) {
+    LOGGER.error('Failed to retrieve Discord new-user signup webhook URL', {
+      error:
+        err instanceof Error
+          ? { name: err.name, message: err.message, stack: err.stack }
+          : String(err),
+    });
+    return;
+  }
+  if (!webhookUrl) return;
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 5_000);

@@ -1,3 +1,27 @@
+jest.mock('@legacy-sports/aws-utils', () => ({
+  readSecret: jest.fn(
+    ({
+      localEnvVar,
+      secretPathEnvVar,
+    }: {
+      localEnvVar?: string;
+      secretPathEnvVar: string;
+    }): Promise<string> => {
+      if (localEnvVar && process.env[localEnvVar] !== undefined) {
+        return Promise.resolve(process.env[localEnvVar]);
+      }
+      if (process.env[secretPathEnvVar] !== undefined) {
+        return Promise.resolve(process.env[secretPathEnvVar]);
+      }
+      return Promise.reject(
+        new Error(
+          `No value configured for ${localEnvVar ?? '<none>'} or ${secretPathEnvVar}`,
+        ),
+      );
+    },
+  ),
+}));
+
 import { formatNewUserEmbed, notifyNewUserSignup } from './discord';
 
 describe('formatNewUserEmbed', () => {
@@ -57,6 +81,7 @@ describe('notifyNewUserSignup', () => {
 
   it('skips notification when webhook URL is not configured', async () => {
     delete process.env['DISCORD_USER_SIGNUP_WEBHOOK_URL'];
+    delete process.env['DISCORD_USER_SIGNUP_WEBHOOK_URL_SECRET_NAME'];
 
     await notifyNewUserSignup('test@example.com', 1, 'local');
 
@@ -105,5 +130,42 @@ describe('notifyNewUserSignup', () => {
     await expect(
       notifyNewUserSignup('user@example.com', 1, 'local'),
     ).resolves.toBeUndefined();
+  });
+
+  it('fetches webhook URL via the secret-name path when only SECRET_NAME is set', async () => {
+    delete process.env['DISCORD_USER_SIGNUP_WEBHOOK_URL'];
+    process.env['DISCORD_USER_SIGNUP_WEBHOOK_URL_SECRET_NAME'] =
+      'https://discord.com/api/webhooks/test/from-secret-name';
+
+    // Reset the module cache so the module-scope webhookUrlPromise is
+    // re-initialised from the new env var configuration rather than any
+    // value cached by prior tests.
+    jest.resetModules();
+    const { notifyNewUserSignup: fresh } = (await import('./discord')) as {
+      notifyNewUserSignup: typeof notifyNewUserSignup;
+    };
+
+    await fresh('user@example.com', 42, 'google');
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [url] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://discord.com/api/webhooks/test/from-secret-name');
+  });
+
+  it('falls through to the secret-name path when the local env var is an empty string', async () => {
+    process.env['DISCORD_USER_SIGNUP_WEBHOOK_URL'] = '';
+    process.env['DISCORD_USER_SIGNUP_WEBHOOK_URL_SECRET_NAME'] =
+      'https://discord.com/api/webhooks/test/secret-name-wins';
+
+    jest.resetModules();
+    const { notifyNewUserSignup: fresh } = (await import('./discord')) as {
+      notifyNewUserSignup: typeof notifyNewUserSignup;
+    };
+
+    await fresh('user@example.com', 7, 'local');
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [url] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://discord.com/api/webhooks/test/secret-name-wins');
   });
 });

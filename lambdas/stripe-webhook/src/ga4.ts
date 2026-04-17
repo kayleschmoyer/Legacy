@@ -1,4 +1,32 @@
 import { LOGGER } from '@legacy-sports/logging';
+import { readSecret } from '@legacy-sports/aws-utils';
+
+/**
+ * Cached promise for the GA API secret. Resolved on first use and reused for
+ * subsequent invocations of the same warm Lambda container. If the fetch
+ * rejects, the cache is cleared so the next caller retries (transient
+ * Secrets Manager / IAM failures should not permanently poison the container).
+ */
+let apiSecretPromise: Promise<string> | null = null;
+
+function getApiSecret(): Promise<string> {
+  if (!apiSecretPromise) {
+    // Treat an empty-string local env var as "unset" so a blank GA_API_SECRET
+    // in the environment doesn't short-circuit the Secrets Manager fallback.
+    const localApiSecret = process.env['GA_API_SECRET'];
+    const pending = readSecret({
+      localEnvVar: localApiSecret ? 'GA_API_SECRET' : undefined,
+      secretPathEnvVar: 'GA_API_SECRET_SECRET_NAME',
+    });
+    pending.catch(() => {
+      if (apiSecretPromise === pending) {
+        apiSecretPromise = null;
+      }
+    });
+    apiSecretPromise = pending;
+  }
+  return apiSecretPromise;
+}
 
 /**
  * Send a GA4 Measurement Protocol event from the server side.
@@ -7,8 +35,9 @@ import { LOGGER } from '@legacy-sports/logging';
  * lifecycle events that may not be captured by the client-side gtag.js
  * (e.g., webhook-triggered renewals, cancellations).
  *
- * Requires GA_MEASUREMENT_ID and GA_API_SECRET env vars. If either is absent,
- * the call is silently skipped (non-production or unconfigured environments).
+ * Requires GA_MEASUREMENT_ID and either GA_API_SECRET (local dev) or
+ * GA_API_SECRET_SECRET_NAME (pointing to an AWS Secrets Manager secret). If
+ * either piece of configuration is absent, the call is silently skipped.
  *
  * Reference: https://developers.google.com/analytics/devguides/collection/protocol/ga4
  */
@@ -18,9 +47,26 @@ export async function sendGa4ServerEvent(
   params: Record<string, string | number | undefined>,
 ): Promise<void> {
   const measurementId = process.env['GA_MEASUREMENT_ID'];
-  const apiSecret = process.env['GA_API_SECRET'];
 
-  if (!measurementId || !apiSecret) {
+  if (
+    !measurementId ||
+    (!process.env['GA_API_SECRET'] && !process.env['GA_API_SECRET_SECRET_NAME'])
+  ) {
+    return;
+  }
+
+  let apiSecret: string;
+  try {
+    apiSecret = await getApiSecret();
+  } catch (err) {
+    LOGGER.warn('[GA4] Failed to retrieve API secret (non-fatal)', {
+      err,
+      eventName,
+      userId,
+    });
+    return;
+  }
+  if (!apiSecret) {
     return;
   }
 

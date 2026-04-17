@@ -18,6 +18,9 @@
 #   aws secretsmanager put-secret-value --secret-id dev/jira-credentials --secret-string <value>
 #   aws secretsmanager put-secret-value --secret-id dev/rollbar-webhook-secret --secret-string <value>
 #   aws secretsmanager put-secret-value --secret-id dev/discord-webhook-url --secret-string <value>
+#   aws secretsmanager put-secret-value --secret-id dev/discord-user-signup-webhook-url --secret-string <value>
+#   aws secretsmanager put-secret-value --secret-id dev/discord-stripe-webhook-url --secret-string <value>
+#   aws secretsmanager put-secret-value --secret-id dev/ga-api-secret --secret-string <value>
 #
 # MLB data provider key (only required when mlb_data_provider != "mlb-statsapi"):
 #   Unlike the above, this secret is managed by Terraform only when
@@ -39,27 +42,6 @@ variable "rollbar_access_token" {
 variable "ga_measurement_id" {
   description = "GA4 measurement ID (e.g. G-XXXXXXXXXX) for server-side Measurement Protocol events"
   type        = string
-  default     = ""
-}
-
-variable "ga_api_secret" {
-  description = "GA4 Measurement Protocol API secret for server-side event sending"
-  type        = string
-  sensitive   = true
-  default     = ""
-}
-
-variable "discord_user_signup_webhook_url" {
-  description = "Discord webhook URL for new-user signup notifications (oauth-proxy Lambda)"
-  type        = string
-  sensitive   = true
-  default     = ""
-}
-
-variable "discord_stripe_webhook_url" {
-  description = "Discord webhook URL for Stripe event notifications (stripe-webhook Lambda)"
-  type        = string
-  sensitive   = true
   default     = ""
 }
 
@@ -165,6 +147,27 @@ variable "rollbar_webhook_secret" {
 
 variable "discord_webhook_url" {
   description = "Discord webhook URL for Rollbar/CloudWatch alarm notifications. Set in AWS Secrets Manager directly via `aws secretsmanager put-secret-value --secret-id <env>/discord-webhook-url`."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "discord_user_signup_webhook_url" {
+  description = "Discord webhook URL for new-user signup notifications (oauth-proxy Lambda). Set in AWS Secrets Manager directly via `aws secretsmanager put-secret-value --secret-id <env>/discord-user-signup-webhook-url --secret-string <value>`."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "discord_stripe_webhook_url" {
+  description = "Discord webhook URL for Stripe event notifications (stripe-webhook Lambda). Set in AWS Secrets Manager directly via `aws secretsmanager put-secret-value --secret-id <env>/discord-stripe-webhook-url --secret-string <value>`."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "ga_api_secret" {
+  description = "GA4 Measurement Protocol API secret for server-side event sending (stripe-webhook Lambda). Set in AWS Secrets Manager directly via `aws secretsmanager put-secret-value --secret-id <env>/ga-api-secret --secret-string <value>`."
   type        = string
   sensitive   = true
   default     = ""
@@ -319,6 +322,30 @@ resource "aws_secretsmanager_secret_version" "mlb_data_api_key" {
 resource "aws_secretsmanager_secret" "discord_webhook_url" {
   name        = "${var.environment}/discord-webhook-url"
   description = "Discord webhook URL for posting Rollbar and CloudWatch alarm notifications"
+
+  tags = local.common_tags
+}
+
+# Discord webhook URL for new-user signup notifications (oauth-proxy Lambda)
+resource "aws_secretsmanager_secret" "discord_user_signup_webhook_url" {
+  name        = "${var.environment}/discord-user-signup-webhook-url"
+  description = "Discord webhook URL for posting new-user signup notifications"
+
+  tags = local.common_tags
+}
+
+# Discord webhook URL for Stripe event notifications (stripe-webhook Lambda)
+resource "aws_secretsmanager_secret" "discord_stripe_webhook_url" {
+  name        = "${var.environment}/discord-stripe-webhook-url"
+  description = "Discord webhook URL for posting Stripe subscription lifecycle notifications"
+
+  tags = local.common_tags
+}
+
+# GA4 Measurement Protocol API secret (stripe-webhook Lambda)
+resource "aws_secretsmanager_secret" "ga_api_secret" {
+  name        = "${var.environment}/ga-api-secret"
+  description = "GA4 Measurement Protocol API secret for server-side event sending"
 
   tags = local.common_tags
 }
