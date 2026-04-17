@@ -212,7 +212,8 @@ unauthTest.describe('Protected Routes @critical', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Public Routes — accessible without authentication (LS-3566, LS-3563, LS-3561)
+// Public Routes — accessible without authentication (LS-3566, LS-3563, LS-3561,
+// LS-3522, LS-3548)
 // ---------------------------------------------------------------------------
 
 unauthTest.describe('Public Routes @critical', () => {
@@ -229,14 +230,20 @@ unauthTest.describe('Public Routes @critical', () => {
   );
 
   unauthTest(
-    'shows Scoreboard page content on /scoreboard when not authenticated',
+    'shows Scoreboard page content on /scoreboard when not authenticated (LS-3522)',
     async ({ page }) => {
       await page.goto('/scoreboard');
       await page.waitForLoadState('load');
 
+      // LS-3522: direct navigation to /scoreboard was returning 404 and rendering
+      // the marketing landing page ("Build Your Dynasty") for unauthenticated users.
+      // /scoreboard must be in publicPaths so EnhancedAuthGuard passes through.
       await expect(page.getByTestId('scoreboard-heading')).toBeVisible({
         timeout: 15000,
       });
+      await expect(page.locator('body')).not.toContainText(
+        'Build Your Dynasty',
+      );
     },
   );
 
