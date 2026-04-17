@@ -176,20 +176,15 @@ test.describe('Loading spinner accessibility @regression', () => {
       .first()
       .waitFor({ state: 'visible', timeout: 15000 });
 
-    // After load, no spinner with role="status" should be visible
-    const visibleSpinners = page.locator('[role="status"]:visible');
-    const count = await visibleSpinners.count();
-
     // After load, no visible status element should still present a loading state.
-    // Check both aria-label and text content since loaders may use either.
-    for (let i = 0; i < count; i++) {
-      const spinner = visibleSpinners.nth(i);
-      const label = (await spinner.getAttribute('aria-label')) ?? '';
-      const textContent = ((await spinner.textContent()) ?? '').trim();
-
-      expect(label.toLowerCase()).not.toContain('loading');
-      expect(textContent.toLowerCase()).not.toContain('loading');
-    }
+    // Use an auto-retrying assertion to handle cascading data fetches that may
+    // briefly re-enter a loading state after networkidle fires.
+    await expect(
+      page.locator('[role="status"]:visible').filter({ hasText: /loading/i }),
+    ).toHaveCount(0, { timeout: 10_000 });
+    await expect(
+      page.locator('[role="status"][aria-label*="loading" i]:visible'),
+    ).toHaveCount(0, { timeout: 10_000 });
   });
 });
 
