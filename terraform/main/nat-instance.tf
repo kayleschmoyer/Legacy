@@ -1,14 +1,20 @@
 # Lightweight NAT Instance for Google API Access
 # Cost-effective alternative to NAT Gateway (~$3-8/month vs $45/month)
 
-# Data source for the latest Amazon Linux 2 AMI (we'll configure NAT manually)
+# Data source for the latest Amazon Linux 2023 AMI (we'll configure NAT manually).
+# Amazon Linux 2 reached EOL on 2025-06-30 and no longer receives security patches;
+# the NAT instance handles all private-subnet egress, so running it on a supported
+# OS is a security-posture requirement. The `al2023-ami-2023.*` prefix selects the
+# standard AL2023 AMI and excludes the `al2023-ami-minimal-*` variants, which omit
+# packages we rely on (e.g. iptables). `-kernel-*` keeps us on the kernel-tagged
+# releases if AWS ever ships an alternate non-kernel variant under the same prefix.
 data "aws_ami" "nat_instance" {
   most_recent = true
   owners      = ["amazon"]
 
   filter {
     name   = "name"
-    values = ["amzn2-ami-hvm-*-x86_64-gp2"]
+    values = ["al2023-ami-2023.*-kernel-*-x86_64"]
   }
 
   filter {
@@ -120,14 +126,26 @@ resource "aws_instance" "nat_instance" {
   # The heredoc below is plaintext; we explicitly base64-encode it and provide
   # the encoded value via user_data_base64 (instead of using user_data, which
   # expects plaintext and handles encoding internally).
+  #
+  # AL2023 notes:
+  # - Uses `dnf` (yum is a symlink but dnf is the canonical command).
+  # - `iptables-services` is not installed by default; we install it so the
+  #   `iptables.service` restores `/etc/sysconfig/iptables` on reboot.
+  # - Nitro instances (including t3) use predictable interface names
+  #   (e.g. `ens5`) rather than `eth0`, so we resolve the primary interface
+  #   from the default route instead of hardcoding it.
   user_data_base64 = base64encode(<<-EOF
     #!/bin/bash
-    yum update -y
+    set -euo pipefail
+    dnf update -y
+    dnf install -y iptables-services
     echo 1 > /proc/sys/net/ipv4/ip_forward
     echo 'net.ipv4.ip_forward = 1' >> /etc/sysctl.conf
-    /sbin/iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+    primary_if=$(ip -o -4 route show to default | awk '{print $5}')
+    /sbin/iptables -t nat -A POSTROUTING -o "$primary_if" -j MASQUERADE
     /sbin/iptables -F FORWARD
     /sbin/iptables-save > /etc/sysconfig/iptables
+    systemctl enable --now iptables
     EOF
   )
 
