@@ -168,7 +168,7 @@ unauthTest.describe(
 unauthTest.describe('Protected Routes @critical', () => {
   const routes = [
     '/',
-    '/baseball',
+    // /baseball is publicly accessible (LS-3532) — see Public Routes section below.
     '/baseball/mock-draft',
     '/players',
     '/management',
@@ -276,6 +276,18 @@ unauthTest.describe('Public Routes @critical', () => {
       ).toBeVisible({ timeout: 15000 });
     },
   );
+
+  unauthTest(
+    'shows Baseball hub content on /baseball when not authenticated (LS-3532)',
+    async ({ page }) => {
+      await page.goto('/baseball');
+      await page.waitForLoadState('load');
+
+      await expect(
+        page.getByRole('heading', { name: /baseball fantasy/i }),
+      ).toBeVisible({ timeout: 15000 });
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -367,7 +379,7 @@ expiredSessionTest.describe('Session Expiry @critical', () => {
   expiredSessionTest(
     'shows landing page on a protected route with an expired JWT',
     async ({ page }) => {
-      await page.goto('/baseball');
+      await page.goto('/players');
       await page.waitForLoadState('load');
 
       await expect(

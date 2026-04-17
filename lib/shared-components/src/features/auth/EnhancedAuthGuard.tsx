@@ -52,6 +52,14 @@ export interface EnhancedAuthGuardProps {
    * Web-only: ignored in React Native where window is undefined.
    */
   publicPaths?: string[];
+  /**
+   * Paths that are accessible without authentication using exact matching only —
+   * unlike publicPaths, child routes (e.g. /baseball/league/create) are NOT
+   * automatically made public when the parent path is listed here.
+   * Same basename and no-trailing-slash rules as publicPaths apply.
+   * Web-only: ignored in React Native where window is undefined.
+   */
+  publicExactPaths?: string[];
 }
 
 export function EnhancedAuthGuard({
@@ -65,6 +73,7 @@ export function EnhancedAuthGuard({
   onLoginFailure,
   onLogoutSuccess: _onLogoutSuccess,
   publicPaths = [],
+  publicExactPaths = [],
 }: EnhancedAuthGuardProps) {
   const { isAuthenticated, isLoading, config, loginWithOAuth } = useAuth();
 
@@ -81,9 +90,10 @@ export function EnhancedAuthGuard({
     typeof window !== 'undefined' ? window.location.pathname : null;
   const isPublicPath =
     currentPath !== null &&
-    publicPaths.some(
+    (publicPaths.some(
       (p) => currentPath === p || currentPath.startsWith(p + '/'),
-    );
+    ) ||
+      publicExactPaths.some((p) => currentPath === p));
   if (isPublicPath) {
     return children;
   }
