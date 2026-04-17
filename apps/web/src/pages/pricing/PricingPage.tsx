@@ -440,7 +440,7 @@ export default function PricingPage() {
         description="Choose the Legacy Sports plan that fits your fantasy baseball ambitions. Free forever or upgrade to Premium for unlimited leagues, AI recaps, salary cap leagues, draft recommendations, and more."
       />
       <ScrollView>
-        <ContentContainer>
+        <ContentContainer tag="main">
           {/* ── Hero ── */}
           <HeroSection>
             <PlanBadge>
