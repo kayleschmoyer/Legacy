@@ -185,7 +185,8 @@ resource "aws_iam_policy" "websocket_lambda_secrets" {
         ]
         Resource = [
           aws_secretsmanager_secret.database_credentials.arn,
-          aws_secretsmanager_secret.jwt_secret.arn
+          aws_secretsmanager_secret.jwt_secret.arn,
+          aws_secretsmanager_secret.rollbar_access_token.arn
         ]
       }
     ]
@@ -249,8 +250,8 @@ resource "aws_lambda_function" "websocket" {
       # rds-ca-rsa2048-g1 which is also trusted. See LS-3168.
       AWS_NODEJS_CONNECTION_REUSE_ENABLED = "1"
 
-      # Rollbar error tracking
-      ROLLBAR_ACCESS_TOKEN = var.rollbar_access_token
+      # Rollbar error tracking (token fetched from Secrets Manager at cold-start)
+      ROLLBAR_ACCESS_TOKEN_SECRET_NAME = aws_secretsmanager_secret.rollbar_access_token.name
 
       # Allowed origins for WebSocket CSRF protection (comma-separated).
       # Defaults to https://legacy-fantasy.com when not set, but must be

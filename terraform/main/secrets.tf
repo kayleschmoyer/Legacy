@@ -350,6 +350,25 @@ resource "aws_secretsmanager_secret" "ga_api_secret" {
   tags = local.common_tags
 }
 
+# Rollbar post_server_item access token for server-side error tracking.
+# Previously passed as plaintext env var to every Lambda — migrated to Secrets
+# Manager so the token is no longer visible via Lambda GetFunctionConfiguration
+# (LS-2790). Lambdas receive the secret NAME via ROLLBAR_ACCESS_TOKEN_SECRET_NAME
+# and fetch the value at cold-start. NOTE: the value is still managed by
+# Terraform below (mirrors discord_webhook_url), so it remains in TF state —
+# protect the state backend accordingly.
+resource "aws_secretsmanager_secret" "rollbar_access_token" {
+  name        = "${var.environment}/rollbar-access-token"
+  description = "Rollbar server-side (post_server_item) access token for Lambda error tracking"
+
+  tags = local.common_tags
+}
+
+resource "aws_secretsmanager_secret_version" "rollbar_access_token" {
+  secret_id     = aws_secretsmanager_secret.rollbar_access_token.id
+  secret_string = var.rollbar_access_token
+}
+
 # =============================================================================
 # REMOVED RESOURCES — secret versions previously managed by Terraform.
 # Values are now set directly in AWS Secrets Manager (outside Terraform).

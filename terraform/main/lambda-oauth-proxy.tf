@@ -54,6 +54,8 @@ resource "aws_iam_policy" "oauth_proxy_lambda_secrets" {
             aws_secretsmanager_secret.database_credentials.arn,
             # Discord new-user signup webhook URL
             aws_secretsmanager_secret.discord_user_signup_webhook_url.arn,
+            # Rollbar access token for error tracking
+            aws_secretsmanager_secret.rollbar_access_token.arn,
           ],
           # Discord OAuth secret (only when configured)
           var.discord_client_secret != "" ? [aws_secretsmanager_secret.discord_client_secret[0].arn] : []
@@ -217,8 +219,8 @@ resource "aws_lambda_function" "oauth_proxy" {
       LOG_LEVEL                           = "debug"
       AWS_NODEJS_CONNECTION_REUSE_ENABLED = "1"
 
-      # Rollbar error tracking
-      ROLLBAR_ACCESS_TOKEN = var.rollbar_access_token
+      # Rollbar error tracking (token fetched from Secrets Manager at cold-start)
+      ROLLBAR_ACCESS_TOKEN_SECRET_NAME = aws_secretsmanager_secret.rollbar_access_token.name
 
       # CORS — comma-separated origins allowed to make credentialed requests.
       # The Lambda code defaults to https://legacy-fantasy.com when not set,

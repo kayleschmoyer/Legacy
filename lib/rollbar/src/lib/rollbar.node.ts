@@ -4,6 +4,7 @@
  */
 
 import Rollbar from 'rollbar';
+import { retrieveSecretParameterValue } from '@legacy-sports/aws-utils';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   RollbarBreadcrumb,
@@ -26,9 +27,45 @@ class NodeRollbarImplementation implements RollbarInterface {
   private reportedErrors = new WeakSet<Error>();
 
   init(config: RollbarConfig): void {
+    // When the access token is provided directly, initialize synchronously.
+    // Otherwise kick off an async fetch from AWS Secrets Manager and finish
+    // initialization once the token resolves. Errors captured before the
+    // secret resolves are logged by LOGGER and dropped by the `!this.rollbar`
+    // guard in captureError — acceptable for cold-start given the alternative
+    // (plaintext tokens in Lambda env vars) fails the security review (LS-2790).
+    if (config.accessToken) {
+      this.initWithToken(config, config.accessToken);
+      return;
+    }
+    if (config.accessTokenSecretName) {
+      void this.initFromSecret(config);
+      return;
+    }
+    LOGGER.warn(
+      'Rollbar not initialized: no access token or secret name provided',
+    );
+  }
+
+  private async initFromSecret(config: RollbarConfig): Promise<void> {
+    if (!config.accessTokenSecretName) return;
+    try {
+      const accessToken = await retrieveSecretParameterValue(
+        config.accessTokenSecretName,
+      );
+      this.initWithToken(config, accessToken);
+    } catch (error) {
+      LOGGER.error(
+        'Failed to fetch Rollbar access token from Secrets Manager',
+        error as Error,
+        { secretName: config.accessTokenSecretName },
+      );
+    }
+  }
+
+  private initWithToken(config: RollbarConfig, accessToken: string): void {
     try {
       this.rollbar = new Rollbar({
-        accessToken: config.accessToken,
+        accessToken,
         environment: config.environment,
         // Default to false: our global handlers in lib/logging/server.ts already forward
         // uncaught errors via LOGGER.error → RollbarOutputDestination. Letting
@@ -44,7 +81,7 @@ class NodeRollbarImplementation implements RollbarInterface {
       });
       LOGGER.info('Rollbar initialized for Node.js environment', {
         environment: config.environment,
-        accessToken: config.accessToken ? 'SET' : 'NOT_SET',
+        accessToken: accessToken ? 'SET' : 'NOT_SET',
         release: config.release ?? 'NOT_SET',
       });
 
@@ -143,15 +180,22 @@ class NodeRollbarImplementation implements RollbarInterface {
   }
 
   getRollbarConfigFromEnv(): RollbarConfig | null {
+    // Prefer a direct access token (local dev, tests) over the Secrets Manager
+    // lookup path (Lambda runtime). `ROLLBAR_ACCESS_TOKEN_SECRET_NAME` points
+    // at an AWS Secrets Manager secret whose value is fetched at cold-start,
+    // so the token does not need to be stored directly in Lambda env vars or
+    // exposed via Lambda GetFunctionConfiguration output (LS-2790).
     const accessToken = process.env['ROLLBAR_ACCESS_TOKEN'];
+    const accessTokenSecretName =
+      process.env['ROLLBAR_ACCESS_TOKEN_SECRET_NAME'];
     const environment =
       process.env['ROLLBAR_ENVIRONMENT'] ||
       process.env['NODE_ENV'] ||
       'development';
 
-    if (!accessToken) {
+    if (!accessToken && !accessTokenSecretName) {
       LOGGER.warn(
-        'ROLLBAR_ACCESS_TOKEN not set, Rollbar will not be initialized',
+        'Neither ROLLBAR_ACCESS_TOKEN nor ROLLBAR_ACCESS_TOKEN_SECRET_NAME set, Rollbar will not be initialized',
       );
       return null;
     }
@@ -163,7 +207,8 @@ class NodeRollbarImplementation implements RollbarInterface {
       undefined;
 
     return {
-      accessToken,
+      accessToken: accessToken ?? '',
+      accessTokenSecretName,
       environment,
       captureUncaught: true,
       captureUnhandledRejections: true,

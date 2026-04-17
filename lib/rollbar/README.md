@@ -22,10 +22,11 @@ Exposes the same function API as the previous `@legacy-sports/sentry` library fo
 
 ## Environment Variables
 
-| Variable                    | Description                           |
-| --------------------------- | ------------------------------------- |
-| `ROLLBAR_ACCESS_TOKEN`      | Server-side (post_server_item) token  |
-| `VITE_ROLLBAR_ACCESS_TOKEN` | Browser-side (post_client_item) token |
-| `ROLLBAR_ENVIRONMENT`       | Override environment name             |
-| `ROLLBAR_RELEASE`           | Override release/version string       |
-| `ROLLBAR_VERBOSE`           | Set to `true` for verbose logging     |
+| Variable                           | Description                                                                                                       |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `ROLLBAR_ACCESS_TOKEN`             | Server-side (post_server_item) token. Used in local dev/CLI; Lambdas prefer `ROLLBAR_ACCESS_TOKEN_SECRET_NAME`.   |
+| `ROLLBAR_ACCESS_TOKEN_SECRET_NAME` | AWS Secrets Manager secret name holding the server-side token. Fetched at cold-start in Lambda runtime (LS-2790). |
+| `VITE_ROLLBAR_ACCESS_TOKEN`        | Browser-side (post_client_item) token                                                                             |
+| `ROLLBAR_ENVIRONMENT`              | Override environment name                                                                                         |
+| `ROLLBAR_RELEASE`                  | Override release/version string                                                                                   |
+| `ROLLBAR_VERBOSE`                  | Set to `true` for verbose logging                                                                                 |

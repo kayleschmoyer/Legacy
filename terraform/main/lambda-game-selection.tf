@@ -45,7 +45,8 @@ resource "aws_iam_policy" "game_selection_lambda_secrets" {
           "secretsmanager:DescribeSecret"
         ]
         Resource = [
-          aws_secretsmanager_secret.database_credentials.arn
+          aws_secretsmanager_secret.database_credentials.arn,
+          aws_secretsmanager_secret.rollbar_access_token.arn
         ]
       },
       {
@@ -179,8 +180,8 @@ resource "aws_lambda_function" "game_selection" {
       NODE_ENV                            = var.environment
       AWS_NODEJS_CONNECTION_REUSE_ENABLED = "1"
 
-      # Rollbar error tracking
-      ROLLBAR_ACCESS_TOKEN = var.rollbar_access_token
+      # Rollbar error tracking (token fetched from Secrets Manager at cold-start)
+      ROLLBAR_ACCESS_TOKEN_SECRET_NAME = aws_secretsmanager_secret.rollbar_access_token.name
     }
   }
 

@@ -7,7 +7,18 @@
 export type RollbarSeverity = 'error' | 'warning' | 'info';
 
 export interface RollbarConfig {
+  /**
+   * Rollbar access token. When an empty string on the Node platform,
+   * `accessTokenSecretName` is used to fetch the token from AWS Secrets
+   * Manager at cold-start (see `rollbar.node.ts#init`).
+   */
   accessToken: string;
+  /**
+   * AWS Secrets Manager secret name holding the Rollbar access token. Only
+   * used by the Node implementation when `accessToken` is empty. Set from
+   * the `ROLLBAR_ACCESS_TOKEN_SECRET_NAME` env var in Lambda (LS-2790).
+   */
+  accessTokenSecretName?: string;
   environment: string;
   captureUncaught?: boolean;
   captureUnhandledRejections?: boolean;

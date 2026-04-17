@@ -44,7 +44,8 @@ resource "aws_iam_policy" "rollbar_discord_lambda_secrets" {
         ]
         Resource = [
           aws_secretsmanager_secret.discord_webhook_url.arn,
-          aws_secretsmanager_secret.rollbar_webhook_secret.arn
+          aws_secretsmanager_secret.rollbar_webhook_secret.arn,
+          aws_secretsmanager_secret.rollbar_access_token.arn
         ]
       }
     ]
@@ -93,8 +94,8 @@ resource "aws_lambda_function" "rollbar_discord" {
       LOG_LEVEL                           = "info"
       AWS_NODEJS_CONNECTION_REUSE_ENABLED = "1"
 
-      # Rollbar error tracking
-      ROLLBAR_ACCESS_TOKEN = var.rollbar_access_token
+      # Rollbar error tracking (token fetched from Secrets Manager at cold-start)
+      ROLLBAR_ACCESS_TOKEN_SECRET_NAME = aws_secretsmanager_secret.rollbar_access_token.name
     }
   }
 

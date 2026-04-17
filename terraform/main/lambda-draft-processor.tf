@@ -68,6 +68,7 @@ resource "aws_iam_policy" "draft_processor_lambda_secrets" {
         ]
         Resource = [
           aws_secretsmanager_secret.database_credentials.arn,
+          aws_secretsmanager_secret.rollbar_access_token.arn,
         ]
       }
     ]
@@ -215,8 +216,8 @@ resource "aws_lambda_function" "draft_processor" {
       CONNECTIONS_TABLE_NAME = aws_dynamodb_table.websocket_connections.name
       WEBSOCKET_ENDPOINT     = "https://${aws_apigatewayv2_api.websocket.id}.execute-api.${data.aws_region.current.id}.amazonaws.com/${var.environment}"
 
-      # Rollbar error tracking
-      ROLLBAR_ACCESS_TOKEN = var.rollbar_access_token
+      # Rollbar error tracking (token fetched from Secrets Manager at cold-start)
+      ROLLBAR_ACCESS_TOKEN_SECRET_NAME = aws_secretsmanager_secret.rollbar_access_token.name
     }
   }
 

@@ -44,7 +44,8 @@ resource "aws_iam_policy" "jira_proxy_lambda_secrets" {
         ]
         Resource = [
           aws_secretsmanager_secret.jira_credentials.arn,
-          aws_secretsmanager_secret.jwt_secret.arn
+          aws_secretsmanager_secret.jwt_secret.arn,
+          aws_secretsmanager_secret.rollbar_access_token.arn
         ]
       }
     ]
@@ -95,8 +96,8 @@ resource "aws_lambda_function" "jira_proxy" {
       LOG_LEVEL                           = "info"
       AWS_NODEJS_CONNECTION_REUSE_ENABLED = "1"
 
-      # Rollbar error tracking
-      ROLLBAR_ACCESS_TOKEN = var.rollbar_access_token
+      # Rollbar error tracking (token fetched from Secrets Manager at cold-start)
+      ROLLBAR_ACCESS_TOKEN_SECRET_NAME = aws_secretsmanager_secret.rollbar_access_token.name
     }
   }
 

@@ -54,7 +54,8 @@ resource "aws_iam_policy" "stripe_webhook_lambda_secrets" {
           aws_secretsmanager_secret.stripe_secret_key.arn,
           aws_secretsmanager_secret.stripe_webhook_secret.arn,
           aws_secretsmanager_secret.discord_stripe_webhook_url.arn,
-          aws_secretsmanager_secret.ga_api_secret.arn
+          aws_secretsmanager_secret.ga_api_secret.arn,
+          aws_secretsmanager_secret.rollbar_access_token.arn
         ]
       }
     ]
@@ -174,8 +175,8 @@ resource "aws_lambda_function" "stripe_webhook" {
       # Discord notifications for Stripe events (fetched from Secrets Manager at cold start)
       DISCORD_STRIPE_WEBHOOK_URL_SECRET_NAME = aws_secretsmanager_secret.discord_stripe_webhook_url.name
 
-      # Rollbar error tracking
-      ROLLBAR_ACCESS_TOKEN = var.rollbar_access_token
+      # Rollbar error tracking (token fetched from Secrets Manager at cold-start)
+      ROLLBAR_ACCESS_TOKEN_SECRET_NAME = aws_secretsmanager_secret.rollbar_access_token.name
 
       # Google Analytics 4 Measurement Protocol (server-side events).
       # GA_MEASUREMENT_ID is not sensitive; the API secret is fetched from Secrets Manager.

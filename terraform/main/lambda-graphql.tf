@@ -58,7 +58,8 @@ resource "aws_iam_policy" "graphql_lambda_secrets" {
             aws_secretsmanager_secret.jwt_secret.arn,
             aws_secretsmanager_secret.stripe_secret_key.arn,
             aws_secretsmanager_secret.stripe_webhook_secret.arn,
-            aws_secretsmanager_secret.system_api_key.arn
+            aws_secretsmanager_secret.system_api_key.arn,
+            aws_secretsmanager_secret.rollbar_access_token.arn
           ],
           var.mlb_data_api_key != "" ? [aws_secretsmanager_secret.mlb_data_api_key[0].arn] : []
         )
@@ -217,8 +218,8 @@ resource "aws_lambda_function" "graphql" {
       SQS_AUTOMATIC_DRAFTS_URL  = aws_sqs_queue.automatic_drafts.url
       SQS_SELECT_GAME_URL       = aws_sqs_queue.select_game.url
 
-      # Rollbar error tracking
-      ROLLBAR_ACCESS_TOKEN = var.rollbar_access_token
+      # Rollbar error tracking (token fetched from Secrets Manager at cold-start)
+      ROLLBAR_ACCESS_TOKEN_SECRET_NAME = aws_secretsmanager_secret.rollbar_access_token.name
 
       # WebSocket configuration for notifications
       CONNECTIONS_TABLE_NAME = aws_dynamodb_table.websocket_connections.name
