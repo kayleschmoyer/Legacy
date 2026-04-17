@@ -433,11 +433,19 @@ export function PublicLandingPage(): React.JSX.Element {
     void exchangeCode();
   }, [config.oauthProxyUrl]);
 
-  // Configure OAuth on mount
+  // Configure OAuth on mount.
+  // One Tap is disabled here: the public landing page is only shown to
+  // anonymous visitors, and initialising One Tap triggers a FedCM call that
+  // logs "Not signed in with the identity provider." in the browser console for
+  // users who are not signed into Google. Explicit sign-in buttons provide the
+  // appropriate UX; One Tap would add no value for first-time visitors.
   useEffect(() => {
     const configure = async () => {
       try {
-        await OAuthProvider.configure(config);
+        await OAuthProvider.configure({
+          ...config,
+          gsi: { ...(config.gsi ?? {}), oneTap: false },
+        });
         setIsConfigured(true);
       } catch (error) {
         LOGGER.error(
@@ -451,9 +459,9 @@ export function PublicLandingPage(): React.JSX.Element {
     void configure();
   }, [config]);
 
-  // Handle One Tap sign-in — fires when the user taps the GSI prompt that
-  // OAuthProvider.configure() shows on this page. Without this listener the
-  // credential is dispatched to no handler and authentication silently fails.
+  // Handle One Tap sign-in — retained in case One Tap is re-enabled here in
+  // future. Without this listener, a credential dispatched by the GSI prompt
+  // would have no handler and authentication would silently fail.
   useEffect(() => {
     const handleOneTapSuccess = async (event: Event) => {
       const customEvent = event as CustomEvent<{
