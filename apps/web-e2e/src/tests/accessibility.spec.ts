@@ -201,20 +201,14 @@ test.describe('Screen Reader Announcements @regression', () => {
     // useRouteAnnouncer hook intentionally skips the very first render,
     // and page.goto() triggers a full page reload (= first render).
     //
-    // The Players nav button is a dropdown trigger; click it then click
-    // the first <a href="/players"> link inside the dropdown.
-    const playersDropdownBtn = page
-      .getByRole('button', { name: 'Players' })
-      .first();
-    await expect(playersDropdownBtn).toBeVisible({ timeout: 5000 });
-    await playersDropdownBtn.click();
-
-    const playersLink = page.locator('a[href="/players"]').first();
-    await expect(playersLink).toBeVisible({ timeout: 5000 });
-    await playersLink.click();
+    // Navigate via the always-present branded home link in the header to ensure
+    // this remains a client-side route transition across nav variants.
+    const homeLink = page.getByRole('link', { name: /legacy sports home/i });
+    await expect(homeLink).toBeVisible({ timeout: 5000 });
+    await homeLink.click();
 
     // The announcement may take a moment after navigation completes
-    await expect(politeRegion).toHaveText(/navigated to players/i, {
+    await expect(politeRegion).toHaveText(/navigated to home/i, {
       timeout: 10000,
     });
   });
