@@ -217,6 +217,30 @@ test.describe('Players Landing Page @smoke', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Player Comparison Page (/players/compare)
+// ---------------------------------------------------------------------------
+
+test.describe('Player Comparison Page @smoke', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/players/compare');
+    await page.waitForLoadState('load');
+  });
+
+  test('loads the player comparison page', async ({ page }) => {
+    await expect(page).toHaveURL('/players/compare');
+    await expect(page.locator('body')).not.toContainText(
+      'Unexpected Application Error',
+    );
+  });
+
+  test('shows a player search input', async ({ page }) => {
+    await expect(
+      page.getByRole('textbox', { name: /search players/i }),
+    ).toBeVisible();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Player Stats Page (/players/stats)
 // ---------------------------------------------------------------------------
 

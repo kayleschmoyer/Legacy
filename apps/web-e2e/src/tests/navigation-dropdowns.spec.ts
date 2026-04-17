@@ -103,6 +103,15 @@ test.describe('Navigation – Players dropdown @smoke', () => {
     await page.waitForLoadState('load');
     await expect(page).toHaveURL(/\/players/);
   });
+
+  test('clicking Compare Players navigates to /players/compare', async ({
+    page,
+  }) => {
+    await page.getByRole('button', { name: /players/i }).click();
+    await page.locator('#players-menu').getByText('Compare Players').click();
+    await page.waitForLoadState('load');
+    await expect(page).toHaveURL(/\/players\/compare/);
+  });
 });
 
 // ---------------------------------------------------------------------------
