@@ -243,24 +243,18 @@ test.describe('Help Page — Historical Stats FAQ @regression', () => {
 });
 
 // ---------------------------------------------------------------------------
-// LS-3511: /help is a public route. Unauthenticated users must see the Help
-// page content — not the "Build Your Dynasty" landing page rendered by
-// EnhancedAuthGuard for protected routes. An automated audit crawler visited
-// https://legacy-fantasy.com/help unauthenticated, received the GitHub Pages
-// 404 response (expected for SPA routes), then saw the marketing landing page
-// after the 404.html redirect loaded the SPA — and mis-reported it as a
-// functional 404. The route is listed in publicPaths; these tests lock in the
-// unauthenticated rendering so a regression cannot go undetected.
+// Unauthenticated visitor — /help is a public route (LS-3513).
+// Help documentation must be visible without requiring sign-in.
 // ---------------------------------------------------------------------------
 
-unauthTest.describe('Help page — unauthenticated visitor @regression', () => {
+unauthTest.describe('Help page — unauthenticated access @regression', () => {
   unauthTest.beforeEach(async ({ page }) => {
     await page.goto('/help');
     await page.waitForLoadState('load');
   });
 
   unauthTest(
-    'shows Help & Support heading on /help when not authenticated',
+    'shows Help & Support heading without requiring login',
     async ({ page }) => {
       await expect(
         page.getByRole('heading', { name: /help & support/i, level: 1 }),
@@ -269,17 +263,32 @@ unauthTest.describe('Help page — unauthenticated visitor @regression', () => {
   );
 
   unauthTest(
-    'does not show the marketing landing page on /help when not authenticated',
+    'does not show landing-page login CTA on /help',
     async ({ page }) => {
-      await expect(page.getByText(/build your dynasty/i)).not.toBeVisible();
+      await expect(page.locator('body')).not.toContainText(
+        'Build Your Dynasty',
+      );
+      await expect(page.locator('body')).not.toContainText('Get Started Free');
     },
   );
 
+  // LS-3513: the functional scanner found a "Continue with Discord" button on
+  // /help and reported it as broken (the scanner used the invalid CSS selector
+  // `(button:visible, [role="button"]:visible)`). The root cause was that /help
+  // was a protected route; LS-3513 made it public. This test locks in that the
+  // auth gate never appears on /help so unauthenticated users always land
+  // directly on the help page, not the sign-in page.
   unauthTest(
-    'shows FAQ section on /help when not authenticated',
+    '"Continue with Discord" auth gate is not shown on public /help route (LS-3513)',
     async ({ page }) => {
+      // /help is public — the auth gate must never intercept it.
       await expect(
-        page.getByRole('heading', { name: /frequently asked questions/i }),
+        page.getByRole('button', { name: /continue with discord/i }),
+      ).not.toBeVisible({ timeout: 15_000 });
+
+      // Confirm the help page itself is reachable without sign-in.
+      await expect(
+        page.getByRole('heading', { name: /help & support/i, level: 1 }),
       ).toBeVisible({ timeout: 15_000 });
     },
   );

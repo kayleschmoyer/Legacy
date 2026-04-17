@@ -208,7 +208,7 @@ unauthTest.describe('Protected Routes @critical', () => {
     '/management',
     '/profile/settings',
     '/preferences',
-    // /help is publicly accessible (LS-3511) — see Public Routes section below.
+    // /help is publicly accessible (LS-3513) — see Public Routes section below.
     // /games/season-draft/create is authenticated-only (LS-3543). An automated
     // scanner attempted to click the landing-page CTA with the invalid
     // `(button:visible, [role="button"]:visible)` selector and logged a false
@@ -247,10 +247,28 @@ unauthTest.describe('Protected Routes @critical', () => {
 
 // ---------------------------------------------------------------------------
 // Public Routes — accessible without authentication (LS-3566, LS-3563, LS-3561,
-// LS-3522, LS-3548, LS-3511)
+// LS-3522, LS-3548, LS-3513)
 // ---------------------------------------------------------------------------
 
 unauthTest.describe('Public Routes @critical', () => {
+  unauthTest(
+    'shows Help page content on /help when not authenticated (LS-3513)',
+    async ({ page }) => {
+      await page.goto('/help');
+      await page.waitForLoadState('load');
+
+      // LS-3513: /help was a protected route showing the marketing landing page
+      // to unauthenticated users. It is now public so help docs are accessible
+      // without sign-in.
+      await expect(
+        page.getByRole('heading', { name: /help & support/i, level: 1 }),
+      ).toBeVisible({ timeout: 15000 });
+      await expect(page.locator('body')).not.toContainText(
+        'Build Your Dynasty',
+      );
+    },
+  );
+
   unauthTest(
     'shows About page content on /about when not authenticated',
     async ({ page }) => {
