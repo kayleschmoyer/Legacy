@@ -268,6 +268,55 @@ unauthTest.describe(
   },
 );
 
+// LS-3520: /faq must display FAQ accordion content (not the marketing homepage)
+// for unauthenticated users. The original bug: navigating to /faq showed the
+// homepage hero ("Build Your Dynasty. Dominate Your League.") instead of FAQ
+// content because the auth gate intercepted before the client-side redirect fired.
+unauthTest.describe(
+  '/faq — FAQ content visible to unauthenticated users @regression',
+  () => {
+    unauthTest(
+      'shows FAQ section heading after /faq redirect (not homepage content)',
+      async ({ page }) => {
+        await page.goto('/faq');
+        await page.waitForURL(/\/pricing/, { timeout: 10_000 });
+
+        // FAQ accordion section must be present — confirms FAQ content is shown,
+        // not the marketing homepage.
+        await expect(page.getByText(/frequently asked|faq/i)).toBeVisible({
+          timeout: 15_000,
+        });
+      },
+    );
+
+    unauthTest(
+      'shows FAQ accordion items after /faq redirect',
+      async ({ page }) => {
+        await page.goto('/faq');
+        await page.waitForURL(/\/pricing/, { timeout: 10_000 });
+
+        // At least one FAQ question must be visible — rules out the homepage hero.
+        await expect(
+          page.getByText(/can i try premium before committing/i),
+        ).toBeVisible({ timeout: 15_000 });
+      },
+    );
+
+    unauthTest(
+      'does not show homepage hero content at /faq',
+      async ({ page }) => {
+        await page.goto('/faq');
+        await page.waitForURL(/\/pricing/, { timeout: 10_000 });
+
+        // The marketing homepage hero must NOT appear — this was the original bug.
+        await expect(page.getByText(/build your dynasty/i)).not.toBeVisible({
+          timeout: 5_000,
+        });
+      },
+    );
+  },
+);
+
 // LS-3559: Clicking "Get Started Free" on /pricing must navigate unauthenticated
 // users to / where EnhancedAuthGuard shows PublicLandingPage with the Google
 // sign-in CTA. The button must be located via getByRole (accessible name) —
