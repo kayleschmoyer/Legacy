@@ -156,6 +156,65 @@ test.describe('Pricing page — FAQ section @regression', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// LS-3515: /pricing is a public route. Unauthenticated users must see the
+// pricing content — not the "Build Your Dynasty" landing page rendered by
+// EnhancedAuthGuard for protected routes. An automated audit crawler visited
+// https://legacy-fantasy.com/pricing unauthenticated, received the GitHub Pages
+// 404 response (expected for SPA routes), then saw the marketing landing page
+// after the 404.html redirect loaded the SPA — and mis-reported it as a
+// functional 404. The route is correctly listed in publicPaths; these tests
+// lock in the unauthenticated rendering so a regression cannot go undetected.
+// ---------------------------------------------------------------------------
+
+unauthTest.describe(
+  'Pricing page — unauthenticated visitor @regression',
+  () => {
+    unauthTest.beforeEach(async ({ page }) => {
+      await page.goto('/pricing');
+      await page.waitForLoadState('load');
+    });
+
+    unauthTest(
+      'shows pricing heading on /pricing when not authenticated',
+      async ({ page }) => {
+        await expect(
+          page.getByRole('heading', { name: /the plan that fits/i }),
+        ).toBeVisible({ timeout: 15_000 });
+      },
+    );
+
+    unauthTest(
+      'does not show the marketing landing page on /pricing when not authenticated',
+      async ({ page }) => {
+        await expect(page.getByText(/build your dynasty/i)).not.toBeVisible();
+      },
+    );
+
+    unauthTest(
+      'shows Free plan card on /pricing when not authenticated',
+      async ({ page }) => {
+        await expect(page.getByText('FREE').first()).toBeVisible({
+          timeout: 15_000,
+        });
+        await expect(page.getByText('$0')).toBeVisible();
+      },
+    );
+
+    unauthTest(
+      '"Get Started Free" button is visible and navigates to / on /pricing when not authenticated',
+      async ({ page }) => {
+        const btn = page
+          .getByRole('button', { name: /get started free/i })
+          .first();
+        await expect(btn).toBeVisible({ timeout: 15_000 });
+        await btn.click();
+        await expect(page).toHaveURL('/');
+      },
+    );
+  },
+);
+
 // LS-3562: /faq is a common alias that users and crawlers reach.
 // It must redirect to /pricing (which contains the FAQ accordion + CTA buttons)
 // so that "Get Started Free" is always reachable via a valid route.
