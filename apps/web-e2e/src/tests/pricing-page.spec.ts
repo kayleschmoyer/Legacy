@@ -189,11 +189,11 @@ test.describe('/faq redirect @regression', () => {
     // Wait for the client-side redirect to complete before interacting.
     await page.waitForURL(/\/pricing/, { timeout: 10_000 });
 
-    // Click the button — it should not throw and should navigate to sign-up
-    // or stay on the pricing page depending on auth state.
     const btn = page.getByRole('button', { name: /get started free/i }).first();
     await expect(btn).toBeVisible({ timeout: 10_000 });
     await btn.click();
-    // No Playwright CSS-selector error should occur — the test passing is the assertion.
+    // The button navigates to / — confirm the URL change so we know the click
+    // worked and the navigation settles before teardown.
+    await page.waitForURL('/');
   });
 });
