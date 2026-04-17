@@ -239,11 +239,8 @@ async function createJiraIssue(
     issuetype: { name: opts.issueType },
   };
 
-  if (opts.issueType === 'Epic') {
-    // customfield_10011 is the Epic Name field in classic Jira projects.
-    // Including it is harmless in team-managed projects (ignored if unknown).
-    fields['customfield_10011'] = opts.summary.slice(0, 255);
-  }
+  // customfield_10011 is the Epic Name field in classic Jira projects only.
+  // Team-managed (next-gen) projects reject it with a 400, so we omit it.
 
   if (opts.parentKey) {
     fields['parent'] = { key: opts.parentKey };
