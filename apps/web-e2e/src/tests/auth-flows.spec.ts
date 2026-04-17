@@ -140,7 +140,6 @@ unauthTest.describe('Protected Routes @critical', () => {
     '/',
     '/baseball',
     '/baseball/mock-draft',
-    '/baseball/league/create',
     '/players',
     '/management',
     '/profile/settings',
@@ -160,6 +159,11 @@ unauthTest.describe('Protected Routes @critical', () => {
     // functional-scan false positive — scanner failed to click "Continue with
     // Google" and logged a 404. Covered here via the correct getByRole locator.
     '/baseball/league/create',
+    // /games/season-draft is authenticated-only (LS-3540 / LS-3541). Same
+    // scanner false positive — including a "Continue with Discord" CSS-selector
+    // parse error on the invalid `(button:visible, [role="button"]:visible)`
+    // selector. Covered here and in season-draft-games.spec.ts via getByRole.
+    '/games/season-draft',
   ];
 
   for (const route of routes) {

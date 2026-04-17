@@ -304,14 +304,17 @@ test.describe('Season Draft Game Create Page @critical', () => {
 });
 
 // ---------------------------------------------------------------------------
-// LS-3540: /games/season-draft is a protected route. Unauthenticated users
-// visiting it are intercepted by EnhancedAuthGuard and shown PublicLandingPage
-// with the "Continue with Google" sign-in CTA and a "Get Started Free" CTA.
-// An automated audit crawler reported this as a 404 (the evidence shows the
-// landing page content — "Build Your Dynasty" — instead of the expected
-// season-draft lobby). These tests lock in that the sign-in CTAs are located
-// via getByRole (accessible name) so unauthenticated visitors can initiate
-// sign-in / sign-up from /games/season-draft.
+// LS-3540 / LS-3541: /games/season-draft is a protected route. Unauthenticated
+// users visiting it are intercepted by EnhancedAuthGuard and shown
+// PublicLandingPage with the "Continue with Google" and "Continue with Discord"
+// sign-in CTAs and a "Get Started Free" CTA lower down. An automated audit
+// crawler reported this as a 404 (evidence shows the landing page content —
+// "Build Your Dynasty" — instead of the expected season-draft lobby) and a
+// CSS-selector parse error when trying to click "Continue with Discord" via
+// the invalid `(button:visible, [role="button"]:visible)` selector. These
+// tests lock in that the sign-in CTAs are located via getByRole (accessible
+// name) so unauthenticated visitors can initiate sign-in / sign-up from
+// /games/season-draft.
 // ---------------------------------------------------------------------------
 
 unauthTest.describe(
@@ -351,6 +354,37 @@ unauthTest.describe(
         });
         await expect(getStartedBtn).toBeVisible({ timeout: 15_000 });
         await expect(getStartedBtn).toBeEnabled();
+      },
+    );
+
+    unauthTest(
+      '"Continue with Discord" button is visible on /games/season-draft when unauthenticated',
+      async ({ page }) => {
+        await page.goto('/games/season-draft');
+        await page.waitForLoadState('load');
+
+        await expect(
+          page.getByRole('button', { name: /continue with discord/i }),
+        ).toBeVisible({ timeout: 15_000 });
+      },
+    );
+
+    unauthTest(
+      '"Continue with Discord" button on /games/season-draft is clickable via getByRole',
+      async ({ page }) => {
+        await page.goto('/games/season-draft');
+        await page.waitForLoadState('load');
+
+        const discordBtn = page.getByRole('button', {
+          name: /continue with discord/i,
+        });
+        await expect(discordBtn).toBeVisible({ timeout: 15_000 });
+        await expect(discordBtn).toBeEnabled();
+        // Confirm the click resolves without a CSS selector parse error —
+        // regression coverage for the original crawler failure. The Discord
+        // OAuth handler sets window.location.href for a cross-origin redirect,
+        // so noWaitAfter prevents Playwright from hanging on the navigation.
+        await discordBtn.click({ noWaitAfter: true });
       },
     );
   },

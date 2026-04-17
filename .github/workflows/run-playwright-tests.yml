@@ -304,7 +304,7 @@ jobs:
           VITE_JIRA_PROXY_URL: "https://e2e-placeholder.test/jira"
           VITE_GIPHY_API_KEY: "e2e-placeholder-key"
           # Placeholder so the conditional "Continue with Discord" CTA on
-          # PublicLandingPage renders in hermetic E2E builds (LS-3537).
+          # PublicLandingPage renders in hermetic E2E builds (LS-3537, LS-3541).
           # The real secret is never read during E2E — this only needs to be
           # truthy so the button mounts and can be located via getByRole.
           VITE_DISCORD_CLIENT_ID: "e2e-placeholder-discord-id"
