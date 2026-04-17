@@ -483,7 +483,7 @@ unauthTest.describe('Scoreboard — unauthenticated access @critical', () => {
 
       // The auth guard must now show the landing page, not the baseball hub.
       await expect(
-        page.getByRole('button', { name: /get started with google/i }),
+        page.getByRole('button', { name: /continue with google/i }),
       ).toBeVisible({ timeout: 15000 });
     },
   );

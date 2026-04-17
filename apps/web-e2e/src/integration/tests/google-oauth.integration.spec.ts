@@ -14,7 +14,7 @@
  *      that caused 504 Gateway Timeout on every cold Lambda invocation).
  *
  *   2. UI popup flow (requires GOOGLE_TEST_EMAIL + GOOGLE_TEST_PASSWORD + GOOGLE_OAUTH_POPUP_TEST env vars)
- *      — Navigate to INTEGRATION_WEB_URL, click "Get Started with Google",
+ *      — Navigate to INTEGRATION_WEB_URL, click "Continue with Google",
  *        fill credentials in the Google sign-in popup, verify auth.
  *      Skipped automatically when env vars are absent so local runs without
  *      credentials don't fail.  Also skipped unless GOOGLE_OAUTH_POPUP_TEST=1
@@ -212,7 +212,7 @@ test.describe('Google OAuth — UI popup flow', () => {
       'GOOGLE_TEST_PASSWORD) and run in --headed mode to enable this test.',
   );
 
-  test('clicking Get Started with Google authenticates via popup and shows the app', async ({
+  test('clicking Continue with Google authenticates via popup and shows the app', async ({
     browser,
   }) => {
     // Open a fresh browser context with no pre-existing auth cookies.
@@ -232,14 +232,12 @@ test.describe('Google OAuth — UI popup flow', () => {
 
       // Confirm we are on the unauthenticated landing page.
       await expect(
-        page.getByRole('button', { name: /get started with google/i }),
+        page.getByRole('button', { name: /continue with google/i }),
       ).toBeVisible({ timeout: 20_000 });
 
       // Listen for the Google popup BEFORE clicking so we don't race.
       const popupPromise = context.waitForEvent('page');
-      await page
-        .getByRole('button', { name: /get started with google/i })
-        .click();
+      await page.getByRole('button', { name: /continue with google/i }).click();
       const popup = await popupPromise;
 
       // Fill credentials inside the Google sign-in popup.
@@ -251,7 +249,7 @@ test.describe('Google OAuth — UI popup flow', () => {
       // The landing page button should disappear as the app transitions to
       // the authenticated shell.
       await expect(
-        page.getByRole('button', { name: /get started with google/i }),
+        page.getByRole('button', { name: /continue with google/i }),
       ).not.toBeVisible({ timeout: 20_000 });
 
       // Primary navigation confirms authenticated state.

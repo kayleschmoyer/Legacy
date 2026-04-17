@@ -82,13 +82,13 @@ const expiredSessionTest = test.extend({
 
 unauthTest.describe('Login Flow @critical', () => {
   unauthTest(
-    'shows the Get Started with Google button when not authenticated',
+    'shows the Continue with Google button when not authenticated',
     async ({ page }) => {
       await page.goto('/');
       await page.waitForLoadState('load');
 
       await expect(
-        page.getByRole('button', { name: /get started with google/i }),
+        page.getByRole('button', { name: /continue with google/i }),
       ).toBeVisible({ timeout: 15000 });
     },
   );
@@ -140,7 +140,7 @@ unauthTest.describe('Protected Routes @critical', () => {
         await page.waitForLoadState('load');
 
         await expect(
-          page.getByRole('button', { name: /get started with google/i }),
+          page.getByRole('button', { name: /continue with google/i }),
         ).toBeVisible({ timeout: 15000 });
       },
     );
@@ -201,7 +201,7 @@ test.describe('Authenticated Access @critical', () => {
     await page.waitForLoadState('load');
 
     await expect(
-      page.getByRole('button', { name: /get started with google/i }),
+      page.getByRole('button', { name: /continue with google/i }),
     ).not.toBeVisible();
   });
 
@@ -226,7 +226,7 @@ test.describe('Authenticated Access @critical', () => {
       await page.waitForLoadState('load');
 
       await expect(
-        page.getByRole('button', { name: /get started with google/i }),
+        page.getByRole('button', { name: /continue with google/i }),
       ).not.toBeVisible();
     }
   });
@@ -244,7 +244,7 @@ expiredSessionTest.describe('Session Expiry @critical', () => {
       await page.waitForLoadState('load');
 
       await expect(
-        page.getByRole('button', { name: /get started with google/i }),
+        page.getByRole('button', { name: /continue with google/i }),
       ).toBeVisible({ timeout: 15000 });
     },
   );
@@ -256,7 +256,7 @@ expiredSessionTest.describe('Session Expiry @critical', () => {
       await page.waitForLoadState('load');
 
       await expect(
-        page.getByRole('button', { name: /get started with google/i }),
+        page.getByRole('button', { name: /continue with google/i }),
       ).toBeVisible({ timeout: 15000 });
     },
   );
@@ -294,7 +294,7 @@ test.describe('Logout Flow @regression', () => {
 
     // Confirm we are authenticated.
     await expect(
-      page.getByRole('button', { name: /get started with google/i }),
+      page.getByRole('button', { name: /continue with google/i }),
     ).not.toBeVisible();
 
     // Simulate logout by clearing auth state from localStorage and cookies.
@@ -309,7 +309,7 @@ test.describe('Logout Flow @regression', () => {
 
     // The auth guard should now show the landing page.
     await expect(
-      page.getByRole('button', { name: /get started with google/i }),
+      page.getByRole('button', { name: /continue with google/i }),
     ).toBeVisible({ timeout: 15000 });
   });
 });
@@ -366,7 +366,7 @@ adminTest.describe('Profile Dropdown Logout @regression', () => {
 
       // After logout, the auth guard shows the landing page.
       await expect(
-        page.getByRole('button', { name: /get started with google/i }),
+        page.getByRole('button', { name: /continue with google/i }),
       ).toBeVisible({ timeout: 15000 });
     },
   );

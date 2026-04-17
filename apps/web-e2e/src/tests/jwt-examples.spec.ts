@@ -28,7 +28,7 @@ test.describe('Regular User Tests @regression', () => {
 
     // The auth guard should NOT display the landing page
     await expect(
-      page.getByRole('button', { name: /get started with google/i }),
+      page.getByRole('button', { name: /continue with google/i }),
     ).not.toBeVisible();
   });
 });
@@ -46,7 +46,7 @@ adminTest.describe('Admin User Tests @regression', () => {
 
       // Should not see landing page
       await expect(
-        page.getByRole('button', { name: /get started with google/i }),
+        page.getByRole('button', { name: /continue with google/i }),
       ).not.toBeVisible();
     },
   );
@@ -70,7 +70,7 @@ leagueManagerTest.describe('League Manager Tests @regression', () => {
 
       // Should not see landing page
       await expect(
-        page.getByRole('button', { name: /get started with google/i }),
+        page.getByRole('button', { name: /continue with google/i }),
       ).not.toBeVisible();
     },
   );
@@ -89,7 +89,7 @@ unauthTest.describe('Unauthenticated Tests @regression', () => {
 
       // Without a JWT, the auth guard should show the landing page
       await expect(
-        page.getByRole('button', { name: /get started with google/i }),
+        page.getByRole('button', { name: /continue with google/i }),
       ).toBeVisible({
         timeout: 10000,
       });
@@ -128,7 +128,7 @@ test.describe('Dynamic JWT Tests @regression', () => {
 
     // Should still be authenticated (not showing landing page)
     await expect(
-      page.getByRole('button', { name: /get started with google/i }),
+      page.getByRole('button', { name: /continue with google/i }),
     ).not.toBeVisible();
   });
 
@@ -162,7 +162,7 @@ test.describe('Dynamic JWT Tests @regression', () => {
 
     // Auth guard should redirect to login since tokens are gone
     await expect(
-      page.getByRole('button', { name: /get started with google/i }),
+      page.getByRole('button', { name: /continue with google/i }),
     ).toBeVisible({
       timeout: 15000,
     });

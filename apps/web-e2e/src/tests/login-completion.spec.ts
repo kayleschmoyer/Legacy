@@ -2,7 +2,7 @@
  * Login Completion E2E Tests
  *
  * Covers the primary login path and a regression guard:
- *   1. "Get Started with Google" button click (authorization code flow)
+ *   1. "Continue with Google" button click (authorization code flow)
  *   2. Regression guard: One Tap must NOT be initialized on the landing page
  *      (re-enabling it would trigger a FedCM "Not signed in with the identity
  *      provider." console error for anonymous visitors on Chrome 120+).
@@ -112,7 +112,7 @@ unauthTest.describe(
 
         // Wait for the page to finish initialising (OAuth configure + button render).
         await expect(
-          page.getByRole('button', { name: /get started with google/i }),
+          page.getByRole('button', { name: /continue with google/i }),
         ).toBeVisible({ timeout: 15000 });
 
         // One Tap must not be initialized: google.accounts.id.initialize() is
@@ -131,7 +131,7 @@ unauthTest.describe(
 // ---------------------------------------------------------------------------
 // Button-click login flow (authorization code flow)
 //
-// The "Get Started with Google" button calls OAuthProvider.signIn() →
+// The "Continue with Google" button calls OAuthProvider.signIn() →
 // signInWithAuthCode() → google.accounts.oauth2.initCodeClient({ callback })
 // → requestCode(). The enhanced GSI mock fires the callback immediately with
 // a fake auth code, so the test never opens a real Google popup.
@@ -172,7 +172,7 @@ unauthTest.describe('Login Completion — button-click flow @critical', () => {
       await page.waitForLoadState('load');
 
       const loginButton = page.getByRole('button', {
-        name: /get started with google/i,
+        name: /continue with google/i,
       });
       await expect(loginButton).toBeVisible({ timeout: 15000 });
 
@@ -206,7 +206,7 @@ unauthTest.describe('Login Completion — button-click flow @critical', () => {
       await page.waitForLoadState('load');
 
       const loginButton = page.getByRole('button', {
-        name: /get started with google/i,
+        name: /continue with google/i,
       });
       await expect(loginButton).toBeVisible({ timeout: 15000 });
       await loginButton.click();
@@ -239,7 +239,7 @@ unauthTest.describe('Login Completion — button-click flow @critical', () => {
       await page.waitForLoadState('load');
 
       const loginButton = page.getByRole('button', {
-        name: /get started with google/i,
+        name: /continue with google/i,
       });
       await expect(loginButton).toBeVisible({ timeout: 15000 });
       await loginButton.click();

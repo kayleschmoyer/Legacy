@@ -648,7 +648,7 @@ export function PublicLandingPage(): React.JSX.Element {
                     void handleSignIn();
                   }}
                   role="button"
-                  aria-label="Get started with Google"
+                  aria-label="Continue with Google"
                 >
                   <XStack
                     alignItems="center"
