@@ -6,7 +6,7 @@
  * and navigation cards synchronously.
  */
 
-import { expect, test } from '../fixtures/auth-enhanced';
+import { expect, test, unauthTest } from '../fixtures/auth-enhanced';
 
 test.describe('Homepage @smoke', () => {
   test.beforeEach(async ({ page }) => {
@@ -73,4 +73,26 @@ test.describe('Homepage @smoke', () => {
       await expect(skipLink.first()).toHaveAttribute('href', '#main-content');
     }
   });
+});
+
+// ---------------------------------------------------------------------------
+// Public Landing Page (unauthenticated "/") — accessibility regression
+// ---------------------------------------------------------------------------
+
+unauthTest.describe('Public Landing Page accessibility @regression', () => {
+  unauthTest.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('load');
+  });
+
+  unauthTest(
+    'logo image has non-empty alt text (LS-3528)',
+    async ({ page }) => {
+      const logo = page.locator('img[src*="logo"]').first();
+      await expect(logo).toBeVisible({ timeout: 10000 });
+      const alt = await logo.getAttribute('alt');
+      expect(alt).toBeTruthy();
+      expect((alt ?? '').trim().length).toBeGreaterThan(0);
+    },
+  );
 });
