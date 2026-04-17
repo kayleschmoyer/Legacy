@@ -239,6 +239,35 @@ unauthTest.describe('/pricing — unauthenticated access @regression', () => {
   );
 });
 
+// LS-3521: Clicking "Get Started Free" on /faq (which redirects to /pricing) must
+// navigate unauthenticated users to / where EnhancedAuthGuard shows the sign-in CTA.
+// The original functional scan failed with an invalid CSS selector
+// `(button:visible, [role="button"]:visible)` — test uses getByRole instead.
+unauthTest.describe(
+  '/faq — sign-in CTA for unauthenticated users (LS-3521) @regression',
+  () => {
+    unauthTest(
+      '"Get Started Free" on /faq leads to sign-in CTA for unauthenticated users',
+      async ({ page }) => {
+        await page.goto('/faq');
+        // Wait for the client-side redirect from /faq → /pricing.
+        await page.waitForURL(/\/pricing/, { timeout: 10_000 });
+
+        const getStartedBtn = page
+          .getByRole('button', { name: /get started free/i })
+          .first();
+        await expect(getStartedBtn).toBeVisible({ timeout: 10_000 });
+        await getStartedBtn.click();
+
+        // EnhancedAuthGuard shows PublicLandingPage for unauthenticated users at /.
+        await expect(
+          page.getByRole('button', { name: /get started with google/i }),
+        ).toBeVisible({ timeout: 15_000 });
+      },
+    );
+  },
+);
+
 // LS-3559: Clicking "Get Started Free" on /pricing must navigate unauthenticated
 // users to / where EnhancedAuthGuard shows PublicLandingPage with the Google
 // sign-in CTA. The button must be located via getByRole (accessible name) —
