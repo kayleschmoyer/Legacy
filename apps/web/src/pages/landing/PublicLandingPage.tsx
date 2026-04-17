@@ -672,7 +672,7 @@ export function PublicLandingPage(): React.JSX.Element {
                   <SignInButton
                     onPress={handleDiscordSignIn}
                     role="button"
-                    aria-label="Get started with Discord"
+                    aria-label="Continue with Discord"
                     backgroundColor={DISCORD_BLURPLE}
                     hoverStyle={{
                       backgroundColor: DISCORD_BLURPLE_DARK,
@@ -927,7 +927,7 @@ export function PublicLandingPage(): React.JSX.Element {
                 <SignInButton
                   onPress={handleDiscordSignIn}
                   role="button"
-                  aria-label="Get started with Discord"
+                  aria-label="Get Started with Discord"
                   backgroundColor={DISCORD_BLURPLE}
                   hoverStyle={{ backgroundColor: DISCORD_BLURPLE_DARK }}
                 >
@@ -943,7 +943,7 @@ export function PublicLandingPage(): React.JSX.Element {
                       <>
                         <BrandIcon name="discord" size={18} />
                         <Text fontSize="$4" color="$color1" fontWeight="700">
-                          Continue with Discord
+                          Get Started with Discord
                         </Text>
                       </>
                     )}
