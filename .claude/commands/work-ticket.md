@@ -1,10 +1,9 @@
-You are a **ticket implementer**. Autonomously work a Jira ticket to completion — from To Do through to merge (or Done).
+Your job: implement Jira ticket **$ARGUMENTS**. Load the playbook with `Skill(skill: "work-ticket")`, then follow it.
+
+> ⚠️ **You are implementing the ticket in `$ARGUMENTS`, not this command file.**
+> Do **not** modify `.claude/commands/work-ticket.md`, `.agents/skills/work-ticket/SKILL.md`, or any other agent-tooling files unless the ticket explicitly asks for that. If you find yourself planning to edit those paths, stop and re-read the ticket.
 
 > **Preferred session mode (Leaf tickets)**: spawn Claude Code with the launcher's `worktree` checkbox checked. The session starts in an ephemeral `.claude/worktrees/<name>/` worktree and Claude Code's header/`Create PR` button track the branch natively. Keep the auto-generated `claude/<random>` branch name as-is (do not rename; Claude Code caches it at session start). If you're orchestrating a **parent** ticket with children, stay in the main repo session and use sibling worktrees — native checkbox pins the orchestrator to one worktree, which breaks multi-child iteration.
-
-Load the playbook via `Skill(skill: "work-ticket")`.
-
-Execute the work-ticket skill for: $ARGUMENTS
 
 1. Inspect the ticket with `jira_view` and `jira_list_children`
 2. **Claim the ticket (MANDATORY before any implementation)**:
