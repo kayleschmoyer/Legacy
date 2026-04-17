@@ -361,6 +361,34 @@ unauthTest.describe('Public Routes @critical', () => {
     },
   );
 
+  // ---------------------------------------------------------------------------
+  // LS-3500: /players/stats must NOT show the PublicLandingPage season badge.
+  // A functional scanner previously reported "(!) Fantasy Baseball · Season 2026"
+  // on this route because the route was incorrectly gated — EnhancedAuthGuard
+  // was showing PublicLandingPage (which contains the HeroBadge with a baseball
+  // SVG icon that the scanner rendered as a "(!) " warning indicator).
+  // LS-3548 added /players/stats to publicPaths; this test locks in that the
+  // landing-page badge text is permanently absent from the public stats route.
+  // ---------------------------------------------------------------------------
+  unauthTest(
+    'does not show the landing-page season badge on /players/stats (LS-3500)',
+    async ({ page }) => {
+      await page.goto('/players/stats');
+      await page.waitForLoadState('load');
+
+      // The "Fantasy Baseball · Season 2026" badge lives on PublicLandingPage.
+      // Since /players/stats is public, the landing page must NOT render here.
+      await expect(page.locator('body')).not.toContainText(
+        'Fantasy Baseball · Season 2026',
+      );
+
+      // Player stats content is visible — confirming the correct page loaded.
+      await expect(
+        page.getByText(/MLB Player Statistics/i).first(),
+      ).toBeVisible({ timeout: 15000 });
+    },
+  );
+
   unauthTest(
     'shows Baseball hub content on /baseball when not authenticated (LS-3532)',
     async ({ page }) => {
