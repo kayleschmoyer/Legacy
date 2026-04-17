@@ -210,10 +210,15 @@ test.describe
       // before clicking. A disabled Tamagui Button won't fire onPress even with force.
       await expect(saveBtn).toBeEnabled({ timeout: 10_000 });
       await saveBtn.click();
-      // Wait for the unsaved badge to disappear (confirms save completed)
-      await expect(page.getByText(/\d+ unsaved/i)).not.toBeVisible({
-        timeout: 30_000,
-      });
+      // The "unsaved" badge clears optimistically (before the mutation completes),
+      // so waiting for it to disappear does not confirm backend persistence.
+      // Wait for the inline success message in the sticky action bar instead —
+      // it only appears after both the mutation and the server refetch have
+      // completed, guaranteeing the new multiplier is visible in subsequent
+      // API queries (Phase 4).
+      await expect(
+        page.getByText('Changes saved — scoring table refreshed.'),
+      ).toBeVisible({ timeout: 30_000 });
     });
   });
 
