@@ -1,3 +1,13 @@
+# Stable random suffix for the prod final-snapshot identifier. Persisted in
+# Terraform state so successive `terraform plan`s see the same value; only
+# created in prod (count = 0 elsewhere) because non-prod environments skip
+# the final snapshot entirely. If an operator ever needs a fresh identifier
+# after a manual snapshot cleanup, `terraform taint` this resource.
+resource "random_id" "db_final_snapshot_suffix" {
+  count       = var.environment == "prod" ? 1 : 0
+  byte_length = 4
+}
+
 # DB Subnet Group - RDS deployed in public subnets (historical; kept to avoid recreation)
 # Access from Lambda goes through RDS Proxy; external access requires VPN/bastion/SSM
 # Security is controlled via security group rules, not network isolation
@@ -53,9 +63,17 @@ resource "aws_db_instance" "postgres" {
   # (no apply_immediately) to avoid an unplanned reboot.
   ca_cert_identifier = "rds-ca-rsa2048-g1"
 
-  # Deletion protection
-  deletion_protection = false
-  skip_final_snapshot = true
+  # Deletion protection — production databases must be recoverable (LS-2798).
+  # In prod: AWS-level deletion protection blocks `terraform destroy` or
+  # `aws_db_instance` replacement until it is intentionally disabled. When an
+  # operator turns protection off for a deliberate teardown, the final snapshot
+  # configured below is taken before the instance is deleted, so production
+  # data is never permanently removed by destroy/replace. A persisted
+  # `random_id` suffix keeps the snapshot identifier unique across successive
+  # teardowns so RDS does not reject the delete on a name collision.
+  deletion_protection       = var.environment == "prod" ? true : false
+  skip_final_snapshot       = var.environment == "prod" ? false : true
+  final_snapshot_identifier = var.environment == "prod" ? "${local.name_prefix}-final-snapshot-${random_id.db_final_snapshot_suffix[0].hex}" : null
 
   tags = merge(local.common_tags, {
     Name = "${local.name_prefix}-postgres"
