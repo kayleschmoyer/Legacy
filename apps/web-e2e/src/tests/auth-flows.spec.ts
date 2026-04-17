@@ -238,7 +238,15 @@ test.describe('Authenticated Access @critical', () => {
   test('authenticated user can navigate between protected routes', async ({
     page,
   }) => {
-    const routes = ['/about', '/baseball', '/players/stats'];
+    // /profile/settings included so an automated scanner hitting the route
+    // unauthenticated (and logging a false-positive 404) has a matching
+    // positive-path regression barrier (LS-3552).
+    const routes = [
+      '/about',
+      '/baseball',
+      '/players/stats',
+      '/profile/settings',
+    ];
 
     for (const route of routes) {
       await page.goto(route);
@@ -247,6 +255,20 @@ test.describe('Authenticated Access @critical', () => {
       await expect(
         page.getByRole('button', { name: /continue with google/i }),
       ).not.toBeVisible();
+      // Confirm the route actually mounted content (not an empty shell) —
+      // otherwise a silent route regression could still satisfy the
+      // negative landing-page assertion above.
+      await expect
+        .poll(
+          () =>
+            page.evaluate(
+              () =>
+                (document.getElementById('main-content')?.children.length ??
+                  0) > 0,
+            ),
+          { timeout: 15_000 },
+        )
+        .toBe(true);
     }
   });
 });
