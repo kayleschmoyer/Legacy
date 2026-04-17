@@ -255,6 +255,11 @@ test.describe('subscription gating — SubscriptionPage UI @smoke', () => {
     managerJwt1,
   }) => {
     await switchUser(commissionerPage, managerJwt1, '/profile/subscription');
+    // Wait for all resources to load so the lazy-loaded SubscriptionPage chunk
+    // is fetched and React has finished mounting before we assert (LS-3616).
+    // Without this, the assertion can fire before the app re-mounts after
+    // switchUser's cookie-swap reload (same root cause as LS-3607).
+    await commissionerPage.waitForLoadState('load');
 
     await expect(
       commissionerPage.getByRole('heading', { name: /subscription|billing/i }),
