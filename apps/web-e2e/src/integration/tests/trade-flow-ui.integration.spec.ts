@@ -266,7 +266,9 @@ test.describe
 
       await waitForJoinPageValidation(page);
 
-      await page.locator('#team-name').fill('Trade Busters');
+      const teamNameInput = page.locator('#team-name');
+      await expect(teamNameInput).toBeVisible({ timeout: 5_000 });
+      await teamNameInput.fill('Trade Busters');
       const joinBtn = page.getByRole('button', { name: /Join League/i });
       await expect(joinBtn).toBeEnabled({ timeout: 5000 });
       await joinBtn.click();
