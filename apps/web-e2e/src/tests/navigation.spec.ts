@@ -38,7 +38,7 @@ test.describe('Navigation Header @smoke', () => {
     // Navigation uses role="navigation" aria-label="Primary"
     const primaryNav = page.getByRole('navigation', { name: 'Primary' });
     await expect(primaryNav).toBeVisible();
-    // Nav contains buttons for Sports, Players, Games, Help
+    // Nav contains dropdowns for Sports, Players, My Leagues and a Games link
     await expect(
       primaryNav.getByRole('button', { name: 'Sports' }),
     ).toBeVisible();
@@ -46,11 +46,9 @@ test.describe('Navigation Header @smoke', () => {
       primaryNav.getByRole('button', { name: 'Players' }),
     ).toBeVisible();
     await expect(
-      primaryNav.getByRole('button', { name: 'Games' }),
+      primaryNav.getByRole('button', { name: 'My Leagues' }),
     ).toBeVisible();
-    await expect(
-      primaryNav.getByRole('button', { name: 'Help' }),
-    ).toBeVisible();
+    await expect(primaryNav.getByRole('link', { name: 'Games' })).toBeVisible();
   });
 
   test('shows user profile area in header', async ({ page }) => {

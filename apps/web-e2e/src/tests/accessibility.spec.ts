@@ -201,18 +201,20 @@ test.describe('Screen Reader Announcements @regression', () => {
     // useRouteAnnouncer hook intentionally skips the very first render,
     // and page.goto() triggers a full page reload (= first render).
     //
-    // The Help nav button is a dropdown trigger, so instead click the
-    // first <a href="/help"> link inside the dropdown after opening it.
-    const helpDropdownBtn = page.getByRole('button', { name: 'Help' }).first();
-    await expect(helpDropdownBtn).toBeVisible({ timeout: 5000 });
-    await helpDropdownBtn.click();
+    // The Players nav button is a dropdown trigger; click it then click
+    // the first <a href="/players"> link inside the dropdown.
+    const playersDropdownBtn = page
+      .getByRole('button', { name: 'Players' })
+      .first();
+    await expect(playersDropdownBtn).toBeVisible({ timeout: 5000 });
+    await playersDropdownBtn.click();
 
-    const helpLink = page.locator('a[href="/help"]').first();
-    await expect(helpLink).toBeVisible({ timeout: 5000 });
-    await helpLink.click();
+    const playersLink = page.locator('a[href="/players"]').first();
+    await expect(playersLink).toBeVisible({ timeout: 5000 });
+    await playersLink.click();
 
     // The announcement may take a moment after navigation completes
-    await expect(politeRegion).toHaveText(/navigated to help/i, {
+    await expect(politeRegion).toHaveText(/navigated to players/i, {
       timeout: 10000,
     });
   });
@@ -240,14 +242,21 @@ test.describe('Primary Navigation Landmark @smoke', () => {
   });
 
   test('primary navigation contains expected items', async ({ page }) => {
-    await page.goto('/help');
+    await page.goto('/about');
     await page.waitForLoadState('load');
 
     const primaryNav = page.getByRole('navigation', { name: 'Primary' });
-    // Nav contains buttons for Sports, Players, Games, Help
+    // Nav contains dropdowns for Sports, Players, My Leagues and a Games link
     await expect(
-      primaryNav.getByRole('button', { name: 'Help' }),
+      primaryNav.getByRole('button', { name: 'Sports' }),
     ).toBeVisible();
+    await expect(
+      primaryNav.getByRole('button', { name: 'Players' }),
+    ).toBeVisible();
+    await expect(
+      primaryNav.getByRole('button', { name: 'My Leagues' }),
+    ).toBeVisible();
+    await expect(primaryNav.getByRole('link', { name: 'Games' })).toBeVisible();
   });
 });
 
