@@ -13,7 +13,7 @@
  * - Cancel navigation
  */
 
-import { expect } from '../fixtures/auth-enhanced';
+import { expect, unauthTest } from '../fixtures/auth-enhanced';
 import { test } from '../fixtures/auth';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 import { LeaguePage } from '../pages/league.page';
@@ -447,4 +447,47 @@ test.describe('Join League — keyboard submission @regression', () => {
       timeout: 15000,
     });
   });
+});
+
+// ---------------------------------------------------------------------------
+// LS-3537: /baseball/league/join is a protected route. Unauthenticated users
+// visiting it are intercepted by EnhancedAuthGuard and shown PublicLandingPage
+// with the "Continue with Discord" sign-in CTA. These tests lock in that the
+// button is located via getByRole (accessible name) — NOT via the broken
+// `(button:visible, [role="button"]:visible)` CSS selector that caused the
+// original crawler-reported failure.
+// ---------------------------------------------------------------------------
+
+unauthTest.describe('Join League — unauthenticated visitor @regression', () => {
+  unauthTest(
+    '"Continue with Discord" button is visible on /baseball/league/join when unauthenticated',
+    async ({ page }) => {
+      await page.goto('/baseball/league/join');
+      await page.waitForLoadState('load');
+
+      await expect(
+        page.getByRole('button', { name: /continue with discord/i }),
+      ).toBeVisible({ timeout: 15_000 });
+    },
+  );
+
+  unauthTest(
+    '"Continue with Discord" button on /baseball/league/join is clickable via getByRole',
+    async ({ page }) => {
+      await page.goto('/baseball/league/join');
+      await page.waitForLoadState('load');
+
+      const discordBtn = page.getByRole('button', {
+        name: /continue with discord/i,
+      });
+      await expect(discordBtn).toBeVisible({ timeout: 15_000 });
+      await expect(discordBtn).toBeEnabled();
+      // Confirm the click resolves without a CSS selector parse error —
+      // regression coverage for the original crawler failure. The Discord
+      // handler sets `window.location.href` to an OAuth URL, so pass
+      // `noWaitAfter: true` to avoid Playwright hanging on the cross-origin
+      // navigation (intercepted as 401 in the hermetic E2E harness).
+      await discordBtn.click({ noWaitAfter: true });
+    },
+  );
 });
