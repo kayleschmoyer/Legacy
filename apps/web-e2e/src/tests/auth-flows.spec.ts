@@ -118,12 +118,16 @@ unauthTest.describe('Login Flow @critical', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Protected Routes — all app routes require authentication. EnhancedAuthGuard
-// replaces the route content with PublicLandingPage for unauthenticated users,
-// exposing the "Continue with Google" sign-in CTA. The CTA must be locatable
-// via getByRole (accessible name) — NOT via the invalid CSS selector
-// `(button:visible, [role="button"]:visible)` that bug-bot scanners produce
-// and that surfaced as LS-3549 (/players/stats).
+// Protected Routes — routes that require authentication
+//
+// Regression coverage for functional-scan bug reports where the scanner used
+// an invalid CSS selector `(button:visible, [role="button"]:visible)` and
+// failed to click "Continue with Google" on protected routes. This has
+// surfaced for multiple routes — LS-3549 (/players/stats) and LS-3553
+// (/profile/settings). EnhancedAuthGuard replaces the route content with
+// PublicLandingPage for unauthenticated users; each route below asserts the
+// CTA is discoverable via `getByRole` — the correct, accessibility-first
+// locator.
 // ---------------------------------------------------------------------------
 
 unauthTest.describe('Protected Routes @critical', () => {
