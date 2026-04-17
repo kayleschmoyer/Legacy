@@ -9,7 +9,7 @@
  * the interactive tutorial launcher).
  */
 
-import { expect, test } from '../fixtures/auth-enhanced';
+import { expect, test, unauthTest } from '../fixtures/auth-enhanced';
 
 test.describe('Help Page — header and layout @smoke', () => {
   test.beforeEach(async ({ page }) => {
@@ -240,6 +240,30 @@ test.describe('Help Page — Historical Stats FAQ @regression', () => {
       .filter({ hasText: /how does game selection work/i });
     await expect(faqButton).toBeVisible();
   });
+});
+
+// ---------------------------------------------------------------------------
+// Unauthenticated visitor — /help is a protected route.  Unauthenticated
+// users see the PublicLandingPage instead of the help content (LS-3556).
+// ---------------------------------------------------------------------------
+
+unauthTest.describe('Help page — unauthenticated visitor @regression', () => {
+  unauthTest(
+    '"Get Started Free" CTA is visible and interactive on /help for unauthenticated users',
+    async ({ page }) => {
+      await page.goto('/help');
+      await page.waitForLoadState('load');
+
+      // The auth guard shows the PublicLandingPage on /help for unauthenticated
+      // users.  The bottom CTA (aria-label="Get started free") must be uniquely
+      // present and enabled so visitors can initiate sign-up from /help.
+      const getStartedBtn = page.getByRole('button', {
+        name: /get started free/i,
+      });
+      await expect(getStartedBtn).toBeVisible({ timeout: 15_000 });
+      await expect(getStartedBtn).toBeEnabled();
+    },
+  );
 });
 
 test.describe('Help Page — contact and support @regression', () => {
