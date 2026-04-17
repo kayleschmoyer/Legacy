@@ -923,33 +923,6 @@ export function PublicLandingPage(): React.JSX.Element {
                   )}
                 </XStack>
               </SignInButton>
-              {config.discordClientId ? (
-                <SignInButton
-                  onPress={handleDiscordSignIn}
-                  role="button"
-                  aria-label="Get Started with Discord"
-                  backgroundColor={DISCORD_BLURPLE}
-                  hoverStyle={{ backgroundColor: DISCORD_BLURPLE_DARK }}
-                >
-                  <XStack
-                    alignItems="center"
-                    gap="$2.5"
-                    minWidth={180}
-                    justifyContent="center"
-                  >
-                    {isDiscordLoading ? (
-                      <Spinner size="small" color="$color1" />
-                    ) : (
-                      <>
-                        <BrandIcon name="discord" size={18} />
-                        <Text fontSize="$4" color="$color1" fontWeight="700">
-                          Get Started with Discord
-                        </Text>
-                      </>
-                    )}
-                  </XStack>
-                </SignInButton>
-              ) : null}
             </XStack>
           </YStack>
         </YStack>
