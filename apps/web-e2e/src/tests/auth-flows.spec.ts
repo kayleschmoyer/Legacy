@@ -148,7 +148,7 @@ unauthTest.describe('Protected Routes @critical', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Public Routes — accessible without authentication (LS-3566, LS-3563)
+// Public Routes — accessible without authentication (LS-3566, LS-3563, LS-3561)
 // ---------------------------------------------------------------------------
 
 unauthTest.describe('Public Routes @critical', () => {
@@ -173,6 +173,18 @@ unauthTest.describe('Public Routes @critical', () => {
       await expect(page.getByTestId('scoreboard-heading')).toBeVisible({
         timeout: 15000,
       });
+    },
+  );
+
+  unauthTest(
+    'shows Pricing page content on /pricing when not authenticated',
+    async ({ page }) => {
+      await page.goto('/pricing');
+      await page.waitForLoadState('load');
+
+      await expect(
+        page.getByRole('heading', { name: /the plan that fits/i }),
+      ).toBeVisible({ timeout: 15000 });
     },
   );
 });

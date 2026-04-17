@@ -12,8 +12,7 @@
  * - No GraphQL calls needed (pricing page is fully static)
  */
 
-import { expect } from '../fixtures/auth-enhanced';
-import { test } from '../fixtures/auth-enhanced';
+import { expect, test, unauthTest } from '../fixtures/auth-enhanced';
 
 test.describe('Pricing page – page load @regression', () => {
   test('renders page heading and billing toggle', async ({ page }) => {
@@ -196,4 +195,46 @@ test.describe('/faq redirect @regression', () => {
     // worked and the navigation settles before teardown.
     await page.waitForURL('/');
   });
+});
+
+// LS-3561: /pricing must be accessible without authentication so that
+// unauthenticated users (and crawlers) reaching /faq see the pricing/FAQ
+// content instead of the auth gate.
+unauthTest.describe('/pricing — unauthenticated access @regression', () => {
+  unauthTest(
+    'shows pricing page content on /pricing without authentication',
+    async ({ page }) => {
+      await page.goto('/pricing');
+      await page.waitForLoadState('load');
+
+      await expect(
+        page.getByRole('heading', { name: /the plan that fits/i }),
+      ).toBeVisible({ timeout: 15_000 });
+    },
+  );
+
+  unauthTest(
+    '"Get Started Free" button is visible on /pricing without authentication',
+    async ({ page }) => {
+      await page.goto('/pricing');
+      await page.waitForLoadState('load');
+
+      await expect(
+        page.getByRole('button', { name: /get started free/i }).first(),
+      ).toBeVisible({ timeout: 10_000 });
+    },
+  );
+
+  unauthTest(
+    'redirects /faq to /pricing without authentication',
+    async ({ page }) => {
+      await page.goto('/faq');
+      await page.waitForURL(/\/pricing/, { timeout: 10_000 });
+
+      await expect(page).toHaveURL(/\/pricing/);
+      await expect(
+        page.getByRole('heading', { name: /the plan that fits/i }),
+      ).toBeVisible({ timeout: 15_000 });
+    },
+  );
 });

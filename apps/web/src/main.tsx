@@ -126,6 +126,13 @@ try {
                 publicPaths={[
                   `${import.meta.env.BASE_URL.replace(/\/$/, '')}/about`,
                   `${import.meta.env.BASE_URL.replace(/\/$/, '')}/scoreboard`,
+                  // /pricing is publicly accessible so unauthenticated users can
+                  // view plans and CTAs before signing up (LS-3561).
+                  `${import.meta.env.BASE_URL.replace(/\/$/, '')}/pricing`,
+                  // /faq redirects to /pricing (LS-3562). Adding it here ensures
+                  // the client-side <Navigate> inside App fires for unauthenticated
+                  // users — without it the auth guard intercepts before App renders.
+                  `${import.meta.env.BASE_URL.replace(/\/$/, '')}/faq`,
                 ]}
                 onLoginSuccess={() => {
                   LOGGER.info('Web app login successful!');
