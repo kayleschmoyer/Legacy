@@ -243,27 +243,44 @@ test.describe('Help Page — Historical Stats FAQ @regression', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Unauthenticated visitor — /help is a protected route.  Unauthenticated
-// users see the PublicLandingPage instead of the help content (LS-3556).
+// LS-3511: /help is a public route. Unauthenticated users must see the Help
+// page content — not the "Build Your Dynasty" landing page rendered by
+// EnhancedAuthGuard for protected routes. An automated audit crawler visited
+// https://legacy-fantasy.com/help unauthenticated, received the GitHub Pages
+// 404 response (expected for SPA routes), then saw the marketing landing page
+// after the 404.html redirect loaded the SPA — and mis-reported it as a
+// functional 404. The route is listed in publicPaths; these tests lock in the
+// unauthenticated rendering so a regression cannot go undetected.
 // ---------------------------------------------------------------------------
 
 unauthTest.describe('Help page — unauthenticated visitor @regression', () => {
-  unauthTest(
-    '"Get Started Free" CTA is visible and navigates to / on /help for unauthenticated users',
-    async ({ page }) => {
-      await page.goto('/help');
-      await page.waitForLoadState('load');
+  unauthTest.beforeEach(async ({ page }) => {
+    await page.goto('/help');
+    await page.waitForLoadState('load');
+  });
 
-      // The auth guard shows the PublicLandingPage on /help for unauthenticated
-      // users.  The bottom CTA (aria-label="Get started free") must be uniquely
-      // present, enabled, and must navigate to / when clicked (LS-3514).
-      const getStartedBtn = page.getByRole('button', {
-        name: /get started free/i,
-      });
-      await expect(getStartedBtn).toBeVisible({ timeout: 15_000 });
-      await expect(getStartedBtn).toBeEnabled();
-      await getStartedBtn.click();
-      await expect(page).toHaveURL('/');
+  unauthTest(
+    'shows Help & Support heading on /help when not authenticated',
+    async ({ page }) => {
+      await expect(
+        page.getByRole('heading', { name: /help & support/i, level: 1 }),
+      ).toBeVisible({ timeout: 15_000 });
+    },
+  );
+
+  unauthTest(
+    'does not show the marketing landing page on /help when not authenticated',
+    async ({ page }) => {
+      await expect(page.getByText(/build your dynasty/i)).not.toBeVisible();
+    },
+  );
+
+  unauthTest(
+    'shows FAQ section on /help when not authenticated',
+    async ({ page }) => {
+      await expect(
+        page.getByRole('heading', { name: /frequently asked questions/i }),
+      ).toBeVisible({ timeout: 15_000 });
     },
   );
 });

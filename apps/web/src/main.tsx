@@ -140,6 +140,9 @@ try {
                   // auth required (LS-3548).
                   `${basePath}/players/stats`,
                   `${basePath}/scoreboard`,
+                  // /help is publicly accessible so unauthenticated users can
+                  // read FAQs and support info before signing up (LS-3511).
+                  `${basePath}/help`,
                 ]}
                 // /baseball hub is publicly accessible (LS-3532). Using publicExactPaths
                 // (not publicPaths) so only the landing page is public — sub-routes like
