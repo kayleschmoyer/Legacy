@@ -158,6 +158,18 @@ async function setupGraphQL(
         contentType: 'application/json',
         body: JSON.stringify({ data: { leagueSeasonAwards: awards } }),
       });
+    } else if (postData.includes('getawardvotingperiod')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { awardVotingPeriod: null } }),
+      });
+    } else if (postData.includes('getawardvoteresults')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { awardVoteResults: [] } }),
+      });
     } else if (
       postData.includes('getplayerswithstats') ||
       postData.includes('playerswithstats')

@@ -101,6 +101,10 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = {
     },
   },
 
+  // ── Season awards voting ──────────────────────────────────────────
+  getawardvotingperiod: { data: { awardVotingPeriod: null } },
+  getawardvoteresults: { data: { awardVoteResults: [] } },
+
   // ── Trade block ───────────────────────────────────────────────────
   getleaguetradeblock: { data: { leagueTradeBlock: [] } },
 
