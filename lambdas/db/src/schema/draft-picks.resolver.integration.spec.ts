@@ -7,18 +7,30 @@
  */
 
 import { eq } from 'drizzle-orm';
+import type { PublicDb } from '@legacy-sports/db-client';
+import { commitDraftPick } from './drafts/helpers';
+import { executePickEffects } from './drafts/draft-pick-effects';
+import { createAllMatchupsForLeague } from './matchups/mutations';
+import { getLeague, getTeam, getUser } from '../__fixtures__';
 import {
   cleanupTestData,
   getTestDatabase,
   integrationTestSchema,
 } from '../../integration-test-setup';
-import { getLeague, getTeam, getUser } from '../__fixtures__';
+
+jest.mock('./matchups/mutations', () => ({
+  createAllMatchupsForLeague: jest.fn().mockResolvedValue({ matchupCount: 0 }),
+}));
+jest.mock('../services/activity-log', () => ({
+  logDraftPickActivity: jest.fn().mockResolvedValue(undefined),
+}));
 
 const {
   drafts,
   draftTeams,
   draftPicks,
   leagues,
+  matchups,
   users,
   teams,
   leagueMembers,
@@ -443,6 +455,96 @@ describe('Draft Picks - Integration Tests', () => {
       expect(entries[0].draftOrder).toBe(1);
       expect(entries[1].draftOrder).toBe(2);
       expect(entries[2].draftOrder).toBe(3);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  describe('isMockDraft guards', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('mock draft: creates draft_picks row but skips team_members insertion', async () => {
+      // commitDraftPick with isMockDraft=true must record the pick in draft_picks
+      // but must NOT add the player to team_members (rosters are ephemeral in mock drafts).
+      const {
+        league,
+        teams: teamFix,
+        draft,
+        players: playerFix,
+      } = await seedDraftFixture(2);
+
+      await commitDraftPick({
+        // Cast: SQLite adapter is structurally compatible for these queries
+        tx: db as unknown as PublicDb,
+        draftId: draft.id,
+        leagueId: league.id,
+        pickInfo: {
+          teamId: teamFix[0].id,
+          round: 1,
+          pickNumber: 1,
+          overallPick: 1, // pick 1 of 4 — draft not yet complete
+        },
+        playerId: playerFix[0].id,
+        maxRosterSize: 2,
+        pickTimeLimitSeconds: 60,
+        isMockDraft: true,
+      });
+
+      const picks = await db
+        .select()
+        .from(draftPicks)
+        .where(eq(draftPicks.draftId, draft.id));
+      expect(picks).toHaveLength(1);
+      expect(picks[0].playerId).toBe(playerFix[0].id);
+
+      const members = await db
+        .select()
+        .from(teamMembers)
+        .where(eq(teamMembers.leagueId, league.id));
+      expect(members).toHaveLength(0);
+    });
+
+    it('completing a mock draft: executePickEffects skips createAllMatchupsForLeague', async () => {
+      // When isMockDraft=true and the draft finishes, handleDraftCompletion must
+      // not be called — no matchups should be created for an ephemeral mock league.
+      const {
+        league,
+        draft,
+        teams: teamFix,
+        players: playerFix,
+      } = await seedDraftFixture(2);
+
+      await executePickEffects({
+        db: db as unknown as PublicDb,
+        notificationService: null,
+        draftLeagueId: league.id,
+        draftId: draft.id,
+        selectionMethod: 'standard',
+        isMockDraft: true,
+        pickResult: {
+          draftPick: { id: 99 },
+          autoPlayerId: playerFix[0].id,
+          autoPickReason: 'auto-pick',
+          isDraftComplete: true,
+          currentPickInfo: {
+            teamId: teamFix[0].id,
+            round: 2,
+            pickNumber: 2,
+            overallPick: 4,
+          },
+          nextPickInfo: null,
+          nextDeadline: null,
+        },
+      });
+
+      expect(jest.mocked(createAllMatchupsForLeague)).not.toHaveBeenCalled();
+
+      const matchupRows = await db
+        .select()
+        .from(matchups)
+        .where(eq(matchups.leagueId, league.id));
+      expect(matchupRows).toHaveLength(0);
     });
   });
 });

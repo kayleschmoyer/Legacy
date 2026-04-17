@@ -317,12 +317,14 @@ builder.mutationField('makeDraftPick', (t) =>
               maxRosterSize: league.maxRosterSize,
               pickTimeLimitSeconds: draft.pick_time_limit_seconds,
               setStartedAt: draft.current_pick === 0,
+              isMockDraft: league.isMockDraft,
             });
 
           return {
             draftPick,
             isDraftComplete,
             leagueId: draft.league_id,
+            isMockDraft: league.isMockDraft,
             selectionMethod: draft.selection_method,
             currentPickInfo,
             nextPickInfo,
@@ -710,6 +712,7 @@ builder.mutationField('makeDraftPick', (t) =>
                   playerId: autoPlayerId,
                   maxRosterSize: apLeague.maxRosterSize,
                   pickTimeLimitSeconds: apDraft.pick_time_limit_seconds,
+                  isMockDraft: apLeague.isMockDraft,
                 });
 
                 return {
@@ -803,9 +806,10 @@ builder.mutationField('makeDraftPick', (t) =>
           }
         }
 
-        // Auto-create all matchups when draft completes
-        // (checks effectiveDraftComplete to handle both manual and chained completions)
-        if (effectiveDraftComplete) {
+        // Auto-create all matchups when draft completes.
+        // Skipped for mock drafts — the league is ephemeral and rosters are not
+        // persisted, so matchups and badge evaluation would be meaningless.
+        if (effectiveDraftComplete && !result.isMockDraft) {
           try {
             const matchupResult = await createAllMatchupsForLeague(
               context.db,

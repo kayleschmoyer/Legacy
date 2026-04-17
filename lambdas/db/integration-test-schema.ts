@@ -22,6 +22,7 @@ export const leagues = sqliteTable('leagues', {
   maxRosterSize: integer('max_roster_size').default(25),
   currentMatchup: integer('current_matchup'),
   draftStatus: text('draft_status').default('not-started'),
+  leaguePhase: text('league_phase'),
   inviteCode: text('invite_code').notNull().unique(),
   minGamesPerSeason: integer('min_games_per_season').default(10),
   gamesPerMatchup: integer('games_per_matchup').default(5),
@@ -29,6 +30,7 @@ export const leagues = sqliteTable('leagues', {
   rosterLockTiming: text('roster_lock_timing').default('matchup_start'),
   schedulingStrategy: text('scheduling_strategy').default('round-robin'),
   createdAt: integer('created_at', { mode: 'timestamp' }),
+  isMockDraft: integer('is_mock_draft', { mode: 'boolean' }).default(false),
 });
 
 export const teams = sqliteTable('teams', {
@@ -97,8 +99,16 @@ export const drafts = sqliteTable('drafts', {
   date: text('date'), // DATE stored as ISO string in SQLite
   draftOrder: text('draft_order').notNull(),
   currentPick: integer('current_pick').notNull().default(0),
+  pickTimeLimitSeconds: integer('pick_time_limit_seconds').default(120),
+  currentPickDeadline: text('current_pick_deadline'), // Timestamp as ISO string
   draftStartedAt: text('draft_started_at'), // Timestamp as ISO string
   draftCompletedAt: text('draft_completed_at'), // Timestamp as ISO string
+  scheduledAt: text('scheduled_at'), // Timestamp as ISO string
+  autoPickDisabled: integer('auto_pick_disabled', { mode: 'boolean' }).default(
+    false,
+  ),
+  createdAt: integer('created_at', { mode: 'timestamp' }),
+  updatedAt: text('updated_at'), // Stored as ISO string when set via Postgres-typed column
 });
 
 export const draftTeams = sqliteTable(
@@ -143,6 +153,9 @@ export const draftPicks = sqliteTable(
     pickNumber: integer('pick_number').notNull(),
     overallPick: integer('overall_pick').notNull(),
     pickedAt: text('picked_at').notNull(), // Timestamp as ISO string
+    bidAmount: integer('bid_amount'),
+    createdAt: text('created_at'),
+    updatedAt: text('updated_at'),
   },
   (table) => ({
     uniqueDraftPlayer: unique().on(table.draftId, table.playerId),

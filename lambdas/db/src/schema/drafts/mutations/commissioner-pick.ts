@@ -235,12 +235,14 @@ builder.mutationField('commissionerPick', (t) =>
               playerId,
               maxRosterSize: league.maxRosterSize,
               pickTimeLimitSeconds: draft.pick_time_limit_seconds,
+              isMockDraft: league.isMockDraft,
             });
 
           return {
             draftPick,
             isDraftComplete,
             leagueId: draft.league_id,
+            isMockDraft: league.isMockDraft,
             selectionMethod: draft.selection_method,
             currentPickInfo,
             nextPickInfo,
@@ -288,8 +290,10 @@ builder.mutationField('commissionerPick', (t) =>
           }
         }
 
-        // Auto-create all matchups when draft completes
-        if (result.isDraftComplete) {
+        // Auto-create all matchups when draft completes.
+        // Skipped for mock drafts — the league is ephemeral and rosters are not
+        // persisted, so matchups and badge evaluation would be meaningless.
+        if (result.isDraftComplete && !result.isMockDraft) {
           try {
             const matchupResult = await createAllMatchupsForLeague(
               context.db,

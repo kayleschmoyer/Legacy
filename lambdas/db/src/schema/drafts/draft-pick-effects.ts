@@ -25,6 +25,8 @@ export interface PickEffectsParams {
   draftLeagueId: number;
   draftId: number;
   selectionMethod: string;
+  /** When true, skips matchup creation and badge evaluation (mock draft). */
+  isMockDraft?: boolean;
   pickResult: {
     draftPick: { id: number };
     autoPlayerId: number;
@@ -64,6 +66,7 @@ export async function executePickEffects(
     draftLeagueId,
     draftId,
     selectionMethod,
+    isMockDraft = false,
     pickResult,
   } = params;
 
@@ -104,7 +107,11 @@ export async function executePickEffects(
       }
     }
 
-    await handleDraftCompletion(db, draftLeagueId);
+    // Mock drafts skip matchup creation and badge evaluation — the league is
+    // ephemeral and rosters are not persisted, so neither would be meaningful.
+    if (!isMockDraft) {
+      await handleDraftCompletion(db, draftLeagueId);
+    }
   }
 
   // Record auto-pick in the activity log (fire-and-forget, non-fatal)

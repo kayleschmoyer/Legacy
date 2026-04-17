@@ -341,6 +341,7 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                   maxRosterSize: league.maxRosterSize,
                   pickTimeLimitSeconds,
                   deadlineBaseTime: expiredDeadline,
+                  isMockDraft: league.isMockDraft,
                 });
 
                 // Mark this team as auto-pick going forward (LS-427)
@@ -420,6 +421,7 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                 draftLeagueId,
                 draftId,
                 selectionMethod: (row.selection_method as string) ?? 'standard',
+                isMockDraft: league.isMockDraft,
                 pickResult,
               });
               result.draftsCompleted += effects.draftsCompleted;

@@ -29,13 +29,15 @@ async function createTestSchema(
       current_matchup INTEGER,
       current_week INTEGER,
       draft_status TEXT DEFAULT 'not-started',
+      league_phase TEXT,
       invite_code TEXT UNIQUE NOT NULL,
       min_games_per_season INTEGER DEFAULT 10,
       games_per_matchup INTEGER DEFAULT 5,
       trade_deadline_week INTEGER,
       roster_lock_timing TEXT DEFAULT 'matchup_start',
       scheduling_strategy TEXT DEFAULT 'round-robin',
-      created_at INTEGER DEFAULT (strftime('%s', 'now'))
+      created_at INTEGER DEFAULT (strftime('%s', 'now')),
+      is_mock_draft INTEGER DEFAULT 0
     )
   `);
 
@@ -130,8 +132,14 @@ async function createTestSchema(
       date TEXT,
       draft_order TEXT NOT NULL,
       current_pick INTEGER NOT NULL DEFAULT 0,
+      pick_time_limit_seconds INTEGER DEFAULT 120,
+      current_pick_deadline TEXT,
       draft_started_at TEXT,
       draft_completed_at TEXT,
+      scheduled_at TEXT,
+      auto_pick_disabled INTEGER DEFAULT 0,
+      created_at INTEGER,
+      updated_at TEXT,
       FOREIGN KEY (league_id) REFERENCES leagues(id) ON DELETE CASCADE
     )
   `);
@@ -162,6 +170,9 @@ async function createTestSchema(
       pick_number INTEGER NOT NULL,
       overall_pick INTEGER NOT NULL,
       picked_at TEXT NOT NULL,
+      bid_amount INTEGER,
+      created_at TEXT,
+      updated_at TEXT,
       FOREIGN KEY (draft_id) REFERENCES drafts(id) ON DELETE CASCADE,
       FOREIGN KEY (team_id) REFERENCES teams(id),
       FOREIGN KEY (player_id) REFERENCES players(id),

@@ -38,6 +38,11 @@ export interface CommitDraftPickParams {
    * should pass this as true.
    */
   setStartedAt?: boolean;
+  /**
+   * When true, skips the addPlayerToRoster call so no teamMembers row is
+   * persisted. Mock drafts record picks in draft_picks but never persist rosters.
+   */
+  isMockDraft?: boolean;
 }
 
 export interface CommitDraftPickResult {
@@ -269,6 +274,7 @@ export async function commitDraftPick(
     pickTimeLimitSeconds,
     deadlineBaseTime,
     setStartedAt = false,
+    isMockDraft = false,
   } = params;
 
   const now = new Date();
@@ -324,15 +330,19 @@ export async function commitDraftPick(
       .where(eq(PublicSchema.leagues.id, leagueId));
   }
 
-  // Add the drafted player to the team's roster
-  await addPlayerToRoster(tx, {
-    teamId: pickInfo.teamId,
-    leagueId,
-    playerId,
-    draftRound: pickInfo.round,
-    draftPick: pickInfo.pickNumber,
-    acquisitionType: 'draft',
-  });
+  // Add the drafted player to the team's roster.
+  // Skipped for mock drafts — picks are recorded in draft_picks but rosters
+  // are never persisted (isMockDraft=true leagues are ephemeral).
+  if (!isMockDraft) {
+    await addPlayerToRoster(tx, {
+      teamId: pickInfo.teamId,
+      leagueId,
+      playerId,
+      draftRound: pickInfo.round,
+      draftPick: pickInfo.pickNumber,
+      acquisitionType: 'draft',
+    });
+  }
 
   // Fetch next pick info so callers can send notifications / chain auto-picks
   let nextPickInfo: Awaited<ReturnType<typeof getCurrentDraftPickInfo>> = null;
