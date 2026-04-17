@@ -78,6 +78,12 @@ test.describe('Skip link coverage across major pages @regression', () => {
   }) => {
     await page.goto(`/baseball/league/${LEAGUE_ID}/overview`);
     await page.waitForLoadState('load');
+    // Wait for league data to load before testing skip link — the overview tab
+    // renders CommissionerAnnouncementsPanel and LeagueDuesStatusDashboard with
+    // cache-and-network, which trigger re-renders after the initial data load.
+    // Waiting for league-title confirms LeagueDetailPage has exited its
+    // initialLoading state and the page is stable enough to test focus behaviour.
+    await page.getByTestId('league-title').waitFor({ timeout: 15000 });
     await assertSkipLinkWorks(page);
   });
 
