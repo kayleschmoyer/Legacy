@@ -172,7 +172,10 @@ test.describe('/faq redirect @regression', () => {
     page,
   }) => {
     await page.goto('/faq');
-    await page.waitForLoadState('load');
+    // Wait for the client-side redirect to complete before asserting on
+    // page content — avoids a race between React Router's <Navigate> and
+    // the element check.
+    await page.waitForURL(/\/pricing/, { timeout: 10_000 });
 
     await expect(
       page.getByRole('button', { name: /get started free/i }).first(),
@@ -183,7 +186,8 @@ test.describe('/faq redirect @regression', () => {
     page,
   }) => {
     await page.goto('/faq');
-    await page.waitForLoadState('load');
+    // Wait for the client-side redirect to complete before interacting.
+    await page.waitForURL(/\/pricing/, { timeout: 10_000 });
 
     // Click the button — it should not throw and should navigate to sign-up
     // or stay on the pricing page depending on auth state.
