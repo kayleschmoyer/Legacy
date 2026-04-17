@@ -314,6 +314,14 @@ test.describe
     await switchUser(page, managerJwt1, joinUrl);
     await page.waitForLoadState('load');
 
+    // Confirm the join page heading is visible before polling for invite-code
+    // validation status. After switchUser's cookie-swap reload the React app
+    // needs a moment to re-mount; without this guard the 15 s validation poll
+    // can start before the validateInviteCode query has fired (LS-3607).
+    await expect(
+      page.getByRole('heading', { name: /join league/i }),
+    ).toBeVisible({ timeout: 10_000 });
+
     await test.step('Join page shows available spot', async () => {
       await waitForJoinPageValidation(page);
     });
