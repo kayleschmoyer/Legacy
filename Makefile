@@ -17,7 +17,8 @@
 	branch-tree cleanup-merged-branches clean-merged squash-branch rebase-tree rebase-tree-auto rebase-tree-skip resolve-conflicts \
 	pre-commit pc quick-check format-commit \
 	wt-setup \
-	stabilize-after-rebase lint-review-patterns ci-classify-failure dev-env-health e2e-scope scaffold-story scan-secret
+	stabilize-after-rebase lint-review-patterns ci-classify-failure dev-env-health e2e-scope scaffold-story scan-secret \
+	ship-pr
 .DEFAULT_GOAL := help
 
 # Platform detection and commands
@@ -921,3 +922,6 @@ scaffold-story: ## Generate a story file for a component. Usage: make scaffold-s
 
 scan-secret: ## Scan all locations for a secret/env var. Usage: make scan-secret VAR=MY_SECRET
 	@node scripts/secret-location-scanner.js $(VAR)
+
+ship-pr: ## Ship current branch as a PR (create draft → label → ready → Copilot review → Jira In Review). Usage: make ship-pr TITLE="LS-#### type(scope): desc" [NO_JIRA=1] [BODY_FILE=path] [BASE=main] [ARGS="..."]
+	@node scripts/ship-pr.js $(if $(TITLE),--title="$(TITLE)") $(if $(NO_JIRA),--no-jira) $(if $(BODY_FILE),--body-file="$(BODY_FILE)") $(if $(BASE),--base="$(BASE)") $(ARGS)

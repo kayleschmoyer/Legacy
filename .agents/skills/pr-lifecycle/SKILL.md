@@ -128,7 +128,28 @@ github_mark_pr_ready(number: <PR#>)
 ```
 
 <details>
-<summary>CLI fallback (only when MCP server is unavailable)</summary>
+<summary>Script (single command — when MCP tools are unavailable)</summary>
+
+`make ship-pr` runs the full 5-step pipeline in one shot: create draft PR → label → mark ready → request Copilot review → transition Jira to "In Review". Requires `JIRA_API_TOKEN` + `JIRA_EMAIL` env vars for the Jira step. Use `NO_JIRA=1`, `BODY_FILE=`, `BASE=`, and `ARGS=` Make variables to pass additional options; or invoke `node scripts/ship-pr.js` directly for full flag control.
+
+```bash
+# Minimal Make target — auto-detects body from .github/tmp-pr-body.md if it exists
+make ship-pr TITLE="LS-#### type(scope): description"
+
+# Make target with options
+make ship-pr TITLE="LS-#### type(scope): desc" NO_JIRA=1
+make ship-pr TITLE="LS-#### type(scope): desc" BODY_FILE=.github/tmp-pr-body.md BASE=my-branch
+
+# Direct script — use for full flag control (--dry-run, --json, --no-jira, --body-file, etc.)
+node scripts/ship-pr.js --title="LS-#### type(scope): desc" --body-file=.github/tmp-pr-body.md
+node scripts/ship-pr.js --title="LS-#### type(scope): desc" --no-jira
+node scripts/ship-pr.js --title="LS-#### type(scope): desc" --dry-run
+```
+
+</details>
+
+<details>
+<summary>CLI fallback (only when both MCP and ship-pr script are unavailable)</summary>
 
 ```bash
 gh pr create --draft --title "LS-#### type(scope): msg" --body-file ".github/tmp-pr-body.md" --base main
