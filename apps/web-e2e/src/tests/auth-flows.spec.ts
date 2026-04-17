@@ -145,6 +145,11 @@ unauthTest.describe('Protected Routes @critical', () => {
     // `(button:visible, [role="button"]:visible)` selector and logged a false
     // positive. Covered here via the correct getByRole locator.
     '/games/season-draft/create',
+    // /baseball/league/join is authenticated-only (LS-3536). Same scanner
+    // false positive — unauthenticated users see PublicLandingPage with the
+    // "Continue with Google" CTA, which the scanner's invalid selector
+    // failed to match and mis-reported as a 404.
+    '/baseball/league/join',
   ];
 
   for (const route of routes) {
