@@ -249,19 +249,21 @@ test.describe('Help Page — Historical Stats FAQ @regression', () => {
 
 unauthTest.describe('Help page — unauthenticated visitor @regression', () => {
   unauthTest(
-    '"Get Started Free" CTA is visible and interactive on /help for unauthenticated users',
+    '"Get Started Free" CTA is visible and navigates to / on /help for unauthenticated users',
     async ({ page }) => {
       await page.goto('/help');
       await page.waitForLoadState('load');
 
       // The auth guard shows the PublicLandingPage on /help for unauthenticated
       // users.  The bottom CTA (aria-label="Get started free") must be uniquely
-      // present and enabled so visitors can initiate sign-up from /help.
+      // present, enabled, and must navigate to / when clicked (LS-3514).
       const getStartedBtn = page.getByRole('button', {
         name: /get started free/i,
       });
       await expect(getStartedBtn).toBeVisible({ timeout: 15_000 });
       await expect(getStartedBtn).toBeEnabled();
+      await getStartedBtn.click();
+      await expect(page).toHaveURL('/');
     },
   );
 });
