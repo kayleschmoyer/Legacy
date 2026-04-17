@@ -32,6 +32,7 @@
 
 import { expect } from '@playwright/test';
 import { createLeagueViaUI } from '../helpers/create-league';
+import { waitForJoinPageValidation } from '../helpers/wait-for-join-page';
 import { switchUser, test } from '../fixtures/ui';
 
 // ---------------------------------------------------------------------------
@@ -172,17 +173,22 @@ test.describe
     ];
 
     for (const { jwt, teamName } of managers) {
-      await switchUser(page, jwt, joinUrl);
-      await page.waitForLoadState('load');
-      await expect(page.getByText(/spot(s)?\s+available/i).first()).toBeVisible(
-        { timeout: 30_000 },
-      );
-      await page.locator('#team-name').fill(teamName);
-      const joinBtn = page.getByRole('button', { name: /Join League/i });
-      await expect(joinBtn).toBeEnabled({ timeout: 5_000 });
-      await joinBtn.click();
-      await expect(page).toHaveURL(/\/baseball\/league\/\d+/, {
-        timeout: 15_000,
+      await test.step(`Manager joins as "${teamName}"`, async () => {
+        await switchUser(page, jwt, joinUrl);
+        await page.waitForLoadState('load');
+
+        await waitForJoinPageValidation(page);
+
+        const teamNameInput = page.getByTestId('team-name');
+        await expect(teamNameInput).toBeVisible({ timeout: 5_000 });
+        await teamNameInput.fill(teamName);
+        const joinBtn = page.getByRole('button', { name: /Join League/i });
+        await expect(joinBtn).toBeEnabled({ timeout: 5_000 });
+        await joinBtn.click();
+
+        await expect(page).toHaveURL(/\/baseball\/league\/\d+/, {
+          timeout: 15_000,
+        });
       });
     }
 
