@@ -264,29 +264,33 @@ test.describe
     managerJwt2,
     managerJwt3,
   }) => {
-    const managers = [
-      { jwt: managerJwt1, teamName: 'Waiver Team 1' },
-      { jwt: managerJwt2, teamName: 'Waiver Team 2' },
-      { jwt: managerJwt3, teamName: 'Waiver Team 3' },
-    ];
+    await test.step('Managers 1-3 join league via invite code', async () => {
+      const managers = [
+        { jwt: managerJwt1, teamName: 'Waiver Team 1' },
+        { jwt: managerJwt2, teamName: 'Waiver Team 2' },
+        { jwt: managerJwt3, teamName: 'Waiver Team 3' },
+      ];
 
-    for (const { jwt, teamName } of managers) {
-      await switchUser(page, jwt, `/baseball/league/join/${state.inviteCode}`);
-      await page.waitForLoadState('load');
+      for (const { jwt, teamName } of managers) {
+        const joinUrl = `/baseball/league/join/${state.inviteCode}`;
+        await switchUser(page, jwt, joinUrl);
+        await page.waitForLoadState('load');
 
-      await waitForJoinPageValidation(page);
+        // Wait for invite code validation (retries on transient auth race)
+        await waitForJoinPageValidation(page);
 
-      await page.locator('#team-name').fill(teamName);
-      const joinBtn = page.getByRole('button', { name: /Join League/i });
-      await expect(joinBtn).toBeEnabled({ timeout: 5000 });
-      await joinBtn.click();
+        await page.getByTestId('team-name').fill(teamName);
+        const joinBtn = page.getByRole('button', { name: /Join League/i });
+        await expect(joinBtn).toBeEnabled({ timeout: 5000 });
+        await joinBtn.click();
 
-      await expect(page).toHaveURL(/\/baseball\/league\/\d+/, {
-        timeout: 15000,
-      });
-    }
+        await expect(page).toHaveURL(/\/baseball\/league\/\d+/, {
+          timeout: 15000,
+        });
+      }
+    });
 
-    // Restore commissioner identity
+    // Restore commissioner identity after user-switching
     await switchUser(page, commissionerJwt);
   });
 
