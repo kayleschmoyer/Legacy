@@ -2,9 +2,23 @@
 /**
  * MCP server bootstrap shim.
  *
- * Ensures node_modules exists as a directory symlink before launching the
- * actual MCP server. Uses only Node.js built-in modules (no node_modules
- * required) so it runs safely even when the symlink is absent.
+ * Ensures node_modules is present before launching the actual MCP server.
+ * Uses only Node.js built-in modules so it runs safely even when
+ * node_modules is absent.
+ *
+ * Two environments are handled:
+ *
+ *   Cloud agents (Copilot Coding Agent, Claude Code on the web):
+ *     CWD is the repo root (parentName does NOT end with ".worktrees").
+ *     copilot-setup-steps.yml normally installs deps first, but if that step
+ *     failed or was skipped, node_modules may be absent.  The shim detects
+ *     this and runs `corepack pnpm install --frozen-lockfile` so MCP servers do not
+ *     fail silently with a missing-module error.
+ *
+ *   Local worktrees (Windows/macOS/Linux developer machines):
+ *     CWD is inside a *.worktrees/<name>/ directory.  node_modules is a
+ *     symlink to the main repo's node_modules.  The shim creates or repairs
+ *     that symlink before starting the server.
  *
  * Usage (via mcp.json):
  *   "command": "node",
@@ -21,7 +35,51 @@ const cwd = process.cwd();
 const parentDir = path.dirname(cwd);
 const parentName = path.basename(parentDir);
 
-// --- 1. Only act inside *.worktrees/<name> directories ----------------------
+/**
+ * Returns true if node_modules exists and resolves to a directory.
+ * Uses lstatSync so broken symlinks are detected (statSync would throw).
+ */
+function isNodeModulesHealthy(nmPath) {
+  try {
+    fs.lstatSync(nmPath); // throws if absent
+    return fs.statSync(nmPath).isDirectory(); // follows symlinks
+  } catch {
+    return false;
+  }
+}
+
+// --- 1a. Cloud / non-worktree environment: ensure node_modules is present ---
+// In cloud agents (Copilot Coding Agent, Claude Code on the web) the CWD is
+// the repo root — parentName will NOT end with ".worktrees".  The
+// copilot-setup-steps.yml installs deps before the agent starts, but if that
+// step failed or was skipped (e.g. a restarted session) node_modules may be
+// absent.  Detect and recover so MCP servers do not fail silently.
+// Uses `corepack pnpm` rather than bare `pnpm` so the install works even
+// when Corepack wasn't activated by copilot-setup-steps.yml.
+if (!parentName.endsWith('.worktrees')) {
+  const nmPath = path.join(cwd, 'node_modules');
+  if (!isNodeModulesHealthy(nmPath)) {
+    process.stderr.write(
+      `[mcp-bootstrap] node_modules not found at ${nmPath} — running corepack pnpm install --frozen-lockfile\n`,
+    );
+    try {
+      execFileSync('corepack', ['pnpm', 'install', '--frozen-lockfile'], {
+        stdio: 'inherit',
+        cwd,
+      });
+    } catch (e) {
+      process.stderr.write(
+        `[mcp-bootstrap] ERROR: corepack pnpm install failed: ${e.message}\n` +
+          `  MCP servers require node_modules to be present.\n` +
+          `  Ensure Corepack is available and copilot-setup-steps.yml ran successfully before starting the agent.\n`,
+      );
+      // Do not exit — the MCP server launch below will fail with a clearer error
+      // about the missing module (tsx) rather than a generic bootstrap failure.
+    }
+  }
+}
+
+// --- 1b. Worktree environment: ensure node_modules symlink points to main repo
 if (parentName.endsWith('.worktrees')) {
   const rootDir = path.dirname(parentDir);
   const mainRepoName = parentName.replace(/\.worktrees$/, '');
