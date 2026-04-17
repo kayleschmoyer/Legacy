@@ -22,8 +22,13 @@ export function findClaudeProjectsDir(): string {
 /**
  * Convert a CWD to the slug format Claude Code uses for project directories.
  *
- *   D:\code\legacy-sports  -> D--code-legacy-sports
- *   /home/user/foo         -> -home-user-foo
+ *   D:\code\legacy-sports                              -> D--code-legacy-sports
+ *   D:\code\legacy-sports\.claude\worktrees\name       -> D--code-legacy-sports--claude-worktrees-name
+ *   /home/user/foo                                     -> -home-user-foo
+ *   /home/user/.claude/worktrees/name                  -> -home-user--claude-worktrees-name
+ *
+ * Claude Code replaces path separators and dots with '-'. On Windows the drive
+ * colon produces an extra '-', giving the 'D--' prefix.
  */
 export function cwdToProjectSlug(cwd: string = process.cwd()): string {
   const resolved = resolve(cwd);
@@ -33,10 +38,11 @@ export function cwdToProjectSlug(cwd: string = process.cwd()): string {
       .slice(2)
       .replace(/\\/g, '-')
       .replace(/\//g, '-')
+      .replace(/\./g, '-')
       .replace(/^-+/, '');
     return `${drive}--${rest}`;
   }
-  return resolved.replace(/[\\/]/g, '-');
+  return resolved.replace(/[\\/]/g, '-').replace(/\./g, '-');
 }
 
 /**
@@ -94,14 +100,44 @@ export function resolveProjectSlug(
   if (existsSync(slugDir) && statSync(slugDir).isDirectory()) {
     return slug;
   }
-  // Fallback: match on the first ten characters of the slug
+  // Fallback: scan all sibling directories whose name starts with the same
+  // prefix and pick the one with the most recently modified JSONL file.
+  // This avoids the old alphabetical tie-break that always returned the main
+  // project dir instead of the active worktree session directory.
   const prefix = slug.slice(0, 10);
-  for (const entry of readdirSync(projectsDir).sort()) {
+  let bestMtime = -1;
+  let bestEntry: string | null = null;
+  for (const entry of readdirSync(projectsDir)) {
+    if (!entry.startsWith(prefix)) continue;
     const entryDir = join(projectsDir, entry);
-    if (entry.startsWith(prefix) && statSync(entryDir).isDirectory()) {
-      return entry;
+    let entryStat;
+    try {
+      entryStat = statSync(entryDir);
+    } catch {
+      continue;
+    }
+    if (!entryStat.isDirectory()) continue;
+    // Find the most recently modified JSONL in this candidate directory.
+    let maxMtime = -1;
+    try {
+      for (const f of readdirSync(entryDir)) {
+        if (!f.endsWith('.jsonl')) continue;
+        try {
+          const mtime = statSync(join(entryDir, f)).mtimeMs;
+          if (mtime > maxMtime) maxMtime = mtime;
+        } catch {
+          // skip unreadable files
+        }
+      }
+    } catch {
+      continue;
+    }
+    if (maxMtime > bestMtime) {
+      bestMtime = maxMtime;
+      bestEntry = entry;
     }
   }
+  if (bestEntry) return bestEntry;
   throw new Error(
     `Could not find project directory for CWD ${process.cwd()} (expected slug "${slug}")`,
   );

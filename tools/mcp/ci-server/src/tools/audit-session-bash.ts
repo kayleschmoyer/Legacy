@@ -1,7 +1,29 @@
 import { execFile } from 'node:child_process';
-import { resolve as resolvePath } from 'node:path';
+import { basename, resolve as resolvePath } from 'node:path';
 import { getRepoRoot } from '../github-api.js';
 import type { ToolResult } from '../types.js';
+
+/**
+ * Strict allow-list for project slug basenames. Mirrors assertSafeSlug in session-files.ts.
+ * Rejects absolute paths, path separators, "..", and any character outside [A-Za-z0-9._-].
+ */
+const SAFE_SLUG_RE = /^[A-Za-z0-9._-]+$/;
+
+function validateProjectSlug(slug: string): string | null {
+  // basename() strips path separators; if the result differs from the input,
+  // the caller smuggled in a directory component (e.g. "../foo", "/abs/path").
+  const safe = basename(slug);
+  if (
+    !safe ||
+    safe === '.' ||
+    safe === '..' ||
+    safe !== slug ||
+    !SAFE_SLUG_RE.test(safe)
+  ) {
+    return null;
+  }
+  return safe;
+}
 
 export interface AuditSessionBashParams {
   sessionId?: string;
@@ -44,7 +66,23 @@ export async function auditSessionBash(
     args.push('--format', 'json');
   }
   if (params.sessionId) args.push('--session-id', params.sessionId);
-  if (params.project) args.push('--project', params.project);
+  if (params.project) {
+    const safe = validateProjectSlug(params.project);
+    if (!safe) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text:
+              `Invalid project slug: ${JSON.stringify(params.project)}. ` +
+              'Must match /^[A-Za-z0-9._-]+$/ with no path separators or ".." components.',
+          },
+        ],
+      };
+    }
+    args.push('--project', safe);
+  }
   if (params.includeMcp) args.push('--include-mcp');
   if (params.pid !== undefined) args.push('--pid', String(params.pid));
   if (params.scanScratch) args.push('--scan-scratch');

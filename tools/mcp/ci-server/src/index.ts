@@ -324,7 +324,8 @@ server.tool(
     'Reads JSONL session files from ~/.claude/projects/ and returns a structured JSON report with every Bash command executed ' +
     'during the session — including subagent transcripts. Designed for the MCP gap audit (Phase 1) to produce a complete ' +
     'Bash command inventory that survives context-window compaction. ' +
-    'Auto-detects the current session and project when no parameters are provided. ' +
+    'Auto-detects the current session and project when no parameters are provided, including worktree sessions started ' +
+    'with the Claude Code launcher worktree checkbox (e.g. ~/.claude/projects/D--code-legacy-sports--claude-worktrees-<name>/). ' +
     'Default output: structured JSON report with full command details. ' +
     'Pass gapsOnly:true for a compact plain-text frequency-table summary that separates potential MCP gaps from already-covered commands. ' +
     'Pass auditMode:true for a structured JSON audit report with pre-classified gaps, confidence scores, draft ticket summaries, and noise filtering — minimizes LLM reasoning by pre-doing the classification. ' +
@@ -340,7 +341,9 @@ server.tool(
       .string()
       .optional()
       .describe(
-        'Project slug (e.g. "D--code-legacy-sports"). Auto-detected from CWD if omitted.',
+        'Project slug (e.g. "D--code-legacy-sports" for the main repo, ' +
+          '"D--code-legacy-sports--claude-worktrees-<name>" for a launcher worktree session). ' +
+          'Auto-detected from CWD if omitted — worktree sessions are detected automatically.',
       ),
     includeMcp: coercedBoolean
       .default(false)

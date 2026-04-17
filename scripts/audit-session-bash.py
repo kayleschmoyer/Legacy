@@ -30,11 +30,35 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 from collections import Counter
 from pathlib import Path
 from typing import Any
+
+# Allow-list for caller-supplied project slugs. Mirrors assertSafeSlug in session-files.ts.
+_SAFE_SLUG_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+
+
+def validate_project_slug(slug: str) -> str:
+    """Validate a caller-supplied project slug against a strict allow-list.
+
+    Mirrors assertSafeSlug in tools/mcp/ci-server/src/session-files.ts.
+    Rejects absolute paths, path separators, '..', and any character outside
+    [A-Za-z0-9._-] to prevent path-traversal outside ~/.claude/projects/.
+    """
+    # os.path.basename strips leading separators; if the result differs from
+    # the input the caller smuggled in a directory component (e.g. "../foo").
+    safe = os.path.basename(slug)
+    if not safe or safe in (".", "..") or safe != slug or not _SAFE_SLUG_RE.match(safe):
+        print(
+            f"Error: invalid project slug {slug!r}. "
+            "Must match /^[A-Za-z0-9._-]+$/ with no path separators or '..' components.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    return safe
 
 
 def find_claude_projects_dir() -> Path:
@@ -54,30 +78,55 @@ def detect_project_slug(projects_dir: Path) -> str:
     """Auto-detect the project slug from CWD.
 
     Converts the current working directory to the slug format Claude Code uses:
-    e.g., D:\\code\\legacy-sports -> D--code-legacy-sports
+    e.g., D:\\code\\legacy-sports              -> D--code-legacy-sports
+          D:\\code\\legacy-sports\\.claude\\worktrees\\name -> D--code-legacy-sports--claude-worktrees-name
+
+    Claude Code replaces path separators with '-' and '.' with '-', then prefixes
+    Windows drive letters with an extra '-' (colon becomes '--').
     """
     cwd = Path.cwd().resolve()
-    # Claude Code slug format: drive letter + -- + path segments joined by -
-    # On Windows: D:\code\legacy-sports -> D--code-legacy-sports
-    # On Linux: /home/user/project -> -home-user-project
     cwd_str = str(cwd)
     if len(cwd_str) >= 2 and cwd_str[1] == ":":
         # Windows path: D:\code\foo -> D--code-foo
+        # Dots in directory names (e.g. .claude) become '-' so \.claude -> --claude
         drive = cwd_str[0]
-        rest = cwd_str[2:].replace("\\", "-").replace("/", "-").lstrip("-")
+        rest = (
+            cwd_str[2:]
+            .replace("\\", "-")
+            .replace("/", "-")
+            .replace(".", "-")
+            .lstrip("-")
+        )
         slug = f"{drive}--{rest}"
     else:
-        # Unix path: /home/user/foo -> -home-user-foo
-        slug = cwd_str.replace("/", "-").replace("\\", "-")
+        # Unix path: /home/user/.claude/worktrees/foo -> -home-user--claude-worktrees-foo
+        slug = cwd_str.replace("/", "-").replace("\\", "-").replace(".", "-")
 
     slug_dir = projects_dir / slug
     if slug_dir.is_dir():
         return slug
 
-    # Fallback: try matching on partial name
-    for d in sorted(projects_dir.iterdir()):
-        if d.is_dir() and d.name.startswith(slug[:10]):
-            return d.name
+    # Fallback: scan all sibling directories whose name starts with the same
+    # prefix and pick the one with the most recently modified JSONL file.
+    # This handles edge cases (e.g. projects created before the dot-fix) and
+    # avoids the old alphabetical tie-break that always returned the main project
+    # dir instead of the active worktree session directory.
+    prefix = slug[:10]
+    best_mtime: float = -1.0
+    best_name: str | None = None
+    for d in projects_dir.iterdir():
+        if not d.is_dir() or not d.name.startswith(prefix):
+            continue
+        jsonl_files = list(d.glob("*.jsonl"))
+        if not jsonl_files:
+            continue
+        mtime = max(f.stat().st_mtime for f in jsonl_files)
+        if mtime > best_mtime:
+            best_mtime = mtime
+            best_name = d.name
+
+    if best_name:
+        return best_name
 
     print(f"Error: could not find project directory for CWD {cwd}", file=sys.stderr)
     print(f"  Expected slug: {slug}", file=sys.stderr)
@@ -889,7 +938,7 @@ def main() -> None:
 
     # Resolve project slug
     if args.project:
-        project_slug = args.project
+        project_slug = validate_project_slug(args.project)
     else:
         project_slug = detect_project_slug(projects_dir)
 
