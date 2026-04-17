@@ -80,6 +80,30 @@ test.describe('About Page @smoke', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// LS-3525: /about is protected by the root-level EnhancedAuthGuard.
+// Unauthenticated visitors see PublicLandingPage with "Get Started Free" CTA.
+// Locates button via getByRole (accessible name) — NOT the broken
+// `(button:visible, [role="button"]:visible)` CSS selector that caused the
+// crawler-reported failure.
+// ---------------------------------------------------------------------------
+
+unauthTest.describe('About page — unauthenticated visitor @regression', () => {
+  unauthTest(
+    '"Get Started Free" CTA is visible and interactive on /about for unauthenticated users',
+    async ({ page }) => {
+      await page.goto('/about');
+      await page.waitForLoadState('load');
+
+      const getStartedBtn = page.getByRole('button', {
+        name: /get started free/i,
+      });
+      await expect(getStartedBtn).toBeVisible({ timeout: 15_000 });
+      await expect(getStartedBtn).toBeEnabled();
+    },
+  );
+});
+
 // ─── Scoreboard ticker navigation ─────────────────────────────────────────────
 // LS-3444: Clicking a ScoreboardTicker chip from the About page must navigate
 // to /scoreboard without a 401 error.  The ticker's continuous CSS animation
