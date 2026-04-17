@@ -26,11 +26,17 @@ Autonomously work a Jira ticket from To Do through to merge (or Done). Handles t
 jira_auth_status()
 ```
 
-If `configured: false` or the call fails, **stop immediately** and tell the user:
+**If `jira_auth_status` returns a connection error** (the MCP server itself didn't start), wait ~10 seconds and retry once — the `legacy-sports-jira` server sometimes needs a moment to initialize. If it still fails, this is an MCP startup issue, not a credential issue; see the node_modules symlink note in AGENTS.md.
 
-> "Jira authentication is not configured or has expired. Please check your `JIRA_CLIENT_ID`, `JIRA_CLIENT_SECRET`, and `JIRA_CLOUD_ID` env vars. Let me know once it's fixed and I'll continue — or if you're on Claude Code on the web and want me to fall back to the Atlassian plugin, just say so."
+**If `configured: false`**, stop immediately. The error message depends on your environment:
 
-Do not proceed until auth is confirmed working or the user explicitly opts in to a fallback.
+- **Copilot Coding Agent**: "Jira credentials are missing. Add `JIRA_EMAIL` + `JIRA_API_TOKEN` (Basic Auth) or `JIRA_CLIENT_ID` + `JIRA_CLIENT_SECRET` + `JIRA_CLOUD_ID` (OAuth 2.0) to Settings → Environments → `copilot` → Environment secrets, then re-run the task."
+- **Claude Code on the web**: "Jira auth is not configured. Either set credentials in your cloud environment settings, or I can fall back to the native Atlassian plugin — just say so."
+- **Local session**: "Jira auth is not configured. Check your `.netrc` or set `JIRA_EMAIL`/`JIRA_API_TOKEN` env vars."
+
+> **⛔ Never use `acli` as a Jira fallback.** `acli` is a local-only CLI that is not installed in cloud environments (Copilot Coding Agent, Claude Code on the web). Attempting `acli jira workitem view LS-####` in a cloud session will always return "command not found" — this is not evidence that Jira is inaccessible. The `legacy-sports-jira` MCP server is the correct tool and is available in all environments when credentials are configured. Note: `configured: true` from `jira_auth_status` confirms credentials are loaded but does not guarantee reachability — in cloud sessions HTTPS egress to `api.atlassian.com` may be proxy-blocked. If `jira_auth_status` returns `configured: true` but `jira_view` fails with `fetch failed`, see the proxy quirk in `.agents/skills/cloud-agent-mode/SKILL.md`.
+
+Do not proceed until auth is confirmed working or the user explicitly opts in to a plugin fallback.
 
 ### Step 1: Inspect the ticket
 
