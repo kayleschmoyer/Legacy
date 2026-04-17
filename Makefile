@@ -111,7 +111,7 @@ endif
 install: ## Install all dependencies (Node.js and Python)
 	@$(call echo_blue,Installing dependencies...)
 ifeq ($(DETECTED_OS),Windows)
-	@powershell -NoProfile -ExecutionPolicy Bypass -File "$(WORKSPACE_PATH_WIN)\scripts\pnpm-install-lock.ps1" -InstallArgs "--frozen-lockfile" $(if $(SKIP_SYMLINK_CHECK),-SkipSymlinkCheck)
+	@powershell -NoProfile -ExecutionPolicy Bypass -File "$(WORKSPACE_PATH_WIN)\scripts\pnpm-install-lock.ps1" -InstallArgs "--frozen-lockfile" $(if $(SKIP_SYMLINK_CHECK),-SkipSymlinkCheck) $(if $(KEEP_SYMLINK),-KeepSymlink)
 else
 	pnpm install --frozen-lockfile
 endif
@@ -131,7 +131,7 @@ endif
 install-force: ## Force install dependencies (handles Windows file locks)
 	@$(call echo_blue,Force installing dependencies...)
 ifeq ($(DETECTED_OS),Windows)
-	@powershell -NoProfile -ExecutionPolicy Bypass -File "$(WORKSPACE_PATH_WIN)\scripts\pnpm-install-lock.ps1" -ForceClean -InstallArgs "--frozen-lockfile" $(if $(SKIP_SYMLINK_CHECK),-SkipSymlinkCheck)
+	@powershell -NoProfile -ExecutionPolicy Bypass -File "$(WORKSPACE_PATH_WIN)\scripts\pnpm-install-lock.ps1" -ForceClean -InstallArgs "--frozen-lockfile" $(if $(SKIP_SYMLINK_CHECK),-SkipSymlinkCheck) $(if $(KEEP_SYMLINK),-KeepSymlink)
 else
 	@$(call echo_yellow,Stopping potential background processes...)
 	@$(KILL_NODE)
@@ -152,7 +152,7 @@ install-tools: ## Install additional development tools (npkill, rimraf)
 install-node: ## Install only Node.js dependencies
 	@$(call echo_blue,Installing Node.js dependencies...)
 ifeq ($(DETECTED_OS),Windows)
-	@powershell -NoProfile -ExecutionPolicy Bypass -File "$(WORKSPACE_PATH_WIN)\scripts\pnpm-install-lock.ps1" -InstallArgs "--frozen-lockfile"
+	@powershell -NoProfile -ExecutionPolicy Bypass -File "$(WORKSPACE_PATH_WIN)\scripts\pnpm-install-lock.ps1" -InstallArgs "--frozen-lockfile" $(if $(KEEP_SYMLINK),-KeepSymlink)
 else
 	pnpm install --frozen-lockfile
 endif
