@@ -8,6 +8,7 @@
  *   - App Avatar section present
  *   - Account & Security section: sign-in method, session status
  *   - Session/Danger zone: Sign Out button present
+ *   - Accessibility: logo alt text, <main> landmark, <nav> landmark (LS-3507)
  *
  * All GraphQL queries are mocked so these tests run without a live backend.
  */
@@ -213,5 +214,45 @@ test.describe('Profile Settings Page @smoke', () => {
     await expect(
       page.getByText(/Manage your account information and preferences/),
     ).toBeVisible();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LS-3507: Accessibility regression — /profile/settings
+//
+// An automated scan flagged an empty alt attribute on the logo image and
+// missing <main> / <nav> landmarks on /profile/settings. These tests lock in
+// the correct accessible markup so a future regression is caught immediately.
+// ---------------------------------------------------------------------------
+
+test.describe('Profile Settings Page — accessibility @regression', () => {
+  test('logo image has non-empty alt text', async ({ page }) => {
+    await setupProfileGraphQL(page);
+    await page.goto('/profile/settings');
+    await page.waitForLoadState('load');
+
+    const logo = page.getByTestId('header-logo');
+    await expect(logo).toBeAttached({ timeout: 15_000 });
+    const alt = await logo.getAttribute('alt');
+    expect(alt).toBeTruthy();
+    expect((alt ?? '').trim().length).toBeGreaterThan(0);
+  });
+
+  test('page has a <main> landmark', async ({ page }) => {
+    await setupProfileGraphQL(page);
+    await page.goto('/profile/settings');
+    await page.waitForLoadState('load');
+
+    await expect(page.getByRole('main')).toBeVisible({ timeout: 15_000 });
+  });
+
+  test('page has a primary navigation landmark', async ({ page }) => {
+    await setupProfileGraphQL(page);
+    await page.goto('/profile/settings');
+    await page.waitForLoadState('load');
+
+    await expect(page.getByRole('navigation', { name: 'Primary' })).toBeVisible(
+      { timeout: 15_000 },
+    );
   });
 });
