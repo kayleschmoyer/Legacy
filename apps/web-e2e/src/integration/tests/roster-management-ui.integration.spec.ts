@@ -285,6 +285,13 @@ test.describe
     });
 
     await test.step('Verify current team name is displayed', async () => {
+      // Wait for the Team Settings card to render first — this heading only
+      // appears once getUserTeamId resolves and confirms the user has a team.
+      // Using a 30 s budget to account for Lambda cold starts in CI.
+      await expect(page.getByText('Team Settings').first()).toBeVisible({
+        timeout: 30000,
+      });
+      // Now wait for leagueTeams to populate and display the correct name.
       await expect(
         page.getByText(state.managerTeamName, { exact: false }).first(),
       ).toBeVisible({ timeout: 15000 });
