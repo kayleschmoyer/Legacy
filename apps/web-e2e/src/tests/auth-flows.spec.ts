@@ -123,17 +123,18 @@ unauthTest.describe('Login Flow @critical', () => {
 // Regression coverage for functional-scan bug reports where the scanner used
 // an invalid CSS selector `(button:visible, [role="button"]:visible)` and
 // failed to click "Continue with Google" on protected routes. This has
-// surfaced for multiple routes — LS-3549 (/players/stats) and LS-3553
-// (/profile/settings). EnhancedAuthGuard replaces the route content with
-// PublicLandingPage for unauthenticated users; each route below asserts the
-// CTA is discoverable via `getByRole` — the correct, accessibility-first
-// locator.
+// surfaced for multiple routes — LS-3549 (/players/stats), LS-3553
+// (/profile/settings), and LS-3539 (/baseball/mock-draft).
+// EnhancedAuthGuard replaces the route content with PublicLandingPage for
+// unauthenticated users; each route below asserts the CTA is discoverable
+// via `getByRole` — the correct, accessibility-first locator.
 // ---------------------------------------------------------------------------
 
 unauthTest.describe('Protected Routes @critical', () => {
   const routes = [
     '/',
     '/baseball',
+    '/baseball/mock-draft',
     '/players',
     '/management',
     '/profile/settings',
