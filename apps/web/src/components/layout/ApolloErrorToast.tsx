@@ -98,8 +98,32 @@ export function ApolloErrorToast(): React.JSX.Element | null {
       {/* Message */}
       <span style={{ flex: 1 }}>{message}</span>
 
+      {/* Retry button — reloads the page to refetch queries (LS-3630) */}
+      <button
+        type="button"
+        aria-label="Retry"
+        onClick={() => {
+          if (typeof window !== 'undefined') window.location.reload();
+        }}
+        style={{
+          background: 'transparent',
+          border: `1px solid ${withAlpha(BRAND_SEAM_RED, 0.55)}`,
+          borderRadius: 6,
+          cursor: 'pointer',
+          color: isLight ? ERROR_TEXT_LIGHT : ERROR_TEXT_DARK,
+          fontSize: 12,
+          fontWeight: 600,
+          lineHeight: '18px',
+          padding: '2px 10px',
+          flexShrink: 0,
+        }}
+      >
+        Retry
+      </button>
+
       {/* Dismiss button */}
       <button
+        type="button"
         aria-label="Dismiss error"
         onClick={dismiss}
         style={{

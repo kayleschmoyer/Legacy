@@ -22,6 +22,7 @@ import {
   BRAND_NAVY_LIGHT,
   withAlpha,
 } from '../../constants/colors';
+import { FONT_DISPLAY } from '../../constants/typography';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -217,7 +218,14 @@ export function CommissionerAnnouncementsPanel({
       >
         <XStack alignItems="center" gap="$2">
           <Megaphone size={18} color={BRAND_GOLD_LIGHT} />
-          <Text fontSize="$5" fontWeight="700" color="$color">
+          <Text
+            fontSize="$5"
+            fontWeight="700"
+            color="$color"
+            fontFamily={FONT_DISPLAY}
+            textTransform="uppercase"
+            letterSpacing={0.8}
+          >
             Commissioner Announcements
           </Text>
           {announcements.length > 0 && (

@@ -17,6 +17,7 @@ import {
   BRAND_NAVY_LIGHT,
   withAlpha,
 } from '../../constants/colors';
+import { FONT_DISPLAY } from '../../constants/typography';
 import {
   type MatchupFragment,
   type MatchupPlayerFragment,
@@ -225,9 +226,10 @@ const TeamPanel = styled(YStack, {
 });
 
 const ScoreDisplay = styled(Text, {
-  fontWeight: '900',
+  fontFamily: FONT_DISPLAY,
+  fontWeight: '800',
   fontVariant: ['tabular-nums'],
-  letterSpacing: -1.5,
+  letterSpacing: -1,
   lineHeight: 52,
   $sm: {
     lineHeight: 40,

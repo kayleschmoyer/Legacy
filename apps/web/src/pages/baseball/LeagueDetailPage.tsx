@@ -1746,6 +1746,72 @@ export function LeagueDetailPage(): React.JSX.Element {
         }}
       />
 
+      {/* Current Matchup — hero focal point above the fold (LS-3630) */}
+      {userCurrentMatchup && !matchupLoading && (
+        <Card
+          backgroundColor="$surfacePanel"
+          borderColor="$surfacePanelBorder"
+          borderWidth={1}
+          borderRadius="$6"
+          padding="$5"
+          animation="quick"
+          hoverStyle={{
+            borderColor: withAlpha(BRAND_NAVY_LIGHT, 0.35),
+          }}
+          style={{
+            background: `linear-gradient(180deg, ${withAlpha(BRAND_NAVY, 0.12)} 0%, transparent 100%)`,
+          }}
+        >
+          <XStack
+            justifyContent="space-between"
+            alignItems="center"
+            marginBottom="$3"
+          >
+            <XStack alignItems="center" gap="$2.5">
+              <Swords size={18} color={BRAND_GOLD_LIGHT} />
+              <Text
+                fontSize="$5"
+                fontWeight="700"
+                color="$color"
+                fontFamily={FONT_DISPLAY}
+                textTransform="uppercase"
+                letterSpacing={0.8}
+              >
+                Current Matchup
+              </Text>
+            </XStack>
+            <Button
+              size="$3"
+              backgroundColor="transparent"
+              borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.5)}
+              borderWidth={1}
+              borderRadius="$4"
+              color={BRAND_GOLD_LIGHT}
+              onPress={() => changeTab('matchup')}
+            >
+              <Text
+                fontSize="$2"
+                fontWeight="600"
+                color={BRAND_GOLD_LIGHT}
+                fontFamily={FONT_DISPLAY}
+                textTransform="uppercase"
+                letterSpacing={0.6}
+              >
+                View Details
+              </Text>
+            </Button>
+          </XStack>
+          <MatchupScoreboard
+            matchup={userCurrentMatchup}
+            gamesRemaining={
+              (userCurrentMatchup.gamesPerMatchup ?? 0) -
+              (userCurrentMatchup.selectedGamesCount ?? 0)
+            }
+            onTeamClick={handleViewTeamRoster}
+          />
+        </Card>
+      )}
+
       {/* League Snapshot — unified glass stats bar */}
       <SnapshotBar
         style={{
@@ -1855,27 +1921,6 @@ export function LeagueDetailPage(): React.JSX.Element {
             letterSpacing={1.2}
             fontWeight="600"
           >
-            Week
-          </Text>
-          <Text
-            fontSize="$9"
-            fontWeight="800"
-            color="$color"
-            fontFamily={FONT_DISPLAY}
-            style={{ fontVariantNumeric: 'tabular-nums' }}
-          >
-            {currentWeek || '\u2014'}
-          </Text>
-        </SnapshotStat>
-        <SnapshotDivider />
-        <SnapshotStat>
-          <Text
-            fontSize="$2"
-            color="$textMuted"
-            textTransform="uppercase"
-            letterSpacing={1.2}
-            fontWeight="600"
-          >
             Positions
           </Text>
           <Text
@@ -1896,72 +1941,6 @@ export function LeagueDetailPage(): React.JSX.Element {
       <XStack gap="$5" flexWrap="wrap" alignItems="flex-start">
         {/* Main column */}
         <YStack flex={2} minWidth={260} gap="$5">
-          {/* Matchup Preview */}
-          {userCurrentMatchup && !matchupLoading && (
-            <Card
-              backgroundColor="$surfacePanel"
-              borderColor="$surfacePanelBorder"
-              borderWidth={1}
-              borderRadius="$6"
-              padding="$5"
-              animation="quick"
-              hoverStyle={{
-                borderColor: withAlpha(BRAND_NAVY_LIGHT, 0.35),
-              }}
-              style={{
-                background: `linear-gradient(180deg, ${withAlpha(BRAND_NAVY, 0.08)} 0%, transparent 100%)`,
-              }}
-            >
-              <XStack
-                justifyContent="space-between"
-                alignItems="center"
-                marginBottom="$3"
-              >
-                <XStack alignItems="center" gap="$2.5">
-                  <Swords size={18} color={BRAND_GOLD_LIGHT} />
-                  <Text
-                    fontSize="$5"
-                    fontWeight="700"
-                    color="$color"
-                    fontFamily={FONT_DISPLAY}
-                    textTransform="uppercase"
-                    letterSpacing={0.8}
-                  >
-                    Current Matchup
-                  </Text>
-                </XStack>
-                <Button
-                  size="$3"
-                  backgroundColor="transparent"
-                  borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.5)}
-                  borderWidth={1}
-                  borderRadius="$4"
-                  color={BRAND_GOLD_LIGHT}
-                  onPress={() => changeTab('matchup')}
-                >
-                  <Text
-                    fontSize="$2"
-                    fontWeight="600"
-                    color={BRAND_GOLD_LIGHT}
-                    fontFamily={FONT_DISPLAY}
-                    textTransform="uppercase"
-                    letterSpacing={0.6}
-                  >
-                    View Details
-                  </Text>
-                </Button>
-              </XStack>
-              <MatchupScoreboard
-                matchup={userCurrentMatchup}
-                gamesRemaining={
-                  (userCurrentMatchup.gamesPerMatchup ?? 0) -
-                  (userCurrentMatchup.selectedGamesCount ?? 0)
-                }
-                onTeamClick={handleViewTeamRoster}
-              />
-            </Card>
-          )}
-
           {/* Activity / Chat / Scoring — section selector + swappable content */}
           <YStack gap="$0">
             {/* Tab strip */}
@@ -2087,80 +2066,46 @@ export function LeagueDetailPage(): React.JSX.Element {
 
         {/* Sidebar */}
         <YStack flex={1} minWidth={240} maxWidth={380} gap="$5">
-          {/* League Status — compact info strip */}
-          <SidebarCard>
-            <XStack alignItems="center" gap="$2.5" marginBottom="$3">
-              <Info size={18} color={BRAND_GOLD_LIGHT} />
-              <Text
-                fontSize="$5"
-                fontWeight="700"
-                color="$color"
-                fontFamily={FONT_DISPLAY}
-                textTransform="uppercase"
-                letterSpacing={0.8}
-              >
-                League Status
-              </Text>
-            </XStack>
-            <XStack gap="$3" flexWrap="wrap">
-              <DraftBadge
-                backgroundColor={draftColors.bg}
-                borderColor={draftColors.border}
+          {/* Commissioner badge — only render for commissioners, since season /
+              week chips are already in the hero header. LS-3630 removed the
+              duplicate "League Status" panel for non-commissioners. */}
+          {isCommissioner && (
+            <SidebarCard>
+              <XStack alignItems="center" gap="$2.5" marginBottom="$3">
+                <Info size={18} color={BRAND_GOLD_LIGHT} />
+                <Text
+                  fontSize="$5"
+                  fontWeight="700"
+                  color="$color"
+                  fontFamily={FONT_DISPLAY}
+                  textTransform="uppercase"
+                  letterSpacing={0.8}
+                >
+                  Your Role
+                </Text>
+              </XStack>
+              <XStack
+                backgroundColor="$amber3"
+                borderColor="$amber7"
+                borderWidth={1}
+                borderRadius="$10"
+                paddingHorizontal="$3"
+                paddingVertical="$1.5"
+                alignSelf="flex-start"
               >
                 <Text
                   fontSize="$2"
                   fontWeight="700"
-                  color={draftColors.text}
+                  color="$amber11"
                   fontFamily={FONT_DISPLAY}
                   textTransform="uppercase"
                   letterSpacing={0.5}
                 >
-                  {formatDraftStatus(String(league.draftStatus))}
+                  Commissioner
                 </Text>
-              </DraftBadge>
-              {currentWeek && (
-                <XStack
-                  backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.12)}
-                  borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.35)}
-                  borderWidth={1}
-                  borderRadius="$10"
-                  paddingHorizontal="$3"
-                  paddingVertical="$1.5"
-                >
-                  <Text
-                    fontSize="$2"
-                    fontWeight="700"
-                    color="$color"
-                    fontFamily={FONT_DISPLAY}
-                    letterSpacing={0.5}
-                  >
-                    Week {currentWeek}
-                  </Text>
-                </XStack>
-              )}
-              {isCommissioner && (
-                <XStack
-                  backgroundColor="$amber3"
-                  borderColor="$amber7"
-                  borderWidth={1}
-                  borderRadius="$10"
-                  paddingHorizontal="$3"
-                  paddingVertical="$1.5"
-                >
-                  <Text
-                    fontSize="$2"
-                    fontWeight="700"
-                    color="$amber11"
-                    fontFamily={FONT_DISPLAY}
-                    textTransform="uppercase"
-                    letterSpacing={0.5}
-                  >
-                    Commissioner
-                  </Text>
-                </XStack>
-              )}
-            </XStack>
-          </SidebarCard>
+              </XStack>
+            </SidebarCard>
+          )}
 
           {/* Quick Standings */}
           {leagueTeams.length > 0 && (
@@ -3752,12 +3697,23 @@ export function LeagueDetailPage(): React.JSX.Element {
               <H1
                 id="league-title"
                 data-testid="league-title"
-                fontSize="$9"
-                fontWeight="800"
                 color="white"
-                lineHeight="$9"
-                fontFamily={FONT_DISPLAY}
+                margin={0}
+                fontSize="$10"
+                fontWeight="800"
+                textTransform="uppercase"
                 letterSpacing={0.5}
+                $sm={{ fontSize: '$11' }}
+                $md={{ fontSize: '$12' }}
+                // fontFamily is kept in inline style because Tamagui's H1
+                // font token overrides the fontFamily prop and renders as
+                // the body serif — see LS-3630 review thread. lineHeight
+                // is set here for the same reason (the H1 default tightens
+                // to ~1.0 which clips descenders with this display face).
+                style={{
+                  fontFamily: FONT_DISPLAY,
+                  lineHeight: 1.02,
+                }}
               >
                 {league.name}
               </H1>
@@ -3965,7 +3921,7 @@ export function LeagueDetailPage(): React.JSX.Element {
                 backgroundColor="transparent"
                 borderWidth={0}
                 borderBottomWidth={2}
-                borderBottomColor={isActive ? BRAND_NAVY_LIGHT : 'transparent'}
+                borderBottomColor={isActive ? '$brandGoldLight' : 'transparent'}
                 borderRadius={0}
                 paddingHorizontal="$4"
                 paddingVertical="$3"

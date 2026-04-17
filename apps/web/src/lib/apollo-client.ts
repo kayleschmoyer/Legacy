@@ -304,8 +304,19 @@ export const errorLink = new ErrorLink(({ error, operation, forward }) => {
         );
       }
     } else if (ServerError.is(error)) {
+      // 502/503/504 almost always indicate the server is unreachable or
+      // overloaded — surface a warmer, action-oriented sentence (the global
+      // toast offers a Retry button). Other status codes (5xx other than the
+      // upstream gateway family, plus unusual 4xx on the transport) keep a
+      // more factual message with the code for diagnosis.
+      const isUpstreamUnreachable =
+        error.statusCode === 502 ||
+        error.statusCode === 503 ||
+        error.statusCode === 504;
       dispatchApolloError(
-        `Server error (${error.statusCode.toString()}): please try again`,
+        isUpstreamUnreachable
+          ? "We couldn't reach the server right now — please try again in a moment."
+          : `Server error (${error.statusCode.toString()}): please try again.`,
       );
       captureError(error instanceof Error ? error : new Error(String(error)), {
         context: `apollo:${operation.operationName}`,
