@@ -139,6 +139,11 @@ unauthTest.describe('Protected Routes @critical', () => {
     '/profile/settings',
     '/preferences',
     '/help',
+    // /games/season-draft/create is authenticated-only (LS-3543). An automated
+    // scanner attempted to click the landing-page CTA with the invalid
+    // `(button:visible, [role="button"]:visible)` selector and logged a false
+    // positive. Covered here via the correct getByRole locator.
+    '/games/season-draft/create',
   ];
 
   for (const route of routes) {
