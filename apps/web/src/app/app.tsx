@@ -617,12 +617,12 @@ function App() {
           The spacer inside ScoreboardTicker ensures no blank strip on empty days. */}
       <ScoreboardTicker />
       <YStack
+        tag="main"
         flex={1}
         padding="$4"
         $sm={{ padding: '$2' }}
         id="main-content"
         data-testid="main-content"
-        role="main"
         tabIndex={-1}
       >
         <Suspense
