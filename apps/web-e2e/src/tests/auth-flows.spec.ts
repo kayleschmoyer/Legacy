@@ -150,6 +150,10 @@ unauthTest.describe('Protected Routes @critical', () => {
     // "Continue with Google" CTA, which the scanner's invalid selector
     // failed to match and mis-reported as a 404.
     '/baseball/league/join',
+    // /baseball/league/create is authenticated-only (LS-3534). Same
+    // functional-scan false positive — scanner failed to click "Continue with
+    // Google" and logged a 404. Covered here via the correct getByRole locator.
+    '/baseball/league/create',
   ];
 
   for (const route of routes) {
