@@ -125,6 +125,7 @@ unauthTest.describe('Protected Routes @critical', () => {
   const routes = [
     '/',
     '/baseball',
+    '/players',
     '/players/stats',
     '/management',
     '/profile/settings',

@@ -5,7 +5,7 @@
  * and sorting. All GraphQL responses are mocked so no live backend is required.
  */
 
-import { expect, test } from '../fixtures/auth-enhanced';
+import { expect, test, unauthTest } from '../fixtures/auth-enhanced';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -192,3 +192,46 @@ test.describe('Players Directory – empty state @regression', () => {
     ).not.toBeVisible();
   });
 });
+
+// ---------------------------------------------------------------------------
+// LS-3545: /players is a protected route. Unauthenticated users visiting
+// /players are intercepted by EnhancedAuthGuard and shown PublicLandingPage
+// with the "Continue with Google" sign-in CTA. These tests lock in that the
+// button is located via getByRole (accessible name) — NOT via the broken
+// `(button:visible, [role="button"]:visible)` CSS selector that caused the
+// original crawler-reported failure.
+// ---------------------------------------------------------------------------
+
+unauthTest.describe(
+  'Players Directory — unauthenticated visitor @regression',
+  () => {
+    unauthTest(
+      '"Continue with Google" button is visible on /players when unauthenticated',
+      async ({ page }) => {
+        await page.goto('/players');
+        await page.waitForLoadState('load');
+
+        await expect(
+          page.getByRole('button', { name: /continue with google/i }),
+        ).toBeVisible({ timeout: 15_000 });
+      },
+    );
+
+    unauthTest(
+      '"Continue with Google" button on /players is clickable via getByRole',
+      async ({ page }) => {
+        await page.goto('/players');
+        await page.waitForLoadState('load');
+
+        const googleBtn = page.getByRole('button', {
+          name: /continue with google/i,
+        });
+        await expect(googleBtn).toBeVisible({ timeout: 15_000 });
+        await expect(googleBtn).toBeEnabled();
+        // Confirm the click resolves without a CSS selector parse error —
+        // regression coverage for the original crawler failure.
+        await googleBtn.click();
+      },
+    );
+  },
+);
