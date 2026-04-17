@@ -561,8 +561,7 @@ export function PublicLandingPage(): React.JSX.Element {
         <XStack alignItems="center" gap="$2">
           <img
             src={`${import.meta.env.BASE_URL}logo.png`}
-            alt=""
-            aria-hidden="true"
+            alt="Legacy Sports"
             style={{ height: 38, width: 'auto', display: 'block' }}
           />
           <Text

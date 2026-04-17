@@ -277,7 +277,9 @@ test.describe('Trading Center — header and layout @critical', () => {
   });
 
   test('shows "Propose Trade" button', async ({ page }) => {
-    await expect(page.getByText('Propose Trade')).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Propose Trade' }),
+    ).toBeVisible();
   });
 
   test('shows "Incoming Offers" section', async ({ page }) => {
