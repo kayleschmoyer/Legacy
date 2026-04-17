@@ -267,11 +267,15 @@ test.describe('Authenticated Access @critical', () => {
     // /profile/settings included so an automated scanner hitting the route
     // unauthenticated (and logging a false-positive 404) has a matching
     // positive-path regression barrier (LS-3552).
+    // /games/season-draft/create is an authenticated-only form. An automated
+    // scanner hit it unauthenticated, saw the landing page rendered by
+    // EnhancedAuthGuard, and logged a false-positive 404 (LS-3542).
     const routes = [
       '/about',
       '/baseball',
       '/players/stats',
       '/profile/settings',
+      '/games/season-draft/create',
     ];
 
     for (const route of routes) {
