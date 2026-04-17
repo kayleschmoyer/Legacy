@@ -470,6 +470,7 @@ test.describe
                 id: number;
                 gameIdentifier: string | null;
                 gameNum: number | null;
+                spSkipped: boolean | null;
               }> | null;
             }>;
           }>(
@@ -477,7 +478,7 @@ test.describe
             `query MatchupPlayers($matchupId: Int!) {
                    getMatchupPlayers(matchupId: $matchupId) {
                      id playerId
-                     games { id gameIdentifier gameNum }
+                     games { id gameIdentifier gameNum spSkipped }
                    }
                  }`,
             { matchupId: matchup.id },
@@ -489,12 +490,23 @@ test.describe
           );
           expect(playersWithGames.length).toBeGreaterThan(0);
 
-          // Every game record should have a valid gameIdentifier
+          // gameIdentifier === null iff spSkipped === true (intentional SP-skip slots).
+          // Non-skipped games must always have a real identifier.
           for (const mp of playersWithGames) {
             for (const g of mp.games ?? []) {
-              expect(g.gameIdentifier).toBeTruthy();
+              if (g.spSkipped) {
+                expect(g.gameIdentifier).toBeNull();
+              } else {
+                expect(g.gameIdentifier).toBeTruthy();
+              }
             }
           }
+
+          // At least some games across all players should be real (non-skipped)
+          const realGames = playersWithGames.flatMap((mp) =>
+            (mp.games ?? []).filter((g) => !g.spSkipped),
+          );
+          expect(realGames.length).toBeGreaterThan(0);
         }
       });
     }
