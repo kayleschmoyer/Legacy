@@ -131,7 +131,6 @@ unauthTest.describe('Protected Routes @critical', () => {
     '/',
     '/baseball',
     '/players',
-    '/players/stats',
     '/management',
     '/profile/settings',
     '/preferences',
@@ -203,6 +202,18 @@ unauthTest.describe('Public Routes @critical', () => {
       await expect(page).toHaveURL(/\/pricing/);
       await expect(
         page.getByRole('heading', { name: /the plan that fits/i }),
+      ).toBeVisible({ timeout: 15000 });
+    },
+  );
+
+  unauthTest(
+    'shows Player Stats page content on /players/stats when not authenticated (LS-3548)',
+    async ({ page }) => {
+      await page.goto('/players/stats');
+      await page.waitForLoadState('load');
+
+      await expect(
+        page.getByText(/MLB Player Statistics/i).first(),
       ).toBeVisible({ timeout: 15000 });
     },
   );

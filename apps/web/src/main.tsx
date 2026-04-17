@@ -136,6 +136,9 @@ try {
                   // unauthenticated users — without it the auth guard intercepts
                   // before App renders.
                   `${basePath}/faq`,
+                  // /players/stats shows public MLB player statistics — no
+                  // auth required (LS-3548).
+                  `${basePath}/players/stats`,
                   `${basePath}/scoreboard`,
                 ]}
                 onLoginSuccess={() => {
