@@ -56,6 +56,9 @@ const authConfig: OAuthConfig = {
   offlineAccess: true,
 };
 
+/** Strips any trailing slash from BASE_URL so path comparisons are consistent. */
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
+
 /**
  * Inner component — reads the resolved theme from ThemeContext and passes it
  * to AppProvider so TamaguiProvider re-renders with the correct active theme
@@ -67,7 +70,7 @@ function ThemeAwareApp() {
   return (
     <ReduxProvider store={store}>
       <BrowserRouter
-        basename={import.meta.env.BASE_URL.replace(/\/$/, '') || '/'}
+        basename={basePath || '/'}
         future={{ v7_relativeSplatPath: true, v7_startTransition: true }}
       >
         <AppProvider
@@ -124,15 +127,16 @@ try {
                 loginComponent={<PublicLandingPage />}
                 testMode={env.authTestMode}
                 publicPaths={[
-                  `${import.meta.env.BASE_URL.replace(/\/$/, '')}/about`,
-                  `${import.meta.env.BASE_URL.replace(/\/$/, '')}/scoreboard`,
+                  `${basePath}/about`,
                   // /pricing is publicly accessible so unauthenticated users can
-                  // view plans and CTAs before signing up (LS-3561).
-                  `${import.meta.env.BASE_URL.replace(/\/$/, '')}/pricing`,
-                  // /faq redirects to /pricing (LS-3562). Adding it here ensures
-                  // the client-side <Navigate> inside App fires for unauthenticated
-                  // users — without it the auth guard intercepts before App renders.
-                  `${import.meta.env.BASE_URL.replace(/\/$/, '')}/faq`,
+                  // view plans and CTAs before signing up (LS-3557, LS-3561).
+                  `${basePath}/pricing`,
+                  // /faq redirects to /pricing (LS-3557, LS-3562). Adding it here
+                  // ensures the client-side <Navigate> inside App fires for
+                  // unauthenticated users — without it the auth guard intercepts
+                  // before App renders.
+                  `${basePath}/faq`,
+                  `${basePath}/scoreboard`,
                 ]}
                 onLoginSuccess={() => {
                   LOGGER.info('Web app login successful!');

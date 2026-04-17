@@ -187,6 +187,19 @@ unauthTest.describe('Public Routes @critical', () => {
       ).toBeVisible({ timeout: 15000 });
     },
   );
+
+  unauthTest(
+    'redirects /faq to /pricing for unauthenticated users (LS-3557)',
+    async ({ page }) => {
+      await page.goto('/faq');
+      await page.waitForLoadState('load');
+
+      await expect(page).toHaveURL(/\/pricing/);
+      await expect(
+        page.getByRole('heading', { name: /the plan that fits/i }),
+      ).toBeVisible({ timeout: 15000 });
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------
