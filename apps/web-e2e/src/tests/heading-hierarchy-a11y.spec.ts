@@ -150,6 +150,16 @@ test.describe('Heading hierarchy — /baseball/league/1/overview @regression', (
     await page.goto('/baseball/league/1/overview');
     await page.waitForLoadState('networkidle');
     await waitForPageContent(page);
+    // waitForPageContent is satisfied by the loading spinner inside #main-content.
+    // For data-driven pages, we must also wait for the league title h1 to render
+    // with actual text before any heading-hierarchy assertions run.
+    await page.waitForFunction(
+      () => {
+        const el = document.querySelector('[data-testid="league-title"]');
+        return el != null && (el.textContent?.trim().length ?? 0) > 0;
+      },
+      { timeout: 15_000 },
+    );
   });
 
   test('League overview page has exactly one h1 after data loads', async ({
