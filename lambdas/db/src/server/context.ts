@@ -49,6 +49,43 @@ export async function getJwtSecret(): Promise<string> {
   return jwtSecretPromise;
 }
 
+const SYSTEM_API_KEY_SECRET_NAME =
+  process.env['SYSTEM_API_KEY_SECRET_NAME'] || '';
+const SYSTEM_API_KEY_LOCAL = process.env['SYSTEM_API_KEY'] || '';
+let systemApiKeyPromise: Promise<string> | null = null;
+
+/**
+ * Resolve the SYSTEM_API_KEY used to authenticate EventBridge-scheduled and
+ * admin-CLI GraphQL invocations.
+ *
+ * - In local dev, the `SYSTEM_API_KEY` env var short-circuits the Secrets
+ *   Manager lookup.
+ * - In deployed environments, `SYSTEM_API_KEY_SECRET_NAME` points at the
+ *   Secrets Manager secret; the value is fetched once per cold start and
+ *   cached in module scope (LS-2792).
+ *
+ * Returns `null` when the key is not configured so callers can treat the
+ * request as non-system without failing the whole context build. Fetch
+ * errors propagate — callers should catch and log.
+ */
+export async function getSystemApiKey(): Promise<string | null> {
+  if (SYSTEM_API_KEY_LOCAL) {
+    return SYSTEM_API_KEY_LOCAL;
+  }
+
+  if (!SYSTEM_API_KEY_SECRET_NAME) {
+    return null;
+  }
+
+  if (!systemApiKeyPromise) {
+    systemApiKeyPromise = retrieveSecretParameterValue(
+      SYSTEM_API_KEY_SECRET_NAME,
+    );
+  }
+
+  return systemApiKeyPromise;
+}
+
 export function parseUserFromJwtPayload(payload: JWTPayload): User {
   const idRaw = payload.id;
   const id = typeof idRaw === 'string' ? Number(idRaw) : idRaw;

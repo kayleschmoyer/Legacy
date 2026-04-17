@@ -57,7 +57,8 @@ resource "aws_iam_policy" "graphql_lambda_secrets" {
             aws_secretsmanager_secret.database_credentials.arn,
             aws_secretsmanager_secret.jwt_secret.arn,
             aws_secretsmanager_secret.stripe_secret_key.arn,
-            aws_secretsmanager_secret.stripe_webhook_secret.arn
+            aws_secretsmanager_secret.stripe_webhook_secret.arn,
+            aws_secretsmanager_secret.system_api_key.arn
           ],
           var.mlb_data_api_key != "" ? [aws_secretsmanager_secret.mlb_data_api_key[0].arn] : []
         )
@@ -223,8 +224,12 @@ resource "aws_lambda_function" "graphql" {
       CONNECTIONS_TABLE_NAME = aws_dynamodb_table.websocket_connections.name
       WEBSOCKET_ENDPOINT     = "https://${aws_apigatewayv2_api.websocket.id}.execute-api.${data.aws_region.current.id}.amazonaws.com/${var.environment}"
 
-      # System API key for EventBridge / admin CLI system mutations
-      SYSTEM_API_KEY = random_password.system_api_key.result
+      # System API key for EventBridge / admin CLI system mutations.
+      # Fetched from Secrets Manager at cold-start — we pass only the secret
+      # name here so the plaintext is not present in the Lambda environment
+      # (and therefore not exposed via lambda:GetFunction or the Lambda
+      # resource's environment configuration in Terraform state). See LS-2792.
+      SYSTEM_API_KEY_SECRET_NAME = aws_secretsmanager_secret.system_api_key.name
 
       # Stripe payment integration
       STRIPE_SECRET_KEY_SECRET_NAME     = aws_secretsmanager_secret.stripe_secret_key.name

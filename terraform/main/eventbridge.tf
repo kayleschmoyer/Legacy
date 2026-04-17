@@ -3,6 +3,40 @@
 # Pattern: EventBridge invokes the GraphQL Lambda directly (not via API Gateway)
 # with a GraphQL mutation payload. This lets us use the same endpoint for both
 # manual (UI) and automatic (cron) triggers.
+#
+# ── SYSTEM_API_KEY exposure trade-off (LS-2792) ─────────────────────────────
+#
+# Each target below embeds `x-system-api-key` in the `input` JSON so the
+# GraphQL Lambda's system-request check (see lambdas/db/src/server/apollo.ts)
+# accepts the invocation. The Lambda itself now fetches the key from Secrets
+# Manager at cold-start, but the EventBridge side still carries the plaintext
+# value because:
+#
+#   1. CloudWatch/EventBridge scheduled rules do not support dynamic secret
+#      injection — target `input` is a static JSON literal, and there is no
+#      input-transformer equivalent for Secrets Manager or SSM SecureString on
+#      `aws_cloudwatch_event_target`.
+#   2. Introducing an intermediate "scheduler-proxy" Lambda that fetches the
+#      secret and forwards the request would eliminate the plaintext exposure
+#      here but add an extra hop, a new deployable, and per-invocation latency
+#      for every scheduled mutation.
+#
+# We therefore accept the residual EventBridge-side exposure with the
+# following compensating controls:
+#
+#   • The value in target input is identical to the Secrets Manager secret
+#     (both are driven by `random_password.system_api_key`), so rotating the
+#     secret only requires regenerating `random_password` + `terraform apply`
+#     — no out-of-band EventBridge edits.
+#   • `events:DescribeRule` / `events:ListTargetsByRule` should be restricted
+#     to the platform-admin role in IAM (they are not granted to application
+#     roles).
+#   • The Lambda's IAM policy grants `secretsmanager:GetSecretValue` only on
+#     this specific secret ARN (see lambda-graphql.tf), so a compromised
+#     Lambda role cannot pivot to other secrets.
+#
+# If CloudTrail ever surfaces unexpected access to this rule's target input
+# or the secret, revisit the "intermediate proxy Lambda" option above.
 
 # ── Waiver Claim Processing ─────────────────────────────────────────
 # Processes pending waiver claims nightly at 2am EST.

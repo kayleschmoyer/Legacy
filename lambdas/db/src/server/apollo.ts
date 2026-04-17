@@ -8,7 +8,7 @@ import type { WebSocketNotificationService } from '@legacy-sports/aws-utils';
 import type { GenericDatabase } from '@legacy-sports/db-client';
 import type * as PublicSchema from '@legacy-sports/db-client/src/drizzle/public/schema';
 import { LOGGER } from '@legacy-sports/logging';
-import { extractUserFromApiEvent, type User } from './context';
+import { extractUserFromApiEvent, getSystemApiKey, type User } from './context';
 import {
   MAX_QUERY_COMPLEXITY,
   MAX_QUERY_DEPTH,
@@ -113,11 +113,26 @@ export function createApolloHandler(
         // Extract JWT from Authorization header or HttpOnly cookie (with CSRF)
         const user: User | null = await extractUserFromApiEvent(event);
 
-        // Check for system API key (EventBridge / admin CLI invocations)
-        const systemApiKey = process.env.SYSTEM_API_KEY;
+        // Check for system API key (EventBridge / admin CLI invocations).
+        // Only resolve the secret when the header is present so normal user
+        // traffic never pays the Secrets Manager cold-start cost. Value is
+        // cached in context.ts after the first fetch (LS-2792).
         const requestApiKey =
           event.headers['x-system-api-key'] ||
           event.headers['X-System-Api-Key'];
+        let systemApiKey: string | null = null;
+        if (requestApiKey) {
+          try {
+            systemApiKey = await getSystemApiKey();
+          } catch (error) {
+            LOGGER.warn(
+              'Failed to resolve SYSTEM_API_KEY from Secrets Manager',
+              {
+                error: error instanceof Error ? error.message : String(error),
+              },
+            );
+          }
+        }
         const isSystemRequest =
           !!systemApiKey &&
           systemApiKey.length > 0 &&
