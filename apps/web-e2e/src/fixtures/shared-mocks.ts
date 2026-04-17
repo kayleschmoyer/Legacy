@@ -70,6 +70,8 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = {
   getleagueactivity: { data: { leagueActivity: [] } },
   getleaguechatmessages: { data: { leagueChatMessages: [] } },
   getleagueannouncements: { data: { leagueAnnouncements: [] } },
+  // AwardVotingPanel fires this on the overview tab — null means no active voting period
+  getawardvotingperiod: { data: { awardVotingPeriod: null } },
   getteamwaiverclaims: { data: { teamWaiverClaims: [] } },
   getpendingtradeoffers: { data: { pendingTradeOffers: [] } },
   getleaguetradeoffers: { data: { leagueTradeOffers: [] } },
@@ -103,7 +105,6 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = {
 
   // ── Season awards (commissioner tab) ─────────────────────────────
   getleagueseasonawards: { data: { leagueSeasonAwards: [] } },
-  getawardvotingperiod: { data: { awardVotingPeriod: null } },
   getawardvoteresults: { data: { awardVoteResults: [] } },
   getmyawardvotes: { data: { myAwardVotes: [] } },
 
