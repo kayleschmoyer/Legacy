@@ -122,12 +122,17 @@ unauthTest.describe('Login Flow @critical', () => {
 //
 // Regression coverage for functional-scan bug reports where the scanner used
 // an invalid CSS selector `(button:visible, [role="button"]:visible)` and
-// failed to click "Continue with Google" on protected routes. This has
-// surfaced for multiple routes — LS-3549 (/players/stats), LS-3553
-// (/profile/settings), and LS-3539 (/baseball/mock-draft).
-// EnhancedAuthGuard replaces the route content with PublicLandingPage for
-// unauthenticated users; each route below asserts the CTA is discoverable
-// via `getByRole` — the correct, accessibility-first locator.
+// failed to click sign-in CTAs on protected routes. This has surfaced for
+// multiple routes — LS-3549 (/players/stats), LS-3553 (/profile/settings),
+// LS-3539 (/baseball/mock-draft), and LS-3535 (/baseball/league/create,
+// reported as a "Continue with Discord" click failure). EnhancedAuthGuard
+// replaces the route content with PublicLandingPage for unauthenticated
+// users; each route below asserts the always-rendered Google CTA is
+// discoverable via `getByRole` — the correct, accessibility-first locator.
+// The Google CTA is sufficient regression coverage because the underlying
+// failure was the selector syntax, not the button identity (the Discord
+// CTA is env-gated on `VITE_DISCORD_CLIENT_ID` and not rendered in
+// hermetic E2E builds).
 // ---------------------------------------------------------------------------
 
 unauthTest.describe('Protected Routes @critical', () => {
@@ -135,6 +140,7 @@ unauthTest.describe('Protected Routes @critical', () => {
     '/',
     '/baseball',
     '/baseball/mock-draft',
+    '/baseball/league/create',
     '/players',
     '/management',
     '/profile/settings',
