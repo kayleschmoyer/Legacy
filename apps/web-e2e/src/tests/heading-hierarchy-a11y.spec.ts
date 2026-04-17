@@ -152,11 +152,18 @@ test.describe('Heading hierarchy — /baseball/league/1/overview @regression', (
     await waitForPageContent(page);
     // waitForPageContent is satisfied by the loading spinner inside #main-content.
     // For data-driven pages, we must also wait for the league title h1 to render
-    // with actual text before any heading-hierarchy assertions run.
+    // with actual text before any heading-hierarchy assertions run (LS-3593).
+    // Additionally confirm it is the FIRST non-dialog heading in the document
+    // so that the "h1 is the first heading" assertion is deterministic (LS-3594).
     await page.waitForFunction(
       () => {
         const el = document.querySelector('[data-testid="league-title"]');
-        return el != null && (el.textContent?.trim().length ?? 0) > 0;
+        if (!el || (el.textContent?.trim().length ?? 0) === 0) return false;
+        // Confirm league-title h1 is the first heading outside any dialog.
+        const headings = Array.from(
+          document.querySelectorAll('h1, h2, h3, h4, h5, h6'),
+        ).filter((h) => !h.closest('[role="dialog"], dialog'));
+        return headings[0] === el;
       },
       { timeout: 15_000 },
     );
