@@ -194,12 +194,14 @@ test.describe('Players Directory – empty state @regression', () => {
 });
 
 // ---------------------------------------------------------------------------
-// LS-3545: /players is a protected route. Unauthenticated users visiting
-// /players are intercepted by EnhancedAuthGuard and shown PublicLandingPage
-// with the "Continue with Google" sign-in CTA. These tests lock in that the
-// button is located via getByRole (accessible name) — NOT via the broken
+// LS-3545 / LS-3547: /players is a protected route. Unauthenticated users
+// visiting /players are intercepted by EnhancedAuthGuard and shown
+// PublicLandingPage with the "Continue with Google" sign-in CTA and a
+// "Get Started Free" CTA lower down. These tests lock in that the buttons
+// are located via getByRole (accessible name) — NOT via the broken
 // `(button:visible, [role="button"]:visible)` CSS selector that caused the
-// original crawler-reported failure.
+// original crawler-reported failures (including the spurious
+// "[GSI_LOGGER]: FedCM get() rejects with NetworkError" attribution).
 // ---------------------------------------------------------------------------
 
 unauthTest.describe(
@@ -231,6 +233,25 @@ unauthTest.describe(
         // Confirm the click resolves without a CSS selector parse error —
         // regression coverage for the original crawler failure.
         await googleBtn.click();
+      },
+    );
+
+    unauthTest(
+      '"Get Started Free" CTA is visible and interactive on /players for unauthenticated users',
+      async ({ page }) => {
+        await page.goto('/players');
+        await page.waitForLoadState('load');
+
+        // The auth guard shows the PublicLandingPage on /players for
+        // unauthenticated users.  The CTA (aria-label="Get started free") must
+        // be present and enabled so visitors can initiate sign-up from /players.
+        // No .first() — the landing page exposes a single "Get started free"
+        // CTA, so Playwright strictness will catch accidental duplicates.
+        const getStartedBtn = page.getByRole('button', {
+          name: /get started free/i,
+        });
+        await expect(getStartedBtn).toBeVisible({ timeout: 15_000 });
+        await expect(getStartedBtn).toBeEnabled();
       },
     );
   },
