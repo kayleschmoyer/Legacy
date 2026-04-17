@@ -5287,30 +5287,57 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               const verified = existsSync(join(nmPath, 'nx')) && binPopulated;
 
               if (verified) {
-                return {
-                  content: [
-                    {
-                      type: 'text',
-                      text: JSON.stringify(
-                        {
-                          success: true,
-                          created: false,
-                          alreadyExists: true,
-                          linkType: winLinkType ?? 'symlink',
-                          symlinkPath: nmPath,
-                          target: mainNmPath,
-                          verified,
-                          message:
-                            'node_modules symlink already exists and points to the correct target.',
-                        },
-                        null,
-                        2,
-                      ),
-                    },
-                  ],
-                };
+                // Confirm accessibility from a fresh subprocess before returning
+                // success — same check as the creation path (LS-3580).
+                let alreadyExistsTestPath = false;
+                if (process.platform === 'win32') {
+                  try {
+                    const testOut = execFileSync(
+                      'powershell',
+                      [
+                        '-NoProfile',
+                        '-NonInteractive',
+                        '-Command',
+                        `Test-Path -LiteralPath '${nmPath.replace(/'/g, "''")}' -PathType Container`,
+                      ],
+                      { encoding: 'utf-8', timeout: 10_000 },
+                    ).trim();
+                    alreadyExistsTestPath = testOut === 'True';
+                  } catch {
+                    alreadyExistsTestPath = false;
+                  }
+                } else {
+                  alreadyExistsTestPath = true; // non-Windows: rely on existsSync
+                }
+
+                if (alreadyExistsTestPath) {
+                  return {
+                    content: [
+                      {
+                        type: 'text',
+                        text: JSON.stringify(
+                          {
+                            success: true,
+                            created: false,
+                            alreadyExists: true,
+                            linkType: winLinkType ?? 'symlink',
+                            symlinkPath: nmPath,
+                            target: mainNmPath,
+                            verified,
+                            message:
+                              'node_modules symlink already exists and points to the correct target.',
+                          },
+                          null,
+                          2,
+                        ),
+                      },
+                    ],
+                  };
+                }
+                // Symlink exists per lstat but is not accessible from a fresh
+                // process — fall through to remove and recreate.
               }
-              // Symlink exists but .bin is empty or nx is missing — remove and recreate
+              // Symlink exists but .bin is empty, nx is missing, or not accessible — remove and recreate
             }
             // Remove link (junction, wrong target, or unhealthy) and recreate.
             // If junction, log the conversion.
@@ -5384,6 +5411,66 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             encoding: 'utf-8',
             timeout: 15_000,
           });
+
+          // Verify the symlink is actually accessible from a fresh subprocess.
+          // Node.js existsSync() runs in the same process context and has
+          // produced false positives (LS-3580): mklink exits 0 but the path
+          // is not accessible to the calling shell or other processes.
+          // A separate PowerShell Test-Path call reflects the true file-system
+          // state independently of the MCP server process.
+          let testPathResult = false;
+          let testPathErr: string | undefined;
+          try {
+            const testOut = execFileSync(
+              'powershell',
+              [
+                '-NoProfile',
+                '-NonInteractive',
+                '-Command',
+                `Test-Path -LiteralPath '${nmPath.replace(/'/g, "''")}' -PathType Container`,
+              ],
+              { encoding: 'utf-8', timeout: 10_000 },
+            ).trim();
+            testPathResult = testOut === 'True';
+          } catch (psErr) {
+            const e = psErr as {
+              message?: string;
+              stdout?: string;
+              stderr?: string;
+            };
+            testPathErr = e.message ?? String(psErr);
+            testPathResult = false;
+          }
+
+          if (!testPathResult) {
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(
+                    {
+                      success: false,
+                      message: testPathErr
+                        ? 'node_modules symlink creation could not be verified: PowerShell Test-Path ' +
+                          `subprocess failed (${testPathErr}). The symlink may or may not exist. ` +
+                          `Check manually: powershell Test-Path -LiteralPath "${nmPath}"`
+                        : 'node_modules symlink creation reported success but the path is ' +
+                          'not accessible after mklink (false-positive exit code). ' +
+                          'Directory symlinks require Windows Developer Mode. ' +
+                          'Enable it: Settings > System > For Developers > Developer Mode. ' +
+                          `Fallback: powershell -File scripts/mklink-symlink.ps1 -Link "${nmPath}" -Target "${mainNmPath}"`,
+                      symlinkPath: nmPath,
+                      target: mainNmPath,
+                      ...(testPathErr ? { testPathError: testPathErr } : {}),
+                    },
+                    null,
+                    2,
+                  ),
+                },
+              ],
+              isError: true,
+            };
+          }
         } else {
           symlinkSync(mainNmPath, nmPath);
         }
