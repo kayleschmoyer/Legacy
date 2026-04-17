@@ -396,6 +396,7 @@ function Navigation() {
             <Link
               to="/games/season-draft"
               style={{ textDecoration: 'none', flexShrink: 0 }}
+              aria-label="Games"
               aria-current={
                 location.pathname.startsWith('/games') ? 'page' : undefined
               }
