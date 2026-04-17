@@ -129,21 +129,25 @@ test.describe
     ];
 
     for (const { jwt, teamName } of managers) {
-      const joinUrl = `/baseball/league/join/${state.inviteCode}`;
-      await switchUser(page, jwt, joinUrl);
-      await page.waitForLoadState('load');
+      await test.step(`Manager joins as "${teamName}"`, async () => {
+        const joinUrl = `/baseball/league/join/${state.inviteCode}`;
+        await switchUser(page, jwt, joinUrl);
+        await page.waitForLoadState('load');
 
-      await waitForJoinPageValidation(page);
+        await waitForJoinPageValidation(page);
 
-      await page.getByTestId('team-name').fill(teamName);
-      const joinBtn = page.getByRole('button', { name: /Join League/i });
-      await expect(joinBtn).toBeEnabled({ timeout: 5_000 });
-      await joinBtn.click();
+        const teamNameInput = page.getByTestId('team-name');
+        await expect(teamNameInput).toBeVisible({ timeout: 5_000 });
+        await teamNameInput.fill(teamName);
+        const joinBtn = page.getByRole('button', { name: /Join League/i });
+        await expect(joinBtn).toBeEnabled({ timeout: 5_000 });
+        await joinBtn.click();
 
-      await expect(page).toHaveURL(/\/baseball\/league\/\d+/, {
-        timeout: 15_000,
+        await expect(page).toHaveURL(/\/baseball\/league\/\d+/, {
+          timeout: 15_000,
+        });
+        state.teams.push(teamName);
       });
-      state.teams.push(teamName);
     }
 
     // Restore commissioner identity
