@@ -71,21 +71,23 @@ Use `worktree_file_info({ paths: [...] })` instead of `wc -l file1 file2 ...` vi
 
 Use the MCP tools below instead of `gh` CLI. These tools handle temp file body encoding, GraphQL thread IDs, and structured output. Fall back to `gh` CLI **only** when the MCP server is unavailable.
 
-| `gh` CLI command                  | MCP tool (use this)                                |
-| --------------------------------- | -------------------------------------------------- |
-| `gh pr create`                    | `github_create_pr` (with `draft: true`)            |
-| `gh pr ready`                     | `github_mark_pr_ready`                             |
-| `gh pr edit --add-label`          | `github_manage_labels`                             |
-| Remove all `ci-failure-*` labels  | `github_clear_ci_failure_labels`                   |
-| `gh api graphql` (resolve thread) | `github_resolve_thread` / `github_resolve_threads` |
-| `gh api` (review threads)         | `github_get_review_threads`                        |
-| `gh api` (PR reviews)             | `github_list_reviews`                              |
-| `gh pr view`                      | `github_view_pr`                                   |
-| `gh pr list`                      | `github_list_prs` / `github_pr_dashboard`          |
-| `gh run list`                     | `ci_list_runs`                                     |
-| `gh run view`                     | `ci_view_run`                                      |
-| `gh run rerun`                    | `ci_rerun`                                         |
-| `gh pr edit --body-file`          | No MCP equivalent — `gh` CLI is correct here       |
+| `gh` CLI command                  | MCP tool (use this)                                                                |
+| --------------------------------- | ---------------------------------------------------------------------------------- |
+| `gh pr create`                    | `github_create_pr` (with `draft: true`)                                            |
+| `gh pr ready`                     | `github_mark_pr_ready`                                                             |
+| `gh pr edit --add-label`          | `github_manage_labels` (supports both `add` and `remove` arrays)                   |
+| `gh pr edit --remove-label`       | `github_manage_labels` (supports both `add` and `remove` arrays)                   |
+| `gh pr merge`                     | `github_merge_pr` (default: merge queue; use `strategy: "direct"` for admin merge) |
+| Remove all `ci-failure-*` labels  | `github_clear_ci_failure_labels`                                                   |
+| `gh api graphql` (resolve thread) | `github_resolve_thread` / `github_resolve_threads`                                 |
+| `gh api` (review threads)         | `github_get_review_threads`                                                        |
+| `gh api` (PR reviews)             | `github_list_reviews`                                                              |
+| `gh pr view`                      | `github_view_pr`                                                                   |
+| `gh pr list`                      | `github_list_prs` / `github_pr_dashboard`                                          |
+| `gh run list`                     | `ci_list_runs`                                                                     |
+| `gh run view`                     | `ci_view_run`                                                                      |
+| `gh run rerun`                    | `ci_rerun`                                                                         |
+| `gh pr edit --body-file`          | No MCP equivalent — `gh` CLI is correct here                                       |
 
 **GitHub auth-aware routing**: call `github_auth_status` at the start of any GitHub workflow. If `configured: true`, use our custom GitHub MCP tools. If `configured: false`, **stop and prompt the user** — do not silently fall back. Tell them their GitHub credentials are missing or expired, and direct them to set `GH_TOKEN`/`GITHUB_TOKEN`, run `gh auth login`, or configure `AGENT_AUTHOR_APP_PRIVATE_KEY` (see `.agents/skills/cloud-agent-mode/SKILL.md`). Only fall back to `gh` CLI after the user confirms their `gh` auth is working or explicitly asks you to try the CLI fallback.
 
