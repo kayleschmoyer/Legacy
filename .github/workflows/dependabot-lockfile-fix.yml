@@ -4,9 +4,13 @@ name: "Fix Dependabot Lockfile"
 # monorepos. This workflow regenerates the lockfile after dependabot creates or
 # updates a PR, then pushes the corrected lockfile back to the PR branch.
 #
-# Uses pull_request_target so we get access to BOT_GITHUB_TOKEN (GitHub restricts
+# Uses pull_request_target so we get access to Actions secrets (GitHub restricts
 # secrets on pull_request events from dependabot). The actor check ensures this
 # only runs for dependabot PRs.
+#
+# Uses the Agent Author GitHub App (ID: 3158619, legacy-sports-code-bot) to
+# generate a short-lived installation token for checkout and push. This token
+# re-triggers required checks on push, which GITHUB_TOKEN cannot do.
 
 on:
   pull_request_target:
@@ -32,18 +36,14 @@ jobs:
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
     steps:
-      - name: Validate required secrets
-        env:
-          BOT_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          if [ -z "${BOT_TOKEN:-}" ]; then
-            echo "::error::secrets.BOT_GITHUB_TOKEN is not configured."
-            echo "::error::This workflow needs a token that can push back to PR branches AND retrigger required checks."
-            echo "::error::Add it under repo Settings -> Secrets and variables -> Actions -> New repository secret."
-            exit 1
-          fi
-          echo "BOT_GITHUB_TOKEN is configured."
+      - name: Generate bot token
+        uses: actions/create-github-app-token@v2
+        id: bot-token
+        with:
+          app-id: 3158619
+          private-key: ${{ secrets.AGENT_AUTHOR_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
 
       - name: Checkout PR branch
         uses: actions/checkout@v6
@@ -52,9 +52,8 @@ jobs:
           # The concurrency group with cancel-in-progress handles races.
           ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 1
-          # Bot token so the push triggers downstream CI (GITHUB_TOKEN does not
-          # re-trigger required checks).
-          token: ${{ secrets.BOT_GITHUB_TOKEN }}
+          # App token so the push re-triggers required checks (GITHUB_TOKEN cannot).
+          token: ${{ steps.bot-token.outputs.token }}
 
       - name: Bootstrap pnpm
         run: |
@@ -72,7 +71,8 @@ jobs:
       - name: Regenerate lockfile
         # --lockfile-only: update pnpm-lock.yaml without writing to node_modules
         # --ignore-scripts: prevent lifecycle scripts from running (security:
-        #   pull_request_target exposes BOT_GITHUB_TOKEN to the process env)
+        #   in pull_request_target, actions/checkout uses the app token for
+        #   authenticated git access via persisted credentials/git config)
         run: pnpm install --no-frozen-lockfile --lockfile-only --ignore-scripts
 
       - name: Commit and push if changed
