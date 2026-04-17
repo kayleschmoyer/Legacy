@@ -272,6 +272,31 @@ unauthTest.describe('Public Routes @critical', () => {
     },
   );
 
+  // LS-3519: /faq redirects to /pricing; the functional scanner attempted to
+  // click a CTA using the invalid `(button:visible, [role="button"]:visible)`
+  // CSS selector and logged a parse error.  This test locks in the correct
+  // getByRole locator so the "Get Started Free" CTA on the landing pricing
+  // page is always reachable without a selector syntax failure.
+  unauthTest(
+    '/faq redirects to /pricing and "Get Started Free" is clickable via getByRole (LS-3519)',
+    async ({ page }) => {
+      await page.goto('/faq');
+      await page.waitForLoadState('load');
+
+      // Confirm redirect landed on /pricing.
+      await expect(page).toHaveURL(/\/pricing/);
+
+      // Locate the CTA by accessible name — regression guard against the
+      // `(button:visible, [role="button"]:visible)` selector parse error.
+      const getStartedBtn = page
+        .getByRole('button', { name: /get started free/i })
+        .first();
+      await expect(getStartedBtn).toBeVisible({ timeout: 15_000 });
+      await expect(getStartedBtn).toBeEnabled();
+      await getStartedBtn.click();
+    },
+  );
+
   unauthTest(
     'shows Player Stats page content on /players/stats when not authenticated (LS-3548)',
     async ({ page }) => {
