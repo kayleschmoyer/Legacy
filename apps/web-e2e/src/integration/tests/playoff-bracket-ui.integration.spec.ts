@@ -173,17 +173,24 @@ test.describe
     ];
 
     for (const { jwt, teamName } of managers) {
-      await switchUser(page, jwt, joinUrl);
-      await page.waitForLoadState('load');
-      await waitForJoinPageValidation(page);
-      await page.locator('#team-name').fill(teamName);
-      const joinBtn = page.getByRole('button', { name: /Join League/i });
-      await expect(joinBtn).toBeEnabled({ timeout: 5_000 });
-      await joinBtn.click();
-      await expect(page).toHaveURL(/\/baseball\/league\/\d+/, {
-        timeout: 15_000,
+      await test.step(`Manager joins as "${teamName}"`, async () => {
+        await switchUser(page, jwt, joinUrl);
+        await page.waitForLoadState('load');
+
+        await waitForJoinPageValidation(page);
+
+        const teamNameInput = page.getByTestId('team-name');
+        await expect(teamNameInput).toBeVisible({ timeout: 5_000 });
+        await teamNameInput.fill(teamName);
+        const joinBtn = page.getByRole('button', { name: /Join League/i });
+        await expect(joinBtn).toBeEnabled({ timeout: 5_000 });
+        await joinBtn.click();
+
+        await expect(page).toHaveURL(/\/baseball\/league\/\d+/, {
+          timeout: 15_000,
+        });
+        state.teamNames.push(teamName);
       });
-      state.teamNames.push(teamName);
     }
 
     // Restore commissioner identity.
