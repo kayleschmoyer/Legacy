@@ -36,6 +36,8 @@ interface SeasonState {
   availablePlayers: Array<{ id: number; firstName: string }>;
   /** IDs of matchup-player entries for lineup management. */
   matchupPlayerIds: number[];
+  /** League position IDs for lineup slot assignment. */
+  leaguePositionIds: number[];
   matchupId: number;
   tradeOfferId: number;
   waiverClaimId: number;
@@ -71,6 +73,7 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
       team2Roster: [],
       availablePlayers: [],
       matchupPlayerIds: [],
+      leaguePositionIds: [],
       matchupId: 0,
       tradeOfferId: 0,
       waiverClaimId: 0,
@@ -641,32 +644,48 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
     });
 
     await test.step('4.3 Query matchup players for lineup', async () => {
-      const data = await graphqlOk<{
-        getMatchupPlayers: Array<{
-          id: number;
-          playerId: number;
-          teamId: number;
-          positionId: number | null;
-        }>;
-      }>(
-        api,
-        `query MatchupPlayers($matchupId: Int!) {
-           getMatchupPlayers(matchupId: $matchupId) {
-             id playerId teamId positionId
-           }
-         }`,
-        { matchupId: state.matchupId },
+      const [matchupData, posData] = await Promise.all([
+        graphqlOk<{
+          getMatchupPlayers: Array<{
+            id: string;
+            playerId: number;
+            teamId: number;
+            positionId: number | null;
+          }>;
+        }>(
+          api,
+          `query MatchupPlayers($matchupId: Int!) {
+             getMatchupPlayers(matchupId: $matchupId) {
+               id playerId teamId positionId
+             }
+           }`,
+          { matchupId: state.matchupId },
+        ),
+        graphqlOk<{ leaguePositions: Array<{ id: number }> }>(
+          api,
+          `query Positions($leagueId: Int!) {
+             leaguePositions(leagueId: $leagueId) { id }
+           }`,
+          { leagueId: state.leagueId },
+        ),
+      ]);
+      state.matchupPlayerIds = matchupData.getMatchupPlayers
+        .filter((mp) => Number(mp.teamId) === state.teams[0].id)
+        .map((mp) => Number(mp.id));
+      state.leaguePositionIds = posData.leaguePositions.map((p) =>
+        Number(p.id),
       );
-      state.matchupPlayerIds = data.getMatchupPlayers
-        .filter((mp) => mp.teamId === state.teams[0].id)
-        .map((mp) => mp.id);
     });
 
     await test.step('4.4 Set weekly lineup position', async () => {
-      if (state.matchupPlayerIds.length > 0) {
+      if (
+        state.matchupPlayerIds.length > 0 &&
+        state.leaguePositionIds.length > 0
+      ) {
         const mp = state.matchupPlayerIds[0];
+        const positionId = state.leaguePositionIds[0];
         const data = await graphqlOk<{
-          updateMatchupPlayerPosition: { id: number; positionId: number };
+          updateMatchupPlayerPosition: { id: string; positionId: number };
         }>(
           api,
           `mutation SetLineup($matchupPlayerId: Int!, $positionId: Int) {
@@ -674,17 +693,24 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
                matchupPlayerId: $matchupPlayerId, positionId: $positionId
              ) { id positionId }
            }`,
-          { matchupPlayerId: mp, positionId: 1 },
+          { matchupPlayerId: mp, positionId },
         );
-        expect(data.updateMatchupPlayerPosition.positionId).toBe(1);
+        expect(data.updateMatchupPlayerPosition.positionId).toBe(positionId);
       }
     });
 
     await test.step('4.5 Swap lineup positions', async () => {
-      if (state.matchupPlayerIds.length >= 2) {
+      if (
+        state.matchupPlayerIds.length >= 2 &&
+        state.leaguePositionIds.length >= 2
+      ) {
         const [a, b] = state.matchupPlayerIds;
+        const [posA, posB] = state.leaguePositionIds;
         const data = await graphqlOk<{
-          swapMatchupPlayerPositions: Array<{ id: number }>;
+          swapMatchupPlayerPositions: Array<{
+            id: string;
+            positionId: number | null;
+          }>;
         }>(
           api,
           `mutation SwapLineup(
@@ -700,8 +726,8 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
           {
             matchupPlayerIdA: a,
             matchupPlayerIdB: b,
-            positionIdA: 2,
-            positionIdB: 1,
+            positionIdA: posB,
+            positionIdB: posA,
           },
         );
         expect(data.swapMatchupPlayerPositions).toHaveLength(2);
