@@ -2,20 +2,38 @@
   "$schema": "https://raw.githubusercontent.com/anthropics/claude-code/main/.mcp.schema.json",
   "mcpServers": {
     "worktree": {
-      "command": "pnpm",
-      "args": ["exec", "tsx", "tools/mcp/worktree-server/src/index.ts"]
+      "command": "node",
+      "args": [
+        ".github/copilot/hooks/mcp-bootstrap.mjs",
+        "node",
+        "--import",
+        "tsx",
+        "tools/mcp/worktree-server/src/index.ts"
+      ]
     },
     "legacy-sports-github": {
-      "command": "pnpm",
-      "args": ["exec", "tsx", "tools/mcp/github-server/src/index.ts"],
+      "command": "node",
+      "args": [
+        ".github/copilot/hooks/mcp-bootstrap.mjs",
+        "node",
+        "--import",
+        "tsx",
+        "tools/mcp/github-server/src/index.ts"
+      ],
       "env": {
         "GH_TOKEN": "${GH_TOKEN:-}",
         "AGENT_AUTHOR_APP_PRIVATE_KEY": "${AGENT_AUTHOR_APP_PRIVATE_KEY:-}"
       }
     },
     "legacy-sports-jira": {
-      "command": "pnpm",
-      "args": ["exec", "tsx", "tools/mcp/jira-server/src/index.ts"],
+      "command": "node",
+      "args": [
+        ".github/copilot/hooks/mcp-bootstrap.mjs",
+        "node",
+        "--import",
+        "tsx",
+        "tools/mcp/jira-server/src/index.ts"
+      ],
       "env": {
         "JIRA_CLIENT_ID": "${JIRA_CLIENT_ID:-}",
         "JIRA_CLIENT_SECRET": "${JIRA_CLIENT_SECRET:-}",
@@ -26,28 +44,64 @@
       }
     },
     "legacy-sports-make": {
-      "command": "pnpm",
-      "args": ["exec", "tsx", "tools/mcp/make-server/src/index.ts"]
+      "command": "node",
+      "args": [
+        ".github/copilot/hooks/mcp-bootstrap.mjs",
+        "node",
+        "--import",
+        "tsx",
+        "tools/mcp/make-server/src/index.ts"
+      ]
     },
     "legacy-sports-nx": {
-      "command": "pnpm",
-      "args": ["exec", "tsx", "tools/mcp/nx-server/src/index.ts"]
+      "command": "node",
+      "args": [
+        ".github/copilot/hooks/mcp-bootstrap.mjs",
+        "node",
+        "--import",
+        "tsx",
+        "tools/mcp/nx-server/src/index.ts"
+      ]
     },
     "legacy-sports-db": {
-      "command": "pnpm",
-      "args": ["exec", "tsx", "tools/mcp/db-server/src/index.ts"]
+      "command": "node",
+      "args": [
+        ".github/copilot/hooks/mcp-bootstrap.mjs",
+        "node",
+        "--import",
+        "tsx",
+        "tools/mcp/db-server/src/index.ts"
+      ]
     },
     "legacy-sports-ci": {
-      "command": "pnpm",
-      "args": ["exec", "tsx", "tools/mcp/ci-server/src/index.ts"]
+      "command": "node",
+      "args": [
+        ".github/copilot/hooks/mcp-bootstrap.mjs",
+        "node",
+        "--import",
+        "tsx",
+        "tools/mcp/ci-server/src/index.ts"
+      ]
     },
     "legacy-sports-aws": {
-      "command": "pnpm",
-      "args": ["exec", "tsx", "tools/mcp/aws-server/src/index.ts"]
+      "command": "node",
+      "args": [
+        ".github/copilot/hooks/mcp-bootstrap.mjs",
+        "node",
+        "--import",
+        "tsx",
+        "tools/mcp/aws-server/src/index.ts"
+      ]
     },
     "legacy-sports-browser": {
-      "command": "pnpm",
-      "args": ["exec", "tsx", "tools/mcp/browser-server/src/index.ts"]
+      "command": "node",
+      "args": [
+        ".github/copilot/hooks/mcp-bootstrap.mjs",
+        "node",
+        "--import",
+        "tsx",
+        "tools/mcp/browser-server/src/index.ts"
+      ]
     }
   }
 }
