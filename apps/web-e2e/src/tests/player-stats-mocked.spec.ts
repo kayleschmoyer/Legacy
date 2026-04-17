@@ -6,7 +6,7 @@
  * Complements the existing player-stats.spec.ts (live-backend tests).
  */
 
-import { expect, test } from '../fixtures/auth-enhanced';
+import { expect, test, unauthTest } from '../fixtures/auth-enhanced';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 
 /** URL predicate for the GraphQL API endpoint */
@@ -376,3 +376,57 @@ test.describe('Player Stats Page (mocked) — error states @regression', () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// LS-3501: /players/stats is a public route. Unauthenticated users must see the
+// player statistics content — not the "Build Your Dynasty" marketing landing page
+// rendered by EnhancedAuthGuard for protected routes. The route is listed in
+// publicPaths (LS-3548); these tests lock in the unauthenticated rendering so
+// a regression cannot go undetected.
+// ---------------------------------------------------------------------------
+
+unauthTest.describe(
+  'Player Stats page — unauthenticated visitor (LS-3501) @regression',
+  () => {
+    unauthTest.beforeEach(async ({ page }) => {
+      await mockPlayerStatsGraphQL(page);
+      await page.goto('/players/stats');
+      await page.waitForLoadState('load');
+    });
+
+    unauthTest(
+      'shows "MLB Player Statistics" heading on /players/stats when not authenticated',
+      async ({ page }) => {
+        await expect(page.getByText('MLB Player Statistics')).toBeVisible({
+          timeout: 15_000,
+        });
+      },
+    );
+
+    unauthTest(
+      'does not show the marketing landing page on /players/stats when not authenticated',
+      async ({ page }) => {
+        await expect(page.getByText(/build your dynasty/i)).not.toBeVisible();
+      },
+    );
+
+    unauthTest(
+      'shows player stats data on /players/stats when not authenticated',
+      async ({ page }) => {
+        await expect(page.getByText('Barry Bonds')).toBeVisible({
+          timeout: 15_000,
+        });
+      },
+    );
+
+    unauthTest(
+      'shows batting and pitching tabs on /players/stats when not authenticated',
+      async ({ page }) => {
+        await expect(page.getByTestId('tab-trigger-batting')).toBeVisible({
+          timeout: 15_000,
+        });
+        await expect(page.getByTestId('tab-trigger-pitching')).toBeVisible();
+      },
+    );
+  },
+);
