@@ -6,7 +6,7 @@
  * during page load.  The baseline mocks in shared-mocks.ts cover these.
  */
 
-import { expect, test } from '../fixtures/auth-enhanced';
+import { expect, test, unauthTest } from '../fixtures/auth-enhanced';
 import { extractOperationName } from '../fixtures/shared-mocks';
 
 function isGraphQLEndpoint(url: URL): boolean {
@@ -166,4 +166,57 @@ test.describe('About page — scoreboard ticker navigation @regression', () => {
       'Unexpected Application Error',
     );
   });
+});
+
+// ---------------------------------------------------------------------------
+// LS-3524: /about is a public route. Unauthenticated users must see the
+// About page content — not the "Build Your Dynasty" landing page rendered by
+// EnhancedAuthGuard for protected routes. An automated audit crawler visited
+// https://legacy-fantasy.com/about unauthenticated, received the GitHub Pages
+// 404 response (expected for SPA routes), then saw the marketing landing page
+// after the 404.html redirect loaded the SPA — and mis-reported it as a
+// functional 404. The route is correctly listed in publicPaths; these tests
+// lock in the unauthenticated rendering so a regression cannot go undetected.
+// ---------------------------------------------------------------------------
+
+unauthTest.describe('About page — unauthenticated visitor @regression', () => {
+  unauthTest.beforeEach(async ({ page }) => {
+    await page.goto('/about');
+    await page.waitForLoadState('load');
+  });
+
+  unauthTest(
+    'shows About Legacy Sports heading on /about when not authenticated',
+    async ({ page }) => {
+      await expect(
+        page.getByRole('heading', { name: /about legacy sports/i }),
+      ).toBeVisible({ timeout: 15_000 });
+    },
+  );
+
+  unauthTest(
+    'does not show the marketing landing page on /about when not authenticated',
+    async ({ page }) => {
+      await expect(page.getByText(/build your dynasty/i)).not.toBeVisible();
+    },
+  );
+
+  unauthTest(
+    'shows Build Information section on /about when not authenticated',
+    async ({ page }) => {
+      await expect(
+        page.getByRole('heading', { name: /build information/i }),
+      ).toBeVisible({ timeout: 15_000 });
+    },
+  );
+
+  unauthTest(
+    '"Get Started Free" button is visible and navigates to / on /about when not authenticated',
+    async ({ page }) => {
+      const btn = page.getByRole('button', { name: /get started free/i });
+      await expect(btn).toBeVisible({ timeout: 15_000 });
+      await btn.click();
+      await expect(page).toHaveURL('/');
+    },
+  );
 });
