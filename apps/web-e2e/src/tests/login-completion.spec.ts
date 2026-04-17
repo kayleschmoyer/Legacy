@@ -76,6 +76,44 @@ const GSI_MOCK_WITH_HOOKS = [
 ].join('\n');
 
 // ---------------------------------------------------------------------------
+// GSI mock with FedCM error simulation
+//
+// Extends GSI_MOCK_WITH_HOOKS so that google.accounts.id.prompt() emits the
+// same console error the real GSI library logs when FedCM is triggered but the
+// user is not signed in to Google:
+//   "[GSI_LOGGER]: FedCM get() rejects with NetworkError: Error retrieving a token."
+//
+// Purpose: when this mock is active, any code path that calls prompt() on page
+// load will directly surface the LS-3529 symptom, making the regression guard
+// test (below) fail for the right reason rather than requiring a second look at
+// the _gsiOneTapCallback mechanism test.
+// ---------------------------------------------------------------------------
+
+const GSI_MOCK_WITH_FEDCM_SIMULATION = [
+  'window.google = { accounts: {',
+  '  id: {',
+  '    initialize: function(config) {',
+  '      window._gsiOneTapCallback = config.callback;',
+  '    },',
+  '    renderButton: function() {},',
+  '    prompt: function() {',
+  '      console.error("[GSI_LOGGER]: FedCM get() rejects with NetworkError: Error retrieving a token.");',
+  '    },',
+  '    cancel: function() {},',
+  '  },',
+  '  oauth2: {',
+  '    initCodeClient: function(config) {',
+  '      return {',
+  '        requestCode: function() {',
+  '          if (config.callback) config.callback({ code: "fake-auth-code" });',
+  '        },',
+  '      };',
+  '    },',
+  '  },',
+  '}};',
+].join('\n');
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -123,6 +161,58 @@ unauthTest.describe(
           () => typeof window._gsiOneTapCallback === 'function',
         );
         expect(oneTapInitialized).toBe(false);
+      },
+    );
+  },
+);
+
+// ---------------------------------------------------------------------------
+// FedCM console error absent on / page load (LS-3529)
+//
+// The real GSI library emits "[GSI_LOGGER]: FedCM get() rejects with
+// NetworkError: Error retrieving a token." when prompt() is called but no
+// Google account is signed in. One Tap was disabled on the landing page
+// (LS-3467) to prevent this. This test uses GSI_MOCK_WITH_FEDCM_SIMULATION
+// so that any accidental call to prompt() on page load is surfaced as a
+// console error, making future regressions fail here directly.
+// ---------------------------------------------------------------------------
+
+unauthTest.describe(
+  'FedCM console error absent on / page load (LS-3529) @critical',
+  () => {
+    unauthTest(
+      '[GSI_LOGGER] FedCM error is not logged on / — One Tap is disabled so prompt() is never called',
+      async ({ page }) => {
+        const fedcmErrors: string[] = [];
+        page.on('console', (msg) => {
+          const text = msg.text();
+          if (text.includes('[GSI_LOGGER]') || text.includes('FedCM get()')) {
+            fedcmErrors.push(text);
+          }
+        });
+
+        // Override the fixture GSI mock: prompt() now emits the real FedCM
+        // error. Takes precedence over the fixture catch-all via LIFO ordering.
+        await page.route('**/accounts.google.com/gsi/client', (route) =>
+          route.fulfill({
+            status: 200,
+            contentType: 'application/javascript',
+            body: GSI_MOCK_WITH_FEDCM_SIMULATION,
+          }),
+        );
+
+        await page.goto('/');
+        await page.waitForLoadState('load');
+
+        await expect(
+          page.getByRole('button', { name: /continue with google/i }),
+        ).toBeVisible({ timeout: 15000 });
+
+        // One Tap is disabled → prompt() never called → no FedCM error logged.
+        expect(
+          fedcmErrors,
+          'Expected no [GSI_LOGGER] FedCM console errors on / page load',
+        ).toHaveLength(0);
       },
     );
   },
