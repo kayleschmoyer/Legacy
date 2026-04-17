@@ -62,6 +62,14 @@ export default defineConfig({
     actionTimeout: 15000,
     navigationTimeout: 15000,
 
+    /* Emulate prefers-reduced-motion so the ScoreboardTicker renders its
+     * static layout instead of the continuously-translating animated strip.
+     * Without this, Playwright flags links inside the scrolling inner container
+     * as "not stable" because the CSS animation keeps moving the element.
+     * Note: reducedMotion lives inside contextOptions (not top-level use) in
+     * Playwright 1.59.x — top-level reducedMotion is not a typed property. */
+    contextOptions: { reducedMotion: 'reduce' },
+
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
   },
