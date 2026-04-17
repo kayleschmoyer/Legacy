@@ -468,6 +468,31 @@ unauthTest.describe('Scoreboard — unauthenticated access @critical', () => {
     },
   );
 
+  // LS-3523: the functional scanner found a "Continue with Google" button on
+  // /scoreboard and reported it as broken (the scanner used the invalid CSS
+  // selector `(button:visible, [role="button"]:visible)`). The root cause was
+  // that /scoreboard was a protected route; LS-3563 made it public. This test
+  // locks in that the auth gate never appears on /scoreboard so unauthenticated
+  // users always land directly on the scoreboard, not the sign-in page.
+  unauthTest(
+    '"Continue with Google" auth gate is not shown on public /scoreboard route (LS-3523)',
+    async ({ page }) => {
+      await mockScoreboardGraphQL(page);
+      await page.goto('/scoreboard');
+      await page.waitForLoadState('load');
+
+      // /scoreboard is public — the auth gate must never intercept it.
+      await expect(
+        page.getByRole('button', { name: /continue with google/i }),
+      ).not.toBeVisible({ timeout: 15_000 });
+
+      // Confirm the scoreboard itself is reachable without sign-in.
+      await expect(page.getByTestId('scoreboard-heading')).toBeVisible({
+        timeout: 15_000,
+      });
+    },
+  );
+
   unauthTest(
     'navigating from /scoreboard to a protected route shows the login gate',
     async ({ page }) => {
