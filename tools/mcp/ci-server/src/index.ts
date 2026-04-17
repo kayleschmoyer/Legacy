@@ -12,7 +12,6 @@ import { rerun } from './tools/rerun.js';
 import { searchLogs } from './tools/search-logs.js';
 import { sessionStats } from './tools/session-stats.js';
 import { viewRun } from './tools/view-run.js';
-import { waitForRun } from './tools/wait-for-run.js';
 import { workflowInfo } from './tools/workflow-info.js';
 import { workflowSetState } from './tools/workflow-state.js';
 import { getToken, buildHeaders, sanitizeErrorBody } from './github-api.js';
@@ -200,37 +199,6 @@ server.tool(
       .describe('Include jobs (default: true)'),
   },
   async (params) => viewRun(params),
-);
-
-server.tool(
-  'ci_wait_for_run',
-  "Prefer this over sleep+poll patterns like `sleep N && gh run view`. Polls a CI workflow run until `status === 'completed'`, then returns the run data including `conclusion`. GitHub run `status` has three values: `queued`, `in_progress`, and `completed` — this tool waits for `completed`. The `conclusion` field (e.g. `success`, `failure`, `cancelled`, `timed_out`, `action_required`, `neutral`, `skipped`) is only set once `status` reaches `completed`; these are conclusion values, not status values. Replaces sleep+poll patterns. Default timeout: 10 minutes, default poll interval: 15 seconds.",
-  {
-    runId: z.coerce
-      .number()
-      .int()
-      .positive()
-      .describe('Workflow run ID (from ci_list_runs or ci_view_run)'),
-    timeoutMs: z.coerce
-      .number()
-      .int()
-      .min(30_000)
-      .max(1_800_000)
-      .default(600_000)
-      .describe(
-        'Maximum wait time in milliseconds (default: 600000 = 10 min, min: 30s, max: 30 min)',
-      ),
-    pollIntervalMs: z.coerce
-      .number()
-      .int()
-      .min(5_000)
-      .max(120_000)
-      .default(15_000)
-      .describe(
-        'Polling interval in milliseconds (default: 15000 = 15s, min: 5s, max: 120s)',
-      ),
-  },
-  async (params) => waitForRun(params),
 );
 
 server.tool(

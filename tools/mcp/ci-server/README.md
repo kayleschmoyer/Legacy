@@ -15,7 +15,6 @@ GitHub Actions workflow run triage and management for Legacy Sports.
 - **ci_get_logs** — Retrieve full or failed-only logs for a run or specific job
 - **ci_search_logs** — Search run logs with optional regex and context lines
 - **ci_rerun** — Rerun failed jobs, a specific job, or an entire workflow run
-- **ci_wait_for_run** — Poll until a workflow run reaches a terminal state
 - **ci_dispatch_workflow** — Trigger a workflow_dispatch event
 
 ### Workflow State

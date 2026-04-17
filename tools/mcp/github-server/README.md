@@ -23,7 +23,6 @@ Pull request and review lifecycle management via the GitHub REST and GraphQL API
 - **github_mark_pr_ready** — Convert a draft PR to ready for review
 - **github_rebase_pr** — Rebase a PR branch onto base and force-push
 - **github_pr_commits** — List commits on a PR
-- **github_wait_for_pr_event** — Poll for a PR event (merged, approved, etc.)
 
 ### Reviews & Comments
 
