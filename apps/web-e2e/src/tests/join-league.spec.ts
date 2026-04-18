@@ -495,15 +495,45 @@ unauthTest.describe(
 );
 
 // ---------------------------------------------------------------------------
-// LS-3537: /baseball/league/join is a protected route. Unauthenticated users
-// visiting it are intercepted by EnhancedAuthGuard and shown PublicLandingPage
-// with the "Continue with Discord" sign-in CTA. These tests lock in that the
-// button is located via getByRole (accessible name) — NOT via the broken
-// `(button:visible, [role="button"]:visible)` CSS selector that caused the
-// original crawler-reported failure.
+// LS-3537 / LS-3482: /baseball/league/join is a protected route. Unauthenticated
+// users visiting it are intercepted by EnhancedAuthGuard and shown
+// PublicLandingPage with "Get Started Free" and "Continue with Discord" CTAs.
+// These tests lock in that buttons are located via getByRole (accessible name)
+// — NOT via the broken `(button:visible, [role="button"]:visible)` CSS selector
+// that caused the original crawler-reported failures.
 // ---------------------------------------------------------------------------
 
 unauthTest.describe('Join League — unauthenticated visitor @regression', () => {
+  unauthTest(
+    '"Get Started Free" button is visible on /baseball/league/join when unauthenticated',
+    async ({ page }) => {
+      await page.goto('/baseball/league/join');
+      await page.waitForLoadState('load');
+
+      await expect(
+        page.getByRole('button', { name: /get started free/i }),
+      ).toBeVisible({ timeout: 15_000 });
+    },
+  );
+
+  unauthTest(
+    '"Get Started Free" button on /baseball/league/join is clickable via getByRole (LS-3482)',
+    async ({ page }) => {
+      await page.goto('/baseball/league/join');
+      await page.waitForLoadState('load');
+
+      const getStartedBtn = page.getByRole('button', {
+        name: /get started free/i,
+      });
+      await expect(getStartedBtn).toBeVisible({ timeout: 15_000 });
+      await expect(getStartedBtn).toBeEnabled();
+      // Regression for LS-3482: confirm the click resolves without the
+      // CSS selector parse error caused by the broken crawler selector
+      // `(button:visible, [role="button"]:visible)`.
+      await getStartedBtn.click();
+    },
+  );
+
   unauthTest(
     '"Continue with Discord" button is visible on /baseball/league/join when unauthenticated',
     async ({ page }) => {
