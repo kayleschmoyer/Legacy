@@ -6287,12 +6287,36 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         grep: grepPattern,
         maxMatches: grepMaxMatches,
       } = args as {
-        ref: string;
-        path: string;
+        ref?: string;
+        path?: string;
         lines?: string;
         grep?: string;
         maxMatches?: number;
       };
+
+      // Validate required params (schema says required but MCP framework may not enforce it)
+      if (!rawRef) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Missing required parameter `ref`. Provide a remote ref such as "origin/LS-1234/my-branch" or "LS-1234/my-branch". To inspect a worktree\'s remote tracking state, use `worktree_status` instead.',
+            },
+          ],
+          isError: true,
+        };
+      }
+      if (!filePath) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Missing required parameter `path`. Provide a file path relative to the repo root (e.g. "tools/mcp/worktree-server/src/index.ts").',
+            },
+          ],
+          isError: true,
+        };
+      }
 
       // grep is mutually exclusive with lines
       if (grepPattern !== undefined && lines !== undefined) {
