@@ -272,6 +272,10 @@ function Separator() {
 export function ScoreboardTicker() {
   const { data, startPolling, stopPolling } = useGetScoreboardQuery({
     fetchPolicy: 'cache-and-network',
+    // Scoreboard is a non-critical ambient feature. If the MLB API is
+    // unavailable the ticker simply renders nothing — suppress the global
+    // error toast so failures here don't pollute unrelated pages.
+    context: { suppressGlobalError: true },
   });
 
   const games: TickerGame[] = (data?.scoreboard?.games ?? []) as TickerGame[];
