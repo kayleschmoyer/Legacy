@@ -271,16 +271,16 @@ server.tool(
 // --- jira_search ---
 server.tool(
   'jira_search',
-  'Search Jira issues using JQL.',
+  'Search Jira issues using JQL. Returns compact results (key, summary, status, type, assignee, priority) — no metadata blobs. Prefer this over Atlassian plugin search tools to avoid context overflow. Default maxResults is 15; raise only when you know the result set is small.',
   {
     jql: z.string().describe('JQL query string'),
     maxResults: z.coerce
       .number()
       .int()
       .positive()
-      .max(100)
-      .default(50)
-      .describe('Max results (default: 50, max: 100)'),
+      .max(50)
+      .default(15)
+      .describe('Max results (default: 15, max: 50)'),
   },
   async (params) => search(params),
 );

@@ -24,8 +24,8 @@ const DEFAULT_FIELDS = [
 
 /** Search Jira issues using JQL via the v3 search/jql endpoint. */
 export async function search(params: SearchParams): Promise<CallToolResult> {
-  const { jql, maxResults: rawMax = 50 } = params;
-  const maxResults = Math.max(1, Math.min(100, Math.floor(rawMax)));
+  const { jql, maxResults: rawMax = 15 } = params;
+  const maxResults = Math.max(1, Math.min(50, Math.floor(rawMax)));
 
   try {
     const result = await searchJql<SearchFields>({
