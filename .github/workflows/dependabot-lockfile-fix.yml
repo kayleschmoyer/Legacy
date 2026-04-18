@@ -37,7 +37,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Generate bot token
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@v3
         id: bot-token
         with:
           app-id: 3158619
