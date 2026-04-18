@@ -47,7 +47,8 @@ Quick-reference decision trees for the most common failure scenarios agents enco
 2. If the conflicts are in generated files (`*.generated.ts`, `schema.graphql`): accept the incoming (main) version and re-run `make codegen`.
 3. If the conflicts are in code you wrote: manually resolve by reading both sides, keeping the intent of your changes while incorporating main's updates.
 4. If the conflicts are in code you didn't write and you can't determine the correct resolution: stop and ask the user.
-5. After resolving all conflicts: `worktree_stabilize` (runs install + codegen + format), then `make pc` before pushing.
+5. After resolving all conflicts, stage the resolved files with `worktree_run({ command: "git add <file>" })` then call `worktree_rebase_continue()` to continue the rebase. **Do NOT use `GIT_EDITOR=true git -C ... rebase --continue`** — `worktree_rebase_continue` suppresses the editor prompt internally and auto-resolves the worktree path.
+6. After the rebase completes: `worktree_stabilize` (runs install + codegen + format), then `make pc` before pushing.
 
 ## Scenario 4: PR Creation Fails
 
