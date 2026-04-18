@@ -88,12 +88,17 @@ When `bot-review` CI check fails or Copilot posts review comments, use this MCP-
    - Default (no `includeResolved`) returns only unresolved threads — exactly the ones blocking merge.
    - Returns thread-level fields: `id` (PRRT\_ node ID), `isResolved`, `isOutdated`, `isCollapsed`, `path`, `line`, `startLine` — plus a `comments` array with `databaseId`, `author`, `body`, `path`, `line` per comment.
 2. **Inspect the returned comments and fix the code** in the flagged files/lines
-3. **Commit and push** the fix
-4. **Resolve threads**: `github_resolve_threads({ threadIds: [<thread-id>, ...], prNumber: PR# })`
+3. **Reply to threads** (when a comment needs acknowledgment or explanation rather than a code fix):
+   - Use `github_reply_to_review` — available for **both local and cloud** sessions via the custom `legacy-sports-github` MCP server.
+   - Pass either `threadId` (GraphQL node ID from `github_get_review_threads`) or `commentId` + `number` (REST databaseId + PR number): `github_reply_to_review({ threadId: "PRRT_...", body: "explanation" })`
+   - **ToolSearch query**: search `"reply review"`, `"reply to review comment"`, or `"github_reply_to_review"` — not `"reply to PR comment"` (which may not surface it).
+   - Do **not** reach for `gh api repos/.../pulls/.../comments` or a Python scratch script — the MCP tool handles both auth paths.
+4. **Commit and push** the fix
+5. **Resolve threads**: `github_resolve_threads({ threadIds: [<thread-id>, ...], prNumber: PR# })`
    - Thread node IDs come from the `id` field of each thread in `github_get_review_threads` output (PRRT\_... format).
    - **Alternative**: if you only have numeric comment `databaseId` values (e.g. from `mcp__github__*` `get_review_comments`), pass them as `commentDatabaseIds` instead — the tool maps them to thread IDs internally: `github_resolve_threads({ commentDatabaseIds: [<databaseId>, ...], prNumber: PR# })`.
    - **If bot-review still fails after resolution**: `github_resolve_threads` with `prNumber` attempts to re-dispatch the Copilot Auto-Approve workflow, but may be silently skipped if the app token lacks `actions: write`. If `bot-review` still shows failure after thread resolution, re-dispatch manually: `ci_dispatch_workflow({ workflow: "Copilot Auto-Approve", ref: "<branch>", inputs: { pr_number: "<PR#>" } })`. Wait ~20 seconds for the recheck job and verify `bot-review` flips to success before attempting merge.
-5. **Re-request review**: `github_request_review({ prs: [PR#] })`
+6. **Re-request review**: `github_request_review({ prs: [PR#] })`
 
 Before the next push, also check whether any other blockers are already known on the PR (conflicts, non-review failing checks). Batch all currently known fixes into one validation + push round whenever possible. Do **not** push a CI-only change while known review threads remain unresolved, or vice versa, unless one blocker must be cleared first to reveal the next.
 
