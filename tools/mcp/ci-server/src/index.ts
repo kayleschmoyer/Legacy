@@ -12,6 +12,7 @@ import { rerun } from './tools/rerun.js';
 import { searchLogs } from './tools/search-logs.js';
 import { sessionStats } from './tools/session-stats.js';
 import { viewRun } from './tools/view-run.js';
+import { viewRunJobs } from './tools/view-run-jobs.js';
 import { workflowInfo } from './tools/workflow-info.js';
 import { workflowSetState } from './tools/workflow-state.js';
 import { getToken, buildHeaders, sanitizeErrorBody } from './github-api.js';
@@ -205,6 +206,34 @@ server.tool(
       .describe('Include jobs (default: true)'),
   },
   async (params) => viewRun(params),
+);
+
+server.tool(
+  'ci_view_run_jobs',
+  'Prefer this over `gh run view --json jobs` via shell. List per-job name, status, and conclusion for a specific CI run. ' +
+    'Use this to confirm all jobs passed before merging a PR. ' +
+    'Returns a summary (total, passed, failed, skipped, inProgress, allPassed) plus per-job details. ' +
+    'Use filter to narrow to a specific conclusion (e.g. "failure" to see only failed jobs). ' +
+    'This is complementary to ci_view_run (run-level summary) and ci_get_logs (log output for failed jobs).',
+  {
+    runId: z.coerce.number().int().positive().describe('Run ID'),
+    attempt: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Attempt number'),
+    filter: z
+      .enum(['failure', 'success', 'skipped', 'cancelled', 'in_progress'])
+      .optional()
+      .describe(
+        'Filter jobs by conclusion (or "in_progress" for currently running jobs). Omit to return all jobs.',
+      ),
+    includeSteps: coercedBoolean
+      .default(false)
+      .describe('Include per-step breakdown for each job (default: false)'),
+  },
+  async (params) => viewRunJobs(params),
 );
 
 server.tool(
