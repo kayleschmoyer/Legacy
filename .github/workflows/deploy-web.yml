@@ -326,12 +326,17 @@ jobs:
           # Find the previous web release tag
           PREV_TAG=$(git tag --list 'web-v*' --sort=-version:refname | grep -v "^${RELEASE_TAG}$" | head -n 1)
 
+          # Only include commits that touched web-relevant paths — mirrors the
+          # paths-filter in deploy.yml so non-web commits (lambda, infra) are
+          # excluded from the release notification. (LS-3034)
+          WEB_PATHS="apps/web/ lib/shared-components/ .github/workflows/deploy-web.yml .github/workflows/deploy.yml"
+
           if [ -n "$PREV_TAG" ]; then
-            echo "Commits since ${PREV_TAG}:"
-            COMMITS=$(git log "${PREV_TAG}..HEAD" --pretty=format:'[`%h`](https://github.com/${{ github.repository }}/commit/%H) %s' --first-parent -20)
+            echo "Commits since ${PREV_TAG} touching web paths:"
+            COMMITS=$(git log "${PREV_TAG}..HEAD" --pretty=format:'[`%h`](https://github.com/${{ github.repository }}/commit/%H) %s' --first-parent -20 -- $WEB_PATHS)
           else
-            echo "No previous web release tag found — showing last 20 commits"
-            COMMITS=$(git log --pretty=format:'[`%h`](https://github.com/${{ github.repository }}/commit/%H) %s' --first-parent -20)
+            echo "No previous web release tag found — showing last 20 web commits"
+            COMMITS=$(git log --pretty=format:'[`%h`](https://github.com/${{ github.repository }}/commit/%H) %s' --first-parent -20 -- $WEB_PATHS)
           fi
 
           # Write to multiline output
