@@ -70,7 +70,7 @@ server.tool(
 // Tool 3: browser_dev_status
 server.tool(
   'browser_dev_status',
-  'List all currently tracked dev servers and browser state. Shows port, worktree path, PID, and whether a browser/page is active.',
+  'List dev servers and browser state. Includes MCP-managed servers (managed: true) and pre-existing servers detected by scanning ports 4200-4399 (managed: false). Always call this before browser_dev_start to check if a server is already running.',
   {},
   async () => devServerStatus(),
 );
