@@ -7622,9 +7622,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         twigFailed = true;
 
         if (!force) {
+          const isFileLock =
+            msg.includes('os error 32') ||
+            msg.includes(
+              'cannot access the file because it is being used by another process',
+            );
           const hint = twigTimedOut
             ? 'Twig timed out — the worktree may have independent node_modules or file locks. On Windows, try `make kill-stale` to release locks. On other platforms, close any processes using the worktree directory. Then retry, or use force=true.'
-            : 'Retry with force=true to fall back to `git worktree remove --force`.';
+            : isFileLock
+              ? 'Another session is currently using this worktree — close that session and retry.'
+              : 'Retry with force=true to fall back to `git worktree remove --force`.';
           return {
             content: [
               {
@@ -7680,19 +7687,39 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               };
             }
           }
-          execFileSync(
-            'git',
-            ['worktree', 'remove', '--force', '--', targetPath],
-            {
-              cwd: MAIN_REPO,
-              encoding: 'utf-8',
-              timeout: 60_000,
-              maxBuffer: 10 * 1024 * 1024,
-            },
-          );
-          results.push(
-            `Removed worktree via git (force fallback after twig ${twigTimedOut ? 'timeout' : 'failure'}): ${branch}`,
-          );
+          // git worktree remove --force rejects directories whose .git file is
+          // absent (e.g. an attach that did not fully complete). Pre-check and
+          // skip directly to rmSync when .git is missing.
+          const gitFilePath = join(targetPath, '.git');
+          if (existsSync(targetPath) && !existsSync(gitFilePath)) {
+            rmSync(targetPath, { recursive: true, force: true });
+            results.push(
+              `Removed worktree via direct deletion (no .git — force fallback after twig ${twigTimedOut ? 'timeout' : 'failure'}): ${branch}`,
+            );
+            try {
+              execFileSync('git', ['worktree', 'prune'], {
+                cwd: MAIN_REPO,
+                encoding: 'utf-8',
+                timeout: 30_000,
+              });
+            } catch {
+              // prune failure is non-fatal
+            }
+          } else {
+            execFileSync(
+              'git',
+              ['worktree', 'remove', '--force', '--', targetPath],
+              {
+                cwd: MAIN_REPO,
+                encoding: 'utf-8',
+                timeout: 60_000,
+                maxBuffer: 10 * 1024 * 1024,
+              },
+            );
+            results.push(
+              `Removed worktree via git (force fallback after twig ${twigTimedOut ? 'timeout' : 'failure'}): ${branch}`,
+            );
+          }
         } catch (gitErr) {
           const gitMsg =
             gitErr instanceof Error
