@@ -531,6 +531,61 @@ unauthTest.describe(
 );
 
 // ---------------------------------------------------------------------------
+// Functional 404 Regression: /baseball/league/join (LS-3479)
+//
+// An automated functional scanner reported repeated HTTP 404 responses on
+// /baseball/league/join even though the EnhancedAuthGuard was rendering the
+// PublicLandingPage (showing "Build Your Dynasty" headings).  The scanner
+// hits the route unauthenticated and the underlying SPA server was not
+// returning a proper 200 for the catch-all HTML entry point.
+//
+// Expected: unauthenticated navigation to /baseball/league/join returns HTTP
+// 200 and renders the auth gate (landing page with "Continue with Google").
+// ---------------------------------------------------------------------------
+
+unauthTest.describe(
+  'Functional 404 Regression — /baseball/league/join (LS-3479) @critical',
+  () => {
+    // LS-3479: server must return HTTP 200 (not 404) so the client SPA can
+    // mount and the EnhancedAuthGuard can render the auth gate.
+    unauthTest(
+      'returns HTTP 200 on /baseball/league/join when not authenticated (LS-3479)',
+      async ({ page }) => {
+        const response = await page.goto('/baseball/league/join');
+        expect(response?.status()).toBe(200);
+      },
+    );
+
+    // LS-3479: unauthenticated users must see the auth gate — the landing
+    // page with "Continue with Google" — not a raw 404 error page.
+    unauthTest(
+      'shows auth gate on /baseball/league/join when not authenticated (LS-3479)',
+      async ({ page }) => {
+        await page.goto('/baseball/league/join');
+        await page.waitForLoadState('load');
+
+        await expect(
+          page.getByRole('button', { name: /continue with google/i }),
+        ).toBeVisible({ timeout: 15000 });
+      },
+    );
+
+    // LS-3479: the page title must reflect a valid app page, not a generic
+    // "404 Not Found" title that would indicate a server-level routing gap.
+    unauthTest(
+      'does not show a 404 page title on /baseball/league/join (LS-3479)',
+      async ({ page }) => {
+        await page.goto('/baseball/league/join');
+        await page.waitForLoadState('load');
+
+        const title = await page.title();
+        expect(title).not.toMatch(/404|not found/i);
+      },
+    );
+  },
+);
+
+// ---------------------------------------------------------------------------
 // Authenticated Access — authenticated user bypasses the login gate
 // ---------------------------------------------------------------------------
 
