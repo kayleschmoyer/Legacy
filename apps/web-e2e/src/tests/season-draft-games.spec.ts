@@ -304,13 +304,13 @@ test.describe('Season Draft Game Create Page @critical', () => {
 });
 
 // ---------------------------------------------------------------------------
-// LS-3540 / LS-3541: /games/season-draft is a protected route. Unauthenticated
-// users visiting it are intercepted by EnhancedAuthGuard and shown
-// PublicLandingPage with the "Continue with Google" and "Continue with Discord"
-// sign-in CTAs and a "Get Started Free" CTA lower down. An automated audit
-// crawler reported this as a 404 (evidence shows the landing page content —
-// "Build Your Dynasty" — instead of the expected season-draft lobby) and a
-// CSS-selector parse error when trying to click "Continue with Discord" via
+// LS-3540 / LS-3541 / LS-3489: /games/season-draft is a protected route.
+// Unauthenticated users visiting it are intercepted by EnhancedAuthGuard and
+// shown PublicLandingPage with the "Continue with Google" and "Continue with
+// Discord" sign-in CTAs and a "Get Started Free" CTA lower down. An automated
+// audit crawler reported this as a 404 (evidence shows the landing page content
+// — "Build Your Dynasty" — instead of the expected season-draft lobby) and a
+// CSS-selector parse error when trying to click "Continue with Google" via
 // the invalid `(button:visible, [role="button"]:visible)` selector. These
 // tests lock in that the sign-in CTAs are located via getByRole (accessible
 // name) so unauthenticated visitors can initiate sign-in / sign-up from
@@ -334,6 +334,24 @@ unauthTest.describe(
         });
         await expect(googleBtn).toBeVisible({ timeout: 15_000 });
         await expect(googleBtn).toBeEnabled();
+      },
+    );
+
+    unauthTest(
+      '"Continue with Google" button on /games/season-draft is clickable via getByRole (LS-3489)',
+      async ({ page }) => {
+        await page.goto('/games/season-draft');
+        await page.waitForLoadState('load');
+
+        const googleBtn = page.getByRole('button', {
+          name: /continue with google/i,
+        });
+        await expect(googleBtn).toBeVisible({ timeout: 15_000 });
+        await expect(googleBtn).toBeEnabled();
+        // Confirm the click resolves without a CSS selector parse error —
+        // regression coverage for the original crawler failure where the
+        // invalid `(button:visible, [role="button"]:visible)` selector was used.
+        await googleBtn.click();
       },
     );
 
