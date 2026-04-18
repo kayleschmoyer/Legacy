@@ -1142,8 +1142,17 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
             description:
               'Ticket key, number, branch name, directory name, or absolute path to a git worktree (including ephemeral .claude/worktrees/ paths)',
           },
+          worktreeKey: {
+            type: 'string',
+            description:
+              'Alias for key. Ticket key, number, branch name, directory name, or absolute path to a git worktree',
+          },
+          worktree: {
+            type: 'string',
+            description:
+              'Alias for key. Ticket key, number, branch name, directory name, or absolute path to a git worktree',
+          },
         },
-        required: ['key'],
       },
     },
     {
@@ -4654,8 +4663,161 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     // worktree_set
     // -----------------------------------------------------------------------
     case 'worktree_set': {
-      const { key } = args as { key: string };
-      const resolved = resolveWorktreePath(key);
+      const {
+        key,
+        worktreeKey,
+        worktree: worktreeAlias,
+      } = args as {
+        key?: unknown;
+        worktreeKey?: unknown;
+        worktree?: unknown;
+      };
+
+      if (key !== undefined && typeof key !== 'string') {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Invalid key: expected string, got ${typeof key}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+      if (typeof key === 'string' && key.trim().length === 0) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Invalid key: provided value is empty or whitespace-only.',
+            },
+          ],
+          isError: true,
+        };
+      }
+      if (worktreeKey !== undefined && typeof worktreeKey !== 'string') {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Invalid worktreeKey: expected string, got ${typeof worktreeKey}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+      if (typeof worktreeKey === 'string' && worktreeKey.trim().length === 0) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Invalid worktreeKey: provided value is empty or whitespace-only. Provide the ticket key, branch name, directory name, or absolute path to a git worktree.',
+            },
+          ],
+          isError: true,
+        };
+      }
+      if (worktreeAlias !== undefined && typeof worktreeAlias !== 'string') {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Invalid worktree: expected string, got ${typeof worktreeAlias}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+      if (
+        typeof worktreeAlias === 'string' &&
+        worktreeAlias.trim().length === 0
+      ) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Invalid worktree: provided value is empty or whitespace-only. Provide the ticket key, branch name, directory name, or absolute path to a git worktree.',
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      const normalizedKey =
+        typeof key === 'string' && key.trim().length > 0
+          ? key.trim()
+          : undefined;
+      const normalizedWorktreeKey =
+        typeof worktreeKey === 'string' && worktreeKey.trim().length > 0
+          ? worktreeKey.trim()
+          : undefined;
+      const normalizedWorktreeAlias =
+        typeof worktreeAlias === 'string' && worktreeAlias.trim().length > 0
+          ? worktreeAlias.trim()
+          : undefined;
+
+      if (
+        normalizedKey &&
+        normalizedWorktreeKey &&
+        normalizedKey !== normalizedWorktreeKey
+      ) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Conflicting parameters: key and worktreeKey were both provided with different non-empty values.',
+            },
+          ],
+          isError: true,
+        };
+      }
+      if (
+        normalizedKey &&
+        normalizedWorktreeAlias &&
+        normalizedKey !== normalizedWorktreeAlias
+      ) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Conflicting parameters: key and worktree were both provided with different non-empty values.',
+            },
+          ],
+          isError: true,
+        };
+      }
+      if (
+        normalizedWorktreeKey &&
+        normalizedWorktreeAlias &&
+        normalizedWorktreeKey !== normalizedWorktreeAlias
+      ) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Conflicting parameters: worktreeKey and worktree were both provided with different non-empty values.',
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      const resolvedKey =
+        normalizedKey ?? normalizedWorktreeKey ?? normalizedWorktreeAlias;
+
+      if (!resolvedKey) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: "Missing required 'key' parameter (or alias 'worktreeKey'/'worktree'). Provide the ticket key, branch name, directory name, or absolute path to a git worktree.",
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      const resolved = resolveWorktreePath(resolvedKey);
 
       if ('error' in resolved) {
         return {
