@@ -1,6 +1,6 @@
 ---
 name: jira-rollover
-description: 'Manage Jira bucket epic rollovers at sprint boundaries. Run after sprint close to sync project properties, close old epics, and re-parent stranded tickets. Use jira_get_bucket_epic to look up current epic keys instead of hardcoding LS-1322 or LS-1455.'
+description: 'Manage Jira bucket epic rollovers at sprint boundaries. Run after sprint close to sync project properties, close old epics, and re-parent stranded tickets. Use jira_get_bucket_epic to look up current epic keys instead of hardcoding a specific ticket number.'
 ---
 
 # Skill: Jira Rollover
@@ -67,7 +67,7 @@ Re-parents stranded tickets without touching epic status or project properties. 
 
 ## Looking up the current epic in code
 
-Never hardcode `LS-1455` or `LS-1322`. Use:
+Never hardcode a bucket epic key by its ticket number. Use:
 
 ```
 jira_get_bucket_epic({ bucket: 'mcp-gaps' })   → { key: "LS-####" }

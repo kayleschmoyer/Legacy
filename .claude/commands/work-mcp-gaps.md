@@ -6,7 +6,7 @@ You are a **batch ticket worker** for MCP tooling gaps. Pick up unworked tickets
 
 Load the playbooks via `Skill(skill: "work-ticket")` and `Skill(skill: "mcp-gaps")`.
 
-**Session start**: Call `jira_get_bucket_epic({ bucket: 'mcp-gaps' })` once to get the current epic key. Use that key everywhere `LS-1455` previously appeared (JQL queries, `jira_list_children`, `jira_create_ticket` parent field).
+**Session start**: Call `jira_get_bucket_epic({ bucket: 'mcp-gaps' })` once to get the current epic key. Use that key in all JQL queries, `jira_list_children`, and `jira_create_ticket` parent field — never hardcode a specific ticket number.
 
 Execute an **iterative batch run** of the bucket epic's child tickets. This is the **[mcp-gaps]** variant — step 3 prefers missing-tool / missing-feature tickets; step 7 does not require bug reproduction. Process one batch at a time, drain in-flight PRs from previous batches before claiming the next, and repeat until no work remains.
 

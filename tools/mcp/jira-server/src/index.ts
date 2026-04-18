@@ -148,7 +148,12 @@ const ticketSchema = z.object({
     .describe(
       'Relevant files, constraints, and dependencies discovered during planning',
     ),
-  parent: z.string().optional().describe('Parent epic key (e.g. "LS-1455")'),
+  parent: z
+    .string()
+    .optional()
+    .describe(
+      'Parent epic key (e.g. "LS-####" — use jira_get_bucket_epic to resolve the current bucket epic key)',
+    ),
   sprint: z
     .string()
     .regex(/^(?:current|\d+)$/, 'Must be "current" or a numeric sprint ID')
