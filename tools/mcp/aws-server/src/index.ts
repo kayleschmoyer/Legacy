@@ -23,6 +23,11 @@ import { ssmRunCommand } from './tools/ssm-run-command.js';
 import { ssoLogin } from './tools/sso-login.js';
 import { ssoStatus } from './tools/sso-status.js';
 import { terraformOutput } from './tools/terraform-output.js';
+import {
+  packerBuild,
+  packerBuildStatus,
+  packerBuildWait,
+} from './tools/packer-build.js';
 
 const server = new McpServer({
   name: 'legacy-sports-aws',
@@ -415,6 +420,84 @@ server.tool(
       ),
   },
   async (params) => iamGetPolicy(params),
+);
+
+// --- packer_build ---
+server.tool(
+  'packer_build',
+  'Run `packer build` against an HCL template and return structured output: amiId, name, durationSec, snapshotId, tags, fullLogPath. Runs `packer init` first to install required plugins. Pass runInBackground=true to start the build asynchronously and get back a buildId — use packer_build_status to poll or packer_build_wait to block until done.',
+  {
+    hclPath: z
+      .string()
+      .describe(
+        'Path to the Packer HCL template file, relative to the repo root (or worktreePath if provided). Example: "terraform/runners/packer/runner-ami.pkr.hcl".',
+      ),
+    vars: z
+      .record(z.string(), z.string())
+      .optional()
+      .describe(
+        'Packer variable overrides passed as `-var key=value`. Example: { vpc_id: "vpc-0abc123", subnet_id: "subnet-0abc123", playwright_version: "1.50.0" }.',
+      ),
+    worktreePath: z
+      .string()
+      .optional()
+      .describe(
+        'Absolute path to a worktree to use as the working directory. Defaults to the repo root.',
+      ),
+    runInBackground: z
+      .boolean()
+      .default(false)
+      .describe(
+        'When true, spawn the build in the background and return immediately with a buildId. Use packer_build_status or packer_build_wait to track completion. Default: false (block until done).',
+      ),
+  },
+  async (params) => packerBuild(params),
+);
+
+// --- packer_build_status ---
+server.tool(
+  'packer_build_status',
+  'Check the status of a background Packer build started with packer_build(runInBackground=true). Returns status ("running" | "done" | "failed"), elapsed time, and a tail of the build log. When done, returns the same structured output as a synchronous packer_build call.',
+  {
+    buildId: z
+      .string()
+      .describe(
+        'The buildId returned by packer_build when runInBackground=true.',
+      ),
+  },
+  async (params) => packerBuildStatus(params),
+);
+
+// --- packer_build_wait ---
+server.tool(
+  'packer_build_wait',
+  'Block until a background Packer build completes, then return the same structured output as a synchronous packer_build call. Use after packer_build(runInBackground=true) when you want to wait for the result in a later turn.',
+  {
+    buildId: z
+      .string()
+      .describe(
+        'The buildId returned by packer_build when runInBackground=true.',
+      ),
+    pollIntervalSec: z.coerce
+      .number()
+      .int()
+      .min(5)
+      .max(300)
+      .default(30)
+      .describe(
+        'How often to poll for completion in seconds (min: 5, default: 30, max: 300).',
+      ),
+    timeoutSec: z.coerce
+      .number()
+      .int()
+      .min(60)
+      .max(3600)
+      .default(1800)
+      .describe(
+        'Maximum time to wait before returning a timeout error, in seconds (default: 1800 = 30 min).',
+      ),
+  },
+  async (params) => packerBuildWait(params),
 );
 
 // Start the server
