@@ -29,6 +29,7 @@ import {
   Users,
   X,
 } from '@tamagui/lucide-icons';
+import { lazyWithRetry } from '../utils/lazyWithRetry';
 import { UserProfileDropdown } from '../components/layout/UserProfileDropdown';
 import { SportsDropdown } from '../components/layout/SportsDropdown';
 import { PlayersDropdown } from '../components/layout/PlayersDropdown';
@@ -51,80 +52,80 @@ import { NAV_BUTTON_MIN_WIDTH, NAV_Z_INDEX } from '../constants/dimensions';
  * Lazy-loaded routes — these pages are split into separate
  * chunks and only downloaded when the user navigates to them.
  * ──────────────────────────────────────────────────────── */
-const HomePage = React.lazy(() => import('../pages/home/HomePage'));
-const BaseballScreen = React.lazy(() =>
+const HomePage = lazyWithRetry(() => import('../pages/home/HomePage'));
+const BaseballScreen = lazyWithRetry(() =>
   import('../components/baseball').then((m) => ({
     default: m.BaseballScreen,
   })),
 );
-const PlayerStatsPage = React.lazy(() =>
+const PlayerStatsPage = lazyWithRetry(() =>
   import('../pages/players/PlayerStatsPage').then((m) => ({
     default: m.PlayerStatsPage,
   })),
 );
-const PlayerDetailPage = React.lazy(() =>
+const PlayerDetailPage = lazyWithRetry(() =>
   import('../pages/players/PlayerStatsPage').then((m) => ({
     default: m.PlayerDetailPage,
   })),
 );
-const PlayerComparisonPage = React.lazy(() =>
+const PlayerComparisonPage = lazyWithRetry(() =>
   import('../pages/players/PlayerComparisonPage').then((m) => ({
     default: m.PlayerComparisonPage,
   })),
 );
-const LeagueCreatePage = React.lazy(
+const LeagueCreatePage = lazyWithRetry(
   () => import('../pages/baseball/LeagueCreatePage'),
 );
-const LeagueDetailPage = React.lazy(
+const LeagueDetailPage = lazyWithRetry(
   () => import('../pages/baseball/LeagueDetailPage'),
 );
-const TeamDetailPage = React.lazy(() =>
+const TeamDetailPage = lazyWithRetry(() =>
   import('../pages/baseball/TeamDetailPage').then((m) => ({
     default: m.TeamDetailPage,
   })),
 );
-const JoinLeagueByCodePage = React.lazy(
+const JoinLeagueByCodePage = lazyWithRetry(
   () => import('../pages/baseball/JoinLeagueByCodePage'),
 );
-const LeagueDiscoveryPage = React.lazy(() =>
+const LeagueDiscoveryPage = lazyWithRetry(() =>
   import('../pages/baseball/LeagueDiscoveryPage').then((m) => ({
     default: m.LeagueDiscoveryPage,
   })),
 );
-const MatchupDetailPage = React.lazy(() =>
+const MatchupDetailPage = lazyWithRetry(() =>
   import('../pages/matchup/MatchupDetailPage').then((m) => ({
     default: m.MatchupDetailPage,
   })),
 );
-const MatchupRedirectPage = React.lazy(() =>
+const MatchupRedirectPage = lazyWithRetry(() =>
   import('../pages/matchup/MatchupRedirectPage').then((m) => ({
     default: m.MatchupRedirectPage,
   })),
 );
-const ManagementPage = React.lazy(
+const ManagementPage = lazyWithRetry(
   () => import('../pages/management/ManagementPage'),
 );
-const AboutPage = React.lazy(() => import('../pages/about/AboutPage'));
-const HelpPage = React.lazy(() => import('../pages/help/HelpPage'));
-const PricingPage = React.lazy(() => import('../pages/pricing/PricingPage'));
-const MockDraftPage = React.lazy(() =>
+const AboutPage = lazyWithRetry(() => import('../pages/about/AboutPage'));
+const HelpPage = lazyWithRetry(() => import('../pages/help/HelpPage'));
+const PricingPage = lazyWithRetry(() => import('../pages/pricing/PricingPage'));
+const MockDraftPage = lazyWithRetry(() =>
   import('../pages/draft/MockDraftPage').then((m) => ({
     default: m.MockDraftPage,
   })),
 );
-const SeasonDraftGamePage = React.lazy(
+const SeasonDraftGamePage = lazyWithRetry(
   () => import('../pages/games/SeasonDraftGamePage'),
 );
-const SeasonDraftGamesPage = React.lazy(
+const SeasonDraftGamesPage = lazyWithRetry(
   () => import('../pages/games/SeasonDraftGamesPage'),
 );
-const SeasonDraftGameCreatePage = React.lazy(
+const SeasonDraftGameCreatePage = lazyWithRetry(
   () => import('../pages/games/SeasonDraftGameCreatePage'),
 );
-const DisclosureGamePage = React.lazy(
+const DisclosureGamePage = lazyWithRetry(
   () => import('../pages/games/DisclosureGamePage'),
 );
-const EliteDraftBoardScreen = React.lazy(() =>
+const EliteDraftBoardScreen = lazyWithRetry(() =>
   import('../components/EliteDraftBoard').then((m) => ({
     default: m.EliteDraftBoardScreen,
   })),
@@ -142,37 +143,37 @@ function AdminGuard({
   return children;
 }
 
-const AdminPage = React.lazy(() =>
+const AdminPage = lazyWithRetry(() =>
   import('../pages/admin/AdminPage').then((m) => ({
     default: m.AdminPage,
   })),
 );
-const AdminRevenuePage = React.lazy(
+const AdminRevenuePage = lazyWithRetry(
   () => import('../pages/admin/AdminRevenuePage'),
 );
-const ProfileSettingsPage = React.lazy(
+const ProfileSettingsPage = lazyWithRetry(
   () => import('../pages/profile/ProfileSettingsPage'),
 );
-const DiscordCallbackPage = React.lazy(() =>
+const DiscordCallbackPage = lazyWithRetry(() =>
   import('../pages/auth/DiscordCallbackPage').then((m) => ({
     default: m.DiscordCallbackPage,
   })),
 );
-const SubscriptionPage = React.lazy(
+const SubscriptionPage = lazyWithRetry(
   () => import('../pages/profile/SubscriptionPage'),
 );
-const PreferencesPage = React.lazy(
+const PreferencesPage = lazyWithRetry(
   () => import('../pages/preferences/PreferencesPage'),
 );
-const NotificationsPage = React.lazy(
+const NotificationsPage = lazyWithRetry(
   () => import('../pages/notifications/NotificationsPage'),
 );
-const ScoreboardPage = React.lazy(() =>
+const ScoreboardPage = lazyWithRetry(() =>
   import('../pages/scoreboard/ScoreboardPage').then((m) => ({
     default: m.ScoreboardPage,
   })),
 );
-const StandingsRedirectPage = React.lazy(() =>
+const StandingsRedirectPage = lazyWithRetry(() =>
   import('../pages/standings/StandingsRedirectPage').then((m) => ({
     default: m.StandingsRedirectPage,
   })),
