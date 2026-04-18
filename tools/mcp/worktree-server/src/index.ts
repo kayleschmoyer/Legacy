@@ -434,6 +434,12 @@ function resolveWorktreePath(
     return { error: 'Missing required key parameter.' };
   }
 
+  // Translate Unix-style Git Bash drive paths (e.g. /d/foo → D:\foo).
+  // node:path on Windows mis-translates these: resolve('/d/foo') → D:\d\foo.
+  if (process.platform === 'win32' && /^\/[a-zA-Z](\/|$)/.test(key)) {
+    key = key[1].toUpperCase() + ':' + key.slice(2).replace(/\//g, '\\');
+  }
+
   // 1. Absolute path — supports ephemeral worktrees (e.g. .claude/worktrees/)
   //    that are not registered via `make worktree`
   if (isAbsolute(key)) {
