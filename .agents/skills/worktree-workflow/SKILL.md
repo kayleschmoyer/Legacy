@@ -56,7 +56,7 @@ The Claude Code session was spawned with the launcher `worktree` checkbox checke
    >
    > See also [workflow-recovery-procedures.md](references/shared/workflow-recovery-procedures.md).
 
-8. **Implement** — read the ticket description, investigate, write code + tests. See [work-ticket SKILL.md Step 5](../work-ticket/SKILL.md) for self-review + implementation notes.
+8. **Plan then implement** — run the [planning skill](../planning/SKILL.md) (Step 1b) to classify risk and read affected code before writing anything. Skip for trivial tasks (typos, doc-only, single-line changes). Then read the full ticket description, investigate, and write code + tests. See [work-ticket SKILL.md Step 5](../work-ticket/SKILL.md) for self-review + implementation notes.
 9. **Migrations** — `db_migration_status()` then `db_migrate()`.
 10. **Validate** — `make_run(target: "pc")`. Must pass before pushing.
 11. **Self-review (mandatory gate)** — run `/review` and produce a Self-Review Summary before pushing. See `skills/pr-lifecycle/references/self-review.md`.
