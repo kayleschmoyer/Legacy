@@ -376,6 +376,24 @@ unauthTest.describe(
     );
 
     unauthTest(
+      '"Get Started Free" CTA on /games/season-draft is clickable via getByRole (LS-3490)',
+      async ({ page }) => {
+        await page.goto('/games/season-draft');
+        await page.waitForLoadState('load');
+
+        const getStartedBtn = page.getByRole('button', {
+          name: /get started free/i,
+        });
+        await expect(getStartedBtn).toBeVisible({ timeout: 15_000 });
+        await expect(getStartedBtn).toBeEnabled();
+        // Regression for LS-3490: confirm the click resolves without the
+        // CSS selector parse error caused by the broken crawler selector
+        // `(button:visible, [role="button"]:visible)`.
+        await getStartedBtn.click();
+      },
+    );
+
+    unauthTest(
       '"Continue with Discord" button is visible on /games/season-draft when unauthenticated',
       async ({ page }) => {
         await page.goto('/games/season-draft');
