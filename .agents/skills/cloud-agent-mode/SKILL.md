@@ -87,11 +87,11 @@ The built-in `mcp__github__pull_request_read({ method: "get_review_comments" })`
 
    to fetch thread node IDs. If `pageInfo.hasNextPage` is `true`, rerun the same query with `-F after=<endCursor>` and keep paging until `hasNextPage` is `false`, then resolve the collected thread IDs via `github_resolve_threads({ threadIds: [...], prNumber: <PR#> })`. Without paging, this misses threads on PRs with more than 100 reviews.
 
-3. **Reply-only fallback (last resort)**: Only if both the custom MCP server (after the ~10s startup retry above) and `gh` are confirmed unavailable. Use `mcp__github__pull_request_read({ method: "get_review_comments" })` to inspect the unresolved threads, extract the numeric `commentId` for the top-level comment in each thread, and reply to that comment via `mcp__github__add_reply_to_pull_request_comment({ commentId, body: "addressed in <sha>" })` (the built-in tool replies to a specific review **comment**, not a thread). Then **surface the blocker to the user** with a message like:
+3. **Reply-only fallback (last resort)**: Only if both the custom MCP server (after the ~10s startup retry above) and `gh` are confirmed unavailable. Use `mcp__github__pull_request_read({ method: "get_review_comments" })` to inspect the unresolved threads, extract the numeric `commentId` for the top-level comment in each thread, and reply to that comment via `mcp__github__add_reply_to_pull_request_comment({ commentId, body: "addressed in <sha>" })` (the built-in tool replies to a specific review **comment**, not a thread). **This fallback requires manual user intervention and blocks autonomous PR merge. STOP here and tell the user:**
 
-   > "I've replied to all Copilot review threads on PR #2259 with the fix SHA, but neither the custom `legacy-sports-github` server nor `gh` is available to resolve thread IDs. The merge queue will block on `1+ unresolved review comment thread(s)` until the threads are resolved manually. Either click Resolve in the GitHub UI, or wait for the sweep agent to pick it up."
+   > "PR #N has unresolved review threads that cannot be resolved automatically in cloud mode. I've replied to each thread with the fix SHA, but thread resolution requires the custom `legacy-sports-github` server or `gh` — neither is available. Please resolve the threads in the GitHub UI, then let me know and I will resume."
 
-   Do not silently leave the PR in a stuck state; the user needs to know whether to wait or intervene.
+   Do not silently leave the PR in a stuck state and do not loop-retry or attempt the same fallback again — wait for the user to respond before continuing.
 
 **Which operations MUST use built-in tools** (authorship is visible to users):
 
