@@ -121,10 +121,13 @@ Before the next push, also check whether any other blockers are already known on
 ## Quick Commands
 
 ```
-# MCP (preferred) — create as draft, label, then mark ready
+# MCP (preferred) — full post-creation sequence
 github_create_pr(title: "LS-#### type(scope): msg", body: <markdown>, draft: true, worktreePath: <path>)
 github_manage_labels(prs: [<PR#>], add: ["agent-in-progress"])
 github_mark_pr_ready(number: <PR#>)
+mcp__github__subscribe_pr_activity(pullRequestNumber: <PR#>)  # REQUIRED — enables CI/review events to stream back
+github_request_review(prs: [<PR#>])
+jira_transition(key: "LS-####", status: "In Review")
 ```
 
 <details>
