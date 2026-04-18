@@ -450,6 +450,51 @@ test.describe('Join League — keyboard submission @regression', () => {
 });
 
 // ---------------------------------------------------------------------------
+// LS-3481: /baseball/league/join is a protected route. Unauthenticated users
+// visiting it are intercepted by EnhancedAuthGuard and shown PublicLandingPage
+// with the "Continue with Google" sign-in CTA. These tests lock in that the
+// button is located via getByRole (accessible name) — NOT via the broken
+// `(button:visible, [role="button"]:visible)` CSS selector that caused the
+// original crawler-reported failure.
+// ---------------------------------------------------------------------------
+
+unauthTest.describe(
+  '/baseball/league/join — Continue with Google button clickable @regression',
+  () => {
+    unauthTest(
+      '"Continue with Google" button is visible on /baseball/league/join when unauthenticated (LS-3481)',
+      async ({ page }) => {
+        await page.goto('/baseball/league/join');
+        await page.waitForLoadState('load');
+
+        await expect(
+          page.getByRole('button', { name: /continue with google/i }),
+        ).toBeVisible({ timeout: 15_000 });
+      },
+    );
+
+    unauthTest(
+      '"Continue with Google" button on /baseball/league/join is clickable via getByRole (LS-3481)',
+      async ({ page }) => {
+        await page.goto('/baseball/league/join');
+        await page.waitForLoadState('load');
+
+        const googleBtn = page.getByRole('button', {
+          name: /continue with google/i,
+        });
+        await expect(googleBtn).toBeVisible({ timeout: 15_000 });
+        await expect(googleBtn).toBeEnabled();
+        // Confirm the click resolves without a CSS selector parse error —
+        // regression coverage for the original crawler failure. The Google
+        // handler triggers an OAuth redirect, so pass `noWaitAfter: true`
+        // to avoid Playwright hanging on the cross-origin navigation.
+        await googleBtn.click({ noWaitAfter: true });
+      },
+    );
+  },
+);
+
+// ---------------------------------------------------------------------------
 // LS-3537: /baseball/league/join is a protected route. Unauthenticated users
 // visiting it are intercepted by EnhancedAuthGuard and shown PublicLandingPage
 // with the "Continue with Discord" sign-in CTA. These tests lock in that the
