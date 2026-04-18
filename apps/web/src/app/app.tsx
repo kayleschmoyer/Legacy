@@ -172,6 +172,11 @@ const ScoreboardPage = React.lazy(() =>
     default: m.ScoreboardPage,
   })),
 );
+const StandingsRedirectPage = React.lazy(() =>
+  import('../pages/standings/StandingsRedirectPage').then((m) => ({
+    default: m.StandingsRedirectPage,
+  })),
+);
 
 /* ────────────────────────────────────────────────────────
  * Modern Header – styled components
@@ -727,6 +732,7 @@ function App() {
             <Route path="/preferences" element={<PreferencesPage />} />
             <Route path="/notifications" element={<NotificationsPage />} />
             <Route path="/scoreboard" element={<ScoreboardPage />} />
+            <Route path="/standings" element={<StandingsRedirectPage />} />
             <Route
               path="/games/season-draft"
               element={<SeasonDraftGamesPage />}
