@@ -85,13 +85,34 @@ export async function createPR(params: CreatePRParams): Promise<ToolResult> {
   try {
     const repo = await getRepoOwnerName();
 
-    // Use explicitly provided head, then upstream tracking ref, then local branch name.
+    // Use explicitly provided head, then current local branch, then upstream tracking ref.
+    // Current branch is preferred over upstream because the upstream may point to "origin/main"
+    // in a fresh worktree before the first push, causing a 422 "No commits between main and main".
     let head: string;
     if (params.head) {
       head = params.head;
     } else {
-      const upstream = await getUpstreamBranch(cwd);
-      head = upstream ?? (await getCurrentBranch(cwd));
+      const currentBranch = await getCurrentBranch(cwd);
+      if (currentBranch === 'HEAD') {
+        // Detached HEAD — fall back to upstream tracking ref
+        const upstream = await getUpstreamBranch(cwd);
+        head = upstream ?? currentBranch;
+      } else {
+        head = currentBranch;
+      }
+    }
+
+    const base = params.base ?? 'main';
+    if (head === base) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: `Auto-detected head branch "${head}" matches base "${base}". Pass \`head\` explicitly (the branch name to merge from) or pass \`worktreePath\` so the tool can detect the branch from your worktree.`,
+          },
+        ],
+      };
     }
 
     const pr = await githubRest<GitHubPRResponse>({
@@ -101,7 +122,7 @@ export async function createPR(params: CreatePRParams): Promise<ToolResult> {
         title: params.title,
         body: params.body,
         head: `${repo.owner}:${head}`,
-        base: params.base ?? 'main',
+        base,
         draft: params.draft ?? false,
       },
     });
