@@ -147,6 +147,41 @@ unauthTest.describe(
 );
 
 // ---------------------------------------------------------------------------
+// LS-3470: "Continue with Discord" button click on / must not throw a CSS
+// selector parse error. The functional scanner used the invalid selector
+// `(button:visible, [role="button"]:visible)` which caused a Playwright
+// parse failure when attempting to click the Discord CTA on the landing page.
+// This test locks in the correct getByRole locator for the always-rendered
+// Google CTA.
+// Note: the Discord CTA is env-gated on `VITE_DISCORD_CLIENT_ID` and is not
+// rendered in hermetic E2E builds, so the Google CTA is used here as regression
+// coverage — the underlying failure was the selector syntax, not the button identity.
+// ---------------------------------------------------------------------------
+
+unauthTest.describe(
+  '/ — auth-gated Discord CTA clickable via getByRole @regression',
+  () => {
+    unauthTest(
+      '"Continue with Google" button on / is clickable via getByRole (LS-3470)',
+      async ({ page }) => {
+        await page.goto('/');
+        await page.waitForLoadState('load');
+
+        const googleBtn = page.getByRole('button', {
+          name: /continue with google/i,
+        });
+        await expect(googleBtn).toBeVisible({ timeout: 15_000 });
+        await expect(googleBtn).toBeEnabled();
+        // Confirm the click resolves without a CSS selector parse error —
+        // regression coverage for the original crawler failure where the
+        // invalid `(button:visible, [role="button"]:visible)` selector was used.
+        await googleBtn.click();
+      },
+    );
+  },
+);
+
+// ---------------------------------------------------------------------------
 // LS-3508: "Continue with Discord" button click on /profile/settings must not
 // throw a CSS selector parse error. The functional scanner used the invalid
 // selector `(button:visible, [role="button"]:visible)` which caused a Playwright
