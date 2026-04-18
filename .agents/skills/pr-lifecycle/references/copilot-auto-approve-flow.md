@@ -18,6 +18,30 @@ End-to-end reference for `.github/workflows/copilot-auto-approve.yml`. Future ag
 
 ---
 
+## Configuration Variables
+
+| Variable                      | Location                                     | Default (absent) | Effect when set to `false`                                                                                                                                                                                                                                  |
+| ----------------------------- | -------------------------------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `COPILOT_AUTO_REVIEW_ENABLED` | GitHub repo → Settings → Actions → Variables | `true` (enabled) | Skips the explicit `requestReviewers` backstop call; auto-passes `bot-review` immediately (so PRs aren't blocked). The GitHub ruleset (`review_on_push`) still fires independently — disable it in repo Settings → Rules to fully suppress Copilot reviews. |
+
+**To disable Copilot reviews:**
+
+```bash
+gh variable set COPILOT_AUTO_REVIEW_ENABLED --body "false"
+```
+
+**To re-enable:**
+
+```bash
+gh variable delete COPILOT_AUTO_REVIEW_ENABLED
+# or
+gh variable set COPILOT_AUTO_REVIEW_ENABLED --body "true"
+```
+
+> When disabled, human reviews are still required as normal — only the Copilot bot-review gate is bypassed.
+
+---
+
 ## Events That Drive The Workflow
 
 ```yaml
@@ -155,6 +179,7 @@ User resolves a Copilot thread via GitHub UI, no new review is submitted. `pull_
 4. **`pull_request_review` from Copilot races `review_request_removed`.** Both fire on submission. `copilot-removed` sleeps 15s and filters `commit_id === sha` before acting, so it no-ops when a submission is being processed.
 5. **Fork PRs: bail early.** `BOT_APP_PRIVATE_KEY` is not available; all jobs gate on `head.repo.full_name == github.repository`.
 6. **Bot-authored PRs skip Copilot.** `dependabot[bot]` and `legacy-sports-code-bot[bot]` never get Copilot reviews — they auto-pass `bot-review` in `request-review` and are excluded from `review-check`, `copilot-removed`, and `delayed-recheck`.
+7. **`COPILOT_AUTO_REVIEW_ENABLED=false` bypasses Copilot entirely.** When the repo variable is `false`, `request-review` auto-passes `bot-review` immediately and skips the `requestReviewers` backstop call. This is the intended path when Copilot rate limits are being hit — see Configuration Variables above.
 
 ---
 

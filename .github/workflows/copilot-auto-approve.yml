@@ -102,12 +102,60 @@ jobs:
             });
             core.info(`Auto-passed bot-review for ${author} PR #${context.payload.pull_request.number}`);
 
-      # Copilot review is requested automatically by the repository ruleset
-      # ("Copilot review for default branch" with review_on_push: true).
-      # No explicit requestReviewers call is needed.
+      # Copilot review is also triggered by the repository ruleset
+      # ("Copilot review for default branch" with review_on_push: true),
+      # but the explicit requestReviewers call below is still needed as a backstop
+      # (see comment on that step). Set COPILOT_AUTO_REVIEW_ENABLED=false to
+      # disable both the explicit call and suppress the bot-review pending state.
+
+      - name: Auto-pass bot-review when Copilot reviews disabled
+        if: >-
+          vars.COPILOT_AUTO_REVIEW_ENABLED == 'false' &&
+          github.event.pull_request.user.login != 'dependabot[bot]' &&
+          github.event.pull_request.user.login != 'legacy-sports-code-bot[bot]' &&
+          github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ steps.bot-token.outputs.token }}
+          script: |
+            const sha = context.payload.pull_request.head.sha;
+            await github.rest.checks.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              name: 'bot-review',
+              head_sha: sha,
+              status: 'completed',
+              conclusion: 'success',
+              output: {
+                title: 'Copilot review disabled',
+                summary: 'Copilot review skipped — COPILOT_AUTO_REVIEW_ENABLED=false',
+              },
+            });
+            core.info(`Auto-passed bot-review for PR #${context.payload.pull_request.number} (Copilot disabled)`);
+
+      - name: Comment on PR when Copilot reviews disabled
+        if: >-
+          vars.COPILOT_AUTO_REVIEW_ENABLED == 'false' &&
+          github.event.action == 'opened' &&
+          github.event.pull_request.user.login != 'dependabot[bot]' &&
+          github.event.pull_request.user.login != 'legacy-sports-code-bot[bot]' &&
+          github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ steps.bot-token.outputs.token }}
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: '> [!NOTE]\n> Copilot code review is currently disabled (`COPILOT_AUTO_REVIEW_ENABLED=false`). The `bot-review` check has been auto-passed. Human reviews are still required.',
+            });
+            core.info(`Posted Copilot-disabled notice on PR #${prNumber}`);
 
       - name: Set bot-review status
         if: >-
+          vars.COPILOT_AUTO_REVIEW_ENABLED != 'false' &&
           github.event.pull_request.user.login != 'dependabot[bot]' &&
           github.event.pull_request.user.login != 'legacy-sports-code-bot[bot]' &&
           github.event.pull_request.head.repo.full_name == github.repository
@@ -295,7 +343,10 @@ jobs:
       # requestReviewers is idempotent, so calling it when Copilot is already a
       # requested reviewer is a harmless no-op. Tested with GITHUB_TOKEN in LS-3073.
       - name: Request Copilot review (backstop for native ruleset)
-        if: github.event.pull_request.user.login != 'dependabot[bot]'
+        if: >-
+          github.event.pull_request.user.login != 'dependabot[bot]' &&
+          github.event.pull_request.user.login != 'legacy-sports-code-bot[bot]' &&
+          vars.COPILOT_AUTO_REVIEW_ENABLED != 'false'
         uses: actions/github-script@v9
         with:
           script: |
