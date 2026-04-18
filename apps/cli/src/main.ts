@@ -595,7 +595,7 @@ async function run(): Promise<void> {
     .description(
       'Fetch a Playwright report and create a Jira epic with one child ticket per failing test. ' +
         '<report> can be a report name (nightly-12345, pr-42, manual-7) or a full GitHub Pages URL. ' +
-        'Requires JIRA_BASE_URL, JIRA_EMAIL, and JIRA_API_TOKEN env vars unless --dry-run is used.',
+        'Requires JIRA_BASE_URL (or JIRA_SITE_URL / JIRA_HOST), JIRA_EMAIL, and JIRA_API_TOKEN env vars unless --dry-run is used.',
     )
     .option(
       '-p, --project <key>',

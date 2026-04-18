@@ -6,7 +6,7 @@
  * per failing test.
  *
  * Required env vars (when not using --dry-run):
- *   JIRA_BASE_URL   e.g. https://myorg.atlassian.net
+ *   JIRA_BASE_URL   e.g. https://myorg.atlassian.net (falls back to JIRA_SITE_URL, then JIRA_HOST)
  *   JIRA_EMAIL      Atlassian account email
  *   JIRA_API_TOKEN  Atlassian API token
  *                   (generate at id.atlassian.com/manage-profile/security/api-tokens)
@@ -279,13 +279,16 @@ function getJiraCredentials(): {
   email: string;
   apiToken: string;
 } {
-  const baseUrl = process.env['JIRA_BASE_URL'];
+  const baseUrl =
+    process.env['JIRA_BASE_URL'] ??
+    process.env['JIRA_SITE_URL'] ??
+    process.env['JIRA_HOST'];
   const email = process.env['JIRA_EMAIL'];
   const apiToken = process.env['JIRA_API_TOKEN'];
 
   if (!baseUrl || !email || !apiToken) {
     const missing: string[] = [];
-    if (!baseUrl) missing.push('JIRA_BASE_URL');
+    if (!baseUrl) missing.push('JIRA_BASE_URL (or JIRA_SITE_URL / JIRA_HOST)');
     if (!email) missing.push('JIRA_EMAIL');
     if (!apiToken) missing.push('JIRA_API_TOKEN');
     throw new Error(`Missing required env vars: ${missing.join(', ')}`);
