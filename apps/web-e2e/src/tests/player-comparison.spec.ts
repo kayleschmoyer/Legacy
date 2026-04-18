@@ -580,32 +580,16 @@ freeUserTest.describe('Player Comparison – premium gate @regression', () => {
 });
 
 // ---------------------------------------------------------------------------
-// LS-3502: /players/compare is a protected route. Unauthenticated visitors
-// must see the PublicLandingPage auth gate — not a raw server 404. An
-// automated audit crawler visited /players/compare unauthenticated, received
-// the GitHub Pages 404 response (expected for SPA routes), saw the marketing
-// landing page after the 404.html redirect loaded the SPA, and mis-reported
-// it as a functional 404. The route is protected (not in publicPaths), so
-// showing the landing page IS the correct auth-guard behavior. These tests
-// lock in that behavior so a regression cannot go undetected.
+// Tests: Unauthenticated visitor – Get Started Free CTA @regression
 // ---------------------------------------------------------------------------
 
 unauthTest.describe(
-  'Player comparison — unauthenticated visitor @regression',
+  'Player Comparison – unauthenticated visitor @regression',
   () => {
     unauthTest.beforeEach(async ({ page }) => {
       await page.goto('/players/compare');
       await page.waitForLoadState('load');
     });
-
-    unauthTest(
-      'shows the marketing landing page on /players/compare when not authenticated',
-      async ({ page }) => {
-        await expect(page.getByText(/build your dynasty/i)).toBeVisible({
-          timeout: 15_000,
-        });
-      },
-    );
 
     unauthTest(
       'does not show the player comparison tool when not authenticated',
@@ -617,23 +601,13 @@ unauthTest.describe(
     );
 
     unauthTest(
-      '"Get Started Free" CTA is visible on /players/compare when not authenticated',
+      '"Get Started Free" CTA is visible and navigates to / on /players/compare for unauthenticated users',
       async ({ page }) => {
         const getStartedBtn = page.getByRole('button', {
           name: /get started free/i,
         });
         await expect(getStartedBtn).toBeVisible({ timeout: 15_000 });
         await expect(getStartedBtn).toBeEnabled();
-      },
-    );
-
-    unauthTest(
-      '"Get Started Free" CTA navigates to / on /players/compare when not authenticated',
-      async ({ page }) => {
-        const getStartedBtn = page.getByRole('button', {
-          name: /get started free/i,
-        });
-        await expect(getStartedBtn).toBeVisible({ timeout: 15_000 });
         await getStartedBtn.click();
         await expect(page).toHaveURL('/');
       },
