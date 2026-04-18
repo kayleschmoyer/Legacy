@@ -37,6 +37,7 @@ This aims to keep most PRs to ≤ 2 review rounds by avoiding unnecessary re-rev
    - For threads you chose not to fix (disagreed / out of scope), reply with an explanation, then resolve
    - **Never leave addressed threads unresolved** — this blocks the merge queue and triggers re-review
    - **Always invoke `github_resolve_threads` directly — never reach for raw GraphQL mutations or shell commands without first calling this tool and getting a connection error or tool-not-found response. Assuming the tool is unavailable without trying it is not acceptable.**
+   - **Check bot-review after resolution**: `github_resolve_threads` with `prNumber` attempts to re-dispatch the Copilot Auto-Approve workflow, but may be silently skipped if the app token lacks `actions: write`. If `bot-review` still shows failure after resolving all threads, re-dispatch manually: `ci_dispatch_workflow({ workflow: "Copilot Auto-Approve", ref: "<branch>", inputs: { pr_number: "<PR#>" } })`. Wait ~20 seconds and verify `bot-review` flips to success before attempting merge.
 8. Copilot re-reviews automatically on push; new threads from the re-review are a separate round
 
 ## Two-Round Cap
