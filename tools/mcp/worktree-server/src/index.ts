@@ -2335,9 +2335,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
-      // Validate conventional commit format (scope is optional)
+      // Validate conventional commit format (scope is optional).
+      // Also accepts an optional LS-#### prefix: "LS-3457 fix(scope): description"
       const conventionalPattern =
-        /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?!?:\s.+/;
+        /^(LS-\d+\s+)?(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?!?:\s.+/;
 
       // For amend+message: message !== undefined means caller explicitly passed a message.
       // Reject empty/whitespace-only strings so callers don't silently fall back to --no-edit.
@@ -2363,7 +2364,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                   `Invalid commit message format: "${trimmed}"\n\n` +
                   'Expected conventional commit: type[(scope)]: description\n' +
                   'Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert\n' +
-                  'Scope is optional. Examples: "feat(auth): add oauth", "fix: typo"',
+                  'Scope is optional. Examples: "feat(auth): add oauth", "fix: typo", "LS-1234 fix(auth): typo"',
               },
             ],
             isError: true,
@@ -2380,7 +2381,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 `Invalid commit message format: "${message}"\n\n` +
                 'Expected conventional commit: type[(scope)]: description\n' +
                 'Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert\n' +
-                'Scope is optional. Examples: "feat(auth): add oauth", "fix: typo"',
+                'Scope is optional. Examples: "feat(auth): add oauth", "fix: typo", "LS-1234 fix(auth): typo"',
             },
           ],
           isError: true,
@@ -3440,22 +3441,20 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             ...(linkTarget !== undefined ? { linkTarget } : {}),
           };
 
-          if (!isFile) {
+          if (!isFile || stat === undefined) {
             return {
               ...base,
               ...(stat !== undefined ? { bytes: stat.size } : {}),
             };
           }
 
-          // isFile is true only when stat?.isFile() returned true, so stat is defined here.
-          const fileStat = stat as import('node:fs').Stats;
-
           // Regular file — count lines and estimate tokens.
           const MAX_READ = 10 * 1024 * 1024;
-          if (fileStat.size > MAX_READ) {
+          const fileSize = stat.size;
+          if (fileSize > MAX_READ) {
             return {
               ...base,
-              bytes: fileStat.size,
+              bytes: fileSize,
               note: `File > ${MAX_READ} bytes — line/token count skipped`,
             };
           }
@@ -3470,10 +3469,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           // Rough token estimate: ~4 bytes per token (Anthropic guidance for
           // English/code). Use stat.size (bytes) to match documented behavior
           // and avoid UTF-16 code-unit discrepancies for non-ASCII files.
-          const approxTokens = Math.ceil(fileStat.size / 4);
+          const approxTokens = Math.ceil(fileSize / 4);
           return {
             ...base,
-            bytes: fileStat.size,
+            bytes: fileSize,
             lines,
             approxTokens,
           };
