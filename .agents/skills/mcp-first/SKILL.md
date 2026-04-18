@@ -172,11 +172,14 @@ Use `ci_list_runs`, `ci_view_run`, `ci_get_logs`, `ci_search_logs`, and `ci_reru
 
 Use `jira_list_children` instead of `searchJiraIssuesUsingJql` with `parent = LS-####` to list children of an epic or story. Raw JQL returns verbose markdown-formatted output that can overflow the MCP context limit (~192K chars for 50 results); `jira_list_children` returns compact structured JSON with pagination support.
 
-| Pattern to avoid                                                              | Correct MCP tool                                                                                                   |
-| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `searchJiraIssuesUsingJql(jql: "parent = LS-#### ORDER BY created ASC", ...)` | `jira_list_children(key: "LS-####")` — supports `status` filter and pagination via `pageToken`                     |
-| `acli jira workitem view LS-####`                                             | `jira_view(key: "LS-####")` — always try MCP first; `acli` is last resort after both MCP and Atlassian plugin fail |
-| `acli jira workitem transition --key LS-#### --status "In Progress"`          | `jira_transition(key: "LS-####", status: "In Progress")` — same fallback order as above                            |
+For any other JQL query, use `jira_search` instead of `searchJiraIssuesUsingJql`. The Atlassian plugin's tool returns ~3.8 KB per issue (~190 KB for 50 results) due to metadata envelope overhead (expand URLs, self links, avatar URLs, statusCategory objects) even when minimal fields are requested. Use `compact: true` for large result sets to get a minimal flat array of `{key, summary, status}` (~2 KB for 50 issues).
+
+| Pattern to avoid                                                              | Correct MCP tool                                                                                                                         |
+| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `searchJiraIssuesUsingJql(jql: "parent = LS-#### ORDER BY created ASC", ...)` | `jira_list_children(key: "LS-####")` — supports `status` filter and pagination via `pageToken`                                           |
+| `searchJiraIssuesUsingJql(jql: "...", fields: [...], maxResults: N, ...)`     | `jira_search(jql: "...", compact: true)` — compact JSON (~2 KB for 50 issues); avoids Atlassian plugin's ~3.8 KB/issue metadata envelope |
+| `acli jira workitem view LS-####`                                             | `jira_view(key: "LS-####")` — always try MCP first; `acli` is last resort after both MCP and Atlassian plugin fail                       |
+| `acli jira workitem transition --key LS-#### --status "In Progress"`          | `jira_transition(key: "LS-####", status: "In Progress")` — same fallback order as above                                                  |
 
 ## Database Operations
 
