@@ -131,6 +131,9 @@ export function useDraftUIState() {
   // Debounced player search
   const [playerSearch, setPlayerSearch] = useState('');
 
+  // WebSocket connection state — drives polling suppression in useDraftQueries
+  const [wsConnected, setWsConnected] = useState(false);
+
   return {
     // Position/search/view
     selectedPosition,
@@ -187,5 +190,8 @@ export function useDraftUIState() {
     // Player search
     playerSearch,
     setPlayerSearch,
+    // WebSocket connection
+    wsConnected,
+    setWsConnected,
   } as const;
 }

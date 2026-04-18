@@ -48,6 +48,7 @@ interface UseDraftQueriesParams {
   playerSearch: string;
   selectedPosition: string;
   viewMode: 'grid' | 'list' | 'compact' | 'board';
+  wsConnected: boolean;
 }
 
 export function useDraftQueries({
@@ -56,6 +57,7 @@ export function useDraftQueries({
   playerSearch,
   selectedPosition,
   viewMode,
+  wsConnected,
 }: UseDraftQueriesParams) {
   // ---- League Data ----
   const {
@@ -146,7 +148,10 @@ export function useDraftQueries({
     {
       variables: { draftId: draftId ?? 0 },
       skip: !draftId || isAuctionDraft,
-      pollInterval: !draftId || draftOrderMissing || isAuctionDraft ? 0 : 5000,
+      pollInterval:
+        !draftId || draftOrderMissing || isAuctionDraft || wsConnected
+          ? 0
+          : 5000,
       errorPolicy: 'all',
     },
   );

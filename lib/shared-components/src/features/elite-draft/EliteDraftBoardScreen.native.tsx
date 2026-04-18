@@ -511,6 +511,7 @@ export function EliteDraftBoardScreen({
     playerSearch: ui.playerSearch,
     selectedPosition: ui.selectedPosition,
     viewMode: ui.viewMode,
+    wsConnected: ui.wsConnected,
   });
 
   const isMyPick = Boolean(
@@ -583,6 +584,7 @@ export function EliteDraftBoardScreen({
     refetchAutoPickStatuses: queries.refetchAutoPickStatuses,
     websocketUrl,
     token: websocketToken,
+    setWsConnected: ui.setWsConnected,
   });
 
   const { timeRemaining } = useDraftTimer({
