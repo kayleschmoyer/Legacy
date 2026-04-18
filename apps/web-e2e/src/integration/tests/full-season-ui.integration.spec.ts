@@ -104,6 +104,9 @@ test.describe
         await waitForJoinPageValidation(page);
 
         // Fill team name and join
+        await expect(page.getByTestId('team-name')).toBeVisible({
+          timeout: 5_000,
+        });
         await page.getByTestId('team-name').fill(teamName);
         const joinBtn = page.getByRole('button', {
           name: /Join League/i,

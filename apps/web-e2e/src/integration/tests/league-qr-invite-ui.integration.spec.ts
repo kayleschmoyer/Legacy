@@ -327,6 +327,9 @@ test.describe
     });
 
     await test.step('Manager enters a team name and joins', async () => {
+      await expect(page.getByTestId('team-name')).toBeVisible({
+        timeout: 5_000,
+      });
       await page.getByTestId('team-name').fill('QR Code Joiners');
       const joinBtn = page.getByRole('button', { name: /Join League/i });
       await expect(joinBtn).toBeEnabled({ timeout: 5_000 });

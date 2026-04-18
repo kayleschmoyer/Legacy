@@ -136,6 +136,9 @@ test.describe
       await switchUser(page, jwt, joinUrl);
       await page.waitForLoadState('load');
       await waitForJoinPageValidation(page);
+      await expect(page.getByTestId('team-name')).toBeVisible({
+        timeout: 5_000,
+      });
       await page.getByTestId('team-name').fill(teamName);
       const joinBtn = page.getByRole('button', { name: /Join League/i });
       await expect(joinBtn).toBeEnabled({ timeout: 5_000 });

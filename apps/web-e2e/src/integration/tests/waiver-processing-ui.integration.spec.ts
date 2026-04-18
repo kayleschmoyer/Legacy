@@ -279,6 +279,9 @@ test.describe
         // Wait for invite code validation (retries on transient auth race)
         await waitForJoinPageValidation(page);
 
+        await expect(page.getByTestId('team-name')).toBeVisible({
+          timeout: 5_000,
+        });
         await page.getByTestId('team-name').fill(teamName);
         const joinBtn = page.getByRole('button', { name: /Join League/i });
         await expect(joinBtn).toBeEnabled({ timeout: 5000 });

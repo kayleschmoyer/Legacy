@@ -303,6 +303,7 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
                 ))}
               {!validating &&
                 isCodeComplete &&
+                (validateData !== undefined || Boolean(validateError)) &&
                 (validateError ? (
                   <Text
                     color="$orange10"

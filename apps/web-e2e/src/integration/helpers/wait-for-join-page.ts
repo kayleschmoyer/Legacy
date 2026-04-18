@@ -10,10 +10,15 @@ import { expect } from '@playwright/test';
  * fail transiently — the page shows "Unable to verify code" instead of
  * the expected "X spot(s) available" text.
  *
- * This helper waits for the success text and, if the error message appears
- * or the 15 s poll times out (slow Lambda cold start), reloads the page to
- * retry validation. The first attempt plus up to `maxRetries` reload retries
- * are performed (i.e. `maxRetries + 1` total attempts).
+ * "Invalid invite code" can also appear transiently: the component renders
+ * that message on the initial render (before the lazy query fires) and when
+ * the backend returns null for a valid code (slow Lambda cold start).  Both
+ * are retried exactly like the network-error case.
+ *
+ * This helper waits for the success text and, if any error message appears
+ * or the 15 s poll times out, reloads the page to retry validation. The
+ * first attempt plus up to `maxRetries` reload retries are performed (i.e.
+ * `maxRetries + 1` total attempts).
  */
 export async function waitForJoinPageValidation(
   page: Page,
@@ -21,6 +26,10 @@ export async function waitForJoinPageValidation(
 ): Promise<void> {
   const spotsLocator = page.getByText(/spot(s)?\s+available/i).first();
   const errorLocator = page.getByText(/unable to verify code/i).first();
+  // "Invalid invite code" appears transiently on initial render (before the
+  // validateInviteCode query fires) or when the backend returns null for a
+  // valid code. Detect it quickly so we can reload rather than wait 15 s.
+  const invalidLocator = page.getByText(/invalid invite code/i).first();
 
   // Re-throws non-TimeoutError failures (page closed, navigation errors) so
   // genuine failures are not silently swallowed and retried as a timeout.
@@ -45,6 +54,10 @@ export async function waitForJoinPageValidation(
       errorLocator
         .waitFor({ state: 'visible', timeout: 15_000 })
         .then(() => 'error' as const)
+        .catch(onlyTimeout),
+      invalidLocator
+        .waitFor({ state: 'visible', timeout: 15_000 })
+        .then(() => 'invalid' as const)
         .catch(onlyTimeout),
       page.waitForTimeout(15_000).then(() => 'timeout' as const),
     ]);
