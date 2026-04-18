@@ -649,6 +649,7 @@ function App() {
           <Routes>
             {/* All routes are now authenticated by default */}
             <Route path="/" element={<NavigableHomeScreen />} />
+            <Route path="/home" element={<Navigate to="/" replace />} />
             <Route path="/football" element={<FootballScreen />} />
             <Route path="/baseball" element={<BaseballScreen />} />
             <Route
