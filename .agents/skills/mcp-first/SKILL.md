@@ -74,23 +74,23 @@ Use `worktree_file_info({ paths: [...] })` instead of `wc -l file1 file2 ...` vi
 
 Use the MCP tools below instead of `gh` CLI. These tools handle temp file body encoding, GraphQL thread IDs, and structured output. Fall back to `gh` CLI **only** when the MCP server is unavailable.
 
-| `gh` CLI command                  | MCP tool (use this)                                                                |
-| --------------------------------- | ---------------------------------------------------------------------------------- |
-| `gh pr create`                    | `github_create_pr` (with `draft: true`)                                            |
-| `gh pr ready`                     | `github_mark_pr_ready`                                                             |
-| `gh pr edit --add-label`          | `github_manage_labels` (supports both `add` and `remove` arrays)                   |
-| `gh pr edit --remove-label`       | `github_manage_labels` (supports both `add` and `remove` arrays)                   |
-| `gh pr merge`                     | `github_merge_pr` (default: merge queue; use `strategy: "direct"` for admin merge) |
-| Remove all `ci-failure-*` labels  | `github_clear_ci_failure_labels`                                                   |
-| `gh api graphql` (resolve thread) | `github_resolve_thread` / `github_resolve_threads`                                 |
-| `gh api` (review threads)         | `github_get_review_threads`                                                        |
-| `gh api` (PR reviews)             | `github_list_reviews`                                                              |
-| `gh pr view`                      | `github_view_pr`                                                                   |
-| `gh pr list`                      | `github_list_prs` / `github_pr_dashboard`                                          |
-| `gh run list`                     | `ci_list_runs`                                                                     |
-| `gh run view`                     | `ci_view_run`                                                                      |
-| `gh run rerun`                    | `ci_rerun`                                                                         |
-| `gh pr edit --body-file`          | No MCP equivalent — `gh` CLI is correct here                                       |
+| `gh` CLI command                              | MCP tool (use this)                                                                |
+| --------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `gh pr create`                                | `github_create_pr` (with `draft: true`)                                            |
+| `gh pr ready`                                 | `github_mark_pr_ready`                                                             |
+| `gh pr edit --add-label`                      | `github_manage_labels` (supports both `add` and `remove` arrays)                   |
+| `gh pr edit --remove-label`                   | `github_manage_labels` (supports both `add` and `remove` arrays)                   |
+| `gh pr merge`                                 | `github_merge_pr` (default: merge queue; use `strategy: "direct"` for admin merge) |
+| Remove all `ci-failure-*` labels              | `github_clear_ci_failure_labels`                                                   |
+| `gh api graphql` (resolve thread)             | `github_resolve_thread` / `github_resolve_threads`                                 |
+| `gh api` (review threads)                     | `github_get_review_threads`                                                        |
+| `gh api` (PR reviews)                         | `github_list_reviews`                                                              |
+| `gh pr view`                                  | `github_view_pr`                                                                   |
+| `gh pr list`                                  | `github_list_prs` / `github_pr_dashboard`                                          |
+| `gh run list` / `gh run list --branch BRANCH` | `ci_list_runs` / `ci_list_runs(branch: "BRANCH", limit: 5)`                        |
+| `gh run view`                                 | `ci_view_run`                                                                      |
+| `gh run rerun`                                | `ci_rerun`                                                                         |
+| `gh pr edit --body-file`                      | No MCP equivalent — `gh` CLI is correct here                                       |
 
 **GitHub auth-aware routing**: call `github_auth_status` at the start of any GitHub workflow. If `configured: true`, use our custom GitHub MCP tools. If `configured: false`, **stop and prompt the user** — do not silently fall back. Tell them their GitHub credentials are missing or expired, and direct them to set `GH_TOKEN`/`GITHUB_TOKEN`, run `gh auth login`, or configure `AGENT_AUTHOR_APP_PRIVATE_KEY` (see `.agents/skills/cloud-agent-mode/SKILL.md`). Only fall back to `gh` CLI after the user confirms their `gh` auth is working or explicitly asks you to try the CLI fallback.
 
@@ -116,6 +116,14 @@ On Claude Code on the web, Claude provides built-in `mcp__github__*` tools that 
 ## CI Operations
 
 Use `ci_list_runs`, `ci_view_run`, `ci_get_logs`, `ci_search_logs`, and `ci_rerun` instead of `gh run` commands via Bash. These tools parse and structure log output for agent consumption.
+
+| `gh` CLI command                           | MCP tool (use this)                             |
+| ------------------------------------------ | ----------------------------------------------- |
+| `gh run list --branch BRANCH --limit N`    | `ci_list_runs(branch: "BRANCH", limit: N)`      |
+| `gh run list --json databaseId,status,...` | `ci_list_runs(branch: "BRANCH", limit: N)`      |
+| `gh run view RUN_ID --log-failed`          | `ci_get_logs(runId: RUN_ID, failedOnly: true)`  |
+| `gh run view RUN_ID --log`                 | `ci_get_logs(runId: RUN_ID, failedOnly: false)` |
+| `gh run rerun RUN_ID --failed`             | `ci_rerun(runId: RUN_ID, onlyFailedJobs: true)` |
 
 **CI status and PR events are surfaced natively by Claude Code** — no wait tool needed. After pushing, Claude Code automatically receives and surfaces CI failures, review events, and merge status. Never use `sleep` + polling loops (`sleep N && gh run view`, `sleep N && gh pr view`, `ci_view_run` in a loop, `github_view_pr` in a loop) — these waste context and shell round-trips.
 
