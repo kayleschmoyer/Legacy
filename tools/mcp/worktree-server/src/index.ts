@@ -1229,6 +1229,40 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
       },
     },
     {
+      name: 'worktree_show_commit',
+      description:
+        'Read the diff introduced by a specific commit SHA. ' +
+        'Use `stat: true` for a file-change summary (like `git show <sha> --stat --oneline`). ' +
+        "Provide `path` to restrict output to a single file's diff. " +
+        'Without either flag, returns the full commit diff. ' +
+        'Prefer this over raw `git show` shell calls during commit reconnaissance.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          sha: {
+            type: 'string',
+            description: 'Commit SHA, HEAD, HEAD~N, or any git rev',
+          },
+          path: {
+            type: 'string',
+            description:
+              'Optional file path to restrict the diff to a single file',
+          },
+          stat: {
+            type: 'boolean',
+            description:
+              'When true, return a stat summary only (--stat --oneline) instead of the full diff',
+          },
+          worktree: {
+            type: 'string',
+            description:
+              'Ticket key, absolute path, or omit for active worktree',
+          },
+        },
+        required: ['sha'],
+      },
+    },
+    {
       name: 'worktree_stabilize',
       description:
         'Post-rebase stabilization: install, db:print-schema, codegen. Must run BEFORE push.',
@@ -5027,6 +5061,79 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           String(err);
         return {
           content: [{ type: 'text', text: `Failed to show commit: ${output}` }],
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_show_commit
+    // -----------------------------------------------------------------------
+    case 'worktree_show_commit': {
+      const {
+        sha,
+        path: filterPath,
+        stat: statOnly,
+        worktree: wtKey,
+      } = args as {
+        sha: string;
+        path?: string;
+        stat?: boolean;
+        worktree?: string;
+      };
+
+      const target = resolveTargetDir(wtKey);
+      if ('error' in target) {
+        return {
+          content: [{ type: 'text', text: target.error }],
+          isError: true,
+        };
+      }
+      const cwd = target.path;
+
+      if (!/^[a-zA-Z0-9_./~^{}-]+$/.test(sha)) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Invalid SHA: "${sha}". Only rev characters allowed.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      try {
+        let output: string;
+        if (statOnly) {
+          output = runGit(['show', sha, '--stat', '--oneline'], cwd, {
+            timeout: 10_000,
+          }).trim();
+        } else if (filterPath) {
+          output = runGit(['show', sha, '--', filterPath], cwd, {
+            timeout: 30_000,
+          }).trim();
+        } else {
+          output = runGit(['show', sha], cwd, { timeout: 30_000 }).trim();
+        }
+
+        const MAX = 200_000;
+        const truncated =
+          output.length > MAX
+            ? output.slice(0, MAX) + '\n... [truncated]'
+            : output;
+
+        return {
+          content: [{ type: 'text', text: truncated }],
+        };
+      } catch (err: unknown) {
+        const e = err as { stdout?: string; stderr?: string; message?: string };
+        const msg =
+          [e.stdout, e.stderr].filter(Boolean).join('\n') ||
+          e.message ||
+          String(err);
+        return {
+          content: [{ type: 'text', text: `Failed to show commit: ${msg}` }],
           isError: true,
         };
       }
