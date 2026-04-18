@@ -33,6 +33,10 @@ import {
   YStack,
 } from 'tamagui';
 import { PITCHING_POSITIONS } from '@legacy-sports/utils';
+import {
+  computeScoring,
+  DEFAULT_PITCHING_SCORING,
+} from '@legacy-sports/scoring';
 import { getPageRange } from './paginationUtils';
 import { formatPositionsPlayed } from './services/CareerStatsService';
 import {
@@ -102,6 +106,29 @@ export interface PitchingStatsDataGridProps {
   testId?: string;
   /** Stats display format: 'standard' shows high-priority columns only, 'expanded' shows all */
   statsFormat?: 'standard' | 'expanded';
+}
+
+// =============================================================================
+// Helpers
+// =============================================================================
+
+function computePitchingFantasyPoints(
+  player: CareerPitchingFragment | null | undefined,
+): number {
+  if (!player) return 0;
+  return computeScoring(
+    {
+      bb: player.baseOnBalls ?? 0,
+      er: player.earnedRuns ?? 0,
+      h: player.hits ?? 0,
+      l: player.losses ?? 0,
+      outsRecorded: player.outsRecorded ?? 0,
+      so: player.strikeouts ?? 0,
+      sv: player.saves ?? 0,
+      w: player.wins ?? 0,
+    },
+    DEFAULT_PITCHING_SCORING,
+  );
 }
 
 // =============================================================================
@@ -251,6 +278,25 @@ export const PITCHING_STATS_COLUMNS: readonly PitchingGridColumn[] = [
     priority: 'high',
     description: 'Pitching Wins Above Replacement',
     formatter: (v: unknown) => (v != null ? (v as number).toFixed(1) : '—'),
+  },
+  {
+    key: 'fantasyPoints',
+    label: 'FPTS',
+    sortable: false,
+    width: '80px',
+    align: 'center',
+    priority: 'high',
+    description: 'Career fantasy points using default scoring settings',
+  },
+  {
+    key: 'fantasyPointsPerGame',
+    label: 'FPTS/G',
+    sortable: false,
+    width: '80px',
+    align: 'center',
+    priority: 'high',
+    description:
+      'Average fantasy points per game using default scoring settings',
   },
 ] as const;
 
@@ -863,17 +909,32 @@ export function PitchingStatsDataGrid({
                           ? formatPositionsPlayed(player?.positionsPlayed) ||
                             player?.primaryPosition ||
                             '-'
-                          : column.formatter
-                            ? column.formatter(
-                                player?.[column.key as keyof typeof player],
-                              )
-                            : (() => {
-                                const rawVal =
-                                  player?.[column.key as keyof typeof player];
-                                return typeof rawVal === 'object'
-                                  ? '-'
-                                  : String(rawVal ?? '-');
-                              })()}
+                          : column.key === 'fantasyPoints'
+                            ? Math.round(
+                                computePitchingFantasyPoints(player),
+                              ).toString()
+                            : column.key === 'fantasyPointsPerGame'
+                              ? (() => {
+                                  const games = player?.games ?? 0;
+                                  const fpts =
+                                    computePitchingFantasyPoints(player);
+                                  return games > 0
+                                    ? (fpts / games).toFixed(1)
+                                    : '0.0';
+                                })()
+                              : column.formatter
+                                ? column.formatter(
+                                    player?.[column.key as keyof typeof player],
+                                  )
+                                : (() => {
+                                    const rawVal =
+                                      player?.[
+                                        column.key as keyof typeof player
+                                      ];
+                                    return typeof rawVal === 'object'
+                                      ? '-'
+                                      : String(rawVal ?? '-');
+                                  })()}
                     </Text>
                   </XStack>
                 ))}
