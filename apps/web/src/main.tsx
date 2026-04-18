@@ -148,11 +148,6 @@ try {
                   // so unauthenticated users can get support without signing in
                   // (LS-3513).
                   `${basePath}/help`,
-                  // /baseball/mock-draft is publicly accessible so unauthenticated
-                  // users can reach the mock draft simulator page (LS-3484).
-                  // The PremiumGate inside the page gates the actual simulator
-                  // behind a premium subscription.
-                  `${basePath}/baseball/mock-draft`,
                 ]}
                 // /baseball hub is publicly accessible (LS-3532). Using publicExactPaths
                 // (not publicPaths) so only the landing page is public — sub-routes like

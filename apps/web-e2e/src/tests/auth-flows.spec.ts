@@ -305,8 +305,8 @@ unauthTest.describe('Protected Routes @critical', () => {
   const routes = [
     '/',
     // /baseball is publicly accessible (LS-3532) — see Public Routes section below.
-    // /baseball/mock-draft is publicly accessible (LS-3484) — see Public Routes section below.
     // /players is publicly accessible (LS-3493, LS-3497) — see Public Routes section below.
+    '/baseball/mock-draft',
     '/management',
     '/profile/settings',
     '/preferences',
@@ -349,7 +349,7 @@ unauthTest.describe('Protected Routes @critical', () => {
 
 // ---------------------------------------------------------------------------
 // Public Routes — accessible without authentication (LS-3566, LS-3563, LS-3561,
-// LS-3522, LS-3548, LS-3513, LS-3484)
+// LS-3522, LS-3548, LS-3513)
 // ---------------------------------------------------------------------------
 
 unauthTest.describe('Public Routes @critical', () => {
@@ -604,24 +604,6 @@ unauthTest.describe('Public Routes @critical', () => {
       await expect(
         page.getByRole('heading', { name: /baseball fantasy/i }),
       ).toBeVisible({ timeout: 15000 });
-    },
-  );
-
-  unauthTest(
-    'shows premium gate on /baseball/mock-draft when not authenticated (LS-3484)',
-    async ({ page }) => {
-      await page.goto('/baseball/mock-draft');
-      await page.waitForLoadState('load');
-
-      // LS-3484: /baseball/mock-draft was missing from publicPaths — unauthenticated
-      // users saw the "Build Your Dynasty" marketing landing page instead of the page.
-      // Now that the route is public, the PremiumGate renders for non-premium visitors.
-      await expect(page.getByText(/premium feature/i)).toBeVisible({
-        timeout: 15000,
-      });
-      await expect(page.locator('body')).not.toContainText(
-        'Build Your Dynasty',
-      );
     },
   );
 });
