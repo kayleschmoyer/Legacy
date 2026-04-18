@@ -363,6 +363,16 @@ export const CSS = `
   background: rgba(13, 21, 38, 0.95);
 }
 .d-search-input::placeholder { color: var(--d-text-muted); }
+.d-search-clear {
+  position: absolute; right: 8px; top: 50%;
+  transform: translateY(-50%);
+  background: none; border: none; padding: 4px;
+  cursor: pointer; color: var(--d-text-muted);
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; transition: color 0.15s, background 0.15s;
+  line-height: 0;
+}
+.d-search-clear:hover { color: var(--d-text); background: rgba(255,255,255,0.06); }
 
 /* ===== Filter Pills ===== */
 .d-pills { display: flex; gap: 4px; flex-wrap: wrap; }

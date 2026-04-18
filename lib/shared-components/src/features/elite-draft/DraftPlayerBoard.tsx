@@ -187,8 +187,30 @@ export function DraftPlayerBoard({
               aria-label="Search players"
               value={searchTerm}
               onChange={(e) => onSetSearchTerm(e.target.value)}
+              style={searchTerm ? { paddingRight: 34 } : undefined}
             />
-            {availablePlayersLoading && (
+            {searchTerm ? (
+              <button
+                className="d-search-clear"
+                type="button"
+                aria-label="Clear search"
+                onClick={() => onSetSearchTerm('')}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  width="14"
+                  height="14"
+                >
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            ) : availablePlayersLoading ? (
               <span
                 style={{
                   position: 'absolute',
@@ -204,7 +226,7 @@ export function DraftPlayerBoard({
                   animation: 'spin 0.8s linear infinite',
                 }}
               />
-            )}
+            ) : null}
           </div>
           <div
             className="d-pills"
