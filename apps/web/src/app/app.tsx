@@ -632,6 +632,7 @@ function App() {
       <ScoreboardTicker />
       <YStack
         tag="main"
+        role="main"
         flex={1}
         padding="$4"
         $sm={{ padding: '$2' }}
