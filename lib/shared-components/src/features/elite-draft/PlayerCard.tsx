@@ -10,6 +10,7 @@ export const PlayerCard = React.memo(function PlayerCard({
   player,
   index,
   isMyPick,
+  pickLoading,
   isWatched,
   isQueued,
   onDraft,
@@ -20,6 +21,7 @@ export const PlayerCard = React.memo(function PlayerCard({
   player: DraftPlayer;
   index: number;
   isMyPick: boolean;
+  pickLoading?: boolean;
   isWatched: boolean;
   isQueued?: boolean;
   onDraft: (playerId: number) => void;
@@ -27,6 +29,7 @@ export const PlayerCard = React.memo(function PlayerCard({
   onToggleQueue?: (playerId: number) => void;
   onPlayerClick?: (playerId: number) => void;
 }) {
+  const isDrafting = isMyPick && pickLoading;
   const posColor = getPositionColor(player.position);
 
   return (
@@ -199,17 +202,23 @@ export const PlayerCard = React.memo(function PlayerCard({
         {/* Actions */}
         <div className="d-card-actions">
           <button
-            className={`d-draft-btn ${isMyPick ? 'can-draft' : 'waiting'}`}
+            className={`d-draft-btn ${isDrafting ? 'drafting' : isMyPick ? 'can-draft' : 'waiting'}`}
             onClick={() => onDraft(player.id)}
-            disabled={!isMyPick}
-            aria-disabled={!isMyPick}
+            disabled={!isMyPick || isDrafting}
+            aria-disabled={!isMyPick || isDrafting}
             aria-label={
-              isMyPick
-                ? `Draft ${player.name} now`
-                : `Waiting for your turn to draft ${player.name}`
+              isDrafting
+                ? `Drafting ${player.name}…`
+                : isMyPick
+                  ? `Draft ${player.name} now`
+                  : `Waiting for your turn to draft ${player.name}`
             }
           >
-            {isMyPick ? '⚡ DRAFT NOW' : '⏳ WAITING'}
+            {isDrafting
+              ? '⏳ DRAFTING…'
+              : isMyPick
+                ? '⚡ DRAFT NOW'
+                : '⏳ WAITING'}
           </button>
           <button
             className={`d-watch-btn ${isWatched ? 'active' : ''}`}

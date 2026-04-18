@@ -90,6 +90,10 @@ export const CSS = `
   0%, 100% { box-shadow: 0 4px 16px rgba(5, 150, 105, 0.25), 0 0 0 0 rgba(5, 150, 105, 0.3); }
   50%      { box-shadow: 0 6px 24px rgba(5, 150, 105, 0.4), 0 0 0 8px rgba(5, 150, 105, 0); }
 }
+@keyframes draftBtnPing {
+  0%        { transform: scale(1); opacity: 0.5; }
+  80%, 100% { transform: scale(1.2); opacity: 0; }
+}
 @keyframes slideInLeft {
   from { opacity: 0; transform: translateX(-16px); }
   to   { opacity: 1; transform: translateX(0); }
@@ -429,7 +433,7 @@ export const CSS = `
   position: relative; border-radius: var(--d-radius-lg); overflow: hidden;
   background: #16223A;
   border: 1px solid rgba(255, 255, 255, 0.07);
-  transition: all 0.4s cubic-bezier(0.4,0,0.2,1);
+  transition: transform 0.4s cubic-bezier(0.4,0,0.2,1), box-shadow 0.4s cubic-bezier(0.4,0,0.2,1), border-color 0.4s cubic-bezier(0.4,0,0.2,1);
   animation: fadeSlideUp 0.45s ease-out both;
   box-shadow: 0 2px 8px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.04);
 }
@@ -534,20 +538,29 @@ export const CSS = `
   flex: 1; padding: 9px 14px;
   border-radius: var(--d-radius-md); border: none;
   font-size: 12px; font-weight: 700; cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4,0,0.2,1); font-family: inherit; letter-spacing: 0.5px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.2s ease, color 0.2s ease, opacity 0.2s ease;
+  font-family: inherit; letter-spacing: 0.5px;
   position: relative; overflow: hidden;
 }
 .d-draft-btn.can-draft {
   background: linear-gradient(135deg, #059669 0%, #047857 60%, #065f46 100%);
   color: white;
-  animation: draftBtnGlow 2s ease-in-out infinite;
   box-shadow: 0 4px 16px rgba(5,150,105,0.3);
+  will-change: transform;
 }
 .d-draft-btn.can-draft::before {
   content: '';
   position: absolute; top: 0; left: -40%; width: 40%; height: 100%;
   background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
   transition: left 0.5s ease;
+}
+.d-draft-btn.can-draft::after {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  border: 2px solid rgba(5, 150, 105, 0.5);
+  animation: draftBtnPing 2s ease-out infinite;
+  pointer-events: none;
 }
 .d-draft-btn.can-draft:hover::before { left: 120%; }
 .d-draft-btn.can-draft:hover {
@@ -558,6 +571,12 @@ export const CSS = `
   transform: translateY(0) scale(0.97);
   box-shadow: 0 2px 8px rgba(5,150,105,0.3);
 }
+.d-draft-btn.drafting {
+  background: linear-gradient(135deg, rgba(5,150,105,0.4) 0%, rgba(4,120,87,0.4) 100%);
+  color: rgba(255,255,255,0.6);
+  cursor: wait;
+}
+.d-draft-btn.drafting::after { content: none; }
 .d-draft-btn.waiting {
   background: rgba(107,114,128,0.2);
   border: 1px solid rgba(107,114,128,0.15);

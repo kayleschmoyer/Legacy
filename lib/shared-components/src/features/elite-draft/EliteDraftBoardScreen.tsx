@@ -451,6 +451,7 @@ export function EliteDraftBoardScreen({
           commPickMode={ui.commPickMode}
           isOwner={queries.isOwner}
           isMyPick={isMyPick}
+          pickLoading={actions.pickLoading}
           myTeamId={queries.myTeamId}
           draftId={queries.draftId}
           filteredPlayers={filteredPlayers}

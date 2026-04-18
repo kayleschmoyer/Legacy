@@ -41,6 +41,7 @@ interface DraftPlayerBoardProps {
   commPickMode: boolean;
   isOwner: boolean;
   isMyPick: boolean;
+  pickLoading: boolean;
   myTeamId: number | null;
   draftId: number | null;
   filteredPlayers: DraftPlayer[];
@@ -73,6 +74,7 @@ export function DraftPlayerBoard({
   commPickMode,
   isOwner,
   isMyPick,
+  pickLoading,
   myTeamId,
   draftId,
   filteredPlayers,
@@ -384,6 +386,7 @@ export function DraftPlayerBoard({
                   player={player}
                   index={idx}
                   isMyPick={commPickMode ? isOwner : isMyPick}
+                  pickLoading={commPickMode ? false : pickLoading}
                   isWatched={watchlistSet.has(player.id)}
                   isQueued={queuedPlayerIds.has(player.id)}
                   onDraft={handleDraftPlayer}
