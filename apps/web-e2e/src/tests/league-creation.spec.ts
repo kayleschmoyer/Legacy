@@ -459,3 +459,84 @@ unauthTest.describe(
     );
   },
 );
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Unauthenticated visitor regression (LS-3475)
+//
+// Direct navigation to /baseball/league/create was reported as returning a 404
+// from the server (GitHub Pages SPA hosting returns 404 for unknown paths and
+// redirects via 404.html, but the initial HTTP response is a 404). In the E2E
+// environment, `serve -s` returns 200 for all SPA routes — these tests lock in
+// that the full marketing page renders correctly on direct navigation so future
+// regressions are caught before they reach production.
+// ─────────────────────────────────────────────────────────────────────────────
+
+unauthTest.describe(
+  'League Create — unauthenticated direct navigation sees marketing page @regression',
+  () => {
+    unauthTest.beforeEach(async ({ page }) => {
+      await page.goto('/baseball/league/create');
+      await page.waitForLoadState('load');
+    });
+
+    unauthTest(
+      'shows marketing headline on /baseball/league/create when unauthenticated (LS-3475)',
+      async ({ page }) => {
+        await expect(
+          page.getByRole('heading', { name: /build your dynasty/i }),
+        ).toBeVisible({ timeout: 15_000 });
+      },
+    );
+
+    unauthTest(
+      'shows "Season 2026" badge on /baseball/league/create when unauthenticated (LS-3475)',
+      async ({ page }) => {
+        await expect(page.getByText(/season 2026/i)).toBeVisible({
+          timeout: 15_000,
+        });
+      },
+    );
+
+    unauthTest(
+      '"Continue with Google" button is visible on /baseball/league/create when unauthenticated (LS-3475)',
+      async ({ page }) => {
+        await expect(
+          page.getByRole('button', { name: /continue with google/i }),
+        ).toBeVisible({ timeout: 15_000 });
+      },
+    );
+
+    unauthTest(
+      '"Continue with Google" button on /baseball/league/create is clickable via getByRole (LS-3475)',
+      async ({ page }) => {
+        const googleBtn = page.getByRole('button', {
+          name: /continue with google/i,
+        });
+        await expect(googleBtn).toBeVisible({ timeout: 15_000 });
+        await expect(googleBtn).toBeEnabled();
+        await googleBtn.click({ noWaitAfter: true });
+      },
+    );
+
+    unauthTest(
+      '"Continue with Discord" button is visible on /baseball/league/create when unauthenticated (LS-3475)',
+      async ({ page }) => {
+        await expect(
+          page.getByRole('button', { name: /continue with discord/i }),
+        ).toBeVisible({ timeout: 15_000 });
+      },
+    );
+
+    unauthTest(
+      '"Continue with Discord" button on /baseball/league/create is clickable via getByRole (LS-3475)',
+      async ({ page }) => {
+        const discordBtn = page.getByRole('button', {
+          name: /continue with discord/i,
+        });
+        await expect(discordBtn).toBeVisible({ timeout: 15_000 });
+        await expect(discordBtn).toBeEnabled();
+        await discordBtn.click({ noWaitAfter: true });
+      },
+    );
+  },
+);
