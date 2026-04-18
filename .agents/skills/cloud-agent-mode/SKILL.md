@@ -298,6 +298,30 @@ The call payload is formed correctly (e.g. `{"id": "21"}` as a JSON object liter
 causes the `"expected object, received string"` error even when the server is warm.
 The `transition` parameter MUST be a JSON object `{ id: "21" }`, not a string.
 
+### Quirk 3: `ci_get_logs` returns step summaries instead of full log text in cloud sessions
+
+**Symptom**: `ci_get_logs` returns output that begins with:
+
+```
+[Log download unavailable: the GitHub Actions log endpoint redirects to
+results-receiver.actions.githubusercontent.com which is blocked in this
+environment (cloud proxy restriction). Step conclusions shown instead:]
+```
+
+followed by a list of step names and `✓`/`✗`/`○` conclusions instead of full log text.
+
+**Root cause**: The GitHub Actions log endpoint (`GET /actions/jobs/{id}/logs`) always returns a 302 redirect to `results-receiver.actions.githubusercontent.com`. The cloud-session proxy blocks CONNECT tunnels to that host with a 403 error. The MCP server falls back to fetching step-level conclusions from `/actions/jobs/{id}` (which does not redirect) so agents still get actionable signal.
+
+**What you can see**: which steps failed (name + conclusion). **What you cannot see**: the actual log lines that explain why.
+
+**Workarounds**:
+
+1. **Open the run in a browser** — `ci_view_run(runId: RUN_ID)` returns `url`; navigate there in your browser to see full logs with GitHub's collapsible UI.
+2. **Use `ci_search_logs` pattern search** — the same proxy restriction applies, so this also falls back to step summaries. Not helpful for log text.
+3. **From a local session** — `ci_get_logs` works normally outside cloud environments; teleport to local if the exact error text is critical.
+
+> This is a known infrastructure limitation (LS-3040). The step-summary fallback is intentional — it surfaces actionable failure signal (which step broke) even when full log text is unavailable.
+
 ### Discovering transition IDs
 
 `transitionJiraIssue` requires a numeric workflow transition ID, and these are **not** stable across projects. `getTransitionsForJiraIssue` is the right way to discover them for any given ticket. For the LS project specifically:

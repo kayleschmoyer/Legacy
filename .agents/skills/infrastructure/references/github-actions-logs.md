@@ -165,9 +165,21 @@ Repeat until CI passes. Do NOT push without `make pc` passing first.
 
 ## Troubleshooting
 
-| Issue                       | Fix                                                                 |
-| --------------------------- | ------------------------------------------------------------------- |
-| `ci_get_logs` returns empty | Use `failedOnly: false` — failure may be in a non-failing step      |
-| Can't find specific error   | Use `ci_search_logs` with a broader pattern, or fetch full logs     |
-| Too many logs to read       | Use `ci_search_logs(runId: RUN_ID, pattern: "project-name.*error")` |
-| Need to compare runs        | Call `ci_get_logs` for each runId and compare the returned text     |
+| Issue                                                  | Fix                                                                                                   |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| `ci_get_logs` returns empty                            | Use `failedOnly: false` — failure may be in a non-failing step                                        |
+| Can't find specific error                              | Use `ci_search_logs` with a broader pattern, or fetch full logs                                       |
+| Too many logs to read                                  | Use `ci_search_logs(runId: RUN_ID, pattern: "project-name.*error")`                                   |
+| Need to compare runs                                   | Call `ci_get_logs` for each runId and compare the returned text                                       |
+| `ci_get_logs` shows step summaries instead of log text | Cloud proxy blocks `results-receiver.actions.githubusercontent.com` (LS-3040). See workarounds below. |
+
+### Cloud environment: full log text unavailable
+
+In cloud agent sessions (Claude Code on the web, Copilot Coding Agent), `ci_get_logs` falls back to step-level summaries when the log download is blocked. You can see which steps failed but not the log lines explaining why.
+
+**Workarounds when full text is needed**:
+
+1. Open the run URL in a browser: call `ci_view_run(runId: RUN_ID)` and navigate to the returned `url` field.
+2. Re-run the investigation from a local session where the proxy does not restrict `results-receiver.actions.githubusercontent.com`.
+
+The step-summary output starts with `[Log download unavailable: ...]` so you can detect this condition programmatically.
