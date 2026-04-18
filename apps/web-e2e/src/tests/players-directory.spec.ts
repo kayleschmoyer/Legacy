@@ -194,13 +194,13 @@ test.describe('Players Directory – empty state @regression', () => {
 });
 
 // ---------------------------------------------------------------------------
-// LS-3545 / LS-3547: /players is a protected route. Unauthenticated users
-// visiting /players are intercepted by EnhancedAuthGuard and shown
-// PublicLandingPage with the "Continue with Google" sign-in CTA and a
-// "Get Started Free" CTA lower down. These tests lock in that the buttons
-// are located via getByRole (accessible name) — NOT via the broken
-// `(button:visible, [role="button"]:visible)` CSS selector that caused the
-// original crawler-reported failures (including the spurious
+// LS-3545 / LS-3547 / LS-3495: /players is a protected route. Unauthenticated
+// users visiting /players are intercepted by EnhancedAuthGuard and shown
+// PublicLandingPage with the "Continue with Google" and "Continue with Discord"
+// sign-in CTAs and a "Get Started Free" CTA lower down. These tests lock in
+// that the buttons are located via getByRole (accessible name) — NOT via the
+// broken `(button:visible, [role="button"]:visible)` CSS selector that caused
+// the original crawler-reported failures (including the spurious
 // "[GSI_LOGGER]: FedCM get() rejects with NetworkError" attribution).
 // ---------------------------------------------------------------------------
 
@@ -252,6 +252,38 @@ unauthTest.describe(
         });
         await expect(getStartedBtn).toBeVisible({ timeout: 15_000 });
         await expect(getStartedBtn).toBeEnabled();
+      },
+    );
+
+    unauthTest(
+      '"Continue with Discord" button is visible on /players when unauthenticated',
+      async ({ page }) => {
+        await page.goto('/players');
+        await page.waitForLoadState('load');
+
+        await expect(
+          page.getByRole('button', { name: /continue with discord/i }),
+        ).toBeVisible({ timeout: 15_000 });
+      },
+    );
+
+    unauthTest(
+      '"Continue with Discord" button on /players is clickable via getByRole',
+      async ({ page }) => {
+        await page.goto('/players');
+        await page.waitForLoadState('load');
+
+        const discordBtn = page.getByRole('button', {
+          name: /continue with discord/i,
+        });
+        await expect(discordBtn).toBeVisible({ timeout: 15_000 });
+        await expect(discordBtn).toBeEnabled();
+        // Confirm the click resolves without a CSS selector parse error —
+        // regression coverage for the original crawler failure (LS-3495). The
+        // Discord OAuth handler sets window.location.href for a cross-origin
+        // redirect, so noWaitAfter prevents Playwright from hanging on the
+        // navigation.
+        await discordBtn.click({ noWaitAfter: true });
       },
     );
   },
