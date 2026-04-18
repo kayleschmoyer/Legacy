@@ -788,6 +788,18 @@ function applyTailLines(output: string, tailLines?: number): string {
   return `[... ${omitted} line${omitted === 1 ? '' : 's'} omitted — use tailLines=0 or omit to see full output ...]\n${tail}`;
 }
 
+/** Read ~/.netrc (or ~/_netrc on Windows) and check for a machine entry. */
+function checkNetrc(machine: string): boolean {
+  const netrcName = process.platform === 'win32' ? '_netrc' : '.netrc';
+  const netrcPath = join(homedir(), netrcName);
+  if (!existsSync(netrcPath)) return false;
+  try {
+    return readFileSync(netrcPath, 'utf-8').includes(`machine ${machine}`);
+  } catch {
+    return false;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // MCP server
 // ---------------------------------------------------------------------------
@@ -1955,6 +1967,19 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
               "Optional ticket key (e.g. 'LS-1134'). Uses active worktree if omitted.",
           },
         },
+        required: [],
+      },
+    },
+    {
+      name: 'auth_check_all',
+      description:
+        'Check workspace auth token presence for all services (GitHub, Jira, AWS, CI). ' +
+        'Returns per-service ok/method/hint. Call at the start of any workflow that requires credentials. ' +
+        'Never initiates login flows — read-only token presence check only. ' +
+        'If allAuthenticated is false, surface the hint for each failing service and stop; never attempt to generate tokens.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {},
         required: [],
       },
     },
@@ -9658,6 +9683,145 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           isError: true,
         };
       }
+    }
+
+    case 'auth_check_all': {
+      // GitHub / CI: GH_TOKEN, GITHUB_TOKEN, AGENT_AUTHOR_APP_PRIVATE_KEY, cached file, netrc
+      const ghEnvToken =
+        process.env.GH_TOKEN ||
+        process.env.GITHUB_TOKEN ||
+        process.env.AGENT_AUTHOR_APP_PRIVATE_KEY;
+      const ghCacheFile = join(
+        homedir(),
+        '.config',
+        'legacy-sports-github',
+        'token.json',
+      );
+      const ghCached = existsSync(ghCacheFile);
+      const ghNetrc = checkNetrc('github.com');
+      const githubOk = !!(ghEnvToken || ghCached || ghNetrc);
+      const githubMethod = ghEnvToken
+        ? process.env.GH_TOKEN
+          ? 'env:GH_TOKEN'
+          : process.env.GITHUB_TOKEN
+            ? 'env:GITHUB_TOKEN'
+            : 'env:AGENT_AUTHOR_APP_PRIVATE_KEY'
+        : ghCached
+          ? 'cached-file'
+          : ghNetrc
+            ? 'netrc'
+            : undefined;
+
+      // Jira: basic (JIRA_EMAIL + JIRA_API_TOKEN) or OAuth (JIRA_CLIENT_ID + JIRA_CLIENT_SECRET + JIRA_CLOUD_ID) or netrc
+      const jiraBasic = !!(
+        process.env.JIRA_EMAIL && process.env.JIRA_API_TOKEN
+      );
+      const jiraOAuth = !!(
+        process.env.JIRA_CLIENT_ID &&
+        process.env.JIRA_CLIENT_SECRET &&
+        process.env.JIRA_CLOUD_ID
+      );
+      const jiraNetrc =
+        checkNetrc('atlassian.net') ||
+        checkNetrc('bkrupa.atlassian.net') ||
+        checkNetrc('id.atlassian.com');
+      const jiraOk = jiraBasic || jiraOAuth || jiraNetrc;
+      const jiraMethod = jiraBasic
+        ? 'env:basic'
+        : jiraOAuth
+          ? 'env:oauth'
+          : jiraNetrc
+            ? 'netrc'
+            : undefined;
+
+      // AWS: verify SSO session is active via sts get-caller-identity
+      const awsProfile = process.env.AWS_PROFILE ?? 'default';
+      let awsOk = false;
+      let awsUserId: string | undefined;
+      try {
+        const awsOut = execFileSync(
+          'aws',
+          [
+            'sts',
+            'get-caller-identity',
+            '--profile',
+            awsProfile,
+            '--output',
+            'json',
+          ],
+          { encoding: 'utf-8', timeout: 8_000 },
+        );
+        const parsed = JSON.parse(awsOut) as {
+          UserId?: string;
+          Account?: string;
+        };
+        awsOk = !!(parsed.UserId || parsed.Account);
+        awsUserId = parsed.UserId;
+      } catch {
+        awsOk = false;
+      }
+
+      // CI uses the same GitHub token
+      const ciOk = githubOk;
+      const ciMethod = githubMethod;
+
+      const allAuthenticated = githubOk && jiraOk && awsOk && ciOk;
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                allAuthenticated,
+                services: {
+                  github: {
+                    ok: githubOk,
+                    ...(githubMethod !== undefined
+                      ? { method: githubMethod }
+                      : {}),
+                    ...(!githubOk
+                      ? {
+                          hint: 'Set `GH_TOKEN` in `.mcp.json` env, or run `gh auth login` in your terminal, then restart the session.',
+                        }
+                      : {}),
+                  },
+                  jira: {
+                    ok: jiraOk,
+                    ...(jiraMethod !== undefined ? { method: jiraMethod } : {}),
+                    ...(!jiraOk
+                      ? {
+                          hint: 'Set `JIRA_EMAIL` and `JIRA_API_TOKEN` in `.mcp.json` env (generate at https://id.atlassian.com/manage-profile/security/api-tokens), then restart the session.',
+                        }
+                      : {}),
+                  },
+                  aws: {
+                    ok: awsOk,
+                    profile: awsProfile,
+                    ...(awsUserId !== undefined ? { userId: awsUserId } : {}),
+                    ...(!awsOk
+                      ? {
+                          hint: `Run \`aws sso login --profile ${awsProfile}\` in your terminal to refresh your SSO session.`,
+                        }
+                      : {}),
+                  },
+                  ci: {
+                    ok: ciOk,
+                    ...(ciMethod !== undefined ? { method: ciMethod } : {}),
+                    ...(!ciOk
+                      ? {
+                          hint: 'Set `GH_TOKEN` with `repo` and `actions:read` scope in `.mcp.json` env, then restart the session.',
+                        }
+                      : {}),
+                  },
+                },
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+      };
     }
 
     default:

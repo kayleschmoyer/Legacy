@@ -94,6 +94,10 @@
           },
           {
             "type": "command",
+            "command": ".claude/hooks/check-workspace-auth.sh"
+          },
+          {
+            "type": "command",
             "command": ".claude/hooks/reset-tool-count.sh"
           }
         ]
