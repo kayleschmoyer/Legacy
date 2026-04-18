@@ -38,6 +38,7 @@ import { webhookList, webhookUpdate, webhookPing } from './tools/webhooks.js';
 import { prCommits } from './tools/pr-commits.js';
 import { prBatchStatus } from './tools/pr-batch-status.js';
 import { listPRComments } from './tools/list-pr-comments.js';
+import { listPRInlineComments } from './tools/list-pr-inline-comments.js';
 
 // Node.js native fetch (undici) does not respect HTTPS_PROXY / GLOBAL_AGENT_HTTPS_PROXY
 // by default. In cloud sessions the egress proxy is required; set the global dispatcher
@@ -636,6 +637,28 @@ server.tool(
       ),
   },
   async (params) => listPRComments(params),
+);
+
+// --- github_list_pr_inline_comments ---
+server.tool(
+  'github_list_pr_inline_comments',
+  'Read inline code review comments on a PR (PRRC_* objects attached to specific diff lines). Returns id, inReplyToId, author, body, path, line, diffHunk for each comment. Use path to filter to a specific file. Use since (ISO 8601) to filter by timestamp. Handles pagination automatically. Maps to GET /repos/{owner}/{repo}/pulls/{number}/comments. For thread resolution status (resolved/unresolved), use github_get_review_threads instead.',
+  {
+    number: z.coerce.number().int().positive().describe('PR number'),
+    path: z
+      .string()
+      .trim()
+      .min(1)
+      .optional()
+      .describe('Filter to a specific file path (exact match)'),
+    since: z
+      .string()
+      .optional()
+      .describe(
+        'ISO 8601 timestamp — only return comments posted at or after this time',
+      ),
+  },
+  async (params) => listPRInlineComments(params),
 );
 
 // --- github_edit_pr ---
