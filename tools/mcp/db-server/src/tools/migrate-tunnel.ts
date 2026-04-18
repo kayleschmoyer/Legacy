@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs';
 import * as net from 'node:net';
 import { resolve } from 'node:path';
 import { config as loadDotenv } from 'dotenv';
-import { getRepoRoot, runPnpm } from '../run-command.js';
+import { getRepoRoot, runTsx } from '../run-command.js';
 import { parseUpOutput } from './migrate.js';
 import type { ToolResult } from '../types.js';
 
@@ -160,6 +160,12 @@ export async function migrateTunnel(
 ): Promise<ToolResult> {
   const repoRoot = params.worktreePath || getRepoRoot();
   const dbClientDir = resolve(repoRoot, 'lib', 'db-client');
+  const rollbackScript = resolve(
+    dbClientDir,
+    'src',
+    'scripts',
+    'rollback-migrations.ts',
+  );
 
   // Load .env so DB_HOST_DIRECT / DB_HOST are available when the MCP server
   // process wasn't started with these vars in its environment. Walk up from the
@@ -291,8 +297,9 @@ export async function migrateTunnel(
     // Check for pending migrations (skip if status check fails — still attempt migration)
     let hasPending = true;
     try {
-      const statusOutput = await runPnpm(
-        ['run', 'db:status'],
+      const statusOutput = await runTsx(
+        rollbackScript,
+        ['status'],
         dbClientDir,
         undefined,
         tunnelEnv,
@@ -329,8 +336,9 @@ export async function migrateTunnel(
     }
 
     // Run migrations through the tunnel
-    const output = await runPnpm(
-      ['run', 'db:up'],
+    const output = await runTsx(
+      rollbackScript,
+      ['up'],
       dbClientDir,
       MIGRATION_TIMEOUT_MS,
       tunnelEnv,

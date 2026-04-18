@@ -1,5 +1,5 @@
 import { resolve } from 'node:path';
-import { getRepoRoot, runPnpm } from '../run-command.js';
+import { getRepoRoot, runTsx } from '../run-command.js';
 import type { ToolResult } from '../types.js';
 
 interface MigrateParams {
@@ -50,10 +50,16 @@ export function parseUpOutput(output: string): MigrateResult {
 export async function migrate(params: MigrateParams): Promise<ToolResult> {
   const repoRoot = params.worktreePath || getRepoRoot();
   const dbClientDir = resolve(repoRoot, 'lib', 'db-client');
+  const rollbackScript = resolve(
+    dbClientDir,
+    'src',
+    'scripts',
+    'rollback-migrations.ts',
+  );
 
   // First check if there are pending migrations
   try {
-    const statusOutput = await runPnpm(['run', 'db:status'], dbClientDir);
+    const statusOutput = await runTsx(rollbackScript, ['status'], dbClientDir);
     // Check if there are no pending migrations:
     // - No "Pending:" lines with migration filenames
     // - Or explicit "No new migrations" / "up to date" messages
@@ -88,7 +94,7 @@ export async function migrate(params: MigrateParams): Promise<ToolResult> {
   }
 
   try {
-    const output = await runPnpm(['run', 'db:up'], dbClientDir);
+    const output = await runTsx(rollbackScript, ['up'], dbClientDir);
     const result = parseUpOutput(output);
 
     return {

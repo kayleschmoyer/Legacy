@@ -57,3 +57,24 @@ export function runPnpm(
 ): Promise<string> {
   return runCommand('pnpm', args, cwd, timeoutMs, { shell: true, env });
 }
+
+/**
+ * Run a TypeScript script via `pnpm exec tsx`.
+ * Prefer this over `pnpm run <script>` for Windows worktrees where pnpm's
+ * script runner does not reliably inject node_modules/.bin into PATH when
+ * node_modules is a junction pointing to the main repo.
+ */
+export function runTsx(
+  scriptPath: string,
+  scriptArgs: string[],
+  cwd: string,
+  timeoutMs?: number,
+  env?: Record<string, string>,
+): Promise<string> {
+  return runPnpm(
+    ['exec', 'tsx', scriptPath, ...scriptArgs],
+    cwd,
+    timeoutMs,
+    env,
+  );
+}

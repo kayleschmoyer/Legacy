@@ -1,5 +1,5 @@
 import { resolve } from 'node:path';
-import { getRepoRoot, runPnpm } from '../run-command.js';
+import { getRepoRoot, runTsx } from '../run-command.js';
 import type { ToolResult } from '../types.js';
 
 interface MigrationStatusParams {
@@ -64,9 +64,15 @@ export async function migrationStatus(
 ): Promise<ToolResult> {
   const repoRoot = params.worktreePath || getRepoRoot();
   const dbClientDir = resolve(repoRoot, 'lib', 'db-client');
+  const rollbackScript = resolve(
+    dbClientDir,
+    'src',
+    'scripts',
+    'rollback-migrations.ts',
+  );
 
   try {
-    const output = await runPnpm(['run', 'db:status'], dbClientDir);
+    const output = await runTsx(rollbackScript, ['status'], dbClientDir);
     const info = parseStatusOutput(output);
 
     return {

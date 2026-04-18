@@ -1,6 +1,6 @@
 import { resolve } from 'node:path';
 import { getSql } from '../db-connection.js';
-import { getRepoRoot, runCommand, runPnpm } from '../run-command.js';
+import { getRepoRoot, runCommand, runTsx } from '../run-command.js';
 import type { ToolResult } from '../types.js';
 
 interface HealthResult {
@@ -35,7 +35,13 @@ async function checkPostgres(): Promise<boolean> {
 async function checkMigrations(repoRoot: string): Promise<boolean> {
   try {
     const dbClientDir = resolve(repoRoot, 'lib', 'db-client');
-    const output = await runPnpm(['run', 'db:status'], dbClientDir);
+    const rollbackScript = resolve(
+      dbClientDir,
+      'src',
+      'scripts',
+      'rollback-migrations.ts',
+    );
+    const output = await runTsx(rollbackScript, ['status'], dbClientDir);
     return /0\s+pending|no (?:new )?migrations|up.to.date/i.test(output);
   } catch {
     return false;
