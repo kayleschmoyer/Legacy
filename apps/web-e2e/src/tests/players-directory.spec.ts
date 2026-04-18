@@ -194,13 +194,13 @@ test.describe('Players Directory – empty state @regression', () => {
 });
 
 // ---------------------------------------------------------------------------
-// LS-3545 / LS-3547 / LS-3495: /players is a protected route. Unauthenticated
-// users visiting /players are intercepted by EnhancedAuthGuard and shown
-// PublicLandingPage with the "Continue with Google" and "Continue with Discord"
-// sign-in CTAs and a "Get Started Free" CTA lower down. These tests lock in
-// that the buttons are located via getByRole (accessible name) — NOT via the
-// broken `(button:visible, [role="button"]:visible)` CSS selector that caused
-// the original crawler-reported failures (including the spurious
+// LS-3495 / LS-3496 / LS-3545 / LS-3547: /players is a protected route.
+// Unauthenticated users visiting /players are intercepted by EnhancedAuthGuard
+// and shown PublicLandingPage with the "Continue with Google" and "Continue
+// with Discord" sign-in CTAs and a "Get Started Free" CTA lower down. These
+// tests lock in that the buttons are located via getByRole (accessible name) —
+// NOT via the broken `(button:visible, [role="button"]:visible)` CSS selector
+// that caused the original crawler-reported failures (including the spurious
 // "[GSI_LOGGER]: FedCM get() rejects with NetworkError" attribution).
 // ---------------------------------------------------------------------------
 
@@ -252,6 +252,24 @@ unauthTest.describe(
         });
         await expect(getStartedBtn).toBeVisible({ timeout: 15_000 });
         await expect(getStartedBtn).toBeEnabled();
+      },
+    );
+
+    unauthTest(
+      '"Get Started Free" CTA on /players is clickable via getByRole (LS-3496)',
+      async ({ page }) => {
+        await page.goto('/players');
+        await page.waitForLoadState('load');
+
+        const getStartedBtn = page.getByRole('button', {
+          name: /get started free/i,
+        });
+        await expect(getStartedBtn).toBeVisible({ timeout: 15_000 });
+        await expect(getStartedBtn).toBeEnabled();
+        // Regression for LS-3496: confirm the click resolves without the
+        // CSS selector parse error caused by the broken crawler selector
+        // `(button:visible, [role="button"]:visible)`.
+        await getStartedBtn.click();
       },
     );
 
