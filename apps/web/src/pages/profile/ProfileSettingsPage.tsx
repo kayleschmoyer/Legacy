@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   H1,
   Paragraph,
@@ -206,6 +207,8 @@ const DISCORD_OAUTH_STATE_STORAGE_KEY = 'discord_oauth_link_state';
 const ProfileSettingsPage: React.FC = () => {
   const auth = useAuth();
   const user = auth?.user;
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const authService = useMemo(
     () => new AuthService(auth.config),
     [auth.config],
@@ -240,6 +243,16 @@ const ProfileSettingsPage: React.FC = () => {
       setEditedUsername(dbUsername);
     }
   }, [dbUsername, isEditingUsername]);
+
+  useEffect(() => {
+    if (searchParams.get('discord_linked') === '1') {
+      void refetchUser();
+      // Strip the param from the URL without pushing a new history entry
+      const next = new URLSearchParams(searchParams);
+      next.delete('discord_linked');
+      navigate({ search: next.toString() }, { replace: true });
+    }
+  }, [searchParams, navigate, refetchUser]);
 
   const handleAvatarSelect = (url: string | null) => {
     void updateUserAvatar({

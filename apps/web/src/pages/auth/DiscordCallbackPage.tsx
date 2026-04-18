@@ -60,7 +60,7 @@ export function DiscordCallbackPage(): React.JSX.Element {
       try {
         await authService.linkDiscordAccount(code);
         LOGGER.info('Discord account linked successfully');
-        navigate('/profile/settings', { replace: true });
+        navigate('/profile/settings?discord_linked=1', { replace: true });
       } catch (err) {
         LOGGER.error('Discord link failed:', String(err));
         setErrorMessage(
