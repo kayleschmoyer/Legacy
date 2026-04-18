@@ -608,6 +608,15 @@ unauthTest.describe(
     );
 
     unauthTest(
+      'does not show the player comparison tool when not authenticated',
+      async ({ page }) => {
+        await expect(
+          page.getByRole('heading', { name: /player comparison/i }),
+        ).not.toBeVisible();
+      },
+    );
+
+    unauthTest(
       '"Get Started Free" CTA is visible on /players/compare when not authenticated',
       async ({ page }) => {
         const getStartedBtn = page.getByRole('button', {
