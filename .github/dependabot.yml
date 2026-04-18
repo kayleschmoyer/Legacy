@@ -182,6 +182,7 @@ updates:
         patterns:
           - "@playwright/test"
           - "playwright"
+          - "@nx/playwright"
         update-types:
           - "minor"
           - "patch"
