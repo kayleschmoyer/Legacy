@@ -83,7 +83,7 @@ Multi-ticket commands (`/sweep-prs`, `/work-bugs`, `/work-mcp-gaps`, `/work-tick
 - Automatic cleanup — ephemeral worktrees are discarded after the subagent returns
 - **Session-type-agnostic** — works identically whether the orchestrator was launched with the worktree checkbox, from the main repo, or from a cloud environment
 
-**Subagent dispatch pattern:**
+**Subagent dispatch pattern** (setup + tool preferences from [`.agents/shared/subagent-setup.md`](references/subagent-setup.md)):
 
 ```
 for each ticket/PR needing code work:
@@ -92,10 +92,10 @@ for each ticket/PR needing code work:
     prompt: """
       Implement/fix <ticket-or-PR-description>.
 
-      Setup:
+      Setup (REQUIRED before any pnpm/make command):
       1. git fetch origin <branch-or-main>
       2. git checkout <existing-branch>  (for PRs)  OR  stay on the ephemeral branch (for new tickets)
-      3. worktree_setup_node_modules()   # or PowerShell fallback if MCP unavailable
+      3. worktree_setup_node_modules()   # or cmd /c "mklink /D node_modules D:\code\legacy-sports\node_modules" fallback
       4. <do NOT rename branch — Jira links via PR title + commits containing LS-####>
       5. If you need to install new packages: cmd /c "rmdir node_modules" first, then pnpm add -w <pkg>, then make install
 
@@ -107,6 +107,8 @@ for each ticket/PR needing code work:
 
       Tool preferences:
       - Use worktree_commit/worktree_push for commits and pushes
+      - Use worktree_diff({ base: "HEAD" }) to inspect uncommitted changes
+      - Use worktree_status() to get current branch and working-tree status
       - Use Glob (not find/ls) for file discovery
       - Use Grep (not grep/rg) for content search
       - Use Read (not cat/head/tail) for reading files

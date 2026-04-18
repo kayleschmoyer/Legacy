@@ -89,23 +89,11 @@ For subagents that explore or modify **MCP server code** (e.g. adding a new tool
 
 ## Work Subagents (Multi-Ticket Orchestrators)
 
-For **work subagents** dispatched by multi-ticket orchestrators (`/sweep-prs`, `/work-bugs`, `/work-mcp-gaps`, `/work-ticket` Parent Mode) via `Agent(isolation: "worktree")`, always include **setup steps** before the work instructions — the subagent's ephemeral worktree starts empty:
+For **work subagents** dispatched by multi-ticket orchestrators (`/sweep-prs`, `/work-bugs`, `/work-mcp-gaps`, `/work-ticket` Parent Mode) via `Agent(isolation: "worktree")`, always include **setup steps** before the work instructions — the subagent's ephemeral worktree starts empty.
 
-```
-  Setup (REQUIRED before any pnpm/make command):
-  1. git fetch origin <branch>                                      # get the target branch
-  2. git checkout <branch>                                           # switch to it (for existing PRs)
-     OR: (for new tickets) keep local branch name as-is, push normally — Jira links via PR title + commits containing LS-####
-  3. worktree_setup_node_modules()                                    # symlink node_modules (fallback from worktree root: cmd /c "mklink /D node_modules D:\code\legacy-sports\node_modules")
+The canonical setup + tool preferences block lives in [`.agents/shared/subagent-setup.md`](../../shared/subagent-setup.md) (symlinked as `references/subagent-setup.md` in skills that use it):
 
-  Tool preferences:
-  - Use worktree_commit/worktree_push for commits and pushes
-  - Use worktree_diff({ base: "HEAD" }) to inspect uncommitted changes (replaces git -C <wt> diff HEAD)
-  - Use worktree_status() to get current branch and working-tree status (replaces git -C <wt> branch --show-current / git status)
-  - Use Glob (not find/ls) for file discovery
-  - Use Grep (not grep/rg) for content search
-  - Use Read (not cat/head/tail) for reading files
-```
+@../../shared/subagent-setup.md
 
 Work subagents inherit all MCP connections from the parent session (all 9 servers), so `github_create_pr`, `worktree_commit`, `make_run`, `jira_transition` etc. are all available. Multi-ticket orchestrators should always use `Agent(isolation: "worktree")` rather than session-launcher worktrees for each ticket.
 
