@@ -263,6 +263,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
 
   /** Holds the ID of the pending refresh timeout so we can cancel it. */
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Tracks the in-flight server logout promise so login() can wait for it to
+  // settle before starting a new auth flow — prevents a delayed oauth-proxy
+  // logout response from expiring freshly-set auth cookies.
+  const logoutPromiseRef = useRef<Promise<void> | null>(null);
+  // Monotonically-incrementing generation counter. Incremented on every logout
+  // so that refresh callbacks captured before logout see a stale generation and
+  // skip AUTH_SUCCESS/TOKEN_UPDATED dispatches, preventing a completed refresh
+  // from re-authenticating the user after they sign out.
+  const authGenRef = useRef(0);
 
   /**
    * Stable ref to `scheduleProactiveRefresh` so its setTimeout callback can
@@ -323,10 +332,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
         expSeconds * 1000 - Date.now() - FIVE_MIN_MS,
       );
 
+      // Capture generation before scheduling — if logout fires between now and
+      // the timer callback, the callback will see a stale gen and bail early.
+      const scheduledGen = authGenRef.current;
+
       refreshTimerRef.current = setTimeout(() => {
+        // Bail if a logout occurred after scheduling but before this callback ran.
+        if (authGenRef.current !== scheduledGen) return;
         authService
           .refreshJwt()
           .then((newToken) => {
+            // Discard results if a logout occurred while the refresh was in flight.
+            if (authGenRef.current !== scheduledGen) return;
             if (!newToken) return; // Silently skip; error link handles hard failures
             dispatchAuth({ type: 'TOKEN_UPDATED', payload: newToken });
             const userInfo = decodeUserFromToken(newToken);
@@ -360,6 +377,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
   // the auth state reflects claim changes (e.g. accessLevel promotion)
   // without requiring a full page reload.
   useEffect(() => {
+    // Capture generation at effect setup — if logout fires later and increments
+    // authGenRef, events dispatched by a pre-logout refresh will be ignored.
+    const effectGen = authGenRef.current;
+
     const handleTokenRefreshed = (event: Event) => {
       const detail = (event as CustomEvent<{ user: User; exp?: number }>)
         .detail;
@@ -369,6 +390,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
       // refreshed JWT belongs to the real admin, not the impersonated user.
       // Check stored admin profile instead of state to avoid stale closures.
       if (authService.getStoredAdminProfile()) return;
+
+      // Discard events from a refresh that started before the last logout.
+      if (authGenRef.current !== effectGen) return;
 
       dispatchAuth({ type: 'AUTH_SUCCESS', payload: detail.user });
       authService.storeUserProfile(detail.user);
@@ -457,10 +481,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
               // changes (e.g. accessLevel promotion) that happened while the
               // user was away. The UI already shows the cached profile (no
               // loading flash), so this is a silent update.
+              const bgRefreshGen = authGenRef.current;
               authService
                 .refreshJwt()
                 .then((freshToken) => {
                   if (!freshToken || !isMounted) return;
+                  // Discard if logout fired while the refresh was in flight.
+                  if (authGenRef.current !== bgRefreshGen) return;
                   dispatchAuth({ type: 'TOKEN_UPDATED', payload: freshToken });
                   // Always reschedule proactive refresh when we have a fresh
                   // token, even if user decoding fails.
@@ -542,6 +569,33 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
 
   const login = useCallback(
     async (email: string, password: string) => {
+      // Wait for any in-flight logout to settle before starting a new auth flow.
+      // Capture the promise so we only clear *this* logout — a newer logout that
+      // starts while we are awaiting will not be clobbered.
+      const pendingLogout = logoutPromiseRef.current;
+      if (pendingLogout) {
+        const LOGOUT_WAIT_TIMEOUT_MS = 10_000;
+        let timeoutId: ReturnType<typeof setTimeout> | null = null;
+        let timedOut = false;
+        try {
+          await Promise.race([
+            pendingLogout,
+            new Promise<void>((resolve) => {
+              timeoutId = setTimeout(() => {
+                timedOut = true;
+                resolve();
+              }, LOGOUT_WAIT_TIMEOUT_MS);
+            }),
+          ]);
+        } finally {
+          if (timeoutId !== null) clearTimeout(timeoutId);
+        }
+        if (timedOut) {
+          LOGGER.warn('Timed out waiting for in-flight logout before login');
+        } else if (logoutPromiseRef.current === pendingLogout) {
+          logoutPromiseRef.current = null;
+        }
+      }
       dispatchAuth({ type: 'AUTH_START' });
 
       try {
@@ -571,6 +625,34 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
 
   const loginWithOAuth = useCallback(
     async (oauthResponse: OAuthResponse) => {
+      // Wait for any in-flight logout to settle before starting a new auth flow.
+      // Capture-and-compare so a concurrent logout does not get its promise nulled.
+      const pendingLogout = logoutPromiseRef.current;
+      if (pendingLogout) {
+        const LOGOUT_WAIT_TIMEOUT_MS = 10_000;
+        let timeoutId: ReturnType<typeof setTimeout> | null = null;
+        let timedOut = false;
+        try {
+          await Promise.race([
+            pendingLogout,
+            new Promise<void>((resolve) => {
+              timeoutId = setTimeout(() => {
+                timedOut = true;
+                resolve();
+              }, LOGOUT_WAIT_TIMEOUT_MS);
+            }),
+          ]);
+        } finally {
+          if (timeoutId !== null) clearTimeout(timeoutId);
+        }
+        if (timedOut) {
+          LOGGER.warn(
+            'Timed out waiting for in-flight logout before OAuth login',
+          );
+        } else if (logoutPromiseRef.current === pendingLogout) {
+          logoutPromiseRef.current = null;
+        }
+      }
       dispatchAuth({ type: 'AUTH_START' });
 
       try {
@@ -594,21 +676,34 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
     [authService, scheduleProactiveRefresh],
   );
 
-  const logout = useCallback(async (): Promise<void> => {
+  const logout = useCallback((): Promise<void> => {
+    // Increment generation so any in-flight refreshJwt() callbacks see a stale
+    // generation and skip AUTH_SUCCESS/TOKEN_UPDATED dispatches.
+    authGenRef.current += 1;
+
+    // Start the server logout first so requestLogout() can still read the stored
+    // CSRF token before clearTokens() removes it. Track the promise so login()
+    // can await it and avoid a race where a delayed logout response expires
+    // freshly-set auth cookies. requestLogout() swallows errors internally.
+    logoutPromiseRef.current = authService.requestLogout();
+    void logoutPromiseRef.current;
+
+    // Clear client state immediately so the UI transitions to the landing page
+    // and in-flight token-refresh callbacks cannot re-authenticate the user.
+    clearRefreshTimer();
+    authService.clearTokens();
     try {
-      clearRefreshTimer();
-      // Clear server-side HttpOnly cookies first
-      await authService.requestLogout();
-      authService.clearTokens();
-      // Also clear any impersonation state
       if (typeof localStorage !== 'undefined') {
         localStorage.removeItem('admin_original_jwt');
       }
-      dispatchAuth({ type: 'AUTH_LOGOUT' });
-    } catch (error) {
-      // Logout errors (network failure clearing server cookies) are not bugs — client state is already cleared.
-      LOGGER.warn('Logout failed:', String(error));
+    } catch {
+      // Storage may be unavailable in private browsing mode — non-critical
     }
+    dispatchAuth({ type: 'AUTH_LOGOUT' });
+    // Return the server logout promise so callers can optionally await full
+    // completion (e.g. for testing), while client state has already cleared
+    // synchronously above. requestLogout() resolves even on network failure.
+    return logoutPromiseRef.current;
   }, [authService, clearRefreshTimer]);
 
   const clearError = useCallback(() => {

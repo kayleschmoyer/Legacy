@@ -542,3 +542,186 @@ describe('AuthProvider – proactive refresh 401 during scheduleProactiveRefresh
     expect(mockInstance.clearTokens).toHaveBeenCalled();
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Logout/login race-condition tests (generation guard + logout promise ref)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('AuthProvider – logout/login race conditions', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('does not re-authenticate when a background refresh resolves after logout', async () => {
+    const MockedAuthService = jest.mocked(AuthService);
+
+    let resolveRefresh!: (token: string | null) => void;
+    const refreshPromise = new Promise<string | null>((resolve) => {
+      resolveRefresh = resolve;
+    });
+
+    const mockInstance = {
+      getStoredUserProfile: jest.fn(() => ({
+        id: 1,
+        email: 'user@test.com',
+        username: 'CachedUser',
+        accessLevel: 'user' as const,
+      })),
+      getStoredTokenExpiry: jest.fn(() => Math.floor(Date.now() / 1000) + 3600),
+      getStoredAdminProfile: jest.fn(() => null),
+      getStoredImpersonatedUserProfile: jest.fn(() => null),
+      storeUserProfile: jest.fn(),
+      storeAdminProfile: jest.fn(),
+      storeImpersonatedUserProfile: jest.fn(),
+      clearAdminProfile: jest.fn(),
+      clearImpersonatedUserProfile: jest.fn(),
+      clearTokens: jest.fn(),
+      verifyToken: jest.fn(() => false),
+      refreshJwt: jest.fn(() => refreshPromise),
+      authenticateWithEmail: jest.fn(),
+      authenticateWithOAuth: jest.fn(),
+      requestLogout: jest.fn(() => Promise.resolve()),
+      startImpersonation: jest.fn(),
+      stopImpersonation: jest.fn(),
+      getStoredToken: jest.fn(() => null),
+      getCurrentToken: jest.fn(() => null),
+    };
+    MockedAuthService.mockImplementation(
+      () => mockInstance as unknown as AuthService,
+    );
+
+    let logoutFn!: () => Promise<void>;
+
+    function AuthWithLogout() {
+      const { user, isLoading, logout } = useAuth();
+      logoutFn = logout;
+      if (isLoading) return <div data-testid="loading" />;
+      if (!user) return <div data-testid="no-user" />;
+      return <div data-testid="user-info">{user.username}</div>;
+    }
+
+    render(
+      <AuthProvider config={testConfig}>
+        <AuthWithLogout />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('user-info').textContent).toBe('CachedUser');
+    });
+
+    // Logout while the background refresh is still in flight
+    await act(async () => {
+      await logoutFn();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('no-user')).toBeTruthy();
+    });
+
+    // Resolve the background refresh — generation guard must block re-auth
+    await act(async () => {
+      resolveRefresh('fresh-token-after-logout');
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // User should still be logged out
+    expect(screen.getByTestId('no-user')).toBeTruthy();
+  });
+
+  it('login completes after waiting for an in-flight logout without deadlocking', async () => {
+    const MockedAuthService = jest.mocked(AuthService);
+
+    let resolveLogout!: () => void;
+    const logoutServerPromise = new Promise<void>((resolve) => {
+      resolveLogout = resolve;
+    });
+
+    const newUser = {
+      id: 2,
+      email: 'new@test.com',
+      username: 'NewUser',
+      accessLevel: 'user' as const,
+    };
+
+    const mockInstance = {
+      getStoredUserProfile: jest.fn(() => ({
+        id: 1,
+        email: 'old@test.com',
+        username: 'OldUser',
+        accessLevel: 'user' as const,
+      })),
+      getStoredTokenExpiry: jest.fn(() => Math.floor(Date.now() / 1000) + 3600),
+      getStoredAdminProfile: jest.fn(() => null),
+      getStoredImpersonatedUserProfile: jest.fn(() => null),
+      storeUserProfile: jest.fn(),
+      storeAdminProfile: jest.fn(),
+      storeImpersonatedUserProfile: jest.fn(),
+      clearAdminProfile: jest.fn(),
+      clearImpersonatedUserProfile: jest.fn(),
+      clearTokens: jest.fn(),
+      verifyToken: jest.fn(() => false),
+      refreshJwt: jest.fn(() => Promise.resolve(null)),
+      authenticateWithEmail: jest.fn(() => Promise.resolve(newUser)),
+      authenticateWithOAuth: jest.fn(),
+      requestLogout: jest.fn(() => logoutServerPromise),
+      startImpersonation: jest.fn(),
+      stopImpersonation: jest.fn(),
+      getStoredToken: jest.fn(() => null),
+      getCurrentToken: jest.fn(() => null),
+    };
+    MockedAuthService.mockImplementation(
+      () => mockInstance as unknown as AuthService,
+    );
+
+    let logoutFn!: () => Promise<void>;
+    let loginFn!: (email: string, password: string) => Promise<void>;
+
+    function AuthWithActions() {
+      const { user, isLoading, logout, login } = useAuth();
+      logoutFn = logout;
+      loginFn = login;
+      if (isLoading) return <div data-testid="loading" />;
+      if (!user) return <div data-testid="no-user" />;
+      return <div data-testid="user-info">{user.username}</div>;
+    }
+
+    render(
+      <AuthProvider config={testConfig}>
+        <AuthWithActions />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('user-info').textContent).toBe('OldUser');
+    });
+
+    // Trigger logout — client state clears immediately, server call is slow
+    act(() => {
+      void logoutFn();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('no-user')).toBeTruthy();
+    });
+
+    // Start login while requestLogout is still pending — login() should wait
+    act(() => {
+      void loginFn('new@test.com', 'password');
+    });
+
+    // Resolve the server logout — login() should now proceed
+    await act(async () => {
+      resolveLogout();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // Login should complete and show the new user
+    await waitFor(() => {
+      expect(screen.getByTestId('user-info').textContent).toBe('NewUser');
+    });
+  });
+});

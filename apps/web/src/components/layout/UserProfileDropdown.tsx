@@ -208,11 +208,17 @@ export const UserProfileDropdown: React.FC = () => {
     return null;
   }
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
     try {
       setIsOpen(false);
       if (auth?.logout) {
-        await auth.logout();
+        // Navigate first (replace so Back doesn't return to the public path and
+        // bypass the auth guard again), then fire logout in the background.
+        // The UI transition is immediate — the server-side cookie clear runs
+        // via fire-and-forget inside auth.logout().
+        navigate('/', { replace: true });
+        // logout() always resolves (requestLogout swallows errors internally).
+        void auth.logout();
       } else {
         window.location.reload();
       }
