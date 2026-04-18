@@ -1809,6 +1809,47 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
         required: [],
       },
     },
+    {
+      name: 'worktree_stash',
+      description:
+        'Temporarily shelve uncommitted changes in the working directory. ' +
+        'Equivalent to `git stash push -u -m <message>` (includes untracked files). ' +
+        'Use before running baseline tests to verify whether failures are pre-existing (i.e. present before your changes), ' +
+        'then restore with worktree_stash_pop.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          message: {
+            type: 'string',
+            description:
+              'Optional label for the stash entry (shown in git stash list output).',
+          },
+          worktree: {
+            type: 'string',
+            description:
+              "Optional ticket key (e.g. 'LS-1134'). Uses active worktree if omitted.",
+          },
+        },
+        required: [],
+      },
+    },
+    {
+      name: 'worktree_stash_pop',
+      description:
+        'Restore the most recently stashed changes. Equivalent to `git stash pop`. ' +
+        'Use after running baseline tests with worktree_stash to restore your in-progress work.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          worktree: {
+            type: 'string',
+            description:
+              "Optional ticket key (e.g. 'LS-1134'). Uses active worktree if omitted.",
+          },
+        },
+        required: [],
+      },
+    },
   ],
 }));
 
@@ -8972,6 +9013,153 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           },
         ],
       };
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_stash
+    // -----------------------------------------------------------------------
+    case 'worktree_stash': {
+      const { message, worktree: wtKey } = args as {
+        message?: string;
+        worktree?: string;
+      };
+
+      const target = resolveTargetDir(wtKey);
+      if ('error' in target) {
+        return {
+          content: [{ type: 'text', text: target.error }],
+          isError: true,
+        };
+      }
+      const cwd = target.path;
+
+      try {
+        const gitArgs = ['stash', 'push', '-u'];
+        if (message && message.trim()) {
+          gitArgs.push('-m', message.trim());
+        }
+        const output = runGit(gitArgs, cwd);
+
+        if (output.trim() === 'No local changes to save') {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(
+                  {
+                    success: true,
+                    stashed: false,
+                    message: 'No local changes to save.',
+                  },
+                  null,
+                  2,
+                ),
+              },
+            ],
+          };
+        }
+
+        const stashRef = runGit(
+          ['stash', 'list', '--max-count=1', '--format=%gd %s'],
+          cwd,
+        ).trim();
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  success: true,
+                  stashed: true,
+                  stashRef: stashRef.split(' ')[0] ?? 'stash@{0}',
+                  output: output.trim(),
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      } catch (err: unknown) {
+        const e = err as {
+          stdout?: string;
+          stderr?: string;
+          status?: number;
+          message?: string;
+        };
+        const output =
+          [e.stdout, e.stderr].filter(Boolean).join('\n') ||
+          e.message ||
+          String(err);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `git stash failed (exit code ${e.status ?? 'unknown'}):\n${output}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_stash_pop
+    // -----------------------------------------------------------------------
+    case 'worktree_stash_pop': {
+      const { worktree: wtKey } = args as {
+        worktree?: string;
+      };
+
+      const target = resolveTargetDir(wtKey);
+      if ('error' in target) {
+        return {
+          content: [{ type: 'text', text: target.error }],
+          isError: true,
+        };
+      }
+      const cwd = target.path;
+
+      try {
+        const output = runGit(['stash', 'pop'], cwd);
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  success: true,
+                  output: output.trim(),
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      } catch (err: unknown) {
+        const e = err as {
+          stdout?: string;
+          stderr?: string;
+          status?: number;
+          message?: string;
+        };
+        const output =
+          [e.stdout, e.stderr].filter(Boolean).join('\n') ||
+          e.message ||
+          String(err);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `git stash pop failed (exit code ${e.status ?? 'unknown'}):\n${output}`,
+            },
+          ],
+          isError: true,
+        };
+      }
     }
 
     default:

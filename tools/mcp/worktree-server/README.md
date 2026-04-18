@@ -51,6 +51,23 @@ Run post-rebase stabilization: `make install`, regenerate schema, and run codege
 | ---------- | ------ | -------- | -------------------------------------------- |
 | `worktree` | string | No       | Ticket key. Uses active worktree if omitted. |
 
+### `worktree_stash`
+
+Temporarily shelve uncommitted changes. Equivalent to `git stash push -u -m <message>` (includes untracked files). Use before running baseline tests to verify whether failures are pre-existing, then restore with `worktree_stash_pop`.
+
+| Parameter  | Type   | Required | Description                                  |
+| ---------- | ------ | -------- | -------------------------------------------- |
+| `message`  | string | No       | Optional label for the stash entry.          |
+| `worktree` | string | No       | Ticket key. Uses active worktree if omitted. |
+
+### `worktree_stash_pop`
+
+Restore the most recently stashed changes. Equivalent to `git stash pop`.
+
+| Parameter  | Type   | Required | Description                                  |
+| ---------- | ------ | -------- | -------------------------------------------- |
+| `worktree` | string | No       | Ticket key. Uses active worktree if omitted. |
+
 ### `worktree_push`
 
 Push the current branch with `--force-with-lease`. Refuses to push the `main` branch.
