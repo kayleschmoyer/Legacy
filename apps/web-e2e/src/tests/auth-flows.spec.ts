@@ -407,6 +407,27 @@ unauthTest.describe('Public Routes @critical', () => {
     },
   );
 
+  // ---------------------------------------------------------------------------
+  // LS-3499: /players/stats must expose a <main> landmark for assistive tech.
+  // An accessibility scan reported "Page has no <main> landmark" on this route.
+  // The scan was run while the route was incorrectly gated (pre-LS-3548) and
+  // landed on a stripped auth shell with no landmark. Now that /players/stats
+  // is public, it renders inside MainLayout's YStack tag="main" wrapper. This
+  // test locks in that a single <main> landmark is present on the public route.
+  // ---------------------------------------------------------------------------
+  unauthTest(
+    'exposes a <main> landmark on /players/stats (LS-3499)',
+    async ({ page }) => {
+      await page.goto('/players/stats');
+      await page.waitForLoadState('load');
+
+      await expect(page.locator('main#main-content')).toBeVisible({
+        timeout: 15000,
+      });
+      await expect(page.getByRole('main')).toHaveCount(1);
+    },
+  );
+
   unauthTest(
     'shows Baseball hub content on /baseball when not authenticated (LS-3532)',
     async ({ page }) => {
