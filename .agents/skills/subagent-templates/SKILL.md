@@ -13,7 +13,7 @@ Agent(subagent_type: "Explore", prompt: """
 
   Tool preferences:
   - Use Glob (not find/ls) for file discovery; if Glob returns empty on an absolute Windows worktree path, fall back to worktree_ls_tree or worktree_run(command: "dir <dir>") (use `dir` not `ls` — worktree_run may resolve to cmd.exe where `ls` is unavailable)
-  - Use Grep (not grep/rg/`find | xargs grep`) for content search — Grep accepts both pattern and glob filter in one call, so `find | xargs grep` is never needed
+  - Use Grep (not grep/rg/`find | xargs grep`) for content search — Grep accepts both pattern and glob filter in one call, so `find | xargs grep` is never needed. Common mappings: `grep -n "pattern" file` → `Grep(pattern: "pattern", path: "file", output_mode: "content")`; `grep -rn "pattern" dir/` → `Grep(pattern: "pattern", path: "dir", output_mode: "content")` (line numbers are on by default); `grep -i "pattern"` → `Grep(pattern: "pattern", path: "...", "-i": true, output_mode: "content")`
   - Use Read (not cat/head/tail) for reading files — including uncommitted changes and untracked/new files
   - Use worktree_show_file(path: "...", ref: "HEAD") for **tracked** files at a Git ref when a worktree is active (worktree_set has been called) — it runs `git show <ref>:<path>` so it does NOT see uncommitted working-tree changes or untracked files, but avoids needing absolute paths. `ref` accepts **any git ref** — HEAD, commit SHAs, branch names, or tags (e.g. `worktree_show_file(path: ".claude/hooks/guard-bash-mcp-first.sh", ref: "abc1234")` reads the file at that commit)
 """)
