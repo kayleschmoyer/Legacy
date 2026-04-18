@@ -7,7 +7,11 @@ import {
 } from '@legacy-sports/shared-components/ui';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import { ScrollView, Spinner, styled, Text, Theme } from 'tamagui';
-import { BrandIcon, type BrandIconName } from '../../components/icons';
+import {
+  BRAND_ICON_ACCENT,
+  BrandIcon,
+  type BrandIconName,
+} from '../../components/icons';
 import { PageMeta } from '../../components/PageMeta';
 import { storeCsrfToken } from '../../lib/csrf';
 import {
@@ -616,7 +620,11 @@ export function PublicLandingPage(): React.JSX.Element {
             <ContentContainer alignItems="center" gap="$6">
               {/* Badge */}
               <HeroBadge>
-                <BrandIcon name="baseball" size={16} />
+                <BrandIcon
+                  name="baseball"
+                  size={18}
+                  accentColor={BRAND_ICON_ACCENT}
+                />
                 <Text
                   fontSize="$2"
                   color="$color11"
