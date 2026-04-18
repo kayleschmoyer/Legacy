@@ -61,6 +61,10 @@
         "hooks": [
           {
             "type": "command",
+            "command": ".claude/hooks/cleanup-worktree-junction.sh"
+          },
+          {
+            "type": "command",
             "command": ".claude/hooks/cleanup-worktree-symlink.sh"
           },
           {
