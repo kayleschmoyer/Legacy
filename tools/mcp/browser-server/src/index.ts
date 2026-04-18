@@ -17,7 +17,7 @@ const server = new McpServer({
 // Tool 1: browser_dev_start
 server.tool(
   'browser_dev_start',
-  'Start a Next.js dev server in a worktree directory. Allocates a port from 4300-4399 automatically unless specified. The server runs in the background and is tracked for the duration of this MCP session. Use browser_dev_stop or browser_cleanup to shut it down.',
+  'Start a Vite/React dev server (nx serve web) in a worktree directory. Allocates a port from 4300-4399 automatically unless specified. The server runs in the background and is tracked for the duration of this MCP session. Use browser_dev_stop or browser_cleanup to shut it down.',
   {
     worktreePath: z
       .string()

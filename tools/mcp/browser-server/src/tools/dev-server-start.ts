@@ -98,19 +98,48 @@ export async function devServerStart(
     };
   }
 
+  // Pre-check: verify the nx binary exists in the worktree's node_modules.
+  // Worktrees use a symlink/junction to the main repo's node_modules; if it's
+  // missing, `pnpm exec nx` will fail with an unhelpful error.
+  const nxBin = join(worktreePath, 'node_modules', '.bin', 'nx');
+  const nxBinCmd = nxBin + '.cmd';
+  if (!existsSync(nxBin) && !existsSync(nxBinCmd)) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            ok: false,
+            error: `nx binary not found at ${nxBin}. The worktree's node_modules may not be set up.`,
+            remedy:
+              'Run worktree_setup_node_modules() or `make install` inside the worktree to restore node_modules, then retry.',
+          }),
+        },
+      ],
+      isError: true,
+    };
+  }
+
   try {
-    // Start Next.js dev server via make dev-web with custom port
+    // Start Vite/React dev server via nx serve web --port=<port>.
+    // We invoke node_modules/.bin/nx directly (shell:true resolves .cmd on Windows)
+    // rather than `make dev-web` because the Makefile target does not forward PORT
+    // and nx's @nx/vite:dev-server executor ignores the PORT env var — the port
+    // must be passed as a --port CLI flag.
     const isWindows = process.platform === 'win32';
-    const child = spawn('make', ['dev-web'], {
-      cwd: worktreePath,
-      stdio: ['ignore', 'ignore', 'pipe'],
-      detached: !isWindows,
-      shell: true,
-      env: {
-        ...process.env,
-        PORT: String(port),
+    const child = spawn(
+      'node_modules/.bin/nx',
+      ['serve', 'web', `--port=${port}`],
+      {
+        cwd: worktreePath,
+        stdio: ['ignore', 'ignore', 'pipe'],
+        detached: !isWindows,
+        shell: true,
+        env: {
+          ...process.env,
+        },
       },
-    });
+    );
 
     if (!child.pid) {
       return {
@@ -174,8 +203,8 @@ export async function devServerStart(
             ok: false,
             error: `Failed to start dev server: ${message}`,
             remedy: isTimeout
-              ? 'The server did not start in time. Run `make kill-stale` to clear stale node processes holding port locks, then retry. If the problem persists, try passing a larger timeoutMs value.'
-              : 'Check that the worktree has node_modules installed (make wt-setup) and that the port is not in use.',
+              ? 'The server did not start in time. Check that node_modules/.bin/nx exists in the worktree (run worktree_setup_node_modules or `make install` if missing). Run `make kill-stale` to clear stale processes, then retry with a larger timeoutMs (e.g. 180000).'
+              : 'Check that the worktree has node_modules installed (worktree_setup_node_modules or `make install`) and that the port is not in use.',
           }),
         },
       ],
