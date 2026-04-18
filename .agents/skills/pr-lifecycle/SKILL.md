@@ -164,7 +164,7 @@ When the merge queue rejects a PR with **"Repository rule violations found: A co
 github_create_pr(title: "LS-#### type(scope): msg", body: <markdown>, draft: true, worktreePath: <path>)
 github_manage_labels(prs: [<PR#>], add: ["agent-in-progress"])
 github_mark_pr_ready(number: <PR#>)
-mcp__github__subscribe_pr_activity(pullRequestNumber: <PR#>)  # REQUIRED — enables CI/review events to stream back
+mcp__github__subscribe_pr_activity(pullRequestNumber: <PR#>)  # Claude Code built-in ONLY — NOT in legacy-sports-github; unavailable in cloud/headless; fallback: poll via github_view_pr + ci_list_runs with ScheduleWakeup
 github_request_review(prs: [<PR#>])
 jira_transition(key: "LS-####", status: "In Review")
 ```

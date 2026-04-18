@@ -149,6 +149,8 @@ On Claude Code on the web, Claude provides built-in `mcp__github__*` tools that 
 
 > **Note:** Built-in `mcp__github__*` tools are NOT available on Copilot Coding Agent — use the custom `legacy-sports-github` MCP server there. See [`cloud-agent-mode/SKILL.md`](../cloud-agent-mode/SKILL.md) for the full cloud review lifecycle workflow.
 
+> **`mcp__github__subscribe_pr_activity` is a Claude Code built-in tool only** — it is NOT part of the custom `legacy-sports-github` MCP server and will not be available in cloud/headless environments (Copilot Coding Agent, CI). In those environments, poll for PR status using `github_view_pr` + `ci_list_runs` instead, scheduled with `ScheduleWakeup`.
+
 ## CI Operations
 
 Use `ci_list_runs`, `ci_view_run`, `ci_get_logs`, `ci_search_logs`, and `ci_rerun` instead of `gh run` commands via Bash. These tools parse and structure log output for agent consumption.
