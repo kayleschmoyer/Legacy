@@ -163,7 +163,13 @@ If the re-request fires here, the flow re-enters at "Copilot re-reviews new SHA"
 
 ## Flow: Thread Resolved Without New Review
 
-User resolves a Copilot thread via GitHub UI, no new review is submitted. `pull_request_review_thread` is not a supported trigger, so agents fix this by calling `workflow_dispatch` with `pr_number` → `recheck` re-evaluates threads.
+An agent (or user) resolves a Copilot thread; no new review is submitted. `pull_request_review_thread` is not a supported trigger, so agents must dispatch the workflow manually using the `ci_dispatch_workflow` MCP tool:
+
+```
+ci_dispatch_workflow(workflow: "copilot-auto-approve.yml", inputs: { pr_number: "<PR#>" })
+```
+
+**Never use `gh workflow run copilot-auto-approve.yml`** — always use `ci_dispatch_workflow`. This triggers the `recheck` job which re-evaluates threads.
 
 ---
 
