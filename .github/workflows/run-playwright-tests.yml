@@ -207,7 +207,7 @@ jobs:
         id: notify
         uses: ./.github/actions/discord-notify
         with:
-          webhook-url: ${{ secrets.DISCORD_CI_WEBHOOK_URL }}
+          webhook-url: ${{ secrets.DISCORD_PLAYWRIGHT_WEBHOOK_URL }}
           status: running
           title: ${{ steps.params.outputs.title }}
           description: ${{ steps.params.outputs.description }}
@@ -705,7 +705,7 @@ jobs:
       - name: "Discord Playwright Results"
         uses: ./.github/actions/discord-notify
         with:
-          webhook-url: ${{ secrets.DISCORD_CI_WEBHOOK_URL }}
+          webhook-url: ${{ secrets.DISCORD_PLAYWRIGHT_WEBHOOK_URL }}
           status: ${{ steps.status.outputs.status }}
           title: "${{ github.event_name == 'schedule' && 'Nightly Playwright Suite — Results' || 'Manual Playwright Suite — Results' }}"
           description: ${{ steps.status.outputs.description }}
