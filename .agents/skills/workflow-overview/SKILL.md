@@ -162,7 +162,7 @@ Can be bypassed with `--no-verify`.
 
 1. **Self-review (mandatory gate)** -- run the `/review` skill and produce a Self-Review Summary listing files reviewed, patterns checked (#1–#20), and issues fixed. Do NOT proceed to step 2 without this.
 2. **Push** -- `worktree_push(setUpstream: true)`.
-3. **Create draft PR** -- `github_create_pr(draft: true)`. Draft-first prevents sweep/review agents from racing with the creating agent.
+3. **Create draft PR** -- `github_create_pr(draft: true, worktreePath: <path>)`. **Always use the MCP tool — never `gh pr create` directly** (the MCP tool routes via `worktreePath`; `gh pr create` silently uses the shell directory and bypasses that routing). Draft-first prevents sweep/review agents from racing with the creating agent.
 4. **Apply `agent-in-progress` label** -- `github_manage_labels(prs: [<PR#>], add: ["agent-in-progress"])` while still a draft, before marking ready. This closes the race window.
 5. **Mark ready for review** -- `github_mark_pr_ready(number: <PR#>)`.
 6. **Copilot review** -- For user-authored PRs, the repository ruleset automatically requests Copilot review; no explicit call is needed. For GitHub App-authored PRs, agents should call `github_request_review(prs: [<PR#>])` with a user OAuth token. Note: the REST `requestReviewers` API silently drops Copilot when called with `GITHUB_TOKEN` or installation tokens.

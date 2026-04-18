@@ -72,6 +72,8 @@ Use `worktree_file_info({ paths: [...] })` instead of `wc -l file1 file2 ...` vi
 
 ## GitHub PR Operations
 
+> **⛔ `gh pr create` is an anti-pattern** — always use `github_create_pr` MCP tool. `gh pr create` silently targets the shell's working directory and ignores `worktreePath`, causing PRs to be created from the wrong branch in multi-worktree sessions. It is also flagged by the MCP gap auditor as a missing-awareness gap. The CLI is a fallback only for when the MCP server is confirmed unavailable.
+
 Use the MCP tools below instead of `gh` CLI. These tools handle temp file body encoding, GraphQL thread IDs, and structured output. Fall back to `gh` CLI **only** when the MCP server is unavailable.
 
 | `gh` CLI command                              | MCP tool (use this)                                                                |

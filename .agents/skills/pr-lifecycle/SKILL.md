@@ -34,6 +34,8 @@ You must produce a **structured Self-Review Summary** (see the template in the r
 
 ### Phase 2: Create PR with Jira Linkage
 
+> **⛔ Never use `gh pr create` directly** — always use `github_create_pr` MCP tool. The MCP tool handles `worktreePath` routing (ensures the PR targets the correct branch in multi-worktree sessions), structured body encoding, and is audited by the MCP gap checker. `gh pr create` silently uses the shell working directory, bypasses `worktreePath`, and produces audit flags. Fall back to `gh pr create` **only** after confirming `github_auth_status()` returns `configured: false` and the user explicitly authorizes the CLI fallback.
+
 Before creating a PR, verify GitHub auth is working:
 
 ```
@@ -44,7 +46,7 @@ If `configured: false`, **stop and prompt the user** — do not silently fall ba
 
 **Cloud (Claude Code on the web)**: Use built-in `mcp__github__create_pull_request({ owner, repo, ... })` and `mcp__github__update_pull_request({ owner, repo, pullNumber, draft: false })` — these authenticate via the platform's token and avoid the username-leak issue. See [`cloud-agent-mode/SKILL.md`](../cloud-agent-mode/SKILL.md) for the full tool mapping.
 
-Verify prerequisites (`make pc`, migrations, branch pushed), create the PR **as a draft** with standard template, mark it ready for review, then transition Jira to "In Review". The draft→ready flow prevents sweep/review agents from racing with the creating agent.
+Verify prerequisites (`make pc`, migrations, branch pushed), create the PR **as a draft** using `github_create_pr` MCP tool, mark it ready for review, then transition Jira to "In Review". The draft→ready flow prevents sweep/review agents from racing with the creating agent.
 
 When a planning phase was run (see [planning skill](../planning/SKILL.md)), include its output in the PR body: the **Context** (why) and **Risk Assessment** sections help reviewers focus on the right areas.
 
