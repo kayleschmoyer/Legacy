@@ -166,7 +166,9 @@ export class MlbStatsApiProvider implements MlbDataProvider {
       hydrate: 'linescore',
     });
 
-    const games: MlbGame[] = (data.dates?.[0]?.games ?? []).map((g) =>
+    const dateEntry =
+      data.dates?.find((d) => d.date === date) ?? data.dates?.[0];
+    const games: MlbGame[] = (dateEntry?.games ?? []).map((g) =>
       this.mapGame(g),
     );
 
@@ -257,7 +259,9 @@ export class MlbStatsApiProvider implements MlbDataProvider {
       { sportId: options?.sportId ?? 1, date, teamId: options?.teamId ?? '' },
       STATIC_TTL_MS,
     );
-    const games: ScheduleGame[] = (data.dates?.[0]?.games ?? []).map((g) => ({
+    const dateEntry =
+      data.dates?.find((d) => d.date === date) ?? data.dates?.[0];
+    const games: ScheduleGame[] = (dateEntry?.games ?? []).map((g) => ({
       gamePk: g.gamePk ?? 0,
       gameDate: g.gameDate ?? '',
       status: g.status?.detailedState ?? '',

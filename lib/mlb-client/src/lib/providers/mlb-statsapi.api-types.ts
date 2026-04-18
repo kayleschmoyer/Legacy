@@ -42,6 +42,7 @@ export interface MlbApiScheduleGame {
 
 export interface MlbApiScheduleResponse {
   dates?: Array<{
+    date?: string;
     games?: MlbApiScheduleGame[];
   }>;
 }
