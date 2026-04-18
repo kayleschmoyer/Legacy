@@ -298,6 +298,39 @@ unauthTest.describe('/pricing — unauthenticated access @regression', () => {
   );
 });
 
+// LS-3517: The functional scanner failed to click "Get Started Free" on /pricing
+// using an invalid CSS selector `(button:visible, [role="button"]:visible)` with
+// nth=3, targeting the bottom CTA section button. Both "Get Started Free" buttons
+// (plan card and bottom CTA) must be reachable via getByRole and navigate correctly.
+
+unauthTest.describe(
+  'Pricing page — bottom CTA "Get Started Free" clickable @regression',
+  () => {
+    unauthTest(
+      'bottom CTA "Get Started Free" on /pricing navigates to sign-in (LS-3517)',
+      async ({ page }) => {
+        await page.goto('/pricing');
+        await page.waitForLoadState('load');
+
+        // The lower CTA section has a second "Get Started Free" button — this
+        // is the one that nth=3 (from the broken composite selector) was targeting.
+        // Use getByRole with .last() to reach it without CSS selector parse errors.
+        const bottomBtn = page
+          .getByRole('button', { name: /get started free/i })
+          .last();
+        await expect(bottomBtn).toBeVisible({ timeout: 10_000 });
+        await bottomBtn.click();
+
+        // Both "Get Started Free" buttons navigate to /; unauthenticated users
+        // see EnhancedAuthGuard → PublicLandingPage with the Google sign-in CTA.
+        await expect(
+          page.getByRole('button', { name: /get started with google/i }),
+        ).toBeVisible({ timeout: 15_000 });
+      },
+    );
+  },
+);
+
 // LS-3521: Clicking "Get Started Free" on /faq (which redirects to /pricing) must
 // navigate unauthenticated users to / where EnhancedAuthGuard shows the sign-in CTA.
 // The original functional scan failed with an invalid CSS selector
