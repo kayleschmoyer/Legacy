@@ -83,6 +83,10 @@ Subagents do **not** inherit AGENTS.md context. Always include tool preference h
 
 - **PR existence check**: to check whether a PR already exists for a given ticket key (e.g., while claiming a ticket or deciding whether to create a PR), use `github_pr_dashboard(state: "all", limit: 50)` and filter by ticket key in-context — never `gh pr list --state all | grep "LS-####"`. Include this hint in any subagent prompt that may need to verify PR existence before acting.
 
+- **Worktree path in Explore prompts (mandatory when in a worktree session)**: Explore subagents default to scanning from the main repo root (`D:\code\legacy-sports`) and return main-repo absolute paths (e.g. `/d/code/legacy-sports/tools/mcp/worktree-server/src/index.ts`). If the parent agent then passes those paths to `Edit`/`Write`, changes land in the **main repo**, not the active worktree — and `git status` on the worktree shows clean. To prevent this:
+  1. **Pass `path:` scoped to the worktree** in Explore prompts: `Glob(pattern: "**/*.ts", path: "<worktree-path>")` and `Read(file_path: "<worktree-path>/...")`. Include the worktree path in the prompt so the subagent uses it as the search root.
+  2. **Substitute paths** received from any Explore subagent before using them in `Edit`/`Write`: replace the main-repo prefix (`D:\code\legacy-sports\` / `/d/code/legacy-sports/`) with the worktree path (e.g. `D:\code\legacy-sports\.claude\worktrees\<name>\`). Never pass raw Explore-returned paths to `Edit`/`Write` without verifying which working tree they belong to.
+
 ## Commands
 
 ```bash

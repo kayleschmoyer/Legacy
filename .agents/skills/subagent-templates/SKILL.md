@@ -11,15 +11,23 @@ Subagents spawned via the `Agent` tool do **not** inherit AGENTS.md context. Whe
 Agent(subagent_type: "Explore", prompt: """
   <task description here>
 
+  Search root: <worktree-path>   ← REQUIRED when called from a worktree session (see path note below)
+
   Tool preferences:
-  - Use Glob (not find/ls) for file discovery — `find . -name "*.tsx"` → `Glob(pattern: "**/*.tsx")`, `find $wt -name "*.ts"` → `Glob(pattern: "src/**/*.ts")`. Glob is purpose-built: faster, returns results sorted by modification time, requires no shell spawning, and gives a cleaner permission prompt. On absolute Windows worktree paths, fall back to worktree_ls_tree or worktree_run(command: "dir <dir>") (use `dir` not `ls` — worktree_run may resolve to cmd.exe where `ls` is unavailable)
-  - Use Grep (not grep/rg/`find | xargs grep`) for content search — Grep accepts both pattern and glob filter in one call, so `find | xargs grep` is never needed. Common mappings: `grep -n "pattern" file` → `Grep(pattern: "pattern", path: "file", output_mode: "content")`; `grep -rn "pattern" dir/` → `Grep(pattern: "pattern", path: "dir", output_mode: "content")` (line numbers are on by default); `grep -i "pattern"` → `Grep(pattern: "pattern", path: "...", "-i": true, output_mode: "content")`
+  - Use Glob (not find/ls) for file discovery — `find . -name "*.tsx"` → `Glob(pattern: "**/*.tsx", path: "<worktree-path>")`, `find $wt -name "*.ts"` → `Glob(pattern: "src/**/*.ts", path: "<worktree-path>")`. Always pass path: "<worktree-path>" when running in a worktree session so returned paths belong to the worktree, not the main repo. Glob is purpose-built: faster, returns results sorted by modification time, requires no shell spawning, and gives a cleaner permission prompt. On absolute Windows worktree paths, fall back to worktree_ls_tree or worktree_run(command: "dir <dir>") (use `dir` not `ls` — worktree_run may resolve to cmd.exe where `ls` is unavailable)
+  - Use Grep (not grep/rg/`find | xargs grep`) for content search — Grep accepts both pattern and glob filter in one call, so `find | xargs grep` is never needed. Common mappings: `grep -n "pattern" file` → `Grep(pattern: "pattern", path: "<worktree-path>", output_mode: "content")`; `grep -rn "pattern" dir/` → `Grep(pattern: "pattern", path: "<worktree-path>/dir", output_mode: "content")` (line numbers are on by default); `grep -i "pattern"` → `Grep(pattern: "pattern", path: "...", "-i": true, output_mode: "content")`
   - Use Read (not cat/head/tail) for reading files — including uncommitted changes and untracked/new files
   - Use worktree_show_file(path: "...", ref: "HEAD") for **tracked** files at a Git ref when a worktree is active (worktree_set has been called) — it runs `git show <ref>:<path>` so it does NOT see uncommitted working-tree changes or untracked files, but avoids needing absolute paths. `ref` accepts **any git ref** — HEAD, commit SHAs, branch names, or tags (e.g. `worktree_show_file(path: ".claude/hooks/guard-bash-mcp-first.sh", ref: "abc1234")` reads the file at that commit)
+  - Return paths as absolute paths under <worktree-path> — never return bare main-repo paths (e.g. /d/code/legacy-sports/...) when running in a worktree session
 """)
 ```
 
-These four lines eliminate the most common subagent Bash anti-patterns (`find` 56x/session, `grep` 23x, `ls` 8x, `cat` on worktree paths 4x in production audits). Without them, subagents default to shell commands because they lack the project's MCP-first context.
+These lines eliminate the most common subagent Bash anti-patterns (`find` 56x/session, `grep` 23x, `ls` 8x, `cat` on worktree paths 4x in production audits). Without them, subagents default to shell commands because they lack the project's MCP-first context.
+
+> **Worktree path hazard**: Explore subagents default to scanning from the main repo root (`D:\code\legacy-sports`) and return main-repo absolute paths (e.g. `/d/code/legacy-sports/tools/mcp/worktree-server/src/index.ts`). If the parent agent passes those paths directly to `Edit`/`Write`, changes land in the **main repo working tree**, not the active worktree — and `git status` on the worktree shows clean. Two safeguards:
+>
+> 1. **Pass the worktree `path:` explicitly** in every Glob/Grep call in the Explore prompt (see template above).
+> 2. **Substitute before editing**: after receiving any file path from an Explore subagent, replace the main-repo prefix (`D:\code\legacy-sports\` / `/d/code/legacy-sports/`) with the active worktree path before passing to `Edit`/`Write`. Never assume a path returned by a subagent targets the worktree.
 
 ## Scoped Explore Agents (Narrow Prompts)
 
