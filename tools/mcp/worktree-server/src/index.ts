@@ -1026,6 +1026,16 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
             description:
               'Generalized pickaxe (`git log -G`). Like `searchString` but the value is treated as a regular expression. Mutually compatible with `searchString` (both forwarded to git, but typically use one at a time).',
           },
+          file: {
+            type: 'string',
+            description:
+              'Restrict log to commits that touched this file path (maps to `git log -- <file>`). Alias for `path` — use either; `file` takes precedence when both are provided. Example: file="apps/web/src/pages/Login.tsx" answers "which commits last modified this file?".',
+          },
+          grep: {
+            type: 'string',
+            description:
+              'Filter commits whose message matches this pattern (maps to `git log --grep=<pattern>`). Useful for finding commits by Jira ticket key, e.g. grep="LS-2433". The pattern is matched case-insensitively against the full commit message.',
+          },
           stat: {
             type: 'boolean',
             description:
@@ -3145,23 +3155,28 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         worktree: wtKey,
         maxCount = 20,
         path: filterPath,
+        file: fileFilter,
         range,
         since,
         until,
         searchString,
         searchRegex,
+        grep,
         stat = false,
       } = args as {
         worktree?: string;
         maxCount?: number;
         path?: string;
+        file?: string;
         range?: string;
         since?: string;
         until?: string;
         searchString?: string;
         searchRegex?: string;
+        grep?: string;
         stat?: boolean;
       };
+      const resolvedFileFilter = fileFilter ?? filterPath;
       const target = resolveTargetDir(wtKey);
       if ('error' in target) {
         return {
@@ -3203,8 +3218,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         if (until) gitArgs.push(`--until=${until}`);
         if (searchString) gitArgs.push(`-S${searchString}`);
         if (searchRegex) gitArgs.push(`-G${searchRegex}`);
+        if (grep) gitArgs.push(`--grep=${grep}`, '--regexp-ignore-case');
         if (range) gitArgs.push(range);
-        if (filterPath) gitArgs.push('--', filterPath);
+        if (resolvedFileFilter) gitArgs.push('--', resolvedFileFilter);
 
         const output = runGit(gitArgs, cwd, { timeout: 30_000 });
         const commits = output
