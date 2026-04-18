@@ -57,7 +57,7 @@ server.tool(
 
 server.tool(
   'ci_get_logs',
-  'Prefer this over `gh run view --log-failed` via shell. Fetch CI logs for a run or job. Defaults to failed-step logs only.',
+  'Prefer this over `gh run view --log-failed` via shell. Fetch CI logs for a run or job. Defaults to failed-step logs only. Use jobName to filter logs to a specific job by name (case-insensitive substring match) without needing its numeric ID.',
   {
     runId: z.coerce
       .number()
@@ -66,6 +66,12 @@ server.tool(
       .optional()
       .describe('Run ID (required when jobId is not provided)'),
     jobId: z.coerce.number().int().positive().optional().describe('Job ID'),
+    jobName: z
+      .string()
+      .optional()
+      .describe(
+        'Filter logs to jobs whose name contains this string (case-insensitive substring match). Useful when you know the job name from ci_view_run but not its numeric ID.',
+      ),
     failedOnly: coercedBoolean
       .default(true)
       .describe('Failed steps only (default: true)'),
@@ -131,20 +137,6 @@ server.tool(
     debug: coercedBoolean.default(false).describe('Enable debug logging'),
   },
   async (params) => rerun(params),
-);
-
-server.tool(
-  'ci_rerun_failed_jobs',
-  'Prefer this over `gh run rerun --failed` via shell. Re-run only the failed jobs in a workflow run. Equivalent to ci_rerun with failedOnly:true but with a focused interface — accepts only runId.',
-  {
-    runId: z.coerce
-      .number()
-      .int()
-      .positive()
-      .describe('Workflow run ID whose failed jobs should be re-run'),
-    debug: coercedBoolean.default(false).describe('Enable debug logging'),
-  },
-  async (params) => rerun({ ...params, failedOnly: true }),
 );
 
 server.tool(

@@ -2,17 +2,12 @@ import { inflateRawSync } from 'node:zlib';
 
 import { githubGet, githubGetArrayBuffer } from './github-api.js';
 
-const PROXY_BLOCKED_MESSAGE = [
-  '[Log download unavailable: the GitHub Actions log endpoint redirects to',
-  'results-receiver.actions.githubusercontent.com which is blocked in this',
-  'environment (cloud proxy restriction). Step conclusions shown instead:]',
-].join('\n');
-
 export interface FetchRunLogsParams {
   runId?: number;
   jobId?: number;
   failedOnly?: boolean;
   attempt?: number;
+  jobName?: string;
 }
 
 interface GitHubJob {
@@ -83,60 +78,25 @@ function extractTextFromZip(buffer: ArrayBuffer): string {
 }
 
 /**
- * Fall back to step-level summary when log download fails.
- * Used when the GitHub Actions log endpoint's 302 redirect to
- * results-receiver.actions.githubusercontent.com is blocked by the cloud proxy.
- */
-async function fetchJobStepSummary(jobId: number): Promise<string> {
-  const job = await githubGet<GitHubJob>(`/actions/jobs/${jobId}`);
-  if (!job.steps?.length) {
-    return `${PROXY_BLOCKED_MESSAGE}\n\n(No step data available for job ${jobId}.)`;
-  }
-  const stepLines = job.steps.map((s) => {
-    const status = s.conclusion ?? s.status;
-    const icon = status === 'success' ? '✓' : status === 'failure' ? '✗' : '○';
-    return `  ${icon} Step ${s.number}: ${s.name} [${status}]`;
-  });
-  return `${PROXY_BLOCKED_MESSAGE}\n\n${stepLines.join('\n')}`;
-}
-
-/**
  * Fetch log text for a single job via the GitHub REST API.
  * GET /repos/{owner}/{repo}/actions/jobs/{job_id}/logs returns a 302 redirect
  * to a downloadable log archive (ZIP). We fetch as binary, unzip, and extract text.
- *
- * Falls back to step-level summary data when the log download is blocked (e.g.,
- * by the Claude Code cloud proxy which restricts CONNECT tunnels to
- * results-receiver.actions.githubusercontent.com).
  */
 async function fetchJobLogs(jobId: number): Promise<string> {
-  try {
-    const buffer = await githubGetArrayBuffer(`/actions/jobs/${jobId}/logs`);
-    // The response may be a ZIP archive or plain text depending on the server.
-    // Check for ZIP magic bytes (PK\x03\x04).
-    const header = new Uint8Array(buffer.slice(0, 4));
-    if (
-      header[0] === 0x50 &&
-      header[1] === 0x4b &&
-      header[2] === 0x03 &&
-      header[3] === 0x04
-    ) {
-      return extractTextFromZip(buffer);
-    }
-    // Not a ZIP — treat as plain text
-    return Buffer.from(buffer).toString('utf-8');
-  } catch (error) {
-    // The log endpoint redirects to results-receiver.actions.githubusercontent.com.
-    // Cloud proxy environments block CONNECT tunnels to that host (403 tunnel error).
-    // Attempt a step-summary fallback: /actions/jobs/{id} returns step conclusions
-    // without redirecting, so it succeeds even when the log download is blocked.
-    // If the step summary also fails (e.g., auth issue), rethrow the original error.
-    try {
-      return await fetchJobStepSummary(jobId);
-    } catch {
-      throw error;
-    }
+  const buffer = await githubGetArrayBuffer(`/actions/jobs/${jobId}/logs`);
+  // The response may be a ZIP archive or plain text depending on the server.
+  // Check for ZIP magic bytes (PK\x03\x04).
+  const header = new Uint8Array(buffer.slice(0, 4));
+  if (
+    header[0] === 0x50 &&
+    header[1] === 0x4b &&
+    header[2] === 0x03 &&
+    header[3] === 0x04
+  ) {
+    return extractTextFromZip(buffer);
   }
+  // Not a ZIP — treat as plain text
+  return Buffer.from(buffer).toString('utf-8');
 }
 
 /**
@@ -222,9 +182,14 @@ export async function fetchRunLogs(
   const allJobs = await fetchAllJobs(params.runId, attemptSuffix);
 
   const failedOnly = params.failedOnly !== false;
-  const jobs = failedOnly
+  let jobs = failedOnly
     ? allJobs.filter((j) => j.conclusion !== 'success')
     : allJobs;
+
+  if (params.jobName) {
+    const nameLower = params.jobName.toLowerCase();
+    jobs = jobs.filter((j) => j.name.toLowerCase().includes(nameLower));
+  }
 
   if (jobs.length === 0) {
     return failedOnly
@@ -264,9 +229,14 @@ export async function fetchRunLogsRing(
   const allJobs = await fetchAllJobs(params.runId, attemptSuffix);
 
   const failedOnly = params.failedOnly !== false;
-  const jobs = failedOnly
+  let jobs = failedOnly
     ? allJobs.filter((j) => j.conclusion !== 'success')
     : allJobs;
+
+  if (params.jobName) {
+    const nameLower = params.jobName.toLowerCase();
+    jobs = jobs.filter((j) => j.name.toLowerCase().includes(nameLower));
+  }
 
   if (jobs.length === 0) {
     const msg = failedOnly

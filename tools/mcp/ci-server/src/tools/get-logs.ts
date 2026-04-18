@@ -8,6 +8,7 @@ interface GetLogsParams {
   attempt?: number;
   maxLines?: number;
   errorSummary?: boolean;
+  jobName?: string;
 }
 
 /**
@@ -104,6 +105,7 @@ export async function getLogs(params: GetLogsParams): Promise<ToolResult> {
         jobId: params.jobId,
         failedOnly: params.failedOnly,
         attempt: params.attempt,
+        jobName: params.jobName,
       },
       streamLimit,
     );
@@ -119,6 +121,7 @@ export async function getLogs(params: GetLogsParams): Promise<ToolResult> {
               {
                 runId: params.runId,
                 jobId: params.jobId ?? null,
+                jobName: params.jobName ?? null,
                 failedOnly: params.failedOnly !== false,
                 attempt: params.attempt ?? null,
                 errorSummary: true,
@@ -142,6 +145,7 @@ export async function getLogs(params: GetLogsParams): Promise<ToolResult> {
             {
               runId: params.runId,
               jobId: params.jobId ?? null,
+              jobName: params.jobName ?? null,
               failedOnly: params.failedOnly !== false,
               attempt: params.attempt ?? null,
               truncated: lines.length < totalLines,
