@@ -306,3 +306,44 @@ unauthTest.describe(
     );
   },
 );
+
+// ---------------------------------------------------------------------------
+// LS-3492: [functional] 404 error on /players endpoint.
+// An automated audit crawler navigated to /players and received a functional
+// 404 — the network request returned 404 and the "Build Your Dynasty"
+// marketing landing page was rendered in place of the players directory.
+// /players is a protected route: unauthenticated visitors correctly see the
+// PublicLandingPage, but authenticated users must reach the players directory.
+// These tests lock in the corrected behaviour: an authenticated session must
+// stay at /players (no 404 redirect), must never see the marketing landing
+// page, and must see the players directory heading.
+// ---------------------------------------------------------------------------
+
+test.describe('Players Directory — functional 404 regression (LS-3492) @regression', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockPlayersGraphQL(page);
+    await page.goto('/players');
+    await page.waitForLoadState('load');
+  });
+
+  test('URL stays at /players for authenticated users — no 404 redirect', async ({
+    page,
+  }) => {
+    await expect(page).toHaveURL('/players', { timeout: 15_000 });
+  });
+
+  test('does not show marketing landing page for authenticated users on /players', async ({
+    page,
+  }) => {
+    await expect(page.getByText(/build your dynasty/i)).not.toBeVisible();
+    await expect(page.getByText(/dominate your league/i)).not.toBeVisible();
+  });
+
+  test('shows players directory content — not a 404 page — for authenticated users', async ({
+    page,
+  }) => {
+    await expect(
+      page.getByRole('heading', { name: /all players/i }),
+    ).toBeVisible({ timeout: 15_000 });
+  });
+});
