@@ -60,7 +60,9 @@ When a planning phase was run (see [planning skill](../planning/SKILL.md)), incl
 
 After creating the PR and transitioning Jira, shepherd the PR through CI and reviews — do **not** treat PR creation as the end of the task.
 
-Claude Code surfaces CI results and review events natively. After marking the PR ready, Claude Code will automatically receive and surface CI failures, new review threads, and other agent-actionable events. Handle each event as it arrives (fixing code, resolving threads, re-running CI) and continue until merged or closed.
+Claude Code surfaces CI results and review events **as push notifications**. After marking the PR ready, Claude Code will automatically receive and surface CI failures, new review threads, and other agent-actionable events. Handle each event as it arrives (fixing code, resolving threads, re-running CI) and continue until merged or closed.
+
+> **⛔ Do NOT poll for CI results.** Never run `sleep N && gh pr view --json statusCheckRollup`, `sleep N && gh run view`, or repeated `ci_view_run` / `github_view_pr` calls in a loop. Claude Code delivers CI events automatically — polling only wastes context (1–2M tokens observed in a single session). After marking the PR ready, simply wait for the next event.
 
 See [drive-pr](../drive-pr/SKILL.md) Step 6 for the full event-handling table.
 
