@@ -4577,10 +4577,63 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               );
             };
 
-            // Helper: append standardized completion message and return response
+            // Helper: scan recently-rebased files for raw conflict markers.
+            // Uses ORIG_HEAD (set by git rebase) to identify all files touched
+            // during the replay — the set rerere could have corrupted.
+            const scanForConflictMarkers = (): string[] => {
+              try {
+                const origHead = run('git rev-parse ORIG_HEAD', cwd).trim();
+                const changedFiles = run(
+                  `git diff --name-only ${origHead}`,
+                  cwd,
+                )
+                  .trim()
+                  .split('\n')
+                  .filter(Boolean);
+                const withMarkers: string[] = [];
+                for (const file of changedFiles) {
+                  try {
+                    const content = readFileSync(join(cwd, file), 'utf8');
+                    if (/^(<{7}[ \t]|={7}$|>{7}[ \t])/m.test(content)) {
+                      withMarkers.push(file);
+                    }
+                  } catch {
+                    // Skip deleted, binary, or unreadable files
+                  }
+                }
+                return withMarkers;
+              } catch {
+                return [];
+              }
+            };
+
+            // Helper: append standardized completion message and return response.
+            // Scans rebased files for stale conflict markers before declaring success —
+            // rerere can silently commit files with markers when it fails to parse hunks.
             const rebaseCompleteResponse = (
               summary: string,
-            ): { content: { type: 'text'; text: string }[] } => {
+            ): {
+              content: { type: 'text'; text: string }[];
+              isError?: boolean;
+            } => {
+              const markerFiles = scanForConflictMarkers();
+              if (markerFiles.length > 0) {
+                log.push(
+                  summary,
+                  '',
+                  '⚠ Conflict markers detected in rebased files despite rerere reporting success:',
+                  markerFiles.join('\n'),
+                  '',
+                  'rerere likely stored a bad resolution. Inspect the listed files,',
+                  'remove all conflict markers, stage the fixes, then:',
+                  '  worktree_rebase_continue',
+                  'Or: worktree_rebase(abort: true) to abort and retry from a clean state.',
+                );
+                return {
+                  content: [{ type: 'text', text: log.join('\n') }],
+                  isError: true,
+                };
+              }
               log.push(summary);
               log.push(
                 '',
@@ -5408,6 +5461,41 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       const cwd = target.path;
       const log: string[] = [`[cwd: ${cwd}]`, '', 'Post-rebase stabilization:'];
+
+      // Guard: detect conflict markers that slipped through from a bad rebase.
+      // This is a secondary defence — worktree_rebase checks first, but an agent
+      // may call worktree_stabilize after a manually resolved rebase as well.
+      const conflictMarkerFiles = (() => {
+        try {
+          const files = run('git diff --name-only origin/main', cwd)
+            .trim()
+            .split('\n')
+            .filter(Boolean);
+          return files.filter((file) => {
+            try {
+              const content = readFileSync(join(cwd, file), 'utf8');
+              return /^(<{7}[ \t]|={7}$|>{7}[ \t])/m.test(content);
+            } catch {
+              return false;
+            }
+          });
+        } catch {
+          return [];
+        }
+      })();
+      if (conflictMarkerFiles.length > 0) {
+        log.push(
+          '⚠ Conflict markers detected in branch files — rebase did not complete cleanly:',
+          conflictMarkerFiles.join('\n'),
+          '',
+          'Remove all conflict markers from the listed files, stage the fixes,',
+          'then call worktree_rebase_continue, or worktree_rebase(abort: true) to start over.',
+        );
+        return {
+          content: [{ type: 'text', text: log.join('\n') }],
+          isError: true,
+        };
+      }
 
       // Check if node_modules is a symlink — skip install if so
       const nodeModulesPath = join(cwd, 'node_modules');
