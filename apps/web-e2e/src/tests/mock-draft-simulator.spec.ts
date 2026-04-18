@@ -6,7 +6,7 @@
  * All GraphQL queries are mocked so these tests run without a live backend.
  */
 
-import { expect, test } from '../fixtures/auth-enhanced';
+import { expect, test, unauthTest } from '../fixtures/auth-enhanced';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -374,3 +374,58 @@ test.describe('Mock Draft Simulator @regression', () => {
     ).toBeVisible();
   });
 });
+
+// ── LS-3486: Unauthenticated visitor tests ───────────────────────────────────
+// /baseball/mock-draft is a protected route. Unauthenticated visitors are
+// intercepted by EnhancedAuthGuard and shown PublicLandingPage with sign-in
+// CTAs. These tests use getByRole (accessible name) — NOT the broken CSS
+// selector `(button:visible, [role="button"]:visible)` that caused the original
+// crawler-reported failure.
+// ─────────────────────────────────────────────────────────────────────────────
+
+unauthTest.describe(
+  'Mock Draft Simulator — unauthenticated visitor @regression',
+  () => {
+    unauthTest(
+      '"Get Started Free" CTA is visible on /baseball/mock-draft when unauthenticated',
+      async ({ page }) => {
+        await page.goto('/baseball/mock-draft');
+        await page.waitForLoadState('load');
+
+        await expect(
+          page.getByRole('button', { name: /get started free/i }),
+        ).toBeVisible({ timeout: 15_000 });
+      },
+    );
+
+    unauthTest(
+      '"Get Started Free" CTA on /baseball/mock-draft is clickable via getByRole (LS-3486)',
+      async ({ page }) => {
+        await page.goto('/baseball/mock-draft');
+        await page.waitForLoadState('load');
+
+        const getStartedBtn = page.getByRole('button', {
+          name: /get started free/i,
+        });
+        await expect(getStartedBtn).toBeVisible({ timeout: 15_000 });
+        await expect(getStartedBtn).toBeEnabled();
+        // Regression for LS-3486: confirm the click resolves without the
+        // CSS selector parse error caused by the broken crawler selector
+        // `(button:visible, [role="button"]:visible)`.
+        await getStartedBtn.click();
+      },
+    );
+
+    unauthTest(
+      '"Continue with Google" button is visible on /baseball/mock-draft when unauthenticated',
+      async ({ page }) => {
+        await page.goto('/baseball/mock-draft');
+        await page.waitForLoadState('load');
+
+        await expect(
+          page.getByRole('button', { name: /continue with google/i }),
+        ).toBeVisible({ timeout: 15_000 });
+      },
+    );
+  },
+);
