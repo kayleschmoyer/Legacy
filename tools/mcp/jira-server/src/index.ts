@@ -272,7 +272,7 @@ server.tool(
 // --- jira_search ---
 server.tool(
   'jira_search',
-  'Search Jira issues using JQL. Returns compact results (key, summary, status, type, assignee, priority) — no metadata blobs. Prefer this over Atlassian plugin search tools to avoid context overflow. Default maxResults is 15; raise only when you know the result set is small.',
+  'Search Jira issues using JQL. Returns compact results (key, summary, status, type, assignee, priority) — no metadata blobs. Prefer this over Atlassian plugin search tools to avoid context overflow. Default maxResults is 15; raise only when you know the result set is small. Use compact=true for large result sets (e.g. listing all children of an epic) to get a minimal flat array of {key, summary, status} — typically under 2 KB for 50 issues.',
   {
     jql: z.string().describe('JQL query string'),
     maxResults: z.coerce
@@ -282,6 +282,12 @@ server.tool(
       .max(50)
       .default(15)
       .describe('Max results (default: 15, max: 50)'),
+    compact: z
+      .boolean()
+      .default(false)
+      .describe(
+        'When true, returns a minimal flat JSON array of {key, summary, status} — no envelope, no extra fields. Use for large result sets like epic children to avoid context overflow.',
+      ),
   },
   async (params) => search(params),
 );

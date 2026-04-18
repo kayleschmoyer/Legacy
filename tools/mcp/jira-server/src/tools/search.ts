@@ -4,6 +4,7 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 interface SearchParams {
   jql: string;
   maxResults?: number;
+  compact?: boolean;
 }
 
 interface SearchFields {
@@ -21,18 +22,30 @@ const DEFAULT_FIELDS = [
   'assignee',
   'priority',
 ];
+const COMPACT_FIELDS = ['summary', 'status'];
 
 /** Search Jira issues using JQL via the v3 search/jql endpoint. */
 export async function search(params: SearchParams): Promise<CallToolResult> {
-  const { jql, maxResults: rawMax = 15 } = params;
+  const { jql, maxResults: rawMax = 15, compact = false } = params;
   const maxResults = Math.max(1, Math.min(50, Math.floor(rawMax)));
 
   try {
     const result = await searchJql<SearchFields>({
       jql,
-      fields: DEFAULT_FIELDS,
+      fields: compact ? COMPACT_FIELDS : DEFAULT_FIELDS,
       maxResults,
     });
+
+    if (compact) {
+      const issues = result.issues.map((issue) => ({
+        key: issue.key,
+        summary: issue.fields.summary,
+        status: issue.fields.status.name,
+      }));
+      return {
+        content: [{ type: 'text', text: JSON.stringify(issues) }],
+      };
+    }
 
     const issues = result.issues.map((issue) => ({
       key: issue.key,
