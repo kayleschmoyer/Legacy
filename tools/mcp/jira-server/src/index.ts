@@ -15,6 +15,7 @@ import { view } from './tools/view.js';
 import { bulkTransition } from './tools/bulk-transition.js';
 import { bulkCreate } from './tools/bulk-create.js';
 import { getBucketEpic, setBucketEpic } from './tools/bucket-epic.js';
+import { claimTicket } from './tools/claim-ticket.js';
 import { tryGetJiraCredentials } from './netrc.js';
 
 // Check credentials at startup — warn if missing but don't exit.
@@ -366,6 +367,25 @@ server.tool(
       cascade: params.cascade,
     });
   },
+);
+
+// --- jira_claim_ticket ---
+server.tool(
+  'jira_claim_ticket',
+  'Atomically read, validate, and claim a Jira ticket. ' +
+    'Fetches ticket details, checks blockers, warns on open children, then transitions to "In Progress". ' +
+    'Returns action: "PROCEED" (claimed), "STOP" (blocked/done/in-review/no-transition), or "ALREADY_CLAIMED" (already In Progress). ' +
+    'Use this instead of separate jira_view + jira_transition calls at the start of a ticket workflow.',
+  {
+    key: z
+      .string()
+      .regex(
+        /^[A-Z][A-Z0-9_]+-\d+$/,
+        'Must be a valid Jira issue key (e.g., LS-1234)',
+      )
+      .describe('Ticket key to claim'),
+  },
+  async (params) => claimTicket(params),
 );
 
 // --- jira_view ---
