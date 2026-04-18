@@ -42,9 +42,31 @@ function parseSteps(output: string): StepResult[] {
       i + 1 < stepEntries.length ? stepEntries[i + 1].index : output.length;
     const section = output.slice(start, end);
 
-    const failed = /(?:FAIL|ERROR|failed|✗|exit code [1-9]|error TS\d)/im.test(
-      section,
-    );
+    // NX's structured verdict is the authoritative signal — check it first.
+    // "NX   Successfully ran target ..." means the step passed regardless of what
+    // else appears in the output (console.error stack traces, prop warnings, etc.
+    // that may contain the word "failed" in a passing run).
+    if (/NX\s+Successfully ran target/i.test(section)) {
+      steps.push({ name: stepEntries[i].name, status: 'passed' });
+      continue;
+    }
+
+    // Use unambiguous failure signals only.
+    // Intentionally excludes bare "failed" / "ERROR" to avoid false positives
+    // from console.error output such as "Warning: Failed prop type ...".
+    const failed =
+      /NX\s+Failed tasks/i.test(section) ||
+      // Jest FAIL <file> line (file-level failure — starts at column 0)
+      /^FAIL\s+\S/m.test(section) ||
+      // TypeScript compiler errors
+      /error TS\d/i.test(section) ||
+      // Subprocess exited with a non-zero code
+      /exit code [1-9]/.test(section) ||
+      // Failure glyph used by make steps
+      /✗/.test(section) ||
+      // make itself surfaced an error
+      /^make.*Error/im.test(section);
+
     const passed = /(?:✓|passed|succeeded|SUCCESS)/im.test(section);
 
     steps.push({
