@@ -26,7 +26,7 @@
  */
 
 import { expect } from '@playwright/test';
-import { switchUser, test } from '../fixtures/ui';
+import { test } from '../fixtures/ui';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -251,18 +251,21 @@ test.describe('subscription gating — SubscriptionPage UI @smoke', () => {
   test.describe.configure({ mode: 'serial' });
 
   test('SubscriptionPage loads and shows subscription section for free user', async ({
-    commissionerPage,
-    managerJwt1,
+    managerPage1,
   }) => {
-    await switchUser(commissionerPage, managerJwt1, '/profile/subscription');
-    // Wait for all resources to load so the lazy-loaded SubscriptionPage chunk
-    // is fetched and React has finished mounting before we assert (LS-3616).
-    // Without this, the assertion can fire before the app re-mounts after
-    // switchUser's cookie-swap reload (same root cause as LS-3607).
-    await commissionerPage.waitForLoadState('load');
+    // Use a dedicated manager browser context rather than switchUser on
+    // commissionerPage. switchUser has a race condition: the background JWT
+    // refresh triggered on first navigation can dispatch AUTH_LOGOUT and clear
+    // localStorage after page.evaluate() sets the manager profile, causing the
+    // reload to start with empty localStorage and show the login page instead
+    // of SubscriptionPage (LS-3672).
+    await managerPage1.goto('/profile/subscription');
+    // Wait for all resources including the lazy-loaded SubscriptionPage chunk
+    // so React has finished mounting before we assert (LS-3616).
+    await managerPage1.waitForLoadState('load');
 
     await expect(
-      commissionerPage.getByRole('heading', { name: /subscription|billing/i }),
+      managerPage1.getByRole('heading', { name: /subscription|billing/i }),
     ).toBeVisible({ timeout: 20_000 });
   });
 });
