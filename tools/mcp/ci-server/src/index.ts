@@ -91,6 +91,24 @@ server.tool(
       .describe(
         'Maximum lines of log output to return (max: 5000). Defaults to 500 when errorSummary is false. When errorSummary is true, fetches up to 10000 lines for broader error extraction.',
       ),
+    maxChars: z.coerce
+      .number()
+      .int()
+      .positive()
+      .max(200_000)
+      .optional()
+      .describe(
+        'Hard cap on total output characters (default: 50000). Prevents context overflow when individual log lines are very long (e.g. JSON blobs). Output is truncated at this limit regardless of maxLines.',
+      ),
+    truncateLineLength: z.coerce
+      .number()
+      .int()
+      .positive()
+      .max(10_000)
+      .optional()
+      .describe(
+        'Truncate individual lines longer than this many characters (e.g. 500). Useful when logs contain very long JSON or minified output. Truncated lines are suffixed with ...[line truncated].',
+      ),
     errorSummary: coercedBoolean
       .default(false)
       .describe(

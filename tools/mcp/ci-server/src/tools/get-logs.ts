@@ -7,6 +7,8 @@ interface GetLogsParams {
   failedOnly?: boolean;
   attempt?: number;
   maxLines?: number;
+  maxChars?: number;
+  truncateLineLength?: number;
   errorSummary?: boolean;
   jobName?: string;
 }
@@ -86,6 +88,46 @@ function extractErrorSummary(allLines: string[]): string[] {
   return deduped.slice(0, 200);
 }
 
+/** Default hard cap on total output characters to prevent context overflow. */
+const DEFAULT_MAX_CHARS = 50_000;
+
+/**
+ * Applies per-line and total-character limits to a set of log lines.
+ * Returns the processed lines and whether any truncation occurred.
+ */
+function applyCharLimits(
+  lines: string[],
+  truncateLineLength: number | undefined,
+  maxChars: number,
+): { processedLines: string[]; charTruncated: boolean } {
+  let charTruncated = false;
+  let budget = maxChars;
+  const processedLines: string[] = [];
+
+  for (const rawLine of lines) {
+    const line =
+      truncateLineLength !== undefined && rawLine.length > truncateLineLength
+        ? `${rawLine.slice(0, truncateLineLength)}...[line truncated]`
+        : rawLine;
+
+    if (budget <= 0) {
+      charTruncated = true;
+      break;
+    }
+
+    if (line.length > budget) {
+      processedLines.push(`${line.slice(0, budget)}...[output truncated]`);
+      charTruncated = true;
+      budget = 0;
+    } else {
+      processedLines.push(line);
+      budget -= line.length + 1; // +1 for the newline separator
+    }
+  }
+
+  return { processedLines, charTruncated };
+}
+
 export async function getLogs(params: GetLogsParams): Promise<ToolResult> {
   if (!params.runId && !params.jobId) {
     return {
@@ -96,6 +138,7 @@ export async function getLogs(params: GetLogsParams): Promise<ToolResult> {
 
   const defaultLimit = params.errorSummary ? 10_000 : 500;
   const maxLines = params.maxLines ?? defaultLimit;
+  const maxChars = params.maxChars ?? DEFAULT_MAX_CHARS;
 
   try {
     const streamLimit = maxLines > 0 ? maxLines : 10_000;
@@ -113,6 +156,11 @@ export async function getLogs(params: GetLogsParams): Promise<ToolResult> {
     // When errorSummary is requested, filter to only error lines + context
     if (params.errorSummary) {
       const summary = extractErrorSummary(lines);
+      const { processedLines, charTruncated } = applyCharLimits(
+        summary,
+        params.truncateLineLength,
+        maxChars,
+      );
       return {
         content: [
           {
@@ -127,7 +175,8 @@ export async function getLogs(params: GetLogsParams): Promise<ToolResult> {
                 errorSummary: true,
                 totalLogLines: totalLines,
                 errorLines: summary.length,
-                logs: summary.join('\n'),
+                charTruncated,
+                logs: processedLines.join('\n'),
               },
               null,
               2,
@@ -136,6 +185,12 @@ export async function getLogs(params: GetLogsParams): Promise<ToolResult> {
         ],
       };
     }
+
+    const { processedLines, charTruncated } = applyCharLimits(
+      lines,
+      params.truncateLineLength,
+      maxChars,
+    );
 
     return {
       content: [
@@ -148,10 +203,11 @@ export async function getLogs(params: GetLogsParams): Promise<ToolResult> {
               jobName: params.jobName ?? null,
               failedOnly: params.failedOnly !== false,
               attempt: params.attempt ?? null,
-              truncated: lines.length < totalLines,
+              truncated: lines.length < totalLines || charTruncated,
+              charTruncated,
               totalLines,
-              returnedLines: lines.length,
-              logs: lines.join('\n'),
+              returnedLines: processedLines.length,
+              logs: processedLines.join('\n'),
             },
             null,
             2,
