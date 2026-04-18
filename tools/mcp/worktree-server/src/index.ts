@@ -21,7 +21,15 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { randomUUID } from 'node:crypto';
-import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import {
+  basename,
+  dirname,
+  isAbsolute,
+  join,
+  relative,
+  resolve,
+  sep,
+} from 'node:path';
 import { homedir, tmpdir } from 'node:os';
 
 // ---------------------------------------------------------------------------
@@ -1029,7 +1037,7 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
     {
       name: 'worktree_file_info',
       description:
-        'Get metadata for one or more files (bytes, line count, approximate token count). For files ≤10MB, reads files only to count lines — contents are not returned to the caller; approximate token count is derived from byte size. For files >10MB, returns only byte size. Useful for choosing a Read strategy for large files (the Read tool has a 10k-token limit) and for replacing `wc -l` Bash fallbacks.',
+        'Get metadata for one or more paths (files or directories). Always reports: exists, isFile, isDirectory, isSymlink, isJunction (Windows only), linkTarget (when isSymlink). For regular files ≤10MB also reports bytes, lines, and approxTokens; files >10MB get bytes only. Use this instead of `ls`, `dir`, `Test-Path`, or `Get-ChildItem` to detect whether node_modules is a junction, a real directory, or missing.',
       inputSchema: {
         type: 'object' as const,
         properties: {
@@ -3361,16 +3369,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
         // Always resolve (even absolute paths) to normalize away any `..` segments.
         const absolute = resolve(cwd, p);
-        // Prevent path traversal: canonicalize both sides with realpathSync so
-        // that symlinked directories cannot escape the worktree root. Fall back
-        // to the unresolved path if the path does not yet exist (checked below).
-        const realAbsolute = (() => {
+        // Prevent path traversal: resolve the PARENT directory with realpathSync
+        // (catches intermediate-symlink traversal), but do NOT follow the final
+        // path component. This lets agents inspect junction/symlink entries whose
+        // targets live outside the worktree (e.g. node_modules → main repo).
+        const realParent = (() => {
           try {
-            return realpathSync(absolute);
+            return realpathSync(dirname(absolute));
           } catch {
-            return absolute;
+            return dirname(absolute);
           }
         })();
+        const realAbsolute = join(realParent, basename(absolute));
         const rel = relative(realCwd, realAbsolute);
         if (rel.startsWith('..') || isAbsolute(rel)) {
           return {
@@ -3380,27 +3390,67 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           };
         }
         try {
-          if (!existsSync(absolute)) {
+          // Use lstatSync so we see the link entry itself, not its target.
+          let lstat: ReturnType<typeof lstatSync>;
+          try {
+            lstat = lstatSync(absolute);
+          } catch {
             return { path: p, exists: false };
           }
-          const stat = statSync(absolute);
-          if (!stat.isFile()) {
+
+          const isSymlinkEntry = lstat.isSymbolicLink();
+          const windowsLinkType = isSymlinkEntry
+            ? getWindowsLinkType(absolute)
+            : null;
+          const isJunction = windowsLinkType === 'Junction';
+
+          let linkTarget: string | undefined;
+          if (isSymlinkEntry) {
+            try {
+              linkTarget = readlinkSync(absolute);
+            } catch {
+              // dangling or unreadable link — omit linkTarget
+            }
+          }
+
+          // Follow the link to get the real file/directory stats.
+          // Typed as Stats (not BigIntStats) — we call statSync without bigint option.
+          let stat: import('node:fs').Stats | undefined;
+          try {
+            stat = statSync(absolute);
+          } catch {
+            // dangling symlink — target does not exist
+          }
+
+          const isFile = stat?.isFile() ?? false;
+          const isDirectory = stat?.isDirectory() ?? false;
+
+          const base = {
+            path: p,
+            exists: true,
+            isFile,
+            isDirectory,
+            isSymlink: isSymlinkEntry,
+            ...(isJunction ? { isJunction: true } : {}),
+            ...(linkTarget !== undefined ? { linkTarget } : {}),
+          };
+
+          if (!isFile) {
             return {
-              path: p,
-              exists: true,
-              bytes: stat.size,
-              error: 'Not a regular file',
+              ...base,
+              ...(stat !== undefined ? { bytes: stat.size } : {}),
             };
           }
-          // Read once for line counting. Files larger than 10 MB get
-          // bytes-only metadata to avoid loading huge binaries into memory
-          // just to count newlines; token estimate is derived from bytes.
+
+          // isFile is true only when stat?.isFile() returned true, so stat is defined here.
+          const fileStat = stat as import('node:fs').Stats;
+
+          // Regular file — count lines and estimate tokens.
           const MAX_READ = 10 * 1024 * 1024;
-          if (stat.size > MAX_READ) {
+          if (fileStat.size > MAX_READ) {
             return {
-              path: p,
-              exists: true,
-              bytes: stat.size,
+              ...base,
+              bytes: fileStat.size,
               note: `File > ${MAX_READ} bytes — line/token count skipped`,
             };
           }
@@ -3415,17 +3465,22 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           // Rough token estimate: ~4 bytes per token (Anthropic guidance for
           // English/code). Use stat.size (bytes) to match documented behavior
           // and avoid UTF-16 code-unit discrepancies for non-ASCII files.
-          const approxTokens = Math.ceil(stat.size / 4);
+          const approxTokens = Math.ceil(fileStat.size / 4);
           return {
-            path: p,
-            exists: true,
-            bytes: stat.size,
+            ...base,
+            bytes: fileStat.size,
             lines,
             approxTokens,
           };
         } catch (err: unknown) {
           const message = err instanceof Error ? err.message : String(err);
-          const exists = existsSync(absolute);
+          let exists = false;
+          try {
+            lstatSync(absolute);
+            exists = true;
+          } catch {
+            // not accessible
+          }
           return { path: p, exists, error: message };
         }
       });
