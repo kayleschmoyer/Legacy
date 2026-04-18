@@ -173,6 +173,10 @@ export const COLUMN_TO_SORT_FIELD_MAP: Record<string, string> = {
   onBasePercentage: 'onBasePercentage',
   sluggingPercentage: 'sluggingPercentage',
   ops: 'ops',
+
+  // Fantasy points (computed client-side but sorted by DB scoring fields)
+  fantasyPoints: 'totalScore',
+  fantasyPointsPerGame: 'avgPointsPerGame',
 };
 
 /**
@@ -284,7 +288,7 @@ export const CAREER_STATS_COLUMNS: readonly GridColumn[] = [
   {
     key: 'fantasyPoints',
     label: 'FPTS',
-    sortable: false,
+    sortable: true,
     width: '80px',
     align: 'center',
     priority: 'high',
@@ -295,7 +299,7 @@ export const CAREER_STATS_COLUMNS: readonly GridColumn[] = [
   {
     key: 'fantasyPointsPerGame',
     label: 'FPTS/G',
-    sortable: false,
+    sortable: true,
     width: '80px',
     align: 'center',
     priority: 'high',
