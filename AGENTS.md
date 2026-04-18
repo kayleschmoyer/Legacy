@@ -81,6 +81,8 @@ Low (single-file, docs, tests: 2-3 min) · Medium (business logic, multi-file, s
 
 Subagents do **not** inherit AGENTS.md context. Always include tool preference hints when spawning subagents. See `.agents/skills/subagent-templates/SKILL.md` for copy-paste templates covering Explore agents, git operations, PR sweeps, MCP server code, work subagents, and parent-agent recovery.
 
+- **PR existence check**: to check whether a PR already exists for a given ticket key (e.g., while claiming a ticket or deciding whether to create a PR), use `github_pr_dashboard(state: "all", limit: 50)` and filter by ticket key in-context — never `gh pr list --state all | grep "LS-####"`. Include this hint in any subagent prompt that may need to verify PR existence before acting.
+
 ## Commands
 
 ```bash
