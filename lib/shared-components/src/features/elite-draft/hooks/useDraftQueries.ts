@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LOGGER } from '@legacy-sports/logging';
 import { useApolloClient, useQuery } from '@apollo/client/react';
-import { isPitcherPosition } from './usePlayerData';
 import type {
   AvailableDraftPlayer,
   CurrentDraftPickInfo,
@@ -223,13 +222,7 @@ export function useDraftQueries({
 
   // ---- Available Players (server-side search) ----
   const client = useApolloClient();
-  // Derive the sort key from the active position filter. Used for both the
-  // initial query and load-more so pagination stays on the same sort order.
-  const playerSortOrderBy = isPitcherPosition(selectedPosition)
-    ? 'pitchingAvgPointsPerGame'
-    : selectedPosition === 'ALL'
-      ? 'avgPointsPerGame'
-      : 'hitterAvgPointsPerGame';
+  const playerSortOrderBy = 'projectedMatchupPoints';
 
   const {
     data: availablePlayersData,

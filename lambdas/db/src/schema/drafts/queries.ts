@@ -198,12 +198,14 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
       // Verify user is a member of this league
       await verifyLeagueMembership(context.db, draft.leagueId, context.user.id);
 
-      // Get league's player pool setting and career minimums
+      // Get league's player pool setting, career minimums, and matchup schedule
       const [league] = await context.db
         .select({
           playerPool: PublicSchema.leagues.playerPool,
           minCareerGames: PublicSchema.leagues.minCareerGames,
           minCareerSeasons: PublicSchema.leagues.minCareerSeasons,
+          gamesPerMatchup: PublicSchema.leagues.gamesPerMatchup,
+          spStartsPerMatchup: PublicSchema.leagues.spStartsPerMatchup,
         })
         .from(PublicSchema.leagues)
         .where(eq(PublicSchema.leagues.id, draft.leagueId))
@@ -385,6 +387,26 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
           ${basePlayerSelect}
           ${whereClause}
           ORDER BY p.last_name ASC, p.first_name ASC
+          LIMIT ${limitVal} OFFSET ${offsetVal}
+        `;
+        const result = await context.db.execute(rawQuery);
+        return (result.rows as unknown as RawPlayerRow[]).map(mapRow);
+      }
+
+      if (orderByKey === 'projectedMatchupPoints') {
+        // Sort by projected fantasy points per matchup: accounts for the league's schedule
+        // (gamesPerMatchup for batters/fielders, spStartsPerMatchup for pitchers).
+        // Uses pre-computed per-game category rates from player_scoring_cache (*_ppg columns).
+        // sql.raw is safe here: gpm and spm are integers sourced from our own DB.
+        const gpm = league?.gamesPerMatchup ?? 5;
+        const spm = league?.spStartsPerMatchup ?? 1;
+        const projExpr = sql.raw(
+          `COALESCE(cs.batting_ppg, 0) * ${gpm} + COALESCE(cs.pitching_ppg, 0) * ${spm} + COALESCE(cs.fielding_ppg, 0) * ${gpm}`,
+        );
+        const rawQuery = sql`
+          ${basePlayerSelectWithScoring}
+          ${whereClause}
+          ORDER BY ${projExpr} DESC
           LIMIT ${limitVal} OFFSET ${offsetVal}
         `;
         const result = await context.db.execute(rawQuery);
