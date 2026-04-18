@@ -383,14 +383,16 @@ test.describe('Season Draft Game – setup phase @critical', () => {
     await expect(page.getByText('Home Runs').first()).toBeVisible();
   });
 
-  test('shows Game Setup card with waiting message', async ({ page }) => {
+  test('shows Game Setup card with start controls for creator', async ({
+    page,
+  }) => {
     await setupGameMocks(page, SETUP_GAME);
     await gotoGamePage(page);
 
     await expect(page.getByText('Game Setup')).toBeVisible();
-    await expect(
-      page.getByText(/waiting for the game creator to start/i),
-    ).toBeVisible();
+    // Creator sees Start Draft and Cancel Game buttons (not a "waiting" message)
+    await expect(page.getByText('Start Draft')).toBeVisible();
+    await expect(page.getByText('Cancel Game').first()).toBeVisible();
   });
 
   test('shows player names in setup card', async ({ page }) => {

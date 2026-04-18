@@ -269,25 +269,16 @@ test.describe('Season Draft Game Create Page @critical', () => {
     await expect(page.getByText(/home runs/i)).toBeVisible();
   });
 
-  test('shows invite players search section @regression', async ({ page }) => {
+  test('shows invite players info section on create page @regression', async ({
+    page,
+  }) => {
     await page.route(isGraphQLEndpoint, async (route, request) => {
       const body = request.postDataJSON() as { operationName?: string };
-      if (body?.operationName === 'SearchUsersForDraft') {
+      if (body?.operationName === 'GetSeasonDraftGames') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify({
-            data: {
-              searchUsers: [
-                {
-                  __typename: 'User',
-                  id: 99,
-                  username: 'frienduser',
-                  avatarUrl: null,
-                },
-              ],
-            },
-          }),
+          body: JSON.stringify({ data: { seasonDraftGames: [] } }),
         });
         return;
       }
@@ -296,10 +287,8 @@ test.describe('Season Draft Game Create Page @critical', () => {
 
     await page.goto('/games/season-draft/create');
 
-    // There should be a search/invite players section
-    await expect(
-      page.getByPlaceholder(/search.*user|invite|username/i),
-    ).toBeVisible();
+    // The create page now uses invite link flow — subtitle mentions invite link
+    await expect(page.getByText(/invite link/i).first()).toBeVisible();
   });
 });
 

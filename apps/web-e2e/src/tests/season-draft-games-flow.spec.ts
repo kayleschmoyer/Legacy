@@ -390,13 +390,8 @@ test.describe('Season Draft Games Flow @critical', () => {
     // Stat key options — hitter stats shown by default
     await expect(page.getByText(/home runs/i)).toBeVisible();
 
-    // Players section with count
-    await expect(page.getByText(/players/i).first()).toBeVisible();
-    // The current user should be listed (shows username or email + "(you)")
-    await expect(page.getByText(/\(you\)/i).first()).toBeVisible();
-
-    // Search input for inviting players
-    await expect(page.getByPlaceholder(/search.*username/i)).toBeVisible();
+    // Invite link flow — page subtitle explains invite link sharing
+    await expect(page.getByText(/invite link/i).first()).toBeVisible();
   });
 
   test('game lobby shows joined players and game info @critical', async ({
@@ -410,11 +405,9 @@ test.describe('Season Draft Games Flow @critical', () => {
       page.getByRole('heading', { name: /strikeout masters/i }),
     ).toBeVisible();
 
-    // Game setup card
+    // Game setup card — creator sees Start Draft button
     await expect(page.getByText(/game setup/i)).toBeVisible();
-    await expect(
-      page.getByText(/waiting for the game creator to start/i),
-    ).toBeVisible();
+    await expect(page.getByText(/start draft/i)).toBeVisible();
 
     // Players listed in the setup card
     await expect(page.getByText(/testuser/i).first()).toBeVisible();

@@ -1,5 +1,6 @@
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { LOGGER } from '@legacy-sports/logging';
+import { randomBytes } from 'crypto';
 import * as PublicSchema from '../../drizzle/public/schema';
 import type { PublicDb } from '../client/PublicDbClient';
 
@@ -69,6 +70,7 @@ export interface GameState {
   statKey: string;
   gameMode: string;
   playerType: string;
+  inviteCode: string | null;
   players: {
     id: number;
     userId: number;
@@ -109,8 +111,8 @@ export class SeasonDraftGameService {
     db: PublicDb,
     params: CreateSeasonDraftGameParams,
   ): Promise<number> {
-    if (params.numPlayers < 2 || params.numPlayers > 6) {
-      throw new Error('Number of players must be between 2 and 6');
+    if (params.numPlayers < 1 || params.numPlayers > 6) {
+      throw new Error('Number of players must be between 1 and 6');
     }
 
     if (params.playerNames.length !== params.numPlayers) {
@@ -148,6 +150,8 @@ export class SeasonDraftGameService {
       }
     }
 
+    const inviteCode = randomBytes(6).toString('hex');
+
     // Create game
     const [game] = await db
       .insert(PublicSchema.seasonDraftGames)
@@ -160,6 +164,7 @@ export class SeasonDraftGameService {
         statKey,
         gameMode,
         playerType,
+        inviteCode,
       })
       .returning();
 
@@ -219,18 +224,163 @@ export class SeasonDraftGameService {
   }
 
   /**
-   * Start the game (move from setup to drafting)
+   * Start the game (move from setup to drafting).
+   * Syncs numPlayers from actual joined player count and requires >= 2.
    */
   static async startGame(db: PublicDb, gameId: number): Promise<void> {
+    const players = await db
+      .select({ id: PublicSchema.seasonDraftPlayers.id })
+      .from(PublicSchema.seasonDraftPlayers)
+      .where(eq(PublicSchema.seasonDraftPlayers.gameId, gameId));
+
+    if (players.length < 2) {
+      throw new Error('At least 2 players must join before starting the draft');
+    }
+
     await db
       .update(PublicSchema.seasonDraftGames)
       .set({
         status: 'drafting',
+        numPlayers: players.length,
         startedAt: new Date().toISOString(),
       })
       .where(eq(PublicSchema.seasonDraftGames.id, gameId));
 
     LOGGER.info(`Started Season Draft Game ${gameId}`);
+  }
+
+  /**
+   * Join a game via invite code.
+   * Adds the user as a new player with roster slots.
+   */
+  static async joinGameByInviteCode(
+    db: PublicDb,
+    inviteCode: string,
+    userId: number,
+    playerName: string,
+  ): Promise<number> {
+    const [game] = await db
+      .select()
+      .from(PublicSchema.seasonDraftGames)
+      .where(eq(PublicSchema.seasonDraftGames.inviteCode, inviteCode))
+      .limit(1);
+
+    if (!game) {
+      throw new Error('Invalid invite code');
+    }
+
+    if (game.status !== 'setup') {
+      throw new Error('This game has already started or been cancelled');
+    }
+
+    const existingPlayers = await db
+      .select({ id: PublicSchema.seasonDraftPlayers.id })
+      .from(PublicSchema.seasonDraftPlayers)
+      .where(eq(PublicSchema.seasonDraftPlayers.gameId, game.id));
+
+    if (existingPlayers.length >= 6) {
+      throw new Error('This game is already full (maximum 6 players)');
+    }
+
+    const alreadyJoined = await db
+      .select({ id: PublicSchema.seasonDraftPlayers.id })
+      .from(PublicSchema.seasonDraftPlayers)
+      .where(
+        and(
+          eq(PublicSchema.seasonDraftPlayers.gameId, game.id),
+          eq(PublicSchema.seasonDraftPlayers.userId, userId),
+        ),
+      )
+      .limit(1);
+
+    if (alreadyJoined.length > 0) {
+      return game.id;
+    }
+
+    const draftOrder = existingPlayers.length;
+
+    const positions =
+      game.playerType === 'pitcher'
+        ? Array.from({ length: 9 }, (_, i) => ({
+            position: 'P',
+            slotNumber: i,
+          }))
+        : [
+            { position: '1B', slotNumber: 0 },
+            { position: '2B', slotNumber: 0 },
+            { position: '3B', slotNumber: 0 },
+            { position: 'SS', slotNumber: 0 },
+            { position: 'OF', slotNumber: 0 },
+            { position: 'OF', slotNumber: 1 },
+            { position: 'OF', slotNumber: 2 },
+            { position: 'C', slotNumber: 0 },
+            { position: 'UT', slotNumber: 0 },
+          ];
+
+    const [player] = await db
+      .insert(PublicSchema.seasonDraftPlayers)
+      .values({
+        gameId: game.id,
+        userId,
+        playerName,
+        draftOrder,
+        totalScore: 0,
+      })
+      .returning();
+
+    for (const pos of positions) {
+      await db.insert(PublicSchema.seasonDraftRosterSlots).values({
+        seasonDraftPlayerId: player.id,
+        position: pos.position,
+        slotNumber: pos.slotNumber,
+        isFilled: false,
+      });
+    }
+
+    await db
+      .update(PublicSchema.seasonDraftGames)
+      .set({ numPlayers: existingPlayers.length + 1 })
+      .where(eq(PublicSchema.seasonDraftGames.id, game.id));
+
+    LOGGER.info(
+      `User ${userId} joined Season Draft Game ${game.id} via invite code`,
+    );
+
+    return game.id;
+  }
+
+  /**
+   * Get basic game info by invite code (for the join page preview).
+   */
+  static async getGameByInviteCode(
+    db: PublicDb,
+    inviteCode: string,
+  ): Promise<{
+    id: number;
+    name: string;
+    status: string;
+    statKey: string;
+    gameMode: string;
+    playerType: string;
+    playerCount: number;
+  } | null> {
+    const [game] = await db
+      .select()
+      .from(PublicSchema.seasonDraftGames)
+      .where(eq(PublicSchema.seasonDraftGames.inviteCode, inviteCode))
+      .limit(1);
+
+    if (!game) return null;
+
+    return {
+      id: game.id,
+      name: game.name,
+      status: game.status,
+      statKey: game.statKey,
+      gameMode: game.gameMode,
+      playerType: game.playerType,
+      playerCount: game.numPlayers,
+    };
   }
 
   /**
@@ -366,6 +516,7 @@ export class SeasonDraftGameService {
       statKey: game.statKey,
       gameMode: game.gameMode,
       playerType: game.playerType,
+      inviteCode: game.inviteCode ?? null,
       players: playersWithRosters,
       picks: picks.map((p) => ({
         pickNumber: p.pickNumber,
@@ -889,6 +1040,7 @@ export class SeasonDraftGameService {
       gameMode: string;
       playerType: string;
       isMyTurn: boolean;
+      inviteCode: string | null;
     }>
   > {
     const games = await db
@@ -901,6 +1053,7 @@ export class SeasonDraftGameService {
         playerType: PublicSchema.seasonDraftGames.playerType,
         currentTurn: PublicSchema.seasonDraftGames.currentTurn,
         draftOrder: PublicSchema.seasonDraftPlayers.draftOrder,
+        inviteCode: PublicSchema.seasonDraftGames.inviteCode,
       })
       .from(PublicSchema.seasonDraftPlayers)
       .innerJoin(
@@ -921,6 +1074,7 @@ export class SeasonDraftGameService {
       gameMode: g.gameMode,
       playerType: g.playerType,
       isMyTurn: g.currentTurn === g.draftOrder,
+      inviteCode: g.inviteCode ?? null,
     }));
   }
 }

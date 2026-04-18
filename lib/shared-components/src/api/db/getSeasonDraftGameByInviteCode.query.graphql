@@ -1,0 +1,12 @@
+# Get basic game info by invite code (for join page preview)
+query GetSeasonDraftGameByInviteCode($inviteCode: String!) {
+  seasonDraftGameByInviteCode(inviteCode: $inviteCode) {
+    id
+    name
+    status
+    statKey
+    gameMode
+    playerType
+    playerCount
+  }
+}

@@ -66,6 +66,7 @@ export const seasonDraftGames = pgTable(
     playerType: seasonDraftPlayerType('player_type')
       .notNull()
       .default('hitter'), // hitter or pitcher
+    inviteCode: varchar('invite_code', { length: 12 }).unique(), // Shareable invite code
     updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' })
       .defaultNow()
       .notNull(),
@@ -80,6 +81,9 @@ export const seasonDraftGames = pgTable(
       statusIdx: index('season_draft_games_status_idx').on(table.status),
       createdByIdx: index('season_draft_games_created_by_idx').on(
         table.createdBy,
+      ),
+      inviteCodeIdx: index('season_draft_games_invite_code_idx').on(
+        table.inviteCode,
       ),
     };
   },

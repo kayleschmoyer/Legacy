@@ -1278,7 +1278,7 @@ export type Mutation = {
   createLeagueAndTeams?: Maybe<CreateLeagueAndTeamsPayload>;
   createMatchup?: Maybe<Matchup>;
   createPlayoffBracket?: Maybe<PlayoffBracket>;
-  /** Create a new Season Draft Game */
+  /** Create a new Season Draft Game. The creator is added automatically; others join via invite link. */
   createSeasonDraftGame?: Maybe<Scalars['Int']['output']>;
   createTiebreakerRules?: Maybe<TiebreakerRule>;
   /** Remove an achievement restriction from a league. Commissioner / General Manager access required. */
@@ -1310,6 +1310,8 @@ export type Mutation = {
   joinLeague?: Maybe<JoinLeaguePayload>;
   joinLeagueByCode?: Maybe<Team>;
   joinPublicLeague?: Maybe<JoinLeaguePayload>;
+  /** Join a Season Draft Game via invite code. Returns the game ID. */
+  joinSeasonDraftGame?: Maybe<Scalars['Int']['output']>;
   makeDraftPick?: Maybe<DraftPick>;
   /** Make a draft pick in a Season Draft Game */
   makeSeasonDraftPick?: Maybe<Scalars['Boolean']['output']>;
@@ -1561,10 +1563,8 @@ export type MutationCreatePlayoffBracketArgs = {
 export type MutationCreateSeasonDraftGameArgs = {
   gameMode?: InputMaybe<Scalars['String']['input']>;
   name: Scalars['String']['input'];
-  playerNames: Array<Scalars['String']['input']>;
   playerType?: InputMaybe<Scalars['String']['input']>;
   statKey?: InputMaybe<Scalars['String']['input']>;
-  userIds: Array<Scalars['Int']['input']>;
 };
 
 export type MutationCreateTiebreakerRulesArgs = {
@@ -1661,6 +1661,10 @@ export type MutationJoinLeagueByCodeArgs = {
 export type MutationJoinPublicLeagueArgs = {
   leagueId: Scalars['Int']['input'];
   teamName: Scalars['String']['input'];
+};
+
+export type MutationJoinSeasonDraftGameArgs = {
+  inviteCode: Scalars['String']['input'];
 };
 
 export type MutationMakeDraftPickArgs = {
@@ -2429,6 +2433,8 @@ export type Query = {
   seasonDraftGame?: Maybe<SeasonDraftGame>;
   /** Get list of available positions to draft for */
   seasonDraftGameAvailablePositions?: Maybe<Array<Scalars['String']['output']>>;
+  /** Get basic game info by invite code (for join page preview) */
+  seasonDraftGameByInviteCode?: Maybe<SeasonDraftGameLobbyInfo>;
   /** Get available draft options for a player: distinct teams (career_team mode) or seasons (season mode) */
   seasonDraftGamePlayerOptions?: Maybe<Array<Scalars['String']['output']>>;
   /** Get stat value for a player/season/position combination */
@@ -2896,6 +2902,10 @@ export type QuerySeasonDraftGameAvailablePositionsArgs = {
   gameId: Scalars['Int']['input'];
 };
 
+export type QuerySeasonDraftGameByInviteCodeArgs = {
+  inviteCode: Scalars['String']['input'];
+};
+
 export type QuerySeasonDraftGamePlayerOptionsArgs = {
   gameMode: SeasonDraftGameMode;
   playerId: Scalars['Int']['input'];
@@ -3189,10 +3199,23 @@ export type SeasonDraftGame = {
   currentTurn?: Maybe<Scalars['Int']['output']>;
   gameMode?: Maybe<SeasonDraftGameMode>;
   id?: Maybe<Scalars['Int']['output']>;
+  inviteCode?: Maybe<Scalars['String']['output']>;
   name?: Maybe<Scalars['String']['output']>;
   picks?: Maybe<Array<SeasonDraftGamePickHistory>>;
   playerType?: Maybe<SeasonDraftPlayerType>;
   players?: Maybe<Array<SeasonDraftPlayer>>;
+  statKey?: Maybe<Scalars['String']['output']>;
+  status?: Maybe<SeasonDraftGameStatus>;
+};
+
+/** Basic info about a Season Draft Game for the join page */
+export type SeasonDraftGameLobbyInfo = {
+  __typename?: 'SeasonDraftGameLobbyInfo';
+  gameMode?: Maybe<SeasonDraftGameMode>;
+  id?: Maybe<Scalars['Int']['output']>;
+  name?: Maybe<Scalars['String']['output']>;
+  playerCount?: Maybe<Scalars['Int']['output']>;
+  playerType?: Maybe<SeasonDraftPlayerType>;
   statKey?: Maybe<Scalars['String']['output']>;
   status?: Maybe<SeasonDraftGameStatus>;
 };
@@ -3230,6 +3253,7 @@ export type SeasonDraftGameSummary = {
   __typename?: 'SeasonDraftGameSummary';
   gameMode?: Maybe<SeasonDraftGameMode>;
   id?: Maybe<Scalars['Int']['output']>;
+  inviteCode?: Maybe<Scalars['String']['output']>;
   isMyTurn?: Maybe<Scalars['Boolean']['output']>;
   name?: Maybe<Scalars['String']['output']>;
   playerType?: Maybe<SeasonDraftPlayerType>;
@@ -4414,8 +4438,6 @@ export type CastAwardVoteMutation = {
 
 export type CreateSeasonDraftGameMutationVariables = Exact<{
   name: Scalars['String']['input'];
-  playerNames: Array<Scalars['String']['input']> | Scalars['String']['input'];
-  userIds: Array<Scalars['Int']['input']> | Scalars['Int']['input'];
   statKey?: InputMaybe<Scalars['String']['input']>;
   gameMode?: InputMaybe<Scalars['String']['input']>;
   playerType?: InputMaybe<Scalars['String']['input']>;
@@ -4426,19 +4448,31 @@ export type CreateSeasonDraftGameMutation = {
   createSeasonDraftGame?: number | null;
 };
 
-export type SearchUsersForDraftQueryVariables = Exact<{
-  searchTerm: Scalars['String']['input'];
-  limit?: InputMaybe<Scalars['Int']['input']>;
+export type JoinSeasonDraftGameMutationVariables = Exact<{
+  inviteCode: Scalars['String']['input'];
 }>;
 
-export type SearchUsersForDraftQuery = {
+export type JoinSeasonDraftGameMutation = {
+  __typename?: 'Mutation';
+  joinSeasonDraftGame?: number | null;
+};
+
+export type GetSeasonDraftGameByInviteCodeQueryVariables = Exact<{
+  inviteCode: Scalars['String']['input'];
+}>;
+
+export type GetSeasonDraftGameByInviteCodeQuery = {
   __typename?: 'Query';
-  searchUsers?: Array<{
-    __typename?: 'User';
+  seasonDraftGameByInviteCode?: {
+    __typename?: 'SeasonDraftGameLobbyInfo';
     id?: number | null;
-    username?: string | null;
-    avatarUrl?: string | null;
-  }> | null;
+    name?: string | null;
+    status?: SeasonDraftGameStatus | null;
+    statKey?: string | null;
+    gameMode?: SeasonDraftGameMode | null;
+    playerType?: SeasonDraftPlayerType | null;
+    playerCount?: number | null;
+  } | null;
 };
 
 export type GetLeagueHistoryQueryVariables = Exact<{
@@ -11526,16 +11560,12 @@ export type CastAwardVoteMutationOptions = BaseMutationOptions<
 export const CreateSeasonDraftGame = gql`
   mutation CreateSeasonDraftGame(
     $name: String!
-    $playerNames: [String!]!
-    $userIds: [Int!]!
     $statKey: String
     $gameMode: String
     $playerType: String
   ) {
     createSeasonDraftGame(
       name: $name
-      playerNames: $playerNames
-      userIds: $userIds
       statKey: $statKey
       gameMode: $gameMode
       playerType: $playerType
@@ -11561,8 +11591,6 @@ export type CreateSeasonDraftGameMutationFn = MutationFunction<
  * const [createSeasonDraftGameMutation, { data, loading, error }] = useCreateSeasonDraftGameMutation({
  *   variables: {
  *      name: // value for 'name'
- *      playerNames: // value for 'playerNames'
- *      userIds: // value for 'userIds'
  *      statKey: // value for 'statKey'
  *      gameMode: // value for 'gameMode'
  *      playerType: // value for 'playerType'
@@ -11590,67 +11618,121 @@ export type CreateSeasonDraftGameMutationOptions = BaseMutationOptions<
   CreateSeasonDraftGameMutation,
   CreateSeasonDraftGameMutationVariables
 >;
-export const SearchUsersForDraft = gql`
-  query SearchUsersForDraft($searchTerm: String!, $limit: Int) {
-    searchUsers(searchTerm: $searchTerm, limit: $limit) {
+export const JoinSeasonDraftGame = gql`
+  mutation JoinSeasonDraftGame($inviteCode: String!) {
+    joinSeasonDraftGame(inviteCode: $inviteCode)
+  }
+`;
+export type JoinSeasonDraftGameMutationFn = MutationFunction<
+  JoinSeasonDraftGameMutation,
+  JoinSeasonDraftGameMutationVariables
+>;
+
+/**
+ * __useJoinSeasonDraftGameMutation__
+ *
+ * To run a mutation, you first call `useJoinSeasonDraftGameMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useJoinSeasonDraftGameMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [joinSeasonDraftGameMutation, { data, loading, error }] = useJoinSeasonDraftGameMutation({
+ *   variables: {
+ *      inviteCode: // value for 'inviteCode'
+ *   },
+ * });
+ */
+export function useJoinSeasonDraftGameMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    JoinSeasonDraftGameMutation,
+    JoinSeasonDraftGameMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    JoinSeasonDraftGameMutation,
+    JoinSeasonDraftGameMutationVariables
+  >(JoinSeasonDraftGame, options);
+}
+export type JoinSeasonDraftGameMutationHookResult = ReturnType<
+  typeof useJoinSeasonDraftGameMutation
+>;
+export type JoinSeasonDraftGameMutationResult =
+  Apollo.MutationResult<JoinSeasonDraftGameMutation>;
+export type JoinSeasonDraftGameMutationOptions = BaseMutationOptions<
+  JoinSeasonDraftGameMutation,
+  JoinSeasonDraftGameMutationVariables
+>;
+export const GetSeasonDraftGameByInviteCode = gql`
+  query GetSeasonDraftGameByInviteCode($inviteCode: String!) {
+    seasonDraftGameByInviteCode(inviteCode: $inviteCode) {
       id
-      username
-      avatarUrl
+      name
+      status
+      statKey
+      gameMode
+      playerType
+      playerCount
     }
   }
 `;
 
 /**
- * __useSearchUsersForDraftQuery__
+ * __useGetSeasonDraftGameByInviteCodeQuery__
  *
- * To run a query within a React component, call `useSearchUsersForDraftQuery` and pass it any options that fit your needs.
- * When your component renders, `useSearchUsersForDraftQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * To run a query within a React component, call `useGetSeasonDraftGameByInviteCodeQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetSeasonDraftGameByInviteCodeQuery` returns an object from Apollo Client that contains loading, error, and data properties
  * you can use to render your UI.
  *
  * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
  *
  * @example
- * const { data, loading, error } = useSearchUsersForDraftQuery({
+ * const { data, loading, error } = useGetSeasonDraftGameByInviteCodeQuery({
  *   variables: {
- *      searchTerm: // value for 'searchTerm'
- *      limit: // value for 'limit'
+ *      inviteCode: // value for 'inviteCode'
  *   },
  * });
  */
-export function useSearchUsersForDraftQuery(
+export function useGetSeasonDraftGameByInviteCodeQuery(
   baseOptions: Apollo.QueryHookOptions<
-    SearchUsersForDraftQuery,
-    SearchUsersForDraftQueryVariables
+    GetSeasonDraftGameByInviteCodeQuery,
+    GetSeasonDraftGameByInviteCodeQueryVariables
   > &
     (
-      | { variables: SearchUsersForDraftQueryVariables; skip?: boolean }
+      | {
+          variables: GetSeasonDraftGameByInviteCodeQueryVariables;
+          skip?: boolean;
+        }
       | { skip: boolean }
     ),
 ) {
   const options = { ...defaultOptions, ...baseOptions };
   return Apollo.useQuery<
-    SearchUsersForDraftQuery,
-    SearchUsersForDraftQueryVariables
-  >(SearchUsersForDraft, options);
+    GetSeasonDraftGameByInviteCodeQuery,
+    GetSeasonDraftGameByInviteCodeQueryVariables
+  >(GetSeasonDraftGameByInviteCode, options);
 }
-export function useSearchUsersForDraftLazyQuery(
+export function useGetSeasonDraftGameByInviteCodeLazyQuery(
   baseOptions?: Apollo.LazyQueryHookOptions<
-    SearchUsersForDraftQuery,
-    SearchUsersForDraftQueryVariables
+    GetSeasonDraftGameByInviteCodeQuery,
+    GetSeasonDraftGameByInviteCodeQueryVariables
   >,
 ) {
   const options = { ...defaultOptions, ...baseOptions };
   return Apollo.useLazyQuery<
-    SearchUsersForDraftQuery,
-    SearchUsersForDraftQueryVariables
-  >(SearchUsersForDraft, options);
+    GetSeasonDraftGameByInviteCodeQuery,
+    GetSeasonDraftGameByInviteCodeQueryVariables
+  >(GetSeasonDraftGameByInviteCode, options);
 }
-export function useSearchUsersForDraftSuspenseQuery(
+export function useGetSeasonDraftGameByInviteCodeSuspenseQuery(
   baseOptions?:
     | Apollo.SkipToken
     | Apollo.SuspenseQueryHookOptions<
-        SearchUsersForDraftQuery,
-        SearchUsersForDraftQueryVariables
+        GetSeasonDraftGameByInviteCodeQuery,
+        GetSeasonDraftGameByInviteCodeQueryVariables
       >,
 ) {
   const options =
@@ -11658,30 +11740,30 @@ export function useSearchUsersForDraftSuspenseQuery(
       ? baseOptions
       : { ...defaultOptions, ...baseOptions };
   return Apollo.useSuspenseQuery<
-    SearchUsersForDraftQuery,
-    SearchUsersForDraftQueryVariables
+    GetSeasonDraftGameByInviteCodeQuery,
+    GetSeasonDraftGameByInviteCodeQueryVariables
   >(
-    SearchUsersForDraft,
+    GetSeasonDraftGameByInviteCode,
     options as
       | Apollo.SkipToken
       | Apollo.SuspenseQueryHookOptions<
-          SearchUsersForDraftQuery,
-          SearchUsersForDraftQueryVariables
+          GetSeasonDraftGameByInviteCodeQuery,
+          GetSeasonDraftGameByInviteCodeQueryVariables
         >,
   );
 }
-export type SearchUsersForDraftQueryHookResult = ReturnType<
-  typeof useSearchUsersForDraftQuery
+export type GetSeasonDraftGameByInviteCodeQueryHookResult = ReturnType<
+  typeof useGetSeasonDraftGameByInviteCodeQuery
 >;
-export type SearchUsersForDraftLazyQueryHookResult = ReturnType<
-  typeof useSearchUsersForDraftLazyQuery
+export type GetSeasonDraftGameByInviteCodeLazyQueryHookResult = ReturnType<
+  typeof useGetSeasonDraftGameByInviteCodeLazyQuery
 >;
-export type SearchUsersForDraftSuspenseQueryHookResult = ReturnType<
-  typeof useSearchUsersForDraftSuspenseQuery
+export type GetSeasonDraftGameByInviteCodeSuspenseQueryHookResult = ReturnType<
+  typeof useGetSeasonDraftGameByInviteCodeSuspenseQuery
 >;
-export type SearchUsersForDraftQueryResult = Apollo.QueryResult<
-  SearchUsersForDraftQuery,
-  SearchUsersForDraftQueryVariables
+export type GetSeasonDraftGameByInviteCodeQueryResult = Apollo.QueryResult<
+  GetSeasonDraftGameByInviteCodeQuery,
+  GetSeasonDraftGameByInviteCodeQueryVariables
 >;
 export const GetLeagueHistory = gql`
   query GetLeagueHistory($leagueId: Int!) {

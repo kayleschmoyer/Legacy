@@ -1,16 +1,12 @@
-# Create a new Season Draft Game
+# Create a new Season Draft Game (creator is added automatically; others join via invite link)
 mutation CreateSeasonDraftGame(
   $name: String!
-  $playerNames: [String!]!
-  $userIds: [Int!]!
   $statKey: String
   $gameMode: String
   $playerType: String
 ) {
   createSeasonDraftGame(
     name: $name
-    playerNames: $playerNames
-    userIds: $userIds
     statKey: $statKey
     gameMode: $gameMode
     playerType: $playerType

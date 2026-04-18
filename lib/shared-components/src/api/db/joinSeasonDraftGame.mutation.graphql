@@ -1,0 +1,4 @@
+# Join a Season Draft Game via invite code
+mutation JoinSeasonDraftGame($inviteCode: String!) {
+  joinSeasonDraftGame(inviteCode: $inviteCode)
+}

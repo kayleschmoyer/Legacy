@@ -153,6 +153,40 @@ SeasonDraftGamePickHistory.implement({
   }),
 });
 
+const SeasonDraftGameLobbyInfo = builder.objectRef<{
+  id: number;
+  name: string;
+  status: string;
+  statKey: string;
+  gameMode: string;
+  playerType: string;
+  playerCount: number;
+}>('SeasonDraftGameLobbyInfo');
+
+SeasonDraftGameLobbyInfo.implement({
+  description: 'Basic info about a Season Draft Game for the join page',
+  fields: (t) => ({
+    id: t.exposeInt('id'),
+    name: t.exposeString('name'),
+    status: t.field({
+      type: SeasonDraftGameStatus,
+      resolve: (parent) =>
+        parent.status as 'setup' | 'drafting' | 'completed' | 'cancelled',
+    }),
+    statKey: t.exposeString('statKey'),
+    gameMode: t.field({
+      type: SeasonDraftGameMode,
+      resolve: (parent) =>
+        parent.gameMode as 'season' | 'career_team' | 'most_teams',
+    }),
+    playerType: t.field({
+      type: SeasonDraftPlayerType,
+      resolve: (parent) => parent.playerType as 'hitter' | 'pitcher',
+    }),
+    playerCount: t.exposeInt('playerCount'),
+  }),
+});
+
 const SeasonDraftGame = builder.objectRef<{
   id: number;
   name: string;
@@ -162,6 +196,7 @@ const SeasonDraftGame = builder.objectRef<{
   statKey: string;
   gameMode: string;
   playerType: string;
+  inviteCode: string | null;
   players: Array<{
     id: number;
     userId: number;
@@ -216,6 +251,7 @@ SeasonDraftGame.implement({
       type: SeasonDraftPlayerType,
       resolve: (parent) => parent.playerType as 'hitter' | 'pitcher',
     }),
+    inviteCode: t.exposeString('inviteCode', { nullable: true }),
     players: t.field({
       type: [SeasonDraftPlayer],
       resolve: (parent) => parent.players,
@@ -235,6 +271,7 @@ const SeasonDraftGameSummary = builder.objectRef<{
   gameMode: string;
   playerType: string;
   isMyTurn: boolean;
+  inviteCode: string | null;
 }>('SeasonDraftGameSummary');
 
 SeasonDraftGameSummary.implement({
@@ -258,6 +295,7 @@ SeasonDraftGameSummary.implement({
       resolve: (parent) => parent.playerType as 'hitter' | 'pitcher',
     }),
     isMyTurn: t.exposeBoolean('isMyTurn'),
+    inviteCode: t.exposeString('inviteCode', { nullable: true }),
   }),
 });
 
@@ -292,10 +330,12 @@ builder.queryFields((t) => ({
         throw AuthenticationError();
       }
 
-      return await SeasonDraftGameService.getGamesForUser(
+      const games = await SeasonDraftGameService.getGamesForUser(
         context.db,
         context.user.id,
       );
+
+      return games.map((g) => ({ ...g, inviteCode: g.inviteCode ?? null }));
     },
   }),
 
@@ -411,6 +451,24 @@ builder.queryFields((t) => ({
       return [...HITTER_STAT_KEYS];
     },
   }),
+
+  seasonDraftGameByInviteCode: t.field({
+    type: SeasonDraftGameLobbyInfo,
+    nullable: true,
+    description: 'Get basic game info by invite code (for join page preview)',
+    args: {
+      inviteCode: t.arg.string({ required: true }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw AuthenticationError();
+      }
+      return await SeasonDraftGameService.getGameByInviteCode(
+        context.db,
+        args.inviteCode,
+      );
+    },
+  }),
 }));
 
 // --- Mutations ---
@@ -418,11 +476,10 @@ builder.queryFields((t) => ({
 builder.mutationFields((t) => ({
   createSeasonDraftGame: t.field({
     type: 'Int',
-    description: 'Create a new Season Draft Game',
+    description:
+      'Create a new Season Draft Game. The creator is added automatically; others join via invite link.',
     args: {
       name: t.arg.string({ required: true }),
-      playerNames: t.arg.stringList({ required: true }),
-      userIds: t.arg.intList({ required: true }),
       statKey: t.arg.string({ required: false }),
       gameMode: t.arg.string({ required: false }),
       playerType: t.arg.string({ required: false }),
@@ -432,14 +489,15 @@ builder.mutationFields((t) => ({
         throw AuthenticationError();
       }
 
-      const numPlayers = args.playerNames.length;
+      const creatorName =
+        context.user.username ?? context.user.email ?? 'Player 1';
 
       const gameId = await SeasonDraftGameService.createGame(context.db, {
         name: args.name,
         createdBy: context.user.id,
-        numPlayers,
-        playerNames: args.playerNames,
-        userIds: args.userIds,
+        numPlayers: 1,
+        playerNames: [creatorName],
+        userIds: [context.user.id],
         statKey: (args.statKey as string) || undefined,
         gameMode: ((args.gameMode as string) || undefined) as
           | 'season'
@@ -453,6 +511,30 @@ builder.mutationFields((t) => ({
       });
 
       return gameId;
+    },
+  }),
+
+  joinSeasonDraftGame: t.field({
+    type: 'Int',
+    description:
+      'Join a Season Draft Game via invite code. Returns the game ID.',
+    args: {
+      inviteCode: t.arg.string({ required: true }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw AuthenticationError();
+      }
+
+      const playerName =
+        context.user.username ?? context.user.email ?? 'Player';
+
+      return await SeasonDraftGameService.joinGameByInviteCode(
+        context.db,
+        args.inviteCode,
+        context.user.id,
+        playerName,
+      );
     },
   }),
 
@@ -483,6 +565,12 @@ builder.mutationFields((t) => ({
 
       if (gameState.status !== 'setup') {
         throw new Error('Game can only be started from setup phase');
+      }
+
+      if (gameState.players.length < 2) {
+        throw new Error(
+          'At least 2 players must join before starting the draft',
+        );
       }
 
       await SeasonDraftGameService.startGame(context.db, args.gameId);

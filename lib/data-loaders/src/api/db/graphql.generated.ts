@@ -1278,7 +1278,7 @@ export type Mutation = {
   createLeagueAndTeams?: Maybe<CreateLeagueAndTeamsPayload>;
   createMatchup?: Maybe<Matchup>;
   createPlayoffBracket?: Maybe<PlayoffBracket>;
-  /** Create a new Season Draft Game */
+  /** Create a new Season Draft Game. The creator is added automatically; others join via invite link. */
   createSeasonDraftGame?: Maybe<Scalars['Int']['output']>;
   createTiebreakerRules?: Maybe<TiebreakerRule>;
   /** Remove an achievement restriction from a league. Commissioner / General Manager access required. */
@@ -1310,6 +1310,8 @@ export type Mutation = {
   joinLeague?: Maybe<JoinLeaguePayload>;
   joinLeagueByCode?: Maybe<Team>;
   joinPublicLeague?: Maybe<JoinLeaguePayload>;
+  /** Join a Season Draft Game via invite code. Returns the game ID. */
+  joinSeasonDraftGame?: Maybe<Scalars['Int']['output']>;
   makeDraftPick?: Maybe<DraftPick>;
   /** Make a draft pick in a Season Draft Game */
   makeSeasonDraftPick?: Maybe<Scalars['Boolean']['output']>;
@@ -1561,10 +1563,8 @@ export type MutationCreatePlayoffBracketArgs = {
 export type MutationCreateSeasonDraftGameArgs = {
   gameMode?: InputMaybe<Scalars['String']['input']>;
   name: Scalars['String']['input'];
-  playerNames: Array<Scalars['String']['input']>;
   playerType?: InputMaybe<Scalars['String']['input']>;
   statKey?: InputMaybe<Scalars['String']['input']>;
-  userIds: Array<Scalars['Int']['input']>;
 };
 
 export type MutationCreateTiebreakerRulesArgs = {
@@ -1661,6 +1661,10 @@ export type MutationJoinLeagueByCodeArgs = {
 export type MutationJoinPublicLeagueArgs = {
   leagueId: Scalars['Int']['input'];
   teamName: Scalars['String']['input'];
+};
+
+export type MutationJoinSeasonDraftGameArgs = {
+  inviteCode: Scalars['String']['input'];
 };
 
 export type MutationMakeDraftPickArgs = {
@@ -2429,6 +2433,8 @@ export type Query = {
   seasonDraftGame?: Maybe<SeasonDraftGame>;
   /** Get list of available positions to draft for */
   seasonDraftGameAvailablePositions?: Maybe<Array<Scalars['String']['output']>>;
+  /** Get basic game info by invite code (for join page preview) */
+  seasonDraftGameByInviteCode?: Maybe<SeasonDraftGameLobbyInfo>;
   /** Get available draft options for a player: distinct teams (career_team mode) or seasons (season mode) */
   seasonDraftGamePlayerOptions?: Maybe<Array<Scalars['String']['output']>>;
   /** Get stat value for a player/season/position combination */
@@ -2896,6 +2902,10 @@ export type QuerySeasonDraftGameAvailablePositionsArgs = {
   gameId: Scalars['Int']['input'];
 };
 
+export type QuerySeasonDraftGameByInviteCodeArgs = {
+  inviteCode: Scalars['String']['input'];
+};
+
 export type QuerySeasonDraftGamePlayerOptionsArgs = {
   gameMode: SeasonDraftGameMode;
   playerId: Scalars['Int']['input'];
@@ -3189,10 +3199,23 @@ export type SeasonDraftGame = {
   currentTurn?: Maybe<Scalars['Int']['output']>;
   gameMode?: Maybe<SeasonDraftGameMode>;
   id?: Maybe<Scalars['Int']['output']>;
+  inviteCode?: Maybe<Scalars['String']['output']>;
   name?: Maybe<Scalars['String']['output']>;
   picks?: Maybe<Array<SeasonDraftGamePickHistory>>;
   playerType?: Maybe<SeasonDraftPlayerType>;
   players?: Maybe<Array<SeasonDraftPlayer>>;
+  statKey?: Maybe<Scalars['String']['output']>;
+  status?: Maybe<SeasonDraftGameStatus>;
+};
+
+/** Basic info about a Season Draft Game for the join page */
+export type SeasonDraftGameLobbyInfo = {
+  __typename?: 'SeasonDraftGameLobbyInfo';
+  gameMode?: Maybe<SeasonDraftGameMode>;
+  id?: Maybe<Scalars['Int']['output']>;
+  name?: Maybe<Scalars['String']['output']>;
+  playerCount?: Maybe<Scalars['Int']['output']>;
+  playerType?: Maybe<SeasonDraftPlayerType>;
   statKey?: Maybe<Scalars['String']['output']>;
   status?: Maybe<SeasonDraftGameStatus>;
 };
@@ -3230,6 +3253,7 @@ export type SeasonDraftGameSummary = {
   __typename?: 'SeasonDraftGameSummary';
   gameMode?: Maybe<SeasonDraftGameMode>;
   id?: Maybe<Scalars['Int']['output']>;
+  inviteCode?: Maybe<Scalars['String']['output']>;
   isMyTurn?: Maybe<Scalars['Boolean']['output']>;
   name?: Maybe<Scalars['String']['output']>;
   playerType?: Maybe<SeasonDraftPlayerType>;

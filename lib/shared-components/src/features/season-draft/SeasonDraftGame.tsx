@@ -109,6 +109,7 @@ interface GameState {
   statKey: string;
   gameMode: SeasonDraftGameMode;
   playerType: SeasonDraftPlayerType;
+  inviteCode?: string | null;
   players: GamePlayer[];
   picks: Array<{
     pickNumber: number;
@@ -152,6 +153,7 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
   >(new Set());
   const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [inviteCopied, setInviteCopied] = useState(false);
 
   // Query game state — polling is managed via startPolling/stopPolling below
   const {
@@ -262,6 +264,15 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
     } finally {
       setIsStartingGame(false);
     }
+  };
+
+  const handleCopyInviteLink = () => {
+    if (!gameState?.inviteCode) return;
+    const url = `${typeof window !== 'undefined' ? window.location.origin : ''}/games/season-draft/join/${gameState.inviteCode}`;
+    void navigator.clipboard.writeText(url).then(() => {
+      setInviteCopied(true);
+      setTimeout(() => setInviteCopied(false), 2000);
+    });
   };
 
   // Cancel game (creator only) — opens the confirmation dialog
@@ -660,16 +671,57 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
       </XStack>
 
       <ScrollView>
-        {/* Setup Phase — Start / Cancel */}
+        {/* Setup Phase — Invite Link + Start / Cancel */}
         {gameState.status === 'setup' && (
           <Card margin="$4" padding="$4" backgroundColor="$yellow3">
             <H3 marginBottom="$2">Game Setup</H3>
+
+            {/* Invite Link Section */}
+            {gameState.inviteCode && (
+              <YStack marginBottom="$4" space="$2">
+                <Text fontWeight="600">Invite players via link:</Text>
+                <XStack space="$2" alignItems="center" flexWrap="wrap">
+                  <Text
+                    flex={1}
+                    fontSize="$3"
+                    color="$gray11"
+                    numberOfLines={1}
+                    style={{ fontFamily: 'monospace' }}
+                  >
+                    {typeof window !== 'undefined'
+                      ? `${window.location.origin}/games/season-draft/join/${gameState.inviteCode}`
+                      : `/games/season-draft/join/${gameState.inviteCode}`}
+                  </Text>
+                  <Button
+                    size="$3"
+                    backgroundColor={inviteCopied ? '$green10' : '$blue10'}
+                    color="white"
+                    onPress={handleCopyInviteLink}
+                  >
+                    {inviteCopied ? 'Copied!' : 'Copy Link'}
+                  </Button>
+                </XStack>
+              </YStack>
+            )}
+
             <Text marginBottom="$2">
-              Waiting for the game creator to start the draft.
+              Players: {gameState.players.map((p) => p.playerName).join(', ')} (
+              {gameState.players.length}/6)
             </Text>
-            <Text marginBottom="$3" color="$gray10">
-              Players: {gameState.players.map((p) => p.playerName).join(', ')}
-            </Text>
+
+            {isCreator && gameState.players.length < 2 && (
+              <Text marginBottom="$3" color="$orange10" fontSize="$3">
+                Share the invite link above. You need at least 2 players to
+                start.
+              </Text>
+            )}
+
+            {!isCreator && (
+              <Text marginBottom="$3" color="$gray10">
+                Waiting for the game creator to start the draft.
+              </Text>
+            )}
+
             {isCreator && (
               <XStack space="$3">
                 <Button
@@ -677,8 +729,10 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
                   size="$4"
                   backgroundColor="$green10"
                   color="white"
-                  disabled={isStartingGame}
-                  opacity={isStartingGame ? 0.6 : 1}
+                  disabled={isStartingGame || gameState.players.length < 2}
+                  opacity={
+                    isStartingGame || gameState.players.length < 2 ? 0.5 : 1
+                  }
                   onPress={() => void handleStartGame()}
                 >
                   {isStartingGame ? 'Starting...' : 'Start Draft'}

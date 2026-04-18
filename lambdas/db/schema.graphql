@@ -1553,15 +1553,13 @@ type Mutation {
   ): PlayoffBracket
 
   """
-  Create a new Season Draft Game
+  Create a new Season Draft Game. The creator is added automatically; others join via invite link.
   """
   createSeasonDraftGame(
     gameMode: String
     name: String!
-    playerNames: [String!]!
     playerType: String
     statKey: String
-    userIds: [Int!]!
   ): Int
   createTiebreakerRules(
     allowCommissionerOverride: Boolean
@@ -1671,6 +1669,11 @@ type Mutation {
   joinLeague(inviteCode: String!, teamName: String!): JoinLeaguePayload
   joinLeagueByCode(inviteCode: String!, teamName: String!): Team
   joinPublicLeague(leagueId: Int!, teamName: String!): JoinLeaguePayload
+
+  """
+  Join a Season Draft Game via invite code. Returns the game ID.
+  """
+  joinSeasonDraftGame(inviteCode: String!): Int
   makeDraftPick(draftId: Int!, playerId: Int!): DraftPick
 
   """
@@ -2736,6 +2739,11 @@ type Query {
   seasonDraftGameAvailablePositions(gameId: Int!): [String!]
 
   """
+  Get basic game info by invite code (for join page preview)
+  """
+  seasonDraftGameByInviteCode(inviteCode: String!): SeasonDraftGameLobbyInfo
+
+  """
   Get available draft options for a player: distinct teams (career_team mode) or seasons (season mode)
   """
   seasonDraftGamePlayerOptions(
@@ -3067,10 +3075,24 @@ type SeasonDraftGame {
   currentTurn: Int
   gameMode: SeasonDraftGameMode
   id: Int
+  inviteCode: String
   name: String
   picks: [SeasonDraftGamePickHistory!]
   playerType: SeasonDraftPlayerType
   players: [SeasonDraftPlayer!]
+  statKey: String
+  status: SeasonDraftGameStatus
+}
+
+"""
+Basic info about a Season Draft Game for the join page
+"""
+type SeasonDraftGameLobbyInfo {
+  gameMode: SeasonDraftGameMode
+  id: Int
+  name: String
+  playerCount: Int
+  playerType: SeasonDraftPlayerType
   statKey: String
   status: SeasonDraftGameStatus
 }
@@ -3112,6 +3134,7 @@ Summary of a Season Draft Game
 type SeasonDraftGameSummary {
   gameMode: SeasonDraftGameMode
   id: Int
+  inviteCode: String
   isMyTurn: Boolean
   name: String
   playerType: SeasonDraftPlayerType

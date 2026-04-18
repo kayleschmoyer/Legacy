@@ -122,6 +122,9 @@ const SeasonDraftGamesPage = lazyWithRetry(
 const SeasonDraftGameCreatePage = lazyWithRetry(
   () => import('../pages/games/SeasonDraftGameCreatePage'),
 );
+const SeasonDraftJoinPage = React.lazy(
+  () => import('../pages/games/SeasonDraftJoinPage'),
+);
 const DisclosureGamePage = lazyWithRetry(
   () => import('../pages/games/DisclosureGamePage'),
 );
@@ -742,6 +745,10 @@ function App() {
             <Route
               path="/games/season-draft/create"
               element={<SeasonDraftGameCreatePage />}
+            />
+            <Route
+              path="/games/season-draft/join/:inviteCode"
+              element={<SeasonDraftJoinPage />}
             />
             <Route
               path="/games/season-draft/:gameId"

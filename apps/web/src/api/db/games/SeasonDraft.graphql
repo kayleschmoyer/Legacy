@@ -1,25 +1,29 @@
 mutation CreateSeasonDraftGame(
   $name: String!
-  $playerNames: [String!]!
-  $userIds: [Int!]!
   $statKey: String
   $gameMode: String
   $playerType: String
 ) {
   createSeasonDraftGame(
     name: $name
-    playerNames: $playerNames
-    userIds: $userIds
     statKey: $statKey
     gameMode: $gameMode
     playerType: $playerType
   )
 }
 
-query SearchUsersForDraft($searchTerm: String!, $limit: Int) {
-  searchUsers(searchTerm: $searchTerm, limit: $limit) {
+mutation JoinSeasonDraftGame($inviteCode: String!) {
+  joinSeasonDraftGame(inviteCode: $inviteCode)
+}
+
+query GetSeasonDraftGameByInviteCode($inviteCode: String!) {
+  seasonDraftGameByInviteCode(inviteCode: $inviteCode) {
     id
-    username
-    avatarUrl
+    name
+    status
+    statKey
+    gameMode
+    playerType
+    playerCount
   }
 }
