@@ -40,6 +40,18 @@ server.tool(
       .string()
       .optional()
       .describe('Make variables, e.g. "DRYRUN=1 FORCE=1"'),
+    timeoutMs: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        'Custom timeout in milliseconds. Defaults: 600000 (10 min) for heavy targets ' +
+          '(pc, pre-commit, build-all, test-all, install, full-check, dev-setup, ami-build, runner-apply), ' +
+          '300000 (5 min) for all others. ' +
+          'Pass 900000 for make pc on a cold cache. ' +
+          'On timeout, returns { timedOut: true, partialOutput } instead of throwing.',
+      ),
   },
   async (params) => runTarget(params),
 );

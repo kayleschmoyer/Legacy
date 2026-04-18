@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { runMake, getRepoRoot } from '../run-command.js';
+import { runMake, getRepoRoot, TimeoutError } from '../run-command.js';
 import type { ToolResult } from '../types.js';
 
 /**
@@ -230,6 +230,13 @@ interface RunTargetParams {
   target: string;
   worktreePath?: string;
   variables?: string;
+  timeoutMs?: number;
+}
+
+/** Return the last N lines of output for timeout partial-output fields. */
+function tailLines(output: string, n = 100): string {
+  const lines = output.split('\n');
+  return lines.length <= n ? output : lines.slice(-n).join('\n');
 }
 
 export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
@@ -288,7 +295,9 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
     // via the variables parameter to avoid blocking on stdin (execFile has no tty).
     'runner-apply',
   ]);
-  const timeoutMs = heavyTargets.has(target) ? 600_000 : 300_000;
+  const defaultTimeoutMs = heavyTargets.has(target) ? 600_000 : 300_000;
+  // Caller-provided timeoutMs overrides the default; useful for make pc on a cold cache.
+  const timeoutMs = params.timeoutMs ?? defaultTimeoutMs;
 
   try {
     const output = await runMake(args, workDir, timeoutMs);
@@ -337,6 +346,26 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
       ],
     };
   } catch (error) {
+    if (error instanceof TimeoutError) {
+      const partialOutput = truncateOutput(
+        tailLines(error.partialOutput),
+        MAX_OUTPUT_CHARS,
+      );
+      const result: Record<string, unknown> = {
+        success: false,
+        timedOut: true,
+        target,
+        worktreePath: workDir,
+        timeoutMs,
+        summary: `${target} timed out after ${timeoutMs}ms — pass a larger timeoutMs to allow more time`,
+        partialOutput,
+      };
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        isError: true,
+      };
+    }
+
     const errorMsg = error instanceof Error ? error.message : String(error);
 
     if (STRUCTURED_TARGETS.has(target)) {
