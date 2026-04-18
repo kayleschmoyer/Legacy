@@ -679,7 +679,10 @@ function App() {
               path="/baseball/league/:id/:tab/:matchupId"
               element={<LeagueDetailPage />}
             />
-            <Route path="/baseball/team/:teamId" element={<TeamDetailPage />} />
+            <Route
+              path="/baseball/teams/:teamId"
+              element={<TeamDetailPage />}
+            />
             <Route
               path="/baseball/league/:leagueId/matchups/:matchupId"
               element={<MatchupDetailPage />}

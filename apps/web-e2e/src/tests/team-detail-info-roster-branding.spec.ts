@@ -9,7 +9,7 @@
  * fundamental page structure, basic roster listing, and error states.
  *
  * All GraphQL queries are mocked so these tests run without a live backend.
- * Route: /baseball/team/:teamId
+ * Route: /baseball/teams/:teamId
  */
 
 import { expect, test } from '../fixtures/auth-enhanced';
@@ -51,7 +51,7 @@ async function mockExternalImages(page: import('@playwright/test').Page) {
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const TEAM_URL = '/baseball/team/1';
+const TEAM_URL = '/baseball/teams/1';
 
 // ── Mock Data ────────────────────────────────────────────────────────────────
 
@@ -338,7 +338,7 @@ test.describe('Team Detail – team info display @regression', () => {
     page,
   }) => {
     await setupGraphQL(page);
-    await page.goto('/baseball/team/abc');
+    await page.goto('/baseball/teams/abc');
     await page.waitForLoadState('load');
 
     await expect(page.getByText('Team not found')).toBeVisible();

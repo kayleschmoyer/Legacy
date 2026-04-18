@@ -70,7 +70,7 @@ export function LeagueStandings({
   );
 
   const handleTeamClick = (teamId: string) => {
-    navigate(`/baseball/team/${teamId}`);
+    navigate(`/baseball/teams/${teamId}`);
   };
 
   if (loading) {

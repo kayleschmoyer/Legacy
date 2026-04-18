@@ -176,7 +176,7 @@ export function LeagueStandings({
     if (onTeamClick) {
       onTeamClick(teamId);
     } else {
-      navigate(`/baseball/team/${teamId}`);
+      navigate(`/baseball/teams/${teamId}`);
     }
   };
 

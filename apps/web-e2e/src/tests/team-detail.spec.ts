@@ -5,7 +5,7 @@
  * owner-info layout, error/loading states.
  *
  * All GraphQL queries are mocked so these tests run without a live backend.
- * Route: /baseball/team/:teamId → tested at /baseball/team/1
+ * Route: /baseball/teams/:teamId → tested at /baseball/teams/1
  */
 
 import { expect } from '../fixtures/auth-enhanced';
@@ -26,7 +26,7 @@ function isGraphQLEndpoint(url: URL): boolean {
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const TEAM_URL = '/baseball/team/1';
+const TEAM_URL = '/baseball/teams/1';
 
 const MOCK_LEAGUE = {
   __typename: 'League',
