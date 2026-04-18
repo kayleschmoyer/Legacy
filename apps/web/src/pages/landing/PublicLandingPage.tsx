@@ -562,7 +562,7 @@ export function PublicLandingPage(): React.JSX.Element {
       >
         <XStack
           tag="nav"
-          aria-label="Primary"
+          aria-label="Landing"
           width="100%"
           paddingHorizontal="$5"
           paddingVertical="$3"

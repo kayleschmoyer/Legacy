@@ -375,23 +375,88 @@ test.describe('Mock Draft Simulator @regression', () => {
   });
 });
 
-// ── LS-3486: Unauthenticated visitor tests ───────────────────────────────────
-// /baseball/mock-draft is a protected route. Unauthenticated visitors are
-// intercepted by EnhancedAuthGuard and shown PublicLandingPage with sign-in
-// CTAs. These tests use getByRole (accessible name) — NOT the broken CSS
-// selector `(button:visible, [role="button"]:visible)` that caused the original
-// crawler-reported failure.
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// LS-3485: /baseball/mock-draft is a protected route. Unauthenticated users
+// visiting /baseball/mock-draft are intercepted by EnhancedAuthGuard and shown
+// PublicLandingPage with the "Build Your Dynasty" headline, "Season 2026"
+// badge, and "Continue with Google" / "Continue with Discord" / "Get Started
+// Free" CTAs. The original automated scanner tried to locate the button with
+// the invalid CSS selector `(button:visible, [role="button"]:visible)`, which
+// throws a parse error. These tests lock in the expected unauthenticated
+// rendering and confirm every CTA is reachable via getByRole.
+// ---------------------------------------------------------------------------
 
 unauthTest.describe(
-  'Mock Draft Simulator — unauthenticated visitor @regression',
+  'Mock Draft — unauthenticated visitor sees marketing page @regression',
   () => {
-    unauthTest(
-      '"Get Started Free" CTA is visible on /baseball/mock-draft when unauthenticated',
-      async ({ page }) => {
-        await page.goto('/baseball/mock-draft');
-        await page.waitForLoadState('load');
+    unauthTest.beforeEach(async ({ page }) => {
+      await page.goto('/baseball/mock-draft');
+      await page.waitForLoadState('load');
+    });
 
+    unauthTest(
+      'shows marketing headline on /baseball/mock-draft when unauthenticated',
+      async ({ page }) => {
+        await expect(
+          page.getByRole('heading', { name: /build your dynasty/i }),
+        ).toBeVisible({ timeout: 15_000 });
+      },
+    );
+
+    unauthTest(
+      'shows "Season 2026" badge on /baseball/mock-draft when unauthenticated',
+      async ({ page }) => {
+        await expect(page.getByText(/season 2026/i)).toBeVisible({
+          timeout: 15_000,
+        });
+      },
+    );
+
+    unauthTest(
+      '"Continue with Google" button is visible on /baseball/mock-draft when unauthenticated',
+      async ({ page }) => {
+        await expect(
+          page.getByRole('button', { name: /continue with google/i }),
+        ).toBeVisible({ timeout: 15_000 });
+      },
+    );
+
+    unauthTest(
+      '"Continue with Google" button on /baseball/mock-draft is clickable via getByRole',
+      async ({ page }) => {
+        const googleBtn = page.getByRole('button', {
+          name: /continue with google/i,
+        });
+        await expect(googleBtn).toBeVisible({ timeout: 15_000 });
+        await expect(googleBtn).toBeEnabled();
+        await googleBtn.click({ noWaitAfter: true });
+      },
+    );
+
+    unauthTest(
+      '"Continue with Discord" button is visible on /baseball/mock-draft when unauthenticated',
+      async ({ page }) => {
+        await expect(
+          page.getByRole('button', { name: /continue with discord/i }),
+        ).toBeVisible({ timeout: 15_000 });
+      },
+    );
+
+    unauthTest(
+      '"Continue with Discord" button on /baseball/mock-draft is clickable via getByRole',
+      async ({ page }) => {
+        const discordBtn = page.getByRole('button', {
+          name: /continue with discord/i,
+        });
+        await expect(discordBtn).toBeVisible({ timeout: 15_000 });
+        await expect(discordBtn).toBeEnabled();
+        await discordBtn.click({ noWaitAfter: true });
+      },
+    );
+
+    unauthTest(
+      '"Get Started Free" CTA on /baseball/mock-draft is visible when unauthenticated (LS-3485)',
+      async ({ page }) => {
         await expect(
           page.getByRole('button', { name: /get started free/i }),
         ).toBeVisible({ timeout: 15_000 });
@@ -399,32 +464,17 @@ unauthTest.describe(
     );
 
     unauthTest(
-      '"Get Started Free" CTA on /baseball/mock-draft is clickable via getByRole (LS-3486)',
+      '"Get Started Free" CTA on /baseball/mock-draft is clickable via getByRole (LS-3485)',
       async ({ page }) => {
-        await page.goto('/baseball/mock-draft');
-        await page.waitForLoadState('load');
-
+        // Regression for LS-3485: confirm the click resolves without the
+        // CSS selector parse error caused by the broken crawler selector
+        // `(button:visible, [role="button"]:visible)`.
         const getStartedBtn = page.getByRole('button', {
           name: /get started free/i,
         });
         await expect(getStartedBtn).toBeVisible({ timeout: 15_000 });
         await expect(getStartedBtn).toBeEnabled();
-        // Regression for LS-3486: confirm the click resolves without the
-        // CSS selector parse error caused by the broken crawler selector
-        // `(button:visible, [role="button"]:visible)`.
         await getStartedBtn.click();
-      },
-    );
-
-    unauthTest(
-      '"Continue with Google" button is visible on /baseball/mock-draft when unauthenticated',
-      async ({ page }) => {
-        await page.goto('/baseball/mock-draft');
-        await page.waitForLoadState('load');
-
-        await expect(
-          page.getByRole('button', { name: /continue with google/i }),
-        ).toBeVisible({ timeout: 15_000 });
       },
     );
   },
