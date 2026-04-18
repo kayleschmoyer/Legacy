@@ -148,14 +148,18 @@ try {
                   // so unauthenticated users can get support without signing in
                   // (LS-3513).
                   `${basePath}/help`,
+                  // /players/compare is publicly accessible so unauthenticated
+                  // users see a "Get Started Free" CTA gate instead of being
+                  // redirected away (LS-3668).
+                  `${basePath}/players/compare`,
                 ]}
                 // /baseball hub is publicly accessible (LS-3532). Using publicExactPaths
                 // (not publicPaths) so only the landing page is public — sub-routes like
                 // /baseball/league/create remain authenticated-only.
                 // /players directory is publicly accessible so unauthenticated users can
                 // browse the player roster (LS-3493, LS-3497). Using publicExactPaths so
-                // only the listing page is public — sub-routes like /players/:id and
-                // /players/compare remain authenticated-only.
+                // only the listing page is public — sub-routes like /players/:id
+                // remain authenticated-only (/players/compare is in publicPaths above).
                 publicExactPaths={[
                   `${basePath}/baseball`,
                   `${basePath}/players`,

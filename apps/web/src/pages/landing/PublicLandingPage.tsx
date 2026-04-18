@@ -924,7 +924,7 @@ export function PublicLandingPage(): React.JSX.Element {
                 }}
                 role="button"
                 tabIndex={0}
-                aria-label="Get started free"
+                aria-label="Get started with Google"
               >
                 <XStack
                   alignItems="center"
@@ -935,9 +935,12 @@ export function PublicLandingPage(): React.JSX.Element {
                   {isLoading || isConfiguring ? (
                     <Spinner size="small" color="$color1" />
                   ) : (
-                    <Text fontSize="$4" color="$color1" fontWeight="700">
-                      Get Started Free
-                    </Text>
+                    <>
+                      <BrandIcon name="google" size={18} />
+                      <Text fontSize="$4" color="$color1" fontWeight="700">
+                        Get Started with Google
+                      </Text>
+                    </>
                   )}
                 </XStack>
               </SignInButton>

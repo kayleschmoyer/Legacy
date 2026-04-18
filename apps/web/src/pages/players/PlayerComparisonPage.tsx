@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Button,
   H2,
@@ -11,7 +12,8 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { BarChart2, Plus, X } from '@tamagui/lucide-icons';
+import { BarChart2, Lock, Plus, X } from '@tamagui/lucide-icons';
+import { useAuth } from '@legacy-sports/shared-components/auth';
 import {
   type GetPlayersWithStatsQuery,
   useGetAllPlayerSeasonStatsQuery,
@@ -755,6 +757,9 @@ function SeasonPitchingTable({
  * - Accessible from the Players nav dropdown
  */
 export function PlayerComparisonPage() {
+  const navigate = useNavigate();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+
   const [selected, setSelected] = useState<(SelectedPlayer | null)[]>([
     null,
     null,
@@ -953,6 +958,56 @@ export function PlayerComparisonPage() {
 
   const showTable = activePlayers.length >= 2;
   const isPremium = useIsPremium();
+
+  if (!authLoading && !isAuthenticated) {
+    return (
+      <YStack
+        flex={1}
+        minHeight="100vh"
+        justifyContent="center"
+        alignItems="center"
+        backgroundColor={BG_DARK as never}
+        padding="$6"
+        gap="$4"
+      >
+        <PageMeta
+          title="Player Comparison"
+          description="Compare up to 4 players side-by-side with career stats, scoring projections, and season breakdowns."
+        />
+        <Lock size={32} color={BRAND_GOLD_LIGHT} />
+        <YStack alignItems="center" gap="$2">
+          <Text
+            color={BRAND_GOLD}
+            fontSize="$5"
+            fontWeight="bold"
+            textAlign="center"
+          >
+            Sign in to compare players
+          </Text>
+          <Text
+            color={TEXT_MUTED}
+            fontSize="$3"
+            textAlign="center"
+            maxWidth={320}
+          >
+            Create a free account to compare up to 4 players side-by-side with
+            career stats, scoring projections, and season breakdowns.
+          </Text>
+        </YStack>
+        <Button
+          onPress={() => navigate('/')}
+          backgroundColor={BRAND_GOLD}
+          color={BRAND_NAVY_DARK}
+          fontWeight="bold"
+          borderRadius="$4"
+          paddingHorizontal="$5"
+          pressStyle={{ opacity: 0.85, scale: 0.97 }}
+        >
+          Get Started Free
+        </Button>
+      </YStack>
+    );
+  }
 
   return (
     <PremiumGate

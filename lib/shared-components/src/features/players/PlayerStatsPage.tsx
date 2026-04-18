@@ -132,6 +132,7 @@ export function PlayerStatsPage({
             {/* Title block */}
             <YStack gap="$1">
               <Text
+                tag="h2"
                 style={{
                   fontFamily: FONT_DISPLAY,
                   fontSize: 36,
@@ -140,6 +141,7 @@ export function PlayerStatsPage({
                   color: TEXT_PRIMARY,
                   lineHeight: 1.1,
                   textTransform: 'uppercase',
+                  margin: 0,
                 }}
               >
                 {title}
