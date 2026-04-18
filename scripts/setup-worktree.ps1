@@ -52,7 +52,7 @@ function Confirm-IndependentInstall {
     Write-Warn "Symlinking would propagate the broken state to this worktree."
     Write-Host "  Options:" -ForegroundColor Yellow
     Write-Host "    Y - Run pnpm install in this worktree only (independent node_modules)" -ForegroundColor Yellow
-    Write-Host "    N - Abort setup (fix main repo first: cd $MainRepoPath ; make install)" -ForegroundColor Yellow
+    Write-Host "    N - Abort setup (fix main repo first: cd $MainRepoPath `; make install)" -ForegroundColor Yellow
     $isInteractive = [Environment]::UserInteractive -and (-not [Console]::IsInputRedirected)
     if (-not $isInteractive) {
         Write-Warn "Non-interactive session detected -- defaulting to independent install"
@@ -328,7 +328,7 @@ else {
                 }
             }
             else {
-                Write-Error "Aborting: fix main repo node_modules first (cd $MainRepoPath ; make install), then re-run wt-setup."
+                Write-Error "Aborting: fix main repo node_modules first (cd $MainRepoPath `; make install), then re-run wt-setup."
             }
         }
         else {
@@ -348,7 +348,7 @@ else {
             $psExe = Join-Path $PSHOME $(if ($PSVersionTable.PSEdition -eq 'Desktop') { 'powershell.exe' } else { 'pwsh.exe' })
             & $psExe -NoProfile -NonInteractive -File $mklinkScript -Link $wtNM -Target $mainNM -Force 2>&1 | Out-Null
             if (-not (Test-IsReparsePoint $wtNM)) {
-                Write-Warn "mklink /D failed — Developer Mode may not be enabled."
+                Write-Warn "mklink /D failed -- Developer Mode may not be enabled."
                 Write-Warn "  Enable it: Settings > System > For Developers > Developer Mode"
                 Write-Warn "  Falling back to independent pnpm install."
                 Invoke-PnpmInstallWithRetry -InstallPath $WorktreePath
@@ -362,7 +362,7 @@ else {
         # Already linked — convert junction to symlink if needed (LS-3084).
         # `git worktree remove` follows junctions and destroys the target.
         if (Test-IsJunction $wtNM) {
-            Write-Warn "node_modules is an NTFS junction — converting to directory symlink"
+            Write-Warn "node_modules is an NTFS junction -- converting to directory symlink"
             Remove-LinkSafe $wtNM
             $mklinkScript = Join-Path $PSScriptRoot 'mklink-symlink.ps1'
             $psExe = Join-Path $PSHOME $(if ($PSVersionTable.PSEdition -eq 'Desktop') { 'powershell.exe' } else { 'pwsh.exe' })
@@ -378,7 +378,7 @@ else {
                 Write-Ok "pnpm install completed (independent node_modules, main repo still needs repair)"
             }
             else {
-                Write-Error "Aborting: fix main repo node_modules first (cd $MainRepoPath ; make install), then re-run wt-setup."
+                Write-Error "Aborting: fix main repo node_modules first (cd $MainRepoPath `; make install), then re-run wt-setup."
             }
         }
         else {
