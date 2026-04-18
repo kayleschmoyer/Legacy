@@ -136,6 +136,10 @@ try {
                   // unauthenticated users — without it the auth guard intercepts
                   // before App renders.
                   `${basePath}/faq`,
+                  // /draft/mock is a legacy alias that redirects to
+                  // /baseball/mock-draft (LS-3074). Adding it here so the
+                  // client-side <Navigate> fires for unauthenticated users.
+                  `${basePath}/draft/mock`,
                   // /players/stats shows public MLB player statistics — no
                   // auth required (LS-3548).
                   `${basePath}/players/stats`,

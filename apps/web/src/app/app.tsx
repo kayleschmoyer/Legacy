@@ -736,6 +736,11 @@ function App() {
               element={<SeasonDraftGamePage />}
             />
             <Route path="/games/disclosure" element={<DisclosureGamePage />} />
+            {/* /draft/mock is a legacy alias — redirect to the canonical route. */}
+            <Route
+              path="/draft/mock"
+              element={<Navigate to="/baseball/mock-draft" replace />}
+            />
             {/* /faq is a common alias that users and crawlers reach — redirect to the
                 pricing page which contains the FAQ accordion section. */}
             <Route path="/faq" element={<Navigate to="/pricing" replace />} />
