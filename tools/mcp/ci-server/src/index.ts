@@ -134,6 +134,20 @@ server.tool(
 );
 
 server.tool(
+  'ci_rerun_failed_jobs',
+  'Prefer this over `gh run rerun --failed` via shell. Re-run only the failed jobs in a workflow run. Equivalent to ci_rerun with failedOnly:true but with a focused interface — accepts only runId.',
+  {
+    runId: z.coerce
+      .number()
+      .int()
+      .positive()
+      .describe('Workflow run ID whose failed jobs should be re-run'),
+    debug: coercedBoolean.default(false).describe('Enable debug logging'),
+  },
+  async (params) => rerun({ ...params, failedOnly: true }),
+);
+
+server.tool(
   'ci_search_logs',
   'Prefer this over `gh run view --log | grep` via shell. Search CI logs by pattern with optional regex and context lines.',
   {
