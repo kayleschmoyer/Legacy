@@ -503,12 +503,11 @@ unauthTest.describe('Scoreboard — unauthenticated access @critical', () => {
 
       // Navigate to a protected route — the auth guard must gate it even after
       // the user started on a public path. Using /management (protected) since
-      // /baseball is publicly accessible (LS-3532) and /players is now public
-      // (LS-3493).
+      // /baseball (LS-3532) and /players (LS-3493, LS-3497) are now publicly accessible.
       await page.goto('/management');
       await page.waitForLoadState('load');
 
-      // The auth guard must now show the landing page, not the management hub.
+      // The auth guard must now show the landing page, not management content.
       await expect(
         page.getByRole('button', { name: /continue with google/i }),
       ).toBeVisible({ timeout: 15000 });

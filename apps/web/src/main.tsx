@@ -154,8 +154,8 @@ try {
                 // (not publicPaths) so only the landing page is public — sub-routes like
                 // /baseball/league/create remain authenticated-only.
                 // /players directory is publicly accessible so unauthenticated users can
-                // browse the player roster (LS-3493). Using publicExactPaths so only the
-                // listing page is public — sub-routes like /players/:id and
+                // browse the player roster (LS-3493, LS-3497). Using publicExactPaths so
+                // only the listing page is public — sub-routes like /players/:id and
                 // /players/compare remain authenticated-only.
                 publicExactPaths={[
                   `${basePath}/baseball`,

@@ -306,7 +306,7 @@ unauthTest.describe('Protected Routes @critical', () => {
     '/',
     // /baseball is publicly accessible (LS-3532) — see Public Routes section below.
     // /baseball/mock-draft is publicly accessible (LS-3484) — see Public Routes section below.
-    // /players is publicly accessible (LS-3493) — see Public Routes section below.
+    // /players is publicly accessible (LS-3493, LS-3497) — see Public Routes section below.
     '/management',
     '/profile/settings',
     '/preferences',
@@ -551,6 +551,46 @@ unauthTest.describe('Public Routes @critical', () => {
       await expect(page.getByRole('main')).toBeVisible({ timeout: 15000 });
       await expect(
         page.getByRole('navigation', { name: /landing/i }),
+      ).toBeVisible({ timeout: 15000 });
+    },
+  );
+
+  unauthTest(
+    'shows Players directory content on /players when not authenticated (LS-3497)',
+    async ({ page }) => {
+      await page.goto('/players');
+      await page.waitForLoadState('load');
+
+      await expect(
+        page.getByRole('heading', { name: /all players/i }),
+      ).toBeVisible({ timeout: 15000 });
+    },
+  );
+
+  // ---------------------------------------------------------------------------
+  // LS-3497: /players must NOT show the PublicLandingPage season badge.
+  // A functional scanner reported "(!) Fantasy Baseball · Season 2026" on this
+  // route because the route was incorrectly gated — EnhancedAuthGuard was
+  // showing PublicLandingPage (which contains the HeroBadge with a baseball SVG
+  // icon that the scanner rendered as a "(!) " warning indicator).
+  // Adding /players to publicPaths ensures the players directory renders
+  // directly for unauthenticated users, eliminating the spurious warning badge.
+  // ---------------------------------------------------------------------------
+  unauthTest(
+    'does not show the landing-page season badge on /players (LS-3497)',
+    async ({ page }) => {
+      await page.goto('/players');
+      await page.waitForLoadState('load');
+
+      // The "Fantasy Baseball · Season 2026" badge lives on PublicLandingPage.
+      // Since /players is now public, the landing page must NOT render here.
+      await expect(page.locator('body')).not.toContainText(
+        'Fantasy Baseball · Season 2026',
+      );
+
+      // Players directory content is visible — confirming the correct page loaded.
+      await expect(
+        page.getByRole('heading', { name: /all players/i }),
       ).toBeVisible({ timeout: 15000 });
     },
   );
@@ -833,7 +873,7 @@ expiredSessionTest.describe('Session Expiry @critical', () => {
   expiredSessionTest(
     'shows landing page on a protected route with an expired JWT',
     async ({ page }) => {
-      // /players is now public (LS-3493); use /management which remains protected.
+      // /players is now public (LS-3493, LS-3497) — use /management (always protected).
       await page.goto('/management');
       await page.waitForLoadState('load');
 
