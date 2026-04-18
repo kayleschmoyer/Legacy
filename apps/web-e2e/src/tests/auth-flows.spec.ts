@@ -697,6 +697,54 @@ unauthTest.describe(
 );
 
 // ---------------------------------------------------------------------------
+// LS-3473: "Continue with Discord" button click on /baseball must not throw a
+// CSS selector parse error. The functional scanner used the invalid selector
+// `(button:visible, [role="button"]:visible)` and tried to click the Discord
+// CTA on /baseball. This failed because /baseball was (at the time) a
+// protected route showing PublicLandingPage. LS-3532 made /baseball publicly
+// accessible so unauthenticated users see the baseball hub directly. These
+// tests lock in that behaviour: the baseball hub renders for unauthenticated
+// users and the auth-gate CTAs are absent.
+// ---------------------------------------------------------------------------
+
+unauthTest.describe(
+  '/baseball — unauthenticated visitor sees baseball hub, not auth gate @regression',
+  () => {
+    unauthTest.beforeEach(async ({ page }) => {
+      await page.goto('/baseball');
+      await page.waitForLoadState('load');
+    });
+
+    unauthTest(
+      'shows baseball hub heading on /baseball when unauthenticated (LS-3473)',
+      async ({ page }) => {
+        await expect(
+          page.getByRole('heading', { name: /baseball fantasy/i }),
+        ).toBeVisible({ timeout: 15_000 });
+      },
+    );
+
+    unauthTest(
+      'does not show auth-gate CTAs on /baseball when unauthenticated (LS-3473)',
+      async ({ page }) => {
+        // /baseball is a public route (LS-3532) — unauthenticated users see
+        // the baseball hub, not PublicLandingPage. The auth-gate CTAs
+        // ("Continue with Google", "Continue with Discord") must therefore be
+        // absent. This is regression coverage for the functional-scanner
+        // failure (LS-3473) where an invalid CSS selector tried to click the
+        // Discord CTA that appeared when the route was still protected.
+        await expect(
+          page.getByRole('button', { name: /continue with discord/i }),
+        ).not.toBeVisible();
+        await expect(
+          page.getByRole('button', { name: /continue with google/i }),
+        ).not.toBeVisible();
+      },
+    );
+  },
+);
+
+// ---------------------------------------------------------------------------
 // Authenticated Access — authenticated user bypasses the login gate
 // ---------------------------------------------------------------------------
 
