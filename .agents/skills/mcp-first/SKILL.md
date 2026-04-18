@@ -56,9 +56,29 @@ These are the specific built-in tool substitutions agents should reach for autom
 
 Prefer the `nx_run` MCP tool over `pnpm exec nx run <project>:<target>`. For affected targets, prefer `nx_run_affected` over `pnpm exec nx affected -t <target>`. Fall back to shell commands only when the MCP server is unavailable.
 
+| Shell command                               | MCP tool (use this)                                        |
+| ------------------------------------------- | ---------------------------------------------------------- |
+| `pnpm exec nx typecheck web`                | `nx_run({ target: "typecheck", project: "web" })`          |
+| `pnpm exec nx run web:typecheck`            | `nx_run({ target: "typecheck", project: "web" })`          |
+| `pnpm exec nx test shared-components`       | `nx_run({ target: "test", project: "shared-components" })` |
+| `pnpm exec nx build api`                    | `nx_run({ target: "build", project: "api" })`              |
+| `pnpm exec nx affected -t typecheck`        | `nx_run_affected({ targets: ["typecheck"] })`              |
+| `pnpm exec nx affected -t test --base=main` | `nx_run_affected({ targets: ["test"], base: "main" })`     |
+
+> **If you find yourself writing `pnpm exec nx` in a Bash tool call during a local session, treat this as a signal that the `legacy-sports-nx` MCP server is not connected.** Check server connectivity rather than falling back silently — `nx` lives in `node_modules/.bin` and will fail with a PATH error if the symlink is missing or broken. Verify the `node_modules` symlink exists (see `.agents/skills/mcp-first/SKILL.md` — MCP Servers section), then restart the session.
+
 ## Make Targets
 
 Prefer `make_run` MCP tool over running `make <target>` via Bash. The MCP tool enforces a target whitelist, sets appropriate timeouts, and provides structured output. For worktree creation use `make_worktree_create`; for worktree setup use `make_wt_setup` (supports symlink removal + independent `make install`).
+
+| Shell command  | MCP tool (use this)               |
+| -------------- | --------------------------------- |
+| `make pc`      | `make_run({ target: "pc" })`      |
+| `make test`    | `make_run({ target: "test" })`    |
+| `make codegen` | `make_run({ target: "codegen" })` |
+| `make install` | `make_run({ target: "install" })` |
+
+> **If you find yourself writing `make <target>` in a Bash tool call during a local session, treat this as a signal that the `legacy-sports-make` MCP server is not connected.** Check server connectivity rather than falling back silently — raw `make pc` will fail with `nx: not found` or similar PATH errors when `node_modules/.bin` is not in `$PATH`. Using `make_run` via MCP avoids this PATH resolution problem entirely. Verify the `node_modules` symlink exists, then restart the session.
 
 ## Git Operations in Worktrees
 
