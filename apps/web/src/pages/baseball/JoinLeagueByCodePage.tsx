@@ -147,8 +147,6 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
       maxWidth={600}
       margin="auto"
       width="100%"
-      role="main"
-      aria-labelledby="join-league-title"
     >
       <PageMeta
         title="Join a League"

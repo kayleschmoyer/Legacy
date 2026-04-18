@@ -288,6 +288,7 @@ const MobileNavLink = styled(Button, {
 
 function Navigation() {
   const location = useLocation();
+  const { isAuthenticated } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [bugDialogOpen, setBugDialogOpen] = useState(false);
   const mobileRef = useRef<HTMLDivElement>(null);
@@ -349,201 +350,203 @@ function Navigation() {
         }}
       />
 
-      <NavContainer>
-        <NavContent>
-          {/* ── Brand ── */}
-          <XStack flex={1} alignItems="center" justifyContent="flex-start">
-            <Link
-              to="/"
-              aria-label="Legacy Sports home"
-              style={{ textDecoration: 'none', flexShrink: 0 }}
-            >
-              <XStack alignItems="center" gap="$2" cursor="pointer">
-                <img
-                  src="/logo.png"
-                  alt="Legacy Sports"
-                  data-testid="header-logo"
-                  style={{ height: 38, width: 'auto', display: 'block' }}
-                />
-                <Paragraph
-                  marginBottom={0}
-                  fontWeight="700"
-                  fontSize={22}
-                  color="$color12"
-                  letterSpacing={1}
-                  userSelect="none"
-                  data-testid="brand-text"
-                  style={{ fontFamily: "'Big Shoulders Display', sans-serif" }}
+      {isAuthenticated && (
+        <nav aria-label="Primary">
+          <NavContainer>
+            <NavContent>
+              {/* ── Brand ── */}
+              <XStack flex={1} alignItems="center" justifyContent="flex-start">
+                <Link
+                  to="/"
+                  aria-label="Legacy Sports home"
+                  style={{ textDecoration: 'none', flexShrink: 0 }}
                 >
-                  Legacy Sports
-                </Paragraph>
+                  <XStack alignItems="center" gap="$2" cursor="pointer">
+                    <img
+                      src="/logo.png"
+                      alt="Legacy Sports"
+                      data-testid="header-logo"
+                      style={{ height: 38, width: 'auto', display: 'block' }}
+                    />
+                    <Paragraph
+                      marginBottom={0}
+                      fontWeight="700"
+                      fontSize={22}
+                      color="$color12"
+                      letterSpacing={1}
+                      userSelect="none"
+                      data-testid="brand-text"
+                      style={{
+                        fontFamily: "'Big Shoulders Display', sans-serif",
+                      }}
+                    >
+                      Legacy Sports
+                    </Paragraph>
+                  </XStack>
+                </Link>
               </XStack>
-            </Link>
-          </XStack>
 
-          {/* ── Desktop Navigation ── */}
-          <NavLinks
-            as="nav"
-            role="navigation"
-            aria-label="Primary"
-            display="none"
-            $gtMd={{ display: 'flex' }}
-          >
-            <SportsDropdown />
-            <PlayersDropdown />
-            <MyLeaguesDropdown />
+              {/* ── Desktop Navigation ── */}
+              <NavLinks display="none" $gtMd={{ display: 'flex' }}>
+                <SportsDropdown />
+                <PlayersDropdown />
+                <MyLeaguesDropdown />
 
-            <Link
-              to="/games/season-draft"
-              style={{ textDecoration: 'none', flexShrink: 0 }}
-              aria-label="Games"
-              aria-current={
-                location.pathname.startsWith('/games') ? 'page' : undefined
-              }
-            >
-              <NavLinkButton active={location.pathname.startsWith('/games')}>
-                <XStack alignItems="center" gap="$2">
-                  <Gamepad2 size={15} />
-                  <Paragraph marginBottom={0}>Games</Paragraph>
+                <Link
+                  to="/games/season-draft"
+                  style={{ textDecoration: 'none', flexShrink: 0 }}
+                  aria-label="Games"
+                  aria-current={
+                    location.pathname.startsWith('/games') ? 'page' : undefined
+                  }
+                >
+                  <NavLinkButton
+                    active={location.pathname.startsWith('/games')}
+                  >
+                    <XStack alignItems="center" gap="$2">
+                      <Gamepad2 size={15} />
+                      <Paragraph marginBottom={0}>Games</Paragraph>
+                    </XStack>
+                  </NavLinkButton>
+                </Link>
+              </NavLinks>
+
+              {/* ── Right section ── */}
+              <XStack
+                flex={1}
+                alignItems="center"
+                justifyContent="flex-end"
+                gap="$3"
+              >
+                {/* Hide bug-report on narrow viewports to keep hamburger in viewport */}
+                <XStack display="none" $gtMd={{ display: 'flex' }}>
+                  <BugReportButton />
                 </XStack>
-              </NavLinkButton>
-            </Link>
-          </NavLinks>
+                <NotificationDropdown />
+                <UserProfileDropdown />
 
-          {/* ── Right section ── */}
-          <XStack
-            flex={1}
-            alignItems="center"
-            justifyContent="flex-end"
-            gap="$3"
-          >
-            {/* Hide bug-report on narrow viewports to keep hamburger in viewport */}
-            <XStack display="none" $gtMd={{ display: 'flex' }}>
-              <BugReportButton />
-            </XStack>
-            <NotificationDropdown />
-            <UserProfileDropdown />
+                {/* Mobile hamburger */}
+                <MobileMenuButton
+                  onPress={() => setMobileOpen((o) => !o)}
+                  aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
+                  aria-expanded={mobileOpen}
+                >
+                  {mobileOpen ? <X size={22} /> : <Menu size={22} />}
+                </MobileMenuButton>
+              </XStack>
+            </NavContent>
+          </NavContainer>
 
-            {/* Mobile hamburger */}
-            <MobileMenuButton
-              onPress={() => setMobileOpen((o) => !o)}
-              aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
-              aria-expanded={mobileOpen}
-            >
-              {mobileOpen ? <X size={22} /> : <Menu size={22} />}
-            </MobileMenuButton>
-          </XStack>
-        </NavContent>
-      </NavContainer>
-
-      {/* ── Mobile Navigation Panel ── */}
-      {mobileOpen && (
-        <MobileNavPanel role="navigation" aria-label="Mobile">
-          <Link to="/football" style={{ textDecoration: 'none' }}>
-            <MobileNavLink
-              active={isActive('/football')}
-              onPress={() => setMobileOpen(false)}
-            >
-              <Activity size={16} />
-              <Paragraph marginBottom={0}>Football</Paragraph>
-            </MobileNavLink>
-          </Link>
-          <Link to="/baseball" style={{ textDecoration: 'none' }}>
-            <MobileNavLink
-              active={location.pathname.startsWith('/baseball')}
-              onPress={() => setMobileOpen(false)}
-            >
-              <Circle size={16} />
-              <Paragraph marginBottom={0}>Baseball</Paragraph>
-            </MobileNavLink>
-          </Link>
-          <Link to="/baseball/leagues" style={{ textDecoration: 'none' }}>
-            <MobileNavLink
-              active={isActive('/baseball/leagues')}
-              onPress={() => setMobileOpen(false)}
-            >
-              <Globe size={16} />
-              <Paragraph marginBottom={0}>Browse Leagues</Paragraph>
-            </MobileNavLink>
-          </Link>
-          <Link to="/players" style={{ textDecoration: 'none' }}>
-            <MobileNavLink
-              active={isActive('/players')}
-              onPress={() => setMobileOpen(false)}
-            >
-              <Users size={16} />
-              <Paragraph marginBottom={0}>Players</Paragraph>
-            </MobileNavLink>
-          </Link>
-          <Link to="/players/stats" style={{ textDecoration: 'none' }}>
-            <MobileNavLink
-              active={isActive('/players/stats')}
-              onPress={() => setMobileOpen(false)}
-            >
-              <BarChart2 size={16} />
-              <Paragraph marginBottom={0}>Player Stats</Paragraph>
-            </MobileNavLink>
-          </Link>
-          <Link to="/games/season-draft" style={{ textDecoration: 'none' }}>
-            <MobileNavLink
-              active={location.pathname.startsWith('/games')}
-              onPress={() => setMobileOpen(false)}
-            >
-              <Gamepad2 size={16} />
-              <Paragraph marginBottom={0}>Games</Paragraph>
-            </MobileNavLink>
-          </Link>
-          {/* Help & Info group */}
-          <YStack
-            borderTopWidth={1}
-            borderTopColor="$borderColor"
-            paddingTop="$2"
-            marginTop="$1"
-            gap="$1"
-          >
-            <Paragraph
-              size="$2"
-              color="$colorPress"
-              paddingHorizontal="$3"
-              paddingVertical="$1"
-              fontWeight="600"
-              textTransform="uppercase"
-              letterSpacing={0.8}
-            >
-              Help &amp; Info
-            </Paragraph>
-            <Link to="/about" style={{ textDecoration: 'none' }}>
-              <MobileNavLink
-                active={isActive('/about')}
-                onPress={() => setMobileOpen(false)}
+          {/* ── Mobile Navigation Panel ── */}
+          {mobileOpen && (
+            <MobileNavPanel role="navigation" aria-label="Mobile navigation">
+              <Link to="/football" style={{ textDecoration: 'none' }}>
+                <MobileNavLink
+                  active={isActive('/football')}
+                  onPress={() => setMobileOpen(false)}
+                >
+                  <Activity size={16} />
+                  <Paragraph marginBottom={0}>Football</Paragraph>
+                </MobileNavLink>
+              </Link>
+              <Link to="/baseball" style={{ textDecoration: 'none' }}>
+                <MobileNavLink
+                  active={location.pathname.startsWith('/baseball')}
+                  onPress={() => setMobileOpen(false)}
+                >
+                  <Circle size={16} />
+                  <Paragraph marginBottom={0}>Baseball</Paragraph>
+                </MobileNavLink>
+              </Link>
+              <Link to="/baseball/leagues" style={{ textDecoration: 'none' }}>
+                <MobileNavLink
+                  active={isActive('/baseball/leagues')}
+                  onPress={() => setMobileOpen(false)}
+                >
+                  <Globe size={16} />
+                  <Paragraph marginBottom={0}>Browse Leagues</Paragraph>
+                </MobileNavLink>
+              </Link>
+              <Link to="/players" style={{ textDecoration: 'none' }}>
+                <MobileNavLink
+                  active={isActive('/players')}
+                  onPress={() => setMobileOpen(false)}
+                >
+                  <Users size={16} />
+                  <Paragraph marginBottom={0}>Players</Paragraph>
+                </MobileNavLink>
+              </Link>
+              <Link to="/players/stats" style={{ textDecoration: 'none' }}>
+                <MobileNavLink
+                  active={isActive('/players/stats')}
+                  onPress={() => setMobileOpen(false)}
+                >
+                  <BarChart2 size={16} />
+                  <Paragraph marginBottom={0}>Player Stats</Paragraph>
+                </MobileNavLink>
+              </Link>
+              <Link to="/games/season-draft" style={{ textDecoration: 'none' }}>
+                <MobileNavLink
+                  active={location.pathname.startsWith('/games')}
+                  onPress={() => setMobileOpen(false)}
+                >
+                  <Gamepad2 size={16} />
+                  <Paragraph marginBottom={0}>Games</Paragraph>
+                </MobileNavLink>
+              </Link>
+              {/* Help & Info group */}
+              <YStack
+                borderTopWidth={1}
+                borderTopColor="$borderColor"
+                paddingTop="$2"
+                marginTop="$1"
+                gap="$1"
               >
-                <Info size={16} />
-                <Paragraph marginBottom={0}>About</Paragraph>
-              </MobileNavLink>
-            </Link>
-            <Link to="/help" style={{ textDecoration: 'none' }}>
-              <MobileNavLink
-                active={isActive('/help')}
-                onPress={() => setMobileOpen(false)}
-              >
-                <HelpCircle size={16} />
-                <Paragraph marginBottom={0}>Help</Paragraph>
-              </MobileNavLink>
-            </Link>
-            <Link to="/pricing" style={{ textDecoration: 'none' }}>
-              <MobileNavLink
-                active={isActive('/pricing')}
-                onPress={() => setMobileOpen(false)}
-              >
-                <Tag size={16} />
-                <Paragraph marginBottom={0}>Pricing</Paragraph>
-              </MobileNavLink>
-            </Link>
-            <XStack paddingHorizontal="$3" paddingVertical="$1">
-              <BugReportButton onDialogOpenChange={setBugDialogOpen} />
-            </XStack>
-          </YStack>
-        </MobileNavPanel>
+                <Paragraph
+                  size="$2"
+                  color="$colorPress"
+                  paddingHorizontal="$3"
+                  paddingVertical="$1"
+                  fontWeight="600"
+                  textTransform="uppercase"
+                  letterSpacing={0.8}
+                >
+                  Help &amp; Info
+                </Paragraph>
+                <Link to="/about" style={{ textDecoration: 'none' }}>
+                  <MobileNavLink
+                    active={isActive('/about')}
+                    onPress={() => setMobileOpen(false)}
+                  >
+                    <Info size={16} />
+                    <Paragraph marginBottom={0}>About</Paragraph>
+                  </MobileNavLink>
+                </Link>
+                <Link to="/help" style={{ textDecoration: 'none' }}>
+                  <MobileNavLink
+                    active={isActive('/help')}
+                    onPress={() => setMobileOpen(false)}
+                  >
+                    <HelpCircle size={16} />
+                    <Paragraph marginBottom={0}>Help</Paragraph>
+                  </MobileNavLink>
+                </Link>
+                <Link to="/pricing" style={{ textDecoration: 'none' }}>
+                  <MobileNavLink
+                    active={isActive('/pricing')}
+                    onPress={() => setMobileOpen(false)}
+                  >
+                    <Tag size={16} />
+                    <Paragraph marginBottom={0}>Pricing</Paragraph>
+                  </MobileNavLink>
+                </Link>
+                <XStack paddingHorizontal="$3" paddingVertical="$1">
+                  <BugReportButton onDialogOpenChange={setBugDialogOpen} />
+                </XStack>
+              </YStack>
+            </MobileNavPanel>
+          )}
+        </nav>
       )}
     </YStack>
   );

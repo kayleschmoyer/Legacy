@@ -19,103 +19,104 @@ exports[`App FootballScreen should match complete football page layout snapshot 
     zindex="200"
   >
     <div />
-    <div>
+    <nav
+      aria-label="Primary"
+    >
       <div>
-        <div
-          alignitems="center"
-          flex="1"
-          justifycontent="flex-start"
-        >
-          <a
-            aria-label="Legacy Sports home"
-            href="/"
-            style="text-decoration: none; flex-shrink: 0;"
+        <div>
+          <div
+            alignitems="center"
+            flex="1"
+            justifycontent="flex-start"
           >
-            <div
-              alignitems="center"
-              cursor="pointer"
-              gap="$2"
+            <a
+              aria-label="Legacy Sports home"
+              href="/"
+              style="text-decoration: none; flex-shrink: 0;"
             >
-              <img
-                alt="Legacy Sports"
-                data-testid="header-logo"
-                src="/logo.png"
-                style="height: 38px; width: auto; display: block;"
-              />
-              <p
-                color="$color12"
-                data-testid="brand-text"
-                font-size="22"
-                font-weight="700"
-                letter-spacing="1"
-                marginbottom="0"
-                style="font-family: 'Big Shoulders Display', sans-serif;"
-                userselect="none"
-              >
-                Legacy Sports
-              </p>
-            </div>
-          </a>
-        </div>
-        <div
-          aria-label="Primary"
-          as="nav"
-          display="none"
-          role="navigation"
-        >
-          <div>
-            Sports Dropdown
-          </div>
-          <div>
-            Players Dropdown
-          </div>
-          <div>
-            My Leagues Dropdown
-          </div>
-          <a
-            aria-label="Games"
-            href="/games/season-draft"
-            style="text-decoration: none; flex-shrink: 0;"
-          >
-            <button>
               <div
                 alignitems="center"
+                cursor="pointer"
                 gap="$2"
               >
-                Gamepad2
+                <img
+                  alt="Legacy Sports"
+                  data-testid="header-logo"
+                  src="/logo.png"
+                  style="height: 38px; width: auto; display: block;"
+                />
                 <p
+                  color="$color12"
+                  data-testid="brand-text"
+                  font-size="22"
+                  font-weight="700"
+                  letter-spacing="1"
                   marginbottom="0"
+                  style="font-family: 'Big Shoulders Display', sans-serif;"
+                  userselect="none"
                 >
-                  Games
+                  Legacy Sports
                 </p>
               </div>
-            </button>
-          </a>
-        </div>
-        <div
-          alignitems="center"
-          flex="1"
-          gap="$3"
-          justifycontent="flex-end"
-        >
+            </a>
+          </div>
           <div
             display="none"
-          />
-          <div>
-            Notification Dropdown
-          </div>
-          <div>
-            User Profile Dropdown
-          </div>
-          <button
-            aria-expanded="false"
-            aria-label="Open menu"
           >
-            Menu
-          </button>
+            <div>
+              Sports Dropdown
+            </div>
+            <div>
+              Players Dropdown
+            </div>
+            <div>
+              My Leagues Dropdown
+            </div>
+            <a
+              aria-label="Games"
+              href="/games/season-draft"
+              style="text-decoration: none; flex-shrink: 0;"
+            >
+              <button>
+                <div
+                  alignitems="center"
+                  gap="$2"
+                >
+                  Gamepad2
+                  <p
+                    marginbottom="0"
+                  >
+                    Games
+                  </p>
+                </div>
+              </button>
+            </a>
+          </div>
+          <div
+            alignitems="center"
+            flex="1"
+            gap="$3"
+            justifycontent="flex-end"
+          >
+            <div
+              display="none"
+            />
+            <div>
+              Notification Dropdown
+            </div>
+            <div>
+              User Profile Dropdown
+            </div>
+            <button
+              aria-expanded="false"
+              aria-label="Open menu"
+            >
+              Menu
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </nav>
   </div>
   <div
     data-testid="main-content"
@@ -155,103 +156,104 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
     zindex="200"
   >
     <div />
-    <div>
+    <nav
+      aria-label="Primary"
+    >
       <div>
-        <div
-          alignitems="center"
-          flex="1"
-          justifycontent="flex-start"
-        >
-          <a
-            aria-label="Legacy Sports home"
-            href="/"
-            style="text-decoration: none; flex-shrink: 0;"
+        <div>
+          <div
+            alignitems="center"
+            flex="1"
+            justifycontent="flex-start"
           >
-            <div
-              alignitems="center"
-              cursor="pointer"
-              gap="$2"
+            <a
+              aria-label="Legacy Sports home"
+              href="/"
+              style="text-decoration: none; flex-shrink: 0;"
             >
-              <img
-                alt="Legacy Sports"
-                data-testid="header-logo"
-                src="/logo.png"
-                style="height: 38px; width: auto; display: block;"
-              />
-              <p
-                color="$color12"
-                data-testid="brand-text"
-                font-size="22"
-                font-weight="700"
-                letter-spacing="1"
-                marginbottom="0"
-                style="font-family: 'Big Shoulders Display', sans-serif;"
-                userselect="none"
-              >
-                Legacy Sports
-              </p>
-            </div>
-          </a>
-        </div>
-        <div
-          aria-label="Primary"
-          as="nav"
-          display="none"
-          role="navigation"
-        >
-          <div>
-            Sports Dropdown
-          </div>
-          <div>
-            Players Dropdown
-          </div>
-          <div>
-            My Leagues Dropdown
-          </div>
-          <a
-            aria-label="Games"
-            href="/games/season-draft"
-            style="text-decoration: none; flex-shrink: 0;"
-          >
-            <button>
               <div
                 alignitems="center"
+                cursor="pointer"
                 gap="$2"
               >
-                Gamepad2
+                <img
+                  alt="Legacy Sports"
+                  data-testid="header-logo"
+                  src="/logo.png"
+                  style="height: 38px; width: auto; display: block;"
+                />
                 <p
+                  color="$color12"
+                  data-testid="brand-text"
+                  font-size="22"
+                  font-weight="700"
+                  letter-spacing="1"
                   marginbottom="0"
+                  style="font-family: 'Big Shoulders Display', sans-serif;"
+                  userselect="none"
                 >
-                  Games
+                  Legacy Sports
                 </p>
               </div>
-            </button>
-          </a>
-        </div>
-        <div
-          alignitems="center"
-          flex="1"
-          gap="$3"
-          justifycontent="flex-end"
-        >
+            </a>
+          </div>
           <div
             display="none"
-          />
-          <div>
-            Notification Dropdown
-          </div>
-          <div>
-            User Profile Dropdown
-          </div>
-          <button
-            aria-expanded="false"
-            aria-label="Open menu"
           >
-            Menu
-          </button>
+            <div>
+              Sports Dropdown
+            </div>
+            <div>
+              Players Dropdown
+            </div>
+            <div>
+              My Leagues Dropdown
+            </div>
+            <a
+              aria-label="Games"
+              href="/games/season-draft"
+              style="text-decoration: none; flex-shrink: 0;"
+            >
+              <button>
+                <div
+                  alignitems="center"
+                  gap="$2"
+                >
+                  Gamepad2
+                  <p
+                    marginbottom="0"
+                  >
+                    Games
+                  </p>
+                </div>
+              </button>
+            </a>
+          </div>
+          <div
+            alignitems="center"
+            flex="1"
+            gap="$3"
+            justifycontent="flex-end"
+          >
+            <div
+              display="none"
+            />
+            <div>
+              Notification Dropdown
+            </div>
+            <div>
+              User Profile Dropdown
+            </div>
+            <button
+              aria-expanded="false"
+              aria-label="Open menu"
+            >
+              Menu
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </nav>
   </div>
   <div
     data-testid="main-content"
@@ -268,136 +270,204 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
 </div>
 `;
 
-exports[`App Navigation should match navigation snapshot 1`] = `null`;
-
-exports[`App Navigation should render navigation with correct links 1`] = `
-<div>
+exports[`App Navigation should match navigation snapshot 1`] = `
+<nav
+  aria-label="Primary"
+>
   <div>
-    Global Announcer
-  </div>
-  <a
-    class="skip-link sr-only"
-    data-testid="skip-link"
-    href="#main-content"
-  >
-    Skip to main content
-  </a>
-  <div
-    role="banner"
-    style="position: sticky; overflow: visible;"
-    top="0"
-    zindex="200"
-  >
-    <div />
     <div>
-      <div>
-        <div
-          alignitems="center"
-          flex="1"
-          justifycontent="flex-start"
-        >
-          <a
-            aria-label="Legacy Sports home"
-            href="/"
-            style="text-decoration: none; flex-shrink: 0;"
-          >
-            <div
-              alignitems="center"
-              cursor="pointer"
-              gap="$2"
-            >
-              <img
-                alt="Legacy Sports"
-                data-testid="header-logo"
-                src="/logo.png"
-                style="height: 38px; width: auto; display: block;"
-              />
-              <p
-                color="$color12"
-                data-testid="brand-text"
-                font-size="22"
-                font-weight="700"
-                letter-spacing="1"
-                marginbottom="0"
-                style="font-family: 'Big Shoulders Display', sans-serif;"
-                userselect="none"
-              >
-                Legacy Sports
-              </p>
-            </div>
-          </a>
-        </div>
-        <div
-          aria-label="Primary"
-          as="nav"
-          display="none"
-          role="navigation"
-        >
-          <div>
-            Sports Dropdown
-          </div>
-          <div>
-            Players Dropdown
-          </div>
-          <div>
-            My Leagues Dropdown
-          </div>
-          <a
-            aria-label="Games"
-            href="/games/season-draft"
-            style="text-decoration: none; flex-shrink: 0;"
-          >
-            <button>
-              <div
-                alignitems="center"
-                gap="$2"
-              >
-                Gamepad2
-                <p
-                  marginbottom="0"
-                >
-                  Games
-                </p>
-              </div>
-            </button>
-          </a>
-        </div>
-        <div
-          alignitems="center"
-          flex="1"
-          gap="$3"
-          justifycontent="flex-end"
+      <div
+        alignitems="center"
+        flex="1"
+        justifycontent="flex-start"
+      >
+        <a
+          aria-label="Legacy Sports home"
+          href="/"
+          style="text-decoration: none; flex-shrink: 0;"
         >
           <div
-            display="none"
-          />
-          <div>
-            Notification Dropdown
-          </div>
-          <div>
-            User Profile Dropdown
-          </div>
-          <button
-            aria-expanded="false"
-            aria-label="Open menu"
+            alignitems="center"
+            cursor="pointer"
+            gap="$2"
           >
-            Menu
-          </button>
+            <img
+              alt="Legacy Sports"
+              data-testid="header-logo"
+              src="/logo.png"
+              style="height: 38px; width: auto; display: block;"
+            />
+            <p
+              color="$color12"
+              data-testid="brand-text"
+              font-size="22"
+              font-weight="700"
+              letter-spacing="1"
+              marginbottom="0"
+              style="font-family: 'Big Shoulders Display', sans-serif;"
+              userselect="none"
+            >
+              Legacy Sports
+            </p>
+          </div>
+        </a>
+      </div>
+      <div
+        display="none"
+      >
+        <div>
+          Sports Dropdown
         </div>
+        <div>
+          Players Dropdown
+        </div>
+        <div>
+          My Leagues Dropdown
+        </div>
+        <a
+          aria-label="Games"
+          href="/games/season-draft"
+          style="text-decoration: none; flex-shrink: 0;"
+        >
+          <button>
+            <div
+              alignitems="center"
+              gap="$2"
+            >
+              Gamepad2
+              <p
+                marginbottom="0"
+              >
+                Games
+              </p>
+            </div>
+          </button>
+        </a>
+      </div>
+      <div
+        alignitems="center"
+        flex="1"
+        gap="$3"
+        justifycontent="flex-end"
+      >
+        <div
+          display="none"
+        />
+        <div>
+          Notification Dropdown
+        </div>
+        <div>
+          User Profile Dropdown
+        </div>
+        <button
+          aria-expanded="false"
+          aria-label="Open menu"
+        >
+          Menu
+        </button>
       </div>
     </div>
   </div>
-  <div
-    data-testid="main-content"
-    flex="1"
-    id="main-content"
-    padding="$4"
-    tabindex="-1"
-    tag="main"
-  >
+</nav>
+`;
+
+exports[`App Navigation should render navigation with correct links 1`] = `
+<nav
+  aria-label="Primary"
+>
+  <div>
     <div>
-      Home Page
+      <div
+        alignitems="center"
+        flex="1"
+        justifycontent="flex-start"
+      >
+        <a
+          aria-label="Legacy Sports home"
+          href="/"
+          style="text-decoration: none; flex-shrink: 0;"
+        >
+          <div
+            alignitems="center"
+            cursor="pointer"
+            gap="$2"
+          >
+            <img
+              alt="Legacy Sports"
+              data-testid="header-logo"
+              src="/logo.png"
+              style="height: 38px; width: auto; display: block;"
+            />
+            <p
+              color="$color12"
+              data-testid="brand-text"
+              font-size="22"
+              font-weight="700"
+              letter-spacing="1"
+              marginbottom="0"
+              style="font-family: 'Big Shoulders Display', sans-serif;"
+              userselect="none"
+            >
+              Legacy Sports
+            </p>
+          </div>
+        </a>
+      </div>
+      <div
+        display="none"
+      >
+        <div>
+          Sports Dropdown
+        </div>
+        <div>
+          Players Dropdown
+        </div>
+        <div>
+          My Leagues Dropdown
+        </div>
+        <a
+          aria-label="Games"
+          href="/games/season-draft"
+          style="text-decoration: none; flex-shrink: 0;"
+        >
+          <button>
+            <div
+              alignitems="center"
+              gap="$2"
+            >
+              Gamepad2
+              <p
+                marginbottom="0"
+              >
+                Games
+              </p>
+            </div>
+          </button>
+        </a>
+      </div>
+      <div
+        alignitems="center"
+        flex="1"
+        gap="$3"
+        justifycontent="flex-end"
+      >
+        <div
+          display="none"
+        />
+        <div>
+          Notification Dropdown
+        </div>
+        <div>
+          User Profile Dropdown
+        </div>
+        <button
+          aria-expanded="false"
+          aria-label="Open menu"
+        >
+          Menu
+        </button>
+      </div>
     </div>
   </div>
-</div>
+</nav>
 `;

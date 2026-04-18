@@ -343,14 +343,10 @@ describe('App', () => {
         jest.advanceTimersByTime(1000);
       });
 
-      // Since user is not authenticated, should show OAuth login instead of navigation
+      // Navigation landmark should always be in the DOM for accessibility
       const nav = container.querySelector('nav');
-      expect(nav).not.toBeInTheDocument();
-
-      // Should show OAuth login form instead
-      const oauthLogin = container.querySelector('div'); // OAuth login container
-      expect(oauthLogin).toBeInTheDocument();
-      expect(oauthLogin).toMatchSnapshot();
+      expect(nav).toBeInTheDocument();
+      expect(nav).toMatchSnapshot();
     });
 
     it('should match navigation snapshot', () => {
