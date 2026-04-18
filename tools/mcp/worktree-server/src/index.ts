@@ -1121,6 +1121,11 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
             description:
               'Push to this remote branch name instead of the local branch name. Must contain an LS-#### Jira key; pushes are refused otherwise. Providing remoteBranch also implies upstream is set (-u). ⚠️ Do NOT use this in native ephemeral (launcher-checkbox) sessions — local/remote name mismatch confuses PR association in the Claude Code UI (anthropics/claude-code#18690). Jira linking for native ephemeral sessions is done via PR title and commit messages containing LS-####, not the branch name. See .agents/skills/branch-naming/SKILL.md.',
           },
+          timeoutMs: {
+            type: 'number',
+            description:
+              'Timeout in milliseconds for the git push subprocess (default: 120000). Increase when pre-push hooks run slow checks (e.g. terraform validate, pnpm format) that exceed the default.',
+          },
         },
       },
     },
@@ -3605,6 +3610,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         setUpstream: setUpstreamRaw,
         skipLint: skipLintRaw,
         remoteBranch,
+        timeoutMs: timeoutMsRaw,
       } = args as {
         worktree?: unknown;
         worktreeKey?: unknown;
@@ -3612,7 +3618,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         setUpstream?: unknown;
         skipLint?: unknown;
         remoteBranch?: unknown;
+        timeoutMs?: unknown;
       };
+      const pushTimeoutMs =
+        typeof timeoutMsRaw === 'number' && timeoutMsRaw > 0
+          ? timeoutMsRaw
+          : 120_000;
       // Coerce string booleans to real booleans (MCP framework may serialise
       // JSON booleans as strings — same class of bug as LS-1907).
       const setUpstream = coerceBool(setUpstreamRaw);
@@ -3948,7 +3959,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const cmdDisplay = `git ${pushArgs.join(' ')}`;
 
       try {
-        const out = runGit(pushArgs, cwd, { timeout: 30_000, env: pushEnv });
+        const out = runGit(pushArgs, cwd, {
+          timeout: pushTimeoutMs,
+          env: pushEnv,
+        });
 
         // Append an explicit success summary so agents don't need a follow-up
         // worktree_status call to confirm the push landed. git push writes its
