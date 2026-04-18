@@ -65,6 +65,7 @@ For subagents that perform git operations in worktrees, also include:
   - Use worktree_commit/worktree_push for commits and pushes
   - Use worktree_diff({ base: "HEAD" }) to inspect uncommitted changes (replaces git -C <wt> diff HEAD)
   - Use worktree_status() to get current branch and working-tree status (replaces git -C <wt> branch --show-current / git status)
+  - Use worktree_reset({ ref: "<ref>" }) for mixed reset (replaces git reset <ref> / git reset origin/main); use worktree_reset({ ref: "<ref>", hard: true }) for hard reset (replaces git reset --hard <ref>)
 ```
 
 ## PR Sweep Subagents
