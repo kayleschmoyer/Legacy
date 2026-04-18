@@ -12,6 +12,7 @@ import { rerun } from './tools/rerun.js';
 import { searchLogs } from './tools/search-logs.js';
 import { sessionStats } from './tools/session-stats.js';
 import { viewRun } from './tools/view-run.js';
+import { waitForRun } from './tools/wait-for-run.js';
 import { workflowInfo } from './tools/workflow-info.js';
 import { workflowSetState } from './tools/workflow-state.js';
 import { getToken, buildHeaders, sanitizeErrorBody } from './github-api.js';
@@ -205,6 +206,41 @@ server.tool(
       .describe('Include jobs (default: true)'),
   },
   async (params) => viewRun(params),
+);
+
+server.tool(
+  'ci_wait_for_run',
+  'Block until a CI run reaches a terminal status (completed/cancelled). ' +
+    'Polls the GitHub API on an interval and returns the final run summary with job conclusions. ' +
+    'Use this in Copilot CLI or other environments where CI events are not surfaced natively. ' +
+    'In Claude Code (local/web), CI events are surfaced natively — prefer waiting for those events ' +
+    'instead of calling this tool. ' +
+    'Returns timedOut:true if the run does not finish within timeoutSecs (default: 1200). ' +
+    'Example: ci_wait_for_run({ runId: 12345678 })',
+  {
+    runId: z.coerce
+      .number()
+      .int()
+      .positive()
+      .describe('Workflow run ID to wait for'),
+    timeoutSecs: z.coerce
+      .number()
+      .int()
+      .positive()
+      .max(3600)
+      .default(1200)
+      .describe(
+        'Maximum time to wait in seconds (default: 1200 = 20 min, max: 3600 = 1 h)',
+      ),
+    pollIntervalSecs: z.coerce
+      .number()
+      .int()
+      .min(15)
+      .max(120)
+      .default(30)
+      .describe('Polling interval in seconds (default: 30, min: 15, max: 120)'),
+  },
+  async (params) => waitForRun(params),
 );
 
 server.tool(

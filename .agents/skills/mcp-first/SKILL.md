@@ -148,15 +148,16 @@ On Claude Code on the web, Claude provides built-in `mcp__github__*` tools that 
 
 Use `ci_list_runs`, `ci_view_run`, `ci_get_logs`, `ci_search_logs`, and `ci_rerun` instead of `gh run` commands via Bash. These tools parse and structure log output for agent consumption.
 
-| `gh` CLI command                           | MCP tool (use this)                             |
-| ------------------------------------------ | ----------------------------------------------- |
-| `gh run list --branch BRANCH --limit N`    | `ci_list_runs(branch: "BRANCH", limit: N)`      |
-| `gh run list --json databaseId,status,...` | `ci_list_runs(branch: "BRANCH", limit: N)`      |
-| `gh run view RUN_ID --log-failed`          | `ci_get_logs(runId: RUN_ID, failedOnly: true)`  |
-| `gh run view RUN_ID --log`                 | `ci_get_logs(runId: RUN_ID, failedOnly: false)` |
-| `gh run rerun RUN_ID --failed`             | `ci_rerun(runId: RUN_ID, onlyFailedJobs: true)` |
+| `gh` CLI command                           | MCP tool (use this)                                                                        |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| `gh run list --branch BRANCH --limit N`    | `ci_list_runs(branch: "BRANCH", limit: N)`                                                 |
+| `gh run list --json databaseId,status,...` | `ci_list_runs(branch: "BRANCH", limit: N)`                                                 |
+| `gh run view RUN_ID --log-failed`          | `ci_get_logs(runId: RUN_ID, failedOnly: true)`                                             |
+| `gh run view RUN_ID --log`                 | `ci_get_logs(runId: RUN_ID, failedOnly: false)`                                            |
+| `gh run rerun RUN_ID --failed`             | `ci_rerun(runId: RUN_ID, onlyFailedJobs: true)`                                            |
+| `sleep N && gh run view RUN_ID` (loop)     | `ci_wait_for_run(runId: RUN_ID)` — Copilot CLI only; in Claude Code wait for native events |
 
-**CI status and PR events are surfaced natively by Claude Code** — no wait tool needed. After pushing, Claude Code automatically receives and surfaces CI failures, review events, and merge status. Never use `sleep` + polling loops (`sleep N && gh run view`, `sleep N && gh pr view`, `sleep N && gh pr checks <pr>`, `ci_view_run` in a loop, `github_view_pr` in a loop) — these waste context and shell round-trips.
+**CI status and PR events are surfaced natively by Claude Code** — no wait tool needed in local/web sessions. After pushing, Claude Code automatically receives and surfaces CI failures, review events, and merge status. Never use `sleep` + polling loops (`sleep N && gh run view`, `sleep N && gh pr view`, `sleep N && gh pr checks <pr>`, `ci_view_run` in a loop, `github_view_pr` in a loop) — these waste context and shell round-trips. **In Copilot CLI** (where native event surfacing is unavailable), use `ci_wait_for_run({ runId: <id> })` to block until a run completes instead of manual sleep loops.
 
 ## Jira Operations
 

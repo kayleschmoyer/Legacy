@@ -359,7 +359,7 @@ Cannot dispatch workflow "merge-queue.yml": the GitHub App token lacks actions:w
 2. **Remove and re-add the merge-queue label** on the PR (if the queue is label-triggered).
 3. **Wait for the queue's retry cycle** — if all review threads are resolved, the merge queue retries automatically without any action.
 
-**`ci_wait_for_run` does not exist**: the acceptance criteria in LS-3065 mentions `ci_wait_for_run`, but this tool was never implemented. CI run status is surfaced natively by Claude Code — no polling tool is needed. Use `ci_list_runs` or `ci_view_run` for one-shot status snapshots if you need them explicitly.
+**`ci_wait_for_run` for blocking CI waits**: in Copilot CLI and other environments where CI events are not surfaced natively, use `ci_wait_for_run({ runId: <id> })` to block until a run completes instead of manual `sleep` + polling loops. In Claude Code (local/web), CI events are surfaced natively — wait for those events rather than calling this tool. For one-shot status snapshots use `ci_list_runs` or `ci_view_run`.
 
 ## Jira Pagination (Critical)
 
