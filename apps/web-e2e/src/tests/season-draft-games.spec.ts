@@ -304,6 +304,75 @@ test.describe('Season Draft Game Create Page @critical', () => {
 });
 
 // ---------------------------------------------------------------------------
+// LS-3491: [functional] 404 error on /games/season-draft/create
+// An automated audit crawler navigated to /games/season-draft/create and
+// received a functional 404 — the server responded with HTTP 404 and the
+// page rendered the "Build Your Dynasty" marketing landing page instead of
+// the season-draft creation interface. /games/season-draft/create is a
+// protected route: EnhancedAuthGuard intercepts unauthenticated requests and
+// renders PublicLandingPage with sign-in CTAs. These tests lock in that the
+// sign-in CTAs are visible and the URL remains at /games/season-draft/create
+// (no spurious redirect to /) for unauthenticated visitors.
+// ---------------------------------------------------------------------------
+
+unauthTest.describe(
+  'Season Draft Game Create — unauthenticated visitor @regression',
+  () => {
+    unauthTest(
+      '"Continue with Google" button is visible and enabled on /games/season-draft/create when unauthenticated',
+      async ({ page }) => {
+        await page.goto('/games/season-draft/create');
+        await page.waitForLoadState('load');
+
+        const googleBtn = page.getByRole('button', {
+          name: /continue with google/i,
+        });
+        await expect(googleBtn).toBeVisible({ timeout: 15_000 });
+        await expect(googleBtn).toBeEnabled();
+      },
+    );
+
+    unauthTest(
+      '"Get Started Free" CTA is visible and interactive on /games/season-draft/create for unauthenticated users',
+      async ({ page }) => {
+        await page.goto('/games/season-draft/create');
+        await page.waitForLoadState('load');
+
+        const getStartedBtn = page.getByRole('button', {
+          name: /get started free/i,
+        });
+        await expect(getStartedBtn).toBeVisible({ timeout: 15_000 });
+        await expect(getStartedBtn).toBeEnabled();
+      },
+    );
+
+    unauthTest(
+      '"Continue with Discord" button is visible on /games/season-draft/create when unauthenticated',
+      async ({ page }) => {
+        await page.goto('/games/season-draft/create');
+        await page.waitForLoadState('load');
+
+        await expect(
+          page.getByRole('button', { name: /continue with discord/i }),
+        ).toBeVisible({ timeout: 15_000 });
+      },
+    );
+
+    unauthTest(
+      'URL stays at /games/season-draft/create for unauthenticated users — no auth-guard redirect',
+      async ({ page }) => {
+        await page.goto('/games/season-draft/create');
+        await page.waitForLoadState('load');
+
+        await expect(page).toHaveURL('/games/season-draft/create', {
+          timeout: 15_000,
+        });
+      },
+    );
+  },
+);
+
+// ---------------------------------------------------------------------------
 // LS-3540 / LS-3541 / LS-3489: /games/season-draft is a protected route.
 // Unauthenticated users visiting it are intercepted by EnhancedAuthGuard and
 // shown PublicLandingPage with the "Continue with Google" and "Continue with
