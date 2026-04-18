@@ -91,6 +91,8 @@ export async function createPR(params: CreatePRParams): Promise<ToolResult> {
     let head: string;
     if (params.head) {
       head = params.head;
+    } else if (params.worktreePath) {
+      head = await getCurrentBranch(cwd);
     } else {
       const currentBranch = await getCurrentBranch(cwd);
       if (currentBranch === 'HEAD') {

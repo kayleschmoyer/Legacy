@@ -457,7 +457,7 @@ server.tool(
       .string()
       .optional()
       .describe(
-        'Remote branch name to use as PR head. If omitted, auto-detected from the upstream tracking ref (git @{upstream}), falling back to the local branch name. Use this when the local branch name differs from the pushed remote branch name (e.g. ephemeral worktrees).',
+        'Remote branch name to use as PR head. If omitted and worktreePath is provided, auto-detected from the local branch name in that worktree (git rev-parse --abbrev-ref HEAD). If omitted and no worktreePath, auto-detected from the upstream tracking ref (git @{upstream}), falling back to the local branch name. Use this when the local branch name differs from the pushed remote branch name.',
       ),
     worktreePath: z
       .string()
