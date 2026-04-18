@@ -1,6 +1,6 @@
 ---
 name: work-ticket
-description: 'Autonomously implement a Jira ticket end-to-end. For leaf tickets (task/story with no children): blocker check, worktree, code, validate, PR, Jira transition. For parent tickets (epic/story with children): iterate through child tickets, working each one to completion. Updates ticket and parent statuses automatically. Runs MCP gap audit before finishing. Load when the user gives a ticket key and expects autonomous completion.'
+description: 'Autonomously implement a Jira ticket end-to-end. For leaf tickets (task/story with no children): blocker check, worktree, code, validate, PR, Jira transition. For parent tickets (epic/story with children): by default picks the first unblocked To Do child and works it to completion; pass --batch to process all children in iterative batches. Updates ticket and parent statuses automatically. Runs MCP gap audit before finishing. Load when the user gives a ticket key and expects autonomous completion.'
 ---
 
 # Skill: Work Ticket
@@ -17,6 +17,19 @@ Autonomously work a Jira ticket from To Do through to merge (or Done). Handles t
 - User provides a Jira ticket key and expects autonomous implementation
 - User says "work on LS-####" or "implement LS-####"
 - Processing a backlog of tickets under an epic
+
+## Arguments
+
+```
+work-ticket <ticket-key> [--batch]
+```
+
+| Argument       | Required | Description                                                                                                                                                                              |
+| -------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `<ticket-key>` | Yes      | Jira ticket key to work (e.g. `LS-1234`)                                                                                                                                                 |
+| `--batch`      | No       | For parent tickets: process **all** unblocked To Do children in iterative batches until the backlog is empty, rather than stopping after the first child. Has no effect on leaf tickets. |
+
+The `--batch` flag is also implied when the user's natural-language request contains phrases like "work all tickets under", "process the full backlog", or "implement all children of".
 
 ## Steps
 
@@ -84,10 +97,11 @@ jira_list_children(key: "LS-####", limit: 100)
 
 > **Pagination required**: if the response contains `nextPageToken`, you must paginate (pass `pageToken` to subsequent calls) until `nextPageToken` is absent. Never assume the first page is complete — default limits (10-25) will silently truncate large epics.
 
-| Condition                                           | Mode                                           |
-| --------------------------------------------------- | ---------------------------------------------- |
-| No children (or `jira_list_children` returns empty) | **Leaf mode** — implement this ticket directly |
-| Has children                                        | **Parent mode** — work the children            |
+| Condition                                                      | Mode                                                               |
+| -------------------------------------------------------------- | ------------------------------------------------------------------ |
+| No children (or `jira_list_children` returns empty)            | **Leaf mode** — implement this ticket directly                     |
+| Has children, `--batch` flag absent                            | **Parent mode (single)** — work the first available child and stop |
+| Has children, `--batch` flag present (or implied by user text) | **Parent mode (batch)** — iterate all children until backlog empty |
 
 ### Step 1b: Planning phase
 
@@ -204,7 +218,9 @@ Follow the full [worktree-workflow skill](../worktree-workflow/SKILL.md):
 
 #### Parent Mode (has children)
 
-Process children in iterative batches until the backlog is empty.
+Pick the **first** unblocked To Do child and work it to completion. Do **not** loop back to claim more children unless `--batch` was passed (or implied by the user's request).
+
+> **Why**: working multiple tickets in a single session risks leaving tickets "In Progress" with no active agent. One ticket per session keeps the state clean and lets the user decide what to pick up next.
 
 1. **Transition parent to In Progress** (if not already):
 
@@ -212,99 +228,43 @@ Process children in iterative batches until the backlog is empty.
    jira_transition(key: "LS-####", status: "In Progress")
    ```
 
-2. **Iterative batch loop** — repeat until no unblocked To Do children remain:
+2. **Find and claim the first available child**:
 
-   ````
-   all_worked = []      # cumulative across all batches
-   all_released = []    # cumulative across all batches
+   a. Enumerate ALL children (paginate if needed):
 
-   REPEAT:
-     a. Enumerate ALL children (paginate if needed):
-        jira_list_children(key: "LS-####", limit: 100)
-        If nextPageToken is present, continue paginating until all pages
-        are collected. Log: "Found N total children: X To Do, Y In Progress,
-        Z In Review, W Done". Verify total == sum of status counts.
-     b. Filter to unblocked To Do tickets (jira_check_blockers).
-        Prefer tickets without dependencies on other children.
-        Process in dependency order (blockers first).
-     c. Select batch: pick up to 5 unblocked To Do tickets (use batch size 1 when using the drive-to-merge flow, since you must shepherd each PR to merge before claiming the next — bulk-claiming multiple tickets leaves them sitting "In Progress" without active work).
-        → If none found → EXIT loop (no unblocked To Do tickets remain).
-          Before exiting, verify pagination was fully exhausted (no
-          `nextPageToken` remained after the last page) — if you exited
-          pagination early, you have a pagination bug; do NOT exit the
-          batch loop. If remaining children are blocked, report them. If
-          some are already In Progress (e.g., being worked by another
-          agent), skip and report those keys.
-     d. Claim batch with verification (prevents duplicate work across concurrent agents):
-        - First, re-check each candidate: call `jira_view` for each selected ticket. If any are not exactly "To Do" (another agent moved them to "In Progress", "In Review", or "Done" between listing and now), drop them from the batch.
-        - Transition remaining To Do tickets: `jira_transition(key: [...batch keys], status: "In Progress")` (one call saves N round-trips).
-        - Verify: call `jira_view` on each claimed ticket to confirm transition succeeded. Drop any that failed.
-        - If the entire batch was dropped, loop back to step a.
-     e. **Dispatch a subagent for each child ticket** — do NOT modify the orchestrator's
-        own working tree. Each child gets its own isolated ephemeral worktree:
+   ```
+   jira_list_children(key: "LS-####", limit: 100)
+   ```
 
-        ```
-        Agent(
-          isolation: "worktree",
-          prompt: """
-            Implement Jira ticket LS-<child_key>. Follow these steps:
+   If `nextPageToken` is present, continue paginating until all pages are collected.
+   Log: "Found N total children: X To Do, Y In Progress, Z In Review, W Done".
 
-            Setup:
-            1. git fetch origin main
-            2. worktree_setup_node_modules()
-            3. Skip jira_transition — the orchestrator already claimed this ticket in step d.
+   b. Filter to unblocked To Do tickets (`jira_check_blockers`). Prefer tickets without
+   dependencies on other children; process in dependency order (blockers first).
+   → If **none found** (all children are blocked, In Progress, In Review, or Done):
+   report which tickets are blocked/active and **stop** — do not attempt to claim anything.
 
-            Work:
-            4. Read the ticket: jira_view(key: "LS-<child_key>")
-            5. Implement the ticket (code + tests)
-            6. Self-review changes: read .agents/skills/pr-lifecycle/references/self-review.md
-               and .agents/skills/pr-lifecycle/references/common-review-patterns.md,
-               then run Skill(skill: "review") to execute the full self-review checklist
-               and common review patterns against your changes. Fix all issues before proceeding.
-            7. db_migration_status() + db_migrate()
-            8. make_run(target: "pc") — must pass
-            9. worktree_commit(message: "type(scope): LS-<child_key> description")
-            10. worktree_push(setUpstream: true)
-            11. github_create_pr(title: "LS-<child_key> ...", draft: true)
-            12. github_manage_labels(add: ["agent-in-progress"])
-            13. github_mark_pr_ready
-            14. github_request_review
-            15. jira_transition(key: "LS-<child_key>", status: "In Review")
+   c. **Select exactly one** — the first unblocked To Do ticket in dependency order.
 
-            Return the PR number and any issues encountered.
+   d. **Claim with verification** (prevents duplicate work across concurrent agents):
+   - Re-check: `jira_view(key: "LS-<child>")`. If the ticket is no longer "To Do"
+     (another agent claimed it between listing and now), return to step b and pick
+     the next candidate.
+   - Transition: `jira_transition(key: "LS-<child>", status: "In Progress")`.
+   - Verify: `jira_view` again to confirm transition succeeded. If it failed, pick
+     the next candidate.
 
-            Tool preferences:
-            - Use worktree_commit/worktree_push for commits and pushes
-            - Use Glob (not find/ls) for file discovery
-            - Use Grep (not grep/rg) for content search
-            - Use Read (not cat/head/tail) for reading files
-          """
-        )
-        ```
+3. **Work the claimed child ticket** using the full Leaf Mode flow (Steps 4–8 above).
+   The child is implemented, validated (`make pc`), self-reviewed, committed, pushed,
+   PR created, watched through CI and review, and shepherded to merge before anything else.
 
-        After the subagent returns:
-        - Record the PR number in the tracking list
-        - Monitor the PR: watch CI, fix review comments (dispatch another subagent
-          for fixes if needed), rebase as needed
-        - Shepherd each child PR through to merge before starting the next child
-        - Mark the child's tracking task completed (`TaskUpdate(taskId: <id>, status: "completed")`)
-          **after the child PR merges and the gap audit is complete**, never at PR creation
+   After the child PR merges:
+   - Mark the child's tracking task completed (`TaskUpdate(taskId: <id>, status: "completed")`).
+   - **Stop** — do not claim additional children. Report remaining To Do children to the user.
 
-        **Fallback** (if `Agent(isolation: "worktree")` is unavailable):
-        save the current branch, `git checkout -b LS-<child_key>/description origin/main`,
-        symlink node_modules, do the work, push, create PR, then
-        `git checkout <original-branch>`. Commit and push before every switch.
-     f. Release uncompleted: any claimed ticket that did not reach "In Review":
-        - If no PR exists → transition back to "To Do" via the Jira REST API directly
-          (note: jira_transition only supports "In Progress", "In Review", "Done" — "To Do" is not a valid target status under any circumstances)
-        - If a PR/branch exists → keep "In Progress" and report for manual follow-up
-     g. Append results to all_worked / all_released.
-     → Loop back to step a.
-   ````
+4. **Update parent status** after the child PR merges:
 
-3. **Update parent status** after all batches complete:
-
-   > **Guard**: before transitioning parent, enumerate ALL children one final time by exhausting pagination (`nextPageToken` absent after last page). Confirm every child is In Review or Done — if even one is To Do or In Progress, do NOT transition parent to In Review.
+   > **Guard**: enumerate ALL children one final time (exhausting pagination). Assess overall state.
 
    | Children state                                          | Parent status                                        |
    | ------------------------------------------------------- | ---------------------------------------------------- |
@@ -312,6 +272,9 @@ Process children in iterative batches until the backlog is empty.
    | All children In Review or Done (none To Do/In Progress) | Transition parent to **In Review**                   |
    | Some children still In Progress                         | Keep parent **In Progress** — report those keys      |
    | Some children still To Do (all blocked)                 | Keep parent **In Progress** — report blocked tickets |
+   | Some children still To Do (unblocked — remaining work)  | Keep parent **In Progress** — report remaining count |
+
+   > **Batch mode** (`--batch` flag or implied): replace steps 2c–3 with the iterative batch loop — pick up to 5 unblocked To Do tickets per batch, dispatch a subagent per child (`Agent(isolation: "worktree", prompt: "...")`), shepherd each PR to merge, then loop back to step 2a until no unblocked To Do children remain. See the subagent prompt template in the Gotchas section below.
 
 ### Step 3: MCP gap audit
 
@@ -356,6 +319,50 @@ The skill is responsible for shepherding the PR all the way to "merged" (step 8 
 - Never transition a parent ahead of its children
 
 ## Gotchas
+
+- **One child ticket per session (default)** — when a parent ticket is given, claim and work only the first available child. Do not loop back to claim more tickets after the first PR merges unless `--batch` was passed. Leaving multiple tickets "In Progress" without an active agent causes stale-claim drift and confuses sweep agents.
+- **Batch mode (`--batch`)** — pass `--batch` (or use natural-language phrases like "work all tickets under LS-####" / "process the full backlog") to enter the iterative batch loop: pick up to 5 unblocked To Do children per batch, dispatch a subagent per child (`Agent(isolation: "worktree")`), shepherd each to merge, then loop. Subagent prompt template:
+
+  ```
+  Agent(
+    isolation: "worktree",
+    prompt: """
+      Implement Jira ticket LS-<child_key>. Follow these steps:
+
+      Setup:
+      1. git fetch origin main
+      2. worktree_setup_node_modules()
+      3. Skip jira_transition — the orchestrator already claimed this ticket.
+
+      Work:
+      4. Read the ticket: jira_view(key: "LS-<child_key>")
+      5. Implement the ticket (code + tests)
+      6. Self-review: read .agents/skills/pr-lifecycle/references/self-review.md
+         and .agents/skills/pr-lifecycle/references/common-review-patterns.md,
+         then run Skill(skill: "review"). Fix all issues before proceeding.
+      7. db_migration_status() + db_migrate()
+      8. make_run(target: "pc") — must pass
+      9. worktree_commit(message: "type(scope): LS-<child_key> description")
+      10. worktree_push(setUpstream: true)
+      11. github_create_pr(title: "LS-<child_key> ...", draft: true)
+      12. github_manage_labels(add: ["agent-in-progress"])
+      13. github_mark_pr_ready
+      14. github_request_review
+      15. jira_transition(key: "LS-<child_key>", status: "In Review")
+
+      Return the PR number and any issues encountered.
+
+      Tool preferences:
+      - Use worktree_commit/worktree_push for commits and pushes
+      - Use Glob (not find/ls) for file discovery
+      - Use Grep (not grep/rg) for content search
+      - Use Read (not cat/head/tail) for reading files
+      - Use make_run(target: "...", worktreePath: "...") for make targets
+      - Use github_create_pr(...) MCP tool for PR creation
+      - Use github_pr_dashboard(state: "all", limit: 50) to check for existing PRs (never gh pr list | grep)
+    """
+  )
+  ```
 
 - **Don't over-plan trivial tasks** — the planning skill has a scope assessment step that tells you when to skip. A typo fix does not need 10 minutes of reconnaissance.
 - **Always check blockers before starting** — working a ticket whose blocker is still in progress wastes effort
