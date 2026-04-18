@@ -148,7 +148,14 @@ try {
                 // /baseball hub is publicly accessible (LS-3532). Using publicExactPaths
                 // (not publicPaths) so only the landing page is public — sub-routes like
                 // /baseball/league/create remain authenticated-only.
-                publicExactPaths={[`${basePath}/baseball`]}
+                // /players directory is publicly accessible so unauthenticated users can
+                // browse the player roster (LS-3493). Using publicExactPaths so only the
+                // listing page is public — sub-routes like /players/:id and
+                // /players/compare remain authenticated-only.
+                publicExactPaths={[
+                  `${basePath}/baseball`,
+                  `${basePath}/players`,
+                ]}
                 onLoginSuccess={() => {
                   LOGGER.info('Web app login successful!');
                   trackLogin('google');

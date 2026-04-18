@@ -194,114 +194,50 @@ test.describe('Players Directory – empty state @regression', () => {
 });
 
 // ---------------------------------------------------------------------------
-// LS-3495 / LS-3496 / LS-3545 / LS-3547: /players is a protected route.
-// Unauthenticated users visiting /players are intercepted by EnhancedAuthGuard
-// and shown PublicLandingPage with the "Continue with Google" and "Continue
-// with Discord" sign-in CTAs and a "Get Started Free" CTA lower down. These
-// tests lock in that the buttons are located via getByRole (accessible name) —
-// NOT via the broken `(button:visible, [role="button"]:visible)` CSS selector
-// that caused the original crawler-reported failures (including the spurious
-// "[GSI_LOGGER]: FedCM get() rejects with NetworkError" attribution).
+// LS-3493: /players is a public route. Unauthenticated users visiting
+// /players should see the player directory (All Players heading, search
+// input) — NOT the marketing landing page. These tests lock in the correct
+// behavior after the route was moved to publicExactPaths in main.tsx.
 // ---------------------------------------------------------------------------
 
 unauthTest.describe(
   'Players Directory — unauthenticated visitor @regression',
   () => {
-    unauthTest(
-      '"Continue with Google" button is visible on /players when unauthenticated',
-      async ({ page }) => {
-        await page.goto('/players');
-        await page.waitForLoadState('load');
+    unauthTest.beforeEach(async ({ page }) => {
+      await mockPlayersGraphQL(page);
+      await page.goto('/players');
+      await page.waitForLoadState('load');
+    });
 
+    unauthTest(
+      'unauthenticated user sees the player directory on /players, not the marketing page',
+      async ({ page }) => {
+        await expect(page).toHaveURL('/players');
+        // Player directory heading must be present — not the marketing tagline.
         await expect(
-          page.getByRole('button', { name: /continue with google/i }),
+          page.getByRole('heading', { name: /all players/i }),
         ).toBeVisible({ timeout: 15_000 });
+        await expect(page.locator('body')).not.toContainText(
+          'Build Your Dynasty',
+        );
       },
     );
 
     unauthTest(
-      '"Continue with Google" button on /players is clickable via getByRole',
+      'search input is visible for unauthenticated users on /players',
       async ({ page }) => {
-        await page.goto('/players');
-        await page.waitForLoadState('load');
-
-        const googleBtn = page.getByRole('button', {
-          name: /continue with google/i,
+        await expect(page.getByPlaceholder(/search/i).first()).toBeVisible({
+          timeout: 15_000,
         });
-        await expect(googleBtn).toBeVisible({ timeout: 15_000 });
-        await expect(googleBtn).toBeEnabled();
-        // Confirm the click resolves without a CSS selector parse error —
-        // regression coverage for the original crawler failure.
-        await googleBtn.click();
       },
     );
 
     unauthTest(
-      '"Get Started Free" CTA is visible and interactive on /players for unauthenticated users',
+      'player cards are rendered for unauthenticated users on /players',
       async ({ page }) => {
-        await page.goto('/players');
-        await page.waitForLoadState('load');
-
-        // The auth guard shows the PublicLandingPage on /players for
-        // unauthenticated users.  The CTA (aria-label="Get started free") must
-        // be present and enabled so visitors can initiate sign-up from /players.
-        // No .first() — the landing page exposes a single "Get started free"
-        // CTA, so Playwright strictness will catch accidental duplicates.
-        const getStartedBtn = page.getByRole('button', {
-          name: /get started free/i,
-        });
-        await expect(getStartedBtn).toBeVisible({ timeout: 15_000 });
-        await expect(getStartedBtn).toBeEnabled();
-      },
-    );
-
-    unauthTest(
-      '"Get Started Free" CTA on /players is clickable via getByRole (LS-3496)',
-      async ({ page }) => {
-        await page.goto('/players');
-        await page.waitForLoadState('load');
-
-        const getStartedBtn = page.getByRole('button', {
-          name: /get started free/i,
-        });
-        await expect(getStartedBtn).toBeVisible({ timeout: 15_000 });
-        await expect(getStartedBtn).toBeEnabled();
-        // Regression for LS-3496: confirm the click resolves without the
-        // CSS selector parse error caused by the broken crawler selector
-        // `(button:visible, [role="button"]:visible)`.
-        await getStartedBtn.click();
-      },
-    );
-
-    unauthTest(
-      '"Continue with Discord" button is visible on /players when unauthenticated',
-      async ({ page }) => {
-        await page.goto('/players');
-        await page.waitForLoadState('load');
-
         await expect(
-          page.getByRole('button', { name: /continue with discord/i }),
+          page.getByText('Aaron Judge', { exact: false }).first(),
         ).toBeVisible({ timeout: 15_000 });
-      },
-    );
-
-    unauthTest(
-      '"Continue with Discord" button on /players is clickable via getByRole',
-      async ({ page }) => {
-        await page.goto('/players');
-        await page.waitForLoadState('load');
-
-        const discordBtn = page.getByRole('button', {
-          name: /continue with discord/i,
-        });
-        await expect(discordBtn).toBeVisible({ timeout: 15_000 });
-        await expect(discordBtn).toBeEnabled();
-        // Confirm the click resolves without a CSS selector parse error —
-        // regression coverage for the original crawler failure (LS-3495). The
-        // Discord OAuth handler sets window.location.href for a cross-origin
-        // redirect, so noWaitAfter prevents Playwright from hanging on the
-        // navigation.
-        await discordBtn.click({ noWaitAfter: true });
       },
     );
   },

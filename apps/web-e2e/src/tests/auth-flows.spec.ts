@@ -238,7 +238,7 @@ unauthTest.describe('Protected Routes @critical', () => {
     '/',
     // /baseball is publicly accessible (LS-3532) — see Public Routes section below.
     '/baseball/mock-draft',
-    '/players',
+    // /players is publicly accessible (LS-3493) — see Public Routes section below.
     '/management',
     '/profile/settings',
     '/preferences',
@@ -619,7 +619,8 @@ expiredSessionTest.describe('Session Expiry @critical', () => {
   expiredSessionTest(
     'shows landing page on a protected route with an expired JWT',
     async ({ page }) => {
-      await page.goto('/players');
+      // /players is now public (LS-3493); use /management which remains protected.
+      await page.goto('/management');
       await page.waitForLoadState('load');
 
       await expect(
