@@ -80,8 +80,14 @@ export interface DraftPickRecord {
   playerId: number;
   /** Player name fields returned directly from getDraftPicks. Used to display
    * names for picks that are absent from the careerBattingStats map (e.g. pure
-   * pitchers). */
-  player?: { id: number; firstName: string; lastName: string } | null;
+   * pitchers). eligiblePositions is used to fix position display for drafted
+   * players who are no longer in the availablePlayers list (LS-3647). */
+  player?: {
+    id: number;
+    firstName: string;
+    lastName: string;
+    eligiblePositions?: string[] | null;
+  } | null;
 }
 
 export interface LeagueTeam {

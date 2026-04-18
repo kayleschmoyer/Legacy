@@ -5792,6 +5792,7 @@ export type GetDraftPicksQuery = {
       id?: number | null;
       firstName?: string | null;
       lastName?: string | null;
+      eligiblePositions?: Array<string> | null;
     } | null;
   }> | null;
 };
@@ -13417,6 +13418,7 @@ export const GetDraftPicks = gql`
         id
         firstName
         lastName
+        eligiblePositions
       }
     }
   }

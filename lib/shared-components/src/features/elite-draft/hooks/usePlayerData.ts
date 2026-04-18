@@ -116,37 +116,52 @@ export function usePlayerData({
           : (ap.hitterAvgPointsPerGame ?? null),
       });
     }
-    // Seed from pick history for drafted players absent from stats
+    // Seed from pick history for drafted players absent from stats, and fix
+    // position for players seeded from playerStatsMap whose position is 'UTIL'
+    // (playerStatsMap hardcodes position as 'UTIL' since primaryPosition was
+    // removed from GetDraftPlayerStats to avoid expensive DataLoader calls —
+    // LS-3113, LS-3647).
     for (const pick of pickHistory) {
-      if (!map.has(pick.playerId) && pick.player) {
-        const name = `${pick.player.firstName} ${pick.player.lastName}`.trim();
-        if (name) {
-          const ps = pitchingStatsMap.get(pick.playerId);
+      if (!pick.player) continue;
+      const name = `${pick.player.firstName} ${pick.player.lastName}`.trim();
+      if (!name) continue;
+      const ps = pitchingStatsMap.get(pick.playerId);
+      if (!map.has(pick.playerId)) {
+        // Player has no batting stats (e.g. pure pitcher) — add entry
+        map.set(pick.playerId, {
+          id: pick.playerId,
+          name,
+          position:
+            pick.player.eligiblePositions?.[0] ??
+            (ps ? (ps.gamesStarted >= ps.games / 2 ? 'SP' : 'RP') : 'P'),
+          eligiblePositions: pick.player.eligiblePositions ?? undefined,
+          avg: 0,
+          hr: 0,
+          rbi: 0,
+          runs: 0,
+          sb: 0,
+          games: ps?.games ?? 0,
+          hits: 0,
+          obp: 0,
+          slg: 0,
+          ...(ps && {
+            era: ps.era,
+            wins: ps.wins,
+            losses: ps.losses,
+            saves: ps.saves,
+            strikeouts: ps.strikeouts,
+            gamesStarted: ps.gamesStarted,
+          }),
+        });
+      } else if (pick.player.eligiblePositions?.length) {
+        // Player is in map from playerStatsMap with hardcoded 'UTIL' — patch
+        // position and eligiblePositions using the authoritative server data.
+        const existing = map.get(pick.playerId);
+        if (existing?.position === 'UTIL') {
           map.set(pick.playerId, {
-            id: pick.playerId,
-            name,
-            position: ps
-              ? ps.gamesStarted >= ps.games / 2
-                ? 'SP'
-                : 'RP'
-              : 'P',
-            avg: 0,
-            hr: 0,
-            rbi: 0,
-            runs: 0,
-            sb: 0,
-            games: ps?.games ?? 0,
-            hits: 0,
-            obp: 0,
-            slg: 0,
-            ...(ps && {
-              era: ps.era,
-              wins: ps.wins,
-              losses: ps.losses,
-              saves: ps.saves,
-              strikeouts: ps.strikeouts,
-              gamesStarted: ps.gamesStarted,
-            }),
+            ...existing,
+            position: pick.player.eligiblePositions[0],
+            eligiblePositions: pick.player.eligiblePositions,
           });
         }
       }

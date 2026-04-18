@@ -276,6 +276,7 @@ query GetDraftPicks($draftId: Int!) {
       id
       firstName
       lastName
+      eligiblePositions
     }
   }
 }

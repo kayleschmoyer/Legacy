@@ -214,6 +214,7 @@ export function useDraftQueries({
                   id: p.player.id,
                   firstName: p.player.firstName ?? '',
                   lastName: p.player.lastName ?? '',
+                  eligiblePositions: p.player.eligiblePositions ?? null,
                 }
               : null,
         })),
