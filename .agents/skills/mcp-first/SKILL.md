@@ -118,6 +118,14 @@ Use `ci_list_runs`, `ci_view_run`, `ci_get_logs`, `ci_search_logs`, and `ci_reru
 
 **CI status and PR events are surfaced natively by Claude Code** — no wait tool needed. After pushing, Claude Code automatically receives and surfaces CI failures, review events, and merge status. Never use `sleep` + polling loops (`sleep N && gh run view`, `sleep N && gh pr view`, `ci_view_run` in a loop, `github_view_pr` in a loop) — these waste context and shell round-trips.
 
+## Jira Operations
+
+Use `jira_list_children` instead of `searchJiraIssuesUsingJql` with `parent = LS-####` to list children of an epic or story. Raw JQL returns verbose markdown-formatted output that can overflow the MCP context limit (~192K chars for 50 results); `jira_list_children` returns compact structured JSON with pagination support.
+
+| Pattern to avoid                                                              | Correct MCP tool                                                                               |
+| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `searchJiraIssuesUsingJql(jql: "parent = LS-#### ORDER BY created ASC", ...)` | `jira_list_children(key: "LS-####")` — supports `status` filter and pagination via `pageToken` |
+
 ## Database Operations
 
 Use `db_migration_status` instead of `pnpm --prefix lib/db-client run db:status` via Bash, `db_migrate` instead of `pnpm --prefix lib/db-client run db:up`, `db_query` for ad-hoc SQL, `db_codegen` for GraphQL codegen, and `db_print_schema` for schema regeneration.
