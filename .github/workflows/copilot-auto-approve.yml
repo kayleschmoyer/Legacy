@@ -25,7 +25,11 @@ name: Copilot Auto-Approve
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    # review_request_removed fires when Copilot finishes reviewing (either by
+    # submitting a review or by being removed from reviewers without posting).
+    # This gives us an event-driven "Copilot is done" signal instead of relying
+    # on a timer to assume clean pass.
+    types: [opened, synchronize, reopened, ready_for_review, review_request_removed]
   pull_request_review:
     types: [submitted]
   workflow_run:
@@ -55,6 +59,7 @@ jobs:
   request-review:
     if: >-
       github.event_name == 'pull_request' &&
+      github.event.action != 'review_request_removed' &&
       !github.event.pull_request.draft
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     steps:
@@ -275,17 +280,22 @@ jobs:
               },
             });
 
-      # On synchronize (new push), the native "Copilot code review" workflow
-      # (triggered by the copilot_code_review ruleset's review_on_push: true)
-      # only auto-triggers on force-pushes, not incremental commits. This leaves
-      # the copilot_code_review ruleset unsatisfied and the PR permanently blocked.
+      # Explicitly request Copilot as a reviewer. Two reasons it isn't enough to
+      # rely on the copilot_code_review ruleset (review_on_push: true):
+      #   1. On synchronize (incremental commits), the ruleset only fires on
+      #      force-pushes, so without an explicit call the ruleset stays
+      #      unsatisfied and the PR is permanently blocked (LS-3073).
+      #   2. On opened/reopened/ready_for_review, the ruleset normally fires,
+      #      but if it fails transiently (app outage, repo config drift),
+      #      Copilot never enters requested_reviewers. Without this call as a
+      #      backstop, bot-review would sit at in_progress forever (since the
+      #      flow now requires an actual pull_request_review or
+      #      review_request_removed event — no timer-based clean-pass fallback).
       #
-      # Fix: explicitly re-request Copilot as a reviewer on every synchronize.
-      # Tested in LS-3073: GITHUB_TOKEN works for this call.
-      - name: Re-request Copilot review for native ruleset
-        if: |
-          github.event.action == 'synchronize' &&
-          github.event.pull_request.user.login != 'dependabot[bot]'
+      # requestReviewers is idempotent, so calling it when Copilot is already a
+      # requested reviewer is a harmless no-op. Tested with GITHUB_TOKEN in LS-3073.
+      - name: Request Copilot review (backstop for native ruleset)
+        if: github.event.pull_request.user.login != 'dependabot[bot]'
         uses: actions/github-script@v9
         with:
           script: |
@@ -297,9 +307,9 @@ jobs:
                 pull_number: prNumber,
                 reviewers: ['copilot-pull-request-reviewer[bot]'],
               });
-              core.info(`Re-requested Copilot review for PR #${prNumber}`);
+              core.info(`Requested Copilot review for PR #${prNumber}`);
             } catch (error) {
-              core.warning(`Copilot re-request failed: ${error.message}`);
+              core.warning(`Copilot request failed: ${error.message}`);
             }
 
   review-check:
@@ -489,6 +499,113 @@ jobs:
               core.warning(`Failed to add label: ${e.message}`);
             }
 
+  copilot-removed:
+    # Event-driven "Copilot is done" signal. GitHub auto-removes a reviewer from
+    # requested_reviewers when they submit a review, so review_request_removed
+    # fires both after Copilot submits (review-check handles the submission via
+    # pull_request_review) and when Copilot is removed without posting anything
+    # (e.g. Copilot internally aborted, user manually removed, etc).
+    #
+    # This job only acts in the "removed without a review for current SHA" case
+    # by approving as clean pass. When a review exists, it is a no-op and lets
+    # review-check evaluate threads.
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.action == 'review_request_removed' &&
+      (github.event.requested_reviewer.login == 'copilot-pull-request-reviewer[bot]' ||
+       github.event.requested_reviewer.login == 'Copilot') &&
+      !github.event.pull_request.draft &&
+      github.event.pull_request.user.login != 'dependabot[bot]' &&
+      github.event.pull_request.user.login != 'legacy-sports-code-bot[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    steps:
+      - name: Generate bot token
+        id: bot-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: 3142924
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+      - name: Approve if no Copilot review for current SHA
+        uses: actions/github-script@v9
+        env:
+          BOT_TOKEN: ${{ steps.bot-token.outputs.token }}
+        with:
+          github-token: ${{ steps.bot-token.outputs.token }}
+          script: |
+            const createCheck = async (p) => {
+              const resp = await fetch(
+                `https://api.github.com/repos/${p.owner}/${p.repo}/check-runs`,
+                { method: 'POST', headers: { Authorization: `Bearer ${process.env.BOT_TOKEN}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' }, body: JSON.stringify(p) }
+              );
+              if (!resp.ok) throw new Error(`checks.create ${resp.status}: ${await resp.text()}`);
+            };
+
+            const prNumber = context.payload.pull_request.number;
+            const sha = context.payload.pull_request.head.sha;
+            const copilotReviewLogins = ['copilot-pull-request-reviewer[bot]', 'Copilot'];
+
+            // Brief wait: review_request_removed can fire fractionally before the
+            // submitted review appears in listReviews. 15s avoids double-handling
+            // a submission that review-check is about to process.
+            await new Promise(r => setTimeout(r, 15000));
+
+            const reviews = await github.rest.pulls.listReviews({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+            });
+            const copilotReviewsForCurrentSha = reviews.data.filter(r =>
+              copilotReviewLogins.includes(r.user.login) && r.commit_id === sha
+            );
+
+            if (copilotReviewsForCurrentSha.length > 0) {
+              core.info(`Copilot posted ${copilotReviewsForCurrentSha.length} review(s) on current SHA — review-check will handle`);
+              return;
+            }
+
+            core.info('Copilot removed without posting a review for current SHA — treating as clean pass');
+
+            await createCheck({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              name: 'bot-review',
+              head_sha: sha,
+              status: 'completed',
+              conclusion: 'success',
+              output: {
+                title: 'Copilot review passed',
+                summary: 'Copilot removed without posting a review — clean pass',
+              },
+            });
+
+            const botReviews = reviews.data.filter(r =>
+              r.user.login === 'legacy-sports-review-bot[bot]' && r.state === 'APPROVED'
+            );
+            if (botReviews.length === 0) {
+              await github.rest.pulls.createReview({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber,
+                event: 'APPROVE',
+                body: 'Auto-approved: Copilot completed without posting review comments.',
+              });
+              core.info(`Approved PR #${prNumber}`);
+            }
+
+            try {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                labels: ['merge-when-ready'],
+              });
+              core.info(`Labeled PR #${prNumber} merge-when-ready`);
+            } catch (e) {
+              core.warning(`Failed to add label: ${e.message}`);
+            }
+
   auto-approve:
     # Runs when the built-in "Copilot code review" workflow completes for a PR
     if: github.event_name == 'workflow_run'
@@ -617,10 +734,13 @@ jobs:
             }
 
             if (copilotReviews.length === 0) {
-              // After ~80s total (30s sleep + ~50s polling) with no Copilot review,
-              // the workflow likely completed without posting one (clean pass).
-              core.info('No Copilot reviews found after polling — assuming clean pass');
-              core.setOutput('has_comments', 'false');
+              // The "Copilot code review" workflow completed but no PR review has
+              // been posted yet. The workflow completing and the review being posted
+              // are separate async events — 80s is not long enough to assume a clean
+              // pass. Leave bot-review in_progress so delayed-recheck fires after
+              // 3 min; the recheck job will approve as clean pass if still no review.
+              core.info('No Copilot reviews found after polling — leaving bot-review in_progress for delayed-recheck');
+              core.setOutput('has_comments', 'pending');
               return;
             }
 
@@ -634,14 +754,13 @@ jobs:
                 core.info('Latest Copilot review is APPROVED — old threads superseded');
                 return;
               }
-              // Case 2: Copilot's latest review is on an older commit, but the
-              // workflow just completed successfully for the current HEAD. This
-              // means Copilot re-reviewed the new code and raised no new issues
-              // (it didn't submit a new CHANGES_REQUESTED). Old threads from
-              // the prior review cycle are superseded.
+              // Case 2: Copilot's latest review is on an older commit. The workflow
+              // completed for the current HEAD but no new review has been posted yet —
+              // same async lag as the "no reviews" case above. Leave in_progress and
+              // let delayed-recheck/review-check handle it once the review is posted.
               if (latest.commit_id !== currentSha) {
-                core.setOutput('has_comments', 'false');
-                core.info(`Latest Copilot review is on ${latest.commit_id.slice(0, 7)}, current HEAD is ${currentSha.slice(0, 7)} — old review superseded by clean workflow run`);
+                core.setOutput('has_comments', 'pending');
+                core.info(`Latest Copilot review is on ${latest.commit_id.slice(0, 7)}, current HEAD is ${currentSha.slice(0, 7)} — review not posted yet, leaving in_progress`);
                 return;
               }
               // Case 3: Copilot reported no reviewable files (e.g. only permission
@@ -725,7 +844,14 @@ jobs:
               if (!resp.ok) throw new Error(`checks.create ${resp.status}: ${await resp.text()}`);
             };
 
-            const hasComments = '${{ steps.check.outputs.has_comments }}' === 'true';
+            const hasCommentsOutput = '${{ steps.check.outputs.has_comments }}';
+            if (hasCommentsOutput === 'pending') {
+              // Copilot's PR review hasn't been posted yet — leave bot-review
+              // in_progress so delayed-recheck can handle it after 3 min.
+              core.info('Copilot review pending — not updating bot-review status');
+              return;
+            }
+            const hasComments = hasCommentsOutput === 'true';
             await createCheck({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -815,7 +941,35 @@ jobs:
               .filter(r => copilotReviewLogins.includes(r.user.login))
               .sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at));
             if (copilotReviews.length === 0) {
-              core.info('No Copilot reviews yet — skipping');
+              // No Copilot review posted yet. Do NOT assume clean pass — a
+              // missing review could mean Copilot is still working. The
+              // event-driven copilot-removed job (fires on review_request_removed)
+              // handles the case where Copilot is done without posting.
+              //
+              // Before bailing, verify Copilot is actually in requested_reviewers.
+              // If it was never requested (or got dropped for any reason),
+              // the review_request_removed event can't fire and the PR would be
+              // stuck forever. Re-request as a self-healing safety net.
+              const copilotRequested = (pr.requested_reviewers || []).some(r =>
+                copilotReviewLogins.includes(r.login)
+              );
+              if (!copilotRequested) {
+                core.info('Copilot not in requested_reviewers and no review exists — re-requesting');
+                try {
+                  await github.rest.pulls.requestReviewers({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    pull_number: prNumber,
+                    reviewers: ['copilot-pull-request-reviewer[bot]'],
+                  });
+                  core.info(`Re-requested Copilot review for PR #${prNumber}`);
+                } catch (e) {
+                  core.warning(`Copilot re-request failed: ${e.message}`);
+                }
+              } else {
+                core.info('Copilot is in requested_reviewers but has not posted a review yet');
+              }
+              core.info('Leaving bot-review in_progress — event-driven signal will resolve');
               return;
             }
 
@@ -949,6 +1103,7 @@ jobs:
     needs: request-review
     if: >-
       github.event_name == 'pull_request' &&
+      github.event.action != 'review_request_removed' &&
       !github.event.pull_request.draft &&
       github.event.pull_request.user.login != 'dependabot[bot]' &&
       github.event.pull_request.user.login != 'legacy-sports-code-bot[bot]'
