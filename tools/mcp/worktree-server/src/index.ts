@@ -4438,20 +4438,42 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           return { content: [{ type: 'text', text: log.join('\n') }] };
         }
 
-        // Check for clean working directory
+        // Check for clean working directory, ignoring gitignored untracked files
+        // (e.g. transient runtime files like .claude/scheduled_tasks.lock)
         const status = run('git status --porcelain', cwd).trim();
         if (status) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text:
-                  `Working directory is not clean in ${cwd}:\n${status}\n\n` +
-                  'Commit or stash changes before rebasing.',
-              },
-            ],
-            isError: true,
-          };
+          const lines = status.split('\n').filter(Boolean);
+          // Tracked changes (staged/unstaged) always block
+          const trackedChanges = lines.filter((l) => !l.startsWith('??'));
+          // For untracked files, only block on non-gitignored ones
+          let blockingUntracked: string[] = [];
+          if (lines.some((l) => l.startsWith('??'))) {
+            // git ls-files --others --exclude-standard lists non-ignored untracked files only
+            const nonIgnored = run(
+              'git ls-files --others --exclude-standard',
+              cwd,
+            ).trim();
+            if (nonIgnored) {
+              blockingUntracked = nonIgnored
+                .split('\n')
+                .filter(Boolean)
+                .map((f) => `?? ${f}`);
+            }
+          }
+          const blockingChanges = [...trackedChanges, ...blockingUntracked];
+          if (blockingChanges.length > 0) {
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text:
+                    `Working directory is not clean in ${cwd}:\n${blockingChanges.join('\n')}\n\n` +
+                    'Commit or stash changes before rebasing.',
+                },
+              ],
+              isError: true,
+            };
+          }
         }
 
         // Fetch origin and update local main ref
