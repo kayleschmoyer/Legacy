@@ -7,6 +7,12 @@ interface MergePRParams {
   strategy: 'queue' | 'direct';
 }
 
+interface MergeResponse {
+  sha: string;
+  merged: boolean;
+  message: string;
+}
+
 interface PRIdResponse {
   repository: {
     pullRequest: { id: string } | null;
@@ -39,7 +45,7 @@ export async function mergePR(params: MergePRParams): Promise<ToolResult> {
 
     if (params.strategy === 'direct') {
       // Direct merge via REST API — bypasses merge queue (admin merge)
-      await githubRest({
+      const mergeResult = await githubRest<MergeResponse>({
         method: 'PUT',
         path: `/repos/${repo.owner}/${repo.name}/pulls/${params.number}/merge`,
         body: {
@@ -57,7 +63,9 @@ export async function mergePR(params: MergePRParams): Promise<ToolResult> {
                 success: true,
                 prNumber: params.number,
                 strategy: params.strategy,
-                output: `PR #${params.number} merged directly via squash.`,
+                sha: mergeResult.sha,
+                merged: mergeResult.merged,
+                output: mergeResult.message,
               },
               null,
               2,
