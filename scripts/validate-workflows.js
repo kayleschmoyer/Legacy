@@ -28,7 +28,8 @@ function log(message, color = 'reset') {
   console.log(`${colors[color]}${message}${colors.reset}`);
 }
 
-// Fetch JSON schema from URL (handles redirects)
+// Fetch JSON schema from URL (handles redirects). Returns null on network errors
+// so callers can skip validation gracefully when offline.
 async function fetchSchema(url) {
   try {
     const response = await fetch(url, {
@@ -42,6 +43,11 @@ async function fetchSchema(url) {
 
     return await response.json();
   } catch (error) {
+    // Distinguish network-level failures (no connectivity) from HTTP errors.
+    // TypeError covers "fetch failed" / ENOTFOUND / ETIMEDOUT etc.
+    if (error instanceof TypeError || error.cause) {
+      return null;
+    }
     throw new Error(`Failed to fetch schema from ${url}: ${error.message}`);
   }
 }
@@ -97,6 +103,14 @@ async function main() {
       fetchSchema(WORKFLOW_SCHEMA_URL),
       fetchSchema(ACTION_SCHEMA_URL),
     ]);
+
+    if (!workflowSchema || !actionSchema) {
+      log(
+        '\n⚠️  Schema fetch failed (network unavailable) — skipping workflow validation',
+        'yellow',
+      );
+      process.exit(0);
+    }
 
     const ajv = new Ajv({
       allErrors: true,
