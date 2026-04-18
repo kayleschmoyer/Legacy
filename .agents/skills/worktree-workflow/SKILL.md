@@ -38,7 +38,7 @@ The Claude Code session was spawned with the launcher `worktree` checkbox checke
    worktree_setup_node_modules()
    ```
 
-   Uses Node.js path APIs internally — no shell escaping needed. Idempotent (safe to call if symlink already exists). Fallback if MCP unavailable (run from the worktree root): `cmd /c "mklink /D node_modules D:\code\legacy-sports\node_modules"` (uses a directory symlink — do NOT use `mklink /J` or `New-Item -ItemType Junction`, which are followed by recursive-delete operations)
+   Uses Node.js path APIs internally — no shell escaping needed. Idempotent (safe to call if symlink already exists). **Never** use `mklink`, `New-Item -ItemType SymbolicLink`, `New-Item -ItemType Junction`, or any other manual symlink/junction command — they bypass `.modules.yaml` path consistency checks and cause Nx graph failures. If `worktree_setup_node_modules` is unavailable (e.g., MCP server not yet connected at session start), run `make install` inside the worktree instead — this creates an independent `node_modules` and is always safe.
 
    > **Installing new packages in a worktree**: while `node_modules` is symlinked to the main repo, you must never run `pnpm add` or `make install` from the worktree. Those commands are unsafe in this setup: the repo's guardrails are meant to stop them, but attempting to run them with the symlink still in place risks corrupting the shared `node_modules` used by every worktree. If your implementation requires adding/removing/updating dependencies, you **must** break the symlink first and install independently:
    >
@@ -52,7 +52,7 @@ The Claude Code session was spawned with the launcher `worktree` checkbox checke
    >
    > 1. If `node_modules` exists as a broken symlink or points to the wrong location, remove it with `cmd /c "rmdir node_modules"`. If `node_modules` is already missing, skip this step.
    > 2. Run `make install` from the worktree — this creates an independent `node_modules`
-   > 3. **Never** use `mklink /J` or `New-Item -ItemType Junction` to recreate the link — junctions are followed by recursive-delete operations and can cause `.modules.yaml` path mismatches and Nx graph failures. If you must recreate the link without MCP, `cd` into the worktree root and run `cmd /c "mklink /D node_modules D:\code\legacy-sports\node_modules"` (directory symlink). Prefer `worktree_setup_node_modules()` (native flow) or `make_wt_setup` (sibling flow) — they handle all edge cases.
+   > 3. **Never** recreate the symlink manually — `mklink /J`, `mklink /D`, `New-Item -ItemType Junction`, `New-Item -ItemType SymbolicLink`, and all other manual symlink/junction commands are forbidden. They bypass `.modules.yaml` path consistency checks and cause Nx graph failures. Only `worktree_setup_node_modules()` (native flow) or `make_wt_setup` (sibling flow) should recreate the symlink — they handle all edge cases. If MCP is unavailable, `make install` inside the worktree creates an independent `node_modules`.
    >
    > See also [workflow-recovery-procedures.md](references/shared/workflow-recovery-procedures.md).
 
@@ -70,7 +70,7 @@ The Claude Code session was spawned with the launcher `worktree` checkbox checke
 - **`make_wt_setup` is NOT used** — it's sibling-only. The symlink command above replaces it.
 - **`worktree_list` / `make_worktree_create` are NOT used** — you're already in a worktree, Claude Code created it for you.
 - **On exit**, `ExitWorktree(action: "remove")` cleans up the ephemeral worktree. Only call this when explicitly done — the worktree can survive across sessions if kept.
-- **All 9 MCP servers** should connect in every session (`MCP_TIMEOUT=10000` in `.claude/settings.json` ensures startup headroom). If a server is unexpectedly missing or timing out, **first verify the `node_modules` symlink exists** — all MCP servers use `pnpm exec tsx` and will time out immediately if the symlink is absent. If this is happening at startup and the worktree MCP server is unavailable, use the existing cmd/PowerShell fallback (e.g., `mklink /D`) to create or repair the symlink, then restart the session. If MCP is already available, run `worktree_setup_node_modules()` to repair it in-session. The `SessionStart` hook attempts this automatically but may not fire in all session types (e.g., Copilot CLI).
+- **All 9 MCP servers** should connect in every session (`MCP_TIMEOUT=10000` in `.claude/settings.json` ensures startup headroom). If a server is unexpectedly missing or timing out, **first verify the `node_modules` symlink exists** — all MCP servers use `pnpm exec tsx` and will time out immediately if the symlink is absent. If this is happening at startup and the worktree MCP server is unavailable, run `make install` inside the worktree to create an independent `node_modules`, then restart the session. If MCP is already available, run `worktree_setup_node_modules()` to repair it in-session. **Never** use `mklink`, `New-Item -ItemType SymbolicLink`, `New-Item -ItemType Junction`, or any other manual symlink/junction command — only `worktree_setup_node_modules()` handles all edge cases correctly. The `SessionStart` hook attempts this automatically but may not fire in all session types (e.g., Copilot CLI).
 
 ## Subagent Dispatch (multi-ticket orchestrators)
 
@@ -95,7 +95,7 @@ for each ticket/PR needing code work:
       Setup (REQUIRED before any pnpm/make command):
       1. git fetch origin <branch-or-main>
       2. git checkout <existing-branch>  (for PRs)  OR  stay on the ephemeral branch (for new tickets)
-      3. worktree_setup_node_modules()   # or cmd /c "mklink /D node_modules D:\code\legacy-sports\node_modules" fallback
+      3. worktree_setup_node_modules()   # or `make install` if MCP unavailable — NEVER use mklink or New-Item symlink/junction commands
       4. <do NOT rename branch — Jira links via PR title + commits containing LS-####>
       5. If you need to install new packages: cmd /c "rmdir node_modules" first, then pnpm add -w <pkg>, then make install
 
