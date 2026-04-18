@@ -272,10 +272,17 @@ rm -rf .git/rebase-merge
 
 ### Lost commits after rebase
 
+```
+# MCP-first: all commits are preserved in reflog for 90 days
+worktree_reflog({ limit: 20 })
+# Find the commit SHA from before the rebase and reset:
+worktree_reset({ ref: "<sha>", hard: true })
+```
+
+Shell fallback:
+
 ```bash
-# All commits are preserved in reflog for 90 days
 git reflog
-# Find the commit hash from before the rebase and reset:
 git reset --hard <hash>
 ```
 

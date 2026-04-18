@@ -70,9 +70,14 @@ if (Test-Path .git/rebase-merge) {
    ```
 
 4. **Recover from a bad rebase** (already completed but wrong):
+   ```
+   # MCP-first: find the pre-rebase state in reflog
+   worktree_reflog({ limit: 20 })
+   # Reset to the state before the rebase (use SHA from reflog entries)
+   worktree_reset({ ref: "<sha>", hard: true })
+   ```
+   Shell fallback:
    ```powershell
-   # Find the pre-rebase state in reflog
    git reflog
-   # Reset to the state before the rebase
    git reset --hard HEAD@{N}   # where N is the reflog entry before rebase
    ```

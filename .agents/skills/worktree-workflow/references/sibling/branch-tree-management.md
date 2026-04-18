@@ -86,4 +86,4 @@ twig tree
 
 - **High commit count**: Use skip-commits to rebase cleanly
 - **Branch not in tree**: Run `twig init` or `twig branch --set-parent parent-branch`
-- **Lost commits after rebase**: Use `git reflog` then `git reset --hard HEAD@{N}`
+- **Lost commits after rebase**: Use `worktree_reflog()` (MCP-first) to find the SHA, then `worktree_reset({ ref: "<sha>", hard: true })`. Shell fallback: `git reflog` then `git reset --hard HEAD@{N}`

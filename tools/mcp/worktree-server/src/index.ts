@@ -1045,6 +1045,27 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
       },
     },
     {
+      name: 'worktree_reflog',
+      description:
+        'Show the reflog for a worktree — all HEAD movements including commits removed by reset --hard, amend, and rebase. ' +
+        'Use this to recover SHAs after destructive operations (reset --hard, bad rebase, accidental amend). ' +
+        'Prefer this over `git reflog` shell calls. Substitutes: `git reflog` → `worktree_reflog()`, `git reflog | head -20` → `worktree_reflog({ limit: 20 })`.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          limit: {
+            type: 'number',
+            description: 'Max reflog entries to return (default: 20, max: 100)',
+          },
+          worktree: {
+            type: 'string',
+            description:
+              'Ticket key, absolute path, or omit for active worktree',
+          },
+        },
+      },
+    },
+    {
       name: 'worktree_file_info',
       description:
         'Get metadata for one or more paths (files or directories). Always reports: exists, isFile, isDirectory, isSymlink, isJunction (Windows only), linkTarget (when isSymlink). For regular files ≤10MB also reports bytes, lines, and approxTokens; files >10MB get bytes only. Use this instead of `ls`, `dir`, `Test-Path`, or `Get-ChildItem` to detect whether node_modules is a junction, a real directory, or missing.',
@@ -3311,6 +3332,73 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           String(err);
         return {
           content: [{ type: 'text', text: `Failed to get log: ${output}` }],
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_reflog
+    // -----------------------------------------------------------------------
+    case 'worktree_reflog': {
+      const { limit: limitRaw = 20, worktree: wtKey } = args as {
+        limit?: number;
+        worktree?: string;
+      };
+      const target = resolveTargetDir(wtKey);
+      if ('error' in target) {
+        return {
+          content: [{ type: 'text', text: target.error }],
+          isError: true,
+        };
+      }
+      const cwd = target.path;
+      const limit = Math.min(Math.max(Number(limitRaw) || 20, 1), 100);
+
+      try {
+        const RS = '\x1e'; // record separator
+        const FS = '\x1f'; // field separator
+        // %H=full SHA, %h=short SHA, %gd=short selector (HEAD@{0}), %gs=subject, %aI=ISO timestamp
+        const output = runGit(
+          [
+            'reflog',
+            `--format=${RS}%H${FS}%h${FS}%gd${FS}%gs${FS}%aI`,
+            `-n`,
+            `${limit}`,
+          ],
+          cwd,
+          { timeout: 15_000 },
+        );
+        const entries = output
+          .split(RS)
+          .filter((b) => b.trim())
+          .map((record) => {
+            const fields = record.trim().split(FS);
+            const sha = fields[0] ?? '';
+            const shortSha = fields[1] ?? '';
+            const selector = fields[2] ?? '';
+            const action = fields[3] ?? '';
+            return {
+              sha,
+              shortSha,
+              action,
+              message: selector ? `${selector}: ${action}` : action,
+              timestamp: fields[4] ?? '',
+            };
+          });
+        return {
+          content: [
+            { type: 'text', text: JSON.stringify({ entries }, null, 2) },
+          ],
+        };
+      } catch (err: unknown) {
+        const e = err as { stdout?: string; stderr?: string; message?: string };
+        const output =
+          [e.stdout, e.stderr].filter(Boolean).join('\n') ||
+          e.message ||
+          String(err);
+        return {
+          content: [{ type: 'text', text: `Failed to get reflog: ${output}` }],
           isError: true,
         };
       }
