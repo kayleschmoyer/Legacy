@@ -306,3 +306,93 @@ unauthTest.describe(
     );
   },
 );
+
+// ---------------------------------------------------------------------------
+// LS-3532: /baseball is a public route. Unauthenticated users visiting
+// /baseball should see the baseball hub (Baseball Fantasy heading, Create
+// League / Join League CTAs) — NOT the marketing landing page. These tests
+// lock in the correct behavior after the route was moved to publicExactPaths
+// in main.tsx.
+// ---------------------------------------------------------------------------
+
+unauthTest.describe(
+  'Baseball Hub — unauthenticated visitor (LS-3532) @regression',
+  () => {
+    unauthTest.beforeEach(async ({ page }) => {
+      await page.goto('/baseball');
+      await page.waitForLoadState('load');
+    });
+
+    unauthTest(
+      'unauthenticated user sees the baseball hub on /baseball, not the marketing page',
+      async ({ page }) => {
+        await expect(page).toHaveURL('/baseball');
+        await expect(
+          page.getByRole('heading', { name: /baseball fantasy/i }),
+        ).toBeVisible({ timeout: 15_000 });
+        await expect(page.locator('body')).not.toContainText(
+          'Build Your Dynasty',
+        );
+        await expect(page.locator('body')).not.toContainText(
+          'Dominate Your League',
+        );
+      },
+    );
+
+    unauthTest(
+      'Create League button is visible for unauthenticated users on /baseball',
+      async ({ page }) => {
+        await expect(page.getByText('Create League').first()).toBeVisible({
+          timeout: 15_000,
+        });
+      },
+    );
+
+    unauthTest(
+      'Join League button is visible for unauthenticated users on /baseball',
+      async ({ page }) => {
+        await expect(page.getByText('Join League').first()).toBeVisible({
+          timeout: 15_000,
+        });
+      },
+    );
+  },
+);
+
+// ---------------------------------------------------------------------------
+// LS-3472: [functional] 404 error on /baseball.
+// An automated audit crawler navigated to /baseball and received a functional
+// 404 — the marketing landing page ("Build Your Dynasty" / "Dominate Your
+// League") was rendered in place of the baseball hub. These tests lock in the
+// corrected behaviour: an authenticated session must stay at /baseball (no
+// 404 redirect), must never see the marketing landing page, and must see the
+// baseball hub heading.
+// ---------------------------------------------------------------------------
+
+test.describe('Baseball Hub — functional 404 regression (LS-3472) @regression', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/baseball');
+    await page.waitForLoadState('load');
+  });
+
+  test('URL stays at /baseball for authenticated users — no 404 redirect', async ({
+    page,
+  }) => {
+    await expect(page).toHaveURL('/baseball', { timeout: 15_000 });
+  });
+
+  test('does not show marketing landing page for authenticated users on /baseball', async ({
+    page,
+  }) => {
+    await expect(page.getByText(/build your dynasty/i)).not.toBeVisible();
+    await expect(page.getByText(/dominate your league/i)).not.toBeVisible();
+  });
+
+  test('shows baseball hub content — not a 404 page — for authenticated users', async ({
+    page,
+  }) => {
+    await expect(
+      page.getByRole('heading', { name: /baseball fantasy/i }),
+    ).toBeVisible({ timeout: 15_000 });
+  });
+});
