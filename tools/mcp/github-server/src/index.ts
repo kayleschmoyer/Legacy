@@ -33,6 +33,7 @@ import { secretsCheck } from './tools/secrets-check.js';
 import { ensureSweepLabels } from './tools/ensure-sweep-labels.js';
 import { sweepStaleClaims } from './tools/sweep-stale-claims.js';
 import { viewPR } from './tools/view-pr.js';
+import { listLabels } from './tools/list-labels.js';
 import { listRunners } from './tools/list-runners.js';
 import { webhookList, webhookUpdate, webhookPing } from './tools/webhooks.js';
 import { prCommits } from './tools/pr-commits.js';
@@ -426,6 +427,21 @@ server.tool(
     description: z.string().optional().describe('Label description'),
   },
   async (params) => createLabel(params),
+);
+
+// --- github_list_labels ---
+server.tool(
+  'github_list_labels',
+  'Prefer this over `gh label list` via shell. List all labels defined in the repository. Use before calling github_manage_labels or github_edit_pr to discover available label names.',
+  {
+    search: z
+      .string()
+      .optional()
+      .describe(
+        'Filter labels by name or description (case-insensitive substring match)',
+      ),
+  },
+  async (params) => listLabels(params),
 );
 
 // --- github_create_pr ---
