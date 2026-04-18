@@ -765,6 +765,72 @@ function rebaseContinueStep(
   return { completed: false, conflicted: conflictedFiles };
 }
 
+/**
+ * After a rebase, git can silently remove the node_modules directory entry
+ * even though it is listed in .gitignore. This function detects that case and
+ * restores the symlink automatically, appending status lines to `log`.
+ * If node_modules exists as a real directory (own install), it is left alone.
+ */
+function restoreNodeModulesSymlink(cwd: string, log: string[]): void {
+  const nmPath = join(cwd, 'node_modules');
+  const mainNmPath = join(MAIN_REPO, 'node_modules');
+
+  // Nothing to link to if main repo's node_modules doesn't exist.
+  if (!existsSync(mainNmPath)) return;
+
+  let stat: ReturnType<typeof lstatSync> | null = null;
+  try {
+    stat = lstatSync(nmPath);
+  } catch {
+    // node_modules doesn't exist at all
+  }
+
+  const recreate = (reason: string): void => {
+    try {
+      if (process.platform === 'win32') {
+        execFileSync('cmd', ['/c', 'mklink', '/D', nmPath, mainNmPath], {
+          encoding: 'utf-8',
+          timeout: 15_000,
+        });
+      } else {
+        symlinkSync(mainNmPath, nmPath);
+      }
+      log.push(`(node_modules symlink ${reason} — automatically restored)`);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      log.push(
+        `(warning: node_modules symlink ${reason} but could not be restored: ${msg})`,
+        '(run worktree_setup_node_modules to restore it manually)',
+      );
+    }
+  };
+
+  if (stat === null) {
+    // Removed entirely (common after git rebase index manipulation)
+    recreate('was missing after rebase');
+    return;
+  }
+
+  if (stat.isSymbolicLink()) {
+    // Check whether the symlink resolves (i.e., is not dangling)
+    try {
+      realpathSync(nmPath);
+      // Valid symlink — nothing to do
+    } catch {
+      // Dangling symlink — remove and recreate
+      try {
+        rmSync(nmPath, { recursive: false });
+      } catch {
+        // ignore cleanup errors; recreate will fail with a clear message if needed
+      }
+      recreate('was broken after rebase');
+    }
+    return;
+  }
+
+  // Real directory (worktree has its own install) — leave it alone
+}
+
 /** Run a command in a directory and return stdout. Throws on non-zero exit. */
 function run(
   command: string,
@@ -4508,6 +4574,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           }
         }
 
+        restoreNodeModulesSymlink(cwd, log);
         log.push(
           '',
           'Rebase complete. Next steps:',
@@ -4634,6 +4701,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                   isError: true,
                 };
               }
+              restoreNodeModulesSymlink(cwd, log);
               log.push(summary);
               log.push(
                 '',
@@ -4852,6 +4920,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const step = rebaseContinueStep(cwd, files);
 
         if (step.completed) {
+          const completionLog: string[] = [];
+          restoreNodeModulesSymlink(cwd, completionLog);
           return {
             content: [
               {
@@ -4862,6 +4932,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     remainingConflicts: [],
                     message:
                       'Rebase complete. Next: worktree_stabilize, then make pc, then worktree_push.',
+                    ...(completionLog.length > 0
+                      ? { notes: completionLog }
+                      : {}),
                   },
                   null,
                   2,
@@ -5496,6 +5569,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           isError: true,
         };
       }
+
+      // Restore node_modules symlink if it was removed during a preceding rebase.
+      // This runs before the isSymlink check so the skip-install path fires correctly.
+      restoreNodeModulesSymlink(cwd, log);
 
       // Check if node_modules is a symlink — skip install if so
       const nodeModulesPath = join(cwd, 'node_modules');
