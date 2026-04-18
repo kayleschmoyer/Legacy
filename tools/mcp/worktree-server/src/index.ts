@@ -505,6 +505,61 @@ function resolveTargetDir(
 }
 
 /**
+ * Read the checked-out branch name directly from the filesystem for a given
+ * worktree directory, bypassing any GIT_DIR / GIT_WORK_TREE environment
+ * overrides that could cause `git branch --show-current` to lie.
+ *
+ * In a proper git worktree, `.git` is a file containing a `gitdir:` pointer.
+ * In the main repo, `.git` is a directory. Either way we end up reading the
+ * `HEAD` file and parsing the branch ref from it.
+ *
+ * Returns `{ branch }` on success, `{ error }` on any failure (missing .git,
+ * detached HEAD, unexpected format, etc.).
+ */
+function readWorktreeHead(dir: string): { branch: string } | { error: string } {
+  const gitPath = join(dir, '.git');
+  let headPath: string;
+
+  try {
+    const stat = statSync(gitPath);
+    if (stat.isFile()) {
+      // Worktree: .git is a file containing "gitdir: /absolute/path/to/gitdir"
+      const content = readFileSync(gitPath, 'utf-8').trim();
+      const m = content.match(/^gitdir:\s*(.+)$/);
+      if (!m) {
+        return {
+          error: `Cannot parse .git file at ${gitPath}: unexpected format "${content}"`,
+        };
+      }
+      const gitDir = resolve(dir, m[1].trim());
+      headPath = join(gitDir, 'HEAD');
+    } else {
+      // Main repo: .git is a directory
+      headPath = join(gitPath, 'HEAD');
+    }
+  } catch (err) {
+    return {
+      error: `Cannot read .git at ${dir}: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+
+  try {
+    const headContent = readFileSync(headPath, 'utf-8').trim();
+    const refMatch = headContent.match(/^ref:\s*refs\/heads\/(.+)$/);
+    if (!refMatch) {
+      return {
+        error: `HEAD is detached (${headContent}). Cannot rename.`,
+      };
+    }
+    return { branch: refMatch[1].trim() };
+  } catch (err) {
+    return {
+      error: `Cannot read HEAD at ${headPath}: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+}
+
+/**
  * Resolve the best available shell for `worktree_run` on Windows.
  *
  * Priority:
@@ -8167,6 +8222,33 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
       const cwd = target.path;
 
+      // Guard: refuse to operate on the main repository root. resolveTargetDir
+      // does not apply this check when returning activeWorktree directly, so an
+      // agent that called worktree_set with a stale path could end up here.
+      if (resolve(cwd) === resolve(MAIN_REPO)) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Refused: active worktree resolves to the main repository root. Use worktree_set to select the correct worktree first.',
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      // Read HEAD directly from the filesystem to obtain the branch name
+      // independently of any GIT_DIR / GIT_WORK_TREE environment variables that
+      // could cause `git branch --show-current` to report a different branch.
+      const headResult = readWorktreeHead(cwd);
+      if ('error' in headResult) {
+        return {
+          content: [{ type: 'text', text: headResult.error }],
+          isError: true,
+        };
+      }
+      const headBranch = headResult.branch;
+
       // Get current branch name
       let previousName: string;
       try {
@@ -8177,6 +8259,25 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             {
               type: 'text',
               text: `Failed to determine current branch: ${err instanceof Error ? err.message : String(err)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      // Cross-check: if git disagrees with the HEAD file the process environment
+      // has overridden the git directory (GIT_DIR etc.) and we are about to
+      // rename the wrong branch. Refuse until the mismatch is resolved.
+      if (previousName !== headBranch) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text:
+                `State mismatch detected: git reports current branch as "${previousName}" ` +
+                `but the worktree HEAD file shows "${headBranch}". ` +
+                `Refusing to rename to avoid operating on the wrong branch. ` +
+                `Run worktree_set to reset the active worktree, then retry.`,
             },
           ],
           isError: true,
