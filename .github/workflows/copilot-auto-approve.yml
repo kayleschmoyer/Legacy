@@ -77,7 +77,7 @@ jobs:
         if: >-
           github.event.pull_request.user.login == 'dependabot[bot]' ||
           github.event.pull_request.user.login == 'legacy-sports-code-bot[bot]'
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           github-token: ${{ steps.bot-token.outputs.token }}
           script: |
@@ -106,7 +106,7 @@ jobs:
           github.event.pull_request.user.login != 'dependabot[bot]' &&
           github.event.pull_request.user.login != 'legacy-sports-code-bot[bot]' &&
           github.event.pull_request.head.repo.full_name == github.repository
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         env:
           BOT_TOKEN: ${{ steps.bot-token.outputs.token }}
         with:
@@ -286,7 +286,7 @@ jobs:
         if: |
           github.event.action == 'synchronize' &&
           github.event.pull_request.user.login != 'dependabot[bot]'
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const prNumber = context.payload.pull_request.number;
@@ -336,7 +336,7 @@ jobs:
         run: sleep 30
 
       - name: Check threads and approve if clean
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         env:
           BOT_TOKEN: ${{ steps.bot-token.outputs.token }}
         with:
@@ -496,7 +496,7 @@ jobs:
     steps:
       - name: Get PR number
         id: pr
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             // workflow_run.pull_requests may be empty for cross-repo PRs
@@ -547,7 +547,7 @@ jobs:
         if: >-
           steps.pr.outputs.number != '' &&
           github.event.workflow_run.conclusion != 'success'
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           github-token: ${{ steps.bot-token.outputs.token }}
           script: |
@@ -582,7 +582,7 @@ jobs:
           steps.pr.outputs.number != '' &&
           github.event.workflow_run.conclusion == 'success'
         id: check
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           github-token: ${{ steps.bot-token.outputs.token }}
           script: |
@@ -711,7 +711,7 @@ jobs:
         if: >-
           steps.pr.outputs.number != '' &&
           github.event.workflow_run.conclusion == 'success'
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         env:
           BOT_TOKEN: ${{ steps.bot-token.outputs.token }}
         with:
@@ -771,7 +771,7 @@ jobs:
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
       - name: Check threads and approve if clean
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         env:
           BOT_TOKEN: ${{ steps.bot-token.outputs.token }}
         with:
@@ -959,7 +959,7 @@ jobs:
 
       - name: Check if bot-review is still pending or failed
         id: check
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const sha = context.payload.pull_request.head.sha;
@@ -988,7 +988,7 @@ jobs:
 
       - name: Dispatch recheck
         if: steps.check.outputs.state == 'pending' || steps.check.outputs.state == 'failure'
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const prNumber = context.payload.pull_request.number;

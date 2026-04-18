@@ -96,7 +96,7 @@ jobs:
       actions: write # dispatch ci-orchestrator on demand
     steps:
       - name: Dispatch CI and wait
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const owner = context.repo.owner;
@@ -177,7 +177,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Check CI Pipeline Status
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             let sha = context.sha;
