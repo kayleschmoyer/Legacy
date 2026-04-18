@@ -4392,6 +4392,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               throw twigErr;
             }
           }
+          // twig exits 0 with "No parent branches found" when no parent is registered —
+          // it prints "Rebase complete." but performs no actual rebase. Detect this on
+          // the success path and fall back to git rebase origin/main.
+          if (/no parent branches found/i.test(rebaseOut)) {
+            log.push(
+              '(twig reported no parent branches — falling back to: git rebase origin/main)',
+            );
+            log.push('$ git rebase origin/main');
+            rebaseOut = run('git rebase origin/main', cwd, {
+              timeout: 120_000,
+              env: NON_INTERACTIVE_GIT_ENV,
+            });
+          }
         }
         log.push(rebaseOut.trim());
 
