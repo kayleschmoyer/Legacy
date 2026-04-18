@@ -1938,6 +1938,44 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
       },
     },
     {
+      name: 'worktree_reset_to_remote',
+      description:
+        'Hard-reset the current branch to its remote tracking ref (git reset --hard origin/<branch>). ' +
+        'Use this to recover from a corrupted local rebase — e.g. committed conflict markers, ' +
+        'stacked duplicate commits, or rerere auto-resolve failures — by discarding all local ' +
+        'history and returning to the clean remote state. ' +
+        'Safety: refuses main/master branches; requires force: true when the working tree is dirty. ' +
+        'Abandoned local commits remain reachable via git reflog.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          remote: {
+            type: 'string',
+            description:
+              'Remote name (default: "origin"). The remote whose tracking ref will be used as the reset target.',
+          },
+          branch: {
+            type: 'string',
+            description:
+              'Branch name to reset to on the remote (default: current tracking branch). ' +
+              'E.g. "main" or "claude/my-feature". Omit to use the current branch\'s upstream.',
+          },
+          force: {
+            type: 'boolean',
+            description:
+              'Skip the dirty-worktree safety check. When false (default), refuses to reset if ' +
+              'there are uncommitted working tree changes. Pass true to discard them.',
+          },
+          worktree: {
+            type: 'string',
+            description:
+              'Ticket key, absolute path, or omit for active worktree',
+          },
+        },
+        required: [],
+      },
+    },
+    {
       name: 'worktree_delete_remote_branch',
       description:
         'Delete a remote branch via `git push origin --delete <branch>`. ' +
@@ -9427,6 +9465,295 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               text: [
                 `[resolvedWorktree: ${cwd}]`,
                 `worktree_reset failed`,
+                output,
+              ]
+                .filter(Boolean)
+                .join('\n'),
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_reset_to_remote
+    // -----------------------------------------------------------------------
+    case 'worktree_reset_to_remote': {
+      const {
+        remote = 'origin',
+        branch: branchOverride,
+        force = false,
+        worktree: wtKeyRaw,
+      } = args as {
+        remote?: string;
+        branch?: string;
+        force?: boolean;
+        worktree?: unknown;
+      };
+
+      // Validate worktree param type
+      if (wtKeyRaw !== undefined && typeof wtKeyRaw !== 'string') {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Invalid worktree: expected string, got ${typeof wtKeyRaw}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+      if (typeof wtKeyRaw === 'string' && wtKeyRaw.trim().length === 0) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Invalid worktree: provided value is empty or whitespace-only. Omit the parameter to use the active worktree.',
+            },
+          ],
+          isError: true,
+        };
+      }
+      const wtKey = typeof wtKeyRaw === 'string' ? wtKeyRaw.trim() : undefined;
+
+      // Validate remote
+      if (typeof remote !== 'string' || remote.trim().length === 0) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Invalid remote: must be a non-empty string.',
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      // Validate branch override
+      if (branchOverride !== undefined) {
+        if (
+          typeof branchOverride !== 'string' ||
+          branchOverride.trim().length === 0
+        ) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: 'Invalid branch: must be a non-empty string.',
+              },
+            ],
+            isError: true,
+          };
+        }
+      }
+
+      const target = resolveTargetDir(wtKey);
+      if ('error' in target) {
+        return {
+          content: [{ type: 'text', text: target.error }],
+          isError: true,
+        };
+      }
+      const cwd = target.path;
+
+      try {
+        // Safety: refuse main/master and detached HEAD
+        const currentBranch = run('git branch --show-current', cwd).trim();
+        if (!currentBranch) {
+          const gitDir = run('git rev-parse --git-dir', cwd).trim();
+          const resolvedGitDir = isAbsolute(gitDir)
+            ? gitDir
+            : join(cwd, gitDir);
+          const inRebase =
+            existsSync(join(resolvedGitDir, 'rebase-merge')) ||
+            existsSync(join(resolvedGitDir, 'rebase-apply'));
+          return {
+            content: [
+              {
+                type: 'text',
+                text: inRebase
+                  ? `[resolvedWorktree: ${cwd}]\nRefused: rebase is in progress. Finish or abort the rebase before resetting.`
+                  : `[resolvedWorktree: ${cwd}]\nRefused: HEAD is detached (no branch checked out). Aborting reset.`,
+              },
+            ],
+            isError: true,
+          };
+        }
+        if (currentBranch === 'main' || currentBranch === 'master') {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `[resolvedWorktree: ${cwd}]\nRefused: cannot reset on ${currentBranch} branch.`,
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        // Determine which remote branch to reset to
+        const remoteBranch = branchOverride
+          ? branchOverride.trim()
+          : currentBranch;
+        const remoteRef = `${remote.trim()}/${remoteBranch}`;
+
+        // Fetch the remote ref to ensure it's up to date
+        try {
+          runGit(['fetch', remote.trim(), remoteBranch], cwd, {
+            timeout: 30_000,
+          });
+        } catch {
+          // Non-fatal: proceed with whatever ref is cached locally
+        }
+
+        // Resolve the remote ref to a SHA
+        let targetSha: string;
+        try {
+          targetSha = runGit(
+            ['rev-parse', '--verify', `${remoteRef}^{commit}`],
+            cwd,
+          ).trim();
+        } catch {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `[resolvedWorktree: ${cwd}]\nCannot resolve remote ref "${remoteRef}". Check that the remote exists and the branch has been pushed.`,
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        const previousSha = run('git rev-parse HEAD', cwd).trim();
+
+        // If already at target, nothing to do
+        if (targetSha === previousSha) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(
+                  {
+                    resolvedWorktree: cwd,
+                    reset: false,
+                    reason: `Already at ${remoteRef} tip — no reset needed.`,
+                    remoteRef,
+                    previousSha,
+                    currentSha: targetSha,
+                  },
+                  null,
+                  2,
+                ),
+              },
+            ],
+          };
+        }
+
+        // Safety: refuse when working tree is dirty unless force=true
+        if (!force) {
+          const indexDirty = (() => {
+            try {
+              runGit(['diff', '--quiet'], cwd, { timeout: 15_000 });
+              return false;
+            } catch {
+              return true;
+            }
+          })();
+          const stagedDirty = (() => {
+            try {
+              runGit(['diff', '--cached', '--quiet'], cwd, { timeout: 15_000 });
+              return false;
+            } catch {
+              return true;
+            }
+          })();
+          if (indexDirty || stagedDirty) {
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: [
+                    `[resolvedWorktree: ${cwd}]`,
+                    `Refused: git reset --hard ${targetSha.slice(0, 7)} would discard uncommitted working tree changes.`,
+                    `Commit, stash, or discard local changes first, or pass force: true to override.`,
+                  ].join('\n'),
+                },
+              ],
+              isError: true,
+            };
+          }
+        }
+
+        // Capture local commits being abandoned (for user awareness / reflog)
+        let abandonedCommits: string[] = [];
+        try {
+          const logOut = runGit(
+            ['log', '--oneline', `${targetSha}..HEAD`],
+            cwd,
+            { timeout: 15_000 },
+          ).trim();
+          abandonedCommits = logOut ? logOut.split('\n') : [];
+        } catch {
+          // Non-fatal
+        }
+
+        // Count files affected
+        let filesChanged = 0;
+        try {
+          const diffOut = runGit(
+            ['diff', '--name-only', targetSha, previousSha],
+            cwd,
+            { timeout: 15_000 },
+          ).trim();
+          filesChanged = diffOut ? diffOut.split('\n').length : 0;
+        } catch {
+          // Non-fatal
+        }
+
+        // Perform the reset
+        runGit(['reset', '--hard', targetSha], cwd);
+
+        const currentSha = run('git rev-parse HEAD', cwd).trim();
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  resolvedWorktree: cwd,
+                  command: `git reset --hard ${remoteRef} (${targetSha.slice(0, 7)})`,
+                  reset: true,
+                  remoteRef,
+                  previousSha,
+                  currentSha,
+                  filesChanged,
+                  abandonedCommits,
+                  note:
+                    abandonedCommits.length > 0
+                      ? `${abandonedCommits.length} local commit(s) abandoned. Recoverable via git reflog.`
+                      : undefined,
+                  nextStep:
+                    'Branch is now clean. Resume work or run worktree_push() to sync.',
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      } catch (err: unknown) {
+        const e = err as { stdout?: string; stderr?: string; status?: number };
+        const output = [e.stdout, e.stderr].filter(Boolean).join('\n');
+        return {
+          content: [
+            {
+              type: 'text',
+              text: [
+                `[resolvedWorktree: ${cwd}]`,
+                `worktree_reset_to_remote failed`,
                 output,
               ]
                 .filter(Boolean)
