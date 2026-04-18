@@ -58,8 +58,16 @@ Run the bundled deterministic detector, which flags 25 specific patterns (AI slo
 
 **CLI scan**:
 
+For `.tsx` and `.jsx` files, use the local wrapper (adds JSX inline `style={{}}` detection which `npx impeccable` misses entirely — see LS-3192):
+
 ```bash
-npx impeccable --json [--fast] [target]
+node scripts/impeccable-tsx.mjs --json [--fast] [target]
+```
+
+For HTML, Vue, Svelte, CSS files, and URLs, use the upstream tool directly:
+
+```bash
+npx impeccable detect --json [--fast] [target]
 ```
 
 - Pass HTML/JSX/TSX/Vue/Svelte files or directories as `[target]` (anything with markup). Do not pass CSS-only files.
