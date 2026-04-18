@@ -84,8 +84,9 @@ When `bot-review` CI check fails or Copilot posts review comments, use this MCP-
 
 > **Classification rule**: `bot-review`, `Copilot review blocked`, and `Copilot review has unresolved comments` are review blockers, not generic CI-debugging tasks. Fetch unresolved review threads first; do not start by reading Actions logs unless another non-review check is also failing.
 
-1. **Get unresolved threads**: `github_get_review_threads({ number: PR#, unresolvedOnly: true })`
-   - Returns structured thread data such as thread `id`, `isResolved`, `isOutdated`, and a `comments` array. Each comment entry includes fields like `path`, `line`, and `body` — no need for raw GraphQL.
+1. **Get unresolved threads**: `github_get_review_threads({ number: PR# })`
+   - Default (no `includeResolved`) returns only unresolved threads — exactly the ones blocking merge.
+   - Returns thread-level fields: `id` (PRRT\_ node ID), `isResolved`, `isOutdated`, `isCollapsed`, `path`, `line`, `startLine` — plus a `comments` array with `databaseId`, `author`, `body`, `path`, `line` per comment.
 2. **Inspect the returned comments and fix the code** in the flagged files/lines
 3. **Commit and push** the fix
 4. **Resolve threads**: `github_resolve_threads({ threadIds: [<thread-id>, ...], prNumber: PR# })`
@@ -97,22 +98,54 @@ Before the next push, also check whether any other blockers are already known on
 
 > **Avoid `gh api graphql` to enumerate review threads** — prefer `github_get_review_threads`, which returns structured data including GraphQL thread node IDs (required for resolution). Use `gh api graphql` only as a last resort when MCP or another documented tool is unavailable or does not return the needed thread IDs.
 
-> **Mapping comment IDs to thread IDs**: `github_resolve_threads` now handles this automatically. If you have a comment's `databaseId` (numeric) but not its thread's PRRT\_ node ID, pass the `databaseId` values via `commentDatabaseIds` with `prNumber` — no raw GraphQL fallback needed.
+<<<<<<< HEAD
+
+> # **Mapping comment IDs to thread IDs**: `github_resolve_threads` now handles this automatically. If you have a comment's `databaseId` (numeric) but not its thread's PRRT\_ node ID, pass the `databaseId` values via `commentDatabaseIds` with `prNumber` — no raw GraphQL fallback needed.
+
+## Merge Queue Blocked: "A conversation must be resolved"
+
+When the merge queue rejects a PR with **"Repository rule violations found: A conversation must be resolved before this pull request can be merged"**, follow this workflow:
+
+> **Critical non-obvious rule**: `isOutdated: true` does NOT mean the thread is resolved. "Outdated" means the code changed after the comment was posted (the diff hunk no longer exists). Outdated threads that are **not** resolved still block the merge queue. Never assume outdated = safe to ignore.
+
+1. **List threads blocking merge**:
+
+   ```
+   github_get_review_threads({ number: PR# })
+   ```
+
+   Default returns only unresolved threads (including outdated-but-unresolved). Inspect `isOutdated` on each — these are the ones that may have been overlooked.
+
+2. **Collect thread IDs** from the `id` field (PRRT\_ prefix) of all returned threads.
+
+3. **Resolve all blocking threads**:
+
+   ```
+   github_resolve_threads({ threadIds: ["PRRT_...", "PRRT_..."], prNumber: PR# })
+   ```
+
+   The `prNumber` parameter triggers a bot-review recheck after resolution.
+
+4. **Wait for the next merge queue cycle** — the PR will be re-evaluated automatically after the commit status updates. No manual re-enqueue is needed unless the PR was removed from the queue.
+   > > > > > > > 721bed77d (LS-3066 feat(github-mcp): extend get_review_threads with thread-level fields and fix filter logic (WIP))
 
 ## Critical Rules
 
 1. **Always self-review before pushing (Tier 2 gate)** -- Phase 1 is mandatory. Read every changed file in full, check all 20 common review patterns, and produce a Self-Review Summary before calling `worktree_push()`. Skipping this is the #1 cause of avoidable Copilot review cycles.
 2. **2-round cap on Copilot fix iterations** -- Round 1: security/bugs/type safety. Round 2: remaining actionable comments. After round 2: resolve and move on.
-3. **Resolve threads after fixing** -- use `github_resolve_threads({ threadIds: [...], prNumber: <PR#> })` after pushing fixes. Thread IDs (PRRT\_... node IDs) come from `github_get_review_threads({ number: <PR#>, unresolvedOnly: true })`. If you only have numeric comment `databaseId` values, use `github_resolve_threads({ commentDatabaseIds: [...], prNumber: <PR#> })` — the tool maps them to thread IDs internally (no raw GraphQL needed). The `prNumber` parameter triggers a bot-review recheck attempt when all thread resolutions succeed; if the app token lacks `actions: write` the dispatch is skipped/non-fatal and the tool returns a `recheckNote` instead of erroring — threads are still resolved and the recheck fires automatically on the next push. Add `merge-when-ready` label after all threads are resolved. **Do NOT use `gh api graphql`** to resolve — `github_resolve_threads` works with both user and GitHub App tokens and handles batching. Fall back to `gh api graphql` only if the custom server is confirmed unavailable after retry.
-4. **Never skip `make pc`** -- each CI failure costs 40-60 min. Minimum alternative: `make format && make lint-fix && make typecheck`.
-5. **Always use `--body-file` or MCP tool for PR body** -- never inline `--body` in any shell (PowerShell is especially problematic).
-6. **Never create a PR from `main`** -- branch name must contain a Jira ticket key.
-7. **Always create PRs as drafts** -- use `draft: true` in `github_create_pr` MCP tool. Apply the `agent-in-progress` label while still a draft, then mark ready. This closes the race window — the PR becomes visible to sweeps already labeled. See [create-pr.md](references/create-pr.md) for the canonical step order.
-8. **Check Runs ≠ Commit Statuses** -- `github_retrigger_check` only works on **Check Runs** (Checks API). `bot-review` and other bot-set statuses use the **Statuses API** and will NOT be found by `github_retrigger_check`. If you get "No check run named 'X' found", use `github_list_commit_statuses({ number: <PR#> })` to see commit statuses instead. To clear a stale commit status: push a new commit (re-triggers the workflow) or dispatch via `ci_dispatch_workflow`. Note: `github_merge_pr(strategy: "direct")` does NOT bypass required commit statuses — it uses the standard merge API which still enforces branch protection rules.
-9. **Claude Code surfaces PR events natively — never use polling loops** -- after marking a PR ready, Claude Code automatically surfaces CI results, review threads, and other agent-actionable events. No wait tool needed. React to each event as it arrives and handle it.
-   - **Never use `sleep` + polling loops** — no `sleep N && gh run view`, no `sleep N && gh pr view --json statusCheckRollup`, no `sleep N && gh pr checks <pr>`, no `ci_view_run every ~60s` loops. These waste context and shell round-trips. `sleep N && gh pr checks` is a common fallback when agents believe the CI server is not loaded — but Claude Code's native event streaming works regardless of which MCP servers are connected.
-10. **Batch known PR fixes into one push** -- when a PR simultaneously has unresolved review threads and failing checks, gather both the thread set and CI evidence before editing. The default remediation unit is one review/CI round -> one validation -> one push. Multiple pushes for already-known issues create avoidable Copilot re-reviews and CI cycles.
-11. **`ci_list_runs`, `ci_view_run`, `github_view_pr`, `github_list_prs` are instant snapshots — use for targeted lookups only.** Calling them in a loop burns 1–2M tokens per session (each call re-reads the full conversation context). Use them exactly once for a targeted lookup.
+   <<<<<<< HEAD
+3. # **Resolve threads after fixing** -- use `github_resolve_threads({ threadIds: [...], prNumber: <PR#> })` after pushing fixes. Thread IDs (PRRT\_... node IDs) come from `github_get_review_threads({ number: <PR#>, unresolvedOnly: true })`. If you only have numeric comment `databaseId` values, use `github_resolve_threads({ commentDatabaseIds: [...], prNumber: <PR#> })` — the tool maps them to thread IDs internally (no raw GraphQL needed). The `prNumber` parameter triggers a bot-review recheck attempt when all thread resolutions succeed; if the app token lacks `actions: write` the dispatch is skipped/non-fatal and the tool returns a `recheckNote` instead of erroring — threads are still resolved and the recheck fires automatically on the next push. Add `merge-when-ready` label after all threads are resolved. **Do NOT use `gh api graphql`** to resolve — `github_resolve_threads` works with both user and GitHub App tokens and handles batching. Fall back to `gh api graphql` only if the custom server is confirmed unavailable after retry.
+4. **Resolve threads after fixing** -- use `github_resolve_threads({ threadIds: [...], prNumber: <PR#> })` after pushing fixes. Thread IDs come from `github_get_review_threads({ number: <PR#> })` (returns unresolved threads by default; pass `includeResolved: true` for all). The `prNumber` parameter triggers a bot-review recheck attempt when all thread resolutions succeed; if the app token lacks `actions: write` the dispatch is skipped/non-fatal and the tool returns a `recheckNote` instead of erroring — threads are still resolved and the recheck fires automatically on the next push. Add `merge-when-ready` label after all threads are resolved. **Do NOT use `gh api graphql`** to resolve — `github_resolve_threads` works with both user and GitHub App tokens and handles batching. Fall back to `gh api graphql` only if the custom server is confirmed unavailable after retry.
+   > > > > > > > 721bed77d (LS-3066 feat(github-mcp): extend get_review_threads with thread-level fields and fix filter logic (WIP))
+5. **Never skip `make pc`** -- each CI failure costs 40-60 min. Minimum alternative: `make format && make lint-fix && make typecheck`.
+6. **Always use `--body-file` or MCP tool for PR body** -- never inline `--body` in any shell (PowerShell is especially problematic).
+7. **Never create a PR from `main`** -- branch name must contain a Jira ticket key.
+8. **Always create PRs as drafts** -- use `draft: true` in `github_create_pr` MCP tool. Apply the `agent-in-progress` label while still a draft, then mark ready. This closes the race window — the PR becomes visible to sweeps already labeled. See [create-pr.md](references/create-pr.md) for the canonical step order.
+9. **Check Runs ≠ Commit Statuses** -- `github_retrigger_check` only works on **Check Runs** (Checks API). `bot-review` and other bot-set statuses use the **Statuses API** and will NOT be found by `github_retrigger_check`. If you get "No check run named 'X' found", use `github_list_commit_statuses({ number: <PR#> })` to see commit statuses instead. To clear a stale commit status: push a new commit (re-triggers the workflow) or dispatch via `ci_dispatch_workflow`. Note: `github_merge_pr(strategy: "direct")` does NOT bypass required commit statuses — it uses the standard merge API which still enforces branch protection rules.
+10. **Claude Code surfaces PR events natively — never use polling loops** -- after marking a PR ready, Claude Code automatically surfaces CI results, review threads, and other agent-actionable events. No wait tool needed. React to each event as it arrives and handle it.
+    - **Never use `sleep` + polling loops** — no `sleep N && gh run view`, no `sleep N && gh pr view --json statusCheckRollup`, no `sleep N && gh pr checks <pr>`, no `ci_view_run every ~60s` loops. These waste context and shell round-trips. `sleep N && gh pr checks` is a common fallback when agents believe the CI server is not loaded — but Claude Code's native event streaming works regardless of which MCP servers are connected.
+11. **Batch known PR fixes into one push** -- when a PR simultaneously has unresolved review threads and failing checks, gather both the thread set and CI evidence before editing. The default remediation unit is one review/CI round -> one validation -> one push. Multiple pushes for already-known issues create avoidable Copilot re-reviews and CI cycles.
+12. **`ci_list_runs`, `ci_view_run`, `github_view_pr`, `github_list_prs` are instant snapshots — use for targeted lookups only.** Calling them in a loop burns 1–2M tokens per session (each call re-reads the full conversation context). Use them exactly once for a targeted lookup.
 
     **CI tool reference — instant snapshots:**
 

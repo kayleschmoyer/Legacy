@@ -4,7 +4,7 @@ import type { ToolResult } from '../types.js';
 
 interface GetReviewThreadsParams {
   number: number;
-  unresolvedOnly?: boolean;
+  includeResolved?: boolean;
 }
 
 interface ThreadComment {
@@ -20,6 +20,10 @@ interface ReviewThread {
   id: string;
   isResolved: boolean;
   isOutdated: boolean;
+  isCollapsed: boolean;
+  path: string;
+  line: number | null;
+  startLine: number | null;
   comments: { pageInfo: { hasNextPage: boolean }; nodes: ThreadComment[] };
 }
 
@@ -44,6 +48,10 @@ query($owner: String!, $repo: String!, $number: Int!) {
           id
           isResolved
           isOutdated
+          isCollapsed
+          path
+          line
+          startLine
           comments(first: 50) {
             pageInfo { hasNextPage }
             nodes {
@@ -75,8 +83,12 @@ export async function getReviewThreads(
     const reviewThreads = result.data.repository.pullRequest.reviewThreads;
     let threads = reviewThreads.nodes;
 
-    if (params.unresolvedOnly) {
-      threads = threads.filter((t) => !t.isResolved && !t.isOutdated);
+    // By default, return only unresolved threads (blocking merge queue).
+    // IMPORTANT: isOutdated threads that are NOT resolved still block the merge queue —
+    // "outdated" means the code changed since the comment was posted, not that the thread
+    // was dismissed. Only filter on isResolved.
+    if (!params.includeResolved) {
+      threads = threads.filter((t) => !t.isResolved);
     }
 
     const truncated =
@@ -87,12 +99,16 @@ export async function getReviewThreads(
       prNumber: params.number,
       total: reviewThreads.nodes.length,
       returned: threads.length,
-      unresolvedOnly: params.unresolvedOnly ?? false,
+      includeResolved: params.includeResolved ?? false,
       truncated,
       threads: threads.map((t) => ({
         id: t.id,
         isResolved: t.isResolved,
         isOutdated: t.isOutdated,
+        isCollapsed: t.isCollapsed,
+        path: t.path,
+        line: t.line,
+        startLine: t.startLine,
         createdAt: t.comments.nodes[0]?.createdAt ?? null,
         commentCount: t.comments.nodes.length,
         comments: t.comments.nodes.map((c) => ({

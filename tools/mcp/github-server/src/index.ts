@@ -464,7 +464,7 @@ server.tool(
 // --- github_get_review_threads ---
 server.tool(
   'github_get_review_threads',
-  'Fetch review threads on a PR via GraphQL. Includes resolved threads by default — set unresolvedOnly: true to filter to open threads only (outdated threads are treated as resolved and excluded). Each thread includes isResolved, isOutdated, createdAt (thread-level, for chronological sorting), and per-comment createdAt. Use for fix-reviews workflows (unresolvedOnly: true) or historical analysis of all review rounds (unresolvedOnly: false). Pagination is capped at 100 threads and 50 comments per thread; truncated: true is set when results are paginated. Pass the PR number as "number" (preferred) or "prNumber" (alias).',
+  'Fetch review threads on a PR via GraphQL. By default returns only UNRESOLVED threads (the ones blocking merge). Pass includeResolved: true to include all threads. IMPORTANT: isOutdated threads that are NOT resolved still block the merge queue — "outdated" means the code changed after the comment was posted, not that it was dismissed. Always use this tool first when debugging "A conversation must be resolved before this pull request can be merged" merge-queue errors. Each thread includes: id (PRRT_ node ID for github_resolve_threads), isResolved, isOutdated, isCollapsed, path, line, startLine (all thread-level for quick scanning without reading comments), plus per-comment databaseId, author, body, path, line. Pagination is capped at 100 threads and 50 comments per thread; truncated: true is set when results are paginated. Pass the PR number as "number" (preferred) or "prNumber" (alias).',
   {
     number: z.coerce.number().int().positive().optional().describe('PR number'),
     prNumber: z.coerce
@@ -473,10 +473,10 @@ server.tool(
       .positive()
       .optional()
       .describe('Alias for "number" — use either, not both'),
-    unresolvedOnly: coercedBoolean
+    includeResolved: coercedBoolean
       .default(false)
       .describe(
-        'Filter to unresolved threads only (default: false — returns all threads including resolved)',
+        'Include resolved threads in results (default: false — returns only unresolved threads, including outdated-but-unresolved threads that still block merge)',
       ),
   },
   async (params) => {
@@ -494,7 +494,7 @@ server.tool(
     }
     return getReviewThreads({
       number: resolved,
-      unresolvedOnly: params.unresolvedOnly,
+      includeResolved: params.includeResolved,
     });
   },
 );
