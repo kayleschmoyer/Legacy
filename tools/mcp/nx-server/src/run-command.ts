@@ -8,6 +8,21 @@ const COMMAND_TIMEOUT = 120_000;
 const NPM_WRAPPER_COMMANDS = new Set(['pnpm', 'npm', 'npx', 'yarn']);
 
 /**
+ * Escape cmd.exe shell metacharacters in a single argument.
+ *
+ * When `shell: true` is used on Windows, Node.js joins all args into a single
+ * string passed to `cmd.exe /d /s /c "..."`. In that context `|`, `<`, and `>`
+ * are interpreted as pipe/redirect operators even when they appear inside what
+ * look like quoted substrings. Prefixing them with `^` (cmd.exe's escape
+ * character) causes them to be treated as literals by cmd.exe.
+ *
+ * Only applied when `needsShell` is true (Windows + npm wrapper commands).
+ */
+function escapeCmdShellArg(arg: string): string {
+  return arg.replace(/[|<>]/g, '^$&');
+}
+
+/**
  * Resolve a command name to its platform-specific executable.
  *
  * On Windows with `shell: false`, npm wrappers need the explicit `.cmd`
@@ -34,9 +49,11 @@ export function getRepoRoot(): string {
  * On Windows, npm wrapper commands (pnpm, npm, npx, yarn) are `.cmd` batch
  * scripts that require `shell: true` (cmd.exe) — without it, execFile can fail
  * with EINVAL when args contain backslashes (e.g. Jest regex patterns).
- * All other commands use `shell: false` to avoid cmd.exe metacharacter risks
- * (`|`, `<`, `>`, `%`, etc.). Tool-level input validation
- * (SHELL_METACHAR_REGEX in run-target.ts) provides defence-in-depth.
+ * When `shell: true`, args containing `|`, `<`, or `>` are automatically
+ * escaped via `escapeCmdShellArg` so cmd.exe treats them as literals rather
+ * than shell operators. All other commands use `shell: false` to avoid cmd.exe
+ * metacharacter risks entirely. Tool-level input validation
+ * (SHELL_METACHAR_REGEX in run-target.ts) provides additional defence-in-depth.
  *
  * Pass `includeStderr: true` to append stderr to the returned string on success.
  * Use this for commands like Jest that write test results to stderr — callers
@@ -52,10 +69,11 @@ export function runCommand(
 ): Promise<string> {
   const isWindows = process.platform === 'win32';
   const needsShell = isWindows && NPM_WRAPPER_COMMANDS.has(command);
+  const effectiveArgs = needsShell ? args.map(escapeCmdShellArg) : args;
   return new Promise((resolve, reject) => {
     execFile(
       needsShell ? command : resolveCommand(command),
-      args,
+      effectiveArgs,
       {
         cwd,
         timeout: timeoutMs,

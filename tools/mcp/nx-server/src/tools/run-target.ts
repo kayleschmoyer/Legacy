@@ -20,10 +20,15 @@ const ALLOWED_TARGETS = new Set([
 
 /**
  * Shell metacharacters that must not appear in passthrough args.
- * Defence-in-depth: runNx() uses shell:false so these cannot be interpreted,
- * but we block them anyway to catch accidental misuse. Pipe `|` is intentionally
- * allowed because it appears in Jest `--testPathPatterns` regex alternations and
- * is safe with shell:false.
+ *
+ * On Windows, pnpm is a `.cmd` batch script that requires `shell: true`
+ * (cmd.exe). `runCommand` in run-command.ts automatically escapes `|`, `<`,
+ * and `>` via `escapeCmdShellArg` so they reach the child process as literals.
+ * The remaining characters below are blocked entirely because they have no
+ * legitimate use in nx target args and cannot be safely escaped.
+ *
+ * Pipe `|` is intentionally NOT blocked — it is a valid Jest
+ * `--testPathPatterns` alternation operator and is handled by `escapeCmdShellArg`.
  */
 const SHELL_METACHAR_REGEX = /[;&`$(){}]/;
 
