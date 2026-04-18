@@ -430,3 +430,50 @@ unauthTest.describe(
     );
   },
 );
+
+// ---------------------------------------------------------------------------
+// LS-3498: [functional] 404 error on /players/stats endpoint.
+// An automated audit crawler navigated to /players/stats unauthenticated and
+// received a functional 404 — EnhancedAuthGuard had not listed the route in
+// publicPaths, so it intercepted the request and rendered the "Build Your
+// Dynasty" marketing landing page while the URL showed /players/stats. Adding
+// the route to publicPaths (LS-3548) resolved the redirect. These tests lock
+// in the corrected URL behaviour: the browser must remain at /players/stats
+// (no auth-guard redirect to /) and the marketing landing page must never
+// appear for unauthenticated visitors to this public route.
+// ---------------------------------------------------------------------------
+
+unauthTest.describe(
+  'Player Stats page — functional 404 regression (LS-3498) @regression',
+  () => {
+    unauthTest.beforeEach(async ({ page }) => {
+      await mockPlayerStatsGraphQL(page);
+      await page.goto('/players/stats');
+      await page.waitForLoadState('load');
+    });
+
+    unauthTest(
+      'URL stays at /players/stats for unauthenticated users — no auth-guard redirect',
+      async ({ page }) => {
+        await expect(page).toHaveURL('/players/stats', { timeout: 15_000 });
+      },
+    );
+
+    unauthTest(
+      'does not show marketing landing page for unauthenticated users on /players/stats',
+      async ({ page }) => {
+        await expect(page.getByText(/build your dynasty/i)).not.toBeVisible();
+        await expect(page.getByText(/dominate your league/i)).not.toBeVisible();
+      },
+    );
+
+    unauthTest(
+      'shows player statistics content — not a 404 page — for unauthenticated users',
+      async ({ page }) => {
+        await expect(
+          page.getByRole('heading', { name: /mlb player statistics/i }),
+        ).toBeVisible({ timeout: 15_000 });
+      },
+    );
+  },
+);
