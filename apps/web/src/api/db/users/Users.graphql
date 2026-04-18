@@ -22,20 +22,28 @@ query GetUserById($id: Int!) {
   }
 }
 
-query GetAllUsers($limit: Int, $offset: Int, $search: String) {
+query GetAllUsers(
+  $limit: Int
+  $offset: Int
+  $search: String
+  $orderBy: String
+  $orderDirection: String
+  $accessLevel: String
+) {
   users(
     limit: $limit
     offset: $offset
-    orderBy: "email"
-    orderDirection: "asc"
+    orderBy: $orderBy
+    orderDirection: $orderDirection
     search: $search
+    accessLevel: $accessLevel
   ) {
     ...User
   }
 }
 
-query GetUsersCount($search: String) {
-  usersCount(search: $search)
+query GetUsersCount($search: String, $accessLevel: String) {
+  usersCount(search: $search, accessLevel: $accessLevel)
 }
 
 mutation UpdateUserRole($userId: Int!, $accessLevel: String!) {

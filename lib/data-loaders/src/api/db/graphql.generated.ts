@@ -2990,6 +2990,7 @@ export type QueryUserTeamIdArgs = {
 };
 
 export type QueryUsersArgs = {
+  accessLevel?: InputMaybe<Scalars['String']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
   orderBy?: InputMaybe<Scalars['String']['input']>;
@@ -2998,6 +2999,7 @@ export type QueryUsersArgs = {
 };
 
 export type QueryUsersCountArgs = {
+  accessLevel?: InputMaybe<Scalars['String']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
 };
 
@@ -3417,8 +3419,10 @@ export enum StatsLoadingStatus {
 
 export type StripePriceInfo = {
   __typename?: 'StripePriceInfo';
+  annualPriceId: Scalars['String']['output'];
   annualTotalCents: Scalars['Int']['output'];
   monthlyPriceCents: Scalars['Int']['output'];
+  monthlyPriceId: Scalars['String']['output'];
 };
 
 export type SubscriberGrowthPoint = {

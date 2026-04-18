@@ -2990,6 +2990,7 @@ export type QueryUserTeamIdArgs = {
 };
 
 export type QueryUsersArgs = {
+  accessLevel?: InputMaybe<Scalars['String']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
   orderBy?: InputMaybe<Scalars['String']['input']>;
@@ -2998,6 +2999,7 @@ export type QueryUsersArgs = {
 };
 
 export type QueryUsersCountArgs = {
+  accessLevel?: InputMaybe<Scalars['String']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
 };
 
@@ -8917,6 +8919,9 @@ export type GetAllUsersQueryVariables = Exact<{
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
+  orderBy?: InputMaybe<Scalars['String']['input']>;
+  orderDirection?: InputMaybe<Scalars['String']['input']>;
+  accessLevel?: InputMaybe<Scalars['String']['input']>;
 }>;
 
 export type GetAllUsersQuery = {
@@ -8936,6 +8941,7 @@ export type GetAllUsersQuery = {
 
 export type GetUsersCountQueryVariables = Exact<{
   search?: InputMaybe<Scalars['String']['input']>;
+  accessLevel?: InputMaybe<Scalars['String']['input']>;
 }>;
 
 export type GetUsersCountQuery = {
@@ -21422,13 +21428,21 @@ export type GetUserByIdQueryResult = Apollo.QueryResult<
   GetUserByIdQueryVariables
 >;
 export const GetAllUsers = gql`
-  query GetAllUsers($limit: Int, $offset: Int, $search: String) {
+  query GetAllUsers(
+    $limit: Int
+    $offset: Int
+    $search: String
+    $orderBy: String
+    $orderDirection: String
+    $accessLevel: String
+  ) {
     users(
       limit: $limit
       offset: $offset
-      orderBy: "email"
-      orderDirection: "asc"
+      orderBy: $orderBy
+      orderDirection: $orderDirection
       search: $search
+      accessLevel: $accessLevel
     ) {
       ...User
     }
@@ -21451,6 +21465,9 @@ export const GetAllUsers = gql`
  *      limit: // value for 'limit'
  *      offset: // value for 'offset'
  *      search: // value for 'search'
+ *      orderBy: // value for 'orderBy'
+ *      orderDirection: // value for 'orderDirection'
+ *      accessLevel: // value for 'accessLevel'
  *   },
  * });
  */
@@ -21512,8 +21529,8 @@ export type GetAllUsersQueryResult = Apollo.QueryResult<
   GetAllUsersQueryVariables
 >;
 export const GetUsersCount = gql`
-  query GetUsersCount($search: String) {
-    usersCount(search: $search)
+  query GetUsersCount($search: String, $accessLevel: String) {
+    usersCount(search: $search, accessLevel: $accessLevel)
   }
 `;
 
@@ -21530,6 +21547,7 @@ export const GetUsersCount = gql`
  * const { data, loading, error } = useGetUsersCountQuery({
  *   variables: {
  *      search: // value for 'search'
+ *      accessLevel: // value for 'accessLevel'
  *   },
  * });
  */

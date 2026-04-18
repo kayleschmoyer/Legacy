@@ -51,6 +51,7 @@ builder.queryField('users', (t) =>
       orderBy: t.arg.string({ required: false }),
       orderDirection: t.arg.string({ required: false }),
       search: t.arg.string({ required: false }),
+      accessLevel: t.arg.string({ required: false }),
     },
     resolve: async (root, args, context) => {
       // Admin only — this endpoint lists all users with their email addresses
@@ -61,6 +62,10 @@ builder.queryField('users', (t) =>
 
       const orderBy = args.orderBy as 'id' | 'email' | 'username' | undefined;
       const orderDirection = args.orderDirection as 'asc' | 'desc' | undefined;
+      const accessLevelFilter = args.accessLevel as
+        | 'none'
+        | 'admin'
+        | undefined;
 
       const users = await dbService.users.getUsers({
         limit: args.limit || undefined,
@@ -68,6 +73,9 @@ builder.queryField('users', (t) =>
         orderBy: orderBy || 'email',
         orderDirection: orderDirection || 'asc',
         searchTerm: args.search || undefined,
+        filters: accessLevelFilter
+          ? { accessLevel: accessLevelFilter }
+          : undefined,
       });
 
       return users.map((u) => ({
@@ -89,6 +97,7 @@ builder.queryField('usersCount', (t) =>
     type: 'Int',
     args: {
       search: t.arg.string({ required: false }),
+      accessLevel: t.arg.string({ required: false }),
     },
     resolve: async (root, args, context) => {
       // Admin only
@@ -97,8 +106,16 @@ builder.queryField('usersCount', (t) =>
         throw ForbiddenError('Admin access required to count users');
       }
 
+      const accessLevelFilter = args.accessLevel as
+        | 'none'
+        | 'admin'
+        | undefined;
+
       return dbService.users.countUsers({
         searchTerm: args.search || undefined,
+        filters: accessLevelFilter
+          ? { accessLevel: accessLevelFilter }
+          : undefined,
       });
     },
   }),

@@ -2818,13 +2818,14 @@ type Query {
   userLeagues: [League!]!
   userTeamId(leagueId: Int!): Int
   users(
+    accessLevel: String
     limit: Int
     offset: Int
     orderBy: String
     orderDirection: String
     search: String
   ): [User!]
-  usersCount(search: String): Int
+  usersCount(accessLevel: String, search: String): Int
   validateInviteCode(code: String!): InviteCodeInfo
 
   """

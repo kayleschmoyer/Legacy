@@ -17,17 +17,32 @@ import {
 
 const PAGE_SIZE = 25;
 
-/**
- * AdminUsersPage — allows admins to view all users and promote/demote admin access.
- * Supports server-side search (debounced) and paginated results.
- * Only accessible to users with accessLevel === 'admin'.
- */
+type SortField = 'email' | 'username' | 'id';
+type SortDirection = 'asc' | 'desc';
+type AccessLevelFilter = 'all' | 'admin' | 'none';
+
+const SORT_FIELD_LABELS: Record<SortField, string> = {
+  email: 'Email',
+  username: 'Username',
+  id: 'ID',
+};
+
+const ACCESS_LEVEL_LABELS: Record<AccessLevelFilter, string> = {
+  all: 'All Users',
+  admin: 'Admins Only',
+  none: 'Non-Admins',
+};
+
 export default function AdminUsersPage() {
   const { user } = useAuth();
   const [searchInput, setSearchInput] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [feedbackMap, setFeedbackMap] = useState<Record<number, string>>({});
+  const [sortField, setSortField] = useState<SortField>('email');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [accessLevelFilter, setAccessLevelFilter] =
+    useState<AccessLevelFilter>('all');
 
   const isAdmin = user?.accessLevel === 'admin';
 
@@ -40,17 +55,31 @@ export default function AdminUsersPage() {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
+  // Reset to page 1 when sort or filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [sortField, sortDirection, accessLevelFilter]);
+
   const searchVar = debouncedSearch.length > 0 ? debouncedSearch : undefined;
+  const accessLevelVar =
+    accessLevelFilter === 'all' ? undefined : accessLevelFilter;
   const offset = (currentPage - 1) * PAGE_SIZE;
 
   const { data, loading, error, refetch } = useGetAllUsersQuery({
-    variables: { limit: PAGE_SIZE, offset, search: searchVar },
+    variables: {
+      limit: PAGE_SIZE,
+      offset,
+      search: searchVar,
+      orderBy: sortField,
+      orderDirection: sortDirection,
+      accessLevel: accessLevelVar,
+    },
     fetchPolicy: 'cache-and-network',
     skip: !isAdmin,
   });
 
   const { data: countData, loading: countLoading } = useGetUsersCountQuery({
-    variables: { search: searchVar },
+    variables: { search: searchVar, accessLevel: accessLevelVar },
     fetchPolicy: 'cache-and-network',
     skip: !isAdmin,
   });
@@ -99,6 +128,15 @@ export default function AdminUsersPage() {
     }
   }
 
+  function handleSortField(field: SortField) {
+    if (field === sortField) {
+      setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  }
+
   // Build visible page numbers (at most 7: first, last, current ±1, with ellipsis)
   function getPageNumbers(): (number | '...')[] {
     if (totalPages <= 7) {
@@ -118,6 +156,11 @@ export default function AdminUsersPage() {
     pages.push(totalPages);
     return pages;
   }
+
+  const sortIndicator = (field: SortField) => {
+    if (sortField !== field) return ' ↕';
+    return sortDirection === 'asc' ? ' ↑' : ' ↓';
+  };
 
   return (
     <YStack
@@ -160,6 +203,56 @@ export default function AdminUsersPage() {
         )}
       </XStack>
 
+      {/* Sort and filter controls */}
+      <XStack gap="$3" alignItems="center" flexWrap="wrap">
+        <Paragraph color="$colorPress" size="$3" flexShrink={0}>
+          Sort by:
+        </Paragraph>
+        {(['email', 'username', 'id'] as SortField[]).map((field) => (
+          <Button
+            key={field}
+            size="$3"
+            onPress={() => handleSortField(field)}
+            backgroundColor={
+              sortField === field ? withAlpha(BRAND_NAVY, 0.12) : undefined
+            }
+            borderColor={sortField === field ? BRAND_NAVY : '$borderColor'}
+            borderWidth={1}
+            color={sortField === field ? BRAND_NAVY : '$color'}
+            fontWeight={sortField === field ? '700' : '400'}
+          >
+            {SORT_FIELD_LABELS[field]}
+            {sortIndicator(field)}
+          </Button>
+        ))}
+
+        <XStack flex={1} />
+
+        <Paragraph color="$colorPress" size="$3" flexShrink={0}>
+          Filter:
+        </Paragraph>
+        {(['all', 'admin', 'none'] as AccessLevelFilter[]).map((level) => (
+          <Button
+            key={level}
+            size="$3"
+            onPress={() => setAccessLevelFilter(level)}
+            backgroundColor={
+              accessLevelFilter === level
+                ? withAlpha(BRAND_NAVY, 0.12)
+                : undefined
+            }
+            borderColor={
+              accessLevelFilter === level ? BRAND_NAVY : '$borderColor'
+            }
+            borderWidth={1}
+            color={accessLevelFilter === level ? BRAND_NAVY : '$color'}
+            fontWeight={accessLevelFilter === level ? '700' : '400'}
+          >
+            {ACCESS_LEVEL_LABELS[level]}
+          </Button>
+        ))}
+      </XStack>
+
       {/* Initial loading state (no users yet) */}
       {(loading || countLoading) && users.length === 0 && (
         <XStack justifyContent="center" padding="$6">
@@ -192,7 +285,9 @@ export default function AdminUsersPage() {
                   {totalCount} user{totalCount !== 1 ? 's' : ''}
                   {debouncedSearch
                     ? ` matching "${debouncedSearch}"`
-                    : ' total'}
+                    : accessLevelFilter !== 'all'
+                      ? ` (${ACCESS_LEVEL_LABELS[accessLevelFilter].toLowerCase()})`
+                      : ' total'}
                   {totalPages > 1
                     ? ` — page ${currentPage} of ${totalPages}`
                     : ''}
