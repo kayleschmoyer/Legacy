@@ -1878,6 +1878,36 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
       },
     },
     {
+      name: 'worktree_list_branches',
+      description:
+        'List local and/or remote-tracking branches with metadata (type, current-branch marker). ' +
+        'Supports substring or regex filtering via the `filter` parameter. ' +
+        'Use this to check whether a branch for a given Jira ticket key already exists (e.g. filter: "LS-2955") ' +
+        'before creating a new worktree, or to verify no open branches reference a ticket.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          filter: {
+            type: 'string',
+            description:
+              'Substring or JavaScript regex pattern to filter branch names. ' +
+              'Examples: "LS-2955" (substring), "^claude/" (regex prefix). ' +
+              'Omit to return all branches.',
+          },
+          remote: {
+            type: 'boolean',
+            description:
+              'Include remote-tracking branches (default: true). ' +
+              'Remote branches are listed as "origin/<name>".',
+          },
+          local: {
+            type: 'boolean',
+            description: 'Include local branches (default: true).',
+          },
+        },
+      },
+    },
+    {
       name: 'worktree_ping',
       description:
         'Check connectivity and state of the worktree server. Returns git version, main repo path, active worktree, and total worktree count. Use this to verify the server is running correctly before using other worktree_* tools.',
@@ -9294,6 +9324,136 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           isError: true,
         };
       }
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_list_branches
+    // -----------------------------------------------------------------------
+    case 'worktree_list_branches': {
+      const rawArgs = args as {
+        filter?: string;
+        remote?: unknown;
+        local?: unknown;
+      };
+
+      const includeRemote = coerceBool(rawArgs.remote) !== false; // default true
+      const includeLocal = coerceBool(rawArgs.local) !== false; // default true
+      const filter = rawArgs.filter;
+
+      // Compile filter as a regex (supports both plain substrings and regex patterns)
+      let filterRegex: RegExp | null = null;
+      if (filter) {
+        try {
+          filterRegex = new RegExp(filter);
+        } catch {
+          return {
+            content: [
+              {
+                type: 'text',
+                text:
+                  `Invalid filter: "${filter}" is not a valid regular expression. ` +
+                  `Use a plain substring (e.g. "LS-2955") or a valid JS regex (e.g. "^claude/").`,
+              },
+            ],
+            isError: true,
+          };
+        }
+      }
+
+      if (!includeLocal && !includeRemote) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                { branches: [], total: 0, filter: filter ?? null },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      }
+
+      interface BranchEntry {
+        name: string;
+        type: 'local' | 'remote';
+        current: boolean;
+      }
+
+      const branches: BranchEntry[] = [];
+
+      try {
+        // Local branches — %(HEAD) is '*' for the checked-out branch, ' ' otherwise.
+        if (includeLocal) {
+          const localOut = runGit(
+            ['branch', '--format=%(HEAD)|%(refname:short)'],
+            MAIN_REPO,
+          );
+          for (const line of localOut.split(/\r?\n/)) {
+            if (!line.trim()) continue;
+            const pipeIdx = line.indexOf('|');
+            if (pipeIdx === -1) continue;
+            const head = line.slice(0, pipeIdx);
+            const name = line.slice(pipeIdx + 1).trim();
+            if (!name) continue;
+            if (filterRegex && !filterRegex.test(name)) continue;
+            branches.push({
+              name,
+              type: 'local',
+              current: head.trim() === '*',
+            });
+          }
+        }
+
+        // Remote-tracking branches — %(HEAD) is unused for -r listings.
+        if (includeRemote) {
+          const remoteOut = runGit(
+            ['branch', '-r', '--format=%(refname:short)'],
+            MAIN_REPO,
+          );
+          for (const line of remoteOut.split(/\r?\n/)) {
+            const name = line.trim();
+            if (!name) continue;
+            // Skip the symbolic HEAD alias (e.g. "origin/HEAD -> origin/main")
+            if (name.includes(' -> ') || name.endsWith('/HEAD')) continue;
+            if (filterRegex && !filterRegex.test(name)) continue;
+            branches.push({ name, type: 'remote', current: false });
+          }
+        }
+      } catch (err: unknown) {
+        const e = err as {
+          stdout?: string;
+          stderr?: string;
+          message?: string;
+        };
+        const output =
+          [e.stdout, e.stderr].filter(Boolean).join('\n') ||
+          e.message ||
+          String(err);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Failed to list branches:\n${output}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              { branches, total: branches.length, filter: filter ?? null },
+              null,
+              2,
+            ),
+          },
+        ],
+      };
     }
 
     // -----------------------------------------------------------------------
