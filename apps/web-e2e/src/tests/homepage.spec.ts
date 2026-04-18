@@ -95,4 +95,21 @@ unauthTest.describe('Public Landing Page accessibility @regression', () => {
       expect((alt ?? '').trim().length).toBeGreaterThan(0);
     },
   );
+
+  // LS-3471: a functional scanner reported that clicking the "Get Started
+  // Free" CTA on "/" produced no action. Root cause was the scanner's own
+  // invalid selector `(button:visible, [role="button"]:visible)` failing to
+  // parse — the button itself is wired to handleSignIn. Lock in that the CTA
+  // is reachable via a valid accessible-name locator and is clickable.
+  unauthTest(
+    '"Get Started Free" CTA on / is reachable and clickable (LS-3471)',
+    async ({ page }) => {
+      const getStartedBtn = page
+        .getByRole('button', { name: /get started free/i })
+        .first();
+      await expect(getStartedBtn).toBeVisible({ timeout: 15_000 });
+      await expect(getStartedBtn).toBeEnabled();
+      await getStartedBtn.click();
+    },
+  );
 });
