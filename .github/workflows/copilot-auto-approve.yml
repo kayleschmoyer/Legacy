@@ -118,6 +118,7 @@ jobs:
         with:
           github-token: ${{ steps.bot-token.outputs.token }}
           script: |
+            const prNumber = context.payload.pull_request.number;
             const sha = context.payload.pull_request.head.sha;
             await github.rest.checks.create({
               owner: context.repo.owner,
@@ -131,12 +132,23 @@ jobs:
                 summary: 'Copilot review skipped — COPILOT_AUTO_REVIEW_ENABLED=false',
               },
             });
-            core.info(`Auto-passed bot-review for PR #${context.payload.pull_request.number} (Copilot disabled)`);
+            core.info(`Auto-passed bot-review for PR #${prNumber} (Copilot disabled)`);
+            try {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                labels: ['merge-when-ready'],
+              });
+              core.info(`Labeled PR #${prNumber} merge-when-ready`);
+            } catch (e) {
+              core.warning(`Failed to add merge-when-ready label: ${e.message}`);
+            }
 
       - name: Comment on PR when Copilot reviews disabled
         if: >-
           vars.COPILOT_AUTO_REVIEW_ENABLED == 'false' &&
-          github.event.action == 'opened' &&
+          (github.event.action == 'opened' || github.event.action == 'ready_for_review') &&
           github.event.pull_request.user.login != 'dependabot[bot]' &&
           github.event.pull_request.user.login != 'legacy-sports-code-bot[bot]' &&
           github.event.pull_request.head.repo.full_name == github.repository
