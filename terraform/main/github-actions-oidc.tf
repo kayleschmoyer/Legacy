@@ -224,8 +224,7 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/lambda/${local.name_prefix}-*",
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/lambda/${local.name_prefix}-*:*",
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/apigateway/${local.name_prefix}-*",
-          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/apigateway/${local.name_prefix}-*:*",
-          "arn:aws:logs:${local.region}:${local.account_id}:log-group::log-stream:"
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/apigateway/${local.name_prefix}-*:*"
         ]
       },
       # CloudWatch Logs write permissions for Terraform apply (creating new log groups)
@@ -976,8 +975,7 @@ resource "aws_iam_role_policy" "github_actions_plan_policy" {
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/lambda/${local.name_prefix}-*",
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/lambda/${local.name_prefix}-*:*",
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/apigateway/${local.name_prefix}-*",
-          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/apigateway/${local.name_prefix}-*:*",
-          "arn:aws:logs:${local.region}:${local.account_id}:log-group::log-stream:"
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/apigateway/${local.name_prefix}-*:*"
         ]
       },
       # EC2 read
