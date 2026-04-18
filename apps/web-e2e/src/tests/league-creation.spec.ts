@@ -9,7 +9,7 @@
  * - Successful league creation and navigation
  */
 
-import { expect } from '../fixtures/auth-enhanced';
+import { expect, unauthTest } from '../fixtures/auth-enhanced';
 import { test } from '../fixtures/auth';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 
@@ -407,3 +407,55 @@ test.describe('League Creation @critical', () => {
     await expect(page).toHaveURL('/baseball/league/999');
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Unauthenticated visitor regression (LS-3477)
+//
+// /baseball/league/create is a protected route. Unauthenticated visitors are
+// intercepted by EnhancedAuthGuard and shown the PublicLandingPage with a
+// "Get Started Free" CTA. An automated audit crawler reported that clicking
+// this CTA had no visible effect — the evidence shows a CSS-selector parse
+// error from the invalid `(button:visible, [role="button"]:visible)` selector.
+// These tests use getByRole (accessible name) to lock in that the CTA is
+// present, enabled, and clickable for unauthenticated visitors.
+// ─────────────────────────────────────────────────────────────────────────────
+
+unauthTest.describe(
+  'League Create — unauthenticated visitor @regression',
+  () => {
+    unauthTest(
+      '"Get Started Free" CTA is visible and interactive on /baseball/league/create for unauthenticated users',
+      async ({ page }) => {
+        await page.goto('/baseball/league/create');
+        await page.waitForLoadState('load');
+
+        // The auth guard shows the PublicLandingPage for unauthenticated users.
+        // The CTA must be present and enabled so visitors can initiate sign-up
+        // from this protected route.
+        const getStartedBtn = page.getByRole('button', {
+          name: /get started free/i,
+        });
+        await expect(getStartedBtn).toBeVisible({ timeout: 15_000 });
+        await expect(getStartedBtn).toBeEnabled();
+      },
+    );
+
+    unauthTest(
+      '"Get Started Free" CTA on /baseball/league/create is clickable via getByRole (LS-3477)',
+      async ({ page }) => {
+        await page.goto('/baseball/league/create');
+        await page.waitForLoadState('load');
+
+        const getStartedBtn = page.getByRole('button', {
+          name: /get started free/i,
+        });
+        await expect(getStartedBtn).toBeVisible({ timeout: 15_000 });
+        await expect(getStartedBtn).toBeEnabled();
+        // Regression for LS-3477: confirm the click resolves without the
+        // CSS selector parse error caused by the broken crawler selector
+        // `(button:visible, [role="button"]:visible)`.
+        await getStartedBtn.click();
+      },
+    );
+  },
+);
