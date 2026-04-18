@@ -152,7 +152,7 @@ export function PlayerStatsPage({
                   letterSpacing: 0.2,
                 }}
               >
-                MLB Career Leaders · Batting &amp; Pitching
+                MLB Career Leaders · Batting & Pitching
               </Text>
             </YStack>
 
