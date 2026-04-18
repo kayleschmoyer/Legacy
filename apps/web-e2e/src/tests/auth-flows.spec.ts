@@ -530,6 +530,31 @@ unauthTest.describe('Public Routes @critical', () => {
     },
   );
 
+  // ---------------------------------------------------------------------------
+  // LS-3469: unauthenticated homepage `/` must expose both <main> and <nav>
+  // landmarks for assistive tech. An accessibility scan reported that the page
+  // lacked both landmarks. PR #2877 (LS-3494) added `tag="main"` and `tag="nav"`
+  // on PublicLandingPage. This test locks in that both landmarks are present
+  // on the unauthenticated landing page so the regression cannot return.
+  // ---------------------------------------------------------------------------
+  unauthTest(
+    'exposes <main> and <nav> landmarks on / when not authenticated (LS-3469)',
+    async ({ page }) => {
+      await page.goto('/');
+      await page.waitForLoadState('load');
+
+      // Landing page content is visible — confirms we're on PublicLandingPage.
+      await expect(page.getByText(/build your dynasty/i)).toBeVisible({
+        timeout: 15000,
+      });
+
+      await expect(page.getByRole('main')).toBeVisible({ timeout: 15000 });
+      await expect(
+        page.getByRole('navigation', { name: /landing/i }),
+      ).toBeVisible({ timeout: 15000 });
+    },
+  );
+
   unauthTest(
     'shows Baseball hub content on /baseball when not authenticated (LS-3532)',
     async ({ page }) => {
