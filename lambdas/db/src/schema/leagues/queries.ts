@@ -254,7 +254,12 @@ builder.queryField('userLeagues', (t) =>
             PublicSchema.leagueMembers,
             eq(PublicSchema.leagues.id, PublicSchema.leagueMembers.leagueId),
           )
-          .where(eq(PublicSchema.leagueMembers.userId, userId))
+          .where(
+            and(
+              eq(PublicSchema.leagueMembers.userId, userId),
+              eq(PublicSchema.leagues.isMockDraft, false),
+            ),
+          )
           .orderBy(PublicSchema.leagues.id);
 
         return results.map((league) => ({
