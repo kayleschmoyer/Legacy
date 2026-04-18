@@ -197,7 +197,7 @@ Follow the full [worktree-workflow skill](../worktree-workflow/SKILL.md):
    - **`merged`**: proceed to step 9.
    - **Do not start unrelated work** while this PR is open. Do not exit the workflow. Do not mark the tracking task completed.
 
-9. **MCP gap audit (after merge)**: follow [`skills/mcp-gaps/SKILL.md`](../mcp-gaps/SKILL.md) Phase 1 — review all Bash commands and MCP overflows from this session, classify gaps, file any new tickets under the current bucket epic (get key via `jira_get_bucket_epic({ bucket: 'mcp-gaps' })`). Check the **minimum threshold** in that skill first — skip the audit if the session was shallow (< 10 Bash calls, no tool failures, no novel shell patterns).
+9. **MCP gap audit (after merge)**: invoke `Skill(skill: "mcp-gap-audit")` — this loads the audit workflow. Phase 1: review all Bash commands and MCP overflows from this session, classify gaps, file any new tickets under the current bucket epic (get key via `jira_get_bucket_epic({ bucket: 'mcp-gaps' })`). Check the **minimum threshold** in that skill first — skip the audit if the session was shallow (< 10 Bash calls, no tool failures, no novel shell patterns).
 10. **Complete tracking tasks**: call `TaskUpdate(taskId: <id>, status: "completed")` for every task tracking this ticket — **only after the PR is merged and the gap audit is complete**, never before. Marking the task complete while the PR is still open is a failure mode.
 
 > After step 7, if this ticket is a child of a parent being processed in Parent Mode, return to the parent loop.
@@ -315,7 +315,7 @@ Process children in iterative batches until the backlog is empty.
 
 ### Step 3: MCP gap audit
 
-After all child PRs are merged, run the [mcp-gaps skill](../mcp-gaps/SKILL.md) Phase 1 (Audit):
+After all child PRs are merged, invoke `Skill(skill: "mcp-gap-audit")` to run Phase 1 (Audit):
 
 1. Review all Bash commands from this session
 2. Classify gaps: `missing-tool`, `missing-feature`, or `missing-awareness`
