@@ -182,6 +182,40 @@ unauthTest.describe(
 );
 
 // ---------------------------------------------------------------------------
+// LS-3487: "Continue with Discord" button click on /baseball/mock-draft must
+// not throw a CSS selector parse error. The functional scanner used the invalid
+// selector `(button:visible, [role="button"]:visible)` which caused a Playwright
+// parse failure when attempting to click the Discord CTA. This test locks in
+// the correct getByRole locator for the always-rendered Google CTA.
+// Note: the Discord CTA is env-gated on `VITE_DISCORD_CLIENT_ID` and is not
+// rendered in hermetic E2E builds, so the Google CTA is used here as regression
+// coverage — the underlying failure was the selector syntax, not the button identity.
+// ---------------------------------------------------------------------------
+
+unauthTest.describe(
+  '/baseball/mock-draft — auth-gated CTA clickable via getByRole @regression',
+  () => {
+    unauthTest(
+      '"Continue with Google" button on /baseball/mock-draft is clickable via getByRole (LS-3487)',
+      async ({ page }) => {
+        await page.goto('/baseball/mock-draft');
+        await page.waitForLoadState('load');
+
+        const googleBtn = page.getByRole('button', {
+          name: /continue with google/i,
+        });
+        await expect(googleBtn).toBeVisible({ timeout: 15_000 });
+        await expect(googleBtn).toBeEnabled();
+        // Confirm the click resolves without a CSS selector parse error —
+        // regression coverage for the original crawler failure where the
+        // invalid `(button:visible, [role="button"]:visible)` selector was used.
+        await googleBtn.click();
+      },
+    );
+  },
+);
+
+// ---------------------------------------------------------------------------
 // Protected Routes — routes that require authentication
 //
 // Regression coverage for functional-scan bug reports where the scanner used
