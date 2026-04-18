@@ -8583,6 +8583,21 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       try {
         runGit(['branch', '-m', '--', newName], cwd);
+        // Verify the rename actually took effect — git branch -m can exit 0
+        // while the rename is a no-op (e.g. when the worktree is in a
+        // detached-but-partially-checked-out state shared across sessions).
+        const actualName = runGit(['branch', '--show-current'], cwd).trim();
+        if (actualName !== newName) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Rename failed: current branch is still "${actualName}" after rename attempt. Use git -C <worktree> branch -m ${newName} manually.`,
+              },
+            ],
+            isError: true,
+          };
+        }
         return {
           content: [
             {
