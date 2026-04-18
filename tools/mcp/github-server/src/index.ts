@@ -1,3 +1,4 @@
+import { ProxyAgent, setGlobalDispatcher } from 'undici';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
@@ -37,6 +38,15 @@ import { webhookList, webhookUpdate, webhookPing } from './tools/webhooks.js';
 import { prCommits } from './tools/pr-commits.js';
 import { prBatchStatus } from './tools/pr-batch-status.js';
 import { listPRComments } from './tools/list-pr-comments.js';
+
+// Node.js native fetch (undici) does not respect HTTPS_PROXY / GLOBAL_AGENT_HTTPS_PROXY
+// by default. In cloud sessions the egress proxy is required; set the global dispatcher
+// so all fetch() calls in this process go through the proxy when configured.
+const proxyUrl =
+  process.env['HTTPS_PROXY'] || process.env['GLOBAL_AGENT_HTTPS_PROXY'];
+if (proxyUrl) {
+  setGlobalDispatcher(new ProxyAgent(proxyUrl));
+}
 
 /**
  * Shared Zod schema for generic string arrays. Accepts a real array OR a
