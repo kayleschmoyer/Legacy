@@ -14,3 +14,5 @@ export * from './models/Scoring';
 export * from './models/SeasonDraftGame';
 export * from './models/SalaryCap';
 export * from './models/DisclosureGame';
+export * from './models/TwentyQuestionsGame';
+export * from './models/TwentyQuestionsQuestion';
