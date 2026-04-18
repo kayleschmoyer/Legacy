@@ -289,7 +289,7 @@ unauthTest.describe(
         await page.waitForLoadState('load');
 
         await expect(
-          page.getByRole('button', { name: /get started with google/i }),
+          page.getByRole('button', { name: /continue with google/i }),
         ).toBeVisible({ timeout: 15_000 });
       },
     );

@@ -226,24 +226,25 @@ unauthTest.describe(
 // coverage — the underlying failure was the selector syntax, not the button identity.
 // ---------------------------------------------------------------------------
 
+// LS-3487 follow-up: /baseball/mock-draft was moved to publicPaths (LS-3484)
+// so unauthenticated users now reach the page directly without seeing the login
+// gate.  The original regression (broken CSS selector for the Google CTA) no
+// longer applies to this route.  This test now verifies the public-route
+// behaviour: the auth guard does NOT intercept the request, so the landing
+// page login CTA is absent.
 unauthTest.describe(
-  '/baseball/mock-draft — auth-gated CTA clickable via getByRole @regression',
+  '/baseball/mock-draft — public route loads without auth gate @regression',
   () => {
     unauthTest(
-      '"Continue with Google" button on /baseball/mock-draft is clickable via getByRole (LS-3487)',
+      '/baseball/mock-draft is accessible to unauthenticated users without login gate (LS-3487)',
       async ({ page }) => {
         await page.goto('/baseball/mock-draft');
         await page.waitForLoadState('load');
 
-        const googleBtn = page.getByRole('button', {
-          name: /continue with google/i,
-        });
-        await expect(googleBtn).toBeVisible({ timeout: 15_000 });
-        await expect(googleBtn).toBeEnabled();
-        // Confirm the click resolves without a CSS selector parse error —
-        // regression coverage for the original crawler failure where the
-        // invalid `(button:visible, [role="button"]:visible)` selector was used.
-        await googleBtn.click();
+        // Route is public: the auth guard returns children, not PublicLandingPage.
+        await expect(
+          page.getByRole('button', { name: /continue with google/i }),
+        ).not.toBeVisible({ timeout: 5_000 });
       },
     );
   },

@@ -324,7 +324,7 @@ unauthTest.describe(
         // Both "Get Started Free" buttons navigate to /; unauthenticated users
         // see EnhancedAuthGuard → PublicLandingPage with the Google sign-in CTA.
         await expect(
-          page.getByRole('button', { name: /get started with google/i }),
+          page.getByRole('button', { name: /continue with google/i }),
         ).toBeVisible({ timeout: 15_000 });
       },
     );
@@ -353,7 +353,7 @@ unauthTest.describe(
 
         // EnhancedAuthGuard shows PublicLandingPage for unauthenticated users at /.
         await expect(
-          page.getByRole('button', { name: /get started with google/i }),
+          page.getByRole('button', { name: /continue with google/i }),
         ).toBeVisible({ timeout: 15_000 });
       },
     );
@@ -433,7 +433,7 @@ unauthTest.describe(
         // EnhancedAuthGuard shows PublicLandingPage for unauthenticated users at /.
         // Locate the Google sign-in CTA by accessible name (not a bare CSS selector).
         await expect(
-          page.getByRole('button', { name: /get started with google/i }),
+          page.getByRole('button', { name: /continue with google/i }),
         ).toBeVisible({ timeout: 15_000 });
       },
     );

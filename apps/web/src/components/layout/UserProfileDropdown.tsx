@@ -212,13 +212,13 @@ export const UserProfileDropdown: React.FC = () => {
     try {
       setIsOpen(false);
       if (auth?.logout) {
-        // Navigate first (replace so Back doesn't return to the public path and
-        // bypass the auth guard again), then fire logout in the background.
-        // The UI transition is immediate — the server-side cookie clear runs
-        // via fire-and-forget inside auth.logout().
-        navigate('/', { replace: true });
-        // logout() always resolves (requestLogout swallows errors internally).
+        // Dispatch AUTH_LOGOUT first so the guard has isAuthenticated=false
+        // when navigate's render fires.  logout() clears client state
+        // synchronously (requestLogout runs fire-and-forget in the background).
+        // navigate() then moves the URL to / where EnhancedAuthGuard renders
+        // PublicLandingPage for the now-unauthenticated user.
         void auth.logout();
+        navigate('/', { replace: true });
       } else {
         window.location.reload();
       }
