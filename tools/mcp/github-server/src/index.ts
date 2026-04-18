@@ -36,6 +36,7 @@ import { listRunners } from './tools/list-runners.js';
 import { webhookList, webhookUpdate, webhookPing } from './tools/webhooks.js';
 import { prCommits } from './tools/pr-commits.js';
 import { prBatchStatus } from './tools/pr-batch-status.js';
+import { listPRComments } from './tools/list-pr-comments.js';
 
 /**
  * Shared Zod schema for generic string arrays. Accepts a real array OR a
@@ -609,6 +610,22 @@ server.tool(
       .describe('Markdown body of the comment'),
   },
   async (params) => commentPR(params),
+);
+
+// --- github_list_pr_comments ---
+server.tool(
+  'github_list_pr_comments',
+  'Read general (top-level) comments on a PR or issue. Returns author, body, created_at, and updated_at for each comment. Use the optional since parameter (ISO 8601) to filter to comments posted after a given timestamp. Handles pagination automatically. Maps to GET /repos/{owner}/{repo}/issues/{number}/comments.',
+  {
+    number: z.coerce.number().int().positive().describe('PR or issue number'),
+    since: z
+      .string()
+      .optional()
+      .describe(
+        'ISO 8601 timestamp — only return comments posted at or after this time',
+      ),
+  },
+  async (params) => listPRComments(params),
 );
 
 // --- github_edit_pr ---
