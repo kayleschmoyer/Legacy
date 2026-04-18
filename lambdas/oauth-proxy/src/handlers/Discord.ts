@@ -7,6 +7,7 @@ import {
   getUserByEmail,
   getUserById,
   linkDiscordAccount,
+  setInitialAvatarUrl,
   unlinkDiscordAccount,
 } from '@legacy-sports/db-client';
 import { verify } from 'jsonwebtoken';
@@ -232,8 +233,17 @@ export const handleDiscordAuth = async (
       );
     }
 
-    const avatarUrl = discordAvatarUrl(discordUser.id, discordUser.avatar);
-    const internalJwt = await createJwt(user, { picture: avatarUrl });
+    // Set initial avatar for users who don't have one yet (new and existing)
+    if (!user.avatarUrl) {
+      const providerAvatar = discordAvatarUrl(
+        discordUser.id,
+        discordUser.avatar,
+      );
+      await setInitialAvatarUrl(db, user.id, providerAvatar);
+      user = { ...user, avatarUrl: providerAvatar };
+    }
+
+    const internalJwt = await createJwt(user);
 
     const cookies = { [JWT_COOKIE_NAME]: internalJwt };
     const cookieHeader = await encryptCookies(cookies);

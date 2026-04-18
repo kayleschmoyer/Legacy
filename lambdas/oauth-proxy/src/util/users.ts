@@ -5,6 +5,7 @@ import {
   getUserByEmail,
   InternalDb,
   InternalUser,
+  setInitialAvatarUrl,
 } from '@legacy-sports/db-client';
 
 const SALT_ROUNDS = 10;
@@ -17,6 +18,7 @@ const SALT_ROUNDS = 10;
 export async function getUserFromGoogleEmail(
   db: InternalDb,
   email: string,
+  avatarUrl?: string,
 ): Promise<InternalUser> {
   if (!email) {
     throw new Error('Cannot look up user: email address is missing or empty');
@@ -31,6 +33,12 @@ export async function getUserFromGoogleEmail(
 
   if (!user) {
     throw new Error('Failed to create JWT for user!');
+  }
+
+  // Set initial avatar for users who don't have one yet (new and existing)
+  if (!user.avatarUrl && avatarUrl) {
+    await setInitialAvatarUrl(db, user.id, avatarUrl);
+    user = { ...user, avatarUrl };
   }
 
   return user;

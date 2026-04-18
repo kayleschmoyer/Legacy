@@ -12,12 +12,13 @@ export async function createJwt(
 ): Promise<string> {
   const jwtKey = await readSecret(SECRET_CONFIG[Secret.JWT_SECRET]);
 
+  const picture = user.avatarUrl ?? additionalFields?.picture;
   const jwt = {
     accessLevel: user.accessLevel,
     email: user.email,
     id: user.id,
     username: user.username,
-    ...(additionalFields?.picture && { picture: additionalFields.picture }),
+    ...(picture && { picture }),
   };
 
   LOGGER.debug('Creating JWT for user:', {

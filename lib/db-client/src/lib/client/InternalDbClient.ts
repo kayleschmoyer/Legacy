@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { TakeUniqueOrNull, TakeUniqueOrThrow } from './utils/TakeUniqueOrThrow';
 import { GenericDatabase } from './abstract/BaseDbClient';
 import { InternalUser } from '../../types/DatabaseTypes';
@@ -77,6 +77,26 @@ export async function linkDiscordAccount(
     .where(eq(Schema.usersInAppInternal.id, userId))
     .returning()
     .then(TakeUniqueOrThrow);
+}
+
+/**
+ * Sets avatarUrl for a user only if their current avatarUrl is null.
+ * Safe to call unconditionally — it is a no-op when avatarUrl is already set.
+ */
+export async function setInitialAvatarUrl(
+  db: InternalDb,
+  userId: number,
+  avatarUrl: string,
+): Promise<void> {
+  await db
+    .update(Schema.usersInAppInternal)
+    .set({ avatarUrl, updatedAt: new Date() })
+    .where(
+      and(
+        eq(Schema.usersInAppInternal.id, userId),
+        isNull(Schema.usersInAppInternal.avatarUrl),
+      ),
+    );
 }
 
 export async function unlinkDiscordAccount(

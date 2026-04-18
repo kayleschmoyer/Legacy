@@ -420,7 +420,7 @@ export const handleSecureGoogleAuth = async (
     // This automatically creates new users with default access level on first login
     LOGGER.info('Getting or creating user from OAuth flow');
 
-    const user = await getOrCreateUser(userEmail);
+    const user = await getOrCreateUser(userEmail, event._googlePicture);
 
     LOGGER.info(`User ready for authentication (ID: ${user.id})`);
 
@@ -612,7 +612,11 @@ export const handleGoogleAuth = async (event: ExtendedAPIGatewayEvent) => {
           'Database connection successful, getting user from JWT...',
         );
 
-        const user = await getUserFromGoogleEmail(db, googleEmail);
+        const user = await getUserFromGoogleEmail(
+          db,
+          googleEmail,
+          googlePicture,
+        );
 
         LOGGER.debug('User retrieved from database:', {
           id: user.id,
@@ -620,7 +624,6 @@ export const handleGoogleAuth = async (event: ExtendedAPIGatewayEvent) => {
           accessLevel: user.accessLevel,
         });
 
-        // Use picture extracted from the already-verified Google ID token payload
         const jwt = await createJwt(user, {
           picture: googlePicture,
         });
@@ -756,7 +759,11 @@ export const handleGoogleRefresh = async (event: APIGatewayEvent) => {
   }
 
   return await withDbClient(async (db) => {
-    const userInfo = await getUserFromGoogleEmail(db, email);
+    const userInfo = await getUserFromGoogleEmail(
+      db,
+      email,
+      googlePayload?.picture,
+    );
 
     const internalJwt = await createJwt(userInfo, {
       picture: googlePayload?.picture,

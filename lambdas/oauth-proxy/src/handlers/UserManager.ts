@@ -3,6 +3,7 @@ import {
   createUser,
   getUserByEmail,
   InternalUser,
+  setInitialAvatarUrl,
 } from '@legacy-sports/db-client';
 import { withDbClient } from '../util/db';
 import { notifyNewUserSignup } from '../util/discord';
@@ -12,7 +13,10 @@ import { notifyNewUserSignup } from '../util/discord';
  * If the user doesn't exist, automatically creates them with default access level
  * Used by the OAuth flow to ensure all authenticated users have a database record
  */
-export async function getOrCreateUser(email: string): Promise<InternalUser> {
+export async function getOrCreateUser(
+  email: string,
+  avatarUrl?: string,
+): Promise<InternalUser> {
   const [localPart, domain] = email.split('@');
   const maskedLocal = localPart.length <= 1 ? '***' : `${localPart[0]}***`;
   const maskedEmail = `${maskedLocal}@${domain}`;
@@ -30,6 +34,12 @@ export async function getOrCreateUser(email: string): Promise<InternalUser> {
         isNewUser = true;
       } else {
         LOGGER.debug(`User found (ID: ${u.id})`);
+      }
+
+      // Set initial avatar for users who don't have one yet (new and existing)
+      if (!u.avatarUrl && avatarUrl) {
+        await setInitialAvatarUrl(db, u.id, avatarUrl);
+        u = { ...u, avatarUrl };
       }
 
       return u;

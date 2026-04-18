@@ -4,6 +4,7 @@ import {
   getUserByDiscordId,
   getUserByEmail,
   linkDiscordAccount,
+  setInitialAvatarUrl,
 } from '@legacy-sports/db-client';
 import { handleDiscordAuth } from './Discord';
 import { notifyNewUserSignup } from '../util/discord';
@@ -27,6 +28,7 @@ jest.mock('@legacy-sports/db-client', () => ({
   getUserByEmail: jest.fn(),
   getUserById: jest.fn(),
   linkDiscordAccount: jest.fn(),
+  setInitialAvatarUrl: jest.fn().mockResolvedValue(undefined),
   unlinkDiscordAccount: jest.fn(),
 }));
 
@@ -79,6 +81,9 @@ const mockGetUserByEmail = getUserByEmail as jest.MockedFunction<
 >;
 const mockLinkDiscordAccount = linkDiscordAccount as jest.MockedFunction<
   typeof linkDiscordAccount
+>;
+const mockSetInitialAvatarUrl = setInitialAvatarUrl as jest.MockedFunction<
+  typeof setInitialAvatarUrl
 >;
 const mockNotifyNewUserSignup = notifyNewUserSignup as jest.MockedFunction<
   typeof notifyNewUserSignup
@@ -149,6 +154,7 @@ describe('handleDiscordAuth', () => {
     jest.clearAllMocks();
     process.env['DISCORD_CLIENT_ID'] = 'test-client-id';
     process.env['DISCORD_REDIRECT_URI'] = 'https://example.com/callback';
+    mockSetInitialAvatarUrl.mockResolvedValue(undefined);
 
     // Default: token exchange then user fetch
     fetchSpy = jest
