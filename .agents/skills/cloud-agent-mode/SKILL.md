@@ -16,8 +16,10 @@ When running as a **cloud coding agent**:
 
 **Cloud workflow (MCP-first):**
 
-1. **Jira**: `jira_create_ticket({ summary: "...", sprint: "current" })` → `jira_check_blockers({ key: "LS-####" })` → **claim and verify** (see below)
-   - **Claim and verify (MANDATORY)**: first call `jira_view({ key: "LS-####" })` and capture the current status. If the ticket is already `"In Progress"`, call `github_list_prs(search: "LS-####")` and **STOP** if an open PR exists. If `"In Review"` or `"Done"`, **STOP** — do not regress completed work. Only call `jira_transition({ key: "LS-####", status: "In Progress" })` when the current status is not already `"In Progress"`. If the transition fails due to Quirk 2 (cold-start `invalid_type` error), **retry after 30 seconds of other activity** (e.g. read files, run a Glob) — do NOT skip the transition when the ticket is not yet `"In Progress"`. After the transition succeeds, call `jira_view({ key: "LS-####" })` again to confirm `status == "In Progress"`. Leaving a ticket in "To Do" while working it causes duplicate work across agents, and re-transitioning an already claimed ticket may trigger Jira automation side effects.
+1. **Jira**: `jira_create_ticket({ summary: "...", sprint: "current" })` → `jira_claim_ticket({ key: "LS-####" })` (atomically checks blockers, validates status, and transitions to In Progress)
+   - `action: "PROCEED"` → claimed; use `branchRecommendation` to decide git base (main vs a blocker branch)
+   - `action: "STOP"` → read `reason` and halt; do not proceed
+   - `action: "ALREADY_CLAIMED"` → call `github_list_prs(search: "LS-####")`; **STOP** if an open PR exists. If no PR exists, inspect the `ticket.updated` timestamp: **STOP** if within the last 60 minutes (assume another agent just claimed it); only proceed if older than 60 minutes (orphaned ticket — note it in the PR body and continue without re-transitioning)
 2. **Code**: implement the changes
 3. **Validate**: `make_run({ target: "typecheck" })`, `make_run({ target: "lint-fix" })`, `make_run({ target: "test" })`
 4. **DB**: `db_migration_status()` → `db_migrate()`
