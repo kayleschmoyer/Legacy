@@ -93,6 +93,11 @@ export function useDraftWebSocket({
   token,
   onPlayerDrafted,
 }: UseDraftWebSocketParams) {
+  // Holds the latest pick notification while debouncing refetches for batch auto-picks.
+  const pendingRefetchNotifRef = useRef<DraftPickNotification | null>(null);
+  const refetchDebounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
   const handleDraftStarted = useCallback(
     (notification: DraftStartedNotification) => {
       setLiveMessage('Draft has started!');
@@ -175,15 +180,23 @@ export function useDraftWebSocket({
         setPickDeadline(new Date(notification.currentPickDeadline));
       }
 
-      void refetchCurrentPick({ draftId: notification.draftId });
-      void refetchPickHistory();
-      void refetchAvailablePlayers();
-      void refetchAutoPickStatuses().catch((e: unknown) =>
-        LOGGER.warn('Auto-pick statuses refetch failed:', String(e)),
-      );
-      void refetchQueue().catch((e: unknown) =>
-        LOGGER.warn('Queue refetch failed:', String(e)),
-      );
+      // Debounce the refetch operations so that rapid-fire batch auto-picks
+      // (e.g. 10 chained picks) only trigger one set of network requests.
+      pendingRefetchNotifRef.current = notification;
+      if (refetchDebounceRef.current) clearTimeout(refetchDebounceRef.current);
+      refetchDebounceRef.current = setTimeout(() => {
+        const latest = pendingRefetchNotifRef.current;
+        if (!latest) return;
+        void refetchCurrentPick({ draftId: latest.draftId });
+        void refetchPickHistory();
+        void refetchAvailablePlayers();
+        void refetchAutoPickStatuses().catch((e: unknown) =>
+          LOGGER.warn('Auto-pick statuses refetch failed:', String(e)),
+        );
+        void refetchQueue().catch((e: unknown) =>
+          LOGGER.warn('Queue refetch failed:', String(e)),
+        );
+      }, 300);
     },
     [
       myTeamId,
@@ -326,6 +339,13 @@ export function useDraftWebSocket({
     onUserLeft: handleUserLeft,
     onUserList: handleUserList,
   });
+
+  // Clear pending debounce on unmount to prevent post-unmount state updates.
+  useEffect(() => {
+    return () => {
+      if (refetchDebounceRef.current) clearTimeout(refetchDebounceRef.current);
+    };
+  }, []);
 
   // Reconnection recovery
   const wsWasConnected = useRef(false);
