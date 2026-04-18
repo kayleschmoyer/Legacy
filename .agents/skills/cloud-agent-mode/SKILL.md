@@ -312,6 +312,31 @@ The `transition` parameter MUST be a JSON object `{ id: "21" }`, not a string.
 
 If the IDs above stop working, call `getTransitionsForJiraIssue({ issueIdOrKey: "LS-####" })` and update this table.
 
+### Quirk 3: `ci_dispatch_workflow` returns 403 in cloud — AGENT_AUTHOR_APP lacks `actions:write`
+
+**Symptom**: calling `ci_dispatch_workflow({ workflow: "merge-queue.yml", ref: "main" })` returns:
+
+```
+Cannot dispatch workflow "merge-queue.yml": the GitHub App token lacks actions:write permission (HTTP 403 from GitHub).
+```
+
+(or the raw GitHub response: `Resource not accessible by integration`)
+
+**Root cause**: the AGENT_AUTHOR_APP installation has `contents:write` and `pull_requests:write` but **not** `actions:write`. GitHub's workflow dispatch endpoint (`POST /actions/workflows/{workflow}/dispatches`) requires `actions:write`, so the call always returns HTTP 403 in cloud sessions regardless of auth being correct. This is a permissions gap, not an auth failure.
+
+**Workaround**: do NOT loop-retry or declare yourself blocked. Pick one:
+
+1. **Push an empty commit** to re-enter the merge queue:
+   ```
+   worktree_commit({ message: "chore: trigger merge queue (LS-####)" })   # allowEmpty flag if needed
+   worktree_push()
+   ```
+   Shell fallback: `git commit --allow-empty -m "chore: trigger merge queue" && git push`
+2. **Remove and re-add the merge-queue label** on the PR (if the queue is label-triggered).
+3. **Wait for the queue's retry cycle** — if all review threads are resolved, the merge queue retries automatically without any action.
+
+**`ci_wait_for_run` does not exist**: the acceptance criteria in LS-3065 mentions `ci_wait_for_run`, but this tool was never implemented. CI run status is surfaced natively by Claude Code — no polling tool is needed. Use `ci_list_runs` or `ci_view_run` for one-shot status snapshots if you need them explicitly.
+
 ## Jira Pagination (Critical)
 
 The Atlassian plugin's `searchJiraIssuesUsingJql` defaults to `maxResults: 10`. The custom `jira_list_children` defaults to 25. Both will silently truncate results for large epics.
