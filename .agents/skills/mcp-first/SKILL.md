@@ -148,7 +148,7 @@ Use `ci_list_runs`, `ci_view_run`, `ci_get_logs`, `ci_search_logs`, and `ci_reru
 | `gh run view RUN_ID --log`                 | `ci_get_logs(runId: RUN_ID, failedOnly: false)` |
 | `gh run rerun RUN_ID --failed`             | `ci_rerun(runId: RUN_ID, onlyFailedJobs: true)` |
 
-**CI status and PR events are surfaced natively by Claude Code** — no wait tool needed. After pushing, Claude Code automatically receives and surfaces CI failures, review events, and merge status. Never use `sleep` + polling loops (`sleep N && gh run view`, `sleep N && gh pr view`, `ci_view_run` in a loop, `github_view_pr` in a loop) — these waste context and shell round-trips.
+**CI status and PR events are surfaced natively by Claude Code** — no wait tool needed. After pushing, Claude Code automatically receives and surfaces CI failures, review events, and merge status. Never use `sleep` + polling loops (`sleep N && gh run view`, `sleep N && gh pr view`, `sleep N && gh pr checks <pr>`, `ci_view_run` in a loop, `github_view_pr` in a loop) — these waste context and shell round-trips.
 
 ## Jira Operations
 

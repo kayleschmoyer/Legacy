@@ -118,12 +118,13 @@ Summarize to the user:
 
 These are pre-classified by the script at high confidence:
 
-| Pattern                | Gap type            | Reason                                                 |
-| ---------------------- | ------------------- | ------------------------------------------------------ |
-| `git show origin/...`  | `missing-tool`      | Remote ref:path reads have no MCP equivalent           |
-| `git ls-tree`          | `missing-tool`      | Listing files on remote branches has no MCP equivalent |
-| `find .` / `find $wt`  | `missing-awareness` | Should use Glob tool                                   |
-| `grep -r` / `grep -rl` | `missing-awareness` | Should use Grep tool                                   |
+| Pattern                             | Gap type            | Reason                                                                                                                                                                                                                                                                                         |
+| ----------------------------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `git show origin/...`               | `missing-tool`      | Remote ref:path reads have no MCP equivalent                                                                                                                                                                                                                                                   |
+| `git ls-tree`                       | `missing-tool`      | Listing files on remote branches has no MCP equivalent                                                                                                                                                                                                                                         |
+| `find .` / `find $wt`               | `missing-awareness` | Should use Glob tool                                                                                                                                                                                                                                                                           |
+| `grep -r` / `grep -rl`              | `missing-awareness` | Should use Grep tool                                                                                                                                                                                                                                                                           |
+| `sleep N && gh pr checks <pr>` loop | `missing-awareness` | Claude Code surfaces PR events natively — no polling loop needed. After `worktree_push()`, CI results and review events arrive automatically. See pr-lifecycle SKILL.md Rule 9. Available even when CI server is not loaded, because native event streaming does not depend on any MCP server. |
 
 ## Known High-Frequency Overflow Patterns
 
