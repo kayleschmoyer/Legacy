@@ -20,7 +20,21 @@ Autonomously work a Jira ticket from To Do through to merge (or Done). Handles t
 
 ## Steps
 
-### Step 0: Verify Jira auth
+### Step 0: Session initialization
+
+#### 0a: Register the active worktree (FIRST — before any worktree MCP tool)
+
+If the session was launched via the launcher's `worktree` checkbox (CWD is `.claude/worktrees/<name>/`), call `worktree_set` immediately:
+
+```
+worktree_set(key: "<absolute .claude/worktrees/... path>")
+```
+
+The worktree MCP server tracks an "active" worktree independently of the session CWD. Without this call it defaults to whatever worktree was active in a previous session, causing `worktree_rename_session`, `worktree_commit`, `worktree_run`, and all other worktree MCP tools to silently target the wrong tree (LS-3459). Use `pwd` or the `WORKTREE_PATH` env var to get the absolute path.
+
+Skip this sub-step only if no worktree MCP tools will be used in this session (rare — `worktree_rename_session` in Step 1 already requires it).
+
+#### 0b: Verify Jira auth
 
 ```
 jira_auth_status()
@@ -143,8 +157,8 @@ Follow the full [worktree-workflow skill](../worktree-workflow/SKILL.md):
    b. Transition only if step (a) found the current status is not already `"In Progress"`: `jira_transition(key: "LS-####", status: "In Progress")`
    c. Verify with `jira_view(key: "LS-####")`. If step (b) performed a transition, confirm `status == "In Progress"`; if the transition failed silently (status unchanged), retry once. If it still fails, **STOP** and report the failure — do not proceed without the claim. If step (a) already found `"In Progress"` and you decided it was orphaned, just confirm it is still `"In Progress"` and continue.
 3. **Worktree** — two flows:
-   - **Native ephemeral (default)**: if the session was spawned with the launcher's `worktree` checkbox checked, `pwd` should already return `.claude/worktrees/<name>/`. The branch is already set to `claude/<random-name>`. **Do not rename it** — Claude Code caches the branch name at session start; renaming breaks PR detection (anthropics/claude-code#18690). Jira links via PR title and commit messages containing `LS-####`. Call `worktree_set(key: "<absolute .claude/worktrees/... path>")` so the worktree MCP tools target the right tree.
-   - **Sibling (parallel/batch work only)**: `make_worktree_create(ticket: "####", description: "desc")` (add `parent: "LS-####"` if blocker is In Review). Shell fallback: `make worktree TICKET=#### DESC=description`. Then call `worktree_set(key: "LS-####")`.
+   - **Native ephemeral (default)**: if the session was spawned with the launcher's `worktree` checkbox checked, `pwd` should already return `.claude/worktrees/<name>/`. The branch is already set to `claude/<random-name>`. **Do not rename it** — Claude Code caches the branch name at session start; renaming breaks PR detection (anthropics/claude-code#18690). Jira links via PR title and commit messages containing `LS-####`. `worktree_set` was already called in Step 0a — no need to call it again here.
+   - **Sibling (parallel/batch work only)**: `make_worktree_create(ticket: "####", description: "desc")` (add `parent: "LS-####"` if blocker is In Review). Shell fallback: `make worktree TICKET=#### DESC=description`. Then call `worktree_set(key: "LS-####")` to register the new worktree as active.
 4. **Setup**:
    - **Native flow (REQUIRED before any pnpm/make command)**: `.claude/worktrees/<name>/` has no `node_modules`. Symlink from the main repo first (LS-2903/LS-3003):
      ```
