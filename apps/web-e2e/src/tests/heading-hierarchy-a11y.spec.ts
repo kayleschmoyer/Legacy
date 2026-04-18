@@ -206,6 +206,21 @@ test.describe('Heading hierarchy — / (home) @regression', () => {
     await page.goto('/');
     await page.waitForLoadState('load');
     await waitForPageContent(page);
+    // The home page has two async layers before any h1 renders:
+    //   1. React.lazy() — defers chunk load past the Suspense fallback
+    //   2. getUserLeagueSummaries query — loading state delays the h1
+    // waitForPageContent() is satisfied by the Suspense fallback, so we
+    // must also wait for the actual h1 to appear (mirrors the league-overview
+    // fix from LS-3593 / LS-3594).
+    await page.waitForFunction(
+      () => {
+        const h1 = Array.from(document.querySelectorAll('h1')).find(
+          (el) => !el.closest('[role="dialog"], dialog'),
+        );
+        return h1 !== undefined && (h1.textContent?.trim().length ?? 0) > 0;
+      },
+      { timeout: 15_000 },
+    );
   });
 
   test('Home page has exactly one h1', async ({ page }) => {
