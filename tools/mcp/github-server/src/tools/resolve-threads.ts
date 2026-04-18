@@ -3,7 +3,8 @@ import { githubGraphQL, githubRest } from '../github-api.js';
 import type { ToolResult } from '../types.js';
 
 interface ResolveThreadsParams {
-  threadIds: string[];
+  threadIds?: string[];
+  commentDatabaseIds?: number[];
   prNumber?: number;
 }
 
@@ -11,6 +12,80 @@ interface ResolveResponse {
   [alias: string]: {
     thread: { isResolved: boolean };
   };
+}
+
+interface ThreadMapResponse {
+  repository: {
+    pullRequest: {
+      reviewThreads: {
+        pageInfo: { hasNextPage: boolean };
+        nodes: Array<{
+          id: string;
+          comments: {
+            nodes: Array<{ databaseId: number | null }>;
+          };
+        }>;
+      };
+    };
+  };
+}
+
+const THREAD_MAP_QUERY = `
+query($owner: String!, $repo: String!, $number: Int!) {
+  repository(owner: $owner, name: $repo) {
+    pullRequest(number: $number) {
+      reviewThreads(first: 100) {
+        pageInfo { hasNextPage }
+        nodes {
+          id
+          comments(first: 10) {
+            nodes { databaseId }
+          }
+        }
+      }
+    }
+  }
+}`;
+
+async function fetchThreadIdsForComments(
+  prNumber: number,
+  commentDatabaseIds: number[],
+): Promise<{ resolved: string[]; notFound: number[] }> {
+  const repo = await getRepoOwnerName();
+  const result = await githubGraphQL<ThreadMapResponse>(THREAD_MAP_QUERY, {
+    owner: repo.owner,
+    repo: repo.name,
+    number: prNumber,
+  });
+
+  const threads = result.data.repository.pullRequest.reviewThreads.nodes;
+
+  const commentToThread = new Map<number, string>();
+  for (const thread of threads) {
+    for (const comment of thread.comments.nodes) {
+      if (comment.databaseId !== null) {
+        commentToThread.set(comment.databaseId, thread.id);
+      }
+    }
+  }
+
+  const resolved: string[] = [];
+  const notFound: number[] = [];
+  const seen = new Set<string>();
+
+  for (const commentId of commentDatabaseIds) {
+    const threadId = commentToThread.get(commentId);
+    if (threadId) {
+      if (!seen.has(threadId)) {
+        resolved.push(threadId);
+        seen.add(threadId);
+      }
+    } else {
+      notFound.push(commentId);
+    }
+  }
+
+  return { resolved, notFound };
 }
 
 function buildBatchResolveMutation(threadIds: string[]): {
@@ -40,14 +115,71 @@ function buildBatchResolveMutation(threadIds: string[]): {
 export async function resolveThreads(
   params: ResolveThreadsParams,
 ): Promise<ToolResult> {
-  const uniqueIds = [...new Set(params.threadIds)];
+  const hasThreadIds = params.threadIds && params.threadIds.length > 0;
+  const hasCommentIds =
+    params.commentDatabaseIds && params.commentDatabaseIds.length > 0;
 
-  if (uniqueIds.length === 0) {
+  if (!hasThreadIds && !hasCommentIds) {
     return {
       isError: true,
-      content: [{ type: 'text', text: 'No thread IDs provided.' }],
+      content: [
+        {
+          type: 'text',
+          text: 'No thread IDs or comment database IDs provided.',
+        },
+      ],
     };
   }
+
+  let allThreadIds: string[] = [...(params.threadIds ?? [])];
+  let notFoundCommentIds: number[] = [];
+
+  if (hasCommentIds) {
+    if (!params.prNumber) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: 'prNumber is required when providing commentDatabaseIds (needed to look up thread IDs from the PR).',
+          },
+        ],
+      };
+    }
+
+    try {
+      const { resolved, notFound } = await fetchThreadIdsForComments(
+        params.prNumber,
+        params.commentDatabaseIds!,
+      );
+      allThreadIds = [...new Set([...allThreadIds, ...resolved])];
+      notFoundCommentIds = notFound;
+    } catch (error) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: `Failed to look up thread IDs for comment database IDs: ${error instanceof Error ? error.message : String(error)}`,
+          },
+        ],
+      };
+    }
+
+    if (allThreadIds.length === 0) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: `None of the provided comment database IDs could be mapped to review thread IDs. Comment IDs not found: ${notFoundCommentIds.join(', ')}. These IDs may belong to a different PR, may have been deleted, or the threads may be paginated beyond the first 100.`,
+          },
+        ],
+      };
+    }
+  }
+
+  const uniqueIds = [...new Set(allThreadIds)];
 
   // Batch in groups of 50 to stay within GraphQL limits
   const BATCH_SIZE = 50;
@@ -143,6 +275,7 @@ export async function resolveThreads(
             resolved,
             failed,
             results,
+            ...(notFoundCommentIds.length > 0 ? { notFoundCommentIds } : {}),
             recheckTriggered,
             ...(recheckNote ? { recheckNote } : {}),
             ...(recheckError ? { recheckError } : {}),

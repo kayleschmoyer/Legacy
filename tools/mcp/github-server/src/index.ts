@@ -834,18 +834,37 @@ server.tool(
 // --- github_resolve_threads ---
 server.tool(
   'github_resolve_threads',
-  'Batch-resolve review threads (groups of 50). If prNumber is provided, triggers bot-review recheck after resolving.',
+  'Batch-resolve review threads (groups of 50). Accepts PRRT_ thread node IDs (from github_get_review_threads) via threadIds, OR numeric comment databaseIds (from mcp__github__* get_review_comments or github_get_review_threads comment entries) via commentDatabaseIds — the tool maps comment IDs to thread IDs internally. When using commentDatabaseIds, prNumber is required. If prNumber is provided and all threads resolved, triggers bot-review recheck.',
   {
-    threadIds: stringList({ min: 1, max: 100 }).describe(
-      'Thread node IDs from github_get_review_threads',
-    ),
+    threadIds: stringList({ min: 1, max: 100 })
+      .optional()
+      .describe(
+        'Thread node IDs (PRRT_...) from github_get_review_threads. Use this OR commentDatabaseIds.',
+      ),
+    commentDatabaseIds: z
+      .preprocess((val) => {
+        if (Array.isArray(val)) return val;
+        if (typeof val === 'string' && val.trimStart().startsWith('[')) {
+          try {
+            const parsed = JSON.parse(val);
+            if (Array.isArray(parsed)) return parsed;
+          } catch {
+            // Not valid JSON — fall through
+          }
+        }
+        return val;
+      }, z.array(z.coerce.number().int().positive()).min(1).max(100))
+      .optional()
+      .describe(
+        'Numeric comment databaseId values (REST IDs) — alternative to threadIds when you only have comment IDs (e.g. from mcp__github__* get_review_comments). Requires prNumber. The tool fetches thread IDs from the PR and maps each comment ID to its parent thread.',
+      ),
     prNumber: z.coerce
       .number()
       .int()
       .positive()
       .optional()
       .describe(
-        'PR number — triggers Copilot Auto-Approve recheck after resolving threads',
+        'PR number — required when using commentDatabaseIds; also triggers Copilot Auto-Approve recheck after resolving threads when all resolutions succeed',
       ),
   },
   async (params) => resolveThreads(params),

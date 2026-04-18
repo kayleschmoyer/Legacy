@@ -89,17 +89,21 @@ When `bot-review` CI check fails or Copilot posts review comments, use this MCP-
 2. **Inspect the returned comments and fix the code** in the flagged files/lines
 3. **Commit and push** the fix
 4. **Resolve threads**: `github_resolve_threads({ threadIds: [<thread-id>, ...], prNumber: PR# })`
+   - Thread node IDs come from the `id` field of each thread in `github_get_review_threads` output (PRRT\_... format).
+   - **Alternative**: if you only have numeric comment `databaseId` values (e.g. from `mcp__github__*` `get_review_comments`), pass them as `commentDatabaseIds` instead — the tool maps them to thread IDs internally: `github_resolve_threads({ commentDatabaseIds: [<databaseId>, ...], prNumber: PR# })`.
 5. **Re-request review**: `github_request_review({ prs: [PR#] })`
 
 Before the next push, also check whether any other blockers are already known on the PR (conflicts, non-review failing checks). Batch all currently known fixes into one validation + push round whenever possible. Do **not** push a CI-only change while known review threads remain unresolved, or vice versa, unless one blocker must be cleared first to reveal the next.
 
 > **Avoid `gh api graphql` to enumerate review threads** — prefer `github_get_review_threads`, which returns structured data including GraphQL thread node IDs (required for resolution). Use `gh api graphql` only as a last resort when MCP or another documented tool is unavailable or does not return the needed thread IDs.
 
+> **Mapping comment IDs to thread IDs**: `github_resolve_threads` now handles this automatically. If you have a comment's `databaseId` (numeric) but not its thread's PRRT\_ node ID, pass the `databaseId` values via `commentDatabaseIds` with `prNumber` — no raw GraphQL fallback needed.
+
 ## Critical Rules
 
 1. **Always self-review before pushing (Tier 2 gate)** -- Phase 1 is mandatory. Read every changed file in full, check all 20 common review patterns, and produce a Self-Review Summary before calling `worktree_push()`. Skipping this is the #1 cause of avoidable Copilot review cycles.
 2. **2-round cap on Copilot fix iterations** -- Round 1: security/bugs/type safety. Round 2: remaining actionable comments. After round 2: resolve and move on.
-3. **Resolve threads after fixing** -- use `github_resolve_threads({ threadIds: [...], prNumber: <PR#> })` after pushing fixes. Thread IDs come from `github_get_review_threads({ number: <PR#>, unresolvedOnly: true })`. The `prNumber` parameter triggers a bot-review recheck attempt when all thread resolutions succeed; if the app token lacks `actions: write` the dispatch is skipped/non-fatal and the tool returns a `recheckNote` instead of erroring — threads are still resolved and the recheck fires automatically on the next push. Add `merge-when-ready` label after all threads are resolved. **Do NOT use `gh api graphql`** to resolve — `github_resolve_threads` works with both user and GitHub App tokens and handles batching. Fall back to `gh api graphql` only if the custom server is confirmed unavailable after retry.
+3. **Resolve threads after fixing** -- use `github_resolve_threads({ threadIds: [...], prNumber: <PR#> })` after pushing fixes. Thread IDs (PRRT\_... node IDs) come from `github_get_review_threads({ number: <PR#>, unresolvedOnly: true })`. If you only have numeric comment `databaseId` values, use `github_resolve_threads({ commentDatabaseIds: [...], prNumber: <PR#> })` — the tool maps them to thread IDs internally (no raw GraphQL needed). The `prNumber` parameter triggers a bot-review recheck attempt when all thread resolutions succeed; if the app token lacks `actions: write` the dispatch is skipped/non-fatal and the tool returns a `recheckNote` instead of erroring — threads are still resolved and the recheck fires automatically on the next push. Add `merge-when-ready` label after all threads are resolved. **Do NOT use `gh api graphql`** to resolve — `github_resolve_threads` works with both user and GitHub App tokens and handles batching. Fall back to `gh api graphql` only if the custom server is confirmed unavailable after retry.
 4. **Never skip `make pc`** -- each CI failure costs 40-60 min. Minimum alternative: `make format && make lint-fix && make typecheck`.
 5. **Always use `--body-file` or MCP tool for PR body** -- never inline `--body` in any shell (PowerShell is especially problematic).
 6. **Never create a PR from `main`** -- branch name must contain a Jira ticket key.
