@@ -4246,8 +4246,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         // Rebase: use explicit base if provided, otherwise try twig, fall back to origin/main
         let rebaseOut = '';
         if (base) {
-          log.push(`$ git rebase ${base}`);
-          rebaseOut = runGit(['rebase', base], cwd, {
+          // If base is a plain local branch name (no special git syntax), rebase onto
+          // the freshly-fetched remote-tracking ref so we don't land on a stale local pointer.
+          const isPlainBranchName =
+            !/[/~^@:]/.test(base) &&
+            !/^[0-9a-f]{40}$/.test(base) &&
+            base !== 'HEAD';
+          const rebaseTarget = isPlainBranchName ? `origin/${base}` : base;
+          log.push(`$ git rebase ${rebaseTarget}`);
+          rebaseOut = runGit(['rebase', rebaseTarget], cwd, {
             timeout: 120_000,
             env: NON_INTERACTIVE_GIT_ENV,
           });
