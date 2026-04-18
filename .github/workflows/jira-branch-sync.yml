@@ -13,7 +13,11 @@ name: "Jira Branch Sync"
 # Ticket key extraction (from branch/title/body, combined and deduped):
 #   - Branch name — all LS-#### matches (e.g. LS-1234/description → LS-1234)
 #   - PR title — all LS-#### matches (PR events only)
-#   - PR body — all LS-#### matches (PR events only)
+#   - PR body — only LS-#### matches preceded by a closing keyword on the same
+#     line: closes/close/closed, fixes/fix/fixed, resolves/resolve/resolved,
+#     completes/complete/completed (case-insensitive). Bare references such as
+#     "unblocks LS-1791" or "blocked by LS-1791" are intentionally excluded to
+#     prevent accidentally transitioning tickets that are merely mentioned.
 #   All discovered keys are merged, normalized, sorted, and deduplicated
 #   before transitions are applied.
 #
@@ -82,10 +86,20 @@ jobs:
           # Extract all LS-#### keys from branch name
           BRANCH_KEYS=$(echo "$BRANCH" | grep -oiP 'LS-\d+' | tr '[:lower:]' '[:upper:]' || true)
 
-          # For PR events, also extract from PR title and body
+          # For PR events, also extract from PR title and body.
+          # Title: all LS-#### matches (titles are terse and primary).
+          # Body: only LS-#### matches preceded by a closing keyword on the same
+          # line (closes/fixes/resolves/completes). Bare references such as
+          # "unblocks LS-1791" are intentionally excluded to prevent accidentally
+          # transitioning tickets that are merely mentioned.
           PR_KEYS=""
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            PR_KEYS=$(printf '%s\n%s' "$PR_TITLE" "$PR_BODY" | grep -oiP 'LS-\d+' | tr '[:lower:]' '[:upper:]' || true)
+            TITLE_KEYS=$(echo "$PR_TITLE" | grep -oiP 'LS-\d+' | tr '[:lower:]' '[:upper:]' || true)
+            BODY_KEYS=$(echo "$PR_BODY" \
+              | grep -ioP '(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?|complete[sd]?)\s+LS-\d+' \
+              | grep -oiP 'LS-\d+' \
+              | tr '[:lower:]' '[:upper:]' || true)
+            PR_KEYS=$(printf '%s\n%s' "$TITLE_KEYS" "$BODY_KEYS")
           fi
 
           # Combine and deduplicate all keys
