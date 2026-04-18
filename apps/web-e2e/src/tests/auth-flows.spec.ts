@@ -108,11 +108,10 @@ unauthTest.describe('Login Flow @critical', () => {
       await page.goto('/');
       await page.waitForLoadState('load');
 
-      // The main nav links should not be present — the auth guard replaces
-      // the entire app with the landing page.
-      await expect(
-        page.getByRole('navigation', { name: 'Primary' }),
-      ).not.toBeVisible();
+      // The authenticated app nav contains "My Leagues" and "Sports" dropdowns.
+      // PR #2877 (LS-3494) added aria-label="Primary" to the landing page nav
+      // too, so we check an auth-only element instead of the nav container.
+      await expect(page.getByText(/my leagues/i)).not.toBeVisible();
     },
   );
 });
@@ -237,7 +236,7 @@ unauthTest.describe('Protected Routes @critical', () => {
   const routes = [
     '/',
     // /baseball is publicly accessible (LS-3532) — see Public Routes section below.
-    '/baseball/mock-draft',
+    // /baseball/mock-draft is publicly accessible (LS-3484) — see Public Routes section below.
     // /players is publicly accessible (LS-3493) — see Public Routes section below.
     '/management',
     '/profile/settings',
@@ -281,7 +280,7 @@ unauthTest.describe('Protected Routes @critical', () => {
 
 // ---------------------------------------------------------------------------
 // Public Routes — accessible without authentication (LS-3566, LS-3563, LS-3561,
-// LS-3522, LS-3548, LS-3513)
+// LS-3522, LS-3548, LS-3513, LS-3484)
 // ---------------------------------------------------------------------------
 
 unauthTest.describe('Public Routes @critical', () => {
@@ -471,6 +470,24 @@ unauthTest.describe('Public Routes @critical', () => {
       await expect(
         page.getByRole('heading', { name: /baseball fantasy/i }),
       ).toBeVisible({ timeout: 15000 });
+    },
+  );
+
+  unauthTest(
+    'shows premium gate on /baseball/mock-draft when not authenticated (LS-3484)',
+    async ({ page }) => {
+      await page.goto('/baseball/mock-draft');
+      await page.waitForLoadState('load');
+
+      // LS-3484: /baseball/mock-draft was missing from publicPaths — unauthenticated
+      // users saw the "Build Your Dynasty" marketing landing page instead of the page.
+      // Now that the route is public, the PremiumGate renders for non-premium visitors.
+      await expect(page.getByText(/premium feature/i)).toBeVisible({
+        timeout: 15000,
+      });
+      await expect(page.locator('body')).not.toContainText(
+        'Build Your Dynasty',
+      );
     },
   );
 });
@@ -690,10 +707,10 @@ expiredSessionTest.describe('Session Expiry @critical', () => {
       await page.goto('/');
       await page.waitForLoadState('load');
 
-      // The primary nav should not be present — auth guard shows landing page.
-      await expect(
-        page.getByRole('navigation', { name: 'Primary' }),
-      ).not.toBeVisible();
+      // The authenticated app nav contains "My Leagues" — not present on the
+      // landing page that auth guard shows for expired sessions (PR #2877 added
+      // aria-label="Primary" to the landing nav too, so nav container is ambiguous).
+      await expect(page.getByText(/my leagues/i)).not.toBeVisible();
     },
   );
 });

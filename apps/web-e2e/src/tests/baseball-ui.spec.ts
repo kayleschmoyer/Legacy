@@ -7,7 +7,7 @@
  * per the ticket scope.
  */
 
-import { expect, test } from '../fixtures/auth';
+import { expect, test, unauthTest } from '../fixtures/auth-enhanced';
 
 // ---------------------------------------------------------------------------
 // Baseball Hub (/baseball)
@@ -258,3 +258,51 @@ test.describe('Join League By Code Form @regression', () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// LS-3484: [functional] 404 error on /baseball/mock-draft endpoint.
+// An automated audit crawler navigated to /baseball/mock-draft unauthenticated
+// and received a functional 404 — EnhancedAuthGuard had not listed the route
+// in publicPaths, so it intercepted the request and rendered the "Build Your
+// Dynasty" marketing landing page while the URL showed /baseball/mock-draft.
+// Adding the route to publicPaths (LS-3484) resolved the redirect. These
+// tests lock in the corrected URL behaviour: the browser must remain at
+// /baseball/mock-draft (no auth-guard redirect to /) and the marketing
+// landing page must never appear for unauthenticated visitors to this route.
+// ---------------------------------------------------------------------------
+
+unauthTest.describe(
+  'Mock Draft page — functional 404 regression (LS-3484) @regression',
+  () => {
+    unauthTest.beforeEach(async ({ page }) => {
+      await page.goto('/baseball/mock-draft');
+      await page.waitForLoadState('load');
+    });
+
+    unauthTest(
+      'URL stays at /baseball/mock-draft for unauthenticated users — no auth-guard redirect',
+      async ({ page }) => {
+        await expect(page).toHaveURL('/baseball/mock-draft', {
+          timeout: 15_000,
+        });
+      },
+    );
+
+    unauthTest(
+      'does not show marketing landing page for unauthenticated users on /baseball/mock-draft',
+      async ({ page }) => {
+        await expect(page.getByText(/build your dynasty/i)).not.toBeVisible();
+        await expect(page.getByText(/dominate your league/i)).not.toBeVisible();
+      },
+    );
+
+    unauthTest(
+      'shows premium gate — not a 404 page — for unauthenticated users',
+      async ({ page }) => {
+        await expect(page.getByText(/premium feature/i)).toBeVisible({
+          timeout: 15_000,
+        });
+      },
+    );
+  },
+);
