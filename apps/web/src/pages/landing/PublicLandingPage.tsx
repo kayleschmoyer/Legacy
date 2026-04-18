@@ -558,52 +558,59 @@ export function PublicLandingPage(): React.JSX.Element {
         position="sticky"
         top={0}
         zIndex={100}
-        paddingHorizontal="$5"
-        paddingVertical="$3"
-        alignItems="center"
-        justifyContent="space-between"
         style={navStyle}
-        $sm={{ paddingHorizontal: '$3' }}
       >
-        {/* Logo */}
-        <XStack alignItems="center" gap="$2">
-          <img
-            src={`${import.meta.env.BASE_URL}logo.png`}
-            alt="Legacy Sports"
-            style={{ height: 38, width: 'auto', display: 'block' }}
-          />
-          <Text
-            fontSize="$5"
-            fontWeight="800"
-            color={BRAND_GOLD}
-            letterSpacing={-0.5}
-          >
-            Legacy Sports
-          </Text>
-        </XStack>
-
-        {/* Nav sign-in button */}
-        <OutlineSignInButton
-          onPress={() => {
-            void handleSignIn();
-          }}
-          role="button"
-          aria-label="Sign in"
+        <XStack
+          tag="nav"
+          aria-label="Primary"
+          width="100%"
+          paddingHorizontal="$5"
+          paddingVertical="$3"
+          alignItems="center"
+          justifyContent="space-between"
+          $sm={{ paddingHorizontal: '$3' }}
         >
+          {/* Logo */}
           <XStack alignItems="center" gap="$2">
-            {isLoading ? (
-              <Spinner size="small" color={BRAND_GOLD_LIGHT} />
-            ) : (
-              <Text fontSize="$3" color={BRAND_GOLD_LIGHT} fontWeight="600">
-                Sign In
-              </Text>
-            )}
+            <img
+              src={`${import.meta.env.BASE_URL}logo.png`}
+              alt="Legacy Sports"
+              style={{ height: 38, width: 'auto', display: 'block' }}
+            />
+            <Text
+              fontSize="$5"
+              fontWeight="800"
+              color={BRAND_GOLD}
+              letterSpacing={-0.5}
+            >
+              Legacy Sports
+            </Text>
           </XStack>
-        </OutlineSignInButton>
+
+          {/* Nav sign-in button */}
+          <OutlineSignInButton
+            onPress={() => {
+              void handleSignIn();
+            }}
+            role="button"
+            tabIndex={0}
+            aria-label="Sign in"
+          >
+            <XStack alignItems="center" gap="$2">
+              {isLoading ? (
+                <Spinner size="small" color={BRAND_GOLD_LIGHT} />
+              ) : (
+                <Text fontSize="$3" color={BRAND_GOLD_LIGHT} fontWeight="600">
+                  Sign In
+                </Text>
+              )}
+            </XStack>
+          </OutlineSignInButton>
+        </XStack>
       </XStack>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <YStack tag="main">
+      <YStack tag="main" flex={1}>
+        <ScrollView showsVerticalScrollIndicator={false}>
           {/* ─── Hero Section ─── */}
           <HeroSection style={heroGradientStyle}>
             <ContentContainer alignItems="center" gap="$6">
@@ -648,6 +655,7 @@ export function PublicLandingPage(): React.JSX.Element {
                     void handleSignIn();
                   }}
                   role="button"
+                  tabIndex={0}
                   aria-label="Continue with Google"
                 >
                   <XStack
@@ -672,6 +680,7 @@ export function PublicLandingPage(): React.JSX.Element {
                   <SignInButton
                     onPress={handleDiscordSignIn}
                     role="button"
+                    tabIndex={0}
                     aria-label="Continue with Discord"
                     backgroundColor={DISCORD_BLURPLE}
                     hoverStyle={{
@@ -906,6 +915,7 @@ export function PublicLandingPage(): React.JSX.Element {
                   void handleSignIn();
                 }}
                 role="button"
+                tabIndex={0}
                 aria-label="Get started free"
               >
                 <XStack
@@ -925,22 +935,22 @@ export function PublicLandingPage(): React.JSX.Element {
               </SignInButton>
             </XStack>
           </YStack>
-        </YStack>
-        {/* ─── Footer ─── */}
-        <YStack
-          tag="footer"
-          paddingVertical="$5"
-          paddingHorizontal="$5"
-          borderTopWidth={1}
-          borderTopColor="$glassBorder"
-          alignItems="center"
-          $sm={{ paddingHorizontal: '$3' }}
-        >
-          <Text fontSize="$2" color="$color10" textAlign="center">
-            © {new Date().getFullYear()} Legacy Sports · All rights reserved
-          </Text>
-        </YStack>
-      </ScrollView>
+          {/* ─── Footer ─── */}
+          <YStack
+            tag="footer"
+            paddingVertical="$5"
+            paddingHorizontal="$5"
+            borderTopWidth={1}
+            borderTopColor="$glassBorder"
+            alignItems="center"
+            $sm={{ paddingHorizontal: '$3' }}
+          >
+            <Text fontSize="$2" color="$color10" textAlign="center">
+              © {new Date().getFullYear()} Legacy Sports · All rights reserved
+            </Text>
+          </YStack>
+        </ScrollView>
+      </YStack>
     </PageContainer>
   );
 }
