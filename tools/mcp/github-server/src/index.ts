@@ -453,16 +453,39 @@ server.tool(
 // --- github_get_review_threads ---
 server.tool(
   'github_get_review_threads',
-  'Fetch review threads on a PR via GraphQL. Includes resolved threads by default — set unresolvedOnly: true to filter to open threads only (outdated threads are treated as resolved and excluded). Each thread includes isResolved, isOutdated, createdAt (thread-level, for chronological sorting), and per-comment createdAt. Use for fix-reviews workflows (unresolvedOnly: true) or historical analysis of all review rounds (unresolvedOnly: false). Pagination is capped at 100 threads and 50 comments per thread; truncated: true is set when results are paginated.',
+  'Fetch review threads on a PR via GraphQL. Includes resolved threads by default — set unresolvedOnly: true to filter to open threads only (outdated threads are treated as resolved and excluded). Each thread includes isResolved, isOutdated, createdAt (thread-level, for chronological sorting), and per-comment createdAt. Use for fix-reviews workflows (unresolvedOnly: true) or historical analysis of all review rounds (unresolvedOnly: false). Pagination is capped at 100 threads and 50 comments per thread; truncated: true is set when results are paginated. Pass the PR number as "number" (preferred) or "prNumber" (alias).',
   {
-    number: z.coerce.number().int().positive().describe('PR number'),
+    number: z.coerce.number().int().positive().optional().describe('PR number'),
+    prNumber: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Alias for "number" — use either, not both'),
     unresolvedOnly: coercedBoolean
       .default(false)
       .describe(
         'Filter to unresolved threads only (default: false — returns all threads including resolved)',
       ),
   },
-  async (params) => getReviewThreads(params),
+  async (params) => {
+    const resolved = params.number ?? params.prNumber;
+    if (!resolved) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: 'Missing required parameter: provide "number" (or alias "prNumber") with a positive integer PR number.',
+          },
+        ],
+      };
+    }
+    return getReviewThreads({
+      number: resolved,
+      unresolvedOnly: params.unresolvedOnly,
+    });
+  },
 );
 
 // --- github_list_prs ---
@@ -613,10 +636,11 @@ server.tool(
 // --- github_manage_labels ---
 server.tool(
   'github_manage_labels',
-  'Prefer this over `gh pr edit --add-label` via shell. Add or remove labels on one or more PRs. Pass a single PR number or an array. When multiple PRs are given, all get the same label changes.',
+  'Prefer this over `gh pr edit --add-label` via shell. Add or remove labels on one or more PRs. Pass a single PR number via "prNumber", or one or more PR numbers via "prs". When multiple PRs are given, all get the same label changes.',
   {
     prs: z
       .preprocess((v) => {
+        if (v === undefined || v === null) return undefined;
         if (Array.isArray(v)) return v;
         if (typeof v === 'string' && v.trimStart().startsWith('[')) {
           try {
@@ -627,12 +651,38 @@ server.tool(
           }
         }
         return [v];
-      }, z.array(z.coerce.number().int().positive()).min(1).max(100))
-      .describe('PR number or array of PR numbers'),
+      }, z.array(z.coerce.number().int().positive()).min(1).max(100).optional())
+      .describe(
+        'PR number or array of PR numbers (use "prNumber" for a single PR)',
+      ),
+    prNumber: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        'Single PR number — alias for prs:[n]. Use either "prNumber" or "prs", not both.',
+      ),
     add: labelList.optional().describe('Labels to add'),
     remove: labelList.optional().describe('Labels to remove'),
   },
-  async (params) => manageLabels(params),
+  async (params) => {
+    const prs =
+      params.prs ??
+      (params.prNumber !== undefined ? [params.prNumber] : undefined);
+    if (!prs?.length) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: 'Missing required parameter: provide "prNumber" (single PR) or "prs" (one or more PR numbers).',
+          },
+        ],
+      };
+    }
+    return manageLabels({ prs, add: params.add, remove: params.remove });
+  },
 );
 
 // --- github_merge_pr ---
