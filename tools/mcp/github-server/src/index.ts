@@ -754,9 +754,15 @@ server.tool(
 // --- github_merge_pr ---
 server.tool(
   'github_merge_pr',
-  'Prefer this over `gh pr merge` via shell. Merge a PR. Default: merge queue (--auto --squash). "direct" uses --admin (requires authorization).',
+  'Prefer this over `gh pr merge` via shell. Merge a PR. Default: merge queue (--auto --squash). "direct" uses --admin (requires authorization). Pass the PR number as "number" (preferred) or "prNumber" (alias).',
   {
-    number: z.coerce.number().int().positive().describe('PR number'),
+    number: z.coerce.number().int().positive().optional().describe('PR number'),
+    prNumber: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Alias for "number" — use either, not both'),
     strategy: z
       .enum(['queue', 'direct'])
       .default('queue')
@@ -764,7 +770,21 @@ server.tool(
         '"queue" (default) or "direct" (--admin, requires authorization)',
       ),
   },
-  async (params) => mergePR(params),
+  async (params) => {
+    const resolved = params.number ?? params.prNumber;
+    if (!resolved) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: 'Missing required parameter: provide "number" (or alias "prNumber") with a positive integer PR number.',
+          },
+        ],
+      };
+    }
+    return mergePR({ number: resolved, strategy: params.strategy });
+  },
 );
 
 // --- github_mark_pr_ready ---
@@ -870,10 +890,11 @@ server.tool(
 // --- github_request_review ---
 server.tool(
   'github_request_review',
-  'Request reviewers on one or more PRs. Accepts a single PR number or an array. Requests Copilot by default.',
+  'Request reviewers on one or more PRs. Accepts a single PR number or array via "prs", or a single PR number via "prNumber" (alias for prs:[n]). Requests Copilot by default.',
   {
     prs: z
       .preprocess((v) => {
+        if (v === undefined || v === null) return undefined;
         if (Array.isArray(v)) return v;
         if (typeof v === 'string' && v.trimStart().startsWith('[')) {
           try {
@@ -884,8 +905,18 @@ server.tool(
           }
         }
         return [v];
-      }, z.array(z.coerce.number().int().positive()).min(1).max(100))
-      .describe('PR number or array of PR numbers'),
+      }, z.array(z.coerce.number().int().positive()).min(1).max(100).optional())
+      .describe(
+        'PR number or array of PR numbers (use "prNumber" for a single PR)',
+      ),
+    prNumber: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        'Single PR number — alias for prs:[n]. Use either "prNumber" or "prs", not both.',
+      ),
     reviewers: z
       .array(z.string())
       .optional()
@@ -894,7 +925,23 @@ server.tool(
       .default(true)
       .describe('Request Copilot review (default: true)'),
   },
-  async (params) => requestReview(params),
+  async (params) => {
+    const prs =
+      params.prs ??
+      (params.prNumber !== undefined ? [params.prNumber] : undefined);
+    if (!prs?.length) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: 'Missing required parameter: provide "prNumber" (single PR) or "prs" (one or more PR numbers).',
+          },
+        ],
+      };
+    }
+    return requestReview({ ...params, prs });
+  },
 );
 
 // --- github_resolve_threads ---
@@ -972,11 +1019,31 @@ server.tool(
 // --- github_view_pr ---
 server.tool(
   'github_view_pr',
-  'Prefer this over `gh pr view` or `gh pr diff --name-only` via shell. View PR details: title, body, state, checks, reviews, diff stats, and changed files list (path, additions, deletions, status).',
+  'Prefer this over `gh pr view` or `gh pr diff --name-only` via shell. View PR details: title, body, state, checks, reviews, diff stats, and changed files list (path, additions, deletions, status). Pass the PR number as "number" (preferred) or "prNumber" (alias).',
   {
-    number: z.coerce.number().int().positive().describe('PR number'),
+    number: z.coerce.number().int().positive().optional().describe('PR number'),
+    prNumber: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Alias for "number" — use either, not both'),
   },
-  async (params) => viewPR(params),
+  async (params) => {
+    const resolved = params.number ?? params.prNumber;
+    if (!resolved) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: 'Missing required parameter: provide "number" (or alias "prNumber") with a positive integer PR number.',
+          },
+        ],
+      };
+    }
+    return viewPR({ number: resolved });
+  },
 );
 
 // --- github_secret_delete ---
