@@ -24,7 +24,7 @@ Worktrees share `node_modules` with the main repo via a symlink. To install a ne
 1. **Remove the symlink** (does NOT delete the main repo's `node_modules`):
 
    ```powershell
-   cmd /c "rmdir node_modules"
+   powershell -NoProfile -Command "Remove-Item -Path node_modules -Force"
    ```
 
 2. **Add the package** to the root `package.json` (still use `-w`):

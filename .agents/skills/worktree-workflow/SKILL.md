@@ -42,7 +42,7 @@ The Claude Code session was spawned with the launcher `worktree` checkbox checke
 
    > **Installing new packages in a worktree**: while `node_modules` is symlinked to the main repo, you must never run `pnpm add` or `make install` from the worktree. Those commands are unsafe in this setup: the repo's guardrails are meant to stop them, but attempting to run them with the symlink still in place risks corrupting the shared `node_modules` used by every worktree. If your implementation requires adding/removing/updating dependencies, you **must** break the symlink first and install independently:
    >
-   > 1. `cmd /c "rmdir node_modules"` — removes the symlink only, not the main repo's `node_modules`
+   > 1. `powershell -NoProfile -Command "Remove-Item -Path node_modules -Force"` — removes the symlink only, not the main repo's `node_modules`
    > 2. `pnpm add -w <package>` — adds the package to root `package.json`
    > 3. `make install` — creates independent `node_modules` in the worktree
    >
@@ -50,7 +50,7 @@ The Claude Code session was spawned with the launcher `worktree` checkbox checke
 
    > **Broken or missing `node_modules` symlink recovery**: if the symlink is broken, missing, or pointing to the wrong location:
    >
-   > 1. If `node_modules` exists as a broken symlink or points to the wrong location, remove it with `cmd /c "rmdir node_modules"`. If `node_modules` is already missing, skip this step.
+   > 1. If `node_modules` exists as a broken symlink or points to the wrong location, remove it with `powershell -NoProfile -Command "Remove-Item -Path node_modules -Force"`. If `node_modules` is already missing, skip this step.
    > 2. Run `make install` from the worktree — this creates an independent `node_modules`
    > 3. **Never** recreate the symlink manually — `mklink /J`, `mklink /D`, `New-Item -ItemType Junction`, `New-Item -ItemType SymbolicLink`, and all other manual symlink/junction commands are forbidden. They bypass `.modules.yaml` path consistency checks and cause Nx graph failures. Only `worktree_setup_node_modules()` (native flow) or `make_wt_setup` (sibling flow) should recreate the symlink — they handle all edge cases. If MCP is unavailable, `make install` inside the worktree creates an independent `node_modules`.
    >
@@ -97,7 +97,7 @@ for each ticket/PR needing code work:
       2. git checkout <existing-branch>  (for PRs)  OR  stay on the ephemeral branch (for new tickets)
       3. worktree_setup_node_modules()   # or `make install` if MCP unavailable — NEVER use mklink or New-Item symlink/junction commands
       4. <do NOT rename branch — Jira links via PR title + commits containing LS-####>
-      5. If you need to install new packages: cmd /c "rmdir node_modules" first, then pnpm add -w <pkg>, then make install
+      5. If you need to install new packages: powershell -NoProfile -Command "Remove-Item -Path node_modules -Force" first, then pnpm add -w <pkg>, then make install
 
       Work:
       6. <specific instructions — implement ticket, fix review, rebase, etc.>

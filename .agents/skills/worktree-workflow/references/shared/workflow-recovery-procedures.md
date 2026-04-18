@@ -56,10 +56,10 @@ When a worktree's `node_modules` symlink is missing, dangling, or pointing to th
 
 ### Recovery Steps
 
-```text
+```powershell
 # 1. Remove the broken symlink (safe — only removes the link, not the target)
 # Skip this step if node_modules is already missing.
-cmd /c "rmdir node_modules"
+powershell -NoProfile -Command "Remove-Item -Path node_modules -Force"
 
 # 2. Install independently in the worktree
 make install
