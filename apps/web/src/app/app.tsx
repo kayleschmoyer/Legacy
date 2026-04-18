@@ -96,6 +96,11 @@ const MatchupDetailPage = React.lazy(() =>
     default: m.MatchupDetailPage,
   })),
 );
+const MatchupRedirectPage = React.lazy(() =>
+  import('../pages/matchup/MatchupRedirectPage').then((m) => ({
+    default: m.MatchupRedirectPage,
+  })),
+);
 const ManagementPage = React.lazy(
   () => import('../pages/management/ManagementPage'),
 );
@@ -677,6 +682,10 @@ function App() {
             <Route
               path="/baseball/league/:leagueId/matchups/:matchupId"
               element={<MatchupDetailPage />}
+            />
+            <Route
+              path="/matchup/:matchupId"
+              element={<MatchupRedirectPage />}
             />
             <Route path="/management" element={<ManagementPage />} />
             <Route path="/players" element={<PlayersScreen />} />
