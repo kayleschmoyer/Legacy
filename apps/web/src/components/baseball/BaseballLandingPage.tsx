@@ -1022,6 +1022,12 @@ export function BaseballLandingPage() {
               Authentication is required to access drafts, invite codes, and
               lineup management.
             </Paragraph>
+            <PrimaryButton
+              onPress={() => navigate('/')}
+              accessibilityLabel="Get started free"
+            >
+              <Text fontWeight="700">Get Started Free</Text>
+            </PrimaryButton>
           </NoticeCard>
         )}
 

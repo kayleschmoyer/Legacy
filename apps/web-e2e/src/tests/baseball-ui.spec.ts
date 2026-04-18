@@ -308,6 +308,56 @@ unauthTest.describe(
 );
 
 // ---------------------------------------------------------------------------
+// LS-3474: [functional] Click failure on Get Started Free button on /baseball.
+// An automated scanner navigated to /baseball unauthenticated and attempted to
+// click "Get Started Free" using the invalid CSS selector
+// `(button:visible, [role="button"]:visible)` — Playwright threw a parse error
+// and the click produced no navigation or state change.
+// /baseball is now a public route (LS-3532): unauthenticated users land on the
+// BaseballLandingPage, which now surfaces a "Get Started Free" CTA in the
+// sign-in notice card. These tests verify the CTA is present and interactive
+// using getByRole (not the broken crawler selector).
+// ---------------------------------------------------------------------------
+
+unauthTest.describe(
+  'Baseball Hub — unauthenticated "Get Started Free" CTA regression (LS-3474) @regression',
+  () => {
+    unauthTest.beforeEach(async ({ page }) => {
+      await page.goto('/baseball');
+      await page.waitForLoadState('load');
+    });
+
+    unauthTest(
+      'URL stays at /baseball for unauthenticated users — no auth-guard redirect',
+      async ({ page }) => {
+        await expect(page).toHaveURL('/baseball', { timeout: 15_000 });
+      },
+    );
+
+    unauthTest(
+      '"Get Started Free" CTA is visible on /baseball for unauthenticated users',
+      async ({ page }) => {
+        await expect(
+          page.getByRole('button', { name: /get started free/i }),
+        ).toBeVisible({ timeout: 15_000 });
+      },
+    );
+
+    unauthTest(
+      '"Get Started Free" CTA on /baseball is enabled and clickable via getByRole',
+      async ({ page }) => {
+        const getStartedBtn = page.getByRole('button', {
+          name: /get started free/i,
+        });
+        await expect(getStartedBtn).toBeVisible({ timeout: 15_000 });
+        await expect(getStartedBtn).toBeEnabled();
+        await getStartedBtn.click({ noWaitAfter: true });
+      },
+    );
+  },
+);
+
+// ---------------------------------------------------------------------------
 // LS-3532: /baseball is a public route. Unauthenticated users visiting
 // /baseball should see the baseball hub (Baseball Fantasy heading, Create
 // League / Join League CTAs) — NOT the marketing landing page. These tests
