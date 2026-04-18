@@ -10,6 +10,7 @@ interface CreatePRParams {
   body: string;
   base?: string;
   draft?: boolean;
+  head?: string;
   worktreePath?: string;
 }
 
@@ -29,6 +30,25 @@ function getCurrentBranch(cwd: string): Promise<string> {
           reject(new Error(`Failed to get current branch: ${err.message}`));
         } else {
           res(stdout.trim());
+        }
+      },
+    );
+  });
+}
+
+function getUpstreamBranch(cwd: string): Promise<string | null> {
+  return new Promise((res) => {
+    execFile(
+      'git',
+      ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}'],
+      { cwd, timeout: 5_000 },
+      (err, stdout) => {
+        if (err) {
+          res(null);
+        } else {
+          // stdout is like "origin/claude/LS-1234-foo" — strip the remote prefix
+          const parts = stdout.trim().split('/');
+          res(parts.length > 1 ? parts.slice(1).join('/') : null);
         }
       },
     );
@@ -63,10 +83,16 @@ export async function createPR(params: CreatePRParams): Promise<ToolResult> {
   }
 
   try {
-    const [repo, head] = await Promise.all([
-      getRepoOwnerName(),
-      getCurrentBranch(cwd),
-    ]);
+    const repo = await getRepoOwnerName();
+
+    // Use explicitly provided head, then upstream tracking ref, then local branch name.
+    let head: string;
+    if (params.head) {
+      head = params.head;
+    } else {
+      const upstream = await getUpstreamBranch(cwd);
+      head = upstream ?? (await getCurrentBranch(cwd));
+    }
 
     const pr = await githubRest<GitHubPRResponse>({
       method: 'POST',

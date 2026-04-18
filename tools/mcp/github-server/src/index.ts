@@ -425,6 +425,12 @@ server.tool(
     body: z.string().describe('PR body (markdown)'),
     base: z.string().default('main').describe('Base branch (default: main)'),
     draft: coercedBoolean.default(false).describe('Create as draft'),
+    head: z
+      .string()
+      .optional()
+      .describe(
+        'Remote branch name to use as PR head. If omitted, auto-detected from the upstream tracking ref (git @{upstream}), falling back to the local branch name. Use this when the local branch name differs from the pushed remote branch name (e.g. ephemeral worktrees).',
+      ),
     worktreePath: z
       .string()
       .refine((p) => !p || /^([A-Za-z]:[/\\]|\/)/.test(p), {
