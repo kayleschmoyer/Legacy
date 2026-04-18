@@ -125,8 +125,20 @@ export async function rebasePR(params: RebasePRParams): Promise<ToolResult> {
       };
     }
 
-    // Thread 3: Ensure worktree is clean before checkout/rebase
-    const status = runGit(['status', '--porcelain'], cwd).trim();
+    // Thread 3: Ensure worktree is clean before checkout/rebase.
+    // Filter out untracked agent runtime files (.claude/) and lock files —
+    // they have no bearing on the rebase and must not block it.
+    const statusOutput = runGit(['status', '--porcelain'], cwd).trim();
+    const dirtyLines = statusOutput
+      ? statusOutput.split('\n').filter((line) => {
+          if (!line.startsWith('?? ')) return true; // tracked change — always dirty
+          const filePath = line.slice(3);
+          if (filePath.startsWith('.claude/')) return false;
+          if (filePath.endsWith('.lock')) return false;
+          return true;
+        })
+      : [];
+    const status = dirtyLines.join('\n');
     if (status) {
       return {
         isError: true,
