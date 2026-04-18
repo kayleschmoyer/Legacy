@@ -794,6 +794,41 @@ builder.mutationField('makeDraftPick', (t) =>
             chainedNextPickInfo = autoPickResult.nextPickInfo;
           }
 
+          // LS-3643: If the chain stopped (budget or cap) and the next team
+          // has auto-pick enabled, expire their deadline immediately so that
+          // autoProcessDraftPicks picks up the next batch without waiting a
+          // full timer cycle. Mirrors the same logic in scheduled-mutations.ts.
+          if (!effectiveDraftComplete && chainedNextPickInfo) {
+            const [nextAutoPickCheck] = await context.db
+              .select({ autoPick: PublicSchema.draftTeams.autoPick })
+              .from(PublicSchema.draftTeams)
+              .where(
+                and(
+                  eq(PublicSchema.draftTeams.draftId, draftId),
+                  eq(
+                    PublicSchema.draftTeams.teamId,
+                    chainedNextPickInfo.teamId,
+                  ),
+                ),
+              )
+              .limit(1);
+            if (nextAutoPickCheck?.autoPick) {
+              await context.db
+                .update(PublicSchema.drafts)
+                .set({ currentPickDeadline: new Date(Date.now() - 1) })
+                .where(eq(PublicSchema.drafts.id, draftId));
+              LOGGER.info(
+                '[LS-3643] Next team has auto-pick — expiring deadline after chain stop',
+                {
+                  draftId,
+                  nextTeamId: chainedNextPickInfo.teamId,
+                  chainCount,
+                  stoppedByTimeBudget,
+                },
+              );
+            }
+          }
+
           if (chainCount > 0 || stoppedByTimeBudget) {
             const chainElapsedMs = Date.now() - chainStartTime;
             LOGGER.info('[LS-440] Auto-pick chain complete', {
