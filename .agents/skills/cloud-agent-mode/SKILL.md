@@ -32,7 +32,7 @@ When running as a **cloud coding agent**:
 
 10. **Review lifecycle**: monitor PR → fix Copilot comments → self-review changed files → fix code → validate before every push → reply → resolve threads → re-request review (see [Review Lifecycle in Cloud](#review-lifecycle-in-cloud) below)
 
-Shell fallbacks (only if MCP server is unavailable): `make <target>`, `git commit`, `git push`, `gh pr create`.
+Shell fallbacks (only if MCP server is unavailable): `make <target>`, `git commit`, `git push`, `gh pr create`, `gh pr edit <PR#> --add-label "agent-in-progress"`.
 
 ## Cloud MCP Cheat Sheet
 
@@ -122,6 +122,7 @@ The built-in `mcp__github__pull_request_read({ method: "get_review_comments" })`
 | Custom MCP tool                                           | Built-in equivalent                                                                                                                                                                   |
 | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `github_create_pr({ title, body, draft })`                | `mcp__github__create_pull_request({ owner, repo, title, head, base, body, draft })`                                                                                                   |
+| `github_manage_labels({ prs: [N], add, remove })`         | No built-in equivalent — **always use custom server**. Shell fallback: `gh pr edit <PR#> --add-label '<label>'` / `--remove-label '<label>'`                                          |
 | `github_mark_pr_ready({ number })`                        | `mcp__github__update_pull_request({ owner, repo, pullNumber, draft: false })`                                                                                                         |
 | `github_view_pr({ number })`                              | `mcp__github__pull_request_read({ method: "get", owner, repo, pullNumber })`                                                                                                          |
 | `github_get_review_threads({ number })`                   | `mcp__github__pull_request_read({ method: "get_review_comments", owner, repo, pullNumber })` ⚠️ built-in does **not** return GraphQL thread node IDs — avoid for review-fix workflows |
