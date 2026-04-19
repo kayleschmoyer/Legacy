@@ -98,4 +98,21 @@ else
   echo "WARNING: pnpm not available — make pc will not work for code changes"
 fi
 
+# ---------------------------------------------------------------------------
+# 5. Export GITHUB_REPO_OWNER / GITHUB_REPO_NAME for the github-server MCP
+# ---------------------------------------------------------------------------
+# In cloud sessions, git remote URLs may be proxy URLs that don't expose the
+# real GitHub owner/repo. These env vars let the MCP server skip remote
+# parsing entirely, avoiding "Could not parse GitHub owner/repo" errors.
+if [ -z "${GITHUB_REPO_OWNER:-}" ] && [ -z "${GITHUB_REPO_NAME:-}" ]; then
+  if [ -n "${GITHUB_REPOSITORY:-}" ]; then
+    # Standard GitHub Actions env var: "owner/repo"
+    export GITHUB_REPO_OWNER="${GITHUB_REPOSITORY%%/*}"
+    export GITHUB_REPO_NAME="${GITHUB_REPOSITORY#*/}"
+    echo "GitHub repo identity: ${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME} (from GITHUB_REPOSITORY)"
+  else
+    echo "Note: GITHUB_REPO_OWNER/GITHUB_REPO_NAME not set — MCP server will parse git remote URL"
+  fi
+fi
+
 echo "=== Cloud setup complete ==="

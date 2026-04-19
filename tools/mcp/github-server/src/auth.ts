@@ -728,6 +728,15 @@ export async function getRepoOwnerName(): Promise<{
 }> {
   if (cachedRepo) return cachedRepo;
 
+  // Explicit env var override — highest priority, set in cloud-setup.sh to
+  // bypass proxy remote URLs that don't expose the real GitHub owner/repo.
+  const envOwner = process.env['GITHUB_REPO_OWNER']?.trim();
+  const envName = process.env['GITHUB_REPO_NAME']?.trim();
+  if (envOwner && envName) {
+    cachedRepo = { owner: envOwner, name: envName };
+    return cachedRepo;
+  }
+
   // In cloud sessions (GitHub Actions, Claude Code on the web), the git remote
   // URL may be a proxied URL that doesn't contain "github.com". Check the
   // standard GITHUB_REPOSITORY env var ("owner/repo") first.
