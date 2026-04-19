@@ -197,6 +197,36 @@ jobs:
             echo "✅ No stale locks detected"
           fi
 
+      - name: Bootstrap IAM Permissions
+        # Apply IAM policy changes first with -refresh=false to break the circular
+        # dependency where terraform plan needs logs:DescribeLogGroups to refresh
+        # aws_cloudwatch_log_group resources, but that permission lives in the inline
+        # policy that can only be applied after a successful plan. Targeting IAM-only
+        # resources with -refresh=false avoids all CloudWatch API calls entirely.
+        # This step is idempotent — it is a no-op when IAM is already current.
+        # LS-3708
+        working-directory: terraform/main
+        env:
+          TF_VAR_rollbar_access_token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
+          TF_VAR_discord_user_signup_webhook_url: ${{ secrets.DISCORD_USER_SIGNUP_WEBHOOK_URL }}
+          TF_VAR_discord_stripe_webhook_url: ${{ secrets.DISCORD_STRIPE_WEBHOOK_URL }}
+          TF_VAR_discord_client_secret: ${{ secrets.DISCORD_CLIENT_SECRET }}
+          TF_VAR_ga_measurement_id: ${{ secrets.GA_MEASUREMENT_ID }}
+          TF_VAR_ga_api_secret: ${{ secrets.GA_API_SECRET }}
+          TF_VAR_mlb_data_api_key: ${{ secrets.MLB_DATA_API_KEY }}
+        run: |
+          echo "🔒 Bootstrapping IAM policy changes (refresh=false targeted pass)..."
+          terraform apply \
+            -input=false \
+            -auto-approve \
+            -refresh=false \
+            -lock-timeout=5m \
+            -target=aws_iam_role_policy.github_actions_additional \
+            -target=aws_iam_role_policy.github_actions_plan_policy \
+            -target=aws_iam_policy.github_actions_supplemental \
+            -target=aws_iam_role_policy_attachment.github_actions_supplemental
+          echo "✅ IAM bootstrap complete"
+
       - name: Plan Infrastructure Changes
         id: plan
         working-directory: terraform/main
