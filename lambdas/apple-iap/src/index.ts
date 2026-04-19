@@ -28,6 +28,10 @@ import {
   withRollbar,
 } from '@legacy-sports/rollbar';
 import { decodeAndVerifyJws } from './jws';
+import {
+  assertNotificationEnvironment,
+  parseExpectedAppleEnvironment,
+} from './environment';
 import { sendGa4ServerEvent } from './ga4';
 import type { AppStoreNotification, NotificationType } from './types';
 
@@ -40,6 +44,9 @@ if (rollbarConfig) {
 
 const BUNDLE_ID_LOCAL = process.env['APPLE_BUNDLE_ID'] ?? '';
 const BUNDLE_ID_SECRET_NAME = process.env['APPLE_BUNDLE_ID_SECRET_NAME'] ?? '';
+const EXPECTED_APPLE_ENVIRONMENT = parseExpectedAppleEnvironment(
+  process.env['EXPECTED_APPLE_ENVIRONMENT'],
+);
 
 let bundleIdPromise: Promise<string> | null = null;
 
@@ -412,6 +419,29 @@ const baseAppleIapHandler = async (
     notificationType: notification.notificationType,
     subtype: notification.subtype,
   });
+
+  // Reject notifications signed for a different App Store environment.
+  // A sandbox-signed notification accepted by the production lambda would let
+  // anyone with a sandbox Apple account grant/revoke premium on a real user's
+  // originalTransactionId.
+  try {
+    assertNotificationEnvironment(
+      notification.data.environment,
+      EXPECTED_APPLE_ENVIRONMENT,
+    );
+  } catch (err) {
+    LOGGER.warn('Apple IAP — rejecting notification from wrong environment', {
+      notificationUUID: notification.notificationUUID,
+      notificationType: notification.notificationType,
+      actualEnvironment: notification.data.environment,
+      expectedEnvironment: EXPECTED_APPLE_ENVIRONMENT,
+      err,
+    });
+    return {
+      statusCode: 400,
+      body: JSON.stringify({ error: 'Environment mismatch' }),
+    };
+  }
 
   // Idempotency check
   const alreadyProcessed = await isEventProcessed(
