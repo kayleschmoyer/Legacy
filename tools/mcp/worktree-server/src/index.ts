@@ -1428,17 +1428,21 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
     {
       name: 'worktree_show_file',
       description:
-        'Read the contents of a file at a specific git ref (branch, tag, or SHA) ' +
-        'without checking it out. Useful for inspecting files on remote branches ' +
-        'during CI triage. Runs `git show <ref>:<path>`. ' +
-        'Defaults to HEAD when `ref` is omitted.',
+        'Read the contents of a file at a specific git ref (branch, tag, SHA, or special ref) ' +
+        'without checking it out. Runs `git show <ref>:<path>`. ' +
+        'Defaults to HEAD when `ref` is omitted. ' +
+        'Use cases: (1) CI triage — inspect files on remote branches; ' +
+        '(2) rebase conflict resolution — read what origin/main or FETCH_HEAD has before deciding which side to keep; ' +
+        '(3) debugging — compare a file at HEAD vs a prior commit. ' +
+        'Prefer this tool over `git show` shell commands — it uses execFileSync (args array) and works correctly on Windows where `git show ref:path` shell quoting fails.',
       inputSchema: {
         type: 'object' as const,
         properties: {
           ref: {
             type: 'string',
             description:
-              'Git ref to read from (e.g. "origin/main", "origin/LS-1234/branch", "HEAD~1", a SHA). ' +
+              'Git ref to read from. Supports branches ("origin/main", "origin/LS-1234/branch"), ' +
+              'SHAs, relative refs ("HEAD~1"), and special refs ("FETCH_HEAD", "ORIG_HEAD", "REBASE_HEAD"). ' +
               'Defaults to "HEAD" when omitted.',
           },
           path: {

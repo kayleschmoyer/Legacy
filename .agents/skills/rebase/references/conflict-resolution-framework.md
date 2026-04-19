@@ -54,11 +54,24 @@ This is the critical step agents skip. For each conflict block, answer these que
 
 1. **What did main change?** — Read the HEAD side. Was it a rename? A new parameter? A bug fix? A refactor? An added import?
 2. **What did the feature branch change?** — Read the other side. Was it adding new functionality? Modifying behavior? Fixing a different bug?
-3. **What was the original code before either change?** — If unclear, check:
-   ```powershell
-   # See the merge base version of the file
-   git show $(git merge-base HEAD REBASE_HEAD):<file-path>
+3. **What was the original code before either change?** — If unclear, use MCP:
+
    ```
+   # Read the base branch (main) version — use this to understand what main changed
+   worktree_show_file({ ref: "origin/main", path: "<file-path>" })
+
+   # Read the merge-base version (common ancestor before either side changed it)
+   # First get the merge-base SHA:
+   worktree_run({ command: "git merge-base HEAD REBASE_HEAD" })
+   # Then read at that SHA:
+   worktree_show_file({ ref: "<merge-base-sha>", path: "<file-path>" })
+   ```
+
+   > **Prefer `worktree_show_file` over `git show ref:path` shell commands** — on Windows,
+   > `git show origin/main:<path>` fails due to shell quoting of the colon separator.
+   > `worktree_show_file` uses `execFileSync` (args array) and works cross-platform.
+   > Special refs like `FETCH_HEAD`, `ORIG_HEAD`, and `REBASE_HEAD` are also supported.
+
 4. **Are the changes independent or contradictory?**
    - **Independent**: Both sides changed different things in the same region (e.g., one added an import, the other modified a function below it). → **Keep both.**
    - **Overlapping but compatible**: Both sides changed the same thing in compatible ways (e.g., both added items to an array). → **Combine them.**
