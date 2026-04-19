@@ -247,7 +247,10 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "logs:TagLogGroup",
           "logs:UntagLogGroup",
           "logs:TagResource",
-          "logs:UntagResource"
+          "logs:UntagResource",
+          "logs:PutMetricFilter",
+          "logs:DeleteMetricFilter",
+          "logs:DescribeMetricFilters"
         ]
         Resource = [
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/lambda/${local.name_prefix}-*",
@@ -650,6 +653,30 @@ resource "aws_iam_policy" "github_actions_supplemental" {
           "acm:ListCertificates"
         ]
         Resource = "*"
+      },
+      # CloudTrail permissions for Terraform apply (creating/managing the audit trail)
+      {
+        Effect = "Allow"
+        Action = [
+          "cloudtrail:CreateTrail",
+          "cloudtrail:DeleteTrail",
+          "cloudtrail:UpdateTrail",
+          "cloudtrail:GetTrail",
+          "cloudtrail:DescribeTrails",
+          "cloudtrail:GetTrailStatus",
+          "cloudtrail:StartLogging",
+          "cloudtrail:StopLogging",
+          "cloudtrail:PutEventSelectors",
+          "cloudtrail:GetEventSelectors",
+          "cloudtrail:PutInsightSelectors",
+          "cloudtrail:GetInsightSelectors",
+          "cloudtrail:AddTags",
+          "cloudtrail:RemoveTags",
+          "cloudtrail:ListTags"
+        ]
+        Resource = [
+          "arn:aws:cloudtrail:${local.region}:${local.account_id}:trail/${local.name_prefix}-*"
+        ]
       },
       # Secrets Manager write permissions — moved here from the inline policy to stay under the 10 KB limit.
       # Secrets Manager appends a random 6-char suffix to all secret ARNs, hence the trailing wildcard on dev/* entries.
@@ -1099,6 +1126,31 @@ resource "aws_iam_role_policy" "github_actions_plan_policy" {
         Action = ["cloudwatch:DescribeAlarms", "cloudwatch:ListTagsForResource"]
         Resource = [
           "arn:aws:cloudwatch:${local.region}:${local.account_id}:alarm:${local.name_prefix}-*"
+        ]
+      },
+      # CloudTrail read (plan refresh for aws_cloudtrail resources)
+      {
+        Sid    = "CloudTrailRead"
+        Effect = "Allow"
+        Action = [
+          "cloudtrail:GetTrail",
+          "cloudtrail:DescribeTrails",
+          "cloudtrail:GetTrailStatus",
+          "cloudtrail:GetEventSelectors",
+          "cloudtrail:GetInsightSelectors",
+          "cloudtrail:ListTags"
+        ]
+        Resource = [
+          "arn:aws:cloudtrail:${local.region}:${local.account_id}:trail/${local.name_prefix}-*"
+        ]
+      },
+      # CloudWatch Logs metric filter read (plan refresh for aws_cloudwatch_log_metric_filter)
+      {
+        Sid    = "CloudWatchLogsMetricFilterRead"
+        Effect = "Allow"
+        Action = ["logs:DescribeMetricFilters"]
+        Resource = [
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/cloudtrail/${local.name_prefix}*"
         ]
       },
       # SNS read
