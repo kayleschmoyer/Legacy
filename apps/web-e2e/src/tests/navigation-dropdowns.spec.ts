@@ -1,10 +1,10 @@
 /**
- * Navigation Dropdowns E2E Tests (LS-607)
+ * Navigation Links & Dropdowns E2E Tests
  *
- * Covers the three header dropdowns:
- *   - Sports menu (button labelled "Sports", items: Baseball, Football)
- *   - Players menu (button labelled "Players", items: All Players, Stats, Compare)
+ * Covers the desktop header navigation:
+ *   - NavPillTabs (Players, Stats, Minigames links)
  *   - User Profile menu (items: Profile Settings, Subscription, Sign Out)
+ *   - Help & support menu (Escape key closes it)
  *
  * All tests use the /about page as the base URL — it renders without GraphQL
  * and the header is always visible.
@@ -15,102 +15,45 @@ import { expect, test } from '../fixtures/auth-enhanced';
 const BASE = '/about';
 
 // ---------------------------------------------------------------------------
-// Sports dropdown
+// Nav pill tabs (replaced the old Sports/Players dropdowns)
 // ---------------------------------------------------------------------------
 
-test.describe('Navigation – Sports dropdown @smoke', () => {
+test.describe('Navigation – Nav pill tabs @smoke', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto(BASE);
     await page.waitForLoadState('load');
   });
 
-  test('renders the Sports trigger button', async ({ page }) => {
-    await expect(page.getByRole('button', { name: /sports/i })).toBeVisible();
+  test('renders the Players pill link', async ({ page }) => {
+    await expect(page.getByRole('link', { name: /^players$/i })).toBeVisible();
   });
 
-  test('opens sports menu on click', async ({ page }) => {
-    const sportsButton = page.getByRole('button', { name: /sports/i });
-    await sportsButton.click();
-
-    const menu = page.locator('#sports-menu');
-    await expect(menu).toBeVisible({ timeout: 10000 });
+  test('renders the Stats pill link', async ({ page }) => {
+    await expect(page.getByRole('link', { name: /^stats$/i })).toBeVisible();
   });
 
-  test('sports menu contains Baseball link', async ({ page }) => {
-    await page.getByRole('button', { name: /sports/i }).click();
-
+  test('renders the Minigames pill link', async ({ page }) => {
     await expect(
-      page.locator('#sports-menu').getByText('Baseball'),
-    ).toBeVisible({ timeout: 10000 });
+      page.getByRole('link', { name: /^minigames$/i }),
+    ).toBeVisible();
   });
 
-  test('sports menu contains Football link', async ({ page }) => {
-    await page.getByRole('button', { name: /sports/i }).click();
-
-    await expect(
-      page.locator('#sports-menu').getByText('Football'),
-    ).toBeVisible({ timeout: 10000 });
-  });
-
-  test('clicking Baseball navigates to /baseball', async ({ page }) => {
-    await page.getByRole('button', { name: /sports/i }).click();
-    await page.locator('#sports-menu').getByText('Baseball').click();
-    await page.waitForLoadState('load');
-    await expect(page).toHaveURL(/\/baseball/);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Players dropdown
-// ---------------------------------------------------------------------------
-
-test.describe('Navigation – Players dropdown @smoke', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto(BASE);
-    await page.waitForLoadState('load');
-  });
-
-  test('renders the Players trigger button', async ({ page }) => {
-    await expect(page.getByRole('button', { name: /players/i })).toBeVisible();
-  });
-
-  test('opens players menu on click', async ({ page }) => {
-    await page.getByRole('button', { name: /players/i }).click();
-
-    const menu = page.locator('#players-menu');
-    await expect(menu).toBeVisible({ timeout: 10000 });
-  });
-
-  test('players menu shows All Players option', async ({ page }) => {
-    await page.getByRole('button', { name: /players/i }).click();
-
-    await expect(
-      page.locator('#players-menu').getByText('All Players'),
-    ).toBeVisible({ timeout: 10000 });
-  });
-
-  test('players menu shows Compare Players option', async ({ page }) => {
-    await page.getByRole('button', { name: /players/i }).click();
-
-    await expect(
-      page.locator('#players-menu').getByText('Compare Players'),
-    ).toBeVisible({ timeout: 10000 });
-  });
-
-  test('clicking All Players navigates to /players', async ({ page }) => {
-    await page.getByRole('button', { name: /players/i }).click();
-    await page.locator('#players-menu').getByText('All Players').click();
+  test('clicking Players navigates to /players', async ({ page }) => {
+    await page.getByRole('link', { name: /^players$/i }).click();
     await page.waitForLoadState('load');
     await expect(page).toHaveURL(/\/players/);
   });
 
-  test('clicking Compare Players navigates to /players/compare', async ({
-    page,
-  }) => {
-    await page.getByRole('button', { name: /players/i }).click();
-    await page.locator('#players-menu').getByText('Compare Players').click();
+  test('clicking Stats navigates to /players/stats', async ({ page }) => {
+    await page.getByRole('link', { name: /^stats$/i }).click();
     await page.waitForLoadState('load');
-    await expect(page).toHaveURL(/\/players\/compare/);
+    await expect(page).toHaveURL(/\/players\/stats/);
+  });
+
+  test('clicking Minigames navigates to /games', async ({ page }) => {
+    await page.getByRole('link', { name: /^minigames$/i }).click();
+    await page.waitForLoadState('load');
+    await expect(page).toHaveURL(/\/games/);
   });
 });
 
@@ -158,12 +101,12 @@ test.describe('Navigation – User Profile dropdown @critical', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('Navigation – keyboard accessibility @regression', () => {
-  test('Escape key closes the Sports dropdown', async ({ page }) => {
+  test('Escape key closes the Help & support dropdown', async ({ page }) => {
     await page.goto(BASE);
     await page.waitForLoadState('load');
 
-    await page.getByRole('button', { name: /sports/i }).click();
-    const menu = page.locator('#sports-menu');
+    await page.getByRole('button', { name: /help & support/i }).click();
+    const menu = page.getByRole('menu', { name: /help & support/i });
     await expect(menu).toBeVisible({ timeout: 10000 });
 
     await page.keyboard.press('Escape');

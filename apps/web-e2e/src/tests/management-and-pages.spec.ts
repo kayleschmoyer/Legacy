@@ -291,6 +291,7 @@ test.describe('Unknown Routes @regression', () => {
     await page.waitForLoadState('load');
 
     // The app should still render its shell (header etc.) without a JS crash
-    await expect(page.getByText('Legacy Sports')).toBeVisible();
+    await expect(page.getByRole('banner')).toBeVisible();
+    await expect(page.getByTestId('header-logo')).toBeVisible();
   });
 });

@@ -39,86 +39,63 @@ test.describe('Football Hub Page @critical', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Football Hub — navigation (Sports dropdown, desktop)
+// Football Hub — primary nav is present on the football page (desktop)
 // ---------------------------------------------------------------------------
 
-test.describe('Football Hub — Sports dropdown navigation @smoke', () => {
+test.describe('Football Hub — primary nav @smoke', () => {
   test.beforeEach(async ({ page }) => {
-    // Start from a neutral page so the Sports dropdown is not already active
-    await page.goto('/about');
+    await page.goto('/football');
     await page.waitForLoadState('load');
   });
 
-  test('Sports dropdown button is visible in the primary nav', async ({
+  test('primary navigation is visible on the football page', async ({
     page,
   }) => {
     const primaryNav = page.getByRole('navigation', { name: 'Primary' });
+    await expect(primaryNav).toBeVisible();
+  });
+
+  test('nav pill tabs are visible on the football page', async ({ page }) => {
+    const primaryNav = page.getByRole('navigation', { name: 'Primary' });
     await expect(
-      primaryNav.getByRole('button', { name: /sports/i }),
+      primaryNav.getByRole('link', { name: /^players$/i }),
+    ).toBeVisible();
+    await expect(
+      primaryNav.getByRole('link', { name: /^minigames$/i }),
     ).toBeVisible();
   });
 
-  test('Sports dropdown opens and shows Football option', async ({ page }) => {
-    const primaryNav = page.getByRole('navigation', { name: 'Primary' });
-    await primaryNav.getByRole('button', { name: /sports/i }).click();
-
-    const menu = page.getByRole('menu');
-    await expect(menu).toBeVisible({ timeout: 10000 });
-    await expect(menu.getByRole('menuitem', { name: /football/i })).toBeVisible(
-      { timeout: 10000 },
-    );
-  });
-
-  test('Football menu item shows NFL fantasy leagues description', async ({
+  test('clicking Players from the football page navigates to /players', async ({
     page,
   }) => {
-    const primaryNav = page.getByRole('navigation', { name: 'Primary' });
-    await primaryNav.getByRole('button', { name: /sports/i }).click();
-
-    await expect(page.getByText(/nfl fantasy leagues/i).first()).toBeVisible({
-      timeout: 10000,
-    });
-  });
-
-  test('clicking Football in the dropdown navigates to /football', async ({
-    page,
-  }) => {
-    const primaryNav = page.getByRole('navigation', { name: 'Primary' });
-    await primaryNav.getByRole('button', { name: /sports/i }).click();
-
-    const menu = page.getByRole('menu');
-    await menu.getByRole('menuitem', { name: /football/i }).click();
-
+    await page.getByRole('link', { name: /^players$/i }).click();
     await page.waitForLoadState('load');
-    await expect(page).toHaveURL('/football');
+    await expect(page).toHaveURL(/\/players/);
   });
 });
 
 // ---------------------------------------------------------------------------
-// Football Hub — navigation (Mobile nav)
+// Football Hub — mobile nav opens and shows navigation items
 // ---------------------------------------------------------------------------
 
 test.describe('Football Hub — mobile nav @smoke', () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
-    await page.goto('/about');
+    await page.goto('/football');
     await page.waitForLoadState('load');
   });
 
-  test('mobile nav Football link navigates to /football', async ({ page }) => {
-    // Open the mobile hamburger menu
+  test('mobile nav opens and shows navigation links', async ({ page }) => {
     const hamburger = page.getByRole('button', {
       name: /open menu|close menu/i,
     });
     await expect(hamburger).toBeVisible();
     await hamburger.click();
 
-    // Wait for the mobile nav to open and find the Football link
-    const mobileNav = page.getByRole('navigation', { name: 'Mobile' });
+    const mobileNav = page.getByRole('navigation', {
+      name: /mobile navigation/i,
+    });
     await expect(mobileNav).toBeVisible({ timeout: 10000 });
-
-    await mobileNav.getByRole('link', { name: /football/i }).click();
-    await page.waitForLoadState('load');
-    await expect(page).toHaveURL('/football');
+    await expect(mobileNav.getByText(/players/i).first()).toBeVisible();
   });
 });

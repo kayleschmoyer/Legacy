@@ -240,17 +240,16 @@ test.describe('Primary Navigation Landmark @smoke', () => {
     await page.waitForLoadState('load');
 
     const primaryNav = page.getByRole('navigation', { name: 'Primary' });
-    // Nav contains dropdowns for Sports, Players, My Leagues and a Games link
+    // Nav contains pill-tab links for Players, Stats, and Minigames
     await expect(
-      primaryNav.getByRole('button', { name: 'Sports' }),
+      primaryNav.getByRole('link', { name: /^players$/i }),
     ).toBeVisible();
     await expect(
-      primaryNav.getByRole('button', { name: 'Players' }),
+      primaryNav.getByRole('link', { name: /^stats$/i }),
     ).toBeVisible();
     await expect(
-      primaryNav.getByRole('button', { name: 'My Leagues' }),
+      primaryNav.getByRole('link', { name: /^minigames$/i }),
     ).toBeVisible();
-    await expect(primaryNav.getByRole('link', { name: 'Games' })).toBeVisible();
   });
 });
 
@@ -296,23 +295,23 @@ test.describe('Mobile Menu Accessibility @regression', () => {
     const hamburger = page.getByRole('button', { name: /open menu/i });
     await hamburger.click();
 
-    await expect(page.getByRole('navigation', { name: 'Mobile' })).toBeVisible({
-      timeout: 5000,
-    });
+    await expect(
+      page.getByRole('navigation', { name: /mobile navigation/i }),
+    ).toBeVisible({ timeout: 5000 });
   });
 
   test('Escape key closes the mobile menu', async ({ page }) => {
     const hamburger = page.getByRole('button', { name: /open menu/i });
     await hamburger.click();
 
-    await expect(page.getByRole('navigation', { name: 'Mobile' })).toBeVisible({
-      timeout: 5000,
-    });
+    await expect(
+      page.getByRole('navigation', { name: /mobile navigation/i }),
+    ).toBeVisible({ timeout: 5000 });
 
     await page.keyboard.press('Escape');
 
     await expect(
-      page.getByRole('navigation', { name: 'Mobile' }),
+      page.getByRole('navigation', { name: /mobile navigation/i }),
     ).not.toBeVisible({ timeout: 5000 });
   });
 });

@@ -29,6 +29,12 @@ async function injectJiraProxyUrl(page: import('@playwright/test').Page) {
   }, E2E_JIRA_PROXY_URL);
 }
 
+/** Opens the Help & support dropdown then clicks "Report a bug" to open the dialog. */
+async function openBugReportViaHelpMenu(page: import('@playwright/test').Page) {
+  await page.getByRole('button', { name: /help & support/i }).click();
+  await page.getByRole('menuitem', { name: /report a bug/i }).click();
+}
+
 test.describe('Bug Report Button @smoke', () => {
   test.beforeEach(async ({ page }) => {
     await injectJiraProxyUrl(page);
@@ -36,15 +42,18 @@ test.describe('Bug Report Button @smoke', () => {
     await page.waitForLoadState('load');
   });
 
-  test('bug report button is visible in the header', async ({ page }) => {
-    const bugButton = page.getByRole('button', { name: /report a bug/i });
-    await expect(bugButton).toBeVisible();
-  });
-
-  test('clicking the button opens the Report a Bug dialog', async ({
+  test('bug report option is accessible via the Help & support menu', async ({
     page,
   }) => {
-    await page.getByRole('button', { name: /report a bug/i }).click();
+    await page.getByRole('button', { name: /help & support/i }).click();
+    const bugItem = page.getByRole('menuitem', { name: /report a bug/i });
+    await expect(bugItem).toBeVisible();
+  });
+
+  test('clicking Report a bug opens the Report a Bug dialog', async ({
+    page,
+  }) => {
+    await openBugReportViaHelpMenu(page);
 
     await expect(
       page.getByRole('dialog').getByText('Report a Bug'),
@@ -56,7 +65,7 @@ test.describe('Bug Report Button @smoke', () => {
   test('dialog contains the description textarea and action buttons', async ({
     page,
   }) => {
-    await page.getByRole('button', { name: /report a bug/i }).click();
+    await openBugReportViaHelpMenu(page);
 
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
@@ -146,7 +155,7 @@ test.describe('Bug Report Dialog Interactions @regression', () => {
     await injectJiraProxyUrl(page);
     await page.goto('/about');
     await page.waitForLoadState('load');
-    await page.getByRole('button', { name: /report a bug/i }).click();
+    await openBugReportViaHelpMenu(page);
     await expect(page.getByRole('dialog')).toBeVisible();
   });
 
@@ -236,8 +245,8 @@ test.describe('Bug Report Dialog Interactions @regression', () => {
     await cancelBtn.click();
     await expect(page.getByRole('dialog')).not.toBeVisible();
 
-    // Reopen
-    await page.getByRole('button', { name: /report a bug/i }).click();
+    // Reopen via Help menu
+    await openBugReportViaHelpMenu(page);
     await expect(page.getByRole('dialog')).toBeVisible();
 
     // Textarea should be empty again
@@ -252,7 +261,7 @@ test.describe('Bug Report Submission @regression', () => {
     await injectJiraProxyUrl(page);
     await page.goto('/about');
     await page.waitForLoadState('load');
-    await page.getByRole('button', { name: /report a bug/i }).click();
+    await openBugReportViaHelpMenu(page);
     await expect(page.getByRole('dialog')).toBeVisible();
   });
 

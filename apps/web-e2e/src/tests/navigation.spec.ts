@@ -38,17 +38,16 @@ test.describe('Navigation Header @smoke', () => {
     // Navigation uses role="navigation" aria-label="Primary"
     const primaryNav = page.getByRole('navigation', { name: 'Primary' });
     await expect(primaryNav).toBeVisible();
-    // Nav contains dropdowns for Sports, Players, My Leagues and a Games link
+    // Nav contains pill-tab links for Players, Stats, and Minigames
     await expect(
-      primaryNav.getByRole('button', { name: 'Sports' }),
+      primaryNav.getByRole('link', { name: /^players$/i }),
     ).toBeVisible();
     await expect(
-      primaryNav.getByRole('button', { name: 'Players' }),
+      primaryNav.getByRole('link', { name: /^stats$/i }),
     ).toBeVisible();
     await expect(
-      primaryNav.getByRole('button', { name: 'My Leagues' }),
+      primaryNav.getByRole('link', { name: /^minigames$/i }),
     ).toBeVisible();
-    await expect(primaryNav.getByRole('link', { name: 'Games' })).toBeVisible();
   });
 
   test('shows user profile area in header', async ({ page }) => {
@@ -80,11 +79,13 @@ test.describe('Navigation Header @smoke', () => {
     await hamburger.click();
 
     // Mobile panel should show main navigation links
-    const mobileNav = page.getByRole('navigation', { name: /mobile/i });
-    await expect(mobileNav.getByText(/baseball/i).first()).toBeVisible({
+    const mobileNav = page.getByRole('navigation', {
+      name: /mobile navigation/i,
+    });
+    await expect(mobileNav.getByText(/players/i).first()).toBeVisible({
       timeout: 10000,
     });
-    await expect(mobileNav.getByText(/about/i).first()).toBeVisible({
+    await expect(mobileNav.getByText(/minigames/i).first()).toBeVisible({
       timeout: 10000,
     });
   });
