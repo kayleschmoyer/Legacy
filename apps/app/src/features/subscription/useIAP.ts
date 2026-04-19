@@ -295,11 +295,15 @@ export function useIAP(): UseIAPResult {
         return;
       }
 
-      await restoreApplePurchasesMutation({
+      const result = await restoreApplePurchasesMutation({
         variables: { jwsTransaction: token },
       });
 
-      setIsSubscribed(true);
+      if (result.data?.restoreApplePurchases === true) {
+        setIsSubscribed(true);
+      } else {
+        setError('Restore failed. Please try again or contact support.');
+      }
     } catch (_err) {
       setError('Restore failed. Please try again or contact support.');
     } finally {

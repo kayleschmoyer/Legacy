@@ -237,11 +237,15 @@ export function useGooglePlayBilling(): UseGooglePlayBillingResult {
         return;
       }
 
-      await restoreGooglePurchasesMutation({
+      const result = await restoreGooglePurchasesMutation({
         variables: { purchaseToken, productId },
       });
 
-      setIsSubscribed(true);
+      if (result.data?.restoreGooglePurchases === true) {
+        setIsSubscribed(true);
+      } else {
+        setError('Restore failed. Please try again or contact support.');
+      }
     } catch (_err) {
       setError('Restore failed. Please try again or contact support.');
     } finally {
