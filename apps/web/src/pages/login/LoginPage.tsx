@@ -61,54 +61,6 @@ function SecureIcon() {
   );
 }
 
-function StadiumArcs({ style }: { style?: React.CSSProperties }) {
-  return (
-    <svg
-      viewBox="0 0 800 600"
-      preserveAspectRatio="xMidYMax slice"
-      style={style}
-      aria-hidden="true"
-    >
-      <defs>
-        <radialGradient id="ll-lamp" cx="50%" cy="110%" r="75%">
-          <stop offset="0%" stopColor="#C5A55A" stopOpacity="0.16" />
-          <stop offset="40%" stopColor="#1B3A5C" stopOpacity="0.10" />
-          <stop offset="100%" stopColor="#0A0F1A" stopOpacity="0" />
-        </radialGradient>
-        <linearGradient id="ll-arc-stroke" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#2C4A7C" stopOpacity="0.35" />
-          <stop offset="100%" stopColor="#2C4A7C" stopOpacity="0.05" />
-        </linearGradient>
-      </defs>
-      <rect width="800" height="600" fill="url(#ll-lamp)" />
-      <g fill="none" stroke="url(#ll-arc-stroke)" strokeWidth="1">
-        <path d="M -40 600 A 540 540 0 0 1 840 600" />
-        <path d="M   0 600 A 460 460 0 0 1 800 600" />
-        <path d="M  40 600 A 380 380 0 0 1 760 600" />
-        <path d="M  80 600 A 300 300 0 0 1 720 600" />
-        <path d="M 120 600 A 220 220 0 0 1 680 600" />
-      </g>
-      <path
-        d="M 80 540 A 300 300 0 0 1 720 540"
-        fill="none"
-        stroke="#C41E3A"
-        strokeOpacity="0.55"
-        strokeWidth="1.5"
-        strokeDasharray="2 10"
-        strokeLinecap="round"
-      />
-      <line
-        x1="0"
-        y1="540"
-        x2="800"
-        y2="540"
-        stroke="rgba(197,165,90,0.18)"
-        strokeWidth="1"
-      />
-    </svg>
-  );
-}
-
 /* ── Constants ── */
 const DISCORD_LOGIN_STATE_KEY = 'discord_oauth_login_state';
 
@@ -379,6 +331,7 @@ export function LoginPage(): React.JSX.Element {
               />
               <div className="ll-wordmark">
                 LEGACY SPORTS
+                <br />
                 <span>FANTASY · YEAR-ROUND</span>
               </div>
             </a>
@@ -397,15 +350,6 @@ export function LoginPage(): React.JSX.Element {
         <main className="ll-shell">
           {/* Left: Brand pane */}
           <section className="ll-cta-pane">
-            <StadiumArcs
-              style={{
-                position: 'absolute',
-                inset: 0,
-                width: '100%',
-                height: '100%',
-                pointerEvents: 'none',
-              }}
-            />
             <div className="ll-cta-inner">
               <div className="ll-eyebrow">
                 <span className="ll-dot-gold" />

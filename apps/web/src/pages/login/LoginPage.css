@@ -97,7 +97,6 @@
   font-size: 10px;
   letter-spacing: 0.18em;
   font-weight: 700;
-  display: block;
 }
 .ll-nav-right {
   margin-left: auto;
@@ -138,8 +137,31 @@
 /* ── CTA pane ── */
 .ll-cta-pane {
   position: relative;
-  overflow: hidden;
   padding: 40px 32px 40px 8px;
+}
+.ll-cta-pane::before {
+  content: '';
+  position: absolute;
+  inset: -20% -10%;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(
+      ellipse 55% 45% at 30% 30%,
+      rgba(44, 74, 124, 0.32) 0%,
+      transparent 65%
+    ),
+    radial-gradient(
+      ellipse 50% 40% at 75% 65%,
+      rgba(196, 30, 58, 0.12) 0%,
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 60% 50% at 50% 80%,
+      rgba(197, 165, 90, 0.1) 0%,
+      transparent 70%
+    );
+  filter: blur(4px);
 }
 .ll-cta-inner {
   position: relative;
@@ -203,6 +225,7 @@
   color: var(--fg2);
   max-width: 520px;
   margin: 4px 0 8px;
+  text-wrap: pretty;
 }
 
 /* Stat strip */
@@ -396,7 +419,6 @@
 }
 .ll-oauth:disabled {
   cursor: not-allowed;
-  opacity: 0.7;
 }
 .ll-oauth:focus-visible {
   outline: 3px solid var(--focus-ring);
@@ -451,6 +473,7 @@
   border: 2px solid currentColor;
   border-right-color: transparent;
   animation: ll-spin 0.8s linear infinite;
+  opacity: 0.7;
   flex-shrink: 0;
 }
 @keyframes ll-spin {
