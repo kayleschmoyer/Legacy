@@ -244,6 +244,19 @@ export { expect } from '@playwright/test';
  * it replaces the `ls_jwt` cookie, updates `ls_user_profile` and
  * `ls_token_expiry` in localStorage, and ensures no stale `auth_jwt` key
  * triggers the broken impersonation path.
+ *
+ * ⚠️  KNOWN RACE CONDITION (LS-3672, LS-3705): the background JWT refresh
+ * triggered by the first `page.goto` can dispatch AUTH_LOGOUT and clear
+ * localStorage *after* `page.evaluate()` sets the new user profile, causing
+ * the subsequent `page.reload()` to start with empty localStorage and render
+ * the login page instead of the intended route.
+ *
+ * Prefer using a dedicated fixture browser context (e.g. `managerPage1`) for
+ * tests that navigate to protected routes as the swapped-in user.
+ * `buildIntegrationStorageState` sets cookies *and* localStorage at context
+ * creation time, so there is no window for AUTH_LOGOUT to race.
+ * Use `switchUser` only when the test truly needs to reuse the same page
+ * instance (e.g. switching back to the commissioner after completing a step).
  */
 export async function switchUser(
   page: Page,

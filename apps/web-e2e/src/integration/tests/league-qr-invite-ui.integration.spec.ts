@@ -23,7 +23,7 @@
 import { expect } from '@playwright/test';
 import { createLeagueViaUI } from '../helpers/create-league';
 import { waitForJoinPageValidation } from '../helpers/wait-for-join-page';
-import { switchUser, test } from '../fixtures/ui';
+import { test } from '../fixtures/ui';
 
 // ---------------------------------------------------------------------------
 // Shared state accumulated across serial phases.
@@ -306,41 +306,40 @@ test.describe
   // -----------------------------------------------------------------------
 
   test('Phase 7: Manager joins the league via the invite URL', async ({
-    commissionerPage: page,
-    commissionerJwt,
-    managerJwt1,
+    managerPage1,
   }) => {
+    // Use a dedicated manager browser context rather than switchUser on
+    // commissionerPage. switchUser has a race condition: the background JWT
+    // refresh triggered on the first navigation can dispatch AUTH_LOGOUT and
+    // clear localStorage after page.evaluate() sets the manager profile,
+    // causing the reload to start with empty localStorage and show the login
+    // page instead of the join page (LS-3705, same pattern as LS-3672).
     const joinUrl = `/baseball/league/join/${state.inviteCode}`;
-    await switchUser(page, managerJwt1, joinUrl);
-    await page.waitForLoadState('load');
+    await managerPage1.goto(joinUrl);
+    await managerPage1.waitForLoadState('load');
 
-    // Confirm the join page heading is visible before polling for invite-code
-    // validation status. After switchUser's cookie-swap reload the React app
-    // needs a moment to re-mount; without this guard the 15 s validation poll
-    // can start before the validateInviteCode query has fired (LS-3607).
     await expect(
-      page.getByRole('heading', { name: /join league/i }),
+      managerPage1.getByRole('heading', { name: /join league/i }),
     ).toBeVisible({ timeout: 10_000 });
 
     await test.step('Join page shows available spot', async () => {
-      await waitForJoinPageValidation(page);
+      await waitForJoinPageValidation(managerPage1);
     });
 
     await test.step('Manager enters a team name and joins', async () => {
-      await expect(page.getByTestId('team-name')).toBeVisible({
+      await expect(managerPage1.getByTestId('team-name')).toBeVisible({
         timeout: 5_000,
       });
-      await page.getByTestId('team-name').fill('QR Code Joiners');
-      const joinBtn = page.getByRole('button', { name: /Join League/i });
+      await managerPage1.getByTestId('team-name').fill('QR Code Joiners');
+      const joinBtn = managerPage1.getByRole('button', {
+        name: /Join League/i,
+      });
       await expect(joinBtn).toBeEnabled({ timeout: 5_000 });
       await joinBtn.click();
-      await expect(page).toHaveURL(/\/baseball\/league\/\d+/, {
+      await expect(managerPage1).toHaveURL(/\/baseball\/league\/\d+/, {
         timeout: 15_000,
       });
     });
-
-    // Restore commissioner identity for the next phase.
-    await switchUser(page, commissionerJwt);
   });
 
   // -----------------------------------------------------------------------
