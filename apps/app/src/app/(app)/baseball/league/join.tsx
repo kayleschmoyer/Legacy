@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment -- legacy mobile code pending type improvements */
 /* eslint-disable @typescript-eslint/no-unsafe-call -- legacy mobile code pending type improvements */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access -- legacy mobile code pending type improvements */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
@@ -18,6 +18,7 @@ import {
 import {
   useJoinLeagueByCodeMutation,
   useValidateInviteCodeLazyQuery,
+  type ValidateInviteCodeQuery,
 } from '../../../../api/db/graphql.generated';
 
 const BRAND_NAVY_LIGHT = '#2C4A7C';
@@ -41,18 +42,34 @@ export default function JoinLeagueByCodeScreen(): React.JSX.Element {
   }, [urlInviteCode]);
 
   const [joinLeague, { loading }] = useJoinLeagueByCodeMutation();
-  const [validateCode, { data: validateData, loading: validating }] =
+  const [validateCode, { loading: validating }] =
     useValidateInviteCodeLazyQuery();
+
+  const validationVersionRef = useRef(0);
+  const [leagueInfo, setLeagueInfo] =
+    useState<ValidateInviteCodeQuery['validateInviteCode']>(undefined);
 
   useEffect(() => {
     const code = inviteCode.trim().toUpperCase();
     const codePattern = /^[A-Z0-9]{8}$/;
-    if (codePattern.test(code)) {
-      void validateCode({ variables: { code } });
+
+    if (!codePattern.test(code)) {
+      setLeagueInfo(undefined);
+      return;
     }
+
+    const version = ++validationVersionRef.current;
+    const timer = setTimeout(() => {
+      void validateCode({ variables: { code } }).then((result) => {
+        if (validationVersionRef.current === version) {
+          setLeagueInfo(result.data?.validateInviteCode ?? undefined);
+        }
+      });
+    }, 400);
+
+    return () => clearTimeout(timer);
   }, [inviteCode, validateCode]);
 
-  const leagueInfo = validateData?.validateInviteCode;
   const isLeagueFull =
     leagueInfo?.isFull ??
     Boolean(

@@ -1,0 +1,18 @@
+mutation JoinLeagueByCode($inviteCode: String!, $teamName: String!) {
+  joinLeagueByCode(inviteCode: $inviteCode, teamName: $teamName) {
+    id
+    leagueId
+    name
+  }
+}
+
+query ValidateInviteCode($code: String!) {
+  validateInviteCode(code: $code) {
+    leagueId
+    leagueName
+    availableSpots
+    totalSpots
+    isFull
+    isAlreadyMember
+  }
+}

@@ -38,10 +38,7 @@ const mockJoinLeague = jest.fn();
 const mockValidateCode = jest.fn();
 jest.mock('../../../../api/db/graphql.generated', () => ({
   useJoinLeagueByCodeMutation: () => [mockJoinLeague, { loading: false }],
-  useValidateInviteCodeLazyQuery: () => [
-    mockValidateCode,
-    { data: null, loading: false },
-  ],
+  useValidateInviteCodeLazyQuery: () => [mockValidateCode, { loading: false }],
 }));
 
 // ── Tests ────────────────────────────────────────────────────────────────────
@@ -49,6 +46,7 @@ jest.mock('../../../../api/db/graphql.generated', () => ({
 describe('JoinLeagueByCodeScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockValidateCode.mockResolvedValue({ data: null });
   });
 
   describe('rendering', () => {
@@ -210,15 +208,44 @@ describe('JoinLeagueByCodeScreen', () => {
   });
 
   describe('invite code validation', () => {
-    it('triggers code validation when 8 valid characters are entered', async () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.runOnlyPendingTimers();
+      jest.useRealTimers();
+    });
+
+    it('triggers code validation after debounce when 8 valid characters are entered', async () => {
       render(<JoinLeagueByCodeScreen />);
       fireEvent.changeText(
         screen.getByPlaceholderText('Enter 8-character code'),
         'ABC12XYZ',
       );
 
-      // validateCode is called via useEffect, so we must await the async cycle
+      expect(mockValidateCode).not.toHaveBeenCalled();
+
+      jest.advanceTimersByTime(400);
+
       await waitFor(() => {
+        expect(mockValidateCode).toHaveBeenCalledWith({
+          variables: { code: 'ABC12XYZ' },
+        });
+      });
+    });
+
+    it('debounces rapid input — only fires once after typing stops', async () => {
+      render(<JoinLeagueByCodeScreen />);
+      const input = screen.getByPlaceholderText('Enter 8-character code');
+
+      fireEvent.changeText(input, 'ABC12XY');
+      jest.advanceTimersByTime(200);
+      fireEvent.changeText(input, 'ABC12XYZ');
+      jest.advanceTimersByTime(400);
+
+      await waitFor(() => {
+        expect(mockValidateCode).toHaveBeenCalledTimes(1);
         expect(mockValidateCode).toHaveBeenCalledWith({
           variables: { code: 'ABC12XYZ' },
         });
@@ -231,6 +258,8 @@ describe('JoinLeagueByCodeScreen', () => {
         screen.getByPlaceholderText('Enter 8-character code'),
         'ABC1',
       );
+
+      jest.advanceTimersByTime(400);
 
       expect(mockValidateCode).not.toHaveBeenCalled();
     });

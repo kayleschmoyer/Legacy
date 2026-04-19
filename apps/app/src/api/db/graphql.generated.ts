@@ -4063,6 +4063,38 @@ export type MarkMemberUnpaidMutation = {
   } | null;
 };
 
+export type JoinLeagueByCodeMutationVariables = Exact<{
+  inviteCode: Scalars['String']['input'];
+  teamName: Scalars['String']['input'];
+}>;
+
+export type JoinLeagueByCodeMutation = {
+  __typename?: 'Mutation';
+  joinLeagueByCode?: {
+    __typename?: 'Team';
+    id?: number | null;
+    leagueId?: number | null;
+    name?: string | null;
+  } | null;
+};
+
+export type ValidateInviteCodeQueryVariables = Exact<{
+  code: Scalars['String']['input'];
+}>;
+
+export type ValidateInviteCodeQuery = {
+  __typename?: 'Query';
+  validateInviteCode?: {
+    __typename?: 'InviteCodeInfo';
+    leagueId?: number | null;
+    leagueName?: string | null;
+    availableSpots?: number | null;
+    totalSpots?: number | null;
+    isFull?: boolean | null;
+    isAlreadyMember?: boolean | null;
+  } | null;
+};
+
 export type LeagueFragment = {
   __typename?: 'League';
   id?: number | null;
@@ -6415,6 +6447,154 @@ export type MarkMemberUnpaidMutationResult =
 export type MarkMemberUnpaidMutationOptions = BaseMutationOptions<
   MarkMemberUnpaidMutation,
   MarkMemberUnpaidMutationVariables
+>;
+export const JoinLeagueByCode = gql`
+  mutation JoinLeagueByCode($inviteCode: String!, $teamName: String!) {
+    joinLeagueByCode(inviteCode: $inviteCode, teamName: $teamName) {
+      id
+      leagueId
+      name
+    }
+  }
+`;
+export type JoinLeagueByCodeMutationFn = MutationFunction<
+  JoinLeagueByCodeMutation,
+  JoinLeagueByCodeMutationVariables
+>;
+
+/**
+ * __useJoinLeagueByCodeMutation__
+ *
+ * To run a mutation, you first call `useJoinLeagueByCodeMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useJoinLeagueByCodeMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [joinLeagueByCodeMutation, { data, loading, error }] = useJoinLeagueByCodeMutation({
+ *   variables: {
+ *      inviteCode: // value for 'inviteCode'
+ *      teamName: // value for 'teamName'
+ *   },
+ * });
+ */
+export function useJoinLeagueByCodeMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    JoinLeagueByCodeMutation,
+    JoinLeagueByCodeMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    JoinLeagueByCodeMutation,
+    JoinLeagueByCodeMutationVariables
+  >(JoinLeagueByCode, options);
+}
+export type JoinLeagueByCodeMutationHookResult = ReturnType<
+  typeof useJoinLeagueByCodeMutation
+>;
+export type JoinLeagueByCodeMutationResult =
+  Apollo.MutationResult<JoinLeagueByCodeMutation>;
+export type JoinLeagueByCodeMutationOptions = BaseMutationOptions<
+  JoinLeagueByCodeMutation,
+  JoinLeagueByCodeMutationVariables
+>;
+export const ValidateInviteCode = gql`
+  query ValidateInviteCode($code: String!) {
+    validateInviteCode(code: $code) {
+      leagueId
+      leagueName
+      availableSpots
+      totalSpots
+      isFull
+      isAlreadyMember
+    }
+  }
+`;
+
+/**
+ * __useValidateInviteCodeQuery__
+ *
+ * To run a query within a React component, call `useValidateInviteCodeQuery` and pass it any options that fit your needs.
+ * When your component renders, `useValidateInviteCodeQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useValidateInviteCodeQuery({
+ *   variables: {
+ *      code: // value for 'code'
+ *   },
+ * });
+ */
+export function useValidateInviteCodeQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    ValidateInviteCodeQuery,
+    ValidateInviteCodeQueryVariables
+  > &
+    (
+      | { variables: ValidateInviteCodeQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    ValidateInviteCodeQuery,
+    ValidateInviteCodeQueryVariables
+  >(ValidateInviteCode, options);
+}
+export function useValidateInviteCodeLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    ValidateInviteCodeQuery,
+    ValidateInviteCodeQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    ValidateInviteCodeQuery,
+    ValidateInviteCodeQueryVariables
+  >(ValidateInviteCode, options);
+}
+export function useValidateInviteCodeSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        ValidateInviteCodeQuery,
+        ValidateInviteCodeQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    ValidateInviteCodeQuery,
+    ValidateInviteCodeQueryVariables
+  >(
+    ValidateInviteCode,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          ValidateInviteCodeQuery,
+          ValidateInviteCodeQueryVariables
+        >,
+  );
+}
+export type ValidateInviteCodeQueryHookResult = ReturnType<
+  typeof useValidateInviteCodeQuery
+>;
+export type ValidateInviteCodeLazyQueryHookResult = ReturnType<
+  typeof useValidateInviteCodeLazyQuery
+>;
+export type ValidateInviteCodeSuspenseQueryHookResult = ReturnType<
+  typeof useValidateInviteCodeSuspenseQuery
+>;
+export type ValidateInviteCodeQueryResult = Apollo.QueryResult<
+  ValidateInviteCodeQuery,
+  ValidateInviteCodeQueryVariables
 >;
 export const GetLeagueById = gql`
   query GetLeagueById(
