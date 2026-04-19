@@ -30,6 +30,7 @@ import {
   ClipboardList,
   Clock,
   Copy,
+  Crown,
   Edit3,
   Eye,
   Info,
@@ -39,10 +40,10 @@ import {
   QrCode,
   Settings,
   Share2,
+  Shield,
   Swords,
   Trophy,
   UserPlus,
-  Users,
   X,
   Zap,
 } from '@tamagui/lucide-icons';
@@ -189,24 +190,6 @@ const PageContainer = styled(YStack, {
   paddingBottom: '$8',
 });
 
-const HeroBar = styled(XStack, {
-  position: 'relative',
-  overflow: 'hidden',
-  width: '100%',
-  paddingHorizontal: '$6',
-  paddingVertical: '$6',
-  gap: '$5',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  flexWrap: 'wrap',
-  $sm: {
-    paddingHorizontal: '$4',
-    paddingVertical: '$4',
-    flexDirection: 'column',
-    alignItems: 'flex-start',
-  },
-});
-
 const ContentArea = styled(YStack, {
   maxWidth: 1200,
   width: '100%',
@@ -225,15 +208,6 @@ const TabBar = styled(XStack, {
   alignSelf: 'center',
   paddingHorizontal: '$6',
   $sm: { paddingHorizontal: '$3' },
-});
-
-const DraftBadge = styled(XStack, {
-  alignItems: 'center',
-  gap: '$1.5',
-  paddingHorizontal: '$3',
-  paddingVertical: '$1.5',
-  borderRadius: '$10',
-  borderWidth: 1,
 });
 
 const SnapshotBar = styled(XStack, {
@@ -336,25 +310,91 @@ function formatDraftStatus(status?: string | null): string {
   }
 }
 
-function getDraftBadgeColors(status?: string | null) {
-  switch (status) {
-    case 'not-started':
-      return { bg: '$gray3', border: '$gray7', text: '$gray11' };
-    case 'queued':
-      return { bg: '$amber3', border: '$amber7', text: '$amber11' };
-    case 'in-progress':
-      return {
-        bg: withAlpha(BRAND_NAVY_LIGHT, 0.18),
-        border: withAlpha(BRAND_NAVY_LIGHT, 0.5),
-        text: BRAND_GOLD_LIGHT,
-      };
-    case 'completed':
-      return { bg: '$green3', border: '$green7', text: '$green11' };
-    case undefined:
-    case null:
-    default:
-      return { bg: '$gray3', border: '$gray7', text: '$gray11' };
-  }
+// ── DraftStatusChip ──────────────────────────────────────────────────────────
+
+type DraftChipDef = {
+  label: string;
+  color: string;
+  bg: string;
+  border: string;
+  dot?: string;
+};
+
+const DRAFT_CHIP_MAP: Record<string, DraftChipDef> = {
+  'not-started': {
+    label: 'Pre-Draft',
+    color: BRAND_GOLD_LIGHT,
+    bg: withAlpha(BRAND_GOLD_LIGHT, 0.14),
+    border: withAlpha(BRAND_GOLD_LIGHT, 0.4),
+  },
+  queued: {
+    label: 'Draft Queued',
+    color: '#F59E0B',
+    bg: 'rgba(245,158,11,0.14)',
+    border: 'rgba(245,158,11,0.4)',
+  },
+  'in-progress': {
+    label: 'Drafting · Live',
+    color: BRAND_GOLD_LIGHT,
+    bg: BRAND_NAVY,
+    border: withAlpha(BRAND_GOLD_LIGHT, 0.45),
+    dot: '#E63950',
+  },
+  completed: {
+    label: 'Season Active',
+    color: '#22C55E',
+    bg: 'rgba(34,197,94,0.12)',
+    border: 'rgba(34,197,94,0.4)',
+    dot: '#22C55E',
+  },
+};
+
+function DraftStatusChip({
+  status,
+}: {
+  status?: string | null;
+}): React.JSX.Element | null {
+  if (!status) return null;
+  const chip: DraftChipDef = DRAFT_CHIP_MAP[status] ?? {
+    label: formatDraftStatus(status),
+    color: withAlpha(WHITE, 0.55),
+    bg: withAlpha(WHITE, 0.05),
+    border: withAlpha(WHITE, 0.15),
+  };
+  return (
+    <XStack
+      alignItems="center"
+      gap="$1.5"
+      alignSelf="flex-start"
+      style={{
+        background: chip.bg,
+        border: `1px solid ${chip.border}`,
+        borderRadius: 9999,
+        padding: '5px 10px',
+      }}
+    >
+      {chip.dot && (
+        <YStack
+          width={7}
+          height={7}
+          borderRadius={9999}
+          style={{ background: chip.dot, flexShrink: 0 }}
+        />
+      )}
+      <Text
+        style={{
+          fontFamily: FONT_DISPLAY,
+          fontSize: 12,
+          fontWeight: '700',
+          textTransform: 'uppercase',
+          letterSpacing: 1.2,
+          color: chip.color,
+        }}
+      >
+        {chip.label}
+      </Text>
+    </XStack>
+  );
 }
 
 // ── Tab Definitions ──────────────────────────────────────────────────────────
@@ -1576,7 +1616,6 @@ export function LeagueDetailPage(): React.JSX.Element {
   const assignedCount = teamMembers.filter((p) => p?.positionId).length;
   const benchCount = teamMembers.length - assignedCount;
   const teamCount = leagueTeams.length;
-  const draftColors = getDraftBadgeColors(String(league?.draftStatus));
 
   // ── Loading / Error States ──
   // Only show the full-page spinner until the core league data is available.
@@ -3698,111 +3737,6 @@ export function LeagueDetailPage(): React.JSX.Element {
           </XStack>
         )}
 
-        {/* Hero Header */}
-        <HeroBar
-          style={{
-            background: `linear-gradient(135deg, ${withAlpha(BG_DARK, 0.95)} 0%, ${withAlpha(BRAND_NAVY, 0.55)} 100%)`,
-          }}
-        >
-          <XStack alignItems="center" gap="$4" flex={1} flexWrap="wrap">
-            <Button
-              size="$3"
-              backgroundColor={withAlpha(WHITE, 0.08)}
-              borderColor={withAlpha(WHITE, 0.15)}
-              borderWidth={1}
-              borderRadius="$4"
-              onPress={() => navigate('/baseball')}
-              icon={<ChevronLeft size={18} color="white" />}
-              aria-label="Back to leagues"
-              hoverStyle={{ backgroundColor: withAlpha(WHITE, 0.14) }}
-            />
-            <YStack gap="$1">
-              <H1
-                id="league-title"
-                data-testid="league-title"
-                color="white"
-                margin={0}
-                fontSize="$10"
-                fontWeight="800"
-                textTransform="uppercase"
-                letterSpacing={0.5}
-                $sm={{ fontSize: '$11' }}
-                $md={{ fontSize: '$12' }}
-                // fontFamily is kept in inline style because Tamagui's H1
-                // font token overrides the fontFamily prop and renders as
-                // the body serif — see LS-3630 review thread. lineHeight
-                // is set here for the same reason (the H1 default tightens
-                // to ~1.0 which clips descenders with this display face).
-                style={{
-                  fontFamily: FONT_DISPLAY,
-                  lineHeight: 1.02,
-                }}
-              >
-                {league.name}
-              </H1>
-              <XStack alignItems="center" gap="$3">
-                <XStack alignItems="center" gap="$1.5">
-                  <Users size={14} color={withAlpha(WHITE, 0.65)} />
-                  <Text fontSize="$3" color={withAlpha(WHITE, 0.75)}>
-                    {teamCount} teams
-                  </Text>
-                </XStack>
-                <Text fontSize="$3" color={withAlpha(WHITE, 0.45)}>
-                  |
-                </Text>
-                <DraftBadge
-                  data-testid="draft-status"
-                  backgroundColor={draftColors.bg}
-                  borderColor={draftColors.border}
-                >
-                  <Text fontSize="$2" fontWeight="700" color={draftColors.text}>
-                    {formatDraftStatus(String(league.draftStatus))}
-                  </Text>
-                </DraftBadge>
-                {currentWeek && (
-                  <>
-                    <Text fontSize="$3" color={withAlpha(WHITE, 0.45)}>
-                      |
-                    </Text>
-                    <Text fontSize="$3" color={withAlpha(WHITE, 0.75)}>
-                      Week {currentWeek}
-                    </Text>
-                  </>
-                )}
-              </XStack>
-            </YStack>
-          </XStack>
-
-          {/* Header quick-share */}
-          <XStack gap="$2">
-            <Button
-              size="$3"
-              backgroundColor={withAlpha(BRAND_NAVY, 0.2)}
-              borderColor={withAlpha(BRAND_NAVY, 0.48)}
-              borderWidth={1}
-              borderRadius="$4"
-              onPress={handleCopyInviteHeader}
-              icon={
-                headerInviteCopied ? (
-                  <Check size={16} color="rgb(34, 197, 94)" />
-                ) : (
-                  <Share2 size={16} color={BRAND_GOLD_LIGHT} />
-                )
-              }
-              hoverStyle={{ backgroundColor: withAlpha(BRAND_NAVY, 0.3) }}
-              aria-label="Share invite link"
-            >
-              <Text
-                fontSize="$3"
-                fontWeight="600"
-                color={headerInviteCopied ? '$green11' : BRAND_GOLD_LIGHT}
-              >
-                {headerInviteCopied ? 'Copied!' : 'Invite'}
-              </Text>
-            </Button>
-          </XStack>
-        </HeroBar>
-
         {/* Spectator Banner — shown when viewing a public league without membership */}
         {isSpectator && (
           <YStack
@@ -3918,6 +3852,273 @@ export function LeagueDetailPage(): React.JSX.Element {
           </YStack>
         )}
 
+        {/* League Hero Card */}
+        <ContentArea paddingTop="$5" paddingBottom="$2">
+          <YStack
+            gap="$4"
+            style={{
+              background: `linear-gradient(135deg, ${withAlpha(BRAND_NAVY, 0.45)} 0%, ${withAlpha(BG_DARK, 0.8)} 100%)`,
+              border: `1px solid ${withAlpha(WHITE, 0.08)}`,
+              borderRadius: 16,
+              padding: '28px 32px',
+              overflow: 'hidden',
+            }}
+          >
+            {/* Top row: back link + commissioner badge */}
+            <XStack alignItems="center" gap="$3">
+              <XStack
+                alignItems="center"
+                gap="$1"
+                cursor="pointer"
+                onPress={() => navigate('/baseball')}
+                opacity={0.65}
+                hoverStyle={{ opacity: 1 }}
+                pressStyle={{ opacity: 0.8 }}
+                animation="quick"
+              >
+                <ChevronLeft size={14} color={withAlpha(WHITE, 0.65)} />
+                <Text
+                  fontSize="$2"
+                  color={withAlpha(WHITE, 0.65)}
+                  fontWeight="600"
+                >
+                  Leagues
+                </Text>
+              </XStack>
+              <Text fontSize="$2" color={withAlpha(WHITE, 0.3)}>
+                ·
+              </Text>
+              <Text fontSize="$2" color={withAlpha(WHITE, 0.4)}>
+                Baseball
+              </Text>
+              {isCommissioner && (
+                <XStack
+                  marginLeft="auto"
+                  alignItems="center"
+                  gap="$1.5"
+                  backgroundColor={withAlpha(BRAND_GOLD_LIGHT, 0.1)}
+                  borderColor={withAlpha(BRAND_GOLD_LIGHT, 0.3)}
+                  borderWidth={1}
+                  borderRadius="$10"
+                  paddingHorizontal="$2.5"
+                  paddingVertical="$1"
+                >
+                  <Crown size={11} color={BRAND_GOLD_LIGHT} />
+                  <Text
+                    style={{
+                      fontFamily: FONT_DISPLAY,
+                      fontSize: 11,
+                      fontWeight: '700',
+                      textTransform: 'uppercase',
+                      letterSpacing: 1.2,
+                      color: BRAND_GOLD_LIGHT,
+                    }}
+                  >
+                    Commissioner
+                  </Text>
+                </XStack>
+              )}
+            </XStack>
+
+            {/* Main row: crest + league info + invite button */}
+            <XStack gap="$5" alignItems="flex-start" flexWrap="wrap">
+              {/* League crest box */}
+              <YStack
+                width={92}
+                height={92}
+                alignItems="center"
+                justifyContent="center"
+                borderRadius={14}
+                borderWidth={1}
+                borderColor={withAlpha(BRAND_GOLD_LIGHT, 0.45)}
+                style={{
+                  background: `linear-gradient(135deg, ${BRAND_NAVY} 0%, #0D1E36 100%)`,
+                  flexShrink: 0,
+                }}
+              >
+                <Shield size={44} color={BRAND_GOLD_LIGHT} />
+              </YStack>
+
+              {/* League name, status chip, meta items */}
+              <YStack flex={1} gap="$2.5" minWidth={200}>
+                <H1
+                  id="league-title"
+                  data-testid="league-title"
+                  color="white"
+                  margin={0}
+                  // fontFamily kept in inline style — see LS-3630 for why Tamagui H1 overrides it
+                  style={{
+                    fontFamily: FONT_DISPLAY,
+                    fontSize: 'clamp(28px, 4vw, 48px)',
+                    fontWeight: 800,
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.5,
+                    lineHeight: 1.02,
+                  }}
+                >
+                  {league.name}
+                </H1>
+
+                <DraftStatusChip status={league.draftStatus} />
+
+                {/* Meta items: Week · Teams · Scoring · Invite */}
+                <XStack gap="$5" flexWrap="wrap" marginTop="$1">
+                  {currentWeek && (
+                    <YStack gap="$0.5">
+                      <Text
+                        style={{
+                          fontFamily: FONT_DISPLAY,
+                          fontSize: 10,
+                          fontWeight: '700',
+                          textTransform: 'uppercase',
+                          letterSpacing: 1.4,
+                          color: withAlpha(WHITE, 0.45),
+                        }}
+                      >
+                        Week
+                      </Text>
+                      <Text
+                        style={{
+                          fontFamily: FONT_DISPLAY,
+                          fontSize: 20,
+                          fontWeight: '700',
+                          color: withAlpha(WHITE, 0.9),
+                        }}
+                      >
+                        {currentWeek}
+                      </Text>
+                    </YStack>
+                  )}
+                  <YStack gap="$0.5">
+                    <Text
+                      style={{
+                        fontFamily: FONT_DISPLAY,
+                        fontSize: 10,
+                        fontWeight: '700',
+                        textTransform: 'uppercase',
+                        letterSpacing: 1.4,
+                        color: withAlpha(WHITE, 0.45),
+                      }}
+                    >
+                      Teams
+                    </Text>
+                    <Text
+                      style={{
+                        fontFamily: FONT_DISPLAY,
+                        fontSize: 20,
+                        fontWeight: '700',
+                        color: withAlpha(WHITE, 0.9),
+                      }}
+                    >
+                      {teamCount}
+                    </Text>
+                  </YStack>
+                  {scoringProfileName && (
+                    <YStack gap="$0.5">
+                      <Text
+                        style={{
+                          fontFamily: FONT_DISPLAY,
+                          fontSize: 10,
+                          fontWeight: '700',
+                          textTransform: 'uppercase',
+                          letterSpacing: 1.4,
+                          color: withAlpha(WHITE, 0.45),
+                        }}
+                      >
+                        Scoring
+                      </Text>
+                      <Text
+                        style={{
+                          fontFamily: FONT_DISPLAY,
+                          fontSize: 20,
+                          fontWeight: '700',
+                          color: withAlpha(WHITE, 0.9),
+                        }}
+                      >
+                        {scoringProfileName}
+                      </Text>
+                    </YStack>
+                  )}
+                  {league.inviteCode && (
+                    <YStack gap="$0.5">
+                      <Text
+                        style={{
+                          fontFamily: FONT_DISPLAY,
+                          fontSize: 10,
+                          fontWeight: '700',
+                          textTransform: 'uppercase',
+                          letterSpacing: 1.4,
+                          color: withAlpha(WHITE, 0.45),
+                        }}
+                      >
+                        Invite
+                      </Text>
+                      <Text
+                        style={{
+                          fontFamily: "'Roboto Mono', 'Courier New', monospace",
+                          fontSize: 15,
+                          fontWeight: '700',
+                          letterSpacing: 1,
+                          color: BRAND_GOLD_LIGHT,
+                        }}
+                      >
+                        {league.inviteCode}
+                      </Text>
+                    </YStack>
+                  )}
+                </XStack>
+              </YStack>
+
+              {/* Invite button */}
+              <Button
+                size="$3"
+                backgroundColor={
+                  headerInviteCopied
+                    ? 'rgba(34,197,94,0.15)'
+                    : withAlpha(BRAND_GOLD_LIGHT, 0.12)
+                }
+                borderColor={
+                  headerInviteCopied
+                    ? 'rgba(34,197,94,0.4)'
+                    : withAlpha(BRAND_GOLD_LIGHT, 0.4)
+                }
+                borderWidth={1}
+                borderRadius="$4"
+                onPress={handleCopyInviteHeader}
+                icon={
+                  headerInviteCopied ? (
+                    <Check size={15} color="rgb(34, 197, 94)" />
+                  ) : (
+                    <Share2 size={15} color={BRAND_GOLD_LIGHT} />
+                  )
+                }
+                hoverStyle={{
+                  backgroundColor: withAlpha(BRAND_GOLD_LIGHT, 0.2),
+                }}
+                pressStyle={{ scale: 0.97 }}
+                animation="quick"
+                aria-label="Share invite link"
+                alignSelf="flex-start"
+              >
+                <Text
+                  style={{
+                    fontFamily: FONT_DISPLAY,
+                    fontSize: 13,
+                    fontWeight: '700',
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.5,
+                    color: headerInviteCopied
+                      ? 'rgb(34,197,94)'
+                      : BRAND_GOLD_LIGHT,
+                  }}
+                >
+                  {headerInviteCopied ? 'Copied!' : 'Invite'}
+                </Text>
+              </Button>
+            </XStack>
+          </YStack>
+        </ContentArea>
+
         {/* Tab Navigation */}
         <TabBar role="tablist" aria-label="League sections">
           {TABS.map((tab) => {
@@ -3928,12 +4129,6 @@ export function LeagueDetailPage(): React.JSX.Element {
               tab.id === 'roster' && viewingTeamId && !isViewingOwnTeam
                 ? (viewingTeamName ?? 'Team Roster')
                 : tab.label;
-            const icon =
-              tab.id === 'roster' && viewingTeamId && !isViewingOwnTeam ? (
-                <Eye size={16} />
-              ) : (
-                tab.icon
-              );
             // Get visible tabs for keyboard navigation
             const visibleTabs = TABS.filter(
               (t) => !t.commissionerOnly || isCommissioner,
@@ -3995,19 +4190,16 @@ export function LeagueDetailPage(): React.JSX.Element {
                   backgroundColor: withAlpha(BRAND_NAVY, 0.14),
                 }}
               >
-                <XStack alignItems="center" gap="$2">
-                  <YStack opacity={isActive ? 1 : 0.5}>{icon}</YStack>
-                  <Text
-                    fontSize="$3"
-                    fontWeight={isActive ? '700' : '600'}
-                    color={isActive ? BRAND_GOLD_LIGHT : '$textMuted'}
-                    fontFamily={FONT_DISPLAY}
-                    textTransform="uppercase"
-                    letterSpacing={0.8}
-                  >
-                    {label}
-                  </Text>
-                </XStack>
+                <Text
+                  fontSize="$3"
+                  fontWeight={isActive ? '700' : '600'}
+                  color={isActive ? BRAND_GOLD_LIGHT : '$textMuted'}
+                  fontFamily={FONT_DISPLAY}
+                  textTransform="uppercase"
+                  letterSpacing={0.8}
+                >
+                  {label}
+                </Text>
               </Button>
             );
           })}

@@ -16,7 +16,13 @@ import {
   useGetLeagueHistoryQuery,
   useGetLeagueStandingsQuery,
 } from '../../api/db/graphql.generated';
-import { AMBER, withAlpha } from '../../constants/colors';
+import {
+  AMBER,
+  BRAND_GOLD_LIGHT,
+  BRAND_NAVY,
+  WHITE,
+  withAlpha,
+} from '../../constants/colors';
 
 export interface LeagueHistoryProps {
   leagueId: number;
@@ -414,6 +420,88 @@ export function LeagueHistory({
                 </YStack>
               )}
             </YStack>
+          </YStack>
+        </SectionCard>
+      )}
+
+      {/* Champions Row — past season winners */}
+      {seasons.filter((s) => s.frozenAt && s.championTeamName).length > 0 && (
+        <SectionCard>
+          <YStack gap="$3">
+            <XStack alignItems="center" gap="$2">
+              <Trophy size={18} color="$brandGoldLight" />
+              <H4>Champions Row</H4>
+            </XStack>
+            <XStack gap="$3" flexWrap="wrap">
+              {seasons
+                .filter((s) => s.frozenAt && s.championTeamName)
+                .map((s) => (
+                  <YStack
+                    key={s.leagueId}
+                    flex={1}
+                    minWidth={180}
+                    padding="$4"
+                    borderRadius="$4"
+                    borderWidth={1}
+                    borderColor={withAlpha(BRAND_GOLD_LIGHT, 0.25)}
+                    style={{
+                      background: `linear-gradient(135deg, ${withAlpha(AMBER, 0.08)} 0%, ${withAlpha(BRAND_NAVY, 0.3)} 60%)`,
+                    }}
+                    gap="$2"
+                  >
+                    <XStack alignItems="center" gap="$2" marginBottom="$1">
+                      <Crown size={16} color="$brandGoldLight" />
+                      <Text
+                        style={{
+                          fontFamily: "'Big Shoulders Display', sans-serif",
+                          fontSize: 20,
+                          fontWeight: '800',
+                          letterSpacing: 0.04,
+                          color: BRAND_GOLD_LIGHT,
+                        }}
+                      >
+                        Season {s.seasonNumber}
+                      </Text>
+                    </XStack>
+                    <Text
+                      style={{
+                        fontFamily: "'Big Shoulders Display', sans-serif",
+                        fontSize: 15,
+                        fontWeight: '700',
+                        color: WHITE,
+                      }}
+                    >
+                      {s.championTeamName}
+                    </Text>
+                    {s.championScore != null && s.runnerUpTeamName && (
+                      <Text
+                        style={{
+                          fontFamily: "'Roboto Mono', 'Courier New', monospace",
+                          fontSize: 11,
+                          color: withAlpha(WHITE, 0.5),
+                          marginTop: 4,
+                        }}
+                      >
+                        Final: {s.championScore.toFixed(1)}
+                        {s.runnerUpScore != null
+                          ? ` – ${s.runnerUpScore.toFixed(1)}`
+                          : ''}
+                      </Text>
+                    )}
+                    {s.runnerUpTeamName && (
+                      <Text
+                        style={{
+                          fontFamily: "'Literata', Georgia, serif",
+                          fontSize: 12,
+                          color: withAlpha(WHITE, 0.45),
+                        }}
+                      >
+                        Runner-up: {s.runnerUpTeamName}
+                      </Text>
+                    )}
+                  </YStack>
+                ))}
+            </XStack>
           </YStack>
         </SectionCard>
       )}

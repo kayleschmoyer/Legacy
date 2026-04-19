@@ -160,9 +160,11 @@ test.describe('QR Invite Link @critical', () => {
       timeout: 15_000,
     });
 
-    // Manual Code section shows the invite code
+    // Manual Code section shows the invite code (scoped to overview panel — hero also shows invite code)
     await expect(page.getByText('Manual Code')).toBeVisible();
-    await expect(page.getByText('INVITE123', { exact: true })).toBeVisible();
+    await expect(
+      page.locator('#panel-overview').getByText('INVITE123', { exact: true }),
+    ).toBeVisible();
 
     // Share Link section shows a URL containing the join path
     await expect(page.getByText('Share Link')).toBeVisible();
