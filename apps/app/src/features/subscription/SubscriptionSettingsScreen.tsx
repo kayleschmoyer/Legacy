@@ -9,6 +9,7 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
+import { getEnvVarOptional } from '@legacy-sports/env-utilities';
 import {
   useBillingPortalSession,
   useCheckoutSession,
@@ -22,6 +23,7 @@ import {
   MONTHLY_PRICE_DISPLAY,
   PREMIUM_FEATURES,
 } from './constants';
+import { EnvironmentVariable } from '../../common/EnvironmentVariables';
 
 // Custom URL scheme registered in app.json (scheme: "legacysports").
 const APP_SCHEME = 'legacysports';
@@ -165,9 +167,9 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
   const isLoading = subLoading || checkoutLoading || portalLoading;
 
   const stripeMonthlyPriceId =
-    (process.env.EXPO_PUBLIC_STRIPE_MONTHLY_PRICE_ID as string) ?? '';
+    getEnvVarOptional(EnvironmentVariable.STRIPE_MONTHLY_PRICE_ID) ?? '';
   const stripeAnnualPriceId =
-    (process.env.EXPO_PUBLIC_STRIPE_ANNUAL_PRICE_ID as string) ?? '';
+    getEnvVarOptional(EnvironmentVariable.STRIPE_ANNUAL_PRICE_ID) ?? '';
 
   const handleUpgrade = async () => {
     // iOS: Platform-aware purchase flow.
