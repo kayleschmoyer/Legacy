@@ -513,6 +513,8 @@ function App() {
             <Route path="/about" element={<AboutPage />} />
             <Route path="/help" element={<HelpPage />} />
             <Route path="/pricing" element={<PricingPage />} />
+            <Route path="/terms" element={<TermsOfServicePage />} />
+            <Route path="/privacy" element={<PrivacyPolicyPage />} />
             <Route
               path="/admin"
               element={
@@ -572,8 +574,6 @@ function App() {
             {/* /faq is a common alias that users and crawlers reach — redirect to the
                 pricing page which contains the FAQ accordion section. */}
             <Route path="/faq" element={<Navigate to="/pricing" replace />} />
-            <Route path="/privacy" element={<PrivacyPolicyPage />} />
-            <Route path="/terms" element={<TermsOfServicePage />} />
           </Routes>
         </Suspense>
       </YStack>

@@ -7,8 +7,9 @@ import {
   Paragraph,
   YStack,
 } from '@legacy-sports/shared-components/ui';
-import { styled } from 'tamagui';
+import { styled, Text } from 'tamagui';
 import { PageMeta } from '../../components/PageMeta';
+import { BRAND_GOLD } from '../../constants/colors';
 
 const Container = styled(YStack, {
   maxWidth: 800,
@@ -26,6 +27,17 @@ const Section = styled(YStack, {
   gap: '$3',
 });
 
+const SectionTitle = styled(H2, {
+  color: BRAND_GOLD,
+  fontSize: '$6',
+});
+
+const BodyText = styled(Paragraph, {
+  color: '$gray11',
+  fontSize: '$4',
+  lineHeight: 24,
+});
+
 export default function PrivacyPolicyPage() {
   const navigate = useNavigate();
 
@@ -33,88 +45,115 @@ export default function PrivacyPolicyPage() {
     <Container>
       <PageMeta
         title="Privacy Policy"
-        description="Legacy Sports Privacy Policy — learn how we collect, use, and protect your personal information."
+        description="Legacy Sports Privacy Policy — learn how we collect, use, and protect your data."
       />
 
       <YStack gap="$2" marginBottom="$2">
         <H1>Privacy Policy</H1>
-        <Paragraph color="$gray11">Last updated: January 1, 2025</Paragraph>
+        <Text color="$gray11" fontSize="$4">
+          Last updated: January 1, 2025
+        </Text>
       </YStack>
 
       <Section>
-        <Paragraph color="$gray11">
-          Legacy Sports ("we", "us", or "our") operates the Legacy Sports
-          fantasy sports platform at legacy-fantasy.com. This Privacy Policy
-          explains how we collect, use, and protect your personal information
-          when you use our service.
-        </Paragraph>
+        <SectionTitle>1. Information We Collect</SectionTitle>
+        <BodyText>
+          We collect information you provide directly to us, such as your name,
+          email address, and account credentials when you register. We also
+          collect usage data, including pages visited, features used, and
+          interactions with the Service.
+        </BodyText>
       </Section>
 
       <Section>
-        <H2>Information We Collect</H2>
-        <Paragraph color="$gray11">
-          When you create an account, we collect your name and email address
-          through your chosen OAuth provider (Google or Discord). We do not
-          store your OAuth provider passwords.
-        </Paragraph>
-        <Paragraph color="$gray11">
-          We also collect information you provide when using the platform,
-          including league names, team names, draft picks, and other fantasy
-          sports activity. We log usage data such as pages visited and features
-          used to improve the platform.
-        </Paragraph>
+        <SectionTitle>2. How We Use Your Information</SectionTitle>
+        <BodyText>
+          We use the information we collect to: (a) provide and improve the
+          Service; (b) communicate with you about your account and updates; (c)
+          personalize your experience; (d) monitor and analyze usage patterns;
+          and (e) comply with legal obligations.
+        </BodyText>
       </Section>
 
       <Section>
-        <H2>How We Use Your Information</H2>
-        <Paragraph color="$gray11">
-          We use your information to provide and improve the Legacy Sports
-          platform, send you notifications about your leagues and teams, respond
-          to your support requests, and ensure the security of your account.
-        </Paragraph>
-        <Paragraph color="$gray11">
-          We do not sell your personal information to third parties. We do not
-          use your data for advertising purposes.
-        </Paragraph>
+        <SectionTitle>3. Information Sharing</SectionTitle>
+        <BodyText>
+          We do not sell, trade, or rent your personal information to third
+          parties. We may share aggregated, non-personally identifiable
+          information publicly or with partners. We may disclose personal
+          information when required by law or to protect our rights.
+        </BodyText>
       </Section>
 
       <Section>
-        <H2>Data Storage and Security</H2>
-        <Paragraph color="$gray11">
-          Your data is stored securely on AWS infrastructure. We use
-          industry-standard encryption for data in transit and at rest. Access
-          to personal data is restricted to authorized personnel only.
-        </Paragraph>
+        <SectionTitle>4. Data Security</SectionTitle>
+        <BodyText>
+          We implement industry-standard security measures to protect your
+          personal information. However, no method of transmission over the
+          Internet or electronic storage is 100% secure. We cannot guarantee
+          absolute security of your data.
+        </BodyText>
       </Section>
 
       <Section>
-        <H2>Cookies and Tracking</H2>
-        <Paragraph color="$gray11">
-          We use cookies and similar technologies to maintain your session and
-          remember your preferences. We may use analytics tools to understand
-          how users interact with the platform in aggregate.
-        </Paragraph>
+        <SectionTitle>5. Cookies and Tracking</SectionTitle>
+        <BodyText>
+          We use cookies and similar tracking technologies to enhance your
+          experience, analyze usage, and remember your preferences. You can
+          control cookie settings through your browser, though disabling cookies
+          may affect Service functionality.
+        </BodyText>
       </Section>
 
       <Section>
-        <H2>Your Rights</H2>
-        <Paragraph color="$gray11">
-          You may request deletion of your account and associated personal data
-          at any time by contacting us. Upon deletion, your personal information
-          will be removed from our systems within 30 days, except where
-          retention is required by law.
-        </Paragraph>
+        <SectionTitle>6. Third-Party Services</SectionTitle>
+        <BodyText>
+          The Service may integrate with third-party authentication providers
+          (such as Google or Discord). These services have their own privacy
+          policies, and we encourage you to review them. We are not responsible
+          for the privacy practices of third-party services.
+        </BodyText>
       </Section>
 
       <Section>
-        <H2>Contact Us</H2>
-        <Paragraph color="$gray11">
-          If you have questions about this Privacy Policy or how we handle your
-          data, please contact us at support@legacy-fantasy.com.
-        </Paragraph>
+        <SectionTitle>7. Data Retention</SectionTitle>
+        <BodyText>
+          We retain your personal information for as long as your account is
+          active or as needed to provide the Service. You may request deletion
+          of your account and associated data by contacting us through the Help
+          page.
+        </BodyText>
       </Section>
 
-      <YStack marginTop="$2">
+      <Section>
+        <SectionTitle>8. Children's Privacy</SectionTitle>
+        <BodyText>
+          The Service is not directed to children under the age of 13. We do not
+          knowingly collect personal information from children under 13. If we
+          become aware that we have collected such information, we will take
+          steps to delete it.
+        </BodyText>
+      </Section>
+
+      <Section>
+        <SectionTitle>9. Changes to This Policy</SectionTitle>
+        <BodyText>
+          We may update this Privacy Policy from time to time. We will notify
+          you of significant changes by updating the "Last updated" date.
+          Continued use of the Service after changes constitutes acceptance of
+          the revised policy.
+        </BodyText>
+      </Section>
+
+      <Section>
+        <SectionTitle>10. Contact</SectionTitle>
+        <BodyText>
+          If you have questions about this Privacy Policy or your personal data,
+          please contact us through the Help page or submit a bug report.
+        </BodyText>
+      </Section>
+
+      <YStack gap="$3" marginTop="$2">
         <Button
           onPress={() => navigate(-1)}
           variant="secondary"

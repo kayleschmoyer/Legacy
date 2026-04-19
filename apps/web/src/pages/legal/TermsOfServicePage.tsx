@@ -7,8 +7,9 @@ import {
   Paragraph,
   YStack,
 } from '@legacy-sports/shared-components/ui';
-import { styled } from 'tamagui';
+import { styled, Text } from 'tamagui';
 import { PageMeta } from '../../components/PageMeta';
+import { BRAND_GOLD } from '../../constants/colors';
 
 const Container = styled(YStack, {
   maxWidth: 800,
@@ -26,6 +27,17 @@ const Section = styled(YStack, {
   gap: '$3',
 });
 
+const SectionTitle = styled(H2, {
+  color: BRAND_GOLD,
+  fontSize: '$6',
+});
+
+const BodyText = styled(Paragraph, {
+  color: '$gray11',
+  fontSize: '$4',
+  lineHeight: 24,
+});
+
 export default function TermsOfServicePage() {
   const navigate = useNavigate();
 
@@ -33,101 +45,105 @@ export default function TermsOfServicePage() {
     <Container>
       <PageMeta
         title="Terms of Service"
-        description="Legacy Sports Terms of Service — the rules and guidelines for using the Legacy Sports fantasy sports platform."
+        description="Legacy Sports Terms of Service — read our terms before using the platform."
       />
 
       <YStack gap="$2" marginBottom="$2">
         <H1>Terms of Service</H1>
-        <Paragraph color="$gray11">Last updated: January 1, 2025</Paragraph>
+        <Text color="$gray11" fontSize="$4">
+          Last updated: January 1, 2025
+        </Text>
       </YStack>
 
       <Section>
-        <Paragraph color="$gray11">
-          By accessing or using Legacy Sports at legacy-fantasy.com, you agree
-          to be bound by these Terms of Service. If you do not agree, please do
-          not use the platform.
-        </Paragraph>
+        <SectionTitle>1. Acceptance of Terms</SectionTitle>
+        <BodyText>
+          By accessing or using Legacy Sports ("the Service"), you agree to be
+          bound by these Terms of Service. If you do not agree to these terms,
+          please do not use the Service.
+        </BodyText>
       </Section>
 
       <Section>
-        <H2>Use of the Service</H2>
-        <Paragraph color="$gray11">
-          Legacy Sports is a fantasy sports platform for entertainment purposes.
-          You must be at least 13 years old to create an account. You are
-          responsible for maintaining the security of your account and for all
-          activity that occurs under your account.
-        </Paragraph>
-        <Paragraph color="$gray11">
-          You agree not to use the platform to harass other users, attempt to
-          gain unauthorized access to any part of the service, or engage in any
-          activity that disrupts or interferes with the platform.
-        </Paragraph>
+        <SectionTitle>2. Description of Service</SectionTitle>
+        <BodyText>
+          Legacy Sports is a fantasy sports management platform that allows
+          users to create and participate in fantasy baseball and football
+          leagues. The Service includes league management tools, draft boards,
+          player statistics, and related features.
+        </BodyText>
       </Section>
 
       <Section>
-        <H2>Leagues and Competitions</H2>
-        <Paragraph color="$gray11">
-          Legacy Sports provides tools to organize and manage fantasy sports
-          leagues. Commissioners have authority over their leagues, including
-          rule changes and dispute resolution. Legacy Sports is not responsible
-          for disputes between league members.
-        </Paragraph>
-        <Paragraph color="$gray11">
-          Legacy Sports does not facilitate real-money wagering. Any prize
-          arrangements between league members are solely between those members
-          and outside the scope of this service.
-        </Paragraph>
+        <SectionTitle>3. User Accounts</SectionTitle>
+        <BodyText>
+          You are responsible for maintaining the confidentiality of your
+          account credentials and for all activities that occur under your
+          account. You must notify us immediately of any unauthorized use of
+          your account. We reserve the right to terminate accounts that violate
+          these terms.
+        </BodyText>
       </Section>
 
       <Section>
-        <H2>Intellectual Property</H2>
-        <Paragraph color="$gray11">
-          The Legacy Sports platform, including its design, code, and content,
-          is owned by Legacy Sports. Statistical data is sourced from
-          third-party providers. You may not reproduce, distribute, or create
-          derivative works from our platform without written permission.
-        </Paragraph>
+        <SectionTitle>4. Acceptable Use</SectionTitle>
+        <BodyText>
+          You agree not to use the Service to: (a) violate any applicable laws
+          or regulations; (b) harass, abuse, or harm other users; (c) transmit
+          spam or unsolicited communications; (d) attempt to gain unauthorized
+          access to any part of the Service; or (e) engage in any activity that
+          disrupts or interferes with the Service.
+        </BodyText>
       </Section>
 
       <Section>
-        <H2>Disclaimer of Warranties</H2>
-        <Paragraph color="$gray11">
-          The platform is provided "as is" without warranties of any kind. We do
-          not guarantee uninterrupted access or that the service will be free of
-          errors. Player statistics and projections are provided for
-          entertainment and may contain inaccuracies.
-        </Paragraph>
+        <SectionTitle>5. Intellectual Property</SectionTitle>
+        <BodyText>
+          The Service and its original content, features, and functionality are
+          owned by Legacy Sports and are protected by applicable intellectual
+          property laws. You may not reproduce, distribute, or create derivative
+          works without our express written permission.
+        </BodyText>
       </Section>
 
       <Section>
-        <H2>Limitation of Liability</H2>
-        <Paragraph color="$gray11">
-          Legacy Sports shall not be liable for any indirect, incidental, or
-          consequential damages arising from your use of the platform. Our total
-          liability to you for any claims shall not exceed the amount you have
-          paid to us in the preceding 12 months.
-        </Paragraph>
+        <SectionTitle>6. Disclaimer of Warranties</SectionTitle>
+        <BodyText>
+          The Service is provided on an "as is" and "as available" basis without
+          warranties of any kind. We do not warrant that the Service will be
+          uninterrupted, error-free, or free of harmful components.
+        </BodyText>
       </Section>
 
       <Section>
-        <H2>Changes to These Terms</H2>
-        <Paragraph color="$gray11">
-          We may update these Terms of Service from time to time. Continued use
-          of the platform after changes take effect constitutes acceptance of
-          the updated terms. We will notify you of significant changes via
-          email.
-        </Paragraph>
+        <SectionTitle>7. Limitation of Liability</SectionTitle>
+        <BodyText>
+          To the maximum extent permitted by law, Legacy Sports shall not be
+          liable for any indirect, incidental, special, consequential, or
+          punitive damages arising from your use of or inability to use the
+          Service.
+        </BodyText>
       </Section>
 
       <Section>
-        <H2>Contact Us</H2>
-        <Paragraph color="$gray11">
+        <SectionTitle>8. Changes to Terms</SectionTitle>
+        <BodyText>
+          We reserve the right to modify these terms at any time. We will notify
+          users of material changes by updating the "Last updated" date.
+          Continued use of the Service after changes constitutes acceptance of
+          the revised terms.
+        </BodyText>
+      </Section>
+
+      <Section>
+        <SectionTitle>9. Contact</SectionTitle>
+        <BodyText>
           If you have questions about these Terms of Service, please contact us
-          at support@legacy-fantasy.com.
-        </Paragraph>
+          through the Help page or submit a bug report.
+        </BodyText>
       </Section>
 
-      <YStack marginTop="$2">
+      <YStack gap="$3" marginTop="$2">
         <Button
           onPress={() => navigate(-1)}
           variant="secondary"

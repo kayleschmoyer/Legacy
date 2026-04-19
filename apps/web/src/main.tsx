@@ -161,6 +161,10 @@ try {
                   // prior authentication. The join mutation itself requires auth and
                   // will surface an error if the user is not signed in (LS-3702).
                   `${basePath}/baseball/league/join`,
+                  // /terms and /privacy are legal pages linked from the login page —
+                  // must be accessible without authentication (LS-3696).
+                  `${basePath}/terms`,
+                  `${basePath}/privacy`,
                 ]}
                 // /baseball hub is publicly accessible (LS-3532). Using publicExactPaths
                 // (not publicPaths) so only the landing page is public — sub-routes like
