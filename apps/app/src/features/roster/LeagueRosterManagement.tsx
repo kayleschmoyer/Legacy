@@ -522,7 +522,7 @@ export function LeagueRosterManagement({
         {/* Bullpen - Pitchers */}
         <PlayerPool
           title="Bullpen"
-          players={[...bullpenPlayers, ...dualEligiblePlayers]}
+          players={bullpenPlayers}
           projections={projections}
           isLoading={loadingProjections}
           selectedPlayer={selectedPlayer}
