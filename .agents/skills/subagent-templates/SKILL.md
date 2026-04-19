@@ -13,6 +13,8 @@ Agent(subagent_type: "Explore", prompt: """
 
   Search root: <worktree-path>   ← REQUIRED when called from a worktree session (see path note below)
 
+  Tool rules: Use Glob (not find/ls), Grep (not grep/rg), Read (not cat/head/tail).
+
   Tool preferences:
   - Use Glob (not find/ls) for file discovery — `find . -name "*.tsx"` → `Glob(pattern: "**/*.tsx", path: "<worktree-path>")`, `find $wt -name "*.ts"` → `Glob(pattern: "src/**/*.ts", path: "<worktree-path>")`. Always pass path: "<worktree-path>" when running in a worktree session so returned paths belong to the worktree, not the main repo. Glob is purpose-built: faster, returns results sorted by modification time, requires no shell spawning, and gives a cleaner permission prompt. On absolute Windows worktree paths, fall back to worktree_ls_tree or worktree_run(command: "dir <dir>") (use `dir` not `ls` — worktree_run may resolve to cmd.exe where `ls` is unavailable)
   - Use Grep (not grep/rg/`find | xargs grep`) for content search — Grep accepts both pattern and glob filter in one call, so `find | xargs grep` is never needed. Common mappings: `grep -n "pattern" file` → `Grep(pattern: "pattern", path: "<worktree-path>", output_mode: "content")`; `grep -rn "pattern" dir/` → `Grep(pattern: "pattern", path: "<worktree-path>/dir", output_mode: "content")` (line numbers are on by default); `grep -i "pattern"` → `Grep(pattern: "pattern", path: "...", "-i": true, output_mode: "content")`
@@ -47,6 +49,8 @@ Agent(subagent_type: "Explore", prompt: """
 
   Start with: check .agents/skills/architecture/FILE-MAP.md first — the canonical path
   may already be listed there.
+
+  Tool rules: Use Glob (not find/ls), Grep (not grep/rg), Read (not cat/head/tail).
 
   Tool preferences:
   - Use Grep to search for the symbol/pattern directly before using Glob
