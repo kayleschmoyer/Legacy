@@ -40,6 +40,19 @@ The Claude Code session was spawned with the launcher `worktree` checkbox checke
 
    Uses Node.js path APIs internally — no shell escaping needed. Idempotent (safe to call if symlink already exists). **Never** use `mklink`, `New-Item -ItemType SymbolicLink`, `New-Item -ItemType Junction`, or any other manual symlink/junction command — they bypass `.modules.yaml` path consistency checks and cause Nx graph failures. If `worktree_setup_node_modules` is unavailable (e.g., MCP server not yet connected at session start), run `make install` inside the worktree instead — this creates an independent `node_modules` and is always safe.
 
+   > **Verify after setup — main repo `node_modules` may be empty**: The symlink target (`D:\code\legacy-sports\node_modules`) may contain **0 packages** if the last `make install` ran inside a sibling worktree rather than the main repo — the symlink resolves without error but all tools (`nx`, `prettier`, etc.) are missing. After calling `worktree_setup_node_modules()`, confirm the install is populated:
+   >
+   > ```
+   > test -d node_modules/nx && echo ok || echo EMPTY
+   > ```
+   >
+   > If `EMPTY`, fall back to an independent install:
+   >
+   > 1. `powershell -NoProfile -Command "Remove-Item -Path node_modules -Force"` — removes the empty symlink
+   > 2. `make install` inside the worktree — creates a standalone `node_modules`
+   >
+   > Never attempt to re-point the junction/symlink manually.
+
    > **Installing new packages in a worktree**: while `node_modules` is symlinked to the main repo, you must never run `pnpm add` or `make install` from the worktree. Those commands are unsafe in this setup: the repo's guardrails are meant to stop them, but attempting to run them with the symlink still in place risks corrupting the shared `node_modules` used by every worktree. If your implementation requires adding/removing/updating dependencies, you **must** break the symlink first and install independently:
    >
    > 1. `powershell -NoProfile -Command "Remove-Item -Path node_modules -Force"` — removes the symlink only, not the main repo's `node_modules`
@@ -48,7 +61,7 @@ The Claude Code session was spawned with the launcher `worktree` checkbox checke
    >
    > See [install-packages.md](../repo-tooling/references/install-packages.md) for the full procedure. **Never run `pnpm add` or `make install` while the symlink is still in place** — the `preinstall-guard` is there to catch this unsafe path, but you must not rely on it because even partial execution can damage every other worktree's shared `node_modules`.
 
-   > **Broken or missing `node_modules` symlink recovery**: if the symlink is broken, missing, or pointing to the wrong location:
+   > **Broken, empty, or missing `node_modules` recovery**: if the symlink is broken, missing, pointing to the wrong location, **or the target resolved but contains 0 packages** (empty main-repo `node_modules`):
    >
    > 1. If `node_modules` exists as a broken symlink or points to the wrong location, remove it with `powershell -NoProfile -Command "Remove-Item -Path node_modules -Force"`. If `node_modules` is already missing, skip this step.
    > 2. Run `make install` from the worktree — this creates an independent `node_modules`

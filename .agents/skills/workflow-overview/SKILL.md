@@ -45,6 +45,19 @@ This is the step-by-step checklist agents follow for every ticket. See the detai
 
       This is instant (no disk copy), the main repo's `node_modules` is untouched, and `pnpm exec nx`, `make typecheck`, `make pc` all work after it. The tool is idempotent — safe to call even if the symlink already exists, and will auto-repair a broken symlink (empty `.bin`). Skip `make wt-setup` — that's sibling-only.
 
+      > **Verify after setup — main repo `node_modules` may be empty**: `worktree_setup_node_modules()` creates a symlink to `D:\code\legacy-sports\node_modules`. If the last `make install` ran inside a sibling worktree (`D:\code\legacy-sports-worktrees\<name>\`) rather than the main repo, the symlink target contains **0 packages** — the link resolves without error but `nx`, `prettier`, and all other tools are missing. After calling the tool, confirm the install is populated:
+      >
+      > ```
+      > test -d node_modules/nx && echo ok || echo EMPTY
+      > ```
+      >
+      > If the result is `EMPTY`, fall back to an independent install:
+      >
+      > 1. `powershell -NoProfile -Command "Remove-Item -Path node_modules -Force"` — removes the empty symlink
+      > 2. `make install` inside the worktree — creates a standalone `node_modules`
+      >
+      > This is always safe. Never attempt to re-point the junction/symlink manually.
+
       > **Note**: The `setup-worktree-symlink.sh` SessionStart hook attempts to create the symlink at session start, but it may not fire in all session types (e.g., Copilot CLI). Always call `worktree_setup_node_modules()` explicitly at step 5 — it is idempotent and safe to call even if the symlink already exists. If MCP servers are timing out at startup, the most common cause is a missing symlink (all servers use `pnpm exec tsx` and will fail immediately without `node_modules/.bin`). In that startup-timeout case the worktree MCP server is itself unavailable, so use the **cmd fallback below first** to recreate the symlink, then restart the session. `worktree_setup_node_modules()` only works once the worktree MCP server is already connected.
 
       If `worktree_setup_node_modules` is unavailable (MCP server not loaded), use the **cmd fallback** (run from your terminal, not from bash):
@@ -55,7 +68,7 @@ This is the step-by-step checklist agents follow for every ticket. See the detai
 
       > **Note**: `mklink /D` creates a directory symlink and requires Windows Developer Mode or an elevated/admin Command Prompt. Do NOT use `mklink /J` (junction) — junctions are followed by recursive-delete operations.
 
-      > **Warning**: Never use `worktree_run(command: "cmd //c mklink //D ...")` or `cmd //c mklink //D node_modules D:\\code\\...` directly in bash — both approaches require fragile backslash escaping that silently creates symlinks to wrong paths. Use `worktree_setup_node_modules()` (MCP) or the cmd fallback above. Verify the symlink after creation: `test -d node_modules/nx && echo ok || echo broken`.
+      > **Warning**: Never use `worktree_run(command: "cmd //c mklink //D ...")` or `cmd //c mklink //D node_modules D:\\code\\...` directly in bash — both approaches require fragile backslash escaping that silently creates symlinks to wrong paths. Use `worktree_setup_node_modules()` (MCP) or the cmd fallback above. After creating the symlink, always verify it is populated: `test -d node_modules/nx && echo ok || echo EMPTY`. If `EMPTY`, the main repo `node_modules` may be empty — remove the symlink (`powershell -NoProfile -Command "Remove-Item -Path node_modules -Force"`) and run `make install` in the worktree instead.
 
     - 5b. **Agent multi-root access** (optional, parallel flow): `make sync-worktrees` then `code legacy-sports.code-workspace` — gives agents search access across all sibling worktrees in one window.
 
