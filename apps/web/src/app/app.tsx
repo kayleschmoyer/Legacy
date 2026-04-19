@@ -105,6 +105,9 @@ const SeasonDraftJoinPage = React.lazy(
 const DisclosureGamePage = lazyWithRetry(
   () => import('../pages/games/DisclosureGamePage'),
 );
+const MinigamesHubPage = lazyWithRetry(
+  () => import('../pages/games/MinigamesHubPage'),
+);
 const EliteDraftBoardScreen = lazyWithRetry(() =>
   import('../components/EliteDraftBoard').then((m) => ({
     default: m.EliteDraftBoardScreen,
@@ -530,6 +533,7 @@ function App() {
             <Route path="/notifications" element={<NotificationsPage />} />
             <Route path="/scoreboard" element={<ScoreboardPage />} />
             <Route path="/standings" element={<StandingsRedirectPage />} />
+            <Route path="/games" element={<MinigamesHubPage />} />
             <Route
               path="/games/season-draft"
               element={<SeasonDraftGamesPage />}

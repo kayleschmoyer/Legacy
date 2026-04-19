@@ -82,6 +82,9 @@ export * from './features/season-draft';
 // Progressive Disclosure Minigame
 export * from './features/disclosure-game';
 
+// Minigames Hub
+export * from './features/minigames-hub';
+
 // Player components
 export * from './features/players';
 
