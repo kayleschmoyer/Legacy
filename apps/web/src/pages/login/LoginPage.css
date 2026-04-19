@@ -502,6 +502,35 @@
 .ll-legal a:hover {
   color: var(--fg2);
 }
+.ll-get-started-row {
+  margin-top: 16px;
+  text-align: center;
+}
+.ll-get-started {
+  background: transparent;
+  border: none;
+  padding: 6px 12px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--fg3);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: rgba(156, 170, 197, 0.3);
+  text-underline-offset: 2px;
+  transition: color 150ms;
+}
+.ll-get-started:hover:not(:disabled) {
+  color: var(--fg2);
+}
+.ll-get-started:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.ll-get-started:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-2);
+}
 
 /* Error */
 .ll-error {

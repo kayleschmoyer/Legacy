@@ -118,14 +118,6 @@ export function EnhancedAuthGuard({
 
   // Show login screen if not authenticated
   if (!isAuthenticated) {
-    // Normalize the URL to / so the browser address bar doesn't show a
-    // protected path (e.g. /profile/settings) while the login page is
-    // displayed.  Public paths bypass this branch entirely so we only
-    // reach here for genuinely protected routes.  We skip the replaceState
-    // when already at / to avoid a needless history entry.
-    if (typeof window !== 'undefined' && window.location.pathname !== '/') {
-      window.history.replaceState({}, '', '/');
-    }
     return (
       loginComponent || (
         <LoginPage

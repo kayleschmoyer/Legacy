@@ -483,6 +483,19 @@ export function LoginPage(): React.JSX.Element {
                 <a href="/terms">Terms of Service</a> and{' '}
                 <a href="/privacy">Privacy Policy</a>.
               </div>
+
+              <div className="ll-get-started-row">
+                <button
+                  type="button"
+                  className="ll-get-started"
+                  onClick={() => {
+                    void handleSignIn();
+                  }}
+                  disabled={googleDisabled}
+                >
+                  Get Started Free
+                </button>
+              </div>
             </div>
 
             <div className="ll-card-footer">

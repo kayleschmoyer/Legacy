@@ -226,25 +226,23 @@ unauthTest.describe(
 // coverage — the underlying failure was the selector syntax, not the button identity.
 // ---------------------------------------------------------------------------
 
-// LS-3487 follow-up: /baseball/mock-draft was moved to publicPaths (LS-3484)
-// so unauthenticated users now reach the page directly without seeing the login
-// gate.  The original regression (broken CSS selector for the Google CTA) no
-// longer applies to this route.  This test now verifies the public-route
-// behaviour: the auth guard does NOT intercept the request, so the landing
-// page login CTA is absent.
+// LS-3487 / LS-3666: /baseball/mock-draft is a protected route. Unauthenticated
+// users are intercepted by EnhancedAuthGuard and shown the login page.  The URL
+// is preserved (no replaceState redirect) so users can bookmark their intent.
+// The login page exposes the "Continue with Google" and "Get Started Free" CTAs.
 unauthTest.describe(
-  '/baseball/mock-draft — public route loads without auth gate @regression',
+  '/baseball/mock-draft — protected route shows login page @regression',
   () => {
     unauthTest(
-      '/baseball/mock-draft is accessible to unauthenticated users without login gate (LS-3487)',
+      'unauthenticated users visiting /baseball/mock-draft see the login page (LS-3487)',
       async ({ page }) => {
         await page.goto('/baseball/mock-draft');
         await page.waitForLoadState('load');
 
-        // Route is public: the auth guard returns children, not PublicLandingPage.
+        // Route is protected: auth guard intercepts and renders the login page.
         await expect(
           page.getByRole('button', { name: /continue with google/i }),
-        ).not.toBeVisible({ timeout: 5_000 });
+        ).toBeVisible({ timeout: 15_000 });
       },
     );
   },
