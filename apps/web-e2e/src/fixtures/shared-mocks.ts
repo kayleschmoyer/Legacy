@@ -150,6 +150,7 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = {
   },
 
   // ── Players ─────────────────────────────────────────────────────
+  getplayercount: { data: { playerCount: 22184 } },
   getallplayers: { data: { players: [] } },
   getplayerswithstats: { data: { playersWithStats: [] } },
   searchplayers: { data: { searchPlayers: [] } },

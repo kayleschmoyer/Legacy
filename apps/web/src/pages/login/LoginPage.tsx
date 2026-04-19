@@ -1,9 +1,13 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { LOGGER } from '@legacy-sports/logging';
 import { OAuthProvider } from '@legacy-sports/shared-components/ui';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import { PageMeta } from '../../components/PageMeta';
 import { storeCsrfToken } from '../../lib/csrf';
+import {
+  useGetOnThisDayQuery,
+  useGetPlayerCountQuery,
+} from '../../api/db/graphql.generated';
 import './LoginPage.css';
 
 /* ── Icons ── */
@@ -79,6 +83,35 @@ function buildDiscordAuthUrl(
   return `https://discord.com/api/oauth2/authorize?${params.toString()}`;
 }
 
+/* ── Helpers ── */
+
+function formatBattingMarquee(
+  lastName: string,
+  hits: number | null | undefined,
+  atBats: number | null | undefined,
+  homeRuns: number | null | undefined,
+  rbi: number | null | undefined,
+): { name: string; score: string; stat: string } {
+  const score = hits != null && atBats != null ? `${hits}-${atBats}` : '';
+  const parts: string[] = [];
+  if (homeRuns) parts.push(`${homeRuns} HR`);
+  if (rbi) parts.push(`${rbi} RBI`);
+  return { name: lastName.toUpperCase(), score, stat: parts.join(' · ') };
+}
+
+function formatPitchingMarquee(
+  lastName: string,
+  inningsPitched: number | null | undefined,
+  strikeouts: number | null | undefined,
+  earnedRuns: number | null | undefined,
+): { name: string; score: string; stat: string } {
+  const score = inningsPitched != null ? `${inningsPitched} IP` : '';
+  const parts: string[] = [];
+  if (strikeouts) parts.push(`${strikeouts} K`);
+  if (earnedRuns != null) parts.push(`${earnedRuns} ER`);
+  return { name: lastName.toUpperCase(), score, stat: parts.join(' · ') };
+}
+
 /* ── Component ── */
 export function LoginPage(): React.JSX.Element {
   const { config, loginWithOAuth, error: authError } = useAuth();
@@ -87,6 +120,44 @@ export function LoginPage(): React.JSX.Element {
   const [isConfigured, setIsConfigured] = useState(false);
   const [isConfiguring, setIsConfiguring] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
+
+  const today = useMemo(() => new Date(), []);
+  const todayMonth = today.getMonth() + 1;
+  const todayDay = today.getDate();
+
+  const { data: playerCountData } = useGetPlayerCountQuery({
+    fetchPolicy: 'cache-first',
+  });
+  const { data: onThisDayData } = useGetOnThisDayQuery({
+    variables: { month: todayMonth, day: todayDay, limit: 8 },
+    fetchPolicy: 'cache-first',
+  });
+
+  const playerCount = playerCountData?.playerCount ?? 22184;
+  const playerCountDisplay = playerCount.toLocaleString('en-US');
+
+  const marqueeEntries = useMemo(() => {
+    const entries = onThisDayData?.onThisDay;
+    if (!entries || entries.length === 0) return null;
+    const picked = entries.slice(0, 4);
+    return picked.map((e) => {
+      if (e.entryType === 'batting') {
+        return formatBattingMarquee(
+          e.lastName ?? '',
+          e.hits,
+          e.atBats,
+          e.homeRuns,
+          e.rbi,
+        );
+      }
+      return formatPitchingMarquee(
+        e.lastName ?? '',
+        e.inningsPitched,
+        e.strikeouts,
+        e.earnedRuns,
+      );
+    });
+  }, [onThisDayData]);
 
   const displayError = errorMessage || authError || '';
 
@@ -375,7 +446,7 @@ export function LoginPage(): React.JSX.Element {
                 </div>
                 <div className="ll-stat-divider" />
                 <div className="ll-stat-cell">
-                  <div className="ll-stat-num">22,184</div>
+                  <div className="ll-stat-num">{playerCountDisplay}</div>
                   <div className="ll-stat-lbl">Players across every era</div>
                 </div>
                 <div className="ll-stat-divider" />
@@ -385,31 +456,50 @@ export function LoginPage(): React.JSX.Element {
                 </div>
               </div>
 
-              {/* Ledger marquee */}
+              {/* On This Day marquee */}
               <div className="ll-marquee">
                 <div className="ll-marquee-label">
-                  Last night&rsquo;s ledger
+                  On this day in baseball history
                 </div>
                 <div className="ll-marquee-row">
-                  <span className="ll-mq-team">
-                    RUTH <span className="ll-mq-score">3-5</span>{' '}
-                    <span className="ll-mq-stat">2 HR · 5 RBI</span>
-                  </span>
-                  <span className="ll-mq-sep">·</span>
-                  <span className="ll-mq-team">
-                    MAYS <span className="ll-mq-score">2-4</span>{' '}
-                    <span className="ll-mq-stat">2B · SB</span>
-                  </span>
-                  <span className="ll-mq-sep">·</span>
-                  <span className="ll-mq-team">
-                    GIBSON <span className="ll-mq-score">7 IP</span>{' '}
-                    <span className="ll-mq-stat">9 K · 0 ER</span>
-                  </span>
-                  <span className="ll-mq-sep">·</span>
-                  <span className="ll-mq-team">
-                    TROUT <span className="ll-mq-score">1-3</span>{' '}
-                    <span className="ll-mq-stat">BB · R</span>
-                  </span>
+                  {marqueeEntries ? (
+                    marqueeEntries.map((entry, idx) => (
+                      <React.Fragment key={entry.name + idx.toString()}>
+                        {idx > 0 && <span className="ll-mq-sep">·</span>}
+                        <span className="ll-mq-team">
+                          {entry.name}{' '}
+                          {entry.score && (
+                            <span className="ll-mq-score">{entry.score}</span>
+                          )}{' '}
+                          {entry.stat && (
+                            <span className="ll-mq-stat">{entry.stat}</span>
+                          )}
+                        </span>
+                      </React.Fragment>
+                    ))
+                  ) : (
+                    <>
+                      <span className="ll-mq-team">
+                        RUTH <span className="ll-mq-score">3-5</span>{' '}
+                        <span className="ll-mq-stat">2 HR · 5 RBI</span>
+                      </span>
+                      <span className="ll-mq-sep">·</span>
+                      <span className="ll-mq-team">
+                        MAYS <span className="ll-mq-score">2-4</span>{' '}
+                        <span className="ll-mq-stat">2B · SB</span>
+                      </span>
+                      <span className="ll-mq-sep">·</span>
+                      <span className="ll-mq-team">
+                        GIBSON <span className="ll-mq-score">7 IP</span>{' '}
+                        <span className="ll-mq-stat">9 K · 0 ER</span>
+                      </span>
+                      <span className="ll-mq-sep">·</span>
+                      <span className="ll-mq-team">
+                        TROUT <span className="ll-mq-score">1-3</span>{' '}
+                        <span className="ll-mq-stat">BB · R</span>
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
             </div>

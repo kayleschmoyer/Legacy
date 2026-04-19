@@ -276,6 +276,16 @@ PlayerRef.implement({
   }),
 });
 
+// Total number of players in the database (unauthenticated — used on the login page)
+builder.queryField('playerCount', (t) =>
+  t.int({
+    description: 'Total number of players in the database',
+    resolve: async () => {
+      return dbService.players.countPlayers();
+    },
+  }),
+);
+
 // Add players query
 builder.queryField('players', (t) =>
   t.field({

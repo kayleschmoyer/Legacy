@@ -17,6 +17,7 @@ import {
   getRollbarConfigFromEnv,
   initRollbar,
 } from '@legacy-sports/rollbar/web';
+import { ApolloProvider } from '@apollo/client/react';
 import {
   AppProvider,
   ErrorBoundary,
@@ -128,7 +129,11 @@ try {
               <EnhancedAuthGuard
                 loginTitle="Welcome to Legacy Sports!"
                 loginSubtitle="Sign in to access your fantasy leagues and stats"
-                loginComponent={<LoginPage />}
+                loginComponent={
+                  <ApolloProvider client={apolloClient}>
+                    <LoginPage />
+                  </ApolloProvider>
+                }
                 testMode={env.authTestMode}
                 publicPaths={[
                   `${basePath}/about`,

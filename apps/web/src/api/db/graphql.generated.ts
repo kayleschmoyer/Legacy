@@ -2440,6 +2440,8 @@ export type Query = {
   playerCareerBatting?: Maybe<CareerBatting>;
   playerCareerFielding?: Maybe<CareerFielding>;
   playerCareerPitching?: Maybe<CareerPitching>;
+  /** Total number of players in the database */
+  playerCount?: Maybe<Scalars['Int']['output']>;
   /** Fetch MLB season stats for a player from the external data provider. Stub resolver — full implementation added in LS-1864 via MlbDataProvider. */
   playerMlbStats?: Maybe<Scalars['String']['output']>;
   playerSeasonBatting?: Maybe<Array<SeasonBatting>>;
@@ -7678,6 +7680,13 @@ export type MarkAllNotificationsAsReadMutationVariables = Exact<{
 export type MarkAllNotificationsAsReadMutation = {
   __typename?: 'Mutation';
   markAllNotificationsAsRead?: boolean | null;
+};
+
+export type GetPlayerCountQueryVariables = Exact<{ [key: string]: never }>;
+
+export type GetPlayerCountQuery = {
+  __typename?: 'Query';
+  playerCount?: number | null;
 };
 
 export type GetPlayerCareerArcQueryVariables = Exact<{
@@ -18642,6 +18651,89 @@ export type MarkAllNotificationsAsReadMutationResult =
 export type MarkAllNotificationsAsReadMutationOptions = BaseMutationOptions<
   MarkAllNotificationsAsReadMutation,
   MarkAllNotificationsAsReadMutationVariables
+>;
+export const GetPlayerCount = gql`
+  query GetPlayerCount {
+    playerCount
+  }
+`;
+
+/**
+ * __useGetPlayerCountQuery__
+ *
+ * To run a query within a React component, call `useGetPlayerCountQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetPlayerCountQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetPlayerCountQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useGetPlayerCountQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    GetPlayerCountQuery,
+    GetPlayerCountQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<GetPlayerCountQuery, GetPlayerCountQueryVariables>(
+    GetPlayerCount,
+    options,
+  );
+}
+export function useGetPlayerCountLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetPlayerCountQuery,
+    GetPlayerCountQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<GetPlayerCountQuery, GetPlayerCountQueryVariables>(
+    GetPlayerCount,
+    options,
+  );
+}
+export function useGetPlayerCountSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetPlayerCountQuery,
+        GetPlayerCountQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetPlayerCountQuery,
+    GetPlayerCountQueryVariables
+  >(
+    GetPlayerCount,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetPlayerCountQuery,
+          GetPlayerCountQueryVariables
+        >,
+  );
+}
+export type GetPlayerCountQueryHookResult = ReturnType<
+  typeof useGetPlayerCountQuery
+>;
+export type GetPlayerCountLazyQueryHookResult = ReturnType<
+  typeof useGetPlayerCountLazyQuery
+>;
+export type GetPlayerCountSuspenseQueryHookResult = ReturnType<
+  typeof useGetPlayerCountSuspenseQuery
+>;
+export type GetPlayerCountQueryResult = Apollo.QueryResult<
+  GetPlayerCountQuery,
+  GetPlayerCountQueryVariables
 >;
 export const GetPlayerCareerArc = gql`
   query GetPlayerCareerArc($playerId: Int!) {

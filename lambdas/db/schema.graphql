@@ -2696,6 +2696,11 @@ type Query {
   playerCareerPitching(playerId: Int!): CareerPitching
 
   """
+  Total number of players in the database
+  """
+  playerCount: Int
+
+  """
   Fetch MLB season stats for a player from the external data provider. Stub resolver — full implementation added in LS-1864 via MlbDataProvider.
   """
   playerMlbStats(mlbPlayerId: Int!, season: Int!): String
