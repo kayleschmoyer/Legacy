@@ -1480,6 +1480,49 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
       },
     },
     {
+      name: 'worktree_read',
+      description:
+        'Read the contents of any file on the local filesystem by absolute path. ' +
+        'Use this for files outside the project directory (e.g. /tmp, ~/Downloads, C:\\\\Users\\\\...). ' +
+        'For files inside the project directory, the built-in Read tool is preferred. ' +
+        'Supports optional line ranges (startLine/endLine) and grep filtering.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          path: {
+            type: 'string',
+            description:
+              'Absolute path to the file to read (e.g. "/tmp/extracted/design.md" or "C:\\\\Users\\\\user\\\\Downloads\\\\handoff.txt").',
+          },
+          startLine: {
+            type: 'integer',
+            minimum: 1,
+            description:
+              'First line to return (1-based, inclusive). Omit to return the full file.',
+          },
+          endLine: {
+            type: 'integer',
+            minimum: 1,
+            description:
+              'Last line to return (1-based, inclusive). Requires startLine.',
+          },
+          grep: {
+            type: 'string',
+            description:
+              'Optional JavaScript RegExp source string. When provided, only matching lines (with line numbers) are returned. Mutually exclusive with startLine/endLine.',
+          },
+          maxMatches: {
+            type: 'integer',
+            minimum: 1,
+            maximum: 500,
+            description:
+              'Max number of matched lines to return when `grep` is provided (default: 50, max: 500).',
+          },
+        },
+        required: ['path'],
+      },
+    },
+    {
       name: 'worktree_show_remote',
       description:
         'Read a file from a remote branch without needing a worktree. ' +
@@ -6954,6 +6997,239 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           isError: true,
         };
       }
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_read
+    // -----------------------------------------------------------------------
+    case 'worktree_read': {
+      const {
+        path: filePath,
+        startLine: startLineArg,
+        endLine: endLineArg,
+        grep: grepPattern,
+        maxMatches: grepMaxMatches,
+      } = args as {
+        path: string;
+        startLine?: number;
+        endLine?: number;
+        grep?: string;
+        maxMatches?: number;
+      };
+
+      if (!filePath || typeof filePath !== 'string') {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: '`path` is required and must be a non-empty string.',
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      if (!isAbsolute(filePath)) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Invalid path: "${filePath}". Only absolute paths are accepted — for project-relative paths use the built-in Read tool.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      if (filePath.includes('\0') || filePath.includes('\n')) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Path must not contain null bytes or newline characters.',
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      if (
+        grepPattern !== undefined &&
+        (startLineArg !== undefined || endLineArg !== undefined)
+      ) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: '`grep` is mutually exclusive with `startLine`/`endLine` — pick one or the other.',
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      if (endLineArg !== undefined && startLineArg === undefined) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: '`endLine` requires `startLine` to be provided.',
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      if (startLineArg !== undefined) {
+        if (!Number.isInteger(startLineArg) || startLineArg < 1) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Invalid startLine: must be an integer >= 1, got ${startLineArg}.`,
+              },
+            ],
+            isError: true,
+          };
+        }
+        const end = endLineArg ?? startLineArg;
+        if (!Number.isInteger(end) || end < startLineArg) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Invalid endLine: must be an integer >= startLine (${startLineArg}), got ${end}.`,
+              },
+            ],
+            isError: true,
+          };
+        }
+        const MAX_LINE_RANGE = 2000;
+        if (end - startLineArg + 1 > MAX_LINE_RANGE) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Line range too large: ${end - startLineArg + 1} lines requested, max is ${MAX_LINE_RANGE}.`,
+              },
+            ],
+            isError: true,
+          };
+        }
+      }
+
+      let fileContent: string;
+      try {
+        fileContent = readFileSync(filePath, 'utf-8');
+      } catch (err: unknown) {
+        const e = err as { code?: string; message?: string };
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Failed to read "${filePath}": ${e.code === 'ENOENT' ? 'File not found.' : (e.message ?? String(err))}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      const MAX_OUTPUT_CHARS = 512_000;
+
+      if (grepPattern !== undefined) {
+        const result = grepContent(fileContent, grepPattern, grepMaxMatches);
+        if ('error' in result) {
+          return {
+            content: [{ type: 'text', text: result.error }],
+            isError: true,
+          };
+        }
+
+        const grepPayload = { path: filePath, grep: grepPattern, ...result };
+        let grepText = JSON.stringify(grepPayload, null, 2);
+
+        if (grepText.length > MAX_OUTPUT_CHARS) {
+          const originalMatches = result.matches;
+          let low = 0;
+          let high = originalMatches.length;
+          let bestText = JSON.stringify(
+            {
+              ...grepPayload,
+              matches: [],
+              outputTruncated: originalMatches.length > 0,
+              outputTruncationReason: `Response limited to ${MAX_OUTPUT_CHARS} characters`,
+            },
+            null,
+            2,
+          );
+
+          while (low <= high) {
+            const mid = Math.floor((low + high) / 2);
+            const candidateText = JSON.stringify(
+              {
+                ...grepPayload,
+                matches: originalMatches.slice(0, mid),
+                outputTruncated: mid < originalMatches.length,
+                outputTruncationReason:
+                  mid < originalMatches.length
+                    ? `Response limited to ${MAX_OUTPUT_CHARS} characters`
+                    : undefined,
+              },
+              null,
+              2,
+            );
+            if (candidateText.length <= MAX_OUTPUT_CHARS) {
+              bestText = candidateText;
+              low = mid + 1;
+            } else {
+              high = mid - 1;
+            }
+          }
+
+          grepText = bestText;
+        }
+
+        return { content: [{ type: 'text', text: grepText }] };
+      }
+
+      let content = fileContent;
+
+      if (startLineArg !== undefined) {
+        const endLine = endLineArg ?? startLineArg;
+        const allLines = content.split('\n');
+        const sliced = allLines.slice(startLineArg - 1, endLine);
+        content = sliced
+          .map((line, i) => `${startLineArg + i}\t${line}`)
+          .join('\n');
+      }
+
+      const lineRange =
+        startLineArg !== undefined
+          ? { startLine: startLineArg, endLine: endLineArg ?? startLineArg }
+          : {};
+      const jsonPayload = JSON.stringify(
+        { path: filePath, ...lineRange, content, truncated: false },
+        null,
+        2,
+      );
+
+      const truncated = jsonPayload.length > MAX_OUTPUT_CHARS;
+      const safeText = truncated
+        ? JSON.stringify(
+            {
+              path: filePath,
+              ...lineRange,
+              content:
+                content.slice(0, MAX_OUTPUT_CHARS) +
+                `\n\n... [truncated — output exceeds ${MAX_OUTPUT_CHARS / 1000}KB. Use startLine/endLine to read a specific section.]`,
+              truncated: true,
+            },
+            null,
+            2,
+          )
+        : jsonPayload;
+
+      return { content: [{ type: 'text', text: safeText }] };
     }
 
     // -----------------------------------------------------------------------
