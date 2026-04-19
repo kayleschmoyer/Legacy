@@ -6,7 +6,8 @@ import { PickAnnouncement } from './PickAnnouncement';
 import { getDraftCommentary } from './draftUtils';
 import { AuctionDraftRoom } from './auction/AuctionDraftRoom';
 import { PreDraftLobby } from './PreDraftLobby';
-import { DraftSidebar } from './DraftSidebar';
+import { DraftTopBand } from './DraftTopBand';
+import { DraftRail } from './DraftRail';
 import {
   LeagueErrorScreen,
   LoadingScreen,
@@ -353,14 +354,14 @@ export function EliteDraftBoardScreen({
       <style>{CSS}</style>
       <div className="d-bg-fx" />
       <div className="d-layout">
-        <DraftSidebar
+        <DraftTopBand
           draftPaused={ui.draftPaused}
           currentPick={currentPick}
           round={round}
           timeRemaining={timeRemaining}
-          isMyPick={isMyPick}
           pickTimeLimitSeconds={ui.pickTimeLimitSeconds}
-          pickDeadline={ui.pickDeadline}
+          isMyPick={isMyPick}
+          currentPickInfo={queries.currentPickInfo}
           isCommissioner={queries.isCommissioner}
           isOwner={queries.isOwner}
           draftId={queries.draftId}
@@ -368,82 +369,19 @@ export function EliteDraftBoardScreen({
           autoPickDisabled={ui.autoPickDisabled}
           pauseLoading={actions.pauseLoading}
           resumeLoading={actions.resumeLoading}
-          commPickLoading={actions.commPickLoading}
           autoPickDisabledLoading={actions.autoPickDisabledLoading}
-          initDraftLoading={actions.initDraftLoading}
-          currentPickInfo={queries.currentPickInfo}
-          currentPickTeamId={queries.currentPickTeamId}
-          currentPickLoadError={ui.currentPickLoadError}
+          isMyTeamAutoPick={actions.isMyTeamAutoPick}
+          toggleAutoPickLoading={actions.toggleAutoPickLoading}
           myTeamId={queries.myTeamId}
-          onlineTeamIds={onlineTeamIds}
-          myTeam={playerData.myTeam}
-          myTeamPicks={playerData.myTeamPicks}
-          positionCounts={playerData.positionCounts}
-          isPremium={isPremium}
-          pickHistory={queries.pickHistory}
-          statsLookup={playerData.statsLookup}
-          chatOpen={ui.chatOpen}
+          teamNameById={queries.teamNameById}
           onPauseDraft={() => void actions.handlePauseDraft()}
           onResumeDraft={() => void actions.handleResumeDraft()}
           onToggleCommPickMode={() => ui.setCommPickMode(!ui.commPickMode)}
           onToggleAutoPickDisabled={() =>
             void actions.handleToggleAutoPickDisabled()
           }
-          onInitializeDraft={(order) =>
-            void actions.handleInitializeDraft(order)
-          }
           onToggleUserAutoPick={() => void actions.handleToggleUserAutoPick()}
-          isMyTeamAutoPick={actions.isMyTeamAutoPick}
-          toggleAutoPickLoading={actions.toggleAutoPickLoading}
-          onRefresh={() => {
-            void queries.refetchAvailablePlayers();
-            if (queries.draftId)
-              void queries.refetchCurrentPick({ draftId: queries.draftId });
-            void queries.refetchPickHistory();
-            void queries.refetchLeague();
-          }}
-          onToggleChat={() => ui.setChatOpen(!ui.chatOpen)}
-          onRetryCurrentPick={() => {
-            if (queries.draftId)
-              void queries.refetchCurrentPick({ draftId: queries.draftId });
-          }}
-          onShowToast={ui.showToast}
-          teamNameById={queries.teamNameById}
-          onDraftPlayer={(id) => void actions.handleMakePick(id)}
-          onCommissionerPick={(id) => void actions.handleCommissionerPick(id)}
         />
-
-        {/* Mobile sticky banner */}
-        {queries.currentPickInfo && (
-          <div className="d-mobile-banner" aria-label="Current pick info">
-            {ui.draftPaused ? (
-              <div className="d-mobile-timer paused" aria-label="Draft paused">
-                ⏸
-              </div>
-            ) : (
-              <div
-                className={`d-mobile-timer${timeRemaining <= 10 ? ' danger' : timeRemaining <= 30 ? ' warn' : ' safe'}`}
-                aria-label={`${Math.floor(timeRemaining / 60)}:${(timeRemaining % 60).toString().padStart(2, '0')} remaining`}
-              >
-                {Math.floor(timeRemaining / 60)}:
-                {(timeRemaining % 60).toString().padStart(2, '0')}
-              </div>
-            )}
-            <div className="d-mobile-pick-info">
-              <div
-                className={`d-mobile-pick-team${isMyPick ? ' my-turn' : ''}`}
-              >
-                {isMyPick
-                  ? 'YOUR PICK'
-                  : queries.teamNameById(queries.currentPickTeamId)}
-              </div>
-              <div className="d-mobile-pick-detail">
-                Pick #{currentPick} · Round {round} · Pick{' '}
-                {queries.currentPickInfo.pickNumber}
-              </div>
-            </div>
-          </div>
-        )}
 
         <DraftPlayerBoard
           viewMode={ui.viewMode}
@@ -468,6 +406,8 @@ export function EliteDraftBoardScreen({
           hasMorePlayers={queries.hasMorePlayers}
           loadingMore={queries.loadingMore}
           onlineTeamIds={onlineTeamIds}
+          myTeam={playerData.myTeam}
+          positionCounts={playerData.positionCounts}
           onSetSearchTerm={ui.setSearchTerm}
           onSetSelectedPosition={ui.setSelectedPosition}
           onSetViewMode={ui.setViewMode}
@@ -476,6 +416,25 @@ export function EliteDraftBoardScreen({
           onCommissionerPick={handleCommissionerPick}
           onToggleQueue={handleToggleQueuePlayer}
           onLoadMore={handleLoadMore}
+        />
+
+        <DraftRail
+          isPremium={isPremium}
+          isMyPick={isMyPick}
+          commPickMode={ui.commPickMode}
+          isOwner={queries.isOwner}
+          draftId={queries.draftId}
+          myTeamId={queries.myTeamId}
+          currentOverallPick={queries.currentPickInfo?.overallPick ?? 0}
+          autoPickDisabled={ui.autoPickDisabled}
+          myTeam={playerData.myTeam}
+          positionCounts={playerData.positionCounts}
+          pickHistory={queries.pickHistory}
+          statsLookup={playerData.statsLookup}
+          teamNameById={queries.teamNameById}
+          onShowToast={ui.showToast}
+          onDraftPlayer={handleDraftPlayer}
+          onCommissionerPick={handleCommissionerPick}
         />
       </div>
 

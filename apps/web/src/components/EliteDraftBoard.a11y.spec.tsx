@@ -201,62 +201,45 @@ describe('EliteDraftBoardScreen a11y', () => {
     expect(pBtn).toHaveAttribute('aria-checked', 'true');
   });
 
-  test('view mode is a radiogroup and toggles aria-checked', async () => {
+  test('view mode is a tablist and toggles aria-selected', async () => {
     const user = userEvent.setup();
     renderDraftBoard();
 
-    const group = screen.getByRole('radiogroup', { name: /view mode/i });
-    expect(group).toBeInTheDocument();
+    const tablist = screen.getByRole('tablist', { name: /view mode/i });
+    expect(tablist).toBeInTheDocument();
 
-    const grid = screen.getByRole('radio', { name: '⊞' });
-    const list = screen.getByRole('radio', { name: '☰' });
+    const cardsTab = screen.getByRole('tab', { name: 'Cards' });
+    const tableTab = screen.getByRole('tab', { name: 'Data Table' });
 
-    expect(grid).toHaveAttribute('aria-checked', 'true');
-    await user.click(list);
-    expect(list).toHaveAttribute('aria-checked', 'true');
+    expect(cardsTab).toHaveAttribute('aria-selected', 'true');
+    await user.click(tableTab);
+    expect(tableTab).toHaveAttribute('aria-selected', 'true');
+    expect(cardsTab).toHaveAttribute('aria-selected', 'false');
   });
 
-  test('view mode radiogroup supports keyboard navigation', async () => {
+  test('view mode tabs switch between all four views', async () => {
     const user = userEvent.setup();
     renderDraftBoard();
 
-    const group = screen.getByRole('radiogroup', { name: /view mode/i });
-    const grid = screen.getByRole('radio', { name: '⊞' });
-    const list = screen.getByRole('radio', { name: '☰' });
-    const compact = screen.getByRole('radio', { name: '⋯' });
+    const cardsTab = screen.getByRole('tab', { name: 'Cards' });
+    const boardTab = screen.getByRole('tab', { name: 'Draft Board' });
+    const depthTab = screen.getByRole('tab', { name: 'My Depth Chart' });
 
-    // ArrowRight moves grid → list
-    await user.click(grid);
-    await user.keyboard('{ArrowRight}');
-    expect(list).toHaveAttribute('aria-checked', 'true');
-    expect(grid).toHaveAttribute('aria-checked', 'false');
+    // Default is Cards
+    expect(cardsTab).toHaveAttribute('aria-selected', 'true');
 
-    // ArrowLeft moves list → grid
-    await user.keyboard('{ArrowLeft}');
-    expect(grid).toHaveAttribute('aria-checked', 'true');
+    // Switch to Draft Board
+    await user.click(boardTab);
+    expect(boardTab).toHaveAttribute('aria-selected', 'true');
+    expect(cardsTab).toHaveAttribute('aria-selected', 'false');
 
-    // End jumps to last (board)
-    await user.keyboard('{End}');
-    const board = group.querySelector<HTMLElement>(
-      '[role="radio"][aria-checked="true"]',
-    );
-    expect(board).toBeTruthy();
+    // Switch to Depth Chart
+    await user.click(depthTab);
+    expect(depthTab).toHaveAttribute('aria-selected', 'true');
 
-    // Home jumps to first (grid)
-    await user.keyboard('{Home}');
-    expect(grid).toHaveAttribute('aria-checked', 'true');
-
-    // ArrowDown also moves forward
-    await user.keyboard('{ArrowDown}');
-    expect(list).toHaveAttribute('aria-checked', 'true');
-
-    // ArrowUp moves backward
-    await user.keyboard('{ArrowUp}');
-    expect(grid).toHaveAttribute('aria-checked', 'true');
-
-    // Verify compact is still reachable via click
-    await user.click(compact);
-    expect(compact).toHaveAttribute('aria-checked', 'true');
+    // Switch back to Cards
+    await user.click(cardsTab);
+    expect(cardsTab).toHaveAttribute('aria-selected', 'true');
   });
 
   test('watchlist toggle exposes aria-pressed', async () => {

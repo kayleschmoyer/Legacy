@@ -20,7 +20,7 @@ export function useDraftUIState() {
   const [selectedPosition, setSelectedPosition] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<
-    'grid' | 'list' | 'compact' | 'board'
+    'grid' | 'list' | 'compact' | 'board' | 'table' | 'depth'
   >('grid');
   const [watchlist, setWatchlist] = useState<number[]>([]);
   const [chatOpen, setChatOpen] = useState(false);

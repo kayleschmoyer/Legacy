@@ -7,6 +7,7 @@ import type {
 } from './types';
 import { DraftGrid } from './DraftGrid';
 import { PlayerCard } from './PlayerCard';
+import { getPositionColor } from './utils';
 // PlayerDetailModal is web-specific; consumers can provide their own via composition.
 // Inline a no-op stub so the component compiles in all environments.
 const PlayerDetailModal: React.FC<{
@@ -18,23 +19,22 @@ const PlayerDetailModal: React.FC<{
 }> = () => null;
 
 const positions = ['ALL', 'C', '1B', '2B', '3B', 'SS', 'OF', 'P'];
-const viewModes: Array<'grid' | 'list' | 'compact' | 'board'> = [
-  'grid',
-  'list',
-  'compact',
-  'board',
+
+const DEPTH_SLOTS: Array<{ pos: string; label: string; slots: number }> = [
+  { pos: 'C', label: 'C', slots: 1 },
+  { pos: '1B', label: '1B', slots: 1 },
+  { pos: '2B', label: '2B', slots: 1 },
+  { pos: '3B', label: '3B', slots: 1 },
+  { pos: 'SS', label: 'SS', slots: 1 },
+  { pos: 'OF', label: 'OF', slots: 3 },
+  { pos: 'P', label: 'P', slots: 9 },
+  { pos: 'U', label: 'UTIL', slots: 2 },
 ];
 
-const VIEW_MODE_TITLES: Record<'grid' | 'list' | 'compact' | 'board', string> =
-  {
-    grid: 'Grid view',
-    list: 'List view',
-    compact: 'Compact view',
-    board: 'Board view',
-  };
+type ViewMode = 'grid' | 'list' | 'compact' | 'board' | 'table' | 'depth';
 
 interface DraftPlayerBoardProps {
-  viewMode: 'grid' | 'list' | 'compact' | 'board';
+  viewMode: ViewMode;
   selectedPosition: string;
   searchTerm: string;
   availablePlayersLoading: boolean;
@@ -45,6 +45,8 @@ interface DraftPlayerBoardProps {
   myTeamId: number | null;
   draftId: number | null;
   filteredPlayers: DraftPlayer[];
+  myTeam: DraftPlayer[];
+  positionCounts: Record<string, number>;
   watchlist: number[];
   queuedPlayerIds: ReadonlySet<number>;
   autoPickTeamIds: ReadonlySet<string>;
@@ -58,13 +60,20 @@ interface DraftPlayerBoardProps {
   onlineTeamIds: ReadonlySet<string>;
   onSetSearchTerm: (v: string) => void;
   onSetSelectedPosition: (v: string) => void;
-  onSetViewMode: (v: 'grid' | 'list' | 'compact' | 'board') => void;
+  onSetViewMode: (v: ViewMode) => void;
   onSetWatchlist: React.Dispatch<React.SetStateAction<number[]>>;
   onDraftPlayer: (playerId: number) => void;
   onCommissionerPick: (playerId: number) => void;
   onToggleQueue: (playerId: number) => void;
   onLoadMore: () => void;
 }
+
+const VIEW_TABS: Array<{ mode: ViewMode; label: string }> = [
+  { mode: 'grid', label: 'Cards' },
+  { mode: 'table', label: 'Data Table' },
+  { mode: 'board', label: 'Draft Board' },
+  { mode: 'depth', label: 'My Depth Chart' },
+];
 
 export function DraftPlayerBoard({
   viewMode,
@@ -78,6 +87,8 @@ export function DraftPlayerBoard({
   myTeamId,
   draftId,
   filteredPlayers,
+  myTeam,
+  positionCounts: _positionCounts,
   watchlist,
   queuedPlayerIds,
   autoPickTeamIds,
@@ -153,6 +164,12 @@ export function DraftPlayerBoard({
     [statsLookup],
   );
 
+  const showSearchControls =
+    viewMode === 'grid' ||
+    viewMode === 'list' ||
+    viewMode === 'compact' ||
+    viewMode === 'table';
+
   return (
     <>
       <PlayerDetailModal
@@ -168,186 +185,130 @@ export function DraftPlayerBoard({
         aria-label="Player draft board"
         data-testid="draft-board"
       >
-        <div className="d-controls">
-          <div className="d-search-wrap">
-            <svg
-              className="d-search-icon"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+        {/* View tabs */}
+        <div className="d-view-tabs" role="tablist" aria-label="View mode">
+          {VIEW_TABS.map(({ mode, label }) => (
+            <button
+              key={mode}
+              className={`d-view-tab${viewMode === mode ? ' active' : ''}`}
+              role="tab"
+              aria-selected={viewMode === mode}
+              onClick={() => onSetViewMode(mode)}
             >
-              <circle cx="11" cy="11" r="8" />
-              <line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
-            <input
-              className="d-search-input"
-              type="text"
-              placeholder="Search available players..."
-              aria-label="Search players"
-              value={searchTerm}
-              onChange={(e) => onSetSearchTerm(e.target.value)}
-              style={searchTerm ? { paddingRight: 34 } : undefined}
-            />
-            {searchTerm ? (
-              <button
-                className="d-search-clear"
-                type="button"
-                aria-label="Clear search"
-                onClick={() => onSetSearchTerm('')}
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  width="14"
-                  height="14"
-                >
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
-            ) : availablePlayersLoading ? (
-              <span
-                style={{
-                  position: 'absolute',
-                  right: 12,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  display: 'inline-block',
-                  width: 14,
-                  height: 14,
-                  border: '2px solid rgba(197, 165, 90, 0.2)',
-                  borderTopColor: 'var(--d-accent)',
-                  borderRadius: '50%',
-                  animation: 'spin 0.8s linear infinite',
-                }}
-              />
-            ) : null}
-          </div>
-          <div
-            className="d-pills"
-            role="radiogroup"
-            aria-label="Filter by position"
-            onKeyDown={(e) => {
-              const idx = positions.indexOf(selectedPosition);
-              let next = idx;
-              if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-                e.preventDefault();
-                next = (idx + 1) % positions.length;
-              } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-                e.preventDefault();
-                next = (idx - 1 + positions.length) % positions.length;
-              } else if (e.key === 'Home') {
-                e.preventDefault();
-                next = 0;
-              } else if (e.key === 'End') {
-                e.preventDefault();
-                next = positions.length - 1;
-              }
-              if (next !== idx) {
-                onSetSelectedPosition(positions[next]);
-                e.currentTarget
-                  .querySelectorAll<HTMLButtonElement>('[role="radio"]')
-                  [next]?.focus();
-              }
-            }}
-          >
-            {positions.map((pos) => (
-              <button
-                key={pos}
-                className={`d-pill${selectedPosition === pos ? ' active' : ''}`}
-                onClick={() => onSetSelectedPosition(pos)}
-                role="radio"
-                aria-checked={selectedPosition === pos}
-                tabIndex={selectedPosition === pos ? 0 : -1}
-              >
-                {pos}
-              </button>
-            ))}
-          </div>
-          <div
-            className="d-views"
-            role="radiogroup"
-            aria-label="View mode"
-            onKeyDown={(e) => {
-              const idx = viewModes.indexOf(viewMode);
-              let next = idx;
-              if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-                e.preventDefault();
-                next = (idx + 1) % viewModes.length;
-              } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-                e.preventDefault();
-                next = (idx - 1 + viewModes.length) % viewModes.length;
-              } else if (e.key === 'Home') {
-                e.preventDefault();
-                next = 0;
-              } else if (e.key === 'End') {
-                e.preventDefault();
-                next = viewModes.length - 1;
-              }
-              if (next !== idx) {
-                onSetViewMode(viewModes[next]);
-                e.currentTarget
-                  .querySelectorAll<HTMLButtonElement>('[role="radio"]')
-                  [next]?.focus();
-              }
-            }}
-          >
-            {viewModes.map((mode) => {
-              const isUserAutoPick =
-                mode === 'board' &&
-                myTeamId !== null &&
-                autoPickTeamIds.has(String(myTeamId));
-              return (
-                <button
-                  key={mode}
-                  className={`d-view-btn${viewMode === mode ? ' active' : ''}`}
-                  onClick={() => onSetViewMode(mode)}
-                  role="radio"
-                  aria-checked={viewMode === mode}
-                  tabIndex={viewMode === mode ? 0 : -1}
-                  title={
-                    isUserAutoPick
-                      ? 'Board view — your team is on auto-pick'
-                      : VIEW_MODE_TITLES[mode]
-                  }
-                  style={{ position: 'relative' }}
-                >
-                  {mode === 'grid'
-                    ? '⊞'
-                    : mode === 'list'
-                      ? '☰'
-                      : mode === 'compact'
-                        ? '⋯'
-                        : '▦'}
-                  {isUserAutoPick && (
-                    <span
-                      aria-label="auto-pick active"
-                      role="img"
-                      style={{
-                        position: 'absolute',
-                        top: -4,
-                        right: -4,
-                        fontSize: 9,
-                        lineHeight: 1,
-                        pointerEvents: 'none',
-                      }}
-                    >
-                      🤖
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+              {label}
+            </button>
+          ))}
         </div>
 
+        {/* Search + position filter — only for player pool views */}
+        {showSearchControls && (
+          <div className="d-controls">
+            <div className="d-search-wrap">
+              <svg
+                className="d-search-icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <input
+                className="d-search-input"
+                type="text"
+                placeholder="Search available players..."
+                aria-label="Search players"
+                value={searchTerm}
+                onChange={(e) => onSetSearchTerm(e.target.value)}
+                style={searchTerm ? { paddingRight: 34 } : undefined}
+              />
+              {searchTerm ? (
+                <button
+                  className="d-search-clear"
+                  type="button"
+                  aria-label="Clear search"
+                  onClick={() => onSetSearchTerm('')}
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    width="14"
+                    height="14"
+                  >
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              ) : availablePlayersLoading ? (
+                <span
+                  style={{
+                    position: 'absolute',
+                    right: 12,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    display: 'inline-block',
+                    width: 14,
+                    height: 14,
+                    border: '2px solid rgba(197, 165, 90, 0.2)',
+                    borderTopColor: 'var(--d-accent)',
+                    borderRadius: '50%',
+                    animation: 'spin 0.8s linear infinite',
+                  }}
+                />
+              ) : null}
+            </div>
+            <div
+              className="d-pills"
+              role="radiogroup"
+              aria-label="Filter by position"
+              onKeyDown={(e) => {
+                const idx = positions.indexOf(selectedPosition);
+                let next = idx;
+                if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                  e.preventDefault();
+                  next = (idx + 1) % positions.length;
+                } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                  e.preventDefault();
+                  next = (idx - 1 + positions.length) % positions.length;
+                } else if (e.key === 'Home') {
+                  e.preventDefault();
+                  next = 0;
+                } else if (e.key === 'End') {
+                  e.preventDefault();
+                  next = positions.length - 1;
+                }
+                if (next !== idx) {
+                  onSetSelectedPosition(positions[next]);
+                  e.currentTarget
+                    .querySelectorAll<HTMLButtonElement>('[role="radio"]')
+                    [next]?.focus();
+                }
+              }}
+            >
+              {positions.map((pos) => (
+                <button
+                  key={pos}
+                  className={`d-pill${selectedPosition === pos ? ' active' : ''}`}
+                  onClick={() => onSetSelectedPosition(pos)}
+                  role="radio"
+                  aria-checked={selectedPosition === pos}
+                  tabIndex={selectedPosition === pos ? 0 : -1}
+                >
+                  {pos}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Draft Board view */}
         {viewMode === 'board' && (
           <DraftGrid
             teams={boardOrderedTeams}
@@ -373,7 +334,218 @@ export function DraftPlayerBoard({
           />
         )}
 
-        {viewMode !== 'board' && (
+        {/* Data Table view */}
+        {viewMode === 'table' && (
+          <div className="d-data-table-wrap">
+            <table className="d-data-table">
+              <thead>
+                <tr>
+                  <th>Rank</th>
+                  <th>Player</th>
+                  <th>Pos</th>
+                  <th className="num">ADP</th>
+                  <th className="num">AVG</th>
+                  <th className="num">HR</th>
+                  <th className="num">RBI</th>
+                  <th className="num">SB</th>
+                  <th className="num">WAR</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {filteredPlayers.map((player, idx) => {
+                  const posColor = getPositionColor(player.position ?? '');
+                  return (
+                    <tr
+                      key={player.id}
+                      className={
+                        watchlistSet.has(player.id) ? 'watched' : undefined
+                      }
+                      onClick={() => handlePlayerClick(player.id)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <td
+                        className="num"
+                        style={{ color: 'var(--d-text-muted)', fontSize: 11 }}
+                      >
+                        {idx + 1}
+                      </td>
+                      <td>
+                        <span style={{ fontWeight: 600, fontSize: 13 }}>
+                          {player.name}
+                        </span>
+                      </td>
+                      <td>
+                        <span
+                          style={{
+                            display: 'inline-block',
+                            padding: '1px 5px',
+                            borderRadius: 3,
+                            fontSize: 10,
+                            fontWeight: 700,
+                            color: posColor,
+                            background: `${posColor}26`,
+                            fontFamily: "'Big Shoulders Display', sans-serif",
+                            letterSpacing: '0.06em',
+                          }}
+                        >
+                          {player.position ?? '?'}
+                        </span>
+                      </td>
+                      <td className="num">
+                        {(
+                          player as DraftPlayer & { adp?: number }
+                        ).adp?.toFixed(1) ?? '—'}
+                      </td>
+                      <td className="num">
+                        {(
+                          player as DraftPlayer & { avg?: number }
+                        ).avg?.toFixed(3) ?? '—'}
+                      </td>
+                      <td className="num">
+                        {(player as DraftPlayer & { hr?: number }).hr ?? '—'}
+                      </td>
+                      <td className="num">
+                        {(player as DraftPlayer & { rbi?: number }).rbi ?? '—'}
+                      </td>
+                      <td className="num">
+                        {(player as DraftPlayer & { sb?: number }).sb ?? '—'}
+                      </td>
+                      <td className="num">
+                        {(
+                          player as DraftPlayer & { war?: number }
+                        ).war?.toFixed(1) ?? '—'}
+                      </td>
+                      <td>
+                        {(commPickMode ? isOwner : isMyPick) && (
+                          <button
+                            className="d-state-btn"
+                            style={{ padding: '3px 10px', fontSize: 11 }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDraftPlayer(player.id);
+                            }}
+                            disabled={pickLoading}
+                          >
+                            Draft
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {filteredPlayers.length === 0 && !availablePlayersLoading && (
+                  <tr>
+                    <td
+                      colSpan={10}
+                      style={{
+                        textAlign: 'center',
+                        padding: '40px 20px',
+                        color: 'var(--d-text-muted)',
+                      }}
+                    >
+                      {searchTerm
+                        ? 'No players match your search'
+                        : 'All available players have been drafted'}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* My Depth Chart view */}
+        {viewMode === 'depth' && (
+          <div className="d-depth-grid">
+            {DEPTH_SLOTS.map(({ pos, label, slots }) => {
+              const drafted = myTeam
+                .filter((p) =>
+                  pos === 'U'
+                    ? !(
+                        p.position &&
+                        ['C', '1B', '2B', '3B', 'SS', 'OF', 'P'].includes(
+                          p.position,
+                        )
+                      )
+                    : p.position === pos,
+                )
+                .slice(0, slots);
+              const posColor = getPositionColor(pos);
+              return (
+                <div key={pos} className="d-depth-slot">
+                  <div
+                    className="d-depth-slot-head"
+                    style={{ borderColor: posColor, color: posColor }}
+                  >
+                    {label}
+                  </div>
+                  {Array.from({ length: slots }).map((_, i) => {
+                    const player = drafted[i];
+                    return (
+                      <div
+                        key={i}
+                        className={`d-depth-row${player ? ' filled' : ' empty'}`}
+                      >
+                        {player ? (
+                          <>
+                            <span
+                              style={{
+                                fontWeight: 600,
+                                fontSize: 12,
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {player.name}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: 10,
+                                color: 'var(--d-text-muted)',
+                                flexShrink: 0,
+                              }}
+                            >
+                              {player.position}
+                            </span>
+                          </>
+                        ) : (
+                          <span
+                            style={{
+                              fontSize: 11,
+                              color: 'var(--d-text-muted)',
+                              fontStyle: 'italic',
+                            }}
+                          >
+                            Empty
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+            {myTeam.length === 0 && (
+              <div
+                style={{
+                  gridColumn: '1 / -1',
+                  textAlign: 'center',
+                  padding: '60px 20px',
+                  color: 'var(--d-text-muted)',
+                }}
+              >
+                <div style={{ fontSize: 13 }}>No players drafted yet</div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Cards / List / Compact view */}
+        {(viewMode === 'grid' ||
+          viewMode === 'list' ||
+          viewMode === 'compact') && (
           <>
             <div
               className="d-player-grid"

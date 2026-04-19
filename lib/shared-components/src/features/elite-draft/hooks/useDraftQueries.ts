@@ -47,7 +47,7 @@ interface UseDraftQueriesParams {
   draftOrderMissing: boolean;
   playerSearch: string;
   selectedPosition: string;
-  viewMode: 'grid' | 'list' | 'compact' | 'board';
+  viewMode: 'grid' | 'list' | 'compact' | 'board' | 'table' | 'depth';
   wsConnected: boolean;
 }
 
