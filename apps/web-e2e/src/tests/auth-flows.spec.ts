@@ -872,7 +872,9 @@ expiredSessionTest.describe('Session Expiry @critical', () => {
       // The authenticated app nav contains "My Leagues" — not present on the
       // landing page that auth guard shows for expired sessions (PR #2877 added
       // aria-label="Primary" to the landing nav too, so nav container is ambiguous).
-      await expect(page.getByText(/my leagues/i)).not.toBeVisible();
+      // Use .first() because the nav renders the league chip in both desktop and
+      // mobile header slots (both in DOM, CSS-toggled), so two matches exist.
+      await expect(page.getByText(/my leagues/i).first()).not.toBeVisible();
     },
   );
 });

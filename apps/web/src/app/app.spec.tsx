@@ -233,6 +233,27 @@ jest.mock('../components/scoreboard/ScoreboardTicker', () => ({
   ScoreboardTicker: () => null,
 }));
 
+// Mock new nav components that use Apollo query hooks (require an ApolloProvider)
+jest.mock('../components/layout/LeagueSwitcherChip', () => ({
+  LeagueSwitcherChip: () => <div>League Switcher</div>,
+}));
+
+jest.mock('../components/layout/NavPillTabs', () => ({
+  NavPillTabs: () => <nav>Nav Tabs</nav>,
+}));
+
+jest.mock('../components/layout/HelpMenuButton', () => ({
+  HelpMenuButton: () => <button>Help</button>,
+}));
+
+jest.mock('../components/layout/MobileBottomBar', () => ({
+  MobileBottomBar: () => null,
+}));
+
+jest.mock('../components/layout/MobileNavDrawer', () => ({
+  MobileNavDrawer: () => null,
+}));
+
 describe('App', () => {
   beforeEach(() => {
     // Clear any timers between tests
@@ -497,8 +518,8 @@ describe('App', () => {
       // Verify navigation is present
       const homeLink = container.querySelector('[href="/"]');
       expect(homeLink).toBeInTheDocument();
-      // Sports dropdown should be present (football link is now in a dropdown)
-      expect(container).toHaveTextContent('Sports');
+      // League switcher chip should be present in the nav
+      expect(container).toHaveTextContent('League Switcher');
     });
 
     it('should match football screen snapshot', () => {
@@ -539,8 +560,8 @@ describe('App', () => {
       // Should show navigation links
       const homeLink = container.querySelector('[href="/"]');
       expect(homeLink).toBeInTheDocument();
-      // Sports dropdown should be present (football link is now in a dropdown)
-      expect(container).toHaveTextContent('Sports');
+      // League switcher chip should be present in the nav
+      expect(container).toHaveTextContent('League Switcher');
 
       // Should show authenticated content instead of OAuth login
       expect(container).toHaveTextContent('User Profile Dropdown');

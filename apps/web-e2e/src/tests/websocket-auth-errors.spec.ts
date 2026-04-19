@@ -253,7 +253,7 @@ test.describe('WebSocket – authentication failures @regression', () => {
     await expect.poll(() => connectionAttempted, { timeout: 5000 }).toBe(true);
 
     // League content should still render despite WS auth failure
-    await expect(page.getByText('Auth Test League')).toBeVisible();
+    await expect(page.getByText('Auth Test League').first()).toBeVisible();
     // No uncaught error overlay
     await expect(page.locator('body')).not.toContainText(
       'Unexpected Application Error',
@@ -281,7 +281,7 @@ test.describe('WebSocket – authentication failures @regression', () => {
     await expect.poll(() => connectionAttempted, { timeout: 5000 }).toBe(true);
 
     // League content should still render despite WS auth failure
-    await expect(page.getByText('Auth Test League')).toBeVisible();
+    await expect(page.getByText('Auth Test League').first()).toBeVisible();
     // No uncaught error overlay
     await expect(page.locator('body')).not.toContainText(
       'Unexpected Application Error',
@@ -309,7 +309,7 @@ test.describe('WebSocket – authentication failures @regression', () => {
     await expect.poll(() => connectionAttempted, { timeout: 5000 }).toBe(true);
 
     // League content should still render even when WS closes immediately
-    await expect(page.getByText('Auth Test League')).toBeVisible();
+    await expect(page.getByText('Auth Test League').first()).toBeVisible();
     // No uncaught error overlay
     await expect(page.locator('body')).not.toContainText(
       'Unexpected Application Error',

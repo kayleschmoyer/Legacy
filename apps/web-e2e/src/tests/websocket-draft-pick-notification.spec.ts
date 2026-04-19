@@ -344,7 +344,9 @@ test.describe('WebSocket – DRAFT_PICK_MADE notification @regression', () => {
     await page.goto(LEAGUE_URL);
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Draft Pick Test League')).toBeVisible();
+    await expect(
+      page.getByText('Draft Pick Test League').first(),
+    ).toBeVisible();
 
     const route = await ws.waitForConnection();
 
@@ -352,7 +354,9 @@ test.describe('WebSocket – DRAFT_PICK_MADE notification @regression', () => {
     route.send(draftPickMadeNotification());
 
     // Page should remain functional — no crash overlay
-    await expect(page.getByText('Draft Pick Test League')).toBeVisible();
+    await expect(
+      page.getByText('Draft Pick Test League').first(),
+    ).toBeVisible();
     await expect(page.locator('body')).not.toContainText(
       'Unexpected Application Error',
     );
@@ -367,7 +371,9 @@ test.describe('WebSocket – DRAFT_PICK_MADE notification @regression', () => {
     await page.goto(LEAGUE_URL);
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Draft Pick Test League')).toBeVisible();
+    await expect(
+      page.getByText('Draft Pick Test League').first(),
+    ).toBeVisible();
 
     const route = await ws.waitForConnection();
 
@@ -415,7 +421,9 @@ test.describe('WebSocket – DRAFT_PICK_MADE notification @regression', () => {
     );
 
     // Page should remain stable after all picks
-    await expect(page.getByText('Draft Pick Test League')).toBeVisible();
+    await expect(
+      page.getByText('Draft Pick Test League').first(),
+    ).toBeVisible();
     await expect(page.locator('body')).not.toContainText(
       'Unexpected Application Error',
     );
@@ -435,7 +443,9 @@ test.describe('WebSocket – DRAFT_PICK_MADE notification @regression', () => {
     await page.goto(LEAGUE_URL);
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Draft Pick Test League')).toBeVisible();
+    await expect(
+      page.getByText('Draft Pick Test League').first(),
+    ).toBeVisible();
 
     const route = await ws.waitForConnection();
 
@@ -443,7 +453,9 @@ test.describe('WebSocket – DRAFT_PICK_MADE notification @regression', () => {
     route.send(draftPickMadeNotification());
 
     // Page should remain functional — no crash
-    await expect(page.getByText('Draft Pick Test League')).toBeVisible();
+    await expect(
+      page.getByText('Draft Pick Test League').first(),
+    ).toBeVisible();
     await expect(page.locator('body')).not.toContainText(
       'Unexpected Application Error',
     );
@@ -458,7 +470,9 @@ test.describe('WebSocket – DRAFT_PICK_MADE notification @regression', () => {
     await page.goto(LEAGUE_URL);
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Draft Pick Test League')).toBeVisible();
+    await expect(
+      page.getByText('Draft Pick Test League').first(),
+    ).toBeVisible();
 
     const route = await ws.waitForConnection();
 
@@ -480,7 +494,9 @@ test.describe('WebSocket – DRAFT_PICK_MADE notification @regression', () => {
     );
 
     // Page should remain stable — foreign-league event must not crash
-    await expect(page.getByText('Draft Pick Test League')).toBeVisible();
+    await expect(
+      page.getByText('Draft Pick Test League').first(),
+    ).toBeVisible();
     await expect(page.locator('body')).not.toContainText(
       'Unexpected Application Error',
     );

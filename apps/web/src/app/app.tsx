@@ -1,42 +1,20 @@
-import React, {
-  Suspense,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from '@legacy-sports/shared-components/auth';
-import {
-  Button,
-  Paragraph,
-  XStack,
-  YStack,
-} from '@legacy-sports/shared-components/ui';
+import { Paragraph, XStack, YStack } from '@legacy-sports/shared-components/ui';
 import { FootballScreen } from '@legacy-sports/shared-components/sports';
 import { PlayersScreen } from '@legacy-sports/shared-components/players';
 import { styled } from 'tamagui';
-import {
-  Activity,
-  BarChart2,
-  Circle,
-  Gamepad2,
-  Globe,
-  HelpCircle,
-  Info,
-  Menu,
-  Tag,
-  Users,
-  X,
-} from '@tamagui/lucide-icons';
+import { Menu } from '@tamagui/lucide-icons';
 import { lazyWithRetry } from '../utils/lazyWithRetry';
 import { UserProfileDropdown } from '../components/layout/UserProfileDropdown';
-import { SportsDropdown } from '../components/layout/SportsDropdown';
-import { PlayersDropdown } from '../components/layout/PlayersDropdown';
-
-import { MyLeaguesDropdown } from '../components/layout/MyLeaguesDropdown';
 import { BugReportButton } from '../components/layout/BugReportButton';
 import { NotificationDropdown } from '../components/layout/NotificationDropdown';
+import { LeagueSwitcherChip } from '../components/layout/LeagueSwitcherChip';
+import { NavPillTabs } from '../components/layout/NavPillTabs';
+import { HelpMenuButton } from '../components/layout/HelpMenuButton';
+import { MobileBottomBar } from '../components/layout/MobileBottomBar';
+import { MobileNavDrawer } from '../components/layout/MobileNavDrawer';
 import { GlobalAnnouncer } from '../components/a11y/GlobalAnnouncer';
 import { usePageTracking } from '../hooks/usePageTracking';
 import { useRouteAnnouncer } from '../hooks/useRouteAnnouncer';
@@ -45,8 +23,7 @@ import { useWebPushRegistration } from '../hooks/useWebPushRegistration';
 import { ImpersonationBanner } from '../components/ImpersonationBanner';
 import { ApolloErrorToast } from '../components/layout/ApolloErrorToast';
 import { ScoreboardTicker } from '../components/scoreboard/ScoreboardTicker';
-
-import { NAV_BUTTON_MIN_WIDTH, NAV_Z_INDEX } from '../constants/dimensions';
+import { NAV_Z_INDEX } from '../constants/dimensions';
 
 /* ────────────────────────────────────────────────────────
  * Lazy-loaded routes — these pages are split into separate
@@ -183,411 +160,197 @@ const StandingsRedirectPage = lazyWithRetry(() =>
 );
 
 /* ────────────────────────────────────────────────────────
- * Modern Header – styled components
+ * Nav – styled components
  * ──────────────────────────────────────────────────────── */
 
-/** Gradient accent bar at the very top of the page */
-const AccentBar = styled(YStack, {
-  height: 3,
-  width: '100%',
-  // gradient applied via inline style (Tamagui doesn't support CSS gradients natively)
-});
-
 const NavContainer = styled(YStack, {
-  backgroundColor: 'rgba(10,15,26,0.75)',
+  backgroundColor: 'rgba(10,15,26,0.78)',
   borderBottomWidth: 1,
   borderBottomColor: '$borderColor',
 });
 
 const NavContent = styled(XStack, {
   alignItems: 'center',
-  justifyContent: 'space-between',
   maxWidth: 1280,
   width: '100%',
   alignSelf: 'center',
   paddingHorizontal: '$5',
-  paddingVertical: '$4',
+  paddingVertical: '$3',
   gap: '$4',
-});
-
-const NavLinks = styled(XStack, {
-  alignItems: 'center',
-  gap: '$3',
-  justifyContent: 'center',
-  minWidth: 0,
-  flexWrap: 'nowrap',
-  // Explicit overflow: visible ensures dropdown menus extending below the nav
-  // are not clipped (CSS default, but stated for clarity).
-  overflow: 'visible',
-});
-
-/** Square-edged nav link button with active bottom-border indicator */
-const NavLinkButton = styled(Button, {
-  size: '$3',
-  borderRadius: '$2',
-  backgroundColor: 'transparent',
-  borderWidth: 0,
-  borderBottomWidth: 2,
-  borderBottomColor: 'transparent',
-  paddingHorizontal: '$4',
-  gap: '$2',
-  flexShrink: 0,
-  minWidth: NAV_BUTTON_MIN_WIDTH,
-  hoverStyle: {
-    backgroundColor: '$color3',
-  },
-  pressStyle: {
-    backgroundColor: '$color4',
-    scale: 0.97,
-  },
-  variants: {
-    active: {
-      true: {
-        borderBottomColor: '$brandNavy',
-        fontWeight: '600',
-      },
-    },
-  } as const,
-});
-
-/** Hamburger / mobile menu button */
-const MobileMenuButton = styled(Button, {
-  display: 'flex',
-  $gtMd: { display: 'none' },
-  backgroundColor: 'transparent',
-  borderWidth: 0,
-  padding: '$2',
-  borderRadius: '$4',
-  hoverStyle: {
-    backgroundColor: '$color3',
-  },
-});
-
-/** Mobile slide-down nav panel */
-const MobileNavPanel = styled(YStack, {
-  display: 'flex',
-  $gtMd: { display: 'none' },
-  backgroundColor: '$surfacePanel',
-  borderBottomWidth: 1,
-  borderBottomColor: '$borderColor',
-  paddingHorizontal: '$5',
-  paddingVertical: '$4',
-  gap: '$2',
-});
-
-const MobileNavLink = styled(Button, {
-  justifyContent: 'flex-start',
-  backgroundColor: 'transparent',
-  borderWidth: 0,
-  padding: '$3',
-  borderRadius: '$3',
-  width: '100%',
-  gap: '$3',
-  hoverStyle: {
-    backgroundColor: '$color3',
-  },
-  variants: {
-    active: {
-      true: {
-        backgroundColor: '$color3',
-        fontWeight: '600',
-      },
-    },
-  } as const,
 });
 
 /* ────────────────────────────────────────────────────────
  * Navigation component
  * ──────────────────────────────────────────────────────── */
 
+const FONT_DISPLAY = "'Big Shoulders Display', system-ui, sans-serif";
+
 function Navigation() {
-  const location = useLocation();
   const { isAuthenticated } = useAuth();
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const location = useLocation();
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [bugDialogOpen, setBugDialogOpen] = useState(false);
-  const mobileRef = useRef<HTMLDivElement>(null);
+  const [compact, setCompact] = useState(false);
 
-  const isActive = useCallback(
-    (path: string) => location.pathname === path,
-    [location.pathname],
-  );
-
-  // Close mobile menu on route change
+  // Condense nav when user scrolls down
   useEffect(() => {
-    setMobileOpen(false);
+    const handler = () => setCompact(window.scrollY > 80);
+    window.addEventListener('scroll', handler, { passive: true });
+    return () => window.removeEventListener('scroll', handler);
+  }, []);
+
+  // Close drawer on route change
+  useEffect(() => {
+    setDrawerOpen(false);
   }, [location.pathname]);
 
-  // Close mobile nav on outside click.
-  // Suppressed while the bug-report dialog is open because Dialog.Portal
-  // renders outside mobileRef, so any click inside the dialog would
-  // otherwise be treated as an outside click and collapse the nav panel.
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (bugDialogOpen) return;
-      if (mobileRef.current && !mobileRef.current.contains(e.target as Node)) {
-        setMobileOpen(false);
-      }
-    };
-    if (mobileOpen) {
-      document.addEventListener('mousedown', handler);
-      return () => document.removeEventListener('mousedown', handler);
-    }
-  }, [mobileOpen, bugDialogOpen]);
-
-  // Handle Escape key to close mobile nav
-  useEffect(() => {
-    if (!mobileOpen) return;
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setMobileOpen(false);
-      }
-    };
-    document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
-  }, [mobileOpen]);
+  if (!isAuthenticated) return null;
 
   return (
     <YStack
-      ref={mobileRef}
       role="banner"
       style={{ position: 'sticky', overflow: 'visible' }}
       top={0}
-      // NAV_Z_INDEX must exceed every secondary sticky element (e.g. CONTENT_STICKY_Z_INDEX)
-      // so the nav bar always remains above page content when both are sticky.
       zIndex={NAV_Z_INDEX}
     >
-      {/* Gradient accent strip */}
-      <AccentBar
-        style={{
-          background:
-            'linear-gradient(90deg, #1B3A5C 0%, #C41E3A 35%, #C5A55A 70%, #1B3A5C 100%)',
-        }}
+      <nav aria-label="Primary">
+        <NavContainer
+          style={{
+            backdropFilter: 'blur(16px) saturate(140%)',
+            WebkitBackdropFilter: 'blur(16px) saturate(140%)',
+            borderBottomColor: compact
+              ? 'rgba(31,45,72,0.6)'
+              : 'rgba(31,45,72,1)',
+          }}
+        >
+          {/* ── Desktop layout (hidden on mobile) ── */}
+          <NavContent display="none" $gtMd={{ display: 'flex' }}>
+            {/* Brand */}
+            <Link
+              to="/"
+              aria-label="Legacy Sports home"
+              style={{ textDecoration: 'none', flexShrink: 0 }}
+            >
+              <XStack alignItems="center" gap="$2" cursor="pointer">
+                <img
+                  src="/logo.png"
+                  alt="Legacy Sports"
+                  data-testid="header-logo"
+                  style={{
+                    height: compact ? 30 : 38,
+                    width: 'auto',
+                    display: 'block',
+                    transition: 'height 200ms ease',
+                  }}
+                />
+                {!compact && (
+                  <YStack
+                    gap={0}
+                    userSelect="none"
+                    data-testid="brand-text"
+                    style={{ lineHeight: 1 }}
+                  >
+                    <Paragraph
+                      marginBottom={0}
+                      style={{
+                        fontFamily: FONT_DISPLAY,
+                        fontWeight: '800',
+                        fontSize: 14,
+                        letterSpacing: '0.04em',
+                        lineHeight: 1,
+                        color: '#D4BB78',
+                      }}
+                    >
+                      LEGACY
+                    </Paragraph>
+                    <Paragraph
+                      marginBottom={0}
+                      style={{
+                        fontFamily: FONT_DISPLAY,
+                        fontWeight: '700',
+                        fontSize: 11,
+                        letterSpacing: '0.16em',
+                        lineHeight: 1,
+                        color: '#F8FAFC',
+                      }}
+                    >
+                      SPORTS
+                    </Paragraph>
+                  </YStack>
+                )}
+              </XStack>
+            </Link>
+
+            {/* League switcher */}
+            <LeagueSwitcherChip />
+
+            {/* Pill tabs — pushed right after the league switcher */}
+            <XStack style={{ marginLeft: 'auto' }}>
+              <NavPillTabs />
+            </XStack>
+
+            {/* Right cluster */}
+            <XStack alignItems="center" gap="$2" style={{ marginLeft: 0 }}>
+              <NotificationDropdown />
+              <HelpMenuButton onBugReport={() => setBugDialogOpen(true)} />
+              <UserProfileDropdown />
+            </XStack>
+          </NavContent>
+
+          {/* ── Mobile header (hidden on desktop) ── */}
+          <XStack
+            display="flex"
+            $gtMd={{ display: 'none' }}
+            alignItems="center"
+            gap="$3"
+            paddingHorizontal="$4"
+            paddingVertical="$3"
+          >
+            {/* Hamburger → drawer */}
+            <button
+              onClick={() => setDrawerOpen(true)}
+              aria-label="Open menu"
+              aria-expanded={drawerOpen}
+              style={{
+                background: 'transparent',
+                border: 0,
+                color: '#DEE6FF',
+                width: 36,
+                height: 36,
+                borderRadius: 9999,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                flexShrink: 0,
+              }}
+            >
+              <Menu size={20} />
+            </button>
+
+            {/* League chip */}
+            <LeagueSwitcherChip />
+
+            <div style={{ flex: 1 }} />
+
+            {/* Notifications */}
+            <NotificationDropdown />
+          </XStack>
+        </NavContainer>
+      </nav>
+
+      {/* Mobile drawer overlay */}
+      <MobileNavDrawer
+        isOpen={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        onBugReport={() => setBugDialogOpen(true)}
       />
 
-      {isAuthenticated && (
-        <nav aria-label="Primary">
-          <NavContainer
-            style={{
-              backdropFilter: 'blur(14px)',
-              WebkitBackdropFilter: 'blur(14px)',
-            }}
-          >
-            <NavContent>
-              {/* ── Brand ── */}
-              <XStack flex={1} alignItems="center" justifyContent="flex-start">
-                <Link
-                  to="/"
-                  aria-label="Legacy Sports home"
-                  style={{ textDecoration: 'none', flexShrink: 0 }}
-                >
-                  <XStack alignItems="center" gap="$2" cursor="pointer">
-                    <img
-                      src="/logo.png"
-                      alt="Legacy Sports"
-                      data-testid="header-logo"
-                      style={{ height: 38, width: 'auto', display: 'block' }}
-                    />
-                    <YStack
-                      gap={0}
-                      userSelect="none"
-                      data-testid="brand-text"
-                      style={{ lineHeight: 1 }}
-                    >
-                      <Paragraph
-                        marginBottom={0}
-                        style={{
-                          fontFamily:
-                            "'Big Shoulders Display', system-ui, sans-serif",
-                          fontWeight: '800',
-                          fontSize: 14,
-                          letterSpacing: '0.04em',
-                          lineHeight: 1,
-                          color: '#D4BB78',
-                        }}
-                      >
-                        LEGACY
-                      </Paragraph>
-                      <Paragraph
-                        marginBottom={0}
-                        style={{
-                          fontFamily:
-                            "'Big Shoulders Display', system-ui, sans-serif",
-                          fontWeight: '700',
-                          fontSize: 11,
-                          letterSpacing: '0.16em',
-                          lineHeight: 1,
-                          color: '#F8FAFC',
-                        }}
-                      >
-                        SPORTS
-                      </Paragraph>
-                    </YStack>
-                  </XStack>
-                </Link>
-              </XStack>
-
-              {/* ── Desktop Navigation ── */}
-              <NavLinks display="none" $gtMd={{ display: 'flex' }}>
-                <SportsDropdown />
-                <PlayersDropdown />
-                <MyLeaguesDropdown />
-
-                <Link
-                  to="/games/season-draft"
-                  style={{ textDecoration: 'none', flexShrink: 0 }}
-                  aria-label="Games"
-                  aria-current={
-                    location.pathname.startsWith('/games') ? 'page' : undefined
-                  }
-                >
-                  <NavLinkButton
-                    active={location.pathname.startsWith('/games')}
-                  >
-                    <XStack alignItems="center" gap="$2">
-                      <Gamepad2 size={15} />
-                      <Paragraph marginBottom={0}>Games</Paragraph>
-                    </XStack>
-                  </NavLinkButton>
-                </Link>
-              </NavLinks>
-
-              {/* ── Right section ── */}
-              <XStack
-                flex={1}
-                alignItems="center"
-                justifyContent="flex-end"
-                gap="$3"
-              >
-                {/* Hide bug-report on narrow viewports to keep hamburger in viewport */}
-                <XStack display="none" $gtMd={{ display: 'flex' }}>
-                  <BugReportButton />
-                </XStack>
-                <NotificationDropdown />
-                <UserProfileDropdown />
-
-                {/* Mobile hamburger */}
-                <MobileMenuButton
-                  onPress={() => setMobileOpen((o) => !o)}
-                  aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
-                  aria-expanded={mobileOpen}
-                >
-                  {mobileOpen ? <X size={22} /> : <Menu size={22} />}
-                </MobileMenuButton>
-              </XStack>
-            </NavContent>
-          </NavContainer>
-
-          {/* ── Mobile Navigation Panel ── */}
-          {mobileOpen && (
-            <MobileNavPanel role="navigation" aria-label="Mobile navigation">
-              <Link to="/football" style={{ textDecoration: 'none' }}>
-                <MobileNavLink
-                  active={isActive('/football')}
-                  onPress={() => setMobileOpen(false)}
-                >
-                  <Activity size={16} />
-                  <Paragraph marginBottom={0}>Football</Paragraph>
-                </MobileNavLink>
-              </Link>
-              <Link to="/baseball" style={{ textDecoration: 'none' }}>
-                <MobileNavLink
-                  active={location.pathname.startsWith('/baseball')}
-                  onPress={() => setMobileOpen(false)}
-                >
-                  <Circle size={16} />
-                  <Paragraph marginBottom={0}>Baseball</Paragraph>
-                </MobileNavLink>
-              </Link>
-              <Link to="/baseball/leagues" style={{ textDecoration: 'none' }}>
-                <MobileNavLink
-                  active={isActive('/baseball/leagues')}
-                  onPress={() => setMobileOpen(false)}
-                >
-                  <Globe size={16} />
-                  <Paragraph marginBottom={0}>Browse Leagues</Paragraph>
-                </MobileNavLink>
-              </Link>
-              <Link to="/players" style={{ textDecoration: 'none' }}>
-                <MobileNavLink
-                  active={isActive('/players')}
-                  onPress={() => setMobileOpen(false)}
-                >
-                  <Users size={16} />
-                  <Paragraph marginBottom={0}>Players</Paragraph>
-                </MobileNavLink>
-              </Link>
-              <Link to="/players/stats" style={{ textDecoration: 'none' }}>
-                <MobileNavLink
-                  active={isActive('/players/stats')}
-                  onPress={() => setMobileOpen(false)}
-                >
-                  <BarChart2 size={16} />
-                  <Paragraph marginBottom={0}>Player Stats</Paragraph>
-                </MobileNavLink>
-              </Link>
-              <Link to="/games/season-draft" style={{ textDecoration: 'none' }}>
-                <MobileNavLink
-                  active={location.pathname.startsWith('/games')}
-                  onPress={() => setMobileOpen(false)}
-                >
-                  <Gamepad2 size={16} />
-                  <Paragraph marginBottom={0}>Games</Paragraph>
-                </MobileNavLink>
-              </Link>
-              {/* Help & Info group */}
-              <YStack
-                borderTopWidth={1}
-                borderTopColor="$borderColor"
-                paddingTop="$2"
-                marginTop="$1"
-                gap="$1"
-              >
-                <Paragraph
-                  size="$2"
-                  color="$colorPress"
-                  paddingHorizontal="$3"
-                  paddingVertical="$1"
-                  fontWeight="600"
-                  textTransform="uppercase"
-                  letterSpacing={0.8}
-                >
-                  Help &amp; Info
-                </Paragraph>
-                <Link to="/about" style={{ textDecoration: 'none' }}>
-                  <MobileNavLink
-                    active={isActive('/about')}
-                    onPress={() => setMobileOpen(false)}
-                  >
-                    <Info size={16} />
-                    <Paragraph marginBottom={0}>About</Paragraph>
-                  </MobileNavLink>
-                </Link>
-                <Link to="/help" style={{ textDecoration: 'none' }}>
-                  <MobileNavLink
-                    active={isActive('/help')}
-                    onPress={() => setMobileOpen(false)}
-                  >
-                    <HelpCircle size={16} />
-                    <Paragraph marginBottom={0}>Help</Paragraph>
-                  </MobileNavLink>
-                </Link>
-                <Link to="/pricing" style={{ textDecoration: 'none' }}>
-                  <MobileNavLink
-                    active={isActive('/pricing')}
-                    onPress={() => setMobileOpen(false)}
-                  >
-                    <Tag size={16} />
-                    <Paragraph marginBottom={0}>Pricing</Paragraph>
-                  </MobileNavLink>
-                </Link>
-                <XStack paddingHorizontal="$3" paddingVertical="$1">
-                  <BugReportButton onDialogOpenChange={setBugDialogOpen} />
-                </XStack>
-              </YStack>
-            </MobileNavPanel>
-          )}
-        </nav>
-      )}
+      {/* Bug report dialog (controlled — no trigger button rendered) */}
+      <BugReportButton
+        controlledOpen={bugDialogOpen}
+        onDialogOpenChange={setBugDialogOpen}
+      />
     </YStack>
   );
 }
@@ -665,6 +428,9 @@ function App() {
         flex={1}
         padding="$4"
         $sm={{ padding: '$2' }}
+        // Extra bottom padding on mobile so content isn't hidden behind the fixed bottom bar
+        paddingBottom="$4"
+        $ltMd={{ paddingBottom: 80 }}
         id="main-content"
         data-testid="main-content"
         tabIndex={-1}
@@ -791,6 +557,10 @@ function App() {
             <Route path="/faq" element={<Navigate to="/pricing" replace />} />
           </Routes>
         </Suspense>
+      </YStack>
+      {/* Mobile bottom bar — fixed, hidden on desktop */}
+      <YStack display="flex" $gtMd={{ display: 'none' }}>
+        <MobileBottomBar />
       </YStack>
     </MainLayout>
   );

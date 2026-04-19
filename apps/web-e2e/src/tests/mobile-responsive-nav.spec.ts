@@ -1,5 +1,5 @@
 /**
- * E2E Tests: Mobile Responsive Navigation (LS-608)
+ * E2E Tests: Mobile Responsive Navigation (LS-608, updated LS-3692)
  *
  * Covers:
  *  - Hamburger button visibility: visible on mobile, hidden on desktop
@@ -112,9 +112,9 @@ test.describe('Mobile panel navigation links @critical', () => {
     );
   });
 
-  test('shows Baseball link @critical', async ({ page }) => {
+  test('shows Leagues section heading @critical', async ({ page }) => {
     const mobileNav = page.getByRole('navigation', { name: /mobile/i });
-    await expect(mobileNav.getByText(/baseball/i).first()).toBeVisible();
+    await expect(mobileNav.getByText(/^leagues$/i).first()).toBeVisible();
   });
 
   test('shows Players link @critical', async ({ page }) => {
@@ -122,60 +122,45 @@ test.describe('Mobile panel navigation links @critical', () => {
     await expect(mobileNav.getByText(/^players$/i)).toBeVisible();
   });
 
-  test('shows Games link @critical', async ({ page }) => {
+  test('shows Minigames link @critical', async ({ page }) => {
     const mobileNav = page.getByRole('navigation', { name: /mobile/i });
-    await expect(mobileNav.getByText(/^games$/i)).toBeVisible();
+    await expect(mobileNav.getByText(/minigames/i)).toBeVisible();
   });
 
-  test('shows About link in Help & Info section @regression', async ({
+  test('shows Stats link @regression', async ({ page }) => {
+    const mobileNav = page.getByRole('navigation', { name: /mobile/i });
+    await expect(mobileNav.getByText(/^stats$/i)).toBeVisible();
+  });
+
+  test('shows Help & support link in You section @regression', async ({
     page,
   }) => {
     const mobileNav = page.getByRole('navigation', { name: /mobile/i });
-    await expect(mobileNav.getByText(/^about$/i)).toBeVisible();
+    await expect(mobileNav.getByText(/help.*support/i)).toBeVisible();
   });
 
-  test('shows Help link in Help & Info section @regression', async ({
-    page,
-  }) => {
+  test('shows You section heading @regression', async ({ page }) => {
     const mobileNav = page.getByRole('navigation', { name: /mobile/i });
-    await expect(mobileNav.getByText(/^help$/i)).toBeVisible();
-  });
-
-  test('shows Pricing link in Help & Info section @regression', async ({
-    page,
-  }) => {
-    const mobileNav = page.getByRole('navigation', { name: /mobile/i });
-    await expect(mobileNav.getByText(/^pricing$/i)).toBeVisible();
-  });
-
-  test('shows Player Stats link @regression', async ({ page }) => {
-    const mobileNav = page.getByRole('navigation', { name: /mobile/i });
-    await expect(mobileNav.getByText(/player stats/i)).toBeVisible();
-  });
-
-  test('shows Help & Info section heading @regression', async ({ page }) => {
-    const mobileNav = page.getByRole('navigation', { name: /mobile/i });
-    await expect(mobileNav.getByText(/help.*info/i)).toBeVisible();
+    await expect(mobileNav.getByText(/^you$/i)).toBeVisible();
   });
 });
 
 // ── Panel closes on link click ────────────────────────────────────────────
 
 test.describe('Mobile panel interaction: close on link click @regression', () => {
-  test('panel closes when About link is clicked @regression', async ({
+  test('panel closes when Players link is clicked @regression', async ({
     page,
   }) => {
     await page.setViewportSize(MOBILE_VIEWPORT);
-    // Start on /pricing (not / which has a presentation overlay blocking the button)
-    await page.goto('/pricing');
+    await page.goto('/about');
     await page.waitForLoadState('load');
 
     await page.getByRole('button', { name: /open menu/i }).click();
     const mobileNav = page.getByRole('navigation', { name: /mobile/i });
     await expect(mobileNav).toBeVisible({ timeout: 10000 });
 
-    await mobileNav.getByText(/^about$/i).click();
-    await expect(page).toHaveURL('/about');
+    await mobileNav.getByText(/^players$/i).click();
+    await expect(page).toHaveURL('/players');
 
     // Menu should close after clicking a link
     await expect(
