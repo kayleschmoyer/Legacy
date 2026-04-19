@@ -1,5 +1,5 @@
 import { expect, test } from '../fixtures/auth-enhanced';
-import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import { mockLeague } from '../mocks/graphql/league.mocks';
 
 interface GraphQLRequest {
   query: string;
@@ -54,45 +54,17 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
     ) {
       return {
         data: {
-          league: {
-            __typename: 'League',
+          league: mockLeague({
             id: testLeagueId,
-            name: 'Test League',
-            description: 'A test league for GraphQL integration testing',
-            owner: 1,
-            maxRosterSize: 25,
-            draftStatus: 'not-started',
-            currentMatchup: null,
-            currentWeekNumber: null,
-            numberOfTeams: 10,
-            playerPool: 'all',
-            draftMode: 'live',
-            selectionMethod: 'standard',
-            draftOrder: 'snake',
-            isPublic: false,
-            maxBatters: 14,
-            maxPitchers: 9,
-            tradingEnabled: true,
-            waiverEnabled: true,
-            startDate: null,
-            logoUrl: null,
-            bannerUrl: null,
-            primaryColor: null,
-            secondaryColor: null,
-            inviteCode: 'TEST1234',
             userMembership: {
               __typename: 'LeagueMember',
               leagueId: testLeagueId,
               userId: 1,
               teamId: 1,
-              permissionLevel: 'owner',
+              permissionLevel: 'commissioner',
               username: 'testuser',
             },
-            gamesPerMatchup: 1,
-            totalMatchups: null,
-            playoffEnabled: false,
-            frozenAt: null,
-          },
+          }),
         },
       };
     }
@@ -104,12 +76,16 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
             __typename: 'Draft',
             id: 1,
             leagueId: testLeagueId,
-            status: 'queued',
-            currentRound: 1,
-            currentPick: 1,
-            totalRounds: 25,
-            draftMode: 'live',
+            draftMode: 'automated',
+            selectionMethod: 'standard',
             draftOrder: 'snake',
+            currentPick: 0,
+            pickTimeLimitSeconds: 120,
+            currentPickDeadline: null,
+            draftStartedAt: new Date().toISOString(),
+            draftCompletedAt: null,
+            // status is derived from league.draftStatus, not a draft field
+            status: 'queued',
           },
         },
       };
@@ -220,9 +196,8 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
             const mockResponse = buildMockResponse(body);
 
             if (mockResponse === null) {
-              // Unknown operation — fall through to the baseline
-              // _apiIsolation fixture for app shell queries
-              await unmockedGraphQLFallback(route);
+              // Unknown operation — fall through to the _apiIsolation baseline fixture
+              await route.fallback();
               return;
             }
 
@@ -235,10 +210,10 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
               body: JSON.stringify(mockResponse),
             });
           } catch {
-            await unmockedGraphQLFallback(route);
+            await route.fallback();
           }
         } else {
-          await unmockedGraphQLFallback(route);
+          await route.fallback();
         }
       },
     );
@@ -332,7 +307,7 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
             const mockResponse = buildMockResponse(body);
 
             if (mockResponse === null) {
-              await unmockedGraphQLFallback(route);
+              await route.fallback();
               return;
             }
 
@@ -349,10 +324,10 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
               body: JSON.stringify(mockResponse),
             });
           } catch {
-            await unmockedGraphQLFallback(route);
+            await route.fallback();
           }
         } else {
-          await unmockedGraphQLFallback(route);
+          await route.fallback();
         }
       },
     );
@@ -456,7 +431,7 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
             // All other operations get normal mock responses
             const mockResponse = buildMockResponse(body);
             if (mockResponse === null) {
-              await unmockedGraphQLFallback(route);
+              await route.fallback();
               return;
             }
             await route.fulfill({
@@ -465,10 +440,10 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
               body: JSON.stringify(mockResponse),
             });
           } catch {
-            await unmockedGraphQLFallback(route);
+            await route.fallback();
           }
         } else {
-          await unmockedGraphQLFallback(route);
+          await route.fallback();
         }
       },
     );
@@ -572,7 +547,7 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
             const mockResponse = buildMockResponse(body);
 
             if (mockResponse === null) {
-              await unmockedGraphQLFallback(route);
+              await route.fallback();
               return;
             }
 
@@ -589,10 +564,10 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
               body: JSON.stringify(mockResponse),
             });
           } catch {
-            await unmockedGraphQLFallback(route);
+            await route.fallback();
           }
         } else {
-          await unmockedGraphQLFallback(route);
+          await route.fallback();
         }
       },
     );
