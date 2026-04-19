@@ -528,8 +528,9 @@ jobs:
             # merge config pointing to the common parent directory. Use printf with
             # a single-quoted format string so the JS payload is written verbatim —
             # no backslash escaping, no shell interpolation.
-            printf '%s\n' 'module.exports = { testDir: "apps/web-e2e/src" };' > playwright.merge.config.js
-            pnpm dlx playwright@1.58.2 merge-reports --reporter html -c playwright.merge.config.js ./all-blob-reports
+            # Include both HTML (for browsing) and JSON (machine-readable for agents).
+            printf '%s\n' 'module.exports = { testDir: "apps/web-e2e/src", reporter: [["html"], ["json", { outputFile: "test-results.json" }]] };' > playwright.merge.config.js
+            pnpm dlx playwright@1.58.2 merge-reports -c playwright.merge.config.js ./all-blob-reports
           else
             echo "has-report=false" >> $GITHUB_OUTPUT
             echo "No blob reports found — skipping deploy"
@@ -572,6 +573,7 @@ jobs:
           rm -rf "${DEST_DIR}"
           mkdir -p "${DEST_DIR}"
           cp -r ../playwright-report/. "${DEST_DIR}/"
+          [ -f ../test-results.json ] && cp ../test-results.json "${DEST_DIR}/test-results.json"
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -613,6 +615,7 @@ jobs:
           echo "## Playwright Report" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Report:** https://bkrupa.github.io/legacy-sports-deploys/playwright-report/$DEST/" >> $GITHUB_STEP_SUMMARY
+          echo "**JSON:** https://bkrupa.github.io/legacy-sports-deploys/playwright-report/$DEST/test-results.json" >> $GITHUB_STEP_SUMMARY
           echo "**Run:** https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
 
   # ---------------------------------------------------------------------------
