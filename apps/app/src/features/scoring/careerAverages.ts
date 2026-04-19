@@ -138,6 +138,7 @@ export function useCareerAverageStats(
     }
 
     let cancelled = false;
+    const controller = new AbortController();
     setLoading(true);
     setError(undefined);
 
@@ -151,6 +152,7 @@ export function useCareerAverageStats(
           query: GetPlayerCareerStats,
           variables: { playerId },
           fetchPolicy: 'cache-first',
+          context: { fetchOptions: { signal: controller.signal } },
         });
 
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
@@ -190,6 +192,7 @@ export function useCareerAverageStats(
 
     return () => {
       cancelled = true;
+      controller.abort();
     };
   }, [client, normalizedIds, records]);
 
