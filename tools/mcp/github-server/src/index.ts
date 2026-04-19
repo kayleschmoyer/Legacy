@@ -654,9 +654,20 @@ server.tool(
 // --- github_list_pr_comments ---
 server.tool(
   'github_list_pr_comments',
-  'Read general (top-level) comments on a PR or issue. Returns author, body, created_at, and updated_at for each comment. Use the optional since parameter (ISO 8601) to filter to comments posted after a given timestamp. Handles pagination automatically. Maps to GET /repos/{owner}/{repo}/issues/{number}/comments.',
+  'Read general (top-level) comments on a PR or issue. Returns author, body, created_at, and updated_at for each comment. Use the optional since parameter (ISO 8601) to filter to comments posted after a given timestamp. Handles pagination automatically. Maps to GET /repos/{owner}/{repo}/issues/{number}/comments. Pass the PR number as "prNumber" (preferred) or "number" (alias).',
   {
-    number: z.coerce.number().int().positive().describe('PR or issue number'),
+    prNumber: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('PR or issue number'),
+    number: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Alias for "prNumber" — use either, not both'),
     since: z
       .string()
       .optional()
@@ -664,7 +675,21 @@ server.tool(
         'ISO 8601 timestamp — only return comments posted at or after this time',
       ),
   },
-  async (params) => listPRComments(params),
+  async (params) => {
+    const prNum = params.prNumber ?? params.number;
+    if (!prNum) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: 'Missing required parameter: provide "prNumber" (or alias "number") with a positive integer PR or issue number.',
+          },
+        ],
+      };
+    }
+    return listPRComments({ number: prNum, since: params.since });
+  },
 );
 
 // --- github_list_pr_inline_comments ---
