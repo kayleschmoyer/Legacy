@@ -133,6 +133,7 @@ describe('stripe-webhook event handlers', () => {
   let mockHandleSubscriptionDowngrade: jest.Mock;
   let mockClearLeagueTierFreezes: jest.Mock;
   let mockSendGa4ServerEvent: jest.Mock;
+  let mockCustomerRetrieveFn: jest.Mock;
 
   beforeEach(() => {
     jest.resetModules();
@@ -176,6 +177,7 @@ describe('stripe-webhook event handlers', () => {
         stripeEvents: { eventId: 'eventId' },
         subscriptions: {
           stripeSubscriptionId: 'stripeSubscriptionId',
+          stripeCustomerId: 'stripeCustomerId',
           tier: 'tier',
           status: 'status',
           userId: 'userId',
@@ -195,7 +197,19 @@ describe('stripe-webhook event handlers', () => {
           items: { data: [{ current_period_end: 1700000000 }] },
         }),
       },
+      customers: {
+        // Default: customer metadata userId matches '42' used in the
+        // checkout.session.completed tests below. Individual tests override
+        // this via mockCustomerRetrieveFn.mockResolvedValueOnce(...) when
+        // they need to exercise the verification failure paths.
+        retrieve: jest.fn().mockResolvedValue({
+          id: 'cus_123',
+          deleted: false,
+          metadata: { userId: '42' },
+        }),
+      },
     };
+    mockCustomerRetrieveFn = mockStripeInstance.customers.retrieve;
     jest.doMock('stripe', () => jest.fn(() => mockStripeInstance));
 
     jest.doMock('./ga4', () => ({
@@ -228,6 +242,17 @@ describe('stripe-webhook event handlers', () => {
     // no-op: claimStripeEvent is handled by setupNotProcessed()
   }
 
+  /**
+   * Setup verifyCheckoutOwnership's DB lookup for an existing subscription
+   * row keyed on stripeCustomerId. By default returns no row, meaning the
+   * customer has no prior subscription tied to a different userId.
+   */
+  function setupOwnershipDbCheck(rows: unknown[] = []) {
+    mockRunWithInternalClient.mockImplementationOnce(
+      (_opts: unknown, cb: (db: unknown) => unknown) => cb(makeSelectDb(rows)),
+    );
+  }
+
   // ── checkout.session.completed ─────────────────────────────────────────────
 
   describe('checkout.session.completed', () => {
@@ -247,6 +272,8 @@ describe('stripe-webhook event handlers', () => {
       );
 
       setupNotProcessed();
+      // verifyCheckoutOwnership: no existing row for this customer
+      setupOwnershipDbCheck();
       // upsertSubscription: previous tier lookup (returns null — first purchase)
       mockRunWithInternalClient.mockImplementationOnce(
         (_opts: unknown, cb: (db: unknown) => unknown) => cb(makeSelectDb([])),
@@ -339,6 +366,9 @@ describe('stripe-webhook event handlers', () => {
       );
 
       setupNotProcessed();
+      // verifyCheckoutOwnership: existing row for this customer owned by the
+      // same userId (42) — ownership check passes.
+      setupOwnershipDbCheck([{ userId: 42 }]);
       // Previous tier = free (existing subscription)
       mockRunWithInternalClient.mockImplementationOnce(
         (_opts: unknown, cb: (db: unknown) => unknown) =>
@@ -363,6 +393,133 @@ describe('stripe-webhook event handlers', () => {
         expect.any(Object),
       );
       expect(mockHandleSubscriptionDowngrade).not.toHaveBeenCalled();
+    });
+
+    // ── Ownership verification (LS-2612) ─────────────────────────────────────
+    //
+    // The session.metadata.userId field is not trustworthy on its own — a
+    // compromised client, misconfigured endpoint, or client-side checkout
+    // could mint a session that credits another user with premium. The
+    // handler must cross-check against the Stripe customer's metadata and
+    // any pre-existing subscription row for that customer, and reject the
+    // event with 400 on mismatch.
+
+    /**
+     * Override the default Stripe customers.retrieve mock installed in
+     * beforeEach for the next call only. The default returns
+     * metadata.userId='42'; individual tests use this to simulate deleted
+     * customers, missing metadata, or mismatched userIds.
+     */
+    function mockCustomerRetrieve(payload: unknown) {
+      mockCustomerRetrieveFn.mockReset();
+      mockCustomerRetrieveFn.mockResolvedValue(payload);
+    }
+
+    it('returns 400 when Stripe customer metadata userId does not match session metadata userId', async () => {
+      mockConstructEvent.mockReturnValue(
+        fakeStripeEvent({
+          type: 'checkout.session.completed',
+          data: {
+            object: {
+              id: 'cs_123',
+              customer: 'cus_123',
+              subscription: 'sub_123',
+              metadata: { userId: '42' },
+            },
+          },
+        }),
+      );
+
+      setupNotProcessed();
+      // Customer belongs to a different user — attacker-style mismatch.
+      mockCustomerRetrieve({
+        id: 'cus_123',
+        deleted: false,
+        metadata: { userId: '99' },
+      });
+
+      const result = await handler(makeEvent());
+
+      expect(result.statusCode).toBe(400);
+      // No subscription upsert and no recordEvent were attempted — only the
+      // isEventProcessed select ran before the verification failure.
+      expect(mockRunWithInternalClient).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns 400 when Stripe customer is deleted', async () => {
+      mockConstructEvent.mockReturnValue(
+        fakeStripeEvent({
+          type: 'checkout.session.completed',
+          data: {
+            object: {
+              id: 'cs_123',
+              customer: 'cus_123',
+              subscription: 'sub_123',
+              metadata: { userId: '42' },
+            },
+          },
+        }),
+      );
+
+      setupNotProcessed();
+      mockCustomerRetrieve({ id: 'cus_123', deleted: true });
+
+      const result = await handler(makeEvent());
+
+      expect(result.statusCode).toBe(400);
+      expect(mockRunWithInternalClient).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns 400 when Stripe customer has no userId metadata', async () => {
+      mockConstructEvent.mockReturnValue(
+        fakeStripeEvent({
+          type: 'checkout.session.completed',
+          data: {
+            object: {
+              id: 'cs_123',
+              customer: 'cus_123',
+              subscription: 'sub_123',
+              metadata: { userId: '42' },
+            },
+          },
+        }),
+      );
+
+      setupNotProcessed();
+      mockCustomerRetrieve({ id: 'cus_123', deleted: false, metadata: {} });
+
+      const result = await handler(makeEvent());
+
+      expect(result.statusCode).toBe(400);
+      expect(mockRunWithInternalClient).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns 400 when existing subscription row for the customer belongs to a different user', async () => {
+      mockConstructEvent.mockReturnValue(
+        fakeStripeEvent({
+          type: 'checkout.session.completed',
+          data: {
+            object: {
+              id: 'cs_123',
+              customer: 'cus_123',
+              subscription: 'sub_123',
+              metadata: { userId: '42' },
+            },
+          },
+        }),
+      );
+
+      setupNotProcessed();
+      // Customer metadata matches the session's claimed userId (default mock
+      // returns '42'), but a pre-existing subscription row for the same
+      // Stripe customer is already bound to a different userId.
+      setupOwnershipDbCheck([{ userId: 7 }]);
+
+      const result = await handler(makeEvent());
+
+      expect(result.statusCode).toBe(400);
+      // isEventProcessed + ownership DB check — no upsert or recordEvent.
+      expect(mockRunWithInternalClient).toHaveBeenCalledTimes(2);
     });
   });
 

@@ -303,6 +303,96 @@ async function applyTierChangeSideEffects(
 
 // ── Event handlers ────────────────────────────────────────────────────────────
 
+/**
+ * Thrown when checkout.session.completed metadata cannot be verified against
+ * the Stripe customer record or an existing subscription row. The top-level
+ * handler catches this, logs to Rollbar, and returns 400 so the caller (or a
+ * compromised client attempting metadata injection) is alerted and the side
+ * effects of granting premium are skipped.
+ */
+class CheckoutOwnershipVerificationError extends Error {
+  constructor(
+    message: string,
+    public readonly context: Record<string, unknown>,
+  ) {
+    super(message);
+    this.name = 'CheckoutOwnershipVerificationError';
+  }
+}
+
+/**
+ * Cross-check that the userId in session.metadata actually owns the Stripe
+ * customer. Without this, anyone who can mint a checkout session with
+ * arbitrary metadata (compromised API key, client-side checkout, misconfigured
+ * endpoint) could credit another user with premium access.
+ *
+ * Two independent checks:
+ *   1. The Stripe customer's metadata.userId must match session.metadata.userId.
+ *      getOrCreateStripeCustomer always stamps this on customer creation, so a
+ *      missing or mismatched value is a strong signal of tampering.
+ *   2. If a subscription row already exists for this customer, its userId must
+ *      match the session's userId. This protects against a scenario where an
+ *      attacker reuses a legitimate customer ID but swaps the metadata.
+ */
+async function verifyCheckoutOwnership(
+  stripe: Stripe,
+  session: Stripe.Checkout.Session,
+  sessionUserId: number,
+  stripeCustomerId: string,
+): Promise<void> {
+  const customer = await stripe.customers.retrieve(stripeCustomerId);
+  if (customer.deleted) {
+    throw new CheckoutOwnershipVerificationError(
+      'Stripe customer is deleted — cannot verify ownership',
+      { sessionId: session.id, stripeCustomerId, sessionUserId },
+    );
+  }
+
+  const customerUserIdStr = customer.metadata?.['userId'];
+  if (!customerUserIdStr) {
+    throw new CheckoutOwnershipVerificationError(
+      'Stripe customer is missing userId metadata — cannot verify ownership',
+      { sessionId: session.id, stripeCustomerId, sessionUserId },
+    );
+  }
+
+  const customerUserId = parseInt(customerUserIdStr, 10);
+  if (isNaN(customerUserId) || customerUserId !== sessionUserId) {
+    throw new CheckoutOwnershipVerificationError(
+      'Session metadata userId does not match Stripe customer metadata userId',
+      {
+        sessionId: session.id,
+        stripeCustomerId,
+        sessionUserId,
+        customerUserIdStr,
+      },
+    );
+  }
+
+  const existing = await runWithInternalClient(getDbOptions(), async (db) => {
+    const rows = await db
+      .select({ userId: InternalSchema.subscriptions.userId })
+      .from(InternalSchema.subscriptions)
+      .where(
+        eq(InternalSchema.subscriptions.stripeCustomerId, stripeCustomerId),
+      )
+      .limit(1);
+    return rows[0] ?? null;
+  });
+
+  if (existing && existing.userId !== sessionUserId) {
+    throw new CheckoutOwnershipVerificationError(
+      'Session metadata userId does not match existing subscription row for Stripe customer',
+      {
+        sessionId: session.id,
+        stripeCustomerId,
+        sessionUserId,
+        existingUserId: existing.userId,
+      },
+    );
+  }
+}
+
 async function handleCheckoutSessionCompleted(
   session: Stripe.Checkout.Session,
 ): Promise<number | null> {
@@ -337,8 +427,14 @@ async function handleCheckoutSessionCompleted(
     return null;
   }
 
-  // Retrieve the subscription from Stripe to get current status / period end
   const stripe = await getStripeClient();
+
+  // Verify the session's claimed userId actually owns the Stripe customer
+  // before granting premium. Throws CheckoutOwnershipVerificationError on
+  // mismatch; the top-level handler returns 400 + Rollbar alert.
+  await verifyCheckoutOwnership(stripe, session, userId, stripeCustomerId);
+
+  // Retrieve the subscription from Stripe to get current status / period end
   const subscription =
     await stripe.subscriptions.retrieve(stripeSubscriptionId);
 
@@ -898,6 +994,26 @@ const baseStripeWebhookHandler = async (
         });
     }
   } catch (err) {
+    if (err instanceof CheckoutOwnershipVerificationError) {
+      LOGGER.error(
+        'Checkout ownership verification failed — rejecting event',
+        err,
+        {
+          eventId: stripeEvent.id,
+          eventType: stripeEvent.type,
+          tags: {
+            lambda: 'stripe-webhook',
+            eventType: stripeEvent.type,
+            reason: 'ownership_verification_failed',
+          },
+          ...err.context,
+        },
+      );
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ error: 'Ownership verification failed' }),
+      };
+    }
     LOGGER.error(
       'Error processing Stripe webhook event',
       err instanceof Error ? err : new Error(String(err)),
