@@ -42,6 +42,7 @@ import { listPRComments } from './tools/list-pr-comments.js';
 import { listPRInlineComments } from './tools/list-pr-inline-comments.js';
 import { listReviewComments } from './tools/list-review-comments.js';
 import { getFileContent } from './tools/get-file-content.js';
+import { getBranchProtection } from './tools/get-branch-protection.js';
 
 // Node.js native fetch (undici) does not respect HTTPS_PROXY / GLOBAL_AGENT_HTTPS_PROXY
 // by default. In cloud sessions the egress proxy is required; set the global dispatcher
@@ -1323,6 +1324,21 @@ server.tool(
       .describe('Branch name, tag, or commit SHA (defaults to "main").'),
   },
   async (params) => getFileContent(params),
+);
+
+// --- github_get_branch_protection ---
+server.tool(
+  'github_get_branch_protection',
+  'Read branch protection rules and GitHub rulesets for a branch. Returns required status checks (from both classic protection and active rulesets), conversation resolution requirement, required review count, and a summary of all rulesets. Use this to diagnose why a PR is stuck in the merge queue or to understand which checks are truly required vs. informational.',
+  {
+    branch: z
+      .string()
+      .trim()
+      .min(1)
+      .default('main')
+      .describe('Branch name to query (default: "main").'),
+  },
+  async (params) => getBranchProtection(params),
 );
 
 // Start the server
