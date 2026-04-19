@@ -296,6 +296,33 @@ describe('stripe-webhook event handlers', () => {
       expect(mockRunWithInternalClient).toHaveBeenCalledTimes(1);
     });
 
+    it('returns 200 without processing when userId is a partial numeric string (e.g. "42abc")', async () => {
+      mockConstructEvent.mockReturnValue(
+        fakeStripeEvent({
+          type: 'checkout.session.completed',
+          data: {
+            object: {
+              id: 'cs_123',
+              customer: 'cus_123',
+              subscription: 'sub_123',
+              metadata: { userId: '42abc' },
+            },
+          },
+        }),
+      );
+
+      setupNotProcessed();
+      setupRecordEvent();
+
+      const result = await handler(makeEvent());
+
+      expect(result.statusCode).toBe(200);
+      // upsertSubscription must not run — only isEventProcessed + recordEvent
+      expect(mockRunWithInternalClient).toHaveBeenCalledTimes(2);
+      expect(mockClearLeagueTierFreezes).not.toHaveBeenCalled();
+      expect(mockHandleSubscriptionDowngrade).not.toHaveBeenCalled();
+    });
+
     it('triggers clearLeagueTierFreezes when new subscription activates (free→premium)', async () => {
       mockConstructEvent.mockReturnValue(
         fakeStripeEvent({

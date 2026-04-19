@@ -104,6 +104,14 @@ function tierFromStatus(status: string): 'free' | 'premium' {
   return status === 'active' || status === 'trialing' ? 'premium' : 'free';
 }
 
+// Strict userId parser — rejects partial numeric strings like '123abc' that
+// parseInt would silently coerce to 123.
+function parseUserId(value: string | undefined | null): number | null {
+  if (!value || !/^\d+$/.test(value)) return null;
+  const n = Number(value);
+  return Number.isInteger(n) && n > 0 ? n : null;
+}
+
 // ── DB helpers ────────────────────────────────────────────────────────────────
 
 /**
@@ -307,8 +315,8 @@ async function handleCheckoutSessionCompleted(
     return null;
   }
 
-  const userId = parseInt(userIdStr, 10);
-  if (isNaN(userId)) {
+  const userId = parseUserId(userIdStr);
+  if (userId === null) {
     LOGGER.warn('checkout.session.completed has invalid userId in metadata', {
       sessionId: session.id,
       userIdStr,
@@ -380,8 +388,7 @@ async function handleSubscriptionEvent(
   let userId: number | null = null;
 
   if (userIdStr) {
-    userId = parseInt(userIdStr, 10);
-    if (isNaN(userId)) userId = null;
+    userId = parseUserId(userIdStr);
   }
 
   if (userId === null) {
@@ -578,8 +585,7 @@ async function handleTrialWillEnd(
   const trialEndsAt = trialEnd ? new Date(trialEnd * 1000) : null;
 
   const userIdStr = subscription.metadata?.['userId'];
-  let userId: number | null = userIdStr ? parseInt(userIdStr, 10) : null;
-  if (userId !== null && isNaN(userId)) userId = null;
+  let userId: number | null = parseUserId(userIdStr);
 
   if (userId === null) {
     const existing = await runWithInternalClient(getDbOptions(), async (db) => {
