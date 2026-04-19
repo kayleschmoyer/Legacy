@@ -548,16 +548,21 @@ server.tool(
 // --- github_list_reviews ---
 server.tool(
   'github_list_reviews',
-  'List reviews on a PR. Useful for checking review status (e.g. whether Copilot has reviewed).',
+  'List reviews on a PR. Returns reviewer, state, submittedAt, bodyLength, and commentCount per review. Use to check whether Copilot APPROVED or COMMENTED, and whether inline comments exist (Copilot sometimes posts COMMENTED with 0 inline comments — a quirk that causes bot-review FAILURE but leaves no threads to fix).',
   {
     number: z.coerce.number().int().positive().describe('PR number'),
-    author: z
+    reviewer: z
       .string()
       .trim()
       .min(1)
       .optional()
       .describe(
         'Filter by reviewer login (e.g. "copilot-pull-request-reviewer[bot]")',
+      ),
+    latestOnly: coercedBoolean
+      .default(true)
+      .describe(
+        'When true (default), return only the most recent review per reviewer. Set false to return all reviews.',
       ),
   },
   async (params) => listReviews(params),
