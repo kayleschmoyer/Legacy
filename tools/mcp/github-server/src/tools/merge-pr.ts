@@ -117,12 +117,20 @@ export async function mergePR(params: MergePRParams): Promise<ToolResult> {
       ],
     };
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const isWorkflowScopeError =
+      message.includes('workflow') &&
+      (message.includes('without `workflow` scope') ||
+        message.includes("without 'workflow' scope") ||
+        message.includes('refusing to allow a Personal Access token'));
     return {
       isError: true,
       content: [
         {
           type: 'text',
-          text: `Failed to merge PR #${params.number} (strategy: ${params.strategy}): ${error instanceof Error ? error.message : String(error)}`,
+          text: isWorkflowScopeError
+            ? `Failed to merge PR #${params.number}: this PR modifies .github/workflows/ files and the configured PAT lacks the \`workflow\` OAuth scope. Ask the repo owner to either merge manually or add the \`workflow\` scope to the PAT in .env.local (GITHUB_TOKEN). Original error: ${message}`
+            : `Failed to merge PR #${params.number} (strategy: ${params.strategy}): ${message}`,
         },
       ],
     };

@@ -786,7 +786,7 @@ server.tool(
 // --- github_merge_pr ---
 server.tool(
   'github_merge_pr',
-  'Prefer this over `gh pr merge` via shell. Merge a PR. Default: merge queue (--auto --squash). "direct" uses --admin (requires authorization). Pass the PR number as "number" (preferred) or "prNumber" (alias).',
+  'Prefer this over `gh pr merge` via shell. Merge a PR. Default: merge queue (--auto --squash). "direct" uses --admin (requires authorization). Pass the PR number as "number" (preferred) or "prNumber" (alias). NOTE: PRs that modify .github/workflows/ files require the PAT to have the `workflow` OAuth scope — if the merge returns a 403 mentioning "workflow scope", escalate to the user to merge manually or reconfigure the token.',
   {
     number: z.coerce.number().int().positive().optional().describe('PR number'),
     prNumber: z.coerce
