@@ -6444,18 +6444,23 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               const verified = existsSync(join(nmPath, 'nx')) && binPopulated;
 
               if (verified) {
-                // Confirm accessibility from a fresh subprocess before returning
-                // success — same check as the creation path (LS-3580).
+                // Confirm that binaries are accessible through the symlink from a
+                // fresh subprocess — testing the container path alone (LS-3580) is
+                // not sufficient: a Windows SymbolicLink can appear as a valid
+                // container while pnpm cannot resolve binaries through it (LS-3689).
+                // Test .bin/tsx specifically because that is the binary the MCP
+                // stdio servers require and what the startup hook checks.
                 let alreadyExistsTestPath = false;
                 if (process.platform === 'win32') {
                   try {
+                    const tsxBin = join(nmPath, '.bin', 'tsx');
                     const testOut = execFileSync(
                       'powershell',
                       [
                         '-NoProfile',
                         '-NonInteractive',
                         '-Command',
-                        `Test-Path -LiteralPath '${nmPath.replace(/'/g, "''")}' -PathType Container`,
+                        `Test-Path -LiteralPath '${tsxBin.replace(/'/g, "''")}' -PathType Leaf`,
                       ],
                       { encoding: 'utf-8', timeout: 10_000 },
                     ).trim();
@@ -6491,8 +6496,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     ],
                   };
                 }
-                // Symlink exists per lstat but is not accessible from a fresh
-                // process — fall through to remove and recreate.
+                // Symlink exists per lstat but .bin/tsx is not accessible from a
+                // fresh process — stale symlink; fall through to remove and recreate.
               }
               // Symlink exists but .bin is empty, nx is missing, or not accessible — remove and recreate
             }
