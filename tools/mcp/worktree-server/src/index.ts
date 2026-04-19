@@ -1562,6 +1562,34 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
       },
     },
     {
+      name: 'worktree_install_recover',
+      description:
+        'Recover from a broken pnpm installation in a worktree that has an independent ' +
+        'node_modules (not a symlink). Runs the idempotent recovery sequence: ' +
+        '(1) kill-stale to release file locks, ' +
+        '(2) sweep orphan *_tmp_* directories that block reinstalls, ' +
+        '(3) retry pnpm install up to 3 times, removing EPERM/ENOTEMPTY/EBUSY offenders on each failure, ' +
+        '(4) if still failing, escalate to pnpm install --force. ' +
+        'Returns structured result with attempts made, paths cleaned, and final node_modules state. ' +
+        'Do NOT use on symlinked node_modules — use worktree_setup_node_modules() instead.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          worktree: {
+            type: 'string',
+            description:
+              'Ticket key, absolute path, or omit for active worktree.',
+          },
+          force: {
+            type: 'boolean',
+            description:
+              'Start with pnpm install --force instead of a normal install. ' +
+              'Useful when prior recovery attempts have already cleared orphan dirs.',
+          },
+        },
+      },
+    },
+    {
       name: 'worktree_unstage',
       description:
         'Remove files from the git staging area (index) without losing changes. ' +
@@ -6027,6 +6055,193 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           isError: true,
         };
       }
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_install_recover
+    // -----------------------------------------------------------------------
+    case 'worktree_install_recover': {
+      const { worktree: wtKey, force: forceFlag } = args as {
+        worktree?: string;
+        force?: boolean;
+      };
+
+      const target = resolveTargetDir(wtKey);
+      if ('error' in target) {
+        return {
+          content: [{ type: 'text', text: target.error }],
+          isError: true,
+        };
+      }
+
+      const cwd = target.path;
+      const nmPath = join(cwd, 'node_modules');
+
+      // Refuse to operate on symlinked node_modules — wrong tool for that job.
+      if (existsSync(nmPath)) {
+        const stat = lstatSync(nmPath);
+        if (stat.isSymbolicLink()) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(
+                  {
+                    success: false,
+                    message:
+                      'node_modules is a symlink to the main repo. ' +
+                      'Use worktree_setup_node_modules() to verify or repair it.',
+                  },
+                  null,
+                  2,
+                ),
+              },
+            ],
+            isError: true,
+          };
+        }
+      }
+
+      const steps: string[] = [];
+      const pathsCleaned: string[] = [];
+      let attempts = 0;
+      let installSuccess = false;
+
+      // Step 1: kill-stale to release file locks held by orphan node processes.
+      steps.push('$ make kill-stale');
+      try {
+        const killOut = run('make kill-stale', MAIN_REPO, { timeout: 30_000 });
+        steps.push(killOut.trim() || '(no output)');
+      } catch (err: unknown) {
+        const e = err as { stdout?: string; stderr?: string };
+        steps.push(
+          `kill-stale warning: ${[e.stdout, e.stderr].filter(Boolean).join(' ').trim() || String(err)}`,
+        );
+      }
+
+      // Step 2: sweep orphan *_tmp_* directories pnpm leaves behind on failed installs.
+      steps.push('Sweeping *_tmp_* directories in node_modules...');
+      if (existsSync(nmPath)) {
+        try {
+          const entries = readdirSync(nmPath, { withFileTypes: true });
+          for (const entry of entries) {
+            if (entry.isDirectory() && entry.name.includes('_tmp_')) {
+              const fullPath = join(nmPath, entry.name);
+              try {
+                rmSync(fullPath, { recursive: true, force: true });
+                pathsCleaned.push(fullPath);
+              } catch (rmErr: unknown) {
+                const re = rmErr as { message?: string };
+                steps.push(
+                  `Warning: could not remove ${fullPath}: ${re.message ?? String(rmErr)}`,
+                );
+              }
+            }
+          }
+        } catch (readErr: unknown) {
+          const re = readErr as { message?: string };
+          steps.push(
+            `Sweep warning (readdirSync): ${re.message ?? String(readErr)}`,
+          );
+        }
+      }
+      steps.push(
+        pathsCleaned.length > 0
+          ? `Cleaned ${pathsCleaned.length} *_tmp_* director${pathsCleaned.length === 1 ? 'y' : 'ies'}.`
+          : 'No *_tmp_* directories found.',
+      );
+
+      // Error-path patterns that name a specific offending file/directory.
+      // Capture group 1 = the path quoted in the error message.
+      const OFFENDER_RE = /(?:EPERM|ENOTEMPTY|EBUSY|ENOENT)[^']*'([^']+)'/g;
+
+      // Step 3: retry install loop (up to 3 times).
+      const MAX_ATTEMPTS = 3;
+      let useForce = forceFlag ?? false;
+      let lastError = '';
+
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        attempts = attempt;
+        const cmd = useForce ? 'pnpm install --force' : 'pnpm install';
+        steps.push(`$ ${cmd} (attempt ${attempt})`);
+
+        try {
+          const installOut = run(cmd, cwd, { timeout: 300_000 });
+          steps.push(installOut.trim() || '(no output)');
+          installSuccess = true;
+          break;
+        } catch (err: unknown) {
+          const e = err as { stdout?: string; stderr?: string };
+          const combined = [e.stdout, e.stderr]
+            .filter(Boolean)
+            .join('\n')
+            .trim();
+          lastError = combined;
+          steps.push(`Install failed:\n${combined.slice(0, 800)}`);
+
+          // Extract and remove offending paths named in the error.
+          let offenderFound = false;
+          let match: RegExpExecArray | null;
+          OFFENDER_RE.lastIndex = 0;
+          while ((match = OFFENDER_RE.exec(combined)) !== null) {
+            const offender = match[1];
+            // Resolve relative paths against the worktree dir.
+            const absOffender = isAbsolute(offender)
+              ? offender
+              : join(cwd, offender);
+            if (existsSync(absOffender)) {
+              try {
+                rmSync(absOffender, { recursive: true, force: true });
+                pathsCleaned.push(absOffender);
+                steps.push(`Removed offending path: ${absOffender}`);
+                offenderFound = true;
+              } catch (rmErr: unknown) {
+                const re = rmErr as { message?: string };
+                steps.push(
+                  `Could not remove ${absOffender}: ${re.message ?? String(rmErr)}`,
+                );
+              }
+            }
+          }
+
+          // If no specific offender found and we haven't escalated yet, switch to force.
+          if (!offenderFound && !useForce) {
+            useForce = true;
+            steps.push(
+              'No specific offender identified — escalating to pnpm install --force.',
+            );
+          }
+        }
+      }
+
+      // Assess final node_modules state.
+      const nxExists = existsSync(join(nmPath, 'nx'));
+      let binPopulated = false;
+      try {
+        binPopulated = readdirSync(join(nmPath, '.bin')).length > 0;
+      } catch {
+        /* .bin absent */
+      }
+
+      const result = {
+        success: installSuccess,
+        worktreePath: cwd,
+        attempts,
+        pathsCleaned,
+        finalState: { nxExists, binPopulated },
+        steps,
+        message: installSuccess
+          ? `pnpm install succeeded after ${attempts} attempt${attempts === 1 ? '' : 's'}.`
+          : `pnpm install still failing after ${MAX_ATTEMPTS} attempts. Last error excerpt:\n${lastError.slice(0, 400)}`,
+        escalation: installSuccess
+          ? null
+          : 'Manual escalation: unlink node_modules with worktree_unlink(), then run make install from a clean shell.',
+      };
+
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        isError: !installSuccess,
+      };
     }
 
     // -----------------------------------------------------------------------
