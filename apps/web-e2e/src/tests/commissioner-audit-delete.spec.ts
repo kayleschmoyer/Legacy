@@ -384,9 +384,9 @@ test.describe('Commissioner Audit Log — commissioner access @regression', () =
     );
 
     // The commissioner page should render for the league owner
-    await expect(
-      page.getByText('Test Commissioner League', { exact: false }),
-    ).toBeVisible();
+    await expect(page.getByTestId('league-title')).toHaveText(
+      'Test Commissioner League',
+    );
   });
 
   test('audit log entries display action text when rendered', async ({
@@ -426,7 +426,9 @@ test.describe('Commissioner Audit Log — non-commissioner access @regression', 
     ).toBeVisible();
 
     // The Commissioner tab should not be present for non-commissioners
-    const commissionerTabs = page.getByRole('button', {
+    // Scope to main content so the nav's league switcher button
+    // (aria-label "Current league: ...") is not matched.
+    const commissionerTabs = page.getByRole('main').getByRole('button', {
       name: /commissioner/i,
     });
     await expect(commissionerTabs).not.toBeVisible();
@@ -639,7 +641,9 @@ test.describe('Delete League — non-commissioner cannot see delete controls @re
     ).toBeVisible();
 
     // Commissioner tab should not be visible, so danger zone is inaccessible
-    const commissionerTabs = page.getByRole('button', {
+    // Scope to main content so the nav's league switcher button
+    // (aria-label "Current league: ...") is not matched.
+    const commissionerTabs = page.getByRole('main').getByRole('button', {
       name: /commissioner/i,
     });
     await expect(commissionerTabs).not.toBeVisible();

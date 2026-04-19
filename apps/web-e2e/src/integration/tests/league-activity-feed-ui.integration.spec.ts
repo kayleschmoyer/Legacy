@@ -689,7 +689,10 @@ test.describe
     });
 
     await test.step('Commissioner tab filters to announcements only', async () => {
+      // Scoped to main so the nav league-switcher
+      // "Current league: ..." button is not matched
       const commTab = page
+        .getByRole('main')
         .getByRole('button', { name: /^Commissioner/i })
         .first();
       await expect(commTab).toBeVisible({ timeout: 5_000 });

@@ -379,7 +379,10 @@ test.describe('Commissioner Tab — navigation @smoke', () => {
     await page.waitForLoadState('load');
 
     await expect(
-      page.getByText('Commissioner', { exact: false }).first(),
+      page
+        .getByRole('main')
+        .getByText('Commissioner', { exact: false })
+        .first(),
     ).toBeVisible();
   });
 
@@ -388,9 +391,9 @@ test.describe('Commissioner Tab — navigation @smoke', () => {
     await page.goto('/baseball/league/1/commissioner');
     await page.waitForLoadState('load');
 
-    await expect(
-      page.getByText('Test Commissioner League', { exact: false }),
-    ).toBeVisible();
+    await expect(page.getByTestId('league-title')).toHaveText(
+      'Test Commissioner League',
+    );
   });
 });
 
@@ -410,8 +413,10 @@ test.describe('Commissioner Tab — non-commissioner access @regression', () => 
       page.getByText('Overview', { exact: false }).first(),
     ).toBeVisible();
 
-    // The Commissioner tab should not be present for non-commissioners
-    const commissionerTabs = page.getByRole('button', {
+    // The Commissioner tab should not be present for non-commissioners.
+    // Scope to main content so the nav's league switcher button
+    // (aria-label "Current league: ...") is not matched.
+    const commissionerTabs = page.getByRole('main').getByRole('button', {
       name: /commissioner/i,
     });
     await expect(commissionerTabs).not.toBeVisible();

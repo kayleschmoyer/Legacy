@@ -415,8 +415,13 @@ test.describe('Activity feed shows multiple event types @regression', () => {
     await expect(
       page.getByText('Draft', { exact: false }).first(),
     ).toBeVisible();
+    // Scoped to main so the nav league-switcher
+    // "Current league: ..." button is not matched
     await expect(
-      page.getByText('Commissioner', { exact: false }).first(),
+      page
+        .getByRole('main')
+        .getByText('Commissioner', { exact: false })
+        .first(),
     ).toBeVisible();
   });
 });

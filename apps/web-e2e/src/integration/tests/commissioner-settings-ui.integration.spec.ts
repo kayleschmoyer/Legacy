@@ -296,12 +296,17 @@ test.describe
       await managerPage1.goto(`/baseball/league/${state.leagueId}`);
       await managerPage1.waitForLoadState('load');
       // Wait for league overview to render
-      await expect(managerPage1.getByText(state.leagueName)).toBeVisible({
-        timeout: 15_000,
-      });
-      // Commissioner tab should not exist for a non-commissioner
+      await expect(managerPage1.getByTestId('league-title')).toHaveText(
+        state.leagueName,
+        { timeout: 15_000 },
+      );
+      // Commissioner tab should not exist for a non-commissioner.
+      // Scope to main so the nav league-switcher
+      // "Current league: ..." button is not matched.
       await expect(
-        managerPage1.getByRole('button', { name: /Commissioner/i }),
+        managerPage1
+          .getByRole('main')
+          .getByRole('button', { name: /Commissioner/i }),
       ).not.toBeVisible({ timeout: 5_000 });
     });
 

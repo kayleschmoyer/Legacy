@@ -551,7 +551,7 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
     await test.step('Navigate to league overview', async () => {
       await page.goto(`/baseball/league/${LEAGUE_ID}/overview`);
       await page.waitForLoadState('load');
-      await expect(page.getByText(LEAGUE_NAME)).toBeVisible();
+      await expect(page.getByTestId('league-title')).toHaveText(LEAGUE_NAME);
     });
 
     await test.step('Verify all core tabs are rendered', async () => {
@@ -1030,7 +1030,7 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
     await test.step('Navigate to league overview', async () => {
       await page.goto(`/baseball/league/${LEAGUE_ID}/overview`);
       await page.waitForLoadState('load');
-      await expect(page.getByText(LEAGUE_NAME)).toBeVisible();
+      await expect(page.getByTestId('league-title')).toHaveText(LEAGUE_NAME);
     });
 
     await test.step('Activity sub-tab is shown by default', async () => {
@@ -1078,7 +1078,7 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
     await test.step('Navigate to league overview', async () => {
       await page.goto(`/baseball/league/${LEAGUE_ID}/overview`);
       await page.waitForLoadState('load');
-      await expect(page.getByText(LEAGUE_NAME)).toBeVisible();
+      await expect(page.getByTestId('league-title')).toHaveText(LEAGUE_NAME);
     });
 
     await test.step('Switch to Chat sub-tab', async () => {

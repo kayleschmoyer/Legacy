@@ -157,6 +157,7 @@ export const LeagueSwitcherChip: React.FC<Props> = ({ draftLive = false }) => {
       `}</style>
 
       <button
+        data-testid="league-switcher-chip"
         onClick={() => setIsOpen((o) => !o)}
         aria-haspopup="listbox"
         aria-expanded={isOpen}

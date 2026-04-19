@@ -381,9 +381,9 @@ test.describe('Overview Tab — navigation @smoke', () => {
     await page.goto('/baseball/league/1/overview');
     await page.waitForLoadState('load');
 
-    await expect(
-      page.getByText('Playoff Push League', { exact: false }),
-    ).toBeVisible();
+    await expect(page.getByTestId('league-title')).toHaveText(
+      'Playoff Push League',
+    );
   });
 
   test('overview tab button is active when on the overview route', async ({

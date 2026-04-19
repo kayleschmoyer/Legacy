@@ -538,9 +538,10 @@ test.describe('Commissioner Announcements — commissioner view @regression', ()
     await expect(
       page.getByText(announcement.sender.username, { exact: true }),
     ).toBeVisible();
-    // "Commissioner" badge
+    // "Commissioner" badge (scoped to main so the nav league-switcher
+    // "Current league: ..." button is not matched)
     await expect(
-      page.getByText('Commissioner', { exact: true }).first(),
+      page.getByRole('main').getByText('Commissioner', { exact: true }).first(),
     ).toBeVisible();
   });
 });
