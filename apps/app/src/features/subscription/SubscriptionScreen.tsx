@@ -5,7 +5,7 @@
  * fetched live from the App Store, allows the user to subscribe, and
  * provides a "Restore Purchases" option for existing subscribers.
  */
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { ActivityIndicator, Alert, Platform } from 'react-native';
 import { Button, Card, Text, XStack, YStack } from 'tamagui';
 import { useIAP } from './useIAP';
@@ -28,24 +28,39 @@ export function SubscriptionScreen({
     clearError,
   } = useIAP();
 
-  const handlePurchase = async (productId: IAPProductId) => {
-    clearError();
-    await purchase(productId);
-    if (isSubscribed) {
-      onSubscriptionComplete?.();
-    }
-  };
+  // Track whether the current isSubscribed=true transition was triggered by a
+  // purchase or restore initiated in this component instance. isSubscribed is
+  // set asynchronously (purchase: via purchaseUpdatedListener after server
+  // verification; restore: via setIsSubscribed inside restorePurchases), so
+  // checking it synchronously after await always reads the stale closure value.
+  const purchaseInitiated = useRef(false);
+  const restoreInitiated = useRef(false);
 
-  const handleRestore = async () => {
-    clearError();
-    await restorePurchases();
-    if (isSubscribed) {
+  useEffect(() => {
+    if (!isSubscribed) return;
+    if (purchaseInitiated.current) {
+      purchaseInitiated.current = false;
+      onSubscriptionComplete?.();
+    } else if (restoreInitiated.current) {
+      restoreInitiated.current = false;
       Alert.alert(
         'Purchases Restored',
         'Your subscription has been restored successfully.',
         [{ text: 'OK', onPress: () => onSubscriptionComplete?.() }],
       );
     }
+  }, [isSubscribed, onSubscriptionComplete]);
+
+  const handlePurchase = async (productId: IAPProductId) => {
+    clearError();
+    purchaseInitiated.current = true;
+    await purchase(productId);
+  };
+
+  const handleRestore = async () => {
+    clearError();
+    restoreInitiated.current = true;
+    await restorePurchases();
   };
 
   if (Platform.OS !== 'ios') {
