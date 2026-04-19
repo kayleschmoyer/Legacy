@@ -7874,6 +7874,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         'format:check',
         'lint',
         'lint-fix',
+        'lint-review-patterns',
         'typecheck',
         'pc',
         'build',
