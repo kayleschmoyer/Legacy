@@ -16,6 +16,16 @@ import {
   useUpdateDuesSettingsMutation,
 } from '../../api/db/graphql.generated';
 
+export function parseDollarsToCents(value: string): number {
+  const s = (value ?? '').trim();
+  if (!s || s === '.') return 0;
+  const [dollars, fraction = ''] = s.split('.');
+  const dollarCents = parseInt(dollars || '0', 10) * 100;
+  const fractionalCents = parseInt(fraction.padEnd(2, '0').slice(0, 2), 10);
+  const result = dollarCents + fractionalCents;
+  return isNaN(result) ? 0 : result;
+}
+
 export interface LeagueDuesSetupProps {
   leagueId: number;
   onSuccess?: (message: string) => void;
@@ -68,7 +78,7 @@ export function LeagueDuesSetup({
   const [updateDuesSettings, { loading: saving }] =
     useUpdateDuesSettingsMutation();
 
-  const amountCents = Math.round(parseFloat(amountDollars || '0') * 100);
+  const amountCents = parseDollarsToCents(amountDollars);
   const validationError =
     enabled && (isNaN(amountCents) || amountCents <= 0)
       ? 'Please enter a valid dues amount greater than $0'
