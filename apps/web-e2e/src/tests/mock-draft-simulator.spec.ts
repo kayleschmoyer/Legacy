@@ -398,15 +398,15 @@ unauthTest.describe(
       'shows marketing headline on /baseball/mock-draft when unauthenticated',
       async ({ page }) => {
         await expect(
-          page.getByRole('heading', { name: /build your dynasty/i }),
+          page.getByRole('heading', { name: /claim your dynasty/i }),
         ).toBeVisible({ timeout: 15_000 });
       },
     );
 
     unauthTest(
-      'shows "Season 2026" badge on /baseball/mock-draft when unauthenticated',
+      'shows "Members Clubhouse" eyebrow on /baseball/mock-draft when unauthenticated',
       async ({ page }) => {
-        await expect(page.getByText(/season 2026/i)).toBeVisible({
+        await expect(page.getByText(/members clubhouse/i)).toBeVisible({
           timeout: 15_000,
         });
       },

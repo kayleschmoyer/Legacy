@@ -450,119 +450,54 @@ test.describe('Join League — keyboard submission @regression', () => {
 });
 
 // ---------------------------------------------------------------------------
-// LS-3481: /baseball/league/join is a protected route. Unauthenticated users
-// visiting it are intercepted by EnhancedAuthGuard and shown PublicLandingPage
-// with the "Continue with Google" sign-in CTA. These tests lock in that the
-// button is located via getByRole (accessible name) — NOT via the broken
-// `(button:visible, [role="button"]:visible)` CSS selector that caused the
-// original crawler-reported failure.
+// LS-3719 / LS-3702: /baseball/league/join was made a public path in LS-3702
+// so invite links work without prior authentication. Unauthenticated users now
+// see JoinLeagueByCodePage directly (the join form), not the login page. These
+// tests lock in the public-route behaviour for unauthenticated visitors.
 // ---------------------------------------------------------------------------
 
 unauthTest.describe(
-  '/baseball/league/join — Continue with Google button clickable @regression',
+  '/baseball/league/join — public route renders join form for unauthenticated users @regression',
   () => {
-    unauthTest(
-      '"Continue with Google" button is visible on /baseball/league/join when unauthenticated (LS-3481)',
-      async ({ page }) => {
-        await page.goto('/baseball/league/join');
-        await page.waitForLoadState('load');
+    unauthTest.beforeEach(async ({ page }) => {
+      await page.goto('/baseball/league/join');
+      await page.waitForLoadState('load');
+    });
 
+    unauthTest(
+      'shows "Join League" heading on /baseball/league/join when unauthenticated (LS-3481)',
+      async ({ page }) => {
         await expect(
-          page.getByRole('button', { name: /continue with google/i }),
+          page.getByRole('heading', { name: /join league/i }),
         ).toBeVisible({ timeout: 15_000 });
       },
     );
 
     unauthTest(
-      '"Continue with Google" button on /baseball/league/join is clickable via getByRole (LS-3481)',
+      'shows invite code input on /baseball/league/join when unauthenticated (LS-3481)',
       async ({ page }) => {
-        await page.goto('/baseball/league/join');
-        await page.waitForLoadState('load');
-
-        const googleBtn = page.getByRole('button', {
-          name: /continue with google/i,
+        await expect(page.getByPlaceholder(/8-character code/i)).toBeVisible({
+          timeout: 15_000,
         });
-        await expect(googleBtn).toBeVisible({ timeout: 15_000 });
-        await expect(googleBtn).toBeEnabled();
-        // Confirm the click resolves without a CSS selector parse error —
-        // regression coverage for the original crawler failure. The Google
-        // handler triggers an OAuth redirect, so pass `noWaitAfter: true`
-        // to avoid Playwright hanging on the cross-origin navigation.
-        await googleBtn.click({ noWaitAfter: true });
+      },
+    );
+
+    unauthTest(
+      'shows team name input on /baseball/league/join when unauthenticated (LS-3482)',
+      async ({ page }) => {
+        await expect(
+          page.getByPlaceholder(/enter your team name/i),
+        ).toBeVisible({ timeout: 15_000 });
+      },
+    );
+
+    unauthTest(
+      'shows "Join League" submit button on /baseball/league/join when unauthenticated (LS-3482)',
+      async ({ page }) => {
+        await expect(
+          page.getByRole('button', { name: /join league/i }),
+        ).toBeVisible({ timeout: 15_000 });
       },
     );
   },
 );
-
-// ---------------------------------------------------------------------------
-// LS-3537 / LS-3482: /baseball/league/join is a protected route. Unauthenticated
-// users visiting it are intercepted by EnhancedAuthGuard and shown
-// PublicLandingPage with "Get Started Free" and "Continue with Discord" CTAs.
-// These tests lock in that buttons are located via getByRole (accessible name)
-// — NOT via the broken `(button:visible, [role="button"]:visible)` CSS selector
-// that caused the original crawler-reported failures.
-// ---------------------------------------------------------------------------
-
-unauthTest.describe('Join League — unauthenticated visitor @regression', () => {
-  unauthTest(
-    '"Get Started Free" button is visible on /baseball/league/join when unauthenticated',
-    async ({ page }) => {
-      await page.goto('/baseball/league/join');
-      await page.waitForLoadState('load');
-
-      await expect(
-        page.getByRole('button', { name: /get started free/i }),
-      ).toBeVisible({ timeout: 15_000 });
-    },
-  );
-
-  unauthTest(
-    '"Get Started Free" button on /baseball/league/join is clickable via getByRole (LS-3482)',
-    async ({ page }) => {
-      await page.goto('/baseball/league/join');
-      await page.waitForLoadState('load');
-
-      const getStartedBtn = page.getByRole('button', {
-        name: /get started free/i,
-      });
-      await expect(getStartedBtn).toBeVisible({ timeout: 15_000 });
-      await expect(getStartedBtn).toBeEnabled();
-      // Regression for LS-3482: confirm the click resolves without the
-      // CSS selector parse error caused by the broken crawler selector
-      // `(button:visible, [role="button"]:visible)`.
-      await getStartedBtn.click();
-    },
-  );
-
-  unauthTest(
-    '"Continue with Discord" button is visible on /baseball/league/join when unauthenticated',
-    async ({ page }) => {
-      await page.goto('/baseball/league/join');
-      await page.waitForLoadState('load');
-
-      await expect(
-        page.getByRole('button', { name: /continue with discord/i }),
-      ).toBeVisible({ timeout: 15_000 });
-    },
-  );
-
-  unauthTest(
-    '"Continue with Discord" button on /baseball/league/join is clickable via getByRole',
-    async ({ page }) => {
-      await page.goto('/baseball/league/join');
-      await page.waitForLoadState('load');
-
-      const discordBtn = page.getByRole('button', {
-        name: /continue with discord/i,
-      });
-      await expect(discordBtn).toBeVisible({ timeout: 15_000 });
-      await expect(discordBtn).toBeEnabled();
-      // Confirm the click resolves without a CSS selector parse error —
-      // regression coverage for the original crawler failure. The Discord
-      // handler sets `window.location.href` to an OAuth URL, so pass
-      // `noWaitAfter: true` to avoid Playwright hanging on the cross-origin
-      // navigation (intercepted as 401 in the hermetic E2E harness).
-      await discordBtn.click({ noWaitAfter: true });
-    },
-  );
-});

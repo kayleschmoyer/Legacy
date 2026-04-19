@@ -259,31 +259,29 @@ test.describe('Profile Settings Page — accessibility @regression', () => {
 
 // ---------------------------------------------------------------------------
 // LS-3506: /profile/settings is a protected route. Unauthenticated users must
-// NOT see a 404 response or the "Build Your Dynasty" marketing landing page at
-// this URL. EnhancedAuthGuard must redirect them to / where PublicLandingPage
-// shows a clean sign-in CTA. An automated audit crawler visited
-// https://legacy-fantasy.com/profile/settings unauthenticated, received the
-// GitHub Pages 404 response (expected for SPA routes), then saw the marketing
-// landing page after the 404.html redirect loaded the SPA — and mis-reported it
-// as the settings route being broken with a functional 404. These tests lock in
-// the unauthenticated redirect behaviour so a regression cannot go undetected.
+// NOT see the profile settings content. EnhancedAuthGuard renders the login
+// page in-place at the requested URL (no redirect). An automated audit crawler
+// visited https://legacy-fantasy.com/profile/settings unauthenticated and
+// mis-reported it as broken — these tests lock in the unauthenticated behaviour
+// so a regression cannot go undetected.
 // ---------------------------------------------------------------------------
 
 unauthTest.describe(
   'Profile Settings — unauthenticated visitor @regression',
   () => {
     unauthTest(
-      'redirects unauthenticated user from /profile/settings to /',
+      'stays at /profile/settings and shows login page for unauthenticated user',
       async ({ page }) => {
         await page.goto('/profile/settings');
         await page.waitForLoadState('load');
 
-        await expect(page).toHaveURL('/', { timeout: 15_000 });
+        // EnhancedAuthGuard renders the login page in-place — no redirect to /.
+        await expect(page).toHaveURL('/profile/settings', { timeout: 15_000 });
       },
     );
 
     unauthTest(
-      'shows sign-in CTA for unauthenticated user after redirect from /profile/settings',
+      'shows sign-in CTA for unauthenticated user at /profile/settings',
       async ({ page }) => {
         await page.goto('/profile/settings');
         await page.waitForLoadState('load');
