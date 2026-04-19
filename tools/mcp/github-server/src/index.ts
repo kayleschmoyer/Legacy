@@ -40,6 +40,7 @@ import { prCommits } from './tools/pr-commits.js';
 import { prBatchStatus } from './tools/pr-batch-status.js';
 import { listPRComments } from './tools/list-pr-comments.js';
 import { listPRInlineComments } from './tools/list-pr-inline-comments.js';
+import { listReviewComments } from './tools/list-review-comments.js';
 
 // Node.js native fetch (undici) does not respect HTTPS_PROXY / GLOBAL_AGENT_HTTPS_PROXY
 // by default. In cloud sessions the egress proxy is required; set the global dispatcher
@@ -675,6 +676,30 @@ server.tool(
       ),
   },
   async (params) => listPRInlineComments(params),
+);
+
+// --- github_list_review_comments ---
+server.tool(
+  'github_list_review_comments',
+  'Read inline code review comments on a PR, with optional filtering by review ID or timestamp. Use reviewId to isolate comments from a specific Copilot or human review submission (avoids mixing new and historical comments). Use since (ISO 8601) to filter by creation time. Returns id, inReplyToId, user, path, line, body, createdAt, reviewId for each comment. Handles pagination automatically. Maps to GET /repos/{owner}/{repo}/pulls/{number}/comments.',
+  {
+    number: z.coerce.number().int().positive().describe('PR number'),
+    since: z
+      .string()
+      .optional()
+      .describe(
+        'ISO 8601 timestamp — only return comments created at or after this time',
+      ),
+    reviewId: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        'Filter to comments from a specific review submission (pull_request_review_id)',
+      ),
+  },
+  async (params) => listReviewComments(params),
 );
 
 // --- github_edit_pr ---
