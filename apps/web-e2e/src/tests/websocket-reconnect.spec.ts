@@ -317,7 +317,8 @@ test.describe('WebSocket – connection drop and reconnect @regression', () => {
     await wsRoute.close();
 
     // Page should remain functional — no error overlay
-    await expect(page.getByText('WebSocket Reconnect Test League')).toBeVisible(
+    await expect(page.getByTestId('league-title')).toHaveText(
+      'WebSocket Reconnect Test League',
       { timeout: 5000 },
     );
     await expect(page.locator('body')).not.toContainText(
@@ -345,7 +346,8 @@ test.describe('WebSocket – connection drop and reconnect @regression', () => {
     expect(ws.getConnectionCount()).toBeGreaterThanOrEqual(2);
 
     // Page should remain stable after reconnect
-    await expect(page.getByText('WebSocket Reconnect Test League')).toBeVisible(
+    await expect(page.getByTestId('league-title')).toHaveText(
+      'WebSocket Reconnect Test League',
       { timeout: 5000 },
     );
     await expect(page.locator('body')).not.toContainText(
@@ -372,7 +374,8 @@ test.describe('WebSocket – connection drop and reconnect @regression', () => {
     await secondRoute.close();
 
     // Page should still be functional after two drops
-    await expect(page.getByText('WebSocket Reconnect Test League')).toBeVisible(
+    await expect(page.getByTestId('league-title')).toHaveText(
+      'WebSocket Reconnect Test League',
       { timeout: 5000 },
     );
     await expect(page.locator('body')).not.toContainText(
@@ -406,7 +409,8 @@ test.describe('WebSocket – connection drop and reconnect @regression', () => {
     );
 
     // League content should still be visible
-    await expect(page.getByText('WebSocket Reconnect Test League')).toBeVisible(
+    await expect(page.getByTestId('league-title')).toHaveText(
+      'WebSocket Reconnect Test League',
       { timeout: 5000 },
     );
   });
