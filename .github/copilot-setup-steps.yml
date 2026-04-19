@@ -17,11 +17,17 @@
 # What this does NOT set up (by design):
 #   - twig CLI (not needed — cloud agents work in single-branch ephemeral envs)
 #   - acli CLI (Jira operations use the MCP server exclusively)
-#   - AWS credentials (no cloud AWS interactions from agent environment)
+#   - Full AWS access (only lambda:InvokeFunctionUrl is granted via the OIDC role)
 #   - Worktree management (agent gets its own isolated checkout)
 # =============================================================================
 
 steps:
+  - name: Configure AWS credentials for MCP servers
+    uses: aws-actions/configure-aws-credentials@ec61189d14ec14c8efccab744f656cffd0e33f37 # v6
+    with:
+      role-to-assume: arn:aws:iam::176661590736:role/legacy-sports-dev-github-actions
+      aws-region: us-east-1
+
   - name: Install Node.js
     uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
     with:
@@ -55,8 +61,8 @@ steps:
         echo "WARNING: No GitHub token available — gh CLI will not be authenticated"
         echo "PR creation via the legacy-sports-github MCP server will fail"
       fi
-      # Export GH_TOKEN so the legacy-sports-github MCP server picks it up.
-      # The MCP server checks GH_TOKEN first, then GITHUB_TOKEN at runtime.
+      # Export GH_TOKEN for the gh CLI and worktree MCP server.
+      # The hosted legacy-sports-github server uses its own credentials from AWS Secrets Manager.
       if [ -n "$AGENT_AUTHOR_TOKEN" ]; then
         echo "::add-mask::$AGENT_AUTHOR_TOKEN"
         echo "GH_TOKEN=$AGENT_AUTHOR_TOKEN" >> "$GITHUB_ENV"
@@ -67,6 +73,30 @@ steps:
 
   - name: Install dependencies
     run: pnpm install --frozen-lockfile
+
+  - name: Export MCP server URLs
+    run: |
+      {
+        echo "MCP_JIRA_URL=$MCP_JIRA_URL"
+        echo "MCP_GITHUB_URL=$MCP_GITHUB_URL"
+        echo "MCP_CI_URL=$MCP_CI_URL"
+      } >> "$GITHUB_ENV"
+      echo "MCP server URLs exported"
+    env:
+      MCP_JIRA_URL: ${{ secrets.MCP_JIRA_URL }}
+      MCP_GITHUB_URL: ${{ secrets.MCP_GITHUB_URL }}
+      MCP_CI_URL: ${{ secrets.MCP_CI_URL }}
+
+  - name: Start MCP signing proxy
+    run: |
+      # Starts the signing proxy in the background. It listens on localhost:4195/4196/4197
+      # and signs each request with SigV4 before forwarding to the Lambda Function URLs.
+      # AWS credentials are already configured by the configure-aws-credentials step above.
+      pnpm exec nx run mcp-signing-proxy:start > /tmp/mcp-signing-proxy.log 2>&1 &
+      echo "MCP_SIGNING_PROXY_PID=$!" >> "$GITHUB_ENV"
+      echo "MCP signing proxy started (PID $!)"
+      # Give the proxy a moment to bind its ports before the agent starts using them
+      sleep 2
 
   - name: Pull Git LFS objects
     run: |
@@ -137,48 +167,6 @@ steps:
         echo "DATABASE_URL=postgresql://legacy_sports:legacy_sports_dev@localhost:5432/legacy_sports_dev"
         echo "USE_LOCAL_CREDENTIALS=true"
       } >> "$GITHUB_ENV"
-
-  - name: Export Jira credentials for MCP servers
-    run: |
-      # OAuth 2.0 (preferred) — all three vars must be present
-      if [ -n "$JIRA_CLIENT_ID" ] && [ -n "$JIRA_CLIENT_SECRET" ] && [ -n "$JIRA_CLOUD_ID" ]; then
-        {
-          echo "JIRA_CLIENT_ID<<EOF"
-          echo "$JIRA_CLIENT_ID"
-          echo "EOF"
-          echo "JIRA_CLIENT_SECRET<<EOF"
-          echo "$JIRA_CLIENT_SECRET"
-          echo "EOF"
-          echo "JIRA_CLOUD_ID<<EOF"
-          echo "$JIRA_CLOUD_ID"
-          echo "EOF"
-          echo "JIRA_SITE_URL<<EOF"
-          echo "${JIRA_SITE_URL:-https://bkrupa.atlassian.net}"
-          echo "EOF"
-        } >> "$GITHUB_ENV"
-        echo "Jira OAuth credentials exported"
-      # Basic Auth fallback — both vars must be present
-      elif [ -n "$JIRA_EMAIL" ] && [ -n "$JIRA_API_TOKEN" ]; then
-        {
-          echo "JIRA_EMAIL<<EOF"
-          echo "$JIRA_EMAIL"
-          echo "EOF"
-          echo "JIRA_API_TOKEN<<EOF"
-          echo "$JIRA_API_TOKEN"
-          echo "EOF"
-        } >> "$GITHUB_ENV"
-        echo "Jira Basic Auth credentials exported"
-      else
-        echo "WARNING: No complete Jira credentials found — jira_auth_status will report configured: false"
-        echo "Add JIRA_CLIENT_ID + JIRA_CLIENT_SECRET + JIRA_CLOUD_ID (OAuth) or JIRA_EMAIL + JIRA_API_TOKEN (Basic Auth) to the copilot environment"
-      fi
-    env:
-      JIRA_CLIENT_ID: ${{ secrets.JIRA_CLIENT_ID }}
-      JIRA_CLIENT_SECRET: ${{ secrets.JIRA_CLIENT_SECRET }}
-      JIRA_CLOUD_ID: ${{ secrets.JIRA_CLOUD_ID }}
-      JIRA_SITE_URL: ${{ secrets.JIRA_SITE_URL }}
-      JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
-      JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
 
   - name: Apply database migrations
     run: cd lib/db-client && pnpm run db:migrate
