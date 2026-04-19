@@ -49,7 +49,7 @@ Pull request and review lifecycle management via the GitHub REST and GraphQL API
 
 ### CI & Checks
 
-- **github_list_commit_statuses** — List commit status checks
+- **github_list_commit_statuses** — List commit statuses (Statuses API) for a commit SHA or PR HEAD; accepts sha, prNumber/number, and optional context filter
 - **github_set_commit_status** — Set a commit status (success/failure/pending)
 - **github_retrigger_check** — Retrigger a check run
 - **github_pr_batch_status** — Detailed status for multiple PRs (mergeable, CI, reviews, threads)

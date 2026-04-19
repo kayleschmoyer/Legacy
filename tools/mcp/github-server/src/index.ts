@@ -1157,11 +1157,58 @@ server.tool(
 // --- github_list_commit_statuses ---
 server.tool(
   'github_list_commit_statuses',
-  'List GitHub commit statuses (Statuses API) for a PR\'s HEAD commit. These are DISTINCT from Check Runs (Checks API) — bot-review and similar statuses appear here, not in github_retrigger_check. Use this to diagnose "check not found" errors when github_retrigger_check fails.',
+  'List GitHub commit statuses (Statuses API) for a specific commit SHA or a PR\'s HEAD commit. These are DISTINCT from Check Runs (Checks API) — bot-review and security-scan statuses appear here, not in github_retrigger_check. Use this to diagnose "check not found" errors or confirm whether a bot-review status has updated after threads were resolved. Provide either "sha" (direct SHA), "prNumber", or its alias "number" (both auto-resolve to HEAD SHA). Use "context" to filter to a single status context.',
   {
-    number: z.coerce.number().int().positive().describe('PR number'),
+    sha: z
+      .string()
+      .trim()
+      .min(1)
+      .optional()
+      .describe(
+        'Commit SHA to read statuses for. Use this OR prNumber/number, not both.',
+      ),
+    prNumber: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        'PR number — auto-resolves to the HEAD commit SHA. Use this OR sha, not both.',
+      ),
+    number: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Alias for "prNumber" — use either, not both.'),
+    context: z
+      .string()
+      .trim()
+      .min(1)
+      .optional()
+      .describe(
+        'Filter to a specific status context (e.g. "bot-review", "security-scan"). Omit to return all contexts.',
+      ),
   },
-  async (params) => listCommitStatuses(params),
+  async (params) => {
+    const resolvedPrNumber = params.prNumber ?? params.number;
+    if (!params.sha && !resolvedPrNumber) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: 'Missing required parameter: provide "sha" (commit SHA) or "prNumber"/"number" (PR number to auto-resolve HEAD SHA).',
+          },
+        ],
+      };
+    }
+    return listCommitStatuses({
+      sha: params.sha,
+      prNumber: resolvedPrNumber,
+      context: params.context,
+    });
+  },
 );
 
 // --- github_ensure_sweep_labels ---

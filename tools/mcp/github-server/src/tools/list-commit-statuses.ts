@@ -4,7 +4,9 @@ import { resolveHeadShaFromPrNumber } from '../pr-utils.js';
 import type { ToolResult } from '../types.js';
 
 interface ListCommitStatusesParams {
-  number: number;
+  sha?: string;
+  prNumber?: number;
+  context?: string;
 }
 
 interface CommitStatus {
@@ -23,21 +25,35 @@ export async function listCommitStatuses(
   try {
     const repo = await getRepoOwnerName();
 
-    // 1. Resolve head commit SHA from PR number
-    const sha = await resolveHeadShaFromPrNumber(params.number);
+    let sha: string | null = params.sha ?? null;
+
     if (!sha) {
-      return {
-        isError: true,
-        content: [
-          {
-            type: 'text',
-            text: `PR #${params.number} not found or has no commits.`,
-          },
-        ],
-      };
+      if (!params.prNumber) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: 'Provide either "sha" (commit SHA) or "prNumber" (PR number to auto-resolve HEAD SHA).',
+            },
+          ],
+        };
+      }
+      sha = await resolveHeadShaFromPrNumber(params.prNumber);
+      if (!sha) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: `PR #${params.prNumber} not found or has no commits.`,
+            },
+          ],
+        };
+      }
     }
 
-    // 2. Fetch commit statuses from the Statuses API (paginated)
+    // Fetch commit statuses from the Statuses API (paginated)
     // GET /repos/{owner}/{repo}/commits/{sha}/statuses
     const perPage = 100;
     const allStatuses: CommitStatus[] = [];
@@ -49,21 +65,24 @@ export async function listCommitStatuses(
         query: { per_page: String(perPage), page: String(page) },
       });
       allStatuses.push(...page_statuses);
-      if (page_statuses.length < perPage) break; // last page
+      if (page_statuses.length < perPage) break;
       page++;
     }
-    const statuses = allStatuses;
 
     // Deduplicate by context — keep only the most recent status per context
     // (GitHub returns statuses newest-first, so first occurrence wins)
     const seen = new Set<string>();
     const deduped: CommitStatus[] = [];
-    for (const s of statuses) {
+    for (const s of allStatuses) {
       if (!seen.has(s.context)) {
         seen.add(s.context);
         deduped.push(s);
       }
     }
+
+    const filtered = params.context
+      ? deduped.filter((s) => s.context === params.context)
+      : deduped;
 
     return {
       content: [
@@ -71,17 +90,17 @@ export async function listCommitStatuses(
           type: 'text',
           text: JSON.stringify(
             {
-              pr: params.number,
               sha,
               shortSha: sha.slice(0, 7),
-              total: deduped.length,
+              ...(params.prNumber !== undefined && { pr: params.prNumber }),
+              total: filtered.length,
               note: 'These are GitHub commit statuses (Statuses API), not Check Runs (Checks API). github_retrigger_check will NOT find these. To update them, push a new commit or re-run/dispatch the workflow or external system that owns the status. Only use github_set_commit_status to correct a genuinely stale or incorrect status after verifying the underlying result, never to override required checks or branch protection intent.',
-              statuses: deduped.map((s) => ({
+              statuses: filtered.map((s) => ({
                 context: s.context,
                 state: s.state,
                 description: s.description,
                 targetUrl: s.target_url,
-                updatedAt: s.updated_at,
+                createdAt: s.created_at,
               })),
             },
             null,
@@ -92,12 +111,14 @@ export async function listCommitStatuses(
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    const ref =
+      params.sha ?? (params.prNumber ? `PR #${params.prNumber}` : 'unknown');
     return {
       isError: true,
       content: [
         {
           type: 'text',
-          text: `Failed to list commit statuses for PR #${params.number}: ${message}`,
+          text: `Failed to list commit statuses for ${ref}: ${message}`,
         },
       ],
     };
