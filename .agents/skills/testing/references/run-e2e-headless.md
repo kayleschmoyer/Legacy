@@ -14,11 +14,10 @@ The web-e2e Playwright config already uses `json` + `line` reporters (no HTML), 
 
 ## Rules
 
-| Rule                                                              | Why                                                                          |
-| ----------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| **Always use `nx run web-e2e:e2e`** (or `nx_run` MCP tool)        | Uses `apps/web-e2e/playwright.config.ts` which has `json` + `line` reporters |
-| **Never run `playwright test` from repo root without `--config`** | Falls back to root `playwright.config.ts` which uses the `html` reporter     |
-| **Never use the `e2e:ui` target** from an agent                   | Opens Playwright's interactive UI mode — blocks the terminal                 |
+| Rule                                                       | Why                                                                          |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| **Always use `nx run web-e2e:e2e`** (or `nx_run` MCP tool) | Uses `apps/web-e2e/playwright.config.ts` which has `json` + `line` reporters |
+| **Never use the `e2e:ui` target** from an agent            | Opens Playwright's interactive UI mode — blocks the terminal                 |
 
 ## Running Tests
 
@@ -58,7 +57,6 @@ pnpm exec playwright test \
 | ----------------------------------------------- | -------------------------------- | ---------------------------------------------- |
 | `apps/web-e2e/playwright.config.ts`             | `json`, `line`, `blob` (CI)      | Yes                                            |
 | `apps/web-e2e/playwright.integration.config.ts` | `html` (`open: 'never'`), `list` | Yes — HTML artifacts saved but no window opens |
-| Root `playwright.config.ts` (legacy)            | `html`                           | No — never use this config                     |
 
 ## Integration Tests (Special Handling)
 

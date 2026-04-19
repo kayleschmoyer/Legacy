@@ -70,18 +70,6 @@ expect(isVisible).toBe(true);
 await expect(page.locator('.toast')).toBeVisible();
 ```
 
-## Always pass `--config`
-
-A legacy root `playwright.config.ts` exists. Without `--config`, Playwright picks it up and uses the wrong port/settings.
-
-```powershell
-# ❌ WRONG: picks up root config (port 4200, dev server)
-pnpm exec playwright test
-
-# ✅ CORRECT: uses E2E config (port 4280, static build)
-pnpm exec playwright test --config=apps/web-e2e/playwright.config.ts
-```
-
 > **Known tech debt (LS-1783 audit):** ~55 `waitForTimeout()` calls remain across 17 E2E spec files. 5 clear violations were fixed in LS-1783; the remaining instances in complex animation/debounce/draft flows are tracked as follow-up tickets. `waitForLoadState('networkidle')` calls remain in both page objects and some spec files and should be treated as tech debt to remove when those areas are modified. `route.fallback()` is used in 90+ places as a passthrough for non-mocked routes — these should be replaced with `route.fulfill()` returning diagnostic errors (tracked separately).
 
 ## Locator Conventions

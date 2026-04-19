@@ -12,6 +12,18 @@ Playwright routes match in **LIFO order** (last registered runs first). The thre
 
 Request flow: **test handler → auth.ts handler → \_apiIsolation baseline → throw if unknown**
 
+## `route.fallback()` vs `route.continue()`
+
+The hermetic pattern depends on this distinction — they look similar but do opposite things:
+
+| Method               | Effect                                                                                                                            | Allowed in hermetic E2E?                                                   |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `route.fallback()`   | Pass control to the **next installed Playwright route handler**. In our setup that is always `_apiIsolation`, which `fulfill()`s. | ✅ Yes — stays fully hermetic.                                             |
+| `route.continue()`   | Let the request proceed to the **real network**.                                                                                  | ❌ Never — breaks hermeticity, will hit `localhost:5000` or external APIs. |
+| `route.fulfill(...)` | Respond with the mock data you supply.                                                                                            | ✅ Yes — the primary tool.                                                 |
+
+Use `route.fallback()` when a test-level handler wants a specific operation mocked but wants ambient/unrelated operations to fall through to the baseline. Never use `route.continue()` — every hermetic test relies on `_apiIsolation` being the ultimate fulfiller.
+
 ## Baseline mocks (`fixtures/shared-mocks.ts`)
 
 The baseline mock map (`BASELINE_GRAPHQL_RESPONSES`) provides default responses for ~30 common GraphQL operations. These cover:
