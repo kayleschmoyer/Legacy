@@ -39,7 +39,8 @@ export function LeagueChatTab({
   leagueId,
   userInfo,
 }: LeagueChatTabProps): React.JSX.Element {
-  const { messages, loading, sending, sendMessage } = useLeagueChat(leagueId);
+  const { messages, loading, sending, wsError, sendMessage } =
+    useLeagueChat(leagueId);
   const [inputText, setInputText] = useState('');
   const [showGifPicker, setShowGifPicker] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
@@ -81,6 +82,21 @@ export function LeagueChatTab({
       keyboardVerticalOffset={80}
     >
       <YStack flex={1}>
+        {/* Real-time connection error banner */}
+        {wsError && (
+          <XStack
+            testID="ws-error-banner"
+            backgroundColor="$red4"
+            paddingHorizontal="$3"
+            paddingVertical="$2"
+            alignItems="center"
+          >
+            <Text color="$red11" fontSize="$3">
+              Could not connect to live chat. Messages may be delayed.
+            </Text>
+          </XStack>
+        )}
+
         {/* Message list */}
         <ScrollView
           ref={scrollViewRef}

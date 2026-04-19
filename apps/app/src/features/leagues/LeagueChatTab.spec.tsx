@@ -24,6 +24,7 @@ const mockUseLeagueChat = jest.fn(() => ({
   messages: [],
   loading: false,
   sending: false,
+  wsError: null,
   sendMessage: mockSendMessage,
 }));
 
@@ -189,6 +190,7 @@ describe('LeagueChatTab', () => {
       messages: [],
       loading: false,
       sending: false,
+      wsError: null,
       sendMessage: mockSendMessage,
     });
   });
@@ -338,6 +340,31 @@ describe('LeagueChatTab', () => {
       const { rerender } = render(<LeagueChatTab {...defaultProps} />);
       rerender(<LeagueChatTab leagueId={99} userInfo={mockUserInfo} />);
       expect(mockUseLeagueChat).toHaveBeenCalledWith(99);
+    });
+  });
+
+  describe('WebSocket error state', () => {
+    it('shows connection-failed banner when wsError is set', () => {
+      mockUseLeagueChat.mockReturnValue({
+        messages: [],
+        loading: false,
+        sending: false,
+        wsError: new Error('Keychain read failed'),
+        sendMessage: mockSendMessage,
+      });
+
+      render(<LeagueChatTab {...defaultProps} />);
+      expect(screen.getByTestId('ws-error-banner')).toBeTruthy();
+      expect(
+        screen.getByText(
+          'Could not connect to live chat. Messages may be delayed.',
+        ),
+      ).toBeTruthy();
+    });
+
+    it('does not show connection-failed banner when wsError is null', () => {
+      render(<LeagueChatTab {...defaultProps} />);
+      expect(screen.queryByTestId('ws-error-banner')).toBeNull();
     });
   });
 });

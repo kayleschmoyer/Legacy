@@ -48,9 +48,11 @@ export function useLeagueChat(leagueId: number): {
   messages: ChatMessage[];
   loading: boolean;
   sending: boolean;
+  wsError: Error | null;
   sendMessage: (text: string, gifUrl?: string) => Promise<void>;
 } {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [wsError, setWsError] = useState<Error | null>(null);
   const clientRef = useRef<WebSocketClient | null>(null);
 
   // Load message history
@@ -75,6 +77,7 @@ export function useLeagueChat(leagueId: number): {
   useEffect(() => {
     setMessages([]);
     setHistorySynced(false);
+    setWsError(null);
   }, [leagueId]);
 
   // Send mutation
@@ -117,47 +120,60 @@ export function useLeagueChat(leagueId: number): {
   useEffect(() => {
     let active = true;
 
-    void readKeychainValue(Secret.INTERNAL_JWT).then((token: string | null) => {
-      if (!active || !token) return;
+    const connect = async () => {
+      try {
+        const token = await readKeychainValue(Secret.INTERNAL_JWT);
+        if (!active || !token) return;
 
-      const wsUrl = process.env.EXPO_PUBLIC_WEBSOCKET_URL ?? '';
-      if (!wsUrl) return;
+        const wsUrl = process.env.EXPO_PUBLIC_WEBSOCKET_URL ?? '';
+        if (!wsUrl) return;
 
-      const client = new WebSocketClient({
-        url: wsUrl,
-        token,
-        leagueId,
-        viewContext: 'chat',
-        autoConnect: true,
-        reconnect: true,
-        captureError,
-      });
+        const client = new WebSocketClient({
+          url: wsUrl,
+          token,
+          leagueId,
+          viewContext: 'chat',
+          autoConnect: true,
+          reconnect: true,
+          captureError,
+        });
 
-      client.on(
-        ClientNotificationType.LEAGUE_CHAT_MESSAGE,
-        (notification: NotificationData) => {
-          if (notification.type !== ClientNotificationType.LEAGUE_CHAT_MESSAGE)
-            return;
-          setMessages((prev) => {
-            if (prev.some((m) => m.id === notification.messageId)) return prev;
-            return [
-              ...prev,
-              {
-                id: notification.messageId,
-                userId: notification.senderId,
-                username: notification.senderUsername,
-                messageText: notification.messageText,
-                messageType: notification.messageType ?? 'text',
-                gifUrl: notification.gifUrl ?? undefined,
-                createdAt: notification.timestamp,
-              },
-            ];
-          });
-        },
-      );
+        client.on(
+          ClientNotificationType.LEAGUE_CHAT_MESSAGE,
+          (notification: NotificationData) => {
+            if (
+              notification.type !== ClientNotificationType.LEAGUE_CHAT_MESSAGE
+            )
+              return;
+            setMessages((prev) => {
+              if (prev.some((m) => m.id === notification.messageId))
+                return prev;
+              return [
+                ...prev,
+                {
+                  id: notification.messageId,
+                  userId: notification.senderId,
+                  username: notification.senderUsername,
+                  messageText: notification.messageText,
+                  messageType: notification.messageType ?? 'text',
+                  gifUrl: notification.gifUrl ?? undefined,
+                  createdAt: notification.timestamp,
+                },
+              ];
+            });
+          },
+        );
 
-      clientRef.current = client;
-    });
+        clientRef.current = client;
+      } catch (err) {
+        if (!active) return;
+        const error = err instanceof Error ? err : new Error(String(err));
+        captureError(error);
+        setWsError(error);
+      }
+    };
+
+    void connect();
 
     return () => {
       active = false;
@@ -166,5 +182,5 @@ export function useLeagueChat(leagueId: number): {
     };
   }, [leagueId]);
 
-  return { messages, loading, sending, sendMessage };
+  return { messages, loading, sending, wsError, sendMessage };
 }
