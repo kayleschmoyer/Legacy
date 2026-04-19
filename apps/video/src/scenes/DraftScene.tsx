@@ -21,6 +21,7 @@ import {
   POS_INFIELD,
   POS_OUTFIELD,
   POS_PITCHER,
+  GREEN,
   SURFACE_CARD,
   SURFACE_PANEL,
   SURFACE_SUBTLE,
@@ -484,6 +485,47 @@ export const DraftScene: React.FC = () => {
             </div>
           </div>
 
+          {/* Position filters — mirrors real draft page filter tabs */}
+          <div
+            style={{
+              display: 'flex',
+              gap: 8,
+              padding: '10px 32px',
+              borderBottom: `1px solid ${OUTLINE_SUBTLE}`,
+              flexWrap: 'wrap',
+              opacity: interpolate(frame, [5, 20], [0, 1], {
+                extrapolateLeft: 'clamp',
+                extrapolateRight: 'clamp',
+              }),
+            }}
+          >
+            {['ALL', 'SP', 'RP', 'C', '1B', '2B', '3B', 'SS', 'OF'].map(
+              (pos) => {
+                const isSelected = pos === 'ALL';
+                return (
+                  <div
+                    key={pos}
+                    style={{
+                      padding: '6px 14px',
+                      borderRadius: 8,
+                      border: `2px solid ${isSelected ? BRAND_GOLD : PANEL_BORDER}`,
+                      background: isSelected
+                        ? BRAND_GOLD + '22'
+                        : 'transparent',
+                      fontFamily: FONT_DISPLAY,
+                      fontWeight: isSelected ? 700 : 400,
+                      fontSize: 13,
+                      color: isSelected ? TEXT_PRIMARY : TEXT_MUTED,
+                      letterSpacing: '0.04em',
+                    }}
+                  >
+                    {pos}
+                  </div>
+                );
+              },
+            )}
+          </div>
+
           {/* Column headers */}
           <div
             style={{
@@ -615,6 +657,31 @@ export const DraftScene: React.FC = () => {
                     }}
                   >
                     {p.adp}.0
+                  </div>
+
+                  {/* Add-to-queue button — mirrors real draft player row action */}
+                  <div
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 8,
+                      background: isHighlighted ? GREEN + '33' : GREEN + '18',
+                      border: `1px solid ${GREEN}${isHighlighted ? '66' : '33'}`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                      marginLeft: 8,
+                    }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                      <path
+                        d="M7 2v10M2 7h10"
+                        stroke={GREEN}
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                      />
+                    </svg>
                   </div>
                 </div>
               );

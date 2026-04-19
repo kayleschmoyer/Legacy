@@ -9,10 +9,12 @@ import {
 import {
   BG_DARK,
   BRAND_GOLD,
+  BRAND_GOLD_LIGHT,
   BRAND_NAVY,
   FONT_BODY,
   FONT_DISPLAY,
   FONT_MONO,
+  GREEN,
   OUTLINE_SUBTLE,
   PANEL_BORDER,
   POS_INFIELD,
@@ -21,6 +23,7 @@ import {
   POS_CATCHER,
   SURFACE_CARD,
   SURFACE_PANEL,
+  SURFACE_SUBTLE,
   TEXT_MUTED,
   TEXT_PRIMARY,
 } from '../theme';
@@ -119,6 +122,263 @@ const AWAY_TEAM = {
     },
   ],
   total: 105.0,
+};
+
+const ScoreboardCard: React.FC<{ frame: number; fps: number }> = ({
+  frame,
+}) => {
+  const cardOpacity = interpolate(frame, [0, 18], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
+
+  const homeScore = interpolate(frame, [15, 75], [0, HOME_TEAM.total], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
+  const awayScore = interpolate(frame, [15, 75], [0, AWAY_TEAM.total], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
+  const gamesCompleted = Math.floor(
+    interpolate(frame, [0, 200], [0, 4], {
+      extrapolateLeft: 'clamp',
+      extrapolateRight: 'clamp',
+    }),
+  );
+
+  return (
+    <div
+      style={{
+        background: SURFACE_PANEL,
+        border: `1px solid ${PANEL_BORDER}`,
+        borderRadius: 14,
+        overflow: 'hidden',
+        opacity: cardOpacity,
+        flexShrink: 0,
+      }}
+    >
+      {/* Top bar */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 16,
+          padding: '14px 28px',
+          borderBottom: `1px solid ${PANEL_BORDER}`,
+          background: SURFACE_SUBTLE,
+        }}
+      >
+        {/* Swords icon */}
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path
+            d="M3 3l10 10M13 3L3 13"
+            stroke={BRAND_GOLD}
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
+          <circle cx="8" cy="8" r="1.5" fill={BRAND_GOLD} fillOpacity="0.6" />
+        </svg>
+        <span
+          style={{
+            fontFamily: FONT_DISPLAY,
+            fontWeight: 700,
+            fontSize: 14,
+            color: BRAND_GOLD,
+            textTransform: 'uppercase',
+            letterSpacing: '0.1em',
+          }}
+        >
+          Week 7
+        </span>
+        <div style={{ width: 1, height: 16, background: PANEL_BORDER }} />
+        <span
+          style={{
+            fontFamily: FONT_BODY,
+            fontSize: 13,
+            color: TEXT_MUTED,
+          }}
+        >
+          {gamesCompleted} of 8 games completed
+        </span>
+
+        {/* IN PROGRESS badge */}
+        <div
+          style={{
+            marginLeft: 'auto',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 7,
+            background: GREEN + '1A',
+            border: `1px solid ${GREEN}44`,
+            borderRadius: 999,
+            padding: '5px 14px',
+          }}
+        >
+          <div
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: '50%',
+              background: GREEN,
+            }}
+          />
+          <span
+            style={{
+              fontFamily: FONT_DISPLAY,
+              fontWeight: 700,
+              fontSize: 12,
+              color: GREEN,
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+            }}
+          >
+            In Progress
+          </span>
+        </div>
+      </div>
+
+      {/* Score panels */}
+      <div style={{ display: 'flex' }}>
+        {/* Home team — leading */}
+        <div
+          style={{
+            flex: 1,
+            padding: '24px 48px',
+            textAlign: 'center',
+            background: BRAND_NAVY + '22',
+          }}
+        >
+          <div
+            style={{
+              fontFamily: FONT_DISPLAY,
+              fontWeight: 700,
+              fontSize: 18,
+              color: BRAND_GOLD,
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
+              marginBottom: 8,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            {HOME_TEAM.name}
+          </div>
+          <div
+            style={{
+              fontFamily: FONT_DISPLAY,
+              fontWeight: 800,
+              fontSize: 56,
+              color: BRAND_GOLD_LIGHT,
+              fontVariantNumeric: 'tabular-nums',
+              letterSpacing: '-1px',
+              lineHeight: 1,
+            }}
+          >
+            {homeScore.toFixed(2)}
+          </div>
+          <div
+            style={{
+              fontFamily: FONT_BODY,
+              fontSize: 13,
+              color: BRAND_GOLD + 'AA',
+              marginTop: 8,
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em',
+            }}
+          >
+            Leading · {HOME_TEAM.record}
+          </div>
+        </div>
+
+        {/* VS divider */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '0 32px',
+            flexShrink: 0,
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 8,
+            }}
+          >
+            <div style={{ width: 1, height: 32, background: PANEL_BORDER }} />
+            <span
+              style={{
+                fontFamily: FONT_DISPLAY,
+                fontWeight: 900,
+                fontSize: 16,
+                color: TEXT_MUTED,
+                letterSpacing: '0.1em',
+              }}
+            >
+              VS
+            </span>
+            <div style={{ width: 1, height: 32, background: PANEL_BORDER }} />
+          </div>
+        </div>
+
+        {/* Away team */}
+        <div
+          style={{
+            flex: 1,
+            padding: '24px 48px',
+            textAlign: 'center',
+          }}
+        >
+          <div
+            style={{
+              fontFamily: FONT_DISPLAY,
+              fontWeight: 700,
+              fontSize: 18,
+              color: TEXT_MUTED,
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
+              marginBottom: 8,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            {AWAY_TEAM.name}
+          </div>
+          <div
+            style={{
+              fontFamily: FONT_DISPLAY,
+              fontWeight: 800,
+              fontSize: 56,
+              color: TEXT_PRIMARY,
+              fontVariantNumeric: 'tabular-nums',
+              letterSpacing: '-1px',
+              lineHeight: 1,
+            }}
+          >
+            {awayScore.toFixed(2)}
+          </div>
+          <div
+            style={{
+              fontFamily: FONT_BODY,
+              fontSize: 13,
+              color: TEXT_MUTED,
+              marginTop: 8,
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em',
+            }}
+          >
+            {AWAY_TEAM.record}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 const TeamColumn: React.FC<{
@@ -359,113 +619,19 @@ export const MatchupScene: React.FC = () => {
 
   const showAll = frame > 8;
 
-  // Week label
-  const headerOpacity = interpolate(frame, [0, 18], [0, 1], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
-
   return (
     <AbsoluteFill
       style={{
         background: BG_DARK,
         display: 'flex',
         flexDirection: 'column',
-        padding: '52px 80px',
-        gap: 32,
+        padding: '40px 80px',
+        gap: 24,
         opacity: sceneIn * exitOpacity,
       }}
     >
-      {/* Header */}
-      <div style={{ opacity: headerOpacity }}>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <div>
-            <div
-              style={{
-                fontFamily: FONT_DISPLAY,
-                fontWeight: 700,
-                fontSize: 14,
-                color: BRAND_GOLD,
-                letterSpacing: '0.18em',
-                textTransform: 'uppercase',
-                marginBottom: 8,
-              }}
-            >
-              Week 7 Matchup · Running the Season
-            </div>
-            <div
-              style={{
-                fontFamily: FONT_DISPLAY,
-                fontWeight: 800,
-                fontSize: 56,
-                color: TEXT_PRIMARY,
-                textTransform: 'uppercase',
-                letterSpacing: '0.01em',
-                lineHeight: 1,
-              }}
-            >
-              WEEKLY SCORING
-            </div>
-          </div>
-
-          {/* Games remaining badge */}
-          <div
-            style={{
-              background: SURFACE_PANEL,
-              border: `1px solid ${PANEL_BORDER}`,
-              borderRadius: 12,
-              padding: '16px 28px',
-              textAlign: 'center',
-            }}
-          >
-            <div
-              style={{
-                fontFamily: FONT_MONO,
-                fontWeight: 700,
-                fontSize: 36,
-                color: TEXT_PRIMARY,
-                fontVariantNumeric: 'tabular-nums',
-              }}
-            >
-              {Math.max(
-                0,
-                Math.floor(
-                  interpolate(frame, [0, 200], [12, 4], {
-                    extrapolateLeft: 'clamp',
-                    extrapolateRight: 'clamp',
-                  }),
-                ),
-              )}
-            </div>
-            <div
-              style={{
-                fontFamily: FONT_BODY,
-                fontSize: 13,
-                color: TEXT_MUTED,
-                textTransform: 'uppercase',
-                letterSpacing: '0.08em',
-              }}
-            >
-              Games Left
-            </div>
-          </div>
-        </div>
-
-        {/* Horizontal rule */}
-        <div
-          style={{
-            marginTop: 20,
-            height: 1,
-            background: `linear-gradient(90deg, ${BRAND_GOLD}44, transparent)`,
-          }}
-        />
-      </div>
+      {/* Scoreboard — mirrors the real MatchupScoreboard component */}
+      <ScoreboardCard frame={frame} fps={fps} />
 
       {/* Matchup columns */}
       <div
