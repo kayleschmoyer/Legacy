@@ -59,9 +59,13 @@ export function useLeagueChat(leagueId: number): {
   const refetchRef = useRef(refetchHistory);
   refetchRef.current = refetchHistory;
 
-  // Sync history into local state
+  // Sync history into local state.
+  // leagueId is included in deps so this effect is invalidated when the league
+  // switches, and loading guards against applying data that arrived for a
+  // previous leagueId while the new fetch is still in-flight (network-only
+  // keeps stale data in the observable until the fresh response lands).
   useEffect(() => {
-    if (!historyData) return;
+    if (!historyData || loading) return;
     const sorted = [...(historyData.getLeagueMessages ?? [])].reverse();
     const historyItems: ChatMessage[] = sorted.map((msg) => {
       let parsedMetadata: Record<string, unknown> | null = null;
@@ -90,7 +94,7 @@ export function useLeagueChat(leagueId: number): {
       const wsOnly = prev.filter((m) => !historyIds.has(m.id));
       return [...historyItems, ...wsOnly];
     });
-  }, [historyData]);
+  }, [historyData, leagueId, loading]);
 
   // Reset when leagueId changes
   useEffect(() => {
