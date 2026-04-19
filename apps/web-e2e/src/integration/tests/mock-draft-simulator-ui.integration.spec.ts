@@ -238,8 +238,11 @@ test.describe
       process.env.INTEGRATION_BASE_URL ?? 'https://api.legacy-fantasy.com/';
     async function nudgeDraftPick(): Promise<void> {
       if (!state.leagueId) return;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8_000);
       await fetch(`${gqlBase}graphql`, {
         method: 'POST',
+        signal: controller.signal,
         headers: {
           Authorization: `Bearer ${commissionerJwt}`,
           'Content-Type': 'application/json',
@@ -250,9 +253,11 @@ test.describe
           }`,
           variables: { leagueId: state.leagueId },
         }),
-      }).catch((_err) => {
-        // best-effort nudge — swallow errors; EventBridge is the hard fallback
-      });
+      })
+        .catch((_err) => {
+          // best-effort nudge — swallow errors; EventBridge is the hard fallback
+        })
+        .finally(() => clearTimeout(timeout));
     }
 
     const totalPicks = state.numTeams * state.rosterSize; // 4 × 5 = 20
@@ -261,6 +266,11 @@ test.describe
     let consecutiveMisses = 0;
     // Reload only after 3× the pick timer with no progress (3 × 30 s = 90 s)
     const MAX_MISSES = 90;
+    // Reload if "YOUR PICK" shows but no clickable button appears for too long.
+    // Indicates Apollo cache stale (server has pick committed but client doesn't
+    // know) — LS-3704. 15 × 1 s iterations = 15 s before reload.
+    let noButtonFoundCount = 0;
+    const MAX_NO_BUTTON_FOUND = 15;
     let lastNudgeMs = -Infinity;
     const NUDGE_INTERVAL_MS = 5_000;
 
@@ -369,14 +379,29 @@ test.describe
             if (wasAccepted) {
               pickCount++;
               consecutiveMisses = 0;
+              noButtonFoundCount = 0;
               const playerName = ariaLabel
                 ?.replace(/^Draft\s+/i, '')
                 .replace(/\s+now$/i, '');
               if (playerName) draftedPlayers.add(playerName);
             }
           } else {
-            // "YOUR PICK" visible but no undrafted button found — give the UI a moment
-            await page.waitForTimeout(1_000);
+            // "YOUR PICK" visible but no clickable "Draft X now" button found.
+            // This can happen when the Apollo cache is stale after a chain error
+            // (LS-3704): the server committed the pick but the client didn't
+            // receive a success response, so the UI is stuck on the user's
+            // previously-completed turn. Reload to resync state.
+            noButtonFoundCount++;
+            if (noButtonFoundCount > MAX_NO_BUTTON_FOUND) {
+              await page.reload();
+              await page.waitForLoadState('load');
+              await page.waitForTimeout(3_000);
+              noButtonFoundCount = 0;
+              consecutiveMisses = 0;
+              lastNudgeMs = -Infinity;
+            } else {
+              await page.waitForTimeout(1_000);
+            }
           }
         } else {
           // AI's turn — nudge the server directly every 5 s and poll for
