@@ -294,7 +294,7 @@ test.describe('Player Comparison – page structure (premium) @smoke', () => {
 
   test('shows Player Comparison heading', async ({ page }) => {
     await expect(
-      page.getByRole('heading', { name: /player comparison/i }).first(),
+      page.getByRole('heading', { name: /compare up to four/i }).first(),
     ).toBeVisible();
   });
 
@@ -303,18 +303,18 @@ test.describe('Player Comparison – page structure (premium) @smoke', () => {
   });
 
   test('shows placeholder text in search input', async ({ page }) => {
-    await expect(page.getByPlaceholder('Search for a player…')).toBeVisible();
+    await expect(page.getByPlaceholder('Search player name…')).toBeVisible();
   });
 
-  test('shows "Select Players" label with count', async ({ page }) => {
-    await expect(page.getByText(/Select Players \(0\/4\)/)).toBeVisible();
+  test('shows player slot label', async ({ page }) => {
+    await expect(page.getByText('Add player · up to 4')).toBeVisible();
   });
 
   test('shows minimum player hint when fewer than 2 selected', async ({
     page,
   }) => {
     await expect(
-      page.getByText(/add at least 2 players to see the comparison table/i),
+      page.getByText(/add at least 2 players to run the comparison/i),
     ).toBeVisible();
   });
 });
@@ -364,10 +364,12 @@ adminTest.describe('Player Comparison – player search @regression', () => {
       await input.fill('Aa');
       await page.getByText('Aaron Judge').click();
 
-      // Player count should now be 1/4
-      await expect(page.getByText(/Select Players \(1\/4\)/)).toBeVisible();
       // Player chip appears
       await expect(page.getByText('Aaron Judge').first()).toBeVisible();
+      // Hint updates to show 1 player selected
+      await expect(
+        page.getByText('1 of 4 selected · 3 slots open'),
+      ).toBeVisible();
     },
   );
 
@@ -384,7 +386,9 @@ adminTest.describe('Player Comparison – player search @regression', () => {
       await page.getByText('Shohei Ohtani').click({ timeout: 2000 });
     }).toPass({ timeout: 15000 });
 
-    await expect(page.getByText(/Select Players \(2\/4\)/)).toBeVisible();
+    await expect(
+      page.getByText('2 of 4 selected · 2 slots open'),
+    ).toBeVisible();
   });
 });
 
@@ -417,7 +421,7 @@ adminTest.describe('Player Comparison – comparison table @regression', () => {
     'minimum player hint disappears once 2 players are selected',
     async ({ page }) => {
       await expect(
-        page.getByText(/add at least 2 players to see the comparison table/i),
+        page.getByText(/add at least 2 players to run the comparison/i),
       ).not.toBeVisible();
     },
   );
@@ -473,8 +477,10 @@ adminTest.describe('Player Comparison – remove player @regression', () => {
     async ({ page }) => {
       await page.getByRole('button', { name: /remove aaron judge/i }).click();
 
-      // Count returns to 0/4
-      await expect(page.getByText(/Select Players \(0\/4\)/)).toBeVisible();
+      // Hint returns to the minimum-player prompt after chip removed
+      await expect(
+        page.getByText(/add at least 2 players to run the comparison/i),
+      ).toBeVisible();
     },
   );
 
@@ -492,7 +498,7 @@ adminTest.describe('Player Comparison – remove player @regression', () => {
       await page.getByRole('button', { name: /remove aaron judge/i }).click();
 
       await expect(
-        page.getByText(/add at least 2 players to see the comparison table/i),
+        page.getByText(/add at least 2 players to run the comparison/i),
       ).toBeVisible();
     },
   );
@@ -595,7 +601,7 @@ unauthTest.describe(
       'does not show the player comparison tool when not authenticated',
       async ({ page }) => {
         await expect(
-          page.getByRole('heading', { name: /player comparison/i }),
+          page.getByRole('heading', { name: /compare up to four/i }),
         ).not.toBeVisible();
       },
     );

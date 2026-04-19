@@ -579,19 +579,19 @@ test.describe('Player Comparison – empty state @smoke', () => {
     await page.waitForLoadState('load');
   });
 
-  test('shows "No players selected" empty state card', async ({ page }) => {
-    await expect(page.getByText('No players selected')).toBeVisible();
+  test('shows "Nobody on deck yet." empty state card', async ({ page }) => {
+    await expect(page.getByText('Nobody on deck yet.')).toBeVisible();
   });
 
-  test('shows draft preparation hint in empty state', async ({ page }) => {
+  test('shows comparison hint in empty state', async ({ page }) => {
     await expect(
-      page.getByText(/draft preparation and free agent evaluation/i),
+      page.getByText(/add at least two players to begin comparing/i),
     ).toBeVisible();
   });
 
   test('empty state disappears after adding first player', async ({ page }) => {
     await addPlayer(page, 'Aa', 'Aaron Judge');
-    await expect(page.getByText('No players selected')).not.toBeVisible();
+    await expect(page.getByText('Nobody on deck yet.')).not.toBeVisible();
   });
 });
 
@@ -714,8 +714,8 @@ adminTest.describe(
       await addPlayer(page, 'Sh', 'Shohei Ohtani');
     });
 
-    adminTest('shows Season-by-Season Breakdown heading', async ({ page }) => {
-      await expect(page.getByText('Season-by-Season Breakdown')).toBeVisible();
+    adminTest('shows Season by Season heading', async ({ page }) => {
+      await expect(page.getByText('Season by Season')).toBeVisible();
     });
 
     adminTest('shows Batting by Season table for Judge', async ({ page }) => {
@@ -749,7 +749,7 @@ adminTest.describe(
       'season batting table shows column headers (Year, G, AB, H, HR, etc.)',
       async ({ page }) => {
         // Locate within the season breakdown section
-        const seasonSection = page.getByText('Season-by-Season Breakdown');
+        const seasonSection = page.getByText('Season by Season');
         await expect(seasonSection).toBeVisible();
 
         // Column headers for batting table
@@ -806,15 +806,17 @@ adminTest.describe('Player Comparison – max players (4/4) @regression', () => 
     await addPlayer(page, 'Mi', 'Mike Trout');
   });
 
-  adminTest('shows 4/4 player count', async ({ page }) => {
-    await expect(page.getByText(/Select Players \(4\/4\)/)).toBeVisible();
+  adminTest('shows 4/4 player count hint', async ({ page }) => {
+    await expect(
+      page.getByText('4 of 4 selected · 0 slots open'),
+    ).toBeVisible();
   });
 
   adminTest(
-    'search input shows "Max 4 players selected" placeholder when at capacity',
+    'search input shows capacity-reached placeholder when at max',
     async ({ page }) => {
       await expect(
-        page.getByPlaceholder('Max 4 players selected'),
+        page.getByPlaceholder('4 players selected — remove one to add more'),
       ).toBeVisible();
     },
   );
@@ -822,7 +824,9 @@ adminTest.describe('Player Comparison – max players (4/4) @regression', () => 
   adminTest(
     'search input is disabled when at max capacity',
     async ({ page }) => {
-      const input = page.getByPlaceholder('Max 4 players selected');
+      const input = page.getByPlaceholder(
+        '4 players selected — remove one to add more',
+      );
       await expect(input).toBeDisabled();
     },
   );
@@ -839,8 +843,8 @@ adminTest.describe('Player Comparison – max players (4/4) @regression', () => 
 
   adminTest('removing a player re-enables search (3/4)', async ({ page }) => {
     await page.getByRole('button', { name: /remove mookie betts/i }).click();
-    await expect(page.getByText(/Select Players \(3\/4\)/)).toBeVisible();
-    await expect(page.getByPlaceholder('Search for a player…')).toBeVisible();
+    await expect(page.getByText('3 of 4 selected · 1 slot open')).toBeVisible();
+    await expect(page.getByPlaceholder('Search player name…')).toBeVisible();
   });
 });
 
@@ -875,9 +879,11 @@ adminTest.describe(
     adminTest(
       'shows 3/4 count and search remains enabled',
       async ({ page }) => {
-        await expect(page.getByText(/Select Players \(3\/4\)/)).toBeVisible();
         await expect(
-          page.getByPlaceholder('Search for a player…'),
+          page.getByText('3 of 4 selected · 1 slot open'),
+        ).toBeVisible();
+        await expect(
+          page.getByPlaceholder('Search player name…'),
         ).toBeVisible();
       },
     );
