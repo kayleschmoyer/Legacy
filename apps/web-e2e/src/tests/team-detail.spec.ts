@@ -88,10 +88,24 @@ function mockMember(overrides: Record<string, unknown> = {}) {
 
 // ── GraphQL Route Handler ─────────────────────────────────────────────────────
 
+interface LeaguePositionMock {
+  __typename: 'LeaguePosition';
+  id: number;
+  leagueId: number;
+  positionType: string;
+}
+
+const DEFAULT_POSITIONS: LeaguePositionMock[] = [
+  { __typename: 'LeaguePosition', id: 1, leagueId: 1, positionType: 'C' },
+  { __typename: 'LeaguePosition', id: 2, leagueId: 1, positionType: '1B' },
+  { __typename: 'LeaguePosition', id: 5, leagueId: 1, positionType: 'SS' },
+];
+
 interface SetupOptions {
   teamMembers?: ReturnType<typeof mockMember>[];
   userTeamId?: number;
   league?: typeof MOCK_LEAGUE;
+  positions?: LeaguePositionMock[];
   errorMembers?: boolean;
 }
 
@@ -103,6 +117,7 @@ async function setupGraphQL(
     teamMembers = [mockMember()],
     userTeamId = 1,
     league = MOCK_LEAGUE,
+    positions = DEFAULT_POSITIONS,
     errorMembers = false,
   } = opts;
 
@@ -162,6 +177,20 @@ async function setupGraphQL(
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { league } }),
+      });
+    } else if (postData.includes('getpositionsforleague')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { leaguePositions: positions } }),
+      });
+    } else if (postData.includes('getteambyid')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: { teamById: { ...teamList[0], managerId: teamList[0]?.owner } },
+        }),
       });
     } else if (postData.includes('updateteambranding')) {
       await route.fulfill({
@@ -284,43 +313,13 @@ test.describe('Team Detail Page – roster @regression', () => {
       teamMembers: [mockMember({ positionId: 5 })],
     });
 
-    // Override the positions query so positionId 5 maps to "SS" (Shortstop).
-    // Registered AFTER setupGraphQL so it runs first in Playwright's LIFO chain.
-    await page.route(
-      (url) =>
-        url.toString().includes('/graphql') &&
-        !url.toString().includes('/@fs/'),
-      async (route) => {
-        const postData = route.request().postData()?.toLowerCase() ?? '';
-        if (postData.includes('getpositionsforleague')) {
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              data: {
-                leaguePositions: [
-                  {
-                    __typename: 'LeaguePosition',
-                    id: 5,
-                    leagueId: 1,
-                    positionType: 'SS',
-                  },
-                ],
-              },
-            }),
-          });
-        } else {
-          await unmockedGraphQLFallback(route);
-        }
-      },
-    );
-
     await page.goto(TEAM_URL);
     await page.waitForLoadState('load');
 
     // The component renders the positionType from the positions query,
-    // not the raw positionId number
-    await expect(page.getByText('SS')).toBeVisible();
+    // not the raw positionId number. Exact match avoids colliding with nav
+    // labels like "Players"+"Stats" whose combined text contains "ss".
+    await expect(page.getByText('SS', { exact: true }).first()).toBeVisible();
   });
 });
 

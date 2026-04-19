@@ -355,8 +355,10 @@ test.describe('Team Detail – roster with positions @regression', () => {
     await page.goto(TEAM_URL);
     await page.waitForLoadState('load');
 
-    // Position ID 5 maps to 'SS' (Shortstop) in our mock positions
-    await expect(page.getByText('SS')).toBeVisible();
+    // Position ID 5 maps to 'SS' (Shortstop) in our mock positions.
+    // Exact match avoids colliding with nav labels like "Players"+"Stats"
+    // whose combined text content contains "ss".
+    await expect(page.getByText('SS', { exact: true }).first()).toBeVisible();
   });
 
   test('shows multiple players with different positions', async ({ page }) => {
