@@ -7,6 +7,7 @@ import { dispatchWorkflow } from './tools/dispatch-workflow.js';
 import { findSession } from './tools/find-session.js';
 import { getLogs } from './tools/get-logs.js';
 import { getPlaywrightReport } from './tools/get-playwright-report.js';
+import { getPlaywrightTestResult } from './tools/get-playwright-test-result.js';
 import { listRuns } from './tools/list-runs.js';
 import { rerun } from './tools/rerun.js';
 import { searchLogs } from './tools/search-logs.js';
@@ -337,6 +338,37 @@ server.tool(
       ),
   },
   async (params) => getPlaywrightReport(params),
+);
+
+server.tool(
+  'ci_get_playwright_test_result',
+  'Read a SINGLE test result out of a Playwright report deployed to legacy-sports-deploys. ' +
+    'Use this (not ci_get_playwright_report) when you already know which test is failing and just need ' +
+    'its error, snippet, stdout/stderr, and attachment list — it keeps the full report out of context. ' +
+    "Matches testTitle as a case-insensitive substring against each test's full title " +
+    '(describe path joined with " > "). If multiple tests match, returns a candidates list instead ' +
+    'of a single result; pass fileName to disambiguate. String fields are truncated to ~4000 chars ' +
+    'so a chatty test cannot overflow the response.',
+  {
+    reportName: z
+      .string()
+      .describe(
+        'Report name as deployed (e.g. "pr-2173" for PR #2173, or the GitHub run ID for push/nightly)',
+      ),
+    testTitle: z
+      .string()
+      .min(1)
+      .describe(
+        'Substring of the test\'s full title (case-insensitive). Full title is the describe path joined by " > ", ending with the test name.',
+      ),
+    fileName: z
+      .string()
+      .optional()
+      .describe(
+        'Optional substring filter on the spec file name (case-insensitive) to disambiguate identical titles across files.',
+      ),
+  },
+  async (params) => getPlaywrightTestResult(params),
 );
 
 server.tool(
