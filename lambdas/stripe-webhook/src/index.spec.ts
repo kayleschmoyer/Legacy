@@ -40,19 +40,17 @@ describe('stripe-webhook handler', () => {
   let handler: HandlerModule['handler'];
   let mockConstructEvent: jest.Mock;
   let mockRunWithInternalClient: jest.Mock;
-  let mockCaptureError: jest.Mock;
 
   beforeEach(() => {
     jest.resetModules();
 
     mockConstructEvent = jest.fn();
     mockRunWithInternalClient = jest.fn();
-    mockCaptureError = jest.fn();
 
     jest.doMock('@legacy-sports/rollbar', () => ({
       getRollbarConfigFromEnv: jest.fn(() => null),
       initRollbar: jest.fn(),
-      captureError: mockCaptureError,
+      captureError: jest.fn(),
       withRollbar: jest.fn(
         (fn: (...args: unknown[]) => unknown) =>
           (...args: unknown[]) =>
@@ -124,16 +122,17 @@ describe('stripe-webhook handler', () => {
   });
 
   describe('idempotency', () => {
-    it('returns 200 immediately when the event was already processed', async () => {
+    it('returns 200 immediately when the event was already claimed by a concurrent invocation', async () => {
       mockConstructEvent.mockReturnValue(fakeStripeEvent());
-      // isEventProcessed → returns a row (already recorded)
+      // claimStripeEvent → INSERT ... ON CONFLICT DO NOTHING RETURNING returns
+      // an empty array because another invocation already inserted the row.
       mockRunWithInternalClient.mockImplementationOnce(
         (_opts: unknown, cb: (db: unknown) => unknown) =>
           cb({
-            select: () => ({
-              from: () => ({
-                where: () => ({
-                  limit: () => Promise.resolve([{ eventId: 'evt_test_123' }]),
+            insert: () => ({
+              values: () => ({
+                onConflictDoNothing: () => ({
+                  returning: () => Promise.resolve([]),
                 }),
               }),
             }),
@@ -145,72 +144,112 @@ describe('stripe-webhook handler', () => {
       expect(result.statusCode).toBe(200);
       const body = JSON.parse(result.body) as { received: boolean };
       expect(body.received).toBe(true);
-      // recordEvent should NOT be called again
+      // No processing or release should run — claim-already-held is the only call.
       expect(mockRunWithInternalClient).toHaveBeenCalledTimes(1);
     });
   });
 
-  describe('recordEvent failure (core bug fix)', () => {
-    it('returns 200 even when recordEvent throws a DB error', async () => {
-      // Use an unhandled event type so only isEventProcessed and recordEvent
-      // are called, keeping the mock setup minimal.
+  describe('processing failure releases the idempotency claim', () => {
+    it('deletes the claim row so Stripe retry can re-process the event', async () => {
       mockConstructEvent.mockReturnValue(
-        fakeStripeEvent({ type: 'invoice.voided' }),
+        fakeStripeEvent({
+          type: 'customer.subscription.updated',
+          data: {
+            object: {
+              id: 'sub_123',
+              customer: 'cus_123',
+              status: 'active',
+              cancel_at_period_end: false,
+              trial_end: null,
+              metadata: { userId: '42' },
+              items: { data: [{ current_period_end: 1700000000 }] },
+            },
+          },
+        }),
       );
 
-      // Call 1: isEventProcessed → not yet recorded
+      // Call 1: claimStripeEvent → we own the claim
       mockRunWithInternalClient.mockImplementationOnce(
         (_opts: unknown, cb: (db: unknown) => unknown) =>
           cb({
-            select: () => ({
-              from: () => ({
-                where: () => ({ limit: () => Promise.resolve([]) }),
+            insert: () => ({
+              values: () => ({
+                onConflictDoNothing: () => ({
+                  returning: () =>
+                    Promise.resolve([{ eventId: 'evt_test_123' }]),
+                }),
               }),
             }),
           }),
       );
 
-      // Call 2: recordEvent → DB insert throws
-      mockRunWithInternalClient.mockImplementationOnce(() => {
-        return Promise.reject(new Error('DB connection lost'));
-      });
+      // Call 2: upsertSubscription's first DB call throws
+      mockRunWithInternalClient.mockImplementationOnce(() =>
+        Promise.reject(new Error('DB unavailable')),
+      );
+
+      // Call 3: releaseStripeEventClaim → delete succeeds
+      const deleteWhere = jest.fn(() => Promise.resolve());
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb({
+            delete: () => ({ where: deleteWhere }),
+          }),
+      );
 
       const result = await handler(makeEvent());
 
-      // Must return 200 — returning 500 here would cause Stripe to retry and
-      // re-run all processing side effects on an already-handled event.
-      expect(result.statusCode).toBe(200);
-      const body = JSON.parse(result.body) as { received: boolean };
-      expect(body.received).toBe(true);
+      // 500 is correct — Stripe will retry now that the claim was released.
+      expect(result.statusCode).toBe(500);
+      expect(deleteWhere).toHaveBeenCalledTimes(1);
     });
 
-    it('captures the error in Rollbar when recordEvent throws', async () => {
+    it('still returns 500 when the claim release itself fails', async () => {
       mockConstructEvent.mockReturnValue(
-        fakeStripeEvent({ type: 'invoice.voided' }),
+        fakeStripeEvent({
+          type: 'customer.subscription.updated',
+          data: {
+            object: {
+              id: 'sub_123',
+              customer: 'cus_123',
+              status: 'active',
+              cancel_at_period_end: false,
+              trial_end: null,
+              metadata: { userId: '42' },
+              items: { data: [{ current_period_end: 1700000000 }] },
+            },
+          },
+        }),
       );
 
+      // claim succeeds
       mockRunWithInternalClient.mockImplementationOnce(
         (_opts: unknown, cb: (db: unknown) => unknown) =>
           cb({
-            select: () => ({
-              from: () => ({
-                where: () => ({ limit: () => Promise.resolve([]) }),
+            insert: () => ({
+              values: () => ({
+                onConflictDoNothing: () => ({
+                  returning: () =>
+                    Promise.resolve([{ eventId: 'evt_test_123' }]),
+                }),
               }),
             }),
           }),
       );
+
+      // processing throws
       mockRunWithInternalClient.mockImplementationOnce(() =>
-        Promise.reject(new Error('DB connection lost')),
+        Promise.reject(new Error('DB unavailable')),
       );
 
-      await handler(makeEvent());
-
-      expect(mockCaptureError).toHaveBeenCalledWith(
-        expect.any(Error),
-        expect.objectContaining({
-          tags: expect.objectContaining({ lambda: 'stripe-webhook' }),
-        }),
+      // release also throws
+      mockRunWithInternalClient.mockImplementationOnce(() =>
+        Promise.reject(new Error('Release failed')),
       );
+
+      const result = await handler(makeEvent());
+
+      expect(result.statusCode).toBe(500);
     });
   });
 
@@ -234,13 +273,16 @@ describe('stripe-webhook handler', () => {
         }),
       );
 
-      // isEventProcessed → not yet recorded
+      // claimStripeEvent → we own the claim
       mockRunWithInternalClient.mockImplementationOnce(
         (_opts: unknown, cb: (db: unknown) => unknown) =>
           cb({
-            select: () => ({
-              from: () => ({
-                where: () => ({ limit: () => Promise.resolve([]) }),
+            insert: () => ({
+              values: () => ({
+                onConflictDoNothing: () => ({
+                  returning: () =>
+                    Promise.resolve([{ eventId: 'evt_test_123' }]),
+                }),
               }),
             }),
           }),
@@ -249,6 +291,14 @@ describe('stripe-webhook handler', () => {
       // First subscription DB call inside upsertSubscription → throws
       mockRunWithInternalClient.mockImplementationOnce(() =>
         Promise.reject(new Error('DB unavailable')),
+      );
+
+      // releaseStripeEventClaim → delete succeeds
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb({
+            delete: () => ({ where: () => Promise.resolve() }),
+          }),
       );
 
       const result = await handler(makeEvent());
@@ -264,24 +314,17 @@ describe('stripe-webhook handler', () => {
         fakeStripeEvent({ type: 'invoice.voided' }),
       );
 
-      // isEventProcessed → not yet recorded
-      mockRunWithInternalClient.mockImplementationOnce(
-        (_opts: unknown, cb: (db: unknown) => unknown) =>
-          cb({
-            select: () => ({
-              from: () => ({
-                where: () => ({ limit: () => Promise.resolve([]) }),
-              }),
-            }),
-          }),
-      );
-
-      // recordEvent → succeeds (insert, onConflictDoNothing)
+      // claimStripeEvent → we own the claim (insert returned a row)
       mockRunWithInternalClient.mockImplementationOnce(
         (_opts: unknown, cb: (db: unknown) => unknown) =>
           cb({
             insert: () => ({
-              values: () => ({ onConflictDoNothing: () => Promise.resolve() }),
+              values: () => ({
+                onConflictDoNothing: () => ({
+                  returning: () =>
+                    Promise.resolve([{ eventId: 'evt_test_123' }]),
+                }),
+              }),
             }),
           }),
       );

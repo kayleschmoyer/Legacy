@@ -103,12 +103,20 @@ function makeSelectThenUpdateDb(
   };
 }
 
-/** DB that handles recordEvent (insert + onConflictDoNothing). */
-function makeRecordEventDb() {
+/**
+ * DB that handles claimStripeEvent — insert + onConflictDoNothing + returning.
+ * `claimed` controls whether the insert returned a row (true = we own the claim,
+ * false = another invocation already claimed this event).
+ */
+function makeClaimEventDb(claimed: boolean) {
   return {
     insert: jest.fn(() => ({
       values: jest.fn(() => ({
-        onConflictDoNothing: jest.fn(() => Promise.resolve()),
+        onConflictDoNothing: jest.fn(() => ({
+          returning: jest.fn(() =>
+            Promise.resolve(claimed ? [{ eventId: 'evt_test' }] : []),
+          ),
+        })),
       })),
     })),
   };
@@ -201,27 +209,23 @@ describe('stripe-webhook event handlers', () => {
 
   afterEach(() => jest.clearAllMocks());
 
-  // ── Helpers for the common isEventProcessed + recordEvent bookends ─────────
+  // ── Helpers for the idempotency claim ──────────────────────────────────────
 
-  /** Setup Call 1: isEventProcessed returns empty (not already processed). */
+  /** Setup Call 1: claimStripeEvent inserts a new row → returns true. */
   function setupNotProcessed() {
     mockRunWithInternalClient.mockImplementationOnce(
       (_opts: unknown, cb: (db: unknown) => unknown) =>
-        cb({
-          select: () => ({
-            from: () => ({
-              where: () => ({ limit: () => Promise.resolve([]) }),
-            }),
-          }),
-        }),
+        cb(makeClaimEventDb(true)),
     );
   }
 
-  /** Setup final call: recordEvent succeeds. */
+  /**
+   * Back-compat shim for the previous two-step claim flow. The handler now
+   * claims up front via `claimStripeEvent`, so there is no trailing record
+   * step to mock — existing test scaffolding keeps calling this as a no-op.
+   */
   function setupRecordEvent() {
-    mockRunWithInternalClient.mockImplementationOnce(
-      (_opts: unknown, cb: (db: unknown) => unknown) => cb(makeRecordEventDb()),
-    );
+    // no-op: claimStripeEvent is handled by setupNotProcessed()
   }
 
   // ── checkout.session.completed ─────────────────────────────────────────────
@@ -288,8 +292,8 @@ describe('stripe-webhook event handlers', () => {
 
       // Graceful skip — no error
       expect(result.statusCode).toBe(200);
-      // upsertSubscription was not called (only isEventProcessed + recordEvent)
-      expect(mockRunWithInternalClient).toHaveBeenCalledTimes(2);
+      // upsertSubscription was not called (only the idempotency claim ran)
+      expect(mockRunWithInternalClient).toHaveBeenCalledTimes(1);
     });
 
     it('triggers clearLeagueTierFreezes when new subscription activates (free→premium)', async () => {
@@ -679,7 +683,7 @@ describe('stripe-webhook event handlers', () => {
 
       // No subscription ID → skip handlePaymentFailed entirely
       expect(result.statusCode).toBe(200);
-      expect(mockRunWithInternalClient).toHaveBeenCalledTimes(2); // only isEventProcessed + recordEvent
+      expect(mockRunWithInternalClient).toHaveBeenCalledTimes(1); // only the idempotency claim ran
     });
   });
 
@@ -770,8 +774,8 @@ describe('stripe-webhook event handlers', () => {
       const result = await handler(makeEvent());
 
       expect(result.statusCode).toBe(200);
-      // Only isEventProcessed + recordEvent — no extra DB calls
-      expect(mockRunWithInternalClient).toHaveBeenCalledTimes(2);
+      // Only the idempotency claim — no extra DB calls
+      expect(mockRunWithInternalClient).toHaveBeenCalledTimes(1);
 
       // Push notification should be published for trial ending
       expect(mockPushPublish).toHaveBeenCalledWith(
@@ -808,8 +812,8 @@ describe('stripe-webhook event handlers', () => {
       const result = await handler(makeEvent());
 
       expect(result.statusCode).toBe(200);
-      // isEventProcessed + userId DB lookup + recordEvent = 3 calls
-      expect(mockRunWithInternalClient).toHaveBeenCalledTimes(3);
+      // claim + userId DB lookup = 2 calls
+      expect(mockRunWithInternalClient).toHaveBeenCalledTimes(2);
     });
 
     it('returns 200 when no subscription record exists for trial_will_end', async () => {

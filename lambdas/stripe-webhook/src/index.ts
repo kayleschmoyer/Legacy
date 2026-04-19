@@ -106,23 +106,34 @@ function tierFromStatus(status: string): 'free' | 'premium' {
 
 // ── DB helpers ────────────────────────────────────────────────────────────────
 
-async function isEventProcessed(eventId: string): Promise<boolean> {
+/**
+ * Atomically claim a Stripe event for processing.
+ *
+ * Returns true if this invocation inserted the dedupe row (we own processing),
+ * false if another invocation already claimed it. Closes the concurrent-delivery
+ * race where two near-simultaneous retries would both see the event as unseen.
+ */
+async function claimStripeEvent(eventId: string): Promise<boolean> {
   return runWithInternalClient(getDbOptions(), async (db) => {
     const rows = await db
-      .select()
-      .from(InternalSchema.stripeEvents)
-      .where(eq(InternalSchema.stripeEvents.eventId, eventId))
-      .limit(1);
+      .insert(InternalSchema.stripeEvents)
+      .values({ eventId })
+      .onConflictDoNothing()
+      .returning({ eventId: InternalSchema.stripeEvents.eventId });
     return rows.length > 0;
   });
 }
 
-async function recordEvent(eventId: string): Promise<void> {
+/**
+ * Release a previously-claimed Stripe event so Stripe's retry will re-run it.
+ * Used when processing throws after a successful claim — without this, the
+ * dedupe row would short-circuit every retry and the event would be lost.
+ */
+async function releaseStripeEventClaim(eventId: string): Promise<void> {
   await runWithInternalClient(getDbOptions(), async (db) => {
     await db
-      .insert(InternalSchema.stripeEvents)
-      .values({ eventId })
-      .onConflictDoNothing();
+      .delete(InternalSchema.stripeEvents)
+      .where(eq(InternalSchema.stripeEvents.eventId, eventId));
   });
 }
 
@@ -730,10 +741,12 @@ const baseStripeWebhookHandler = async (
     eventType: stripeEvent.type,
   });
 
-  // Idempotency check
-  const alreadyProcessed = await isEventProcessed(stripeEvent.id);
-  if (alreadyProcessed) {
-    LOGGER.info('Stripe event already processed — skipping', {
+  // Idempotency: atomically claim the event before running any side effects.
+  // If claimStripeEvent returns false, another invocation already claimed it
+  // (concurrent Stripe retry) — acknowledge and exit without re-processing.
+  const claimed = await claimStripeEvent(stripeEvent.id);
+  if (!claimed) {
+    LOGGER.info('Stripe event already claimed — skipping', {
       eventId: stripeEvent.id,
     });
     return { statusCode: 200, body: JSON.stringify({ received: true }) };
@@ -890,28 +903,27 @@ const baseStripeWebhookHandler = async (
         ...(!(err instanceof Error) && { originalError: err }),
       },
     );
+    // Release the claim so Stripe's retry re-runs this event. If the release
+    // itself fails, log and fall through — a stuck claim for a failed event is
+    // the lesser evil compared to silently dropping the 500 response.
+    try {
+      await releaseStripeEventClaim(stripeEvent.id);
+    } catch (releaseErr) {
+      LOGGER.error(
+        'Failed to release Stripe event claim after processing error — event may be stuck in dedupe table',
+        releaseErr instanceof Error
+          ? releaseErr
+          : new Error(String(releaseErr)),
+        {
+          eventId: stripeEvent.id,
+          tags: { lambda: 'stripe-webhook', eventType: stripeEvent.type },
+        },
+      );
+    }
     return {
       statusCode: 500,
       body: JSON.stringify({ error: 'Internal server error' }),
     };
-  }
-
-  // Record event as processed (idempotency).
-  // Must NOT throw: if recordEvent fails and we return 500, Stripe will retry
-  // and re-run all processing side effects (pushSubscriptionUpdated, tier
-  // changes, etc.) on an event that was already successfully handled.
-  try {
-    await recordEvent(stripeEvent.id);
-  } catch (err) {
-    LOGGER.error(
-      'Failed to record Stripe event — idempotency record missing; returning 200 to prevent duplicate side effects on retry',
-      err instanceof Error ? err : new Error(String(err)),
-      {
-        eventId: stripeEvent.id,
-        tags: { lambda: 'stripe-webhook', eventType: stripeEvent.type },
-        ...(!(err instanceof Error) && { originalError: err }),
-      },
-    );
   }
 
   // Push real-time tier update to the user's WebSocket connections.
