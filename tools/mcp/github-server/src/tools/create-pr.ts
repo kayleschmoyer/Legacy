@@ -85,26 +85,27 @@ export async function createPR(params: CreatePRParams): Promise<ToolResult> {
   try {
     const repo = await getRepoOwnerName();
 
-    // Use explicitly provided head, then current local branch, then upstream tracking ref.
-    // Current branch is preferred over upstream because the upstream may point to "origin/main"
-    // in a fresh worktree before the first push, causing a 422 "No commits between main and main".
+    // Determine PR head branch. Priority: explicit param > upstream tracking ref > local branch name.
+    // Upstream is preferred over local when they differ — worktree_push called with remoteBranch
+    // sets up tracking to a remote ref that differs from the local branch name, and GitHub 422s
+    // if we pass the local name (it doesn't exist as a remote branch). We guard against the
+    // "fresh worktree, upstream=origin/main" case by skipping upstream when it equals base.
+    const base = params.base ?? 'main';
     let head: string;
     if (params.head) {
       head = params.head;
-    } else if (params.worktreePath) {
-      head = await getCurrentBranch(cwd);
     } else {
       const currentBranch = await getCurrentBranch(cwd);
-      if (currentBranch === 'HEAD') {
-        // Detached HEAD — fall back to upstream tracking ref
-        const upstream = await getUpstreamBranch(cwd);
+      const upstream = await getUpstreamBranch(cwd);
+
+      if (upstream && upstream !== base) {
+        head = upstream;
+      } else if (currentBranch === 'HEAD') {
         head = upstream ?? currentBranch;
       } else {
         head = currentBranch;
       }
     }
-
-    const base = params.base ?? 'main';
     if (head === base) {
       return {
         isError: true,
