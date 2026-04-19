@@ -317,11 +317,8 @@ unauthTest.describe('Protected Routes @critical', () => {
     // `(button:visible, [role="button"]:visible)` selector and logged a false
     // positive. Covered here via the correct getByRole locator.
     '/games/season-draft/create',
-    // /baseball/league/join is authenticated-only (LS-3536, LS-3537). Same
-    // scanner false positive — unauthenticated users see PublicLandingPage
-    // with the "Continue with Google" / "Continue with Discord" CTAs, which
-    // the scanner's invalid selector failed to match and mis-reported.
-    '/baseball/league/join',
+    // /baseball/league/join is now a public path (LS-3702) — moved to the
+    // "Public Routes" section below. Invite links must work without prior auth.
     // /baseball/league/create is authenticated-only (LS-3534). Same
     // functional-scan false positive — scanner failed to click "Continue with
     // Google" and logged a 404. Covered here via the correct getByRole locator.
@@ -673,15 +670,17 @@ unauthTest.describe(
 // hits the route unauthenticated and the underlying SPA server was not
 // returning a proper 200 for the catch-all HTML entry point.
 //
-// Expected: unauthenticated navigation to /baseball/league/join returns HTTP
-// 200 and renders the auth gate (landing page with "Continue with Google").
+// LS-3702: /baseball/league/join is now a public path so invite links work
+// without requiring prior authentication. Unauthenticated users see the join
+// form directly instead of the auth gate (the join mutation itself enforces
+// auth server-side).
 // ---------------------------------------------------------------------------
 
 unauthTest.describe(
   'Functional 404 Regression — /baseball/league/join (LS-3479) @critical',
   () => {
     // LS-3479: server must return HTTP 200 (not 404) so the client SPA can
-    // mount and the EnhancedAuthGuard can render the auth gate.
+    // mount and the join page can render.
     unauthTest(
       'returns HTTP 200 on /baseball/league/join when not authenticated (LS-3479)',
       async ({ page }) => {
@@ -690,16 +689,16 @@ unauthTest.describe(
       },
     );
 
-    // LS-3479: unauthenticated users must see the auth gate — the landing
-    // page with "Continue with Google" — not a raw 404 error page.
+    // LS-3702: unauthenticated users now see the join form directly — the
+    // page is publicly accessible so invite links work without prior auth.
     unauthTest(
-      'shows auth gate on /baseball/league/join when not authenticated (LS-3479)',
+      'shows join form on /baseball/league/join when not authenticated (LS-3702)',
       async ({ page }) => {
         await page.goto('/baseball/league/join');
         await page.waitForLoadState('load');
 
         await expect(
-          page.getByRole('button', { name: /continue with google/i }),
+          page.getByRole('heading', { name: /join league/i }),
         ).toBeVisible({ timeout: 15000 });
       },
     );

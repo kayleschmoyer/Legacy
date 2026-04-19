@@ -156,6 +156,11 @@ try {
                   // users see a "Get Started Free" CTA gate instead of being
                   // redirected away (LS-3668).
                   `${basePath}/players/compare`,
+                  // /baseball/league/join and sub-paths (/baseball/league/join/:code)
+                  // are publicly accessible so invite links work without requiring
+                  // prior authentication. The join mutation itself requires auth and
+                  // will surface an error if the user is not signed in (LS-3702).
+                  `${basePath}/baseball/league/join`,
                 ]}
                 // /baseball hub is publicly accessible (LS-3532). Using publicExactPaths
                 // (not publicPaths) so only the landing page is public — sub-routes like
