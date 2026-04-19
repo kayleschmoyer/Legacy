@@ -1,5 +1,6 @@
 // Matchup feature components
 export * from './GamesRemaining';
+export * from './MatchupCard';
 export * from './PlayerProjections';
 export * from './MatchupRecapPanel';
 export * from './LeagueTradeBlock';

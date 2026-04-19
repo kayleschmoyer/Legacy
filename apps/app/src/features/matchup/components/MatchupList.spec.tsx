@@ -19,6 +19,7 @@ jest.mock('tamagui', () => {
   const { View, Text: RNText } =
     jest.requireActual<RNComponents>('react-native');
   return {
+    styled: (Component: unknown) => Component,
     Card: Object.assign(
       ({
         children,

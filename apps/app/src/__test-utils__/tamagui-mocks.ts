@@ -31,7 +31,12 @@ function getRN(): RNWithTextInput {
  * Full set of Tamagui component mocks backed by plain React Native primitives.
  * Each mock accepts a superset of the props used across our test suite.
  */
+function styled<T>(Component: T): T {
+  return Component;
+}
+
 export const tamaguiMocks = {
+  styled,
   Button: ({
     children,
     onPress,
