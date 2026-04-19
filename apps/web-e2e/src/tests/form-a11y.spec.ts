@@ -389,6 +389,13 @@ test.describe('Form field accessibility @regression', () => {
         'Unexpected Application Error',
       );
 
+      // Auth guard initialization runs in a useEffect after the first paint,
+      // so networkidle may fire while the auth loading spinner is still showing.
+      // Wait explicitly for the league name input to confirm the form is rendered.
+      await expect(page.getByPlaceholder('Enter your league name')).toBeVisible(
+        { timeout: 10000 },
+      );
+
       const { inputCount } = await evaluateFormA11y(page);
       // Expect at least one form input on a create page
       expect(inputCount).toBeGreaterThan(0);
