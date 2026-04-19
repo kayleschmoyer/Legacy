@@ -99,7 +99,7 @@ if (!forceInstall) {
     console.error(' node_modules and break every other symlinked worktree.');
     console.error('');
     console.error(' To fix:');
-    console.error('   1. Remove the symlink:  cmd /c "rmdir node_modules"');
+    console.error('   1. Remove the symlink:  rm -rf node_modules');
     console.error('   2. Re-run:               make install');
     console.error('   -- or --');
     console.error(
@@ -189,7 +189,7 @@ if (!forceInstall && process.platform === 'win32' && fs.existsSync(nmPath)) {
         console.error('   - Commit or stash lockfile changes first');
         console.error('   - Clean up idle worktrees:  twig worktree clean');
         console.error('   - Or remove their symlinks:');
-        console.error('     cd <worktree> && cmd /c "rmdir node_modules"');
+        console.error('     cd <worktree> && rm -rf node_modules');
         console.error('   - Or force install:');
         console.error('     $env:FORCE_INSTALL=1; pnpm install');
         console.error('');

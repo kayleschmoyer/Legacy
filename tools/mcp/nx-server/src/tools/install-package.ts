@@ -106,7 +106,7 @@ export async function installPackage(
               error: 'SYMLINK_DETECTED',
               message:
                 'node_modules is a symlink to the main repo. Running pnpm install here would mutate the shared node_modules and break every other worktree. ' +
-                'To install a package: (1) run the install in the main repo directory, or (2) remove the symlink first (cmd /c "rmdir node_modules") then run make install.',
+                'To install a package: (1) run the install in the main repo directory, or (2) remove the symlink first (rm -rf node_modules in Git Bash) then run make install.',
               cwd,
             },
             null,
