@@ -36,7 +36,7 @@ import { store } from './store/store';
 import { initializeAnalytics, trackLogin } from './utils/analytics';
 import { ThemeProvider, useThemeContext } from './context/ThemeContext';
 import { GrowthBookProvider } from './context/GrowthBookProvider';
-import { PublicLandingPage } from './pages/landing/PublicLandingPage';
+import { LoginPage } from './pages/login/LoginPage';
 
 // Initialize Rollbar for web app
 const rollbarConfig = getRollbarConfigFromEnv();
@@ -124,7 +124,7 @@ try {
               <EnhancedAuthGuard
                 loginTitle="Welcome to Legacy Sports!"
                 loginSubtitle="Sign in to access your fantasy leagues and stats"
-                loginComponent={<PublicLandingPage />}
+                loginComponent={<LoginPage />}
                 testMode={env.authTestMode}
                 publicPaths={[
                   `${basePath}/about`,
