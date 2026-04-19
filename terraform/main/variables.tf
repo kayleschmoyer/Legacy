@@ -141,6 +141,18 @@ variable "stripe_publishable_key" {
   default     = ""
 }
 
+variable "stripe_monthly_price_id" {
+  description = "Stripe Price ID for the monthly subscription plan (e.g. price_xxx). From Stripe Dashboard → Products → Prices."
+  type        = string
+  default     = ""
+}
+
+variable "stripe_annual_price_id" {
+  description = "Stripe Price ID for the annual subscription plan (e.g. price_xxx). From Stripe Dashboard → Products → Prices."
+  type        = string
+  default     = ""
+}
+
 variable "stripe_trial_period_days" {
   description = "Number of free trial days offered on new subscriptions (0 = no trial)"
   type        = number

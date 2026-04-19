@@ -50,3 +50,15 @@ discord_client_id = "1493368154972487800"
 # Discord OAuth redirect URI — must match exactly what's registered in
 # the Discord Developer Portal under OAuth2 → Redirects.
 discord_redirect_uri = "https://legacy-fantasy.com/auth/discord/callback"
+
+# ── Stripe Price IDs ──────────────────────────────────────────────────────────
+# Stripe Price IDs for the subscription plans exposed by the GraphQL `stripePrices`
+# query. These are NOT secrets — they are public identifiers that begin with
+# "price_" and are safe to check in. Obtain them from:
+#   Stripe Dashboard → Products → [your product] → Pricing → Price ID
+#
+# If left empty the GraphQL resolver returns null, the frontend falls back to
+# hardcoded display prices, and the "Upgrade" button shows
+# "Upgrade is temporarily unavailable" (LS-3683).
+stripe_monthly_price_id = ""
+stripe_annual_price_id  = ""
