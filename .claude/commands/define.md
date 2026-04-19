@@ -4,6 +4,8 @@ Load the playbook via `Skill(skill: "define")`.
 
 Execute the define skill for: $ARGUMENTS
 
+> Specific invocation: `/define LS-3421` (enrich existing) or `/define "add email verification to signup flow"` (new ticket).
+
 1. Parse arguments — determine whether this is a new ticket or an enrich of an existing one (`LS-####`)
 2. Gather context through targeted dialogue (one round of questions at most)
 3. Draft the structured spec using the standard template (Problem, Goals, Acceptance Criteria, Out of Scope, Technical Approach, Open Questions)

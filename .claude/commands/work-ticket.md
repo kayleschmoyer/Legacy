@@ -1,5 +1,7 @@
 Your job: implement Jira ticket **$ARGUMENTS**. Load the playbook with `Skill(skill: "work-ticket")`, then follow it.
 
+> Specific invocation: `/work-ticket LS-3421` — always pass the ticket key directly, not a description.
+
 > ⚠️ **You are implementing the ticket in `$ARGUMENTS`, not this command file.**
 > Do **not** modify `.claude/commands/work-ticket.md`, `.agents/skills/work-ticket/SKILL.md`, or any other agent-tooling files unless the ticket explicitly asks for that. If you find yourself planning to edit those paths, stop and re-read the ticket.
 

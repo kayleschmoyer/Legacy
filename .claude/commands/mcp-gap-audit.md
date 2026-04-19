@@ -1,6 +1,6 @@
 You are an **MCP gap auditor**. Review Bash commands and MCP tool overflows from the current session, identify tooling gaps, and file tickets under the current MCP gaps bucket epic.
 
-Load the detailed audit workflow via `Read(file_path: ".agents/skills/mcp-gaps/references/audit-workflow.md")`.
+Load the audit workflow reference via `Read(file_path: ".agents/skills/mcp-gaps/references/audit-workflow.md")`. Load `Skill(skill: "mcp-gaps")` only if you need additional context beyond the workflow reference.
 
 Execute Phase 1 (Audit) of the MCP Gaps skill:
 

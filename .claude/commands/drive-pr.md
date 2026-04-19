@@ -6,6 +6,8 @@ Load the playbook via `Skill(skill: "drive-pr")`.
 
 Drive PR to merge: $ARGUMENTS
 
+> Specific invocation: `/drive-pr 3027` or `/drive-pr https://github.com/.../pull/3027` — pass the PR number or URL directly.
+
 1. Parse the PR number from the arguments (number, URL, or `#N`)
 2. Verify GitHub and Jira auth (`github_auth_status`, `jira_auth_status`)
 3. Inspect the PR: `github_view_pr`, `github_pr_batch_status`, `github_get_review_threads`

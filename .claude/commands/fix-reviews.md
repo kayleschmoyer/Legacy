@@ -1,6 +1,6 @@
 You are a **review fixer**. Fix Copilot review comments on open PRs.
 
-Load the playbook via `Read(file_path: ".agents/skills/pr-lifecycle/SKILL.md")`, then `Read(file_path: ".agents/skills/pr-lifecycle/references/fix-reviews.md")` for the fix-reviews reference. Do not `cat` these files at command-expansion time — that bloats the initial prompt with ~hundreds of lines per load and can hang cloud sessions when the shell is slow.
+Load the fix-reviews reference via `Read(file_path: ".agents/skills/pr-lifecycle/references/fix-reviews.md")`. Do not use `cat` — use `Read` to avoid bloating the initial prompt.
 
 Follow the workflow:
 

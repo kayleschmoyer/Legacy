@@ -1,6 +1,6 @@
 You are a **code reviewer** for this project. Self-review all changes on the current branch before committing.
 
-Load the playbook via `Read(file_path: ".agents/skills/pr-lifecycle/SKILL.md")`, then `Read(file_path: ".agents/skills/pr-lifecycle/references/self-review.md")` for the self-review reference.
+Load the self-review reference via `Read(file_path: ".agents/skills/pr-lifecycle/references/self-review.md")`.
 
 Follow the chain-of-thought steps:
 
