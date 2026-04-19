@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import humanizeString from 'humanize-string';
 import { Button, Separator, Text, YStack } from 'tamagui';
 import { ScrollView } from 'react-native';
@@ -91,6 +91,85 @@ const formatScoreDisplay = (
   return '';
 };
 
+interface PlayerRowProps {
+  item: PlayerData;
+  isSelected: boolean;
+  teamMember: TeamMemberFragment | undefined;
+  positionSlot: LeaguePositionFragment | undefined;
+  projValue: number | undefined;
+  actualValue: number | undefined;
+  selectedPlayer: TeamMemberFragment | undefined;
+  selectedPositionMapping: LeaguePositionFragment | undefined;
+  onClick: (item: PlayerData) => void;
+}
+
+const PlayerRow = memo(
+  ({
+    item,
+    isSelected,
+    teamMember,
+    positionSlot,
+    projValue,
+    actualValue,
+    selectedPlayer,
+    selectedPositionMapping,
+    onClick,
+  }: PlayerRowProps): React.JSX.Element => {
+    const scoreColor = computeScoreColor(actualValue, projValue);
+    const scoreDisplay = formatScoreDisplay(actualValue, projValue);
+
+    return (
+      <YStack
+        backgroundColor={isSelected ? '$primary' : '$background'}
+        padding="$3"
+        flexDirection="row"
+        alignItems="center"
+        justifyContent="space-between"
+      >
+        <Button
+          size="$2"
+          onPress={() => onClick(item)}
+          disabled={
+            !canPlayerPlayPosition(selectedPlayer, positionSlot) ||
+            !canPlayerPlayPosition(teamMember, selectedPositionMapping) ||
+            (selectedPositionMapping === undefined &&
+              positionSlot === undefined &&
+              selectedPlayer !== undefined &&
+              selectedPlayer !== teamMember)
+          }
+          theme="active"
+        >
+          {positionSlot?.positionType
+            ? humanizeString(positionSlot.positionType)
+                .toUpperCase()
+                .replace(' ', '')
+            : teamMember &&
+                isPlayerPitcher(teamMember) &&
+                !isPlayerBatter(teamMember)
+              ? 'BP'
+              : 'BE'}
+        </Button>
+
+        <Text flex={1} textAlign="center">
+          {getPlayerName(teamMember)}
+        </Text>
+
+        <Text color={scoreColor}>{scoreDisplay}</Text>
+      </YStack>
+    );
+  },
+  (prev, next) =>
+    prev.item === next.item &&
+    prev.isSelected === next.isSelected &&
+    prev.teamMember === next.teamMember &&
+    prev.positionSlot === next.positionSlot &&
+    prev.projValue === next.projValue &&
+    prev.actualValue === next.actualValue &&
+    prev.selectedPlayer === next.selectedPlayer &&
+    prev.selectedPositionMapping === next.selectedPositionMapping &&
+    prev.onClick === next.onClick,
+);
+
 export interface LineupEditorProps {
   availableRosterSlots: readonly LeaguePositionFragment[];
   onPlayerAdded: (
@@ -138,6 +217,33 @@ export function LineupEditor(props: LineupEditorProps): React.JSX.Element {
   const [selectedPlayerData, setSelectedPlayerData] = useState<
     BenchPlayerData | StarterData | undefined
   >(undefined);
+
+  const rosterSlotById = useMemo(() => {
+    const map = new Map<number, LeaguePositionFragment>();
+    for (const slot of availableRosterSlots) {
+      const id = normalizeNumericIdentifier(slot.id);
+      if (id !== undefined) map.set(id, slot);
+    }
+    return map;
+  }, [availableRosterSlots]);
+
+  const teamMemberByPlayerId = useMemo(() => {
+    const map = new Map<number, TeamMemberFragment>();
+    for (const member of team) {
+      const id = normalizeNumericIdentifier(member.playerId);
+      if (id !== undefined) map.set(id, member);
+    }
+    return map;
+  }, [team]);
+
+  const teamMemberByPositionId = useMemo(() => {
+    const map = new Map<number, TeamMemberFragment>();
+    for (const member of team) {
+      const id = normalizeNumericIdentifier(member.positionId);
+      if (id !== undefined) map.set(id, member);
+    }
+    return map;
+  }, [team]);
 
   const selectedPositionMapping = useMemo(() => {
     switch (selectedPlayerData?.type) {
@@ -276,9 +382,7 @@ export function LineupEditor(props: LineupEditorProps): React.JSX.Element {
         continue;
       }
 
-      const teamMember = team.find(
-        (t) => normalizeNumericIdentifier(t.positionId) === mappingId,
-      );
+      const teamMember = teamMemberByPositionId.get(mappingId);
 
       result.push({
         playerId: normalizeNumericIdentifier(teamMember?.playerId),
@@ -311,7 +415,13 @@ export function LineupEditor(props: LineupEditorProps): React.JSX.Element {
     }
 
     return result;
-  }, [team, availableRosterSlots, selectedPlayer, selectedPositionMapping]);
+  }, [
+    team,
+    availableRosterSlots,
+    teamMemberByPositionId,
+    selectedPlayer,
+    selectedPositionMapping,
+  ]);
 
   const onClick = useCallback(
     (item: PlayerData) => {
@@ -369,80 +479,46 @@ export function LineupEditor(props: LineupEditorProps): React.JSX.Element {
 
   const renderPlayerRow = useCallback(
     (item: PlayerData) => {
-      const positionSlot = availableRosterSlots.find(
-        (s) => item.type === 'starter-data' && s.id === item.positionMappingId,
-      );
+      const positionSlot =
+        item.type === 'starter-data'
+          ? rosterSlotById.get(item.positionMappingId)
+          : undefined;
       const normalizedItemPlayerId =
         item.type === 'bench-player-data' || item.type === 'starter-data'
           ? item.playerId
           : undefined;
-      const teamMember = team.find((t) => {
-        const candidateId = normalizeNumericIdentifier(t.playerId);
-        return (
-          candidateId !== undefined && candidateId === normalizedItemPlayerId
-        );
-      });
-
+      const teamMember =
+        normalizedItemPlayerId !== undefined
+          ? teamMemberByPlayerId.get(normalizedItemPlayerId)
+          : undefined;
       const playerId = normalizeNumericIdentifier(teamMember?.playerId);
-
       const projValue =
-        playerId === undefined ? undefined : projections[playerId];
-      const actualValue = playerId === undefined ? undefined : actual[playerId];
-
-      const scoreColor = computeScoreColor(actualValue, projValue);
-      const scoreDisplay = formatScoreDisplay(actualValue, projValue);
+        playerId !== undefined ? projections[playerId] : undefined;
+      const actualValue = playerId !== undefined ? actual[playerId] : undefined;
 
       return (
-        <YStack
-          backgroundColor={
-            item === selectedPlayerData ? '$primary' : '$background'
-          }
-          padding="$3"
-          flexDirection="row"
-          alignItems="center"
-          justifyContent="space-between"
-        >
-          <Button
-            size="$2"
-            onPress={() => onClick(item)}
-            disabled={
-              !canPlayerPlayPosition(selectedPlayer, positionSlot) ||
-              !canPlayerPlayPosition(teamMember, selectedPositionMapping) ||
-              (selectedPositionMapping === undefined &&
-                positionSlot === undefined &&
-                selectedPlayer !== undefined &&
-                selectedPlayer !== teamMember)
-            }
-            theme="active"
-          >
-            {positionSlot?.positionType
-              ? humanizeString(positionSlot.positionType)
-                  .toUpperCase()
-                  .replace(' ', '')
-              : teamMember &&
-                  isPlayerPitcher(teamMember) &&
-                  !isPlayerBatter(teamMember)
-                ? 'BP'
-                : 'BE'}
-          </Button>
-
-          <Text flex={1} textAlign="center">
-            {getPlayerName(teamMember)}
-          </Text>
-
-          <Text color={scoreColor}>{scoreDisplay}</Text>
-        </YStack>
+        <PlayerRow
+          item={item}
+          isSelected={item === selectedPlayerData}
+          teamMember={teamMember}
+          positionSlot={positionSlot}
+          projValue={projValue}
+          actualValue={actualValue}
+          selectedPlayer={selectedPlayer}
+          selectedPositionMapping={selectedPositionMapping}
+          onClick={onClick}
+        />
       );
     },
     [
       actual,
-      availableRosterSlots,
+      rosterSlotById,
+      teamMemberByPlayerId,
       onClick,
       projections,
       selectedPlayer,
       selectedPlayerData,
       selectedPositionMapping,
-      team,
     ],
   );
 
