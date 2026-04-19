@@ -655,6 +655,13 @@ resource "aws_iam_policy" "github_actions_supplemental" {
         Resource = "*"
       },
       # CloudTrail permissions for Terraform apply (creating/managing the audit trail)
+      # cloudtrail:DescribeTrails and cloudtrail:ListTrails do not support resource-level
+      # permissions — they must use Resource "*". Splitting into a separate statement.
+      {
+        Effect   = "Allow"
+        Action   = ["cloudtrail:DescribeTrails", "cloudtrail:ListTrails"]
+        Resource = "*"
+      },
       {
         Effect = "Allow"
         Action = [
@@ -662,7 +669,6 @@ resource "aws_iam_policy" "github_actions_supplemental" {
           "cloudtrail:DeleteTrail",
           "cloudtrail:UpdateTrail",
           "cloudtrail:GetTrail",
-          "cloudtrail:DescribeTrails",
           "cloudtrail:GetTrailStatus",
           "cloudtrail:StartLogging",
           "cloudtrail:StopLogging",
@@ -1129,12 +1135,19 @@ resource "aws_iam_role_policy" "github_actions_plan_policy" {
         ]
       },
       # CloudTrail read (plan refresh for aws_cloudtrail resources)
+      # cloudtrail:DescribeTrails and cloudtrail:ListTrails do not support resource-level
+      # permissions — they must use Resource "*". Splitting into a separate statement.
+      {
+        Sid      = "CloudTrailDescribe"
+        Effect   = "Allow"
+        Action   = ["cloudtrail:DescribeTrails", "cloudtrail:ListTrails"]
+        Resource = "*"
+      },
       {
         Sid    = "CloudTrailRead"
         Effect = "Allow"
         Action = [
           "cloudtrail:GetTrail",
-          "cloudtrail:DescribeTrails",
           "cloudtrail:GetTrailStatus",
           "cloudtrail:GetEventSelectors",
           "cloudtrail:GetInsightSelectors",
