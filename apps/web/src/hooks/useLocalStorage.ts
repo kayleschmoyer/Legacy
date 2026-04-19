@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 
 /**
  * A simple hook for reading/writing a value to localStorage,
@@ -7,7 +7,7 @@ import { useState } from 'react';
 export function useLocalStorage<T>(
   key: string,
   initialValue: T,
-): [T, (value: T) => void] {
+): [T, (value: T | ((prev: T) => T)) => void] {
   const [storedValue, setStoredValue] = useState<T>(() => {
     try {
       const item = window.localStorage.getItem(key);
@@ -17,14 +17,21 @@ export function useLocalStorage<T>(
     }
   });
 
-  const setValue = (value: T) => {
-    try {
-      setStoredValue(value);
-      window.localStorage.setItem(key, JSON.stringify(value));
-    } catch {
-      // ignore
-    }
-  };
+  const setValue = useCallback(
+    (value: T | ((prev: T) => T)) => {
+      setStoredValue((prev) => {
+        const next =
+          typeof value === 'function' ? (value as (p: T) => T)(prev) : value;
+        try {
+          window.localStorage.setItem(key, JSON.stringify(next));
+        } catch {
+          // ignore
+        }
+        return next;
+      });
+    },
+    [key],
+  );
 
   return [storedValue, setValue];
 }
