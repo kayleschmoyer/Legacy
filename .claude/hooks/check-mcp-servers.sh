@@ -33,8 +33,11 @@ fi
 WARNINGS=()
 
 # --- 1. node_modules/.bin/tsx -----------------------------------------------
+# Use -f (follows symlinks) rather than "! -f && ! -L" so that a broken symlink
+# (pnpm stores binaries as symlinks) also triggers the warning. With "! -L",
+# a broken symlink would pass silently: -L is true for any symlink, broken or not.
 TSX="$WORKTREE/node_modules/.bin/tsx"
-if [ ! -f "$TSX" ] && [ ! -L "$TSX" ]; then
+if [ ! -f "$TSX" ]; then
   WARNINGS+=("[MCP WARNING] node_modules/.bin/tsx is missing — all 7 stdio MCP servers will fail to connect silently.")
   if [ "$IS_WORKTREE" = "true" ]; then
     WIN_WT=$(echo "$WORKTREE" | sed 's|/d/|D:\\|; s|/|\\|g' 2>/dev/null || echo "$WORKTREE")
@@ -58,6 +61,28 @@ fi
 if [ ! -f "$WORKTREE/.github/copilot/hooks/mcp-bootstrap.mjs" ]; then
   WARNINGS+=("[MCP WARNING] .github/copilot/hooks/mcp-bootstrap.mjs missing — MCP server launch will fail.")
   WARNINGS+=("  Restore it: git checkout main -- .github/copilot/hooks/mcp-bootstrap.mjs")
+fi
+
+# --- 4. signing proxy (localhost:4195-4197) ---------------------------------
+# The 3 URL-based servers (jira: 4195, github: 4196, ci: 4197) connect via
+# Streamable HTTP through the local signing proxy. If it is not running they
+# fail silently with no [MCP WARNING]. Use bash's built-in /dev/tcp to probe
+# each port with a 1-second timeout; fall back gracefully if /dev/tcp is
+# unsupported by the shell.
+PROXY_MISSING=false
+if [ -f "$WORKTREE/.mcp.json" ]; then
+  for PORT_INFO in "4195:legacy-sports-jira" "4196:legacy-sports-github" "4197:legacy-sports-ci"; do
+    PORT="${PORT_INFO%%:*}"
+    SERVER="${PORT_INFO##*:}"
+    if ! (echo "" > "/dev/tcp/localhost/$PORT") 2>/dev/null; then
+      WARNINGS+=("[MCP WARNING] signing proxy not listening on localhost:$PORT ($SERVER) — URL-based MCP server will fail silently.")
+      PROXY_MISSING=true
+    fi
+  done
+  if [ "$PROXY_MISSING" = "true" ]; then
+    WARNINGS+=("  Fix: run 'pnpm exec nx run mcp-signing-proxy:start' in your terminal, then restart the session.")
+    WARNINGS+=("  Also verify MCP_JIRA_URL, MCP_GITHUB_URL, MCP_CI_URL are set in .env.local.")
+  fi
 fi
 
 # --- Emit warnings ----------------------------------------------------------

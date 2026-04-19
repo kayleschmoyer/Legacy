@@ -16,9 +16,10 @@
  *     fail silently with a missing-module error.
  *
  *   Local worktrees (Windows/macOS/Linux developer machines):
- *     CWD is inside a *.worktrees/<name>/ directory.  node_modules is a
- *     symlink to the main repo's node_modules.  The shim creates or repairs
- *     that symlink before starting the server.
+ *     CWD is inside either a *.worktrees/<name>/ directory (sibling worktrees)
+ *     or a .claude/worktrees/<name>/ directory (native ephemeral worktrees).
+ *     node_modules is a symlink to the main repo's node_modules.  The shim
+ *     creates or repairs that symlink before starting the server.
  *
  * Usage (via mcp.json):
  *   "command": "node",
@@ -48,15 +49,41 @@ function isNodeModulesHealthy(nmPath) {
   }
 }
 
+// Detect both worktree patterns before branching:
+//   Pattern A (native ephemeral): <repo>/.claude/worktrees/<name>
+//   Pattern B (sibling):          <root>/<repo>.worktrees/<name>
+// Pattern A was previously undetected — parentName would be 'worktrees', not
+// ending with '.worktrees', so native worktrees fell into the cloud branch and
+// incorrectly triggered `corepack pnpm install` when node_modules was absent
+// instead of creating the symlink to the main repo's node_modules (LS-3716).
+const cwdNormalized = cwd.replace(/\\/g, '/');
+const nativeWorktreeMatch = cwdNormalized.match(
+  /^(.*)\/.claude\/worktrees\/[^/]+$/,
+);
+const isSiblingWorktree = parentName.endsWith('.worktrees');
+const isLocalWorktree = nativeWorktreeMatch !== null || isSiblingWorktree;
+
+// Pre-compute mainNm for whichever worktree pattern matched
+let localWorktreeMainNm = null;
+if (nativeWorktreeMatch) {
+  // Strip the /.claude/worktrees/<name> suffix to get the main repo root
+  const mainRepoPath = nativeWorktreeMatch[1].replace(/\//g, path.sep);
+  localWorktreeMainNm = path.join(mainRepoPath, 'node_modules');
+} else if (isSiblingWorktree) {
+  const rootDir = path.dirname(parentDir);
+  const mainRepoName = parentName.replace(/\.worktrees$/, '');
+  localWorktreeMainNm = path.join(rootDir, mainRepoName, 'node_modules');
+}
+
 // --- 1a. Cloud / non-worktree environment: ensure node_modules is present ---
 // In cloud agents (Copilot Coding Agent, Claude Code on the web) the CWD is
-// the repo root — parentName will NOT end with ".worktrees".  The
+// the repo root — isLocalWorktree will be false.  The
 // copilot-setup-steps.yml installs deps before the agent starts, but if that
 // step failed or was skipped (e.g. a restarted session) node_modules may be
 // absent.  Detect and recover so MCP servers do not fail silently.
 // Uses `corepack pnpm` rather than bare `pnpm` so the install works even
 // when Corepack wasn't activated by copilot-setup-steps.yml.
-if (!parentName.endsWith('.worktrees')) {
+if (!isLocalWorktree) {
   const nmPath = path.join(cwd, 'node_modules');
   if (!isNodeModulesHealthy(nmPath)) {
     process.stderr.write(
@@ -80,10 +107,8 @@ if (!parentName.endsWith('.worktrees')) {
 }
 
 // --- 1b. Worktree environment: ensure node_modules symlink points to main repo
-if (parentName.endsWith('.worktrees')) {
-  const rootDir = path.dirname(parentDir);
-  const mainRepoName = parentName.replace(/\.worktrees$/, '');
-  const mainNm = path.join(rootDir, mainRepoName, 'node_modules');
+if (isLocalWorktree && localWorktreeMainNm !== null) {
+  const mainNm = localWorktreeMainNm;
   const worktreeNm = path.join(cwd, 'node_modules');
 
   // Use lstatSync to detect broken symlinks (statSync follows links and throws).

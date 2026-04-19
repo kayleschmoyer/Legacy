@@ -25,8 +25,10 @@ Run these checks in order. Stop at the first failure and apply the recovery step
 
 7 of the 10 MCP servers are stdio and launch via `mcp-bootstrap.mjs` which runs `node --import tsx ...`. If `node_modules` is missing or broken, all 7 stdio servers silently time out during startup — Claude Code surfaces no error. The remaining 3 (jira, github, ci) connect via Streamable HTTP through the local signing proxy on `localhost:4195-4197` and do not need `tsx`.
 
+Use `-f` (not `-x`) — pnpm stores binaries as symlinks; `-f` follows symlinks and fails for both absent files and broken symlinks, while `-x` on a broken symlink returns false but doesn't distinguish from truly absent.
+
 ```bash
-test -x node_modules/.bin/tsx && echo "tsx: OK" || echo "MISSING: node_modules/.bin/tsx"
+test -f node_modules/.bin/tsx && echo "tsx: OK" || echo "MISSING: node_modules/.bin/tsx"
 ```
 
 - **OK** → proceed to Check 2
@@ -66,7 +68,21 @@ done
 - **Any MISSING** → a server's source was removed from the working tree. Run `git status` to check
   for missing tracked files; `git checkout HEAD -- tools/mcp/<srv>/src/index.ts` to restore.
 
-### Check 5 — `MCP_TIMEOUT` is ≥ 10 000 ms
+### Check 5 — signing proxy (localhost:4195-4197)
+
+The 3 URL-based servers (jira: 4195, github: 4196, ci: 4197) connect via Streamable HTTP through the local signing proxy. If it is not running, they fail silently — no `[MCP WARNING]` is emitted (check-mcp-servers.sh probes these ports via `/dev/tcp`).
+
+```bash
+for PORT in 4195 4196 4197; do
+  (echo "" > /dev/tcp/localhost/$PORT) 2>/dev/null && echo "port $PORT: OK" || echo "port $PORT: NOT LISTENING"
+done
+```
+
+- **All OK** → proceed to Check 6
+- **Any NOT LISTENING** → start the proxy: `pnpm exec nx run mcp-signing-proxy:start`, then restart the session.
+  Also verify `MCP_JIRA_URL`, `MCP_GITHUB_URL`, `MCP_CI_URL` are set in `.env.local`.
+
+### Check 6 — `MCP_TIMEOUT` is ≥ 10 000 ms
 
 All servers need at least 10 s startup headroom when `node_modules` is a symlink that must be resolved by the OS. The project default is set in `.claude/settings.json`.
 
@@ -105,6 +121,9 @@ This gives the worktree its own independent `node_modules` (not a symlink). Slow
 
 **Cloud agents (Copilot Coding Agent / Claude Code on the web):**
 `mcp-bootstrap.mjs` detects the missing `node_modules` and runs `corepack pnpm install --frozen-lockfile` automatically. If it still fails, the bootstrap error is written to the server's stderr (visible in CI logs as `[mcp-bootstrap] ERROR: ...`). Check the GitHub Actions run logs for the `copilot-setup-steps` job.
+
+**Native ephemeral worktrees (`.claude/worktrees/<name>/`):**
+`mcp-bootstrap.mjs` detects both worktree patterns (Pattern A: `<repo>/.claude/worktrees/<name>`; Pattern B: `<root>/<repo>.worktrees/<name>`) and creates the symlink to the main repo's `node_modules`. Before LS-3716 was fixed, Pattern A fell through to the cloud branch, which incorrectly ran `corepack pnpm install` when `node_modules` was absent instead of creating the symlink.
 
 ### Recovery: Wrong session root / `CLAUDE_PROJECT_DIR`
 
