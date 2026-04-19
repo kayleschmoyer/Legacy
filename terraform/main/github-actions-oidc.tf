@@ -251,7 +251,9 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/lambda/${local.name_prefix}-*",
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/lambda/${local.name_prefix}-*:*",
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/apigateway/${local.name_prefix}-*",
-          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/apigateway/${local.name_prefix}-*:*"
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/apigateway/${local.name_prefix}-*:*",
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/cloudtrail/${local.name_prefix}*",
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/cloudtrail/${local.name_prefix}*:*"
         ]
       },
       # Secrets Manager read permissions
@@ -675,6 +677,10 @@ resource "aws_iam_policy" "github_actions_supplemental" {
           "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/discord-client-secret*",
           "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/mlb-data-api-key*",
           "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/discord-webhook-url*",
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/discord-user-signup-webhook-url*",
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/discord-stripe-webhook-url*",
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/ga-api-secret*",
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/rollbar-access-token*",
         ]
       }
     ]
