@@ -8,6 +8,7 @@ import {
   PublicSchema,
 } from '@legacy-sports/db-client';
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
+import { LOGGER } from '@legacy-sports/logging';
 
 import { getCurrentDraftPickInfo } from './helpers';
 import {
@@ -409,8 +410,19 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
           ORDER BY ${projExpr} DESC
           LIMIT ${limitVal} OFFSET ${offsetVal}
         `;
-        const result = await context.db.execute(rawQuery);
-        return (result.rows as unknown as RawPlayerRow[]).map(mapRow);
+        try {
+          const result = await context.db.execute(rawQuery);
+          return (result.rows as unknown as RawPlayerRow[]).map(mapRow);
+        } catch (err) {
+          // Fall back to hitterAvgPointsPerGame if the *_ppg columns are unavailable
+          // (e.g. migration 20260310_120000_add_category_ppg_to_scoring_cache not yet applied).
+          LOGGER.error(
+            '[Draft] projectedMatchupPoints sort failed — falling back to hitterAvgPointsPerGame',
+            err instanceof Error ? err : new Error(String(err)),
+            { draftId, leagueId: draft.leagueId },
+          );
+          // Fall through to default scoring sort below
+        }
       }
 
       // ---- Determine ORDER BY strategy ----
