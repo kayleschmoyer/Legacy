@@ -105,7 +105,11 @@ export function DraftTopBand({
           />
           {draftPaused ? 'Paused' : 'Live Draft'}
         </div>
-        <div className="d-tb-pick-num num" aria-label={`Pick ${currentPick}`}>
+        <div
+          className="d-tb-pick-num num"
+          aria-label={`Pick ${currentPick}`}
+          data-testid="current-pick"
+        >
           Pick #{currentPick}
         </div>
         <div className="d-tb-round-meta">
