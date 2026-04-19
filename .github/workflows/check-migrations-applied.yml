@@ -53,7 +53,7 @@ jobs:
       is-self-hosted: ${{ steps.resolve.outputs.is-self-hosted }}
     steps:
       - name: "Checkout Repository"
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           sparse-checkout: .github/actions/resolve-runner-label
       - name: "Resolve Runner Label"
@@ -78,7 +78,7 @@ jobs:
           exit 1
 
       - name: "Checkout Repository"
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: "Setup Workspace"
         uses: ./.github/actions/setup
@@ -88,7 +88,7 @@ jobs:
           include-optional-deps: false
 
       - name: "Configure AWS credentials"
-        uses: aws-actions/configure-aws-credentials@v6
+        uses: aws-actions/configure-aws-credentials@ec61189d14ec14c8efccab744f656cffd0e33f37 # v6
         with:
           # Read-only plan role — this workflow runs on pull_request and does not apply
           # any Terraform changes. Needs SSM reads, Secrets Manager DB credentials, and
@@ -171,7 +171,7 @@ jobs:
 
       - name: "Label PR on Migration Failure"
         if: always() && github.event.pull_request.number
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |

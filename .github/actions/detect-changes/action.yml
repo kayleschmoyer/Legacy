@@ -207,7 +207,7 @@ runs:
 
     - name: "Detect Changed Files"
       id: detect-changes
-      uses: dorny/paths-filter@v4
+      uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4
       with:
         base: ${{ steps.determine-base.outputs.base-ref }}
         ref: ${{ steps.determine-base.outputs.head-ref }}

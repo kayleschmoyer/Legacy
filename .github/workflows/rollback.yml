@@ -125,7 +125,7 @@ jobs:
 
       - name: Checkout Target Revision
         if: "!inputs.dry_run"
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           ref: ${{ steps.find-previous.outputs.target_sha }}
           fetch-depth: 0
@@ -182,11 +182,11 @@ jobs:
 
       - name: Setup Pages
         if: "!inputs.dry_run"
-        uses: actions/configure-pages@v6
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6
 
       - name: Upload to GitHub Pages
         if: "!inputs.dry_run"
-        uses: actions/upload-pages-artifact@v4
+        uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4
         with:
           path: ./dist/apps/web
 
@@ -203,7 +203,7 @@ jobs:
       - name: Deploy to GitHub Pages
         if: "!inputs.dry_run"
         id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5
 
       - name: "Rollbar Deploy Succeeded (Rollback)"
         if: "!inputs.dry_run && success()"
@@ -246,12 +246,12 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 0
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v6
+        uses: aws-actions/configure-aws-credentials@ec61189d14ec14c8efccab744f656cffd0e33f37 # v6
         with:
           role-to-assume: arn:aws:iam::176661590736:role/legacy-sports-dev-github-actions
           aws-region: ${{ env.AWS_REGION }}
@@ -398,7 +398,7 @@ jobs:
 
       - name: Setup Terraform
         if: "!inputs.dry_run"
-        uses: hashicorp/setup-terraform@v4
+        uses: hashicorp/setup-terraform@5e8dbf3c6d9deaf4193ca7a8fb23f2ac83bb6c85 # v4
         with:
           terraform_version: "~> 1.14"
 

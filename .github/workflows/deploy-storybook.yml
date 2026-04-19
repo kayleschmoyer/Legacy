@@ -47,7 +47,7 @@ jobs:
       runner-label: ${{ steps.resolve.outputs.runner-label }}
     steps:
       - name: "Checkout Repository"
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           sparse-checkout: .github/actions/resolve-runner-label
       - name: "Resolve Runner Label"
@@ -70,7 +70,7 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 1
 
@@ -98,7 +98,7 @@ jobs:
       - name: Generate App Token
         id: app-token
         if: github.event_name != 'pull_request'
-        uses: actions/create-github-app-token@v3
+        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3
         with:
           app-id: ${{ secrets.PREVIEW_APP_ID }}
           private-key: ${{ secrets.PREVIEW_APP_PRIVATE_KEY }}
@@ -150,7 +150,7 @@ jobs:
       # ── Sticky PR Comment (only on pull requests) ─────────────────────────
       - name: Comment Storybook URL
         if: always() && github.event_name == 'pull_request'
-        uses: marocchino/sticky-pull-request-comment@v3
+        uses: marocchino/sticky-pull-request-comment@d4d6b0936434b21bc8345ad45a440c5f7d2c40ff # v3.0.3
         with:
           header: storybook-preview
           number: ${{ github.event.pull_request.number }}

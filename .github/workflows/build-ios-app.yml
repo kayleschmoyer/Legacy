@@ -57,7 +57,7 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 0
 
@@ -70,7 +70,7 @@ jobs:
           skip-system-deps: true
 
       - name: Setup Xcode
-        uses: maxim-lobanov/setup-xcode@v1
+        uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1
         with:
           xcode-version: ${{ env.XCODE_VERSION }}
 
@@ -80,7 +80,7 @@ jobs:
           pod install --repo-update
 
       - name: Cache CocoaPods
-        uses: actions/cache@v5
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: |
             apps/app/ios/Pods
@@ -219,7 +219,7 @@ jobs:
 
       - name: Upload IPA as GitHub Artifact (Release)
         if: steps.version.outputs.build_config == 'Release'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: ${{ steps.version.outputs.artifact_name }}
           path: |
@@ -230,7 +230,7 @@ jobs:
 
       - name: Upload App Bundle as GitHub Artifact (Debug)
         if: steps.version.outputs.build_config == 'Debug'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: ${{ steps.version.outputs.artifact_name }}
           path: ${{ steps.artifacts.outputs.app_zip_path }}
@@ -242,7 +242,7 @@ jobs:
           steps.version.outputs.build_config == 'Release' && 
           (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
           (github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           tag_name: ios-v${{ steps.version.outputs.version }}-${{ steps.version.outputs.build_number }}
           name: iOS IPA v${{ steps.version.outputs.version }} (${{ steps.version.outputs.commit_sha }})
@@ -330,7 +330,7 @@ jobs:
 
     steps:
       - name: Checkout (for commit history)
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 0
           fetch-tags: true

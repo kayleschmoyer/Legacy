@@ -87,7 +87,7 @@ runs:
     - name: "Restore Nx Cache from Base Branch"
       id: restore-base-cache
       if: steps.determine-source.outputs.is-pr == 'true'
-      uses: actions/cache/restore@v5
+      uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
       with:
         path: |
           .nx-cache
@@ -100,7 +100,7 @@ runs:
     - name: "Restore Nx Cache from Current Branch"
       id: restore-current-cache
       if: steps.determine-source.outputs.is-pr != 'true'
-      uses: actions/cache/restore@v5
+      uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
       with:
         path: |
           .nx-cache
@@ -152,7 +152,7 @@ runs:
       if: |
         inputs.restore-only != 'true' &&
         (github.event_name == 'push' || github.event_name == 'merge_group')
-      uses: actions/cache/save@v5
+      uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
       with:
         path: |
           .nx-cache

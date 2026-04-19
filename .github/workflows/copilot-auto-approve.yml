@@ -69,7 +69,7 @@ jobs:
         # so the token is available for the auto-pass step below.
         if: github.event.pull_request.head.repo.full_name == github.repository
         id: bot-token
-        uses: actions/create-github-app-token@v3
+        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3
         with:
           app-id: 3142924
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
@@ -82,7 +82,7 @@ jobs:
         if: >-
           github.event.pull_request.user.login == 'dependabot[bot]' ||
           github.event.pull_request.user.login == 'legacy-sports-code-bot[bot]'
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           github-token: ${{ steps.bot-token.outputs.token }}
           script: |
@@ -114,7 +114,7 @@ jobs:
           github.event.pull_request.user.login != 'dependabot[bot]' &&
           github.event.pull_request.user.login != 'legacy-sports-code-bot[bot]' &&
           github.event.pull_request.head.repo.full_name == github.repository
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           github-token: ${{ steps.bot-token.outputs.token }}
           script: |
@@ -152,7 +152,7 @@ jobs:
           github.event.pull_request.user.login != 'dependabot[bot]' &&
           github.event.pull_request.user.login != 'legacy-sports-code-bot[bot]' &&
           github.event.pull_request.head.repo.full_name == github.repository
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           github-token: ${{ steps.bot-token.outputs.token }}
           script: |
@@ -171,7 +171,7 @@ jobs:
           github.event.pull_request.user.login != 'dependabot[bot]' &&
           github.event.pull_request.user.login != 'legacy-sports-code-bot[bot]' &&
           github.event.pull_request.head.repo.full_name == github.repository
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           BOT_TOKEN: ${{ steps.bot-token.outputs.token }}
         with:
@@ -359,7 +359,7 @@ jobs:
           github.event.pull_request.user.login != 'dependabot[bot]' &&
           github.event.pull_request.user.login != 'legacy-sports-code-bot[bot]' &&
           vars.COPILOT_AUTO_REVIEW_ENABLED != 'false'
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
             const prNumber = context.payload.pull_request.number;
@@ -389,7 +389,7 @@ jobs:
     steps:
       - name: Generate bot token
         id: bot-token
-        uses: actions/create-github-app-token@v3
+        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3
         with:
           app-id: 3142924
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
@@ -409,7 +409,7 @@ jobs:
         run: sleep 30
 
       - name: Check threads and approve if clean
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           BOT_TOKEN: ${{ steps.bot-token.outputs.token }}
         with:
@@ -585,13 +585,13 @@ jobs:
     steps:
       - name: Generate bot token
         id: bot-token
-        uses: actions/create-github-app-token@v3
+        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3
         with:
           app-id: 3142924
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
       - name: Approve if no Copilot review for current SHA
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           BOT_TOKEN: ${{ steps.bot-token.outputs.token }}
         with:
@@ -676,7 +676,7 @@ jobs:
     steps:
       - name: Get PR number
         id: pr
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
             // workflow_run.pull_requests may be empty for cross-repo PRs
@@ -718,7 +718,7 @@ jobs:
       - name: Generate bot token
         if: steps.pr.outputs.number != ''
         id: bot-token
-        uses: actions/create-github-app-token@v3
+        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3
         with:
           app-id: 3142924
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
@@ -727,7 +727,7 @@ jobs:
         if: >-
           steps.pr.outputs.number != '' &&
           github.event.workflow_run.conclusion != 'success'
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           github-token: ${{ steps.bot-token.outputs.token }}
           script: |
@@ -762,7 +762,7 @@ jobs:
           steps.pr.outputs.number != '' &&
           github.event.workflow_run.conclusion == 'success'
         id: check
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           github-token: ${{ steps.bot-token.outputs.token }}
           script: |
@@ -893,7 +893,7 @@ jobs:
         if: >-
           steps.pr.outputs.number != '' &&
           github.event.workflow_run.conclusion == 'success'
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           BOT_TOKEN: ${{ steps.bot-token.outputs.token }}
         with:
@@ -954,13 +954,13 @@ jobs:
     steps:
       - name: Generate bot token
         id: bot-token
-        uses: actions/create-github-app-token@v3
+        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3
         with:
           app-id: 3142924
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
       - name: Check threads and approve if clean
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           BOT_TOKEN: ${{ steps.bot-token.outputs.token }}
         with:
@@ -1177,7 +1177,7 @@ jobs:
 
       - name: Check if bot-review is still pending or failed
         id: check
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
             const sha = context.payload.pull_request.head.sha;
@@ -1206,7 +1206,7 @@ jobs:
 
       - name: Dispatch recheck
         if: steps.check.outputs.state == 'pending' || steps.check.outputs.state == 'failure'
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
             const prNumber = context.payload.pull_request.number;

@@ -49,7 +49,7 @@ jobs:
       runner-label: ${{ steps.resolve.outputs.runner-label }}
     steps:
       - name: "Checkout Repository"
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           sparse-checkout: .github/actions/resolve-runner-label
       - name: "Resolve Runner Label"
@@ -70,7 +70,7 @@ jobs:
 
     steps:
       - name: "Checkout Repository"
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: "Setup Workspace"
         uses: ./.github/actions/setup
@@ -117,7 +117,7 @@ jobs:
         if: >-
           steps.drift-check.outputs.drift == 'true' &&
           github.event_name == 'pull_request'
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -161,7 +161,7 @@ jobs:
 
       - name: "Label PR on Schema Drift"
         if: always() && github.event.pull_request.number
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |

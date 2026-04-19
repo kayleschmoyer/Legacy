@@ -157,7 +157,7 @@ jobs:
       thread-id: ${{ steps.notify.outputs.thread-id }}
     steps:
       - name: "Checkout Repository"
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: "Compute notification params"
         id: params
@@ -225,7 +225,7 @@ jobs:
 
     steps:
       - name: "Checkout Repository"
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           ref: ${{ inputs.ref || github.ref }}
           fetch-depth: 1
@@ -492,13 +492,13 @@ jobs:
       has-report: ${{ steps.merge.outputs.has-report }}
     steps:
       - name: "Checkout Repository"
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           sparse-checkout: .github/actions/s3-artifact
           fetch-depth: 1
 
       - name: "Setup Node.js"
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
         with:
           node-version: 22
 
@@ -538,7 +538,7 @@ jobs:
       - name: "Generate App Token"
         id: app-token
         if: steps.merge.outputs.has-report == 'true'
-        uses: actions/create-github-app-token@v3
+        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3
         with:
           app-id: ${{ secrets.PREVIEW_APP_ID }}
           private-key: ${{ secrets.PREVIEW_APP_PRIVATE_KEY }}
@@ -626,7 +626,7 @@ jobs:
     timeout-minutes: 3
     steps:
       - name: "Checkout Repository"
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: "Resolve Status"
         id: status

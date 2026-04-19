@@ -37,7 +37,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Generate bot token
-        uses: actions/create-github-app-token@v3
+        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3
         id: bot-token
         with:
           app-id: 3158619
@@ -46,7 +46,7 @@ jobs:
           repositories: ${{ github.event.repository.name }}
 
       - name: Checkout PR branch
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           # head.ref is required (not head.sha) so we can push back to the branch.
           # The concurrency group with cancel-in-progress handles races.
@@ -63,7 +63,7 @@ jobs:
           corepack prepare "pnpm@${PNPM_VERSION}" --activate
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
         with:
           node-version: 22
           cache: pnpm

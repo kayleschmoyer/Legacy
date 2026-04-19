@@ -84,7 +84,7 @@ runs:
         echo "✅ Validated pnpm workspace (pnpm-lock.yaml found)"
 
     - name: Setup Node.js
-      uses: actions/setup-node@v6
+      uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
       with:
         node-version: ${{ inputs.node-version }}
         cache: ${{ inputs.install-dependencies == 'true' && 'pnpm' || '' }}
@@ -92,7 +92,7 @@ runs:
     - name: Cache pnpm Store
       if: inputs.install-dependencies == 'true'
       id: cache-pnpm-store
-      uses: actions/cache@v5
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
       with:
         path: ~/.local/share/pnpm/store
         key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}${{ inputs.cache-key-suffix != '' && format('-{0}', inputs.cache-key-suffix) || '' }}
@@ -105,7 +105,7 @@ runs:
     - name: Cache node_modules
       if: inputs.install-dependencies == 'true'
       id: cache-node-modules
-      uses: actions/cache@v5
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
       with:
         path: node_modules
         # yamllint disable-line rule:line-length
@@ -260,7 +260,7 @@ runs:
 
     - name: Set NX SHAs
       if: inputs.set-nx-shas == 'true'
-      uses: nrwl/nx-set-shas@v5.0.1
+      uses: nrwl/nx-set-shas@afb73a62d26e41464e9254689e1fd6122ee683c1 # v5.0.1
       with:
         main-branch-name: "main"
         error-on-no-successful-workflow: false

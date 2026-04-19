@@ -56,7 +56,7 @@ runs:
 
     - name: "📦 Cache Native C++ Build Outputs"
       if: inputs.cache-native-builds == 'true'
-      uses: actions/cache@v5
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
       with:
         path: |
           apps/app/android/app/.cxx
@@ -68,7 +68,7 @@ runs:
 
     - name: "📦 Cache Metro Bundler"
       if: inputs.cache-native-builds == 'true'
-      uses: actions/cache@v5
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
       with:
         path: |
           /tmp/metro-*
