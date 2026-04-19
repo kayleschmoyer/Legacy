@@ -43,6 +43,10 @@ import { listPRInlineComments } from './tools/list-pr-inline-comments.js';
 import { listReviewComments } from './tools/list-review-comments.js';
 import { getFileContent } from './tools/get-file-content.js';
 import { getBranchProtection } from './tools/get-branch-protection.js';
+import {
+  resolveActionSha,
+  resolveActionShas,
+} from './tools/resolve-action-sha.js';
 
 // Node.js native fetch (undici) does not respect HTTPS_PROXY / GLOBAL_AGENT_HTTPS_PROXY
 // by default. In cloud sessions the egress proxy is required; set the global dispatcher
@@ -1344,6 +1348,80 @@ server.tool(
       .describe('Branch name to query (default: "main").'),
   },
   async (params) => getBranchProtection(params),
+);
+
+// --- github_resolve_action_sha ---
+server.tool(
+  'github_resolve_action_sha',
+  'Resolve a GitHub Actions tag (e.g. "v4") to its immutable commit SHA for supply-chain pinning. Returns the SHA, original tag, and whether the tag was lightweight or annotated. Use this before pinning action references in workflow files. For bulk resolution use github_resolve_action_shas.',
+  {
+    owner: z
+      .string()
+      .trim()
+      .min(1)
+      .describe(
+        'GitHub organisation or user that owns the action repo (e.g. "actions").',
+      ),
+    repo: z
+      .string()
+      .trim()
+      .min(1)
+      .describe('Repository name of the action (e.g. "checkout").'),
+    tag: z
+      .string()
+      .trim()
+      .min(1)
+      .describe('Mutable tag to resolve (e.g. "v4" or "v4.1.0").'),
+  },
+  async (params) => resolveActionSha(params),
+);
+
+// --- github_resolve_action_shas ---
+server.tool(
+  'github_resolve_action_shas',
+  'Resolve multiple GitHub Actions tags to their immutable commit SHAs in a single call. Runs all resolutions in parallel. Each result includes the action, sha, tag, and tagType ("lightweight" | "annotated"). Failed entries include an "error" field instead of "sha". Use this when pinning many actions at once.',
+  {
+    actions: z
+      .preprocess(
+        (val) => {
+          if (Array.isArray(val)) return val;
+          if (typeof val === 'string') {
+            try {
+              const parsed = JSON.parse(val);
+              if (Array.isArray(parsed)) return parsed;
+            } catch {
+              // Not valid JSON
+            }
+          }
+          return val;
+        },
+        z
+          .array(
+            z.object({
+              owner: z
+                .string()
+                .trim()
+                .min(1)
+                .describe('GitHub org or user (e.g. "actions").'),
+              repo: z
+                .string()
+                .trim()
+                .min(1)
+                .describe('Repository name (e.g. "checkout").'),
+              tag: z
+                .string()
+                .trim()
+                .min(1)
+                .describe('Mutable tag to resolve (e.g. "v4").'),
+            }),
+          )
+          .min(1),
+      )
+      .describe(
+        'Array of actions to resolve. Each entry must have owner, repo, and tag.',
+      ),
+  },
+  async (params) => resolveActionShas(params),
 );
 
 // Start the server
