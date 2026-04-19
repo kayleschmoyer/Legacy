@@ -47,6 +47,8 @@ export async function loadPlayerGameStats(
     hallOfFame: boolean;
     rookieOfTheYear: boolean;
     totalGames: number;
+    batHand: string | null;
+    throwHand: string | null;
   } = {
     id: playerId,
     firstName: '',
@@ -63,6 +65,8 @@ export async function loadPlayerGameStats(
     hallOfFame: false,
     rookieOfTheYear: false,
     totalGames: 0,
+    batHand: null,
+    throwHand: null,
   };
 
   try {

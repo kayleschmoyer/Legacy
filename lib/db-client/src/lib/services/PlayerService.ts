@@ -32,6 +32,8 @@ interface ScoringResultRow {
   hall_of_fame: boolean | null;
   rookie_of_the_year: boolean | null;
   mlb_player_id: number | null;
+  bat_hand: string | null;
+  throw_hand: string | null;
 }
 
 export interface PlayerFilters {
@@ -520,6 +522,7 @@ export class PlayerService {
             p.all_star_selections, p.gold_gloves, p.silver_sluggers,
             p.mvp_awards, p.cy_young_awards, p.world_series_rings,
             p.hall_of_fame, p.rookie_of_the_year, p.total_games, p.mlb_player_id,
+            p.bat_hand, p.throw_hand,
             COALESCE(cs_league.batting_score, cs_default.batting_score, 0) AS batting_score,
             COALESCE(cs_league.pitching_score, cs_default.pitching_score, 0) AS pitching_score,
             COALESCE(cs_league.fielding_score, cs_default.fielding_score, 0) AS fielding_score,
@@ -573,6 +576,8 @@ export class PlayerService {
           rookieOfTheYear: row.rookie_of_the_year ?? false,
           totalGames: row.total_games ?? 0,
           mlbPlayerId: row.mlb_player_id ?? null,
+          batHand: row.bat_hand ?? null,
+          throwHand: row.throw_hand ?? null,
           scoring: {
             playerId: row.id,
             battingScore: Number(row.batting_score) || 0,

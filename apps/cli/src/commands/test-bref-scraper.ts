@@ -56,6 +56,8 @@ async function main() {
     hallOfFame: false,
     rookieOfTheYear: false,
     totalGames: 0,
+    batHand: null,
+    throwHand: null,
   };
 
   const season = parseInt(options.season, 10);

@@ -31,6 +31,12 @@ export {
   FREE_TIER_LEAGUE_LIMIT,
 } from './SubscriptionDowngradeService';
 export { SeasonDraftGameService } from './SeasonDraftGameService';
+export { TwentyQuestionsService } from './TwentyQuestionsService';
+export type {
+  QuestionCategory,
+  GameStateWithQuestions,
+  PlayerRecord as TwentyQuestionsPlayerRecord,
+} from './TwentyQuestionsService';
 export { HITTER_STAT_KEYS, PITCHER_STAT_KEYS } from './SeasonDraftGameService';
 export {
   DisclosureGameService,

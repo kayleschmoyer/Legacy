@@ -38,6 +38,10 @@ export const players = pgTable(
     // MLB Stats API player ID for cross-referencing with the external data
     // provider. Nullable — historical players may not have a mapping yet.
     mlbPlayerId: integer('mlb_player_id'),
+    // Handedness — populated by Baseball Reference import pipeline. Added in
+    // migration 20260418_000000_add_twenty_questions_tables.
+    batHand: text('bat_hand'),
+    throwHand: text('throw_hand'),
   },
   (table) => {
     return {
