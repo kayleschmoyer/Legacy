@@ -5558,6 +5558,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
       const cwd = target.path;
 
+      if (!sha) {
+        return {
+          content: [{ type: 'text', text: 'Missing required parameter: sha' }],
+          isError: true,
+        };
+      }
+
       if (!/^[a-zA-Z0-9_./~^{}-]+$/.test(sha)) {
         return {
           content: [
