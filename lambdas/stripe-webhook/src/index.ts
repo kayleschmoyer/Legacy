@@ -54,6 +54,14 @@ const GRACE_PERIOD_DAYS = parseInt(
 let stripeClientPromise: Promise<Stripe> | null = null;
 let webhookSecretPromise: Promise<string> | null = null;
 
+// Pinned Stripe API version. Without this, the SDK defaults to whatever
+// version ships with the installed build — an SDK bump (e.g. dependabot) can
+// silently change webhook payload shapes (`invoice.parent?.subscription_details`,
+// `subscription.items.data[0]?.current_period_end`, event object typings) and
+// break signature-verification leniency. To upgrade: read Stripe's API
+// changelog, adjust any affected payload accesses, then bump this constant.
+const STRIPE_API_VERSION = '2026-02-25.clover' as const;
+
 function getStripeClient(): Promise<Stripe> {
   if (!stripeClientPromise) {
     stripeClientPromise = initStripeClient();
@@ -62,13 +70,16 @@ function getStripeClient(): Promise<Stripe> {
 }
 
 async function initStripeClient(): Promise<Stripe> {
-  if (STRIPE_SECRET_KEY_LOCAL) return new Stripe(STRIPE_SECRET_KEY_LOCAL);
+  if (STRIPE_SECRET_KEY_LOCAL)
+    return new Stripe(STRIPE_SECRET_KEY_LOCAL, {
+      apiVersion: STRIPE_API_VERSION,
+    });
   if (!STRIPE_SECRET_KEY_SECRET_NAME)
     throw new Error(
       'Stripe secret key not configured: set STRIPE_SECRET_KEY or STRIPE_SECRET_KEY_SECRET_NAME',
     );
   const key = await retrieveSecretParameterValue(STRIPE_SECRET_KEY_SECRET_NAME);
-  return new Stripe(key);
+  return new Stripe(key, { apiVersion: STRIPE_API_VERSION });
 }
 
 function getWebhookSecret(): Promise<string> {
