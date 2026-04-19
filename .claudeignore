@@ -56,3 +56,10 @@ pnpm-lock.yaml
 .twig/
 .nx/cache
 .nx/workspace-data
+
+# Additional build/cache artifacts
+**/.turbo/
+**/.vite/
+**/storybook-static/
+**/*.spec.ts-snapshots/
+.screenshots/
