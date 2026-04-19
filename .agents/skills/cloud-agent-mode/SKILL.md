@@ -34,6 +34,26 @@ When running as a **cloud coding agent**:
 
 Shell fallbacks (only if MCP server is unavailable): `make <target>`, `git commit`, `git push`, `gh pr create`, `gh pr edit <PR#> --add-label "agent-in-progress"`.
 
+## File Exploration in Cloud Sessions (Critical)
+
+Cloud agents lose access to the `worktree`, `make`, and `nx` MCP servers but retain all **built-in Claude Code tools** — `Glob`, `Grep`, and `Read`. Without custom servers as a constant reminder to stay MCP-first, agents often slip into a Bash-first mindset and reach for `find`, `ls`, `grep`, and `cat` for file discovery and content reads. **Do not do this** — even in cloud sessions these built-in tools are always available.
+
+The [Tool-first for file operations](../../../AGENTS.md) rule in AGENTS.md applies in cloud environments too. Key substitutions:
+
+| Instead of (Bash)                     | Use (built-in tool)                                                           |
+| ------------------------------------- | ----------------------------------------------------------------------------- |
+| `find . -name "*.tsx" -type f`        | `Glob(pattern: "**/*.tsx")`                                                   |
+| `find path -type d -name "*league*"`  | `Glob(pattern: "**/*league*", path: "path")`                                  |
+| `ls -la path/`                        | `Glob(pattern: "*", path: "path")`                                            |
+| `grep -n "pattern" file.tsx`          | `Grep(pattern: "pattern", path: "file.tsx", output_mode: "content")`          |
+| `grep -rn "pattern" dir/`             | `Grep(pattern: "pattern", path: "dir", output_mode: "content")`               |
+| `grep -n "minHeight\|100vh" file.tsx` | `Grep(pattern: "minHeight\|100vh", path: "file.tsx", output_mode: "content")` |
+| `cat apps/web/src/app/app.tsx`        | `Read(file_path: "apps/web/src/app/app.tsx")`                                 |
+| `head -n 50 file.ts`                  | `Read(file_path: "file.ts", limit: 50)`                                       |
+| `tail -n 50 file.ts`                  | `Read(file_path: "file.ts", offset: <approx_line>, limit: 50)`                |
+
+> **Why this matters**: a session (LS-2938 fix) ran 78 Bash commands, 50+ of which were `find`/`ls`/`grep`/`cat` that had direct built-in equivalents. `Glob`/`Grep`/`Read` are faster, have no shell-quoting hazards, and produce structured output. The absence of custom MCP servers is not a signal to fall back to Bash for file exploration.
+
 ## Cloud MCP Cheat Sheet
 
 Always use MCP tools instead of raw shell commands. The MCP tools provide structured output, error handling, and are permission-controlled.
