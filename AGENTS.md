@@ -41,6 +41,13 @@ Rules are grouped by category and tiered by severity. **Tier 1** violations are 
 - **Jira — workflow transitions**: use `jira_get_transitions(key: "LS-####")` to list available transitions — never `mcp__*__getTransitionsForJiraIssue` (the Atlassian plugin version has a known bug where it can return full issue data for a different issue instead of the transitions array). `jira_get_transitions` calls the Jira REST API directly and returns `[{id, name, to: {name, statusCategory}}]`.
 - **Jira — `getJiraIssue` Atlassian plugin bug**: the Atlassian plugin's `getJiraIssue` tool is known to return the parent epic's children list instead of the requested single issue (LS-3715, related: LS-3710). **Never use `mcp__*__getJiraIssue` to fetch a single ticket.** When the Atlassian plugin is your active Jira interface (worktree sessions where `jira_auth_status` is unavailable, or cloud sessions), use `searchJiraIssuesUsingJql` with `jql: "key = LS-XXXX"` and `maxResults: 1` instead. The custom `jira_view` MCP tool is unaffected by this bug.
 
+### Working Approach (Tier 3)
+
+- **Think before coding** — ask when unsure; don't silently pick one interpretation and run with it.
+- **Simplicity first** — minimum code; any overengineering shows at a glance.
+- **Surgical edits** — only touch what's required; don't fix up neighboring code on the way by. Unrelated cleanup belongs in a separate ticket (see "One ticket = one worktree = one PR").
+- **Goal-driven** — translate fuzzy instructions into verifiable targets before starting.
+
 ### Code Quality (Tier 3)
 
 - **No `console.*`** — use `LOGGER` from `@legacy-sports/logging`. Exceptions: `lib/logging/`, `apps/cli/`, migration files, and build-time scripts.
