@@ -159,12 +159,17 @@ export function useIAP(): UseIAPResult {
           variables: { jwsTransaction: purchaseToken },
         });
 
+        // Always finish the StoreKit transaction regardless of verification
+        // result. Leaving it unfinished causes repeated re-delivery on every
+        // app launch (Apple) and auto-refunds after 3 days (Google Play).
+        // Premium access is only granted when the server confirms success.
+        await iapFinish({
+          purchase: event,
+          isConsumable: false,
+        });
+
         if (result.data?.verifyApplePurchase?.success) {
           setIsSubscribed(true);
-          await iapFinish({
-            purchase: event,
-            isConsumable: false,
-          });
         } else {
           setError('Purchase verification failed. Please contact support.');
         }

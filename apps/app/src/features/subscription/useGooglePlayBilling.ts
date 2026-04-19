@@ -108,12 +108,16 @@ export function useGooglePlayBilling(): UseGooglePlayBillingResult {
           variables: { purchaseToken, productId },
         });
 
+        // Always acknowledge the purchase regardless of verification result.
+        // Unacknowledged Google Play purchases are auto-refunded after 3 days,
+        // causing revenue loss even when the billing itself succeeded.
+        // Premium access is only granted when the server confirms success.
+        await finishTransaction({
+          purchase: purchaseItem,
+          isConsumable: false,
+        });
+
         if (result.data?.verifyGooglePurchase?.success) {
-          // Acknowledge the purchase to prevent Google from auto-refunding
-          await finishTransaction({
-            purchase: purchaseItem,
-            isConsumable: false,
-          });
           setIsSubscribed(true);
         } else {
           setError('Purchase verification failed. Please contact support.');
