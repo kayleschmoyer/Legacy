@@ -1862,6 +1862,31 @@ export function LeagueDetailPage(): React.JSX.Element {
             {league.maxRosterSize}
           </Text>
         </SnapshotStat>
+        {league.gamesPerMatchup != null && (
+          <>
+            <SnapshotDivider />
+            <SnapshotStat>
+              <Text
+                fontSize="$2"
+                color="$textMuted"
+                textTransform="uppercase"
+                letterSpacing={1.2}
+                fontWeight="600"
+              >
+                Games / Matchup
+              </Text>
+              <Text
+                fontSize="$9"
+                fontWeight="800"
+                color="$color"
+                fontFamily={FONT_DISPLAY}
+                style={{ fontVariantNumeric: 'tabular-nums' }}
+              >
+                {league.gamesPerMatchup}
+              </Text>
+            </SnapshotStat>
+          </>
+        )}
         <SnapshotDivider />
         <SnapshotStat>
           <Text
@@ -2253,17 +2278,15 @@ export function LeagueDetailPage(): React.JSX.Element {
             </SidebarCard>
           )}
 
-          {/* League Dues Status — visible to all members */}
-          {isCommissioner && (
-            <LeagueDuesStatusDashboard
-              leagueId={leagueId}
-              isCommissioner={isCommissioner}
-              onSuccess={showMatchupSuccess}
-              onError={(err) => {
-                setMatchupErrorMessage(err.message);
-              }}
-            />
-          )}
+          {/* League Dues Status — visible to all members when dues are enabled */}
+          <LeagueDuesStatusDashboard
+            leagueId={leagueId}
+            isCommissioner={isCommissioner}
+            onSuccess={showMatchupSuccess}
+            onError={(err) => {
+              setMatchupErrorMessage(err.message);
+            }}
+          />
 
           {/* Invite Friends */}
           <InviteCard>
