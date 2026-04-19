@@ -11,6 +11,7 @@ import {
   setNotificationChannelAsync,
   setNotificationHandler,
 } from 'expo-notifications';
+import type { NotificationResponse } from 'expo-notifications';
 import type { EventSubscription } from 'expo-modules-core';
 import { useRouter } from 'expo-router';
 import { LOGGER } from '@legacy-sports/logging';
@@ -45,9 +46,12 @@ type NotificationData = {
  */
 export function usePushNotifications(userId: number | null | undefined) {
   const router = useRouter();
+  const routerRef = useRef(router);
+  routerRef.current = router;
   const [registerDeviceToken] = useRegisterDeviceTokenMutation();
   const notificationListener = useRef<EventSubscription>();
   const responseListener = useRef<EventSubscription>();
+  const lastHandledNotificationId = useRef<string | null>(null);
 
   const registerToken = useCallback(async () => {
     if (!userId) return;
@@ -127,48 +131,46 @@ export function usePushNotifications(userId: number | null | undefined) {
     };
   }, []);
 
-  // Cold-start: check if app was opened via a notification tap
+  // Unified tap handler — handles both cold-start and foreground taps.
+  // Uses routerRef so the listener is installed once on mount and never
+  // re-installed due to router identity changes. Dedupes via
+  // lastHandledNotificationId so a cold-start response that is also
+  // delivered to the foreground listener produces only one navigation.
   useEffect(() => {
-    void getLastNotificationResponseAsync().then((response) => {
-      if (!response) return;
+    const handleResponse = (
+      response: NotificationResponse,
+      source: 'cold-start' | 'tap',
+    ) => {
+      const notificationId = response.notification.request.identifier;
+      if (lastHandledNotificationId.current === notificationId) return;
+      lastHandledNotificationId.current = notificationId;
+
       const data = response.notification.request.content.data as
         | NotificationData
         | undefined;
       if (!data) return;
 
-      LOGGER.info('Push notification cold-start tap', {
+      LOGGER.info(`Push notification ${source}`, {
         type: data.notificationType,
         leagueId: data.leagueId,
         matchupId: data.matchupId,
       });
 
-      navigateFromNotification(router, data);
+      navigateFromNotification(routerRef.current, data);
+    };
+
+    void getLastNotificationResponseAsync().then((response) => {
+      if (response) handleResponse(response, 'cold-start');
     });
-  }, [router]);
 
-  // Tap / interaction listener — used for deep-link navigation
-  useEffect(() => {
     responseListener.current = addNotificationResponseReceivedListener(
-      (response) => {
-        const data = response.notification.request.content.data as
-          | NotificationData
-          | undefined;
-        if (!data) return;
-
-        LOGGER.info('Push notification tapped', {
-          type: data.notificationType,
-          leagueId: data.leagueId,
-          matchupId: data.matchupId,
-        });
-
-        navigateFromNotification(router, data);
-      },
+      (response) => handleResponse(response, 'tap'),
     );
 
     return () => {
       responseListener.current?.remove();
     };
-  }, [router]);
+  }, []);
 }
 
 function navigateFromNotification(
