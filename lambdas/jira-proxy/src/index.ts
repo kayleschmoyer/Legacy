@@ -173,6 +173,7 @@ const MAX_ATTACHMENT_SIZE_BYTES = 2 * 1024 * 1024;
 /** Allowed attachment MIME type prefix/values */
 const ALLOWED_ATTACHMENT_TYPES =
   /^(image\/|video\/(mp4|webm|quicktime|x-msvideo)$)/;
+const MAX_RECENT_ERRORS = 10;
 
 /**
  * Validate and parse the incoming bug report request body.
@@ -270,6 +271,53 @@ function parseBugReport(rawBody: string | null): CreateIssueInput {
       throw new Error('Field "userAgent" must be a string');
     }
     input.userAgent = body['userAgent'];
+  }
+
+  if (body['commitSha'] !== undefined) {
+    if (typeof body['commitSha'] !== 'string') {
+      throw new Error('Field "commitSha" must be a string');
+    }
+    input.commitSha = body['commitSha'];
+  }
+
+  if (body['viewport'] !== undefined) {
+    if (typeof body['viewport'] !== 'string') {
+      throw new Error('Field "viewport" must be a string');
+    }
+    input.viewport = body['viewport'];
+  }
+
+  if (body['timestamp'] !== undefined) {
+    if (typeof body['timestamp'] !== 'string') {
+      throw new Error('Field "timestamp" must be a string');
+    }
+    input.timestamp = body['timestamp'];
+  }
+
+  if (body['recentErrors'] !== undefined) {
+    if (!Array.isArray(body['recentErrors'])) {
+      throw new Error('Field "recentErrors" must be an array');
+    }
+    const raw = (body['recentErrors'] as unknown[]).slice(0, MAX_RECENT_ERRORS);
+    input.recentErrors = raw.map((item) => {
+      if (typeof item !== 'object' || item === null) {
+        throw new Error('Each recentError must be an object');
+      }
+      const e = item as Record<string, unknown>;
+      if (typeof e['message'] !== 'string') {
+        throw new Error('Each recentError must have a "message" string');
+      }
+      if (typeof e['timestamp'] !== 'string') {
+        throw new Error('Each recentError must have a "timestamp" string');
+      }
+      return {
+        message: e['message'],
+        timestamp: e['timestamp'],
+        ...(typeof e['source'] === 'string' ? { source: e['source'] } : {}),
+        ...(typeof e['lineno'] === 'number' ? { lineno: e['lineno'] } : {}),
+        ...(typeof e['colno'] === 'number' ? { colno: e['colno'] } : {}),
+      };
+    });
   }
 
   if (body['attachments'] !== undefined) {

@@ -10,6 +10,8 @@ import { Dialog } from 'tamagui';
 import { Bug } from '@tamagui/lucide-icons';
 import { env } from '../../config/environment';
 import { CSRF_HEADER, getCsrfToken } from '../../lib/csrf';
+import type { CapturedError } from '../../lib/consoleErrorCapture';
+import { getCapturedErrors } from '../../lib/consoleErrorCapture';
 
 /** Max length for user description in the text area. */
 const MAX_DESCRIPTION_LENGTH = 1000;
@@ -254,6 +256,7 @@ export const BugReportButton: React.FC<BugReportButtonProps> = ({
       }
     }
 
+    const recentErrors = getCapturedErrors();
     const payload = {
       summary: buildSummary(description) || 'Bug report',
       description: description.trim(),
@@ -264,7 +267,11 @@ export const BugReportButton: React.FC<BugReportButtonProps> = ({
       pageUrl: window.location.href,
       userAgent: navigator.userAgent,
       appVersion: env.appVersion,
+      commitSha: env.commitSha,
       environment: detectEnvironment(),
+      viewport: `${String(window.innerWidth)}x${String(window.innerHeight)}`,
+      timestamp: new Date().toISOString(),
+      ...(recentErrors.length > 0 ? { recentErrors } : {}),
       ...(attachmentData.length > 0 ? { attachments: attachmentData } : {}),
     };
 
@@ -308,6 +315,7 @@ export const BugReportButton: React.FC<BugReportButtonProps> = ({
 
   const isLoading = submitState.status === 'loading';
   const isSuccess = submitState.status === 'success';
+  const capturedErrors = getCapturedErrors();
 
   // Don't render when the jira proxy URL is not configured
   if (!env.jiraProxyUrl) return null;
@@ -545,6 +553,10 @@ export const BugReportButton: React.FC<BugReportButtonProps> = ({
                         ['Version', env.appVersion],
                         ['Commit', env.commitSha],
                         ['Environment', detectEnvironment()],
+                        [
+                          'Viewport',
+                          `${String(window.innerWidth)}x${String(window.innerHeight)}`,
+                        ],
                         ['Browser', navigator.userAgent.slice(0, 80)],
                       ].map(([label, value]) => (
                         <XStack key={label} gap="$2">
@@ -567,6 +579,27 @@ export const BugReportButton: React.FC<BugReportButtonProps> = ({
                           </Paragraph>
                         </XStack>
                       ))}
+                      {capturedErrors.length > 0 && (
+                        <YStack gap="$1" marginTop="$2">
+                          <Paragraph
+                            size="$1"
+                            color="$colorPress"
+                            fontWeight="600"
+                          >
+                            Recent errors ({String(capturedErrors.length)}):
+                          </Paragraph>
+                          {capturedErrors.map((e: CapturedError, i: number) => (
+                            <Paragraph
+                              key={String(i)}
+                              size="$1"
+                              color="$red10"
+                              numberOfLines={2}
+                            >
+                              {e.message}
+                            </Paragraph>
+                          ))}
+                        </YStack>
+                      )}
                     </YStack>
                   )}
                 </YStack>

@@ -142,6 +142,14 @@ export interface AttachmentInput {
   data: string;
 }
 
+export interface CapturedErrorInput {
+  message: string;
+  source?: string;
+  lineno?: number;
+  colno?: number;
+  timestamp: string;
+}
+
 export interface CreateIssueInput {
   summary: string;
   description?: string;
@@ -151,11 +159,19 @@ export interface CreateIssueInput {
   /** Username extracted from the authenticated JWT (added server-side). */
   reporterUsername?: string;
   appVersion?: string;
+  /** Git commit SHA at time of report. */
+  commitSha?: string;
   environment?: string;
   /** Current page URL where the bug was reported from. */
   pageUrl?: string;
   /** User-agent string from the browser. */
   userAgent?: string;
+  /** Viewport dimensions at time of report, e.g. "1440x900". */
+  viewport?: string;
+  /** ISO 8601 timestamp when the report was submitted. */
+  timestamp?: string;
+  /** Recent browser console errors captured before the report. */
+  recentErrors?: CapturedErrorInput[];
   /** Optional screenshots or short video clips to attach to the Jira issue. */
   attachments?: AttachmentInput[];
 }
@@ -194,38 +210,76 @@ function textToAdf(text: string): JiraDocNode {
 }
 
 /**
- * Build ADF description that includes optional metadata fields
+ * Build an agent-ready ADF description from the bug report payload.
+ *
+ * The output is structured so a coding agent can act on it directly:
+ * user description first, then technical context, browser context,
+ * console errors, and a short investigation checklist.
  */
 function buildDescription(input: CreateIssueInput): JiraDocNode {
   const parts: string[] = [];
 
+  // ── 1. User-provided description ─────────────────────────────────────────
   if (input.description) {
-    parts.push(input.description);
+    parts.push(`## Bug Report\n\n${input.description}`);
   }
 
-  const metaParts: string[] = [];
-  if (input.appVersion) {
-    metaParts.push(`App Version: ${input.appVersion}`);
-  }
-  if (input.environment) {
-    metaParts.push(`Environment: ${input.environment}`);
-  }
-  if (input.reporterEmail) {
-    metaParts.push(`Reported by: ${input.reporterEmail}`);
-  }
-  if (input.reporterUsername) {
-    metaParts.push(`Username: ${input.reporterUsername}`);
-  }
-  if (input.pageUrl) {
-    metaParts.push(`Page URL: ${input.pageUrl}`);
-  }
-  if (input.userAgent) {
-    metaParts.push(`User Agent: ${input.userAgent}`);
+  // ── 2. Technical context ─────────────────────────────────────────────────
+  const techLines: string[] = [];
+  if (input.pageUrl) techLines.push(`- Page URL: ${input.pageUrl}`);
+  if (input.environment) techLines.push(`- Environment: ${input.environment}`);
+  if (input.commitSha) techLines.push(`- Commit SHA: ${input.commitSha}`);
+  if (input.appVersion) techLines.push(`- App Version: ${input.appVersion}`);
+  if (input.timestamp) techLines.push(`- Reported At: ${input.timestamp}`);
+  if (techLines.length > 0) {
+    parts.push(`## Technical Context\n\n${techLines.join('\n')}`);
   }
 
-  if (metaParts.length > 0) {
-    parts.push(`--- Metadata ---\n${metaParts.join('\n')}`);
+  // ── 3. Browser / reporter context ────────────────────────────────────────
+  const browserLines: string[] = [];
+  if (input.reporterEmail)
+    browserLines.push(`- Reporter: ${input.reporterEmail}`);
+  if (input.reporterUsername)
+    browserLines.push(`- Username: ${input.reporterUsername}`);
+  if (input.viewport) browserLines.push(`- Viewport: ${input.viewport}`);
+  if (input.userAgent) browserLines.push(`- User Agent: ${input.userAgent}`);
+  if (browserLines.length > 0) {
+    parts.push(`## Browser Context\n\n${browserLines.join('\n')}`);
   }
+
+  // ── 4. Recent console errors ─────────────────────────────────────────────
+  if (input.recentErrors && input.recentErrors.length > 0) {
+    const errorLines = input.recentErrors.map((e) => {
+      const loc = e.source
+        ? ` (${e.source}${e.lineno != null ? `:${String(e.lineno)}` : ''})`
+        : '';
+      return `- [${e.timestamp}] ${e.message}${loc}`;
+    });
+    parts.push(`## Recent Console Errors\n\n${errorLines.join('\n')}`);
+  } else {
+    parts.push(
+      '## Recent Console Errors\n\nNo errors captured at report time.',
+    );
+  }
+
+  // ── 5. Agent investigation notes ─────────────────────────────────────────
+  const investigationSteps: string[] = [
+    '1. Reproduce the issue at the Page URL above using the same viewport dimensions.',
+    '2. Look at the component(s) responsible for rendering that route.',
+  ];
+  if (input.commitSha) {
+    investigationSteps.push(
+      `3. Run \`git log ${input.commitSha}\` and \`git show ${input.commitSha}\` to inspect recent changes near the affected area.`,
+    );
+  }
+  if (input.recentErrors && input.recentErrors.length > 0) {
+    investigationSteps.push(
+      '4. The console errors above indicate where the failure originates — start there.',
+    );
+  }
+  parts.push(
+    `## Agent Investigation Notes\n\n${investigationSteps.join('\n')}`,
+  );
 
   return textToAdf(parts.join('\n\n'));
 }

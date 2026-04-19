@@ -30,6 +30,7 @@ import { TamaguiProvider } from 'tamagui';
 import { tamaguiConfig } from '@legacy-sports/tamagui-config';
 import { LOGGER } from '@legacy-sports/logging';
 import { env } from './config/environment';
+import { installConsoleErrorCapture } from './lib/consoleErrorCapture';
 import { apolloClient } from './lib/apollo-client';
 import { default as App } from './app/app';
 import { store } from './store/store';
@@ -43,6 +44,9 @@ const rollbarConfig = getRollbarConfigFromEnv();
 if (rollbarConfig) {
   initRollbar(rollbarConfig);
 }
+
+// Install global error capture for bug reports before any other setup
+installConsoleErrorCapture();
 
 // Initialize Google Analytics
 initializeAnalytics();
