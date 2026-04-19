@@ -16,6 +16,7 @@ import { bulkTransition } from './tools/bulk-transition.js';
 import { bulkCreate } from './tools/bulk-create.js';
 import { getBucketEpic, setBucketEpic } from './tools/bucket-epic.js';
 import { claimTicket } from './tools/claim-ticket.js';
+import { getTransitions } from './tools/get-transitions.js';
 import { tryGetJiraCredentials } from './netrc.js';
 
 // Check credentials at startup — warn if missing but don't exit.
@@ -378,6 +379,24 @@ server.tool(
       cascade: params.cascade,
     });
   },
+);
+
+// --- jira_get_transitions ---
+server.tool(
+  'jira_get_transitions',
+  'List available workflow transitions for a Jira issue. Returns [{id, name, to: {name, statusCategory}}]. ' +
+    'Use this instead of mcp__*__getTransitionsForJiraIssue (Atlassian plugin) — that tool has a known bug ' +
+    'where it may return issue data instead of a transitions array.',
+  {
+    key: z
+      .string()
+      .regex(
+        /^[A-Z][A-Z0-9_]+-\d+$/,
+        'Must be a valid Jira issue key (e.g., LS-123)',
+      )
+      .describe('Ticket key'),
+  },
+  async (params) => getTransitions(params),
 );
 
 // --- jira_claim_ticket ---

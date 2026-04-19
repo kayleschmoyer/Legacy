@@ -188,6 +188,7 @@ For any other JQL query, use `jira_search` instead of `searchJiraIssuesUsingJql`
 | `searchJiraIssuesUsingJql(jql: "...", fields: [...], maxResults: N, ...)`     | `jira_search(jql: "...", compact: true)` — compact JSON (~2 KB for 50 issues); avoids Atlassian plugin's ~3.8 KB/issue metadata envelope                                    |
 | `acli jira workitem view LS-####`                                             | `jira_view(key: "LS-####")` — always try MCP first; `acli` is last resort after both MCP and Atlassian plugin fail                                                          |
 | `acli jira workitem transition --key LS-#### --status "In Progress"`          | `jira_transition(key: "LS-####", status: "In Progress")` — if `jira_auth_status` unavailable (ephemeral worktree), use Atlassian plugin instead; `acli` is last resort only |
+| `getTransitionsForJiraIssue(cloudId, issueIdOrKey)`                           | `jira_get_transitions(key: "LS-####")` — Atlassian plugin version has a known bug returning wrong issue data; use the custom MCP tool instead                               |
 
 ## Database Operations
 
