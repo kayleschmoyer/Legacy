@@ -1,8 +1,9 @@
-import axios from 'axios';
 import * as React from 'react';
 import { Button, ScrollView, Text, TextInput } from 'react-native';
 import { Row, Table } from 'react-native-table-component';
-import { handleError } from '../../common/utilities/ErrorHandler';
+import { LOGGER } from '@legacy-sports/logging';
+import { axiosInstance } from '../../common/utilities/axiosInstance';
+import { useIsMounted } from '../../common/hooks/useIsMounted';
 
 export default function ViewGameLogs(): React.JSX.Element {
   const [player, setPlayer] = React.useState('');
@@ -11,9 +12,15 @@ export default function ViewGameLogs(): React.JSX.Element {
     Record<string, Record<string, string | number>> | undefined
   >(undefined);
   const [stats, setStats] = React.useState<Array<string>>([]);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const isMounted = useIsMounted();
 
   const getGameLog = () => {
-    axios
+    setLoading(true);
+    setError(null);
+    axiosInstance
       .post<Record<string, Record<string, string | number>>>(
         process.env.EXPO_PUBLIC_STATS_API_URL ||
           'http://localhost:5000/baseball-game-logs',
@@ -23,6 +30,8 @@ export default function ViewGameLogs(): React.JSX.Element {
         },
       )
       .then((response) => {
+        if (!isMounted()) return;
+
         const serverData = response.data;
 
         const games: Record<string, Record<string, string | number>> = {};
@@ -44,7 +53,16 @@ export default function ViewGameLogs(): React.JSX.Element {
         setData(games);
         setStats(Array.from(gameStats));
       })
-      .catch(handleError);
+      .catch((err: unknown) => {
+        if (!isMounted()) return;
+        const message =
+          err instanceof Error ? err.message : 'An unexpected error occurred.';
+        LOGGER.error('Failed to fetch game logs:', message);
+        setError(message);
+      })
+      .finally(() => {
+        if (isMounted()) setLoading(false);
+      });
   };
 
   return (
@@ -53,7 +71,13 @@ export default function ViewGameLogs(): React.JSX.Element {
 
       <TextInput value={player} onChangeText={setPlayer} />
       <TextInput value={date} onChangeText={setDate} />
-      <Button onPress={getGameLog} title="Get Player Data" />
+      <Button
+        onPress={getGameLog}
+        title={loading ? 'Loading...' : 'Get Player Data'}
+        disabled={loading}
+      />
+
+      {error != null && <Text style={{ color: 'red' }}>{error}</Text>}
 
       {data ? (
         <Table>

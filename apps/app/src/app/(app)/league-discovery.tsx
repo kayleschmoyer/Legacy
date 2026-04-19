@@ -16,6 +16,7 @@ import {
   useGetPublicLeaguesQuery,
   useJoinPublicLeagueMutation,
 } from '../../api/db/graphql.generated';
+import { useIsMounted } from '../../common/hooks/useIsMounted';
 
 const DRAFT_STATUS_FILTERS = ['All', 'Open', 'Queued', 'In Progress'] as const;
 
@@ -46,6 +47,7 @@ export default function LeagueDiscoveryScreen() {
   });
 
   const [joinMutation] = useJoinPublicLeagueMutation();
+  const isMounted = useIsMounted();
 
   const leagues = data?.publicLeagues ?? [];
 
@@ -57,6 +59,7 @@ export default function LeagueDiscoveryScreen() {
         const result = await joinMutation({
           variables: { leagueId, teamName: teamName.trim() },
         });
+        if (!isMounted()) return;
         if (result.data?.joinPublicLeague?.success) {
           setJoinTargetId(null);
           setTeamName('');
@@ -75,16 +78,17 @@ export default function LeagueDiscoveryScreen() {
           Alert.alert('Join Failed', errorMessage);
         }
       } catch (err) {
+        if (!isMounted()) return;
         LOGGER.error('Failed to join league:', String(err));
         Alert.alert(
           'Join Failed',
           'An unexpected error occurred. Please try again.',
         );
       } finally {
-        setJoiningId(null);
+        if (isMounted()) setJoiningId(null);
       }
     },
-    [joinMutation, teamName, refetch, router],
+    [joinMutation, teamName, refetch, router, isMounted],
   );
 
   return (

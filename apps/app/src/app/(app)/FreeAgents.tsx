@@ -14,6 +14,7 @@ import {
   useGetUserTeamIdQuery,
 } from '../../api/db/graphql.generated';
 import { useAuthorizedUserInfo } from '../../common/auth/AuthorizedUserContext';
+import { useIsMounted } from '../../common/hooks/useIsMounted';
 
 type FreeAgentPlayer = NonNullable<
   GetFreeAgentPlayersQuery['freeAgents']
@@ -69,9 +70,12 @@ function LeagueFreeAgents({
     variables: { leagueId },
   });
 
+  const isMounted = useIsMounted();
+
   const [claimFreeAgent, { loading: claiming }] = useClaimFreeAgentMutation({
     onCompleted: () => {
       Alert.alert('Success', 'Waiver claim submitted successfully.');
+      if (!isMounted()) return;
       setClaimingPlayerId(null);
       setFaabBid('');
       void refetch();

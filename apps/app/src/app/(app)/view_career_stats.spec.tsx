@@ -17,6 +17,9 @@ jest.mock('axios', () => ({
   default: {
     // Lazy closure: mockAxiosPost is read at call time, not at factory-init time
     post: (...args: unknown[]): unknown => mockAxiosPost(...args),
+    create: () => ({
+      post: (...args: unknown[]): unknown => mockAxiosPost(...args),
+    }),
   },
 }));
 
