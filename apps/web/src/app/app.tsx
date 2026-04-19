@@ -111,6 +111,12 @@ const MinigamesHubPage = lazyWithRetry(
 const TwentyQuestionsPage = lazyWithRetry(
   () => import('../pages/games/TwentyQuestionsPage'),
 );
+const PrivacyPolicyPage = lazyWithRetry(
+  () => import('../pages/legal/PrivacyPolicyPage'),
+);
+const TermsOfServicePage = lazyWithRetry(
+  () => import('../pages/legal/TermsOfServicePage'),
+);
 const EliteDraftBoardScreen = lazyWithRetry(() =>
   import('../components/EliteDraftBoard').then((m) => ({
     default: m.EliteDraftBoardScreen,
@@ -566,6 +572,8 @@ function App() {
             {/* /faq is a common alias that users and crawlers reach — redirect to the
                 pricing page which contains the FAQ accordion section. */}
             <Route path="/faq" element={<Navigate to="/pricing" replace />} />
+            <Route path="/privacy" element={<PrivacyPolicyPage />} />
+            <Route path="/terms" element={<TermsOfServicePage />} />
           </Routes>
         </Suspense>
       </YStack>
