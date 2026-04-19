@@ -5,6 +5,6 @@ export { MatchupRosterComparison } from './MatchupRosterComparison';
 export { MatchupRosterEditor } from './MatchupRosterEditor';
 export { PlayerMatchupStatsModal } from './PlayerMatchupStatsModal';
 export { PlayerSeasonStatsModal } from './PlayerSeasonStatsModal';
-export { StandingsTable } from './StandingsTable';
+export { StandingsTable } from '@legacy-sports/shared-components';
 export { StatsLoadingIndicator } from './StatsLoadingIndicator';
 export { GamesRemaining } from './GamesRemaining';

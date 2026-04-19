@@ -10,5 +10,5 @@ export type { MatchupGridProps } from './MatchupGrid';
 export { GamesRemaining } from './GamesRemaining';
 export type { GamesRemainingProps } from './GamesRemaining';
 
-export { StandingsTable } from './StandingsTable';
-export type { StandingsTableProps } from './StandingsTable';
+export { StandingsTable } from '@legacy-sports/shared-components';
+export type { StandingsTableProps } from '@legacy-sports/shared-components';

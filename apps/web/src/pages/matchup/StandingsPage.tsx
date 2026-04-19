@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button, H2, Spinner, Text, XStack, YStack } from 'tamagui';
-import { StandingsTable } from '../../features/matchup/StandingsTable';
+import { StandingsTable } from '@legacy-sports/shared-components';
 import { useStandings } from '../../hooks/useStandings';
 import {
   BRAND_NAVY,

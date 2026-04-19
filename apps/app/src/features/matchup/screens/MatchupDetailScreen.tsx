@@ -7,6 +7,7 @@ import {
   MatchupNavigationControls,
   MatchupRecapPanel,
   MatchupRosterComparison,
+  StandingsTable,
 } from '@legacy-sports/shared-components';
 import {
   MatchupStatus,
@@ -14,7 +15,6 @@ import {
 } from '../../../api/db/graphql.generated';
 import { MatchupRosterEditor } from '../components/MatchupRosterEditor';
 import { MatchupScoreboard } from '../components/MatchupScoreboard';
-import { StandingsTable } from '../components/StandingsTable';
 import {
   useCurrentWeek,
   useMatchupById,

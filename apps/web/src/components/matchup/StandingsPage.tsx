@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button, H2, Separator, Spinner, Text, XStack, YStack } from 'tamagui';
-import { StandingsTable } from './StandingsTable';
+import { StandingsTable } from '@legacy-sports/shared-components';
 import { PlayoffBracketDisplay } from './PlayoffBracketDisplay';
 import { useStandings } from '../../hooks/useStandings';
 import { useGetPlayoffBracketQuery } from '../../api/db/graphql.generated';

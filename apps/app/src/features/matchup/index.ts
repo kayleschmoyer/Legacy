@@ -12,7 +12,7 @@ export { useStandings } from './hooks/useStandings';
 export { MatchupCard } from './components/MatchupCard';
 export { MatchupScoreboard } from './components/MatchupScoreboard';
 export { MatchupList } from './components/MatchupList';
-export { StandingsTable } from './components/StandingsTable';
+export { StandingsTable } from '@legacy-sports/shared-components';
 
 // Screens
 export { default as MatchupDetailScreen } from './screens/MatchupDetailScreen';
