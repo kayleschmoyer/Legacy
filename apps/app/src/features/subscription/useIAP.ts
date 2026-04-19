@@ -134,6 +134,7 @@ export function useIAP(): UseIAPResult {
   const [verifyApplePurchase] = useVerifyApplePurchaseMutation();
   const [restoreApplePurchasesMutation] = useRestoreApplePurchasesMutation();
 
+  const mountedRef = useRef(true);
   const purchaseUpdateSubscriptionRef = useRef<PurchaseListenerHandle | null>(
     null,
   );
@@ -160,13 +161,15 @@ export function useIAP(): UseIAPResult {
         });
 
         // Always finish the StoreKit transaction regardless of verification
-        // result. Leaving it unfinished causes repeated re-delivery on every
-        // app launch (Apple) and auto-refunds after 3 days (Google Play).
+        // result or mounted state. Leaving it unfinished causes repeated
+        // re-delivery on every app launch and auto-refunds after 3 days.
         // Premium access is only granted when the server confirms success.
         await iapFinish({
           purchase: event,
           isConsumable: false,
         });
+
+        if (!mountedRef.current) return;
 
         if (result.data?.verifyApplePurchase?.success) {
           setIsSubscribed(true);
@@ -174,9 +177,13 @@ export function useIAP(): UseIAPResult {
           setError('Purchase verification failed. Please contact support.');
         }
       } catch (_err) {
-        setError('Purchase verification failed. Please try again.');
+        if (mountedRef.current) {
+          setError('Purchase verification failed. Please try again.');
+        }
       } finally {
-        setLoading(false);
+        if (mountedRef.current) {
+          setLoading(false);
+        }
       }
     },
     [verifyApplePurchase],
@@ -238,6 +245,7 @@ export function useIAP(): UseIAPResult {
 
     return () => {
       mounted = false;
+      mountedRef.current = false;
       purchaseUpdateSubscriptionRef.current?.remove();
       purchaseErrorSubscriptionRef.current?.remove();
     };

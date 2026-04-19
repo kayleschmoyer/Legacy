@@ -108,14 +108,17 @@ export function useGooglePlayBilling(): UseGooglePlayBillingResult {
           variables: { purchaseToken, productId },
         });
 
-        // Always acknowledge the purchase regardless of verification result.
-        // Unacknowledged Google Play purchases are auto-refunded after 3 days,
-        // causing revenue loss even when the billing itself succeeded.
-        // Premium access is only granted when the server confirms success.
+        // Always acknowledge the purchase regardless of verification result
+        // or mounted state. Unacknowledged Google Play purchases are
+        // auto-refunded after 3 days, causing revenue loss even when the
+        // billing itself succeeded. Premium access is only granted when the
+        // server confirms success.
         await finishTransaction({
           purchase: purchaseItem,
           isConsumable: false,
         });
+
+        if (!mounted) return;
 
         if (result.data?.verifyGooglePurchase?.success) {
           setIsSubscribed(true);
@@ -123,9 +126,13 @@ export function useGooglePlayBilling(): UseGooglePlayBillingResult {
           setError('Purchase verification failed. Please contact support.');
         }
       } catch (_err) {
-        setError('Purchase verification failed. Please try again.');
+        if (mounted) {
+          setError('Purchase verification failed. Please try again.');
+        }
       } finally {
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     };
 
