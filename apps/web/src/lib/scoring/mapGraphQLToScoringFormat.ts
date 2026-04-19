@@ -5,6 +5,7 @@
  * but the scoring system expects database column names (e.g., hr, so).
  */
 
+import type { SeasonStats } from '@legacy-sports/scoring';
 import type {
   GameBatting,
   GameFielding,
@@ -290,5 +291,24 @@ export function mapSeasonFieldingStats(
     a: graphqlStats.assists,
     eDef: graphqlStats.errors,
     dpDef: graphqlStats.doublePlays,
+  };
+}
+
+/**
+ * Maps a MatchupPlayerFragment to the SeasonStats shape expected by
+ * calculateMatchupProjection. Returns null when playerId or season is absent.
+ * sf is always null — sacrifice flies are not present in the season fragment (known TODO).
+ */
+export function mapMatchupPlayerToSeasonStats(
+  mp: MatchupPlayerFragment,
+): SeasonStats | null {
+  if (!mp.playerId || !mp.season) return null;
+  const batting = mapSeasonBattingStats(mp.seasonBatting);
+  return {
+    playerId: mp.playerId,
+    season: mp.season,
+    battingStats: batting ? { ...batting, sf: null } : undefined,
+    pitchingStats: mapSeasonPitchingStats(mp.seasonPitching) ?? undefined,
+    fieldingStats: mapSeasonFieldingStats(mp.seasonFielding) ?? undefined,
   };
 }

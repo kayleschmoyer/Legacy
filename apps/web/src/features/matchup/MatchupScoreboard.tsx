@@ -32,6 +32,7 @@ import {
 import {
   mapBattingStats,
   mapFieldingStats,
+  mapMatchupPlayerToSeasonStats,
   mapPitchingStats,
 } from '../../lib/scoring/mapGraphQLToScoringFormat';
 
@@ -283,79 +284,10 @@ export function MatchupScoreboard({
   // Build season stats map from matchup players data for projection calculations
   const seasonStatsMap = useMemo(() => {
     const map = new Map<number, SeasonStats>();
-    if (!playersData?.getMatchupPlayers) return map;
-
-    playersData.getMatchupPlayers.forEach((mp: MatchupPlayerFragment) => {
-      const playerId = mp.playerId;
-      const season = mp.season;
-      const batting = mp.seasonBatting;
-      const pitching = mp.seasonPitching;
-      const fielding = mp.seasonFielding;
-
-      if (!playerId || !season) return;
-
-      map.set(playerId, {
-        playerId,
-        season,
-        battingStats: batting
-          ? {
-              g: batting.games ?? null,
-              pa: batting.plateAppearances ?? null,
-              ab: batting.atBats ?? null,
-              r: batting.runs ?? null,
-              h: batting.hits ?? null,
-              doubles: batting.doubles ?? null,
-              triples: batting.triples ?? null,
-              hr: batting.homeRuns ?? null,
-              rbi: batting.rbi ?? null,
-              sb: batting.stolenBases ?? null,
-              cs: batting.caughtStealing ?? null,
-              bb: batting.baseOnBalls ?? null,
-              so: batting.strikeouts ?? null,
-              gidp: batting.groundedIntoDoublePlays ?? null,
-              hbp: batting.hitByPitch ?? null,
-              sh: batting.sacrificeHits ?? null,
-              sf: null,
-              ibb: batting.intentionalBaseOnBalls ?? null,
-            }
-          : undefined,
-        pitchingStats: pitching
-          ? {
-              g: pitching.games ?? null,
-              w: pitching.wins ?? null,
-              l: pitching.losses ?? null,
-              gs: pitching.gamesStarted ?? null,
-              gf: pitching.gamesFinished ?? null,
-              cg: pitching.completeGames ?? null,
-              sho: pitching.shutouts ?? null,
-              sv: pitching.saves ?? null,
-              ip: pitching.inningsPitched ?? null,
-              h: pitching.hits ?? null,
-              r: pitching.runs ?? null,
-              er: pitching.earnedRuns ?? null,
-              hr: pitching.homeRuns ?? null,
-              bb: pitching.baseOnBalls ?? null,
-              ibb: pitching.intentionalBaseOnBalls ?? null,
-              so: pitching.strikeouts ?? null,
-              hbp: pitching.hitByPitch ?? null,
-              battersFaced: pitching.battersFaced ?? null,
-              outsRecorded: pitching.outsRecorded ?? null,
-            }
-          : undefined,
-        fieldingStats: fielding
-          ? {
-              g: fielding.games ?? null,
-              innDef: fielding.inningsDefended ?? null,
-              chances: fielding.chances ?? null,
-              po: fielding.putouts ?? null,
-              a: fielding.assists ?? null,
-              eDef: fielding.errors ?? null,
-              dpDef: fielding.doublePlays ?? null,
-            }
-          : undefined,
-      });
+    playersData?.getMatchupPlayers?.forEach((mp: MatchupPlayerFragment) => {
+      const stats = mapMatchupPlayerToSeasonStats(mp);
+      if (stats) map.set(stats.playerId, stats);
     });
-
     return map;
   }, [playersData]);
 

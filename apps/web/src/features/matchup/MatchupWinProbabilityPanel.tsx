@@ -4,7 +4,6 @@ import { Target, TrendingUp } from '@tamagui/lucide-icons';
 import {
   calculateMatchupProjection,
   computeScoring,
-  type SeasonStats,
 } from '@legacy-sports/scoring';
 import { calculateMatchupWinProbability } from '@legacy-sports/analytics';
 import {
@@ -24,6 +23,7 @@ import { useLeagueScoringSettings } from '../../lib/scoring';
 import {
   mapBattingStats,
   mapFieldingStats,
+  mapMatchupPlayerToSeasonStats,
   mapPitchingStats,
 } from '../../lib/scoring/mapGraphQLToScoringFormat';
 
@@ -307,77 +307,22 @@ export function MatchupWinProbabilityPanel({
         fieldingPerGame: number;
       } | null = null;
 
-      if (remaining > 0 && player.playerId && player.season) {
-        const seasonStats: SeasonStats = {
-          playerId: player.playerId,
-          season: player.season,
-          battingStats: player.seasonBatting
-            ? {
-                g: player.seasonBatting.games ?? null,
-                pa: player.seasonBatting.plateAppearances ?? null,
-                ab: player.seasonBatting.atBats ?? null,
-                r: player.seasonBatting.runs ?? null,
-                h: player.seasonBatting.hits ?? null,
-                doubles: player.seasonBatting.doubles ?? null,
-                triples: player.seasonBatting.triples ?? null,
-                hr: player.seasonBatting.homeRuns ?? null,
-                rbi: player.seasonBatting.rbi ?? null,
-                sb: player.seasonBatting.stolenBases ?? null,
-                cs: player.seasonBatting.caughtStealing ?? null,
-                bb: player.seasonBatting.baseOnBalls ?? null,
-                so: player.seasonBatting.strikeouts ?? null,
-                gidp: player.seasonBatting.groundedIntoDoublePlays ?? null,
-                hbp: player.seasonBatting.hitByPitch ?? null,
-                sh: player.seasonBatting.sacrificeHits ?? null,
-                sf: null,
-                ibb: player.seasonBatting.intentionalBaseOnBalls ?? null,
-              }
-            : undefined,
-          pitchingStats: player.seasonPitching
-            ? {
-                g: player.seasonPitching.games ?? null,
-                w: player.seasonPitching.wins ?? null,
-                l: player.seasonPitching.losses ?? null,
-                gs: player.seasonPitching.gamesStarted ?? null,
-                gf: player.seasonPitching.gamesFinished ?? null,
-                cg: player.seasonPitching.completeGames ?? null,
-                sho: player.seasonPitching.shutouts ?? null,
-                sv: player.seasonPitching.saves ?? null,
-                ip: player.seasonPitching.inningsPitched ?? null,
-                h: player.seasonPitching.hits ?? null,
-                r: player.seasonPitching.runs ?? null,
-                er: player.seasonPitching.earnedRuns ?? null,
-                hr: player.seasonPitching.homeRuns ?? null,
-                bb: player.seasonPitching.baseOnBalls ?? null,
-                ibb: player.seasonPitching.intentionalBaseOnBalls ?? null,
-                so: player.seasonPitching.strikeouts ?? null,
-                hbp: player.seasonPitching.hitByPitch ?? null,
-                battersFaced: player.seasonPitching.battersFaced ?? null,
-                outsRecorded: player.seasonPitching.outsRecorded ?? null,
-              }
-            : undefined,
-          fieldingStats: player.seasonFielding
-            ? {
-                g: player.seasonFielding.games ?? null,
-                innDef: player.seasonFielding.inningsDefended ?? null,
-                chances: player.seasonFielding.chances ?? null,
-                po: player.seasonFielding.putouts ?? null,
-                a: player.seasonFielding.assists ?? null,
-                eDef: player.seasonFielding.errors ?? null,
-                dpDef: player.seasonFielding.doublePlays ?? null,
-              }
-            : undefined,
-        };
-
-        try {
-          const proj = calculateMatchupProjection(seasonStats, scoringSettings);
-          perGame = {
-            battingPerGame: proj.battingPerGame,
-            pitchingPerGame: proj.pitchingPerGame,
-            fieldingPerGame: proj.fieldingPerGame,
-          };
-        } catch {
-          // Fall through – perGame remains null; actual scores only
+      if (remaining > 0) {
+        const seasonStats = mapMatchupPlayerToSeasonStats(player);
+        if (seasonStats) {
+          try {
+            const proj = calculateMatchupProjection(
+              seasonStats,
+              scoringSettings,
+            );
+            perGame = {
+              battingPerGame: proj.battingPerGame,
+              pitchingPerGame: proj.pitchingPerGame,
+              fieldingPerGame: proj.fieldingPerGame,
+            };
+          } catch {
+            // Fall through – perGame remains null; actual scores only
+          }
         }
       }
 
