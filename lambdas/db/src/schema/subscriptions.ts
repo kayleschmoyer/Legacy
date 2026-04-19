@@ -5,10 +5,11 @@ import {
   reapplyLeagueRestrictions,
   runWithInternalClient,
 } from '@legacy-sports/db-client';
-import { and, eq, gte, sql } from 'drizzle-orm';
+import { and, eq, gte, lt, sql } from 'drizzle-orm';
 import Stripe from 'stripe';
 import { getDbOptions } from '@legacy-sports/utils/node';
 import { LOGGER } from '@legacy-sports/logging';
+import type { WebSocketNotificationService } from '@legacy-sports/aws-utils';
 import { builder } from './builder';
 import {
   AuthenticationError,
@@ -598,6 +599,150 @@ async function getOrCreateStripeCustomer(
     metadata: { userId: String(userId) },
   });
 }
+
+// ─── Grace period expiry (scheduled) ─────────────────────────────────────────
+
+interface ExpireSubscriptionGracePeriodsResultShape {
+  expired: number;
+  errors: string[];
+}
+
+const ExpireSubscriptionGracePeriodsResultRef =
+  builder.objectRef<ExpireSubscriptionGracePeriodsResultShape>(
+    'ExpireSubscriptionGracePeriodsResult',
+  );
+
+ExpireSubscriptionGracePeriodsResultRef.implement({
+  fields: (t) => ({
+    expired: t.exposeInt('expired'),
+    errors: t.exposeStringList('errors'),
+  }),
+});
+
+/**
+ * Scheduled sweep: downgrade premium users whose payment-failure grace period
+ * has expired.
+ *
+ * The Stripe webhook's `invoice.payment_failed` handler sets
+ * `grace_period_ends_at = now + GRACE_PERIOD_DAYS` and only downgrades when a
+ * subsequent `invoice.payment_failed` arrives past that deadline.  If Stripe
+ * stops retrying (after exhausting retries) or never delivers another event
+ * after the grace period, the user would keep premium indefinitely despite
+ * never paying.  This sweep closes that gap by processing expired grace
+ * periods on a fixed schedule (hourly via EventBridge).
+ *
+ * Idempotent: rows are filtered on `tier = 'premium'`, so once a row is
+ * downgraded it won't be re-processed.
+ *
+ * Exported (not just wired into the resolver) so it can be unit-tested
+ * independently of the Pothos builder.
+ */
+export async function expireSubscriptionGracePeriods(
+  notificationService: WebSocketNotificationService | null | undefined,
+): Promise<ExpireSubscriptionGracePeriodsResultShape> {
+  LOGGER.info('[expireSubscriptionGracePeriods] Starting sweep');
+
+  const result: ExpireSubscriptionGracePeriodsResultShape = {
+    expired: 0,
+    errors: [],
+  };
+
+  const now = new Date();
+
+  const rows = await runWithInternalClient(getDbOptions(), async (db) =>
+    db
+      .select({
+        id: InternalSchema.subscriptions.id,
+        userId: InternalSchema.subscriptions.userId,
+        stripeSubscriptionId: InternalSchema.subscriptions.stripeSubscriptionId,
+        gracePeriodEndsAt: InternalSchema.subscriptions.gracePeriodEndsAt,
+      })
+      .from(InternalSchema.subscriptions)
+      .where(
+        and(
+          eq(InternalSchema.subscriptions.status, 'past_due'),
+          eq(InternalSchema.subscriptions.tier, 'premium'),
+          lt(InternalSchema.subscriptions.gracePeriodEndsAt, now),
+        ),
+      ),
+  );
+
+  LOGGER.info(
+    `[expireSubscriptionGracePeriods] Found ${rows.length} expired grace periods`,
+  );
+
+  for (const row of rows) {
+    try {
+      await runWithInternalClient(getDbOptions(), async (db) => {
+        // Scope the update to the specific row by primary key — a user may
+        // theoretically hold multiple platform rows (Stripe + Apple IAP), and
+        // the sweep must only touch the expired one.
+        await db
+          .update(InternalSchema.subscriptions)
+          .set({ tier: 'free', updatedAt: new Date() })
+          .where(eq(InternalSchema.subscriptions.id, row.id));
+        await db
+          .update(InternalSchema.usersInAppInternal)
+          .set({ subscriptionTier: 'free', updatedAt: new Date() })
+          .where(eq(InternalSchema.usersInAppInternal.id, row.userId));
+      });
+
+      await handleSubscriptionDowngrade(row.userId, getDbOptions());
+
+      if (notificationService) {
+        try {
+          await notificationService.notifySubscriptionUpdated(
+            row.userId,
+            'free',
+            'past_due',
+          );
+        } catch (err) {
+          LOGGER.warn(
+            '[expireSubscriptionGracePeriods] Notification failed (non-fatal)',
+            { err, userId: row.userId },
+          );
+        }
+      }
+
+      result.expired++;
+      LOGGER.info('[expireSubscriptionGracePeriods] Downgraded user to free', {
+        userId: row.userId,
+        stripeSubscriptionId: row.stripeSubscriptionId,
+        gracePeriodEndsAt: row.gracePeriodEndsAt,
+      });
+    } catch (err) {
+      const errMsg = `User ${row.userId}: ${err instanceof Error ? err.message : String(err)}`;
+      LOGGER.error(
+        `[expireSubscriptionGracePeriods] Error downgrading user: ${errMsg}`,
+      );
+      result.errors.push(errMsg);
+    }
+  }
+
+  LOGGER.info('[expireSubscriptionGracePeriods] Completed', {
+    expired: result.expired,
+    errorCount: result.errors.length,
+  });
+
+  return result;
+}
+
+builder.mutationField('expireSubscriptionGracePeriods', (t) =>
+  t.field({
+    type: ExpireSubscriptionGracePeriodsResultRef,
+    description:
+      'Downgrade premium subscriptions whose grace_period_ends_at has passed. ' +
+      'System / admin only. Triggered hourly by EventBridge.',
+    resolve: async (_parent, _args, context) => {
+      if (!context.isSystemRequest && !context.user?.isAdmin) {
+        throw ForbiddenError(
+          'Only system processes or admins can expire subscription grace periods.',
+        );
+      }
+      return expireSubscriptionGracePeriods(context.notificationService);
+    },
+  }),
+);
 
 // ─── Apple IAP ───────────────────────────────────────────────────────────────
 

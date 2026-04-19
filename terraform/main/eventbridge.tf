@@ -389,3 +389,48 @@ resource "aws_lambda_permission" "dues_reminders_eventbridge" {
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.dues_reminders.arn
 }
+
+# ── Subscription Grace-Period Expiry (LS-2614) ──────────────────────
+# Downgrades premium users whose payment-failure grace period has passed.
+# Stripe only fires `invoice.payment_failed` a limited number of times before
+# giving up; if no event arrives past the 7-day grace period the Stripe webhook
+# handler never sees a trigger to downgrade. This hourly sweep closes the gap.
+# The mutation short-circuits quickly when no rows match, so cost is negligible.
+
+resource "aws_cloudwatch_event_rule" "expire_subscription_grace_periods" {
+  name                = "${local.name_prefix}-expire-subscription-grace-periods"
+  description         = "Downgrade expired subscription grace periods hourly"
+  schedule_expression = "rate(1 hour)"
+
+  tags = local.common_tags
+}
+
+resource "aws_cloudwatch_event_target" "expire_subscription_grace_periods" {
+  rule      = aws_cloudwatch_event_rule.expire_subscription_grace_periods.name
+  target_id = "expire-subscription-grace-periods"
+  arn       = aws_lambda_function.graphql.arn
+
+  input = jsonencode({
+    httpMethod = "POST"
+    body = jsonencode({
+      query = "mutation { expireSubscriptionGracePeriods { expired errors } }"
+    })
+    headers = {
+      "content-type"     = "application/json"
+      "x-system-api-key" = random_password.system_api_key.result
+    }
+    requestContext = {
+      http = {
+        method = "POST"
+      }
+    }
+  })
+}
+
+resource "aws_lambda_permission" "expire_subscription_grace_periods_eventbridge" {
+  statement_id  = "AllowEventBridgeExpireSubscriptionGracePeriods"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.graphql.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.expire_subscription_grace_periods.arn
+}

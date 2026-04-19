@@ -803,6 +803,11 @@ type EvaluateBadgesResult {
   awardedCount: Int
 }
 
+type ExpireSubscriptionGracePeriodsResult {
+  errors: [String!]
+  expired: Int
+}
+
 input ForceAddPlayerInput {
   leagueId: Int!
   playerId: Int!
@@ -1604,6 +1609,11 @@ type Mutation {
   Evaluate and award all eligible matchup-based badges for a completed matchup. Call when a matchup status transitions to completed. Requires authentication.
   """
   evaluateMatchupBadges(matchupId: Int!): EvaluateBadgesResult
+
+  """
+  Downgrade premium subscriptions whose grace_period_ends_at has passed. System / admin only. Triggered hourly by EventBridge.
+  """
+  expireSubscriptionGracePeriods: ExpireSubscriptionGracePeriodsResult
 
   """
   Commissioner: force-add a player to a team, bypassing normal acquisition rules.
