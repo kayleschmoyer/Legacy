@@ -39,6 +39,11 @@ import { applyDecay, applyEscalation } from '../../services/salary-rollover';
 // League service instance for create operations
 const leagueService = createLeagueService(getDbOptions());
 
+// Server-side validation limits — kept in sync with apps/web/src/constants/league.ts
+const MAX_LEAGUE_NAME_LENGTH = 50;
+const MIN_NUMBER_OF_TEAMS = 2;
+const MAX_NUMBER_OF_TEAMS = 30;
+
 // ── Input / payload types ──────────────────────────────────────────────────
 
 const CreateLeagueAndTeamsInput = builder.inputType(
@@ -203,6 +208,24 @@ builder.mutationField('createLeagueAndTeams', (t) =>
       } = args.input;
       const userId = context.user.id;
       const username = context.user.username || 'User';
+
+      // ── Input validation ────────────────────────────────────────────────────
+      if (leagueName.trim().length === 0) {
+        throw UserInputError('League name cannot be empty');
+      }
+      if (leagueName.length > MAX_LEAGUE_NAME_LENGTH) {
+        throw UserInputError(
+          `League name must be ${MAX_LEAGUE_NAME_LENGTH} characters or fewer`,
+        );
+      }
+      if (
+        numberOfTeams < MIN_NUMBER_OF_TEAMS ||
+        numberOfTeams > MAX_NUMBER_OF_TEAMS
+      ) {
+        throw UserInputError(
+          `Number of teams must be between ${MIN_NUMBER_OF_TEAMS} and ${MAX_NUMBER_OF_TEAMS}`,
+        );
+      }
 
       // ── Premium feature gating ──────────────────────────────────────────────
       const isAdmin = context.user.isAdmin === true;
