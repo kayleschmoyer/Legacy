@@ -23,8 +23,6 @@ import {
   BRAND_NAVY_DARK,
   BRAND_NAVY_LIGHT,
   BRAND_SEAM_RED,
-  DISCORD_BLURPLE,
-  DISCORD_BLURPLE_DARK,
   SURFACE_PANEL,
   withAlpha,
 } from '../../constants/colors';
@@ -117,25 +115,6 @@ const OutlineSignInButton = styled(YStack, {
   },
 });
 
-const FeatureCard = styled(YStack, {
-  flex: 1,
-  minWidth: 220,
-  borderRadius: '$6',
-  borderWidth: 1,
-  borderColor: '$glassBorder',
-  padding: '$5',
-  gap: '$3',
-  animation: 'medium',
-  hoverStyle: {
-    borderColor: '$glassBorderHover',
-    transform: 'translateY(-2px)',
-  },
-  $sm: {
-    minWidth: '100%',
-    padding: '$4',
-  },
-});
-
 const FeatureIconCircle = styled(YStack, {
   width: 44,
   height: 44,
@@ -168,6 +147,50 @@ const SportCard = styled(YStack, {
   },
 });
 
+const FeaturedDraftCard = styled(YStack, {
+  width: '100%',
+  borderRadius: '$6',
+  borderWidth: 1,
+  borderColor: '$glassBorder',
+  padding: '$7',
+  gap: '$4',
+  animation: 'medium',
+  hoverStyle: {
+    borderColor: '$glassBorderHover',
+    transform: 'translateY(-2px)',
+  },
+  $sm: {
+    padding: '$5',
+  },
+});
+
+const UtilityCard = styled(YStack, {
+  flex: 1,
+  minWidth: 160,
+  borderRadius: '$5',
+  borderWidth: 1,
+  borderColor: '$glassBorder',
+  padding: '$4',
+  gap: '$2',
+  animation: 'medium',
+  hoverStyle: {
+    borderColor: '$glassBorderHover',
+    transform: 'translateY(-2px)',
+  },
+  $sm: {
+    minWidth: '100%',
+  },
+});
+
+const StepCard = styled(YStack, {
+  flex: 1,
+  minWidth: 220,
+  gap: '$3',
+  $sm: {
+    minWidth: '100%',
+  },
+});
+
 /* ─── Background Styles ─── */
 
 const pageBackgroundStyle: React.CSSProperties = {
@@ -185,12 +208,33 @@ const heroGradientStyle: React.CSSProperties = {
 
 const heroHeadingStyle: React.CSSProperties = {
   margin: 0,
+  fontFamily: '"Literata", Georgia, serif',
   fontWeight: 900,
   textAlign: 'center',
   letterSpacing: -1,
   lineHeight: 1.1,
   fontSize: 'clamp(2.5rem, 6vw, 4rem)',
   color: BRAND_GOLD_DARK,
+};
+
+const sectionHeadingStyle: React.CSSProperties = {
+  margin: 0,
+  fontFamily: '"Big Shoulders Display", sans-serif',
+  fontWeight: 800,
+  letterSpacing: -0.5,
+  lineHeight: 1.05,
+  textAlign: 'center',
+  fontSize: 'clamp(1.75rem, 4vw, 2.5rem)',
+};
+
+const stepNumberStyle: React.CSSProperties = {
+  fontFamily: '"Big Shoulders Display", sans-serif',
+  fontWeight: 800,
+  fontSize: 'clamp(3rem, 6vw, 5rem)',
+  lineHeight: 1,
+  color: BRAND_GOLD,
+  opacity: 0.55,
+  display: 'block',
 };
 
 const featureCardStyle: React.CSSProperties = {
@@ -209,28 +253,42 @@ const FEATURES = [
     label: 'stats',
     title: 'Live Stats',
     description:
-      'Real-time player statistics, projections, and performance trends updated as the game unfolds.',
-  },
-  {
-    icon: 'draft' as const,
-    label: 'draft',
-    title: 'Draft Tools',
-    description:
-      'Snake and auction drafts with smart rankings, position analysis, and mock draft simulations.',
+      'Player statistics and performance trends updated as the game unfolds.',
   },
   {
     icon: 'live' as const,
     label: 'realtime',
     title: 'Instant Updates',
     description:
-      'WebSocket-powered live scoring and lineup lock notifications so you never miss a move.',
+      'Scores update live. Lineup locks notify you before the first pitch.',
   },
   {
     icon: 'secure' as const,
     label: 'secure',
     title: 'Secure Leagues',
     description:
-      'Private invite codes, commissioner controls, and fair waiver rules for your perfect league.',
+      'Private invite codes, commissioner controls, and fair waiver rules.',
+  },
+];
+
+const HOW_IT_WORKS = [
+  {
+    number: '01',
+    title: 'Pick your era',
+    description:
+      'Choose from 1920s legends to modern stars — every active MLB season is in the pool.',
+  },
+  {
+    number: '02',
+    title: 'Draft your legends',
+    description:
+      'Snake or auction format. Real historical rosters. The 1927 Yankees lineup is available.',
+  },
+  {
+    number: '03',
+    title: 'Compete on their stats',
+    description:
+      'Head-to-head matchups scored on archived MLB statistics — exactly as they played.',
   },
 ];
 
@@ -243,15 +301,6 @@ const SPORTS = [
       'Build your roster, dominate the draft, and track real-time stats across every matchup.',
     accent: withAlpha(BRAND_NAVY, 0.55),
     available: true,
-  },
-  {
-    icon: 'football' as const,
-    label: 'football',
-    title: 'Football',
-    description:
-      'Manage lineups, trade players, and lead your team through every game week.',
-    accent: withAlpha('#16A34A', 0.35),
-    available: false,
   },
 ] satisfies Array<{
   icon: BrandIconName;
@@ -657,7 +706,7 @@ export function PublicLandingPage(): React.JSX.Element {
               </YStack>
 
               {/* CTA Buttons */}
-              <XStack gap="$3" flexWrap="wrap" justifyContent="center">
+              <YStack gap="$3" alignItems="center">
                 <SignInButton
                   onPress={() => {
                     void handleSignIn();
@@ -669,7 +718,7 @@ export function PublicLandingPage(): React.JSX.Element {
                   <XStack
                     alignItems="center"
                     gap="$2.5"
-                    minWidth={200}
+                    minWidth={220}
                     justifyContent="center"
                   >
                     {isLoading || isConfiguring ? (
@@ -684,38 +733,34 @@ export function PublicLandingPage(): React.JSX.Element {
                     )}
                   </XStack>
                 </SignInButton>
+
                 {config.discordClientId ? (
-                  <SignInButton
+                  <OutlineSignInButton
                     onPress={handleDiscordSignIn}
                     role="button"
                     tabIndex={0}
                     aria-label="Continue with Discord"
-                    backgroundColor={DISCORD_BLURPLE}
-                    hoverStyle={{
-                      backgroundColor: DISCORD_BLURPLE_DARK,
-                      transform: 'translateY(-2px)',
-                    }}
                   >
                     <XStack
                       alignItems="center"
-                      gap="$2.5"
-                      minWidth={200}
+                      gap="$2"
+                      minWidth={220}
                       justifyContent="center"
                     >
                       {isDiscordLoading ? (
-                        <Spinner size="small" color="$color1" />
+                        <Spinner size="small" color="$color11" />
                       ) : (
                         <>
-                          <BrandIcon name="discord" size={18} />
-                          <Text fontSize="$4" color="$color1" fontWeight="700">
+                          <BrandIcon name="discord" size={16} />
+                          <Text fontSize="$3" color="$color11" fontWeight="600">
                             Continue with Discord
                           </Text>
                         </>
                       )}
                     </XStack>
-                  </SignInButton>
+                  </OutlineSignInButton>
                 ) : null}
-              </XStack>
+              </YStack>
 
               {displayError ? (
                 <Text fontSize="$3" color="$red9" textAlign="center">
@@ -723,12 +768,85 @@ export function PublicLandingPage(): React.JSX.Element {
                 </Text>
               ) : null}
 
-              {/* Social proof */}
-              <Text fontSize="$2" color="$color10" textAlign="center">
-                Free to play · No credit card required
-              </Text>
+              {/* Social proof + join path */}
+              <YStack alignItems="center" gap="$1.5">
+                <Text fontSize="$2" color="$color10" textAlign="center">
+                  Free to play · No credit card required
+                </Text>
+                <Text fontSize="$2" color="$color10" textAlign="center">
+                  Joining a friend's league?{' '}
+                  <Text
+                    fontSize="$2"
+                    color={BRAND_GOLD_LIGHT}
+                    fontWeight="600"
+                    textDecorationLine="underline"
+                    cursor="pointer"
+                    onPress={() => {
+                      void handleSignIn();
+                    }}
+                  >
+                    Sign in to enter your invite code →
+                  </Text>
+                </Text>
+              </YStack>
             </ContentContainer>
           </HeroSection>
+
+          {/* ─── How It Works ─── */}
+          <YStack
+            paddingVertical="$10"
+            paddingHorizontal="$5"
+            style={{
+              background: `linear-gradient(180deg, transparent 0%, ${withAlpha(BRAND_NAVY, 0.1)} 50%, transparent 100%)`,
+            }}
+            $sm={{ paddingHorizontal: '$3' }}
+          >
+            <ContentContainer gap="$8">
+              <YStack alignItems="center" gap="$2">
+                <h2 style={sectionHeadingStyle} aria-label="How it works">
+                  How it works
+                </h2>
+                <Text
+                  fontSize="$4"
+                  color="$color11"
+                  textAlign="center"
+                  maxWidth={400}
+                  style={{ fontFamily: '"Literata", Georgia, serif' }}
+                >
+                  Fantasy baseball reimagined around real history.
+                </Text>
+              </YStack>
+
+              <XStack flexWrap="wrap" gap="$6" justifyContent="center">
+                {HOW_IT_WORKS.map((step) => (
+                  <StepCard key={step.number}>
+                    <span style={stepNumberStyle}>{step.number}</span>
+                    <YStack gap="$1.5">
+                      <Text
+                        fontSize="$5"
+                        fontWeight="700"
+                        color="$color"
+                        style={{
+                          fontFamily: '"Big Shoulders Display", sans-serif',
+                          letterSpacing: -0.3,
+                        }}
+                      >
+                        {step.title}
+                      </Text>
+                      <Text
+                        fontSize="$3"
+                        color="$color11"
+                        lineHeight="$5"
+                        style={{ fontFamily: '"Literata", Georgia, serif' }}
+                      >
+                        {step.description}
+                      </Text>
+                    </YStack>
+                  </StepCard>
+                ))}
+              </XStack>
+            </ContentContainer>
+          </YStack>
 
           {/* ─── Features Section ─── */}
           <YStack
@@ -738,48 +856,141 @@ export function PublicLandingPage(): React.JSX.Element {
           >
             <ContentContainer gap="$6">
               <YStack alignItems="center" gap="$2">
-                <Text
-                  fontSize="$8"
-                  fontWeight="800"
-                  color="$color"
-                  textAlign="center"
-                  letterSpacing={-0.5}
-                >
-                  Everything you need to win
-                </Text>
+                <h2 style={sectionHeadingStyle}>Everything you need to win</h2>
                 <Text
                   fontSize="$4"
                   color="$color11"
                   textAlign="center"
                   maxWidth={440}
+                  style={{ fontFamily: '"Literata", Georgia, serif' }}
                 >
                   Powerful tools that give you an edge every single week.
                 </Text>
               </YStack>
 
               <Theme name="dark">
-                <XStack flexWrap="wrap" gap="$4" justifyContent="center">
-                  {FEATURES.map((feature) => (
-                    <FeatureCard key={feature.label} style={featureCardStyle}>
-                      <FeatureIconCircle>
-                        <BrandIcon
-                          name={feature.icon}
-                          size={22}
-                          title={feature.title}
-                          decorative={false}
-                        />
-                      </FeatureIconCircle>
-                      <YStack gap="$1">
-                        <Text fontSize="$4" fontWeight="700" color="$color">
-                          {feature.title}
-                        </Text>
-                        <Text fontSize="$3" color="$color11" lineHeight="$5">
-                          {feature.description}
-                        </Text>
+                <YStack gap="$4">
+                  {/* Draft Tools — featured, full-width */}
+                  <FeaturedDraftCard
+                    style={{
+                      background: `linear-gradient(135deg, ${BG_DARK} 0%, ${withAlpha(BRAND_NAVY, 0.35)} 100%)`,
+                    }}
+                  >
+                    <XStack
+                      gap="$6"
+                      flexWrap="wrap"
+                      alignItems="flex-start"
+                      $sm={{ flexDirection: 'column', gap: '$4' }}
+                    >
+                      <YStack flex={1} minWidth={220} gap="$3">
+                        <FeatureIconCircle>
+                          <BrandIcon
+                            name="draft"
+                            size={24}
+                            title="Draft Tools"
+                            decorative={false}
+                          />
+                        </FeatureIconCircle>
+                        <YStack gap="$1.5">
+                          <Text
+                            fontSize="$7"
+                            fontWeight="800"
+                            color="$color"
+                            style={{
+                              fontFamily: '"Big Shoulders Display", sans-serif',
+                              letterSpacing: -0.5,
+                            }}
+                          >
+                            Draft Tools
+                          </Text>
+                          <Text
+                            fontSize="$4"
+                            color="$color11"
+                            lineHeight="$6"
+                            maxWidth={340}
+                            style={{ fontFamily: '"Literata", Georgia, serif' }}
+                          >
+                            Snake and auction formats with smart historical
+                            rankings, position analysis across eras, and mock
+                            draft simulations. The draft is the season.
+                          </Text>
+                        </YStack>
                       </YStack>
-                    </FeatureCard>
-                  ))}
-                </XStack>
+                      <YStack
+                        flex={0}
+                        minWidth={180}
+                        gap="$2"
+                        paddingTop="$1"
+                        $sm={{ display: 'none' }}
+                      >
+                        {[
+                          'Snake draft',
+                          'Auction format',
+                          'Mock drafts',
+                          'Era rankings',
+                        ].map((item) => (
+                          <XStack key={item} alignItems="center" gap="$2">
+                            <YStack
+                              width={6}
+                              height={6}
+                              borderRadius={9999}
+                              style={{
+                                backgroundColor: BRAND_GOLD,
+                                opacity: 0.7,
+                              }}
+                            />
+                            <Text
+                              fontSize="$3"
+                              color="$color11"
+                              style={{
+                                fontFamily: '"Literata", Georgia, serif',
+                              }}
+                            >
+                              {item}
+                            </Text>
+                          </XStack>
+                        ))}
+                      </YStack>
+                    </XStack>
+                  </FeaturedDraftCard>
+
+                  {/* Utility features — compact 3-column row */}
+                  <XStack flexWrap="wrap" gap="$3">
+                    {FEATURES.map((feature) => (
+                      <UtilityCard key={feature.label} style={featureCardStyle}>
+                        <FeatureIconCircle>
+                          <BrandIcon
+                            name={feature.icon}
+                            size={20}
+                            title={feature.title}
+                            decorative={false}
+                          />
+                        </FeatureIconCircle>
+                        <YStack gap="$1">
+                          <Text
+                            fontSize="$3"
+                            fontWeight="700"
+                            color="$color"
+                            style={{
+                              fontFamily: '"Big Shoulders Display", sans-serif',
+                              letterSpacing: -0.2,
+                            }}
+                          >
+                            {feature.title}
+                          </Text>
+                          <Text
+                            fontSize="$2"
+                            color="$color11"
+                            lineHeight="$4"
+                            style={{ fontFamily: '"Literata", Georgia, serif' }}
+                          >
+                            {feature.description}
+                          </Text>
+                        </YStack>
+                      </UtilityCard>
+                    ))}
+                  </XStack>
+                </YStack>
               </Theme>
             </ContentContainer>
           </YStack>
@@ -795,22 +1006,15 @@ export function PublicLandingPage(): React.JSX.Element {
           >
             <ContentContainer gap="$6">
               <YStack alignItems="center" gap="$2">
-                <Text
-                  fontSize="$8"
-                  fontWeight="800"
-                  color="$color"
-                  textAlign="center"
-                  letterSpacing={-0.5}
-                >
-                  Pick your sport
-                </Text>
+                <h2 style={sectionHeadingStyle}>Pick your sport</h2>
                 <Text
                   fontSize="$4"
                   color="$color11"
                   textAlign="center"
                   maxWidth={400}
+                  style={{ fontFamily: '"Literata", Georgia, serif' }}
                 >
-                  Baseball is live now. Football is coming soon.
+                  Baseball is live now.
                 </Text>
               </YStack>
 
@@ -903,49 +1107,42 @@ export function PublicLandingPage(): React.JSX.Element {
             $sm={{ paddingHorizontal: '$3', paddingVertical: '$8' }}
           >
             <YStack alignItems="center" gap="$3" maxWidth={500}>
+              <h2 style={sectionHeadingStyle}>Ready to play?</h2>
               <Text
-                fontSize="$8"
-                fontWeight="800"
-                color="$color"
+                fontSize="$4"
+                color="$color11"
                 textAlign="center"
-                letterSpacing={-0.5}
+                style={{ fontFamily: '"Literata", Georgia, serif' }}
               >
-                Ready to play?
-              </Text>
-              <Text fontSize="$4" color="$color11" textAlign="center">
-                Join your league, draft your team, and start competing today.
+                Start your dynasty. Your first season is free.
               </Text>
             </YStack>
 
-            <XStack gap="$3" flexWrap="wrap" justifyContent="center">
-              <SignInButton
-                onPress={() => {
-                  void handleSignIn();
-                }}
-                role="button"
-                tabIndex={0}
-                aria-label="Get started with Google"
+            <SignInButton
+              onPress={() => {
+                void handleSignIn();
+              }}
+              role="button"
+              tabIndex={0}
+              aria-label="Start playing free"
+            >
+              <XStack
+                alignItems="center"
+                gap="$2.5"
+                minWidth={200}
+                justifyContent="center"
               >
-                <XStack
-                  alignItems="center"
-                  gap="$2.5"
-                  minWidth={180}
-                  justifyContent="center"
-                >
-                  {isLoading || isConfiguring ? (
-                    <Spinner size="small" color="$color1" />
-                  ) : (
-                    <>
-                      <BrandIcon name="google" size={18} />
-                      <Text fontSize="$4" color="$color1" fontWeight="700">
-                        Get Started with Google
-                      </Text>
-                    </>
-                  )}
-                </XStack>
-              </SignInButton>
-            </XStack>
+                {isLoading || isConfiguring ? (
+                  <Spinner size="small" color="$color1" />
+                ) : (
+                  <Text fontSize="$4" color="$color1" fontWeight="700">
+                    Start Playing Free
+                  </Text>
+                )}
+              </XStack>
+            </SignInButton>
           </YStack>
+
           {/* ─── Footer ─── */}
           <YStack
             tag="footer"
@@ -954,11 +1151,36 @@ export function PublicLandingPage(): React.JSX.Element {
             borderTopWidth={1}
             borderTopColor="$glassBorder"
             alignItems="center"
+            gap="$2"
             $sm={{ paddingHorizontal: '$3' }}
           >
             <Text fontSize="$2" color="$color10" textAlign="center">
               © {new Date().getFullYear()} Legacy Sports · All rights reserved
             </Text>
+            <XStack gap="$4" flexWrap="wrap" justifyContent="center">
+              <Text
+                tag="a"
+                fontSize="$2"
+                color="$color10"
+                style={{ cursor: 'pointer', textDecorationLine: 'underline' }}
+                onPress={() => {
+                  window.location.href = '/privacy';
+                }}
+              >
+                Privacy Policy
+              </Text>
+              <Text
+                tag="a"
+                fontSize="$2"
+                color="$color10"
+                style={{ cursor: 'pointer', textDecorationLine: 'underline' }}
+                onPress={() => {
+                  window.location.href = '/terms';
+                }}
+              >
+                Terms of Service
+              </Text>
+            </XStack>
           </YStack>
         </ScrollView>
       </YStack>
