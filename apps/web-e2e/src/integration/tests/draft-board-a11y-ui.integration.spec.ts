@@ -310,7 +310,7 @@ test.describe
       return;
     }
 
-    const viewGroup = page.getByRole('radiogroup', { name: /view mode/i });
+    const viewGroup = page.getByRole('tablist', { name: /view mode/i });
     await expect(viewGroup).toBeVisible({ timeout: 15_000 });
 
     // Dismiss any pick-announcement overlay that may be covering the controls.
@@ -331,39 +331,39 @@ test.describe
 
     await dismissPickAnnouncementOverlay(page);
 
-    // The four modes: ⊞ (grid), ☰ (list), ⋯ (compact), ▦ (board)
-    const gridBtn = viewGroup.getByRole('radio', { name: '⊞' });
-    const listBtn = viewGroup.getByRole('radio', { name: '☰' });
-    const compactBtn = viewGroup.getByRole('radio', { name: '⋯' });
+    // View tabs: Cards (grid), Data Table, Draft Board, My Depth Chart
+    const gridBtn = viewGroup.getByRole('tab', { name: 'Cards' });
+    const tableBtn = viewGroup.getByRole('tab', { name: 'Data Table' });
+    const boardBtn = viewGroup.getByRole('tab', { name: 'Draft Board' });
 
-    await test.step('Grid is the initial active view (aria-checked=true)', async () => {
-      await expect(gridBtn).toHaveAttribute('aria-checked', 'true');
-      await expect(listBtn).toHaveAttribute('aria-checked', 'false');
-      await expect(compactBtn).toHaveAttribute('aria-checked', 'false');
+    await test.step('Cards is the initial active view (aria-selected=true)', async () => {
+      await expect(gridBtn).toHaveAttribute('aria-selected', 'true');
+      await expect(tableBtn).toHaveAttribute('aria-selected', 'false');
+      await expect(boardBtn).toHaveAttribute('aria-selected', 'false');
     });
 
-    await test.step('Clicking list switches aria-checked state', async () => {
-      await clickWithOverlayDismiss(listBtn);
-      await expect(listBtn).toHaveAttribute('aria-checked', 'true', {
+    await test.step('Clicking Data Table switches aria-selected state', async () => {
+      await clickWithOverlayDismiss(tableBtn);
+      await expect(tableBtn).toHaveAttribute('aria-selected', 'true', {
         timeout: 5_000,
       });
-      await expect(gridBtn).toHaveAttribute('aria-checked', 'false');
+      await expect(gridBtn).toHaveAttribute('aria-selected', 'false');
     });
 
-    await test.step('Clicking compact switches aria-checked state', async () => {
-      await clickWithOverlayDismiss(compactBtn);
-      await expect(compactBtn).toHaveAttribute('aria-checked', 'true', {
+    await test.step('Clicking Draft Board switches aria-selected state', async () => {
+      await clickWithOverlayDismiss(boardBtn);
+      await expect(boardBtn).toHaveAttribute('aria-selected', 'true', {
         timeout: 5_000,
       });
-      await expect(listBtn).toHaveAttribute('aria-checked', 'false');
+      await expect(tableBtn).toHaveAttribute('aria-selected', 'false');
     });
 
-    await test.step('Clicking grid restores the original active state', async () => {
+    await test.step('Clicking Cards restores the original active state', async () => {
       await clickWithOverlayDismiss(gridBtn);
-      await expect(gridBtn).toHaveAttribute('aria-checked', 'true', {
+      await expect(gridBtn).toHaveAttribute('aria-selected', 'true', {
         timeout: 5_000,
       });
-      await expect(compactBtn).toHaveAttribute('aria-checked', 'false');
+      await expect(boardBtn).toHaveAttribute('aria-selected', 'false');
     });
   });
 

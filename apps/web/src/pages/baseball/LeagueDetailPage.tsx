@@ -2494,12 +2494,14 @@ export function LeagueDetailPage(): React.JSX.Element {
                     borderWidth={1}
                     borderColor="$outlineSubtle"
                   >
-                    <QRCodeSVG
-                      value={inviteUrl}
-                      size={200}
-                      level="M"
-                      includeMargin
-                    />
+                    <div data-testid="qr-code-svg">
+                      <QRCodeSVG
+                        value={inviteUrl}
+                        size={200}
+                        level="M"
+                        includeMargin
+                      />
+                    </div>
                     <Text
                       fontSize="$2"
                       color="$textMuted"

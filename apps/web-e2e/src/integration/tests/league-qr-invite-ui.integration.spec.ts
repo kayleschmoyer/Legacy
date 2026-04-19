@@ -239,7 +239,7 @@ test.describe
     });
 
     await test.step('QR code SVG is hidden by default', async () => {
-      await expect(page.locator('svg[role="img"]')).not.toBeVisible();
+      await expect(page.getByTestId('qr-code-svg')).not.toBeVisible();
       // Verify "Show QR Code" label on the toggle button
       await expect(
         page.getByRole('button', { name: /show qr code/i }),
@@ -248,8 +248,10 @@ test.describe
 
     await test.step('Clicking "Show" reveals the QR code SVG', async () => {
       await page.getByRole('button', { name: /show qr code/i }).click();
-      // QRCodeSVG renders an <svg> element; wait for it to appear
-      await expect(page.locator('svg').last()).toBeVisible({ timeout: 10_000 });
+      // QRCodeSVG (qrcode.react) renders an <svg> with data-testid="qr-code-svg"
+      await expect(page.getByTestId('qr-code-svg')).toBeVisible({
+        timeout: 10_000,
+      });
       // Button label should flip to "Hide"
       await expect(
         page.getByRole('button', { name: /hide qr code/i }),
