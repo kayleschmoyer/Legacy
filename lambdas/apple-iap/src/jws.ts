@@ -14,6 +14,12 @@
  */
 import { decodeProtectedHeader, importX509, jwtVerify } from 'jose';
 import * as crypto from 'crypto';
+import {
+  assertCertValidAt,
+  assertChainNameLinkage,
+  assertLeafKeyUsageAllowsSigning,
+  derToPem,
+} from './jws.test-helpers';
 import type {
   AppStoreNotification,
   AppStoreNotificationData,
@@ -148,29 +154,30 @@ async function decodeNestedJws(
 }
 
 /**
- * Convert a base64-encoded DER certificate to PEM format.
- */
-function derToPem(der: string): string {
-  const pemBody = der.match(/.{1,64}/g)?.join('\n') ?? der;
-  return `-----BEGIN CERTIFICATE-----\n${pemBody}\n-----END CERTIFICATE-----`;
-}
-
-/**
  * Validate that the certificate chain:
- * 1. Each cert (except the last) is signed by the next cert in the chain
- * 2. The last cert in the chain is signed by the Apple Root CA G3
+ * 1. Every cert (including the Apple Root CA) is currently within its validity window
+ * 2. Each cert's issuer DN matches the next cert's subject DN (RFC 5280 name chaining)
+ * 3. Each cert (except the last) is cryptographically signed by the next cert in the chain
+ * 4. The last cert in the chain is signed by the Apple Root CA G3
+ * 5. The leaf certificate's keyUsage permits digital signatures
  *
- * This prevents accepting notifications signed with arbitrary certificates.
+ * Revocation (OCSP/CRL) is not checked; residual risk accepted per LS-2617.
  */
 function validateCertificateChain(pemCerts: string[]): void {
   if (pemCerts.length === 0) {
     throw new Error('Empty certificate chain');
   }
 
-  // Build X509Certificate objects
   const certObjects = pemCerts.map((pem) => new crypto.X509Certificate(pem));
+  const rootCert = new crypto.X509Certificate(APPLE_ROOT_CA_G3_PEM);
+  const now = Date.now();
 
-  // Verify each cert is issued by the next one in the chain
+  for (const cert of [...certObjects, rootCert]) {
+    assertCertValidAt(cert, now);
+  }
+
+  assertChainNameLinkage(certObjects, rootCert.subject);
+
   for (let i = 0; i < certObjects.length - 1; i++) {
     const cert = certObjects[i];
     const issuer = certObjects[i + 1];
@@ -181,10 +188,10 @@ function validateCertificateChain(pemCerts: string[]): void {
     }
   }
 
-  // Verify the last cert in the chain is signed by Apple Root CA G3
-  const rootCert = new crypto.X509Certificate(APPLE_ROOT_CA_G3_PEM);
   const lastCert = certObjects[certObjects.length - 1];
   if (!lastCert.verify(rootCert.publicKey)) {
     throw new Error('Certificate chain does not terminate at Apple Root CA G3');
   }
+
+  assertLeafKeyUsageAllowsSigning(certObjects[0].keyUsage);
 }
