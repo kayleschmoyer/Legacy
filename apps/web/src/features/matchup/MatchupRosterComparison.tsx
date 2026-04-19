@@ -1034,11 +1034,7 @@ export function MatchupRosterComparison({
     );
   }
 
-  if (
-    loading ||
-    positionsLoading ||
-    isStatsLoading(matchup.statsLoadingStatus)
-  ) {
+  if (loading || positionsLoading) {
     return <SkeletonLoading team1Name={team1Name} team2Name={team2Name} />;
   }
 
@@ -1805,6 +1801,27 @@ export function MatchupRosterComparison({
             </Text>
           </XStack>
         </XStack>
+
+        {/* Banner when server-side stats are still being processed */}
+        {isStatsLoading(matchup.statsLoadingStatus) && (
+          <XStack
+            backgroundColor="$blue2"
+            padding="$3"
+            borderBottomWidth={1}
+            borderBottomColor="$blue6"
+            gap="$2"
+            alignItems="flex-start"
+          >
+            <YStack gap="$1">
+              <Text fontSize="$2" color="$blue11" fontWeight="600">
+                Stats are updating
+              </Text>
+              <Text fontSize="$1" color="$blue10">
+                Scores will refresh automatically as game stats finish loading.
+              </Text>
+            </YStack>
+          </XStack>
+        )}
 
         {/* Warning if season stats are missing */}
         {seasonStatsMap.size === 0 && playerCount > 0 && (
