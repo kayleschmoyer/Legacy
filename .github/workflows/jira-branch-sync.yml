@@ -48,6 +48,10 @@ on:
   pull_request:
     types: [opened, reopened, closed]
 
+concurrency:
+  group: jira-branch-sync-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   sync-jira:
     name: Sync Jira Ticket
