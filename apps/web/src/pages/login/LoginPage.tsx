@@ -1,205 +1,115 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { LOGGER } from '@legacy-sports/logging';
-import { OAuthProvider, XStack } from '@legacy-sports/shared-components/ui';
+import { OAuthProvider } from '@legacy-sports/shared-components/ui';
 import { useAuth } from '@legacy-sports/shared-components/auth';
-import { Spinner } from 'tamagui';
-import { BrandIcon } from '../../components/icons';
 import { PageMeta } from '../../components/PageMeta';
 import { storeCsrfToken } from '../../lib/csrf';
-import {
-  BG_DARK,
-  BRAND_GOLD,
-  BRAND_GOLD_DARK,
-  BRAND_GOLD_LIGHT,
-  BRAND_NAVY,
-  BRAND_NAVY_LIGHT,
-  BRAND_SEAM_RED,
-  DISCORD_BLURPLE,
-  DISCORD_BLURPLE_DARK,
-  SURFACE_SUBTLE,
-  TEXT_MUTED,
-  withAlpha,
-} from '../../constants/colors';
+import './LoginPage.css';
 
-/* ─── Styles ─── */
+/* ── Icons ── */
 
-const leftPanelStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  justifyContent: 'center',
-  alignItems: 'center',
-  flex: '0 0 55%',
-  padding: '3rem 4rem',
-  position: 'relative',
-  overflow: 'hidden',
-  background: `
-    radial-gradient(ellipse at 30% 20%, ${withAlpha(BRAND_NAVY, 0.55)} 0%, transparent 60%),
-    radial-gradient(ellipse at 70% 80%, ${withAlpha(BRAND_SEAM_RED, 0.12)} 0%, transparent 50%),
-    radial-gradient(ellipse at 10% 90%, ${withAlpha(BRAND_GOLD, 0.07)} 0%, transparent 45%),
-    ${BG_DARK}
-  `,
-};
-
-const leftPanelContentStyle: React.CSSProperties = {
-  position: 'relative',
-  zIndex: 1,
-  maxWidth: 440,
-  width: '100%',
-};
-
-const scoreboardLineStyle: React.CSSProperties = {
-  position: 'absolute',
-  top: 0,
-  left: 0,
-  right: 0,
-  height: 3,
-  background: `linear-gradient(90deg, transparent 0%, ${BRAND_GOLD} 30%, ${withAlpha(BRAND_GOLD, 0.4)} 70%, transparent 100%)`,
-  opacity: 0.6,
-};
-
-const rightPanelStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  justifyContent: 'center',
-  alignItems: 'center',
-  flex: '0 0 45%',
-  padding: '3rem 2.5rem',
-  backgroundColor: SURFACE_SUBTLE,
-  borderLeft: `1px solid ${withAlpha(BRAND_NAVY, 0.35)}`,
-};
-
-const authCardStyle: React.CSSProperties = {
-  width: '100%',
-  maxWidth: 380,
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '1.5rem',
-};
-
-const dividerStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '0.75rem',
-};
-
-const dividerLineStyle: React.CSSProperties = {
-  flex: 1,
-  height: 1,
-  backgroundColor: withAlpha(BRAND_NAVY, 0.5),
-};
-
-const googleButtonStyle = (
-  hover: boolean,
-  loading: boolean,
-): React.CSSProperties => ({
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: '0.625rem',
-  width: '100%',
-  padding: '0.875rem 1.5rem',
-  borderRadius: '0.5rem',
-  backgroundColor: hover ? BRAND_NAVY : BRAND_NAVY_LIGHT,
-  border: 'none',
-  cursor: loading ? 'not-allowed' : 'pointer',
-  opacity: loading ? 0.7 : 1,
-  transform: hover && !loading ? 'translateY(-1px)' : 'none',
-  transition: 'all 150ms ease-out',
-  fontFamily: '"Literata", Georgia, serif',
-  fontWeight: 600,
-  fontSize: '0.9375rem',
-  color: '#F8FAFC',
-  letterSpacing: 0.1,
-});
-
-const discordButtonStyle = (
-  hover: boolean,
-  loading: boolean,
-): React.CSSProperties => ({
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: '0.625rem',
-  width: '100%',
-  padding: '0.875rem 1.5rem',
-  borderRadius: '0.5rem',
-  backgroundColor: hover ? DISCORD_BLURPLE_DARK : DISCORD_BLURPLE,
-  border: 'none',
-  cursor: loading ? 'not-allowed' : 'pointer',
-  opacity: loading ? 0.7 : 1,
-  transform: hover && !loading ? 'translateY(-1px)' : 'none',
-  transition: 'all 150ms ease-out',
-  fontFamily: '"Literata", Georgia, serif',
-  fontWeight: 600,
-  fontSize: '0.9375rem',
-  color: '#FFFFFF',
-  letterSpacing: 0.1,
-});
-
-const errorStyle: React.CSSProperties = {
-  padding: '0.75rem 1rem',
-  borderRadius: '0.5rem',
-  backgroundColor: withAlpha(BRAND_SEAM_RED, 0.12),
-  border: `1px solid ${withAlpha(BRAND_SEAM_RED, 0.35)}`,
-  fontFamily: '"Literata", Georgia, serif',
-  fontSize: '0.875rem',
-  color: '#E63950',
-  lineHeight: 1.5,
-};
-
-/* ─── Decorative stitch marks ─── */
-function StitchDecoration() {
+function GoogleG() {
   return (
-    <svg
-      width="160"
-      height="160"
-      viewBox="0 0 160 160"
-      fill="none"
-      aria-hidden="true"
-      style={{
-        position: 'absolute',
-        bottom: -20,
-        right: -20,
-        opacity: 0.055,
-        pointerEvents: 'none',
-      }}
-    >
-      <circle cx="80" cy="80" r="70" stroke={BRAND_GOLD} strokeWidth="1.5" />
+    <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true">
       <path
-        d="M80 10 C95 40, 115 55, 150 80 C115 105, 95 120, 80 150"
-        stroke={BRAND_GOLD}
-        strokeWidth="1"
-        fill="none"
-        strokeDasharray="4 4"
+        fill="#FFC107"
+        d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.1 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.3-.4-3.5z"
       />
       <path
-        d="M80 10 C65 40, 45 55, 10 80 C45 105, 65 120, 80 150"
-        stroke={BRAND_GOLD}
-        strokeWidth="1"
-        fill="none"
-        strokeDasharray="4 4"
+        fill="#FF3D00"
+        d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.1 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"
       />
-      {[...Array(7)].map((_, i) => {
-        const t = i / 6;
-        const x1 = 80 + 70 * Math.sin(Math.PI * t) * 0.18;
-        const y1 = 10 + 140 * t - 5;
-        return (
-          <line
-            key={i}
-            x1={x1 - 4}
-            y1={y1}
-            x2={x1 + 4}
-            y2={y1 + 2}
-            stroke={BRAND_GOLD}
-            strokeWidth="0.8"
-          />
-        );
-      })}
+      <path
+        fill="#4CAF50"
+        d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"
+      />
+      <path
+        fill="#1976D2"
+        d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.2 4.2-4.1 5.6l6.2 5.2C41 35 44 30 44 24c0-1.3-.1-2.3-.4-3.5z"
+      />
     </svg>
   );
 }
 
-/* ─── Constants ─── */
+function DiscordMark() {
+  return (
+    <svg width="20" height="16" viewBox="0 0 71 55" aria-hidden="true">
+      <path
+        fill="#fff"
+        d="M60.1 4.9A58.5 58.5 0 0 0 45.4.4a.2.2 0 0 0-.2.1 40.8 40.8 0 0 0-1.8 3.7 54 54 0 0 0-16.2 0A37.5 37.5 0 0 0 25.4.5a.2.2 0 0 0-.2-.1 58.4 58.4 0 0 0-14.7 4.5.2.2 0 0 0-.1.1C1.2 18.7-1.4 32.1.1 45.3a.2.2 0 0 0 .1.2 58.9 58.9 0 0 0 17.7 9 .2.2 0 0 0 .3-.1 42 42 0 0 0 3.6-5.9.2.2 0 0 0-.1-.3 38.8 38.8 0 0 1-5.5-2.6.2.2 0 0 1 0-.4l1.1-.8a.2.2 0 0 1 .2 0 42 42 0 0 0 35.6 0 .2.2 0 0 1 .2 0l1.1.8a.2.2 0 0 1 0 .4 36.4 36.4 0 0 1-5.5 2.6.2.2 0 0 0-.1.3 47 47 0 0 0 3.6 5.9.2.2 0 0 0 .3.1 58.7 58.7 0 0 0 17.7-9 .2.2 0 0 0 .1-.2c1.8-15.3-2.3-28.6-9.8-40.3a.2.2 0 0 0-.1-.1zM23.7 37.3c-3.5 0-6.4-3.2-6.4-7.1 0-4 2.8-7.2 6.4-7.2 3.6 0 6.5 3.2 6.4 7.2 0 3.9-2.8 7.1-6.4 7.1zm23.6 0c-3.5 0-6.4-3.2-6.4-7.1 0-4 2.8-7.2 6.4-7.2 3.6 0 6.5 3.2 6.4 7.2 0 3.9-2.8 7.1-6.4 7.1z"
+      />
+    </svg>
+  );
+}
+
+function SecureIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 32 32"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M16 3 6 7v9c0 6.1 4.3 11.5 10 13 5.7-1.5 10-6.9 10-13V7l-10-4z" />
+      <path d="m11 16 3.5 3.5L21 13" stroke="#C5A55A" />
+    </svg>
+  );
+}
+
+function StadiumArcs({ style }: { style?: React.CSSProperties }) {
+  return (
+    <svg
+      viewBox="0 0 800 600"
+      preserveAspectRatio="xMidYMax slice"
+      style={style}
+      aria-hidden="true"
+    >
+      <defs>
+        <radialGradient id="ll-lamp" cx="50%" cy="110%" r="75%">
+          <stop offset="0%" stopColor="#C5A55A" stopOpacity="0.16" />
+          <stop offset="40%" stopColor="#1B3A5C" stopOpacity="0.10" />
+          <stop offset="100%" stopColor="#0A0F1A" stopOpacity="0" />
+        </radialGradient>
+        <linearGradient id="ll-arc-stroke" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#2C4A7C" stopOpacity="0.35" />
+          <stop offset="100%" stopColor="#2C4A7C" stopOpacity="0.05" />
+        </linearGradient>
+      </defs>
+      <rect width="800" height="600" fill="url(#ll-lamp)" />
+      <g fill="none" stroke="url(#ll-arc-stroke)" strokeWidth="1">
+        <path d="M -40 600 A 540 540 0 0 1 840 600" />
+        <path d="M   0 600 A 460 460 0 0 1 800 600" />
+        <path d="M  40 600 A 380 380 0 0 1 760 600" />
+        <path d="M  80 600 A 300 300 0 0 1 720 600" />
+        <path d="M 120 600 A 220 220 0 0 1 680 600" />
+      </g>
+      <path
+        d="M 80 540 A 300 300 0 0 1 720 540"
+        fill="none"
+        stroke="#C41E3A"
+        strokeOpacity="0.55"
+        strokeWidth="1.5"
+        strokeDasharray="2 10"
+        strokeLinecap="round"
+      />
+      <line
+        x1="0"
+        y1="540"
+        x2="800"
+        y2="540"
+        stroke="rgba(197,165,90,0.18)"
+        strokeWidth="1"
+      />
+    </svg>
+  );
+}
+
+/* ── Constants ── */
 const DISCORD_LOGIN_STATE_KEY = 'discord_oauth_login_state';
 
 function buildDiscordAuthUrl(
@@ -217,7 +127,7 @@ function buildDiscordAuthUrl(
   return `https://discord.com/api/oauth2/authorize?${params.toString()}`;
 }
 
-/* ─── Component ─── */
+/* ── Component ── */
 export function LoginPage(): React.JSX.Element {
   const { config, loginWithOAuth, error: authError } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
@@ -225,20 +135,10 @@ export function LoginPage(): React.JSX.Element {
   const [isConfigured, setIsConfigured] = useState(false);
   const [isConfiguring, setIsConfiguring] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
-  const [googleHover, setGoogleHover] = useState(false);
-  const [discordHover, setDiscordHover] = useState(false);
-  const [isNarrow, setIsNarrow] = useState(false);
 
   const displayError = errorMessage || authError || '';
 
-  useEffect(() => {
-    const mq = window.matchMedia('(max-width: 720px)');
-    setIsNarrow(mq.matches);
-    const handler = (e: MediaQueryListEvent) => setIsNarrow(e.matches);
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
-  }, []);
-
+  /* Discord callback handling */
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (!window.location.pathname.endsWith('/auth/discord/callback')) return;
@@ -260,7 +160,7 @@ export function LoginPage(): React.JSX.Element {
         sessionStorage.removeItem(DISCORD_LOGIN_STATE_KEY);
       }
     } catch {
-      // sessionStorage unavailable
+      /* sessionStorage unavailable */
     }
 
     if (!code || !state || state !== storedState) {
@@ -296,7 +196,7 @@ export function LoginPage(): React.JSX.Element {
               message = (errorData.message ?? errorData.error) as string;
             }
           } catch {
-            // keep default
+            /* keep default */
           }
           throw new Error(message);
         }
@@ -305,13 +205,10 @@ export function LoginPage(): React.JSX.Element {
           jwt: string;
           csrfToken?: string;
         };
-
         if (!result.jwt)
           throw new Error('Discord sign-in did not return a token');
 
-        if (result.csrfToken) {
-          storeCsrfToken(result.csrfToken);
-        }
+        if (result.csrfToken) storeCsrfToken(result.csrfToken);
 
         try {
           const parts = result.jwt.split('.');
@@ -342,9 +239,8 @@ export function LoginPage(): React.JSX.Element {
                 'ls_user_profile',
                 JSON.stringify(userProfile),
               );
-              if (payload.exp) {
+              if (payload.exp)
                 localStorage.setItem('ls_token_expiry', String(payload.exp));
-              }
             }
           }
         } catch (err) {
@@ -370,6 +266,7 @@ export function LoginPage(): React.JSX.Element {
     void exchangeCode();
   }, [config.oauthProxyUrl]);
 
+  /* Google OAuth configure */
   useEffect(() => {
     const configure = async () => {
       try {
@@ -387,6 +284,7 @@ export function LoginPage(): React.JSX.Element {
     void configure();
   }, [config]);
 
+  /* Google One Tap */
   useEffect(() => {
     const handleOneTapSuccess = async (event: Event) => {
       const customEvent = event as CustomEvent<{
@@ -446,9 +344,8 @@ export function LoginPage(): React.JSX.Element {
       b.toString(16).padStart(2, '0'),
     ).join('');
     try {
-      if (typeof sessionStorage !== 'undefined') {
+      if (typeof sessionStorage !== 'undefined')
         sessionStorage.setItem(DISCORD_LOGIN_STATE_KEY, state);
-      }
     } catch {
       return;
     }
@@ -461,250 +358,8 @@ export function LoginPage(): React.JSX.Element {
     window.location.href = buildDiscordAuthUrl(clientId, redirectUri, state);
   }, [config.discordClientId]);
 
-  const logoNav = (
-    <header
-      style={{
-        padding: '1.25rem 2.5rem',
-        borderBottom: `1px solid ${withAlpha(BRAND_NAVY, 0.3)}`,
-        backgroundColor: BG_DARK,
-      }}
-    >
-      <nav aria-label="Landing">
-        <XStack alignItems="center" gap="$2">
-          <img
-            src={`${import.meta.env.BASE_URL}logo.png`}
-            alt="Legacy Sports"
-            style={{ height: 36, width: 'auto', display: 'block' }}
-          />
-          <span
-            style={{
-              fontFamily: '"Big Shoulders Display", sans-serif',
-              fontWeight: 800,
-              fontSize: '1.25rem',
-              color: BRAND_GOLD,
-              letterSpacing: -0.5,
-            }}
-          >
-            Legacy Sports
-          </span>
-        </XStack>
-      </nav>
-    </header>
-  );
-
-  const authPanel = (
-    <div style={authCardStyle}>
-      {/* Heading */}
-      <div
-        style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}
-      >
-        <h1
-          style={{
-            margin: 0,
-            fontFamily: '"Big Shoulders Display", sans-serif',
-            fontWeight: 800,
-            fontSize: '1.875rem',
-            color: '#F8FAFC',
-            letterSpacing: -0.5,
-            lineHeight: 1.1,
-          }}
-        >
-          Sign in to your account
-        </h1>
-        <p
-          style={{
-            margin: 0,
-            fontFamily: '"Literata", Georgia, serif',
-            fontSize: '0.9375rem',
-            color: TEXT_MUTED,
-            lineHeight: 1.5,
-          }}
-        >
-          Your leagues are waiting.
-        </p>
-      </div>
-
-      {/* Buttons */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-        <button
-          style={googleButtonStyle(googleHover, isLoading || isConfiguring)}
-          onMouseEnter={() => setGoogleHover(true)}
-          onMouseLeave={() => setGoogleHover(false)}
-          onClick={() => {
-            void handleSignIn();
-          }}
-          disabled={isLoading || isConfiguring}
-          aria-label="Continue with Google"
-        >
-          {isLoading || isConfiguring ? (
-            <Spinner size="small" color="$color1" />
-          ) : (
-            <>
-              <BrandIcon name="google" size={18} />
-              Continue with Google
-            </>
-          )}
-        </button>
-
-        {config.discordClientId ? (
-          <button
-            style={discordButtonStyle(discordHover, isDiscordLoading)}
-            onMouseEnter={() => setDiscordHover(true)}
-            onMouseLeave={() => setDiscordHover(false)}
-            onClick={handleDiscordSignIn}
-            disabled={isDiscordLoading}
-            aria-label="Continue with Discord"
-          >
-            {isDiscordLoading ? (
-              <Spinner size="small" color="$color1" />
-            ) : (
-              <>
-                <BrandIcon name="discord" size={16} />
-                Continue with Discord
-              </>
-            )}
-          </button>
-        ) : null}
-      </div>
-
-      {/* Error */}
-      {displayError ? (
-        <div style={errorStyle} role="alert">
-          {displayError}
-        </div>
-      ) : null}
-
-      {/* Divider */}
-      <div style={dividerStyle} aria-hidden="true">
-        <div style={dividerLineStyle} />
-        <span
-          style={{
-            fontFamily: '"Literata", Georgia, serif',
-            fontSize: '0.75rem',
-            color: withAlpha(TEXT_MUTED, 0.6),
-            whiteSpace: 'nowrap',
-          }}
-        >
-          or
-        </span>
-        <div style={dividerLineStyle} />
-      </div>
-
-      {/* Social proof & invite */}
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '0.375rem',
-          alignItems: 'center',
-        }}
-      >
-        <p
-          style={{
-            margin: 0,
-            fontFamily: '"Literata", Georgia, serif',
-            fontSize: '0.8125rem',
-            color: withAlpha(TEXT_MUTED, 0.7),
-            textAlign: 'center',
-          }}
-        >
-          Free to play · No credit card required
-        </p>
-        <p
-          style={{
-            margin: 0,
-            fontFamily: '"Literata", Georgia, serif',
-            fontSize: '0.8125rem',
-            color: withAlpha(TEXT_MUTED, 0.7),
-            textAlign: 'center',
-          }}
-        >
-          Joining a league?{' '}
-          <button
-            onClick={() => {
-              void handleSignIn();
-            }}
-            style={{
-              background: 'none',
-              border: 'none',
-              padding: 0,
-              cursor: 'pointer',
-              fontFamily: '"Literata", Georgia, serif',
-              fontSize: '0.8125rem',
-              fontWeight: 600,
-              color: BRAND_GOLD_LIGHT,
-              textDecoration: 'underline',
-            }}
-          >
-            Sign in to enter your invite code →
-          </button>
-        </p>
-      </div>
-
-      {/* Footer links */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'center',
-          gap: '1.5rem',
-          paddingTop: '0.25rem',
-        }}
-      >
-        {(['Privacy Policy', 'Terms of Service'] as const).map((label) => (
-          <a
-            key={label}
-            href={label === 'Privacy Policy' ? '/privacy' : '/terms'}
-            style={{
-              fontFamily: '"Literata", Georgia, serif',
-              fontSize: '0.75rem',
-              color: withAlpha(TEXT_MUTED, 0.5),
-              textDecoration: 'underline',
-              cursor: 'pointer',
-            }}
-          >
-            {label}
-          </a>
-        ))}
-      </div>
-    </div>
-  );
-
-  if (isNarrow) {
-    return (
-      <>
-        <PageMeta
-          title="Sign In — Legacy Sports"
-          description="Sign in to Legacy Sports to access your fantasy baseball leagues, draft tools, and live stats."
-        />
-        <div
-          style={{
-            minHeight: '100vh',
-            backgroundColor: BG_DARK,
-            display: 'flex',
-            flexDirection: 'column',
-            background: `
-              radial-gradient(ellipse at 50% 0%, ${withAlpha(BRAND_NAVY, 0.35)} 0%, transparent 60%),
-              ${BG_DARK}
-            `,
-          }}
-        >
-          {logoNav}
-          <main
-            style={{
-              flex: 1,
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              alignItems: 'center',
-              padding: '2rem 1.5rem',
-            }}
-          >
-            {authPanel}
-          </main>
-        </div>
-      </>
-    );
-  }
+  const googleDisabled = isLoading || isDiscordLoading || isConfiguring;
+  const discordDisabled = isLoading || isDiscordLoading;
 
   return (
     <>
@@ -712,131 +367,191 @@ export function LoginPage(): React.JSX.Element {
         title="Sign In — Legacy Sports"
         description="Sign in to Legacy Sports to access your fantasy baseball leagues, draft tools, and live stats."
       />
-      <div
-        style={{
-          minHeight: '100vh',
-          display: 'flex',
-          flexDirection: 'column',
-          backgroundColor: BG_DARK,
-        }}
-      >
-        {logoNav}
-        <main style={{ display: 'flex', flex: 1 }}>
-          {/* Left: Brand panel */}
-          <div style={leftPanelStyle}>
-            <div style={scoreboardLineStyle} />
-            <StitchDecoration />
 
-            <div style={leftPanelContentStyle}>
-              {/* Season badge */}
-              <div
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.375rem 0.875rem',
-                  borderRadius: 9999,
-                  backgroundColor: withAlpha(BRAND_NAVY, 0.5),
-                  border: `1px solid ${withAlpha(BRAND_NAVY_LIGHT, 0.4)}`,
-                  marginBottom: '1.5rem',
-                }}
-              >
-                <BrandIcon name="baseball" size={14} />
-                <span
-                  style={{
-                    fontFamily: '"Literata", Georgia, serif',
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                    color: BRAND_GOLD_LIGHT,
-                    letterSpacing: 0.5,
-                  }}
-                >
-                  Fantasy Baseball · Season 2026
-                </span>
+      <div className="ll-root" data-screen-label="Login">
+        {/* ── Nav ── */}
+        <header className="ll-nav">
+          <nav aria-label="Landing" className="ll-nav-inner">
+            <a className="ll-brand" href="/">
+              <img
+                src={`${import.meta.env.BASE_URL}logo.png`}
+                alt="Legacy Sports"
+              />
+              <div className="ll-wordmark">
+                LEGACY SPORTS
+                <span>FANTASY · YEAR-ROUND</span>
+              </div>
+            </a>
+            <div className="ll-nav-right">
+              <span className="ll-nav-meta">
+                New to Legacy?{' '}
+                <a href="/signup" className="ll-link-gold">
+                  Create an account
+                </a>
+              </span>
+            </div>
+          </nav>
+        </header>
+
+        {/* ── Main ── */}
+        <main className="ll-shell">
+          {/* Left: Brand pane */}
+          <section className="ll-cta-pane">
+            <StadiumArcs
+              style={{
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                pointerEvents: 'none',
+              }}
+            />
+            <div className="ll-cta-inner">
+              <div className="ll-eyebrow">
+                <span className="ll-dot-gold" />
+                Members Clubhouse
               </div>
 
-              {/* Headline */}
-              <h2
-                style={{
-                  margin: '0 0 1rem',
-                  fontFamily: '"Big Shoulders Display", sans-serif',
-                  fontWeight: 800,
-                  fontSize: 'clamp(2.5rem, 4vw, 3.5rem)',
-                  color: BRAND_GOLD_DARK,
-                  letterSpacing: -1,
-                  lineHeight: 1.05,
-                }}
-              >
-                Build Your Dynasty.
-              </h2>
+              <h1 className="ll-h1">
+                Take the field.
+                <br />
+                <span className="ll-h1-accent">Claim your dynasty.</span>
+              </h1>
 
-              <p
-                style={{
-                  margin: '0 0 2.5rem',
-                  fontFamily: '"Literata", Georgia, serif',
-                  fontSize: '1.0625rem',
-                  color: TEXT_MUTED,
-                  lineHeight: 1.65,
-                  maxWidth: 360,
-                }}
-              >
-                The only fantasy baseball platform powered by real MLB history —
-                draft legends across every era and compete on archived
-                statistics.
+              <p className="ll-lede">
+                Sign in to manage your rosters, draft legends across every era,
+                and see how your lineup stacked up this week.
               </p>
 
-              {/* Stats row */}
-              <div
-                style={{
-                  display: 'flex',
-                  gap: '2rem',
-                  paddingTop: '2rem',
-                  borderTop: `1px solid ${withAlpha(BRAND_NAVY_LIGHT, 0.25)}`,
-                }}
-              >
-                {[
-                  { value: '100+', label: 'Seasons of stats' },
-                  { value: '15K+', label: 'Historical players' },
-                  { value: 'Free', label: 'To play' },
-                ].map(({ value, label }) => (
-                  <div
-                    key={label}
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '0.25rem',
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontFamily: '"Big Shoulders Display", sans-serif',
-                        fontWeight: 700,
-                        fontSize: '1.5rem',
-                        color: BRAND_GOLD,
-                        fontVariantNumeric: 'tabular-nums',
-                        lineHeight: 1,
-                      }}
-                    >
-                      {value}
-                    </span>
-                    <span
-                      style={{
-                        fontFamily: '"Literata", Georgia, serif',
-                        fontSize: '0.75rem',
-                        color: withAlpha(TEXT_MUTED, 0.7),
-                        letterSpacing: 0.2,
-                      }}
-                    >
-                      {label}
-                    </span>
-                  </div>
-                ))}
+              {/* Stat strip */}
+              <div className="ll-stat-strip">
+                <div className="ll-stat-cell">
+                  <div className="ll-stat-num">1876</div>
+                  <div className="ll-stat-lbl">First season on record</div>
+                </div>
+                <div className="ll-stat-divider" />
+                <div className="ll-stat-cell">
+                  <div className="ll-stat-num">22,184</div>
+                  <div className="ll-stat-lbl">Players across every era</div>
+                </div>
+                <div className="ll-stat-divider" />
+                <div className="ll-stat-cell">
+                  <div className="ll-stat-num ll-stat-num-gold">∞</div>
+                  <div className="ll-stat-lbl">Year-round leagues</div>
+                </div>
+              </div>
+
+              {/* Ledger marquee */}
+              <div className="ll-marquee">
+                <div className="ll-marquee-label">
+                  Last night&rsquo;s ledger
+                </div>
+                <div className="ll-marquee-row">
+                  <span className="ll-mq-team">
+                    RUTH <span className="ll-mq-score">3-5</span>{' '}
+                    <span className="ll-mq-stat">2 HR · 5 RBI</span>
+                  </span>
+                  <span className="ll-mq-sep">·</span>
+                  <span className="ll-mq-team">
+                    MAYS <span className="ll-mq-score">2-4</span>{' '}
+                    <span className="ll-mq-stat">2B · SB</span>
+                  </span>
+                  <span className="ll-mq-sep">·</span>
+                  <span className="ll-mq-team">
+                    GIBSON <span className="ll-mq-score">7 IP</span>{' '}
+                    <span className="ll-mq-stat">9 K · 0 ER</span>
+                  </span>
+                  <span className="ll-mq-sep">·</span>
+                  <span className="ll-mq-team">
+                    TROUT <span className="ll-mq-score">1-3</span>{' '}
+                    <span className="ll-mq-stat">BB · R</span>
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
+          </section>
 
-          {/* Right: Auth panel */}
-          <div style={rightPanelStyle}>{authPanel}</div>
+          {/* Right: Auth card */}
+          <section className="ll-card-pane">
+            <div className="ll-card">
+              <div className="ll-card-head">
+                <div className="ll-eyebrow ll-eyebrow-center">Sign In</div>
+                <h2 className="ll-card-title">Step up to the plate</h2>
+                <p className="ll-card-sub">
+                  Use the account you already trust.
+                </p>
+              </div>
+
+              <div className="ll-oauth-list">
+                <button
+                  type="button"
+                  className="ll-oauth ll-oauth-google"
+                  onClick={() => {
+                    void handleSignIn();
+                  }}
+                  disabled={googleDisabled}
+                  aria-label="Continue with Google"
+                >
+                  <span className="ll-oauth-icon">
+                    <GoogleG />
+                  </span>
+                  <span className="ll-oauth-label">
+                    {isLoading
+                      ? 'Connecting to Google…'
+                      : 'Continue with Google'}
+                  </span>
+                  {(isLoading || isConfiguring) && (
+                    <span className="ll-spinner" aria-hidden="true" />
+                  )}
+                </button>
+
+                {config.discordClientId ? (
+                  <button
+                    type="button"
+                    className="ll-oauth ll-oauth-discord"
+                    onClick={handleDiscordSignIn}
+                    disabled={discordDisabled}
+                    aria-label="Continue with Discord"
+                  >
+                    <span className="ll-oauth-icon">
+                      <DiscordMark />
+                    </span>
+                    <span className="ll-oauth-label">
+                      {isDiscordLoading
+                        ? 'Connecting to Discord…'
+                        : 'Continue with Discord'}
+                    </span>
+                    {isDiscordLoading && (
+                      <span className="ll-spinner" aria-hidden="true" />
+                    )}
+                  </button>
+                ) : null}
+              </div>
+
+              {displayError ? (
+                <div className="ll-error" role="alert">
+                  {displayError}
+                </div>
+              ) : null}
+
+              <div className="ll-legal">
+                By continuing, you agree to our{' '}
+                <a href="/terms">Terms of Service</a> and{' '}
+                <a href="/privacy">Privacy Policy</a>.
+              </div>
+            </div>
+
+            <div className="ll-card-footer">
+              <div className="ll-footer-item">
+                <SecureIcon />
+                <span>Trusted sign-in · Your account stays secure</span>
+              </div>
+              <div className="ll-footer-sep">·</div>
+              <div className="ll-footer-item">
+                <span>Free to play · No credit card</span>
+              </div>
+            </div>
+          </section>
         </main>
       </div>
     </>

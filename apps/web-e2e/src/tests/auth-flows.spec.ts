@@ -97,7 +97,7 @@ unauthTest.describe('Login Flow @critical', () => {
     await page.goto('/');
     await page.waitForLoadState('load');
 
-    await expect(page.getByText(/build your dynasty/i)).toBeVisible({
+    await expect(page.getByText(/claim your dynasty/i)).toBeVisible({
       timeout: 15000,
     });
   });
@@ -545,7 +545,7 @@ unauthTest.describe('Public Routes @critical', () => {
       await page.waitForLoadState('load');
 
       // Landing page content is visible — confirms we're on PublicLandingPage.
-      await expect(page.getByText(/build your dynasty/i)).toBeVisible({
+      await expect(page.getByText(/claim your dynasty/i)).toBeVisible({
         timeout: 15000,
       });
 
