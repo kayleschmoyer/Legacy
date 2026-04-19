@@ -5189,6 +5189,30 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
+      // Detect broken node_modules symlink before running — prevents confusing
+      // ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL / "Command not found" cascades.
+      const nmPath = join(targetDir, 'node_modules');
+      try {
+        lstatSync(nmPath); // throws if entry absent entirely
+        if (!existsSync(nmPath)) {
+          // lstat succeeded (entry exists) but existsSync returned false → broken symlink
+          return {
+            content: [
+              {
+                type: 'text',
+                text:
+                  `node_modules symlink is broken in ${targetDir} — the symlink entry exists but its target is missing.\n` +
+                  'Call worktree_setup_node_modules() to repair it, then retry.',
+              },
+            ],
+            isError: true,
+          };
+        }
+      } catch {
+        // node_modules is simply absent (not a symlink at all); let the command
+        // run and fail naturally — absence may be intentional for non-Node dirs.
+      }
+
       try {
         const shell =
           process.platform === 'win32' ? resolveWindowsShell() : '/bin/sh';
@@ -5243,6 +5267,31 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const rawOutput =
           [e.stdout, e.stderr].filter(Boolean).join('\n') ||
           (err instanceof Error ? err.message : String(err));
+
+        // Surface a clear remediation hint when node_modules is missing/broken,
+        // instead of the confusing ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL cascade.
+        if (
+          rawOutput.includes('ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL') ||
+          rawOutput.includes('Command "nx" not found') ||
+          rawOutput.includes('Command "tsx" not found')
+        ) {
+          const nmExists = existsSync(join(targetDir, 'node_modules'));
+          if (!nmExists) {
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text:
+                    `[cwd: ${targetDir}]\n$ ${command}\n\n` +
+                    `node_modules is missing or broken in ${targetDir}.\n` +
+                    'Call worktree_setup_node_modules() to repair it, then retry.',
+                },
+              ],
+              isError: true,
+            };
+          }
+        }
+
         const output = applyTailLines(rawOutput, tailLines);
         return {
           content: [
