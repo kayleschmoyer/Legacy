@@ -510,13 +510,13 @@ test.describe
   // -----------------------------------------------------------------------
 
   test('Phase 10: Manager can view the matchup detail page', async ({
-    commissionerPage: page,
-    commissionerJwt,
-    managerJwt1,
+    managerPage1: page,
   }) => {
-    await switchUser(
-      page,
-      managerJwt1,
+    // Use a dedicated manager browser context rather than switchUser on
+    // commissionerPage. switchUser has a race condition (LS-3672, LS-3705):
+    // background JWT refresh can dispatch AUTH_LOGOUT and clear localStorage
+    // after page.evaluate() sets the manager profile.
+    await page.goto(
       `/baseball/league/${state.leagueId}/matchups/${state.matchupId}`,
     );
 
@@ -538,8 +538,5 @@ test.describe
         page.getByRole('heading', { name: /Matchup Details/i }),
       ).toBeVisible({ timeout: 10_000 });
     });
-
-    // Restore commissioner identity.
-    await switchUser(page, commissionerJwt);
   });
 });

@@ -797,18 +797,16 @@ test.describe
   // -----------------------------------------------------------------------
 
   test('Phase 11: Manager can view the completed bracket', async ({
-    commissionerPage: page,
-    managerJwt1,
-    commissionerJwt,
+    managerPage1: page,
   }) => {
     test.setTimeout(60_000);
 
-    await test.step('Switch to manager identity and navigate to standings', async () => {
-      await switchUser(
-        page,
-        managerJwt1,
-        `/baseball/league/${state.leagueId}/standings`,
-      );
+    await test.step('Manager navigates to standings', async () => {
+      // Use a dedicated manager browser context rather than switchUser on
+      // commissionerPage. switchUser has a race condition (LS-3672, LS-3705):
+      // background JWT refresh can dispatch AUTH_LOGOUT and clear localStorage
+      // after page.evaluate() sets the manager profile.
+      await page.goto(`/baseball/league/${state.leagueId}/standings`);
       await page.waitForLoadState('load');
       await expect(page.locator('body')).not.toContainText(
         'Unexpected Application Error',
@@ -829,8 +827,5 @@ test.describe
         timeout: 10_000,
       });
     });
-
-    // Restore commissioner identity
-    await switchUser(page, commissionerJwt);
   });
 });

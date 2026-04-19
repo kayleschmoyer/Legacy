@@ -692,18 +692,16 @@ test.describe
   // -----------------------------------------------------------------------
 
   test('Phase 10: Manager membership was migrated to new league', async ({
-    commissionerPage: page,
-    commissionerJwt,
-    managerJwt1,
+    managerPage1: page,
   }) => {
     test.setTimeout(30_000);
 
-    await test.step('Switch to manager 1 and navigate to new league', async () => {
-      await switchUser(
-        page,
-        managerJwt1,
-        `/baseball/league/${state.newLeagueId}/overview`,
-      );
+    await test.step('Manager 1 navigates to new league', async () => {
+      // Use a dedicated manager browser context rather than switchUser on
+      // commissionerPage. switchUser has a race condition (LS-3672, LS-3705):
+      // background JWT refresh can dispatch AUTH_LOGOUT and clear localStorage
+      // after page.evaluate() sets the manager profile.
+      await page.goto(`/baseball/league/${state.newLeagueId}/overview`);
       await page.waitForLoadState('load');
     });
 
@@ -722,18 +720,6 @@ test.describe
       await expect(page.getByText('Pre-Draft').first()).toBeVisible({
         timeout: 10_000,
       });
-    });
-
-    await test.step('Restore commissioner identity', async () => {
-      await switchUser(
-        page,
-        commissionerJwt,
-        `/baseball/league/${state.newLeagueId}/overview`,
-      );
-      await page.waitForLoadState('load');
-      await expect(page.locator('body')).not.toContainText(
-        'Unexpected Application Error',
-      );
     });
   });
 });

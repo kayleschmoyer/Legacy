@@ -224,7 +224,7 @@ test.describe
     });
 
     await test.step('Search input shows correct placeholder text', async () => {
-      await expect(page.getByPlaceholder('Search for a player…')).toBeVisible({
+      await expect(page.getByPlaceholder('Search player name…')).toBeVisible({
         timeout: 10_000,
       });
     });

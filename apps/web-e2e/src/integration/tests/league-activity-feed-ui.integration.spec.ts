@@ -259,8 +259,7 @@ test.describe
 
   test('Phase 5: Propose and accept a trade', async ({
     commissionerPage: page,
-    commissionerJwt,
-    managerJwt2,
+    managerPage2,
   }) => {
     await test.step('Navigate to trades tab', async () => {
       await page.goto(`/baseball/league/${state.leagueId}/trades`);
@@ -365,20 +364,20 @@ test.describe
     });
 
     await test.step('Manager 2 accepts the trade via UI', async () => {
-      await switchUser(
-        page,
-        managerJwt2,
-        `/baseball/league/${state.leagueId}/trades`,
-      );
-      await page.waitForLoadState('load');
+      // Use a dedicated manager browser context rather than switchUser on
+      // commissionerPage. switchUser has a race condition (LS-3672, LS-3705):
+      // background JWT refresh can dispatch AUTH_LOGOUT and clear localStorage
+      // after page.evaluate() sets the manager profile.
+      await managerPage2.goto(`/baseball/league/${state.leagueId}/trades`);
+      await managerPage2.waitForLoadState('load');
 
       // Find and click the Accept button on the incoming trade
-      const acceptBtn = page.getByRole('button', { name: /Accept/i });
+      const acceptBtn = managerPage2.getByRole('button', { name: /Accept/i });
       await expect(acceptBtn.first()).toBeVisible({ timeout: 15_000 });
       await acceptBtn.first().click();
 
       // Handle confirmation dialog if present
-      const confirmBtn = page.getByRole('button', { name: /Confirm/i });
+      const confirmBtn = managerPage2.getByRole('button', { name: /Confirm/i });
       if (
         await confirmBtn
           .waitFor({ state: 'visible', timeout: 3_000 })
@@ -388,10 +387,7 @@ test.describe
         await confirmBtn.click();
       }
 
-      await page.waitForTimeout(3_000);
-
-      // Restore commissioner identity
-      await switchUser(page, commissionerJwt);
+      await managerPage2.waitForTimeout(3_000);
     });
   });
 

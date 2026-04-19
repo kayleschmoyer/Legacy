@@ -267,19 +267,15 @@ test.describe
   // PHASE 5 — INLINE TEAM NAME EDITING (manager 1 renames their team)
   // -----------------------------------------------------------------
 
-  test('Phase 5: Inline team name editing', async ({
-    commissionerPage: page,
-    commissionerJwt,
-    managerJwt1,
-  }) => {
+  test('Phase 5: Inline team name editing', async ({ managerPage1: page }) => {
     state.renamedTeamName = `Renamed Roster ${Date.now()}`;
 
     await test.step('Manager 1 navigates to My Team tab', async () => {
-      await switchUser(
-        page,
-        managerJwt1,
-        `/baseball/league/${state.leagueId}/team-settings`,
-      );
+      // Use a dedicated manager browser context rather than switchUser on
+      // commissionerPage. switchUser has a race condition (LS-3672, LS-3705):
+      // background JWT refresh can dispatch AUTH_LOGOUT and clear localStorage
+      // after page.evaluate() sets the manager profile.
+      await page.goto(`/baseball/league/${state.leagueId}/team-settings`);
       await page.waitForLoadState('load');
       await expect(page.locator('body')).not.toContainText(
         'Unexpected Application Error',
@@ -335,9 +331,6 @@ test.describe
         page.getByText(state.renamedTeamName, { exact: false }).first(),
       ).toBeVisible({ timeout: 10000 });
     });
-
-    // Restore commissioner
-    await switchUser(page, commissionerJwt);
   });
 
   // -----------------------------------------------------------------
