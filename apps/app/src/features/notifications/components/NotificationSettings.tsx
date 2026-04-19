@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-misused-promises -- legacy mobile code pending type improvements */
 import React from 'react';
 import {
   Card,
@@ -19,23 +18,13 @@ export interface NotificationSettingsProps {
   loading?: boolean;
 }
 
-/**
- * NotificationSettings - Component for managing notification preferences
- * Allows users to enable/disable different notification types and channels
- *
- * Note: GraphQL fragments are type-safe but ESLint detects them as error types
- * in some contexts. Suppressing with eslint-disable where appropriate.
- */
 export function NotificationSettings({
   preferences,
   onUpdate,
   loading = false,
 }: NotificationSettingsProps) {
-  const handleToggle = async (
-    key: keyof NotificationPreference,
-    value: boolean,
-  ) => {
-    await onUpdate({ [key]: value });
+  const handleToggle = (key: keyof NotificationPreference, value: boolean) => {
+    void onUpdate({ [key]: value });
   };
 
   return (
