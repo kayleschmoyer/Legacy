@@ -41,6 +41,7 @@ import { prBatchStatus } from './tools/pr-batch-status.js';
 import { listPRComments } from './tools/list-pr-comments.js';
 import { listPRInlineComments } from './tools/list-pr-inline-comments.js';
 import { listReviewComments } from './tools/list-review-comments.js';
+import { getFileContent } from './tools/get-file-content.js';
 
 // Node.js native fetch (undici) does not respect HTTPS_PROXY / GLOBAL_AGENT_HTTPS_PROXY
 // by default. In cloud sessions the egress proxy is required; set the global dispatcher
@@ -1302,6 +1303,26 @@ server.tool(
       .describe('Webhook ID (from github_webhook_list).'),
   },
   async (params) => webhookPing(params),
+);
+
+// --- github_get_file_content ---
+server.tool(
+  'github_get_file_content',
+  'Read the contents of a file at a specific git ref (branch, tag, or commit SHA) without checking out a worktree. Returns {path, ref, content, sha}. Useful for PR triage and review agents that need to inspect files on remote branches.',
+  {
+    path: z
+      .string()
+      .trim()
+      .min(1)
+      .describe(
+        'File path relative to repo root (e.g. "apps/web/src/pages/Login.tsx").',
+      ),
+    ref: z
+      .string()
+      .optional()
+      .describe('Branch name, tag, or commit SHA (defaults to "main").'),
+  },
+  async (params) => getFileContent(params),
 );
 
 // Start the server
