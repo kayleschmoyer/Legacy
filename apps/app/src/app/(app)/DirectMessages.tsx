@@ -5,6 +5,7 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Card, Input, Spinner, Text, XStack, YStack } from 'tamagui';
 import { ChevronLeft, MessageSquare, Send, Users } from '@tamagui/lucide-icons';
 import { LOGGER } from '@legacy-sports/logging';
@@ -37,8 +38,13 @@ function ConversationThread({
 
   const { data, loading, refetch } = useGetDirectMessagesQuery({
     variables: { otherUserId, limit: 50 },
-    pollInterval: 10000,
   });
+
+  useFocusEffect(
+    useCallback(() => {
+      void refetch();
+    }, [refetch]),
+  );
 
   const [sendMessage, { loading: sending }] = useSendDirectMessageMutation({
     onCompleted: () => {
