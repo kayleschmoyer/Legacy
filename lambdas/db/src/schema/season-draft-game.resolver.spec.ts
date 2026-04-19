@@ -32,6 +32,8 @@ describe('Season Draft Game Resolver', () => {
       getGameState: jest.fn().mockResolvedValue(null),
       getGamesForUser: jest.fn().mockResolvedValue([]),
       createGame: jest.fn().mockResolvedValue(42),
+      joinGameByInviteCode: jest.fn().mockResolvedValue(42),
+      getGameByInviteCode: jest.fn().mockResolvedValue(null),
       startGame: jest.fn().mockResolvedValue(undefined),
       makePick: jest.fn().mockResolvedValue(undefined),
       cancelGame: jest.fn().mockResolvedValue(undefined),
@@ -374,22 +376,17 @@ describe('Season Draft Game Resolver', () => {
     it('throws when unauthenticated', async () => {
       const resolver = getMutation('createSeasonDraftGame');
       await expect(
-        resolver(
-          {},
-          { name: 'Game', playerNames: ['Alice', 'Bob'], userIds: [1, 2] },
-          unauthCtx,
-          undefined as never,
-        ),
+        resolver({}, { name: 'Game' }, unauthCtx, undefined as never),
       ).rejects.toThrow('Authentication required');
     });
 
-    it('creates a new game and returns game id', async () => {
+    it('creates a new game and derives creator from context', async () => {
       mockSeasonDraftGameService.createGame.mockResolvedValueOnce(99);
 
       const resolver = getMutation('createSeasonDraftGame');
       const result = await resolver(
         {},
-        { name: 'Draft Game', playerNames: ['Alice', 'Bob'], userIds: [1, 2] },
+        { name: 'Draft Game' },
         mockContext,
         undefined as never,
       );
@@ -397,8 +394,42 @@ describe('Season Draft Game Resolver', () => {
       expect(result).toBe(99);
       expect(mockSeasonDraftGameService.createGame).toHaveBeenCalledWith(
         mockDb,
-        expect.objectContaining({ name: 'Draft Game', createdBy: 1 }),
+        expect.objectContaining({
+          name: 'Draft Game',
+          createdBy: 1,
+          numPlayers: 1,
+          playerNames: ['Player 1'],
+          userIds: [1],
+        }),
       );
+    });
+  });
+
+  // ── joinSeasonDraftGame mutation ──────────────────────────────────────────
+
+  describe('joinSeasonDraftGame mutation', () => {
+    it('throws when unauthenticated', async () => {
+      const resolver = getMutation('joinSeasonDraftGame');
+      await expect(
+        resolver({}, { inviteCode: 'abc123' }, unauthCtx, undefined as never),
+      ).rejects.toThrow('Authentication required');
+    });
+
+    it('joins a game and returns the game id', async () => {
+      mockSeasonDraftGameService.joinGameByInviteCode.mockResolvedValueOnce(77);
+
+      const resolver = getMutation('joinSeasonDraftGame');
+      const result = await resolver(
+        {},
+        { inviteCode: 'abc123' },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(result).toBe(77);
+      expect(
+        mockSeasonDraftGameService.joinGameByInviteCode,
+      ).toHaveBeenCalledWith(mockDb, 'abc123', 1, 'Player');
     });
   });
 
@@ -621,6 +652,61 @@ describe('Season Draft Game Resolver', () => {
         3,
         1,
       );
+    });
+  });
+
+  // ── seasonDraftGameByInviteCode query ────────────────────────────────────
+
+  describe('seasonDraftGameByInviteCode query', () => {
+    it('throws when unauthenticated', async () => {
+      const resolver = getQuery('seasonDraftGameByInviteCode');
+      await expect(
+        resolver({}, { inviteCode: 'abc123' }, unauthCtx, undefined as never),
+      ).rejects.toThrow('Authentication required');
+    });
+
+    it('returns null when game is not found', async () => {
+      mockSeasonDraftGameService.getGameByInviteCode.mockResolvedValueOnce(
+        null,
+      );
+
+      const resolver = getQuery('seasonDraftGameByInviteCode');
+      const result = await resolver(
+        {},
+        { inviteCode: 'notfound' },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(result).toBeNull();
+    });
+
+    it('returns game lobby info by invite code', async () => {
+      const lobbyInfo = {
+        id: 5,
+        name: 'HR Challenge',
+        status: 'setup',
+        statKey: 'hr',
+        gameMode: 'season',
+        playerType: 'hitter',
+        playerCount: 2,
+      };
+      mockSeasonDraftGameService.getGameByInviteCode.mockResolvedValueOnce(
+        lobbyInfo,
+      );
+
+      const resolver = getQuery('seasonDraftGameByInviteCode');
+      const result = await resolver(
+        {},
+        { inviteCode: 'xyz789' },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(result).toEqual(lobbyInfo);
+      expect(
+        mockSeasonDraftGameService.getGameByInviteCode,
+      ).toHaveBeenCalledWith(mockDb, 'xyz789');
     });
   });
 
