@@ -33,6 +33,8 @@ The `--batch` flag is also implied when the user's natural-language request cont
 
 ## Steps
 
+> **⛔ NON-NEGOTIABLE: Any ticket that produces a code change MUST result in a merged PR. The workflow is not complete at `make pc`. The workflow is not complete when the PR is created. The workflow is complete when the PR is MERGED. Stopping before PR creation is the single most common agent failure mode — it is never acceptable.**
+
 ### Step 0: Session initialization
 
 #### 0a: Register the active worktree (FIRST — before any worktree MCP tool)
@@ -192,8 +194,10 @@ Follow the full [worktree-workflow skill](../worktree-workflow/SKILL.md):
    > **⛔ Do NOT run individual targets (`format`, `lint`, `typecheck`, `test`) instead of or before `make pc`.** `make pc` runs all steps in one shot and handles formatter auto-commits internally. Running targets individually multiplies turns and bypasses the auto-commit logic. If `make pc` fails, read the `steps[]` JSON to find the failing step, fix the code — you may optionally run that specific failing target to iterate faster — then always finish with a full `make_run(target: "pc")` pass before pushing.
 
    > **⛔ Do NOT stop here.** `make pc` passing is a checkpoint, not the finish line. If you exit the workflow at this point, the work is unfinished — keep going.
+   >
+   > **⛔ NEXT ACTION IS MANDATORY: proceed immediately to Step 7 and create the PR.** Any ticket that required a code change MUST produce a PR. There is no scenario — not "the change is small", not "I'm not sure it's ready", not "the user can review it locally" — that permits skipping PR creation. If you are tempted to stop here, you are in the most common agent failure mode. Do not stop. Create the PR.
 
-7. **Ship** (prerequisite: step 5 self-review was executed and all issues fixed — if you skipped step 5, go back now; do NOT create a PR without completing self-review): `worktree_commit({ message: "type(scope): msg" })` → `worktree_push()` → `github_create_pr(title: "LS-#### type(scope): msg", body: "<markdown>", worktreePath: "$wt", draft: true)` → `github_manage_labels(prs: [<PR#>], add: ["agent-in-progress"])` → `github_mark_pr_ready(number: <PR#>)` → `github_request_review(prs: [<PR#>])` → `jira_transition(key: "LS-####", status: "In Review")`. Apply the label while still a draft so the PR is already labeled when it becomes visible to sweeps. See [create PR](../pr-lifecycle/references/create-pr.md) only for PR body/title formatting and PR mechanics — this skill's step ordering overrides that reference: after PR creation, complete step 8 (watch to merge) first, then run the MCP gap audit in step 9 after merge.
+7. **Ship** ⛔ MANDATORY FOR ALL CODE-CHANGE TICKETS — DO NOT SKIP (prerequisite: step 5 self-review was executed and all issues fixed — if you skipped step 5, go back now; do NOT create a PR without completing self-review): `worktree_commit({ message: "type(scope): msg" })` → `worktree_push()` → `github_create_pr(title: "LS-#### type(scope): msg", body: "<markdown>", worktreePath: "$wt", draft: true)` → `github_manage_labels(prs: [<PR#>], add: ["agent-in-progress"])` → `github_mark_pr_ready(number: <PR#>)` → `github_request_review(prs: [<PR#>])` → `jira_transition(key: "LS-####", status: "In Review")`. Apply the label while still a draft so the PR is already labeled when it becomes visible to sweeps. See [create PR](../pr-lifecycle/references/create-pr.md) only for PR body/title formatting and PR mechanics — this skill's step ordering overrides that reference: after PR creation, complete step 8 (watch to merge) first, then run the MCP gap audit in step 9 after merge.
 
    > **⛔ Do NOT stop here.** Creating the PR is also not the finish line. Claude Code surfaces CI failures and review comments natively — proceed to step 8 to handle events as they arrive. If you exit after `github_create_pr` without watching for events, the ticket is unfinished.
 
@@ -368,6 +372,7 @@ The skill is responsible for shepherding the PR all the way to "merged" (step 8 
 - **Always check blockers before starting** — working a ticket whose blocker is still in progress wastes effort
 - **One worktree per child** — never combine multiple child tickets into one branch/PR
 - **Don't skip `make pc`** — even when processing multiple children, validate each one; always call `make_run(target: "pc")`, never chain individual targets (`format` → `lint` → `typecheck`) as a substitute
+- **⛔ NEVER stop before creating the PR** — if a ticket required any code change, a PR is mandatory. No exceptions for "small changes", "obvious fixes", or any other reason. Stopping after `make pc` without creating a PR is an **incomplete task** — the change has no reviewer, no CI run, and no path to production.
 - **Don't stop at `make pc`, `github_create_pr`, or `github_mark_pr_ready`** — these are checkpoints, not the finish line. The work-ticket skill ends when the PR is **merged** (not when the PR is opened) and the gap audit + tracking task updates are complete. Stopping early is the most common agent failure mode for this skill — see step 8.
 - **Always watch PR activity** — step 8 requires active event handling. Claude Code surfaces CI results, review threads, and merge status natively — without monitoring for events and reacting to them, the agent goes silent after PR creation.
 - **Epic-level artifacts** — if the parent needs its own code changes (shared config, design docs), create a separate worktree for the parent ticket itself (see worktree-workflow skill)
