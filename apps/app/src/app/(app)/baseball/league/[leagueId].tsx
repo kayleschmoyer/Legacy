@@ -1,4 +1,3 @@
-/* eslint-disable no-restricted-imports, no-restricted-syntax, @typescript-eslint/no-floating-promises, @typescript-eslint/no-unused-vars, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any, @typescript-eslint/no-misused-promises -- legacy file with inline gql queries and unsafe types pending refactor */
 import {
   useGlobalSearchParams,
   useLocalSearchParams,
@@ -18,9 +17,6 @@ import {
 } from 'tamagui';
 import { Tabs } from '@tamagui/tabs';
 import { Alert, Platform, ScrollView, Share } from 'react-native';
-import { gql } from '@apollo/client';
-
-import { useLazyQuery } from '@apollo/client/react';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   CommissionerAuditLog,
@@ -38,14 +34,12 @@ import {
   LeaguePositionFragment,
   StartDraftMutation,
   TeamMemberFragment,
-  useStartDraftMutation,
-} from '../../../../api/db/graphql.generated';
-import {
   useGetLeagueByIdQuery,
+  useGetLeagueTeamsLazyQuery,
   useGetPositionsForLeagueQuery,
-} from '../../../../api/db/graphql.generated';
-import {
   useGetTeamMembersQuery,
+  useGetUserTeamIdLazyQuery,
+  useStartDraftMutation,
   useUpdateTeamMemberPositionMutation,
 } from '../../../../api/db/graphql.generated';
 import { LeagueRosterManagement } from '../../../../features/roster/LeagueRosterManagement';
@@ -60,25 +54,6 @@ import { useLeagueScoringSettings } from '../../../../common/scoring';
 import { handleError } from '../../../../common/utilities/ErrorHandler';
 import { useAuthorizedUserInfo } from '../../../../common/auth/AuthorizedUserContext';
 import { readKeychainValue, Secret } from '../../../../common/auth/AuthHooks';
-// Manual GraphQL query for getting user's team ID in a league
-const GET_USER_TEAM_ID = gql`
-  query GetUserTeamId($leagueId: Int!) {
-    userTeamId(leagueId: $leagueId)
-  }
-`;
-
-// Manual GraphQL query for getting league teams (for standings)
-const GET_LEAGUE_TEAMS = gql`
-  query GetLeagueTeams($leagueId: Int!) {
-    leagueTeams(leagueId: $leagueId) {
-      id
-      name
-      leagueId
-    }
-  }
-`;
-
-// Note: START_DRAFT_MUTATION is available via useStartDraftMutation from generated file if needed
 
 export default function LeagueId(): React.JSX.Element {
   const params = useLocalSearchParams();
@@ -127,20 +102,16 @@ export default function LeagueId(): React.JSX.Element {
       },
     });
 
-  // Get current user info to determine their team in this league
-  const currentUser = useAuthorizedUserInfo();
-
-  // Use the proper userTeamId GraphQL query to get the user's team in this league
   const [getUserTeamId, { data: userTeamData, loading: userTeamLoading }] =
-    useLazyQuery(GET_USER_TEAM_ID);
+    useGetUserTeamIdLazyQuery();
 
   // Effect to fetch user's team ID when league ID changes
   useEffect(() => {
     if (!isNaN(numLeagueId) && userInfo?.id) {
-      getUserTeamId({
+      void getUserTeamId({
         variables: { leagueId: numLeagueId },
-        onError: (error) => {
-          LOGGER.error('User team ID query error:', String(error));
+        onError: (error: Error) => {
+          LOGGER.error('User team ID query error:', error);
         },
       });
     }
@@ -166,27 +137,23 @@ export default function LeagueId(): React.JSX.Element {
       variables: {
         teamId: userTeamId || 0,
       },
-      onError: (error) => {
-        LOGGER.error('Team members query error:', String(error));
+      onError: (error: Error) => {
+        LOGGER.error('Team members query error:', error);
       },
     });
 
-  // Fetch league teams for standings
   const [
     getLeagueTeams,
     { data: leagueTeamsData, loading: leagueTeamsLoading },
-  ] = useLazyQuery(GET_LEAGUE_TEAMS);
+  ] = useGetLeagueTeamsLazyQuery();
 
   // Effect to fetch league teams when on standings tab
   useEffect(() => {
     if (selectedTab === 'standings' && !isNaN(numLeagueId)) {
-      getLeagueTeams({
+      void getLeagueTeams({
         variables: { leagueId: numLeagueId },
-        onError: (error) => {
-          LOGGER.error(
-            'Error fetching league teams',
-            error instanceof Error ? error : new Error(String(error)),
-          );
+        onError: (error: Error) => {
+          LOGGER.error('Error fetching league teams', error);
         },
       });
     }
@@ -204,8 +171,8 @@ export default function LeagueId(): React.JSX.Element {
         'Draft has been started and queued for processing!',
       );
     },
-    onError: (error: any) => {
-      LOGGER.error('Error starting draft:', String(error));
+    onError: (error) => {
+      LOGGER.error('Error starting draft:', error);
       Alert.alert('Error', error.message || 'Failed to start draft');
     },
   });
@@ -292,7 +259,7 @@ export default function LeagueId(): React.JSX.Element {
           text: 'Start Draft',
           style: 'default',
           onPress: () => {
-            startDraft({
+            void startDraft({
               variables: {
                 leagueId: numLeagueId,
                 selectionMethod: 'random',
@@ -496,8 +463,12 @@ export default function LeagueId(): React.JSX.Element {
                 (member) => member !== null,
               ) as TeamMemberFragment[]) || []
             }
-            onPlayerAssign={handlePlayerAssign}
-            onPlayerRemove={handlePlayerRemove}
+            onPlayerAssign={(player, position) => {
+              void handlePlayerAssign(player, position);
+            }}
+            onPlayerRemove={(position) => {
+              void handlePlayerRemove(position);
+            }}
             loading={positionsLoading || teamMembersLoading || userTeamLoading}
           />
         </Tabs.Content>
@@ -679,7 +650,7 @@ export default function LeagueId(): React.JSX.Element {
   );
 }
 
-export function LeagueIdHeader(props: HeaderTitleProps): React.JSX.Element {
+export function LeagueIdHeader(_props: HeaderTitleProps): React.JSX.Element {
   const params = useGlobalSearchParams();
   const leagueId = params.leagueId;
 
