@@ -85,47 +85,84 @@ Each PR lives in its own symlinked worktree. The shared `node_modules` is **read
 
 Review fixes (Pass 2) and CI code fixes (Pass 3) operate on independent PRs in separate worktrees with no shared mutable state, making them safe to parallelize via sub-agents.
 
+> **Why sub-agents are mandatory here (not just recommended)**: each PR fix can consume 5,000–15,000+ tokens of orchestrator context (CI logs, file reads, review thread content, edits). On a sweep of 6+ PRs that cost compounds — the orchestrator exhausts its context window before reaching later PRs. Sub-agents isolate this cost: each bears its own context window, and the orchestrator's consumption stays O(number of PRs × dispatch overhead) regardless of how deep any fix goes.
+
 **How it works:**
 
-1. After the scan identifies PRs needing review fixes or CI fixes, group them into a batch (max 3 concurrent)
-2. Spawn one `Agent` per PR, each working in its own worktree. Use the appropriate prompt template:
+1. After the scan identifies PRs needing review fixes or CI fixes, group them into batches (max 3 concurrent)
+2. Spawn one `Agent` per PR using `subagent_type: "general-purpose"`. Provide a **fully self-contained prompt** — the sub-agent has no access to the orchestrator's context, so all context (PR number, branch, worktree path, thread IDs, failing job IDs) must be embedded in the prompt. Use the templates below:
 
    > **Orchestrator rule**: write the commit/push instruction as an **outcome** ("commit and push the fix") — never include explicit `git -C <path> commit` or `git -C <path> push` instructions in the prompt. Explicit git commands override the tool preference hints and can prevent the agent from using `worktree_commit`/`worktree_push`, which add the concrete safety checks we want here (for example: refusing unsafe pushes such as `main`, using `--force-with-lease`, retrying cleanly when hooks auto-amend and abort the first push, and confirming the remote when needed).
 
    **Review fix sub-agent (Pass 2):**
 
-   > Fix review comments on PR #\<number\> in worktree \<path\>.
-   > Read unresolved threads, apply fixes, run make pc, commit and push the fix.
-   > Resolve all fixed threads in one call via github_resolve_threads(threadIds: [...]).
-   > If unfixable, comment on the PR with the diagnosed blocker and move on.
-   >
-   > **Implementation context from Jira** (ticket \<LS-####\>):
-   > \<paste the "## Implementation Notes" comment from `jira_get_comments(key: "LS-####")` verbatim (look for a comment with that header), or "No implementation notes found." if absent\>
-   > Use this context to understand the original approach and design decisions before interpreting review feedback. If a reviewer's suggestion conflicts with a noted constraint, acknowledge it in the PR comment rather than blindly applying the change.
-   >
-   > Tool preferences:
-   >
-   > - Use Glob (not find/ls) for file discovery — do NOT use `find` or `ls`; if Glob returns empty on an absolute Windows worktree path, fall back to `worktree_ls_tree` first, or `worktree_run({ command: "ls <dir>" })` for that narrow case
-   > - Use Grep (not grep/rg) for content search
-   > - Use Read (not cat/head/tail) for reading files
-   > - Use worktree_run for git commands (not git -C via Bash)
-   > - Use worktree_commit/worktree_push for commits and pushes (not git -C commit / git -C push)
+   ```
+   Agent(
+     subagent_type: "general-purpose",
+     prompt: """
+       Fix review comments on PR #<number> (branch: <branch>) in worktree <path>.
+
+       Unresolved thread IDs and summaries (from github_get_review_threads):
+       <paste thread list here>
+
+       Steps:
+       1. Load skills/pr-lifecycle/SKILL.md and follow the fix-reviews workflow
+       2. Read the relevant files in the worktree, understand the review feedback
+       3. Apply fixes, run make -C <path> pc (REQUIRED before committing)
+       4. Commit and push: worktree_commit / worktree_push
+       5. Resolve fixed threads: github_resolve_threads(threadIds: [...])
+       6. Release sweep-claimed on exit (success OR failure):
+          github_manage_labels(number: <PR#>, remove: ["sweep-claimed"])
+       7. If a fix is blocked, comment on the PR with the specific blocker and release claim
+       8. Report: fixed | unfixable-blocker: <reason> | failed: <error>
+
+       Tool preferences:
+       - Use Glob (not find/ls) for file discovery
+       - Use Grep (not grep/rg) for content search
+       - Use Read (not cat/head/tail) for reading files
+       - Use worktree_run for git commands (not git -C via Bash)
+       - Use worktree_commit/worktree_push for commits and pushes
+     """
+   )
+   ```
 
    **CI fix sub-agent (Pass 3):**
 
-   > Fix the CI failure on PR #\<number\> in worktree \<path\>.
-   > Diagnose using ci_get_logs, apply the fix, run make pc, commit and push the fix.
-   > After a successful push, call github_clear_ci_failure_labels(number: \<number\>) to remove stale ci-failure-\* labels.
-   > The CI system will re-add labels if CI fails again after the push.
-   > If unfixable, comment on the PR with the diagnosed root cause and what was attempted — do not remove labels.
-   >
-   > Tool preferences:
-   >
-   > - Use Glob (not find/ls) for file discovery — do NOT use `find` or `ls`; if Glob returns empty on an absolute Windows worktree path, fall back to `worktree_ls_tree` first, or `worktree_run({ command: "ls <dir>" })` for that narrow case
-   > - Use Grep (not grep/rg) for content search
-   > - Use Read (not cat/head/tail) for reading files
-   > - Use worktree_run for git commands (not git -C via Bash)
-   > - Use worktree_commit/worktree_push for commits and pushes (not git -C commit / git -C push)
+   ```
+   Agent(
+     subagent_type: "general-purpose",
+     prompt: """
+       Fix the CI failure on PR #<number> (branch: <branch>) in worktree <path>.
+
+       Failing jobs (from ci_view_run): <list of job names and IDs>
+       CI failure labels on PR: <list of ci-failure-* labels>
+       Latest CI run ID: <runId>
+
+       Steps:
+       1. Fetch full logs: ci_get_logs(jobId: <failing-job-id>)
+       2. Classify root cause and apply fix (see Pass 3 triage table in skills/open-prs/SKILL.md):
+          - stale_branch: worktree_rebase, re-run CI — no code change
+          - formatting: pnpm exec nx format:write, commit, push
+          - codegen: make codegen, commit, push
+          - lint: pnpm exec nx affected -t lint --fix, commit, push
+          - type_error / test_failure / unknown: load skills/debugging/SKILL.md for diagnosis
+       3. Validate all code changes: make -C <path> pc (REQUIRED — never skip)
+       4. Commit and push: worktree_commit / worktree_push
+       5. Remove stale CI failure labels: github_clear_ci_failure_labels(number: <PR#>)
+       6. Release sweep-claimed on exit (success OR failure):
+          github_manage_labels(number: <PR#>, remove: ["sweep-claimed"])
+       7. If unfixable, comment with diagnosed root cause and what was attempted — do not remove labels
+       8. Report: fixed | unfixable-blocker: <reason> | failed: <error>
+
+       Tool preferences:
+       - Use Glob (not find/ls) for file discovery
+       - Use Grep (not grep/rg) for content search
+       - Use Read (not cat/head/tail) for reading files
+       - Use worktree_run for git commands (not git -C via Bash)
+       - Use worktree_commit/worktree_push for commits and pushes
+     """
+   )
+   ```
 
 3. Wait for all agents in the batch to complete before spawning the next batch
 4. Collect results from each agent — verify PR state (fixed, blocker commented, or failed)

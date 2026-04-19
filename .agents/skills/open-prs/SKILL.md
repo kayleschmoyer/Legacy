@@ -153,6 +153,20 @@ When an MCP tool fails, **do not assume the entire server is down**. Different t
 >
 > For the cloud agent workflow (Cloud Steps 1–6, Cloud Full Sweep Algorithm), see [CLOUD-SWEEP.md](CLOUD-SWEEP.md).
 
+> **⚠️ ORCHESTRATOR FOOTPRINT PRINCIPLE — read before proceeding.**
+> The sweep orchestrator must maintain a **minimal context footprint**. It scans, claims, dispatches, and tracks state — it does **NOT** do per-PR deep work inline. Every operation that involves reading CI logs, loading skill files, reading review threads, editing code, running `make pc`, committing, or pushing **must be delegated to a sub-agent** via `Agent(subagent_type: "general-purpose", ...)` with a fully self-contained prompt.
+>
+> **Why this is critical**: processing one PR inline can consume 5,000–15,000+ tokens (CI logs, file reads, edits, review threads). On a sweep with 6+ PRs that cost compounds — the orchestrator exhausts its context window before reaching later PRs, leaving their review threads and CI failures unaddressed. Sub-agents solve this by each bearing their own context cost — the orchestrator's consumption stays O(number of PRs × dispatch overhead) regardless of how deeply any individual PR fix goes.
+>
+> **Violations to avoid** — the orchestrator must NOT:
+>
+> - Load per-PR skill files (`skills/pr-lifecycle/SKILL.md`, `skills/debugging/SKILL.md`) and execute their steps inline
+> - Call `Read` / `Edit` / `Grep` on PR branch files directly in the orchestrator
+> - Run `make_run({ target: "pc" })` in a PR's worktree from the orchestrator context
+> - Call `ci_get_logs` / `ci_search_logs` to diagnose CI failures inline in the orchestrator
+>
+> **Permitted orchestrator actions**: `github_pr_scan`, `github_pr_dashboard`, `github_pr_batch_status`, `github_manage_labels`, `github_request_review`, `github_get_review_threads` (summary only — to count threads and build the sub-agent prompt), `ci_list_runs` / `ci_view_run` (summary/status only — not full log fetch), `ci_rerun` (for obviously transient failures), `worktree_list` (to discover worktree paths for sub-agent prompts), and the `Agent()` dispatch call itself.
+
 ## High-Level Pass Order (Local)
 
 1. **Step 0** — Create sweep task
