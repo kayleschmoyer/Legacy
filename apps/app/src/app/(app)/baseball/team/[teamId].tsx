@@ -26,6 +26,7 @@ import {
 import { LineupEditor } from '../../../../features/roster/LineupEditor';
 import { PositionSlot } from '../../../../common/models/Models';
 import { handleError } from '../../../../common/utilities/ErrorHandler';
+import { toIntId } from '../../../../common/utilities/RouteUtils';
 
 /** Shape of a single matchup player returned by GetMatchupStats (not yet in generated types). */
 interface MatchupPlayerStats {
@@ -358,18 +359,12 @@ export default function Team(): React.JSX.Element {
   const params = useLocalSearchParams();
   const teamId = params.teamId;
 
-  const teamIdStr =
-    typeof teamId === 'string'
-      ? teamId
-      : Array.isArray(teamId)
-        ? teamId[0]
-        : '';
-  const numTeamId = parseInt(teamIdStr, 10);
+  const numTeamId = toIntId(teamId);
 
   const { loading: loadingTeam, data: team } = useGetTeamByIdQuery({
-    skip: isNaN(numTeamId),
+    skip: numTeamId === null,
     variables: {
-      teamId: numTeamId,
+      teamId: numTeamId ?? 0,
     },
   });
 
@@ -512,7 +507,7 @@ export default function Team(): React.JSX.Element {
           battingSettings={battingSettings}
           fieldingSettings={fieldingSettings}
           pitchingSettings={pitchingSettings}
-          teamId={numTeamId}
+          teamId={numTeamId ?? 0}
           leagueId={team.team.leagueId}
           avatarUrl={team.team.avatarUrl}
           bannerUrl={team.team.bannerUrl}
@@ -526,18 +521,12 @@ export function TeamIdHeader(): React.JSX.Element {
   const params = useLocalSearchParams();
   const teamId = params.teamId;
 
-  const teamIdStr =
-    typeof teamId === 'string'
-      ? teamId
-      : Array.isArray(teamId)
-        ? teamId[0]
-        : '';
-  const numTeamId = parseInt(teamIdStr, 10);
+  const numTeamId = toIntId(teamId);
 
   const { data: team } = useGetTeamByIdQuery({
-    skip: isNaN(numTeamId),
+    skip: numTeamId === null,
     variables: {
-      teamId: numTeamId,
+      teamId: numTeamId ?? 0,
     },
   });
 

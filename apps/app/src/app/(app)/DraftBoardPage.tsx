@@ -4,20 +4,12 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Text, YStack } from 'tamagui';
 import { EliteDraftBoardScreen } from '@legacy-sports/shared-components';
 import { LOGGER } from '@legacy-sports/logging';
+import { toIntId } from '../../common/utilities/RouteUtils';
 
 export default function DraftBoardPage() {
   const { leagueId: leagueIdParam } = useLocalSearchParams();
-  const normalizedLeagueIdParam =
-    typeof leagueIdParam === 'string'
-      ? leagueIdParam
-      : Array.isArray(leagueIdParam)
-        ? leagueIdParam[0]
-        : undefined;
   const router = useRouter();
-  const parsedLeagueId = normalizedLeagueIdParam
-    ? parseInt(normalizedLeagueIdParam, 10)
-    : null;
-  const leagueId = Number.isFinite(parsedLeagueId) ? parsedLeagueId : null;
+  const leagueId = toIntId(leagueIdParam);
   const websocketUrl = process.env.EXPO_PUBLIC_WEBSOCKET_URL;
 
   useEffect(() => {

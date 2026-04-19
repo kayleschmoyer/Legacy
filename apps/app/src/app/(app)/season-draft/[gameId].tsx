@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Text, YStack } from 'tamagui';
 import { SeasonDraftGame } from '@legacy-sports/shared-components';
 import { useAuthorizedUserInfo } from '../../../common/auth/AuthorizedUserContext';
+import { toIntId } from '../../../common/utilities/RouteUtils';
 
 /**
  * Mobile Season Draft Game Detail
@@ -15,15 +16,9 @@ export default function SeasonDraftGameScreen() {
   const router = useRouter();
   const userInfo = useAuthorizedUserInfo();
 
-  const normalizedGameId =
-    typeof gameId === 'string'
-      ? gameId
-      : Array.isArray(gameId)
-        ? gameId[0]
-        : undefined;
-  const numericGameId = normalizedGameId ? parseInt(normalizedGameId, 10) : NaN;
+  const numericGameId = toIntId(gameId);
 
-  if (isNaN(numericGameId)) {
+  if (numericGameId === null) {
     return (
       <YStack flex={1} alignItems="center" justifyContent="center">
         <Text color="$gray11">Invalid game</Text>

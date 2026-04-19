@@ -21,6 +21,7 @@ import {
   useMatchupsForLeague,
 } from '../hooks/useMatchup';
 import { useStandings } from '../hooks/useStandings';
+import { toIntId } from '../../../common/utilities/RouteUtils';
 
 /**
  * MatchupDetailScreen - Full matchup breakdown screen
@@ -30,11 +31,8 @@ export default function MatchupDetailScreen() {
   const params = useLocalSearchParams();
   const router = useRouter();
 
-  const rawMatchupId = params.matchupId;
-  const matchupId = rawMatchupId ? parseInt(rawMatchupId as string, 10) : null;
-
-  const rawLeagueId = params.leagueId;
-  const leagueId = rawLeagueId ? parseInt(rawLeagueId as string, 10) : null;
+  const matchupId = toIntId(params.matchupId);
+  const leagueId = toIntId(params.leagueId);
 
   const {
     matchup,

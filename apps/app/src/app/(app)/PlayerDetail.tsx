@@ -1,6 +1,7 @@
 import React from 'react';
 import { useLocalSearchParams } from 'expo-router';
 import { PlayerDetailById } from '@legacy-sports/shared-components';
+import { toIntId } from '../../common/utilities/RouteUtils';
 
 /**
  * Mobile Player Detail Screen
@@ -14,7 +15,7 @@ export default function PlayerDetailScreen() {
     playerName: string;
   }>();
 
-  const id = playerId ? parseInt(playerId, 10) : 0;
+  const id = toIntId(playerId) ?? 0;
 
   return <PlayerDetailById playerId={id} />;
 }

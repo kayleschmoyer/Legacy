@@ -54,6 +54,7 @@ import { useLeagueScoringSettings } from '../../../../common/scoring';
 import { handleError } from '../../../../common/utilities/ErrorHandler';
 import { useAuthorizedUserInfo } from '../../../../common/auth/AuthorizedUserContext';
 import { readKeychainValue, Secret } from '../../../../common/auth/AuthHooks';
+import { toIntId } from '../../../../common/utilities/RouteUtils';
 
 export default function LeagueId(): React.JSX.Element {
   const params = useLocalSearchParams();
@@ -654,18 +655,12 @@ export function LeagueIdHeader(_props: HeaderTitleProps): React.JSX.Element {
   const params = useGlobalSearchParams();
   const leagueId = params.leagueId;
 
-  const leagueIdStr =
-    typeof leagueId === 'string'
-      ? leagueId
-      : Array.isArray(leagueId)
-        ? leagueId[0]
-        : '';
-  const numLeagueId = parseInt(leagueIdStr, 10);
+  const numLeagueId = toIntId(leagueId);
 
   const { data } = useGetLeagueByIdQuery({
-    skip: isNaN(numLeagueId),
+    skip: numLeagueId === null,
     variables: {
-      id: numLeagueId,
+      id: numLeagueId ?? 0,
     },
   });
 
