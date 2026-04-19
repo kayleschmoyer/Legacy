@@ -194,7 +194,7 @@ const AccentBar = styled(YStack, {
 });
 
 const NavContainer = styled(YStack, {
-  backgroundColor: '$surfacePanel',
+  backgroundColor: 'rgba(10,15,26,0.75)',
   borderBottomWidth: 1,
   borderBottomColor: '$borderColor',
 });
@@ -366,7 +366,12 @@ function Navigation() {
 
       {isAuthenticated && (
         <nav aria-label="Primary">
-          <NavContainer>
+          <NavContainer
+            style={{
+              backdropFilter: 'blur(14px)',
+              WebkitBackdropFilter: 'blur(14px)',
+            }}
+          >
             <NavContent>
               {/* ── Brand ── */}
               <XStack flex={1} alignItems="center" justifyContent="flex-start">
@@ -382,20 +387,41 @@ function Navigation() {
                       data-testid="header-logo"
                       style={{ height: 38, width: 'auto', display: 'block' }}
                     />
-                    <Paragraph
-                      marginBottom={0}
-                      fontWeight="700"
-                      fontSize={22}
-                      color="$color12"
-                      letterSpacing={1}
+                    <YStack
+                      gap={0}
                       userSelect="none"
                       data-testid="brand-text"
-                      style={{
-                        fontFamily: "'Big Shoulders Display', sans-serif",
-                      }}
+                      style={{ lineHeight: 1 }}
                     >
-                      Legacy Sports
-                    </Paragraph>
+                      <Paragraph
+                        marginBottom={0}
+                        style={{
+                          fontFamily:
+                            "'Big Shoulders Display', system-ui, sans-serif",
+                          fontWeight: '800',
+                          fontSize: 14,
+                          letterSpacing: '0.04em',
+                          lineHeight: 1,
+                          color: '#D4BB78',
+                        }}
+                      >
+                        LEGACY
+                      </Paragraph>
+                      <Paragraph
+                        marginBottom={0}
+                        style={{
+                          fontFamily:
+                            "'Big Shoulders Display', system-ui, sans-serif",
+                          fontWeight: '700',
+                          fontSize: 11,
+                          letterSpacing: '0.16em',
+                          lineHeight: 1,
+                          color: '#F8FAFC',
+                        }}
+                      >
+                        SPORTS
+                      </Paragraph>
+                    </YStack>
                   </XStack>
                 </Link>
               </XStack>

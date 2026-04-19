@@ -45,18 +45,25 @@ exports[`App FootballScreen should match complete football page layout snapshot 
                   src="/logo.png"
                   style="height: 38px; width: auto; display: block;"
                 />
-                <p
-                  color="$color12"
+                <div
                   data-testid="brand-text"
-                  font-size="22"
-                  font-weight="700"
-                  letter-spacing="1"
-                  marginbottom="0"
-                  style="font-family: 'Big Shoulders Display', sans-serif;"
+                  gap="0"
+                  style="line-height: 1;"
                   userselect="none"
                 >
-                  Legacy Sports
-                </p>
+                  <p
+                    marginbottom="0"
+                    style="font-family: 'Big Shoulders Display', system-ui, sans-serif; font-weight: 800; font-size: 14px; letter-spacing: 0.04em; line-height: 1; color: rgb(212, 187, 120);"
+                  >
+                    LEGACY
+                  </p>
+                  <p
+                    marginbottom="0"
+                    style="font-family: 'Big Shoulders Display', system-ui, sans-serif; font-weight: 700; font-size: 11px; letter-spacing: 0.16em; line-height: 1; color: rgb(248, 250, 252);"
+                  >
+                    SPORTS
+                  </p>
+                </div>
               </div>
             </a>
           </div>
@@ -183,18 +190,25 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
                   src="/logo.png"
                   style="height: 38px; width: auto; display: block;"
                 />
-                <p
-                  color="$color12"
+                <div
                   data-testid="brand-text"
-                  font-size="22"
-                  font-weight="700"
-                  letter-spacing="1"
-                  marginbottom="0"
-                  style="font-family: 'Big Shoulders Display', sans-serif;"
+                  gap="0"
+                  style="line-height: 1;"
                   userselect="none"
                 >
-                  Legacy Sports
-                </p>
+                  <p
+                    marginbottom="0"
+                    style="font-family: 'Big Shoulders Display', system-ui, sans-serif; font-weight: 800; font-size: 14px; letter-spacing: 0.04em; line-height: 1; color: rgb(212, 187, 120);"
+                  >
+                    LEGACY
+                  </p>
+                  <p
+                    marginbottom="0"
+                    style="font-family: 'Big Shoulders Display', system-ui, sans-serif; font-weight: 700; font-size: 11px; letter-spacing: 0.16em; line-height: 1; color: rgb(248, 250, 252);"
+                  >
+                    SPORTS
+                  </p>
+                </div>
               </div>
             </a>
           </div>
@@ -299,18 +313,25 @@ exports[`App Navigation should match navigation snapshot 1`] = `
               src="/logo.png"
               style="height: 38px; width: auto; display: block;"
             />
-            <p
-              color="$color12"
+            <div
               data-testid="brand-text"
-              font-size="22"
-              font-weight="700"
-              letter-spacing="1"
-              marginbottom="0"
-              style="font-family: 'Big Shoulders Display', sans-serif;"
+              gap="0"
+              style="line-height: 1;"
               userselect="none"
             >
-              Legacy Sports
-            </p>
+              <p
+                marginbottom="0"
+                style="font-family: 'Big Shoulders Display', system-ui, sans-serif; font-weight: 800; font-size: 14px; letter-spacing: 0.04em; line-height: 1; color: rgb(212, 187, 120);"
+              >
+                LEGACY
+              </p>
+              <p
+                marginbottom="0"
+                style="font-family: 'Big Shoulders Display', system-ui, sans-serif; font-weight: 700; font-size: 11px; letter-spacing: 0.16em; line-height: 1; color: rgb(248, 250, 252);"
+              >
+                SPORTS
+              </p>
+            </div>
           </div>
         </a>
       </div>
@@ -400,18 +421,25 @@ exports[`App Navigation should render navigation with correct links 1`] = `
               src="/logo.png"
               style="height: 38px; width: auto; display: block;"
             />
-            <p
-              color="$color12"
+            <div
               data-testid="brand-text"
-              font-size="22"
-              font-weight="700"
-              letter-spacing="1"
-              marginbottom="0"
-              style="font-family: 'Big Shoulders Display', sans-serif;"
+              gap="0"
+              style="line-height: 1;"
               userselect="none"
             >
-              Legacy Sports
-            </p>
+              <p
+                marginbottom="0"
+                style="font-family: 'Big Shoulders Display', system-ui, sans-serif; font-weight: 800; font-size: 14px; letter-spacing: 0.04em; line-height: 1; color: rgb(212, 187, 120);"
+              >
+                LEGACY
+              </p>
+              <p
+                marginbottom="0"
+                style="font-family: 'Big Shoulders Display', system-ui, sans-serif; font-weight: 700; font-size: 11px; letter-spacing: 0.16em; line-height: 1; color: rgb(248, 250, 252);"
+              >
+                SPORTS
+              </p>
+            </div>
           </div>
         </a>
       </div>

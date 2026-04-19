@@ -17,13 +17,11 @@ import { storeCsrfToken } from '../../lib/csrf';
 import {
   BG_DARK,
   BRAND_GOLD,
-  BRAND_GOLD_DARK,
   BRAND_GOLD_LIGHT,
   BRAND_NAVY,
   BRAND_NAVY_DARK,
   BRAND_NAVY_LIGHT,
   BRAND_SEAM_RED,
-  SURFACE_PANEL,
   withAlpha,
 } from '../../constants/colors';
 
@@ -208,13 +206,13 @@ const heroGradientStyle: React.CSSProperties = {
 
 const heroHeadingStyle: React.CSSProperties = {
   margin: 0,
-  fontFamily: '"Literata", Georgia, serif',
-  fontWeight: 900,
+  fontFamily: '"Big Shoulders Display", system-ui, sans-serif',
+  fontWeight: 800,
   textAlign: 'center',
-  letterSpacing: -1,
-  lineHeight: 1.1,
+  letterSpacing: '-0.02em',
+  lineHeight: 1,
   fontSize: 'clamp(2.5rem, 6vw, 4rem)',
-  color: BRAND_GOLD_DARK,
+  color: '#FFFFFF',
 };
 
 const sectionHeadingStyle: React.CSSProperties = {
@@ -593,8 +591,10 @@ export function PublicLandingPage(): React.JSX.Element {
 
   const navStyle = useMemo<React.CSSProperties>(
     () => ({
-      background: SURFACE_PANEL,
-      borderBottom: `1px solid ${withAlpha(BRAND_NAVY, 0.4)}`,
+      background: 'rgba(10,15,26,0.75)',
+      backdropFilter: 'blur(14px)',
+      WebkitBackdropFilter: 'blur(14px)',
+      borderBottom: `1px solid rgba(255,255,255,0.08)`,
     }),
     [],
   );
@@ -630,14 +630,32 @@ export function PublicLandingPage(): React.JSX.Element {
               alt="Legacy Sports"
               style={{ height: 38, width: 'auto', display: 'block' }}
             />
-            <Text
-              fontSize="$5"
-              fontWeight="800"
-              color={BRAND_GOLD}
-              letterSpacing={-0.5}
-            >
-              Legacy Sports
-            </Text>
+            <YStack lineHeight={1} gap={0}>
+              <Text
+                style={{
+                  fontFamily: '"Big Shoulders Display", system-ui, sans-serif',
+                  fontWeight: '800',
+                  fontSize: 14,
+                  letterSpacing: '0.04em',
+                  lineHeight: 1,
+                  color: BRAND_GOLD_LIGHT,
+                }}
+              >
+                LEGACY
+              </Text>
+              <Text
+                style={{
+                  fontFamily: '"Big Shoulders Display", system-ui, sans-serif',
+                  fontWeight: '700',
+                  fontSize: 11,
+                  letterSpacing: '0.16em',
+                  lineHeight: 1,
+                  color: '#F8FAFC',
+                }}
+              >
+                SPORTS
+              </Text>
+            </YStack>
           </XStack>
 
           {/* Nav sign-in button */}
