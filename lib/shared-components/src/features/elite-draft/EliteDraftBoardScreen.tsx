@@ -296,7 +296,7 @@ export function EliteDraftBoardScreen({
     );
   }
 
-  if (ui.draftComplete || queries.currentPickInfo?.isComplete) {
+  if (ui.draftComplete || queries.leagueDraft?.draftCompletedAt) {
     return (
       <DraftCompleteView
         league={

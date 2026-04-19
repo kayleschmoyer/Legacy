@@ -1404,6 +1404,14 @@ export type Mutation = {
   toggleDraftAutoPick?: Maybe<Scalars['Boolean']['output']>;
   /** Trigger stat loading for a baseball player if stats have not been fetched yet. Returns true if loading was triggered, false if stats already exist. */
   triggerSeasonDraftStatLoading?: Maybe<Scalars['Boolean']['output']>;
+  /** Abandon an active game — returns final game state */
+  twentyQuestionsAbandon?: Maybe<TwentyQuestionsGame>;
+  /** Ask a yes/no question — returns updated game state */
+  twentyQuestionsAsk?: Maybe<TwentyQuestionsGame>;
+  /** Guess the player identity — returns updated game state (with targetPlayer if won/lost) */
+  twentyQuestionsGuess?: Maybe<TwentyQuestionsGame>;
+  /** Start a new 20 Questions game (errors if an active game exists) */
+  twentyQuestionsStart?: Maybe<TwentyQuestionsGame>;
   undoLastDraftPick?: Maybe<DraftPick>;
   /** Commissioner: update the persistent LM note for a league. */
   updateCommissionerNote?: Maybe<CommissionerActionResult>;
@@ -1919,6 +1927,23 @@ export type MutationToggleDraftAutoPickArgs = {
 
 export type MutationTriggerSeasonDraftStatLoadingArgs = {
   playerId: Scalars['Int']['input'];
+};
+
+export type MutationTwentyQuestionsAbandonArgs = {
+  gameId: Scalars['String']['input'];
+};
+
+export type MutationTwentyQuestionsAskArgs = {
+  input: TwentyQuestionsAskInput;
+};
+
+export type MutationTwentyQuestionsGuessArgs = {
+  gameId: Scalars['String']['input'];
+  playerId: Scalars['Int']['input'];
+};
+
+export type MutationTwentyQuestionsStartArgs = {
+  difficulty?: InputMaybe<TwentyQuestionsDifficulty>;
 };
 
 export type MutationUndoLastDraftPickArgs = {
@@ -2460,6 +2485,10 @@ export type Query = {
   teamMembers?: Maybe<Array<TeamMember>>;
   teamTradeOffers?: Maybe<Array<TradeOffer>>;
   teamWaiverClaims?: Maybe<Array<WaiverClaim>>;
+  /** Return the caller's current active game, or null if none */
+  twentyQuestionsActiveGame?: Maybe<TwentyQuestionsGame>;
+  /** Paginated history of the caller's past games */
+  twentyQuestionsHistory?: Maybe<Array<TwentyQuestionsGame>>;
   user?: Maybe<User>;
   /** Return progress records for in-progress multi-step badges for a user */
   userBadgeProgress?: Maybe<Array<BadgeProgress>>;
@@ -2981,6 +3010,11 @@ export type QueryTeamTradeOffersArgs = {
 export type QueryTeamWaiverClaimsArgs = {
   status?: InputMaybe<Scalars['String']['input']>;
   teamId: Scalars['Int']['input'];
+};
+
+export type QueryTwentyQuestionsHistoryArgs = {
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type QueryUserArgs = {
@@ -3633,6 +3667,65 @@ export type TradeOfferPlayer = {
   playerPosition?: Maybe<Scalars['String']['output']>;
   tradeOfferId?: Maybe<Scalars['Int']['output']>;
 };
+
+export type TwentyQuestionsAskInput = {
+  category: TwentyQuestionsCategory;
+  gameId: Scalars['String']['input'];
+  /** JSON-encoded question parameters */
+  parameter: Scalars['String']['input'];
+};
+
+export enum TwentyQuestionsCategory {
+  ActiveStatus = 'active_status',
+  BattingHand = 'batting_hand',
+  Era = 'era',
+  HallOfFame = 'hall_of_fame',
+  Position = 'position',
+  StatThreshold = 'stat_threshold',
+  Team = 'team',
+  ThrowingHand = 'throwing_hand',
+}
+
+export enum TwentyQuestionsDifficulty {
+  Easy = 'easy',
+  Hard = 'hard',
+  Medium = 'medium',
+}
+
+/** State of a 20 Questions game session */
+export type TwentyQuestionsGame = {
+  __typename?: 'TwentyQuestionsGame';
+  completedAt?: Maybe<Scalars['String']['output']>;
+  difficulty?: Maybe<TwentyQuestionsDifficulty>;
+  id?: Maybe<Scalars['String']['output']>;
+  maxQuestions?: Maybe<Scalars['Int']['output']>;
+  questions?: Maybe<Array<TwentyQuestionsQuestion>>;
+  questionsUsed?: Maybe<Scalars['Int']['output']>;
+  startedAt?: Maybe<Scalars['String']['output']>;
+  status?: Maybe<TwentyQuestionsStatus>;
+  /** Revealed only when status is won or lost */
+  targetPlayer?: Maybe<Player>;
+  tokensEarned?: Maybe<Scalars['Int']['output']>;
+};
+
+/** A single yes/no question asked during a 20 Questions game */
+export type TwentyQuestionsQuestion = {
+  __typename?: 'TwentyQuestionsQuestion';
+  answer?: Maybe<Scalars['Boolean']['output']>;
+  category?: Maybe<TwentyQuestionsCategory>;
+  guessPlayer?: Maybe<Player>;
+  isGuess?: Maybe<Scalars['Boolean']['output']>;
+  /** JSON-encoded question parameters (e.g. position, team, decade) */
+  parameter?: Maybe<Scalars['String']['output']>;
+  questionNumber?: Maybe<Scalars['Int']['output']>;
+};
+
+export enum TwentyQuestionsStatus {
+  Abandoned = 'abandoned',
+  Active = 'active',
+  Lost = 'lost',
+  Won = 'won',
+}
 
 export type UpdateCommissionerNoteInput = {
   leagueId: Scalars['Int']['input'];

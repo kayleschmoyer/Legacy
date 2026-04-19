@@ -291,16 +291,21 @@ test.describe
     await page.goto(`/baseball/league/${state.leagueId}/draft`);
     await page.waitForLoadState('domcontentloaded');
 
-    // If the AI auto-draft completed before this phase, skip gracefully
+    // Wait for either the live board or the completed state — whichever renders first.
+    // Using .or() avoids the two-render race where the board briefly appears before
+    // useDraftEffects fires and replaces it with DraftCompleteView.
+    const draftBoard = page.getByRole('main', { name: /player draft board/i });
     const draftComplete = page.getByText('Draft Complete!');
-    if (await draftComplete.isVisible({ timeout: 5_000 }).catch(() => false)) {
+    await draftBoard
+      .or(draftComplete)
+      .first()
+      .waitFor({ state: 'visible', timeout: 45_000 });
+
+    // If the AI auto-draft completed before this phase, skip gracefully
+    if (await draftComplete.isVisible()) {
       test.skip(true, 'Draft completed before view mode could be tested');
       return;
     }
-
-    await expect(
-      page.getByRole('main', { name: /player draft board/i }),
-    ).toBeVisible({ timeout: 45_000 });
 
     const viewGroup = page.getByRole('radiogroup', { name: /view mode/i });
     await expect(viewGroup).toBeVisible({ timeout: 15_000 });
