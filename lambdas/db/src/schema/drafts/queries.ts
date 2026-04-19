@@ -441,9 +441,16 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
         totalScore: 'COALESCE(cs.total_score, 0)',
         careerGames: 'COALESCE(cs.career_games, 0)',
         avgPointsPerGame: 'COALESCE(cs.avg_ppg, 0)',
-        // Aliases defined in basePlayerSelectWithScoring; avoids duplication.
-        hitterAvgPointsPerGame: 'hitter_avg_ppg',
-        pitchingAvgPointsPerGame: 'pitching_avg_ppg',
+        // PostgreSQL does not resolve SELECT output aliases when they appear
+        // inside another expression (e.g. the COALESCE wrapper in ORDER BY
+        // below). Duplicate the underlying scoring expression instead of
+        // referencing `hitter_avg_ppg` / `pitching_avg_ppg` so the ORDER BY
+        // resolves against the `cs` input-table columns.
+        hitterAvgPointsPerGame:
+          '(COALESCE(cs.batting_score, 0) + COALESCE(cs.fielding_score, 0))' +
+          ' / NULLIF(cs.career_games, 0)',
+        pitchingAvgPointsPerGame:
+          'COALESCE(cs.pitching_score, 0) / NULLIF(cs.career_games, 0)',
       };
 
       // Scoring sorts: join player_scoring_cache (LS-696 — replaces compute_career_scores)
