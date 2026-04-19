@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState, type AppStateStatus } from 'react-native';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   useGetNotificationHistoryQuery,
@@ -38,12 +39,48 @@ export function useNotifications(userId: number) {
     skip: !userId,
   });
 
-  // Fetch unread count
-  const { data: countData, refetch: refetchCount } =
-    useGetUnreadNotificationCountQuery({
-      skip: !userId,
-      pollInterval: 30000, // Poll every 30 seconds
-    });
+  // Fetch unread count — polling is gated on app foreground state to avoid
+  // draining battery during background/inactive periods.
+  const {
+    data: countData,
+    refetch: refetchCount,
+    startPolling,
+    stopPolling,
+  } = useGetUnreadNotificationCountQuery({
+    skip: !userId,
+  });
+
+  const isPollingRef = useRef(false);
+
+  useEffect(() => {
+    if (!userId) return;
+
+    function handleAppStateChange(nextState: AppStateStatus) {
+      if (nextState === 'active') {
+        if (!isPollingRef.current) {
+          startPolling(30000);
+          isPollingRef.current = true;
+        }
+      } else {
+        stopPolling();
+        isPollingRef.current = false;
+      }
+    }
+
+    // Start polling immediately (app is active when this mounts)
+    startPolling(30000);
+    isPollingRef.current = true;
+
+    const subscription = AppState.addEventListener(
+      'change',
+      handleAppStateChange,
+    );
+    return () => {
+      stopPolling();
+      isPollingRef.current = false;
+      subscription.remove();
+    };
+  }, [userId, startPolling, stopPolling]);
 
   // Update unread count when data changes
   useEffect(() => {
