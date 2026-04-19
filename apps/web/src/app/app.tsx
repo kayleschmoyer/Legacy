@@ -256,14 +256,16 @@ function Navigation() {
                   }}
                 />
                 {!compact && (
-                  <YStack
-                    gap={0}
-                    userSelect="none"
+                  <div
                     data-testid="brand-text"
-                    style={{ lineHeight: 1 }}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      userSelect: 'none',
+                      lineHeight: 1,
+                    }}
                   >
-                    <Paragraph
-                      marginBottom={0}
+                    <span
                       style={{
                         fontFamily: FONT_DISPLAY,
                         fontWeight: '800',
@@ -274,9 +276,8 @@ function Navigation() {
                       }}
                     >
                       LEGACY
-                    </Paragraph>
-                    <Paragraph
-                      marginBottom={0}
+                    </span>
+                    <span
                       style={{
                         fontFamily: FONT_DISPLAY,
                         fontWeight: '700',
@@ -287,8 +288,8 @@ function Navigation() {
                       }}
                     >
                       SPORTS
-                    </Paragraph>
-                  </YStack>
+                    </span>
+                  </div>
                 )}
               </XStack>
             </Link>

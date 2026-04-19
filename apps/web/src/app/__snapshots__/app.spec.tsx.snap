@@ -45,22 +45,18 @@ exports[`App FootballScreen should match complete football page layout snapshot 
               />
               <div
                 data-testid="brand-text"
-                gap="0"
-                style="line-height: 1;"
-                userselect="none"
+                style="display: flex; flex-direction: column; user-select: none; line-height: 1;"
               >
-                <p
-                  marginbottom="0"
+                <span
                   style="font-family: 'Big Shoulders Display', system-ui, sans-serif; font-weight: 800; font-size: 14px; letter-spacing: 0.04em; line-height: 1; color: rgb(212, 187, 120);"
                 >
                   LEGACY
-                </p>
-                <p
-                  marginbottom="0"
+                </span>
+                <span
                   style="font-family: 'Big Shoulders Display', system-ui, sans-serif; font-weight: 700; font-size: 11px; letter-spacing: 0.16em; line-height: 1; color: rgb(248, 250, 252);"
                 >
                   SPORTS
-                </p>
+                </span>
               </div>
             </div>
           </a>
@@ -186,22 +182,18 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
               />
               <div
                 data-testid="brand-text"
-                gap="0"
-                style="line-height: 1;"
-                userselect="none"
+                style="display: flex; flex-direction: column; user-select: none; line-height: 1;"
               >
-                <p
-                  marginbottom="0"
+                <span
                   style="font-family: 'Big Shoulders Display', system-ui, sans-serif; font-weight: 800; font-size: 14px; letter-spacing: 0.04em; line-height: 1; color: rgb(212, 187, 120);"
                 >
                   LEGACY
-                </p>
-                <p
-                  marginbottom="0"
+                </span>
+                <span
                   style="font-family: 'Big Shoulders Display', system-ui, sans-serif; font-weight: 700; font-size: 11px; letter-spacing: 0.16em; line-height: 1; color: rgb(248, 250, 252);"
                 >
                   SPORTS
-                </p>
+                </span>
               </div>
             </div>
           </a>
@@ -306,22 +298,18 @@ exports[`App Navigation should match navigation snapshot 1`] = `
           />
           <div
             data-testid="brand-text"
-            gap="0"
-            style="line-height: 1;"
-            userselect="none"
+            style="display: flex; flex-direction: column; user-select: none; line-height: 1;"
           >
-            <p
-              marginbottom="0"
+            <span
               style="font-family: 'Big Shoulders Display', system-ui, sans-serif; font-weight: 800; font-size: 14px; letter-spacing: 0.04em; line-height: 1; color: rgb(212, 187, 120);"
             >
               LEGACY
-            </p>
-            <p
-              marginbottom="0"
+            </span>
+            <span
               style="font-family: 'Big Shoulders Display', system-ui, sans-serif; font-weight: 700; font-size: 11px; letter-spacing: 0.16em; line-height: 1; color: rgb(248, 250, 252);"
             >
               SPORTS
-            </p>
+            </span>
           </div>
         </div>
       </a>
@@ -407,22 +395,18 @@ exports[`App Navigation should render navigation with correct links 1`] = `
           />
           <div
             data-testid="brand-text"
-            gap="0"
-            style="line-height: 1;"
-            userselect="none"
+            style="display: flex; flex-direction: column; user-select: none; line-height: 1;"
           >
-            <p
-              marginbottom="0"
+            <span
               style="font-family: 'Big Shoulders Display', system-ui, sans-serif; font-weight: 800; font-size: 14px; letter-spacing: 0.04em; line-height: 1; color: rgb(212, 187, 120);"
             >
               LEGACY
-            </p>
-            <p
-              marginbottom="0"
+            </span>
+            <span
               style="font-family: 'Big Shoulders Display', system-ui, sans-serif; font-weight: 700; font-size: 11px; letter-spacing: 0.16em; line-height: 1; color: rgb(248, 250, 252);"
             >
               SPORTS
-            </p>
+            </span>
           </div>
         </div>
       </a>
