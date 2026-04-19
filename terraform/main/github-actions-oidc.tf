@@ -231,12 +231,12 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/lambda/${local.name_prefix}-*",
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/lambda/${local.name_prefix}-*:*",
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/apigateway/${local.name_prefix}-*",
-          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/apigateway/${local.name_prefix}-*:*",
-          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/cloudtrail/${local.name_prefix}*",
-          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/cloudtrail/${local.name_prefix}*:*"
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/apigateway/${local.name_prefix}-*:*"
         ]
       },
       # CloudWatch Logs write permissions for Terraform apply (creating new log groups)
+      # Note: CloudTrail log group ARNs + metric filter actions live in the supplemental
+      # policy (github_actions_supplemental) to keep this inline policy under 10 KB.
       {
         Effect = "Allow"
         Action = [
@@ -247,18 +247,13 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "logs:TagLogGroup",
           "logs:UntagLogGroup",
           "logs:TagResource",
-          "logs:UntagResource",
-          "logs:PutMetricFilter",
-          "logs:DeleteMetricFilter",
-          "logs:DescribeMetricFilters"
+          "logs:UntagResource"
         ]
         Resource = [
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/lambda/${local.name_prefix}-*",
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/lambda/${local.name_prefix}-*:*",
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/apigateway/${local.name_prefix}-*",
-          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/apigateway/${local.name_prefix}-*:*",
-          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/cloudtrail/${local.name_prefix}*",
-          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/cloudtrail/${local.name_prefix}*:*"
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/apigateway/${local.name_prefix}-*:*"
         ]
       },
       # Secrets Manager read permissions
@@ -653,6 +648,33 @@ resource "aws_iam_policy" "github_actions_supplemental" {
           "acm:ListCertificates"
         ]
         Resource = "*"
+      },
+      # CloudWatch Logs permissions for the CloudTrail log group — moved here from the
+      # inline policy to stay under the 10 KB limit. Covers both read (refresh) and
+      # write (create/delete log group, metric filter CRUD) operations scoped to
+      # /aws/cloudtrail/${local.name_prefix}* log groups.
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:DescribeLogStreams",
+          "logs:ListTagsLogGroup",
+          "logs:ListTagsForResource",
+          "logs:CreateLogGroup",
+          "logs:DeleteLogGroup",
+          "logs:PutRetentionPolicy",
+          "logs:DeleteRetentionPolicy",
+          "logs:TagLogGroup",
+          "logs:UntagLogGroup",
+          "logs:TagResource",
+          "logs:UntagResource",
+          "logs:PutMetricFilter",
+          "logs:DeleteMetricFilter",
+          "logs:DescribeMetricFilters"
+        ]
+        Resource = [
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/cloudtrail/${local.name_prefix}*",
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/cloudtrail/${local.name_prefix}*:*"
+        ]
       },
       # CloudTrail permissions for Terraform apply (creating/managing the audit trail)
       # cloudtrail:DescribeTrails and cloudtrail:ListTrails do not support resource-level
