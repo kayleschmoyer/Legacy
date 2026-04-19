@@ -177,9 +177,9 @@ Follow the full [worktree-workflow skill](../worktree-workflow/SKILL.md):
 3. **Setup**:
    - **Native flow (REQUIRED before any pnpm/make command)**: `.claude/worktrees/<name>/` has no `node_modules`. Symlink from the main repo first (LS-2903/LS-3003):
      ```
-     worktree_setup_node_modules()
+     node scripts/setup-worktree-node-modules.mjs
      ```
-     Idempotent, no escaping needed. Fallback if MCP unavailable (run from the worktree root): `cmd /c "mklink /D node_modules D:\code\legacy-sports\node_modules"` (directory symlink — do NOT use `mklink /J` or `New-Item -ItemType Junction`). After that `pnpm exec nx`, `make typecheck`, `make pc` all work. Do NOT call `make_wt_setup` — it's sibling-only.
+     Idempotent, no escaping needed. Requires Windows Developer Mode. Fallback if Developer Mode unavailable: `make install` inside the worktree (independent `node_modules`). After either step `pnpm exec nx`, `make typecheck`, `make pc` all work. Do NOT call `make_wt_setup` — it's sibling-only.
    - **Sibling flow**: `make_wt_setup(worktreePath: "$wt")`. Shell fallback: `make wt-setup WT=$wt`.
 4. **Implement**: Before writing any code, re-read the **full ticket description** from the `jira_view` response (not just the summary). Confirm you are implementing against the Acceptance Criteria — if you cannot cite at least one AC from the description, stop and return to Step 1c. Then investigate the codebase and write code + tests.
    - **Bug tickets**: follow the [bug verification workflow](../debugging/SKILL.md#verification-by-bug-type) — reproduce the bug **before** writing any fix, then verify the fix resolves the reported behavior **after**. Include before/after evidence in the PR body under a `## Verification` section (appended after the standard template). `make pc` passing is necessary but not sufficient for bugs. The `## Verification` section is not part of the standard PR template -- add it manually for bug-fix PRs.
@@ -335,7 +335,7 @@ The skill is responsible for shepherding the PR all the way to "merged" (step 8 
 
       Setup:
       1. git fetch origin main
-      2. worktree_setup_node_modules()
+      2. node scripts/setup-worktree-node-modules.mjs
       3. Skip jira_transition — the orchestrator already claimed this ticket.
 
       Work:

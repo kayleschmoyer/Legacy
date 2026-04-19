@@ -52,7 +52,7 @@ From the worktree, just run:
 make install
 ```
 
-`scripts/pnpm-install-lock.ps1` detects that the target of the worktree's `node_modules` symlink is unhealthy (missing one of `.bin/{tsx,nx}`), drops the symlink itself, and then falls through to a private `pnpm install --frozen-lockfile`. The worktree ends up with its own `node_modules` and is **detached** from the shared directory until the next `worktree_setup_node_modules` / `make wt-setup`.
+`scripts/pnpm-install-lock.ps1` detects that the target of the worktree's `node_modules` symlink is unhealthy (missing one of `.bin/{tsx,nx}`), drops the symlink itself, and then falls through to a private `pnpm install --frozen-lockfile`. The worktree ends up with its own `node_modules` and is **detached** from the shared directory until the next `node scripts/setup-worktree-node-modules.mjs` / `make wt-setup`.
 
 If the symlink target is already healthy, `make install` inside the worktree is a fast no-op — it logs `[ok] node_modules is a healthy symlink` and exits 0 without reinstalling.
 

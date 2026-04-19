@@ -40,8 +40,8 @@ if [ ! -f "$TSX" ] && [ ! -L "$TSX" ]; then
     WIN_WT=$(echo "$WORKTREE" | sed 's|/d/|D:\\|; s|/|\\|g' 2>/dev/null || echo "$WORKTREE")
     WIN_MAIN=$(echo "$MAIN_REPO" | sed 's|/d/|D:\\|; s|/|\\|g' 2>/dev/null || echo "$MAIN_REPO")
     WARNINGS+=("  Cause:  node_modules symlink is absent or broken in worktree.")
-    WARNINGS+=("  Fix A:  call worktree_setup_node_modules() (if MCP worktree server is connected)")
-    WARNINGS+=("  Fix B:  from your terminal → cd \"$WIN_WT\" && cmd /c \"mklink /D node_modules \\\"$WIN_MAIN\\node_modules\\\"\"")
+    WARNINGS+=("  Fix A:  from your terminal → cd \"$WIN_WT\" && node scripts/setup-worktree-node-modules.mjs")
+    WARNINGS+=("  Fix B:  from your terminal → cd \"$WIN_WT\" && make install  (independent node_modules, no Developer Mode needed)")
   else
     WARNINGS+=("  Fix:    run 'make install' in the project root, then restart the session.")
   fi

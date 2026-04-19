@@ -37,7 +37,6 @@
       "mcp__worktree__worktree_stabilize",
       "mcp__worktree__worktree_status",
       "mcp__worktree__worktree_rename_branch",
-      "mcp__worktree__worktree_setup_node_modules",
       "mcp__worktree__worktree_unlink",
       "mcp__worktree__worktree_unlock",
       "mcp__worktree__worktree_unstage"

@@ -69,5 +69,5 @@ This gives the worktree its own independent `node_modules`. The worktree will no
 
 ### What NOT to Do
 
-- **Never** create a Windows junction or symlink to the main repo's `node_modules` manually (e.g., `mklink /J`, `New-Item -ItemType Junction`, `New-Item -ItemType SymbolicLink`). Only `worktree_setup_node_modules()` (native flow) or `make_wt_setup` (sibling flow) should create the symlink — they handle `.modules.yaml` path consistency.
+- **Never** create a Windows junction or symlink to the main repo's `node_modules` manually using `New-Item -ItemType Junction`, `New-Item -ItemType SymbolicLink`, or raw `mklink /J`. Use `node scripts/setup-worktree-node-modules.mjs` (native flow) or `make_wt_setup` (sibling flow) to create the symlink — they handle `.modules.yaml` path consistency and junction detection.
 - **Never** run `pnpm install` directly — always use `make install`, which includes the correct flags and lockfile handling.

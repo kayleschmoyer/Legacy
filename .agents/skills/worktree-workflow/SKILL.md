@@ -35,12 +35,14 @@ The Claude Code session was spawned with the launcher `worktree` checkbox checke
 7. **Symlink `node_modules` from the main repo** (REQUIRED before any pnpm/make command — LS-2903/LS-3003):
 
    ```
-   worktree_setup_node_modules()
+   node scripts/setup-worktree-node-modules.mjs
    ```
 
-   Uses Node.js path APIs internally — no shell escaping needed. Idempotent (safe to call if symlink already exists). **Never** use `mklink`, `New-Item -ItemType SymbolicLink`, `New-Item -ItemType Junction`, or any other manual symlink/junction command — they bypass `.modules.yaml` path consistency checks and cause Nx graph failures. If `worktree_setup_node_modules` is unavailable (e.g., MCP server not yet connected at session start), run `make install` inside the worktree instead — this creates an independent `node_modules` and is always safe.
+   Run from the worktree root. Uses Node.js `fs` APIs internally — no shell escaping needed. Idempotent (safe to call if symlink already exists). Requires Windows Developer Mode for directory symlinks. **Never** use `New-Item -ItemType SymbolicLink`, `New-Item -ItemType Junction`, or raw `mklink /J` — they bypass `.modules.yaml` path consistency checks and cause Nx graph failures.
 
-   > **Verify after setup — main repo `node_modules` may be empty**: The symlink target (`D:\code\legacy-sports\node_modules`) may contain **0 packages** if the last `make install` ran inside a sibling worktree rather than the main repo — the symlink resolves without error but all tools (`nx`, `prettier`, etc.) are missing. After calling `worktree_setup_node_modules()`, confirm the install is populated:
+   If Windows Developer Mode is not available, use `make install` inside the worktree instead — this creates an independent `node_modules` and is always safe.
+
+   > **Verify after setup — main repo `node_modules` may be empty**: The symlink target (`D:\code\legacy-sports\node_modules`) may contain **0 packages** if the last `make install` ran inside a sibling worktree rather than the main repo — the symlink resolves without error but all tools (`nx`, `prettier`, etc.) are missing. After running the script, confirm the install is populated:
    >
    > ```
    > test -d node_modules/nx && echo ok || echo EMPTY
@@ -64,8 +66,8 @@ The Claude Code session was spawned with the launcher `worktree` checkbox checke
    > **Broken, empty, or missing `node_modules` recovery**: if the symlink is broken, missing, pointing to the wrong location, **or the target resolved but contains 0 packages** (empty main-repo `node_modules`):
    >
    > 1. If `node_modules` exists as a broken symlink or points to the wrong location, remove it with `powershell -NoProfile -Command "Remove-Item -Path node_modules -Force"`. If `node_modules` is already missing, skip this step.
-   > 2. Run `make install` from the worktree — this creates an independent `node_modules`
-   > 3. **Never** recreate the symlink manually — `mklink /J`, `mklink /D`, `New-Item -ItemType Junction`, `New-Item -ItemType SymbolicLink`, and all other manual symlink/junction commands are forbidden. They bypass `.modules.yaml` path consistency checks and cause Nx graph failures. Only `worktree_setup_node_modules()` (native flow) or `make_wt_setup` (sibling flow) should recreate the symlink — they handle all edge cases. If MCP is unavailable, `make install` inside the worktree creates an independent `node_modules`.
+   > 2. Run `node scripts/setup-worktree-node-modules.mjs` to recreate the symlink, **or** run `make install` for an independent `node_modules`
+   > 3. **Never** recreate the symlink with `mklink /J`, `mklink /D`, `New-Item -ItemType Junction`, `New-Item -ItemType SymbolicLink`, or any other manual command — they bypass `.modules.yaml` path consistency checks and cause Nx graph failures.
    >
    > See also [workflow-recovery-procedures.md](references/shared/workflow-recovery-procedures.md).
 
@@ -84,7 +86,7 @@ The Claude Code session was spawned with the launcher `worktree` checkbox checke
 - **`make_wt_setup` is NOT used** — it's sibling-only. The symlink command above replaces it.
 - **`worktree_list` / `make_worktree_create` are NOT used** — you're already in a worktree, Claude Code created it for you.
 - **On exit**, `ExitWorktree(action: "remove")` cleans up the ephemeral worktree. Only call this when explicitly done — the worktree can survive across sessions if kept.
-- **All 9 MCP servers** should connect in every session (`MCP_TIMEOUT=10000` in `.claude/settings.json` ensures startup headroom). If a server is unexpectedly missing or timing out, **first verify the `node_modules` symlink exists** — all MCP servers use `pnpm exec tsx` and will time out immediately if the symlink is absent. If this is happening at startup and the worktree MCP server is unavailable, run `make install` inside the worktree to create an independent `node_modules`, then restart the session. If MCP is already available, run `worktree_setup_node_modules()` to repair it in-session. **Never** use `mklink`, `New-Item -ItemType SymbolicLink`, `New-Item -ItemType Junction`, or any other manual symlink/junction command — only `worktree_setup_node_modules()` handles all edge cases correctly. The `SessionStart` hook attempts this automatically but may not fire in all session types (e.g., Copilot CLI).
+- **All 9 MCP servers** should connect in every session (`MCP_TIMEOUT=10000` in `.claude/settings.json` ensures startup headroom). If a server is unexpectedly missing or timing out, **first verify the `node_modules` symlink exists** — all MCP servers use `pnpm exec tsx` and will time out immediately if the symlink is absent. Run `node scripts/setup-worktree-node-modules.mjs` (from the worktree root) to recreate the symlink, then restart the session. If Windows Developer Mode is unavailable, run `make install` inside the worktree instead. **Never** use `New-Item -ItemType SymbolicLink`, `New-Item -ItemType Junction`, or raw `mklink /J` — they bypass path consistency checks. The `SessionStart` hook attempts this automatically but may not fire in all session types (e.g., Copilot CLI).
 
 ## Subagent Dispatch (multi-ticket orchestrators)
 
@@ -109,7 +111,7 @@ for each ticket/PR needing code work:
       Setup (REQUIRED before any pnpm/make command):
       1. git fetch origin <branch-or-main>
       2. git checkout <existing-branch>  (for PRs)  OR  stay on the ephemeral branch (for new tickets)
-      3. worktree_setup_node_modules()   # or `make install` if MCP unavailable — NEVER use mklink or New-Item symlink/junction commands
+      3. node scripts/setup-worktree-node-modules.mjs   # or `make install` if Developer Mode unavailable — NEVER use mklink /J or New-Item junction commands
       4. <do NOT rename branch — Jira links via PR title + commits containing LS-####>
       5. If you need to install new packages: powershell -NoProfile -Command "Remove-Item -Path node_modules -Force" first, then pnpm add -w <pkg>, then make install
 
@@ -148,7 +150,7 @@ original_branch = git branch --show-current
 for each target:
   git fetch origin <branch>
   git checkout <branch>
-  worktree_setup_node_modules()  # idempotent — skips if symlink already correct
+  node scripts/setup-worktree-node-modules.mjs   # idempotent — skips if symlink already correct
   # ... do work, commit, push ...
   # (must commit+push before switching — dirty working tree blocks checkout)
 git checkout $original_branch

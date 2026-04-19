@@ -209,7 +209,7 @@ if (Test-Path $nmPath) {
         Write-Host ""
         Write-Host "  Removing the symlink and installing a private node_modules for" -ForegroundColor Cyan
         Write-Host "  this worktree. After this, the worktree is DETACHED from main's" -ForegroundColor Cyan
-        Write-Host "  shared deps (you can re-symlink later via worktree_setup_node_modules)." -ForegroundColor Cyan
+        Write-Host "  shared deps (re-symlink later: node scripts/setup-worktree-node-modules.mjs)." -ForegroundColor Cyan
         Write-Host "  To opt out of this auto-recovery, pass -KeepSymlink or set KEEP_SYMLINK=1." -ForegroundColor DarkGray
         Write-Host ""
 

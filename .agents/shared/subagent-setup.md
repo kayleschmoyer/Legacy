@@ -7,7 +7,7 @@ Setup (REQUIRED before any pnpm/make command):
 1. git fetch origin <branch>                                      # get the target branch
 2. git checkout <branch>                                          # switch to it (for existing PRs)
    OR: (for new tickets) keep local branch name as-is, push normally — Jira links via PR title + commits containing LS-####
-3. worktree_setup_node_modules()                                  # symlink node_modules (fallback from worktree root: cmd /c "mklink /D node_modules D:\code\legacy-sports\node_modules")
+3. node scripts/setup-worktree-node-modules.mjs                   # symlink node_modules (fallback: make install for independent node_modules)
 
 Tool preferences:
 - Use worktree_commit/worktree_push for commits and pushes

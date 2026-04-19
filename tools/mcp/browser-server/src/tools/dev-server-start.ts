@@ -112,7 +112,7 @@ export async function devServerStart(
             ok: false,
             error: `nx binary not found at ${nxBin}. The worktree's node_modules may not be set up.`,
             remedy:
-              'Run worktree_setup_node_modules() or `make install` inside the worktree to restore node_modules, then retry.',
+              'Run `node scripts/setup-worktree-node-modules.mjs` or `make install` inside the worktree to restore node_modules, then retry.',
           }),
         },
       ],
@@ -203,8 +203,8 @@ export async function devServerStart(
             ok: false,
             error: `Failed to start dev server: ${message}`,
             remedy: isTimeout
-              ? 'The server did not start in time. Check that node_modules/.bin/nx exists in the worktree (run worktree_setup_node_modules or `make install` if missing). Run `make kill-stale` to clear stale processes, then retry with a larger timeoutMs (e.g. 180000).'
-              : 'Check that the worktree has node_modules installed (worktree_setup_node_modules or `make install`) and that the port is not in use.',
+              ? 'The server did not start in time. Check that node_modules/.bin/nx exists in the worktree (run `node scripts/setup-worktree-node-modules.mjs` or `make install` if missing). Run `make kill-stale` to clear stale processes, then retry with a larger timeoutMs (e.g. 180000).'
+              : 'Check that the worktree has node_modules installed (`node scripts/setup-worktree-node-modules.mjs` or `make install`) and that the port is not in use.',
           }),
         },
       ],

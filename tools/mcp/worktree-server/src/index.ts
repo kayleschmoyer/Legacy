@@ -800,7 +800,7 @@ function restoreNodeModulesSymlink(cwd: string, log: string[]): void {
       const msg = e instanceof Error ? e.message : String(e);
       log.push(
         `(warning: node_modules symlink ${reason} but could not be restored: ${msg})`,
-        '(run worktree_setup_node_modules to restore it manually)',
+        '(run `node scripts/setup-worktree-node-modules.mjs` from the worktree root to restore it manually)',
       );
     }
   };
@@ -1579,32 +1579,6 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
       },
     },
     {
-      name: 'worktree_setup_node_modules',
-      description:
-        "Create a node_modules symlink from the worktree to the main repo's " +
-        'node_modules. Required in native ephemeral worktrees before running ' +
-        'pnpm/make commands. Sibling worktrees use make_wt_setup instead. ' +
-        'Idempotent — skips creation if a valid symlink already ' +
-        'exists. Uses directory symlink (mklink /D) to prevent cascade deletion ' +
-        'when Claude Code archives the worktree.',
-      inputSchema: {
-        type: 'object' as const,
-        properties: {
-          worktree: {
-            type: 'string',
-            description:
-              'Ticket key, absolute path, or omit for active worktree.',
-          },
-          mainRepoPath: {
-            type: 'string',
-            description:
-              'Path to the main repo root (parent of node_modules). ' +
-              'Defaults to the detected main repo.',
-          },
-        },
-      },
-    },
-    {
       name: 'worktree_install_recover',
       description:
         'Recover from a broken pnpm installation in a worktree that has an independent ' +
@@ -1614,7 +1588,7 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
         '(3) retry pnpm install up to 3 times, removing EPERM/ENOTEMPTY/EBUSY offenders on each failure, ' +
         '(4) if still failing, escalate to pnpm install --force. ' +
         'Returns structured result with attempts made, paths cleaned, and final node_modules state. ' +
-        'Do NOT use on symlinked node_modules — use worktree_setup_node_modules() instead.',
+        'Do NOT use on symlinked node_modules — run `node scripts/setup-worktree-node-modules.mjs` to recreate the symlink instead.',
       inputSchema: {
         type: 'object' as const,
         properties: {
@@ -5245,7 +5219,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 type: 'text',
                 text:
                   `node_modules symlink is broken in ${targetDir} — the symlink entry exists but its target is missing.\n` +
-                  'Call worktree_setup_node_modules() to repair it, then retry.',
+                  'Run `node scripts/setup-worktree-node-modules.mjs` from the worktree root to repair it, then retry.',
               },
             ],
             isError: true,
@@ -5327,7 +5301,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                   text:
                     `[cwd: ${targetDir}]\n$ ${command}\n\n` +
                     `node_modules is missing or broken in ${targetDir}.\n` +
-                    'Call worktree_setup_node_modules() to repair it, then retry.',
+                    'Run `node scripts/setup-worktree-node-modules.mjs` from the worktree root to repair it, then retry.',
                 },
               ],
               isError: true,
@@ -6189,7 +6163,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     success: false,
                     message:
                       'node_modules is a symlink to the main repo. ' +
-                      'Use worktree_setup_node_modules() to verify or repair it.',
+                      'Run `node scripts/setup-worktree-node-modules.mjs` from the worktree root to verify or repair it.',
                   },
                   null,
                   2,
@@ -6341,367 +6315,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
         isError: !installSuccess,
       };
-    }
-
-    // -----------------------------------------------------------------------
-    // worktree_setup_node_modules
-    // -----------------------------------------------------------------------
-    case 'worktree_setup_node_modules': {
-      const { worktree: wtKey, mainRepoPath: customMainRepo } = args as {
-        worktree?: string;
-        mainRepoPath?: string;
-      };
-
-      const target = resolveTargetDir(wtKey);
-      if ('error' in target) {
-        return {
-          content: [{ type: 'text', text: target.error }],
-          isError: true,
-        };
-      }
-
-      const cwd = target.path;
-      const nmPath = join(cwd, 'node_modules');
-      const mainRepo = customMainRepo ?? MAIN_REPO;
-      const mainNmPath = join(mainRepo, 'node_modules');
-
-      try {
-        // Verify the main repo's node_modules exists
-        if (!existsSync(mainNmPath)) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: JSON.stringify(
-                  {
-                    success: false,
-                    message: `Main repo node_modules not found at ${mainNmPath}. Run 'make install' in the main repo first.`,
-                  },
-                  null,
-                  2,
-                ),
-              },
-            ],
-            isError: true,
-          };
-        }
-
-        /**
-         * Normalize a path for symlink-target comparison on Windows.
-         * realpathSync may return paths with different casing or a \\?\ prefix;
-         * toLowerCase + prefix stripping ensures consistent comparison.
-         */
-        const normalizeForCompare = (p: string): string => {
-          let normalized = p;
-          try {
-            normalized = realpathSync(normalized);
-          } catch {
-            normalized = resolve(normalized);
-          }
-          if (process.platform === 'win32') {
-            if (normalized.startsWith('\\\\?\\')) {
-              normalized = normalized.slice(4);
-            }
-            normalized = normalized.toLowerCase();
-          }
-          return normalized;
-        };
-
-        // Track whether we're converting a junction (used in success response)
-        let isJunction = false;
-
-        // Check if node_modules already exists
-        if (existsSync(nmPath)) {
-          const stat = lstatSync(nmPath);
-          if (stat.isSymbolicLink()) {
-            // Already a reparse point — but on Windows lstatSync().isSymbolicLink()
-            // returns true for BOTH directory symlinks and NTFS junctions. Junctions
-            // are dangerous: recursive-delete tools follow them and destroy the
-            // target. Detect and convert junctions automatically (LS-3084).
-            const winLinkType = getWindowsLinkType(nmPath);
-            isJunction = winLinkType === 'Junction';
-
-            let currentTarget: string;
-            try {
-              currentTarget = realpathSync(nmPath);
-            } catch {
-              currentTarget = readlinkSync(nmPath);
-            }
-
-            if (
-              !isJunction &&
-              normalizeForCompare(currentTarget) ===
-                normalizeForCompare(mainNmPath)
-            ) {
-              // Correct directory symlink already exists — verify it's healthy
-              const binDir = join(nmPath, '.bin');
-              let binPopulated = false;
-              try {
-                binPopulated = readdirSync(binDir).length > 0;
-              } catch {
-                /* .bin doesn't exist */
-              }
-              const verified = existsSync(join(nmPath, 'nx')) && binPopulated;
-
-              if (verified) {
-                // Confirm that binaries are accessible through the symlink from a
-                // fresh subprocess — testing the container path alone (LS-3580) is
-                // not sufficient: a Windows SymbolicLink can appear as a valid
-                // container while pnpm cannot resolve binaries through it (LS-3689).
-                // Test .bin/tsx specifically because that is the binary the MCP
-                // stdio servers require and what the startup hook checks.
-                let alreadyExistsTestPath = false;
-                if (process.platform === 'win32') {
-                  try {
-                    const tsxBin = join(nmPath, '.bin', 'tsx');
-                    const testOut = execFileSync(
-                      'powershell',
-                      [
-                        '-NoProfile',
-                        '-NonInteractive',
-                        '-Command',
-                        `Test-Path -LiteralPath '${tsxBin.replace(/'/g, "''")}' -PathType Leaf`,
-                      ],
-                      { encoding: 'utf-8', timeout: 10_000 },
-                    ).trim();
-                    alreadyExistsTestPath = testOut === 'True';
-                  } catch {
-                    alreadyExistsTestPath = false;
-                  }
-                } else {
-                  alreadyExistsTestPath = true; // non-Windows: rely on existsSync
-                }
-
-                if (alreadyExistsTestPath) {
-                  return {
-                    content: [
-                      {
-                        type: 'text',
-                        text: JSON.stringify(
-                          {
-                            success: true,
-                            created: false,
-                            alreadyExists: true,
-                            linkType: winLinkType ?? 'symlink',
-                            symlinkPath: nmPath,
-                            target: mainNmPath,
-                            verified,
-                            message:
-                              'node_modules symlink already exists and points to the correct target.',
-                          },
-                          null,
-                          2,
-                        ),
-                      },
-                    ],
-                  };
-                }
-                // Symlink exists per lstat but .bin/tsx is not accessible from a
-                // fresh process — stale symlink; fall through to remove and recreate.
-              }
-              // Symlink exists but .bin is empty, nx is missing, or not accessible — remove and recreate
-            }
-            // Remove link (junction, wrong target, or unhealthy) and recreate.
-            // If junction, log the conversion.
-            if (isJunction) {
-              // Use cmd rmdir for safe junction removal (non-recursive)
-              if (process.platform === 'win32') {
-                execFileSync('cmd', ['/c', 'rmdir', nmPath], {
-                  encoding: 'utf-8',
-                  timeout: 10_000,
-                });
-              } else {
-                rmSync(nmPath, { recursive: false });
-              }
-            } else {
-              rmSync(nmPath, { recursive: false });
-            }
-          } else if (stat.isDirectory()) {
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: JSON.stringify(
-                    {
-                      success: false,
-                      message:
-                        'node_modules is already a real directory (not a symlink). ' +
-                        'Delete it manually first if you want to replace it with a symlink.',
-                    },
-                    null,
-                    2,
-                  ),
-                },
-              ],
-              isError: true,
-            };
-          } else {
-            // Regular file or other unexpected type
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: JSON.stringify(
-                    {
-                      success: false,
-                      message:
-                        `node_modules exists but is not a symlink or directory (type: ${stat.mode.toString(8)}). ` +
-                        'Delete it manually before creating a symlink.',
-                    },
-                    null,
-                    2,
-                  ),
-                },
-              ],
-              isError: true,
-            };
-          }
-        }
-
-        // Create a directory symlink using Node.js path APIs.
-        // Symlinks are NOT followed by recursive-delete tools (PowerShell
-        // Remove-Item, Node.js fs.rmSync, git worktree remove), so Claude
-        // Code's archive can safely delete the worktree without destroying
-        // the main repo's node_modules through the link.
-        // Requires Windows Developer Mode (one-time system setting).
-        if (process.platform === 'win32') {
-          // Windows: use execFileSync with structured args array to avoid all
-          // shell escaping issues. Paths are passed as separate argv elements —
-          // no quoting, no backslash doubling, no mangling.
-          // mklink /D = directory symlink (safe, not followed by recursive-delete)
-          execFileSync('cmd', ['/c', 'mklink', '/D', nmPath, mainNmPath], {
-            encoding: 'utf-8',
-            timeout: 15_000,
-          });
-
-          // Verify the symlink is actually accessible from a fresh subprocess.
-          // Node.js existsSync() runs in the same process context and has
-          // produced false positives (LS-3580): mklink exits 0 but the path
-          // is not accessible to the calling shell or other processes.
-          // A separate PowerShell Test-Path call reflects the true file-system
-          // state independently of the MCP server process.
-          let testPathResult = false;
-          let testPathErr: string | undefined;
-          try {
-            const testOut = execFileSync(
-              'powershell',
-              [
-                '-NoProfile',
-                '-NonInteractive',
-                '-Command',
-                `Test-Path -LiteralPath '${nmPath.replace(/'/g, "''")}' -PathType Container`,
-              ],
-              { encoding: 'utf-8', timeout: 10_000 },
-            ).trim();
-            testPathResult = testOut === 'True';
-          } catch (psErr) {
-            const e = psErr as {
-              message?: string;
-              stdout?: string;
-              stderr?: string;
-            };
-            testPathErr = e.message ?? String(psErr);
-            testPathResult = false;
-          }
-
-          if (!testPathResult) {
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: JSON.stringify(
-                    {
-                      success: false,
-                      message: testPathErr
-                        ? 'node_modules symlink creation could not be verified: PowerShell Test-Path ' +
-                          `subprocess failed (${testPathErr}). The symlink may or may not exist. ` +
-                          `Check manually: powershell Test-Path -LiteralPath "${nmPath}"`
-                        : 'node_modules symlink creation reported success but the path is ' +
-                          'not accessible after mklink (false-positive exit code). ' +
-                          'Directory symlinks require Windows Developer Mode. ' +
-                          'Enable it: Settings > System > For Developers > Developer Mode. ' +
-                          `Fallback: powershell -File scripts/mklink-symlink.ps1 -Link "${nmPath}" -Target "${mainNmPath}"`,
-                      symlinkPath: nmPath,
-                      target: mainNmPath,
-                      ...(testPathErr ? { testPathError: testPathErr } : {}),
-                    },
-                    null,
-                    2,
-                  ),
-                },
-              ],
-              isError: true,
-            };
-          }
-        } else {
-          symlinkSync(mainNmPath, nmPath);
-        }
-
-        const createdBinDir = join(nmPath, '.bin');
-        let createdBinPopulated = false;
-        try {
-          createdBinPopulated = readdirSync(createdBinDir).length > 0;
-        } catch {
-          /* .bin doesn't exist */
-        }
-        const nxExists = existsSync(join(nmPath, 'nx'));
-        const verified = nxExists && createdBinPopulated;
-        // Verify link type post-creation (LS-3084)
-        const createdLinkType = getWindowsLinkType(nmPath);
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(
-                {
-                  success: true,
-                  created: true,
-                  linkType: createdLinkType ?? 'symlink',
-                  ...(isJunction ? { convertedFromJunction: true } : {}),
-                  symlinkPath: nmPath,
-                  target: mainNmPath,
-                  verified,
-                  message: verified
-                    ? `node_modules ${isJunction ? 'junction converted to ' : ''}symlink created and verified. Ready to run pnpm/make commands.`
-                    : !nxExists
-                      ? 'Symlink created but nx not found — verify main repo node_modules is populated.'
-                      : 'Symlink created but .bin is empty — main repo node_modules may be incomplete. Run make install in the main repo.',
-                },
-                null,
-                2,
-              ),
-            },
-          ],
-        };
-      } catch (err: unknown) {
-        const e = err as { message?: string; stdout?: string; stderr?: string };
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(
-                {
-                  success: false,
-                  message:
-                    `Failed to create node_modules symlink: ${e.message ?? String(err)}` +
-                    (String(e.message ?? e.stderr ?? '').match(
-                      /privilege|EPERM|1314/i,
-                    )
-                      ? '\n\nHint: Directory symlinks require Windows Developer Mode. ' +
-                        'Enable it: Settings > System > For Developers > Developer Mode'
-                      : ''),
-                  ...(e.stdout ? { stdout: e.stdout } : {}),
-                  ...(e.stderr ? { stderr: e.stderr } : {}),
-                },
-                null,
-                2,
-              ),
-            },
-          ],
-          isError: true,
-        };
-      }
     }
 
     // -----------------------------------------------------------------------
@@ -9375,7 +8988,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     `Worktree is now active — run worktree_set({ key: "${branch}" }) to re-activate after server restart`,
                     setup
                       ? 'Setup complete'
-                      : 'Symlink node_modules if needed: worktree_setup_node_modules()',
+                      : 'Symlink node_modules if needed: `node scripts/setup-worktree-node-modules.mjs`',
                   ],
                 },
                 null,
