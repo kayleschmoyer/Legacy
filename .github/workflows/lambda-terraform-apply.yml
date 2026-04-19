@@ -227,6 +227,17 @@ jobs:
             -target=aws_iam_role_policy_attachment.github_actions_supplemental
           echo "✅ IAM bootstrap complete"
 
+      - name: Wait for IAM Propagation
+        # IAM inline policy changes propagate eventually — not instantly. The bootstrap
+        # step above may complete and hand off to plan within milliseconds, before the
+        # new policy has replicated across all AWS IAM servers globally. A short sleep
+        # gives IAM enough time to converge so the plan step runs with current permissions.
+        # LS-3708
+        run: |
+          echo "⏳ Waiting 15s for IAM policy changes to propagate..."
+          sleep 15
+          echo "✅ IAM propagation wait complete"
+
       - name: Plan Infrastructure Changes
         id: plan
         working-directory: terraform/main
