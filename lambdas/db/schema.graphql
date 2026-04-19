@@ -1931,6 +1931,28 @@ type Mutation {
   Trigger stat loading for a baseball player if stats have not been fetched yet. Returns true if loading was triggered, false if stats already exist.
   """
   triggerSeasonDraftStatLoading(playerId: Int!): Boolean
+
+  """
+  Abandon an active game — returns final game state
+  """
+  twentyQuestionsAbandon(gameId: String!): TwentyQuestionsGame
+
+  """
+  Ask a yes/no question — returns updated game state
+  """
+  twentyQuestionsAsk(input: TwentyQuestionsAskInput!): TwentyQuestionsGame
+
+  """
+  Guess the player identity — returns updated game state (with targetPlayer if won/lost)
+  """
+  twentyQuestionsGuess(gameId: String!, playerId: Int!): TwentyQuestionsGame
+
+  """
+  Start a new 20 Questions game (errors if an active game exists)
+  """
+  twentyQuestionsStart(
+    difficulty: TwentyQuestionsDifficulty = medium
+  ): TwentyQuestionsGame
   undoLastDraftPick(draftId: Int!): DraftPick
 
   """
@@ -2811,6 +2833,19 @@ type Query {
   teamMembers(teamId: Int!): [TeamMember!]
   teamTradeOffers(status: String, teamId: Int!): [TradeOffer!]
   teamWaiverClaims(status: String, teamId: Int!): [WaiverClaim!]
+
+  """
+  Return the caller's current active game, or null if none
+  """
+  twentyQuestionsActiveGame: TwentyQuestionsGame
+
+  """
+  Paginated history of the caller's past games
+  """
+  twentyQuestionsHistory(
+    limit: Int = 10
+    offset: Int = 0
+  ): [TwentyQuestionsGame!]
   user(id: Int!): User
 
   """
@@ -3545,6 +3580,76 @@ type TradeOfferPlayer {
   playerName: String
   playerPosition: String
   tradeOfferId: Int
+}
+
+input TwentyQuestionsAskInput {
+  category: TwentyQuestionsCategory!
+  gameId: String!
+
+  """
+  JSON-encoded question parameters
+  """
+  parameter: String!
+}
+
+enum TwentyQuestionsCategory {
+  active_status
+  batting_hand
+  era
+  hall_of_fame
+  position
+  stat_threshold
+  team
+  throwing_hand
+}
+
+enum TwentyQuestionsDifficulty {
+  easy
+  hard
+  medium
+}
+
+"""
+State of a 20 Questions game session
+"""
+type TwentyQuestionsGame {
+  completedAt: String
+  difficulty: TwentyQuestionsDifficulty
+  id: String
+  maxQuestions: Int
+  questions: [TwentyQuestionsQuestion!]
+  questionsUsed: Int
+  startedAt: String
+  status: TwentyQuestionsStatus
+
+  """
+  Revealed only when status is won or lost
+  """
+  targetPlayer: Player
+  tokensEarned: Int
+}
+
+"""
+A single yes/no question asked during a 20 Questions game
+"""
+type TwentyQuestionsQuestion {
+  answer: Boolean
+  category: TwentyQuestionsCategory
+  guessPlayer: Player
+  isGuess: Boolean
+
+  """
+  JSON-encoded question parameters (e.g. position, team, decade)
+  """
+  parameter: String
+  questionNumber: Int
+}
+
+enum TwentyQuestionsStatus {
+  abandoned
+  active
+  lost
+  won
 }
 
 input UpdateCommissionerNoteInput {
