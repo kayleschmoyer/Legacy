@@ -282,11 +282,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                     variant={
                       formData.maxRosterSize === size ? 'active' : 'outlined'
                     }
-                    onPress={(e: any) => {
-                      e?.preventDefault?.();
-                      e?.stopPropagation?.();
-                      handleInputChange('maxRosterSize', size);
-                    }}
+                    onPress={() => handleInputChange('maxRosterSize', size)}
                     disabled={loading}
                     minWidth="$5"
                     backgroundColor={
@@ -346,11 +342,9 @@ export function LeagueCreatePage(): React.JSX.Element {
                         ? 'active'
                         : 'outlined'
                     }
-                    onPress={(e: any) => {
-                      e?.preventDefault?.();
-                      e?.stopPropagation?.();
-                      handleInputChange('playerPool', option.value);
-                    }}
+                    onPress={() =>
+                      handleInputChange('playerPool', option.value)
+                    }
                     disabled={loading}
                     flex={1}
                     backgroundColor={
@@ -408,11 +402,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                         ? 'active'
                         : 'outlined'
                     }
-                    onPress={(e: any) => {
-                      e?.preventDefault?.();
-                      e?.stopPropagation?.();
-                      handleInputChange('draftMode', option.value);
-                    }}
+                    onPress={() => handleInputChange('draftMode', option.value)}
                     disabled={loading}
                     flex={1}
                     backgroundColor={
@@ -470,11 +460,9 @@ export function LeagueCreatePage(): React.JSX.Element {
                         ? 'active'
                         : 'outlined'
                     }
-                    onPress={(e: any) => {
-                      e?.preventDefault?.();
-                      e?.stopPropagation?.();
-                      handleInputChange('selectionMethod', option.value);
-                    }}
+                    onPress={() =>
+                      handleInputChange('selectionMethod', option.value)
+                    }
                     disabled={loading}
                     flex={1}
                     backgroundColor={
@@ -538,11 +526,9 @@ export function LeagueCreatePage(): React.JSX.Element {
                         ? 'active'
                         : 'outlined'
                     }
-                    onPress={(e: any) => {
-                      e?.preventDefault?.();
-                      e?.stopPropagation?.();
-                      handleInputChange('draftOrder', option.value);
-                    }}
+                    onPress={() =>
+                      handleInputChange('draftOrder', option.value)
+                    }
                     disabled={loading}
                     flex={1}
                     backgroundColor={
