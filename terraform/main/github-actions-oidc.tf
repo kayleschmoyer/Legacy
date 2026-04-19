@@ -212,10 +212,17 @@ resource "aws_iam_role_policy" "github_actions_additional" {
       # are no longer needed here as of LS-2425. State separation moved module.github_runners
       # into terraform/runners/ which has its own state file, so the regular Apply Lambda
       # Infrastructure workflow no longer refreshes runner resources.
+      #
+      # logs:DescribeLogGroups does not support resource-level permissions — it must use Resource "*".
+      # Splitting it into its own statement avoids AccessDeniedException during terraform plan/refresh.
+      {
+        Effect   = "Allow"
+        Action   = ["logs:DescribeLogGroups"]
+        Resource = "*"
+      },
       {
         Effect = "Allow"
         Action = [
-          "logs:DescribeLogGroups",
           "logs:DescribeLogStreams",
           "logs:ListTagsLogGroup",
           "logs:ListTagsForResource"
@@ -962,11 +969,17 @@ resource "aws_iam_role_policy" "github_actions_plan_policy" {
       # are no longer needed here as of LS-2425. State separation moved module.github_runners
       # into terraform/runners/ which has its own state file, so the regular Apply Lambda
       # Infrastructure workflow no longer refreshes runner resources.
+      # logs:DescribeLogGroups does not support resource-level permissions — must use Resource "*".
+      {
+        Sid      = "CloudWatchLogsDescribe"
+        Effect   = "Allow"
+        Action   = ["logs:DescribeLogGroups"]
+        Resource = "*"
+      },
       {
         Sid    = "CloudWatchLogsRead"
         Effect = "Allow"
         Action = [
-          "logs:DescribeLogGroups",
           "logs:DescribeLogStreams",
           "logs:ListTagsLogGroup",
           "logs:ListTagsForResource"
