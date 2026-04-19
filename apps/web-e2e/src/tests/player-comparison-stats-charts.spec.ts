@@ -621,7 +621,8 @@ adminTest.describe(
     );
 
     adminTest('shows pitching stat rows (Wins, ERA)', async ({ page }) => {
-      await expect(page.getByText('Wins')).toBeVisible();
+      // exact: true avoids matching "Offensive Wins Above Replacement" tooltip
+      await expect(page.getByText('Wins', { exact: true })).toBeVisible();
       await expect(page.getByText('ERA').first()).toBeVisible();
     });
 
@@ -654,10 +655,12 @@ adminTest.describe(
     });
 
     adminTest(
-      'displays "▲ best" indicator for the leading stat',
+      'displays "BEST" indicator for the leading stat',
       async ({ page }) => {
-        // At least one "▲ best" should be visible in the comparison table
-        await expect(page.getByText('▲ best').first()).toBeVisible();
+        // At least one "BEST" badge should be visible in the comparison table
+        await expect(
+          page.getByText('BEST', { exact: true }).first(),
+        ).toBeVisible();
       },
     );
 
@@ -720,19 +723,19 @@ adminTest.describe(
 
     adminTest('shows Batting by Season table for Judge', async ({ page }) => {
       await expect(
-        page.getByText('Aaron Judge — Batting by Season'),
+        page.getByRole('table', { name: 'Season batting for Aaron Judge' }),
       ).toBeVisible();
     });
 
     adminTest('shows Batting by Season table for Ohtani', async ({ page }) => {
       await expect(
-        page.getByText('Shohei Ohtani — Batting by Season'),
+        page.getByRole('table', { name: 'Season batting for Shohei Ohtani' }),
       ).toBeVisible();
     });
 
     adminTest('shows Pitching by Season table for Ohtani', async ({ page }) => {
       await expect(
-        page.getByText('Shohei Ohtani — Pitching by Season'),
+        page.getByRole('table', { name: 'Season pitching for Shohei Ohtani' }),
       ).toBeVisible();
     });
 
@@ -740,7 +743,7 @@ adminTest.describe(
       'does NOT show Pitching by Season table for Judge (non-pitcher)',
       async ({ page }) => {
         await expect(
-          page.getByText('Aaron Judge — Pitching by Season'),
+          page.getByRole('table', { name: 'Season pitching for Aaron Judge' }),
         ).not.toBeVisible();
       },
     );
@@ -771,10 +774,10 @@ adminTest.describe(
     adminTest(
       'Ohtani season pitching table shows pitching headers',
       async ({ page }) => {
-        // Scope to the pitching section to avoid matching career pitching comparison
-        const pitchingSection = page
-          .getByText('Shohei Ohtani — Pitching by Season')
-          .locator('..');
+        // Scope to the pitching table to avoid matching career pitching comparison
+        const pitchingSection = page.getByRole('table', {
+          name: 'Season pitching for Shohei Ohtani',
+        });
 
         await expect(pitchingSection).toBeVisible();
         await expect(pitchingSection.getByText('ERA').first()).toBeVisible();

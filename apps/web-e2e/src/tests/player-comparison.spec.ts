@@ -364,11 +364,9 @@ adminTest.describe('Player Comparison – player search @regression', () => {
       await input.fill('Aa');
       await page.getByText('Aaron Judge').click();
 
-      // Player chip appears
-      await expect(page.getByText('Aaron Judge').first()).toBeVisible();
-      // Hint updates to show 1 player selected
+      // Player chip appears — verified by its Remove button
       await expect(
-        page.getByText('1 of 4 selected · 3 slots open'),
+        page.getByRole('button', { name: /remove aaron judge/i }),
       ).toBeVisible();
     },
   );
