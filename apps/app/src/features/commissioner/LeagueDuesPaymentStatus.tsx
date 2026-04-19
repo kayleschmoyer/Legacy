@@ -69,6 +69,10 @@ export function LeagueDuesPaymentStatus({
 
   const handleTogglePaid = useCallback(
     async (userId: number, currentlyPaid: boolean) => {
+      if (!userId) {
+        LOGGER.error('togglePaid called with missing userId', { userId });
+        return;
+      }
       setTogglingUserId(userId);
       try {
         if (currentlyPaid) {
@@ -268,7 +272,7 @@ export function LeagueDuesPaymentStatus({
                         member.paid ?? false,
                       )
                     }
-                    disabled={mutating}
+                    disabled={mutating || !member.userId}
                     opacity={mutating && !isToggling ? 0.5 : 1}
                     icon={
                       isToggling ? (
