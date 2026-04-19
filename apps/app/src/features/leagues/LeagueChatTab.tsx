@@ -10,23 +10,13 @@ import {
 import { Button, Spinner, Text, XStack, YStack } from 'tamagui';
 import { GifPicker } from '@legacy-sports/shared-components';
 import { useLeagueChat } from './hooks/useLeagueChat';
+import { formatTime } from './formatTime';
 import type { LegacySportsJwt } from '../../common/auth/AuthHooks';
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-function formatTime(isoString: string): string {
-  const normalized =
-    isoString.includes('Z') || isoString.includes('+')
-      ? isoString
-      : isoString.replace(' ', 'T') + 'Z';
-  const date = new Date(normalized);
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-}
 
 // ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
+
 interface LeagueChatTabProps {
   leagueId: number;
   userInfo: LegacySportsJwt;
