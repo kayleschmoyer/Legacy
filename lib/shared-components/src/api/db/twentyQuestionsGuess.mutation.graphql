@@ -1,0 +1,23 @@
+mutation TwentyQuestionsGuess($gameId: String!, $playerId: Int!) {
+  twentyQuestionsGuess(gameId: $gameId, playerId: $playerId) {
+    id
+    status
+    difficulty
+    questionsUsed
+    maxQuestions
+    tokensEarned
+    questions {
+      questionNumber
+      category
+      parameter
+      answer
+      isGuess
+    }
+    targetPlayer {
+      id
+      firstName
+      lastName
+      eligiblePositions
+    }
+  }
+}

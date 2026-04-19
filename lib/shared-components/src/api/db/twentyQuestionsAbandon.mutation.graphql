@@ -1,0 +1,23 @@
+mutation TwentyQuestionsAbandon($gameId: String!) {
+  twentyQuestionsAbandon(gameId: $gameId) {
+    id
+    status
+    difficulty
+    questionsUsed
+    maxQuestions
+    tokensEarned
+    questions {
+      questionNumber
+      category
+      parameter
+      answer
+      isGuess
+    }
+    targetPlayer {
+      id
+      firstName
+      lastName
+      eligiblePositions
+    }
+  }
+}

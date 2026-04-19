@@ -6802,6 +6802,21 @@ export type SearchPlayersForDraftQuery = {
   }> | null;
 };
 
+export type SearchPlayersForTwentyQuestionsQueryVariables = Exact<{
+  searchTerm: Scalars['String']['input'];
+  limit?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type SearchPlayersForTwentyQuestionsQuery = {
+  __typename?: 'Query';
+  searchPlayers?: Array<{
+    __typename?: 'Player';
+    id?: number | null;
+    firstName?: string | null;
+    lastName?: string | null;
+  }> | null;
+};
+
 export type SearchUsersForDraftQueryVariables = Exact<{
   searchTerm: Scalars['String']['input'];
   limit?: InputMaybe<Scalars['Int']['input']>;
@@ -7554,6 +7569,167 @@ export type TriggerSeasonDraftStatLoadingMutationVariables = Exact<{
 export type TriggerSeasonDraftStatLoadingMutation = {
   __typename?: 'Mutation';
   triggerSeasonDraftStatLoading?: boolean | null;
+};
+
+export type TwentyQuestionsAbandonMutationVariables = Exact<{
+  gameId: Scalars['String']['input'];
+}>;
+
+export type TwentyQuestionsAbandonMutation = {
+  __typename?: 'Mutation';
+  twentyQuestionsAbandon?: {
+    __typename?: 'TwentyQuestionsGame';
+    id?: string | null;
+    status?: TwentyQuestionsStatus | null;
+    difficulty?: TwentyQuestionsDifficulty | null;
+    questionsUsed?: number | null;
+    maxQuestions?: number | null;
+    tokensEarned?: number | null;
+    questions?: Array<{
+      __typename?: 'TwentyQuestionsQuestion';
+      questionNumber?: number | null;
+      category?: TwentyQuestionsCategory | null;
+      parameter?: string | null;
+      answer?: boolean | null;
+      isGuess?: boolean | null;
+    }> | null;
+    targetPlayer?: {
+      __typename?: 'Player';
+      id?: number | null;
+      firstName?: string | null;
+      lastName?: string | null;
+      eligiblePositions?: Array<string> | null;
+    } | null;
+  } | null;
+};
+
+export type TwentyQuestionsActiveGameQueryVariables = Exact<{
+  [key: string]: never;
+}>;
+
+export type TwentyQuestionsActiveGameQuery = {
+  __typename?: 'Query';
+  twentyQuestionsActiveGame?: {
+    __typename?: 'TwentyQuestionsGame';
+    id?: string | null;
+    status?: TwentyQuestionsStatus | null;
+    difficulty?: TwentyQuestionsDifficulty | null;
+    questionsUsed?: number | null;
+    maxQuestions?: number | null;
+    tokensEarned?: number | null;
+    questions?: Array<{
+      __typename?: 'TwentyQuestionsQuestion';
+      questionNumber?: number | null;
+      category?: TwentyQuestionsCategory | null;
+      parameter?: string | null;
+      answer?: boolean | null;
+      isGuess?: boolean | null;
+    }> | null;
+    targetPlayer?: {
+      __typename?: 'Player';
+      id?: number | null;
+      firstName?: string | null;
+      lastName?: string | null;
+      eligiblePositions?: Array<string> | null;
+    } | null;
+  } | null;
+};
+
+export type TwentyQuestionsAskMutationVariables = Exact<{
+  input: TwentyQuestionsAskInput;
+}>;
+
+export type TwentyQuestionsAskMutation = {
+  __typename?: 'Mutation';
+  twentyQuestionsAsk?: {
+    __typename?: 'TwentyQuestionsGame';
+    id?: string | null;
+    status?: TwentyQuestionsStatus | null;
+    difficulty?: TwentyQuestionsDifficulty | null;
+    questionsUsed?: number | null;
+    maxQuestions?: number | null;
+    tokensEarned?: number | null;
+    questions?: Array<{
+      __typename?: 'TwentyQuestionsQuestion';
+      questionNumber?: number | null;
+      category?: TwentyQuestionsCategory | null;
+      parameter?: string | null;
+      answer?: boolean | null;
+      isGuess?: boolean | null;
+    }> | null;
+    targetPlayer?: {
+      __typename?: 'Player';
+      id?: number | null;
+      firstName?: string | null;
+      lastName?: string | null;
+      eligiblePositions?: Array<string> | null;
+    } | null;
+  } | null;
+};
+
+export type TwentyQuestionsGuessMutationVariables = Exact<{
+  gameId: Scalars['String']['input'];
+  playerId: Scalars['Int']['input'];
+}>;
+
+export type TwentyQuestionsGuessMutation = {
+  __typename?: 'Mutation';
+  twentyQuestionsGuess?: {
+    __typename?: 'TwentyQuestionsGame';
+    id?: string | null;
+    status?: TwentyQuestionsStatus | null;
+    difficulty?: TwentyQuestionsDifficulty | null;
+    questionsUsed?: number | null;
+    maxQuestions?: number | null;
+    tokensEarned?: number | null;
+    questions?: Array<{
+      __typename?: 'TwentyQuestionsQuestion';
+      questionNumber?: number | null;
+      category?: TwentyQuestionsCategory | null;
+      parameter?: string | null;
+      answer?: boolean | null;
+      isGuess?: boolean | null;
+    }> | null;
+    targetPlayer?: {
+      __typename?: 'Player';
+      id?: number | null;
+      firstName?: string | null;
+      lastName?: string | null;
+      eligiblePositions?: Array<string> | null;
+    } | null;
+  } | null;
+};
+
+export type TwentyQuestionsStartMutationVariables = Exact<{
+  difficulty?: InputMaybe<TwentyQuestionsDifficulty>;
+}>;
+
+export type TwentyQuestionsStartMutation = {
+  __typename?: 'Mutation';
+  twentyQuestionsStart?: {
+    __typename?: 'TwentyQuestionsGame';
+    id?: string | null;
+    status?: TwentyQuestionsStatus | null;
+    difficulty?: TwentyQuestionsDifficulty | null;
+    questionsUsed?: number | null;
+    maxQuestions?: number | null;
+    tokensEarned?: number | null;
+    questions?: Array<{
+      __typename?: 'TwentyQuestionsQuestion';
+      questionNumber?: number | null;
+      category?: TwentyQuestionsCategory | null;
+      parameter?: string | null;
+      answer?: boolean | null;
+      isGuess?: boolean | null;
+    }> | null;
+    targetPlayer?: {
+      __typename?: 'Player';
+      id?: number | null;
+      firstName?: string | null;
+      lastName?: string | null;
+      eligiblePositions?: Array<string> | null;
+    } | null;
+  } | null;
 };
 
 export type GetTeamWaiverClaimsQueryVariables = Exact<{
@@ -15897,6 +16073,102 @@ export type SearchPlayersForDraftQueryResult = Apollo.QueryResult<
   SearchPlayersForDraftQuery,
   SearchPlayersForDraftQueryVariables
 >;
+export const SearchPlayersForTwentyQuestions = gql`
+  query SearchPlayersForTwentyQuestions($searchTerm: String!, $limit: Int) {
+    searchPlayers(searchTerm: $searchTerm, limit: $limit) {
+      id
+      firstName
+      lastName
+    }
+  }
+`;
+
+/**
+ * __useSearchPlayersForTwentyQuestionsQuery__
+ *
+ * To run a query within a React component, call `useSearchPlayersForTwentyQuestionsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useSearchPlayersForTwentyQuestionsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useSearchPlayersForTwentyQuestionsQuery({
+ *   variables: {
+ *      searchTerm: // value for 'searchTerm'
+ *      limit: // value for 'limit'
+ *   },
+ * });
+ */
+export function useSearchPlayersForTwentyQuestionsQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    SearchPlayersForTwentyQuestionsQuery,
+    SearchPlayersForTwentyQuestionsQueryVariables
+  > &
+    (
+      | {
+          variables: SearchPlayersForTwentyQuestionsQueryVariables;
+          skip?: boolean;
+        }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    SearchPlayersForTwentyQuestionsQuery,
+    SearchPlayersForTwentyQuestionsQueryVariables
+  >(SearchPlayersForTwentyQuestions, options);
+}
+export function useSearchPlayersForTwentyQuestionsLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    SearchPlayersForTwentyQuestionsQuery,
+    SearchPlayersForTwentyQuestionsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    SearchPlayersForTwentyQuestionsQuery,
+    SearchPlayersForTwentyQuestionsQueryVariables
+  >(SearchPlayersForTwentyQuestions, options);
+}
+export function useSearchPlayersForTwentyQuestionsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        SearchPlayersForTwentyQuestionsQuery,
+        SearchPlayersForTwentyQuestionsQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    SearchPlayersForTwentyQuestionsQuery,
+    SearchPlayersForTwentyQuestionsQueryVariables
+  >(
+    SearchPlayersForTwentyQuestions,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          SearchPlayersForTwentyQuestionsQuery,
+          SearchPlayersForTwentyQuestionsQueryVariables
+        >,
+  );
+}
+export type SearchPlayersForTwentyQuestionsQueryHookResult = ReturnType<
+  typeof useSearchPlayersForTwentyQuestionsQuery
+>;
+export type SearchPlayersForTwentyQuestionsLazyQueryHookResult = ReturnType<
+  typeof useSearchPlayersForTwentyQuestionsLazyQuery
+>;
+export type SearchPlayersForTwentyQuestionsSuspenseQueryHookResult = ReturnType<
+  typeof useSearchPlayersForTwentyQuestionsSuspenseQuery
+>;
+export type SearchPlayersForTwentyQuestionsQueryResult = Apollo.QueryResult<
+  SearchPlayersForTwentyQuestionsQuery,
+  SearchPlayersForTwentyQuestionsQueryVariables
+>;
 export const SearchUsersForDraft = gql`
   query SearchUsersForDraft($searchTerm: String!, $limit: Int) {
     searchUsers(searchTerm: $searchTerm, limit: $limit) {
@@ -17604,6 +17876,382 @@ export type TriggerSeasonDraftStatLoadingMutationResult =
 export type TriggerSeasonDraftStatLoadingMutationOptions = BaseMutationOptions<
   TriggerSeasonDraftStatLoadingMutation,
   TriggerSeasonDraftStatLoadingMutationVariables
+>;
+export const TwentyQuestionsAbandon = gql`
+  mutation TwentyQuestionsAbandon($gameId: String!) {
+    twentyQuestionsAbandon(gameId: $gameId) {
+      id
+      status
+      difficulty
+      questionsUsed
+      maxQuestions
+      tokensEarned
+      questions {
+        questionNumber
+        category
+        parameter
+        answer
+        isGuess
+      }
+      targetPlayer {
+        id
+        firstName
+        lastName
+        eligiblePositions
+      }
+    }
+  }
+`;
+export type TwentyQuestionsAbandonMutationFn = MutationFunction<
+  TwentyQuestionsAbandonMutation,
+  TwentyQuestionsAbandonMutationVariables
+>;
+
+/**
+ * __useTwentyQuestionsAbandonMutation__
+ *
+ * To run a mutation, you first call `useTwentyQuestionsAbandonMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useTwentyQuestionsAbandonMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [twentyQuestionsAbandonMutation, { data, loading, error }] = useTwentyQuestionsAbandonMutation({
+ *   variables: {
+ *      gameId: // value for 'gameId'
+ *   },
+ * });
+ */
+export function useTwentyQuestionsAbandonMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    TwentyQuestionsAbandonMutation,
+    TwentyQuestionsAbandonMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    TwentyQuestionsAbandonMutation,
+    TwentyQuestionsAbandonMutationVariables
+  >(TwentyQuestionsAbandon, options);
+}
+export type TwentyQuestionsAbandonMutationHookResult = ReturnType<
+  typeof useTwentyQuestionsAbandonMutation
+>;
+export type TwentyQuestionsAbandonMutationResult =
+  Apollo.MutationResult<TwentyQuestionsAbandonMutation>;
+export type TwentyQuestionsAbandonMutationOptions = BaseMutationOptions<
+  TwentyQuestionsAbandonMutation,
+  TwentyQuestionsAbandonMutationVariables
+>;
+export const TwentyQuestionsActiveGame = gql`
+  query TwentyQuestionsActiveGame {
+    twentyQuestionsActiveGame {
+      id
+      status
+      difficulty
+      questionsUsed
+      maxQuestions
+      tokensEarned
+      questions {
+        questionNumber
+        category
+        parameter
+        answer
+        isGuess
+      }
+      targetPlayer {
+        id
+        firstName
+        lastName
+        eligiblePositions
+      }
+    }
+  }
+`;
+
+/**
+ * __useTwentyQuestionsActiveGameQuery__
+ *
+ * To run a query within a React component, call `useTwentyQuestionsActiveGameQuery` and pass it any options that fit your needs.
+ * When your component renders, `useTwentyQuestionsActiveGameQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useTwentyQuestionsActiveGameQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useTwentyQuestionsActiveGameQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    TwentyQuestionsActiveGameQuery,
+    TwentyQuestionsActiveGameQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    TwentyQuestionsActiveGameQuery,
+    TwentyQuestionsActiveGameQueryVariables
+  >(TwentyQuestionsActiveGame, options);
+}
+export function useTwentyQuestionsActiveGameLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    TwentyQuestionsActiveGameQuery,
+    TwentyQuestionsActiveGameQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    TwentyQuestionsActiveGameQuery,
+    TwentyQuestionsActiveGameQueryVariables
+  >(TwentyQuestionsActiveGame, options);
+}
+export function useTwentyQuestionsActiveGameSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        TwentyQuestionsActiveGameQuery,
+        TwentyQuestionsActiveGameQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    TwentyQuestionsActiveGameQuery,
+    TwentyQuestionsActiveGameQueryVariables
+  >(
+    TwentyQuestionsActiveGame,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          TwentyQuestionsActiveGameQuery,
+          TwentyQuestionsActiveGameQueryVariables
+        >,
+  );
+}
+export type TwentyQuestionsActiveGameQueryHookResult = ReturnType<
+  typeof useTwentyQuestionsActiveGameQuery
+>;
+export type TwentyQuestionsActiveGameLazyQueryHookResult = ReturnType<
+  typeof useTwentyQuestionsActiveGameLazyQuery
+>;
+export type TwentyQuestionsActiveGameSuspenseQueryHookResult = ReturnType<
+  typeof useTwentyQuestionsActiveGameSuspenseQuery
+>;
+export type TwentyQuestionsActiveGameQueryResult = Apollo.QueryResult<
+  TwentyQuestionsActiveGameQuery,
+  TwentyQuestionsActiveGameQueryVariables
+>;
+export const TwentyQuestionsAsk = gql`
+  mutation TwentyQuestionsAsk($input: TwentyQuestionsAskInput!) {
+    twentyQuestionsAsk(input: $input) {
+      id
+      status
+      difficulty
+      questionsUsed
+      maxQuestions
+      tokensEarned
+      questions {
+        questionNumber
+        category
+        parameter
+        answer
+        isGuess
+      }
+      targetPlayer {
+        id
+        firstName
+        lastName
+        eligiblePositions
+      }
+    }
+  }
+`;
+export type TwentyQuestionsAskMutationFn = MutationFunction<
+  TwentyQuestionsAskMutation,
+  TwentyQuestionsAskMutationVariables
+>;
+
+/**
+ * __useTwentyQuestionsAskMutation__
+ *
+ * To run a mutation, you first call `useTwentyQuestionsAskMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useTwentyQuestionsAskMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [twentyQuestionsAskMutation, { data, loading, error }] = useTwentyQuestionsAskMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useTwentyQuestionsAskMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    TwentyQuestionsAskMutation,
+    TwentyQuestionsAskMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    TwentyQuestionsAskMutation,
+    TwentyQuestionsAskMutationVariables
+  >(TwentyQuestionsAsk, options);
+}
+export type TwentyQuestionsAskMutationHookResult = ReturnType<
+  typeof useTwentyQuestionsAskMutation
+>;
+export type TwentyQuestionsAskMutationResult =
+  Apollo.MutationResult<TwentyQuestionsAskMutation>;
+export type TwentyQuestionsAskMutationOptions = BaseMutationOptions<
+  TwentyQuestionsAskMutation,
+  TwentyQuestionsAskMutationVariables
+>;
+export const TwentyQuestionsGuess = gql`
+  mutation TwentyQuestionsGuess($gameId: String!, $playerId: Int!) {
+    twentyQuestionsGuess(gameId: $gameId, playerId: $playerId) {
+      id
+      status
+      difficulty
+      questionsUsed
+      maxQuestions
+      tokensEarned
+      questions {
+        questionNumber
+        category
+        parameter
+        answer
+        isGuess
+      }
+      targetPlayer {
+        id
+        firstName
+        lastName
+        eligiblePositions
+      }
+    }
+  }
+`;
+export type TwentyQuestionsGuessMutationFn = MutationFunction<
+  TwentyQuestionsGuessMutation,
+  TwentyQuestionsGuessMutationVariables
+>;
+
+/**
+ * __useTwentyQuestionsGuessMutation__
+ *
+ * To run a mutation, you first call `useTwentyQuestionsGuessMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useTwentyQuestionsGuessMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [twentyQuestionsGuessMutation, { data, loading, error }] = useTwentyQuestionsGuessMutation({
+ *   variables: {
+ *      gameId: // value for 'gameId'
+ *      playerId: // value for 'playerId'
+ *   },
+ * });
+ */
+export function useTwentyQuestionsGuessMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    TwentyQuestionsGuessMutation,
+    TwentyQuestionsGuessMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    TwentyQuestionsGuessMutation,
+    TwentyQuestionsGuessMutationVariables
+  >(TwentyQuestionsGuess, options);
+}
+export type TwentyQuestionsGuessMutationHookResult = ReturnType<
+  typeof useTwentyQuestionsGuessMutation
+>;
+export type TwentyQuestionsGuessMutationResult =
+  Apollo.MutationResult<TwentyQuestionsGuessMutation>;
+export type TwentyQuestionsGuessMutationOptions = BaseMutationOptions<
+  TwentyQuestionsGuessMutation,
+  TwentyQuestionsGuessMutationVariables
+>;
+export const TwentyQuestionsStart = gql`
+  mutation TwentyQuestionsStart($difficulty: TwentyQuestionsDifficulty) {
+    twentyQuestionsStart(difficulty: $difficulty) {
+      id
+      status
+      difficulty
+      questionsUsed
+      maxQuestions
+      tokensEarned
+      questions {
+        questionNumber
+        category
+        parameter
+        answer
+        isGuess
+      }
+      targetPlayer {
+        id
+        firstName
+        lastName
+        eligiblePositions
+      }
+    }
+  }
+`;
+export type TwentyQuestionsStartMutationFn = MutationFunction<
+  TwentyQuestionsStartMutation,
+  TwentyQuestionsStartMutationVariables
+>;
+
+/**
+ * __useTwentyQuestionsStartMutation__
+ *
+ * To run a mutation, you first call `useTwentyQuestionsStartMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useTwentyQuestionsStartMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [twentyQuestionsStartMutation, { data, loading, error }] = useTwentyQuestionsStartMutation({
+ *   variables: {
+ *      difficulty: // value for 'difficulty'
+ *   },
+ * });
+ */
+export function useTwentyQuestionsStartMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    TwentyQuestionsStartMutation,
+    TwentyQuestionsStartMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    TwentyQuestionsStartMutation,
+    TwentyQuestionsStartMutationVariables
+  >(TwentyQuestionsStart, options);
+}
+export type TwentyQuestionsStartMutationHookResult = ReturnType<
+  typeof useTwentyQuestionsStartMutation
+>;
+export type TwentyQuestionsStartMutationResult =
+  Apollo.MutationResult<TwentyQuestionsStartMutation>;
+export type TwentyQuestionsStartMutationOptions = BaseMutationOptions<
+  TwentyQuestionsStartMutation,
+  TwentyQuestionsStartMutationVariables
 >;
 export const GetTeamWaiverClaims = gql`
   query GetTeamWaiverClaims($teamId: Int!, $status: String) {

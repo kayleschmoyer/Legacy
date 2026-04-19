@@ -108,6 +108,9 @@ const DisclosureGamePage = lazyWithRetry(
 const MinigamesHubPage = lazyWithRetry(
   () => import('../pages/games/MinigamesHubPage'),
 );
+const TwentyQuestionsPage = lazyWithRetry(
+  () => import('../pages/games/TwentyQuestionsPage'),
+);
 const EliteDraftBoardScreen = lazyWithRetry(() =>
   import('../components/EliteDraftBoard').then((m) => ({
     default: m.EliteDraftBoardScreen,
@@ -551,6 +554,10 @@ function App() {
               element={<SeasonDraftGamePage />}
             />
             <Route path="/games/disclosure" element={<DisclosureGamePage />} />
+            <Route
+              path="/games/twenty-questions"
+              element={<TwentyQuestionsPage />}
+            />
             {/* /draft/mock is a legacy alias — redirect to the canonical route. */}
             <Route
               path="/draft/mock"
