@@ -119,23 +119,35 @@ function statusFromNotificationType(
 
 // ── Idempotency ───────────────────────────────────────────────────────────────
 
-async function isEventProcessed(eventId: string): Promise<boolean> {
+/**
+ * Atomically claim an Apple notification for processing.
+ *
+ * Returns true if this invocation inserted the dedupe row (we own processing),
+ * false if another invocation already claimed it. Closes the concurrent-delivery
+ * race where two near-simultaneous Apple retries would both see the event as
+ * unseen and re-run tier changes, league freezes, and GA4 events.
+ */
+async function claimAppleEvent(eventId: string): Promise<boolean> {
   return runWithInternalClient(getDbOptions(), async (db) => {
     const rows = await db
-      .select()
-      .from(InternalSchema.appleEvents)
-      .where(eq(InternalSchema.appleEvents.eventId, eventId))
-      .limit(1);
+      .insert(InternalSchema.appleEvents)
+      .values({ eventId })
+      .onConflictDoNothing()
+      .returning({ eventId: InternalSchema.appleEvents.eventId });
     return rows.length > 0;
   });
 }
 
-async function recordEvent(eventId: string): Promise<void> {
+/**
+ * Release a previously-claimed Apple notification so Apple's retry will re-run
+ * it. Used when processing throws after a successful claim — without this, the
+ * dedupe row would short-circuit every retry and the event would be lost.
+ */
+async function releaseAppleEventClaim(eventId: string): Promise<void> {
   await runWithInternalClient(getDbOptions(), async (db) => {
     await db
-      .insert(InternalSchema.appleEvents)
-      .values({ eventId })
-      .onConflictDoNothing();
+      .delete(InternalSchema.appleEvents)
+      .where(eq(InternalSchema.appleEvents.eventId, eventId));
   });
 }
 
@@ -443,12 +455,13 @@ const baseAppleIapHandler = async (
     };
   }
 
-  // Idempotency check
-  const alreadyProcessed = await isEventProcessed(
-    notification.notificationUUID,
-  );
-  if (alreadyProcessed) {
-    LOGGER.info('Apple IAP — notification already processed — skipping', {
+  // Idempotency: atomically claim the notification before running any side
+  // effects. If claimAppleEvent returns false, another invocation already
+  // claimed it (concurrent Apple retry) — acknowledge and exit without
+  // re-processing.
+  const claimed = await claimAppleEvent(notification.notificationUUID);
+  if (!claimed) {
+    LOGGER.info('Apple IAP — notification already claimed — skipping', {
       notificationUUID: notification.notificationUUID,
     });
     return { statusCode: 200, body: JSON.stringify({ received: true }) };
@@ -472,13 +485,26 @@ const baseAppleIapHandler = async (
       notificationType: notification.notificationType,
       err,
     });
+    // Release the claim so Apple's retry re-runs this notification. If the
+    // release itself fails, log and fall through — a stuck claim for a failed
+    // event is the lesser evil compared to silently dropping the 500 response.
+    try {
+      await releaseAppleEventClaim(notification.notificationUUID);
+    } catch (releaseErr) {
+      LOGGER.error(
+        'Apple IAP — failed to release event claim after processing error — event may be stuck in dedupe table',
+        {
+          notificationUUID: notification.notificationUUID,
+          notificationType: notification.notificationType,
+          releaseErr,
+        },
+      );
+    }
     return {
       statusCode: 500,
       body: JSON.stringify({ error: 'Internal server error' }),
     };
   }
-
-  await recordEvent(notification.notificationUUID);
 
   if (userId !== null) {
     await pushSubscriptionUpdated(userId, originalTransactionId);
