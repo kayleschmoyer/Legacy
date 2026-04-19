@@ -2,8 +2,10 @@
 # SessionStart hook: verify MCP server preconditions and emit visible warnings
 # when the session is likely to have one or more servers missing (LS-3022).
 #
-# All 9 legacy-sports MCP servers start via mcp-bootstrap.mjs → pnpm exec tsx.
-# If node_modules/.bin/tsx is absent, every server silently times out — the
+# 7 of the 10 legacy-sports MCP servers use stdio (mcp-bootstrap.mjs → pnpm exec tsx).
+# The remaining 3 (jira, github, ci) connect via Streamable HTTP through the local
+# signing proxy (localhost:4195-4197); those do not need tsx.
+# If node_modules/.bin/tsx is absent, the 7 stdio servers silently time out — the
 # agent receives an empty deferred tools list and may fall back to gh/git/make
 # without knowing why.  This hook surfaces the failure proactively so the agent
 # can report and request a repair rather than proceeding with degraded tooling.
@@ -33,7 +35,7 @@ WARNINGS=()
 # --- 1. node_modules/.bin/tsx -----------------------------------------------
 TSX="$WORKTREE/node_modules/.bin/tsx"
 if [ ! -f "$TSX" ] && [ ! -L "$TSX" ]; then
-  WARNINGS+=("[MCP WARNING] node_modules/.bin/tsx is missing — all 9 MCP servers will fail to connect silently.")
+  WARNINGS+=("[MCP WARNING] node_modules/.bin/tsx is missing — all 7 stdio MCP servers will fail to connect silently.")
   if [ "$IS_WORKTREE" = "true" ]; then
     WIN_WT=$(echo "$WORKTREE" | sed 's|/d/|D:\\|; s|/|\\|g' 2>/dev/null || echo "$WORKTREE")
     WIN_MAIN=$(echo "$MAIN_REPO" | sed 's|/d/|D:\\|; s|/|\\|g' 2>/dev/null || echo "$MAIN_REPO")

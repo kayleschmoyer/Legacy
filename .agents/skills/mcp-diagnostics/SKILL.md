@@ -23,7 +23,7 @@ Run these checks in order. Stop at the first failure and apply the recovery step
 
 ### Check 1 — `node_modules/.bin/tsx`
 
-All 9 MCP servers launch via `mcp-bootstrap.mjs` which runs `node --import tsx ...`. If `node_modules` is missing or broken, every server silently times out during startup — Claude Code surfaces no error.
+7 of the 10 MCP servers are stdio and launch via `mcp-bootstrap.mjs` which runs `node --import tsx ...`. If `node_modules` is missing or broken, all 7 stdio servers silently time out during startup — Claude Code surfaces no error. The remaining 3 (jira, github, ci) connect via Streamable HTTP through the local signing proxy on `localhost:4195-4197` and do not need `tsx`.
 
 ```bash
 test -x node_modules/.bin/tsx && echo "tsx: OK" || echo "MISSING: node_modules/.bin/tsx"
@@ -116,7 +116,7 @@ environment variable was overridden. Restart the session from the correct worktr
 
 When MCP servers are confirmed missing and recovery is not possible in the current session:
 
-1. **State which servers are missing** — e.g. "all 9 custom MCP servers absent; deferred tools
+1. **State which servers are missing** — e.g. "all 10 custom MCP servers absent; deferred tools
    list is empty".
 2. **State which check failed** — e.g. "Check 1 failed: `node_modules/.bin/tsx` missing".
 3. **Do not silently fall back** — using `gh`/`git`/`make` Bash fallbacks without reporting

@@ -2,6 +2,10 @@
   "inputs": [],
   "servers": {
     "legacy-sports-ci": {
+      "type": "http",
+      "url": "http://localhost:4197"
+    },
+    "legacy-sports-ci-local": {
       "type": "stdio",
       "command": "node",
       "args": ["--import", "tsx", "tools/mcp/ci-server/src/index.ts"]
@@ -12,17 +16,8 @@
       "args": ["--import", "tsx", "tools/mcp/db-server/src/index.ts"]
     },
     "legacy-sports-jira": {
-      "type": "stdio",
-      "command": "node",
-      "args": ["--import", "tsx", "tools/mcp/jira-server/src/index.ts"],
-      "env": {
-        "JIRA_CLIENT_ID": "${env:JIRA_CLIENT_ID}",
-        "JIRA_CLIENT_SECRET": "${env:JIRA_CLIENT_SECRET}",
-        "JIRA_CLOUD_ID": "${env:JIRA_CLOUD_ID}",
-        "JIRA_SITE_URL": "${env:JIRA_SITE_URL}",
-        "JIRA_EMAIL": "${env:JIRA_EMAIL}",
-        "JIRA_API_TOKEN": "${env:JIRA_API_TOKEN}"
-      }
+      "type": "http",
+      "url": "http://localhost:4195"
     },
     "worktree": {
       "type": "stdio",
@@ -35,13 +30,8 @@
       "args": ["--import", "tsx", "tools/mcp/aws-server/src/index.ts"]
     },
     "legacy-sports-github": {
-      "type": "stdio",
-      "command": "node",
-      "args": ["--import", "tsx", "tools/mcp/github-server/src/index.ts"],
-      "env": {
-        "GH_TOKEN": "${env:GH_TOKEN}",
-        "AGENT_AUTHOR_APP_PRIVATE_KEY": "${env:AGENT_AUTHOR_APP_PRIVATE_KEY}"
-      }
+      "type": "http",
+      "url": "http://localhost:4196"
     },
     "legacy-sports-nx": {
       "type": "stdio",

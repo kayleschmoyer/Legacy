@@ -126,7 +126,36 @@ pnpm exec nx affected -t build
 # You'll see successful builds for affected library projects
 ```
 
-### **Step 5: Validate Installation**
+### **Step 5: Set Up Hosted MCP Servers**
+
+The Jira, GitHub, and CI MCP servers run as hosted AWS Lambda Function URLs. For local
+Claude Code sessions you need the **signing proxy** running so that MCP tool calls are
+SigV4-signed before hitting the Lambda endpoints.
+
+```powershell
+# 1. Get the Lambda Function URLs from Terraform and add them to .env.local
+terraform -chdir=terraform/main output mcp_jira_url
+terraform -chdir=terraform/main output mcp_github_url
+terraform -chdir=terraform/main output mcp_ci_url
+# Add the three MCP_*_URL values (and optionally MCP_AWS_PROFILE) to .env.local
+
+# 2. Start the signing proxy (reads MCP_*_URL from .env.local)
+pnpm exec nx run mcp-signing-proxy:start
+```
+
+The proxy listens on `localhost:4195` (Jira), `:4196` (GitHub), `:4197` (CI).
+Claude Code and VS Code MCP configs already point at these ports.
+
+> **Session audit tools** (`ci_audit_session_bash`, `ci_find_session`, `ci_session_stats`)
+> read local `~/.claude/projects/` files and cannot run on Lambda. They are available via
+> the `legacy-sports-ci-local` stdio server entry, which remains a local process.
+
+See [docs/guides/mcp-server-access.md](./mcp-server-access.md) for IAM policy setup,
+detailed auth troubleshooting, and cloud-agent (GitHub Actions) configuration.
+
+---
+
+### **Step 6: Validate Installation**
 
 ```powershell
 # Run workspace validation
@@ -553,6 +582,7 @@ pnpm exec nx show projects
 - **Repository Improvements**: See `REPOSITORY_IMPROVEMENTS.md` for ongoing enhancements
 - **ESLint Configuration**: See `tools/eslint-config/README.md` for linting setup
 - **Agent Instructions**: See `AGENTS.md` for AI agent guidelines
+- **Hosted MCP Servers**: See `docs/guides/mcp-server-access.md` for token setup and auth details
 
 ### **Nx Resources**
 
