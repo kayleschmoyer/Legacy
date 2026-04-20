@@ -357,7 +357,7 @@ test.describe
     await test.step('3.1 Create all matchups', async () => {
       const data = await graphqlOk<{
         createAllMatchups: {
-          matchups: Array<{ id: number; weekNumber: number; status: string }>;
+          matchups: Array<{ id: string; weekNumber: number; status: string }>;
           currentMatchupId: number | null;
         };
       }>(
@@ -376,7 +376,7 @@ test.describe
     await test.step('3.2 Verify initial matchup status: week 1 in_progress, rest scheduled', async () => {
       const data = await graphqlOk<{
         getMatchupsForLeague: Array<{
-          id: number;
+          id: string;
           weekNumber: number;
           status: string;
         }>;
@@ -450,9 +450,10 @@ test.describe
       });
 
       await test.step(`4.${game}c Verify matchup_player_games have valid game_identifier (game ${game})`, async () => {
-        // Fetch matchups for week 1
+        // Fetch matchups for week 1. Matchup.id is a GraphQL ID scalar, so it
+        // arrives as a string over the wire even though it represents a number.
         const matchupData = await graphqlOk<{
-          getMatchupsForLeague: Array<{ id: number }>;
+          getMatchupsForLeague: Array<{ id: string }>;
         }>(
           api,
           `query Matchups($leagueId: Int!, $weekNumber: Int) {
@@ -481,7 +482,7 @@ test.describe
                      games { id gameIdentifier gameNum spSkipped }
                    }
                  }`,
-            { matchupId: matchup.id },
+            { matchupId: Number(matchup.id) },
           );
 
           // At least some players should have games assigned by now
@@ -514,7 +515,7 @@ test.describe
     await test.step('4.d Verify game counts match gamesPerMatchup', async () => {
       const matchupData = await graphqlOk<{
         getMatchupsForLeague: Array<{
-          id: number;
+          id: string;
           selectedGamesCount: number | null;
           gamesPerMatchup: number | null;
         }>;
@@ -536,7 +537,7 @@ test.describe
     await test.step('4.e Verify scores are populated (non-null)', async () => {
       const matchupData = await graphqlOk<{
         getMatchupsForLeague: Array<{
-          id: number;
+          id: string;
           team1Score: number | null;
           team2Score: number | null;
         }>;
@@ -558,7 +559,7 @@ test.describe
 
     await test.step('4.f Verify no duplicate game_identifier per player per matchup', async () => {
       const matchupData = await graphqlOk<{
-        getMatchupsForLeague: Array<{ id: number }>;
+        getMatchupsForLeague: Array<{ id: string }>;
       }>(
         api,
         `query Matchups($leagueId: Int!, $weekNumber: Int) {
@@ -584,7 +585,7 @@ test.describe
                    games { gameIdentifier }
                  }
                }`,
-          { matchupId: matchup.id },
+          { matchupId: Number(matchup.id) },
         );
 
         for (const mp of playerData.getMatchupPlayers) {
@@ -614,7 +615,7 @@ test.describe
       // Check week 1 matchups are completed
       const week1Data = await graphqlOk<{
         getMatchupsForLeague: Array<{
-          id: number;
+          id: string;
           weekNumber: number;
           status: string;
         }>;
@@ -647,7 +648,7 @@ test.describe
       // Check week 2 matchups are now in_progress
       const week2Data = await graphqlOk<{
         getMatchupsForLeague: Array<{
-          id: number;
+          id: string;
           weekNumber: number;
           status: string;
         }>;
@@ -704,7 +705,7 @@ test.describe
     await test.step('5.c Verify scores populated for week 2', async () => {
       const matchupData = await graphqlOk<{
         getMatchupsForLeague: Array<{
-          id: number;
+          id: string;
           team1Score: number | null;
           team2Score: number | null;
           selectedGamesCount: number | null;
@@ -728,7 +729,7 @@ test.describe
 
     await test.step('5.d Verify no duplicate game_identifier per player in week 2', async () => {
       const matchupData = await graphqlOk<{
-        getMatchupsForLeague: Array<{ id: number }>;
+        getMatchupsForLeague: Array<{ id: string }>;
       }>(
         api,
         `query Matchups($leagueId: Int!, $weekNumber: Int) {
@@ -754,7 +755,7 @@ test.describe
                    games { gameIdentifier }
                  }
                }`,
-          { matchupId: matchup.id },
+          { matchupId: Number(matchup.id) },
         );
 
         for (const mp of playerData.getMatchupPlayers) {
@@ -791,7 +792,7 @@ test.describe
     await test.step('6.1 All matchups across all weeks are completed', async () => {
       const data = await graphqlOk<{
         getMatchupsForLeague: Array<{
-          id: number;
+          id: string;
           weekNumber: number;
           status: string;
         }>;
