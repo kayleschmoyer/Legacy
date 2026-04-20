@@ -534,12 +534,16 @@ test.describe
   // -----------------------------------------------------------------
 
   test('Phase 6: Pending claims appear on the My Roster page', async ({
-    commissionerPage: page,
-    commissionerJwt,
-    managerJwt1,
+    commissionerPage,
+    managerPage1,
   }) => {
-    const verifyPendingClaimsUI = async (jwt: string): Promise<void> => {
-      await switchUser(page, jwt, `/baseball/league/${state.leagueId}/roster`);
+    // Use dedicated browser contexts for each role. switchUser on a single
+    // page has a race condition (LS-3672, LS-3705, LS-3735): the background
+    // JWT refresh can dispatch AUTH_LOGOUT and clear localStorage after
+    // page.evaluate() sets the profile, landing on the unauthenticated
+    // sign-in page and leaving the Pending Waiver card unrendered.
+    const verifyPendingClaimsUI = async (page: Page): Promise<void> => {
+      await page.goto(`/baseball/league/${state.leagueId}/roster`);
       await page.waitForLoadState('load');
       await expect(page).toHaveURL(/\/roster/);
       await expect(page.locator('body')).not.toContainText(
@@ -549,7 +553,6 @@ test.describe
 
       // PendingWaiverClaims renders an amber card with a "Pending Waiver"
       // heading whenever the team has active pending claims.
-      // Allow extra time for the roster data to fully load after switchUser.
       await expect(page.getByText(/Pending Waiver/i).first()).toBeVisible({
         timeout: 30000,
       });
@@ -572,14 +575,12 @@ test.describe
     };
 
     await test.step('Commissioner sees pending claim on My Roster', async () => {
-      await verifyPendingClaimsUI(commissionerJwt);
+      await verifyPendingClaimsUI(commissionerPage);
     });
 
     await test.step('Manager 1 sees pending claim on My Roster', async () => {
-      await verifyPendingClaimsUI(managerJwt1);
+      await verifyPendingClaimsUI(managerPage1);
     });
-
-    await switchUser(page, commissionerJwt);
   });
 
   // -----------------------------------------------------------------
