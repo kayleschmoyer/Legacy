@@ -610,16 +610,13 @@ export async function filterPlayerIdsByLeagueEligibility(
 
 /**
  * Atomically mark a draft as complete by stamping `draftCompletedAt` on the
- * drafts row and setting `draftStatus = 'completed'` on the leagues row.
+ * drafts row and setting `draftStatus = 'completed'` and
+ * `leaguePhase = 'active'` on the leagues row.
  *
- * When `db` is a transaction object (e.g. inside commitDraftPick), both writes
- * share that transaction and are fully atomic.  When called standalone (e.g.
- * from draft-processor), wrap the call in `db.transaction(async (tx) => …)`
- * to achieve the same atomicity guarantee.
- *
- * Shared by:
- *  - commitDraftPick (lambdas/db) — passes its caller-supplied tx
- *  - draft-processor lambda — wraps in its own db.transaction()
+ * Wrap the call in `db.transaction(async (tx) => …)` to make both writes
+ * atomic.  The automated-draft path (draft-processor lambda) uses this helper;
+ * the live-draft path (commitDraftPick in lambdas/db) performs the equivalent
+ * updates inline on its own transaction and must be kept in sync by hand.
  */
 export async function finalizeDraftCompletion(
   db: PublicDb,
@@ -633,13 +630,13 @@ export async function finalizeDraftCompletion(
 
   await db
     .update(PublicSchema.leagues)
-    .set({ draftStatus: 'completed' } as Partial<
+    .set({ draftStatus: 'completed', leaguePhase: 'active' } as Partial<
       typeof PublicSchema.leagues.$inferInsert
     >)
     .where(eq(PublicSchema.leagues.id, leagueId));
 
   LOGGER.info(
-    'Draft finalized: draftCompletedAt stamped and draftStatus set to completed',
+    'Draft finalized: draftCompletedAt stamped, draftStatus=completed, leaguePhase=active',
     {
       leagueId,
     },
