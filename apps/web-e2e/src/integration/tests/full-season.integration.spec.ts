@@ -961,11 +961,11 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
   test('Phase 7: Week advancement', async ({ apiCommissioner }) => {
     await test.step('7.1 Auto-select games for league', async () => {
       const data = await graphqlOk<{
-        autoSelectGames: { processedCount: number };
+        autoSelectGames: { leaguesProcessed: number };
       }>(
         apiCommissioner,
         `mutation AutoSelect($leagueId: Int) {
-           autoSelectGames(leagueId: $leagueId) { processedCount }
+           autoSelectGames(leagueId: $leagueId) { leaguesProcessed }
          }`,
         { leagueId: state.leagueId },
       );
