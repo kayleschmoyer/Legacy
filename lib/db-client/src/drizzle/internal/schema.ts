@@ -9,6 +9,7 @@ import {
   text,
   timestamp,
   boolean,
+  bigint,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
@@ -182,6 +183,7 @@ export const subscriptions = appInternal.table(
     refundAmountCents: integer('refund_amount_cents'),
     disputedAt: timestamp('disputed_at', { withTimezone: true }),
     disputeStatus: text('dispute_status'),
+    lastEventTimestamp: bigint('last_event_timestamp', { mode: 'number' }),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

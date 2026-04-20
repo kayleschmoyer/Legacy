@@ -86,7 +86,12 @@ function makeInsertUpdateDb() {
 /** DB that handles a select followed by two updates (for updateSubscriptionStatus / handlePaymentFailed). */
 function makeSelectThenUpdateDb(
   rows: unknown[] = [{ userId: 42, tier: 'premium' }],
+  returningRows: unknown[] = [{ userId: 42 }],
 ) {
+  const whereFn = jest.fn(() => ({
+    returning: jest.fn(() => Promise.resolve(returningRows)),
+    then: (resolve: (v: unknown) => unknown) => resolve(undefined),
+  }));
   return {
     select: jest.fn(() => ({
       from: jest.fn(() => ({
@@ -97,7 +102,7 @@ function makeSelectThenUpdateDb(
     })),
     update: jest.fn(() => ({
       set: jest.fn(() => ({
-        where: jest.fn(() => Promise.resolve()),
+        where: whereFn,
       })),
     })),
   };
@@ -182,6 +187,7 @@ describe('stripe-webhook event handlers', () => {
           status: 'status',
           userId: 'userId',
           gracePeriodEndsAt: 'gracePeriodEndsAt',
+          lastEventTimestamp: 'lastEventTimestamp',
         },
         usersInAppInternal: { id: 'id' },
       },
@@ -1300,6 +1306,126 @@ describe('stripe-webhook event handlers', () => {
 
       expect(result.statusCode).toBe(200);
       expect(mockHandleSubscriptionDowngrade).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── Out-of-order event guard (LS-2613) ────────────────────────────────────
+
+  describe('out-of-order event guard', () => {
+    it('ignores a stale subscription.updated arriving after a newer event', async () => {
+      // Event created at t=100 arrives after the row has already been
+      // written by an event from t=200 (typical Stripe retry race).
+      mockConstructEvent.mockReturnValue(
+        fakeStripeEvent({
+          type: 'customer.subscription.updated',
+          created: 100,
+          data: {
+            object: {
+              id: 'sub_123',
+              customer: 'cus_123',
+              status: 'active',
+              cancel_at_period_end: false,
+              trial_end: null,
+              metadata: { userId: '42' },
+              items: { data: [{ current_period_end: 1700000000 }] },
+            },
+          },
+        }),
+      );
+
+      setupNotProcessed();
+      // Existing row carries a newer lastEventTimestamp (200 > 100).
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectDb([{ tier: 'free', lastEventTimestamp: 200 }])),
+      );
+      setupRecordEvent();
+
+      const result = await handler(makeEvent());
+
+      // Stale event is acknowledged (200) but no writes / side effects fire.
+      expect(result.statusCode).toBe(200);
+      expect(mockHandleSubscriptionDowngrade).not.toHaveBeenCalled();
+      expect(mockClearLeagueTierFreezes).not.toHaveBeenCalled();
+      expect(mockPushPublish).not.toHaveBeenCalled();
+      // isEventProcessed + select-existing + recordEvent — no insert/update DB.
+      expect(mockRunWithInternalClient).toHaveBeenCalledTimes(3);
+    });
+
+    it('ignores a stale subscription.deleted when last_event_timestamp is newer', async () => {
+      mockConstructEvent.mockReturnValue(
+        fakeStripeEvent({
+          type: 'customer.subscription.deleted',
+          created: 100,
+          data: { object: { id: 'sub_123' } },
+        }),
+      );
+
+      setupNotProcessed();
+      // Existing row is premium with a newer lastEventTimestamp; the
+      // conditional UPDATE affects zero rows → treated as stale.
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(
+            makeSelectThenUpdateDb(
+              [{ userId: 42, tier: 'premium', lastEventTimestamp: 200 }],
+              [], // returning() → 0 rows => stale
+            ),
+          ),
+      );
+      setupRecordEvent();
+
+      const result = await handler(makeEvent());
+
+      expect(result.statusCode).toBe(200);
+      // Tier-change side effects must NOT fire for a stale cancel.
+      expect(mockHandleSubscriptionDowngrade).not.toHaveBeenCalled();
+      expect(mockPushPublish).not.toHaveBeenCalled();
+    });
+
+    it('processes a fresh event when last_event_timestamp is older', async () => {
+      mockConstructEvent.mockReturnValue(
+        fakeStripeEvent({
+          type: 'customer.subscription.updated',
+          created: 300,
+          data: {
+            object: {
+              id: 'sub_123',
+              customer: 'cus_123',
+              status: 'canceled',
+              cancel_at_period_end: false,
+              trial_end: null,
+              metadata: { userId: '42' },
+              items: { data: [{ current_period_end: 1700000000 }] },
+            },
+          },
+        }),
+      );
+
+      setupNotProcessed();
+      // Existing row's lastEventTimestamp (200) is older than the new event (300).
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectDb([{ tier: 'premium', lastEventTimestamp: 200 }])),
+      );
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeInsertUpdateDb()),
+      );
+      setupRecordEvent();
+      // pushSubscriptionUpdated DB lookup
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectDb([{ tier: 'free', status: 'canceled' }])),
+      );
+
+      await handler(makeEvent());
+
+      // premium → free with older lastEventTimestamp → downgrade fires.
+      expect(mockHandleSubscriptionDowngrade).toHaveBeenCalledWith(
+        42,
+        expect.any(Object),
+      );
     });
   });
 });

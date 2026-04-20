@@ -79,6 +79,7 @@ describe('stripe-webhook handler', () => {
           tier: 'tier',
           status: 'status',
           userId: 'userId',
+          lastEventTimestamp: 'lastEventTimestamp',
         },
         usersInAppInternal: { id: 'id' },
       },

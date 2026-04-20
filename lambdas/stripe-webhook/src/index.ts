@@ -1,6 +1,6 @@
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import Stripe from 'stripe';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull, lt, or } from 'drizzle-orm';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   createNotificationPublisher,
@@ -153,27 +153,43 @@ async function upsertSubscription(
   currentPeriodEnd: Date | null,
   cancelAtPeriodEnd: boolean,
   trialEndsAt: Date | null,
-): Promise<void> {
+  eventTimestamp: number,
+): Promise<boolean> {
   const newTier = tierFromStatus(status);
 
-  // Capture the previous tier before overwriting so we can detect direction
-  // of change (premium → free or free → premium).
-  const previousTier = await runWithInternalClient(
-    getDbOptions(),
-    async (db) => {
-      const rows = await db
-        .select({ tier: InternalSchema.subscriptions.tier })
-        .from(InternalSchema.subscriptions)
-        .where(
-          eq(
-            InternalSchema.subscriptions.stripeSubscriptionId,
-            stripeSubscriptionId,
-          ),
-        )
-        .limit(1);
-      return (rows[0]?.tier ?? null) as 'free' | 'premium' | null;
-    },
-  );
+  // Capture the previous tier and last seen event timestamp before
+  // overwriting so we can (a) detect direction of tier change and
+  // (b) reject stale out-of-order webhook deliveries.
+  const existing = await runWithInternalClient(getDbOptions(), async (db) => {
+    const rows = await db
+      .select({
+        tier: InternalSchema.subscriptions.tier,
+        lastEventTimestamp: InternalSchema.subscriptions.lastEventTimestamp,
+      })
+      .from(InternalSchema.subscriptions)
+      .where(
+        eq(
+          InternalSchema.subscriptions.stripeSubscriptionId,
+          stripeSubscriptionId,
+        ),
+      )
+      .limit(1);
+    return rows[0] ?? null;
+  });
+
+  if (
+    existing?.lastEventTimestamp != null &&
+    existing.lastEventTimestamp >= eventTimestamp
+  ) {
+    LOGGER.info('ignored stale event', {
+      stripeSubscriptionId,
+      eventTimestamp,
+      lastEventTimestamp: existing.lastEventTimestamp,
+    });
+    return false;
+  }
+
+  const previousTier = (existing?.tier ?? null) as 'free' | 'premium' | null;
 
   await runWithInternalClient(getDbOptions(), async (db) => {
     await db
@@ -187,6 +203,7 @@ async function upsertSubscription(
         currentPeriodEnd,
         cancelAtPeriodEnd,
         trialEndsAt,
+        lastEventTimestamp: eventTimestamp,
       })
       .onConflictDoUpdate({
         target: InternalSchema.subscriptions.stripeSubscriptionId,
@@ -196,8 +213,16 @@ async function upsertSubscription(
           currentPeriodEnd,
           cancelAtPeriodEnd,
           trialEndsAt,
+          lastEventTimestamp: eventTimestamp,
           updatedAt: new Date(),
         },
+        // Defense against a concurrent newer write landing between our
+        // select above and this upsert: only overwrite when our event is
+        // strictly newer than the row's last_event_timestamp.
+        setWhere: or(
+          isNull(InternalSchema.subscriptions.lastEventTimestamp),
+          lt(InternalSchema.subscriptions.lastEventTimestamp, eventTimestamp),
+        ),
       });
 
     // Denormalize tier onto users table for fast resolver lookups
@@ -209,11 +234,13 @@ async function upsertSubscription(
 
   // Apply tier-change side effects (league freezes / feature conversions)
   await applyTierChangeSideEffects(userId, previousTier, newTier);
+  return true;
 }
 
 async function updateSubscriptionStatus(
   stripeSubscriptionId: string,
   status: string,
+  eventTimestamp: number,
 ): Promise<number | null> {
   const newTier = tierFromStatus(status);
 
@@ -222,6 +249,7 @@ async function updateSubscriptionStatus(
       .select({
         userId: InternalSchema.subscriptions.userId,
         tier: InternalSchema.subscriptions.tier,
+        lastEventTimestamp: InternalSchema.subscriptions.lastEventTimestamp,
       })
       .from(InternalSchema.subscriptions)
       .where(
@@ -239,17 +267,42 @@ async function updateSubscriptionStatus(
       return null;
     }
 
-    const { userId, tier: previousTier } = existing[0];
+    const { userId, tier: previousTier, lastEventTimestamp } = existing[0];
 
-    await db
+    // Conditional update — only apply when the incoming event is strictly
+    // newer than the row's last_event_timestamp. If zero rows come back,
+    // the event is stale (out-of-order delivery / retry) and must be
+    // ignored to avoid overwriting newer state.
+    const updated = await db
       .update(InternalSchema.subscriptions)
-      .set({ status, tier: newTier, updatedAt: new Date() })
+      .set({
+        status,
+        tier: newTier,
+        lastEventTimestamp: eventTimestamp,
+        updatedAt: new Date(),
+      })
       .where(
-        eq(
-          InternalSchema.subscriptions.stripeSubscriptionId,
-          stripeSubscriptionId,
+        and(
+          eq(
+            InternalSchema.subscriptions.stripeSubscriptionId,
+            stripeSubscriptionId,
+          ),
+          or(
+            isNull(InternalSchema.subscriptions.lastEventTimestamp),
+            lt(InternalSchema.subscriptions.lastEventTimestamp, eventTimestamp),
+          ),
         ),
-      );
+      )
+      .returning({ userId: InternalSchema.subscriptions.userId });
+
+    if (updated.length === 0) {
+      LOGGER.info('ignored stale event', {
+        stripeSubscriptionId,
+        eventTimestamp,
+        lastEventTimestamp,
+      });
+      return null;
+    }
 
     // Denormalize tier onto users table
     await db
@@ -395,6 +448,7 @@ async function verifyCheckoutOwnership(
 
 async function handleCheckoutSessionCompleted(
   session: Stripe.Checkout.Session,
+  eventTimestamp: number,
 ): Promise<number | null> {
   const userIdStr = session.metadata?.['userId'];
   if (!userIdStr) {
@@ -440,7 +494,7 @@ async function handleCheckoutSessionCompleted(
 
   const periodEnd = subscription.items.data[0]?.current_period_end;
   const trialEnd = subscription.trial_end;
-  await upsertSubscription(
+  const applied = await upsertSubscription(
     userId,
     stripeCustomerId,
     stripeSubscriptionId,
@@ -448,7 +502,10 @@ async function handleCheckoutSessionCompleted(
     periodEnd ? new Date(periodEnd * 1000) : null,
     subscription.cancel_at_period_end,
     trialEnd ? new Date(trialEnd * 1000) : null,
+    eventTimestamp,
   );
+
+  if (!applied) return null;
 
   LOGGER.info('Handled checkout.session.completed', {
     userId,
@@ -467,6 +524,7 @@ async function handleCheckoutSessionCompleted(
 
 async function handleSubscriptionEvent(
   subscription: Stripe.Subscription,
+  eventTimestamp: number,
 ): Promise<number | null> {
   const userIdStr = subscription.metadata?.['userId'];
   const stripeCustomerId =
@@ -516,7 +574,7 @@ async function handleSubscriptionEvent(
 
   const periodEnd = subscription.items.data[0]?.current_period_end;
   const trialEnd = subscription.trial_end;
-  await upsertSubscription(
+  const applied = await upsertSubscription(
     userId,
     stripeCustomerId,
     stripeSubscriptionId,
@@ -524,7 +582,10 @@ async function handleSubscriptionEvent(
     periodEnd ? new Date(periodEnd * 1000) : null,
     subscription.cancel_at_period_end,
     trialEnd ? new Date(trialEnd * 1000) : null,
+    eventTimestamp,
   );
+
+  if (!applied) return null;
 
   LOGGER.info('Handled subscription event', {
     userId,
@@ -1118,7 +1179,10 @@ const baseStripeWebhookHandler = async (
     switch (stripeEvent.type) {
       case 'checkout.session.completed': {
         const session = stripeEvent.data.object;
-        userId = await handleCheckoutSessionCompleted(session);
+        userId = await handleCheckoutSessionCompleted(
+          session,
+          stripeEvent.created,
+        );
         subscriptionId =
           typeof session.subscription === 'string'
             ? session.subscription
@@ -1139,7 +1203,7 @@ const baseStripeWebhookHandler = async (
       case 'customer.subscription.created':
       case 'customer.subscription.updated': {
         const sub = stripeEvent.data.object;
-        userId = await handleSubscriptionEvent(sub);
+        userId = await handleSubscriptionEvent(sub, stripeEvent.created);
         subscriptionId = sub.id;
         customerId = typeof sub.customer === 'string' ? sub.customer : null;
         subscriptionStatus = sub.status;
@@ -1148,7 +1212,11 @@ const baseStripeWebhookHandler = async (
 
       case 'customer.subscription.deleted': {
         const sub = stripeEvent.data.object;
-        userId = await updateSubscriptionStatus(sub.id, 'canceled');
+        userId = await updateSubscriptionStatus(
+          sub.id,
+          'canceled',
+          stripeEvent.created,
+        );
         subscriptionId = sub.id;
         customerId = typeof sub.customer === 'string' ? sub.customer : null;
         subscriptionStatus = 'canceled';
