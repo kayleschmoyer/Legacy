@@ -41,6 +41,12 @@ import {
 } from '@tamagui/lucide-icons';
 import { Button } from '../../Button';
 import {
+  GetLeagueTradeOffers,
+  type GetLeagueTradeOffersQuery,
+  type GetLeagueTradeOffersQueryVariables,
+  GetTeamTradeOffers,
+  type GetTeamTradeOffersQuery,
+  type GetTeamTradeOffersQueryVariables,
   TradeOfferFragment,
   useAcceptTradeMutation,
   useCancelTradeMutation,
@@ -600,6 +606,38 @@ function ProposeTradeDialog({
           message: draft.message || null,
           expiresInDays: draft.expiresInDays,
         },
+        // Insert the returned trade into the cached lists synchronously so
+        // the UI doesn't depend on a post-mutation refetch that could hit a
+        // Lambda/connection that hasn't yet observed the write.
+        update: (cache, { data }) => {
+          const created = data?.proposeTrade;
+          if (!created) return;
+          cache.updateQuery<
+            GetTeamTradeOffersQuery,
+            GetTeamTradeOffersQueryVariables
+          >(
+            {
+              query: GetTeamTradeOffers,
+              variables: { teamId: userTeamId, status: 'pending' },
+            },
+            (existing) => {
+              const list = existing?.teamTradeOffers ?? [];
+              if (list.some((t) => t.id === created.id)) return existing;
+              return { teamTradeOffers: [...list, created] };
+            },
+          );
+          cache.updateQuery<
+            GetLeagueTradeOffersQuery,
+            GetLeagueTradeOffersQueryVariables
+          >(
+            { query: GetLeagueTradeOffers, variables: { leagueId } },
+            (existing) => {
+              const list = existing?.leagueTradeOffers ?? [];
+              if (list.some((t) => t.id === created.id)) return existing;
+              return { leagueTradeOffers: [...list, created] };
+            },
+          );
+        },
       });
       onSuccess();
     } catch (err) {
@@ -609,7 +647,7 @@ function ProposeTradeDialog({
     } finally {
       setSubmitting(false);
     }
-  }, [draft, leagueId, proposeTrade, onSuccess]);
+  }, [draft, leagueId, userTeamId, proposeTrade, onSuccess]);
 
   // Cycle through expiry options on press
   const currentExpiryIdx = EXPIRY_OPTIONS.findIndex(
@@ -1455,7 +1493,10 @@ export function TradingCenter({
           onDismiss={() => setShowProposeDialog(false)}
           onSuccess={() => {
             setShowProposeDialog(false);
-            void handleRefetch();
+            // No refetch here — the mutation's `update` callback has already
+            // written the new offer into the cache. A network refetch could
+            // hit a replica/Lambda that hasn't observed the commit yet and
+            // overwrite the pending list with stale data.
           }}
         />
       )}
