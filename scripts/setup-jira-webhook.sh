@@ -39,14 +39,32 @@ if ! aws sts get-caller-identity --region "$REGION" > /dev/null 2>&1; then
 fi
 
 # ── Look up secret names (dynamic suffix from Terraform name_prefix) ──────────
+# SSM is preferred: Terraform stores the exact name in a known parameter path so
+# we do not need secretsmanager:ListSecrets (a *-resource action). Falls back to
+# list-secrets for environments where the SSM parameter hasn't been created yet.
 
 echo "==> Looking up Secrets Manager secret names..."
 
-JIRA_SECRET_NAME=$(aws secretsmanager list-secrets \
+SSM_EXIT=0
+SSM_OUTPUT=$(aws ssm get-parameter \
   --region "$REGION" \
-  --filter Key=name,Values="${NAME_PREFIX}-jira-webhook-secret-" \
-  --query "reverse(sort_by(SecretList, &CreatedDate))[0].Name" \
-  --output text 2>/dev/null)
+  --name "/legacy-sports/${ENVIRONMENT}/lambda/github-webhook/jira-webhook-secret-name" \
+  --query "Parameter.Value" \
+  --output text 2>&1) || SSM_EXIT=$?
+
+if [[ $SSM_EXIT -eq 0 ]]; then
+  JIRA_SECRET_NAME="$SSM_OUTPUT"
+elif echo "$SSM_OUTPUT" | grep -q "ParameterNotFound"; then
+  echo "  SSM param not yet created — falling back to secretsmanager:ListSecrets..."
+  JIRA_SECRET_NAME=$(aws secretsmanager list-secrets \
+    --region "$REGION" \
+    --filter Key=name,Values="${NAME_PREFIX}-jira-webhook-secret-" \
+    --query "reverse(sort_by(SecretList, &CreatedDate))[0].Name" \
+    --output text 2>/dev/null) || JIRA_SECRET_NAME=""
+else
+  echo "ERROR: SSM lookup failed (exit $SSM_EXIT): $SSM_OUTPUT"
+  exit 1
+fi
 
 if [[ "$JIRA_SECRET_NAME" == "None" || -z "$JIRA_SECRET_NAME" ]]; then
   echo "ERROR: Could not find ${NAME_PREFIX}-jira-webhook-secret-* in Secrets Manager."

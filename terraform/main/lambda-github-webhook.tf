@@ -129,6 +129,33 @@ resource "aws_ssm_parameter" "github_webhook_lambda_version" {
   })
 }
 
+# Stores the Terraform-assigned secret names (with random suffixes) so that CI
+# and setup scripts can look them up via ssm:GetParameter instead of
+# secretsmanager:ListSecrets (which is a *-resource action not in the policy).
+resource "aws_ssm_parameter" "agent_author_app_private_key_secret_name" {
+  name        = "/legacy-sports/${var.environment}/lambda/github-webhook/agent-author-app-private-key-secret-name"
+  description = "Exact Secrets Manager secret name for the agent_author_app_private_key — read by lambda-terraform-apply to sync the Review Bot private key without needing secretsmanager:ListSecrets"
+  type        = "String"
+  value       = aws_secretsmanager_secret.agent_author_app_private_key.name
+
+  tags = merge(local.common_tags, {
+    Component = "github-webhook"
+    Function  = "github-webhook"
+  })
+}
+
+resource "aws_ssm_parameter" "jira_webhook_secret_name" {
+  name        = "/legacy-sports/${var.environment}/lambda/github-webhook/jira-webhook-secret-name"
+  description = "Exact Secrets Manager secret name for the jira_webhook_secret — read by setup-jira-webhook.sh without needing secretsmanager:ListSecrets"
+  type        = "String"
+  value       = aws_secretsmanager_secret.jira_webhook_secret.name
+
+  tags = merge(local.common_tags, {
+    Component = "github-webhook"
+    Function  = "github-webhook"
+  })
+}
+
 resource "aws_lambda_function" "github_webhook" {
   s3_bucket     = aws_s3_bucket.lambda_deployments.bucket
   s3_key        = "github-webhook/github-webhook-${aws_ssm_parameter.github_webhook_lambda_version.value}.zip"

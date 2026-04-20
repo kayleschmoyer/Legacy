@@ -457,23 +457,38 @@ jobs:
         # copilot-auto-approve.yml for review-bot token generation). This is
         # idempotent — put-secret-value is safe to call on every workflow run.
         # The step is skipped if apply itself failed (secret resource may not exist).
+        #
+        # Secret name lookup uses SSM Parameter Store (ssm:GetParameter) rather than
+        # secretsmanager:ListSecrets — ListSecrets is a *-resource action that is not
+        # in the GitHub Actions IAM policy and would fail with AccessDenied (exit 254).
+        # The exact secret name is stored in SSM by Terraform as part of apply.
         if: "!cancelled() && steps.apply.outcome != 'failure'"
         env:
           REVIEW_BOT_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
         run: |
           echo "🔑 Syncing Review Bot app private key to Secrets Manager..."
 
-          SECRET_NAME=$(aws secretsmanager list-secrets \
+          # Read the exact secret name from SSM (written by Terraform on apply).
+          # Capture stderr alongside stdout so we can distinguish ParameterNotFound
+          # (expected on the first run before terraform creates the param) from real
+          # errors like AccessDenied or wrong region.
+          SSM_EXIT=0
+          SSM_OUTPUT=$(aws ssm get-parameter \
             --region "$AWS_REGION" \
-            --filter Key=name,Values="${LAMBDA_PREFIX}-agent-author-app-private-key-" \
-            --query "reverse(sort_by(SecretList, &CreatedDate))[0].Name" \
-            --output text 2>/dev/null)
+            --name "/legacy-sports/${AWS_STAGE}/lambda/github-webhook/agent-author-app-private-key-secret-name" \
+            --query "Parameter.Value" \
+            --output text 2>&1) || SSM_EXIT=$?
 
-          if [[ "$SECRET_NAME" == "None" || -z "$SECRET_NAME" ]]; then
-            echo "::warning::Secret ${LAMBDA_PREFIX}-agent-author-app-private-key-* not found \
-          — skipping sync. Run terraform apply first to create the resource."
-            exit 0
+          if [[ $SSM_EXIT -ne 0 ]]; then
+            if echo "$SSM_OUTPUT" | grep -q "ParameterNotFound"; then
+              echo "::warning::SSM param not yet created — skipping sync. \
+          Will succeed automatically on next run after terraform apply."
+              exit 0
+            fi
+            echo "::error::SSM lookup failed (exit $SSM_EXIT): $SSM_OUTPUT"
+            exit 1
           fi
+          SECRET_NAME="$SSM_OUTPUT"
 
           aws secretsmanager put-secret-value \
             --region "$AWS_REGION" \
