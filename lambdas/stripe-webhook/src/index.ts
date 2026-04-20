@@ -749,6 +749,259 @@ async function handleTrialWillEnd(
   return userId;
 }
 
+// ── Refund / dispute handlers ────────────────────────────────────────────────
+
+type RefundOutcome = {
+  userId: number;
+  subscriptionId: string | null;
+};
+
+/**
+ * Look up the subscription row matching a Stripe customer ID.
+ * Returns the userId, subscription row id + stripeSubscriptionId, or null.
+ */
+async function findSubscriptionByCustomer(stripeCustomerId: string): Promise<{
+  userId: number;
+  stripeSubscriptionId: string | null;
+} | null> {
+  return runWithInternalClient(getDbOptions(), async (db) => {
+    const rows = await db
+      .select({
+        userId: InternalSchema.subscriptions.userId,
+        stripeSubscriptionId: InternalSchema.subscriptions.stripeSubscriptionId,
+      })
+      .from(InternalSchema.subscriptions)
+      .where(
+        eq(InternalSchema.subscriptions.stripeCustomerId, stripeCustomerId),
+      )
+      .limit(1);
+    return rows[0] ?? null;
+  });
+}
+
+/**
+ * Cancel the Stripe subscription (best-effort). Errors are logged but never
+ * rethrown — we've already revoked local access, and a Stripe API failure
+ * must not cause the webhook to return 500 (which would trigger retries).
+ */
+async function cancelStripeSubscriptionSafely(
+  stripeSubscriptionId: string,
+  reason: 'refund' | 'dispute',
+): Promise<void> {
+  try {
+    const stripe = await getStripeClient();
+    await stripe.subscriptions.cancel(stripeSubscriptionId);
+    LOGGER.info('Canceled Stripe subscription after access revocation', {
+      stripeSubscriptionId,
+      reason,
+    });
+  } catch (err) {
+    LOGGER.warn('Failed to cancel Stripe subscription (non-fatal)', {
+      err,
+      stripeSubscriptionId,
+      reason,
+    });
+  }
+}
+
+/**
+ * Handle charge.refunded.
+ * - Always persists refunded_at / refund_amount_cents on the subscription row
+ *   and fires the GA4 refund analytic.
+ * - Full refund (amount_refunded >= amount): downgrades the user to free,
+ *   applies downgrade side-effects, and cancels the Stripe subscription.
+ * - Partial refund: logs + persists metadata only; tier is unchanged.
+ */
+async function handleChargeRefunded(
+  charge: Stripe.Charge,
+): Promise<RefundOutcome | null> {
+  const stripeCustomerId =
+    typeof charge.customer === 'string' ? charge.customer : null;
+  if (!stripeCustomerId) {
+    LOGGER.warn('charge.refunded missing customer ID — skipping', {
+      chargeId: charge.id,
+    });
+    return null;
+  }
+
+  const existing = await findSubscriptionByCustomer(stripeCustomerId);
+  if (!existing) {
+    LOGGER.warn('No subscription record found for charge.refunded customer', {
+      stripeCustomerId,
+      chargeId: charge.id,
+    });
+    return null;
+  }
+
+  const userId = existing.userId;
+  const stripeSubscriptionId = existing.stripeSubscriptionId;
+  const amountRefunded = charge.amount_refunded ?? 0;
+  const amount = charge.amount ?? 0;
+  const isFullRefund = amount > 0 && amountRefunded >= amount;
+  const now = new Date();
+
+  const previousTier = await runWithInternalClient(
+    getDbOptions(),
+    async (db) => {
+      const rows = await db
+        .select({ tier: InternalSchema.subscriptions.tier })
+        .from(InternalSchema.subscriptions)
+        .where(eq(InternalSchema.subscriptions.userId, userId))
+        .limit(1);
+      const prior = (rows[0]?.tier ?? null) as 'free' | 'premium' | null;
+
+      await db
+        .update(InternalSchema.subscriptions)
+        .set({
+          refundedAt: now,
+          refundAmountCents: amountRefunded,
+          updatedAt: now,
+          ...(isFullRefund
+            ? { status: 'refunded', tier: 'free' as const }
+            : {}),
+        })
+        .where(
+          eq(InternalSchema.subscriptions.stripeCustomerId, stripeCustomerId),
+        );
+
+      if (isFullRefund) {
+        await db
+          .update(InternalSchema.usersInAppInternal)
+          .set({ subscriptionTier: 'free', updatedAt: now })
+          .where(eq(InternalSchema.usersInAppInternal.id, userId));
+      }
+
+      return prior;
+    },
+  );
+
+  if (isFullRefund) {
+    LOGGER.info('Full refund — revoking premium access', {
+      userId,
+      chargeId: charge.id,
+      amountRefunded,
+    });
+    await applyTierChangeSideEffects(userId, previousTier, 'free');
+    if (stripeSubscriptionId) {
+      await cancelStripeSubscriptionSafely(stripeSubscriptionId, 'refund');
+    }
+  } else {
+    LOGGER.info('Partial refund — tier unchanged, metadata persisted', {
+      userId,
+      chargeId: charge.id,
+      amountRefunded,
+      amount,
+    });
+  }
+
+  const transactionId =
+    typeof charge.payment_intent === 'string'
+      ? charge.payment_intent
+      : charge.id;
+  await sendGa4ServerEvent(userId, 'refund', {
+    transaction_id: transactionId,
+    value: amountRefunded / 100,
+    currency: (charge.currency ?? 'usd').toUpperCase(),
+  });
+
+  return { userId, subscriptionId: stripeSubscriptionId };
+}
+
+/**
+ * Handle charge.dispute.created (chargeback).
+ * Always revokes premium access immediately: disputes require proof of
+ * non-service-use to contest, and keeping the user on premium undermines that.
+ * Also cancels the underlying Stripe subscription to stop further billing.
+ */
+async function handleChargeDisputeCreated(
+  dispute: Stripe.Dispute,
+): Promise<RefundOutcome | null> {
+  // dispute.charge may be a string id or expanded Charge object.
+  const chargeId =
+    typeof dispute.charge === 'string' ? dispute.charge : dispute.charge.id;
+
+  let stripeCustomerId: string | null = null;
+  try {
+    const stripe = await getStripeClient();
+    const charge = await stripe.charges.retrieve(chargeId);
+    stripeCustomerId =
+      typeof charge.customer === 'string' ? charge.customer : null;
+  } catch (err) {
+    LOGGER.warn('Failed to retrieve charge for dispute — skipping', {
+      err,
+      disputeId: dispute.id,
+      chargeId,
+    });
+    return null;
+  }
+
+  if (!stripeCustomerId) {
+    LOGGER.warn('Dispute charge has no customer ID — skipping', {
+      disputeId: dispute.id,
+      chargeId,
+    });
+    return null;
+  }
+
+  const existing = await findSubscriptionByCustomer(stripeCustomerId);
+  if (!existing) {
+    LOGGER.warn('No subscription record found for dispute customer', {
+      stripeCustomerId,
+      disputeId: dispute.id,
+    });
+    return null;
+  }
+
+  const userId = existing.userId;
+  const stripeSubscriptionId = existing.stripeSubscriptionId;
+  const now = new Date();
+
+  const previousTier = await runWithInternalClient(
+    getDbOptions(),
+    async (db) => {
+      const rows = await db
+        .select({ tier: InternalSchema.subscriptions.tier })
+        .from(InternalSchema.subscriptions)
+        .where(eq(InternalSchema.subscriptions.userId, userId))
+        .limit(1);
+      const prior = (rows[0]?.tier ?? null) as 'free' | 'premium' | null;
+
+      await db
+        .update(InternalSchema.subscriptions)
+        .set({
+          status: 'disputed',
+          tier: 'free',
+          disputedAt: now,
+          disputeStatus: dispute.status,
+          updatedAt: now,
+        })
+        .where(
+          eq(InternalSchema.subscriptions.stripeCustomerId, stripeCustomerId),
+        );
+
+      await db
+        .update(InternalSchema.usersInAppInternal)
+        .set({ subscriptionTier: 'free', updatedAt: now })
+        .where(eq(InternalSchema.usersInAppInternal.id, userId));
+
+      return prior;
+    },
+  );
+
+  LOGGER.info('Dispute created — revoking premium access immediately', {
+    userId,
+    disputeId: dispute.id,
+    disputeStatus: dispute.status,
+  });
+
+  await applyTierChangeSideEffects(userId, previousTier, 'free');
+  if (stripeSubscriptionId) {
+    await cancelStripeSubscriptionSafely(stripeSubscriptionId, 'dispute');
+  }
+
+  return { userId, subscriptionId: stripeSubscriptionId };
+}
+
 // ── Notification helper ───────────────────────────────────────────────────────
 
 async function pushSubscriptionUpdated(
@@ -953,38 +1206,19 @@ const baseStripeWebhookHandler = async (
 
       case 'charge.refunded': {
         const charge = stripeEvent.data.object;
-        const chargeCustomerId =
+        const refundResult = await handleChargeRefunded(charge);
+        userId = refundResult?.userId ?? null;
+        subscriptionId = refundResult?.subscriptionId ?? null;
+        customerId =
           typeof charge.customer === 'string' ? charge.customer : null;
-        if (chargeCustomerId) {
-          const existing = await runWithInternalClient(
-            getDbOptions(),
-            async (db) => {
-              const rows = await db
-                .select({ userId: InternalSchema.subscriptions.userId })
-                .from(InternalSchema.subscriptions)
-                .where(
-                  eq(
-                    InternalSchema.subscriptions.stripeCustomerId,
-                    chargeCustomerId,
-                  ),
-                )
-                .limit(1);
-              return rows[0] ?? null;
-            },
-          );
-          if (existing) {
-            userId = existing.userId;
-            const transactionId =
-              typeof charge.payment_intent === 'string'
-                ? charge.payment_intent
-                : charge.id;
-            await sendGa4ServerEvent(userId, 'refund', {
-              transaction_id: transactionId,
-              value: (charge.amount_refunded ?? 0) / 100,
-              currency: (charge.currency ?? 'usd').toUpperCase(),
-            });
-          }
-        }
+        break;
+      }
+
+      case 'charge.dispute.created': {
+        const dispute = stripeEvent.data.object;
+        const disputeResult = await handleChargeDisputeCreated(dispute);
+        userId = disputeResult?.userId ?? null;
+        subscriptionId = disputeResult?.subscriptionId ?? null;
         break;
       }
 

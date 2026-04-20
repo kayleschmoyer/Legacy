@@ -178,6 +178,10 @@ export const subscriptions = appInternal.table(
     gracePeriodEndsAt: timestamp('grace_period_ends_at', {
       withTimezone: true,
     }),
+    refundedAt: timestamp('refunded_at', { withTimezone: true }),
+    refundAmountCents: integer('refund_amount_cents'),
+    disputedAt: timestamp('disputed_at', { withTimezone: true }),
+    disputeStatus: text('dispute_status'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

@@ -196,6 +196,15 @@ describe('stripe-webhook event handlers', () => {
           trial_end: null,
           items: { data: [{ current_period_end: 1700000000 }] },
         }),
+        cancel: jest
+          .fn()
+          .mockResolvedValue({ id: 'sub_123', status: 'canceled' }),
+      },
+      charges: {
+        retrieve: jest.fn().mockResolvedValue({
+          id: 'ch_disputed',
+          customer: 'cus_123',
+        }),
       },
       customers: {
         // Default: customer metadata userId matches '42' used in the
@@ -1030,7 +1039,24 @@ describe('stripe-webhook event handlers', () => {
   // ── charge.refunded ───────────────────────────────────────────────────────
 
   describe('charge.refunded', () => {
-    it('performs customer→user lookup and fires GA4 refund event', async () => {
+    /**
+     * DB for refund/dispute path: a customer lookup (select/from/where/limit)
+     * followed by a previousTier read + updates inside a runWithInternalClient
+     * callback. We simulate both with makeSelectThenUpdateDb variants.
+     */
+    function makeRefundDb(
+      customerRow: unknown[] = [
+        { userId: 42, stripeSubscriptionId: 'sub_123' },
+      ],
+      priorTierRow: unknown[] = [{ tier: 'premium' }],
+    ) {
+      return {
+        customerLookup: (): unknown => makeSelectDb(customerRow),
+        tierUpdate: (): unknown => makeSelectThenUpdateDb(priorTierRow),
+      };
+    }
+
+    it('full refund downgrades tier, cancels Stripe subscription, persists metadata, fires GA4', async () => {
       mockConstructEvent.mockReturnValue(
         fakeStripeEvent({
           type: 'charge.refunded',
@@ -1039,6 +1065,7 @@ describe('stripe-webhook event handlers', () => {
               id: 'ch_123',
               customer: 'cus_123',
               payment_intent: 'pi_123',
+              amount: 1999,
               amount_refunded: 1999,
               currency: 'usd',
             },
@@ -1047,22 +1074,85 @@ describe('stripe-webhook event handlers', () => {
       );
 
       setupNotProcessed();
-      // customer→user lookup
+      const db = makeRefundDb();
+      // customer→user lookup (findSubscriptionByCustomer)
       mockRunWithInternalClient.mockImplementationOnce(
         (_opts: unknown, cb: (db: unknown) => unknown) =>
-          cb(makeSelectDb([{ userId: 42 }])),
+          cb(db.customerLookup()),
+      );
+      // prior tier + update subscription + update user (all inside one callback)
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) => cb(db.tierUpdate()),
       );
       setupRecordEvent();
+      // pushSubscriptionUpdated DB lookup (subscriptionId is non-null)
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectDb([{ tier: 'free', status: 'refunded' }])),
+      );
 
       const result = await handler(makeEvent());
 
       expect(result.statusCode).toBe(200);
+      // Full refund: premium → free triggers downgrade side-effects
+      expect(mockHandleSubscriptionDowngrade).toHaveBeenCalledWith(
+        42,
+        expect.any(Object),
+      );
       expect(mockSendGa4ServerEvent).toHaveBeenCalledWith(
         42,
         'refund',
         expect.objectContaining({
           transaction_id: 'pi_123',
           value: 19.99,
+          currency: 'USD',
+        }),
+      );
+    });
+
+    it('partial refund persists metadata but does not change tier', async () => {
+      mockConstructEvent.mockReturnValue(
+        fakeStripeEvent({
+          type: 'charge.refunded',
+          data: {
+            object: {
+              id: 'ch_part',
+              customer: 'cus_123',
+              payment_intent: 'pi_part',
+              amount: 1999,
+              amount_refunded: 500,
+              currency: 'usd',
+            },
+          },
+        }),
+      );
+
+      setupNotProcessed();
+      const db = makeRefundDb();
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(db.customerLookup()),
+      );
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) => cb(db.tierUpdate()),
+      );
+      setupRecordEvent();
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectDb([{ tier: 'premium', status: 'active' }])),
+      );
+
+      const result = await handler(makeEvent());
+
+      expect(result.statusCode).toBe(200);
+      // Partial refund must NOT downgrade the user.
+      expect(mockHandleSubscriptionDowngrade).not.toHaveBeenCalled();
+      expect(mockSendGa4ServerEvent).toHaveBeenCalledWith(
+        42,
+        'refund',
+        expect.objectContaining({
+          transaction_id: 'pi_part',
+          value: 5,
           currency: 'USD',
         }),
       );
@@ -1077,6 +1167,7 @@ describe('stripe-webhook event handlers', () => {
               id: 'ch_456',
               customer: 'cus_123',
               payment_intent: null,
+              amount: 999,
               amount_refunded: 999,
               currency: 'usd',
             },
@@ -1085,11 +1176,19 @@ describe('stripe-webhook event handlers', () => {
       );
 
       setupNotProcessed();
+      const db = makeRefundDb();
       mockRunWithInternalClient.mockImplementationOnce(
         (_opts: unknown, cb: (db: unknown) => unknown) =>
-          cb(makeSelectDb([{ userId: 42 }])),
+          cb(db.customerLookup()),
+      );
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) => cb(db.tierUpdate()),
       );
       setupRecordEvent();
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectDb([{ tier: 'free', status: 'refunded' }])),
+      );
 
       await handler(makeEvent());
 
@@ -1100,44 +1199,7 @@ describe('stripe-webhook event handlers', () => {
       );
     });
 
-    it('remains non-fatal when GA4 sending throws — returns 200 to Stripe', async () => {
-      // sendGa4ServerEvent has an internal try/catch and never propagates errors,
-      // but verify the webhook still returns 200 if the mock unexpectedly rejects.
-      mockSendGa4ServerEvent.mockImplementationOnce(async () => {
-        throw new Error('GA4 timeout');
-      });
-
-      mockConstructEvent.mockReturnValue(
-        fakeStripeEvent({
-          type: 'charge.refunded',
-          data: {
-            object: {
-              id: 'ch_789',
-              customer: 'cus_123',
-              payment_intent: 'pi_789',
-              amount_refunded: 500,
-              currency: 'usd',
-            },
-          },
-        }),
-      );
-
-      setupNotProcessed();
-      mockRunWithInternalClient.mockImplementationOnce(
-        (_opts: unknown, cb: (db: unknown) => unknown) =>
-          cb(makeSelectDb([{ userId: 42 }])),
-      );
-      // GA4 throwing causes the outer catch to fire → 500
-      // The real sendGa4ServerEvent is non-fatal (catches internally), so this
-      // test documents the current handler behaviour and acts as a regression guard.
-      const result = await handler(makeEvent());
-
-      // If GA4 throws out of sendGa4ServerEvent the outer handler will return 500.
-      // Acceptable: GA4 errors are swallowed inside the real implementation.
-      expect([200, 500]).toContain(result.statusCode);
-    });
-
-    it('skips GA4 event when no user found for the customer', async () => {
+    it('skips processing when no user found for the customer', async () => {
       mockConstructEvent.mockReturnValue(
         fakeStripeEvent({
           type: 'charge.refunded',
@@ -1146,6 +1208,7 @@ describe('stripe-webhook event handlers', () => {
               id: 'ch_999',
               customer: 'cus_unknown',
               payment_intent: 'pi_999',
+              amount: 100,
               amount_refunded: 100,
               currency: 'usd',
             },
@@ -1164,6 +1227,79 @@ describe('stripe-webhook event handlers', () => {
 
       expect(result.statusCode).toBe(200);
       expect(mockSendGa4ServerEvent).not.toHaveBeenCalled();
+      expect(mockHandleSubscriptionDowngrade).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── charge.dispute.created ────────────────────────────────────────────────
+
+  describe('charge.dispute.created', () => {
+    it('immediately revokes premium access and cancels Stripe subscription', async () => {
+      mockConstructEvent.mockReturnValue(
+        fakeStripeEvent({
+          type: 'charge.dispute.created',
+          data: {
+            object: {
+              id: 'dp_123',
+              charge: 'ch_disputed',
+              status: 'warning_needs_response',
+            },
+          },
+        }),
+      );
+
+      setupNotProcessed();
+      // customer→user lookup
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectDb([{ userId: 42, stripeSubscriptionId: 'sub_123' }])),
+      );
+      // prior tier + update subscription + update user
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectThenUpdateDb([{ tier: 'premium' }])),
+      );
+      setupRecordEvent();
+      // pushSubscriptionUpdated DB lookup
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectDb([{ tier: 'free', status: 'disputed' }])),
+      );
+
+      const result = await handler(makeEvent());
+
+      expect(result.statusCode).toBe(200);
+      // Chargeback always downgrades premium → free
+      expect(mockHandleSubscriptionDowngrade).toHaveBeenCalledWith(
+        42,
+        expect.any(Object),
+      );
+    });
+
+    it('skips when no subscription record matches the dispute customer', async () => {
+      mockConstructEvent.mockReturnValue(
+        fakeStripeEvent({
+          type: 'charge.dispute.created',
+          data: {
+            object: {
+              id: 'dp_999',
+              charge: 'ch_disputed',
+              status: 'warning_needs_response',
+            },
+          },
+        }),
+      );
+
+      setupNotProcessed();
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) => cb(makeSelectDb([])),
+      );
+      setupRecordEvent();
+
+      const result = await handler(makeEvent());
+
+      expect(result.statusCode).toBe(200);
+      expect(mockHandleSubscriptionDowngrade).not.toHaveBeenCalled();
     });
   });
 });
