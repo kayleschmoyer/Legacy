@@ -120,6 +120,13 @@ export const WaiverClaimModal: React.FC<WaiverClaimModalProps> = ({
           dropPlayerId: dropPlayerId ?? undefined,
           faabBid: isFaab ? (parsedFaabBid ?? undefined) : undefined,
         },
+        // claimFreeAgent returns the new WaiverClaim entity, but Apollo's
+        // normalized cache can't know which list queries it belongs to.
+        // Refetch the team's waiver list and the league activity feed by
+        // name so every active observer updates regardless of variables
+        // (LS-3769).
+        awaitRefetchQueries: true,
+        refetchQueries: ['GetTeamWaiverClaims', 'GetLeagueActivity'],
       });
       setSuccess(true);
     } catch (err) {

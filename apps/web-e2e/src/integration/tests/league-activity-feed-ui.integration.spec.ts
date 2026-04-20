@@ -23,7 +23,7 @@
  *     src/integration/tests/league-activity-feed-ui.integration.spec.ts
  */
 
-import { expect, type Locator, type Page } from '@playwright/test';
+import { expect } from '@playwright/test';
 import { createLeagueViaUI } from '../helpers/create-league';
 import { waitForJoinPageValidation } from '../helpers/wait-for-join-page';
 import { switchUser, test } from '../fixtures/ui';
@@ -75,33 +75,6 @@ async function gqlFetch<T>(
   }
   if (!json.data) throw new Error('GraphQL response contained no data');
   return json.data;
-}
-
-/**
- * Wait for `locator` to become visible, and if the first wait times out,
- * reload the page once and wait again. Use when a prior phase has written
- * data the current phase depends on, but read-replica lag or an Apollo
- * cache miss can make it absent from the first fetch. Other errors (page
- * closed, navigation failure) surface immediately rather than triggering
- * a reload. LS-3753, LS-3766.
- */
-async function waitVisibleWithReload(
-  page: Page,
-  locator: Locator,
-  {
-    firstTimeout = 10_000,
-    retryTimeout = 15_000,
-  }: { firstTimeout?: number; retryTimeout?: number } = {},
-): Promise<void> {
-  try {
-    await locator.waitFor({ state: 'visible', timeout: firstTimeout });
-    return;
-  } catch (e) {
-    if (!(e instanceof Error) || e.name !== 'TimeoutError') throw e;
-  }
-  await page.reload();
-  await page.waitForLoadState('load');
-  await expect(locator).toBeVisible({ timeout: retryTimeout });
 }
 
 // ---------------------------------------------------------------------------
@@ -406,15 +379,14 @@ test.describe
         managerPage2.getByText('Trading Center', { exact: false }).first(),
       ).toBeVisible({ timeout: 15_000 });
 
-      // Find the Accept button on the incoming trade. The trade was proposed
-      // moments ago in a separate browser context — if it hasn't propagated to
-      // this context's first fetch, reload once to force a fresh network
-      // request (bypasses any cache-and-network race where the cached empty
-      // result is served first). LS-3753.
+      // The trade was proposed moments ago in a separate browser context.
+      // TradingCenter uses `cache-and-network` so the query revalidates on
+      // mount — a generous wait lets the network response land before the
+      // assertion. LS-3769 removed the prior reload+retry workaround.
       const acceptBtn = managerPage2
         .getByRole('button', { name: /Accept/i })
         .first();
-      await waitVisibleWithReload(managerPage2, acceptBtn);
+      await expect(acceptBtn).toBeVisible({ timeout: 15_000 });
       await acceptBtn.click();
 
       // Handle confirmation dialog if present
@@ -615,13 +587,12 @@ test.describe
     });
 
     await test.step('Verify announcement event appears', async () => {
-      // The announcement insert in Phase 4 is a separate transaction from the
-      // activity feed query here; read-replica lag or an Apollo cache that
-      // hasn't revalidated can leave the event absent from the first fetch.
-      // Reload once on miss to force a fresh network request — same helper as
-      // the trade-accept step above (LS-3753, LS-3766).
+      // LeagueActivityFeed uses `cache-and-network` and
+      // postLeagueAnnouncement refetches GetLeagueActivity by name, so the
+      // announcement event is present on the next mount without a reload
+      // (LS-3769).
       const announcement = page.getByText(/League announcement/i).first();
-      await waitVisibleWithReload(page, announcement);
+      await expect(announcement).toBeVisible({ timeout: 15_000 });
     });
 
     await test.step('Verify via API that all event types are recorded', async () => {

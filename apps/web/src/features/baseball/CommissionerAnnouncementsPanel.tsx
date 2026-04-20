@@ -86,7 +86,7 @@ export function CommissionerAnnouncementsPanel({
   // Delete state
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const { data, loading, refetch } = useGetLeagueAnnouncementsQuery({
+  const { data, loading } = useGetLeagueAnnouncementsQuery({
     variables: { leagueId },
     skip: isNaN(leagueId),
     fetchPolicy: 'cache-and-network',
@@ -110,22 +110,28 @@ export function CommissionerAnnouncementsPanel({
       await postAnnouncement({
         variables: { leagueId, messageText: text },
         awaitRefetchQueries: true,
+        // The mutation returns the new LeagueChatMessage entity (handled by
+        // the normalized cache), but the league activity feed renders a
+        // separate LeagueActivity event type that the server derives from
+        // announcements. Refetch both list queries — GetLeagueActivity is
+        // passed by name so every active observer refetches regardless of
+        // its (leagueId, limit, eventTypes) variables (LS-3769).
         refetchQueries: [
           {
             query: GetLeagueAnnouncements,
             variables: { leagueId },
           },
+          'GetLeagueActivity',
         ],
       });
       setInputText('');
       setShowCompose(false);
-      void refetch();
     } catch (err: unknown) {
       setPostError(
         err instanceof Error ? err.message : 'Failed to post announcement',
       );
     }
-  }, [inputText, posting, postAnnouncement, leagueId, refetch]);
+  }, [inputText, posting, postAnnouncement, leagueId]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {

@@ -314,6 +314,14 @@ export function LeagueActivityFeed({
   const { data, loading, error } = useGetLeagueActivityQuery({
     variables: { leagueId, limit: 200 },
     errorPolicy: 'all',
+    // The feed aggregates events produced by many different mutations
+    // (trades, waivers, announcements, draft picks) across multiple users'
+    // sessions. Apollo's normalized cache can't auto-append heterogeneous
+    // LeagueActivity records from each source mutation without duplicating
+    // server-side formatting, and cross-user writes arrive without any
+    // local mutation at all. `cache-and-network` keeps the feed fresh on
+    // every mount while still rendering instantly from cache (LS-3769).
+    fetchPolicy: 'cache-and-network',
   });
 
   const activities: ActivityItem[] = useMemo(
@@ -396,7 +404,7 @@ export function LeagueActivityFeed({
 
       {/* Activity list */}
       <YStack gap="$1">
-        {loading ? (
+        {loading && !data ? (
           <YStack paddingVertical="$5" alignItems="center">
             <Spinner size="small" color="$textMuted" />
           </YStack>
