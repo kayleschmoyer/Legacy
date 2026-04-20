@@ -108,22 +108,45 @@ export async function selectAndAssignGameIdentifiers(
     (g) => !usedIds.has(g.gameIdentifier),
   );
 
-  // Randomly select N unique games for unassigned slots
-  const shuffled = availableGames
+  // Take as many fresh-unique identifiers as possible for the unassigned
+  // slots; any remaining slots are filled by the recycle fallback below.
+  const selected: string[] = availableGames
     .map((g) => ({ gameIdentifier: g.gameIdentifier, sort: Math.random() }))
     .sort((a, b) => a.sort - b.sort)
-    .slice(0, unassignedGames.length);
+    .slice(0, unassignedGames.length)
+    .map((g) => g.gameIdentifier)
+    .filter((id): id is string => id !== null);
+
+  // If unique games are exhausted (player has fewer distinct BR games than
+  // gamesPerMatchup, or duplicate-prevention filtered too aggressively),
+  // recycle from the full uniqueGames pool so no non-SP-skipped slot is left
+  // with gameIdentifier=null. Re-using an identifier is acceptable; leaving
+  // null breaks the invariant that non-skipped rows always have a real game.
+  if (selected.length < unassignedGames.length) {
+    const recyclePool = uniqueGames
+      .map((g) => g.gameIdentifier)
+      .filter((id): id is string => id !== null);
+    const needed = unassignedGames.length - selected.length;
+    LOGGER.warn(
+      `Only ${availableGames.length} unique games available for ${unassignedGames.length} slots (matchup player ${matchupPlayerId}); recycling ${needed} identifier(s) from pool of ${recyclePool.length}`,
+    );
+    for (let i = 0; i < needed && recyclePool.length > 0; i++) {
+      selected.push(
+        recyclePool[Math.floor(Math.random() * recyclePool.length)],
+      );
+    }
+  }
 
   LOGGER.info(
-    `Selected ${shuffled.length} random games from ${availableGames.length} available (${usedIds.size} already used)`,
+    `Assigning ${selected.length} games (${availableGames.length} unique available, ${usedIds.size} already used) for ${unassignedGames.length} slots`,
   );
 
   // Update each unassigned matchup_player_games record with a game_identifier
-  for (let i = 0; i < shuffled.length && i < unassignedGames.length; i++) {
+  for (let i = 0; i < selected.length && i < unassignedGames.length; i++) {
     await db
       .update(PublicSchema.matchupPlayerGames)
       .set({
-        gameIdentifier: shuffled[i].gameIdentifier,
+        gameIdentifier: selected[i],
       })
       .where(eq(PublicSchema.matchupPlayerGames.id, unassignedGames[i].id));
   }
