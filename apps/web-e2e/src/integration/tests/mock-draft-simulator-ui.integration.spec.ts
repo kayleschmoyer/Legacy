@@ -266,7 +266,7 @@ test.describe
     let consecutiveMisses = 0;
     // Reload only after 3× the pick timer with no progress (3 × 30 s = 90 s)
     const MAX_MISSES = 90;
-    // Reload if "YOUR PICK" shows but no clickable button appears for too long.
+    // Reload if "Your pick" shows but no clickable button appears for too long.
     // Indicates Apollo cache stale (server has pick committed but client doesn't
     // know) — LS-3704. 15 × 1 s iterations = 15 s before reload.
     let noButtonFoundCount = 0;
@@ -292,7 +292,7 @@ test.describe
         // v1.40+ — the timeout is silently ignored and the call returns
         // immediately.  Use waitFor() to actually wait for the element.
         const isMyTurn = await page
-          .getByText('YOUR PICK', { exact: true })
+          .getByText('Your pick', { exact: true })
           .first()
           .waitFor({ state: 'visible', timeout: 2_000 })
           .then(() => true)
@@ -300,7 +300,7 @@ test.describe
 
         if (isMyTurn) {
           // Wait for at least one "Draft ... now" button to appear.
-          // "YOUR PICK" in the header can render before the PlayerCard
+          // "Your pick" in the header can render before the PlayerCard
           // components re-render with isMyPick=true (which changes the
           // aria-label from "Waiting for your turn..." to "Draft X now").
           // Without this wait, the button count can be 0 on every iteration
@@ -338,7 +338,7 @@ test.describe
           if (draftBtnIdx >= 0) {
             // Capture the current pick label so we can detect when the pick
             // advances — robust even for back-to-back picks in snake drafts
-            // where "YOUR PICK" may remain visible across picks.
+            // where "Your pick" may remain visible across picks.
             const currentPickLocator = page
               .getByText(/Round .* · Pick .*/)
               .first();
@@ -367,9 +367,9 @@ test.describe
                 await page.waitForTimeout(pollIntervalMs);
               }
             } else {
-              // Fallback: use "YOUR PICK" disappearance heuristic
+              // Fallback: use "Your pick" disappearance heuristic
               wasAccepted = await page
-                .getByText('YOUR PICK', { exact: true })
+                .getByText('Your pick', { exact: true })
                 .first()
                 .waitFor({ state: 'hidden', timeout: 8_000 })
                 .then(() => true)
@@ -386,7 +386,7 @@ test.describe
               if (playerName) draftedPlayers.add(playerName);
             }
           } else {
-            // "YOUR PICK" visible but no clickable "Draft X now" button found.
+            // "Your pick" visible but no clickable "Draft X now" button found.
             // This can happen when the Apollo cache is stale after a chain error
             // (LS-3704): the server committed the pick but the client didn't
             // receive a success response, so the UI is stuck on the user's

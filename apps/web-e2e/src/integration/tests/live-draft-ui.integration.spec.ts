@@ -7,7 +7,7 @@
  *   2. Three managers join via invite code
  *   3. Verify live draft settings (defaults: Live/Standard/Snake)
  *   4. Commissioner starts the draft
- *   5. All 4 users open the draft board; whoever sees "YOUR PICK" picks
+ *   5. All 4 users open the draft board; whoever sees "Your pick" picks
  *   6. Verify draft completes and commissioner roster is filled
  *   7. Manager verifies their roster via their own browser context
  *
@@ -243,7 +243,7 @@ test.describe
       // Track players drafted this session so we never click a button for an
       // already-drafted player whose card is still visible due to WebSocket /
       // Apollo update lag.  Without this guard the test can get a false
-      // wasAccepted=true (because "YOUR PICK" briefly hides during a
+      // wasAccepted=true (because "Your pick" briefly hides during a
       // concurrent refetch re-render) and log a duplicate pick.
       const draftedPlayers = new Set<string>();
 
@@ -263,9 +263,9 @@ test.describe
         }
         if (draftDone) break;
 
-        // Find the page showing "YOUR PICK" — the draft board shows
-        // "YOUR PICK" when isMyPick=true, "ON THE CLOCK" otherwise.
-        // Only click on the page whose turn it actually is.
+        // Find the page showing "Your pick" — the draft board's top band
+        // (DraftTopBand) shows "Your pick" when isMyPick=true, "On the clock"
+        // otherwise. Only click on the page whose turn it actually is.
         //
         // Use exact:true to avoid false positives from the
         // PickAnnouncement overlay ("\ud83c\udf89 YOUR PICK") which briefly
@@ -276,7 +276,7 @@ test.describe
         let pickerFound = false;
         for (const { label, page } of pages) {
           const isMyTurn = await page
-            .getByText('YOUR PICK', { exact: true })
+            .getByText('Your pick', { exact: true })
             .first()
             .waitFor({ state: 'visible', timeout: 2000 })
             .then(() => true)
@@ -290,7 +290,7 @@ test.describe
           const allDraftBtns = page.getByRole('button', {
             name: /Draft .* now/i,
           });
-          // Wait for at least one draft button to render after "YOUR PICK"
+          // Wait for at least one draft button to render after "Your pick"
           // appears - the player list may lag behind the turn indicator.
           await allDraftBtns
             .first()
@@ -321,14 +321,14 @@ test.describe
           await allDraftBtns.nth(draftBtnIdx).click({ force: true });
 
           // Verify the pick was accepted by checking the turn advanced:
-          // "YOUR PICK" (exact) must disappear from this page, meaning
+          // "Your pick" (exact) must disappear from this page, meaning
           // the server confirmed the pick and moved to the next drafter.
           //
           // Do NOT check whether the player button disappears — it can
           // vanish due to an incoming WebSocket update about another
           // manager's pick (false positive), causing duplicate-pick logs.
           const wasAccepted = await page
-            .getByText('YOUR PICK', { exact: true })
+            .getByText('Your pick', { exact: true })
             .first()
             .waitFor({ state: 'hidden', timeout: 8000 })
             .then(() => true)
