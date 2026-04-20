@@ -385,27 +385,29 @@ test.describe
         .filter({ hasText: 'STARTERS' })
         .first();
 
-      // Target the pressable row via its testID, not the inner Text node.
-      // Clicking the inner <Text> doesn't reliably propagate to the XStack's
-      // onPress handler on web (LS-3754).
-      // PLAYER_NAME_RE is anchored with `^`, so it wouldn't match a row's
-      // combined text (which starts with the position badge). Use `has` to
-      // match rows that *contain* a player-name Text descendant instead.
-      // The `has` locator is re-rooted per candidate row, so `page.getByText`
-      // (not `editorCard.getByText(...).first()`, which resolves to a single
-      // global snapshot and breaks the filter — LS-3765) is the right root.
-      const starterRow = editorCard
-        .getByTestId(/^matchup-player-row-/)
-        .filter({ has: page.getByText(PLAYER_NAME_RE) })
-        .first();
-      await expect(starterRow).toBeVisible({ timeout: 15_000 });
-
-      // Capture the player name for later verification
-      state.benchedPlayerName =
-        (await starterRow.getByText(PLAYER_NAME_RE).first().textContent()) ??
-        '';
+      // Capture a visible starter name first — text matching confirmed working
+      // in Phase 5. We resolve the name up-front so we can use hasText (string
+      // substring match) to find the row rather than has+regex. The `^`-anchored
+      // PLAYER_NAME_RE doesn't match a row's combined text (which starts with the
+      // position badge, e.g. "SP John Smith …"), so filter({ has: getByText(regex)
+      // }) silently matched 0 rows (LS-3775).
+      const playerNameEl = editorCard.getByText(PLAYER_NAME_RE).first();
+      await expect(playerNameEl).toBeVisible({ timeout: 15_000 });
+      state.benchedPlayerName = ((await playerNameEl.textContent()) ?? '')
+        .replace(/\s+/g, ' ')
+        .trim();
       expect(state.benchedPlayerName).toBeTruthy();
 
+      // Target the pressable row via its testID, not the inner Text node.
+      // Clicking the inner <Text> doesn't reliably propagate to the XStack's
+      // onPress handler on web (LS-3754). hasText with a string does
+      // case-insensitive substring matching on the row's combined text, which
+      // reliably finds the row even when the text starts with a position badge.
+      const starterRow = editorCard
+        .getByTestId(/^matchup-player-row-/)
+        .filter({ hasText: state.benchedPlayerName })
+        .first();
+      await expect(starterRow).toBeVisible({ timeout: 15_000 });
       await starterRow.click();
       await page.waitForTimeout(500);
     });

@@ -23,7 +23,7 @@
  *     src/integration/tests/league-activity-feed-ui.integration.spec.ts
  */
 
-import { expect } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 import { createLeagueViaUI } from '../helpers/create-league';
 import { waitForJoinPageValidation } from '../helpers/wait-for-join-page';
 import { switchUser, test } from '../fixtures/ui';
@@ -51,6 +51,27 @@ const GQL_URL =
   (
     process.env.INTEGRATION_BASE_URL ?? 'https://api.legacy-fantasy.com/'
   ).replace(/\/?$/, '/') + 'graphql';
+
+/**
+ * Wait for a locator to become visible, reloading once if the first attempt
+ * times out. Covers Apollo cache-miss / read-replica lag windows where the
+ * component mounts before the network response arrives (LS-3766, LS-3775).
+ */
+async function waitVisibleWithReload(
+  page: Page,
+  locator: Locator,
+  { firstTimeout = 10_000, retryTimeout = 15_000 } = {},
+): Promise<void> {
+  try {
+    await locator.waitFor({ state: 'visible', timeout: firstTimeout });
+    return;
+  } catch (e) {
+    if (!(e instanceof Error) || e.name !== 'TimeoutError') throw e;
+  }
+  await page.reload();
+  await page.waitForLoadState('load');
+  await expect(locator).toBeVisible({ timeout: retryTimeout });
+}
 
 /** Fire a raw GraphQL query against the live backend. */
 async function gqlFetch<T>(
@@ -587,12 +608,14 @@ test.describe
     });
 
     await test.step('Verify announcement event appears', async () => {
-      // LeagueActivityFeed uses `cache-and-network` and
-      // postLeagueAnnouncement refetches GetLeagueActivity by name, so the
-      // announcement event is present on the next mount without a reload
-      // (LS-3769).
+      // Phase 4 posts the announcement while on /overview where
+      // LeagueActivityFeed is not mounted — so refetchQueries by name
+      // (LS-3769) finds no active observer and is a no-op. On first
+      // navigation here, cache-and-network issues a fresh request, but
+      // read-replica lag can delay the row. Reload+retry covers that
+      // window (LS-3766, restored by LS-3775).
       const announcement = page.getByText(/League announcement/i).first();
-      await expect(announcement).toBeVisible({ timeout: 15_000 });
+      await waitVisibleWithReload(page, announcement);
     });
 
     await test.step('Verify via API that all event types are recorded', async () => {
