@@ -371,9 +371,35 @@ test.describe
       await managerPage2.goto(`/baseball/league/${state.leagueId}/trades`);
       await managerPage2.waitForLoadState('load');
 
-      // Find and click the Accept button on the incoming trade
+      // Wait for TradingCenter to mount (requires userTeamId query to resolve).
+      // If it hasn't loaded, the page shows "Join this league..." instead and
+      // Accept would never appear. Asserting the heading here gives a clear
+      // failure signal separating "component not mounted" from "trade missing".
+      await expect(
+        managerPage2.getByText('Trading Center', { exact: false }).first(),
+      ).toBeVisible({ timeout: 15_000 });
+
+      // Find the Accept button on the incoming trade. The trade was proposed
+      // moments ago in a separate browser context — if it hasn't propagated to
+      // this context's first fetch, reload once to force a fresh network
+      // request (bypasses any cache-and-network race where the cached empty
+      // result is served first). LS-3753.
       const acceptBtn = managerPage2.getByRole('button', { name: /Accept/i });
-      await expect(acceptBtn.first()).toBeVisible({ timeout: 15_000 });
+      let firstTry = true;
+      try {
+        await acceptBtn.first().waitFor({ state: 'visible', timeout: 10_000 });
+      } catch (e) {
+        // Only treat Playwright timeouts as "not found yet — retry". Any other
+        // error (page closed, navigation failure, etc.) is a real problem and
+        // should surface immediately.
+        if (!(e instanceof Error) || e.name !== 'TimeoutError') throw e;
+        firstTry = false;
+      }
+      if (!firstTry) {
+        await managerPage2.reload();
+        await managerPage2.waitForLoadState('load');
+        await expect(acceptBtn.first()).toBeVisible({ timeout: 15_000 });
+      }
       await acceptBtn.first().click();
 
       // Handle confirmation dialog if present
