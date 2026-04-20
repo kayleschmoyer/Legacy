@@ -7,21 +7,21 @@
  */
 
 /**
- * Height of the sticky top navigation bar in pixels.
+ * Height of the sticky top navigation bar in its default (non-compact) state,
+ * in pixels. Used as the `top` offset for fixed/sticky elements that must
+ * clear the nav bar (e.g. the score ticker strip).
  *
  * Composed of:
- *   - AccentBar gradient strip (3 px)
- *   - NavContent paddingVertical ($4 × 2 = 32 px)
- *   - Logo image height (38 px)
+ *   - NavContent paddingVertical ($3 × 2 = 26 px)
+ *   - Logo image height — non-compact only (38 px; compact shrinks to 30 px)
  *   - Border bottom (1 px)
- *   - 1 px safety buffer
- *   = 75 px
+ *   = 65 px
  *
- * Consumers that render their own `position: sticky` elements should use
- * this value as the `top` offset so they stack directly below the nav bar
- * instead of overlapping it.
+ * The compact variant (logo 30 px, triggered at scrollY > 80) reduces the
+ * rendered height to 57 px, but fixed/sticky consumers keep this offset so
+ * they never overlap the nav on initial page load.
  */
-export const NAV_HEIGHT_PX = 75;
+export const NAV_HEIGHT_PX = 65;
 
 /**
  * Z-index for the main sticky navigation bar.
