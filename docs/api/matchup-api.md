@@ -390,6 +390,13 @@ mutation MovePlayer($matchupPlayerId: Int!, $positionId: Int!) {
 > by this mutation but is not exposed through GraphQL — it's used by
 > server-side roster propagation only. See
 > [Schema and roster](../architecture/matchup-system.md#1-schema-and-roster-lib-db-clientsrcdrizzlepublicmodelsmatchupsts).
+>
+> **Lineup window.** Both `updateMatchupPlayerPosition` and
+> `swapMatchupPlayerPositions` require `matchup.status === 'scheduled'` —
+> they throw once the contest has started (`in_progress`) or finished
+> (`completed`). See
+> [Status machine and automated progression](../architecture/matchup-system.md#4-status-machine-and-automated-progression)
+> for who flips `scheduled → in_progress`.
 
 ---
 

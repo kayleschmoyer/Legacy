@@ -109,6 +109,43 @@ A matchup's `status` enum is `scheduled → in_progress → completed` (with
 parallel enum that tracks the async fetch from the stats lambda
 (`not_started → queued → loading → completed | failed → retry`).
 
+**Lineup-editing window.** `updateMatchupPlayerPosition` and
+`swapMatchupPlayerPositions` require `status === 'scheduled'`. Managers
+set and swap lineups during the scheduled window; once the contest starts
+(status flips to `in_progress`) the lineup is locked for the rest of the
+week.
+
+**Who flips `scheduled → in_progress`.** `createAllMatchupsForLeague`
+inserts every matchup — including week 1 — as `scheduled`. Two code paths
+drive the transition:
+
+1. **`autoSelectGames`** (`lambdas/db/src/schema/matchups/scheduled-mutations.ts`)
+   — the nightly game-selection cron. Before selecting games, it checks
+   each active league and, if the league has no `in_progress` matchups yet
+   (i.e. no week has been activated), it promotes that league's
+   lowest-week `scheduled` matchups to `in_progress`. This locks the
+   lineup for that week and is the activator for **week 1**.
+2. **`advanceLeagueWeekInternal`** (same file, invoked by
+   `autoAdvanceMatchups`) — at weekly advance, it marks the current
+   `in_progress` week `completed` and promotes the next week's
+   `scheduled` matchups to `in_progress` in the same transaction. This is
+   the activator for **weeks 2+**.
+
+Game selection itself only runs on `in_progress` matchups —
+`autoSelectGames` filters `status = 'in_progress'` after the activation
+step. This is intentional: selecting games on a `scheduled` matchup would
+let managers see outcomes and retroactively swap in players. Once a
+matchup is `in_progress`, `updateMatchupPlayerPosition` and
+`swapMatchupPlayerPositions` reject edits. (LS-515, LS-3751.)
+
+**No league gets stuck in `scheduled`.** A newly-created league's week-1
+matchups are guaranteed to be promoted on the first nightly
+`autoSelectGames` run. Every later week is promoted atomically by
+`advanceLeagueWeekInternal` when the prior week finishes. The only way a
+league can remain `scheduled` is if `draftStatus !== 'completed'` (the
+cron skips such leagues on purpose), or if the nightly cron is not
+running — both are observability concerns, not lifecycle gaps.
+
 `autoAdvanceMatchups` (`scheduled-mutations.ts:303`) is the weekly job that:
 
 1. Marks the prior week's matchups `completed`.

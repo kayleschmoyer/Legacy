@@ -80,8 +80,11 @@ export { assertAuthorized } from './system-auth';
 
 // ── Mutation: autoSelectGames ────────────────────────────────────────────────
 // Triggered nightly at midnight EST by EventBridge.
-// For every active league with in-progress or scheduled (current-week) matchups,
-// determines the next game number and triggers game selection via SQS.
+// First locks lineups for leagues whose first week has not yet started
+// (promotes the lowest 'scheduled' week → 'in_progress'), then determines the
+// next game number and triggers game selection via SQS for current-week
+// in_progress matchups. Game selection is intentionally gated on 'in_progress'
+// so managers cannot watch game outcomes and retroactively swap in players.
 // Also used by the commissioner UI button (leagueId provided).
 
 builder.mutationField('autoSelectGames', (t) =>
@@ -130,10 +133,64 @@ builder.mutationField('autoSelectGames', (t) =>
           `[autoSelectGames] Found ${activeLeagues.length} active leagues`,
         );
 
-        // 2. Bulk-fetch all actionable matchups (in_progress OR scheduled) for all
-        //    active leagues in a single query. Scheduled matchups are included so that
-        //    commissioner-triggered game selection works before the week is advanced.
+        // 2. Lock lineups for leagues that have not yet started their contest.
+        //    Game selection must never run on 'scheduled' matchups — that would
+        //    let managers watch game outcomes and swap in players retroactively.
+        //    For each active league with no 'in_progress' matchups yet (i.e. the
+        //    first time autoSelectGames runs for them), promote the lowest-week
+        //    'scheduled' matchups to 'in_progress'. Subsequent weeks are activated
+        //    by advanceLeagueWeekInternal.
         const activeLeagueIds = activeLeagues.map((l) => l.id);
+        if (activeLeagueIds.length > 0) {
+          const leaguesWithInProgress = await context.db
+            .selectDistinct({ leagueId: PublicSchema.matchups.leagueId })
+            .from(PublicSchema.matchups)
+            .where(
+              and(
+                inArray(PublicSchema.matchups.leagueId, activeLeagueIds),
+                eq(PublicSchema.matchups.status, 'in_progress'),
+              ),
+            );
+          const leaguesWithInProgressSet = new Set(
+            leaguesWithInProgress.map((r) => r.leagueId),
+          );
+          const leaguesNeedingActivation = activeLeagueIds.filter(
+            (id) => !leaguesWithInProgressSet.has(id),
+          );
+
+          for (const lid of leaguesNeedingActivation) {
+            const firstScheduled = await context.db
+              .select({ weekNumber: PublicSchema.matchups.weekNumber })
+              .from(PublicSchema.matchups)
+              .where(
+                and(
+                  eq(PublicSchema.matchups.leagueId, lid),
+                  eq(PublicSchema.matchups.status, 'scheduled'),
+                ),
+              )
+              .orderBy(PublicSchema.matchups.weekNumber)
+              .limit(1);
+            const firstWeek = firstScheduled[0]?.weekNumber;
+            if (firstWeek === undefined) continue;
+
+            const activated = await context.db
+              .update(PublicSchema.matchups)
+              .set({ status: 'in_progress' })
+              .where(
+                and(
+                  eq(PublicSchema.matchups.leagueId, lid),
+                  eq(PublicSchema.matchups.weekNumber, firstWeek),
+                  eq(PublicSchema.matchups.status, 'scheduled'),
+                ),
+              )
+              .returning({ id: PublicSchema.matchups.id });
+            LOGGER.info(
+              `[autoSelectGames] Locked lineups for league ${lid} week ${firstWeek}: ${activated.length} matchups activated`,
+            );
+          }
+        }
+
+        // 3. Bulk-fetch current-week in_progress matchups for all active leagues.
         const allActionableMatchups =
           activeLeagueIds.length > 0
             ? await context.db
@@ -148,10 +205,7 @@ builder.mutationField('autoSelectGames', (t) =>
                 .where(
                   and(
                     inArray(PublicSchema.matchups.leagueId, activeLeagueIds),
-                    inArray(PublicSchema.matchups.status, [
-                      'in_progress',
-                      'scheduled',
-                    ]),
+                    eq(PublicSchema.matchups.status, 'in_progress'),
                   ),
                 )
             : [];
@@ -200,7 +254,7 @@ builder.mutationField('autoSelectGames', (t) =>
 
             if (currentMatchups.length === 0) {
               LOGGER.debug(
-                `[autoSelectGames] League ${league.id} (${league.name}) has no actionable matchups (in_progress or scheduled), skipping`,
+                `[autoSelectGames] League ${league.id} (${league.name}) has no in_progress matchups, skipping`,
               );
               continue;
             }

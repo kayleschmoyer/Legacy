@@ -1126,23 +1126,22 @@ export async function createAllMatchupsForLeague(
     }
   }
 
-  // Activate week-1 matchups to 'in_progress' so autoSelectGames can
-  // immediately start picking games after draft completion.
-  // Without this, both autoSelectGames and autoAdvanceMatchups skip the league
-  // because they only operate on matchups with status = 'in_progress'.
-  // (Subsequent weeks are activated by advanceLeagueWeekInternal after each
-  // week's games are complete — this is the equivalent step for week 1.)
-  if (week1MatchupIds.length > 0) {
-    await db
-      .update(PublicSchema.matchups)
-      .set({ status: 'in_progress' })
-      .where(inArray(PublicSchema.matchups.id, week1MatchupIds));
-
-    LOGGER.info('Activated week-1 matchups to in_progress', {
-      leagueId,
-      matchupIds: week1MatchupIds,
-    });
-  }
+  // Matchup lifecycle: all weeks are inserted as 'scheduled'. Managers edit
+  // lineups during the scheduled window (updateMatchupPlayerPosition /
+  // swapMatchupPlayerPositions both require status === 'scheduled'). The
+  // scheduled → in_progress transition locks lineups and is driven by:
+  //   • autoSelectGames (the first nightly run for a league promotes the
+  //     lowest-week scheduled matchups to in_progress, then selects games).
+  //   • advanceLeagueWeekInternal (completes the current in_progress week and
+  //     promotes the next scheduled week once all games are decided).
+  // Game selection is gated on in_progress so managers cannot watch game
+  // outcomes and retroactively swap players in.
+  //
+  // A previous revision flipped week-1 to 'in_progress' here at creation time
+  // (LS-511) so autoSelectGames — which then filtered on in_progress only —
+  // could pick games immediately. That locked the lineup before the manager
+  // ever had a chance to set it (LS-3751). Activation now happens in
+  // autoSelectGames instead, preserving the lineup-editing window.
 
   const week1Matchup = insertedMatchups.find((m) => m.weekNumber === 1);
   const currentMatchupId = week1Matchup?.id ?? insertedMatchups[0]?.id ?? null;

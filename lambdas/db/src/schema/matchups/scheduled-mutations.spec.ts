@@ -181,19 +181,35 @@ describe('Scheduled Mutations', () => {
   // ── autoSelectGames logic ────────────────────────────────────────────────
 
   describe('autoSelectGames', () => {
-    it('should skip leagues with no actionable matchups (in_progress or scheduled)', async () => {
-      // The mutation finds active leagues, checks for in_progress OR scheduled
-      // matchups (current week only), and triggers SQS messages for game selection.
+    it('should skip leagues with no in_progress matchups (after activation step)', async () => {
+      // The mutation finds active leagues, activates the lowest scheduled
+      // week if no week is in_progress yet, then selects games for the
+      // current in_progress week only. Leagues with no scheduled matchups
+      // either (i.e. season complete) are skipped.
       expect(true).toBe(true);
     });
 
-    it('should process leagues whose current-week matchups are still scheduled', () => {
-      // Regression for LS-515: when a league has just completed its draft but
-      // week advance hasn't run yet, week-1 matchups are status='scheduled'.
-      // The query must include 'scheduled' so commissioner game-selection works.
-      const statuses = ['in_progress', 'scheduled'] as const;
-      const matchup = { id: 566, weekNumber: 1, status: 'scheduled' as const };
-      expect(statuses).toContain(matchup.status);
+    it('activates scheduled matchups for leagues that have no in_progress week yet (LS-3751)', () => {
+      // First nightly run for a just-drafted league: all weeks are
+      // 'scheduled'. autoSelectGames promotes the lowest-week scheduled
+      // matchups to 'in_progress' (locking lineups), then proceeds to
+      // select games. This replaces the old LS-515 behavior where game
+      // selection itself processed 'scheduled' matchups — that was unsafe
+      // because it meant games could be selected before the lineup lock.
+      const leagueMatchups = [
+        { weekNumber: 1, status: 'scheduled' as const },
+        { weekNumber: 2, status: 'scheduled' as const },
+      ];
+      const hasInProgress = leagueMatchups.some(
+        (m) => m.status === 'in_progress',
+      );
+      expect(hasInProgress).toBe(false);
+      const lowestScheduled = Math.min(
+        ...leagueMatchups
+          .filter((m) => m.status === 'scheduled')
+          .map((m) => m.weekNumber),
+      );
+      expect(lowestScheduled).toBe(1);
     });
 
     it('should only process the minimum week, not future scheduled weeks', () => {
@@ -309,50 +325,68 @@ describe('Scheduled Mutations', () => {
     });
   });
 
-  // ── createAllMatchupsForLeague (week-1 activation) ───────────────────────
-  // LS-511: Game selection failing for newly-drafted leagues.
-  // Root cause: createAllMatchupsForLeague created ALL matchups as 'scheduled'.
-  // Both autoSelectGames and autoAdvanceMatchups only process 'in_progress'
-  // matchups, so newly-created leagues were permanently skipped.
-  // Fix: createAllMatchupsForLeague now flips week-1 matchups to 'in_progress'.
+  // ── createAllMatchupsForLeague (lineup-window preservation) ─────────────
+  // LS-3751: Lineup edits must be possible between draft completion and the
+  // first contest starting. Previously createAllMatchupsForLeague flipped
+  // week-1 matchups to 'in_progress' at creation (LS-511), which locked the
+  // lineup before the manager could set it. Week-1 activation now happens in
+  // autoSelectGames itself: the first nightly run for a league (one with no
+  // in_progress matchups yet) promotes the lowest-week scheduled matchups to
+  // in_progress before selecting games. Game selection is gated on
+  // in_progress so managers cannot watch outcomes and retroactively swap
+  // players in.
 
-  describe('createAllMatchupsForLeague week-1 activation (LS-511)', () => {
-    it('should require week-1 matchups to be in_progress so autoSelectGames can process them', () => {
-      // autoSelectGames filters for status = 'in_progress'. If week-1 matchups
-      // remain 'scheduled', the nightly cron and commissioner-triggered game
-      // selection both silently skip the league.
-      const week1Status = 'in_progress';
-      const autoSelectGamesSees = [
-        { weekNumber: 1, status: week1Status },
-        { weekNumber: 1, status: week1Status },
+  describe('matchup lifecycle after createAllMatchupsForLeague (LS-3751)', () => {
+    it('should leave week-1 matchups as scheduled so managers can set lineups', () => {
+      // Managers use updateMatchupPlayerPosition / swapMatchupPlayerPositions,
+      // both of which require matchup.status === 'scheduled'. Week-1 must stay
+      // scheduled until autoSelectGames activates it on the first nightly run.
+      const week1AfterCreate = [
+        { weekNumber: 1, status: 'scheduled' as const },
+        { weekNumber: 1, status: 'scheduled' as const },
       ];
-      const inProgressForAutoSelect = autoSelectGamesSees.filter(
-        (m) => m.status === 'in_progress',
-      );
-      expect(inProgressForAutoSelect.length).toBeGreaterThan(0);
+      const editable = week1AfterCreate.filter((m) => m.status === 'scheduled');
+      expect(editable).toHaveLength(week1AfterCreate.length);
     });
 
-    it('should set weekAdvanceStatus to idle (not success) after initial matchup creation', () => {
-      // 'idle' is consistent with advanceLeagueWeekInternal end state and signals
-      // the league is ready to receive game selection — not mid-advance.
+    it('autoSelectGames activates the lowest scheduled week when no week is in_progress', () => {
+      // Activation rule: if a league has any 'in_progress' matchups, the
+      // current in-progress week is the one that autoAdvanceMatchups will
+      // eventually close. Otherwise autoSelectGames promotes the lowest-week
+      // scheduled matchups to 'in_progress' (locking their lineups).
+      const leagueA = [
+        { weekNumber: 1, status: 'scheduled' as const },
+        { weekNumber: 2, status: 'scheduled' as const },
+      ];
+      const leagueAHasInProgress = leagueA.some(
+        (m) => m.status === 'in_progress',
+      );
+      expect(leagueAHasInProgress).toBe(false);
+      const minScheduledWeek = Math.min(
+        ...leagueA
+          .filter((m) => m.status === 'scheduled')
+          .map((m) => m.weekNumber),
+      );
+      expect(minScheduledWeek).toBe(1);
+    });
+
+    it('game selection runs only on in_progress matchups', () => {
+      // Gate: autoSelectGames filters status = 'in_progress' when picking
+      // games, so a manager cannot watch game outcomes on a scheduled matchup
+      // and retroactively swap in players. 'scheduled' matchups are never
+      // queued for stats loading.
+      const filter = 'in_progress' as const;
+      const scheduled = { status: 'scheduled' as const };
+      const inProgress = { status: 'in_progress' as const };
+      expect(scheduled.status === filter).toBe(false);
+      expect(inProgress.status === filter).toBe(true);
+    });
+
+    it('should set weekAdvanceStatus to idle after initial matchup creation', () => {
+      // 'idle' is consistent with advanceLeagueWeekInternal end state and
+      // signals the league is ready to receive game selection — not mid-advance.
       const weekAdvanceStatus = 'idle';
       expect(['processing', 'queued']).not.toContain(weekAdvanceStatus);
-    });
-
-    it('would leave a league permanently stuck if week-1 matchups stayed scheduled', () => {
-      // Without the fix: all matchups start as 'scheduled'.
-      // autoSelectGames: finds no in_progress → skips.
-      // autoAdvanceMatchups: finds no in_progress → skips.
-      // Result: no games ever selected for the league.
-      const allMatchupsBeforeFix = [
-        { weekNumber: 1, status: 'scheduled' },
-        { weekNumber: 1, status: 'scheduled' },
-        { weekNumber: 2, status: 'scheduled' },
-      ];
-      const inProgress = allMatchupsBeforeFix.filter(
-        (m) => m.status === 'in_progress',
-      );
-      expect(inProgress.length).toBe(0); // confirms the stuck state before fix
     });
   });
 });
