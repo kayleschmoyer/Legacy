@@ -24,6 +24,83 @@ interface PullResponse {
   requested_reviewers?: Array<{ login: string }>;
 }
 
+interface PrSnapshot {
+  head: { sha: string };
+  requested_reviewers?: Array<{ login: string }>;
+}
+
+interface ReviewSummary {
+  user: { login: string } | null;
+  commit_id: string;
+}
+
+/**
+ * Check whether re-requesting Copilot would be a no-op.
+ *
+ * Returns `handled: true` when Copilot is already a requested reviewer OR has
+ * already posted a review for the PR's current HEAD SHA. Both cases mean the
+ * `requestReviewers` POST would be pure noise — the copilot-auto-approve
+ * workflow's request-review job already covers synchronize events, and agent
+ * skills call `github_request_review` liberally after every fix cycle.
+ *
+ * Returns `handled: false` on any API failure so the caller falls through to
+ * the POST — never want the precheck to suppress a needed re-request.
+ */
+async function copilotAlreadyHandled(
+  owner: string,
+  repo: string,
+  prNumber: number,
+): Promise<{ handled: boolean; reason?: string }> {
+  try {
+    // Fetch PR first and short-circuit on the common no-op case before
+    // touching the (potentially paginated) reviews endpoint.
+    const pr = await githubRest<PrSnapshot>({
+      method: 'GET',
+      path: `/repos/${owner}/${repo}/pulls/${prNumber}`,
+    });
+
+    const alreadyRequested = (pr.requested_reviewers ?? []).some((r) =>
+      COPILOT_RESPONSE_LOGINS.has(r.login),
+    );
+    if (alreadyRequested) {
+      return {
+        handled: true,
+        reason: 'Copilot is already a requested reviewer',
+      };
+    }
+
+    const headSha = pr.head.sha;
+    // Paginate reviews with early exit on the first matching Copilot review
+    // for the current HEAD SHA. PRs with >100 reviews would otherwise miss
+    // a later-page review and reintroduce the redundant re-request noise.
+    const PER_PAGE = 100;
+    for (let page = 1; ; page++) {
+      const reviews = await githubRest<ReviewSummary[]>({
+        method: 'GET',
+        path: `/repos/${owner}/${repo}/pulls/${prNumber}/reviews`,
+        query: { per_page: String(PER_PAGE), page: String(page) },
+      });
+      const match = reviews.some(
+        (r) =>
+          r.user != null &&
+          COPILOT_RESPONSE_LOGINS.has(r.user.login) &&
+          r.commit_id === headSha,
+      );
+      if (match) {
+        return {
+          handled: true,
+          reason: `Copilot already reviewed HEAD (${headSha.slice(0, 7)})`,
+        };
+      }
+      if (reviews.length < PER_PAGE) break;
+    }
+
+    return { handled: false };
+  } catch {
+    return { handled: false };
+  }
+}
+
 /**
  * Request Copilot review using a **user** OAuth token.
  *
@@ -45,7 +122,17 @@ async function requestCopilotReview(
   owner: string,
   repo: string,
   prNumber: number,
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{
+  success: boolean;
+  skipped?: boolean;
+  reason?: string;
+  error?: string;
+}> {
+  const precheck = await copilotAlreadyHandled(owner, repo, prNumber);
+  if (precheck.handled) {
+    return { success: true, skipped: true, reason: precheck.reason };
+  }
+
   const userToken = await tryGhAuthToken();
 
   if (!userToken) {
@@ -138,7 +225,13 @@ export async function requestReview(
 
   const perPrResults: Array<{
     prNumber: number;
-    reviewers: Array<{ reviewer: string; success: boolean; error?: string }>;
+    reviewers: Array<{
+      reviewer: string;
+      success: boolean;
+      skipped?: boolean;
+      reason?: string;
+      error?: string;
+    }>;
   }> = [];
 
   try {
@@ -153,6 +246,8 @@ export async function requestReview(
           const reviewerResults: Array<{
             reviewer: string;
             success: boolean;
+            skipped?: boolean;
+            reason?: string;
             error?: string;
           }> = [];
           const path = `/repos/${repo.owner}/${repo.name}/pulls/${prNumber}/requested_reviewers`;
@@ -167,6 +262,8 @@ export async function requestReview(
             reviewerResults.push({
               reviewer: COPILOT_BOT,
               success: copilotResult.success,
+              ...(copilotResult.skipped ? { skipped: true } : {}),
+              ...(copilotResult.reason ? { reason: copilotResult.reason } : {}),
               ...(copilotResult.error ? { error: copilotResult.error } : {}),
             });
           }
