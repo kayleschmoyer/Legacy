@@ -816,7 +816,7 @@ test.describe
 
     await test.step('Manager sees the Playoff Bracket section', async () => {
       await expect(
-        page.getByText('Playoff Bracket', { exact: false }),
+        page.getByRole('heading', { name: 'Playoff Bracket', exact: true }),
       ).toBeVisible({ timeout: 15_000 });
     });
 
