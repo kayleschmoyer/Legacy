@@ -461,7 +461,10 @@ test.describe
     });
 
     await test.step('Cancel dialog without confirming', async () => {
-      const cancelBtn = page.getByRole('button', { name: /Cancel/i });
+      // Scope to the dialog: getByRole on the page can pick up Tamagui's
+      // adapted-sheet close button or other Cancel controls outside the dialog.
+      const dialog = page.getByRole('alertdialog');
+      const cancelBtn = dialog.getByRole('button', { name: /Cancel/i }).first();
       await expect(cancelBtn).toBeVisible({ timeout: 5_000 });
       await cancelBtn.click();
 

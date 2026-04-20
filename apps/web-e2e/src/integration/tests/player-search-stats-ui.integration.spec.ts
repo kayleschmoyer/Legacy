@@ -249,17 +249,26 @@ test.describe
       await page.getByLabel('Search players to compare').fill(PLAYER_SEARCH_1);
     });
 
-    await test.step('Dropdown results appear within 10 s', async () => {
+    await test.step('Dropdown results appear within 15 s', async () => {
       // The dropdown lists up to 8 results. Any visible list item means the API responded.
-      // We look for a row showing a player name containing our search term (case-insensitive).
+      // We scope to the listbox so we don't accidentally match other UI text (the
+      // <input>'s value is not matched by getByText, but other on-page text may be).
+      const dropdown = page.getByRole('listbox', {
+        name: /Player suggestions/i,
+      });
       await expect(
-        page.getByText(new RegExp(PLAYER_SEARCH_1, 'i')).nth(1), // nth(1) skips the input value itself
+        dropdown.getByText(new RegExp(PLAYER_SEARCH_1, 'i')).first(),
       ).toBeVisible({ timeout: 15_000 });
     });
 
     await test.step('Click the first result to add the player', async () => {
-      // Click the first result in the dropdown list
-      await page.getByText(new RegExp(PLAYER_SEARCH_1, 'i')).nth(1).click();
+      const dropdown = page.getByRole('listbox', {
+        name: /Player suggestions/i,
+      });
+      await dropdown
+        .getByText(new RegExp(PLAYER_SEARCH_1, 'i'))
+        .first()
+        .click();
     });
 
     await test.step('A player chip appears with the player name', async () => {
