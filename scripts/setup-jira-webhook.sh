@@ -118,6 +118,11 @@ if [[ -z "$WEBHOOK_URL" ]]; then
 fi
 echo ""
 
+# ── Compute test HMAC for the smoke-test curl command ────────────────────────
+
+TEST_BODY='{"webhookEvent":"jira:issue_updated","issue":{"key":"LS-1234"},"changelog":{"items":[{"field":"status","fromString":"To Do","toString":"In Progress"}]}}'
+TEST_SIG="sha256=$(printf '%s' "$TEST_BODY" | openssl dgst -sha256 -hmac "$JIRA_WEBHOOK_SECRET" | awk '{print $2}')"
+
 # ── Print Jira webhook configuration ─────────────────────────────────────────
 
 cat <<INSTRUCTIONS
@@ -136,9 +141,10 @@ cat <<INSTRUCTIONS
        Status: Enabled
        URL:    ${WEBHOOK_URL}
 
-  4. Add a custom header (click "Advanced"):
-       Header name:  X-Jira-Webhook-Secret
-       Header value: ${JIRA_WEBHOOK_SECRET}
+  4. In the "Secret" field, paste:
+       ${JIRA_WEBHOOK_SECRET}
+     (Jira signs each request body with HMAC-SHA256 using this secret and
+      sends the digest in the X-Hub-Signature header — no custom headers needed)
 
   5. Under "Issue" events, check only:
        ✅ Issue: updated
@@ -154,18 +160,8 @@ cat <<INSTRUCTIONS
 
   curl -X POST ${WEBHOOK_URL} \\
     -H "Content-Type: application/json" \\
-    -H "X-Jira-Webhook-Secret: ${JIRA_WEBHOOK_SECRET}" \\
-    -d '{
-      "webhookEvent": "jira:issue_updated",
-      "issue": { "key": "LS-1234" },
-      "changelog": {
-        "items": [{
-          "field": "status",
-          "fromString": "To Do",
-          "toString": "In Progress"
-        }]
-      }
-    }'
+    -H "X-Hub-Signature: ${TEST_SIG}" \\
+    -d '${TEST_BODY}'
 
   Expected response: {"status":"ok","result":"Dispatched jira-issue-updated for LS-1234 (To Do → In Progress)"}
   Then check Actions tab: https://github.com/bkrupa/legacy-sports/actions/workflows/jira-status-audit.yml

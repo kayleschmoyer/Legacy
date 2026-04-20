@@ -1,10 +1,7 @@
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { LOGGER } from '@legacy-sports/logging';
 import { retrieveSecretParameterValue } from '@legacy-sports/aws-utils';
-import {
-  verifyGitHubSignature,
-  verifyJiraWebhookSecret,
-} from './verify-signature';
+import { verifyGitHubSignature } from './verify-signature';
 import { handleReviewThreadEvent } from './handle-review-thread';
 import { handleJiraTransitionEvent } from './handle-jira-transition';
 
@@ -101,18 +98,19 @@ export const handler = async (
 
   // ── Jira webhook route (/github-webhook/jira) ─────────────────────────────
   if (path.endsWith('/jira')) {
-    const jiraSecretHeader =
-      headers['X-Jira-Webhook-Secret'] ?? headers['x-jira-webhook-secret'];
-    if (!jiraSecretHeader) {
-      LOGGER.warn(
-        'Jira webhook rejected — missing X-Jira-Webhook-Secret header',
-      );
+    // Jira's built-in webhook Secret field signs the request body with
+    // HMAC-SHA256 and sends the digest in X-Hub-Signature: sha256=<hex> —
+    // the same format GitHub uses, so we reuse verifyGitHubSignature.
+    const jiraSigHeader =
+      headers['X-Hub-Signature'] ?? headers['x-hub-signature'];
+    if (!jiraSigHeader) {
+      LOGGER.warn('Jira webhook rejected — missing X-Hub-Signature header');
       return json(401, { error: 'Unauthorized' });
     }
 
     const jiraSecret = await getJiraWebhookSecret();
-    if (!verifyJiraWebhookSecret(jiraSecret, jiraSecretHeader)) {
-      LOGGER.warn('Jira webhook rejected — invalid secret');
+    if (!verifyGitHubSignature(bodyStr, jiraSigHeader, jiraSecret)) {
+      LOGGER.warn('Jira webhook rejected — invalid HMAC signature');
       return json(401, { error: 'Unauthorized' });
     }
 

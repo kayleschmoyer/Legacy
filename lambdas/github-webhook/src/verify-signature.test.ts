@@ -1,8 +1,5 @@
 import { createHmac } from 'crypto';
-import {
-  verifyGitHubSignature,
-  verifyJiraWebhookSecret,
-} from './verify-signature';
+import { verifyGitHubSignature } from './verify-signature';
 
 function makeSignature(body: string, secret: string): string {
   return `sha256=${createHmac('sha256', secret).update(body).digest('hex')}`;
@@ -11,6 +8,8 @@ function makeSignature(body: string, secret: string): string {
 const SECRET = 'test-webhook-secret';
 const BODY = '{"action":"resolved"}';
 
+// verifyGitHubSignature is used for both GitHub (X-Hub-Signature-256) and
+// Jira (X-Hub-Signature) routes — both use sha256=<hex> HMAC format.
 describe('verifyGitHubSignature', () => {
   it('returns true for a valid signature', () => {
     const sig = makeSignature(BODY, SECRET);
@@ -50,33 +49,5 @@ describe('verifyGitHubSignature', () => {
   it('returns false when the prefix is missing', () => {
     const hex = createHmac('sha256', SECRET).update(BODY).digest('hex');
     expect(verifyGitHubSignature(BODY, hex, SECRET)).toBe(false);
-  });
-});
-
-describe('verifyJiraWebhookSecret', () => {
-  const JIRA_SECRET = 'super-secret-jira-token';
-
-  it('returns true when the provided secret matches', () => {
-    expect(verifyJiraWebhookSecret(JIRA_SECRET, JIRA_SECRET)).toBe(true);
-  });
-
-  it('returns false when the provided secret is undefined', () => {
-    expect(verifyJiraWebhookSecret(JIRA_SECRET, undefined)).toBe(false);
-  });
-
-  it('returns false when the provided secret is empty', () => {
-    expect(verifyJiraWebhookSecret(JIRA_SECRET, '')).toBe(false);
-  });
-
-  it('returns false when the expected secret is empty', () => {
-    expect(verifyJiraWebhookSecret('', JIRA_SECRET)).toBe(false);
-  });
-
-  it('returns false when the secret is wrong', () => {
-    expect(verifyJiraWebhookSecret(JIRA_SECRET, 'wrong-token')).toBe(false);
-  });
-
-  it('returns false for a token with different length (timing-safe branch)', () => {
-    expect(verifyJiraWebhookSecret(JIRA_SECRET, 'short')).toBe(false);
   });
 });

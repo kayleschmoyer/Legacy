@@ -16,7 +16,6 @@ jest.mock('@legacy-sports/logging', () => ({
 
 jest.mock('./verify-signature', () => ({
   verifyGitHubSignature: jest.fn().mockReturnValue(true),
-  verifyJiraWebhookSecret: jest.fn().mockReturnValue(true),
 }));
 
 jest.mock('./handle-review-thread', () => ({
@@ -42,16 +41,12 @@ process.env['AGENT_AUTHOR_APP_PRIVATE_KEY_SECRET_NAME'] =
 process.env['AGENT_AUTHOR_APP_ID'] = '3142924';
 process.env['GITHUB_REPO'] = 'bkrupa/legacy-sports';
 
-import {
-  verifyGitHubSignature,
-  verifyJiraWebhookSecret,
-} from './verify-signature';
+import { verifyGitHubSignature } from './verify-signature';
 import { handleReviewThreadEvent } from './handle-review-thread';
 import { handleJiraTransitionEvent } from './handle-jira-transition';
 import { handler } from './index';
 
 const mockVerify = verifyGitHubSignature as jest.Mock;
-const mockVerifyJira = verifyJiraWebhookSecret as jest.Mock;
 const mockHandle = handleReviewThreadEvent as jest.Mock;
 const mockHandleJira = handleJiraTransitionEvent as jest.Mock;
 
@@ -86,7 +81,9 @@ function makeJiraEvent(
 ): APIGatewayProxyEvent {
   return makeEvent({
     path: '/github-webhook/jira',
-    headers: { 'X-Jira-Webhook-Secret': 'test-jira-secret' },
+    // Jira's built-in Secret field sends HMAC-SHA256 in X-Hub-Signature.
+    // The mock for verifyGitHubSignature returns true, so any value works here.
+    headers: { 'X-Hub-Signature': 'sha256=abc123' },
     body: JSON.stringify({
       webhookEvent: 'jira:issue_updated',
       issue: { key: 'LS-1234' },
@@ -102,7 +99,6 @@ function makeJiraEvent(
 
 beforeEach(() => {
   mockVerify.mockReturnValue(true);
-  mockVerifyJira.mockReturnValue(true);
   mockHandle.mockResolvedValue('Set bot-review=success for PR #1');
   mockHandleJira.mockResolvedValue(
     'Dispatched jira-issue-updated for LS-1234 (In Progress → In Review)',
@@ -190,14 +186,14 @@ describe('handler — event routing', () => {
 });
 
 describe('handler — Jira webhook route (/github-webhook/jira)', () => {
-  it('returns 401 when X-Jira-Webhook-Secret header is missing', async () => {
+  it('returns 401 when X-Hub-Signature header is missing', async () => {
     const result = await handler(makeJiraEvent({ headers: {} }));
     expect(result.statusCode).toBe(401);
     expect(mockHandleJira).not.toHaveBeenCalled();
   });
 
-  it('returns 401 when Jira secret is invalid', async () => {
-    mockVerifyJira.mockReturnValue(false);
+  it('returns 401 when HMAC signature is invalid', async () => {
+    mockVerify.mockReturnValueOnce(false);
     const result = await handler(makeJiraEvent());
     expect(result.statusCode).toBe(401);
     expect(mockHandleJira).not.toHaveBeenCalled();
@@ -223,10 +219,10 @@ describe('handler — Jira webhook route (/github-webhook/jira)', () => {
     expect(JSON.parse(result.body)).toEqual({ error: 'Internal server error' });
   });
 
-  it('accepts lowercase x-jira-webhook-secret header', async () => {
+  it('accepts lowercase x-hub-signature header', async () => {
     const result = await handler(
       makeJiraEvent({
-        headers: { 'x-jira-webhook-secret': 'test-jira-secret' },
+        headers: { 'x-hub-signature': 'sha256=abc123' },
       }),
     );
     expect(result.statusCode).toBe(200);
