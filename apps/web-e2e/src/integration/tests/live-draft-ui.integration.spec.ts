@@ -448,18 +448,23 @@ test.describe
         page.getByText('Outfield', { exact: false }).first(),
       ).toBeVisible({ timeout: 30000 });
 
-      // After a live draft, players go to bench/bullpen (not starting lineup)
-      // Verify bench count > 0 by reading the summary section
-      await expect(page.getByText('Bench').first()).toBeVisible();
-      const benchParent = page
-        .getByText('Bench', { exact: true })
+      // After a live draft, autoPopulateFirstMatchupLineup (LS-445) places
+      // drafted fielders into starter slots first; surplus fielders go to
+      // Bench and surplus pitchers to Bullpen. With maxRosterSize=25 and
+      // ~17 lineup slots, drafted fielders typically fill all fielder slots
+      // before anything lands on Bench — so asserting Bench > 0 is flaky.
+      // Instead, assert the starter lineup filled, which directly proves
+      // the draft populated the roster via auto-lineup.
+      await expect(page.getByText('Lineup').first()).toBeVisible();
+      const lineupParent = page
+        .getByText('Lineup', { exact: true })
         .first()
         .locator('..');
-      const benchText = await benchParent.textContent();
-      const benchMatch = benchText?.match(/Bench\s*(\d+)/);
-      expect(benchMatch).toBeTruthy();
-      if (!benchMatch) throw new Error('benchMatch should be defined');
-      expect(parseInt(benchMatch[1], 10)).toBeGreaterThan(0);
+      const lineupText = await lineupParent.textContent();
+      const lineupMatch = lineupText?.match(/Lineup\s*(\d+)\s*\/\s*\d+/);
+      expect(lineupMatch).toBeTruthy();
+      if (!lineupMatch) throw new Error('lineupMatch should be defined');
+      expect(parseInt(lineupMatch[1], 10)).toBeGreaterThan(0);
     });
 
     await test.step('Verify commissioner-drafted players appear on roster', async () => {
@@ -468,12 +473,12 @@ test.describe
       // the wrong page (stale from the previous turn) and the iteration
       // order biases capture toward the first pages that win the race.
       // Empirically the commissioner page sometimes captures zero picks
-      // even though the underlying draft completed normally — the bench
-      // count check above already proves the roster was populated, so
+      // even though the underlying draft completed normally — the lineup
+      // check above already proves the roster was populated, so
       // skip the player-name verification when no picks were captured.
       if (state.commissionerPicks.length === 0) {
         console.log(
-          '[live-draft] No commissioner picks captured (race-attribution); roster bench count already verified.',
+          '[live-draft] No commissioner picks captured (race-attribution); roster lineup already verified.',
         );
         return;
       }
@@ -525,30 +530,30 @@ test.describe
     });
 
     await test.step('Verify manager roster has players', async () => {
-      // After a live draft, players go to bench/bullpen (not starting lineup)
-      // Verify bench count > 0 by reading the summary section
-      await expect(managerPage1.getByText('Bench').first()).toBeVisible({
+      // See Phase 6: Bench > 0 is flaky after auto-lineup fills all fielder
+      // slots. Assert the starter lineup filled instead.
+      await expect(managerPage1.getByText('Lineup').first()).toBeVisible({
         timeout: 15000,
       });
-      const benchParent = managerPage1
-        .getByText('Bench', { exact: true })
+      const lineupParent = managerPage1
+        .getByText('Lineup', { exact: true })
         .first()
         .locator('..');
-      const benchText = await benchParent.textContent();
-      const benchMatch = benchText?.match(/Bench\s*(\d+)/);
-      expect(benchMatch).toBeTruthy();
-      if (!benchMatch) throw new Error('benchMatch should be defined');
-      expect(parseInt(benchMatch[1], 10)).toBeGreaterThan(0);
+      const lineupText = await lineupParent.textContent();
+      const lineupMatch = lineupText?.match(/Lineup\s*(\d+)\s*\/\s*\d+/);
+      expect(lineupMatch).toBeTruthy();
+      if (!lineupMatch) throw new Error('lineupMatch should be defined');
+      expect(parseInt(lineupMatch[1], 10)).toBeGreaterThan(0);
     });
 
     await test.step('Verify manager 1-drafted players appear on roster', async () => {
       // See Phase 6 note: "Your pick" detection races can leave a page
       // with zero captured picks even though the underlying draft ran fine.
-      // Skip the player-name check when nothing was captured — the bench
-      // count assertion above already proves the manager's roster filled.
+      // Skip the player-name check when nothing was captured — the lineup
+      // assertion above already proves the manager's roster filled.
       if (state.manager1Picks.length === 0) {
         console.log(
-          '[live-draft] No manager 1 picks captured (race-attribution); roster bench count already verified.',
+          '[live-draft] No manager 1 picks captured (race-attribution); roster lineup already verified.',
         );
         return;
       }

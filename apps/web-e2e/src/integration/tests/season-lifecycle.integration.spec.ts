@@ -373,7 +373,11 @@ test.describe
       expect(data.createAllMatchups.matchups.length).toBeGreaterThan(0);
     });
 
-    await test.step('3.2 Verify initial matchup status: week 1 in_progress, rest scheduled', async () => {
+    await test.step('3.2 Verify initial matchup status: all weeks scheduled', async () => {
+      // LS-3751: createAllMatchupsForLeague leaves every week (including
+      // week 1) as 'scheduled' so managers can edit lineups during the
+      // pre-contest window. The scheduled → in_progress flip now happens
+      // in autoSelectGames when the first game is queued (Phase 4).
       const data = await graphqlOk<{
         getMatchupsForLeague: Array<{
           id: string;
@@ -394,11 +398,7 @@ test.describe
       expect(matchups.length).toBeGreaterThan(0);
 
       for (const m of matchups) {
-        if (m.weekNumber === 1) {
-          expect(m.status).toBe('in_progress');
-        } else {
-          expect(m.status).toBe('scheduled');
-        }
+        expect(m.status).toBe('scheduled');
       }
     });
 
