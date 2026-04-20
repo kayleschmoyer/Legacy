@@ -517,10 +517,17 @@ test.describe
     });
 
     await test.step('Verify navigation to new league URL', async () => {
-      // After renewal, the commissioner is navigated to the new league page.
-      await expect(page).toHaveURL(/\/baseball\/league\/\d+/, {
-        timeout: 30_000,
-      });
+      // Wait for the URL to change to a *different* league than the old one.
+      // toHaveURL(/\/baseball\/league\/\d+/) would satisfy immediately because
+      // the current URL (e.g. /baseball/league/1307/commissioner) already matches
+      // the regex — we need an explicit predicate to ensure navigation to the NEW league.
+      await page.waitForURL(
+        (url) => {
+          const match = url.pathname.match(/\/baseball\/league\/(\d+)/);
+          return match !== null && Number(match[1]) !== state.leagueId;
+        },
+        { timeout: 30_000 },
+      );
 
       // The new league ID must differ from the original (old) league.
       const match = page.url().match(/\/baseball\/league\/(\d+)/);

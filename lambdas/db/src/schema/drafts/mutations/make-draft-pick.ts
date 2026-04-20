@@ -370,14 +370,6 @@ builder.mutationField('makeDraftPick', (t) =>
               currentPickDeadline: result.nextDeadline?.toISOString() ?? null,
             },
           );
-
-          // If the manual pick itself completed the draft, notify now.
-          if (effectiveDraftComplete) {
-            await context.notificationService.notifyDraftCompleted(
-              result.leagueId,
-              result.selectionMethod,
-            );
-          }
         }
 
         // ── LS-440: Chain consecutive auto-picks ───────────────────────────
@@ -790,13 +782,6 @@ builder.mutationField('makeDraftPick', (t) =>
                       autoPickResult.nextDeadline?.toISOString() ?? null,
                   },
                 );
-
-                if (autoPickResult.isDraftComplete) {
-                  await context.notificationService.notifyDraftCompleted(
-                    autoPickResult.leagueId,
-                    autoPickResult.selectionMethod,
-                  );
-                }
               }
 
               // Record chained auto-pick in the activity log (LS-538)
@@ -909,6 +894,17 @@ builder.mutationField('makeDraftPick', (t) =>
                 err,
               });
             });
+        }
+
+        // Notify all completed drafts (real and mock).
+        // For real drafts, this fires after createAllMatchupsForLeague so
+        // positionId values are set before the frontend refetches team members.
+        // Notifying before matchup creation caused roster lineup to show 0 (LS-3774).
+        if (effectiveDraftComplete && context.notificationService) {
+          await context.notificationService.notifyDraftCompleted(
+            result.leagueId,
+            result.selectionMethod,
+          );
         }
 
         // Record draft pick in the activity log (fire-and-forget, non-fatal)

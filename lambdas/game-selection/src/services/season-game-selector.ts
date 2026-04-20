@@ -8,6 +8,7 @@ import {
   inArray,
   isNotNull,
   isNull,
+  ne,
   notInArray,
   or,
   sql,
@@ -75,6 +76,7 @@ async function selectGameIdentifier(
   const battingConditions = [
     eq(PublicSchema.gameBatting.playerId, playerId),
     eq(PublicSchema.gameBatting.season, season),
+    ne(PublicSchema.gameBatting.gameIdentifier, ''),
   ];
 
   if (excludeGameIdentifiers.length > 0) {
@@ -177,6 +179,7 @@ async function selectGameIdentifierFromPitching(
   const conditions = [
     eq(PublicSchema.gamePitching.playerId, playerId),
     eq(PublicSchema.gamePitching.season, season),
+    ne(PublicSchema.gamePitching.gameIdentifier, ''),
   ];
 
   if (excludeGameIdentifiers.length > 0) {
@@ -304,11 +307,35 @@ export async function selectGamesForMatchupPlayer(
       );
 
       if (!gameIdentifier) {
+        // All unique games exhausted — recycle from the full pool (no exclusions).
+        // A repeated game is acceptable; returning statsAreCached: true with a
+        // null/empty identifier would violate the invariant that cached selections
+        // have a real game_identifier (LS-3774).
         LOGGER.warn(
-          `No available ${pitcherRole} games for pitcher ${playerId} season ${season} (${excludeIds.length} already used)`,
+          `No available ${pitcherRole} games for pitcher ${playerId} season ${season} (${excludeIds.length} already used); recycling from full pool`,
         );
+        const recycled = await selectGameIdentifierFromPitching(
+          db,
+          playerId,
+          season,
+          [],
+          pitcherRole,
+        );
+        // Guard: if the full pool is also empty, fall back to the pending-load
+        // path (statsAreCached: false) to avoid returning a cached selection
+        // without a valid game_identifier.
+        if (!recycled) {
+          LOGGER.warn(
+            `Full pool also empty for pitcher ${playerId} season ${season}; falling back to stats load`,
+          );
+          return {
+            gameIdentifier: null,
+            fieldingGamePos: fieldingPos,
+            statsAreCached: false,
+          };
+        }
         return {
-          gameIdentifier: null,
+          gameIdentifier: recycled,
           fieldingGamePos: fieldingPos,
           statsAreCached: true,
         };
@@ -355,11 +382,35 @@ export async function selectGamesForMatchupPlayer(
   );
 
   if (!gameIdentifier) {
+    // All unique games exhausted — recycle from the full pool (no exclusions).
+    // A repeated game is acceptable; returning statsAreCached: true with a
+    // null/empty identifier would violate the invariant that cached selections
+    // have a real game_identifier (LS-3774).
     LOGGER.warn(
-      `No available games left for player ${playerId} season ${season} (${excludeIds.length} already used)`,
+      `No available games left for player ${playerId} season ${season} (${excludeIds.length} already used); recycling from full pool`,
     );
+    const recycled = await selectGameIdentifier(
+      db,
+      playerId,
+      season,
+      [],
+      pitcherRole,
+    );
+    // Guard: if the full pool is also empty, fall back to the pending-load
+    // path (statsAreCached: false) to avoid returning a cached selection
+    // without a valid game_identifier.
+    if (!recycled) {
+      LOGGER.warn(
+        `Full pool also empty for player ${playerId} season ${season}; falling back to stats load`,
+      );
+      return {
+        gameIdentifier: null,
+        fieldingGamePos: fieldingPos,
+        statsAreCached: false,
+      };
+    }
     return {
-      gameIdentifier: null,
+      gameIdentifier: recycled,
       fieldingGamePos: fieldingPos,
       statsAreCached: true,
     };

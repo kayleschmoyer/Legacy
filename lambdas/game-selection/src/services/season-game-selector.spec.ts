@@ -66,6 +66,7 @@ jest.mock('drizzle-orm', () => ({
   inArray: jest.fn((col: unknown, vals: unknown) => ({ col, vals })),
   isNotNull: jest.fn((col: unknown) => col),
   isNull: jest.fn((col: unknown) => col),
+  ne: jest.fn((col: unknown, val: unknown) => ({ col, val })),
   notInArray: jest.fn((col: unknown, vals: unknown) => ({ col, vals })),
   or: jest.fn((...args: unknown[]) => args),
   sql: jest.fn(),
@@ -202,6 +203,174 @@ describe('season-game-selector', () => {
 
       expect(result.statsAreCached).toBe(true);
       expect(result.gameIdentifier).toBe('pitch-game-001');
+    });
+
+    it('should recycle a pitcher game when unique pool exhausted', async () => {
+      const selectResults: unknown[][] = [
+        // 1. cachedCheck (gameBatting) - no batting stats
+        [],
+        // 2. getPrimaryFieldingPosition
+        [{ pos: 'P', g: 30 }],
+        // 3. pitchingCheck - pitching stats exist
+        [{ gameIdentifier: 'pitch-game-001' }],
+        // 4. usedGames - game already used
+        [{ gameIdentifier: 'pitch-game-001' }],
+        // 5. selectGameIdentifierFromPitching (with exclusions) - exhausted
+        [],
+        // 6. selectGameIdentifierFromPitching (full pool, recycle) - returns game
+        [{ gameIdentifier: 'pitch-game-001' }],
+      ];
+
+      let selectIndex = 0;
+      const mockDb = {
+        select: jest.fn().mockImplementation(() => {
+          const result = selectResults[selectIndex++] ?? [];
+          const chainResult = Object.assign([...result], {
+            limit: jest.fn().mockReturnValue(result),
+          });
+          return {
+            from: jest.fn().mockReturnValue({
+              where: jest.fn().mockReturnValue(chainResult),
+            }),
+          };
+        }),
+      } as unknown as PublicDb;
+
+      const result = await selectGamesForMatchupPlayer(
+        mockDb,
+        100,
+        1,
+        2023,
+        'SP',
+      );
+
+      expect(result.statsAreCached).toBe(true);
+      expect(result.gameIdentifier).toBe('pitch-game-001');
+    });
+
+    it('should return statsAreCached=false when pitcher full pool is also empty', async () => {
+      const selectResults: unknown[][] = [
+        // 1. cachedCheck (gameBatting) - no batting stats
+        [],
+        // 2. getPrimaryFieldingPosition
+        [{ pos: 'P', g: 30 }],
+        // 3. pitchingCheck - pitching stats exist
+        [{ gameIdentifier: 'pitch-game-001' }],
+        // 4. usedGames - game already used
+        [{ gameIdentifier: 'pitch-game-001' }],
+        // 5. selectGameIdentifierFromPitching (with exclusions) - exhausted
+        [],
+        // 6. selectGameIdentifierFromPitching (full pool) - also empty (all stale)
+        [],
+      ];
+
+      let selectIndex = 0;
+      const mockDb = {
+        select: jest.fn().mockImplementation(() => {
+          const result = selectResults[selectIndex++] ?? [];
+          const chainResult = Object.assign([...result], {
+            limit: jest.fn().mockReturnValue(result),
+          });
+          return {
+            from: jest.fn().mockReturnValue({
+              where: jest.fn().mockReturnValue(chainResult),
+            }),
+          };
+        }),
+      } as unknown as PublicDb;
+
+      const result = await selectGamesForMatchupPlayer(
+        mockDb,
+        100,
+        1,
+        2023,
+        'SP',
+      );
+
+      expect(result.statsAreCached).toBe(false);
+      expect(result.gameIdentifier).toBeNull();
+    });
+
+    it('should recycle a non-pitcher game when unique pool exhausted', async () => {
+      const selectResults: unknown[][] = [
+        // 1. cachedCheck - batting stats exist
+        [{ gameIdentifier: 'game-2023-001' }],
+        // 2. getPrimaryFieldingPosition
+        [{ pos: 'SS', g: 100 }],
+        // 3. usedGames - game already used
+        [{ gameIdentifier: 'game-2023-001' }],
+        // 4. selectGameIdentifier (with exclusions) - exhausted
+        [],
+        // 5. selectGameIdentifier (full pool, recycle) - returns game
+        [{ gameIdentifier: 'game-2023-001' }],
+      ];
+
+      let selectIndex = 0;
+      const mockDb = {
+        select: jest.fn().mockImplementation(() => {
+          const result = selectResults[selectIndex++] ?? [];
+          const chainResult = Object.assign([...result], {
+            limit: jest.fn().mockReturnValue(result),
+          });
+          return {
+            from: jest.fn().mockReturnValue({
+              where: jest.fn().mockReturnValue(chainResult),
+            }),
+          };
+        }),
+      } as unknown as PublicDb;
+
+      const result = await selectGamesForMatchupPlayer(
+        mockDb,
+        100,
+        1,
+        2023,
+        'non-pitcher',
+      );
+
+      expect(result.statsAreCached).toBe(true);
+      expect(result.gameIdentifier).toBe('game-2023-001');
+    });
+
+    it('should return statsAreCached=false when non-pitcher full pool is also empty', async () => {
+      const selectResults: unknown[][] = [
+        // 1. cachedCheck - batting stats exist
+        [{ gameIdentifier: 'game-2023-001' }],
+        // 2. getPrimaryFieldingPosition
+        [{ pos: 'SS', g: 100 }],
+        // 3. usedGames - game already used
+        [{ gameIdentifier: 'game-2023-001' }],
+        // 4. selectGameIdentifier (with exclusions) - exhausted
+        [],
+        // 5. selectGameIdentifier (full pool) - also empty (all stale)
+        [],
+      ];
+
+      let selectIndex = 0;
+      const mockDb = {
+        select: jest.fn().mockImplementation(() => {
+          const result = selectResults[selectIndex++] ?? [];
+          const chainResult = Object.assign([...result], {
+            limit: jest.fn().mockReturnValue(result),
+          });
+          return {
+            from: jest.fn().mockReturnValue({
+              where: jest.fn().mockReturnValue(chainResult),
+            }),
+          };
+        }),
+      } as unknown as PublicDb;
+
+      const result = await selectGamesForMatchupPlayer(
+        mockDb,
+        100,
+        1,
+        2023,
+        'non-pitcher',
+      );
+
+      expect(result.statsAreCached).toBe(false);
+      expect(result.gameIdentifier).toBeNull();
     });
   });
 

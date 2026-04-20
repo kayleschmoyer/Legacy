@@ -601,31 +601,43 @@ export class WaiverClaimProcessor {
     // Wrap the roster delete + scheduled-matchup cleanup in a single
     // transaction so a failure during matchup_players cleanup cannot leave
     // the team short a roster row. Locked (`in_progress`) matchups are
-    // intentionally skipped — scoring for the in-flight week must use the
+    // intentionally excluded — scoring for the in-flight week must use the
     // roster as it was when the week started.
+    // Fetch scheduled matchup IDs *inside* the transaction using tx.select()
+    // mapped to an array, then conditionally run the delete if the array is
+    // non-empty. This avoids tx.select() directly in inArray() (a novel
+    // Drizzle pattern in this codebase) while keeping both reads and writes
+    // in the same transaction and guarding against empty-array inArray() errors.
     await this.db.transaction(async (tx) => {
       await tx
         .delete(PublicSchema.teamMembers)
         .where(eq(PublicSchema.teamMembers.id, dropMember[0].id));
 
-      await tx.delete(PublicSchema.matchupPlayers).where(
-        and(
-          eq(PublicSchema.matchupPlayers.teamId, claim.teamId),
-          eq(PublicSchema.matchupPlayers.playerId, dropPlayerId),
-          inArray(
-            PublicSchema.matchupPlayers.matchupId,
-            tx
-              .select({ id: PublicSchema.matchups.id })
-              .from(PublicSchema.matchups)
-              .where(
-                and(
-                  eq(PublicSchema.matchups.leagueId, claim.leagueId),
-                  eq(PublicSchema.matchups.status, 'scheduled'),
-                ),
-              ),
+      const scheduledMatchups = await tx
+        .select({ id: PublicSchema.matchups.id })
+        .from(PublicSchema.matchups)
+        .where(
+          and(
+            eq(PublicSchema.matchups.leagueId, claim.leagueId),
+            eq(PublicSchema.matchups.status, 'scheduled'),
           ),
-        ),
-      );
+        );
+      const scheduledMatchupIds = scheduledMatchups.map((m) => m.id);
+
+      if (scheduledMatchupIds.length > 0) {
+        await tx
+          .delete(PublicSchema.matchupPlayers)
+          .where(
+            and(
+              eq(PublicSchema.matchupPlayers.teamId, claim.teamId),
+              eq(PublicSchema.matchupPlayers.playerId, dropPlayerId),
+              inArray(
+                PublicSchema.matchupPlayers.matchupId,
+                scheduledMatchupIds,
+              ),
+            ),
+          );
+      }
     });
 
     LOGGER.info('Dropped player for waiver claim', {
