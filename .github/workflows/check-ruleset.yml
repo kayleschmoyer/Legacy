@@ -3,8 +3,9 @@
 # Posts a warning annotation if they diverge.
 #
 # Triggers on repository_ruleset events (created/edited/deleted) so drift is
-# caught within seconds of any change, rather than waiting up to 7 days for
-# the old weekly cron. workflow_dispatch is retained for ad-hoc checks.
+# caught within seconds of any change. A weekly Monday cron serves as a
+# backstop in case repository_ruleset events are missed or unsupported.
+# workflow_dispatch is retained for ad-hoc checks.
 
 name: Check Ruleset Drift
 
@@ -16,6 +17,10 @@ on:
     # .github/ruleset.json) even if no live ruleset event was emitted.
     paths:
       - .github/ruleset.json
+  schedule:
+    # Weekly backstop: catches drift if repository_ruleset events are missed
+    # (e.g. unsupported on this plan, or events fired before the workflow existed).
+    - cron: "0 9 * * 1"
   workflow_dispatch:
 
 # UI edits can emit multiple `edited` events in quick succession; cancel
