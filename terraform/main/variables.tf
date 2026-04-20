@@ -135,6 +135,12 @@ variable "github_username" {
   default     = "bkrupa"
 }
 
+variable "agent_author_app_id" {
+  description = "Numeric GitHub App ID used by the github-webhook Lambda to obtain installation tokens for repository_dispatch (jira-issue-updated) events. Defaults to the Agent Reviewer app (legacy-sports-review-bot, ID 3142924)."
+  type        = number
+  default     = 3142924
+}
+
 variable "stripe_publishable_key" {
   description = "Stripe publishable key for client-side payment integration"
   type        = string

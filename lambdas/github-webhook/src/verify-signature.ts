@@ -26,3 +26,30 @@ export function verifyGitHubSignature(
     return false;
   }
 }
+
+/**
+ * Verify a Jira webhook request using a shared bearer token in the
+ * `X-Jira-Webhook-Secret` header.
+ *
+ * Jira Automation's "Send web request" action can include static headers but
+ * cannot compute HMAC signatures. A timing-safe token comparison is used
+ * to prevent timing side-channel attacks.
+ */
+export function verifyJiraWebhookSecret(
+  expectedSecret: string,
+  providedSecret: string | undefined,
+): boolean {
+  if (!providedSecret || !expectedSecret) {
+    return false;
+  }
+
+  try {
+    return timingSafeEqual(
+      Buffer.from(providedSecret),
+      Buffer.from(expectedSecret),
+    );
+  } catch {
+    // Buffer lengths differ — secrets can't match
+    return false;
+  }
+}

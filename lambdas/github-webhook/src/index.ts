@@ -1,8 +1,12 @@
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { LOGGER } from '@legacy-sports/logging';
 import { retrieveSecretParameterValue } from '@legacy-sports/aws-utils';
-import { verifyGitHubSignature } from './verify-signature';
+import {
+  verifyGitHubSignature,
+  verifyJiraWebhookSecret,
+} from './verify-signature';
 import { handleReviewThreadEvent } from './handle-review-thread';
+import { handleJiraTransitionEvent } from './handle-jira-transition';
 
 // ── Environment ───────────────────────────────────────────────────────────────
 
@@ -18,6 +22,8 @@ function requireEnv(name: string): string {
 
 let webhookSecretPromise: Promise<string> | null = null;
 let botKeyPromise: Promise<string> | null = null;
+let jiraWebhookSecretPromise: Promise<string> | null = null;
+let agentAuthorAppKeyPromise: Promise<string> | null = null;
 
 function getWebhookSecret(): Promise<string> {
   if (!webhookSecretPromise) {
@@ -35,6 +41,24 @@ function getBotAppPrivateKey(): Promise<string> {
     );
   }
   return botKeyPromise;
+}
+
+function getJiraWebhookSecret(): Promise<string> {
+  if (!jiraWebhookSecretPromise) {
+    jiraWebhookSecretPromise = retrieveSecretParameterValue(
+      requireEnv('JIRA_WEBHOOK_SECRET_SECRET_NAME'),
+    );
+  }
+  return jiraWebhookSecretPromise;
+}
+
+function getAgentAuthorAppKey(): Promise<string> {
+  if (!agentAuthorAppKeyPromise) {
+    agentAuthorAppKeyPromise = retrieveSecretParameterValue(
+      requireEnv('AGENT_AUTHOR_APP_PRIVATE_KEY_SECRET_NAME'),
+    );
+  }
+  return agentAuthorAppKeyPromise;
 }
 
 // ── Response helpers ──────────────────────────────────────────────────────────
@@ -55,7 +79,10 @@ function json(
 export const handler = async (
   event: APIGatewayProxyEvent,
 ): Promise<APIGatewayProxyResult> => {
-  const { httpMethod, path, headers, body: rawBody, isBase64Encoded } = event;
+  const { httpMethod, path, body: rawBody, isBase64Encoded } = event;
+  // API Gateway can send a null headers object at runtime even though the
+  // TypeScript type says otherwise — normalise once here for both routes.
+  const headers = event.headers ?? {};
 
   // Health check
   if (httpMethod === 'GET' && path.endsWith('/health')) {
@@ -66,11 +93,64 @@ export const handler = async (
     return json(405, { error: 'Method not allowed' });
   }
 
-  // Decode body
+  // Decode body (shared by both routes)
   const bodyStr =
     isBase64Encoded && rawBody
       ? Buffer.from(rawBody, 'base64').toString('utf8')
       : (rawBody ?? '');
+
+  // ── Jira webhook route (/github-webhook/jira) ─────────────────────────────
+  if (path.endsWith('/jira')) {
+    const jiraSecretHeader =
+      headers['X-Jira-Webhook-Secret'] ?? headers['x-jira-webhook-secret'];
+    if (!jiraSecretHeader) {
+      LOGGER.warn(
+        'Jira webhook rejected — missing X-Jira-Webhook-Secret header',
+      );
+      return json(401, { error: 'Unauthorized' });
+    }
+
+    const jiraSecret = await getJiraWebhookSecret();
+    if (!verifyJiraWebhookSecret(jiraSecret, jiraSecretHeader)) {
+      LOGGER.warn('Jira webhook rejected — invalid secret');
+      return json(401, { error: 'Unauthorized' });
+    }
+
+    let jiraPayload: unknown;
+    try {
+      jiraPayload = JSON.parse(bodyStr) as unknown;
+    } catch {
+      return json(400, { error: 'Invalid JSON payload' });
+    }
+
+    const [appPrivateKey, githubRepo] = await Promise.all([
+      getAgentAuthorAppKey(),
+      Promise.resolve(requireEnv('GITHUB_REPO')),
+    ]);
+    const agentAuthorAppIdRaw = requireEnv('AGENT_AUTHOR_APP_ID');
+    const agentAuthorAppId = Number(agentAuthorAppIdRaw);
+    if (!Number.isFinite(agentAuthorAppId) || agentAuthorAppId <= 0) {
+      throw new Error(
+        `AGENT_AUTHOR_APP_ID must be a positive integer, got: "${agentAuthorAppIdRaw}"`,
+      );
+    }
+
+    try {
+      const result = await handleJiraTransitionEvent(
+        jiraPayload as Parameters<typeof handleJiraTransitionEvent>[0],
+        appPrivateKey,
+        agentAuthorAppId,
+        githubRepo,
+      );
+      LOGGER.info('Handled Jira webhook event', { result });
+      return json(200, { status: 'ok', result });
+    } catch (error) {
+      LOGGER.error('Error handling Jira webhook event', { error });
+      return json(500, { error: 'Internal server error' });
+    }
+  }
+
+  // ── GitHub webhook route (/github-webhook) ────────────────────────────────
 
   // Verify GitHub webhook signature — check header presence before hitting Secrets Manager
   const sigHeader =

@@ -52,11 +52,38 @@ async function fetchSchema(url) {
   }
 }
 
+// GitHub Actions events that are valid at runtime but not yet present in the
+// SchemaStore github-workflow.json schema. Strip them from the `on` object
+// before AJV validation to avoid false positives. Update this list as the
+// upstream schema catches up.
+const KNOWN_VALID_EVENTS_NOT_IN_SCHEMA = new Set([
+  'repository_ruleset', // added 2024-Q4 — https://docs.github.com/en/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows#repository_ruleset
+]);
+
 // Validate a single YAML file
 async function validateFile(filePath, schema, ajv) {
   try {
     const content = fs.readFileSync(filePath, 'utf8');
     const data = yaml.load(content);
+
+    // Remove events that are valid in GitHub Actions but missing from the
+    // SchemaStore schema so they don't generate false-positive failures.
+    // Only applies when `on` is a plain mapping object — array form
+    // (e.g. `on: [push, pull_request]`) never contains the new events
+    // and must not be converted to an object.
+    if (
+      data &&
+      typeof data.on === 'object' &&
+      data.on !== null &&
+      !Array.isArray(data.on)
+    ) {
+      const stripped = Object.fromEntries(
+        Object.entries(data.on).filter(
+          ([key]) => !KNOWN_VALID_EVENTS_NOT_IN_SCHEMA.has(key),
+        ),
+      );
+      data.on = stripped;
+    }
 
     const validate = ajv.compile(schema);
     const valid = validate(data);

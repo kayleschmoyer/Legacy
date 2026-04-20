@@ -4,7 +4,7 @@ import { LOGGER } from '@legacy-sports/logging';
 const GITHUB_API = 'https://api.github.com';
 
 /** Default request timeout for GitHub API calls (15s — well inside the 30s Lambda timeout) */
-const REQUEST_TIMEOUT_MS = 15_000;
+export const REQUEST_TIMEOUT_MS = 15_000;
 
 /**
  * Generate a GitHub App JWT signed with the app's RSA private key.
@@ -21,6 +21,44 @@ function generateAppJwt(appId: number, privateKey: string): string {
     privateKey,
     { algorithm: 'RS256' },
   );
+}
+
+/**
+ * Look up the installation ID for a GitHub App on a specific repository,
+ * then exchange the App JWT for a short-lived installation access token.
+ *
+ * Use this when you know the app + repo but not the installation ID.
+ * The token inherits the app's permissions for that installation.
+ */
+export async function getRepoInstallationToken(
+  appId: number,
+  privateKey: string,
+  owner: string,
+  repo: string,
+): Promise<string> {
+  const jwt = generateAppJwt(appId, privateKey);
+
+  const instResp = await fetch(
+    `${GITHUB_API}/repos/${owner}/${repo}/installation`,
+    {
+      headers: {
+        Authorization: `Bearer ${jwt}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    },
+  );
+
+  if (!instResp.ok) {
+    const body = await instResp.text();
+    throw new Error(
+      `Failed to get installation for ${owner}/${repo} (${instResp.status}): ${body}`,
+    );
+  }
+
+  const { id: installationId } = (await instResp.json()) as { id: number };
+  return getInstallationToken(appId, privateKey, installationId);
 }
 
 /**

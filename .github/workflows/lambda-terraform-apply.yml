@@ -79,6 +79,9 @@ jobs:
           if [ -z "${{ secrets.ROLLBAR_ACCESS_TOKEN }}" ]; then
             MISSING+=("ROLLBAR_ACCESS_TOKEN")
           fi
+          if [ -z "${{ secrets.BOT_APP_PRIVATE_KEY }}" ]; then
+            MISSING+=("BOT_APP_PRIVATE_KEY")
+          fi
           if [ ${#MISSING[@]} -gt 0 ]; then
             echo "::error::Missing required secrets: ${MISSING[*]}"
             exit 1
@@ -446,6 +449,38 @@ jobs:
           else
             echo "✅ All deployed versions consistent with SSM"
           fi
+
+      - name: Sync Review Bot App Key to Secrets Manager
+        # Runs after every successful apply (or when apply was a no-op) to keep
+        # the agent_author_app_private_key Secrets Manager entry in sync with
+        # the BOT_APP_PRIVATE_KEY GitHub Actions secret (same key used by
+        # copilot-auto-approve.yml for review-bot token generation). This is
+        # idempotent — put-secret-value is safe to call on every workflow run.
+        # The step is skipped if apply itself failed (secret resource may not exist).
+        if: "!cancelled() && steps.apply.outcome != 'failure'"
+        env:
+          REVIEW_BOT_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+        run: |
+          echo "🔑 Syncing Review Bot app private key to Secrets Manager..."
+
+          SECRET_NAME=$(aws secretsmanager list-secrets \
+            --region "$AWS_REGION" \
+            --filter Key=name,Values="${LAMBDA_PREFIX}-agent-author-app-private-key-" \
+            --query "sort_by(SecretList, &CreatedDate)[-1].Name" \
+            --output text 2>/dev/null)
+
+          if [[ "$SECRET_NAME" == "None" || -z "$SECRET_NAME" ]]; then
+            echo "::warning::Secret ${LAMBDA_PREFIX}-agent-author-app-private-key-* not found \
+          — skipping sync. Run terraform apply first to create the resource."
+            exit 0
+          fi
+
+          aws secretsmanager put-secret-value \
+            --region "$AWS_REGION" \
+            --secret-id "$SECRET_NAME" \
+            --secret-string "$REVIEW_BOT_KEY"
+
+          echo "✅ Review Bot app private key synced: $SECRET_NAME"
 
       - name: Release Lock on Apply Failure
         if: always() && steps.apply.outcome == 'failure'

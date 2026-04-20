@@ -1,14 +1,28 @@
-# check-ruleset.yml — Weekly drift detection for branch protection rulesets.
+# check-ruleset.yml — Event-driven drift detection for branch protection rulesets.
 # Compares the live ruleset on GitHub against the checked-in JSON config.
 # Posts a warning annotation if they diverge.
+#
+# Triggers on repository_ruleset events (created/edited/deleted) so drift is
+# caught within seconds of any change, rather than waiting up to 7 days for
+# the old weekly cron. workflow_dispatch is retained for ad-hoc checks.
 
 name: Check Ruleset Drift
 
 on:
-  schedule:
-    # Every Monday at 09:00 UTC
-    - cron: "0 9 * * 1"
+  repository_ruleset:
+    types: [created, edited, deleted]
+  push:
+    # Catch drift when the checked-in config changes (e.g. a PR updates
+    # .github/ruleset.json) even if no live ruleset event was emitted.
+    paths:
+      - .github/ruleset.json
   workflow_dispatch:
+
+# UI edits can emit multiple `edited` events in quick succession; cancel
+# any in-progress run so only the latest ruleset state is checked.
+concurrency:
+  group: check-ruleset-drift
+  cancel-in-progress: true
 
 permissions:
   contents: read

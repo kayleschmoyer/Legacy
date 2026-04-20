@@ -11,12 +11,33 @@ name: "Jira Status Audit"
 # a ticket status in Jira, GitHub PRs remain unaware. Similarly, epics can
 # drift out of sync when children are transitioned outside of PR activity.
 #
+# Triggering via Jira webhook:
+#   For near-real-time audits, configure Jira to call the
+#   /github-webhook/jira Lambda route on issue transitions. That route
+#   validates the Jira request (X-Jira-Webhook-Secret header) and fires
+#   the repository_dispatch event to GitHub.
+#
+#   This fires the audit immediately when a ticket is manually transitioned
+#   in Jira, rather than waiting for the weekly backstop cron.
+#
+#   Direct POSTs to GitHub's /dispatches endpoint are also supported, but
+#   the sender login must be in the JIRA_DISPATCH_ALLOWED_SENDERS repo var
+#   to pass the Verify dispatch sender allowlist check.
+#
 # Authentication: Uses Atlassian OAuth 2.0 (client credentials grant).
 
 on:
+  repository_dispatch:
+    types: [jira-issue-updated]
   schedule:
-    - cron: "0 6 * * *" # Daily at 06:00 UTC
+    - cron: "0 6 * * 1" # Weekly on Monday at 06:00 UTC (backstop for webhook gaps)
   workflow_dispatch:
+
+# Debounce rapid-fire dispatch events (e.g. Jira bulk transitions / retries).
+# Only the most recent event matters — cancel any in-progress run.
+concurrency:
+  group: jira-status-audit
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -29,6 +50,34 @@ jobs:
     timeout-minutes: 10
 
     steps:
+      # Guard against unauthorized repository_dispatch callers.
+      # The dispatch endpoint requires a PAT or GitHub App token with repo scope,
+      # but any collaborator with that access could trigger this workflow and gain
+      # access to JIRA_CREDENTIALS and PR write permissions. Allowlist the expected
+      # sender logins (the dedicated Jira automation bot/GitHub App). Scheduled and
+      # manual runs are not subject to this check.
+      - name: Verify dispatch sender
+        if: github.event_name == 'repository_dispatch'
+        env:
+          SENDER: ${{ github.event.sender.login }}
+          # Comma-separated list of allowed senders (GitHub App/bot logins).
+          # Update JIRA_DISPATCH_ALLOWED_SENDERS in repo vars to add/remove bots.
+          # Include both the GitHub App bot login ([bot] suffix) and the
+          # machine-user login (no suffix) since fine-grained PATs owned by
+          # a machine user appear without the [bot] suffix in sender.login.
+          ALLOWED: ${{ vars.JIRA_DISPATCH_ALLOWED_SENDERS || 'legacy-sports-review-bot,legacy-sports-review-bot[bot]' }}
+        run: |
+          IFS=',' read -ra ALLOWED_LOGINS <<< "$ALLOWED"
+          for login in "${ALLOWED_LOGINS[@]}"; do
+            login="${login// /}"  # trim whitespace
+            if [[ "$SENDER" == "$login" ]]; then
+              echo "✅ Authorized dispatch sender: $SENDER"
+              exit 0
+            fi
+          done
+          echo "::error::Unauthorized repository_dispatch sender: '$SENDER'. Allowed: $ALLOWED"
+          exit 1
+
       - name: Checkout (for workflow context)
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:

@@ -1,11 +1,17 @@
 # GitHub Webhook Lambda Configuration
-# Handles pull_request_review_thread events from GitHub and updates the
-# bot-review check run via the Review Bot app (ID: 3142924).
+# Handles two webhook routes:
 #
-# This closes the gap where cloud agents cannot dispatch the
-# copilot-auto-approve.yml workflow (no actions:write) after resolving
-# review threads — the webhook handler sets bot-review=success directly
-# using the Review Bot's checks:write permission. (LS-3033)
+# POST /github-webhook     — pull_request_review_thread events from GitHub.
+#   Updates the bot-review check run via the Review Bot app (ID: 3142924).
+#   This closes the gap where cloud agents cannot dispatch the
+#   copilot-auto-approve.yml workflow (no actions:write) after resolving
+#   review threads. (LS-3033)
+#
+# POST /github-webhook/jira — issue_updated events from Jira Automation.
+#   Fires a repository_dispatch (jira-issue-updated) to GitHub so that
+#   jira-status-audit.yml runs immediately on manual Jira transitions
+#   rather than waiting for the weekly backstop cron.
+#   Auth: shared bearer token in X-Jira-Webhook-Secret header.
 
 # ── Secrets Manager (externally managed values) ───────────────────────────────
 
@@ -19,6 +25,20 @@ resource "aws_secretsmanager_secret" "github_webhook_secret" {
 resource "aws_secretsmanager_secret" "github_bot_app_private_key" {
   name_prefix = "${local.name_prefix}-github-bot-app-private-key-"
   description = "RSA PEM private key for the Review Bot GitHub App (ID: 3142924) — used by the github-webhook Lambda to generate installation tokens"
+
+  tags = local.common_tags
+}
+
+resource "aws_secretsmanager_secret" "jira_webhook_secret" {
+  name_prefix = "${local.name_prefix}-jira-webhook-secret-"
+  description = "Shared bearer token verified by the github-webhook Lambda for inbound Jira Automation webhooks (X-Jira-Webhook-Secret header). Configure the same value in Jira Automation's 'Send web request' action."
+
+  tags = local.common_tags
+}
+
+resource "aws_secretsmanager_secret" "agent_author_app_private_key" {
+  name_prefix = "${local.name_prefix}-agent-author-app-private-key-"
+  description = "RSA PEM private key for the Agent Reviewer GitHub App (legacy-sports-review-bot, app ID stored in AGENT_AUTHOR_APP_ID env var). Used by the github-webhook Lambda to obtain short-lived installation tokens for repository_dispatch calls."
 
   tags = local.common_tags
 }
@@ -65,7 +85,9 @@ resource "aws_iam_policy" "github_webhook_lambda_secrets" {
         ]
         Resource = [
           aws_secretsmanager_secret.github_webhook_secret.arn,
-          aws_secretsmanager_secret.github_bot_app_private_key.arn
+          aws_secretsmanager_secret.github_bot_app_private_key.arn,
+          aws_secretsmanager_secret.jira_webhook_secret.arn,
+          aws_secretsmanager_secret.agent_author_app_private_key.arn,
         ]
       }
     ]
@@ -126,6 +148,10 @@ resource "aws_lambda_function" "github_webhook" {
       AWS_NODEJS_CONNECTION_REUSE_ENABLED = "1"
       WEBHOOK_SECRET_SECRET_NAME          = aws_secretsmanager_secret.github_webhook_secret.name
       BOT_APP_PRIVATE_KEY_SECRET_NAME     = aws_secretsmanager_secret.github_bot_app_private_key.name
+      JIRA_WEBHOOK_SECRET_SECRET_NAME          = aws_secretsmanager_secret.jira_webhook_secret.name
+      AGENT_AUTHOR_APP_PRIVATE_KEY_SECRET_NAME = aws_secretsmanager_secret.agent_author_app_private_key.name
+      AGENT_AUTHOR_APP_ID                      = tostring(var.agent_author_app_id)
+      GITHUB_REPO                              = "${var.github_username}/${var.project_name}"
     }
   }
 
@@ -203,6 +229,11 @@ resource "aws_lambda_permission" "github_webhook_api_gateway_paths" {
 # ── Outputs ───────────────────────────────────────────────────────────────────
 
 output "github_webhook_url" {
-  description = "GitHub webhook endpoint URL — configure this in the GitHub App/repo webhook settings with pull_request_review_thread events"
+  description = "GitHub webhook endpoint URL — configure in GitHub App/repo webhook settings with pull_request_review_thread events"
   value       = "${local.api_base_url}/github-webhook"
+}
+
+output "jira_webhook_url" {
+  description = "Jira webhook endpoint URL — configure in Jira Automation 'Send web request' action; set X-Jira-Webhook-Secret header to the secret value stored in Secrets Manager for jira_webhook_secret"
+  value       = "${local.api_base_url}/github-webhook/jira"
 }
