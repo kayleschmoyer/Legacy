@@ -581,7 +581,8 @@ export class WaiverClaimProcessor {
   }
 
   private async dropPlayer(claim: PendingClaim): Promise<boolean> {
-    if (!claim.dropPlayerId) return false;
+    if (claim.dropPlayerId == null) return false;
+    const dropPlayerId = claim.dropPlayerId;
 
     const dropMember = await this.db
       .select({ id: PublicSchema.teamMembers.id })
@@ -590,20 +591,46 @@ export class WaiverClaimProcessor {
         and(
           eq(PublicSchema.teamMembers.teamId, claim.teamId),
           eq(PublicSchema.teamMembers.leagueId, claim.leagueId),
-          eq(PublicSchema.teamMembers.playerId, claim.dropPlayerId),
+          eq(PublicSchema.teamMembers.playerId, dropPlayerId),
         ),
       )
       .limit(1);
 
     if (dropMember.length === 0) return false;
 
-    await this.db
-      .delete(PublicSchema.teamMembers)
-      .where(eq(PublicSchema.teamMembers.id, dropMember[0].id));
+    // Wrap the roster delete + scheduled-matchup cleanup in a single
+    // transaction so a failure during matchup_players cleanup cannot leave
+    // the team short a roster row. Locked (`in_progress`) matchups are
+    // intentionally skipped — scoring for the in-flight week must use the
+    // roster as it was when the week started.
+    await this.db.transaction(async (tx) => {
+      await tx
+        .delete(PublicSchema.teamMembers)
+        .where(eq(PublicSchema.teamMembers.id, dropMember[0].id));
+
+      await tx.delete(PublicSchema.matchupPlayers).where(
+        and(
+          eq(PublicSchema.matchupPlayers.teamId, claim.teamId),
+          eq(PublicSchema.matchupPlayers.playerId, dropPlayerId),
+          inArray(
+            PublicSchema.matchupPlayers.matchupId,
+            tx
+              .select({ id: PublicSchema.matchups.id })
+              .from(PublicSchema.matchups)
+              .where(
+                and(
+                  eq(PublicSchema.matchups.leagueId, claim.leagueId),
+                  eq(PublicSchema.matchups.status, 'scheduled'),
+                ),
+              ),
+          ),
+        ),
+      );
+    });
 
     LOGGER.info('Dropped player for waiver claim', {
       claimId: claim.id,
-      droppedPlayerId: claim.dropPlayerId,
+      droppedPlayerId: dropPlayerId,
       teamId: claim.teamId,
     });
 

@@ -223,7 +223,10 @@ export async function addClaimedPlayerToCurrentMatchup(
     }
   }
 
-  // 3. Add the player to matchup_players for every matchup this week involving their team
+  // 3. Add the player to matchup_players for every matchup this week involving
+  //    their team. Locked (`in_progress`) matchups are skipped: inserting there
+  //    would mutate a lineup that is already being scored, violating the rule
+  //    that locked lineups must remain immutable.
   const weekMatchups = await db
     .select({ id: PublicSchema.matchups.id })
     .from(PublicSchema.matchups)
@@ -231,6 +234,7 @@ export async function addClaimedPlayerToCurrentMatchup(
       and(
         eq(PublicSchema.matchups.leagueId, leagueId),
         eq(PublicSchema.matchups.weekNumber, weekNumber),
+        eq(PublicSchema.matchups.status, 'scheduled'),
         or(
           eq(PublicSchema.matchups.team1Id, teamId),
           eq(PublicSchema.matchups.team2Id, teamId),

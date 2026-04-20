@@ -10,7 +10,7 @@
  */
 import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, or } from 'drizzle-orm';
 
 import { TradeOffer } from './types';
 import {
@@ -109,6 +109,91 @@ async function resolveUserTeam(
   }
 
   return membership.teamId;
+}
+
+// ── Helper: sync matchup_players when players change teams via trade ──────
+
+/**
+ * Move the given players from `fromTeamId` to `toTeamId` in every
+ * `scheduled` matchup for the league. Locked (`in_progress`) matchups are
+ * intentionally skipped so the in-flight week's lineup remains immutable.
+ *
+ * For each scheduled matchup the destination team participates in we insert a
+ * matchup_players row for the player under `toTeamId`; rows under the source
+ * team are always removed so the old team's scheduled lineup reflects the
+ * trade. Existing rows are de-duplicated via the unique (matchup_id,
+ * player_id, team_id) index.
+ */
+async function syncMatchupPlayersForTradeLeg(
+  // Accept either the request-scoped `context.db` or a transaction handle
+  // from `db.transaction(async (tx) => ...)`. Both are structurally
+  // compatible; callers wrap the parent mutation in a transaction so all
+  // writes (roster swap + matchup sync + trade status flip) succeed or
+  // roll back together.
+  db: Context['db'],
+  leagueId: number,
+  fromTeamId: number,
+  toTeamId: number,
+  playerIds: number[],
+): Promise<void> {
+  if (playerIds.length === 0) return;
+
+  // Remove stale rows under the former team for all scheduled matchups.
+  await db.delete(PublicSchema.matchupPlayers).where(
+    and(
+      eq(PublicSchema.matchupPlayers.teamId, fromTeamId),
+      inArray(PublicSchema.matchupPlayers.playerId, playerIds),
+      inArray(
+        PublicSchema.matchupPlayers.matchupId,
+        db
+          .select({ id: PublicSchema.matchups.id })
+          .from(PublicSchema.matchups)
+          .where(
+            and(
+              eq(PublicSchema.matchups.leagueId, leagueId),
+              eq(PublicSchema.matchups.status, 'scheduled'),
+            ),
+          ),
+      ),
+    ),
+  );
+
+  // Insert rows under the new team for every scheduled matchup the team
+  // participates in, so next week's lineup shows the incoming players.
+  const destMatchups = await db
+    .select({ id: PublicSchema.matchups.id })
+    .from(PublicSchema.matchups)
+    .where(
+      and(
+        eq(PublicSchema.matchups.leagueId, leagueId),
+        eq(PublicSchema.matchups.status, 'scheduled'),
+        or(
+          eq(PublicSchema.matchups.team1Id, toTeamId),
+          eq(PublicSchema.matchups.team2Id, toTeamId),
+        ),
+      ),
+    );
+
+  if (destMatchups.length === 0) return;
+
+  const rows = destMatchups.flatMap((m) =>
+    playerIds.map((playerId) => ({
+      matchupId: m.id,
+      playerId,
+      teamId: toTeamId,
+    })),
+  );
+
+  await db
+    .insert(PublicSchema.matchupPlayers)
+    .values(rows)
+    .onConflictDoNothing({
+      target: [
+        PublicSchema.matchupPlayers.matchupId,
+        PublicSchema.matchupPlayers.playerId,
+        PublicSchema.matchupPlayers.teamId,
+      ],
+    });
 }
 
 // ── Helper: post a system chat message for a trade action ─────────────────
@@ -648,42 +733,64 @@ builder.mutationField('acceptTrade', (t) =>
         );
       }
 
-      await Promise.all([
-        ...(toReceiving.length > 0
-          ? [
-              db
-                .update(PublicSchema.teamMembers)
-                .set({ teamId: receivingTeamId, positionId: null })
-                .where(
-                  and(
-                    eq(PublicSchema.teamMembers.leagueId, trade.leagueId),
-                    inArray(PublicSchema.teamMembers.playerId, toReceiving),
-                    eq(PublicSchema.teamMembers.teamId, proposingTeamId),
+      // 4 + 4b + 5. All dependent writes must be atomic: swap rosters,
+      // propagate to scheduled-week matchup_players, and flip the trade to
+      // accepted. A partial failure would otherwise leave rosters swapped
+      // while the trade offer is still pending.
+      await db.transaction(async (tx) => {
+        await Promise.all([
+          ...(toReceiving.length > 0
+            ? [
+                tx
+                  .update(PublicSchema.teamMembers)
+                  .set({ teamId: receivingTeamId, positionId: null })
+                  .where(
+                    and(
+                      eq(PublicSchema.teamMembers.leagueId, trade.leagueId),
+                      inArray(PublicSchema.teamMembers.playerId, toReceiving),
+                      eq(PublicSchema.teamMembers.teamId, proposingTeamId),
+                    ),
                   ),
-                ),
-            ]
-          : []),
-        ...(toProposing.length > 0
-          ? [
-              db
-                .update(PublicSchema.teamMembers)
-                .set({ teamId: proposingTeamId, positionId: null })
-                .where(
-                  and(
-                    eq(PublicSchema.teamMembers.leagueId, trade.leagueId),
-                    inArray(PublicSchema.teamMembers.playerId, toProposing),
-                    eq(PublicSchema.teamMembers.teamId, receivingTeamId),
+              ]
+            : []),
+          ...(toProposing.length > 0
+            ? [
+                tx
+                  .update(PublicSchema.teamMembers)
+                  .set({ teamId: proposingTeamId, positionId: null })
+                  .where(
+                    and(
+                      eq(PublicSchema.teamMembers.leagueId, trade.leagueId),
+                      inArray(PublicSchema.teamMembers.playerId, toProposing),
+                      eq(PublicSchema.teamMembers.teamId, receivingTeamId),
+                    ),
                   ),
-                ),
-            ]
-          : []),
-      ]);
+              ]
+            : []),
+        ]);
 
-      // 5. Mark the trade as accepted
-      await db
-        .update(PublicSchema.tradeOffers)
-        .set({ status: 'accepted', respondedAt: new Date() })
-        .where(eq(PublicSchema.tradeOffers.id, args.tradeId));
+        await Promise.all([
+          syncMatchupPlayersForTradeLeg(
+            tx,
+            trade.leagueId,
+            proposingTeamId,
+            receivingTeamId,
+            toReceiving,
+          ),
+          syncMatchupPlayersForTradeLeg(
+            tx,
+            trade.leagueId,
+            receivingTeamId,
+            proposingTeamId,
+            toProposing,
+          ),
+        ]);
+
+        await tx
+          .update(PublicSchema.tradeOffers)
+          .set({ status: 'accepted', respondedAt: new Date() })
+          .where(eq(PublicSchema.tradeOffers.id, args.tradeId));
+      });
 
       LOGGER.info('Trade accepted — players swapped', {
         tradeId: args.tradeId,
@@ -943,24 +1050,53 @@ builder.mutationField('vetoTrade', (t) =>
         teamLegs.push(leg.playerId);
       }
 
-      await Promise.all(
-        [...legsByFromTeam.entries()].map(([fromTeamId, playerIds]) =>
-          db
-            .update(PublicSchema.teamMembers)
-            .set({ teamId: fromTeamId, positionId: null })
-            .where(
-              and(
-                eq(PublicSchema.teamMembers.leagueId, trade.leagueId),
-                inArray(PublicSchema.teamMembers.playerId, playerIds),
+      // Reverse roster swap + reverse matchup_players sync + trade status
+      // flip must be atomic so a partial failure cannot leave the trade
+      // marked accepted with rosters already reverted (or vice versa).
+      const tradeTeamIds = [trade.proposingTeamId, trade.receivingTeamId];
+      await db.transaction(async (tx) => {
+        await Promise.all(
+          [...legsByFromTeam.entries()].map(([fromTeamId, playerIds]) =>
+            tx
+              .update(PublicSchema.teamMembers)
+              .set({ teamId: fromTeamId, positionId: null })
+              .where(
+                and(
+                  eq(PublicSchema.teamMembers.leagueId, trade.leagueId),
+                  inArray(PublicSchema.teamMembers.playerId, playerIds),
+                ),
               ),
-            ),
-        ),
-      );
+          ),
+        );
 
-      await db
-        .update(PublicSchema.tradeOffers)
-        .set({ status: 'vetoed', vetoedAt: new Date() })
-        .where(eq(PublicSchema.tradeOffers.id, args.tradeId));
+        // Reverse-propagate the swap into scheduled matchup_players so
+        // future-week lineups match the pre-trade rosters. The players were
+        // previously moved to the *opposite* team by acceptTrade; locate
+        // that team from the trade's two sides and hand each group back to
+        // its original owner. Locked matchups remain immutable.
+        await Promise.all(
+          [...legsByFromTeam.entries()].map(
+            ([originalFromTeamId, playerIds]) => {
+              const previousToTeamId = tradeTeamIds.find(
+                (id) => id !== originalFromTeamId,
+              );
+              if (previousToTeamId == null) return Promise.resolve();
+              return syncMatchupPlayersForTradeLeg(
+                tx,
+                trade.leagueId,
+                previousToTeamId,
+                originalFromTeamId,
+                playerIds,
+              );
+            },
+          ),
+        );
+
+        await tx
+          .update(PublicSchema.tradeOffers)
+          .set({ status: 'vetoed', vetoedAt: new Date() })
+          .where(eq(PublicSchema.tradeOffers.id, args.tradeId));
+      });
 
       LOGGER.info('Trade vetoed by commissioner', {
         tradeId: args.tradeId,
