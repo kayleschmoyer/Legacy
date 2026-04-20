@@ -79,6 +79,13 @@
         "tsx",
         "tools/mcp/browser-server/src/index.ts"
       ]
+    },
+    "stripe": {
+      "command": "npx",
+      "args": ["-y", "@stripe/mcp@0.3.3", "--tools=all"],
+      "env": {
+        "STRIPE_SECRET_KEY": "${STRIPE_SECRET_KEY}"
+      }
     }
   }
 }
