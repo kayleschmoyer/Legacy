@@ -1,25 +1,23 @@
-# check-ruleset.yml — Event-driven drift detection for branch protection rulesets.
+# check-ruleset.yml — Drift detection for branch protection rulesets.
 # Compares the live ruleset on GitHub against the checked-in JSON config.
 # Posts a warning annotation if they diverge.
 #
-# Triggers on repository_ruleset events (created/edited/deleted) so drift is
-# caught within seconds of any change. A weekly Monday cron serves as a
-# backstop in case repository_ruleset events are missed or unsupported.
-# workflow_dispatch is retained for ad-hoc checks.
+# Runs weekly (Monday 09:00 UTC) as a backstop, on push when ruleset.json
+# changes, and on demand via workflow_dispatch.
+# Note: repository_ruleset is not a valid GitHub Actions trigger event.
+# This workflow still checks checked-in config changes and eventual live drift,
+# but live GitHub UI edits are only detected on the weekly schedule or manual runs.
 
 name: Check Ruleset Drift
 
 on:
-  repository_ruleset:
-    types: [created, edited, deleted]
   push:
     # Catch drift when the checked-in config changes (e.g. a PR updates
     # .github/ruleset.json) even if no live ruleset event was emitted.
     paths:
       - .github/ruleset.json
   schedule:
-    # Weekly backstop: catches drift if repository_ruleset events are missed
-    # (e.g. unsupported on this plan, or events fired before the workflow existed).
+    # Weekly backstop to catch drift from live ruleset edits via GitHub UI.
     - cron: "0 9 * * 1"
   workflow_dispatch:
 
@@ -45,7 +43,9 @@ jobs:
       - name: Fetch live ruleset from GitHub
         id: fetch
         env:
-          GH_TOKEN: ${{ secrets.RULESET_ADMIN_TOKEN }}
+          # RULESET_ADMIN_TOKEN has write access for apply-ruleset.sh; fall back to
+          # the default token (read-only) for drift detection when it is not set.
+          GH_TOKEN: ${{ secrets.RULESET_ADMIN_TOKEN || github.token }}
           REPO: ${{ github.repository }}
           RULESET_NAME: main-branch-protection
         run: |

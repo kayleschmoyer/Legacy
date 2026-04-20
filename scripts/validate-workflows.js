@@ -57,7 +57,8 @@ async function fetchSchema(url) {
 // before AJV validation to avoid false positives. Update this list as the
 // upstream schema catches up.
 const KNOWN_VALID_EVENTS_NOT_IN_SCHEMA = new Set([
-  'repository_ruleset', // added 2024-Q4 — https://docs.github.com/en/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows#repository_ruleset
+  // No entries currently — repository_ruleset was removed; it is NOT a valid
+  // GitHub Actions workflow trigger (GitHub returns "Unexpected value" at parse time).
 ]);
 
 // Validate a single YAML file
