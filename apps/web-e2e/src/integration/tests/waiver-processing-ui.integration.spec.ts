@@ -101,7 +101,8 @@ async function gqlFetch<T>(
 // ---------------------------------------------------------------------------
 // Helper: submit a waiver claim via the Free Agents tab UI.
 //
-// - Navigates to the free-agents page as `jwt`
+// - Navigates `page` (which must already be authenticated as the desired
+//   user — pass commissionerPage or managerPageN) to the free-agents page
 // - Searches for `playerName` and clicks the Add button
 // - Handles the mandatory drop when the roster is full (exercises the
 //   "drop" requirement from the ticket)
@@ -110,11 +111,10 @@ async function gqlFetch<T>(
 
 async function submitWaiverClaimViaUI(
   page: Page,
-  jwt: string,
   leagueId: number,
   playerName: string,
 ): Promise<void> {
-  await switchUser(page, jwt, `/baseball/league/${leagueId}/free-agents`);
+  await page.goto(`/baseball/league/${leagueId}/free-agents`);
   await page.waitForLoadState('load');
   await expect(page).toHaveURL(/\/free-agents/);
 
@@ -473,9 +473,9 @@ test.describe
   // -----------------------------------------------------------------
 
   test('Phase 5: Submit competing waiver claims with drop from both teams', async ({
-    commissionerPage: page,
+    commissionerPage,
     commissionerJwt,
-    managerJwt1,
+    managerPage1,
   }) => {
     test.setTimeout(180_000);
 
@@ -508,24 +508,24 @@ test.describe
 
     await test.step('Commissioner submits waiver claim (with drop if roster full)', async () => {
       await submitWaiverClaimViaUI(
-        page,
-        commissionerJwt,
+        commissionerPage,
         state.leagueId,
         state.freeAgentPlayerName,
       );
     });
 
     await test.step('Manager 1 submits claim for the same player (with drop if roster full)', async () => {
+      // Use a dedicated manager browser context rather than switchUser on
+      // commissionerPage. switchUser has a race condition (LS-3735): the
+      // background JWT refresh can dispatch AUTH_LOGOUT and clear
+      // localStorage after page.evaluate() sets the manager profile,
+      // landing the test on the unauthenticated sign-in page.
       await submitWaiverClaimViaUI(
-        page,
-        managerJwt1,
+        managerPage1,
         state.leagueId,
         state.freeAgentPlayerName,
       );
     });
-
-    // Restore commissioner identity after user-switching
-    await switchUser(page, commissionerJwt);
   });
 
   // -----------------------------------------------------------------

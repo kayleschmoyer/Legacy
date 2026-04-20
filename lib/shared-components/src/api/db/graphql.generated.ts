@@ -689,6 +689,12 @@ export type EvaluateBadgesResult = {
   awardedCount?: Maybe<Scalars['Int']['output']>;
 };
 
+export type ExpireSubscriptionGracePeriodsResult = {
+  __typename?: 'ExpireSubscriptionGracePeriodsResult';
+  errors?: Maybe<Array<Scalars['String']['output']>>;
+  expired?: Maybe<Scalars['Int']['output']>;
+};
+
 export type ForceAddPlayerInput = {
   leagueId: Scalars['Int']['input'];
   playerId: Scalars['Int']['input'];
@@ -1301,6 +1307,8 @@ export type Mutation = {
   evaluateDraftBadges?: Maybe<EvaluateBadgesResult>;
   /** Evaluate and award all eligible matchup-based badges for a completed matchup. Call when a matchup status transitions to completed. Requires authentication. */
   evaluateMatchupBadges?: Maybe<EvaluateBadgesResult>;
+  /** Downgrade premium subscriptions whose grace_period_ends_at has passed. System / admin only. Triggered hourly by EventBridge. */
+  expireSubscriptionGracePeriods?: Maybe<ExpireSubscriptionGracePeriodsResult>;
   /** Commissioner: force-add a player to a team, bypassing normal acquisition rules. */
   forceAddPlayer?: Maybe<CommissionerActionResult>;
   /** Commissioner: force-drop a player from a team. */

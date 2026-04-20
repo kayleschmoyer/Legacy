@@ -519,16 +519,15 @@ test.describe
   // -----------------------------------------------------------------
 
   test('Phase 10: Manager can view their own roster', async ({
-    commissionerPage: page,
-    commissionerJwt,
-    managerJwt1,
+    managerPage1: page,
   }) => {
-    await test.step('Switch to manager 1 and navigate to roster', async () => {
-      await switchUser(
-        page,
-        managerJwt1,
-        `/baseball/league/${state.leagueId}/roster`,
-      );
+    // Use a dedicated manager browser context rather than switchUser on
+    // commissionerPage. switchUser has a race condition (LS-3672, LS-3705,
+    // LS-3735): background JWT refresh can dispatch AUTH_LOGOUT and clear
+    // localStorage after page.evaluate() sets the manager profile, landing
+    // the test on the unauthenticated sign-in page.
+    await test.step('Navigate to manager 1 roster', async () => {
+      await page.goto(`/baseball/league/${state.leagueId}/roster`);
       await page.waitForLoadState('load');
       await expect(page).toHaveURL(/\/roster/);
       await expect(page.locator('body')).not.toContainText(
@@ -553,8 +552,5 @@ test.describe
         page.getByText(state.renamedTeamName, { exact: false }).first(),
       ).toBeVisible({ timeout: 15000 });
     });
-
-    // Restore commissioner
-    await switchUser(page, commissionerJwt);
   });
 });
