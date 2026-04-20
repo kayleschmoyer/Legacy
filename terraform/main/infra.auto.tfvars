@@ -60,5 +60,5 @@ discord_redirect_uri = "https://legacy-fantasy.com/auth/discord/callback"
 # If left empty the GraphQL resolver returns null, the frontend falls back to
 # hardcoded display prices, and the "Upgrade" button shows
 # "Upgrade is temporarily unavailable" (LS-3683).
-stripe_monthly_price_id = ""
-stripe_annual_price_id  = ""
+stripe_monthly_price_id = "price_1TOAxg359dSHpsyveNJvtJ0i"
+stripe_annual_price_id  = "price_1TOAxh359dSHpsyvDBbxUobZ"

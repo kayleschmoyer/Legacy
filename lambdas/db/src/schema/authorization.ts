@@ -46,6 +46,12 @@ import {
   ForbiddenError,
   PremiumRequiredError,
 } from './graphql-errors';
+import {
+  ENTITLEMENT_LABELS,
+  type EntitlementKey,
+  type SubscriptionTier,
+  tierHasEntitlement,
+} from './entitlements';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -157,9 +163,27 @@ export type AuthorizedHandler<TParent, TArgs, TResult> = (
  *
  * @throws Error when `context.user` is null/undefined (same as {@link requireAuth}).
  */
+/**
+ * Per-request memoization cache for subscription tier lookups. Keyed on the
+ * GraphQL `Context` object (new instance per request), so concurrent
+ * `hasEntitlement` / `requireEntitlement` calls in the same resolver share a
+ * single DB query. The WeakMap auto-clears when the context is GC'd.
+ */
+const tierCache = new WeakMap<Context, Promise<SubscriptionTier>>();
+
 export async function getSubscriptionTier(
   context: Context,
-): Promise<'free' | 'premium'> {
+): Promise<SubscriptionTier> {
+  const cached = tierCache.get(context);
+  if (cached) return cached;
+  const promise = resolveSubscriptionTier(context);
+  tierCache.set(context, promise);
+  return promise;
+}
+
+async function resolveSubscriptionTier(
+  context: Context,
+): Promise<SubscriptionTier> {
   const user = requireAuth(context);
   // Admins are always treated as premium regardless of DB tier
   if (user.isAdmin) return 'premium';
@@ -168,7 +192,44 @@ export async function getSubscriptionTier(
     .from(InternalSchema.usersInAppInternal)
     .where(eq(InternalSchema.usersInAppInternal.id, user.id))
     .limit(1);
-  return rows[0]?.tier ?? 'free';
+  const raw = rows[0]?.tier;
+  return raw === 'premium' ? 'premium' : 'free';
+}
+
+/**
+ * Non-throwing entitlement check. Admins always return `true`.
+ *
+ * Resolves the user's tier once and delegates to the static tier→entitlement
+ * map in `./entitlements`. Safe to call from resolvers that branch on
+ * capability (e.g. "show upgrade CTA vs. show feature").
+ */
+export async function hasEntitlement(
+  context: Context,
+  key: EntitlementKey,
+): Promise<boolean> {
+  const user = requireAuth(context);
+  if (user.isAdmin) return true;
+  const tier = await getSubscriptionTier(context);
+  return tierHasEntitlement(tier, key);
+}
+
+/**
+ * Throws {@link PremiumRequiredError} when the authenticated user's tier does
+ * not grant the given entitlement. Prefer this over {@link requirePremium}
+ * for new code — the error message is derived from the entitlement label so
+ * a future tier that grants only a subset still produces an accurate prompt.
+ */
+export async function requireEntitlement(
+  context: Context,
+  key: EntitlementKey,
+  customMessage?: string,
+): Promise<void> {
+  if (await hasEntitlement(context, key)) return;
+  const label = ENTITLEMENT_LABELS[key];
+  throw PremiumRequiredError(
+    customMessage ??
+      `${label} requires an upgraded subscription. Upgrade to unlock this feature.`,
+  );
 }
 
 /**
