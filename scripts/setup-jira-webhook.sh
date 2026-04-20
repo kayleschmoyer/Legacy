@@ -45,7 +45,7 @@ echo "==> Looking up Secrets Manager secret names..."
 JIRA_SECRET_NAME=$(aws secretsmanager list-secrets \
   --region "$REGION" \
   --filter Key=name,Values="${NAME_PREFIX}-jira-webhook-secret-" \
-  --query "sort_by(SecretList, &CreatedDate)[-1].Name" \
+  --query "reverse(sort_by(SecretList, &CreatedDate))[0].Name" \
   --output text 2>/dev/null)
 
 if [[ "$JIRA_SECRET_NAME" == "None" || -z "$JIRA_SECRET_NAME" ]]; then
