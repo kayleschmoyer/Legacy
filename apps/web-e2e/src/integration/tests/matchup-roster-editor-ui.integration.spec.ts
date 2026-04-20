@@ -385,18 +385,25 @@ test.describe
         .filter({ hasText: 'STARTERS' })
         .first();
 
-      // Find a player name (First Last pattern) inside the editor card.
-      // Use a negative lookahead to skip header text like "Edit Lineup" or
-      // "Current Lineup" which also match the two-capitalized-word pattern.
-      const anyPlayerInEditor = editorCard.getByText(PLAYER_NAME_RE).first();
-      await expect(anyPlayerInEditor).toBeVisible({ timeout: 15_000 });
+      // Target the pressable row via its testID, not the inner Text node.
+      // Clicking the inner <Text> doesn't reliably propagate to the XStack's
+      // onPress handler on web (LS-3754).
+      // PLAYER_NAME_RE is anchored with `^`, so it wouldn't match a row's
+      // combined text (which starts with the position badge). Use `has` to
+      // match rows that *contain* a player-name Text descendant instead.
+      const starterRow = editorCard
+        .getByTestId(/^matchup-player-row-/)
+        .filter({ has: editorCard.getByText(PLAYER_NAME_RE).first() })
+        .first();
+      await expect(starterRow).toBeVisible({ timeout: 15_000 });
 
       // Capture the player name for later verification
-      state.benchedPlayerName = (await anyPlayerInEditor.textContent()) ?? '';
+      state.benchedPlayerName =
+        (await starterRow.getByText(PLAYER_NAME_RE).first().textContent()) ??
+        '';
       expect(state.benchedPlayerName).toBeTruthy();
 
-      // Click the player's row (the pressable XStack wrapping the player card)
-      await anyPlayerInEditor.click();
+      await starterRow.click();
       await page.waitForTimeout(500);
     });
 
@@ -483,11 +490,12 @@ test.describe
         .locator('div, section')
         .filter({ hasText: 'Edit Lineup' })
         .first();
-      const benchedPlayerText = editorCard
-        .getByText(state.benchedPlayerName)
+      const benchedPlayerRow = editorCard
+        .getByTestId(/^matchup-player-row-/)
+        .filter({ hasText: state.benchedPlayerName })
         .first();
-      await expect(benchedPlayerText).toBeVisible({ timeout: 10_000 });
-      await benchedPlayerText.click();
+      await expect(benchedPlayerRow).toBeVisible({ timeout: 10_000 });
+      await benchedPlayerRow.click();
       await page.waitForTimeout(500);
     });
 
@@ -628,9 +636,12 @@ test.describe
         .locator('div, section')
         .filter({ hasText: 'Edit Lineup' })
         .first();
-      const firstPlayer = editorCard.getByText(player1Name).first();
-      await expect(firstPlayer).toBeVisible({ timeout: 10_000 });
-      await firstPlayer.click();
+      const firstPlayerRow = editorCard
+        .getByTestId(/^matchup-player-row-/)
+        .filter({ hasText: player1Name })
+        .first();
+      await expect(firstPlayerRow).toBeVisible({ timeout: 10_000 });
+      await firstPlayerRow.click();
       await page.waitForTimeout(500);
 
       // "Tap to swap" hint should appear on other players
@@ -644,9 +655,12 @@ test.describe
         .locator('div, section')
         .filter({ hasText: 'Edit Lineup' })
         .first();
-      const secondPlayer = editorCard.getByText(player2Name).first();
-      await expect(secondPlayer).toBeVisible({ timeout: 5_000 });
-      await secondPlayer.click();
+      const secondPlayerRow = editorCard
+        .getByTestId(/^matchup-player-row-/)
+        .filter({ hasText: player2Name })
+        .first();
+      await expect(secondPlayerRow).toBeVisible({ timeout: 5_000 });
+      await secondPlayerRow.click();
       // Wait for mutation to complete
       await page.waitForTimeout(2_000);
     });

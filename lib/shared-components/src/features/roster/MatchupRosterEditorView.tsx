@@ -272,6 +272,7 @@ export function MatchupRosterEditorView({
     return (
       <XStack
         key={player.id}
+        testID={`matchup-player-row-${player.id}`}
         paddingVertical="$2.5"
         paddingHorizontal="$3"
         backgroundColor={
