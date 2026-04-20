@@ -463,8 +463,12 @@ test.describe
     await test.step('Cancel dialog without confirming', async () => {
       // Scope to the dialog: getByRole on the page can pick up Tamagui's
       // adapted-sheet close button or other Cancel controls outside the dialog.
+      // Tamagui's Dialog.Close with asChild may alter the button's ARIA role
+      // depending on the rendering mode, so use a tag-based locator rather
+      // than getByRole to reliably find the Cancel button (LS-3765, matches
+      // the pattern already used in apps/web-e2e/src/tests/season-renewal.spec.ts).
       const dialog = page.getByRole('alertdialog');
-      const cancelBtn = dialog.getByRole('button', { name: /Cancel/i }).first();
+      const cancelBtn = dialog.locator('button', { hasText: 'Cancel' }).first();
       await expect(cancelBtn).toBeVisible({ timeout: 5_000 });
       await cancelBtn.click();
 

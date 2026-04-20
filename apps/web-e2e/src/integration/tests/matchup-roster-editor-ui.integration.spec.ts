@@ -391,9 +391,12 @@ test.describe
       // PLAYER_NAME_RE is anchored with `^`, so it wouldn't match a row's
       // combined text (which starts with the position badge). Use `has` to
       // match rows that *contain* a player-name Text descendant instead.
+      // The `has` locator is re-rooted per candidate row, so `page.getByText`
+      // (not `editorCard.getByText(...).first()`, which resolves to a single
+      // global snapshot and breaks the filter — LS-3765) is the right root.
       const starterRow = editorCard
         .getByTestId(/^matchup-player-row-/)
-        .filter({ has: editorCard.getByText(PLAYER_NAME_RE).first() })
+        .filter({ has: page.getByText(PLAYER_NAME_RE) })
         .first();
       await expect(starterRow).toBeVisible({ timeout: 15_000 });
 
