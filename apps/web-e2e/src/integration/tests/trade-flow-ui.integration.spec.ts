@@ -496,38 +496,36 @@ test.describe
   // -----------------------------------------------------------------
 
   test('Phase 6: Manager rejects the incoming trade offer', async ({
-    commissionerPage: page,
+    managerPage1,
     commissionerJwt,
-    managerJwt1,
   }) => {
-    await test.step('Switch to manager identity and go to Trades tab', async () => {
-      await switchUser(
-        page,
-        managerJwt1,
-        `/baseball/league/${state.leagueId}/trades`,
-      );
-      await page.waitForLoadState('load');
+    // Dedicated managerPage1 context instead of switchUser — avoids the
+    // AUTH_LOGOUT race documented in LS-3672/LS-3705/LS-3735 and fixed here
+    // per LS-3767. The commissioner's browser context is untouched.
+    await test.step('Navigate to Trades tab as manager', async () => {
+      await managerPage1.goto(`/baseball/league/${state.leagueId}/trades`);
+      await managerPage1.waitForLoadState('load');
       await expect(
-        page.getByText('Trading Center', { exact: false }).first(),
+        managerPage1.getByText('Trading Center', { exact: false }).first(),
       ).toBeVisible({ timeout: 20000 });
     });
 
     await test.step('Verify incoming offer is visible', async () => {
       await expect(
-        page.getByText('Incoming Offers', { exact: false }),
+        managerPage1.getByText('Incoming Offers', { exact: false }),
       ).toBeVisible({ timeout: 10000 });
-      // The trade card should show the proposing team's name
-      await expect(page.getByText(/from:/i).first()).toBeVisible({
+      await expect(managerPage1.getByText(/from:/i).first()).toBeVisible({
         timeout: 15000,
       });
     });
 
     await test.step('Click Reject on the incoming offer', async () => {
-      const rejectBtn = page.getByRole('button', { name: /Reject/i }).first();
+      const rejectBtn = managerPage1
+        .getByRole('button', { name: /Reject/i })
+        .first();
       await expect(rejectBtn).toBeVisible({ timeout: 10000 });
       await rejectBtn.click();
-      // The offer should disappear from Incoming after rejection
-      await page.waitForTimeout(2000);
+      await managerPage1.waitForTimeout(2000);
     });
 
     await test.step('Verify trade is marked rejected via API', async () => {
@@ -556,10 +554,6 @@ test.describe
         )
         .toBe('rejected');
     });
-
-    await test.step('Restore commissioner identity', async () => {
-      await switchUser(page, commissionerJwt);
-    });
   });
 
   // -----------------------------------------------------------------
@@ -569,19 +563,15 @@ test.describe
   // -----------------------------------------------------------------
 
   test('Phase 7: Manager sends a counter-offer to the commissioner', async ({
-    commissionerPage: page,
-    commissionerJwt,
+    managerPage1,
     managerJwt1,
   }) => {
-    await test.step('Switch to manager and navigate to Trades tab', async () => {
-      await switchUser(
-        page,
-        managerJwt1,
-        `/baseball/league/${state.leagueId}/trades`,
-      );
-      await page.waitForLoadState('load');
+    // Dedicated managerPage1 context (LS-3767) — no switchUser race.
+    await test.step('Navigate to Trades tab as manager', async () => {
+      await managerPage1.goto(`/baseball/league/${state.leagueId}/trades`);
+      await managerPage1.waitForLoadState('load');
       await expect(
-        page.getByText('Trading Center', { exact: false }).first(),
+        managerPage1.getByText('Trading Center', { exact: false }).first(),
       ).toBeVisible({ timeout: 20000 });
     });
 
@@ -589,7 +579,7 @@ test.describe
       // The commissioner's team name is whatever was auto-named at league creation.
       // We target it by excluding "Trade Busters" (the manager's own team name).
       // Use a general approach: click Propose Trade and select the first other team.
-      const proposeBtn = page
+      const proposeBtn = managerPage1
         .getByRole('button', { name: /propose trade/i })
         .first();
       await expect(proposeBtn).toBeVisible({ timeout: 10000 });
@@ -597,15 +587,15 @@ test.describe
 
       // Step 1: Select the first team shown (commissioner's team)
       await expect(
-        page.getByText(/select the team you want to trade with/i),
+        managerPage1.getByText(/select the team you want to trade with/i),
       ).toBeVisible({ timeout: 10000 });
 
       // Pick the first team button in the dialog
-      const counterDialog = page.getByRole('dialog', {
+      const counterDialog = managerPage1.getByRole('dialog', {
         name: /Propose Trade/i,
       });
       const teamButtons = counterDialog.getByRole('button');
-      await page.waitForTimeout(1000);
+      await managerPage1.waitForTimeout(1000);
       const teamCount = await teamButtons.count();
       let teamClicked = false;
       for (let i = 0; i < teamCount; i++) {
@@ -626,7 +616,9 @@ test.describe
       expect(teamClicked).toBe(true);
 
       // Step 2: Select offering player (first available)
-      await expect(page.getByText(/you will give/i).first()).toBeVisible({
+      await expect(
+        managerPage1.getByText(/you will give/i).first(),
+      ).toBeVisible({
         timeout: 10000,
       });
       const offerBtns = counterDialog.getByRole('button');
@@ -651,14 +643,14 @@ test.describe
       expect(offerPlayerClicked).toBe(true);
 
       // Click "Next — Select Their Players" (must wait — appears after selection)
-      const nextBtn2 = page.getByRole('button', {
+      const nextBtn2 = managerPage1.getByRole('button', {
         name: /Next.*Select Their Players/i,
       });
       await expect(nextBtn2).toBeVisible({ timeout: 10_000 });
       await nextBtn2.click();
 
       // Step 3: Select requesting player (first available)
-      await expect(page.getByText(/give you/i).first()).toBeVisible({
+      await expect(managerPage1.getByText(/give you/i).first()).toBeVisible({
         timeout: 10000,
       });
       const requestBtns = counterDialog.getByRole('button');
@@ -683,23 +675,27 @@ test.describe
       expect(requestPlayerClicked2).toBe(true);
 
       // Click "Review Trade" (must wait — appears after selection)
-      const reviewBtn2 = page.getByRole('button', { name: /Review Trade/i });
+      const reviewBtn2 = managerPage1.getByRole('button', {
+        name: /Review Trade/i,
+      });
       await expect(reviewBtn2).toBeVisible({ timeout: 10_000 });
       await reviewBtn2.click();
 
       // Step 4: Send
       await expect(
-        page.getByRole('button', { name: /Send Trade Offer/i }),
+        managerPage1.getByRole('button', { name: /Send Trade Offer/i }),
       ).toBeVisible({ timeout: 10000 });
-      await page.getByRole('button', { name: /Send Trade Offer/i }).click();
+      await managerPage1
+        .getByRole('button', { name: /Send Trade Offer/i })
+        .click();
       await expect(
-        page.getByRole('button', { name: /Send Trade Offer/i }),
+        managerPage1.getByRole('button', { name: /Send Trade Offer/i }),
       ).not.toBeVisible({ timeout: 15000 });
     });
 
     await test.step('Verify counter-offer is visible as outgoing', async () => {
       await expect(
-        page.getByText('Outgoing Offers', { exact: true }),
+        managerPage1.getByText('Outgoing Offers', { exact: true }),
       ).toBeVisible({ timeout: 10000 });
     });
 
@@ -752,10 +748,6 @@ test.describe
         .toBeGreaterThan(0);
 
       state.counterTradeId = counterTradeId;
-    });
-
-    await test.step('Restore commissioner identity', async () => {
-      await switchUser(page, commissionerJwt);
     });
   });
 
@@ -828,8 +820,7 @@ test.describe
 
   test('Phase 9: Trade history shows completed trades for both users', async ({
     commissionerPage: page,
-    commissionerJwt,
-    managerJwt1,
+    managerPage1,
   }) => {
     await test.step('Commissioner sees accepted trade in Trade History', async () => {
       await goToTrades(page, state.leagueId);
@@ -848,35 +839,29 @@ test.describe
     });
 
     await test.step('Manager sees the accepted trade in Trade History', async () => {
-      await switchUser(
-        page,
-        managerJwt1,
-        `/baseball/league/${state.leagueId}/trades`,
-      );
-      await page.waitForLoadState('load');
+      // Dedicated managerPage1 context (LS-3767) — no switchUser race.
+      await managerPage1.goto(`/baseball/league/${state.leagueId}/trades`);
+      await managerPage1.waitForLoadState('load');
       await expect(
-        page.getByText('Trading Center', { exact: false }).first(),
+        managerPage1.getByText('Trading Center', { exact: false }).first(),
       ).toBeVisible({ timeout: 20000 });
 
-      // Expand Trade History
-      const historyBtn2 = page.getByRole('button', {
+      const historyBtn2 = managerPage1.getByRole('button', {
         name: /Trade History/i,
       });
       await expect(historyBtn2).toBeVisible({ timeout: 10000 });
       await historyBtn2.click();
 
       // Both the original rejected offer and the accepted counter should appear
-      await expect(page.getByText(/ACCEPTED|REJECTED/i).first()).toBeVisible({
+      await expect(
+        managerPage1.getByText(/ACCEPTED|REJECTED/i).first(),
+      ).toBeVisible({
         timeout: 15000,
       });
 
-      const completedBadges = page.getByText(/ACCEPTED|REJECTED/i);
+      const completedBadges = managerPage1.getByText(/ACCEPTED|REJECTED/i);
       const count = await completedBadges.count();
       expect(count).toBeGreaterThanOrEqual(2);
-    });
-
-    await test.step('Restore commissioner identity', async () => {
-      await switchUser(page, commissionerJwt);
     });
   });
 });
