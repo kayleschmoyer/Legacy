@@ -26,7 +26,6 @@ interface PullResponse {
 
 interface PrSnapshot {
   head: { sha: string };
-  requested_reviewers?: Array<{ login: string }>;
 }
 
 interface ReviewSummary {
@@ -34,14 +33,36 @@ interface ReviewSummary {
   commit_id: string;
 }
 
+interface CheckRun {
+  status: string;
+  conclusion: string | null;
+}
+
+interface CheckRunsResponse {
+  total_count: number;
+  check_runs: CheckRun[];
+}
+
 /**
  * Check whether re-requesting Copilot would be a no-op.
  *
- * Returns `handled: true` when Copilot is already a requested reviewer OR has
- * already posted a review for the PR's current HEAD SHA. Both cases mean the
- * `requestReviewers` POST would be pure noise — the copilot-auto-approve
- * workflow's request-review job already covers synchronize events, and agent
- * skills call `github_request_review` liberally after every fix cycle.
+ * Two short-circuit branches, checked in order (cheapest first):
+ *
+ * 1. The `bot-review` CheckRun for HEAD is `queued` / `in_progress` /
+ *    `completed + success` — the copilot-auto-approve workflow is handling
+ *    (or has handled) this commit. One API call; covers the common
+ *    steady-state case without paginating reviews.
+ * 2. Copilot has already posted a review for the PR's current HEAD SHA.
+ *    Only reached when `bot-review` is missing or in a non-success
+ *    completed state — then we still need to confirm whether a review
+ *    snuck in (e.g. `bot-review` failed on a non-Copilot concern after
+ *    Copilot already approved).
+ *
+ * Uses the `bot-review` CheckRun rather than `requested_reviewers` because
+ * the latter conflates "pending", "in flight", and "bot errored and dropped
+ * itself" — it cannot distinguish the one case where a re-request is
+ * needed. `bot-review` is owned by `.github/workflows/copilot-auto-approve.yml`
+ * and its state machine is under our control.
  *
  * Returns `handled: false` on any API failure so the caller falls through to
  * the POST — never want the precheck to suppress a needed re-request.
@@ -52,27 +73,42 @@ async function copilotAlreadyHandled(
   prNumber: number,
 ): Promise<{ handled: boolean; reason?: string }> {
   try {
-    // Fetch PR first and short-circuit on the common no-op case before
-    // touching the (potentially paginated) reviews endpoint.
     const pr = await githubRest<PrSnapshot>({
       method: 'GET',
       path: `/repos/${owner}/${repo}/pulls/${prNumber}`,
     });
+    const headSha = pr.head.sha;
 
-    const alreadyRequested = (pr.requested_reviewers ?? []).some((r) =>
-      COPILOT_RESPONSE_LOGINS.has(r.login),
-    );
-    if (alreadyRequested) {
-      return {
-        handled: true,
-        reason: 'Copilot is already a requested reviewer',
-      };
+    // Branch 1: inspect the `bot-review` CheckRun for HEAD (cheap, one call).
+    const checkRuns = await githubRest<CheckRunsResponse>({
+      method: 'GET',
+      path: `/repos/${owner}/${repo}/commits/${headSha}/check-runs`,
+      query: { check_name: 'bot-review', per_page: '1' },
+    });
+    const run = checkRuns.check_runs[0];
+    if (run) {
+      if (run.status === 'in_progress' || run.status === 'queued') {
+        return {
+          handled: true,
+          reason: `bot-review ${run.status} for HEAD (${headSha.slice(0, 7)})`,
+        };
+      }
+      if (run.status === 'completed' && run.conclusion === 'success') {
+        return {
+          handled: true,
+          reason: `bot-review completed success for HEAD (${headSha.slice(0, 7)})`,
+        };
+      }
+      // Any other completed conclusion (failure / cancelled / timed_out /
+      // action_required / neutral / stale / skipped) — fall through to
+      // branch 2: the bot errored or bailed; still verify no Copilot review
+      // exists on HEAD before paying for the re-request.
     }
 
-    const headSha = pr.head.sha;
-    // Paginate reviews with early exit on the first matching Copilot review
-    // for the current HEAD SHA. PRs with >100 reviews would otherwise miss
-    // a later-page review and reintroduce the redundant re-request noise.
+    // Branch 2: Copilot already reviewed the current HEAD SHA.
+    // Paginate reviews with early exit on the first match. PRs with >100
+    // reviews would otherwise miss a later-page review and reintroduce the
+    // redundant re-request noise.
     const PER_PAGE = 100;
     for (let page = 1; ; page++) {
       const reviews = await githubRest<ReviewSummary[]>({
