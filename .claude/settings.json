@@ -39,7 +39,8 @@
       "mcp__worktree__worktree_rename_branch",
       "mcp__worktree__worktree_unlink",
       "mcp__worktree__worktree_unlock",
-      "mcp__worktree__worktree_unstage"
+      "mcp__worktree__worktree_unstage",
+      "mcp__stripe__*"
     ]
   },
   "enabledMcpjsonServers": [
@@ -51,7 +52,8 @@
     "legacy-sports-jira",
     "legacy-sports-make",
     "legacy-sports-nx",
-    "worktree"
+    "worktree",
+    "stripe"
   ],
   "hooks": {
     "Stop": [
