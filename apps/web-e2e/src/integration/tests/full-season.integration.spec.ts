@@ -974,11 +974,11 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
 
     await test.step('7.2 Auto-advance matchups (commissioner)', async () => {
       const data = await graphqlOk<{
-        autoAdvanceMatchups: { advancedCount: number };
+        autoAdvanceMatchups: { leaguesAdvanced: number };
       }>(
         apiCommissioner,
         `mutation AutoAdvance($leagueId: Int) {
-           autoAdvanceMatchups(leagueId: $leagueId) { advancedCount }
+           autoAdvanceMatchups(leagueId: $leagueId) { leaguesAdvanced }
          }`,
         { leagueId: state.leagueId },
       );
