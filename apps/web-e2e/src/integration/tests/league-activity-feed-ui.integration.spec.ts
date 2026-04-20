@@ -23,7 +23,7 @@
  *     src/integration/tests/league-activity-feed-ui.integration.spec.ts
  */
 
-import { expect } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 import { createLeagueViaUI } from '../helpers/create-league';
 import { waitForJoinPageValidation } from '../helpers/wait-for-join-page';
 import { switchUser, test } from '../fixtures/ui';
@@ -75,6 +75,33 @@ async function gqlFetch<T>(
   }
   if (!json.data) throw new Error('GraphQL response contained no data');
   return json.data;
+}
+
+/**
+ * Wait for `locator` to become visible, and if the first wait times out,
+ * reload the page once and wait again. Use when a prior phase has written
+ * data the current phase depends on, but read-replica lag or an Apollo
+ * cache miss can make it absent from the first fetch. Other errors (page
+ * closed, navigation failure) surface immediately rather than triggering
+ * a reload. LS-3753, LS-3766.
+ */
+async function waitVisibleWithReload(
+  page: Page,
+  locator: Locator,
+  {
+    firstTimeout = 10_000,
+    retryTimeout = 15_000,
+  }: { firstTimeout?: number; retryTimeout?: number } = {},
+): Promise<void> {
+  try {
+    await locator.waitFor({ state: 'visible', timeout: firstTimeout });
+    return;
+  } catch (e) {
+    if (!(e instanceof Error) || e.name !== 'TimeoutError') throw e;
+  }
+  await page.reload();
+  await page.waitForLoadState('load');
+  await expect(locator).toBeVisible({ timeout: retryTimeout });
 }
 
 // ---------------------------------------------------------------------------
@@ -384,23 +411,11 @@ test.describe
       // this context's first fetch, reload once to force a fresh network
       // request (bypasses any cache-and-network race where the cached empty
       // result is served first). LS-3753.
-      const acceptBtn = managerPage2.getByRole('button', { name: /Accept/i });
-      let firstTry = true;
-      try {
-        await acceptBtn.first().waitFor({ state: 'visible', timeout: 10_000 });
-      } catch (e) {
-        // Only treat Playwright timeouts as "not found yet — retry". Any other
-        // error (page closed, navigation failure, etc.) is a real problem and
-        // should surface immediately.
-        if (!(e instanceof Error) || e.name !== 'TimeoutError') throw e;
-        firstTry = false;
-      }
-      if (!firstTry) {
-        await managerPage2.reload();
-        await managerPage2.waitForLoadState('load');
-        await expect(acceptBtn.first()).toBeVisible({ timeout: 15_000 });
-      }
-      await acceptBtn.first().click();
+      const acceptBtn = managerPage2
+        .getByRole('button', { name: /Accept/i })
+        .first();
+      await waitVisibleWithReload(managerPage2, acceptBtn);
+      await acceptBtn.click();
 
       // Handle confirmation dialog if present
       const confirmBtn = managerPage2.getByRole('button', { name: /Confirm/i });
@@ -600,9 +615,13 @@ test.describe
     });
 
     await test.step('Verify announcement event appears', async () => {
-      await expect(page.getByText(/League announcement/i).first()).toBeVisible({
-        timeout: 10_000,
-      });
+      // The announcement insert in Phase 4 is a separate transaction from the
+      // activity feed query here; read-replica lag or an Apollo cache that
+      // hasn't revalidated can leave the event absent from the first fetch.
+      // Reload once on miss to force a fresh network request — same helper as
+      // the trade-accept step above (LS-3753, LS-3766).
+      const announcement = page.getByText(/League announcement/i).first();
+      await waitVisibleWithReload(page, announcement);
     });
 
     await test.step('Verify via API that all event types are recorded', async () => {
