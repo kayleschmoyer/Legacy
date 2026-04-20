@@ -230,14 +230,16 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
     await page.goto(leagueUrl);
     await page.waitForLoadState('networkidle');
 
-    // Verify that league data was fetched
+    // Poll on the league RESPONSE (not just the request). Polling on
+    // request-name alone is a race: the page fires multiple "*League*"
+    // operations (GetUserLeagues, GetLeagueTeams, GetLeagueDraft, ...)
+    // and the poll can exit on the first of them — before GetLeagueById's
+    // response, the only one that returns data.league, has actually arrived.
     await expect
       .poll(
         () =>
-          graphqlRequests.filter(
-            (req) =>
-              req.query?.includes('league') ||
-              req.operationName?.includes('League'),
+          graphqlResponses.filter(
+            (resp) => resp.data?.league || resp.data?.leagues,
           ).length,
       )
       .toBeGreaterThan(0);
@@ -252,12 +254,9 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
       `✅ Found ${leagueQueries.length} league-related GraphQL queries`,
     );
 
-    // Check if initial league data includes draft status
     const leagueResponses = graphqlResponses.filter(
       (resp) => resp.data?.league || resp.data?.leagues,
     );
-
-    expect(leagueResponses.length).toBeGreaterThan(0);
 
     const leagueData =
       leagueResponses[0]?.data?.league ??
