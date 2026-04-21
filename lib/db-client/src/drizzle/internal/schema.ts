@@ -169,6 +169,7 @@ export const subscriptions = appInternal.table(
     stripeSubscriptionId: text('stripe_subscription_id'),
     appleOriginalTransactionId: text('apple_original_transaction_id'),
     appleProductId: text('apple_product_id'),
+    appleEnvironment: text('apple_environment'),
     googlePurchaseToken: text('google_purchase_token'),
     googleProductId: text('google_product_id'),
     status: text('status').notNull().default('inactive'),

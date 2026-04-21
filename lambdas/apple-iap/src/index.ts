@@ -160,6 +160,7 @@ async function upsertAppleSubscription(
   status: string,
   tier: 'free' | 'premium',
   currentPeriodEnd: Date | null,
+  environment: 'Sandbox' | 'Production',
 ): Promise<void> {
   const previousTier = await runWithInternalClient(
     getDbOptions(),
@@ -185,6 +186,7 @@ async function upsertAppleSubscription(
         userId,
         appleOriginalTransactionId: originalTransactionId,
         appleProductId: productId,
+        appleEnvironment: environment,
         status,
         tier,
         currentPeriodEnd,
@@ -194,6 +196,7 @@ async function upsertAppleSubscription(
         target: InternalSchema.subscriptions.appleOriginalTransactionId,
         set: {
           appleProductId: productId,
+          appleEnvironment: environment,
           status,
           tier,
           currentPeriodEnd,
@@ -292,6 +295,7 @@ async function handleNotification(
     status,
     tier,
     currentPeriodEnd,
+    data.environment,
   );
 
   LOGGER.info('Apple IAP — processed notification', {

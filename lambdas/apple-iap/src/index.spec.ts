@@ -264,6 +264,94 @@ describe('apple-iap handler', () => {
     });
   });
 
+  describe('happy path — environment persisted on upsert', () => {
+    it('passes apple_environment to the subscription upsert for a SUBSCRIBED notification', async () => {
+      mockDecodeAndVerifyJws.mockResolvedValue(
+        fakeNotification({
+          notificationType: 'SUBSCRIBED',
+          data: {
+            bundleId: 'com.legacy.sports',
+            environment: 'Sandbox',
+            signedTransactionInfo: {
+              originalTransactionId: 'orig-sandbox-1',
+              transactionId: 'tx-sandbox-1',
+              productId: 'premium_monthly',
+              bundleId: 'com.legacy.sports',
+              purchaseDate: Date.now(),
+              expiresDate: Date.now() + 86400000,
+            },
+          },
+        }),
+      );
+
+      // Call 1: claimAppleEvent → we own the claim
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb({
+            insert: () => ({
+              values: () => ({
+                onConflictDoNothing: () => ({
+                  returning: () =>
+                    Promise.resolve([{ eventId: 'uuid-test-123' }]),
+                }),
+              }),
+            }),
+          }),
+      );
+
+      // Call 2: findUserIdByOriginalTransactionId → found
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb({
+            select: () => ({
+              from: () => ({
+                where: () => ({
+                  limit: () => Promise.resolve([{ userId: 42 }]),
+                }),
+              }),
+            }),
+          }),
+      );
+
+      // Call 3: upsertAppleSubscription — select previousTier
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb({
+            select: () => ({
+              from: () => ({
+                where: () => ({
+                  limit: () => Promise.resolve([{ tier: 'free' }]),
+                }),
+              }),
+            }),
+          }),
+      );
+
+      // Call 4: upsertAppleSubscription — insert subscription + update user tier
+      const insertValues = jest.fn(() => ({
+        onConflictDoUpdate: jest.fn(() => Promise.resolve()),
+      }));
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb({
+            insert: () => ({ values: insertValues }),
+            update: () => ({
+              set: () => ({
+                where: () => Promise.resolve(),
+              }),
+            }),
+          }),
+      );
+
+      const result = await handler(makeEvent());
+
+      expect(result.statusCode).toBe(200);
+      expect(insertValues).toHaveBeenCalledWith(
+        expect.objectContaining({ appleEnvironment: 'Sandbox' }),
+      );
+    });
+  });
+
   describe('input validation', () => {
     it('returns 400 when the body is empty', async () => {
       const result = await handler(makeEvent({ body: '' }));
