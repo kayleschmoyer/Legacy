@@ -1016,7 +1016,7 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
       }>(
         api,
         `query Activity($leagueId: Int!) {
-           leagueActivity(leagueId: $leagueId) { eventType description createdAt }
+           leagueActivity(leagueId: $leagueId) { eventType }
          }`,
         { leagueId: state.leagueId },
       );

@@ -595,41 +595,43 @@ test.describe
 
     await test.step('Via API: verify all 4 members were migrated', async () => {
       const result = await gqlFetch<{
-        getLeagueMembers: Array<{ userId: number; permissionLevel: string }>;
+        leagueTeams: Array<{ id: number; managerId: number | null }>;
+        league: { userMembership: { permissionLevel: string } | null } | null;
       }>(
         commissionerJwt,
         `query Members($leagueId: Int!) {
-             getLeagueMembers(leagueId: $leagueId) {
-               userId
-               permissionLevel
-             }
+             leagueTeams(leagueId: $leagueId) { id managerId }
+             league(id: $leagueId) { userMembership { permissionLevel } }
            }`,
         { leagueId: state.newLeagueId },
       );
-      // 4-team league: commissioner + 3 managers = 4 members
-      expect(result.getLeagueMembers.length).toBe(4);
-      const commissioner = result.getLeagueMembers.find(
-        (m) => m.permissionLevel === 'commissioner',
+      // 4-team league: commissioner + 3 managers = 4 members, each with a
+      // distinct non-null managerId confirming the member was migrated.
+      expect(result.leagueTeams.length).toBe(4);
+      const managerIds = result.leagueTeams.map((t) => t.managerId);
+      expect(managerIds.every((id) => id != null)).toBe(true);
+      expect(new Set(managerIds).size).toBe(4);
+      expect(result.league?.userMembership?.permissionLevel).toBe(
+        'commissioner',
       );
-      expect(commissioner).toBeTruthy();
     });
 
     await test.step('Via API: verify team names were preserved', async () => {
       const result = await gqlFetch<{
-        getLeagueTeams: Array<{ id: number; name: string }>;
+        leagueTeams: Array<{ id: number; name: string }>;
       }>(
         commissionerJwt,
         `query Teams($leagueId: Int!) {
-             getLeagueTeams(leagueId: $leagueId) {
+             leagueTeams(leagueId: $leagueId) {
                id name
              }
            }`,
         { leagueId: state.newLeagueId },
       );
-      expect(result.getLeagueTeams.length).toBe(4);
+      expect(result.leagueTeams.length).toBe(4);
       // Teams from the old league should be represented — at least one
       // manager's team name was carried forward.
-      const teamNames = result.getLeagueTeams.map((t) => t.name);
+      const teamNames = result.leagueTeams.map((t) => t.name);
       const hasKnownTeam = teamNames.some((n) =>
         ['The Sluggers', 'The Aces', 'The Rockets'].includes(n),
       );
