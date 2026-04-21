@@ -67,6 +67,18 @@ async function resolveBundleId(): Promise<string> {
   return retrieveSecretParameterValue(BUNDLE_ID_SECRET_NAME);
 }
 
+// ── No-op notification types ──────────────────────────────────────────────────
+
+// Notification types that carry no tier change and require no DB writes.
+// Centralised here so handleNotification, tierFromNotificationType, and
+// statusFromNotificationType all reference the same authoritative list.
+const NOOP_NOTIFICATION_TYPES = new Set<NotificationType>([
+  'TEST',
+  'PRICE_INCREASE',
+  'RENEWAL_EXTENSION',
+  'RENEWAL_EXTENDED',
+]);
+
 // ── Tier helper ───────────────────────────────────────────────────────────────
 
 function tierFromNotificationType(
@@ -87,8 +99,24 @@ function tierFromNotificationType(
     case 'REFUND':
     case 'REVOKE':
       return 'free';
-    default:
-      return 'free';
+    case 'PRICE_INCREASE':
+    case 'RENEWAL_EXTENSION':
+    case 'RENEWAL_EXTENDED':
+    case 'TEST':
+      // Intercepted by handleNotification (via NOOP_NOTIFICATION_TYPES) before
+      // this function is ever reached. Arriving here is a programming error.
+      throw new Error(
+        `tierFromNotificationType: unexpected no-op notification type '${notificationType}'`,
+      );
+    default: {
+      // Compile-time exhaustiveness: TypeScript will error here if a new
+      // NotificationType member is added without a corresponding case above.
+      // At runtime, guards against Apple introducing a type not yet in our union.
+      const unknownType: never = notificationType;
+      throw new Error(
+        `tierFromNotificationType: unrecognised notification type '${String(unknownType)}'`,
+      );
+    }
   }
 }
 
@@ -97,23 +125,33 @@ function statusFromNotificationType(
 ): string {
   switch (notificationType) {
     case 'SUBSCRIBED':
-      return 'active';
     case 'DID_RENEW':
     case 'DID_RECOVER':
+    case 'OFFER_REDEEMED':
       return 'active';
     case 'DID_FAIL_TO_RENEW':
       return 'past_due';
     case 'EXPIRED':
-      return 'canceled';
     case 'GRACE_PERIOD_EXPIRED':
       return 'canceled';
     case 'REFUND':
     case 'REVOKE':
       return 'canceled';
-    case 'OFFER_REDEEMED':
-      return 'active';
-    default:
-      return 'inactive';
+    case 'PRICE_INCREASE':
+    case 'RENEWAL_EXTENSION':
+    case 'RENEWAL_EXTENDED':
+    case 'TEST':
+      // Intercepted by handleNotification (via NOOP_NOTIFICATION_TYPES) before
+      // this function is ever reached. Arriving here is a programming error.
+      throw new Error(
+        `statusFromNotificationType: unexpected no-op notification type '${notificationType}'`,
+      );
+    default: {
+      const unknownType: never = notificationType;
+      throw new Error(
+        `statusFromNotificationType: unrecognised notification type '${String(unknownType)}'`,
+      );
+    }
   }
 }
 
@@ -266,6 +304,17 @@ async function handleNotification(
   const transactionInfo = data.signedTransactionInfo;
 
   const { originalTransactionId, productId, expiresDate } = transactionInfo;
+
+  // Notification types that carry no tier change and require no DB writes
+  // (see NOOP_NOTIFICATION_TYPES for the full list and rationale).
+  // Acknowledge without touching the DB.
+  if (NOOP_NOTIFICATION_TYPES.has(notificationType)) {
+    LOGGER.info(
+      'Apple IAP — informational notification; acknowledging without DB writes',
+      { notificationType, subtype },
+    );
+    return null;
+  }
 
   // Look up the userId from the existing subscription row (set by verifyApplePurchase
   // when the user first purchased on device). If the row doesn't exist yet (race

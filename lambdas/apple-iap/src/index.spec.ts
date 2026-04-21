@@ -114,6 +114,47 @@ describe('apple-iap handler', () => {
     jest.clearAllMocks();
   });
 
+  describe('no-op notification types', () => {
+    function mockSuccessfulClaim() {
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb({
+            insert: () => ({
+              values: () => ({
+                onConflictDoNothing: () => ({
+                  returning: () =>
+                    Promise.resolve([{ eventId: 'uuid-test-123' }]),
+                }),
+              }),
+            }),
+          }),
+      );
+    }
+
+    it.each([
+      'TEST',
+      'PRICE_INCREASE',
+      'RENEWAL_EXTENSION',
+      'RENEWAL_EXTENDED',
+    ] as NotificationType[])(
+      'acknowledges %s without any DB writes beyond the idempotency claim',
+      async (notificationType) => {
+        mockDecodeAndVerifyJws.mockResolvedValue(
+          fakeNotification({ notificationType }),
+        );
+        mockSuccessfulClaim();
+
+        const result = await handler(makeEvent());
+
+        expect(result.statusCode).toBe(200);
+        const body = JSON.parse(result.body) as { received: boolean };
+        expect(body.received).toBe(true);
+        // Only the claim call should have run — no userId lookup, no upsert.
+        expect(mockRunWithInternalClient).toHaveBeenCalledTimes(1);
+      },
+    );
+  });
+
   describe('idempotency', () => {
     it('returns 200 immediately when the event was already claimed by a concurrent invocation', async () => {
       mockDecodeAndVerifyJws.mockResolvedValue(fakeNotification());
