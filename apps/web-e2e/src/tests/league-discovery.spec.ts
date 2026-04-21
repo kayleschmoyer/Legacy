@@ -255,9 +255,7 @@ test.describe('League Discovery — member & full badges @regression', () => {
     await lp.gotoDiscovery();
     await lp.expectDiscoveryLoaded();
 
-    await expect(
-      page.getByText(/You're already in this league/i),
-    ).toBeVisible();
+    await expect(page.getByTestId('already-member-banner')).toBeVisible();
     // "View League →" button should appear instead of "Join League →"
     await expect(
       page.getByRole('button', { name: /View League/i }),

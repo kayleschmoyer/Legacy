@@ -428,6 +428,7 @@ function LeagueCard({
       {/* Member ribbon */}
       {isMember && (
         <div
+          data-testid="already-member-banner"
           style={{
             display: 'flex',
             alignItems: 'center',

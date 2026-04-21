@@ -772,12 +772,10 @@ test.describe
   // -----------------------------------------------------------------------
 
   test('Phase 9: Manager sees the same activity feed', async ({
-    commissionerPage: page,
-    managerJwt1,
-    commissionerJwt,
+    managerPage1: page,
   }) => {
-    await test.step('Switch to manager and navigate to league page', async () => {
-      await switchUser(page, managerJwt1, `/baseball/league/${state.leagueId}`);
+    await test.step('Navigate to league page as manager', async () => {
+      await page.goto(`/baseball/league/${state.leagueId}`);
       await page.waitForLoadState('load');
     });
 
@@ -807,8 +805,5 @@ test.describe
         page.getByRole('button', { name: /^Draft/i }).first(),
       ).toBeVisible({ timeout: 5_000 });
     });
-
-    // Restore commissioner identity
-    await switchUser(page, commissionerJwt);
   });
 });
