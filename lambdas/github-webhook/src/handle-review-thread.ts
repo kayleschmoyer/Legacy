@@ -2,13 +2,14 @@ import { LOGGER } from '@legacy-sports/logging';
 import {
   createCheckRun,
   getInstallationToken,
+  getPrReviews,
   getPrReviewThreads,
 } from './github-app';
 
 // Review Bot GitHub App ID (registered in LS-3002 with checks:write)
 const REVIEW_BOT_APP_ID = 3142924;
 
-// Logins used by Copilot in review thread comments
+// Logins used by Copilot in review thread comments and reviews
 const COPILOT_LOGINS = new Set([
   'copilot-pull-request-reviewer',
   'copilot-pull-request-reviewer[bot]',
@@ -34,8 +35,8 @@ interface PullRequestReviewThreadPayload {
  * On `action === "resolved"`:
  *   1. Gets an installation token for the Review Bot using its private key.
  *   2. Queries all review threads on the PR.
- *   3. If all non-outdated Copilot threads are resolved → sets bot-review to success.
- *   4. If unresolved Copilot threads remain → sets bot-review to failure.
+ *   3. If all non-outdated threads are resolved → sets bot-review to success.
+ *   4. If any unresolved threads remain → sets bot-review to failure.
  *
  * On `action === "unresolved"`:
  *   Same steps — a re-opened thread must flip bot-review back to failure.
@@ -78,40 +79,63 @@ export async function handleReviewThreadEvent(
     installationId,
   );
 
-  const threads = await getPrReviewThreads(token, owner, repo, prNumber);
+  const [threads, reviews] = await Promise.all([
+    getPrReviewThreads(token, owner, repo, prNumber),
+    getPrReviews(token, owner, repo, prNumber),
+  ]);
 
-  const unresolvedCopilotThreads = threads.filter(
-    (t) =>
-      !t.isOutdated &&
-      !t.isResolved &&
+  // Mirror the workflow's copilotCleared logic: when Copilot explicitly approved
+  // or couldn't review any files, its own threads are superseded and don't block.
+  const copilotReviews = reviews
+    .filter((r) => COPILOT_LOGINS.has(r.userLogin))
+    .sort(
+      (a, b) =>
+        new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime(),
+    );
+  const latestCopilot = copilotReviews[0];
+  const copilotCleared =
+    latestCopilot != null &&
+    (latestCopilot.state === 'APPROVED' ||
+      (latestCopilot.body?.includes("wasn't able to review any files") ??
+        false));
+
+  const unresolvedThreads = threads.filter((t) => {
+    if (t.isOutdated || t.isResolved) return false;
+    // When Copilot cleared, its own threads are superseded — only block on non-Copilot threads
+    if (
+      copilotCleared &&
       t.authorLogin !== null &&
-      COPILOT_LOGINS.has(t.authorLogin),
-  );
+      COPILOT_LOGINS.has(t.authorLogin)
+    )
+      return false;
+    return true;
+  });
 
-  if (unresolvedCopilotThreads.length > 0) {
+  if (unresolvedThreads.length > 0) {
     LOGGER.info(
-      'Unresolved Copilot threads remain — setting bot-review to failure',
+      'Unresolved review threads remain — setting bot-review to failure',
       {
         prNumber,
-        unresolved: unresolvedCopilotThreads.length,
+        unresolved: unresolvedThreads.length,
+        copilotCleared,
       },
     );
     await createCheckRun(token, owner, repo, {
       name: 'bot-review',
       headSha,
       conclusion: 'failure',
-      title: 'Copilot review blocked',
-      summary: `Copilot review has ${unresolvedCopilotThreads.length} unresolved comment(s)`,
+      title: 'Review blocked',
+      summary: `PR has ${unresolvedThreads.length} unresolved comment(s)`,
     });
-    return `Set bot-review=failure for PR #${prNumber}: ${unresolvedCopilotThreads.length} unresolved Copilot thread(s)`;
+    return `Set bot-review=failure for PR #${prNumber}: ${unresolvedThreads.length} unresolved thread(s)`;
   }
 
   await createCheckRun(token, owner, repo, {
     name: 'bot-review',
     headSha,
     conclusion: 'success',
-    title: 'Copilot review passed',
-    summary: 'All Copilot review threads resolved',
+    title: 'All review threads resolved',
+    summary: 'All review threads resolved',
   });
 
   return `Set bot-review=success for PR #${prNumber} (${owner}/${repo}@${headSha.slice(0, 7)})`;

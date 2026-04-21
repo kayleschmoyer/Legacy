@@ -259,3 +259,52 @@ export async function getPrReviewThreads(
 
   return threads;
 }
+
+/**
+ * Fetch all submitted reviews on a PR via the REST API.
+ * Returns the fields needed to determine whether Copilot has cleared its threads.
+ */
+export async function getPrReviews(
+  installationToken: string,
+  owner: string,
+  repo: string,
+  prNumber: number,
+): Promise<
+  Array<{
+    state: string;
+    body: string | null;
+    userLogin: string;
+    submittedAt: string;
+  }>
+> {
+  const resp = await fetch(
+    `${GITHUB_API}/repos/${owner}/${repo}/pulls/${prNumber}/reviews`,
+    {
+      headers: {
+        Authorization: `Bearer ${installationToken}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    },
+  );
+
+  if (!resp.ok) {
+    const body = await resp.text();
+    throw new Error(`Failed to get PR reviews (${resp.status}): ${body}`);
+  }
+
+  const data = (await resp.json()) as Array<{
+    state: string;
+    body: string;
+    user: { login: string };
+    submitted_at: string;
+  }>;
+
+  return data.map((r) => ({
+    state: r.state,
+    body: r.body ?? null,
+    userLogin: r.user.login,
+    submittedAt: r.submitted_at,
+  }));
+}

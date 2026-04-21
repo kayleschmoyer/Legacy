@@ -5,6 +5,7 @@ jest.mock('./github-app');
 
 const mockGetInstallationToken = githubApp.getInstallationToken as jest.Mock;
 const mockGetPrReviewThreads = githubApp.getPrReviewThreads as jest.Mock;
+const mockGetPrReviews = githubApp.getPrReviews as jest.Mock;
 const mockCreateCheckRun = githubApp.createCheckRun as jest.Mock;
 
 const BASE_PAYLOAD = {
@@ -13,9 +14,26 @@ const BASE_PAYLOAD = {
   installation: { id: 99 },
 };
 
+/** Copilot COMMENTED review — threads are active */
+const COPILOT_COMMENTED_REVIEW = {
+  state: 'CHANGES_REQUESTED',
+  body: 'Please address the following.',
+  userLogin: 'copilot-pull-request-reviewer[bot]',
+  submittedAt: '2024-01-01T00:00:00Z',
+};
+
+/** Copilot APPROVED review — threads are superseded */
+const COPILOT_APPROVED_REVIEW = {
+  state: 'APPROVED',
+  body: 'Looks good!',
+  userLogin: 'copilot-pull-request-reviewer[bot]',
+  submittedAt: '2024-01-02T00:00:00Z',
+};
+
 beforeEach(() => {
   jest.resetAllMocks();
   mockGetInstallationToken.mockResolvedValue('tok-test');
+  mockGetPrReviews.mockResolvedValue([]);
   mockCreateCheckRun.mockResolvedValue(undefined);
 });
 
@@ -46,7 +64,7 @@ describe('handleReviewThreadEvent — missing installation', () => {
 });
 
 describe('handleReviewThreadEvent — resolved action', () => {
-  it('sets bot-review=success when no unresolved Copilot threads remain', async () => {
+  it('sets bot-review=success when no unresolved threads remain', async () => {
     mockGetPrReviewThreads.mockResolvedValue([
       {
         isResolved: true,
@@ -79,7 +97,7 @@ describe('handleReviewThreadEvent — resolved action', () => {
     expect(result).toMatch(/bot-review=success/);
   });
 
-  it('sets bot-review=failure when unresolved Copilot threads remain', async () => {
+  it('sets bot-review=failure when unresolved threads remain', async () => {
     mockGetPrReviewThreads.mockResolvedValue([
       {
         isResolved: false,
@@ -102,12 +120,31 @@ describe('handleReviewThreadEvent — resolved action', () => {
     expect(result).toMatch(/bot-review=failure/);
   });
 
-  it('ignores threads by non-Copilot authors', async () => {
+  it('sets bot-review=failure for unresolved threads by non-Copilot authors', async () => {
     mockGetPrReviewThreads.mockResolvedValue([
       { isResolved: false, isOutdated: false, authorLogin: 'human-reviewer' },
     ]);
 
-    await handleReviewThreadEvent(
+    const result = await handleReviewThreadEvent(
+      { ...BASE_PAYLOAD, action: 'resolved' },
+      'private-key',
+    );
+
+    expect(mockCreateCheckRun).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(String),
+      expect.any(String),
+      expect.objectContaining({ conclusion: 'failure' }),
+    );
+    expect(result).toMatch(/bot-review=failure/);
+  });
+
+  it('sets bot-review=success when only outdated non-Copilot threads remain', async () => {
+    mockGetPrReviewThreads.mockResolvedValue([
+      { isResolved: false, isOutdated: true, authorLogin: 'human-reviewer' },
+    ]);
+
+    const result = await handleReviewThreadEvent(
       { ...BASE_PAYLOAD, action: 'resolved' },
       'private-key',
     );
@@ -118,6 +155,106 @@ describe('handleReviewThreadEvent — resolved action', () => {
       expect.any(String),
       expect.objectContaining({ conclusion: 'success' }),
     );
+    expect(result).toMatch(/bot-review=success/);
+  });
+});
+
+describe('handleReviewThreadEvent — copilotCleared bypass', () => {
+  it('ignores unresolved Copilot threads when Copilot APPROVED', async () => {
+    mockGetPrReviewThreads.mockResolvedValue([
+      {
+        isResolved: false,
+        isOutdated: false,
+        authorLogin: 'copilot-pull-request-reviewer',
+      },
+    ]);
+    mockGetPrReviews.mockResolvedValue([COPILOT_APPROVED_REVIEW]);
+
+    const result = await handleReviewThreadEvent(
+      { ...BASE_PAYLOAD, action: 'resolved' },
+      'private-key',
+    );
+
+    expect(mockCreateCheckRun).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(String),
+      expect.any(String),
+      expect.objectContaining({ conclusion: 'success' }),
+    );
+    expect(result).toMatch(/bot-review=success/);
+  });
+
+  it('still blocks on unresolved human threads when Copilot APPROVED', async () => {
+    mockGetPrReviewThreads.mockResolvedValue([
+      { isResolved: false, isOutdated: false, authorLogin: 'human-reviewer' },
+    ]);
+    mockGetPrReviews.mockResolvedValue([COPILOT_APPROVED_REVIEW]);
+
+    const result = await handleReviewThreadEvent(
+      { ...BASE_PAYLOAD, action: 'resolved' },
+      'private-key',
+    );
+
+    expect(mockCreateCheckRun).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(String),
+      expect.any(String),
+      expect.objectContaining({ conclusion: 'failure' }),
+    );
+    expect(result).toMatch(/bot-review=failure/);
+  });
+
+  it("ignores unresolved Copilot threads when Copilot couldn't review files", async () => {
+    mockGetPrReviewThreads.mockResolvedValue([
+      {
+        isResolved: false,
+        isOutdated: false,
+        authorLogin: 'copilot-pull-request-reviewer[bot]',
+      },
+    ]);
+    mockGetPrReviews.mockResolvedValue([
+      {
+        ...COPILOT_COMMENTED_REVIEW,
+        body: "I wasn't able to review any files in this pull request.",
+      },
+    ]);
+
+    const result = await handleReviewThreadEvent(
+      { ...BASE_PAYLOAD, action: 'resolved' },
+      'private-key',
+    );
+
+    expect(mockCreateCheckRun).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(String),
+      expect.any(String),
+      expect.objectContaining({ conclusion: 'success' }),
+    );
+    expect(result).toMatch(/bot-review=success/);
+  });
+
+  it('does NOT apply copilotCleared when latest Copilot review is CHANGES_REQUESTED', async () => {
+    mockGetPrReviewThreads.mockResolvedValue([
+      {
+        isResolved: false,
+        isOutdated: false,
+        authorLogin: 'copilot-pull-request-reviewer',
+      },
+    ]);
+    mockGetPrReviews.mockResolvedValue([COPILOT_COMMENTED_REVIEW]);
+
+    const result = await handleReviewThreadEvent(
+      { ...BASE_PAYLOAD, action: 'resolved' },
+      'private-key',
+    );
+
+    expect(mockCreateCheckRun).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(String),
+      expect.any(String),
+      expect.objectContaining({ conclusion: 'failure' }),
+    );
+    expect(result).toMatch(/bot-review=failure/);
   });
 });
 
