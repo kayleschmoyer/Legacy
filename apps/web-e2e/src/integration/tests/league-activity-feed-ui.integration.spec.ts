@@ -270,6 +270,14 @@ test.describe
       await expect(page.getByText(state.announcementText)).toBeVisible({
         timeout: 15_000,
       });
+      // Verify the league_announcement row appears in the activity feed on this
+      // same page. The mutation uses refetchQueries + awaitRefetchQueries, so
+      // the feed re-queries before the mutation resolves. Confirming here
+      // guarantees the row is in the DB before Phase 7 navigates to a fresh
+      // page and fires its own query (eliminates 45-second blind waits).
+      await expect(page.getByText(/League announcement/i).first()).toBeVisible({
+        timeout: 20_000,
+      });
     });
   });
 
@@ -608,19 +616,15 @@ test.describe
     });
 
     await test.step('Verify announcement event appears', async () => {
-      // Phase 4 posts the announcement while on /overview where
-      // LeagueActivityFeed is not mounted — so refetchQueries by name
-      // (LS-3769) finds no active observer and is a no-op. On first
-      // navigation here, cache-and-network issues a fresh request, but
-      // read-replica lag can delay the row. Reload+retry covers that
-      // window (LS-3766, restored by LS-3775).
-      // Use extended timeouts (LS-3781): the backend server caps leagueActivity
-      // limit at 100, and with many draft-pick events the query can take longer
-      // to resolve from a cold cache.
+      // Phase 4 confirms the league_announcement row is in the DB by verifying
+      // it appears in the activity feed on the same page immediately after
+      // posting. This page has a fresh Apollo cache (new browser context) and
+      // fires a new GetLeagueActivity request on mount. Read-replica lag
+      // is negligible by this phase (Phases 5–6 ran between 4 and 7).
       const announcement = page.getByText(/League announcement/i).first();
       await waitVisibleWithReload(page, announcement, {
-        firstTimeout: 20_000,
-        retryTimeout: 25_000,
+        firstTimeout: 10_000,
+        retryTimeout: 15_000,
       });
     });
 

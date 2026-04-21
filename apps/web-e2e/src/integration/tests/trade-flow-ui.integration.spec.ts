@@ -654,7 +654,14 @@ test.describe
         timeout: 10000,
       });
       const requestBtns = counterDialog.getByRole('button');
-      await expect(requestBtns.first()).toBeVisible({ timeout: 15_000 });
+      // Wait for at least one player button to load. The dialog always has a
+      // Close (X) button in the header (empty text) and a Back button at the
+      // bottom — so count > 2 means at least one player button is present.
+      // Using .first() here races against theirPlayers loading: the Close button
+      // is always first in DOM and resolves immediately before data arrives.
+      await expect
+        .poll(async () => requestBtns.count(), { timeout: 15_000 })
+        .toBeGreaterThan(2);
       const requestCount = await requestBtns.count();
       let requestPlayerClicked2 = false;
       for (let i = 0; i < requestCount; i++) {
