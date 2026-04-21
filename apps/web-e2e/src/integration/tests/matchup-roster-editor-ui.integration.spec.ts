@@ -52,8 +52,11 @@ let state: RosterEditorState;
 /**
  * Regex matching player names ("First Last") while excluding UI header text
  * like "Edit Lineup" or "Current Lineup" that also match the two-word pattern.
+ *
+ * Handles common MLB name formats: initials ("A.J. Burnett"), hyphens
+ * ("Shin-Soo Choo"), and apostrophes ("O'Brien").
  */
-const PLAYER_NAME_RE = /^(?!Edit |Current )[A-Z][a-z]+ [A-Z][a-z]+/;
+const PLAYER_NAME_RE = /^(?!Edit |Current )[A-Z][-\w.']* [A-Z][-\w.']*/;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -308,6 +311,10 @@ test.describe
   test('Phase 5: Matchup detail page shows Edit Lineup section', async ({
     commissionerPage: page,
   }) => {
+    // Two independent reload loops (Edit Lineup + starters) can each run up to
+    // 30–60 s; add headroom beyond the default integration timeout.
+    test.setTimeout(180_000);
+
     await test.step('Navigate to matchup detail page and wait for Edit Lineup', async () => {
       const matchupUrl = `/baseball/league/${state.leagueId}/matchups/${state.matchupId}`;
       await page.goto(matchupUrl);
@@ -347,20 +354,45 @@ test.describe
     });
 
     await test.step('At least one player is in the starters section', async () => {
-      // Starter player cards have a position badge (non-BN) + player name text.
-      // The Edit Lineup card is scoped by the "Edit Lineup" heading.
       const editorCard = page
         .locator('div, section')
         .filter({ hasText: 'Edit Lineup' })
         .filter({ hasText: 'STARTERS' })
         .first();
 
-      // Scope to player rows so PLAYER_NAME_RE cannot match the league name
-      // (e.g. "Roster Editor E2E …") which appears elsewhere in the editor card.
-      const playerCells = editorCard
-        .getByTestId(/^matchup-player-row-/)
-        .getByText(PLAYER_NAME_RE);
-      await expect(playerCells.first()).toBeVisible({ timeout: 15_000 });
+      // After an automated draft the autoPopulateFirstMatchupLineup transaction
+      // may still be committing when the page first loads. Poll with page reloads
+      // (same pattern as live-draft-ui.integration.spec.ts, fixed by LS-3794)
+      // until at least one STARTER player row appears.
+      //
+      // Scope to the STARTERS container (a div that contains "STARTERS" text
+      // but not "BENCH" — the bench section is a sibling, not a descendant) so
+      // bench-only rows don't satisfy this check before starters are assigned.
+      const startersSection = editorCard
+        .locator('div')
+        .filter({ hasText: /STARTERS/ })
+        .filter({ hasNotText: /BENCH/ })
+        .first();
+      const playerRows = startersSection.getByTestId(/^matchup-player-row-/);
+      const deadline = Date.now() + 60_000;
+      while (
+        !(await playerRows
+          .first()
+          .isVisible()
+          .catch(() => false))
+      ) {
+        if (Date.now() >= deadline) break;
+        await page.waitForTimeout(5_000);
+        await page.reload();
+        await page.waitForLoadState('load');
+        await page
+          .getByText('Edit Lineup', { exact: true })
+          .first()
+          .waitFor({ state: 'visible', timeout: 15_000 })
+          .catch(() => undefined);
+      }
+
+      await expect(playerRows.first()).toBeVisible({ timeout: 10_000 });
     });
   });
 
