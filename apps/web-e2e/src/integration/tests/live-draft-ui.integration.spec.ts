@@ -273,7 +273,7 @@ test.describe
         //
         // NOTE: isVisible({ timeout }) is deprecated in Playwright
         // v1.40+ — the timeout is silently ignored.  Use waitFor().
-        let pickerFound = false;
+        let pickAccepted = false;
         for (const { label, page } of pages) {
           const isMyTurn = await page
             .getByText('Your pick', { exact: true })
@@ -318,6 +318,9 @@ test.describe
           // No undrafted button found on this page — wait for UI to refresh
           if (draftBtnIdx < 0) continue;
 
+          console.log(
+            `[live-draft] Clicking pick by ${label} (pick #${pickCount + 1}) — ${ariaLabel}`,
+          );
           await allDraftBtns.nth(draftBtnIdx).click({ force: true });
 
           // Verify the pick was accepted by checking the turn advanced:
@@ -327,10 +330,12 @@ test.describe
           // Do NOT check whether the player button disappears — it can
           // vanish due to an incoming WebSocket update about another
           // manager's pick (false positive), causing duplicate-pick logs.
+          //
+          // Timeout raised to 12 s (from 8 s) for CI network latency headroom.
           const wasAccepted = await page
             .getByText('Your pick', { exact: true })
             .first()
-            .waitFor({ state: 'hidden', timeout: 8000 })
+            .waitFor({ state: 'hidden', timeout: 12000 })
             .then(() => true)
             .catch(() => false);
 
@@ -339,7 +344,7 @@ test.describe
             consecutiveMisses = 0;
             // eslint-disable-next-line no-console
             console.log(
-              `[live-draft] Pick #${pickCount} by ${label} — ${ariaLabel}`,
+              `[live-draft] Pick #${pickCount} by ${label} accepted — ${ariaLabel}`,
             );
             // Record player name for post-draft roster assertions.
             // ariaLabel format: "Draft Bill Lange now"
@@ -353,13 +358,21 @@ test.describe
               else if (label === 'Manager 1')
                 state.manager1Picks.push(playerName);
             }
+            pickAccepted = true;
+          } else {
+            // Pick click did not result in turn advancement within the timeout.
+            // Leave pickAccepted=false so the !pickAccepted block below
+            // increments consecutiveMisses and triggers the reload/break guards
+            // — without this the loop spins indefinitely when picks are
+            // silently failing or WS updates are delayed past the timeout.
+            console.log(
+              `[live-draft] Pick by ${label} NOT confirmed within timeout (pick #${pickCount}) — ${ariaLabel}`,
+            );
           }
-
-          pickerFound = true;
           break;
         }
 
-        if (!pickerFound) {
+        if (!pickAccepted) {
           consecutiveMisses++;
           if (consecutiveMisses > 30) {
             // eslint-disable-next-line no-console
