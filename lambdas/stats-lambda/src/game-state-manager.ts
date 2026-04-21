@@ -59,8 +59,18 @@ export async function selectAndAssignGameIdentifiers(
 
   if (uniqueGames.length === 0) {
     LOGGER.warn(
-      `No valid game identifiers found for player ${playerId} season ${season} (checked batting and pitching), cannot select games`,
+      `No valid game identifiers found for player ${playerId} season ${season} (checked batting and pitching), marking unassigned slots as spSkipped`,
     );
+    // Bulk-mark all unassigned slots as spSkipped in one round-trip.
+    await db
+      .update(PublicSchema.matchupPlayerGames)
+      .set({ spSkipped: true, statsLoadingStatus: 'completed' })
+      .where(
+        and(
+          eq(PublicSchema.matchupPlayerGames.matchupPlayerId, matchupPlayerId),
+          isNull(PublicSchema.matchupPlayerGames.gameIdentifier),
+        ),
+      );
     return;
   }
 

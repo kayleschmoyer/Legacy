@@ -245,31 +245,77 @@ export class WaiverClaimProcessor {
               error: errorMessage,
             });
 
-            await db
-              .update(PublicSchema.waiverClaims)
-              .set({
-                status: 'failed',
-                errorMessage,
-                processedAt: new Date(),
-              })
-              .where(eq(PublicSchema.waiverClaims.id, claim.id));
-
-            void insertActivityLog(
-              { db: this.db },
-              {
-                leagueId: claim.leagueId,
-                teamId: claim.teamId,
-                actorUserId: claim.userId,
-                eventType: 'waiver_claim_rejected',
-                payload: {
-                  claimId: claim.id,
-                  playerId: claim.playerId,
-                  reason: errorMessage,
-                },
-              },
+            // Check roster first: if addPlayerToRoster succeeded before the
+            // exception the player is already rostered. Reconcile claim status
+            // and block remaining claimants to avoid inconsistent user-facing state.
+            claimed = await isPlayerOnRoster(
+              this.db,
+              claim.leagueId,
+              claim.playerId,
             );
 
-            failed++;
+            if (claimed) {
+              await db
+                .update(PublicSchema.waiverClaims)
+                .set({ status: 'completed', processedAt: new Date() })
+                .where(eq(PublicSchema.waiverClaims.id, claim.id));
+
+              succeeded++;
+              succeededLeagueIds.add(claim.leagueId);
+              succeededClaims.push({
+                leagueId: claim.leagueId,
+                teamId: claim.teamId,
+                userId: claim.userId,
+                playerId: claim.playerId,
+                dropPlayerId: claim.dropPlayerId ?? null,
+                faabBid: claim.faabBid ?? null,
+                waiverType,
+              });
+              void insertActivityLog(
+                { db: this.db },
+                {
+                  leagueId: claim.leagueId,
+                  teamId: claim.teamId,
+                  actorUserId: claim.userId,
+                  eventType: 'waiver_claim_approved',
+                  payload: {
+                    claimId: claim.id,
+                    playerId: claim.playerId,
+                    dropPlayerId: claim.dropPlayerId ?? null,
+                    faabBid: claim.faabBid ?? null,
+                    waiverType,
+                  },
+                },
+              );
+              if (waiverType === 'standard') {
+                await this.rotateWaiverOrder(claim, teamSettingsMap);
+              }
+            } else {
+              await db
+                .update(PublicSchema.waiverClaims)
+                .set({
+                  status: 'failed',
+                  errorMessage,
+                  processedAt: new Date(),
+                })
+                .where(eq(PublicSchema.waiverClaims.id, claim.id));
+
+              failed++;
+              void insertActivityLog(
+                { db: this.db },
+                {
+                  leagueId: claim.leagueId,
+                  teamId: claim.teamId,
+                  actorUserId: claim.userId,
+                  eventType: 'waiver_claim_rejected',
+                  payload: {
+                    claimId: claim.id,
+                    playerId: claim.playerId,
+                    reason: errorMessage,
+                  },
+                },
+              );
+            }
           }
         }
       }
