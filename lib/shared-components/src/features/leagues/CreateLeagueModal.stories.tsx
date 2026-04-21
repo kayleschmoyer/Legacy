@@ -9,7 +9,7 @@ const meta: Meta<typeof CreateLeagueModal> = {
     docs: {
       description: {
         component:
-          'Modal dialog for creating a new fantasy league with sport, team count, draft, and scheduling configuration.',
+          'Multi-step modal wizard for creating a new fantasy league. Baseball: Basics, Roster, Era, Draft, Waivers (5 steps). Other sports: Basics, Roster, Draft, Waivers (4 steps — Era is baseball-only). Horizontal stepper across the top with progress tracking and scorecard summary.',
       },
     },
   },
@@ -22,14 +22,34 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   args: {
     visible: true,
+    sport: 'baseball',
     onClose: fn(),
     onSubmit: fn(),
+  },
+};
+
+export const Premium: Story = {
+  args: {
+    visible: true,
+    sport: 'baseball',
+    onClose: fn(),
+    onSubmit: fn(),
+    isPremium: true,
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Premium user — all era options and FAAB/salary cap are unlocked.',
+      },
+    },
   },
 };
 
 export const Loading: Story = {
   args: {
     visible: true,
+    sport: 'baseball',
     onClose: fn(),
     onSubmit: fn(),
     loading: true,
@@ -38,7 +58,7 @@ export const Loading: Story = {
     docs: {
       description: {
         story:
-          'Loading state with disabled inputs and "Creating..." button text.',
+          'Submission in flight — all inputs and nav buttons are disabled.',
       },
     },
   },
@@ -47,14 +67,33 @@ export const Loading: Story = {
 export const WithError: Story = {
   args: {
     visible: true,
+    sport: 'baseball',
     onClose: fn(),
     onSubmit: fn(),
-    error: 'Failed to create league',
+    error:
+      'The commissioner service did not respond. Your settings are preserved — try again.',
   },
   parameters: {
     docs: {
       description: {
-        story: 'Error state showing an inline error banner.',
+        story: 'Server error banner displayed above the step body.',
+      },
+    },
+  },
+};
+
+export const Football: Story = {
+  args: {
+    visible: true,
+    sport: 'football',
+    onClose: fn(),
+    onSubmit: fn(),
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Non-baseball sport — Era step is omitted; wizard has 4 steps instead of 5.',
       },
     },
   },

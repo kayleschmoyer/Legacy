@@ -264,6 +264,7 @@ function SportHome({
       {/* Create League Modal */}
       <CreateLeagueModal
         visible={showCreateModal}
+        sport={sport}
         onClose={() => setShowCreateModal(false)}
         onSubmit={onCreateLeague}
         loading={loading}
