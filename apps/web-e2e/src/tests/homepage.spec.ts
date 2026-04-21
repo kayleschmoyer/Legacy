@@ -29,11 +29,12 @@ test.describe('Homepage @smoke', () => {
   test('displays a call-to-action button linking to baseball', async ({
     page,
   }) => {
-    // HomePage renders a "Get Started" / baseball CTA button
-    const cta = page.getByRole('button', {
-      name: /get started|play ball|baseball/i,
-    });
+    // HomePage renders baseball onboarding CTA buttons (Create League, Join League)
+    const cta = page.getByRole('button', { name: /join league/i });
     await expect(cta).toBeVisible();
+    await cta.click();
+    await page.waitForLoadState('load');
+    await expect(page).toHaveURL('/baseball/league/join');
   });
 
   test('displays the Baseball sport card', async ({ page }) => {
@@ -45,11 +46,12 @@ test.describe('Homepage @smoke', () => {
   test('Create League quick-action navigates to league creation', async ({
     page,
   }) => {
-    // Baseball sport card has a "Create League" quick-action button
-    const createLeagueBtn = page.getByRole('button', {
-      name: /create league/i,
-    });
+    // Multiple "Create League" buttons exist (hero + sport cards); target first enabled one
+    const createLeagueBtn = page
+      .getByRole('button', { name: /create league/i, disabled: false })
+      .first();
     await expect(createLeagueBtn).toBeVisible();
+    await expect(createLeagueBtn).toBeEnabled();
 
     // Verify navigating directly to the create league page works
     await page.goto('/baseball/league/create');
@@ -58,9 +60,9 @@ test.describe('Homepage @smoke', () => {
   });
 
   test('features section is present', async ({ page }) => {
-    // The homepage includes a "features" / "everything you need" marketing section
+    // The homepage includes content sections: sport picker and/or history feed
     await expect(
-      page.getByText(/everything you need|features|manage/i).first(),
+      page.getByText(/choose your sport|on this day/i).first(),
     ).toBeVisible();
   });
 
