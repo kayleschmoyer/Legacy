@@ -236,10 +236,12 @@ test.describe
   test('Phase 4: Identify the commissioner matchup ID', async ({
     commissionerJwt,
   }) => {
-    await test.step('Run autoSelectGames to populate matchup_players', async () => {
-      // getMatchupPlayers returns rows from matchup_players, which is only
-      // populated after game selection runs. Without this, the roster editor
-      // shows nothing (players.length === 0) and "Edit Lineup" never appears.
+    await test.step('Run autoSelectGames to activate week-1 matchup', async () => {
+      // autoSelectGames transitions 'scheduled' matchups to 'in_progress' and
+      // sends SQS messages for game selection. matchup_players is populated
+      // during the draft via populateMatchupPlayersAndSeasons; this call is
+      // needed so the matchup status is Scheduled or InProgress (both are
+      // accepted by the roster editor).
       await gqlFetch<{
         autoSelectGames: { gamesTriggered: number } | null;
       }>(

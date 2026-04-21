@@ -449,22 +449,38 @@ test.describe
       ).toBeVisible({ timeout: 30000 });
 
       // After a live draft, autoPopulateFirstMatchupLineup (LS-445) places
-      // drafted fielders into starter slots first; surplus fielders go to
-      // Bench and surplus pitchers to Bullpen. With maxRosterSize=25 and
-      // ~17 lineup slots, drafted fielders typically fill all fielder slots
-      // before anything lands on Bench — so asserting Bench > 0 is flaky.
-      // Instead, assert the starter lineup filled, which directly proves
-      // the draft populated the roster via auto-lineup.
-      await expect(page.getByText('Lineup').first()).toBeVisible();
+      // drafted fielders into starter slots first. In a live draft,
+      // draftCompletedAt is committed inside the final pick transaction, so
+      // the UI can show "Draft Complete!" before autoPopulateFirstMatchupLineup
+      // (which runs outside the transaction) finishes. Poll with reloads until
+      // the lineup count is > 0 (up to ~60s) to absorb this race condition.
+      const lineupDeadline = Date.now() + 60_000;
       const lineupParent = page
         .getByText('Lineup', { exact: true })
         .first()
         .locator('..');
-      const lineupText = await lineupParent.textContent();
-      const lineupMatch = lineupText?.match(/Lineup\s*(\d+)\s*\/\s*\d+/);
-      expect(lineupMatch).toBeTruthy();
-      if (!lineupMatch) throw new Error('lineupMatch should be defined');
-      expect(parseInt(lineupMatch[1], 10)).toBeGreaterThan(0);
+      await expect(page.getByText('Lineup').first()).toBeVisible({
+        timeout: Math.max(1, lineupDeadline - Date.now()),
+      });
+      let lineupCount = 0;
+      while (Date.now() < lineupDeadline) {
+        const lineupText = await lineupParent.textContent();
+        const lineupMatch = lineupText?.match(/Lineup\s*(\d+)\s*\/\s*\d+/);
+        lineupCount = lineupMatch ? parseInt(lineupMatch[1], 10) : 0;
+        if (lineupCount > 0) break;
+        const remaining = lineupDeadline - Date.now();
+        if (remaining <= 0) break;
+        await page.waitForTimeout(Math.min(5_000, remaining));
+        if (Date.now() >= lineupDeadline) break;
+        await page.reload();
+        await page.waitForLoadState('load');
+        const remainingAfterReload = lineupDeadline - Date.now();
+        if (remainingAfterReload <= 0) break;
+        await expect(page.getByText('Lineup').first()).toBeVisible({
+          timeout: remainingAfterReload,
+        });
+      }
+      expect(lineupCount).toBeGreaterThan(0);
     });
 
     await test.step('Verify commissioner-drafted players appear on roster', async () => {
@@ -530,20 +546,35 @@ test.describe
     });
 
     await test.step('Verify manager roster has players', async () => {
-      // See Phase 6: Bench > 0 is flaky after auto-lineup fills all fielder
-      // slots. Assert the starter lineup filled instead.
-      await expect(managerPage1.getByText('Lineup').first()).toBeVisible({
-        timeout: 15000,
-      });
+      // See Phase 6: poll with reloads until lineup count > 0 to absorb the
+      // race between draftCompletedAt commit and autoPopulateFirstMatchupLineup.
+      const lineupDeadline = Date.now() + 60_000;
       const lineupParent = managerPage1
         .getByText('Lineup', { exact: true })
         .first()
         .locator('..');
-      const lineupText = await lineupParent.textContent();
-      const lineupMatch = lineupText?.match(/Lineup\s*(\d+)\s*\/\s*\d+/);
-      expect(lineupMatch).toBeTruthy();
-      if (!lineupMatch) throw new Error('lineupMatch should be defined');
-      expect(parseInt(lineupMatch[1], 10)).toBeGreaterThan(0);
+      await expect(managerPage1.getByText('Lineup').first()).toBeVisible({
+        timeout: Math.max(1, lineupDeadline - Date.now()),
+      });
+      let lineupCount = 0;
+      while (Date.now() < lineupDeadline) {
+        const lineupText = await lineupParent.textContent();
+        const lineupMatch = lineupText?.match(/Lineup\s*(\d+)\s*\/\s*\d+/);
+        lineupCount = lineupMatch ? parseInt(lineupMatch[1], 10) : 0;
+        if (lineupCount > 0) break;
+        const remaining = lineupDeadline - Date.now();
+        if (remaining <= 0) break;
+        await managerPage1.waitForTimeout(Math.min(5_000, remaining));
+        if (Date.now() >= lineupDeadline) break;
+        await managerPage1.reload();
+        await managerPage1.waitForLoadState('load');
+        const remainingAfterReload = lineupDeadline - Date.now();
+        if (remainingAfterReload <= 0) break;
+        await expect(managerPage1.getByText('Lineup').first()).toBeVisible({
+          timeout: remainingAfterReload,
+        });
+      }
+      expect(lineupCount).toBeGreaterThan(0);
     });
 
     await test.step('Verify manager 1-drafted players appear on roster', async () => {

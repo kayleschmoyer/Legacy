@@ -654,7 +654,16 @@ export async function populateMatchupPlayersAndSeasons(
       }
 
       if (playersToInsert.length > 0) {
-        await db.insert(PublicSchema.matchupPlayers).values(playersToInsert);
+        await db
+          .insert(PublicSchema.matchupPlayers)
+          .values(playersToInsert)
+          .onConflictDoNothing({
+            target: [
+              PublicSchema.matchupPlayers.matchupId,
+              PublicSchema.matchupPlayers.playerId,
+              PublicSchema.matchupPlayers.teamId,
+            ],
+          });
       }
     }
 
@@ -685,7 +694,14 @@ export async function populateMatchupPlayersAndSeasons(
     if (selectionResult.selections.length > 0) {
       await db
         .insert(PublicSchema.leagueWeekPlayerSeasons)
-        .values(selectionResult.selections);
+        .values(selectionResult.selections)
+        .onConflictDoNothing({
+          target: [
+            PublicSchema.leagueWeekPlayerSeasons.leagueId,
+            PublicSchema.leagueWeekPlayerSeasons.weekNumber,
+            PublicSchema.leagueWeekPlayerSeasons.playerId,
+          ],
+        });
     }
 
     if (selectionResult.skippedPlayers.length > 0) {
