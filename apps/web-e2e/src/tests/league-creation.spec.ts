@@ -258,27 +258,17 @@ test.describe('League Creation @critical', () => {
     await page.waitForLoadState('networkidle');
 
     // Verify informational card is present
-    await expect(page.locator('text=What happens next?')).toBeVisible();
+    await expect(page.locator('text=What happens next')).toBeVisible();
 
     // Check for key information points
     await expect(
       page.locator(
-        'text=Your league will be created with the specified number of teams',
+        "text=Your league is created and you're set as Commissioner",
       ),
     ).toBeVisible();
-    await expect(
-      page.locator("text=You'll be set as the league commissioner"),
-    ).toBeVisible();
-    await expect(
-      page.locator(
-        'text=Teams will be auto-generated and ready for member assignment',
-      ),
-    ).toBeVisible();
-    await expect(
-      page.locator(
-        'text=You can invite friends to join your league after creation',
-      ),
-    ).toBeVisible();
+    await expect(page.locator('text=Send invite links')).toBeVisible();
+    await expect(page.locator('text=Draft opens')).toBeVisible();
+    await expect(page.locator('text=Tune lineups')).toBeVisible();
   });
 
   test('should allow canceling league creation', async ({ page }) => {

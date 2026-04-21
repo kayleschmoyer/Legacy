@@ -621,18 +621,10 @@ test.describe('League Creation — Advanced Settings @regression', () => {
 
     await expect(page.getByText('What happens next?')).toBeVisible();
     await expect(
-      page.getByText("You'll be set as the league commissioner"),
+      page.getByText("Your league is created and you're set as Commissioner"),
     ).toBeVisible();
-    await expect(
-      page.getByText(
-        'Teams will be auto-generated and ready for member assignment',
-      ),
-    ).toBeVisible();
-    await expect(
-      page.getByText(
-        'You can invite friends to join your league after creation',
-      ),
-    ).toBeVisible();
+    await expect(page.getByText('Send invite links')).toBeVisible();
+    await expect(page.getByText('Draft opens')).toBeVisible();
   });
 
   // ─── Loading State ────────────────────────────────────────────────────────
