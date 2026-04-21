@@ -189,8 +189,9 @@ export function PlayerStatsPage() {
     [],
   );
 
-  // Handle share functionality
-  const handleShare = useCallback((url: string) => {
+  // Handle share functionality — shared component passes a relative URL; prepend origin here
+  const handleShare = useCallback((relativeUrl: string) => {
+    const url = `${window.location.origin}${relativeUrl}`;
     setLiveMsg('');
     void (async () => {
       try {

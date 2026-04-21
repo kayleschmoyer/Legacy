@@ -61,4 +61,6 @@ export type PlayerStatsViewMode =
   | 'batting'
   | 'pitching'
   | 'fielding'
-  | 'combined';
+  | 'combined'
+  | 'hitters'
+  | 'pitchers';

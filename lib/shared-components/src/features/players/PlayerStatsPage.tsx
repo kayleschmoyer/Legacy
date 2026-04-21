@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { Tabs, Text, XStack, YStack } from 'tamagui';
-import { BarChart2, Zap } from '@tamagui/lucide-icons';
+import React, { useCallback, useMemo, useState } from 'react';
+import { Pressable, TextInput } from 'react-native';
+import { Text, XStack, YStack } from 'tamagui';
 import { PlayerStatsDataGrid } from './PlayerStatsDataGrid';
 import { PitchingStatsDataGrid } from './PitchingStatsDataGrid';
 import type {
@@ -13,19 +13,37 @@ import { Platform } from '../../platform-components';
 import {
   BG_DARK,
   BRAND_GOLD,
-  BRAND_NAVY,
-  BRAND_NAVY_DARK,
+  BRAND_GOLD_LIGHT,
+  BRAND_NAVY_LIGHT,
   SURFACE_CARD,
-  SURFACE_SUBTLE,
+  SURFACE_PANEL,
   TEXT_MUTED,
   TEXT_PRIMARY,
-  withAlpha,
 } from '../../utils/colors';
 import type { CareerPitchingFragment } from '../../api/db/graphql.generated';
 
-// ─── .impeccable.md editorial typography (web-only font stack) ───────────────
 const FONT_DISPLAY = "'Big Shoulders Display', sans-serif";
 const FONT_BODY = "'Literata', serif";
+const FONT_MONO = "'JetBrains Mono', ui-monospace, monospace";
+
+const OUTLINE_SUBTLE = '#1C2740';
+const OUTLINE_DEFAULT = '#2F3B53';
+const FG3 = '#9CAAC5';
+const FG4 = '#6C80BA';
+
+const POSITIONS = [
+  'All Positions',
+  'SP',
+  'RP',
+  'C',
+  '1B',
+  '2B',
+  '3B',
+  'SS',
+  'OF',
+  'UT',
+  'DH',
+];
 
 export interface PlayerStatsPageProps {
   title?: string;
@@ -44,103 +62,261 @@ export interface PlayerStatsPageProps {
   onShare?: (url: string) => void;
 }
 
+interface AppliedFilters {
+  search: string;
+  position: string;
+  pageSize: number;
+  minHR: number;
+  minAVG: number;
+  minWins: number;
+}
+
+function normalizeViewMode(
+  mode: PlayerStatsViewMode,
+): 'combined' | 'hitters' | 'pitchers' {
+  if (mode === 'pitching' || mode === 'pitchers') return 'pitchers';
+  if (mode === 'hitters' || mode === 'batting') return 'hitters';
+  return 'combined';
+}
+
 /**
  * Player Statistics Page Component
  *
- * A comprehensive page for displaying and filtering player statistics.
- * Fully implemented with actual career statistics data from GraphQL API.
- * Features tabs for Batting and Pitching statistics.
+ * Editorial header with Combined/Hitters/Pitchers view tabs, unified toolbar
+ * with search + position filter, advanced stat range sliders, and separate
+ * batting/pitching grids wired to the GraphQL API.
  *
- * UI Refresh (LS-3120): editorial typography, flat surfaces, crossfade
- * tab transitions, brand-compliant gold usage.
+ * Design: .impeccable.md — nostalgic, sporty, professional. Tables are the
+ * product; chrome is restrained so numbers read like a Sunday paper box score.
  */
 export function PlayerStatsPage({
   title = 'Player Statistics',
-  initialViewMode: _initialViewMode = 'combined',
-  initialFilters: _initialFilters = {},
+  initialViewMode = 'combined',
+  initialFilters = {},
   initialPageSize = 25,
   showHeader = true,
-  showActions: _showActions = true,
+  showActions = true,
   statsFormat = 'expanded',
   onPlayerDetails,
-  onExport: _onExport,
-  onShare: _onShare,
+  onExport,
+  onShare,
 }: PlayerStatsPageProps) {
-  const [activeTab, setActiveTab] = useState<string>('batting');
+  // ── View mode ─────────────────────────────────────────────────
+  const [viewMode, setViewMode] = useState<'combined' | 'hitters' | 'pitchers'>(
+    () => normalizeViewMode(initialViewMode),
+  );
 
-  // Handle batting player click
-  const handleBattingPlayerClick = (player: PlayerCareerStats) => {
-    if (onPlayerDetails) {
-      const playerWithStats: PlayerWithStats = {
+  // ── Toolbar draft state (not applied until applyFilters()) ─────
+  const [search, setSearch] = useState(initialFilters.searchTerm ?? '');
+  const [position, setPosition] = useState(
+    initialFilters.position ?? 'All Positions',
+  );
+  const [pageSize, setPageSize] = useState(initialPageSize);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+
+  // ── Advanced filter draft state ────────────────────────────────
+  const [minHR, setMinHR] = useState(initialFilters.minHomeRuns ?? 0);
+  const [minAVG, setMinAVG] = useState(initialFilters.minBattingAvg ?? 0);
+  const [minWins, setMinWins] = useState(initialFilters.minWins ?? 0);
+
+  // ── Applied filters — committed snapshot that drives grid queries ─
+  // Separate draft vs. applied state avoids mid-input query flicker and
+  // removes the need for eslint-disable on useMemo dependency arrays.
+  const [appliedFilters, setAppliedFilters] = useState<AppliedFilters>(() => ({
+    search: initialFilters.searchTerm ?? '',
+    position: initialFilters.position ?? 'All Positions',
+    pageSize: initialPageSize,
+    minHR: initialFilters.minHomeRuns ?? 0,
+    minAVG: initialFilters.minBattingAvg ?? 0,
+    minWins: initialFilters.minWins ?? 0,
+  }));
+
+  const applyFilters = useCallback(() => {
+    setAppliedFilters({ search, position, pageSize, minHR, minAVG, minWins });
+  }, [search, position, pageSize, minHR, minAVG, minWins]);
+
+  // Stringify-based key forces grid unmount/remount on each filter commit,
+  // which triggers a fresh GraphQL query with the new initialParams.
+  const appliedKey = JSON.stringify(appliedFilters);
+  const battingKey = `batting-${appliedKey}`;
+  const pitchingKey = `pitching-${appliedKey}`;
+
+  // ── Derived params passed to data grids ───────────────────────
+  const battingParams = useMemo(
+    () => ({
+      first: appliedFilters.pageSize,
+      orderBy: 'homeRuns',
+      orderDirection: 'desc' as const,
+      minGames: 0,
+      searchTerm: appliedFilters.search || undefined,
+      position:
+        appliedFilters.position !== 'All Positions'
+          ? appliedFilters.position
+          : undefined,
+      minHomeRuns: appliedFilters.minHR > 0 ? appliedFilters.minHR : undefined,
+      minBattingAvg:
+        appliedFilters.minAVG > 0 ? appliedFilters.minAVG : undefined,
+    }),
+    [appliedFilters],
+  );
+
+  const pitchingParams = useMemo(
+    () => ({
+      limit: appliedFilters.pageSize,
+      offset: 0,
+      orderBy: 'wins',
+      orderDirection: 'desc' as const,
+      minGames: 0,
+      searchTerm: appliedFilters.search || undefined,
+      position:
+        appliedFilters.position !== 'All Positions'
+          ? appliedFilters.position
+          : undefined,
+      minWins: appliedFilters.minWins > 0 ? appliedFilters.minWins : undefined,
+    }),
+    [appliedFilters],
+  );
+
+  // ── Player click handlers ──────────────────────────────────────
+  const handleBattingPlayerClick = useCallback(
+    (player: PlayerCareerStats) => {
+      if (!onPlayerDetails) return;
+      onPlayerDetails({
         id: player.playerId,
         name: player.displayName || `Player ${player.playerId}`,
-      } as PlayerWithStats;
-      onPlayerDetails(playerWithStats);
-    }
-  };
+      } as PlayerWithStats);
+    },
+    [onPlayerDetails],
+  );
 
-  // Handle pitching player click
-  const handlePitchingPlayerClick = (player: CareerPitchingFragment) => {
-    if (onPlayerDetails) {
+  const handlePitchingPlayerClick = useCallback(
+    (player: CareerPitchingFragment) => {
+      if (!onPlayerDetails) return;
       const firstName = player.player?.firstName;
       const lastName = player.player?.lastName;
-      const playerWithStats: PlayerWithStats = {
+      onPlayerDetails({
         id: player.playerId || 0,
         name:
           firstName && lastName
             ? `${firstName} ${lastName}`
             : `Player ${player.playerId}`,
-      } as PlayerWithStats;
-      onPlayerDetails(playerWithStats);
-    }
-  };
+      } as PlayerWithStats);
+    },
+    [onPlayerDetails],
+  );
+
+  // ── Export / share ─────────────────────────────────────────────
+  const handleExport = useCallback(() => {
+    if (!onExport) return;
+    const filters: PlayerStatsFilters = {
+      searchTerm: search || undefined,
+      position: position !== 'All Positions' ? position : undefined,
+      minHomeRuns: minHR > 0 ? minHR : undefined,
+      minBattingAvg: minAVG > 0 ? minAVG : undefined,
+      minWins: minWins > 0 ? minWins : undefined,
+    };
+    onExport(filters, viewMode);
+  }, [onExport, search, position, minHR, minAVG, minWins, viewMode]);
+
+  const handleShare = useCallback(() => {
+    if (!onShare) return;
+    const params = new URLSearchParams({
+      view: viewMode,
+      pageSize: String(pageSize),
+    });
+    if (search) params.set('search', search);
+    if (position !== 'All Positions') params.set('position', position);
+    if (minHR > 0) params.set('minHomeRuns', String(minHR));
+    if (minAVG > 0) params.set('minBattingAvg', minAVG.toFixed(3));
+    if (minWins > 0) params.set('minWins', String(minWins));
+    // Build relative URL — the caller is responsible for prepending the origin.
+    // This keeps the shared component free of window.location (safe for native).
+    onShare(`/players/stats?${params.toString()}`);
+  }, [onShare, viewMode, pageSize, search, position, minHR, minAVG, minWins]);
+
+  // ── Visibility flags ───────────────────────────────────────────
+  const showBatting = viewMode === 'combined' || viewMode === 'hitters';
+  const showPitching = viewMode === 'combined' || viewMode === 'pitchers';
+
+  // ── URL preview (mocked for display, matches actual URL contract) ─
+  const urlPreview = useMemo(() => {
+    const params: string[] = [`view=${viewMode}`, `pageSize=${pageSize}`];
+    if (search) params.push(`search=${encodeURIComponent(search)}`);
+    if (position !== 'All Positions')
+      params.push(`position=${encodeURIComponent(position)}`);
+    if (minHR > 0) params.push(`minHomeRuns=${minHR}`);
+    if (minAVG > 0) params.push(`minBattingAvg=${minAVG.toFixed(3)}`);
+    if (minWins > 0) params.push(`minWins=${minWins}`);
+    return `/players/stats?${params.join('&')}`;
+  }, [viewMode, pageSize, search, position, minHR, minAVG, minWins]);
 
   return (
     <YStack flex={1} style={{ backgroundColor: BG_DARK }}>
-      {/* ── CSS: crossfade tab transitions + reduced-motion guard (web only) ── */}
+      {/* ── Web-only CSS: crossfade tab transitions, slider track ── */}
       {Platform.OS === 'web' && (
         <style>{`
-          @keyframes playerStats-fadeIn {
-            from { opacity: 0; }
-            to   { opacity: 1; }
-          }
+          @keyframes ps-fadeIn { from { opacity: 0; } to { opacity: 1; } }
           @media (prefers-reduced-motion: no-preference) {
-            .playerStats-tabContent {
-              animation: playerStats-fadeIn 0.2s ease forwards;
-            }
+            .ps-tabContent { animation: ps-fadeIn 140ms ease forwards; }
+          }
+          .ps-slider { -webkit-appearance: none; appearance: none; width: 100%; height: 4px;
+            background: linear-gradient(to right, ${BRAND_GOLD} 0%, ${BRAND_GOLD} var(--pct,0%), rgba(255,255,255,0.08) var(--pct,0%), rgba(255,255,255,0.08) 100%);
+            border-radius: 9999px; outline: 0; cursor: pointer; }
+          .ps-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px;
+            border-radius: 50%; background: ${BRAND_GOLD}; border: 2px solid ${BG_DARK}; cursor: pointer; }
+          .ps-slider::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%;
+            background: ${BRAND_GOLD}; border: 2px solid ${BG_DARK}; cursor: pointer; }
+          .ps-select-native { appearance: none; background: transparent; border: 0; outline: 0;
+            color: ${TEXT_PRIMARY}; font-family: ${FONT_BODY}; font-size: 14px; padding: 0; cursor: pointer; width: 100%; }
+          .ps-select-native option { background: ${SURFACE_PANEL}; color: ${TEXT_PRIMARY}; }
+          @media (prefers-reduced-motion: reduce) {
+            .ps-tabContent { animation: none; }
           }
         `}</style>
       )}
 
-      {/* ── Header ─────────────────────────────────────────────────── */}
+      {/* ── Page header ───────────────────────────────────────────── */}
       {showHeader && (
         <YStack
           style={{
-            background: `linear-gradient(160deg, ${BRAND_NAVY_DARK} 0%, ${BRAND_NAVY} 100%)`,
-            borderBottom: `1px solid ${withAlpha(BRAND_GOLD, 0.2)}`,
-            boxShadow: `0 2px 16px rgba(0,0,0,0.45)`,
+            maxWidth: 1280,
+            width: '100%',
+            padding: '32px 24px 0',
+            margin: '0 auto',
           }}
-          paddingVertical="$6"
-          paddingHorizontal="$8"
         >
           <XStack
-            alignItems="center"
             justifyContent="space-between"
-            gap="$4"
+            alignItems="flex-start"
+            gap="$6"
             flexWrap="wrap"
           >
-            {/* Title block */}
-            <YStack gap="$1">
+            {/* Left: editorial copy */}
+            <YStack gap="$2" style={{ flex: 1, minWidth: 240 }}>
               <Text
-                tag="h2"
                 style={{
                   fontFamily: FONT_DISPLAY,
-                  fontSize: 36,
-                  fontWeight: '800',
-                  letterSpacing: 0.5,
-                  color: TEXT_PRIMARY,
-                  lineHeight: 1.1,
+                  fontWeight: '700',
+                  fontSize: 11,
+                  letterSpacing: '0.16em',
                   textTransform: 'uppercase',
+                  color: BRAND_GOLD_LIGHT,
+                }}
+              >
+                Players · League Archive
+              </Text>
+              <Text
+                tag="h1"
+                style={{
+                  fontFamily: FONT_DISPLAY,
+                  fontWeight: '800',
+                  fontSize:
+                    Platform.OS === 'web'
+                      ? ('clamp(40px, 4.4vw, 60px)' as unknown as number)
+                      : 48,
+                  lineHeight: 1,
+                  letterSpacing: '-0.02em',
+                  color: '#FFFFFF',
                   margin: 0,
                 }}
               >
@@ -149,217 +325,700 @@ export function PlayerStatsPage({
               <Text
                 style={{
                   fontFamily: FONT_BODY,
-                  fontSize: 13,
-                  color: TEXT_MUTED,
-                  letterSpacing: 0.2,
+                  fontSize: 17,
+                  lineHeight: 1.55,
+                  color: FG3,
+                  maxWidth: '64ch',
+                  margin: 0,
                 }}
               >
-                MLB Career Leaders · Batting & Pitching
+                Every qualified hitter and pitcher across the archive. Draft
+                legends, compare seasons, and build your dynasty on the numbers
+                that actually happened.
               </Text>
+              {/* URL preview — shows the shareable query string */}
+              <XStack
+                alignItems="center"
+                gap="$2"
+                style={{
+                  marginTop: 14,
+                  padding: '8px 14px',
+                  background: 'rgba(13,21,38,0.6)',
+                  border: `1px solid ${OUTLINE_SUBTLE}`,
+                  borderRadius: 8,
+                  maxWidth: '100%',
+                  overflow: 'hidden',
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: FONT_DISPLAY,
+                    fontWeight: '700',
+                    fontSize: 10,
+                    letterSpacing: '0.14em',
+                    textTransform: 'uppercase',
+                    color: FG4,
+                    flexShrink: 0,
+                  }}
+                >
+                  URL
+                </Text>
+                <Text
+                  style={{
+                    fontFamily: FONT_MONO,
+                    fontSize: 12,
+                    color: FG3,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    minWidth: 0,
+                  }}
+                  numberOfLines={1}
+                >
+                  {urlPreview}
+                </Text>
+              </XStack>
             </YStack>
 
-            {/* All-Time Records label */}
-            <YStack
-              paddingHorizontal="$3"
-              paddingVertical="$1"
+            {/* Right: action buttons — only shown when showActions is true */}
+            {showActions && (
+              <XStack
+                gap="$2"
+                style={{ marginTop: Platform.OS === 'web' ? 8 : 0 }}
+              >
+                <Pressable
+                  onPress={handleShare}
+                  accessibilityRole="button"
+                  style={{
+                    paddingVertical: 10,
+                    paddingHorizontal: 16,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: OUTLINE_DEFAULT,
+                    backgroundColor: 'transparent',
+                    borderStyle: 'solid',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 8,
+                    minHeight: 40,
+                  }}
+                >
+                  {Platform.OS === 'web' && (
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <circle cx="18" cy="5" r="3" />
+                      <circle cx="6" cy="12" r="3" />
+                      <circle cx="18" cy="19" r="3" />
+                      <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+                      <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+                    </svg>
+                  )}
+                  <Text
+                    style={{
+                      color: TEXT_PRIMARY,
+                      fontSize: 12,
+                      fontFamily: FONT_DISPLAY,
+                      fontWeight: '700',
+                    }}
+                  >
+                    Share
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={handleExport}
+                  accessibilityRole="button"
+                  style={{
+                    paddingVertical: 10,
+                    paddingHorizontal: 16,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: OUTLINE_DEFAULT,
+                    backgroundColor: 'transparent',
+                    borderStyle: 'solid',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 8,
+                    minHeight: 40,
+                  }}
+                >
+                  {Platform.OS === 'web' && (
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="7 10 12 15 17 10" />
+                      <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                  )}
+                  <Text
+                    style={{
+                      color: TEXT_PRIMARY,
+                      fontSize: 12,
+                      fontFamily: FONT_DISPLAY,
+                      fontWeight: '700',
+                    }}
+                  >
+                    Export JSON
+                  </Text>
+                </Pressable>
+              </XStack>
+            )}
+          </XStack>
+        </YStack>
+      )}
+
+      {/* ── Main content area ──────────────────────────────────────── */}
+      <YStack
+        flex={1}
+        style={{
+          maxWidth: 1280,
+          width: '100%',
+          padding: '24px 24px 96px',
+          margin: '0 auto',
+          gap: 24,
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        {/* ── View mode tabs: Combined / Hitters / Pitchers ─────────── */}
+        {/* MOTION: crossfade 140ms on tab switch; no layout shift */}
+        <XStack
+          style={{
+            borderBottom: `1px solid ${OUTLINE_SUBTLE}`,
+            gap: 2,
+          }}
+        >
+          {(
+            [
+              ['combined', 'Combined'],
+              ['hitters', 'Hitters'],
+              ['pitchers', 'Pitchers'],
+            ] as const
+          ).map(([id, label]) => (
+            <Pressable
+              key={id}
+              onPress={() => setViewMode(id)}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: viewMode === id }}
               style={{
-                backgroundColor: SURFACE_CARD,
-                border: `1px solid ${withAlpha(BRAND_GOLD, 0.25)}`,
-                borderRadius: 4,
+                paddingVertical: 14,
+                paddingHorizontal: 22,
+                backgroundColor: 'transparent',
+                position: 'relative',
+                minHeight: 48,
+                justifyContent: 'center',
+                alignItems: 'center',
               }}
             >
               <Text
                 style={{
                   fontFamily: FONT_DISPLAY,
-                  fontSize: 11,
                   fontWeight: '700',
-                  letterSpacing: 1.5,
+                  fontSize: 13,
+                  letterSpacing: '0.1em',
                   textTransform: 'uppercase',
-                  color: BRAND_GOLD,
+                  color: viewMode === id ? TEXT_PRIMARY : FG3,
                 }}
               >
-                All-Time Records
+                {label}
               </Text>
-            </YStack>
-          </XStack>
-        </YStack>
-      )}
+              {viewMode === id && (
+                <YStack
+                  style={{
+                    position: 'absolute',
+                    left: 18,
+                    right: 18,
+                    bottom: -1,
+                    height: 3,
+                    backgroundColor: BRAND_GOLD,
+                    borderRadius: 2,
+                  }}
+                />
+              )}
+            </Pressable>
+          ))}
+        </XStack>
 
-      {/* ── Main Content ─────────────────────────────────────────────── */}
-      <YStack flex={1} padding="$4" gap="$4">
-        {/* ── Tab Switcher ──────────────────────────────────────────── */}
-        <Tabs
-          value={activeTab}
-          onValueChange={setActiveTab}
-          orientation="horizontal"
-          flexDirection="column"
-          flex={1}
+        {/* ── Toolbar: search, position, page size, advanced ─────────── */}
+        <XStack
+          style={{
+            display: Platform.OS === 'web' ? 'grid' : 'flex',
+            gridTemplateColumns:
+              'minmax(240px, 1.5fr) minmax(130px, 1fr) minmax(130px, 1fr) auto',
+            flexDirection: 'column',
+            gap: 10,
+            padding: 14,
+            background: SURFACE_PANEL,
+            border: `1px solid ${OUTLINE_SUBTLE}`,
+            borderRadius: 16,
+          }}
         >
-          <Tabs.List
+          {/* Search */}
+          <YStack
             style={{
-              backgroundColor: SURFACE_SUBTLE,
-              border: `1px solid ${withAlpha(BRAND_NAVY, 0.35)}`,
-              borderRadius: 10,
-              padding: 4,
+              position: 'relative',
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
+              background: 'rgba(10,15,26,0.55)',
+              border: `1px solid ${OUTLINE_SUBTLE}`,
+              borderRadius: 6,
+              padding: '0 12px 0 38px',
+              minHeight: 44,
             }}
           >
-            {/* Batting Tab */}
-            <Tabs.Tab
-              value="batting"
-              data-testid="tab-trigger-batting"
+            {Platform.OS === 'web' && (
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke={FG3}
+                strokeWidth="2"
+                style={{
+                  position: 'absolute',
+                  left: 12,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                }}
+              >
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.3-4.3" />
+              </svg>
+            )}
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              onSubmitEditing={applyFilters}
+              placeholder="Search player name · min 2 chars"
+              placeholderTextColor={FG4}
               style={{
-                backgroundColor:
-                  activeTab === 'batting' ? BRAND_NAVY : 'transparent',
-                borderRadius: 6,
-                cursor: 'pointer',
-                // Web: CSS border shorthand + transition
-                ...(Platform.OS === 'web' && {
-                  borderBottom:
-                    activeTab === 'batting'
-                      ? `2px solid ${BRAND_GOLD}`
-                      : '2px solid transparent',
-                  transition:
-                    'background-color 0.15s ease, border-color 0.15s ease',
-                }),
-                // Native: RN-compatible border longhand
-                ...(Platform.OS !== 'web' && {
-                  borderBottomWidth: 2,
-                  borderBottomColor:
-                    activeTab === 'batting' ? BRAND_GOLD : 'transparent',
-                }),
+                flex: 1,
+                backgroundColor: 'transparent',
+                color: TEXT_PRIMARY,
+                fontFamily: FONT_BODY,
+                fontSize: 14,
+                paddingVertical: 8,
+                borderWidth: 0,
+                outlineWidth: 0,
               }}
-              paddingVertical="$2"
-              paddingHorizontal="$4"
+            />
+            {search ? (
+              <Pressable
+                onPress={() => {
+                  setSearch('');
+                  applyFilters();
+                }}
+                accessibilityLabel="Clear search"
+                accessibilityRole="button"
+                style={{
+                  backgroundColor: 'transparent',
+                  width: 28,
+                  height: 28,
+                  borderRadius: 14,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                <Text style={{ color: FG3, fontSize: 20, lineHeight: 20 }}>
+                  ×
+                </Text>
+              </Pressable>
+            ) : null}
+          </YStack>
+
+          {/* Position select */}
+          <YStack
+            style={{
+              position: 'relative',
+              justifyContent: 'center',
+              background: 'rgba(10,15,26,0.55)',
+              border: `1px solid ${OUTLINE_SUBTLE}`,
+              borderRadius: 6,
+              padding: '6px 30px 6px 12px',
+              minHeight: 44,
+            }}
+          >
+            <Text
+              style={{
+                fontFamily: FONT_DISPLAY,
+                fontWeight: '700',
+                fontSize: 10,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                color: FG3,
+              }}
             >
-              <XStack alignItems="center" gap="$2" justifyContent="center">
-                <BarChart2
-                  size={16}
-                  color={activeTab === 'batting' ? BRAND_GOLD : TEXT_MUTED}
-                />
+              Position
+            </Text>
+            {Platform.OS === 'web' ? (
+              <select
+                className="ps-select-native"
+                value={position}
+                onChange={(e) => {
+                  setPosition((e.target as HTMLSelectElement).value);
+                  applyFilters();
+                }}
+              >
+                {POSITIONS.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+            ) : null}
+            {Platform.OS === 'web' && (
+              <Text
+                style={{
+                  position: 'absolute',
+                  right: 12,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: FG3,
+                  fontSize: 12,
+                  pointerEvents: 'none',
+                }}
+              >
+                ▾
+              </Text>
+            )}
+          </YStack>
+
+          {/* Rows per page */}
+          <YStack
+            style={{
+              position: 'relative',
+              justifyContent: 'center',
+              background: 'rgba(10,15,26,0.55)',
+              border: `1px solid ${OUTLINE_SUBTLE}`,
+              borderRadius: 6,
+              padding: '6px 30px 6px 12px',
+              minHeight: 44,
+            }}
+          >
+            <Text
+              style={{
+                fontFamily: FONT_DISPLAY,
+                fontWeight: '700',
+                fontSize: 10,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                color: FG3,
+              }}
+            >
+              Rows
+            </Text>
+            {Platform.OS === 'web' ? (
+              <select
+                className="ps-select-native"
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number((e.target as HTMLSelectElement).value));
+                  applyFilters();
+                }}
+              >
+                {[10, 25, 50, 100].map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+            ) : null}
+            {Platform.OS === 'web' && (
+              <Text
+                style={{
+                  position: 'absolute',
+                  right: 12,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: FG3,
+                  fontSize: 12,
+                  pointerEvents: 'none',
+                }}
+              >
+                ▾
+              </Text>
+            )}
+          </YStack>
+
+          {/* Advanced toggle */}
+          <Pressable
+            onPress={() => setAdvancedOpen((v) => !v)}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: advancedOpen }}
+            style={{
+              paddingVertical: 10,
+              paddingHorizontal: 16,
+              borderRadius: 12,
+              borderWidth: 1,
+              borderStyle: 'solid',
+              borderColor: advancedOpen ? BRAND_NAVY_LIGHT : OUTLINE_DEFAULT,
+              backgroundColor: advancedOpen
+                ? 'rgba(27,58,92,0.35)'
+                : 'transparent',
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
+              minHeight: 44,
+            }}
+          >
+            {Platform.OS === 'web' && (
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke={advancedOpen ? TEXT_PRIMARY : FG3}
+                strokeWidth="2"
+              >
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+              </svg>
+            )}
+            <Text
+              style={{
+                fontFamily: FONT_DISPLAY,
+                fontWeight: '700',
+                fontSize: 12,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                color: advancedOpen ? TEXT_PRIMARY : FG3,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Advanced
+            </Text>
+            <Text style={{ fontSize: 10, color: FG3 }}>
+              {advancedOpen ? '▴' : '▾'}
+            </Text>
+          </Pressable>
+        </XStack>
+
+        {/* ── Advanced filters panel ─────────────────────────────────── */}
+        {/* MOTION: slide down 180ms ease-out when opened */}
+        {advancedOpen && (
+          <YStack
+            style={{
+              padding: '18px 20px',
+              background: SURFACE_CARD,
+              border: `1px solid ${OUTLINE_SUBTLE}`,
+              borderRadius: 16,
+              gap: 14,
+            }}
+          >
+            <XStack justifyContent="space-between" alignItems="center">
+              <Text
+                style={{
+                  fontFamily: FONT_DISPLAY,
+                  fontWeight: '700',
+                  fontSize: 11,
+                  letterSpacing: '0.16em',
+                  textTransform: 'uppercase',
+                  color: BRAND_GOLD_LIGHT,
+                }}
+              >
+                Stat Ranges
+              </Text>
+              <Pressable
+                onPress={() => {
+                  setMinHR(0);
+                  setMinAVG(0);
+                  setMinWins(0);
+                  applyFilters();
+                }}
+                accessibilityRole="button"
+                style={{
+                  backgroundColor: 'transparent',
+                  paddingVertical: 4,
+                  paddingHorizontal: 8,
+                  borderRadius: 6,
+                }}
+              >
                 <Text
                   style={{
-                    fontFamily: FONT_DISPLAY,
-                    fontSize: 15,
-                    fontWeight: activeTab === 'batting' ? '700' : '600',
-                    letterSpacing: 0.4,
-                    color: activeTab === 'batting' ? TEXT_PRIMARY : TEXT_MUTED,
-                    ...(Platform.OS === 'web' && {
-                      transition: 'color 0.15s ease',
-                    }),
+                    color: BRAND_GOLD_LIGHT,
+                    fontFamily: FONT_BODY,
+                    fontSize: 13,
+                    fontWeight: '500',
                   }}
                 >
-                  Batting Stats
+                  Reset ranges
                 </Text>
-              </XStack>
-            </Tabs.Tab>
-
-            {/* Pitching Tab */}
-            <Tabs.Tab
-              value="pitching"
-              data-testid="tab-trigger-pitching"
+              </Pressable>
+            </XStack>
+            <XStack
               style={{
-                backgroundColor:
-                  activeTab === 'pitching' ? BRAND_NAVY : 'transparent',
-                borderRadius: 6,
-                cursor: 'pointer',
-                // Web: CSS border shorthand + transition
-                ...(Platform.OS === 'web' && {
-                  borderBottom:
-                    activeTab === 'pitching'
-                      ? `2px solid ${BRAND_GOLD}`
-                      : '2px solid transparent',
-                  transition:
-                    'background-color 0.15s ease, border-color 0.15s ease',
-                }),
-                // Native: RN-compatible border longhand
-                ...(Platform.OS !== 'web' && {
-                  borderBottomWidth: 2,
-                  borderBottomColor:
-                    activeTab === 'pitching' ? BRAND_GOLD : 'transparent',
-                }),
+                display: Platform.OS === 'web' ? 'grid' : 'flex',
+                gridTemplateColumns: 'repeat(2, 1fr)',
+                flexDirection: 'column',
+                gap: 20,
               }}
-              paddingVertical="$2"
-              paddingHorizontal="$4"
             >
-              <XStack alignItems="center" gap="$2" justifyContent="center">
-                <Zap
-                  size={16}
-                  color={activeTab === 'pitching' ? BRAND_GOLD : TEXT_MUTED}
-                />
-                <Text
-                  style={{
-                    fontFamily: FONT_DISPLAY,
-                    fontSize: 15,
-                    fontWeight: activeTab === 'pitching' ? '700' : '600',
-                    letterSpacing: 0.4,
-                    color: activeTab === 'pitching' ? TEXT_PRIMARY : TEXT_MUTED,
-                    ...(Platform.OS === 'web' && {
-                      transition: 'color 0.15s ease',
-                    }),
-                  }}
-                >
-                  Pitching Stats
-                </Text>
-              </XStack>
-            </Tabs.Tab>
-          </Tabs.List>
-
-          {/* ── Batting Tab Content ──────────────────────────── */}
-          <Tabs.Content value="batting" flex={1}>
-            <YStack
-              flex={1}
-              paddingTop="$4"
-              {...(Platform.OS === 'web' && {
-                className: 'playerStats-tabContent',
-              })}
-            >
-              <PlayerStatsDataGrid
-                title="MLB Career Batting Leaders"
-                initialParams={{
-                  first: initialPageSize,
-                  orderBy: 'homeRuns',
-                  orderDirection: 'desc',
-                  minGames: 0,
-                }}
-                onPlayerSelect={handleBattingPlayerClick}
-                showSearch={true}
-                showFilters={true}
-                showSorting={true}
-                showPagination={true}
-                statsFormat={statsFormat}
+              <StatSlider
+                label="Min Home Runs"
+                value={minHR}
+                min={0}
+                max={75}
+                step={1}
+                format={(v) => String(v)}
+                onChange={setMinHR}
+                onCommit={applyFilters}
               />
-            </YStack>
-          </Tabs.Content>
-
-          {/* ── Pitching Tab Content ─────────────────────────── */}
-          <Tabs.Content value="pitching" flex={1}>
-            <YStack
-              flex={1}
-              paddingTop="$4"
-              {...(Platform.OS === 'web' && {
-                className: 'playerStats-tabContent',
-              })}
-            >
-              <PitchingStatsDataGrid
-                title="MLB Career Pitching Leaders"
-                initialParams={{
-                  limit: initialPageSize,
-                  offset: 0,
-                  orderBy: 'wins',
-                  orderDirection: 'desc',
-                  minGames: 0,
-                }}
-                onPlayerSelect={handlePitchingPlayerClick}
-                showSearch={true}
-                showFilters={true}
-                showSorting={true}
-                showPagination={true}
-                statsFormat={statsFormat}
+              <StatSlider
+                label="Min Batting Average"
+                value={minAVG}
+                min={0}
+                max={0.43}
+                step={0.005}
+                format={(v) => v.toFixed(3).replace(/^0/, '')}
+                onChange={setMinAVG}
+                onCommit={applyFilters}
               />
-            </YStack>
-          </Tabs.Content>
-        </Tabs>
+            </XStack>
+          </YStack>
+        )}
+
+        {/* ── Batting table ─────────────────────────────────────────── */}
+        {showBatting && (
+          <YStack
+            key={battingKey}
+            className={Platform.OS === 'web' ? 'ps-tabContent' : undefined}
+          >
+            <PlayerStatsDataGrid
+              title="MLB Career Batting Leaders"
+              initialParams={battingParams}
+              onPlayerSelect={handleBattingPlayerClick}
+              showSearch={false}
+              showFilters={false}
+              showSorting={true}
+              showPagination={true}
+              statsFormat={statsFormat}
+            />
+          </YStack>
+        )}
+
+        {/* ── Pitching table ────────────────────────────────────────── */}
+        {showPitching && (
+          <YStack
+            key={pitchingKey}
+            className={Platform.OS === 'web' ? 'ps-tabContent' : undefined}
+          >
+            <PitchingStatsDataGrid
+              title="MLB Career Pitching Leaders"
+              initialParams={pitchingParams}
+              onPlayerSelect={handlePitchingPlayerClick}
+              showSearch={false}
+              showFilters={false}
+              showSorting={true}
+              showPagination={true}
+              statsFormat={statsFormat}
+            />
+          </YStack>
+        )}
       </YStack>
+    </YStack>
+  );
+}
+
+// ── Stat range slider ──────────────────────────────────────────────────────────
+
+interface StatSliderProps {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  format: (v: number) => string;
+  onChange: (v: number) => void;
+  onCommit: () => void;
+}
+
+function StatSlider({
+  label,
+  value,
+  min,
+  max,
+  step,
+  format,
+  onChange,
+  onCommit,
+}: StatSliderProps) {
+  const pct = Math.round(((value - min) / (max - min)) * 100);
+
+  return (
+    <YStack style={{ gap: 8 }}>
+      <XStack justifyContent="space-between" alignItems="baseline">
+        <Text
+          style={{
+            fontFamily: FONT_BODY,
+            fontWeight: '500',
+            fontSize: 13,
+            color: TEXT_MUTED,
+          }}
+        >
+          {label}
+        </Text>
+        <Text
+          style={{
+            fontFamily: FONT_DISPLAY,
+            fontWeight: '800',
+            fontSize: 18,
+            color: BRAND_GOLD_LIGHT,
+            fontVariantNumeric: 'tabular-nums',
+          }}
+        >
+          {format(value)}
+        </Text>
+      </XStack>
+      {Platform.OS === 'web' ? (
+        <input
+          type="range"
+          aria-label={label}
+          className="ps-slider"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          style={{ '--pct': `${pct}%` } as React.CSSProperties}
+          onChange={(e) =>
+            onChange(Number((e.target as HTMLInputElement).value))
+          }
+          onMouseUp={onCommit}
+          onTouchEnd={onCommit}
+          onKeyUp={onCommit}
+        />
+      ) : null}
+      <XStack justifyContent="space-between">
+        <Text
+          style={{
+            fontFamily: FONT_MONO,
+            fontSize: 10,
+            color: FG4,
+          }}
+        >
+          {format(min)}
+        </Text>
+        <Text
+          style={{
+            fontFamily: FONT_MONO,
+            fontSize: 10,
+            color: FG4,
+          }}
+        >
+          {format(max)}
+        </Text>
+      </XStack>
     </YStack>
   );
 }
