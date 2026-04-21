@@ -353,8 +353,11 @@ test.describe
         .filter({ hasText: 'STARTERS' })
         .first();
 
-      // Look for any player name text within the editor (player cards have player names)
-      const playerCells = editorCard.getByText(PLAYER_NAME_RE);
+      // Scope to player rows so PLAYER_NAME_RE cannot match the league name
+      // (e.g. "Roster Editor E2E …") which appears elsewhere in the editor card.
+      const playerCells = editorCard
+        .getByTestId(/^matchup-player-row-/)
+        .getByText(PLAYER_NAME_RE);
       await expect(playerCells.first()).toBeVisible({ timeout: 15_000 });
     });
   });
@@ -385,14 +388,16 @@ test.describe
         .filter({ hasText: 'STARTERS' })
         .first();
 
-      // Capture a visible starter name first — text matching confirmed working
-      // in Phase 5. We resolve the name up-front so we can use hasText (string
-      // substring match) to find the row rather than has+regex. The `^`-anchored
-      // PLAYER_NAME_RE doesn't match a row's combined text (which starts with the
-      // position badge, e.g. "SP John Smith …"), so filter({ has: getByText(regex)
-      // }) silently matched 0 rows (LS-3775).
-      const playerNameEl = editorCard.getByText(PLAYER_NAME_RE).first();
-      await expect(playerNameEl).toBeVisible({ timeout: 15_000 });
+      // Capture a visible starter name from within the first player row, not
+      // from the broader editorCard. Scoping to the row prevents PLAYER_NAME_RE
+      // from matching the league name (e.g. "Roster Editor E2E …"), whose first
+      // two words happen to pass the regex's negative lookahead (LS-3781).
+      const firstStarterRow = editorCard
+        .getByTestId(/^matchup-player-row-/)
+        .first();
+      await expect(firstStarterRow).toBeVisible({ timeout: 15_000 });
+      const playerNameEl = firstStarterRow.getByText(PLAYER_NAME_RE).first();
+      await expect(playerNameEl).toBeVisible({ timeout: 5_000 });
       state.benchedPlayerName = ((await playerNameEl.textContent()) ?? '')
         .replace(/\s+/g, ' ')
         .trim();

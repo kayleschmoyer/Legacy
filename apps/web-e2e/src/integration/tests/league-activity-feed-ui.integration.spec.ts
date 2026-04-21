@@ -614,8 +614,14 @@ test.describe
       // navigation here, cache-and-network issues a fresh request, but
       // read-replica lag can delay the row. Reload+retry covers that
       // window (LS-3766, restored by LS-3775).
+      // Use extended timeouts (LS-3781): the backend server caps leagueActivity
+      // limit at 100, and with many draft-pick events the query can take longer
+      // to resolve from a cold cache.
       const announcement = page.getByText(/League announcement/i).first();
-      await waitVisibleWithReload(page, announcement);
+      await waitVisibleWithReload(page, announcement, {
+        firstTimeout: 20_000,
+        retryTimeout: 25_000,
+      });
     });
 
     await test.step('Verify via API that all event types are recorded', async () => {

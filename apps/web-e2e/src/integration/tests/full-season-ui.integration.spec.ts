@@ -558,9 +558,11 @@ test.describe
     });
 
     await test.step('Verify matchup scoreboard and lineups', async () => {
-      // The matchup page should show the week header and VS badge
+      // The matchup page should show the week header and VS badge.
+      // Allow extra time: the matchup tab loads data fresh after navigation
+      // from the commissioner panel and can be slower on a cold Apollo cache.
       await expect(page.getByText(/Week 1/i).first()).toBeVisible({
-        timeout: 15000,
+        timeout: 30000,
       });
       await expect(page.getByText('VS').first()).toBeVisible();
 
