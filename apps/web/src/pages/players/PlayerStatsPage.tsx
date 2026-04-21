@@ -18,10 +18,13 @@ import { PageMeta } from '../../components/PageMeta';
 import {
   BG_DARK,
   BRAND_NAVY_LIGHT,
+  BRAND_SEAM_RED,
   TEXT_HIGH_CONTRAST,
   WHITE,
+  withAlpha,
 } from '../../constants/colors';
 import { PlayerDetailModal } from '../../components/PlayerDetailModal';
+import { useGetPlayerIdByBrefIdQuery } from '../../api/db/graphql.generated';
 
 // GraphQL Int is a 32-bit signed integer — clamp URL param values to prevent query errors
 const MAX_GRAPHQL_INT = 2147483647;
@@ -261,21 +264,52 @@ export function PlayerStatsPage() {
 /**
  * Player Detail Page
  *
- * Renders a full-page view for `/players/:id` with the player detail modal
- * auto-opened, and a back button that navigates back to the previous page,
- * falling back to /players/stats when there is no prior in-app history.
+ * Handles both `/players/:id` (numeric) and `/players/:brefid` (Baseball
+ * Reference ID string) — React Router matches both to the same `:id` param.
+ * When the param is non-numeric we resolve it via `playerByBrefId` first.
  */
 export function PlayerDetailPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { id } = useParams<{ id: string }>();
-  const playerId = id ? parseInt(id, 10) : null;
+  const { id: identifier } = useParams<{ id: string }>();
 
-  // Navigate back to the previous page, or fall back to /players/stats when
-  // the page was opened via a direct link/new tab (no prior in-app history).
-  // location.key is 'default' only on the first entry (direct navigation/deep
-  // link); any in-app navigation gives it a unique key string assigned by
-  // React Router (not a URL hash).
+  const isNumeric = !!identifier && /^\d+$/.test(identifier);
+  const parsedNumericId = isNumeric ? Number(identifier) : null;
+  const isValidNumericId =
+    parsedNumericId !== null &&
+    Number.isSafeInteger(parsedNumericId) &&
+    parsedNumericId > 0 &&
+    parsedNumericId <= MAX_GRAPHQL_INT;
+  const numericId = isValidNumericId ? parsedNumericId : null;
+  const brefId = !isNumeric ? (identifier?.trim().toLowerCase() ?? null) : null;
+
+  const {
+    data: brefData,
+    loading: brefLoading,
+    error: brefError,
+  } = useGetPlayerIdByBrefIdQuery({
+    variables: { brefId: brefId ?? '' },
+    skip: !brefId,
+  });
+
+  const resolvedId = isNumeric
+    ? numericId
+    : (brefData?.playerByBrefId?.id ?? null);
+
+  const resolvedName =
+    [brefData?.playerByBrefId?.firstName, brefData?.playerByBrefId?.lastName]
+      .filter(Boolean)
+      .join(' ') || 'Player details';
+
+  useEffect(() => {
+    if (brefError) {
+      LOGGER.error(
+        '[PlayerDetailPage] brefId lookup error:',
+        brefError.message,
+      );
+    }
+  }, [brefError]);
+
   const handleBack = useCallback(() => {
     if (location.key !== 'default') {
       navigate(-1);
@@ -316,14 +350,83 @@ export function PlayerDetailPage() {
         ← Back
       </button>
 
-      <PlayerDetailModal
-        open={true}
-        onOpenChange={(open) => {
-          if (!open) handleBack();
-        }}
-        playerId={playerId}
-        playerName="Player details"
-      />
+      {brefLoading && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            padding: '2rem',
+            textAlign: 'center',
+            color: TEXT_HIGH_CONTRAST,
+          }}
+        >
+          Loading player…
+        </div>
+      )}
+
+      {brefError && (
+        <div
+          role="alert"
+          style={{
+            padding: '1rem',
+            backgroundColor: withAlpha(BRAND_SEAM_RED, 0.12),
+            border: `1px solid ${BRAND_SEAM_RED}`,
+            borderRadius: '6px',
+            color: BRAND_SEAM_RED,
+            marginBottom: '1rem',
+          }}
+        >
+          Error loading player. Please try again.
+        </div>
+      )}
+
+      {isNumeric && !isValidNumericId && (
+        <div
+          role="alert"
+          style={{
+            padding: '1rem',
+            backgroundColor: withAlpha(BRAND_SEAM_RED, 0.12),
+            border: `1px solid ${BRAND_SEAM_RED}`,
+            borderRadius: '6px',
+            color: BRAND_SEAM_RED,
+            marginBottom: '1rem',
+          }}
+        >
+          Invalid player ID &ldquo;{identifier}&rdquo;.
+        </div>
+      )}
+
+      {!brefLoading &&
+        !brefError &&
+        !resolvedId &&
+        (isValidNumericId || brefId) && (
+          <div
+            role="alert"
+            style={{
+              padding: '1rem',
+              backgroundColor: withAlpha(BRAND_SEAM_RED, 0.12),
+              border: `1px solid ${BRAND_SEAM_RED}`,
+              borderRadius: '6px',
+              color: BRAND_SEAM_RED,
+              marginBottom: '1rem',
+            }}
+          >
+            {brefId
+              ? `No player found with Baseball Reference ID "${brefId}".`
+              : `No player found for ID "${identifier}".`}
+          </div>
+        )}
+
+      {resolvedId !== null && !brefError && (
+        <PlayerDetailModal
+          open={true}
+          onOpenChange={(open) => {
+            if (!open) handleBack();
+          }}
+          playerId={resolvedId}
+          playerName={resolvedName}
+        />
+      )}
     </div>
   );
 }
