@@ -317,6 +317,44 @@ describe('SeasonDraftGame', () => {
       expect(mockStopPolling).toHaveBeenCalled();
       expect(mockStartPolling).not.toHaveBeenCalled();
     });
+
+    // Regression test for LS-3786: page flickered every 5 seconds because
+    // the loading spinner was shown during background poll refetches.
+    it('does not show the loading spinner during a background poll (loading:true with existing data)', () => {
+      jest.mocked(useGetSeasonDraftGameQuery).mockReturnValue({
+        data: { seasonDraftGame: mockGameState },
+        loading: true, // Apollo sets loading:true during poll network request
+        error: undefined,
+        refetch: mockRefetch,
+        startPolling: mockStartPolling,
+        stopPolling: mockStopPolling,
+      } as unknown as ReturnType<typeof useGetSeasonDraftGameQuery>);
+
+      const { queryByText } = render(
+        <SeasonDraftGame gameId={1} currentUserId={1} />,
+      );
+
+      // Game content should still be visible — no full-page spinner
+      expect(queryByText('Loading game...')).toBeNull();
+      expect(queryByText('Test Draft')).toBeTruthy();
+    });
+
+    it('shows the loading spinner on initial load (loading:true with no data)', () => {
+      jest.mocked(useGetSeasonDraftGameQuery).mockReturnValue({
+        data: undefined,
+        loading: true,
+        error: undefined,
+        refetch: mockRefetch,
+        startPolling: mockStartPolling,
+        stopPolling: mockStopPolling,
+      } as unknown as ReturnType<typeof useGetSeasonDraftGameQuery>);
+
+      const { getByText } = render(
+        <SeasonDraftGame gameId={1} currentUserId={1} />,
+      );
+
+      expect(getByText('Loading game...')).toBeTruthy();
+    });
   });
 
   // ── most_teams mode ─────────────────────────────────────────────────────

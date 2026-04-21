@@ -175,19 +175,23 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
   // ends, is not found, or the query errors persistently. Using
   // startPolling/stopPolling in an effect avoids stale-ref issues when
   // gameId changes without unmounting (React Router param change).
+  //
+  // Depend only on the primitive status string and the error flag — NOT on
+  // the full `gameState` object. Apollo returns a new `gameState` reference
+  // on every poll response (the cache reconstructs arrays, etc.) which would
+  // cause this effect to call stopPolling()+startPolling() on every poll,
+  // triggering redundant network requests and causing visible flicker.
   const gameStatus = gameState?.status;
   useEffect(() => {
     const shouldPoll =
-      !queryError &&
-      !!gameState &&
-      (gameStatus === 'drafting' || gameStatus === 'setup');
+      !queryError && (gameStatus === 'drafting' || gameStatus === 'setup');
     if (shouldPoll) {
       startPolling(5000);
     } else {
       stopPolling();
     }
     return () => stopPolling();
-  }, [gameState, gameStatus, queryError, startPolling, stopPolling]);
+  }, [gameStatus, queryError, startPolling, stopPolling]);
 
   // Lazy query for player search
   const [searchPlayersQuery, { data: searchData }] =
@@ -528,7 +532,11 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
     isMostTeamsMode,
   ]);
 
-  if (loading) {
+  // Only block the UI on the very first load (no data yet). During background
+  // poll refetches Apollo sets loading:true but keeps the previous data, so
+  // we should not replace the page content with a spinner — that is what
+  // causes the 5-second flicker reported in LS-3786.
+  if (loading && !gameData) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" />
