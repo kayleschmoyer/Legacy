@@ -796,6 +796,7 @@ export async function autoPopulateFirstMatchupLineup(
       matchupId: PublicSchema.matchupPlayers.matchupId,
       playerId: PublicSchema.matchupPlayers.playerId,
       teamId: PublicSchema.matchupPlayers.teamId,
+      positionId: PublicSchema.matchupPlayers.positionId,
     })
     .from(PublicSchema.matchupPlayers)
     .where(inArray(PublicSchema.matchupPlayers.matchupId, week1MatchupIds));
@@ -936,16 +937,30 @@ export async function autoPopulateFirstMatchupLineup(
     return allowed.some((pos) => eligible.has(pos));
   };
 
-  // 5. Greedy assignment per (matchup, team): fill specific slots first
+  // 5. Greedy assignment per (matchup, team): fill specific slots first.
+  //    Skip players/slots already populated by populateMatchupPlayersAndSeasons
+  //    (which copies team_members.positionId into matchup_players). This avoids
+  //    UNIQUE constraint violations and prevents overwriting correct assignments.
   const assignments = new Map<number, number>(); // matchup_player.id → position.id
   for (const teamPlayers of groups.values()) {
-    const assigned = new Set<number>(); // matchup_player IDs already assigned
+    // Slots already occupied by players seeded from populateMatchupPlayersAndSeasons
+    const filledPositionIds = new Set<number>(
+      teamPlayers
+        .filter((mp) => mp.positionId !== null)
+        .map((mp) => mp.positionId as number),
+    );
+    // Players already assigned — skip them; only fill genuinely empty slots
+    const assigned = new Set<number>(
+      teamPlayers.filter((mp) => mp.positionId !== null).map((mp) => mp.id),
+    );
     for (const position of sortedPositions) {
+      if (filledPositionIds.has(position.id)) continue; // slot already occupied
       for (const mp of teamPlayers) {
         if (assigned.has(mp.id)) continue;
         if (canFill(mp.playerId, position.positionType)) {
           assignments.set(mp.id, position.id);
           assigned.add(mp.id);
+          filledPositionIds.add(position.id);
           break;
         }
       }
