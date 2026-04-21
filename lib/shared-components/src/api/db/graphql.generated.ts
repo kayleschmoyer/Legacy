@@ -792,6 +792,8 @@ export type GiveUpDisclosureGameResult = {
   __typename?: 'GiveUpDisclosureGameResult';
   /** The correct player ID revealed after forfeiting */
   correctPlayerId?: Maybe<Scalars['Int']['output']>;
+  /** The correct player name revealed after forfeiting */
+  correctPlayerName?: Maybe<Scalars['String']['output']>;
 };
 
 export type GoogleVerifyResult = {
@@ -5419,6 +5421,7 @@ export type GiveUpDisclosureGameMutation = {
   giveUpDisclosureGame?: {
     __typename?: 'GiveUpDisclosureGameResult';
     correctPlayerId?: number | null;
+    correctPlayerName?: string | null;
   } | null;
 };
 
@@ -12114,6 +12117,7 @@ export const GiveUpDisclosureGame = gql`
   mutation GiveUpDisclosureGame($sessionId: Int!) {
     giveUpDisclosureGame(sessionId: $sessionId) {
       correctPlayerId
+      correctPlayerName
     }
   }
 `;

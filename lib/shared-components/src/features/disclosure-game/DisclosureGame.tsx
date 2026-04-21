@@ -49,6 +49,7 @@ interface ResultState {
   score: number;
   cluesUsed: number;
   correctPlayerId: number | null;
+  correctPlayerName: string | null;
 }
 
 // ── Props ──────────────────────────────────────────────────────────────────
@@ -173,6 +174,7 @@ export const DisclosureGame: React.FC<DisclosureGameProps> = ({ onBack }) => {
           score: res.score ?? 0,
           cluesUsed: res.cluesUsed ?? 0,
           correctPlayerId: null,
+          correctPlayerName: null,
         });
         setPhase('result');
       } else if (
@@ -184,6 +186,7 @@ export const DisclosureGame: React.FC<DisclosureGameProps> = ({ onBack }) => {
           score: 0,
           cluesUsed: revealedClues.length,
           correctPlayerId: res.correctPlayerId ?? null,
+          correctPlayerName: null,
         });
         setPhase('result');
       } else {
@@ -209,6 +212,7 @@ export const DisclosureGame: React.FC<DisclosureGameProps> = ({ onBack }) => {
         score: 0,
         cluesUsed: revealedClues.length,
         correctPlayerId: res.correctPlayerId ?? null,
+        correctPlayerName: res.correctPlayerName ?? null,
       });
       setPhase('result');
     } catch (_e) {
@@ -309,9 +313,10 @@ export const DisclosureGame: React.FC<DisclosureGameProps> = ({ onBack }) => {
         <Paragraph color="$gray11" testID="result-clues-used">
           Clues used: {result.cluesUsed} / {totalClues}
         </Paragraph>
-        {result.correctPlayerId && (
+        {(result.correctPlayerName || result.correctPlayerId) && (
           <Paragraph color="$gray10" testID="result-correct-player">
-            Correct player ID: {result.correctPlayerId}
+            The player was:{' '}
+            {result.correctPlayerName || String(result.correctPlayerId)}
           </Paragraph>
         )}
         <Button

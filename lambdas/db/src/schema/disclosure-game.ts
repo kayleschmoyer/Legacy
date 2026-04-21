@@ -223,12 +223,18 @@ builder.mutationFields((t) => ({
 
   giveUpDisclosureGame: t.field({
     type: builder
-      .objectRef<{ correctPlayerId: number }>('GiveUpDisclosureGameResult')
+      .objectRef<{
+        correctPlayerId: number;
+        correctPlayerName: string;
+      }>('GiveUpDisclosureGameResult')
       .implement({
         description: 'Result of giving up a disclosure game session',
         fields: (ft) => ({
           correctPlayerId: ft.exposeInt('correctPlayerId', {
             description: 'The correct player ID revealed after forfeiting',
+          }),
+          correctPlayerName: ft.exposeString('correctPlayerName', {
+            description: 'The correct player name revealed after forfeiting',
           }),
         }),
       }),

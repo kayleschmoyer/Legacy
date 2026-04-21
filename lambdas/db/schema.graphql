@@ -904,6 +904,11 @@ type GiveUpDisclosureGameResult {
   The correct player ID revealed after forfeiting
   """
   correctPlayerId: Int
+
+  """
+  The correct player name revealed after forfeiting
+  """
+  correctPlayerName: String
 }
 
 type GoogleVerifyResult {

@@ -942,7 +942,7 @@ export class DisclosureGameService {
   async giveUp(
     sessionId: number,
     userId: number,
-  ): Promise<{ correctPlayerId: number }> {
+  ): Promise<{ correctPlayerId: number; correctPlayerName: string }> {
     const [session] = await this.db
       .select()
       .from(PublicSchema.disclosureGameSessions)
@@ -966,7 +966,21 @@ export class DisclosureGameService {
       })
       .where(eq(PublicSchema.disclosureGameSessions.id, sessionId));
 
-    return { correctPlayerId: session.playerId };
+    const [player] = await this.db
+      .select({
+        firstName: PublicSchema.players.firstName,
+        lastName: PublicSchema.players.lastName,
+      })
+      .from(PublicSchema.players)
+      .where(eq(PublicSchema.players.id, session.playerId))
+      .limit(1);
+
+    const joinedPlayerName = player
+      ? [player.firstName, player.lastName].filter(Boolean).join(' ').trim()
+      : '';
+    const correctPlayerName = joinedPlayerName || String(session.playerId);
+
+    return { correctPlayerId: session.playerId, correctPlayerName };
   }
 
   /**

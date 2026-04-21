@@ -786,6 +786,8 @@ export type GiveUpDisclosureGameResult = {
   __typename?: 'GiveUpDisclosureGameResult';
   /** The correct player ID revealed after forfeiting */
   correctPlayerId?: Maybe<Scalars['Int']['output']>;
+  /** The correct player name revealed after forfeiting */
+  correctPlayerName?: Maybe<Scalars['String']['output']>;
 };
 
 export type GoogleVerifyResult = {
