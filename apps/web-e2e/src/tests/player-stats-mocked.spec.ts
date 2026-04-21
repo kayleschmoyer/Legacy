@@ -268,12 +268,12 @@ test.describe('Player Stats Page (mocked) – page structure @regression', () =>
     await expect(page.getByText('MLB Player Statistics')).toBeVisible();
   });
 
-  test('shows Batting Stats tab', async ({ page }) => {
-    await expect(page.getByTestId('tab-trigger-batting')).toBeVisible();
+  test('shows Hitters tab', async ({ page }) => {
+    await expect(page.getByRole('tab', { name: 'Hitters' })).toBeVisible();
   });
 
-  test('shows Pitching Stats tab', async ({ page }) => {
-    await expect(page.getByTestId('tab-trigger-pitching')).toBeVisible();
+  test('shows Pitchers tab', async ({ page }) => {
+    await expect(page.getByRole('tab', { name: 'Pitchers' })).toBeVisible();
   });
 
   test('shows batting stats heading in batting tab', async ({ page }) => {
@@ -295,7 +295,9 @@ test.describe('Player Stats Page (mocked) – page structure @regression', () =>
   });
 
   test('shows search input for batting stats', async ({ page }) => {
-    await expect(page.getByPlaceholder('Search players...')).toBeVisible();
+    await expect(
+      page.getByPlaceholder('Search player name · min 2 chars'),
+    ).toBeVisible();
   });
 });
 
@@ -304,7 +306,7 @@ test.describe('Player Stats Page (mocked) – pitching tab @regression', () => {
     await mockPlayerStatsGraphQL(page);
     await page.goto('/players/stats');
     await page.waitForLoadState('load');
-    await page.getByTestId('tab-trigger-pitching').click();
+    await page.getByRole('tab', { name: 'Pitchers' }).click();
   });
 
   test('shows pitching stats heading after switching tabs', async ({
@@ -322,7 +324,9 @@ test.describe('Player Stats Page (mocked) – pitching tab @regression', () => {
   });
 
   test('shows search input for pitching stats', async ({ page }) => {
-    await expect(page.getByPlaceholder('Search pitchers...')).toBeVisible();
+    await expect(
+      page.getByPlaceholder('Search player name · min 2 chars'),
+    ).toBeVisible();
   });
 });
 
@@ -340,7 +344,7 @@ test.describe('Player Stats Page (mocked) — empty states @regression', () => {
     await page.goto('/players/stats');
     await page.waitForLoadState('load');
 
-    await page.getByTestId('tab-trigger-pitching').click();
+    await page.getByRole('tab', { name: 'Pitchers' }).click();
     await expect(page.getByText('No pitchers found')).toBeVisible();
   });
 });
@@ -359,7 +363,7 @@ test.describe('Player Stats Page (mocked) — error states @regression', () => {
     await page.goto('/players/stats');
     await page.waitForLoadState('load');
 
-    await page.getByTestId('tab-trigger-pitching').click();
+    await page.getByRole('tab', { name: 'Pitchers' }).click();
     await expect(page.getByText('Error Loading Statistics')).toBeVisible();
   });
 
@@ -420,12 +424,12 @@ unauthTest.describe(
     );
 
     unauthTest(
-      'shows batting and pitching tabs on /players/stats when not authenticated',
+      'shows Hitters and Pitchers tabs on /players/stats when not authenticated',
       async ({ page }) => {
-        await expect(page.getByTestId('tab-trigger-batting')).toBeVisible({
+        await expect(page.getByRole('tab', { name: 'Hitters' })).toBeVisible({
           timeout: 15_000,
         });
-        await expect(page.getByTestId('tab-trigger-pitching')).toBeVisible();
+        await expect(page.getByRole('tab', { name: 'Pitchers' })).toBeVisible();
       },
     );
   },

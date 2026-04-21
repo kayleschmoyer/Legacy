@@ -165,9 +165,13 @@ test.describe('Player Statistics Page @regression', () => {
     ).toBeVisible();
 
     // Check that the stats interface components are present
-    await expect(page.getByPlaceholder('Search players...')).toBeVisible();
-    // Click column headers hint is embedded in the info paragraph
-    await expect(page.getByTestId('player-stats-sort-hint')).toBeVisible();
+    await expect(
+      page.getByPlaceholder('Search player name · min 2 chars'),
+    ).toBeVisible();
+    // Batting grid title confirms the stats interface rendered
+    await expect(
+      page.getByText('MLB Career Batting Leaders').first(),
+    ).toBeVisible();
   });
 
   test('should display player statistics data grid', async ({ page }) => {
@@ -182,7 +186,9 @@ test.describe('Player Statistics Page @regression', () => {
 
   test('should allow searching for players', async ({ page }) => {
     // Find the search input
-    const searchInput = page.getByPlaceholder('Search players...');
+    const searchInput = page.getByPlaceholder(
+      'Search player name · min 2 chars',
+    );
     await expect(searchInput).toBeVisible();
 
     // Type in a search query
@@ -201,21 +207,20 @@ test.describe('Player Statistics Page @regression', () => {
   });
 
   test('should support view mode switching', async ({ page }) => {
-    // Tamagui Tabs — look for tab triggers with batting/pitching text
-    const battingTab = page.getByTestId('tab-trigger-batting');
-    const pitchingTab = page.getByTestId('tab-trigger-pitching');
+    const combinedTab = page.getByRole('tab', { name: 'Combined' });
+    const hittersTab = page.getByRole('tab', { name: 'Hitters' });
+    const pitchersTab = page.getByRole('tab', { name: 'Pitchers' });
 
-    if (await battingTab.isVisible()) {
-      await battingTab.click();
-      // Verify batting view is active
-      await expect(battingTab).toHaveAttribute('data-state', 'active');
-    }
+    await expect(combinedTab).toBeVisible();
+    await expect(hittersTab).toBeVisible();
+    await expect(pitchersTab).toBeVisible();
+    await expect(combinedTab).toHaveAttribute('aria-selected', 'true');
 
-    if (await pitchingTab.isVisible()) {
-      await pitchingTab.click();
-      // Verify pitching view is active
-      await expect(pitchingTab).toHaveAttribute('data-state', 'active');
-    }
+    await hittersTab.click();
+    await expect(hittersTab).toHaveAttribute('aria-selected', 'true');
+
+    await pitchersTab.click();
+    await expect(pitchersTab).toHaveAttribute('aria-selected', 'true');
   });
 
   test('should support sorting by clicking column headers', async ({

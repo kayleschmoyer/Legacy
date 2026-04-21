@@ -66,10 +66,10 @@ test.describe
       });
     });
 
-    await test.step('Batting tab is active by default', async () => {
-      // Tabs component renders a "Batting Stats" tab label
+    await test.step('Combined view is active by default — batting grid is visible', async () => {
+      // Default view is Combined (both grids); batting grid title confirms it rendered
       await expect(
-        page.getByText('Batting Stats', { exact: true }).first(),
+        page.getByText('MLB Career Batting Leaders').first(),
       ).toBeVisible({
         timeout: 15_000,
       });
@@ -166,15 +166,15 @@ test.describe
     await page.goto('/players/stats');
     await page.waitForLoadState('domcontentloaded');
 
-    // Wait for batting tab to load first
+    // Wait for batting grid to load first (default combined view)
     await expect(
-      page.getByText('Batting Stats', { exact: true }).first(),
+      page.getByText('MLB Career Batting Leaders').first(),
     ).toBeVisible({
       timeout: 30_000,
     });
 
     await test.step('Click the Pitching tab', async () => {
-      const pitchingTab = page.getByRole('tab', { name: /Pitching/i });
+      const pitchingTab = page.getByRole('tab', { name: /Pitcher/i });
       await expect(pitchingTab).toBeVisible({ timeout: 10_000 });
       await pitchingTab.click();
     });
@@ -192,8 +192,8 @@ test.describe
     });
 
     await test.step('The pitching grid renders', async () => {
-      // The pitching data grid has a "Search pitchers..." placeholder
-      await expect(page.getByPlaceholder('Search pitchers...')).toBeVisible({
+      // Pitching grid is confirmed by its title (showSearch=false on PlayerStatsPage)
+      await expect(page.getByText('MLB Career Pitching Leaders')).toBeVisible({
         timeout: 15_000,
       });
     });

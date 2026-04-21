@@ -256,22 +256,26 @@ test.describe('Player Stats Page — static elements @smoke', () => {
   });
 
   test('shows the player search input', async ({ page }) => {
-    await expect(page.getByPlaceholder('Search players...')).toBeVisible();
+    await expect(
+      page.getByPlaceholder('Search player name · min 2 chars'),
+    ).toBeVisible();
   });
 
   test('shows a Refresh button', async ({ page }) => {
-    await expect(page.getByRole('button', { name: /refresh/i })).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: /refresh/i }).first(),
+    ).toBeVisible();
   });
 
   test('search input accepts text', async ({ page }) => {
-    const input = page.getByPlaceholder('Search players...');
+    const input = page.getByPlaceholder('Search player name · min 2 chars');
     await expect(input).toBeVisible();
     await input.fill('Trout');
     await expect(input).toHaveValue('Trout');
   });
 
   test('search input can be cleared', async ({ page }) => {
-    const input = page.getByPlaceholder('Search players...');
+    const input = page.getByPlaceholder('Search player name · min 2 chars');
     await expect(input).toBeVisible();
     await input.fill('Aaron');
     await input.clear();
