@@ -47,7 +47,7 @@ Test every page at all three:
 
 # Inspection Checklist
 
-Check each screenshot against `.impeccable.md` standards.
+Check each screenshot against the design system (https://claude.ai/design/p/670f7892-5193-4b8a-a54c-20b112ad11bb, canonical) and `AGENTS.md` Design Context (supplemental).
 
 ## Layout and Responsive
 

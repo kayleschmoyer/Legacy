@@ -121,8 +121,8 @@ function normalizeViewMode(
  * with search + position filter, advanced stat range sliders, and separate
  * batting/pitching grids wired to the GraphQL API.
  *
- * Design: .impeccable.md — nostalgic, sporty, professional. Tables are the
- * product; chrome is restrained so numbers read like a Sunday paper box score.
+ * Design: nostalgic, sporty, professional (see AGENTS.md § Design Context). Tables are the product;
+ * chrome is restrained so numbers read like a Sunday paper box score.
  */
 export function PlayerStatsPage({
   title = 'Player Statistics',

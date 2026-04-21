@@ -8,8 +8,9 @@
 
 Before designing anything, read:
 
-1. **`/.impeccable.md`** — the full design brief. Every visual decision must be traceable back to a principle there.
-2. **The page's reference doc** in this directory (e.g., `home.md`, `scoreboard.md`). It defines the exact data model, conditional states, and route — use it to know what content must appear and under what conditions.
+1. **The design system** at https://claude.ai/design/p/670f7892-5193-4b8a-a54c-20b112ad11bb — fetch it via WebFetch. This is the canonical source of truth for tokens, colors, typography, and component patterns.
+2. **`/AGENTS.md` (Design Context section)** — brand personality, motion principles, and layout guidelines that supplement the design system. Every visual decision must be traceable back to one of these two sources.
+3. **The page's reference doc** in this directory (e.g., `home.md`, `scoreboard.md`). It defines the exact data model, conditional states, and route — use it to know what content must appear and under what conditions.
 
 ---
 
@@ -135,7 +136,7 @@ Touch targets: annotate any interactive element that must be ≥ 44×44px with a
 
 Before marking the design complete, verify:
 
-- [ ] Reads `/.impeccable.md` and the page reference doc before starting
+- [ ] Fetches design system URL and reads `AGENTS.md` (Design Context section) and the page reference doc before starting
 - [ ] Output is a single self-contained HTML file in `scratch/mockups/<page-name>.html`
 - [ ] All four states are present and togglable (loading, error, empty, populated)
 - [ ] Fonts loaded from Google Fonts CDN (Big Shoulders Display + Literata)

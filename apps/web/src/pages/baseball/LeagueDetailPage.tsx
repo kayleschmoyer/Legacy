@@ -157,7 +157,7 @@ import {
   updateTeamMember,
 } from '../../store/leagueSlice';
 
-/** .impeccable.md editorial typography: Big Shoulders Display for headings & stat values */
+/** Editorial typography: Big Shoulders Display for headings & stat values (see AGENTS.md § Design Context) */
 const FONT_DISPLAY = "'Big Shoulders Display', sans-serif";
 const DraftOrderControl = React.lazy(() =>
   import('../../components/commissioner/DraftOrderControl').then((m) => ({

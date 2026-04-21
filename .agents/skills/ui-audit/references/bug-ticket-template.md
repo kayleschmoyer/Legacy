@@ -17,7 +17,7 @@ Repro:
 1. Navigate to <exact path>.
 2. Set viewport to <width>x<height>.
 3. Observe <specific element or area>.
-Expected: <What should happen per .impeccable.md or common UX standards>
+Expected: <What should happen per the design system (https://claude.ai/design/p/670f7892-5193-4b8a-a54c-20b112ad11bb), AGENTS.md Design Context, or common UX standards>
 Actual: <What actually happens>
 Fix hint: <CSS/style issue | responsive breakpoint | missing conditional | wrong Tamagui token>
 ```

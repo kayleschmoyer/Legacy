@@ -118,7 +118,7 @@ See `.agents/skills/architecture/SKILL.md` for system overview. For a fast capab
 
 ## Design Context
 
-Full design brief lives in `.impeccable.md` at the project root — load it before doing any frontend design work. Key guidelines are summarized below; they apply to all frontend code generation and review.
+The full design system lives at **https://claude.ai/design/p/670f7892-5193-4b8a-a54c-20b112ad11bb** — fetch it before doing any frontend design work. Key guidelines are summarized below for reference.
 
 ### Users
 

@@ -33,7 +33,7 @@ import { SECONDARY_STICKY_TOP } from '../../constants/dimensions';
 
 const PAGE_SIZE = 50;
 
-/** .impeccable.md editorial typography: Big Shoulders Display for headings & stat labels */
+/** Editorial typography: Big Shoulders Display for headings & stat labels (see AGENTS.md § Design Context) */
 const FONT_DISPLAY = "'Big Shoulders Display', sans-serif";
 
 type PlayerType = 'hitters' | 'pitchers';
