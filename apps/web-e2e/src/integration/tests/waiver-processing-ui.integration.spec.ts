@@ -589,8 +589,9 @@ test.describe
 
   test('Phase 7: Commissioner processes waivers from the commissioner panel', async ({
     commissionerPage: page,
+    commissionerJwt,
   }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(150_000);
 
     await test.step('Navigate to commissioner panel', async () => {
       await page.goto(`/baseball/league/${state.leagueId}/commissioner`);
@@ -633,6 +634,37 @@ test.describe
       await expect(
         page.getByRole('status').filter({ hasText: /processed|succeeded/i }),
       ).toBeVisible({ timeout: 30000 });
+    });
+
+    await test.step('Confirm winning team claim is completed in DB', async () => {
+      // The processWaiverClaims Lambda inserts into teamMembers BEFORE it
+      // updates waiverClaims.status → 'completed'. Polling directly via GQL
+      // until the 'completed' claim is readable is a stronger consistency
+      // gate than the role="status" UI card: it proves the teamMembers write
+      // is also visible to the same query path that Phase 8 will use,
+      // preventing the false-positive that caused 6 consecutive failures
+      // (LS-3819). If the winning team's claim never reaches 'completed'
+      // within 30 s, processing genuinely failed and we surface that here
+      // rather than as a cryptic roster-contents mismatch in Phase 8.
+      await expect(async () => {
+        const data = await gqlFetch<{
+          teamWaiverClaims: Array<{ playerId: number; status: string }>;
+        }>(
+          commissionerJwt,
+          `query GetWinnerCompletedClaims($teamId: Int!, $status: String) {
+            teamWaiverClaims(teamId: $teamId, status: $status) {
+              playerId
+              status
+            }
+          }`,
+          { teamId: state.expectedWinnerTeamId, status: 'completed' },
+        );
+        const completedPlayerIds = data.teamWaiverClaims.map((c) => c.playerId);
+        expect(completedPlayerIds).toContain(state.freeAgentPlayerId);
+      }).toPass({
+        timeout: 30_000,
+        intervals: [500, 1_000, 2_000, 3_000, 5_000],
+      });
     });
   });
 
