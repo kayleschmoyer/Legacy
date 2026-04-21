@@ -895,6 +895,7 @@ builder.queryField('careerBattingStats', (t) =>
       minBattingAvg: t.arg.float({ required: false }),
       searchTerm: t.arg.string({ required: false }),
       position: t.arg.string({ required: false }),
+      team: t.arg.string({ required: false }),
     },
     resolve: async (root, args) => {
       // Convert relay pagination args to offset/limit, capping at MAX_CAREER_BATTING_LIMIT
@@ -924,6 +925,7 @@ builder.queryField('careerBattingStats', (t) =>
             minBattingAvg: args.minBattingAvg || undefined,
             searchTerm: args.searchTerm || undefined,
             position: args.position || undefined,
+            team: args.team || undefined,
           },
         }),
         dbService.statistics.getCareerBattingStatsCount({
@@ -934,6 +936,7 @@ builder.queryField('careerBattingStats', (t) =>
             minBattingAvg: args.minBattingAvg || undefined,
             searchTerm: args.searchTerm || undefined,
             position: args.position || undefined,
+            team: args.team || undefined,
           },
         }),
       ]);
@@ -977,6 +980,7 @@ builder.queryField('careerPitchingStats', (t) =>
       minStrikeouts: t.arg.int({ required: false }),
       searchTerm: t.arg.string({ required: false }),
       position: t.arg.string({ required: false }),
+      team: t.arg.string({ required: false }),
     },
     resolve: async (root, args) => {
       return dbService.statistics.getCareerPitchingStats({
@@ -990,6 +994,7 @@ builder.queryField('careerPitchingStats', (t) =>
           minStrikeouts: args.minStrikeouts || undefined,
           searchTerm: args.searchTerm || undefined,
           position: args.position || undefined,
+          team: args.team || undefined,
         },
       });
     },
@@ -1006,6 +1011,7 @@ builder.queryField('careerPitchingStatsCount', (t) =>
       minStrikeouts: t.arg.int({ required: false }),
       searchTerm: t.arg.string({ required: false }),
       position: t.arg.string({ required: false }),
+      team: t.arg.string({ required: false }),
     },
     resolve: async (root, args) => {
       return dbService.statistics.countCareerPitchingStats({
@@ -1014,6 +1020,7 @@ builder.queryField('careerPitchingStatsCount', (t) =>
         minStrikeouts: args.minStrikeouts || undefined,
         searchTerm: args.searchTerm || undefined,
         position: args.position || undefined,
+        team: args.team || undefined,
       });
     },
   }),

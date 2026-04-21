@@ -2453,6 +2453,7 @@ type Query {
     orderDirection: String
     position: String
     searchTerm: String
+    team: String
   ): CareerBattingConnection
   careerFieldingStats(
     limit: Int
@@ -2471,6 +2472,7 @@ type Query {
     orderDirection: String
     position: String
     searchTerm: String
+    team: String
   ): [CareerPitching!]
   careerPitchingStatsCount(
     minGames: Int
@@ -2478,6 +2480,7 @@ type Query {
     minWins: Int
     position: String
     searchTerm: String
+    team: String
   ): Int
 
   """

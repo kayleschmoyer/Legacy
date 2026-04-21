@@ -5,6 +5,7 @@ query GetCareerPitchingStatsCount(
   $minStrikeouts: Int
   $searchTerm: String
   $position: String
+  $team: String
 ) {
   careerPitchingStatsCount(
     minGames: $minGames
@@ -12,5 +13,6 @@ query GetCareerPitchingStatsCount(
     minStrikeouts: $minStrikeouts
     searchTerm: $searchTerm
     position: $position
+    team: $team
   )
 }

@@ -2548,6 +2548,7 @@ export type QueryCareerBattingStatsArgs = {
   orderDirection?: InputMaybe<Scalars['String']['input']>;
   position?: InputMaybe<Scalars['String']['input']>;
   searchTerm?: InputMaybe<Scalars['String']['input']>;
+  team?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type QueryCareerFieldingStatsArgs = {
@@ -2568,6 +2569,7 @@ export type QueryCareerPitchingStatsArgs = {
   orderDirection?: InputMaybe<Scalars['String']['input']>;
   position?: InputMaybe<Scalars['String']['input']>;
   searchTerm?: InputMaybe<Scalars['String']['input']>;
+  team?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type QueryCareerPitchingStatsCountArgs = {
@@ -2576,6 +2578,7 @@ export type QueryCareerPitchingStatsCountArgs = {
   minWins?: InputMaybe<Scalars['Int']['input']>;
   position?: InputMaybe<Scalars['String']['input']>;
   searchTerm?: InputMaybe<Scalars['String']['input']>;
+  team?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type QueryCommissionerAuditLogsArgs = {

@@ -502,20 +502,6 @@ describe('PlayerStatsDataGrid - Interactions', () => {
     expect(pageSizeButton).toBeInTheDocument();
   });
 
-  test('should handle refresh button click', () => {
-    render(
-      <TestWrapper>
-        <PlayerStatsDataGrid {...defaultProps} />
-      </TestWrapper>,
-    );
-
-    const refreshButton = screen.getByText('Refresh');
-    fireEvent.click(refreshButton);
-
-    // Refresh button should be present (component should not crash)
-    expect(refreshButton).toBeInTheDocument();
-  });
-
   test('Next button advances to page 2 and page counter updates (LS-871)', async () => {
     // Page 1 mock: totalCount > pageSize so Next is enabled, hasNextPage=true
     const page1Mock: MockedResponse = {

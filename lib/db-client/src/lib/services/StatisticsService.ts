@@ -57,6 +57,7 @@ export interface StatisticsFilters {
   minBattingAvg?: number;
   searchTerm?: string;
   position?: string;
+  team?: string;
 }
 
 export interface SeasonStatisticsFilters {
@@ -158,6 +159,7 @@ export class StatisticsService {
       minStrikeouts: queryOptions.filters?.minStrikeouts,
       searchTerm: queryOptions.filters?.searchTerm,
       position: queryOptions.filters?.position,
+      team: queryOptions.filters?.team,
     };
 
     const options: QueryOptions = {
@@ -1169,6 +1171,12 @@ export class StatisticsService {
       );
     }
 
+    if (filters.team !== undefined) {
+      conditions.push(
+        sql`${PublicSchema.careerBatting.playerId} IN (SELECT player_id FROM season_batting WHERE team = ${filters.team})`,
+      );
+    }
+
     return conditions;
   }
 
@@ -1205,6 +1213,12 @@ export class StatisticsService {
     if (filters.position && filters.position !== 'P') {
       conditions.push(
         sql`${PublicSchema.careerPitching.playerId} IN (SELECT player_id FROM public.player_eligible_positions WHERE position = ${filters.position})`,
+      );
+    }
+
+    if (filters.team !== undefined) {
+      conditions.push(
+        sql`${PublicSchema.careerPitching.playerId} IN (SELECT player_id FROM season_pitching WHERE team = ${filters.team})`,
       );
     }
 

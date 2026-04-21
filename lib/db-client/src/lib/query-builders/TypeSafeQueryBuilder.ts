@@ -34,6 +34,10 @@ function buildPlayerNameSearch(searchTerm: string): SQL<unknown> | undefined {
   );
 }
 
+function battingTeamFilter(team: string): SQL<unknown> {
+  return sql`${PublicSchema.careerBatting.playerId} IN (SELECT player_id FROM season_batting WHERE team = ${team})`;
+}
+
 /**
  * Type-safe query builder using Drizzle's recommended conditional patterns
  * This approach avoids .$dynamic() by building complete queries conditionally
@@ -53,6 +57,7 @@ export interface StatisticsQueryFilters {
   minBattingAvg?: number;
   searchTerm?: string;
   position?: string;
+  team?: string;
 }
 
 /**
@@ -145,6 +150,9 @@ export class CareerBattingQueryBuilder {
       battingConditions.push(
         sql`${PublicSchema.careerBatting.ab} > 0 AND (${PublicSchema.careerBatting.h}::numeric / ${PublicSchema.careerBatting.ab}::numeric) >= ${filters.minBattingAvg}`,
       );
+    }
+    if (filters.team !== undefined) {
+      battingConditions.push(battingTeamFilter(filters.team));
     }
 
     // Determine ordering clause
@@ -509,6 +517,9 @@ export class CareerBattingQueryBuilder {
         sql`${PublicSchema.careerBatting.ab} > 0 AND (${PublicSchema.careerBatting.h}::numeric / ${PublicSchema.careerBatting.ab}::numeric) >= ${filters.minBattingAvg}`,
       );
     }
+    if (filters.team !== undefined) {
+      battingConditions.push(battingTeamFilter(filters.team));
+    }
 
     // Add search condition if provided
     const allConditions = [...battingConditions];
@@ -572,6 +583,9 @@ export class CareerBattingQueryBuilder {
         sql`${PublicSchema.careerBatting.ab} > 0 AND (${PublicSchema.careerBatting.h}::numeric / ${PublicSchema.careerBatting.ab}::numeric) >= ${filters.minBattingAvg}`,
       );
     }
+    if (filters.team !== undefined) {
+      conditions.push(battingTeamFilter(filters.team));
+    }
 
     // Build query using function-based approach
     const baseQuery = () =>
@@ -616,6 +630,9 @@ export class CareerBattingQueryBuilder {
       conditions.push(
         sql`${PublicSchema.careerBatting.ab} > 0 AND (${PublicSchema.careerBatting.h}::numeric / ${PublicSchema.careerBatting.ab}::numeric) >= ${filters.minBattingAvg}`,
       );
+    }
+    if (filters.team !== undefined) {
+      conditions.push(battingTeamFilter(filters.team));
     }
     if (filters.position) {
       conditions.push(
@@ -674,6 +691,9 @@ export class CareerBattingQueryBuilder {
       conditions.push(
         sql`${PublicSchema.careerBatting.ab} > 0 AND (${PublicSchema.careerBatting.h}::numeric / ${PublicSchema.careerBatting.ab}::numeric) >= ${filters.minBattingAvg}`,
       );
+    }
+    if (filters.team !== undefined) {
+      conditions.push(battingTeamFilter(filters.team));
     }
     if (filters.position) {
       conditions.push(

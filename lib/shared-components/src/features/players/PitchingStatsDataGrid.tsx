@@ -21,17 +21,8 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import {
-  Button,
-  H2,
-  H3,
-  Input,
-  Select,
-  Spinner,
-  Text,
-  XStack,
-  YStack,
-} from 'tamagui';
+import { Platform } from 'react-native';
+import { Button, Input, Select, Spinner, Text, XStack, YStack } from 'tamagui';
 import { PITCHING_POSITIONS } from '@legacy-sports/utils';
 import {
   computeScoring,
@@ -54,29 +45,51 @@ const BRAND_GOLD = '#C5A55A';
 const BRAND_GOLD_LIGHT = '#D4BB78';
 const TEXT_HIGH_CONTRAST = '#F5F7FA';
 const TEXT_MUTED = '#9CAAC5';
+const BG_PAGE = '#0A0F1A';
+const OUTLINE_SUBTLE = '#1C2740';
 
-// Icons
-const Search = ({ size, color }: { size?: number; color?: string }) => (
-  <Text fontSize={size} color={color} accessibilityLabel="Search">
-    <span role="img" aria-label="Search">
-      🔍
-    </span>
-  </Text>
-);
-const RefreshCw = () => (
-  <Text accessibilityLabel="Refresh">
-    <span role="img" aria-label="Refresh">
-      🔄
-    </span>
-  </Text>
-);
-const AlertCircle = ({ size, color }: { size?: number; color?: string }) => (
-  <Text fontSize={size} color={color} accessibilityLabel="Error">
-    <span role="img" aria-label="Error">
-      ⚠️
-    </span>
-  </Text>
-);
+const FONT_DISPLAY = "'Big Shoulders Display', sans-serif";
+const FONT_BODY = "'Literata', serif";
+const FONT_MONO = "'JetBrains Mono', ui-monospace, monospace";
+
+// SVG icons — web-only; return null on native to avoid DOM svg crash
+const SearchIcon = ({ color }: { color?: string }) => {
+  if (Platform.OS !== 'web') return null;
+  return (
+    <svg
+      aria-hidden="true"
+      focusable={false}
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color ?? TEXT_MUTED}
+      strokeWidth="2"
+    >
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.3-4.3" />
+    </svg>
+  );
+};
+const AlertIcon = () => {
+  if (Platform.OS !== 'web') return null;
+  return (
+    <svg
+      role="img"
+      aria-label="Error"
+      width="40"
+      height="40"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="#C41E3A"
+      strokeWidth="1.6"
+    >
+      <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+      <line x1="12" y1="9" x2="12" y2="13" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
+    </svg>
+  );
+};
 
 // =============================================================================
 // Type Definitions
@@ -377,6 +390,7 @@ export function PitchingStatsDataGrid({
       minStrikeouts: queryParams.minStrikeouts,
       searchTerm: queryParams.searchTerm,
       position: queryParams.position,
+      team: queryParams.team,
     },
     errorPolicy: 'all',
     fetchPolicy: 'cache-and-network',
@@ -547,7 +561,7 @@ export function PitchingStatsDataGrid({
               paddingRight: 8,
             }}
           >
-            <Search size={14} color={TEXT_MUTED} />
+            <SearchIcon />
             <Input
               flex={1}
               placeholder="Search pitchers..."
@@ -671,33 +685,7 @@ export function PitchingStatsDataGrid({
             </XStack>
           </XStack>
         )}
-
-        <Button
-          size="$2"
-          onPress={handleRefresh}
-          disabled={loading}
-          style={{
-            background: `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAND_NAVY_LIGHT} 100%)`,
-            border: `1px solid rgba(196,165,90,0.25)`,
-            borderRadius: 8,
-            color: BRAND_GOLD_LIGHT,
-          }}
-          icon={RefreshCw}
-        >
-          Refresh
-        </Button>
       </XStack>
-
-      {showSorting && (
-        <XStack justifyContent="center" paddingTop="$1">
-          <Text fontSize="$2" style={{ color: TEXT_MUTED }} textAlign="center">
-            <span role="img" aria-label="Tip">
-              💡
-            </span>{' '}
-            Click column headers to sort
-          </Text>
-        </XStack>
-      )}
     </YStack>
   );
 
@@ -716,8 +704,8 @@ export function PitchingStatsDataGrid({
     >
       <XStack
         style={{
-          background: `linear-gradient(135deg, ${BRAND_NAVY_DARK} 0%, ${BRAND_NAVY} 60%, ${BRAND_NAVY_LIGHT} 100%)`,
-          borderBottom: `2px solid rgba(196,165,90,0.25)`,
+          background: BRAND_NAVY_DARK,
+          borderBottom: `2px solid ${OUTLINE_SUBTLE}`,
         }}
         paddingVertical="$2"
         paddingHorizontal="$3"
@@ -773,28 +761,23 @@ export function PitchingStatsDataGrid({
             >
               <XStack gap="$1" alignItems="center">
                 <Text
-                  fontSize="$3"
-                  fontWeight={isActiveSortColumn ? '700' : '600'}
                   numberOfLines={1}
                   userSelect="none"
                   style={{
-                    color: isActiveSortColumn
-                      ? BRAND_GOLD_LIGHT
-                      : TEXT_HIGH_CONTRAST,
+                    fontFamily: FONT_DISPLAY,
+                    fontWeight: '700',
+                    fontSize: 11,
+                    letterSpacing: '0.1em',
+                    textTransform: 'uppercase',
+                    color: isActiveSortColumn ? BRAND_GOLD_LIGHT : TEXT_MUTED,
                     transition: 'color 0.15s ease',
                   }}
                 >
                   {column.label}
                 </Text>
-                {column.sortable && (
-                  <Text
-                    fontSize="$2"
-                    style={{
-                      color: isActiveSortColumn ? BRAND_GOLD : TEXT_MUTED,
-                      opacity: isActiveSortColumn ? 1 : 0.6,
-                    }}
-                  >
-                    {isActiveSortColumn ? (isDescending ? '↓' : '↑') : '↕'}
+                {column.sortable && isActiveSortColumn && (
+                  <Text style={{ fontSize: 10, color: BRAND_GOLD }}>
+                    {isDescending ? '▼' : '▲'}
                   </Text>
                 )}
               </XStack>
@@ -865,79 +848,84 @@ export function PitchingStatsDataGrid({
               <XStack
                 key={player?.playerId || index}
                 style={{
-                  background:
-                    index % 2 === 0
-                      ? 'rgba(10,15,26,0.4)'
-                      : 'rgba(22,34,58,0.35)',
-                  borderBottom: '1px solid rgba(44,74,124,0.2)',
-                  transition: 'background 0.15s ease',
+                  background: index % 2 === 0 ? BG_PAGE : 'rgba(17,27,47,0.8)',
+                  borderBottom: `1px solid ${OUTLINE_SUBTLE}`,
+                  transition: 'background 0.12s ease',
                   cursor: 'pointer',
                 }}
                 hoverStyle={{
-                  backgroundColor: `rgba(44,74,124,0.35)` as never,
+                  backgroundColor: `rgba(27,58,92,0.3)` as never,
                 }}
-                pressStyle={{ scale: 0.995 }}
+                pressStyle={{ scale: 0.998 }}
                 paddingVertical="$2"
                 paddingHorizontal="$3"
                 onPress={() => player && handleRowClick(player)}
                 cursor="pointer"
               >
-                {visibleColumns.map((column) => (
-                  <XStack
-                    key={column.key}
-                    width={column.width || 'auto'}
-                    minWidth={column.minWidth}
-                    flexGrow={1}
-                    justifyContent={
-                      column.align === 'center'
-                        ? 'center'
-                        : column.align === 'right'
-                          ? 'flex-end'
-                          : 'flex-start'
-                    }
-                    alignItems="center"
-                  >
-                    <Text
-                      fontSize="$3"
-                      numberOfLines={1}
-                      style={{ color: TEXT_HIGH_CONTRAST }}
+                {visibleColumns.map((column) => {
+                  const isNameCol = column.key === 'playerName';
+                  const cellValue =
+                    column.key === 'playerName'
+                      ? `${player?.player?.firstName ?? ''} ${player?.player?.lastName ?? ''}`.trim() ||
+                        `Player ${player?.playerId ?? '-'}`
+                      : column.key === 'formattedPositions'
+                        ? formatPositionsPlayed(player?.positionsPlayed) ||
+                          player?.primaryPosition ||
+                          '-'
+                        : column.key === 'fantasyPoints'
+                          ? Math.round(
+                              computePitchingFantasyPoints(player),
+                            ).toString()
+                          : column.key === 'fantasyPointsPerGame'
+                            ? (() => {
+                                const games = player?.games ?? 0;
+                                const fpts =
+                                  computePitchingFantasyPoints(player);
+                                return games > 0
+                                  ? (fpts / games).toFixed(1)
+                                  : '0.0';
+                              })()
+                            : column.formatter
+                              ? column.formatter(
+                                  player?.[column.key as keyof typeof player],
+                                )
+                              : (() => {
+                                  const rawVal =
+                                    player?.[column.key as keyof typeof player];
+                                  return typeof rawVal === 'object'
+                                    ? '—'
+                                    : String(rawVal ?? '—');
+                                })();
+                  return (
+                    <XStack
+                      key={column.key}
+                      width={column.width || 'auto'}
+                      minWidth={column.minWidth}
+                      flexGrow={1}
+                      justifyContent={
+                        column.align === 'center'
+                          ? 'center'
+                          : column.align === 'right'
+                            ? 'flex-end'
+                            : 'flex-start'
+                      }
+                      alignItems="center"
                     >
-                      {column.key === 'playerName'
-                        ? `${player?.player?.firstName ?? ''} ${player?.player?.lastName ?? ''}`.trim() ||
-                          `Player ${player?.playerId ?? '-'}`
-                        : column.key === 'formattedPositions'
-                          ? formatPositionsPlayed(player?.positionsPlayed) ||
-                            player?.primaryPosition ||
-                            '-'
-                          : column.key === 'fantasyPoints'
-                            ? Math.round(
-                                computePitchingFantasyPoints(player),
-                              ).toString()
-                            : column.key === 'fantasyPointsPerGame'
-                              ? (() => {
-                                  const games = player?.games ?? 0;
-                                  const fpts =
-                                    computePitchingFantasyPoints(player);
-                                  return games > 0
-                                    ? (fpts / games).toFixed(1)
-                                    : '0.0';
-                                })()
-                              : column.formatter
-                                ? column.formatter(
-                                    player?.[column.key as keyof typeof player],
-                                  )
-                                : (() => {
-                                    const rawVal =
-                                      player?.[
-                                        column.key as keyof typeof player
-                                      ];
-                                    return typeof rawVal === 'object'
-                                      ? '-'
-                                      : String(rawVal ?? '-');
-                                  })()}
-                    </Text>
-                  </XStack>
-                ))}
+                      <Text
+                        numberOfLines={1}
+                        style={{
+                          fontFamily: isNameCol ? FONT_BODY : FONT_MONO,
+                          fontWeight: isNameCol ? '600' : '400',
+                          fontSize: isNameCol ? 14 : 13,
+                          color: isNameCol ? TEXT_HIGH_CONTRAST : TEXT_MUTED,
+                          fontVariantNumeric: 'tabular-nums',
+                        }}
+                      >
+                        {cellValue}
+                      </Text>
+                    </XStack>
+                  );
+                })}
               </XStack>
             ),
           )
@@ -1110,41 +1098,46 @@ export function PitchingStatsDataGrid({
       className={className}
       testID={testId}
     >
-      {/* Grid Title */}
-      <H2
-        textAlign="center"
-        style={{
-          background: `linear-gradient(90deg, ${TEXT_HIGH_CONTRAST} 0%, ${BRAND_GOLD_LIGHT} 100%)`,
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          backgroundClip: 'text',
-        }}
-      >
-        {title}
-      </H2>
-
-      {/* Total Count Badge */}
-      {!loading && !error && (
-        <XStack justifyContent="center">
-          <YStack
-            paddingHorizontal="$3"
-            paddingVertical="$1"
+      {/* Section caption — eyebrow + count/sort subtitle */}
+      <XStack justifyContent="space-between" alignItems="flex-end">
+        <YStack gap="$1">
+          <Text
             style={{
-              background: `rgba(44,74,124,0.18)`,
-              border: `1px solid rgba(44,74,124,0.35)`,
-              borderRadius: 99,
+              fontFamily: FONT_DISPLAY,
+              fontWeight: '700',
+              fontSize: 11,
+              letterSpacing: '0.16em',
+              textTransform: 'uppercase',
+              color: BRAND_GOLD_LIGHT,
             }}
           >
+            Pitching Leaders
+          </Text>
+          <Text
+            style={{
+              fontFamily: FONT_DISPLAY,
+              fontWeight: '800',
+              fontSize: 22,
+              letterSpacing: '-0.01em',
+              color: TEXT_HIGH_CONTRAST,
+            }}
+          >
+            {title}
+          </Text>
+          {!loading && !error && (
             <Text
-              fontSize="$3"
-              fontWeight="600"
-              style={{ color: BRAND_GOLD_LIGHT }}
+              style={{
+                fontFamily: FONT_BODY,
+                fontSize: 13,
+                color: TEXT_MUTED,
+              }}
             >
-              {totalCount.toLocaleString()} Pitchers
+              {totalCount.toLocaleString()} pitchers · sorted by{' '}
+              {queryParams.orderBy ?? 'wins'}
             </Text>
-          </YStack>
-        </XStack>
-      )}
+          )}
+        </YStack>
+      </XStack>
 
       {(showSearch || showSorting || showFilters) && renderControls()}
 
@@ -1155,20 +1148,34 @@ export function PitchingStatsDataGrid({
           padding="$6"
           gap="$3"
           style={{
-            background: 'rgba(196,30,58,0.1)',
-            border: '1px solid rgba(196,30,58,0.35)',
+            background: 'rgba(196,30,58,0.08)',
+            border: '1px solid rgba(196,30,58,0.3)',
             borderRadius: 14,
           }}
         >
-          <AlertCircle size={32} color="$red10" />
-          <H3 color="$red11">Error Loading Statistics</H3>
-          <Text color="$red10" textAlign="center">
-            {error?.message || 'Failed to load pitching statistics'}
+          <AlertIcon />
+          <Text
+            style={{
+              fontFamily: FONT_DISPLAY,
+              fontWeight: '700',
+              fontSize: 18,
+              color: '#E63950',
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
+            }}
+          >
+            Error Loading Statistics
+          </Text>
+          <Text
+            style={{ fontFamily: FONT_BODY, fontSize: 14, color: TEXT_MUTED }}
+            textAlign="center"
+          >
+            {error?.message ?? 'Failed to load pitching statistics'}
           </Text>
           <Button
             onPress={handleRefresh}
             style={{
-              background: `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAND_NAVY_LIGHT} 100%)`,
+              background: BRAND_NAVY,
               border: `1px solid rgba(196,165,90,0.3)`,
               borderRadius: 10,
               color: BRAND_GOLD_LIGHT,

@@ -210,6 +210,25 @@ describe('Statistics Resolver', () => {
         expect.objectContaining({ limit: 25 }),
       );
     });
+
+    it('passes team filter to both data and count service calls', async () => {
+      mockStatistics.getCareerBattingStats.mockResolvedValueOnce([]);
+      mockStatistics.getCareerBattingStatsCount.mockResolvedValueOnce(0);
+
+      const resolver = getQuery('careerBattingStats');
+      await resolver({}, { team: 'NYY' }, emptyCtx, undefined as never);
+
+      expect(mockStatistics.getCareerBattingStats).toHaveBeenCalledWith(
+        expect.objectContaining({
+          filters: expect.objectContaining({ team: 'NYY' }),
+        }),
+      );
+      expect(mockStatistics.getCareerBattingStatsCount).toHaveBeenCalledWith(
+        expect.objectContaining({
+          filters: expect.objectContaining({ team: 'NYY' }),
+        }),
+      );
+    });
   });
 
   // ── careerPitchingStats ────────────────────────────────────────────────────
@@ -239,6 +258,19 @@ describe('Statistics Resolver', () => {
         expect.objectContaining({ limit: 10 }),
       );
     });
+
+    it('passes team filter to service', async () => {
+      mockStatistics.getCareerPitchingStats.mockResolvedValueOnce([]);
+
+      const resolver = getQuery('careerPitchingStats');
+      await resolver({}, { team: 'BOS' }, emptyCtx, undefined as never);
+
+      expect(mockStatistics.getCareerPitchingStats).toHaveBeenCalledWith(
+        expect.objectContaining({
+          filters: expect.objectContaining({ team: 'BOS' }),
+        }),
+      );
+    });
   });
 
   // ── careerPitchingStatsCount ───────────────────────────────────────────────
@@ -251,6 +283,23 @@ describe('Statistics Resolver', () => {
       const result = await resolver({}, {}, emptyCtx, undefined as never);
 
       expect(result).toBe(42);
+    });
+
+    it('passes team filter to service', async () => {
+      mockStatistics.countCareerPitchingStats.mockResolvedValueOnce(7);
+
+      const resolver = getQuery('careerPitchingStatsCount');
+      const result = await resolver(
+        {},
+        { team: 'LAD' },
+        emptyCtx,
+        undefined as never,
+      );
+
+      expect(result).toBe(7);
+      expect(mockStatistics.countCareerPitchingStats).toHaveBeenCalledWith(
+        expect.objectContaining({ team: 'LAD' }),
+      );
     });
   });
 

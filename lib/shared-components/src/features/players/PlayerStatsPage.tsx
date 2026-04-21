@@ -45,6 +45,40 @@ const POSITIONS = [
   'DH',
 ];
 
+const MLB_TEAMS = [
+  'All Teams',
+  'ARI',
+  'ATL',
+  'BAL',
+  'BOS',
+  'CHC',
+  'CHW',
+  'CIN',
+  'CLE',
+  'COL',
+  'DET',
+  'HOU',
+  'KCR',
+  'LAA',
+  'LAD',
+  'MIA',
+  'MIL',
+  'MIN',
+  'NYM',
+  'NYY',
+  'OAK',
+  'PHI',
+  'PIT',
+  'SDP',
+  'SEA',
+  'SFG',
+  'STL',
+  'TBR',
+  'TEX',
+  'TOR',
+  'WSN',
+];
+
 export interface PlayerStatsPageProps {
   title?: string;
   initialViewMode?: PlayerStatsViewMode;
@@ -65,6 +99,7 @@ export interface PlayerStatsPageProps {
 interface AppliedFilters {
   search: string;
   position: string;
+  team: string;
   pageSize: number;
   minHR: number;
   minAVG: number;
@@ -111,6 +146,7 @@ export function PlayerStatsPage({
   const [position, setPosition] = useState(
     initialFilters.position ?? 'All Positions',
   );
+  const [team, setTeam] = useState(initialFilters.team ?? 'All Teams');
   const [pageSize, setPageSize] = useState(initialPageSize);
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
@@ -125,6 +161,7 @@ export function PlayerStatsPage({
   const [appliedFilters, setAppliedFilters] = useState<AppliedFilters>(() => ({
     search: initialFilters.searchTerm ?? '',
     position: initialFilters.position ?? 'All Positions',
+    team: initialFilters.team ?? 'All Teams',
     pageSize: initialPageSize,
     minHR: initialFilters.minHomeRuns ?? 0,
     minAVG: initialFilters.minBattingAvg ?? 0,
@@ -132,8 +169,16 @@ export function PlayerStatsPage({
   }));
 
   const applyFilters = useCallback(() => {
-    setAppliedFilters({ search, position, pageSize, minHR, minAVG, minWins });
-  }, [search, position, pageSize, minHR, minAVG, minWins]);
+    setAppliedFilters({
+      search,
+      position,
+      team,
+      pageSize,
+      minHR,
+      minAVG,
+      minWins,
+    });
+  }, [search, position, team, pageSize, minHR, minAVG, minWins]);
 
   // Stringify-based key forces grid unmount/remount on each filter commit,
   // which triggers a fresh GraphQL query with the new initialParams.
@@ -153,6 +198,8 @@ export function PlayerStatsPage({
         appliedFilters.position !== 'All Positions'
           ? appliedFilters.position
           : undefined,
+      team:
+        appliedFilters.team !== 'All Teams' ? appliedFilters.team : undefined,
       minHomeRuns: appliedFilters.minHR > 0 ? appliedFilters.minHR : undefined,
       minBattingAvg:
         appliedFilters.minAVG > 0 ? appliedFilters.minAVG : undefined,
@@ -172,6 +219,8 @@ export function PlayerStatsPage({
         appliedFilters.position !== 'All Positions'
           ? appliedFilters.position
           : undefined,
+      team:
+        appliedFilters.team !== 'All Teams' ? appliedFilters.team : undefined,
       minWins: appliedFilters.minWins > 0 ? appliedFilters.minWins : undefined,
     }),
     [appliedFilters],
@@ -211,12 +260,13 @@ export function PlayerStatsPage({
     const filters: PlayerStatsFilters = {
       searchTerm: search || undefined,
       position: position !== 'All Positions' ? position : undefined,
+      team: team !== 'All Teams' ? team : undefined,
       minHomeRuns: minHR > 0 ? minHR : undefined,
       minBattingAvg: minAVG > 0 ? minAVG : undefined,
       minWins: minWins > 0 ? minWins : undefined,
     };
     onExport(filters, viewMode);
-  }, [onExport, search, position, minHR, minAVG, minWins, viewMode]);
+  }, [onExport, search, position, team, minHR, minAVG, minWins, viewMode]);
 
   const handleShare = useCallback(() => {
     if (!onShare) return;
@@ -226,13 +276,24 @@ export function PlayerStatsPage({
     });
     if (search) params.set('search', search);
     if (position !== 'All Positions') params.set('position', position);
+    if (team !== 'All Teams') params.set('team', team);
     if (minHR > 0) params.set('minHomeRuns', String(minHR));
     if (minAVG > 0) params.set('minBattingAvg', minAVG.toFixed(3));
     if (minWins > 0) params.set('minWins', String(minWins));
     // Build relative URL — the caller is responsible for prepending the origin.
     // This keeps the shared component free of window.location (safe for native).
     onShare(`/players/stats?${params.toString()}`);
-  }, [onShare, viewMode, pageSize, search, position, minHR, minAVG, minWins]);
+  }, [
+    onShare,
+    viewMode,
+    pageSize,
+    search,
+    position,
+    team,
+    minHR,
+    minAVG,
+    minWins,
+  ]);
 
   // ── Visibility flags ───────────────────────────────────────────
   const showBatting = viewMode === 'combined' || viewMode === 'hitters';
@@ -244,11 +305,12 @@ export function PlayerStatsPage({
     if (search) params.push(`search=${encodeURIComponent(search)}`);
     if (position !== 'All Positions')
       params.push(`position=${encodeURIComponent(position)}`);
+    if (team !== 'All Teams') params.push(`team=${encodeURIComponent(team)}`);
     if (minHR > 0) params.push(`minHomeRuns=${minHR}`);
     if (minAVG > 0) params.push(`minBattingAvg=${minAVG.toFixed(3)}`);
     if (minWins > 0) params.push(`minWins=${minWins}`);
     return `/players/stats?${params.join('&')}`;
-  }, [viewMode, pageSize, search, position, minHR, minAVG, minWins]);
+  }, [viewMode, pageSize, search, position, team, minHR, minAVG, minWins]);
 
   return (
     <YStack flex={1} style={{ backgroundColor: BG_DARK }}>
@@ -555,7 +617,7 @@ export function PlayerStatsPage({
           style={{
             display: Platform.OS === 'web' ? 'grid' : 'flex',
             gridTemplateColumns:
-              'minmax(240px, 1.5fr) minmax(130px, 1fr) minmax(130px, 1fr) auto',
+              'minmax(240px, 1.5fr) minmax(120px, 1fr) minmax(120px, 1fr) minmax(120px, 1fr) auto',
             flexDirection: 'column',
             gap: 10,
             padding: 14,
@@ -668,13 +730,72 @@ export function PlayerStatsPage({
                 className="ps-select-native"
                 value={position}
                 onChange={(e) => {
-                  setPosition((e.target as HTMLSelectElement).value);
-                  applyFilters();
+                  const next = (e.target as HTMLSelectElement).value;
+                  setPosition(next);
+                  setAppliedFilters((cur) => ({ ...cur, position: next }));
                 }}
               >
                 {POSITIONS.map((p) => (
                   <option key={p} value={p}>
                     {p}
+                  </option>
+                ))}
+              </select>
+            ) : null}
+            {Platform.OS === 'web' && (
+              <Text
+                style={{
+                  position: 'absolute',
+                  right: 12,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: FG3,
+                  fontSize: 12,
+                  pointerEvents: 'none',
+                }}
+              >
+                ▾
+              </Text>
+            )}
+          </YStack>
+
+          {/* Team select */}
+          <YStack
+            style={{
+              position: 'relative',
+              justifyContent: 'center',
+              background: 'rgba(10,15,26,0.55)',
+              border: `1px solid ${OUTLINE_SUBTLE}`,
+              borderRadius: 6,
+              padding: '6px 30px 6px 12px',
+              minHeight: 44,
+            }}
+          >
+            <Text
+              style={{
+                fontFamily: FONT_DISPLAY,
+                fontWeight: '700',
+                fontSize: 10,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                color: FG3,
+              }}
+            >
+              Team
+            </Text>
+            {Platform.OS === 'web' ? (
+              <select
+                className="ps-select-native"
+                value={team}
+                onChange={(e) => {
+                  const next = (e.target as HTMLSelectElement).value;
+                  setTeam(next);
+                  setAppliedFilters((cur) => ({ ...cur, team: next }));
+                }}
+              >
+                {MLB_TEAMS.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
                   </option>
                 ))}
               </select>
@@ -725,8 +846,9 @@ export function PlayerStatsPage({
                 className="ps-select-native"
                 value={pageSize}
                 onChange={(e) => {
-                  setPageSize(Number((e.target as HTMLSelectElement).value));
-                  applyFilters();
+                  const next = Number((e.target as HTMLSelectElement).value);
+                  setPageSize(next);
+                  setAppliedFilters((cur) => ({ ...cur, pageSize: next }));
                 }}
               >
                 {[10, 25, 50, 100].map((n) => (
@@ -860,7 +982,7 @@ export function PlayerStatsPage({
             <XStack
               style={{
                 display: Platform.OS === 'web' ? 'grid' : 'flex',
-                gridTemplateColumns: 'repeat(2, 1fr)',
+                gridTemplateColumns: 'repeat(3, 1fr)',
                 flexDirection: 'column',
                 gap: 20,
               }}
@@ -883,6 +1005,16 @@ export function PlayerStatsPage({
                 step={0.005}
                 format={(v) => v.toFixed(3).replace(/^0/, '')}
                 onChange={setMinAVG}
+                onCommit={applyFilters}
+              />
+              <StatSlider
+                label="Min Wins (Pitchers)"
+                value={minWins}
+                min={0}
+                max={40}
+                step={1}
+                format={(v) => String(v)}
+                onChange={setMinWins}
                 onCommit={applyFilters}
               />
             </XStack>

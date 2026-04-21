@@ -2554,6 +2554,7 @@ export type QueryCareerBattingStatsArgs = {
   orderDirection?: InputMaybe<Scalars['String']['input']>;
   position?: InputMaybe<Scalars['String']['input']>;
   searchTerm?: InputMaybe<Scalars['String']['input']>;
+  team?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type QueryCareerFieldingStatsArgs = {
@@ -2574,6 +2575,7 @@ export type QueryCareerPitchingStatsArgs = {
   orderDirection?: InputMaybe<Scalars['String']['input']>;
   position?: InputMaybe<Scalars['String']['input']>;
   searchTerm?: InputMaybe<Scalars['String']['input']>;
+  team?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type QueryCareerPitchingStatsCountArgs = {
@@ -2582,6 +2584,7 @@ export type QueryCareerPitchingStatsCountArgs = {
   minWins?: InputMaybe<Scalars['Int']['input']>;
   position?: InputMaybe<Scalars['String']['input']>;
   searchTerm?: InputMaybe<Scalars['String']['input']>;
+  team?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type QueryCommissionerAuditLogsArgs = {
@@ -4598,6 +4601,7 @@ export type GetCareerBattingStatsQueryVariables = Exact<{
   minBattingAvg?: InputMaybe<Scalars['Float']['input']>;
   searchTerm?: InputMaybe<Scalars['String']['input']>;
   position?: InputMaybe<Scalars['String']['input']>;
+  team?: InputMaybe<Scalars['String']['input']>;
 }>;
 
 export type GetCareerBattingStatsQuery = {
@@ -4663,6 +4667,7 @@ export type GetCareerPitchingStatsQueryVariables = Exact<{
   minStrikeouts?: InputMaybe<Scalars['Int']['input']>;
   searchTerm?: InputMaybe<Scalars['String']['input']>;
   position?: InputMaybe<Scalars['String']['input']>;
+  team?: InputMaybe<Scalars['String']['input']>;
 }>;
 
 export type GetCareerPitchingStatsQuery = {
@@ -4711,6 +4716,7 @@ export type GetCareerPitchingStatsCountQueryVariables = Exact<{
   minStrikeouts?: InputMaybe<Scalars['Int']['input']>;
   searchTerm?: InputMaybe<Scalars['String']['input']>;
   position?: InputMaybe<Scalars['String']['input']>;
+  team?: InputMaybe<Scalars['String']['input']>;
 }>;
 
 export type GetCareerPitchingStatsCountQuery = {
@@ -10015,6 +10021,7 @@ export const GetCareerBattingStats = gql`
     $minBattingAvg: Float
     $searchTerm: String
     $position: String
+    $team: String
   ) {
     careerBattingStats(
       first: $first
@@ -10027,6 +10034,7 @@ export const GetCareerBattingStats = gql`
       minBattingAvg: $minBattingAvg
       searchTerm: $searchTerm
       position: $position
+      team: $team
     ) {
       edges {
         node {
@@ -10067,6 +10075,7 @@ export const GetCareerBattingStats = gql`
  *      minBattingAvg: // value for 'minBattingAvg'
  *      searchTerm: // value for 'searchTerm'
  *      position: // value for 'position'
+ *      team: // value for 'team'
  *   },
  * });
  */
@@ -10143,6 +10152,7 @@ export const GetCareerPitchingStats = gql`
     $minStrikeouts: Int
     $searchTerm: String
     $position: String
+    $team: String
   ) {
     careerPitchingStats(
       limit: $limit
@@ -10154,6 +10164,7 @@ export const GetCareerPitchingStats = gql`
       minStrikeouts: $minStrikeouts
       searchTerm: $searchTerm
       position: $position
+      team: $team
     ) {
       ...CareerPitching
     }
@@ -10182,6 +10193,7 @@ export const GetCareerPitchingStats = gql`
  *      minStrikeouts: // value for 'minStrikeouts'
  *      searchTerm: // value for 'searchTerm'
  *      position: // value for 'position'
+ *      team: // value for 'team'
  *   },
  * });
  */
@@ -10254,6 +10266,7 @@ export const GetCareerPitchingStatsCount = gql`
     $minStrikeouts: Int
     $searchTerm: String
     $position: String
+    $team: String
   ) {
     careerPitchingStatsCount(
       minGames: $minGames
@@ -10261,6 +10274,7 @@ export const GetCareerPitchingStatsCount = gql`
       minStrikeouts: $minStrikeouts
       searchTerm: $searchTerm
       position: $position
+      team: $team
     )
   }
 `;
@@ -10282,6 +10296,7 @@ export const GetCareerPitchingStatsCount = gql`
  *      minStrikeouts: // value for 'minStrikeouts'
  *      searchTerm: // value for 'searchTerm'
  *      position: // value for 'position'
+ *      team: // value for 'team'
  *   },
  * });
  */

@@ -14,6 +14,7 @@ query GetCareerBattingStats(
   $minBattingAvg: Float
   $searchTerm: String
   $position: String
+  $team: String
 ) {
   careerBattingStats(
     first: $first
@@ -26,6 +27,7 @@ query GetCareerBattingStats(
     minBattingAvg: $minBattingAvg
     searchTerm: $searchTerm
     position: $position
+    team: $team
   ) {
     edges {
       node {

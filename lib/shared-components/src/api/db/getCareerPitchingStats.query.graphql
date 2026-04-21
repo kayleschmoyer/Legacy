@@ -11,6 +11,7 @@ query GetCareerPitchingStats(
   $minStrikeouts: Int
   $searchTerm: String
   $position: String
+  $team: String
 ) {
   careerPitchingStats(
     limit: $limit
@@ -22,6 +23,7 @@ query GetCareerPitchingStats(
     minStrikeouts: $minStrikeouts
     searchTerm: $searchTerm
     position: $position
+    team: $team
   ) {
     ...CareerPitching
   }
