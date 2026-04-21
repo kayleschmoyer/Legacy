@@ -170,6 +170,9 @@ try {
                   // must be accessible without authentication (LS-3696).
                   `${basePath}/terms`,
                   `${basePath}/privacy`,
+                  // /donate is publicly accessible so unauthenticated users can
+                  // support the platform without signing in (LS-3777).
+                  `${basePath}/donate`,
                 ]}
                 // /baseball hub is publicly accessible (LS-3532). Using publicExactPaths
                 // (not publicPaths) so only the landing page is public — sub-routes like

@@ -654,6 +654,10 @@ enum DisclosureSessionStatus {
   won
 }
 
+type DonationPaymentLinkResult {
+  url: String!
+}
+
 """
 A draft event for a league
 """
@@ -2489,6 +2493,11 @@ type Query {
   Fetch the current state of a disclosure game session
   """
   disclosureGameSession(sessionId: Int!): DisclosureGameSession
+
+  """
+  Return the Stripe Payment Link URL for one-time donations. No authentication required. Returns null when not configured.
+  """
+  donationPaymentLink: DonationPaymentLinkResult
 
   """
   Get a complete export of all personal data for the authenticated user

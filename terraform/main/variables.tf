@@ -159,6 +159,12 @@ variable "stripe_annual_price_id" {
   default     = ""
 }
 
+variable "stripe_donation_payment_link" {
+  description = "Stripe Payment Link URL for one-time donations (e.g. https://buy.stripe.com/xxx). Created in Stripe Dashboard → Payment Links."
+  type        = string
+  default     = ""
+}
+
 variable "stripe_trial_period_days" {
   description = "Number of free trial days offered on new subscriptions (0 = no trial)"
   type        = number

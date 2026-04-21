@@ -568,6 +568,11 @@ export enum DisclosureSessionStatus {
   Won = 'won',
 }
 
+export type DonationPaymentLinkResult = {
+  __typename?: 'DonationPaymentLinkResult';
+  url: Scalars['String']['output'];
+};
+
 /** A draft event for a league */
 export type Draft = {
   __typename?: 'Draft';
@@ -2358,6 +2363,8 @@ export type Query = {
   defaultScoringProfile?: Maybe<ScoringConfig>;
   /** Fetch the current state of a disclosure game session */
   disclosureGameSession?: Maybe<DisclosureGameSession>;
+  /** Return the Stripe Payment Link URL for one-time donations. No authentication required. Returns null when not configured. */
+  donationPaymentLink?: Maybe<DonationPaymentLinkResult>;
   /** Get a complete export of all personal data for the authenticated user */
   exportMyData?: Maybe<UserDataExport>;
   freeAgents?: Maybe<Array<Player>>;
@@ -8351,6 +8358,18 @@ export type CreateBillingPortalSessionMutation = {
   createBillingPortalSession?: {
     __typename?: 'BillingPortalSessionResult';
     url?: string | null;
+  } | null;
+};
+
+export type GetDonationPaymentLinkQueryVariables = Exact<{
+  [key: string]: never;
+}>;
+
+export type GetDonationPaymentLinkQuery = {
+  __typename?: 'Query';
+  donationPaymentLink?: {
+    __typename?: 'DonationPaymentLinkResult';
+    url: string;
   } | null;
 };
 
@@ -20187,6 +20206,91 @@ export type CreateBillingPortalSessionMutationResult =
 export type CreateBillingPortalSessionMutationOptions = BaseMutationOptions<
   CreateBillingPortalSessionMutation,
   CreateBillingPortalSessionMutationVariables
+>;
+export const GetDonationPaymentLink = gql`
+  query GetDonationPaymentLink {
+    donationPaymentLink {
+      url
+    }
+  }
+`;
+
+/**
+ * __useGetDonationPaymentLinkQuery__
+ *
+ * To run a query within a React component, call `useGetDonationPaymentLinkQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetDonationPaymentLinkQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetDonationPaymentLinkQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useGetDonationPaymentLinkQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    GetDonationPaymentLinkQuery,
+    GetDonationPaymentLinkQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetDonationPaymentLinkQuery,
+    GetDonationPaymentLinkQueryVariables
+  >(GetDonationPaymentLink, options);
+}
+export function useGetDonationPaymentLinkLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetDonationPaymentLinkQuery,
+    GetDonationPaymentLinkQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetDonationPaymentLinkQuery,
+    GetDonationPaymentLinkQueryVariables
+  >(GetDonationPaymentLink, options);
+}
+export function useGetDonationPaymentLinkSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetDonationPaymentLinkQuery,
+        GetDonationPaymentLinkQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetDonationPaymentLinkQuery,
+    GetDonationPaymentLinkQueryVariables
+  >(
+    GetDonationPaymentLink,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetDonationPaymentLinkQuery,
+          GetDonationPaymentLinkQueryVariables
+        >,
+  );
+}
+export type GetDonationPaymentLinkQueryHookResult = ReturnType<
+  typeof useGetDonationPaymentLinkQuery
+>;
+export type GetDonationPaymentLinkLazyQueryHookResult = ReturnType<
+  typeof useGetDonationPaymentLinkLazyQuery
+>;
+export type GetDonationPaymentLinkSuspenseQueryHookResult = ReturnType<
+  typeof useGetDonationPaymentLinkSuspenseQuery
+>;
+export type GetDonationPaymentLinkQueryResult = Apollo.QueryResult<
+  GetDonationPaymentLinkQuery,
+  GetDonationPaymentLinkQueryVariables
 >;
 export const GetTeamMembers = gql`
   query GetTeamMembers($teamId: Int!) {

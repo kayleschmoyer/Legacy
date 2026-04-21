@@ -39,3 +39,9 @@ mutation CreateBillingPortalSession($returnUrl: String!) {
     url
   }
 }
+
+query GetDonationPaymentLink {
+  donationPaymentLink {
+    url
+  }
+}

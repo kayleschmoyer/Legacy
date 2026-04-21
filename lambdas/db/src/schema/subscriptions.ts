@@ -151,6 +151,45 @@ StripePriceInfoRef.implement({
   }),
 });
 
+// ─── Donation Payment Link ───────────────────────────────────────────────────
+
+const DonationPaymentLinkResultRef = builder.objectRef<{ url: string }>(
+  'DonationPaymentLinkResult',
+);
+
+DonationPaymentLinkResultRef.implement({
+  fields: (t) => ({
+    url: t.exposeString('url', { nullable: false }),
+  }),
+});
+
+builder.queryField('donationPaymentLink', (t) =>
+  t.field({
+    type: DonationPaymentLinkResultRef,
+    nullable: true,
+    description:
+      'Return the Stripe Payment Link URL for one-time donations. ' +
+      'No authentication required. Returns null when not configured.',
+    resolve: () => {
+      const url = process.env['STRIPE_DONATION_PAYMENT_LINK'];
+      if (!url) return null;
+      // Require https and a known Stripe Payment Link host to prevent
+      // accidental open-redirect if the env var is misconfigured.
+      const isStripeHost =
+        url.startsWith('https://buy.stripe.com/') ||
+        url.startsWith('https://checkout.stripe.com/');
+      if (!isStripeHost) {
+        LOGGER.warn(
+          'STRIPE_DONATION_PAYMENT_LINK is set but does not start with a recognised Stripe Payment Link host — returning null',
+          { url },
+        );
+        return null;
+      }
+      return { url };
+    },
+  }),
+);
+
 /** In-memory TTL cache for Stripe prices (avoids hitting Stripe on every request). */
 let cachedPrices: {
   monthlyPriceCents: number;

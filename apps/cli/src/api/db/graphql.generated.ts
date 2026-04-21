@@ -568,6 +568,11 @@ export enum DisclosureSessionStatus {
   Won = 'won',
 }
 
+export type DonationPaymentLinkResult = {
+  __typename?: 'DonationPaymentLinkResult';
+  url: Scalars['String']['output'];
+};
+
 /** A draft event for a league */
 export type Draft = {
   __typename?: 'Draft';
@@ -2358,6 +2363,8 @@ export type Query = {
   defaultScoringProfile?: Maybe<ScoringConfig>;
   /** Fetch the current state of a disclosure game session */
   disclosureGameSession?: Maybe<DisclosureGameSession>;
+  /** Return the Stripe Payment Link URL for one-time donations. No authentication required. Returns null when not configured. */
+  donationPaymentLink?: Maybe<DonationPaymentLinkResult>;
   /** Get a complete export of all personal data for the authenticated user */
   exportMyData?: Maybe<UserDataExport>;
   freeAgents?: Maybe<Array<Player>>;

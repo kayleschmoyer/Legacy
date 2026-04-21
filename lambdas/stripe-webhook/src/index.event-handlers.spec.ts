@@ -538,6 +538,77 @@ describe('stripe-webhook event handlers', () => {
     });
   });
 
+  // ── checkout.session.completed (donation / mode=payment) ──────────────────
+
+  describe('checkout.session.completed (mode=payment donation)', () => {
+    it('returns 200 without subscription side effects for payment-mode sessions', async () => {
+      mockConstructEvent.mockReturnValue(
+        fakeStripeEvent({
+          type: 'checkout.session.completed',
+          data: {
+            object: {
+              id: 'cs_donation_123',
+              mode: 'payment',
+              customer: 'cus_123',
+              subscription: null,
+              amount_total: 1000,
+              currency: 'usd',
+              metadata: {},
+            },
+          },
+        }),
+      );
+
+      setupNotProcessed();
+
+      const result = await handler(makeEvent());
+
+      expect(result.statusCode).toBe(200);
+      // Only the idempotency claim ran — no subscription DB calls
+      expect(mockRunWithInternalClient).toHaveBeenCalledTimes(1);
+      expect(mockClearLeagueTierFreezes).not.toHaveBeenCalled();
+      expect(mockHandleSubscriptionDowngrade).not.toHaveBeenCalled();
+      expect(mockSendGa4ServerEvent).not.toHaveBeenCalled();
+    });
+
+    it('fires donation_completed GA4 event when userId is in session metadata', async () => {
+      mockConstructEvent.mockReturnValue(
+        fakeStripeEvent({
+          type: 'checkout.session.completed',
+          data: {
+            object: {
+              id: 'cs_donation_456',
+              mode: 'payment',
+              customer: 'cus_123',
+              subscription: null,
+              amount_total: 2500,
+              currency: 'usd',
+              metadata: { userId: '42' },
+            },
+          },
+        }),
+      );
+
+      setupNotProcessed();
+
+      const result = await handler(makeEvent());
+
+      expect(result.statusCode).toBe(200);
+      expect(mockRunWithInternalClient).toHaveBeenCalledTimes(1);
+      expect(mockSendGa4ServerEvent).toHaveBeenCalledWith(
+        42,
+        'donation_completed',
+        {
+          value: 25,
+          currency: 'USD',
+          source: 'stripe_payment_link',
+        },
+      );
+      expect(mockClearLeagueTierFreezes).not.toHaveBeenCalled();
+      expect(mockHandleSubscriptionDowngrade).not.toHaveBeenCalled();
+    });
+  });
+
   // ── customer.subscription.created ─────────────────────────────────────────
 
   describe('customer.subscription.created', () => {

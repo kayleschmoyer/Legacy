@@ -446,10 +446,47 @@ async function verifyCheckoutOwnership(
   }
 }
 
+/**
+ * Handle checkout.session.completed for one-time donation payments.
+ * Payment Links create sessions with mode='payment' and no subscription.
+ * We log the donation and fire a GA4 event but make no DB changes —
+ * donations do not grant any platform access.
+ */
+async function handleDonationCheckoutCompleted(
+  session: Stripe.Checkout.Session,
+): Promise<void> {
+  const amountTotal = session.amount_total ?? 0;
+  const currency = session.currency ?? 'usd';
+
+  LOGGER.info('Donation checkout completed', {
+    sessionId: session.id,
+    amountTotal,
+    currency,
+    customerId: typeof session.customer === 'string' ? session.customer : null,
+  });
+
+  const userIdStr = session.metadata?.['userId'];
+  const userId = userIdStr ? parseUserId(userIdStr) : null;
+
+  if (userId !== null) {
+    await sendGa4ServerEvent(userId, 'donation_completed', {
+      value: amountTotal / 100,
+      currency: currency.toUpperCase(),
+      source: 'stripe_payment_link',
+    });
+  }
+}
+
 async function handleCheckoutSessionCompleted(
   session: Stripe.Checkout.Session,
   eventTimestamp: number,
 ): Promise<number | null> {
+  // One-time donation via Payment Link — mode is 'payment', no subscription
+  if (session.mode === 'payment') {
+    await handleDonationCheckoutCompleted(session);
+    return null;
+  }
+
   const userIdStr = session.metadata?.['userId'];
   if (!userIdStr) {
     LOGGER.warn(

@@ -170,6 +170,7 @@ const StandingsRedirectPage = lazyWithRetry(() =>
     default: m.StandingsRedirectPage,
   })),
 );
+const DonatePage = lazyWithRetry(() => import('../pages/donate/DonatePage'));
 
 /* ────────────────────────────────────────────────────────
  * Nav – styled components
@@ -567,6 +568,7 @@ function App() {
               path="/games/twenty-questions"
               element={<TwentyQuestionsPage />}
             />
+            <Route path="/donate" element={<DonatePage />} />
             {/* /draft/mock is a legacy alias — redirect to the canonical route. */}
             <Route
               path="/draft/mock"

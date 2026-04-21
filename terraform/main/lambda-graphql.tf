@@ -239,6 +239,7 @@ resource "aws_lambda_function" "graphql" {
       STRIPE_TRIAL_PERIOD_DAYS          = tostring(var.stripe_trial_period_days)
       STRIPE_MONTHLY_PRICE_ID           = var.stripe_monthly_price_id
       STRIPE_ANNUAL_PRICE_ID            = var.stripe_annual_price_id
+      STRIPE_DONATION_PAYMENT_LINK      = var.stripe_donation_payment_link
 
       # CORS — comma-separated list of origins permitted to make cross-origin
       # requests.  Must include the production web domain so draft-pick (and all

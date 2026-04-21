@@ -568,6 +568,11 @@ export enum DisclosureSessionStatus {
   Won = 'won',
 }
 
+export type DonationPaymentLinkResult = {
+  __typename?: 'DonationPaymentLinkResult';
+  url: Scalars['String']['output'];
+};
+
 /** A draft event for a league */
 export type Draft = {
   __typename?: 'Draft';
@@ -681,6 +686,12 @@ export type EvaluateBadgesResult = {
   awardedBadgeKeys?: Maybe<Array<Scalars['String']['output']>>;
   /** Number of new badges awarded */
   awardedCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type ExpireSubscriptionGracePeriodsResult = {
+  __typename?: 'ExpireSubscriptionGracePeriodsResult';
+  errors?: Maybe<Array<Scalars['String']['output']>>;
+  expired?: Maybe<Scalars['Int']['output']>;
 };
 
 export type ForceAddPlayerInput = {
@@ -1295,6 +1306,8 @@ export type Mutation = {
   evaluateDraftBadges?: Maybe<EvaluateBadgesResult>;
   /** Evaluate and award all eligible matchup-based badges for a completed matchup. Call when a matchup status transitions to completed. Requires authentication. */
   evaluateMatchupBadges?: Maybe<EvaluateBadgesResult>;
+  /** Downgrade premium subscriptions whose grace_period_ends_at has passed. System / admin only. Triggered hourly by EventBridge. */
+  expireSubscriptionGracePeriods?: Maybe<ExpireSubscriptionGracePeriodsResult>;
   /** Commissioner: force-add a player to a team, bypassing normal acquisition rules. */
   forceAddPlayer?: Maybe<CommissionerActionResult>;
   /** Commissioner: force-drop a player from a team. */
@@ -2350,6 +2363,8 @@ export type Query = {
   defaultScoringProfile?: Maybe<ScoringConfig>;
   /** Fetch the current state of a disclosure game session */
   disclosureGameSession?: Maybe<DisclosureGameSession>;
+  /** Return the Stripe Payment Link URL for one-time donations. No authentication required. Returns null when not configured. */
+  donationPaymentLink?: Maybe<DonationPaymentLinkResult>;
   /** Get a complete export of all personal data for the authenticated user */
   exportMyData?: Maybe<UserDataExport>;
   freeAgents?: Maybe<Array<Player>>;
