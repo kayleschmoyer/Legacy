@@ -115,6 +115,7 @@ test.describe('Heading hierarchy — /help @regression', () => {
     await page.goto('/help');
     await page.waitForLoadState('load');
     await waitForPageContent(page);
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   });
 
   test('Help page has exactly one h1', async ({ page }) => {
