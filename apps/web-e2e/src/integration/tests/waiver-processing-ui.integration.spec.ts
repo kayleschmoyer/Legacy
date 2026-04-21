@@ -589,7 +589,6 @@ test.describe
 
   test('Phase 7: Commissioner processes waivers from the commissioner panel', async ({
     commissionerPage: page,
-    commissionerJwt,
   }) => {
     test.setTimeout(60_000);
 
@@ -623,38 +622,17 @@ test.describe
     });
 
     await test.step('Wait for success feedback with claim counts', async () => {
-      // WaiverProcessControl shows a success message like
-      // "Waivers processed: 1 succeeded, 1 failed out of 2 claims."
-      await expect(page.getByText(/succeeded|processed/i).first()).toBeVisible({
-        timeout: 30000,
-      });
-    });
-
-    await test.step('Verify processWaiverClaims result via GQL', async () => {
-      // Call processWaiverClaims a second time for the same league.
-      // The UI-triggered run may not have consumed all claims instantly
-      // (race condition with multiple teams). The important validation is
-      // that the first call completed (success message above). A follow-up
-      // call should process any stragglers — any result is acceptable.
-      const data = await gqlFetch<{
-        processWaiverClaims: {
-          processed: number;
-          succeeded: number;
-          failed: number;
-        };
-      }>(
-        commissionerJwt,
-        `mutation ProcessWaiverClaims($leagueId: Int) {
-          processWaiverClaims(leagueId: $leagueId) {
-            processed
-            succeeded
-            failed
-          }
-        }`,
-        { leagueId: state.leagueId },
-      );
-      // Just verify the follow-up call didn't error — any count is fine
-      expect(data.processWaiverClaims.processed).toBeGreaterThanOrEqual(0);
+      // WaiverProcessControl renders the success message inside a
+      // role="status" card (LeagueDetailPage.tsx). The previous
+      // /processed/i text match was a false positive: the WaiverProcessControl
+      // description "automatically processed nightly at 2am EST" is already
+      // visible before the Lambda completes, causing the follow-up GQL call
+      // to race with the in-flight Lambda and award the player to the wrong team
+      // (LS-3809). Waiting for role="status" ensures the card only appears
+      // after the mutation + refetch complete.
+      await expect(
+        page.getByRole('status').filter({ hasText: /processed|succeeded/i }),
+      ).toBeVisible({ timeout: 30000 });
     });
   });
 
