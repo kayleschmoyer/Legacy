@@ -95,11 +95,11 @@ test.describe
         page.getByText('Player', { exact: true }).first(),
       ).toBeVisible({ timeout: 15_000 });
 
-      // At least the column header row confirms data loaded
-      // Also check for pagination or a row count indicator
-      await expect(page.getByText(/Refresh/i).first()).toBeVisible({
-        timeout: 15_000,
-      });
+      // At least one data row proves the API response was rendered.
+      // The Refresh button was removed in LS-3802; player rows use data-testid="player-row-{id}".
+      await expect(
+        page.locator('[data-testid^="player-row-"]').first(),
+      ).toBeVisible({ timeout: 15_000 });
     });
   });
 
@@ -143,11 +143,11 @@ test.describe
     });
 
     await test.step('Grid re-loads with filtered data', async () => {
-      // After typing the filter, the grid should refresh.
-      // Wait for the Refresh button to re-appear (means component re-rendered)
-      await expect(page.getByText(/Refresh/i).first()).toBeVisible({
-        timeout: 15_000,
-      });
+      // After typing the filter, the grid should refresh automatically.
+      // The Refresh button was removed in LS-3802; wait for a player row instead.
+      await expect(
+        page.locator('[data-testid^="player-row-"]').first(),
+      ).toBeVisible({ timeout: 15_000 });
 
       // Still shows batting column headers — the grid re-rendered
       await expect(page.getByText('HR', { exact: true }).first()).toBeVisible({
