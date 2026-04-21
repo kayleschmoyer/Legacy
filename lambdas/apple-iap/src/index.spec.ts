@@ -221,10 +221,10 @@ describe('apple-iap handler', () => {
     });
   });
 
-  describe('happy path — race condition (userId not yet known)', () => {
-    it('claims the event before processing and returns 200 when userId lookup yields null', async () => {
+  describe('race condition — userId not yet known (first-purchase ASN arrives early)', () => {
+    it('releases the idempotency claim and returns 503 when userId lookup yields null', async () => {
       mockDecodeAndVerifyJws.mockResolvedValue(
-        fakeNotification({ notificationType: 'DID_RENEW' }),
+        fakeNotification({ notificationType: 'SUBSCRIBED' }),
       );
 
       // Call 1: claimAppleEvent → we own the claim
@@ -254,13 +254,23 @@ describe('apple-iap handler', () => {
           }),
       );
 
+      // Call 3: releaseAppleEventClaim → delete succeeds so Apple will retry
+      const deleteWhere = jest.fn(() => Promise.resolve());
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb({
+            delete: () => ({ where: deleteWhere }),
+          }),
+      );
+
       const result = await handler(makeEvent());
 
-      expect(result.statusCode).toBe(200);
-      const body = JSON.parse(result.body) as { received: boolean };
-      expect(body.received).toBe(true);
-      // Claim + userId lookup = 2 calls; no further side effects, no release.
-      expect(mockRunWithInternalClient).toHaveBeenCalledTimes(2);
+      // 503 tells Apple to retry; by retry time verifyApplePurchase will have run.
+      expect(result.statusCode).toBe(503);
+      // Claim must be released so the retry is not short-circuited.
+      expect(deleteWhere).toHaveBeenCalledTimes(1);
+      // Exactly 3 DB calls: claim + userId lookup + release.
+      expect(mockRunWithInternalClient).toHaveBeenCalledTimes(3);
     });
   });
 

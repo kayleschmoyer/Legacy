@@ -270,7 +270,8 @@ async function handleNotification(
   // Look up the userId from the existing subscription row (set by verifyApplePurchase
   // when the user first purchased on device). If the row doesn't exist yet (race
   // condition where the ASN arrives before the client calls verifyApplePurchase),
-  // we log a warning and skip — the client mutation will set it shortly after.
+  // return null — the caller releases the idempotency claim and returns 503 so
+  // Apple retries after the client mutation has had a chance to run.
   const userId = await findUserIdByOriginalTransactionId(originalTransactionId);
 
   if (userId === null) {
@@ -510,9 +511,40 @@ const baseAppleIapHandler = async (
     };
   }
 
-  if (userId !== null) {
-    await pushSubscriptionUpdated(userId, originalTransactionId);
+  if (userId === null) {
+    // Race: ASN arrived before verifyApplePurchase created the subscription row.
+    // Release the idempotency claim and return 503 so Apple retries — by the time
+    // it does, the client mutation will have run and userId will be resolvable.
+    LOGGER.warn(
+      'Apple IAP — userId unknown at notification time; releasing claim for Apple retry',
+      {
+        notificationUUID: notification.notificationUUID,
+        notificationType: notification.notificationType,
+        originalTransactionId,
+      },
+    );
+    try {
+      await releaseAppleEventClaim(notification.notificationUUID);
+    } catch (releaseErr) {
+      LOGGER.error(
+        'Apple IAP — failed to release event claim for userId-null notification',
+        {
+          notificationUUID: notification.notificationUUID,
+          notificationType: notification.notificationType,
+          originalTransactionId,
+          releaseErr,
+        },
+      );
+    }
+    return {
+      statusCode: 503,
+      body: JSON.stringify({
+        error: 'Subscription not yet available — please retry',
+      }),
+    };
   }
+
+  await pushSubscriptionUpdated(userId, originalTransactionId);
 
   return { statusCode: 200, body: JSON.stringify({ received: true }) };
 };
