@@ -110,6 +110,73 @@ body {
   }
 }
 
+@keyframes ls-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Skeleton shimmer overlay — add to any skeleton block */
+:root {
+  --skeleton-base: rgba(255, 255, 255, 0.04);
+  --skeleton-shine: rgba(255, 255, 255, 0.05);
+}
+
+/* Light-theme overrides */
+.app-container.light {
+  --skeleton-base: rgba(0, 0, 0, 0.06);
+  --skeleton-shine: rgba(0, 0, 0, 0.04);
+}
+
+.ls-skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--skeleton-base);
+  border-radius: 6px;
+}
+.ls-skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--skeleton-shine) 50%,
+    transparent 100%
+  );
+  animation: ls-shimmer 1.6s linear infinite;
+}
+
+@keyframes ls-dot-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+/* Pulsing dot for live draft status */
+.ls-dot-pulse {
+  animation: ls-dot-pulse 1.4s infinite;
+}
+
+@keyframes ls-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Spinning icon for refresh button */
+.ls-spinning {
+  animation: ls-spin 0.9s linear infinite;
+  display: inline-block;
+}
+
 /* ────────────────────────────────────────────────────────
  * Responsive utilities
  * ──────────────────────────────────────────────────────── */
