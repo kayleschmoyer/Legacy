@@ -10,7 +10,7 @@
 import { type GenericDatabase, PublicSchema } from '@legacy-sports/db-client';
 import type { WebSocketNotificationService } from '@legacy-sports/aws-utils';
 import { LOGGER } from '@legacy-sports/logging';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNull, lt, sql } from 'drizzle-orm';
 import {
   getDiscordWebhookUrls,
   notifyDiscordWaiverClaim,
@@ -118,6 +118,28 @@ export class WaiverClaimProcessor {
     let failed = 0;
     const succeededLeagueIds = new Set<number>();
     const succeededClaims: SucceededClaim[] = [];
+
+    // 0. Reset truly-stuck 'processing' claims back to 'pending' so a follow-up
+    //    call can re-process them if a prior run crashed mid-flight.
+    //    The age guard (updatedAt < now() - 5 min) prevents flipping claims that
+    //    are legitimately mid-flight in a concurrent invocation (UI + EventBridge).
+    const stuckConditions = [
+      eq(PublicSchema.waiverClaims.status, 'processing'),
+      isNull(PublicSchema.waiverClaims.processedAt),
+      lt(
+        PublicSchema.waiverClaims.updatedAt,
+        sql`NOW() - INTERVAL '5 minutes'`,
+      ),
+    ];
+    if (opts.leagueId != null) {
+      stuckConditions.push(
+        eq(PublicSchema.waiverClaims.leagueId, opts.leagueId),
+      );
+    }
+    await db
+      .update(PublicSchema.waiverClaims)
+      .set({ status: 'pending' })
+      .where(and(...stuckConditions));
 
     // 1. Fetch pending claims
     const pendingClaims = await this.fetchPendingClaims(opts.leagueId ?? null);

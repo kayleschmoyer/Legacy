@@ -398,6 +398,7 @@ builder.mutationField('autoAdvanceMatchups', (t) =>
             playoffEnabled: PublicSchema.leagues.playoffEnabled,
             playoffFormat: PublicSchema.leagues.playoffFormat,
             playoffMultiWeek: PublicSchema.leagues.playoffMultiWeek,
+            currentWeek: PublicSchema.leagues.currentWeek,
           })
           .from(PublicSchema.leagues)
           .where(and(...leagueConditions));
@@ -422,7 +423,16 @@ builder.mutationField('autoAdvanceMatchups', (t) =>
               continue;
             }
 
-            // 2. Find current in-progress matchups
+            const currentWeek = league.currentWeek;
+            if (currentWeek == null) {
+              LOGGER.debug(
+                `[autoAdvanceMatchups] League ${league.id} (${league.name}) has no current week set, skipping`,
+              );
+              result.leaguesSkipped++;
+              continue;
+            }
+
+            // 2. Find current matchups (in_progress or completed by stats lambda) for this week
             const currentMatchups = await context.db
               .select({
                 id: PublicSchema.matchups.id,
@@ -433,13 +443,17 @@ builder.mutationField('autoAdvanceMatchups', (t) =>
               .where(
                 and(
                   eq(PublicSchema.matchups.leagueId, league.id),
-                  eq(PublicSchema.matchups.status, 'in_progress'),
+                  eq(PublicSchema.matchups.weekNumber, currentWeek),
+                  inArray(PublicSchema.matchups.status, [
+                    'in_progress',
+                    'completed',
+                  ]),
                 ),
               );
 
             if (currentMatchups.length === 0) {
               LOGGER.debug(
-                `[autoAdvanceMatchups] League ${league.id} (${league.name}) has no in-progress matchups, skipping`,
+                `[autoAdvanceMatchups] League ${league.id} (${league.name}) has no in-progress or completed matchups for week ${currentWeek}, skipping`,
               );
               result.leaguesSkipped++;
               continue;
@@ -474,7 +488,6 @@ builder.mutationField('autoAdvanceMatchups', (t) =>
             }
 
             // 4. Check the current week against totalMatchups to see if the season is over
-            const currentWeek = currentMatchups[0].weekNumber;
             if (currentWeek >= league.totalMatchups) {
               if (league.playoffEnabled === false) {
                 // Playoffs disabled — just mark current week complete and stop
@@ -837,9 +850,10 @@ builder.mutationField('autoAdvanceMatchups', (t) =>
 //   3. Activates those matchups (status → in_progress) so autoSelectGames
 //      can start selecting games for them.
 //
-// The currentWeek parameter MUST come from the in-progress matchup row that
-// triggered the advance — NOT from max(weekNumber) — because all future weeks
-// are already stored in the DB.
+// The currentWeek parameter comes from league.currentWeek (the authoritative
+// source added in LS-533) — NOT from the matchup row — because the stats lambda
+// may mark a matchup status='completed' before autoAdvanceMatchups runs, so
+// filtering on in_progress alone would miss those matchups.
 
 async function advanceLeagueWeekInternal(
   db: Db,

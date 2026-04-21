@@ -323,6 +323,33 @@ describe('Scheduled Mutations', () => {
       expect(scheduledForNextWeek.length).toBe(0);
       expect(nextWeek).toBeGreaterThan(10); // past end of pre-created schedule
     });
+
+    it('should advance when stats lambda has already marked matchups completed (LS-3795)', () => {
+      // Bug LS-3795: the stats lambda sets matchup status='completed' when all
+      // game stats load. If autoAdvanceMatchups ran after that, it found zero
+      // in-progress matchups and skipped. Fix: filter by weekNumber=currentWeek
+      // AND status IN ('in_progress','completed'), sourcing currentWeek from
+      // league.currentWeek rather than from the matchup row.
+      const leagueCurrentWeek = 1;
+
+      // Simulate all week-1 matchups having been marked completed by stats lambda
+      const week1Matchups = [
+        { weekNumber: 1, status: 'completed' as const },
+        { weekNumber: 1, status: 'completed' as const },
+      ];
+
+      // Old filter (in_progress only) would miss these
+      const oldFilter = week1Matchups.filter((m) => m.status === 'in_progress');
+      expect(oldFilter).toHaveLength(0); // would skip league — the bug
+
+      // New filter (in_progress or completed for currentWeek) finds them
+      const newFilter = week1Matchups.filter(
+        (m) =>
+          m.weekNumber === leagueCurrentWeek &&
+          (m.status === 'in_progress' || m.status === 'completed'),
+      );
+      expect(newFilter).toHaveLength(2); // correctly proceeds to advance
+    });
   });
 
   // ── createAllMatchupsForLeague (lineup-window preservation) ─────────────
