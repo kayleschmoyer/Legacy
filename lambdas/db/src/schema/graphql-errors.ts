@@ -68,3 +68,18 @@ export function UserInputError(message: string): GraphQLError {
     extensions: { code: 'BAD_USER_INPUT' },
   });
 }
+
+/**
+ * Throw when a game feature is temporarily unavailable due to missing data
+ * or operational state (e.g. player facts not yet seeded).
+ *
+ * Maps to Apollo code `GAME_UNAVAILABLE`.
+ * The client should display the message and suggest trying again later.
+ */
+export function GameUnavailableError(
+  message = 'No games are available right now. Please try again later.',
+): GraphQLError {
+  return new GraphQLError(message, {
+    extensions: { code: 'GAME_UNAVAILABLE' },
+  });
+}

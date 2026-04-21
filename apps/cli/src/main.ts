@@ -54,6 +54,7 @@ import { handleLoadPositionalAdjustments } from './commands/loadPositionalAdjust
 import { handleLoadOnThisDayEvents } from './commands/loadOnThisDayEvents';
 import { handleCleanupTestLeagues } from './commands/cleanupTestLeagues';
 import { handleReportToJiraEpic } from './commands/reportToJiraEpic';
+import { handleSeedDisclosureFacts } from './commands/seedDisclosureFacts';
 
 // Initialize Rollbar for CLI
 const rollbarConfig = getRollbarConfigFromEnv();
@@ -626,6 +627,15 @@ async function run(): Promise<void> {
           dryRun: options.dryRun,
         }),
     );
+
+  program
+    .command('seed-disclosure-facts')
+    .description(
+      'Populate the player_facts table from existing player and stats data. ' +
+        'Required before the Who Am I? game (/games/disclosure) can start sessions. ' +
+        'The seed is idempotent — safe to re-run.',
+    )
+    .action(() => handleSeedDisclosureFacts());
 
   program
     .command('cleanup-test-leagues')

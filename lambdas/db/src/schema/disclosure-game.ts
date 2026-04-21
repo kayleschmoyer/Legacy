@@ -1,6 +1,6 @@
 import { DisclosureGameService } from '@legacy-sports/db-client';
 import { builder } from './builder';
-import { AuthenticationError } from './graphql-errors';
+import { AuthenticationError, GameUnavailableError } from './graphql-errors';
 
 /**
  * Progressive Disclosure Minigame GraphQL Schema (LS-1883 / LS-2106)
@@ -170,7 +170,17 @@ builder.mutationFields((t) => ({
         throw AuthenticationError();
       }
       const svc = new DisclosureGameService(context.db);
-      return svc.startSession(context.user.id);
+      try {
+        return await svc.startSession(context.user.id);
+      } catch (err) {
+        if (
+          err instanceof Error &&
+          err.message.startsWith('No eligible players found')
+        ) {
+          throw GameUnavailableError();
+        }
+        throw err;
+      }
     },
   }),
 
