@@ -339,6 +339,7 @@ function FeatureComparisonTable() {
       <XStack
         paddingHorizontal="$4"
         paddingVertical="$3"
+        gap="$3"
         borderBottomWidth={1}
         borderBottomColor="$glassBorder"
         backgroundColor={withAlpha(BRAND_NAVY, 0.15)}
