@@ -242,7 +242,7 @@ jobs:
           steps.version.outputs.build_config == 'Release' && 
           (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
           (github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true')
-        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
         with:
           tag_name: ios-v${{ steps.version.outputs.version }}-${{ steps.version.outputs.build_number }}
           name: iOS IPA v${{ steps.version.outputs.version }} (${{ steps.version.outputs.commit_sha }})
