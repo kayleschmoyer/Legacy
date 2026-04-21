@@ -518,29 +518,46 @@ const SubscriptionPage: React.FC = () => {
     annualPriceId,
   } = useStripePrices();
 
+  const { data, loading, refetch } = useGetMySubscriptionQuery();
+  const subscription = data?.mySubscription ?? null;
+
+  // Track whether this page load was a successful checkout return so the
+  // refetch effect below survives the searchParams change caused by navigate().
+  const [checkoutJustCompleted, setCheckoutJustCompleted] = useState(false);
+
   useEffect(() => {
     const checkoutStatus = searchParams.get('checkout');
-    if (checkoutStatus === 'success') {
-      const sessionId =
-        searchParams.get('session_id') ?? `client_${Date.now()}`;
-      const alreadyTracked =
-        sessionStorage.getItem('tracked_purchase_session_id') === sessionId;
-      if (!alreadyTracked) {
-        const storedCycle = (sessionStorage.getItem('upgrade_billing_cycle') ??
-          'monthly') as 'monthly' | 'annual';
-        const value = storedCycle === 'annual' ? ANNUAL_TOTAL : MONTHLY_PRICE;
-        trackPurchase(storedCycle, value, sessionId);
-        trackSubscriptionStarted('premium');
-        sessionStorage.setItem('tracked_purchase_session_id', sessionId);
-        sessionStorage.removeItem('upgrade_billing_cycle');
-      }
-      // Remove query params to prevent re-tracking on refresh/back/forward
-      navigate('/profile/subscription', { replace: true });
+    if (checkoutStatus !== 'success') return;
+
+    const sessionId = searchParams.get('session_id') ?? `client_${Date.now()}`;
+    const alreadyTracked =
+      sessionStorage.getItem('tracked_purchase_session_id') === sessionId;
+    if (!alreadyTracked) {
+      const storedCycle = (sessionStorage.getItem('upgrade_billing_cycle') ??
+        'monthly') as 'monthly' | 'annual';
+      const value = storedCycle === 'annual' ? ANNUAL_TOTAL : MONTHLY_PRICE;
+      trackPurchase(storedCycle, value, sessionId);
+      trackSubscriptionStarted('premium');
+      sessionStorage.setItem('tracked_purchase_session_id', sessionId);
+      sessionStorage.removeItem('upgrade_billing_cycle');
     }
+    // Remove query params to prevent re-tracking on refresh/back/forward.
+    // This changes searchParams, which would re-trigger this effect — but the
+    // next run exits early because checkout !== 'success', so it's safe.
+    navigate('/profile/subscription', { replace: true });
+    setCheckoutJustCompleted(true);
   }, [searchParams, navigate, ANNUAL_TOTAL, MONTHLY_PRICE]);
 
-  const { data, loading } = useGetMySubscriptionQuery();
-  const subscription = data?.mySubscription ?? null;
+  // Separated from the searchParams effect so navigate() doesn't cancel the
+  // delayed retry: when searchParams changes, only the effect above re-runs.
+  useEffect(() => {
+    if (!checkoutJustCompleted) return;
+    // Refetch immediately, then again after 3 s — Stripe webhooks are async so
+    // the DB may not have updated by the time the redirect lands.
+    void refetch();
+    const timer = setTimeout(() => void refetch(), 3000);
+    return () => clearTimeout(timer);
+  }, [checkoutJustCompleted, refetch]);
 
   const [createCheckoutSession, { loading: checkoutLoading }] =
     useCreateCheckoutSessionMutation();
