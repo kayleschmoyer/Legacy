@@ -310,6 +310,11 @@ describe('stripe-webhook event handlers', () => {
       expect(result.statusCode).toBe(200);
       const body = JSON.parse(result.body) as { received: boolean };
       expect(body.received).toBe(true);
+      expect(mockSendGa4ServerEvent).toHaveBeenCalledWith(
+        42,
+        'subscription_started',
+        { tier: 'premium', source: 'stripe' },
+      );
     });
 
     it('returns 200 without processing when userId is missing from metadata', async () => {
@@ -781,6 +786,11 @@ describe('stripe-webhook event handlers', () => {
       const result = await handler(makeEvent());
 
       expect(result.statusCode).toBe(200);
+      expect(mockSendGa4ServerEvent).toHaveBeenCalledWith(
+        42,
+        'subscription_cancelled',
+        { tier: 'premium', source: 'stripe' },
+      );
     });
 
     it('calls handleSubscriptionDowngrade when deleting a premium subscription', async () => {
@@ -1016,6 +1026,73 @@ describe('stripe-webhook event handlers', () => {
       const result = await handler(makeEvent());
 
       expect(result.statusCode).toBe(200);
+    });
+
+    it('fires subscription_renewed GA4 event for subscription_cycle billing', async () => {
+      mockConstructEvent.mockReturnValue(
+        fakeStripeEvent({
+          type: 'invoice.payment_succeeded',
+          data: {
+            object: {
+              parent: {
+                subscription_details: { subscription: 'sub_123' },
+              },
+              billing_reason: 'subscription_cycle',
+            },
+          },
+        }),
+      );
+
+      setupNotProcessed();
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectThenUpdateDb([{ userId: 42 }])),
+      );
+      setupRecordEvent();
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectDb([{ tier: 'premium', status: 'active' }])),
+      );
+
+      const result = await handler(makeEvent());
+
+      expect(result.statusCode).toBe(200);
+      expect(mockSendGa4ServerEvent).toHaveBeenCalledWith(
+        42,
+        'subscription_renewed',
+        { tier: 'premium', source: 'stripe' },
+      );
+    });
+
+    it('does not fire subscription_renewed GA4 when billing_reason is not subscription_cycle', async () => {
+      mockConstructEvent.mockReturnValue(
+        fakeStripeEvent({
+          type: 'invoice.payment_succeeded',
+          data: {
+            object: {
+              parent: {
+                subscription_details: { subscription: 'sub_123' },
+              },
+              billing_reason: 'manual',
+            },
+          },
+        }),
+      );
+
+      setupNotProcessed();
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectThenUpdateDb([{ userId: 42 }])),
+      );
+      setupRecordEvent();
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectDb([{ tier: 'premium', status: 'active' }])),
+      );
+
+      await handler(makeEvent());
+
+      expect(mockSendGa4ServerEvent).not.toHaveBeenCalled();
     });
   });
 

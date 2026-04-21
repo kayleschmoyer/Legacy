@@ -469,11 +469,18 @@ async function handleDonationCheckoutCompleted(
   const userId = userIdStr ? parseUserId(userIdStr) : null;
 
   if (userId !== null) {
-    await sendGa4ServerEvent(userId, 'donation_completed', {
-      value: amountTotal / 100,
-      currency: currency.toUpperCase(),
-      source: 'stripe_payment_link',
-    });
+    try {
+      await sendGa4ServerEvent(userId, 'donation_completed', {
+        value: amountTotal / 100,
+        currency: currency.toUpperCase(),
+        source: 'stripe_payment_link',
+      });
+    } catch (err) {
+      LOGGER.warn('donation_completed GA4 event failed (non-fatal)', {
+        err,
+        userId,
+      });
+    }
   }
 }
 
@@ -549,11 +556,6 @@ async function handleCheckoutSessionCompleted(
     stripeCustomerId,
     stripeSubscriptionId,
     status: subscription.status,
-  });
-
-  await sendGa4ServerEvent(userId, 'subscription_started', {
-    tier: 'premium',
-    source: 'stripe',
   });
 
   return userId;
@@ -992,16 +994,6 @@ async function handleChargeRefunded(
     });
   }
 
-  const transactionId =
-    typeof charge.payment_intent === 'string'
-      ? charge.payment_intent
-      : charge.id;
-  await sendGa4ServerEvent(userId, 'refund', {
-    transaction_id: transactionId,
-    value: amountRefunded / 100,
-    currency: (charge.currency ?? 'usd').toUpperCase(),
-  });
-
   return { userId, subscriptionId: stripeSubscriptionId };
 }
 
@@ -1211,6 +1203,11 @@ const baseStripeWebhookHandler = async (
   let subscriptionStatus: string | null = null;
   let invoiceAmount: number | null = null;
   let invoiceCurrency: string | null = null;
+  let ga4SideEffect: {
+    userId: number;
+    eventName: string;
+    params: Record<string, string | number | undefined>;
+  } | null = null;
 
   try {
     switch (stripeEvent.type) {
@@ -1226,6 +1223,13 @@ const baseStripeWebhookHandler = async (
             : null;
         customerId =
           typeof session.customer === 'string' ? session.customer : null;
+        if (userId !== null) {
+          ga4SideEffect = {
+            userId,
+            eventName: 'subscription_started',
+            params: { tier: 'premium', source: 'stripe' },
+          };
+        }
         break;
       }
 
@@ -1258,10 +1262,11 @@ const baseStripeWebhookHandler = async (
         customerId = typeof sub.customer === 'string' ? sub.customer : null;
         subscriptionStatus = 'canceled';
         if (userId !== null) {
-          await sendGa4ServerEvent(userId, 'subscription_cancelled', {
-            tier: 'premium',
-            source: 'stripe',
-          });
+          ga4SideEffect = {
+            userId,
+            eventName: 'subscription_cancelled',
+            params: { tier: 'premium', source: 'stripe' },
+          };
         }
         break;
       }
@@ -1279,16 +1284,17 @@ const baseStripeWebhookHandler = async (
           typeof invoice.customer === 'string' ? invoice.customer : null;
         invoiceAmount = invoice.amount_paid ?? null;
         invoiceCurrency = invoice.currency ?? null;
-        // Fire subscription_renewed for recurring payments only — the initial
+        // Queue subscription_renewed for recurring payments only — the initial
         // payment is already covered by checkout.session.completed.
         if (
           userId !== null &&
           invoice.billing_reason === 'subscription_cycle'
         ) {
-          await sendGa4ServerEvent(userId, 'subscription_renewed', {
-            tier: 'premium',
-            source: 'stripe',
-          });
+          ga4SideEffect = {
+            userId,
+            eventName: 'subscription_renewed',
+            params: { tier: 'premium', source: 'stripe' },
+          };
         }
         break;
       }
@@ -1316,6 +1322,27 @@ const baseStripeWebhookHandler = async (
         subscriptionId = refundResult?.subscriptionId ?? null;
         customerId =
           typeof charge.customer === 'string' ? charge.customer : null;
+        if (userId !== null) {
+          const transactionId =
+            typeof charge.payment_intent === 'string'
+              ? charge.payment_intent
+              : charge.id;
+          ga4SideEffect = {
+            userId,
+            eventName: 'refund',
+            params: {
+              transaction_id: transactionId,
+              value:
+                (typeof charge.amount_refunded === 'number'
+                  ? charge.amount_refunded
+                  : 0) / 100,
+              currency: (typeof charge.currency === 'string'
+                ? charge.currency
+                : 'usd'
+              ).toUpperCase(),
+            },
+          };
+        }
         break;
       }
 
@@ -1385,6 +1412,24 @@ const baseStripeWebhookHandler = async (
       statusCode: 500,
       body: JSON.stringify({ error: 'Internal server error' }),
     };
+  }
+
+  // Fire any queued GA4 analytics event outside the claim-releasing try block.
+  // Non-fatal: a GA4 failure must never trigger a Stripe retry or 5xx response.
+  if (ga4SideEffect !== null) {
+    try {
+      await sendGa4ServerEvent(
+        ga4SideEffect.userId,
+        ga4SideEffect.eventName,
+        ga4SideEffect.params,
+      );
+    } catch (err) {
+      LOGGER.warn('GA4 side-effect event failed (non-fatal)', {
+        err,
+        eventName: ga4SideEffect.eventName,
+        userId: ga4SideEffect.userId,
+      });
+    }
   }
 
   // Push real-time tier update to the user's WebSocket connections.
