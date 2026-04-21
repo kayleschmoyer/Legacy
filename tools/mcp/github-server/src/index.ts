@@ -47,6 +47,7 @@ import {
   resolveActionSha,
   resolveActionShas,
 } from './tools/resolve-action-sha.js';
+import { enableAutoMerge } from './tools/enable-auto-merge.js';
 
 // Node.js native fetch (undici) does not respect HTTPS_PROXY / GLOBAL_AGENT_HTTPS_PROXY
 // by default. In cloud sessions the egress proxy is required; set the global dispatcher
@@ -815,7 +816,7 @@ server.tool(
 // --- github_merge_pr ---
 server.tool(
   'github_merge_pr',
-  'Prefer this over `gh pr merge` via shell. Merge a PR. Default: merge queue (--auto --squash). "direct" uses --admin (requires authorization). Pass the PR number as "number" (preferred) or "prNumber" (alias). NOTE: PRs that modify .github/workflows/ files require the PAT to have the `workflow` OAuth scope — if the merge returns a 403 mentioning "workflow scope", escalate to the user to merge manually or reconfigure the token.',
+  'Prefer this over `gh pr merge` via shell. Merge a PR. Default: merge queue (strategy: "queue") — enables auto-merge via GraphQL, no local git checkout. "direct" uses --admin (requires authorization). Pass the PR number as "number" (preferred) or "prNumber" (alias). NOTE: PRs that modify .github/workflows/ files require the PAT to have the `workflow` OAuth scope — if the merge returns a 403 mentioning "workflow scope", escalate to the user to merge manually or reconfigure the token. To enable auto-merge with a configurable merge method, use `github_pr_enable_auto_merge` instead.',
   {
     number: z.coerce.number().int().positive().optional().describe('PR number'),
     prNumber: z.coerce
@@ -845,6 +846,54 @@ server.tool(
       };
     }
     return mergePR({ number: resolved, strategy: params.strategy });
+  },
+);
+
+// --- github_pr_enable_auto_merge ---
+server.tool(
+  'github_pr_enable_auto_merge',
+  'Enable auto-merge on a PR via the GitHub GraphQL API. The PR will merge automatically once all required checks pass. Use this instead of `gh pr merge --auto`, which fails in worktree sessions because it tries to check out the base branch locally. Pass the PR number as "number" (preferred) or "prNumber" (alias).',
+  {
+    number: z.coerce.number().int().positive().optional().describe('PR number'),
+    prNumber: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Alias for "number" — use either, not both'),
+    mergeMethod: z
+      .enum(['SQUASH', 'MERGE', 'REBASE'])
+      .default('SQUASH')
+      .describe('Merge method to use when auto-merging (default: SQUASH)'),
+  },
+  async (params) => {
+    if (params.number !== undefined && params.prNumber !== undefined) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: 'Ambiguous input: both "number" and "prNumber" were provided. Pass only one.',
+          },
+        ],
+      };
+    }
+    const resolved = params.number ?? params.prNumber;
+    if (!resolved) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: 'Missing required parameter: provide "number" (or alias "prNumber") with a positive integer PR number.',
+          },
+        ],
+      };
+    }
+    return enableAutoMerge({
+      prNumber: resolved,
+      mergeMethod: params.mergeMethod,
+    });
   },
 );
 

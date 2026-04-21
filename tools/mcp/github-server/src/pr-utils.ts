@@ -1,6 +1,35 @@
 import { getRepoOwnerName } from './auth.js';
 import { githubGraphQL } from './github-api.js';
 
+interface PRNodeIdResponse {
+  repository: {
+    pullRequest: { id: string } | null;
+  };
+}
+
+const PR_NODE_ID_QUERY = `
+query($owner: String!, $repo: String!, $number: Int!) {
+  repository(owner: $owner, name: $repo) {
+    pullRequest(number: $number) { id }
+  }
+}`;
+
+/**
+ * Resolve the GraphQL node ID for a pull request.
+ * Returns the node ID string (e.g. "PR_..."), or null if not found.
+ */
+export async function resolvePullRequestNodeId(
+  prNumber: number,
+): Promise<string | null> {
+  const repo = await getRepoOwnerName();
+  const result = await githubGraphQL<PRNodeIdResponse>(PR_NODE_ID_QUERY, {
+    owner: repo.owner,
+    repo: repo.name,
+    number: prNumber,
+  });
+  return result.data.repository.pullRequest?.id ?? null;
+}
+
 export interface PRCommitResponse {
   repository: {
     pullRequest: {

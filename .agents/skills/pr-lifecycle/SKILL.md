@@ -117,6 +117,25 @@ Before the next push, also check whether any other blockers are already known on
 
 > **Mapping comment IDs to thread IDs**: `github_resolve_threads` now handles this automatically. If you have a comment's `databaseId` (numeric) but not its thread's PRRT\_ node ID, pass the `databaseId` values via `commentDatabaseIds` with `prNumber` — no raw GraphQL fallback needed.
 
+## Enabling Auto-Merge from Worktrees
+
+> **⛔ Never use `gh pr merge --auto` from a worktree session.** The `gh` CLI shells out to `git` to check out the base branch locally before enabling auto-merge. When the parent repo already has `main` checked out (always the case in our worktree workflow), this fails with:
+>
+> ```
+> fatal: 'main' is already used by worktree at 'D:/code/legacy-sports'
+> ```
+
+Use `github_pr_enable_auto_merge` instead — it calls the `enablePullRequestAutoMerge` GraphQL mutation directly with no local git operations:
+
+```
+github_pr_enable_auto_merge(number: <PR#>)                          # default: SQUASH
+github_pr_enable_auto_merge(number: <PR#>, mergeMethod: "REBASE")  # or MERGE
+```
+
+The PR will auto-merge once all required checks pass. This works from any worktree, cloud session, or headless environment.
+
+> `github_merge_pr(strategy: "queue")` also uses GraphQL under the hood and is equivalent for the default SQUASH case. Use `github_pr_enable_auto_merge` when you want explicit control over `mergeMethod` or want to make the auto-merge intent clear without triggering a full merge attempt.
+
 ## Merge Queue Blocked: "A conversation must be resolved"
 
 When the merge queue rejects a PR with **"Repository rule violations found: A conversation must be resolved before this pull request can be merged"**, follow this workflow:
@@ -180,6 +199,10 @@ github_mark_pr_ready(number: <PR#>)
 mcp__github__subscribe_pr_activity(pullRequestNumber: <PR#>)  # Claude Code built-in ONLY — NOT in legacy-sports-github; unavailable in cloud/headless; fallback: poll via github_view_pr + ci_list_runs with ScheduleWakeup
 github_request_review(prs: [<PR#>])
 jira_transition(key: "LS-####", status: "In Review")
+
+# Enable auto-merge (worktree-safe — use instead of `gh pr merge --auto`)
+github_pr_enable_auto_merge(number: <PR#>)                         # SQUASH (default)
+github_pr_enable_auto_merge(number: <PR#>, mergeMethod: "REBASE")  # or MERGE
 ```
 
 <details>
