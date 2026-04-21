@@ -167,8 +167,9 @@ test.describe('On This Day Feed @smoke', () => {
     await page.goto('/');
     await page.waitForLoadState('load');
 
-    // Player name should appear
-    await expect(page.getByText('Babe Ruth')).toBeVisible();
+    // Player name should appear — use .first() because Tamagui renders Text as
+    // <p><span>, so getByText matches both the wrapper and inner span
+    await expect(page.getByText('Babe Ruth').first()).toBeVisible();
 
     // Season badge
     await expect(page.getByText('1927')).toBeVisible();
@@ -186,7 +187,7 @@ test.describe('On This Day Feed @smoke', () => {
     await page.goto('/');
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Bob Gibson')).toBeVisible();
+    await expect(page.getByText('Bob Gibson').first()).toBeVisible();
     await expect(page.getByText('1968')).toBeVisible();
 
     // Pitching summary includes innings pitched and strikeouts
@@ -204,8 +205,8 @@ test.describe('On This Day Feed @smoke', () => {
     await page.goto('/');
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Babe Ruth')).toBeVisible();
-    await expect(page.getByText('Bob Gibson')).toBeVisible();
+    await expect(page.getByText('Babe Ruth').first()).toBeVisible();
+    await expect(page.getByText('Bob Gibson').first()).toBeVisible();
   });
 });
 
