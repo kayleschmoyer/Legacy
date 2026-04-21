@@ -78,7 +78,8 @@ export async function selectAndAssignGameIdentifiers(
     `Found ${uniqueGames.length} unique games for player ${playerId} season ${season}`,
   );
 
-  // Get records that need game_identifier assignment (null gameIdentifier)
+  // Get records that need game_identifier assignment (null gameIdentifier, not SP-skipped).
+  // spSkipped rows are intentional placeholders — never assign them a real game.
   const unassignedGames = await db
     .select()
     .from(PublicSchema.matchupPlayerGames)
@@ -86,6 +87,7 @@ export async function selectAndAssignGameIdentifiers(
       and(
         eq(PublicSchema.matchupPlayerGames.matchupPlayerId, matchupPlayerId),
         isNull(PublicSchema.matchupPlayerGames.gameIdentifier),
+        eq(PublicSchema.matchupPlayerGames.spSkipped, false),
       ),
     );
 
