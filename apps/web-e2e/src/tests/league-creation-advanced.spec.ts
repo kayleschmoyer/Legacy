@@ -8,8 +8,12 @@
  * top-level GraphQL error handling.
  */
 
-import { createCustomAuthTest, expect } from '../fixtures/auth-enhanced';
-import { test } from '../fixtures/auth-enhanced';
+import {
+  adminTest,
+  createCustomAuthTest,
+  expect,
+  test,
+} from '../fixtures/auth-enhanced';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 
 const freeUserTest = createCustomAuthTest('freeuser@test.com', 'none');
@@ -308,8 +312,12 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     // Expand the Draft Settings section
     await expandSection(page, 'draft');
 
-    await expect(page.getByRole('button', { name: 'Snake' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Linear' })).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Snake', exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Linear', exact: true }),
+    ).toBeVisible();
     await expect(
       page.getByText('Snake order reverses each round'),
     ).toBeVisible();
@@ -383,7 +391,9 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     await expandSection(page, 'era-history');
 
     await expect(page.getByText('Historical Era Filter')).toBeVisible();
-    await expect(page.getByText('All Eras')).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: /All Eras 1871/ }),
+    ).toBeVisible();
     await expect(page.getByText('Dead Ball (pre-1920)')).toBeVisible();
     await expect(page.getByText('Modern (2006+)')).toBeVisible();
   });
@@ -476,28 +486,29 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     ).toBeVisible();
   });
 
-  test('should show salary cap limit input when Enable Salary Cap is toggled', async ({
-    page,
-  }) => {
-    await page.goto('/baseball/league/create');
-    await page.waitForLoadState('networkidle');
+  adminTest(
+    'should show salary cap limit input when Enable Salary Cap is toggled',
+    async ({ page }) => {
+      await page.goto('/baseball/league/create');
+      await page.waitForLoadState('networkidle');
 
-    // Expand the Waivers, Budget & Salary Cap section
-    await expandSection(page, 'waiver-budget');
+      // Expand the Waivers, Budget & Salary Cap section
+      await expandSection(page, 'waiver-budget');
 
-    // Cap limit input should not be visible initially
-    await expect(page.getByPlaceholder('e.g. 50000000')).not.toBeVisible();
+      // Cap limit input should not be visible initially
+      await expect(page.getByPlaceholder('e.g. 50000000')).not.toBeVisible();
 
-    // Click the Enable Salary Cap toggle
-    await page.getByText('Enable Salary Cap').click();
+      // Click the "On" button in the Enable Salary Cap PillToggle
+      await page.getByRole('button', { name: 'On', exact: true }).click();
 
-    // Cap limit input should now be visible
-    await expect(page.getByPlaceholder('e.g. 50000000')).toBeVisible();
-    await expect(page.getByText('Salary Cap Limit')).toBeVisible();
-    await expect(
-      page.getByText('Maximum total salary each team can spend'),
-    ).toBeVisible();
-  });
+      // Cap limit input should now be visible
+      await expect(page.getByPlaceholder('e.g. 50000000')).toBeVisible();
+      await expect(page.getByText('Salary Cap Limit')).toBeVisible();
+      await expect(
+        page.getByText('Maximum total salary each team can spend'),
+      ).toBeVisible();
+    },
+  );
 
   // ─── Form Validation (inline error card) ──────────────────────────────────
 
