@@ -181,3 +181,32 @@ export const DISCORD_BLURPLE_DARK = '#4752C4';
 export const INJURY_HEALTHY = '#22C55E';
 export const INJURY_QUESTIONABLE = '#FBBF24';
 export const INJURY_OUT = '#EF4444';
+
+// ─── Extended Surface & Border Tokens ──────────────────────
+
+/** Deep background — hero panel, elevated surfaces in homepage layouts. */
+export const SURFACE_DEEP = '#0F1A2D';
+/** Hover/focus surface — used for interactive row hover states. */
+export const SURFACE_HOVER = '#1C2A47';
+/** Strong border — dividers and card borders at higher contrast than PANEL_BORDER. */
+export const BORDER_STRONG = '#2F3B53';
+/** Interactive border on hover/focus states. */
+export const BORDER_INTERACTIVE = '#4D5D80';
+
+// ─── Extended Text Tokens ───────────────────────────────────
+
+/** Secondary text — labels, subtitles, less-prominent content. */
+export const TEXT_SECONDARY = '#8A9BB5';
+/** Dim/separator text — separators, decorative mid-tone accents. */
+export const TEXT_SEPARATOR = '#445676';
+/** Tertiary text — further muted, de-emphasized content. */
+export const TEXT_TERTIARY = '#6C80BA';
+/** Interface text — high-contrast on dark backgrounds (lighter than TEXT_PRIMARY). */
+export const TEXT_INTERFACE = '#E8EDF5';
+
+// ─── Score / Status Colors ──────────────────────────────────
+
+/** Loss accent — score highlighting for losing matchup side. */
+export const SCORE_LOSS = '#E07A8C';
+/** Warm amber text — "coming soon" labels and soft warning states. */
+export const AMBER_WARM = '#E3B870';
