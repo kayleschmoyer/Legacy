@@ -339,23 +339,8 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
             );
           }
 
-          await updateMatchupStatus(db, message.matchupId, finalStatus, {
-            status: matchupMainStatus,
-          });
-
-          LOGGER.info(
-            `Set matchup ${message.matchupId} stats_loading_status to '${finalStatus}'${matchupMainStatus ? ` and status to '${matchupMainStatus}'` : ''}`,
-            {
-              successfulPlayers: message.players.length - failedPlayerCount,
-              failedPlayers: failedPlayerCount,
-              retryablePlayers: retryablePlayerCount,
-              hitRateLimit,
-              retryCount,
-              maxRetries,
-            },
-          );
-
-          // Calculate and persist matchup scores after stats loading completes
+          // Calculate scores before marking status 'completed' so that any
+          // consumer polling statsLoadingStatus sees scores already persisted.
           if (finalStatus === 'completed') {
             try {
               // Fetch league-specific scoring multipliers (snake_case keys from DB)
@@ -425,6 +410,22 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
               // scores can be recalculated later via the standalone handler
             }
           }
+
+          await updateMatchupStatus(db, message.matchupId, finalStatus, {
+            status: matchupMainStatus,
+          });
+
+          LOGGER.info(
+            `Set matchup ${message.matchupId} stats_loading_status to '${finalStatus}'${matchupMainStatus ? ` and status to '${matchupMainStatus}'` : ''}`,
+            {
+              successfulPlayers: message.players.length - failedPlayerCount,
+              failedPlayers: failedPlayerCount,
+              retryablePlayers: retryablePlayerCount,
+              hitRateLimit,
+              retryCount,
+              maxRetries,
+            },
+          );
 
           // Send notification that all matchup stats are complete (using cached leagueId)
           if (
