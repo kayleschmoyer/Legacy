@@ -142,6 +142,89 @@ resource "aws_iam_policy" "github_actions_runners" {
         Resource = [
           "arn:aws:s3:::${local.name_prefix}-runner-*/*"
         ]
+      },
+
+      # IAM OIDC provider read — required by data "aws_iam_openid_connect_provider"
+      # in data.tf (looks up the GitHub Actions OIDC provider by URL).
+      # ListOpenIDConnectProviders is an account-level list operation; resource
+      # must be "*". GetOpenIDConnectProvider is needed to read the provider attrs.
+      {
+        Sid    = "RunnerOIDCProviderRead"
+        Effect = "Allow"
+        Action = [
+          "iam:ListOpenIDConnectProviders",
+          "iam:GetOpenIDConnectProvider"
+        ]
+        Resource = ["*"]
+      },
+
+      # SNS topic read — required by data "aws_sns_topic" in data.tf (looks up
+      # the ops-alerts topic by name). ListTopics is account-level (resource = "*");
+      # GetTopicAttributes is needed for the data source to read topic attributes.
+      {
+        Sid    = "RunnerSNSRead"
+        Effect = "Allow"
+        Action = [
+          "sns:ListTopics",
+          "sns:GetTopicAttributes"
+        ]
+        Resource = ["*"]
+      },
+
+      # CloudWatch Logs broad describe — Terraform's AWS provider calls
+      # DescribeLogGroups without a prefix filter when refreshing log group state,
+      # which IAM evaluates against the root log-group ARN. The prefix-scoped
+      # permissions in RunnerCloudWatchLogsRead cover targeted reads; this covers
+      # the account-level list call that the provider issues on every plan/apply.
+      {
+        Sid    = "RunnerCloudWatchLogsDescribeAll"
+        Effect = "Allow"
+        Action = ["logs:DescribeLogGroups"]
+        Resource = ["*"]
+      },
+
+      # CloudWatch Dashboard CRUD — required by aws_cloudwatch_dashboard in
+      # runner-dashboard.tf (runner performance monitoring dashboard).
+      # ListDashboards does not support resource-level permissions; kept separate.
+      {
+        Sid    = "RunnerCloudWatchDashboard"
+        Effect = "Allow"
+        Action = [
+          "cloudwatch:GetDashboard",
+          "cloudwatch:PutDashboard",
+          "cloudwatch:DeleteDashboards"
+        ]
+        Resource = [
+          "arn:aws:cloudwatch::${local.account_id}:dashboard/${local.name_prefix}-*"
+        ]
+      },
+      {
+        Sid    = "RunnerCloudWatchDashboardList"
+        Effect = "Allow"
+        Action = ["cloudwatch:ListDashboards"]
+        Resource = ["*"]
+      },
+
+      # Cost Explorer anomaly detection CRUD — required by aws_ce_anomaly_monitor
+      # and aws_ce_anomaly_subscription in runner-monitoring.tf.
+      # CE operates globally (no region in ARNs).
+      {
+        Sid    = "RunnerCostExplorerAnomaly"
+        Effect = "Allow"
+        Action = [
+          "ce:GetAnomalyMonitors",
+          "ce:CreateAnomalyMonitor",
+          "ce:UpdateAnomalyMonitor",
+          "ce:DeleteAnomalyMonitor",
+          "ce:GetAnomalySubscriptions",
+          "ce:CreateAnomalySubscription",
+          "ce:UpdateAnomalySubscription",
+          "ce:DeleteAnomalySubscription",
+          "ce:TagResource",
+          "ce:UntagResource",
+          "ce:ListTagsForResource"
+        ]
+        Resource = ["*"]
       }
     ]
   })

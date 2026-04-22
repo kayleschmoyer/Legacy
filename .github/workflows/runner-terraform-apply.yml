@@ -169,3 +169,12 @@ jobs:
             echo "⚠️ Terraform lock item exists. Review the lock holder/Info above before any manual cleanup."
             echo "⚠️ Terraform lock item exists. Review the job logs for the DynamoDB lock contents before manually clearing a stale lock." >> "$GITHUB_STEP_SUMMARY"
           fi
+
+      - name: Discord error notification
+        if: always() && failure()
+        uses: ./.github/actions/discord-notify
+        with:
+          webhook-url: ${{ secrets.DISCORD_ERRORS_WEBHOOK_URL }}
+          status: failure
+          title: "Runner Infrastructure Apply Failed"
+          description: "Runner Terraform apply failed — self-hosted CI runners may not launch until this is resolved."
