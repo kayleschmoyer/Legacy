@@ -3,10 +3,12 @@ command = "node"
 args = [".github/copilot/hooks/mcp-bootstrap.mjs", "node", "--import", "tsx", "tools/mcp/worktree-server/src/index.ts"]
 
 [mcp_servers.legacy-sports-github]
-url = "http://localhost:4196"
+command = "node"
+args = [".github/copilot/hooks/mcp-bootstrap.mjs", "node", "--import", "tsx", "tools/mcp/github-server/src/index.ts"]
 
 [mcp_servers.legacy-sports-jira]
-url = "http://localhost:4195"
+command = "node"
+args = [".github/copilot/hooks/mcp-bootstrap.mjs", "node", "--import", "tsx", "tools/mcp/jira-server/src/index.ts"]
 
 [mcp_servers.legacy-sports-make]
 command = "node"
@@ -21,7 +23,8 @@ command = "node"
 args = [".github/copilot/hooks/mcp-bootstrap.mjs", "node", "--import", "tsx", "tools/mcp/db-server/src/index.ts"]
 
 [mcp_servers.legacy-sports-ci]
-url = "http://localhost:4197"
+command = "node"
+args = [".github/copilot/hooks/mcp-bootstrap.mjs", "node", "--import", "tsx", "tools/mcp/ci-server/src/index.ts"]
 
 [mcp_servers.legacy-sports-ci-local]
 command = "node"
