@@ -289,4 +289,23 @@ describe('getPrReviewThreads', () => {
       getPrReviewThreads(MOCK_TOKEN, 'owner', 'repo', 1),
     ).rejects.toThrow('500');
   });
+
+  it('returns partial results and does not throw when MAX_PAGES is exhausted', async () => {
+    // Simulate 10 pages (MAX_PAGES), each reporting hasNextPage=true.
+    // The function should stop after 10 requests and return what it has.
+    for (let i = 0; i < 10; i++) {
+      mockFetch.mockResolvedValueOnce(
+        GRAPHQL_RESPONSE(
+          [{ isResolved: false, isOutdated: false, authorLogin: `user-${i}` }],
+          true, // always more pages
+          `cursor-${i}`,
+        ),
+      );
+    }
+
+    const threads = await getPrReviewThreads(MOCK_TOKEN, 'owner', 'repo', 1);
+
+    expect(threads).toHaveLength(10);
+    expect(mockFetch).toHaveBeenCalledTimes(10);
+  });
 });

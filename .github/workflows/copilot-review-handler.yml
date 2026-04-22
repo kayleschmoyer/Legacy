@@ -1,0 +1,175 @@
+name: Copilot Review Handler
+
+# Copilot (a GitHub App) does not fire repository webhook events when it submits
+# a pull_request_review — only App-to-App events, which never reach our webhook
+# Lambda. workflow_run is the only supported trigger that fires in the default-
+# branch context (where secrets are available) after Copilot finishes.
+#
+# This workflow is the Copilot-review half of the bot-review state machine.
+# The webhook Lambda owns the other half: pull_request lifecycle events and
+# human pull_request_review events. The two writers are complementary, not
+# conflicting — they handle disjoint event sources.
+#
+# Known limitation: workflow_run only fires when the triggering workflow ran on
+# the same repository (not forks). Fork PRs are already skipped via the `if:`
+# guard below, and the Lambda's fork-PR check provides an additional safeguard.
+on:
+  workflow_run:
+    workflows: ["Copilot code review"]
+    types: [completed]
+
+permissions:
+  checks: write
+  issues: write
+  contents: read
+  pull-requests: read
+
+jobs:
+  set-bot-review:
+    runs-on: ubuntu-latest
+    # Skip fork PRs — they run on a different repository.
+    if: github.event.workflow_run.head_repository.full_name == github.repository
+    steps:
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          script: |
+            const headSha = context.payload.workflow_run.head_sha;
+            const prs     = context.payload.workflow_run.pull_requests;
+
+            if (!prs || prs.length === 0) {
+              core.info('No associated PRs on this workflow_run — skipping');
+              return;
+            }
+
+            const prNumber = prs[0].number;
+            const { owner, repo } = context.repo;
+
+            core.info(`Handling Copilot review for PR #${prNumber}, SHA ${headSha}`);
+
+            const COPILOT_LOGINS = new Set([
+              'copilot-pull-request-reviewer',
+              'copilot-pull-request-reviewer[bot]',
+              'Copilot',
+            ]);
+
+            // ── 1. Find the latest Copilot review for this exact SHA ──────────
+
+            const { data: reviews } = await github.rest.pulls.listReviews({
+              owner, repo, pull_number: prNumber,
+            });
+
+            const copilotReviews = reviews
+              .filter(r => COPILOT_LOGINS.has(r.user.login) && r.commit_id === headSha)
+              .sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at));
+
+            if (copilotReviews.length === 0) {
+              core.info('No Copilot review found for current SHA — skipping');
+              return;
+            }
+
+            const latest = copilotReviews[0];
+            const copilotCleared =
+              latest.state === 'APPROVED' ||
+              (latest.body || '').includes("wasn't able to review any files");
+
+            core.info(`Latest Copilot review state=${latest.state}, copilotCleared=${copilotCleared}`);
+
+            // Helper to create (or overwrite) the bot-review check run.
+            async function createCheck(conclusion, title, summary) {
+              await github.rest.checks.create({
+                owner, repo,
+                name: 'bot-review',
+                head_sha: headSha,
+                status: 'completed',
+                conclusion,
+                output: { title, summary },
+              });
+              core.info(`Set bot-review=${conclusion}`);
+            }
+
+            // ── 2. Copilot left comments → immediate failure ──────────────────
+
+            if (!copilotCleared) {
+              await createCheck(
+                'failure',
+                'Review blocked',
+                'Copilot left review comments — resolve all threads to proceed',
+              );
+              return;
+            }
+
+            // ── 3. Copilot cleared → fetch all review threads (paginated) ─────
+
+            const MAX_THREADS = 1000; // >1 000 threads is unreachable in practice
+            const allThreadNodes = [];
+            let cursor = null;
+            let hasNextPage = true;
+
+            while (hasNextPage) {
+              const { repository } = await github.graphql(`
+                query($owner: String!, $repo: String!, $number: Int!, $cursor: String) {
+                  repository(owner: $owner, name: $repo) {
+                    pullRequest(number: $number) {
+                      reviewThreads(first: 100, after: $cursor) {
+                        pageInfo { hasNextPage endCursor }
+                        nodes {
+                          isResolved
+                          isOutdated
+                          comments(first: 1) {
+                            nodes { author { login } }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              `, { owner, repo, number: prNumber, cursor });
+
+              const { nodes, pageInfo } = repository.pullRequest.reviewThreads;
+              allThreadNodes.push(...nodes);
+              hasNextPage = pageInfo.hasNextPage;
+              cursor = pageInfo.endCursor;
+
+              if (allThreadNodes.length > MAX_THREADS) {
+                core.warning(`PR #${prNumber} has >${MAX_THREADS} review threads — setting failure as safe default`);
+                await createCheck(
+                  'failure',
+                  'Review check incomplete',
+                  `PR has more than ${MAX_THREADS} review threads and cannot be evaluated safely`,
+                );
+                return;
+              }
+            }
+
+            // ── 4. Check for unresolved non-Copilot threads ───────────────────
+
+            const unresolved = allThreadNodes.filter(t => {
+              if (t.isResolved || t.isOutdated) return false;
+              const authorLogin = t.comments.nodes[0]?.author?.login ?? null;
+              // Copilot threads are bypassed because copilotCleared=true
+              if (authorLogin !== null && COPILOT_LOGINS.has(authorLogin)) return false;
+              return true;
+            });
+
+            if (unresolved.length > 0) {
+              await createCheck(
+                'failure',
+                'Review blocked',
+                `PR has ${unresolved.length} unresolved non-Copilot thread(s)`,
+              );
+              return;
+            }
+
+            // ── 5. All clear → success + label ───────────────────────────────
+
+            await createCheck(
+              'success',
+              'Copilot review passed',
+              'All review threads resolved',
+            );
+
+            await github.rest.issues.addLabels({
+              owner, repo,
+              issue_number: prNumber,
+              labels: ['merge-when-ready'],
+            });

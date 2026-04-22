@@ -4,6 +4,8 @@ import * as githubApp from './github-app';
 jest.mock('./github-app');
 
 const mockGetInstallationToken = githubApp.getInstallationToken as jest.Mock;
+const mockGetRepoInstallationToken =
+  githubApp.getRepoInstallationToken as jest.Mock;
 const mockGetPrReviews = githubApp.getPrReviews as jest.Mock;
 const mockCreateCheckRun = githubApp.createCheckRun as jest.Mock;
 const mockCreateInProgressCheckRun =
@@ -33,6 +35,7 @@ beforeEach(() => {
   jest.resetAllMocks();
   jest.useFakeTimers();
   mockGetInstallationToken.mockResolvedValue('tok-test');
+  mockGetRepoInstallationToken.mockResolvedValue('tok-test');
   mockGetPrReviews.mockResolvedValue([]);
   mockCreateCheckRun.mockResolvedValue(undefined);
   mockCreateInProgressCheckRun.mockResolvedValue(undefined);
@@ -54,13 +57,19 @@ describe('handlePullRequestEvent — ignored cases', () => {
     expect(mockCreateInProgressCheckRun).not.toHaveBeenCalled();
   });
 
-  it('returns early when installation.id is missing', async () => {
+  it('falls back to repo installation lookup when installation.id is missing', async () => {
     const result = await handlePullRequestEvent(
       { ...BASE_PAYLOAD, action: 'opened', installation: undefined },
       'pk',
     );
-    expect(result).toMatch(/missing installation\.id/);
+    expect(result).toMatch(/in_progress/);
     expect(mockGetInstallationToken).not.toHaveBeenCalled();
+    expect(mockGetRepoInstallationToken).toHaveBeenCalledWith(
+      3142924,
+      'pk',
+      'bkrupa',
+      'legacy-sports',
+    );
   });
 
   it('ignores fork PRs', async () => {
@@ -166,7 +175,9 @@ describe('handlePullRequestEvent — review_request_removed', () => {
     );
     await jest.runAllTimersAsync();
     const result = await promise;
-    expect(result).toMatch(/clean pass/);
+    expect(result).toMatch(
+      /bot-review=success.*Copilot removed without review/,
+    );
     expect(mockCreateCheckRun).toHaveBeenCalledWith(
       'tok-test',
       'bkrupa',

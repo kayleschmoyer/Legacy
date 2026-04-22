@@ -3,6 +3,9 @@ import { LOGGER } from '@legacy-sports/logging';
 
 const GITHUB_API = 'https://api.github.com';
 
+/** Maximum number of pages to fetch per paginated GraphQL call (100 nodes/page → 1 000 threads max). */
+const MAX_PAGES = 10;
+
 /** Default request timeout for GitHub API calls (15s — well inside the 30s Lambda timeout) */
 export const REQUEST_TIMEOUT_MS = 15_000;
 
@@ -190,8 +193,10 @@ export async function getPrReviewThreads(
 
   let cursor: string | null = null;
   let hasNextPage = true;
+  let pages = 0;
 
-  while (hasNextPage) {
+  while (hasNextPage && pages < MAX_PAGES) {
+    pages++;
     const resp = await fetch('https://api.github.com/graphql', {
       method: 'POST',
       headers: {
@@ -255,6 +260,18 @@ export async function getPrReviewThreads(
 
     hasNextPage = reviewThreads.pageInfo.hasNextPage;
     cursor = reviewThreads.pageInfo.endCursor;
+  }
+
+  if (hasNextPage) {
+    // >1 000 review threads is effectively unreachable in practice. Throwing
+    // here would bubble to the Lambda handler, return a 500, and leave
+    // bot-review stuck in_progress. Log a warning and return what we have
+    // instead — the worst-case false-success for an absurdly large PR is
+    // preferable to leaving it permanently blocked.
+    LOGGER.warn(
+      'getPrReviewThreads hit MAX_PAGES limit — returning partial thread list',
+      { owner, repo, prNumber, maxPages: MAX_PAGES },
+    );
   }
 
   return threads;

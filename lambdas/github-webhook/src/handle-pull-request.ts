@@ -5,6 +5,7 @@ import {
   createInProgressCheckRun,
   getInstallationToken,
   getPrReviews,
+  getRepoInstallationToken,
   requestCopilotReview,
 } from './github-app';
 
@@ -70,15 +71,6 @@ export async function handlePullRequestEvent(
     authorLogin,
   });
 
-  const installationId = payload.installation?.id;
-  if (!installationId) {
-    LOGGER.warn('Ignoring pull_request event without installation.id', {
-      action,
-      prNumber,
-    });
-    return `Ignored pull_request ${action} for PR #${prNumber}: missing installation.id`;
-  }
-
   // Fork PRs don't have access to secrets — skip them.
   if (pr.head.repo.full_name !== pr.base.repo.full_name) {
     return `Ignored pull_request ${action} for PR #${prNumber}: fork PR`;
@@ -108,11 +100,26 @@ export async function handlePullRequestEvent(
     }
   }
 
-  const token = await getInstallationToken(
-    REVIEW_BOT_APP_ID,
-    botAppPrivateKey,
-    installationId,
-  );
+  // For lifecycle actions, ignore draft PRs before touching the GitHub API.
+  if (action !== 'review_request_removed' && pr.draft) {
+    return `Ignored pull_request ${action} for draft PR #${prNumber}`;
+  }
+
+  // pull_request events from plain git pushes (non-App context) don't carry
+  // installation.id. Fall back to a repo lookup when it's absent.
+  const installationId = payload.installation?.id;
+  const token = installationId
+    ? await getInstallationToken(
+        REVIEW_BOT_APP_ID,
+        botAppPrivateKey,
+        installationId,
+      )
+    : await getRepoInstallationToken(
+        REVIEW_BOT_APP_ID,
+        botAppPrivateKey,
+        owner,
+        repo,
+      );
 
   // ── review_request_removed ────────────────────────────────────────────────
 
@@ -159,10 +166,6 @@ export async function handlePullRequestEvent(
     });
     await addLabel(token, owner, repo, prNumber, 'merge-when-ready');
     return `Auto-passed bot-review for ${authorLogin} PR #${prNumber}`;
-  }
-
-  if (pr.draft) {
-    return `Ignored pull_request ${action} for draft PR #${prNumber}`;
   }
 
   await createInProgressCheckRun(token, owner, repo, {
