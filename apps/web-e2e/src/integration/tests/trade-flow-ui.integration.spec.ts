@@ -135,9 +135,13 @@ async function proposeTradeViaUI(
     timeout: 10000,
   });
 
-  // Wait for at least one player button to render in the dialog
+  // Wait for player buttons to render (not just the always-present close button).
+  // Using .first() races against myPlayers loading — the X close button resolves
+  // immediately before data arrives. Poll until count > 1 (close + ≥1 player).
   const dialogButtons = dialog.getByRole('button');
-  await expect(dialogButtons.first()).toBeVisible({ timeout: 15_000 });
+  await expect
+    .poll(async () => dialogButtons.count(), { timeout: 15_000 })
+    .toBeGreaterThan(1);
   const dialogCount = await dialogButtons.count();
 
   // Click the first player button (skip navigation/step buttons)
@@ -622,7 +626,10 @@ test.describe
         timeout: 10000,
       });
       const offerBtns = counterDialog.getByRole('button');
-      await expect(offerBtns.first()).toBeVisible({ timeout: 15_000 });
+      // Same race as Phase 5: poll until count > 1 so player buttons are loaded.
+      await expect
+        .poll(async () => offerBtns.count(), { timeout: 15_000 })
+        .toBeGreaterThan(1);
       const offerCount = await offerBtns.count();
       let offerPlayerClicked = false;
       for (let i = 0; i < offerCount; i++) {
