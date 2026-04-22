@@ -101,7 +101,59 @@ export async function getInstallationToken(
 }
 
 /**
- * Create a check run on a repository using the provided installation token.
+ * Find the in_progress check run by name and head SHA created by this app,
+ * returning its ID or null. Prefers in_progress status over completed so we
+ * update the run we actually want to close out, not a stale completed one.
+ * Only returns null when the check run genuinely doesn't exist (404 / empty
+ * list) — any other non-2xx response is surfaced as an error so transient
+ * failures don't silently fall back to POST and recreate the duplicate.
+ *
+ * Note: only check runs owned by the same GitHub App as `installationToken`
+ * are updatable. The Lambda (Review Bot App) can update its own runs; the
+ * copilot-review-handler workflow (GITHUB_TOKEN / github-actions app) cannot
+ * update Lambda-owned runs and must create a new one instead.
+ */
+async function findInProgressCheckRunId(
+  installationToken: string,
+  owner: string,
+  repo: string,
+  name: string,
+  headSha: string,
+): Promise<number | null> {
+  const resp = await fetch(
+    `${GITHUB_API}/repos/${owner}/${repo}/commits/${headSha}/check-runs?check_name=${encodeURIComponent(name)}&per_page=10`,
+    {
+      headers: {
+        Authorization: `Bearer ${installationToken}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    },
+  );
+
+  // 404 means the commit isn't indexed yet — treat as "not found"
+  if (resp.status === 404) return null;
+
+  if (!resp.ok) {
+    const body = await resp.text();
+    throw new Error(`Failed to look up check runs (${resp.status}): ${body}`);
+  }
+
+  const data = (await resp.json()) as {
+    total_count: number;
+    check_runs: Array<{ id: number; status: string }>;
+  };
+
+  // Prefer the in_progress run — that's the one we want to close out
+  const inProgress = data.check_runs.find((r) => r.status === 'in_progress');
+  return inProgress?.id ?? null;
+}
+
+/**
+ * Upsert a completed check run: update the existing one if present, create otherwise.
+ * Prevents duplicate check runs accumulating when Lambda sets in_progress on push
+ * and the handler later resolves it to success/failure.
  */
 export async function createCheckRun(
   installationToken: string,
@@ -115,8 +167,20 @@ export async function createCheckRun(
     summary: string;
   },
 ): Promise<void> {
-  const resp = await fetch(`${GITHUB_API}/repos/${owner}/${repo}/check-runs`, {
-    method: 'POST',
+  const existingId = await findInProgressCheckRunId(
+    installationToken,
+    owner,
+    repo,
+    params.name,
+    params.headSha,
+  );
+
+  const url = existingId
+    ? `${GITHUB_API}/repos/${owner}/${repo}/check-runs/${existingId}`
+    : `${GITHUB_API}/repos/${owner}/${repo}/check-runs`;
+
+  const resp = await fetch(url, {
+    method: existingId ? 'PATCH' : 'POST',
     headers: {
       Authorization: `Bearer ${installationToken}`,
       Accept: 'application/vnd.github+json',
@@ -126,7 +190,7 @@ export async function createCheckRun(
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     body: JSON.stringify({
       name: params.name,
-      head_sha: params.headSha,
+      ...(existingId ? {} : { head_sha: params.headSha }),
       status: 'completed',
       conclusion: params.conclusion,
       output: {
@@ -138,14 +202,17 @@ export async function createCheckRun(
 
   if (!resp.ok) {
     const body = await resp.text();
-    throw new Error(`Failed to create check run (${resp.status}): ${body}`);
+    throw new Error(
+      `Failed to ${existingId ? 'update' : 'create'} check run (${resp.status}): ${body}`,
+    );
   }
 
-  LOGGER.info('Created check run', {
+  LOGGER.info('Upserted check run', {
     owner,
     repo,
     name: params.name,
     conclusion: params.conclusion,
+    updated: existingId != null,
   });
 }
 

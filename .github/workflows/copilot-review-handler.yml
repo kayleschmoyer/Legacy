@@ -27,7 +27,7 @@ permissions:
   checks: write
   issues: write
   contents: read
-  pull-requests: read
+  pull-requests: write
 
 jobs:
   set-bot-review:
@@ -110,7 +110,13 @@ jobs:
 
             core.info(`Latest Copilot review state=${latest.state}, copilotCleared=${copilotCleared}`);
 
-            // Helper to create (or overwrite) the bot-review check run.
+            // Helper to write the bot-review check run.
+            // Note: this workflow uses GITHUB_TOKEN (github-actions app), while the
+            // Lambda uses the Review Bot App token. GitHub only allows a check run to
+            // be updated by the same app that created it, so we cannot PATCH the
+            // Lambda's in_progress run from here. We always POST a new run; GitHub
+            // uses the latest result for required status checks, so this correctly
+            // reflects the current state even though the Lambda's run stays open.
             async function createCheck(conclusion, title, summary) {
               await github.rest.checks.create({
                 owner, repo,

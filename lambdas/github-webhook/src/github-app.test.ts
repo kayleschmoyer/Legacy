@@ -108,7 +108,17 @@ describe('getRepoInstallationToken', () => {
 // ── createCheckRun ────────────────────────────────────────────────────────────
 
 describe('createCheckRun', () => {
-  it('posts a completed check run to GitHub', async () => {
+  it('creates a new check run when no in_progress run exists', async () => {
+    // Lookup returns runs but none are in_progress
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          total_count: 1,
+          check_runs: [{ id: 11111, status: 'completed' }],
+        }),
+    });
+    // POST creates a new run
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: () => Promise.resolve({}),
@@ -122,8 +132,9 @@ describe('createCheckRun', () => {
       summary: 'Review passed',
     });
 
-    const [url, opts] = mockFetch.mock.calls[0] as [string, RequestInit];
+    const [url, opts] = mockFetch.mock.calls[1] as [string, RequestInit];
     expect(url).toBe('https://api.github.com/repos/owner/repo/check-runs');
+    expect(opts.method).toBe('POST');
     const body = JSON.parse(opts.body as string) as Record<string, unknown>;
     expect(body).toMatchObject({
       name: 'bot-review',
@@ -133,7 +144,88 @@ describe('createCheckRun', () => {
     });
   });
 
-  it('throws on non-2xx response', async () => {
+  it('updates the in_progress run when one is found, ignoring completed runs', async () => {
+    // Lookup returns both a completed run and an in_progress run
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          total_count: 2,
+          check_runs: [
+            { id: 11111, status: 'completed' },
+            { id: 99999, status: 'in_progress' },
+          ],
+        }),
+    });
+    // PATCH updates the in_progress run
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({}),
+    });
+
+    await createCheckRun(MOCK_TOKEN, 'owner', 'repo', {
+      name: 'bot-review',
+      headSha: 'abc1234',
+      conclusion: 'success',
+      title: 'All good',
+      summary: 'Review passed',
+    });
+
+    const [url, opts] = mockFetch.mock.calls[1] as [string, RequestInit];
+    expect(url).toBe(
+      'https://api.github.com/repos/owner/repo/check-runs/99999',
+    );
+    expect(opts.method).toBe('PATCH');
+    const body = JSON.parse(opts.body as string) as Record<string, unknown>;
+    expect(body).toMatchObject({ status: 'completed', conclusion: 'success' });
+    expect(body).not.toHaveProperty('head_sha');
+  });
+
+  it('throws when the lookup returns a non-404 error', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      text: () => Promise.resolve('Internal Server Error'),
+    });
+
+    await expect(
+      createCheckRun(MOCK_TOKEN, 'owner', 'repo', {
+        name: 'bot-review',
+        headSha: 'abc1234',
+        conclusion: 'failure',
+        title: 'Failed',
+        summary: 'Review failed',
+      }),
+    ).rejects.toThrow('500');
+  });
+
+  it('falls back to POST when lookup returns 404', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 404 });
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({}),
+    });
+
+    await createCheckRun(MOCK_TOKEN, 'owner', 'repo', {
+      name: 'bot-review',
+      headSha: 'abc1234',
+      conclusion: 'success',
+      title: 'All good',
+      summary: 'Review passed',
+    });
+
+    const [url, opts] = mockFetch.mock.calls[1] as [string, RequestInit];
+    expect(url).toBe('https://api.github.com/repos/owner/repo/check-runs');
+    expect(opts.method).toBe('POST');
+  });
+
+  it('throws on non-2xx response from the create/update call', async () => {
+    // Lookup finds no in_progress run
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ total_count: 0, check_runs: [] }),
+    });
+    // POST fails
     mockFetch.mockResolvedValueOnce({
       ok: false,
       status: 422,
