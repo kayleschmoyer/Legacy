@@ -7,6 +7,7 @@ const mockGetInstallationToken = githubApp.getInstallationToken as jest.Mock;
 const mockGetPrReviewThreads = githubApp.getPrReviewThreads as jest.Mock;
 const mockGetPrReviews = githubApp.getPrReviews as jest.Mock;
 const mockCreateCheckRun = githubApp.createCheckRun as jest.Mock;
+const mockAddLabel = githubApp.addLabel as jest.Mock;
 
 const BASE_PAYLOAD = {
   pull_request: { number: 42, head: { sha: 'abc1234' } },
@@ -20,6 +21,7 @@ const COPILOT_COMMENTED_REVIEW = {
   body: 'Please address the following.',
   userLogin: 'copilot-pull-request-reviewer[bot]',
   submittedAt: '2024-01-01T00:00:00Z',
+  commitId: 'abc1234', // must match BASE_PAYLOAD.pull_request.head.sha
 };
 
 /** Copilot APPROVED review — threads are superseded */
@@ -28,6 +30,7 @@ const COPILOT_APPROVED_REVIEW = {
   body: 'Looks good!',
   userLogin: 'copilot-pull-request-reviewer[bot]',
   submittedAt: '2024-01-02T00:00:00Z',
+  commitId: 'abc1234', // must match BASE_PAYLOAD.pull_request.head.sha
 };
 
 beforeEach(() => {
@@ -35,6 +38,7 @@ beforeEach(() => {
   mockGetInstallationToken.mockResolvedValue('tok-test');
   mockGetPrReviews.mockResolvedValue([]);
   mockCreateCheckRun.mockResolvedValue(undefined);
+  mockAddLabel.mockResolvedValue(undefined);
 });
 
 describe('handleReviewThreadEvent — ignored actions', () => {
@@ -93,6 +97,13 @@ describe('handleReviewThreadEvent — resolved action', () => {
       'bkrupa',
       'legacy-sports',
       expect.objectContaining({ conclusion: 'success', name: 'bot-review' }),
+    );
+    expect(mockAddLabel).toHaveBeenCalledWith(
+      'tok-test',
+      'bkrupa',
+      'legacy-sports',
+      42,
+      'merge-when-ready',
     );
     expect(result).toMatch(/bot-review=success/);
   });
@@ -216,6 +227,7 @@ describe('handleReviewThreadEvent — copilotCleared bypass', () => {
       {
         ...COPILOT_COMMENTED_REVIEW,
         body: "I wasn't able to review any files in this pull request.",
+        commitId: 'abc1234',
       },
     ]);
 

@@ -18,6 +18,18 @@ jest.mock('./verify-signature', () => ({
   verifyGitHubSignature: jest.fn().mockReturnValue(true),
 }));
 
+jest.mock('./handle-pull-request', () => ({
+  handlePullRequestEvent: jest
+    .fn()
+    .mockResolvedValue('Set bot-review=in_progress for PR #1'),
+}));
+
+jest.mock('./handle-pull-request-review', () => ({
+  handlePullRequestReviewEvent: jest
+    .fn()
+    .mockResolvedValue('Set bot-review=success for PR #1'),
+}));
+
 jest.mock('./handle-review-thread', () => ({
   handleReviewThreadEvent: jest
     .fn()
@@ -42,11 +54,15 @@ process.env['AGENT_AUTHOR_APP_ID'] = '3142924';
 process.env['GITHUB_REPO'] = 'bkrupa/legacy-sports';
 
 import { verifyGitHubSignature } from './verify-signature';
+import { handlePullRequestEvent } from './handle-pull-request';
+import { handlePullRequestReviewEvent } from './handle-pull-request-review';
 import { handleReviewThreadEvent } from './handle-review-thread';
 import { handleJiraTransitionEvent } from './handle-jira-transition';
 import { handler } from './index';
 
 const mockVerify = verifyGitHubSignature as jest.Mock;
+const mockHandlePr = handlePullRequestEvent as jest.Mock;
+const mockHandlePrReview = handlePullRequestReviewEvent as jest.Mock;
 const mockHandle = handleReviewThreadEvent as jest.Mock;
 const mockHandleJira = handleJiraTransitionEvent as jest.Mock;
 
@@ -99,6 +115,8 @@ function makeJiraEvent(
 
 beforeEach(() => {
   mockVerify.mockReturnValue(true);
+  mockHandlePr.mockResolvedValue('Set bot-review=in_progress for PR #1');
+  mockHandlePrReview.mockResolvedValue('Set bot-review=success for PR #1');
   mockHandle.mockResolvedValue('Set bot-review=success for PR #1');
   mockHandleJira.mockResolvedValue(
     'Dispatched jira-issue-updated for LS-1234 (In Progress → In Review)',
@@ -138,7 +156,7 @@ describe('handler — signature verification', () => {
 });
 
 describe('handler — event routing', () => {
-  it('returns 200 ignored for non-pull_request_review_thread events', async () => {
+  it('returns 200 ignored for unhandled event types (e.g. push)', async () => {
     const result = await handler(
       makeEvent({
         headers: {
@@ -153,6 +171,8 @@ describe('handler — event routing', () => {
       eventType: 'push',
     });
     expect(mockHandle).not.toHaveBeenCalled();
+    expect(mockHandlePr).not.toHaveBeenCalled();
+    expect(mockHandlePrReview).not.toHaveBeenCalled();
   });
 
   it('returns 400 for invalid JSON body', async () => {
@@ -160,11 +180,40 @@ describe('handler — event routing', () => {
     expect(result.statusCode).toBe(400);
   });
 
-  it('returns 200 and calls handler for pull_request_review_thread events', async () => {
+  it('routes pull_request_review_thread to handleReviewThreadEvent', async () => {
     const result = await handler(makeEvent());
     expect(result.statusCode).toBe(200);
     expect(mockHandle).toHaveBeenCalledTimes(1);
+    expect(mockHandlePr).not.toHaveBeenCalled();
     expect(JSON.parse(result.body)).toMatchObject({ status: 'ok' });
+  });
+
+  it('routes pull_request to handlePullRequestEvent', async () => {
+    const result = await handler(
+      makeEvent({
+        headers: {
+          'X-Hub-Signature-256': 'sha256=abc',
+          'X-GitHub-Event': 'pull_request',
+        },
+      }),
+    );
+    expect(result.statusCode).toBe(200);
+    expect(mockHandlePr).toHaveBeenCalledTimes(1);
+    expect(mockHandle).not.toHaveBeenCalled();
+  });
+
+  it('routes pull_request_review to handlePullRequestReviewEvent', async () => {
+    const result = await handler(
+      makeEvent({
+        headers: {
+          'X-Hub-Signature-256': 'sha256=abc',
+          'X-GitHub-Event': 'pull_request_review',
+        },
+      }),
+    );
+    expect(result.statusCode).toBe(200);
+    expect(mockHandlePrReview).toHaveBeenCalledTimes(1);
+    expect(mockHandle).not.toHaveBeenCalled();
   });
 
   it('returns 500 with generic message when handler throws', async () => {
@@ -180,7 +229,6 @@ describe('handler — event routing', () => {
     const result = await handler(
       makeEvent({ body: b64, isBase64Encoded: true }),
     );
-    // Signature still passes because mockVerify always returns true
     expect(result.statusCode).toBe(200);
   });
 });

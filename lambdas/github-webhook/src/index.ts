@@ -2,6 +2,8 @@ import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { LOGGER } from '@legacy-sports/logging';
 import { retrieveSecretParameterValue } from '@legacy-sports/aws-utils';
 import { verifyGitHubSignature } from './verify-signature';
+import { handlePullRequestEvent } from './handle-pull-request';
+import { handlePullRequestReviewEvent } from './handle-pull-request-review';
 import { handleReviewThreadEvent } from './handle-review-thread';
 import { handleJiraTransitionEvent } from './handle-jira-transition';
 
@@ -170,7 +172,13 @@ export const handler = async (
 
   LOGGER.info('Received GitHub webhook event', { eventType });
 
-  if (eventType !== 'pull_request_review_thread') {
+  const HANDLED_EVENTS = new Set([
+    'pull_request',
+    'pull_request_review',
+    'pull_request_review_thread',
+  ]);
+
+  if (!HANDLED_EVENTS.has(eventType)) {
     // Return 200 for all other events — GitHub expects 200 or it retries
     return json(200, { status: 'ignored', eventType });
   }
@@ -185,14 +193,29 @@ export const handler = async (
   const botKey = await getBotAppPrivateKey();
 
   try {
-    const result = await handleReviewThreadEvent(
-      payload as Parameters<typeof handleReviewThreadEvent>[0],
-      botKey,
-    );
-    LOGGER.info('Handled pull_request_review_thread event', { result });
+    let result: string;
+
+    if (eventType === 'pull_request') {
+      result = await handlePullRequestEvent(
+        payload as Parameters<typeof handlePullRequestEvent>[0],
+        botKey,
+      );
+    } else if (eventType === 'pull_request_review') {
+      result = await handlePullRequestReviewEvent(
+        payload as Parameters<typeof handlePullRequestReviewEvent>[0],
+        botKey,
+      );
+    } else {
+      result = await handleReviewThreadEvent(
+        payload as Parameters<typeof handleReviewThreadEvent>[0],
+        botKey,
+      );
+    }
+
+    LOGGER.info(`Handled ${eventType} event`, { result });
     return json(200, { status: 'ok', result });
   } catch (error) {
-    LOGGER.error('Error handling pull_request_review_thread event', { error });
+    LOGGER.error(`Error handling ${eventType} event`, { error });
     return json(500, { error: 'Internal server error' });
   }
 };

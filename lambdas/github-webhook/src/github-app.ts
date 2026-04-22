@@ -275,6 +275,7 @@ export async function getPrReviews(
     body: string | null;
     userLogin: string;
     submittedAt: string;
+    commitId: string;
   }>
 > {
   const resp = await fetch(
@@ -296,9 +297,10 @@ export async function getPrReviews(
 
   const data = (await resp.json()) as Array<{
     state: string;
-    body: string;
+    body: string | null;
     user: { login: string };
     submitted_at: string;
+    commit_id: string;
   }>;
 
   return data.map((r) => ({
@@ -306,5 +308,129 @@ export async function getPrReviews(
     body: r.body ?? null,
     userLogin: r.user.login,
     submittedAt: r.submitted_at,
+    commitId: r.commit_id,
   }));
+}
+
+/**
+ * Create an in-progress check run on a repository.
+ */
+export async function createInProgressCheckRun(
+  installationToken: string,
+  owner: string,
+  repo: string,
+  params: { name: string; headSha: string; title: string; summary: string },
+): Promise<void> {
+  const resp = await fetch(`${GITHUB_API}/repos/${owner}/${repo}/check-runs`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${installationToken}`,
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+      'Content-Type': 'application/json',
+    },
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    body: JSON.stringify({
+      name: params.name,
+      head_sha: params.headSha,
+      status: 'in_progress',
+      output: { title: params.title, summary: params.summary },
+    }),
+  });
+
+  if (!resp.ok) {
+    const body = await resp.text();
+    throw new Error(
+      `Failed to create in-progress check run (${resp.status}): ${body}`,
+    );
+  }
+
+  LOGGER.info('Created in-progress check run', {
+    owner,
+    repo,
+    name: params.name,
+  });
+}
+
+/**
+ * Request Copilot as a reviewer on a PR. Idempotent — safe to call when
+ * Copilot is already in requested_reviewers.
+ */
+export async function requestCopilotReview(
+  installationToken: string,
+  owner: string,
+  repo: string,
+  prNumber: number,
+): Promise<void> {
+  const resp = await fetch(
+    `${GITHUB_API}/repos/${owner}/${repo}/pulls/${prNumber}/requested_reviewers`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${installationToken}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+        'Content-Type': 'application/json',
+      },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      body: JSON.stringify({
+        reviewers: ['copilot-pull-request-reviewer[bot]'],
+      }),
+    },
+  );
+
+  if (!resp.ok) {
+    const body = await resp.text();
+    // 422 means Copilot can't be requested (e.g. it's already reviewing) — not fatal
+    if (resp.status === 422) {
+      LOGGER.warn(
+        'Copilot reviewer request returned 422 (may already be reviewing)',
+        {
+          owner,
+          repo,
+          prNumber,
+          body,
+        },
+      );
+      return;
+    }
+    throw new Error(
+      `Failed to request Copilot review (${resp.status}): ${body}`,
+    );
+  }
+
+  LOGGER.info('Requested Copilot review', { owner, repo, prNumber });
+}
+
+/**
+ * Add a label to a PR (or issue). Idempotent — GitHub ignores duplicate labels.
+ */
+export async function addLabel(
+  installationToken: string,
+  owner: string,
+  repo: string,
+  issueNumber: number,
+  label: string,
+): Promise<void> {
+  const resp = await fetch(
+    `${GITHUB_API}/repos/${owner}/${repo}/issues/${issueNumber}/labels`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${installationToken}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+        'Content-Type': 'application/json',
+      },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      body: JSON.stringify({ labels: [label] }),
+    },
+  );
+
+  if (!resp.ok) {
+    const body = await resp.text();
+    throw new Error(`Failed to add label (${resp.status}): ${body}`);
+  }
+
+  LOGGER.info('Added label', { owner, repo, issueNumber, label });
 }

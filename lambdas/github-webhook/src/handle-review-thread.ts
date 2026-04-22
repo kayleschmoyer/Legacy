@@ -1,5 +1,6 @@
 import { LOGGER } from '@legacy-sports/logging';
 import {
+  addLabel,
   createCheckRun,
   getInstallationToken,
   getPrReviews,
@@ -84,10 +85,12 @@ export async function handleReviewThreadEvent(
     getPrReviews(token, owner, repo, prNumber),
   ]);
 
-  // Mirror the workflow's copilotCleared logic: when Copilot explicitly approved
-  // or couldn't review any files, its own threads are superseded and don't block.
+  // Mirror the copilotCleared logic: when Copilot explicitly approved or couldn't
+  // review any files for the current headSha, its own threads are superseded and
+  // don't block. Scoping to headSha avoids applying a stale review from an older
+  // commit to the current SHA.
   const copilotReviews = reviews
-    .filter((r) => COPILOT_LOGINS.has(r.userLogin))
+    .filter((r) => COPILOT_LOGINS.has(r.userLogin) && r.commitId === headSha)
     .sort(
       (a, b) =>
         new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime(),
@@ -137,6 +140,7 @@ export async function handleReviewThreadEvent(
     title: 'All review threads resolved',
     summary: 'All review threads resolved',
   });
+  await addLabel(token, owner, repo, prNumber, 'merge-when-ready');
 
   return `Set bot-review=success for PR #${prNumber} (${owner}/${repo}@${headSha.slice(0, 7)})`;
 }

@@ -321,12 +321,26 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
     // Build the set of check runs to evaluate:
     // - always skip EXCLUDED_CHECKS
     // - when branch protection specifies required checks, skip anything not in that set
-    const relevantChecks = checks.data.check_runs.filter((c) => {
+    // - deduplicate by name, keeping the most recent completed run (prevents stale
+    //   cancelled runs from blocking when a subsequent run succeeds)
+    const filteredChecks = checks.data.check_runs.filter((c) => {
       if (EXCLUDED_CHECKS.has(c.name)) return false;
       if (requiredCheckNames !== null && !requiredCheckNames.has(c.name))
         return false;
       return true;
     });
+    const latestByName = new Map();
+    for (const c of filteredChecks) {
+      const existing = latestByName.get(c.name);
+      if (
+        !existing ||
+        new Date(c.completed_at || c.started_at) >
+          new Date(existing.completed_at || existing.started_at)
+      ) {
+        latestByName.set(c.name, c);
+      }
+    }
+    const relevantChecks = Array.from(latestByName.values());
 
     if (requiredCheckNames !== null) {
       // Detect required checks that haven't posted a run yet (CI not started).
