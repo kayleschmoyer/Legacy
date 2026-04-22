@@ -118,33 +118,30 @@ test.describe
       timeout: 30_000,
     });
 
-    await test.step('Set Min HR filter to 200', async () => {
-      // The filter input is labeled "Min HR:" followed by a numeric input
-      const minHRInputs = page.getByPlaceholder('');
+    await test.step('Open the Advanced filters panel', async () => {
+      // LS-3825: The refactored UI moved Min HR from inline DataGrid inputs
+      // (showFilters=false) to a range slider inside the "Advanced" panel.
+      const advancedButton = page.getByRole('button', { name: /Advanced/i });
+      await expect(advancedButton).toBeVisible({ timeout: 10_000 });
+      await advancedButton.click();
+    });
 
-      // Look for the Min HR filter input by context — it follows the "Min HR:" label text
-      // Use the input adjacent to "Min HR:" text
-      const filterInput = page
-        .locator('input[type="text"]')
-        .filter({ hasText: '' })
-        .nth(1); // second input (after search) is Min Games = 0, third is Min HR
-
-      // Use the more reliable approach: get all inputs and find the one that has value "0" for Min HR
-      // The filter inputs are: Search (text), Min G (number), Min HR (number), Min RBI (number)
-      // Min HR is the third input (index 2)
-      const allInputs = page.locator('input');
-      const count = await allInputs.count();
-      expect(count).toBeGreaterThanOrEqual(3);
-
-      // 0 = search, 1 = Min G, 2 = Min HR, 3 = Min RBI
-      await allInputs.nth(2).click();
-      await allInputs.nth(2).selectText();
-      await allInputs.nth(2).fill('200');
+    await test.step('Set Min Home Runs filter using the slider', async () => {
+      // The Advanced panel renders a <input type="range" aria-label="Min Home Runs">
+      const minHRSlider = page.getByLabel('Min Home Runs');
+      await expect(minHRSlider).toBeVisible({ timeout: 10_000 });
+      // Press End to move slider to max (75 career HR minimum).
+      // onKeyUp triggers onCommit → applyFilters.
+      await minHRSlider.press('End');
+      // Confirm the filter value actually changed — guards against the keypress
+      // not taking effect on the controlled <input type="range">.
+      await expect(minHRSlider).toHaveValue('75');
     });
 
     await test.step('Grid re-loads with filtered data', async () => {
-      // After typing the filter, the grid should refresh automatically.
-      // The Refresh button was removed in LS-3802; wait for a player row instead.
+      // After applying the filter the grid re-fetches automatically.
+      // PlayerStatsPage increments battingKey on applyFilters, unmounting and
+      // remounting the DataGrid — wait for a row in the refreshed grid.
       await expect(
         page.locator('[data-testid^="player-row-"]').first(),
       ).toBeVisible({ timeout: 15_000 });
