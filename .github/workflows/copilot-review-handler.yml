@@ -129,18 +129,15 @@ jobs:
               core.info(`Set bot-review=${conclusion}`);
             }
 
-            // ── 2. Copilot left comments → immediate failure ──────────────────
-
-            if (!copilotCleared) {
-              await createCheck(
-                'failure',
-                'Review blocked',
-                'Copilot left review comments — resolve all threads to proceed',
-              );
-              return;
-            }
-
-            // ── 3. Copilot cleared → fetch all review threads (paginated) ─────
+            // ── 2. Fetch all review threads (paginated) ───────────────────────
+            //
+            // Always fetch threads — even when copilotCleared=false. Copilot can
+            // submit a COMMENTED review containing only a PR-overview comment (no
+            // inline thread comments), which leaves its state as COMMENTED without
+            // creating any reviewThreads. An early-return on !copilotCleared would
+            // incorrectly block those PRs. Instead, use copilotCleared in the
+            // thread filter below, mirroring the Lambda's handle-review-thread.ts
+            // and handle-pull-request-review.ts logic.
 
             const MAX_THREADS = 1000; // >1 000 threads is unreachable in practice
             const allThreadNodes = [];
@@ -183,13 +180,15 @@ jobs:
               }
             }
 
-            // ── 4. Check for unresolved non-Copilot threads ───────────────────
+            // ── 3. Check for unresolved threads ───────────────────────────────
 
             const unresolved = allThreadNodes.filter(t => {
               if (t.isResolved || t.isOutdated) return false;
               const authorLogin = t.comments.nodes[0]?.author?.login ?? null;
-              // Copilot threads are bypassed because copilotCleared=true
-              if (authorLogin !== null && COPILOT_LOGINS.has(authorLogin)) return false;
+              // When Copilot cleared, its own threads are superseded — skip them.
+              // When !copilotCleared, Copilot threads still block (e.g. Copilot
+              // left inline review comments that have not been resolved).
+              if (copilotCleared && authorLogin !== null && COPILOT_LOGINS.has(authorLogin)) return false;
               return true;
             });
 
@@ -197,12 +196,12 @@ jobs:
               await createCheck(
                 'failure',
                 'Review blocked',
-                `PR has ${unresolved.length} unresolved non-Copilot thread(s)`,
+                `PR has ${unresolved.length} unresolved review thread(s)`,
               );
               return;
             }
 
-            // ── 5. All clear → success + label ───────────────────────────────
+            // ── 4. All clear → success + label ───────────────────────────────
 
             await createCheck(
               'success',

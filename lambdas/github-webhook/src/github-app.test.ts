@@ -3,6 +3,7 @@ import {
   getInstallationToken,
   getPrReviewThreads,
   getRepoInstallationToken,
+  listPullRequestsForCommit,
 } from './github-app';
 
 jest.mock('jsonwebtoken', () => ({ sign: jest.fn(() => 'mock-jwt') }));
@@ -399,5 +400,70 @@ describe('getPrReviewThreads', () => {
 
     expect(threads).toHaveLength(10);
     expect(mockFetch).toHaveBeenCalledTimes(10);
+  });
+});
+
+// ── listPullRequestsForCommit ─────────────────────────────────────────────────
+
+describe('listPullRequestsForCommit', () => {
+  it('returns mapped PR objects', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve([
+          {
+            number: 42,
+            state: 'open',
+            head: { sha: 'abc1234', repo: { full_name: 'owner/repo' } },
+            updated_at: '2024-01-01T00:00:00Z',
+          },
+          {
+            number: 7,
+            state: 'closed',
+            head: { sha: 'abc1234', repo: null },
+            updated_at: '2024-01-02T00:00:00Z',
+          },
+        ]),
+    });
+
+    const prs = await listPullRequestsForCommit(
+      MOCK_TOKEN,
+      'owner',
+      'repo',
+      'abc1234',
+    );
+
+    expect(prs).toHaveLength(2);
+    expect(prs[0]).toEqual({
+      number: 42,
+      state: 'open',
+      headSha: 'abc1234',
+      headRepoFullName: 'owner/repo',
+      updatedAt: '2024-01-01T00:00:00Z',
+    });
+    expect(prs[1]).toEqual({
+      number: 7,
+      state: 'closed',
+      headSha: 'abc1234',
+      headRepoFullName: null,
+      updatedAt: '2024-01-02T00:00:00Z',
+    });
+
+    const [url] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(
+      'https://api.github.com/repos/owner/repo/commits/abc1234/pulls',
+    );
+  });
+
+  it('throws on non-2xx response', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      text: () => Promise.resolve('Not Found'),
+    });
+
+    await expect(
+      listPullRequestsForCommit(MOCK_TOKEN, 'owner', 'repo', 'abc1234'),
+    ).rejects.toThrow('404');
   });
 });

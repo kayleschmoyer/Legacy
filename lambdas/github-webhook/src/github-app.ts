@@ -487,6 +487,58 @@ export async function requestCopilotReview(
 }
 
 /**
+ * List pull requests associated with a commit SHA.
+ * Used by the workflow_run handler to resolve headSha → PR number without
+ * needing the PR number baked into the event payload.
+ */
+export async function listPullRequestsForCommit(
+  installationToken: string,
+  owner: string,
+  repo: string,
+  commitSha: string,
+): Promise<
+  Array<{
+    number: number;
+    state: string;
+    headSha: string;
+    headRepoFullName: string | null;
+    updatedAt: string;
+  }>
+> {
+  const resp = await fetch(
+    `${GITHUB_API}/repos/${owner}/${repo}/commits/${commitSha}/pulls`,
+    {
+      headers: {
+        Authorization: `Bearer ${installationToken}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    },
+  );
+
+  if (!resp.ok) {
+    const body = await resp.text();
+    throw new Error(`Failed to list PRs for commit (${resp.status}): ${body}`);
+  }
+
+  const data = (await resp.json()) as Array<{
+    number: number;
+    state: string;
+    head: { sha: string; repo: { full_name: string } | null };
+    updated_at: string;
+  }>;
+
+  return data.map((pr) => ({
+    number: pr.number,
+    state: pr.state,
+    headSha: pr.head.sha,
+    headRepoFullName: pr.head.repo?.full_name ?? null,
+    updatedAt: pr.updated_at,
+  }));
+}
+
+/**
  * Add a label to a PR (or issue). Idempotent — GitHub ignores duplicate labels.
  */
 export async function addLabel(

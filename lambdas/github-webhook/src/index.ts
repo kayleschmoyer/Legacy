@@ -5,6 +5,7 @@ import { verifyGitHubSignature } from './verify-signature';
 import { handlePullRequestEvent } from './handle-pull-request';
 import { handlePullRequestReviewEvent } from './handle-pull-request-review';
 import { handleReviewThreadEvent } from './handle-review-thread';
+import { handleWorkflowRunEvent } from './handle-workflow-run';
 import { handleJiraTransitionEvent } from './handle-jira-transition';
 
 // ── Environment ───────────────────────────────────────────────────────────────
@@ -182,6 +183,7 @@ export const handler = async (
     'pull_request',
     'pull_request_review',
     'pull_request_review_thread',
+    'workflow_run',
   ]);
 
   if (!HANDLED_EVENTS.has(eventType)) {
@@ -215,6 +217,11 @@ export const handler = async (
     } else if (eventType === 'pull_request_review') {
       result = await handlePullRequestReviewEvent(
         payload as Parameters<typeof handlePullRequestReviewEvent>[0],
+        botKey,
+      );
+    } else if (eventType === 'workflow_run') {
+      result = await handleWorkflowRunEvent(
+        payload as Parameters<typeof handleWorkflowRunEvent>[0],
         botKey,
       );
     } else {
