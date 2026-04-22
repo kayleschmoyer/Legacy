@@ -160,7 +160,13 @@ export const handler = async (
     return json(401, { error: 'Unauthorized' });
   }
 
-  const secret = await getWebhookSecret();
+  let secret: string;
+  try {
+    secret = await getWebhookSecret();
+  } catch (error) {
+    LOGGER.error('Failed to retrieve webhook secret', { error });
+    return json(500, { error: 'Internal server error' });
+  }
 
   if (!verifyGitHubSignature(bodyStr, sigHeader, secret)) {
     LOGGER.warn('GitHub webhook rejected — invalid signature');
@@ -190,7 +196,13 @@ export const handler = async (
     return json(400, { error: 'Invalid JSON payload' });
   }
 
-  const botKey = await getBotAppPrivateKey();
+  let botKey: string;
+  try {
+    botKey = await getBotAppPrivateKey();
+  } catch (error) {
+    LOGGER.error('Failed to retrieve bot app private key', { error });
+    return json(500, { error: 'Internal server error' });
+  }
 
   try {
     let result: string;

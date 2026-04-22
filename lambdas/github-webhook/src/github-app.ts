@@ -6,7 +6,7 @@ const GITHUB_API = 'https://api.github.com';
 /** Maximum number of pages to fetch per paginated GraphQL call (100 nodes/page → 1 000 threads max). */
 const MAX_PAGES = 10;
 
-/** Default request timeout for GitHub API calls (15s — well inside the 30s Lambda timeout) */
+/** Default request timeout for GitHub API calls (15 s — well inside the 30 s Lambda timeout). */
 export const REQUEST_TIMEOUT_MS = 15_000;
 
 /**
