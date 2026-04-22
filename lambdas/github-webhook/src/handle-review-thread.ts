@@ -85,10 +85,10 @@ export async function handleReviewThreadEvent(
     getPrReviews(token, owner, repo, prNumber),
   ]);
 
-  // Mirror the copilotCleared logic: when Copilot explicitly approved or couldn't
-  // review any files for the current headSha, its own threads are superseded and
-  // don't block. Scoping to headSha avoids applying a stale review from an older
-  // commit to the current SHA.
+  // Mirror the copilotCleared logic: when Copilot explicitly approved, couldn't
+  // review any files, or re-reviewed and generated no new comments for the current
+  // headSha, its own threads are superseded and don't block. Scoping to headSha
+  // avoids applying a stale review from an older commit to the current SHA.
   const copilotReviews = reviews
     .filter((r) => COPILOT_LOGINS.has(r.userLogin) && r.commitId === headSha)
     .sort(
@@ -100,7 +100,8 @@ export async function handleReviewThreadEvent(
     latestCopilot != null &&
     (latestCopilot.state === 'APPROVED' ||
       (latestCopilot.body?.includes("wasn't able to review any files") ??
-        false));
+        false) ||
+      (latestCopilot.body?.includes('generated no new comments') ?? false));
 
   const unresolvedThreads = threads.filter((t) => {
     if (t.isOutdated || t.isResolved) return false;

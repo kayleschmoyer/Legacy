@@ -215,6 +215,36 @@ describe('handleReviewThreadEvent — copilotCleared bypass', () => {
     expect(result).toMatch(/bot-review=failure/);
   });
 
+  it('ignores unresolved Copilot threads when Copilot generated no new comments (re-review)', async () => {
+    mockGetPrReviewThreads.mockResolvedValue([
+      {
+        isResolved: false,
+        isOutdated: false,
+        authorLogin: 'copilot-pull-request-reviewer[bot]',
+      },
+    ]);
+    mockGetPrReviews.mockResolvedValue([
+      {
+        ...COPILOT_COMMENTED_REVIEW,
+        body: 'Copilot reviewed 1 out of 1 changed files and generated no new comments.',
+        commitId: 'abc1234',
+      },
+    ]);
+
+    const result = await handleReviewThreadEvent(
+      { ...BASE_PAYLOAD, action: 'resolved' },
+      'private-key',
+    );
+
+    expect(mockCreateCheckRun).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(String),
+      expect.any(String),
+      expect.objectContaining({ conclusion: 'success' }),
+    );
+    expect(result).toMatch(/bot-review=success/);
+  });
+
   it("ignores unresolved Copilot threads when Copilot couldn't review files", async () => {
     mockGetPrReviewThreads.mockResolvedValue([
       {

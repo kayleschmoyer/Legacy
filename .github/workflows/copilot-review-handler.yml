@@ -105,7 +105,8 @@ jobs:
             const latest = copilotReviews[0];
             const copilotCleared =
               latest.state === 'APPROVED' ||
-              (latest.body || '').includes("wasn't able to review any files");
+              (latest.body || '').includes("wasn't able to review any files") ||
+              (latest.body || '').includes('generated no new comments');
 
             core.info(`Latest Copilot review state=${latest.state}, copilotCleared=${copilotCleared}`);
 

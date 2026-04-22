@@ -103,11 +103,11 @@ async function evaluateAndSetBotReview(
 /**
  * Handle a `pull_request_review` webhook event.
  *
- * Copilot APPROVED / "wasn't able to review any files":
+ * Copilot APPROVED / "wasn't able to review any files" / "generated no new comments":
  *   Copilot cleared its own threads. Check remaining non-Copilot threads and
  *   set bot-review=success/failure accordingly.
  *
- * Copilot COMMENTED / CHANGES_REQUESTED:
+ * Copilot COMMENTED / CHANGES_REQUESTED (with new inline comments):
  *   Copilot left inline comments. Set bot-review=failure immediately.
  *   pull_request_review_thread resolved events will re-evaluate once the
  *   developer addresses the comments.
@@ -169,7 +169,8 @@ export async function handlePullRequestReviewEvent(
   if (isCopilot) {
     const copilotCleared =
       review.state === 'APPROVED' ||
-      (review.body?.includes("wasn't able to review any files") ?? false);
+      (review.body?.includes("wasn't able to review any files") ?? false) ||
+      (review.body?.includes('generated no new comments') ?? false);
 
     if (!copilotCleared) {
       // Copilot left review comments. Set failure immediately — the developer
@@ -223,7 +224,8 @@ export async function handlePullRequestReviewEvent(
     latestCopilot != null &&
     (latestCopilot.state === 'APPROVED' ||
       (latestCopilot.body?.includes("wasn't able to review any files") ??
-        false));
+        false) ||
+      (latestCopilot.body?.includes('generated no new comments') ?? false));
 
   const conclusion = await evaluateAndSetBotReview(
     token,

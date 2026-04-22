@@ -170,6 +170,43 @@ describe('handlePullRequestReviewEvent — Copilot COMMENTED', () => {
   });
 });
 
+describe('handlePullRequestReviewEvent — Copilot generated no new comments', () => {
+  it('treats as cleared and sets success when no non-Copilot threads remain', async () => {
+    mockGetPrReviewThreads.mockResolvedValue([]);
+    const result = await handlePullRequestReviewEvent(
+      {
+        ...BASE_PAYLOAD,
+        review: {
+          state: 'COMMENTED',
+          body: 'Copilot reviewed 1 out of 1 changed files and generated no new comments.',
+          user: { login: 'copilot-pull-request-reviewer[bot]' },
+        },
+      },
+      'pk',
+    );
+    expect(result).toMatch(/success/);
+    expect(mockGetPrReviewThreads).toHaveBeenCalled();
+  });
+
+  it('bypasses Copilot threads but still blocks on unresolved human threads', async () => {
+    mockGetPrReviewThreads.mockResolvedValue([
+      { isResolved: false, isOutdated: false, authorLogin: 'human-reviewer' },
+    ]);
+    const result = await handlePullRequestReviewEvent(
+      {
+        ...BASE_PAYLOAD,
+        review: {
+          state: 'COMMENTED',
+          body: 'Copilot reviewed 1 out of 1 changed files and generated no new comments.',
+          user: { login: 'copilot-pull-request-reviewer[bot]' },
+        },
+      },
+      'pk',
+    );
+    expect(result).toMatch(/failure/);
+  });
+});
+
 describe("handlePullRequestReviewEvent — Copilot couldn't review files", () => {
   it('treats as cleared when body includes sentinel phrase', async () => {
     mockGetPrReviewThreads.mockResolvedValue([]);
@@ -215,6 +252,24 @@ describe('handlePullRequestReviewEvent — non-Copilot review', () => {
     await jest.runAllTimersAsync();
     const result = await promise;
     expect(result).toMatch(/failure/);
+  });
+
+  it('treats Copilot "generated no new comments" review as cleared during re-eval', async () => {
+    mockGetPrReviews.mockResolvedValue([
+      {
+        state: 'COMMENTED',
+        body: 'Copilot reviewed 1 out of 1 changed files and generated no new comments.',
+        userLogin: 'copilot-pull-request-reviewer[bot]',
+        submittedAt: '2024-01-01T00:00:00Z',
+        commitId: 'abc1234',
+      },
+    ]);
+    mockGetPrReviewThreads.mockResolvedValue([]);
+    const promise = handlePullRequestReviewEvent(humanPayload, 'pk');
+    await jest.runAllTimersAsync();
+    const result = await promise;
+    expect(result).toMatch(/success/);
+    expect(mockAddLabel).toHaveBeenCalled();
   });
 
   it('skips setting check when no Copilot review exists yet', async () => {
