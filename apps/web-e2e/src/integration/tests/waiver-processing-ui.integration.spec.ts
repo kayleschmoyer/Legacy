@@ -129,20 +129,37 @@ async function submitWaiverClaimViaUI(
   if (searchVisible) {
     const lastName = playerName.split(' ').pop() ?? playerName;
     await searchInput.fill(lastName);
-    await page.waitForTimeout(500);
+    // Wait at least 1 s for the 300 ms search debounce + GQL round-trip +
+    // re-render.  Previously 500 ms was used, but that left a race window
+    // when the debounce fired (300 ms) but the network response hadn't
+    // arrived yet, causing the page to still show the unfiltered list.
+    await page.waitForTimeout(1_000);
   }
 
   // Use the exact player name in the aria-label to avoid clicking a different
   // player's Add button when the search returns multiple results.
+  // IMPORTANT: use state:'attached' (DOM presence) not state:'visible' (viewport
+  // visibility) so a player that is scrolled below the fold — e.g. because the
+  // UI default-sorts by hitterAvgPointsPerGame DESC and a higher-rated player
+  // with the same last name appears first — is still found.  We then explicitly
+  // scroll it into view before clicking.
+  // Do NOT fall back to the first available "Add" button: that fallback caused
+  // the test to submit claims for the wrong player (LS-3829) seven consecutive
+  // times when the target player was below the fold.
   const exactAddBtn = page.locator(`button[aria-label="Add ${playerName}"]`);
-  const firstAddBtn = page.locator('button[aria-label^="Add "]').first();
-  const hasExact = await exactAddBtn
-    .waitFor({ state: 'visible', timeout: 10_000 })
+  const isInDom = await exactAddBtn
+    .waitFor({ state: 'attached', timeout: 15_000 })
     .then(() => true)
     .catch(() => false);
-  const addBtn = hasExact ? exactAddBtn : firstAddBtn;
-  await expect(addBtn).toBeVisible({ timeout: 5_000 });
-  await addBtn.click();
+  if (!isInDom) {
+    throw new Error(
+      `Add button for "${playerName}" was not found in the free-agents list. ` +
+        `The player may no longer be a free agent or the page failed to render.`,
+    );
+  }
+  await exactAddBtn.scrollIntoViewIfNeeded();
+  await expect(exactAddBtn).toBeVisible({ timeout: 5_000 });
+  await exactAddBtn.click();
 
   // WaiverClaimModal opens
   await expect(page.getByText('Claim Free Agent')).toBeVisible({
@@ -476,6 +493,7 @@ test.describe
     commissionerPage,
     commissionerJwt,
     managerPage1,
+    managerJwt1,
   }) => {
     test.setTimeout(180_000);
 
@@ -525,6 +543,56 @@ test.describe
         state.leagueId,
         state.freeAgentPlayerName,
       );
+    });
+
+    // Verify via GQL that BOTH teams actually submitted claims for the correct
+    // player (state.freeAgentPlayerId).  Previously the UI fallback path in
+    // submitWaiverClaimViaUI could silently claim a different player (LS-3829),
+    // causing Phase 7 to fail with a cryptic "player 87 not in completed claims"
+    // error seven runs in a row.  Catching the mismatch here surfaces it with a
+    // clear diagnostic message while the phase is still relevant.
+    await test.step('Verify both teams have a pending claim for the correct player via GQL', async () => {
+      const [commClaims, mgr1Claims] = await Promise.all([
+        gqlFetch<{
+          teamWaiverClaims: Array<{ playerId: number; status: string }>;
+        }>(
+          commissionerJwt,
+          `query GetPendingClaims($teamId: Int!, $status: String) {
+            teamWaiverClaims(teamId: $teamId, status: $status) {
+              playerId
+              status
+            }
+          }`,
+          { teamId: state.commissionerTeamId, status: 'pending' },
+        ),
+        gqlFetch<{
+          teamWaiverClaims: Array<{ playerId: number; status: string }>;
+        }>(
+          managerJwt1,
+          `query GetPendingClaims($teamId: Int!, $status: String) {
+            teamWaiverClaims(teamId: $teamId, status: $status) {
+              playerId
+              status
+            }
+          }`,
+          { teamId: state.manager1TeamId, status: 'pending' },
+        ),
+      ]);
+
+      const commPlayerIds = commClaims.teamWaiverClaims.map((c) => c.playerId);
+      const mgr1PlayerIds = mgr1Claims.teamWaiverClaims.map((c) => c.playerId);
+
+      expect(
+        commPlayerIds,
+        `Commissioner's pending claims should include player ${state.freeAgentPlayerId} (${state.freeAgentPlayerName}). ` +
+          `Got: ${JSON.stringify(commPlayerIds)}. The UI Add button may have submitted for the wrong player.`,
+      ).toContain(state.freeAgentPlayerId);
+
+      expect(
+        mgr1PlayerIds,
+        `Manager1's pending claims should include player ${state.freeAgentPlayerId} (${state.freeAgentPlayerName}). ` +
+          `Got: ${JSON.stringify(mgr1PlayerIds)}. The UI Add button may have submitted for the wrong player.`,
+      ).toContain(state.freeAgentPlayerId);
     });
   });
 

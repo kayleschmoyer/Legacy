@@ -144,6 +144,40 @@ describe('WaiverClaimProcessor — sortByPriority', () => {
       expect(claims[1].teamId).toBe(20);
     });
 
+    it('LS-3829 regression: two teams competing for the same player; lower waiverOrder team wins', () => {
+      // Regression guard for LS-3829.  In runs 58-62, the E2E test
+      // accidentally submitted claims for DIFFERENT players (the UI silently
+      // fell back to the first visible Add button, which pointed to a
+      // recently-dropped player with better stats).  Once the UI bug is fixed,
+      // both teams compete for the same player; this test verifies the priority
+      // sort correctly awards the claim to the team with the lower waiverOrder.
+      const base = new Date('2026-01-01T00:00:00Z');
+      const claims = [
+        // Team 1 (waiverOrder 2 — lower priority) submitted first
+        makeClaim({ id: 1, teamId: 1, playerId: 77, createdAt: base }),
+        // Team 2 (waiverOrder 1 — higher priority) submitted a moment later
+        makeClaim({
+          id: 2,
+          teamId: 2,
+          playerId: 77,
+          createdAt: new Date(base.getTime() + 1_000),
+        }),
+      ];
+      const teams: TeamSettings[] = [
+        { id: 1, waiverOrder: 2, faabBudget: null },
+        { id: 2, waiverOrder: 1, faabBudget: null }, // lower order → wins
+      ];
+
+      sortClaims(claims, 'standard', teams);
+
+      // Team 2 (waiverOrder 1) should be first — it wins the claim
+      expect(claims[0].teamId).toBe(2);
+      // Team 1 (waiverOrder 2) loses and would be cancelled
+      expect(claims[1].teamId).toBe(1);
+      // Both claims are for the same player
+      expect(claims.every((c) => c.playerId === 77)).toBe(true);
+    });
+
     it('sorts multiple claims correctly across four teams', () => {
       const base = new Date('2026-01-01T00:00:00Z');
       const claims = [
