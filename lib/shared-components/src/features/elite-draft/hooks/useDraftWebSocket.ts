@@ -227,8 +227,19 @@ export function useDraftWebSocket({
       setDraftPaused(false);
       setLiveMessage('Draft is complete!');
       void refetchLeague();
+      // Refresh leagueDraft so draftCompletedAt is stored in the Apollo cache.
+      // Without this, a component re-mount (or missed last-pick WS event) leaves
+      // draftCompletedAt as null and the "Draft Complete!" banner never renders
+      // unless the user manually reloads the page (LS-3823).
+      void refetchDraft();
     },
-    [refetchLeague, setDraftComplete, setDraftPaused, setLiveMessage],
+    [
+      refetchDraft,
+      refetchLeague,
+      setDraftComplete,
+      setDraftPaused,
+      setLiveMessage,
+    ],
   );
 
   const handleDraftPaused = useCallback(

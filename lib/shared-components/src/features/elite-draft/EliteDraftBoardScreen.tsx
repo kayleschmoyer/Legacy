@@ -285,17 +285,8 @@ export function EliteDraftBoardScreen({
     );
   }
 
-  if (queries.availablePlayersError) {
-    return (
-      <PlayersErrorScreen
-        message={queries.availablePlayersError.message}
-        onRetry={() => {
-          void queries.refetchAvailablePlayers();
-        }}
-      />
-    );
-  }
-
+  // Check draft completion before any error screens — once the draft is done
+  // the available-players query is irrelevant (LS-3823).
   if (ui.draftComplete || queries.leagueDraft?.draftCompletedAt) {
     return (
       <DraftCompleteView
@@ -315,6 +306,17 @@ export function EliteDraftBoardScreen({
         leagueTeams={queries.leagueTeams}
         statsLookup={playerData.statsLookup}
         onNavigate={onNavigate}
+      />
+    );
+  }
+
+  if (queries.availablePlayersError) {
+    return (
+      <PlayersErrorScreen
+        message={queries.availablePlayersError.message}
+        onRetry={() => {
+          void queries.refetchAvailablePlayers();
+        }}
       />
     );
   }

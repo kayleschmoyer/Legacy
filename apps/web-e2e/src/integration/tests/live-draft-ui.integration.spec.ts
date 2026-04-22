@@ -401,27 +401,44 @@ test.describe
     });
 
     await test.step('Verify draft completed', async () => {
-      // Check "Draft Complete!" on ANY of the 4 draft board pages
+      // Poll all existing pages for the "Draft Complete!" banner.
+      // The pick loop exits as soon as it detects the banner, but if the
+      // WebSocket notification arrived between iterations it may not be visible
+      // yet on every page. Give up to 30 s for the banner to propagate via WS
+      // before falling back to a page reload.
       let draftComplete = false;
-      for (const { page } of pages) {
-        if (
-          await page
-            .getByText('Draft Complete!')
-            .isVisible()
-            .catch(() => false)
-        ) {
-          draftComplete = true;
-          break;
+      const pollDeadline = Date.now() + 30_000;
+      while (!draftComplete && Date.now() < pollDeadline) {
+        for (const { page } of pages) {
+          if (
+            await page
+              .getByText('Draft Complete!')
+              .isVisible()
+              .catch(() => false)
+          ) {
+            draftComplete = true;
+            break;
+          }
+        }
+        if (!draftComplete) {
+          await pages[0].page.waitForTimeout(2000);
         }
       }
 
-      // If not visible yet, reload commissioner page on draft board and wait
+      // If still not visible, reload the commissioner page and wait for Apollo
+      // to refetch leagueDraft — draftCompletedAt in DB ensures the banner
+      // renders on a fresh load even when the WS completion event was missed.
       if (!draftComplete) {
+        // eslint-disable-next-line no-console
+        console.log(
+          '[live-draft] Banner not visible after 30 s polling — reloading commissioner page',
+        );
         await commissionerPage.goto(`/baseball/league/${state.leagueId}/draft`);
         await commissionerPage.waitForLoadState('load');
         await expect(commissionerPage.getByText('Draft Complete!')).toBeVisible(
           { timeout: 30000 },
         );
+        draftComplete = true;
       }
 
       expect(draftComplete).toBe(true);
