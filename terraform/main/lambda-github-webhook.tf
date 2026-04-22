@@ -144,6 +144,18 @@ resource "aws_ssm_parameter" "agent_author_app_private_key_secret_name" {
   })
 }
 
+resource "aws_ssm_parameter" "github_webhook_secret_name" {
+  name        = "/legacy-sports/${var.environment}/lambda/github-webhook/github-webhook-secret-name"
+  description = "Exact Secrets Manager secret name for the github_webhook_secret — populate via: aws secretsmanager put-secret-value --secret-id <value> --secret-string <hex-secret>"
+  type        = "String"
+  value       = aws_secretsmanager_secret.github_webhook_secret.name
+
+  tags = merge(local.common_tags, {
+    Component = "github-webhook"
+    Function  = "github-webhook"
+  })
+}
+
 resource "aws_ssm_parameter" "jira_webhook_secret_name" {
   name        = "/legacy-sports/${var.environment}/lambda/github-webhook/jira-webhook-secret-name"
   description = "Exact Secrets Manager secret name for the jira_webhook_secret — read by setup-jira-webhook.sh without needing secretsmanager:ListSecrets"

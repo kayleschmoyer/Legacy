@@ -31,11 +31,12 @@ resource "aws_iam_policy" "github_actions_runners" {
       # The module creates log groups under two prefixes:
       #   /github-runners/*           — standalone log groups in github-runners.tf
       #   /github-self-hosted-runners/* — module-managed log groups
+      # Note: logs:DescribeLogGroups is intentionally omitted here — it requires
+      # Resource = "*" and lives in RunnerCloudWatchLogsDescribeAll below.
       {
         Sid    = "RunnerCloudWatchLogsRead"
         Effect = "Allow"
         Action = [
-          "logs:DescribeLogGroups",
           "logs:DescribeLogStreams",
           "logs:ListTagsLogGroup",
           "logs:ListTagsForResource"
