@@ -117,12 +117,13 @@ test.describe
         updateLeagueSettings: {
           gamesPerMatchup: number;
           totalMatchups: number;
+          playoffEnabled: boolean | null;
         };
       }>(
         apiCommissioner,
         `mutation UpdateSettings($input: UpdateLeagueSettingsInput!) {
                updateLeagueSettings(input: $input) {
-                 gamesPerMatchup totalMatchups
+                 gamesPerMatchup totalMatchups playoffEnabled
                }
              }`,
         {
@@ -130,11 +131,13 @@ test.describe
             leagueId: state.leagueId,
             gamesPerMatchup: GAMES_PER_MATCHUP,
             totalMatchups: TOTAL_MATCHUPS,
+            playoffEnabled: false,
           },
         },
       );
       expect(data.updateLeagueSettings.gamesPerMatchup).toBe(GAMES_PER_MATCHUP);
       expect(data.updateLeagueSettings.totalMatchups).toBe(TOTAL_MATCHUPS);
+      expect(data.updateLeagueSettings.playoffEnabled).toBe(false);
     });
 
     await test.step('1.3 Manager 1 joins league', async () => {

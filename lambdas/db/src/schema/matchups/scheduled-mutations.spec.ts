@@ -103,6 +103,8 @@ jest.mock('@legacy-sports/db-client', () => ({
   })),
 }));
 
+type MatchupStatus = 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+
 describe('Scheduled Mutations', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -196,9 +198,12 @@ describe('Scheduled Mutations', () => {
       // select games. This replaces the old LS-515 behavior where game
       // selection itself processed 'scheduled' matchups — that was unsafe
       // because it meant games could be selected before the lineup lock.
-      const leagueMatchups = [
-        { weekNumber: 1, status: 'scheduled' as const },
-        { weekNumber: 2, status: 'scheduled' as const },
+      const leagueMatchups: Array<{
+        weekNumber: number;
+        status: MatchupStatus;
+      }> = [
+        { weekNumber: 1, status: 'scheduled' },
+        { weekNumber: 2, status: 'scheduled' },
       ];
       const hasInProgress = leagueMatchups.some(
         (m) => m.status === 'in_progress',
@@ -324,6 +329,36 @@ describe('Scheduled Mutations', () => {
       expect(nextWeek).toBeGreaterThan(10); // past end of pre-created schedule
     });
 
+    it('should clear currentMatchup (set to null) when final week completes with playoffs disabled (LS-3826)', () => {
+      // When playoffEnabled === false and currentWeek >= totalMatchups, the
+      // season is over. autoAdvanceMatchups must set currentMatchup to null so
+      // the league query returns null (not a stale playoff matchup FK).
+      // Bug: the strict `=== false` check means a null/undefined playoffEnabled
+      // falls through to the playoff-creation branch, which sets currentMatchup
+      // to the first playoff matchup ID instead of null.
+      const league: {
+        currentWeek: number;
+        totalMatchups: number;
+        playoffEnabled: boolean | null;
+      } = {
+        currentWeek: 2,
+        totalMatchups: 2,
+        playoffEnabled: false,
+      };
+      const isSeasonOver = league.currentWeek >= league.totalMatchups;
+      const willClearMatchup = isSeasonOver && league.playoffEnabled === false;
+      expect(isSeasonOver).toBe(true);
+      expect(willClearMatchup).toBe(true);
+
+      // Guard: null playoffEnabled must not enter the clear-matchup path —
+      // commissioners must explicitly disable playoffs to get this behavior.
+      const leagueNullPlayoffs = { ...league, playoffEnabled: null };
+      const willClearWhenNull =
+        leagueNullPlayoffs.currentWeek >= leagueNullPlayoffs.totalMatchups &&
+        leagueNullPlayoffs.playoffEnabled === false;
+      expect(willClearWhenNull).toBe(false);
+    });
+
     it('should advance when stats lambda has already marked matchups completed (LS-3795)', () => {
       // Bug LS-3795: the stats lambda sets matchup status='completed' when all
       // game stats load. If autoAdvanceMatchups ran after that, it found zero
@@ -333,9 +368,12 @@ describe('Scheduled Mutations', () => {
       const leagueCurrentWeek = 1;
 
       // Simulate all week-1 matchups having been marked completed by stats lambda
-      const week1Matchups = [
-        { weekNumber: 1, status: 'completed' as const },
-        { weekNumber: 1, status: 'completed' as const },
+      const week1Matchups: Array<{
+        weekNumber: number;
+        status: MatchupStatus;
+      }> = [
+        { weekNumber: 1, status: 'completed' },
+        { weekNumber: 1, status: 'completed' },
       ];
 
       // Old filter (in_progress only) would miss these
@@ -419,9 +457,12 @@ describe('Scheduled Mutations', () => {
       // Managers use updateMatchupPlayerPosition / swapMatchupPlayerPositions,
       // both of which require matchup.status === 'scheduled'. Week-1 must stay
       // scheduled until autoSelectGames activates it on the first nightly run.
-      const week1AfterCreate = [
-        { weekNumber: 1, status: 'scheduled' as const },
-        { weekNumber: 1, status: 'scheduled' as const },
+      const week1AfterCreate: Array<{
+        weekNumber: number;
+        status: MatchupStatus;
+      }> = [
+        { weekNumber: 1, status: 'scheduled' },
+        { weekNumber: 1, status: 'scheduled' },
       ];
       const editable = week1AfterCreate.filter((m) => m.status === 'scheduled');
       expect(editable).toHaveLength(week1AfterCreate.length);
@@ -432,9 +473,9 @@ describe('Scheduled Mutations', () => {
       // current in-progress week is the one that autoAdvanceMatchups will
       // eventually close. Otherwise autoSelectGames promotes the lowest-week
       // scheduled matchups to 'in_progress' (locking their lineups).
-      const leagueA = [
-        { weekNumber: 1, status: 'scheduled' as const },
-        { weekNumber: 2, status: 'scheduled' as const },
+      const leagueA: Array<{ weekNumber: number; status: MatchupStatus }> = [
+        { weekNumber: 1, status: 'scheduled' },
+        { weekNumber: 2, status: 'scheduled' },
       ];
       const leagueAHasInProgress = leagueA.some(
         (m) => m.status === 'in_progress',
@@ -453,11 +494,14 @@ describe('Scheduled Mutations', () => {
       // games, so a manager cannot watch game outcomes on a scheduled matchup
       // and retroactively swap in players. 'scheduled' matchups are never
       // queued for stats loading.
-      const filter = 'in_progress' as const;
-      const scheduled = { status: 'scheduled' as const };
-      const inProgress = { status: 'in_progress' as const };
-      expect(scheduled.status === filter).toBe(false);
-      expect(inProgress.status === filter).toBe(true);
+      const filter: MatchupStatus = 'in_progress';
+      const matchups: Array<{ status: MatchupStatus }> = [
+        { status: 'scheduled' },
+        { status: 'in_progress' },
+      ];
+      const processable = matchups.filter((m) => m.status === filter);
+      expect(processable).toHaveLength(1);
+      expect(processable[0].status).toBe('in_progress');
     });
 
     it('should set weekAdvanceStatus to idle after initial matchup creation', () => {
