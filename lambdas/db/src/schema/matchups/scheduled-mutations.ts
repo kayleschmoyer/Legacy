@@ -494,18 +494,29 @@ builder.mutationField('autoAdvanceMatchups', (t) =>
                 LOGGER.info(
                   `[autoAdvanceMatchups] League ${league.id} (${league.name}) season complete, playoffs disabled`,
                 );
+                // Mark all active matchups (in_progress or scheduled) as
+                // completed. The 'scheduled' case covers the edge where
+                // autoSelectGames' SQS message was not processed before
+                // autoAdvanceMatchups ran the final-week path.
                 await context.db
                   .update(PublicSchema.matchups)
                   .set({ status: 'completed' })
                   .where(
                     and(
                       eq(PublicSchema.matchups.leagueId, league.id),
-                      eq(PublicSchema.matchups.status, 'in_progress'),
+                      inArray(PublicSchema.matchups.status, [
+                        'in_progress',
+                        'scheduled',
+                      ]),
                     ),
                   );
                 await context.db
                   .update(PublicSchema.leagues)
-                  .set({ currentMatchup: null, weekAdvanceStatus: 'idle' })
+                  .set({
+                    currentMatchup: null,
+                    currentWeek: null,
+                    weekAdvanceStatus: 'idle',
+                  })
                   .where(eq(PublicSchema.leagues.id, league.id));
                 result.leaguesAdvanced++;
                 continue;

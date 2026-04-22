@@ -727,6 +727,46 @@ builder.mutationField('createAllMatchups', (t) =>
           // requires BOTH fields to be NULL — currentMatchup alone can be NULL
           // in a finished season (autoAdvanceMatchups clears it after the final
           // week), so we must not mistake that for partial init.
+          //
+          // Additionally, guard against false-positive on a no-playoff completed
+          // season where autoAdvanceMatchups also clears currentWeek (LS-3827).
+          // In a finished season ALL matchups are 'completed'; in partial-init
+          // they are 'scheduled' (game selection never ran); in a corrupted
+          // in-progress league some are 'scheduled'/'in_progress'. Checking for
+          // the absence of any active (scheduled/in_progress) matchup is the
+          // tightest predicate: it only matches the all-completed finished state.
+          const [activeMatchup] = await context.db
+            .select({ id: PublicSchema.matchups.id })
+            .from(PublicSchema.matchups)
+            .where(
+              and(
+                eq(PublicSchema.matchups.leagueId, leagueId),
+                inArray(PublicSchema.matchups.status, [
+                  'scheduled',
+                  'in_progress',
+                ]),
+              ),
+            )
+            .limit(1);
+
+          if (!activeMatchup) {
+            // No active matchups — all are completed.  This is a finished
+            // no-playoff season (autoAdvanceMatchups cleared both pointers —
+            // LS-3827). Skip repair; return existing matchups as-is.
+            LOGGER.info(
+              'createAllMatchups: all matchups completed and league pointers both NULL — finished season, skipping repair',
+              { leagueId },
+            );
+            const allMatchups = await context.db
+              .select()
+              .from(PublicSchema.matchups)
+              .where(eq(PublicSchema.matchups.leagueId, leagueId));
+            return { matchups: allMatchups, currentMatchupId: null };
+          }
+
+          // Active matchups exist but both league pointers are NULL — this is
+          // either a partial-init or a corrupted in-progress league. Proceed
+          // with repair attempt (week-1 activation) and log a warning.
           LOGGER.warn(
             'createAllMatchups: matchups exist but league currentMatchup/currentWeek are both NULL — attempting repair',
             { leagueId, leagueRow },

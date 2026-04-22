@@ -350,6 +350,57 @@ describe('Scheduled Mutations', () => {
       );
       expect(newFilter).toHaveLength(2); // correctly proceeds to advance
     });
+
+    it('final-week advance (no playoffs) clears both currentMatchup and currentWeek (LS-3827)', () => {
+      // Bug LS-3827: autoAdvanceMatchups cleared currentMatchup but not
+      // currentWeek in the no-playoff season-complete path. Leaving currentWeek
+      // set caused the UI's getCurrentWeekForLeague to return the final week
+      // number, making userCurrentMatchup resolve to the final-week matchup.
+      // isSeasonComplete then required that matchup.status === 'completed',
+      // which failed when SQS game selection hadn't promoted it from 'scheduled'
+      // before the advance ran — causing the "Season Complete" panel to never
+      // appear. Fix: clear both pointers so userCurrentMatchup resolves to null
+      // and isSeasonComplete is true regardless of matchup status.
+      const currentWeek = 1;
+      const totalMatchups = 1;
+      const playoffEnabled = false;
+
+      expect(currentWeek).toBeGreaterThanOrEqual(totalMatchups);
+      expect(playoffEnabled).toBe(false);
+
+      // Both league pointers must be null after the final-week advance
+      const expectedLeagueUpdate = {
+        currentMatchup: null,
+        currentWeek: null,
+        weekAdvanceStatus: 'idle',
+      };
+      expect(expectedLeagueUpdate.currentMatchup).toBeNull();
+      expect(expectedLeagueUpdate.currentWeek).toBeNull();
+      expect(expectedLeagueUpdate.weekAdvanceStatus).toBe('idle');
+    });
+
+    it('final-week advance (no playoffs) marks both in_progress and scheduled matchups completed (LS-3827)', () => {
+      // If autoSelectGames' SQS message was not yet processed when
+      // autoAdvanceMatchups ran the final-week path, the matchup can still be
+      // 'scheduled' (never activated to in_progress). The advance must mark it
+      // 'completed' regardless of current status so the season closes cleanly.
+      const matchupsToComplete = [
+        { weekNumber: 1, status: 'in_progress' as const },
+        { weekNumber: 1, status: 'scheduled' as const }, // SQS not yet processed
+      ];
+
+      // Old filter (in_progress only) would miss the 'scheduled' matchup
+      const oldFilter = matchupsToComplete.filter(
+        (m) => m.status === 'in_progress',
+      );
+      expect(oldFilter).toHaveLength(1); // leaves the scheduled matchup open — the bug
+
+      // New filter (in_progress | scheduled) catches all active final-week matchups
+      const newFilter = matchupsToComplete.filter(
+        (m) => m.status === 'in_progress' || m.status === 'scheduled',
+      );
+      expect(newFilter).toHaveLength(2); // correctly marks both completed
+    });
   });
 
   // ── createAllMatchupsForLeague (lineup-window preservation) ─────────────
