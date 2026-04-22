@@ -19,20 +19,27 @@ export function lazyWithRetry<T extends React.ComponentType>(
   factory: () => Promise<{ default: T }>,
 ): React.LazyExoticComponent<T> {
   return React.lazy(() =>
-    factory().catch((error: unknown) => {
-      const alreadyRetried = sessionStorage.getItem(RELOAD_KEY) === 'true';
-      if (!alreadyRetried) {
-        sessionStorage.setItem(RELOAD_KEY, 'true');
-        window.location.reload();
-        // Never-settling promise keeps React suspended while the reload fires.
-        return new Promise<never>((_resolve) => {
-          return;
-        });
-      }
-      // Second failure: clear the flag so future navigations can retry again,
-      // then let the error bubble to the nearest ErrorBoundary.
-      sessionStorage.removeItem(RELOAD_KEY);
-      throw error;
-    }),
+    factory()
+      .then((module) => {
+        // Successful load: clear any prior retry flag so future chunk failures
+        // (e.g. after another deployment) can trigger a fresh reload.
+        sessionStorage.removeItem(RELOAD_KEY);
+        return module;
+      })
+      .catch((error: unknown) => {
+        const alreadyRetried = sessionStorage.getItem(RELOAD_KEY) === 'true';
+        if (!alreadyRetried) {
+          sessionStorage.setItem(RELOAD_KEY, 'true');
+          window.location.reload();
+          // Never-settling promise keeps React suspended while the reload fires.
+          return new Promise<never>((_resolve) => {
+            return;
+          });
+        }
+        // Second failure: clear the flag so future navigations can retry again,
+        // then let the error bubble to the nearest ErrorBoundary.
+        sessionStorage.removeItem(RELOAD_KEY);
+        throw error;
+      }),
   );
 }
