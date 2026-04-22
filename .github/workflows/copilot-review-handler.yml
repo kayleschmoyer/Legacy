@@ -13,6 +13,11 @@ name: Copilot Review Handler
 # Known limitation: workflow_run only fires when the triggering workflow ran on
 # the same repository (not forks). Fork PRs are already skipped via the `if:`
 # guard below, and the Lambda's fork-PR check provides an additional safeguard.
+#
+# workflow_run.pull_requests is always empty for the Copilot code review
+# workflow because it is triggered by GitHub's internal App machinery rather
+# than a pull_request event. The script falls back to
+# repos.listPullRequestsAssociatedWithCommit to look up the PR by head SHA.
 on:
   workflow_run:
     workflows: ["Copilot code review"]
@@ -34,15 +39,45 @@ jobs:
         with:
           script: |
             const headSha = context.payload.workflow_run.head_sha;
-            const prs     = context.payload.workflow_run.pull_requests;
+            const { owner, repo } = context.repo;
+
+            // workflow_run.pull_requests is only populated when the triggering
+            // workflow was itself triggered by a pull_request event. The Copilot
+            // code review workflow is triggered by GitHub internally and always
+            // delivers an empty array. Fall back to the commit → PR API instead.
+            let prs = context.payload.workflow_run.pull_requests;
+            if (!prs || prs.length === 0) {
+              core.info('workflow_run.pull_requests empty — looking up PR by commit SHA');
+              const { data: associated } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+                owner, repo, commit_sha: headSha,
+              });
+              prs = associated
+                .filter(pr =>
+                  pr.state === 'open' &&
+                  pr.head.repo?.full_name === `${owner}/${repo}` &&
+                  pr.head.sha === headSha
+                )
+                .sort((a, b) => {
+                  const updatedAtDiff = new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+                  if (updatedAtDiff !== 0) {
+                    return updatedAtDiff;
+                  }
+                  return a.number - b.number;
+                });
+
+              if (prs.length > 1) {
+                core.info(
+                  `Multiple open PRs found with head SHA ${headSha}; selecting PR #${prs[0].number} (newest updated_at, then lowest number)`
+                );
+              }
+            }
 
             if (!prs || prs.length === 0) {
-              core.info('No associated PRs on this workflow_run — skipping');
+              core.info('No open PRs found for this commit — skipping');
               return;
             }
 
             const prNumber = prs[0].number;
-            const { owner, repo } = context.repo;
 
             core.info(`Handling Copilot review for PR #${prNumber}, SHA ${headSha}`);
 
