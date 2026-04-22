@@ -33,7 +33,7 @@ import {
   isNegroLeague,
   SEASON_MATCHUP_MULTIPLIER,
 } from '@legacy-sports/utils';
-import { and, asc, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 
 import { type GenericDatabase } from './client/abstract/BaseDbClient';
 import { PublicSchema } from './client/PublicDbClient';
@@ -657,12 +657,22 @@ export async function populateMatchupPlayersAndSeasons(
         await db
           .insert(PublicSchema.matchupPlayers)
           .values(playersToInsert)
-          .onConflictDoNothing({
+          .onConflictDoUpdate({
             target: [
               PublicSchema.matchupPlayers.matchupId,
               PublicSchema.matchupPlayers.playerId,
               PublicSchema.matchupPlayers.teamId,
             ],
+            // Restore the correct positionId from team_members only when a
+            // prior SQS-retry run left a stale null-positionId row. This
+            // avoids clobbering already-populated lineup assignments while
+            // still preserving manually-edited rows.
+            set: { positionId: sql`EXCLUDED.position_id` },
+            setWhere: and(
+              eq(PublicSchema.matchupPlayers.manuallyEdited, false),
+              isNull(PublicSchema.matchupPlayers.positionId),
+              sql`EXCLUDED.position_id IS NOT NULL`,
+            ),
           });
       }
     }

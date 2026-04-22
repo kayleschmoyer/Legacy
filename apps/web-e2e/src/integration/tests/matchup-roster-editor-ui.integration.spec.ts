@@ -310,10 +310,40 @@ test.describe
 
   test('Phase 5: Matchup detail page shows Edit Lineup section', async ({
     commissionerPage: page,
+    commissionerJwt,
   }) => {
     // Two independent reload loops (Edit Lineup + starters) can each run up to
     // 30–60 s; add headroom beyond the default integration timeout.
     test.setTimeout(180_000);
+
+    await test.step('GQL consistency gate: wait for starter positionIds to be set', async () => {
+      // autoPopulateFirstMatchupLineup runs asynchronously after draft completion
+      // and may not have committed when Phase 5 starts. Poll the direct API until
+      // at least one matchup_player with a non-null positionId is returned so the
+      // UI reload loop doesn't time out on stale data.
+      const deadline = Date.now() + 60_000;
+      let hasStarters = false;
+      while (!hasStarters && Date.now() < deadline) {
+        const { getMatchupPlayers } = await gqlFetch<{
+          getMatchupPlayers: Array<{ id: string; positionId: number | null }>;
+        }>(
+          commissionerJwt,
+          `query GetMatchupPlayers($matchupId: Int!) {
+            getMatchupPlayers(matchupId: $matchupId) {
+              id
+              positionId
+            }
+          }`,
+          { matchupId: state.matchupId },
+        );
+        hasStarters = getMatchupPlayers.some((mp) => mp.positionId !== null);
+        if (!hasStarters) await new Promise((r) => setTimeout(r, 4_000));
+      }
+      expect(
+        hasStarters,
+        'At least one starter must have a non-null positionId before UI check',
+      ).toBe(true);
+    });
 
     await test.step('Navigate to matchup detail page and wait for Edit Lineup', async () => {
       const matchupUrl = `/baseball/league/${state.leagueId}/matchups/${state.matchupId}`;
