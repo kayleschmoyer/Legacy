@@ -7,7 +7,7 @@ import {
   getPrReviewThreads,
 } from './github-app';
 
-// Review Bot GitHub App ID (registered in LS-3002 with checks:write)
+// Review Bot GitHub App ID (registered in LS-3002 with checks:write).
 const REVIEW_BOT_APP_ID = 3142924;
 
 // All known logins Copilot uses. Must stay in sync with the equivalent sets
