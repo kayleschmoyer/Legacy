@@ -9,6 +9,9 @@ import {
 
 const REVIEW_BOT_APP_ID = 3142924;
 
+// All known logins Copilot uses. Must stay in sync with the equivalent sets
+// in handle-pull-request.ts, handle-review-thread.ts, handle-workflow-run.ts,
+// and copilot-review-handler.yml.
 const COPILOT_LOGINS = new Set([
   'copilot-pull-request-reviewer',
   'copilot-pull-request-reviewer[bot]',
@@ -53,12 +56,12 @@ async function evaluateAndSetBotReview(
     (r) => COPILOT_LOGINS.has(r.userLogin) && r.commitId === headSha,
   );
   if (!hasCopilotReviewForHeadSha) {
-    // No Copilot review for the current head SHA yet — leave bot-review in_progress
-    // set by the pull_request handler so we don't act on a stale review.
-    LOGGER.info(
-      'No Copilot review for current head SHA yet — leaving bot-review in_progress',
-      { prNumber, headSha },
-    );
+    // No Copilot review for the current head SHA yet — skip to avoid acting
+    // on a stale review from a previous commit.
+    LOGGER.info('No Copilot review for current head SHA yet — skipping', {
+      prNumber,
+      headSha,
+    });
     return 'no-copilot-review';
   }
 
@@ -200,6 +203,9 @@ export async function handlePullRequestReviewEvent(
       headSha,
       true,
     );
+    if (conclusion === 'no-copilot-review') {
+      return `Skipped bot-review for PR #${prNumber}: no Copilot review for current SHA (state=${review.state})`;
+    }
     return `Set bot-review=${conclusion} for PR #${prNumber}: Copilot cleared (state=${review.state})`;
   }
 
@@ -235,5 +241,8 @@ export async function handlePullRequestReviewEvent(
     headSha,
     copilotCleared,
   );
+  if (conclusion === 'no-copilot-review') {
+    return `Skipped bot-review for PR #${prNumber}: no Copilot review for current SHA (reviewer=@${reviewerLogin})`;
+  }
   return `Set bot-review=${conclusion} for PR #${prNumber}: non-Copilot review by @${reviewerLogin}`;
 }

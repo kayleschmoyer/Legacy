@@ -10,7 +10,9 @@ import {
 // Review Bot GitHub App ID (registered in LS-3002 with checks:write)
 const REVIEW_BOT_APP_ID = 3142924;
 
-// Logins used by Copilot in review thread comments and reviews
+// All known logins Copilot uses. Must stay in sync with the equivalent sets
+// in handle-pull-request.ts, handle-pull-request-review.ts, handle-workflow-run.ts,
+// and copilot-review-handler.yml.
 const COPILOT_LOGINS = new Set([
   'copilot-pull-request-reviewer',
   'copilot-pull-request-reviewer[bot]',

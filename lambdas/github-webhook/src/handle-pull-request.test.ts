@@ -8,8 +8,6 @@ const mockGetRepoInstallationToken =
   githubApp.getRepoInstallationToken as jest.Mock;
 const mockGetPrReviews = githubApp.getPrReviews as jest.Mock;
 const mockCreateCheckRun = githubApp.createCheckRun as jest.Mock;
-const mockCreateInProgressCheckRun =
-  githubApp.createInProgressCheckRun as jest.Mock;
 const mockRequestCopilotReview = githubApp.requestCopilotReview as jest.Mock;
 const mockAddLabel = githubApp.addLabel as jest.Mock;
 
@@ -38,7 +36,6 @@ beforeEach(() => {
   mockGetRepoInstallationToken.mockResolvedValue('tok-test');
   mockGetPrReviews.mockResolvedValue([]);
   mockCreateCheckRun.mockResolvedValue(undefined);
-  mockCreateInProgressCheckRun.mockResolvedValue(undefined);
   mockRequestCopilotReview.mockResolvedValue(undefined);
   mockAddLabel.mockResolvedValue(undefined);
 });
@@ -54,7 +51,7 @@ describe('handlePullRequestEvent — ignored cases', () => {
       'pk',
     );
     expect(result).toMatch(/Ignored pull_request action="closed"/);
-    expect(mockCreateInProgressCheckRun).not.toHaveBeenCalled();
+    expect(mockRequestCopilotReview).not.toHaveBeenCalled();
   });
 
   it('falls back to repo installation lookup when installation.id is missing', async () => {
@@ -62,7 +59,7 @@ describe('handlePullRequestEvent — ignored cases', () => {
       { ...BASE_PAYLOAD, action: 'opened', installation: undefined },
       'pk',
     );
-    expect(result).toMatch(/in_progress/);
+    expect(result).toMatch(/Requested Copilot review/);
     expect(mockGetInstallationToken).not.toHaveBeenCalled();
     expect(mockGetRepoInstallationToken).toHaveBeenCalledWith(
       3142924,
@@ -92,7 +89,7 @@ describe('handlePullRequestEvent — ignored cases', () => {
       'pk',
     );
     expect(result).toMatch(/draft PR/);
-    expect(mockCreateInProgressCheckRun).not.toHaveBeenCalled();
+    expect(mockRequestCopilotReview).not.toHaveBeenCalled();
   });
 });
 
@@ -119,32 +116,27 @@ describe('handlePullRequestEvent — bot-authored PRs', () => {
         42,
         'merge-when-ready',
       );
-      expect(mockCreateInProgressCheckRun).not.toHaveBeenCalled();
+      expect(mockRequestCopilotReview).not.toHaveBeenCalled();
     },
   );
 });
 
 describe('handlePullRequestEvent — normal PR lifecycle', () => {
   it.each(['opened', 'synchronize', 'reopened', 'ready_for_review'])(
-    'sets in_progress and requests Copilot on %s',
+    'requests Copilot review on %s (no in_progress check run)',
     async (action) => {
       const result = await handlePullRequestEvent(
         { ...BASE_PAYLOAD, action },
         'pk',
       );
-      expect(result).toMatch(/in_progress/);
-      expect(mockCreateInProgressCheckRun).toHaveBeenCalledWith(
-        'tok-test',
-        'bkrupa',
-        'legacy-sports',
-        expect.objectContaining({ name: 'bot-review', headSha: 'abc1234' }),
-      );
+      expect(result).toMatch(/Requested Copilot review/);
       expect(mockRequestCopilotReview).toHaveBeenCalledWith(
         'tok-test',
         'bkrupa',
         'legacy-sports',
         42,
       );
+      expect(mockCreateCheckRun).not.toHaveBeenCalled();
     },
   );
 });

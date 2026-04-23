@@ -81,6 +81,9 @@ jobs:
 
             core.info(`Handling Copilot review for PR #${prNumber}, SHA ${headSha}`);
 
+            // All known logins Copilot uses. Must stay in sync with the equivalent
+            // sets in handle-pull-request.ts, handle-pull-request-review.ts,
+            // handle-review-thread.ts, and handle-workflow-run.ts.
             const COPILOT_LOGINS = new Set([
               'copilot-pull-request-reviewer',
               'copilot-pull-request-reviewer[bot]',
@@ -88,17 +91,27 @@ jobs:
             ]);
 
             // ── 1. Find the latest Copilot review for this exact SHA ──────────
+            // The workflow_run.completed event can fire before GitHub persists
+            // the Copilot review to the REST API. Retry for up to 30 seconds
+            // to handle this race condition.
 
-            const { data: reviews } = await github.rest.pulls.listReviews({
-              owner, repo, pull_number: prNumber,
-            });
-
-            const copilotReviews = reviews
-              .filter(r => COPILOT_LOGINS.has(r.user.login) && r.commit_id === headSha)
-              .sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at));
+            let copilotReviews = [];
+            for (let attempt = 1; attempt <= 6; attempt++) {
+              const { data: reviews } = await github.rest.pulls.listReviews({
+                owner, repo, pull_number: prNumber,
+              });
+              copilotReviews = reviews
+                .filter(r => COPILOT_LOGINS.has(r.user.login) && r.commit_id === headSha)
+                .sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at));
+              if (copilotReviews.length > 0) break;
+              if (attempt < 6) {
+                core.info(`No Copilot review found for current SHA (attempt ${attempt}/6) — retrying in 5s`);
+                await new Promise(r => setTimeout(r, 5_000));
+              }
+            }
 
             if (copilotReviews.length === 0) {
-              core.info('No Copilot review found for current SHA — skipping');
+              core.info('No Copilot review found for current SHA after retries — skipping');
               return;
             }
 

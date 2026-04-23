@@ -2,7 +2,6 @@ import { LOGGER } from '@legacy-sports/logging';
 import {
   addLabel,
   createCheckRun,
-  createInProgressCheckRun,
   getInstallationToken,
   getPrReviews,
   getRepoInstallationToken,
@@ -11,6 +10,9 @@ import {
 
 const REVIEW_BOT_APP_ID = 3142924;
 
+// All known logins Copilot uses. Must stay in sync with the equivalent sets
+// in handle-pull-request-review.ts, handle-review-thread.ts, handle-workflow-run.ts,
+// and copilot-review-handler.yml.
 const COPILOT_LOGINS = new Set([
   'copilot-pull-request-reviewer',
   'copilot-pull-request-reviewer[bot]',
@@ -44,7 +46,8 @@ interface PullRequestPayload {
  *   - Bot-authored PRs → auto-pass bot-review (Copilot won't review them)
  *   - Draft PRs → ignore
  *   - Fork PRs → ignore (no installation token available for cross-repo PRs)
- *   - Otherwise → set bot-review=in_progress and request Copilot review
+ *   - Otherwise → request Copilot review (no in_progress check run created;
+ *     the check appears as a missing required status until Copilot finishes)
  *
  * review_request_removed (Copilot removed as reviewer):
  *   - Wait 5s for any concurrently-submitted review to propagate
@@ -168,14 +171,7 @@ export async function handlePullRequestEvent(
     return `Auto-passed bot-review for ${authorLogin} PR #${prNumber}`;
   }
 
-  await createInProgressCheckRun(token, owner, repo, {
-    name: 'bot-review',
-    headSha,
-    title: 'Waiting for Copilot review',
-    summary: 'Waiting for Copilot review to complete',
-  });
-
   await requestCopilotReview(token, owner, repo, prNumber);
 
-  return `Set bot-review=in_progress and requested Copilot review for PR #${prNumber}`;
+  return `Requested Copilot review for PR #${prNumber}`;
 }

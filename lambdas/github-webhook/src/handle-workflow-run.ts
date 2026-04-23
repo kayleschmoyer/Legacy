@@ -17,8 +17,8 @@ const COPILOT_REVIEW_WORKFLOW_NAME = 'Copilot code review';
 
 // All known logins Copilot uses across review thread comments, review
 // submissions, and requested_reviewers. Must stay in sync with the equivalent
-// sets in handle-pull-request-review.ts, handle-review-thread.ts, and
-// copilot-review-handler.yml.
+// sets in handle-pull-request.ts, handle-pull-request-review.ts,
+// handle-review-thread.ts, and copilot-review-handler.yml.
 const COPILOT_LOGINS = new Set([
   'copilot-pull-request-reviewer',
   'copilot-pull-request-reviewer[bot]',
@@ -48,23 +48,17 @@ interface WorkflowRunPayload {
  * Why this handler exists:
  *   Copilot (a GitHub App) does not fire `pull_request_review` repository
  *   webhook events — its reviews are App-to-App and never reach the Lambda.
- *   The Lambda creates a `bot-review=in_progress` check run on push using the
- *   Review Bot App token. Only the same App can PATCH that run (GitHub enforces
- *   check-run ownership), so the `copilot-review-handler.yml` workflow
- *   (which runs as GITHUB_TOKEN / github-actions app) cannot close it.
+ *   The pull_request handler no longer creates a bot-review=in_progress run
+ *   on push (that caused a permanently stuck check because cross-app PATCH is
+ *   forbidden by GitHub). Instead, bot-review stays absent until Copilot
+ *   finishes — GitHub treats a missing required check the same as pending,
+ *   so merging remains blocked.
  *
- *   By subscribing the Review Bot GitHub App to `workflow_run` events, the
- *   Lambda receives a webhook when Copilot finishes and can PATCH its own
- *   in_progress run to success or failure — eliminating the stuck run.
- *
- * Prerequisite:
- *   The Review Bot GitHub App must have `workflow_run` checked under
- *   "Subscribe to events" in its settings page on GitHub.
- *
- * The `copilot-review-handler.yml` workflow remains active as a parallel
- * path: it cannot PATCH the Lambda's run (cross-app), so it always POSTs a
- * new completed run. Having both is harmless — GitHub's required status
- * checks use the latest result, so both writers agree.
+ *   This handler and `copilot-review-handler.yml` are parallel writers: both
+ *   POST a new completed bot-review run when Copilot finishes. GitHub's
+ *   required status check gate uses the most recent run, so both agreeing is
+ *   harmless. Having two writers ensures the check is set even if one path
+ *   fails (e.g. the workflow_run webhook is not delivered to the Lambda).
  */
 export async function handleWorkflowRunEvent(
   payload: WorkflowRunPayload,

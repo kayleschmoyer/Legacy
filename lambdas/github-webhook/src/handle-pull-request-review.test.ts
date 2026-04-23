@@ -278,7 +278,7 @@ describe('handlePullRequestReviewEvent — non-Copilot review', () => {
     const promise = handlePullRequestReviewEvent(humanPayload, 'pk');
     await jest.runAllTimersAsync();
     const result = await promise;
-    expect(result).toMatch(/no-copilot-review/);
+    expect(result).toMatch(/Skipped bot-review/);
     expect(mockCreateCheckRun).not.toHaveBeenCalled();
   });
 });
