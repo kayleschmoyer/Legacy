@@ -475,6 +475,7 @@ resource "aws_iam_role_policy" "github_actions_additional" {
         ]
       },
       # API Gateway write permissions for Terraform apply (integration responses, methods, domains, account, etc.)
+      # /apis (no wildcard) is required for POST when creating new HTTP APIs (apigatewayv2_api).
       {
         Effect = "Allow"
         Action = [
@@ -485,6 +486,7 @@ resource "aws_iam_role_policy" "github_actions_additional" {
         ]
         Resource = [
           "arn:aws:apigateway:${local.region}::/restapis/*",
+          "arn:aws:apigateway:${local.region}::/apis",
           "arn:aws:apigateway:${local.region}::/apis/*",
           "arn:aws:apigateway:${local.region}::/domainnames",
           "arn:aws:apigateway:${local.region}::/domainnames/*",

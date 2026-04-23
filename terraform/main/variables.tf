@@ -248,6 +248,18 @@ variable "mlb_data_provider" {
   }
 }
 
+variable "mcp_oidc_issuer_url" {
+  description = "IAM Identity Center OIDC issuer URL (the 'iss' claim in the idToken JWT). Run 'node scripts/mcp-auth.mjs --setup' to obtain this value. Example: https://identitycenter.amazonaws.com/ssoins-xxxxxxxxxxxxxxxx"
+  type        = string
+  default     = ""
+}
+
+variable "mcp_oidc_client_id" {
+  description = "IAM Identity Center OIDC client ID created by 'node scripts/mcp-auth.mjs --setup'. Leave empty for the initial terraform apply (deploys APIs without auth); add after running --setup, then re-apply to activate the JWT authorizer."
+  type        = string
+  default     = ""
+}
+
 variable "mlb_data_api_key" {
   description = "API key for the MLB data provider. Leave empty for mlb-statsapi (no key required). Required for balldontlie and rolling-insights in production."
   type        = string

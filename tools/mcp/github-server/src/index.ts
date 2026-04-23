@@ -250,1254 +250,1283 @@ void getToken().catch((err) => {
   );
 });
 
-const server = new McpServer({
-  name: 'legacy-sports-github',
-  version: '1.0.0',
-});
+export function createServer(): McpServer {
+  const server = new McpServer({
+    name: 'legacy-sports-github',
+    version: '1.0.0',
+  });
 
-// --- github_auth_status ---
-server.tool(
-  'github_auth_status',
-  'Check GitHub API authentication status (passive check only — does not trigger interactive auth). Call this first in any GitHub workflow to verify API access is available. Also see ci_auth_status for GitHub rate limit info.',
-  {},
-  async (): Promise<ToolResult> => {
-    const auth = await tryGetGitHubAuth();
+  // --- github_auth_status ---
+  server.tool(
+    'github_auth_status',
+    'Check GitHub API authentication status (passive check only — does not trigger interactive auth). Call this first in any GitHub workflow to verify API access is available. Also see ci_auth_status for GitHub rate limit info.',
+    {},
+    async (): Promise<ToolResult> => {
+      const auth = await tryGetGitHubAuth();
 
-    if (!auth) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify(
-              {
-                configured: false,
-                source: null,
-                user: null,
-                fallback:
-                  'No GitHub token found. Set GH_TOKEN or GITHUB_TOKEN env var, AGENT_AUTHOR_APP_PRIVATE_KEY for GitHub App auth, or run `gh auth login`.',
-              },
-              null,
-              2,
-            ),
-          },
-        ],
-      };
-    }
-
-    const userResult = await getGitHubUser(auth.token);
-
-    if (userResult.status === 'invalid') {
-      // GitHub App tokens can be auto-refreshed — regenerate instead of asking the user
-      if (auth.source === 'github-app') {
-        try {
-          const refreshed = await tryResolveToken();
-          if (refreshed) {
-            const retryUser = await getGitHubUser(refreshed.token);
-            if (retryUser.status === 'valid') {
-              return {
-                content: [
-                  {
-                    type: 'text',
-                    text: JSON.stringify(
-                      {
-                        configured: true,
-                        source: refreshed.source,
-                        user: retryUser.login,
-                        fallback: null,
-                      },
-                      null,
-                      2,
-                    ),
-                  },
-                ],
-              };
-            }
-            if (retryUser.status === 'unknown') {
-              return {
-                content: [
-                  {
-                    type: 'text',
-                    text: JSON.stringify(
-                      {
-                        configured: 'unknown',
-                        source: refreshed.source,
-                        user: null,
-                        reason: retryUser.reason,
-                        fallback:
-                          'A GitHub App token was refreshed but could not be validated due to a transient error (rate-limit, 5xx, or network issue). It may still work — proceed and retry if API calls fail.',
-                      },
-                      null,
-                      2,
-                    ),
-                  },
-                ],
-              };
-            }
-          }
-        } catch {
-          // Fall through to the error message below
-        }
+      if (!auth) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  configured: false,
+                  source: null,
+                  user: null,
+                  fallback:
+                    'No GitHub token found. Set GH_TOKEN or GITHUB_TOKEN env var, AGENT_AUTHOR_APP_PRIVATE_KEY for GitHub App auth, or run `gh auth login`.',
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
       }
 
-      const fallback =
-        auth.source === 'env'
-          ? 'A GitHub token was found in the environment, but it appears to be invalid or expired. Double-check GH_TOKEN or GITHUB_TOKEN, or run `gh auth login` to refresh your credentials.'
-          : auth.source === 'github-app'
-            ? 'A GitHub App token was generated but could not be validated. Check that AGENT_AUTHOR_APP_PRIVATE_KEY is correct and the app installation is active.'
-            : `A GitHub token was found via ${auth.source}, but it appears to be invalid or expired. Run \`gh auth login\` to refresh your credentials.`;
+      const userResult = await getGitHubUser(auth.token);
 
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify(
-              {
-                configured: false,
-                source: auth.source,
-                user: null,
-                fallback,
-              },
-              null,
-              2,
-            ),
-          },
-        ],
-      };
-    }
+      if (userResult.status === 'invalid') {
+        // GitHub App tokens can be auto-refreshed — regenerate instead of asking the user
+        if (auth.source === 'github-app') {
+          try {
+            const refreshed = await tryResolveToken();
+            if (refreshed) {
+              const retryUser = await getGitHubUser(refreshed.token);
+              if (retryUser.status === 'valid') {
+                return {
+                  content: [
+                    {
+                      type: 'text',
+                      text: JSON.stringify(
+                        {
+                          configured: true,
+                          source: refreshed.source,
+                          user: retryUser.login,
+                          fallback: null,
+                        },
+                        null,
+                        2,
+                      ),
+                    },
+                  ],
+                };
+              }
+              if (retryUser.status === 'unknown') {
+                return {
+                  content: [
+                    {
+                      type: 'text',
+                      text: JSON.stringify(
+                        {
+                          configured: 'unknown',
+                          source: refreshed.source,
+                          user: null,
+                          reason: retryUser.reason,
+                          fallback:
+                            'A GitHub App token was refreshed but could not be validated due to a transient error (rate-limit, 5xx, or network issue). It may still work — proceed and retry if API calls fail.',
+                        },
+                        null,
+                        2,
+                      ),
+                    },
+                  ],
+                };
+              }
+            }
+          } catch {
+            // Fall through to the error message below
+          }
+        }
 
-    if (userResult.status === 'unknown') {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify(
-              {
-                configured: 'unknown',
-                source: auth.source,
-                user: null,
-                reason: userResult.reason,
-                fallback:
-                  'A GitHub token was found but could not be validated due to a transient error. It may still work — proceed and retry if API calls fail.',
-              },
-              null,
-              2,
-            ),
-          },
-        ],
-      };
-    }
+        const fallback =
+          auth.source === 'env'
+            ? 'A GitHub token was found in the environment, but it appears to be invalid or expired. Double-check GH_TOKEN or GITHUB_TOKEN, or run `gh auth login` to refresh your credentials.'
+            : auth.source === 'github-app'
+              ? 'A GitHub App token was generated but could not be validated. Check that AGENT_AUTHOR_APP_PRIVATE_KEY is correct and the app installation is active.'
+              : `A GitHub token was found via ${auth.source}, but it appears to be invalid or expired. Run \`gh auth login\` to refresh your credentials.`;
 
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(
+        return {
+          content: [
             {
-              configured: true,
-              source: auth.source,
-              user: userResult.login,
-              fallback: null,
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  configured: false,
+                  source: auth.source,
+                  user: null,
+                  fallback,
+                },
+                null,
+                2,
+              ),
             },
-            null,
-            2,
-          ),
-        },
-      ],
-    };
-  },
-);
+          ],
+        };
+      }
 
-// --- github_close_pr ---
-server.tool(
-  'github_close_pr',
-  'Close a PR with optional comment.',
-  {
-    number: z.coerce.number().int().positive().describe('PR number'),
-    comment: z.string().trim().min(1).optional().describe('Closing comment'),
-  },
-  async (params) => closePR(params),
-);
+      if (userResult.status === 'unknown') {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  configured: 'unknown',
+                  source: auth.source,
+                  user: null,
+                  reason: userResult.reason,
+                  fallback:
+                    'A GitHub token was found but could not be validated due to a transient error. It may still work — proceed and retry if API calls fail.',
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      }
 
-// --- github_create_label ---
-server.tool(
-  'github_create_label',
-  'Create a label on the repository. Returns success if label already exists.',
-  {
-    name: z.string().trim().min(1).describe('Label name'),
-    color: z
-      .string()
-      .regex(
-        /^#?[0-9a-fA-F]{6}$/,
-        'Must be 6 hex chars, optionally prefixed with #',
-      )
-      .optional()
-      .describe('Hex color code (e.g. "ff0000" or "#ff0000")'),
-    description: z.string().optional().describe('Label description'),
-  },
-  async (params) => createLabel(params),
-);
-
-// --- github_list_labels ---
-server.tool(
-  'github_list_labels',
-  'Prefer this over `gh label list` via shell. List all labels defined in the repository. Use before calling github_manage_labels or github_edit_pr to discover available label names.',
-  {
-    search: z
-      .string()
-      .optional()
-      .describe(
-        'Filter labels by name or description (case-insensitive substring match)',
-      ),
-  },
-  async (params) => listLabels(params),
-);
-
-// --- github_create_pr ---
-server.tool(
-  'github_create_pr',
-  'Prefer this over `gh pr create` via shell. Create a pull request. Title should include Jira key.',
-  {
-    title: z.string().describe('PR title with Jira key'),
-    body: z.string().describe('PR body (markdown)'),
-    base: z.string().default('main').describe('Base branch (default: main)'),
-    draft: coercedBoolean.default(false).describe('Create as draft'),
-    head: z
-      .string()
-      .optional()
-      .describe(
-        'Remote branch name to use as PR head. If omitted and worktreePath is provided, auto-detected from the local branch name in that worktree (git rev-parse --abbrev-ref HEAD). If omitted and no worktreePath, auto-detected from the upstream tracking ref (git @{upstream}), falling back to the local branch name. Use this when the local branch name differs from the pushed remote branch name.',
-      ),
-    worktreePath: z
-      .string()
-      .refine((p) => !p || /^([A-Za-z]:[/\\]|\/)/.test(p), {
-        message: 'worktreePath must be an absolute path',
-      })
-      .optional()
-      .describe('Worktree path to run gh from'),
-  },
-  async (params) => createPR(params),
-);
-
-// --- github_get_repo_info ---
-server.tool(
-  'github_get_repo_info',
-  'Get repo info: owner, name, default branch, URL.',
-  {},
-  async () => getRepoInfo(),
-);
-
-// --- github_get_review_threads ---
-server.tool(
-  'github_get_review_threads',
-  'Fetch review threads on a PR via GraphQL. By default returns only UNRESOLVED threads (the ones blocking merge). Pass includeResolved: true to include all threads. IMPORTANT: isOutdated threads that are NOT resolved still block the merge queue — "outdated" means the code changed after the comment was posted, not that it was dismissed. Always use this tool first when debugging "A conversation must be resolved before this pull request can be merged" merge-queue errors. Each thread includes: id (PRRT_ node ID for github_resolve_threads), isResolved, isOutdated, isCollapsed, path, line, startLine (all thread-level for quick scanning without reading comments), plus per-comment databaseId, author, body, path, line. Pagination is capped at 100 threads and 50 comments per thread; truncated: true is set when results are paginated. Pass the PR number as "number" (preferred) or "prNumber" (alias).',
-  {
-    number: z.coerce.number().int().positive().optional().describe('PR number'),
-    prNumber: z.coerce
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .describe('Alias for "number" — use either, not both'),
-    includeResolved: coercedBoolean
-      .default(false)
-      .describe(
-        'Include resolved threads in results (default: false — returns only unresolved threads, including outdated-but-unresolved threads that still block merge)',
-      ),
-  },
-  async (params) => {
-    const resolved = params.number ?? params.prNumber;
-    if (!resolved) {
       return {
-        isError: true,
         content: [
           {
             type: 'text',
-            text: 'Missing required parameter: provide "number" (or alias "prNumber") with a positive integer PR number.',
+            text: JSON.stringify(
+              {
+                configured: true,
+                source: auth.source,
+                user: userResult.login,
+                fallback: null,
+              },
+              null,
+              2,
+            ),
           },
         ],
       };
-    }
-    return getReviewThreads({
-      number: resolved,
-      includeResolved: params.includeResolved,
-    });
-  },
-);
+    },
+  );
 
-// --- github_list_prs ---
-server.tool(
-  'github_list_prs',
-  'Prefer this over `gh pr list` via shell. List PRs with optional filters. Auto-paginates to return all matching PRs (up to limit). Response includes total and hasMore fields.',
-  {
-    state: z
-      .enum(['open', 'closed', 'merged', 'all'])
-      .default('open')
-      .describe('State filter (default: open)'),
-    branch: z.string().optional().describe('Head branch filter'),
-    author: z.string().optional().describe('Author filter'),
-    label: z.string().optional().describe('Label filter'),
-    search: z.string().optional().describe('Search query'),
-    limit: z.coerce
-      .number()
-      .int()
-      .positive()
-      .max(500)
-      .default(500)
-      .describe(
-        'Max total results across all pages (default: 500, auto-paginates)',
-      ),
-  },
-  async (params) => listPRs(params),
-);
+  // --- github_close_pr ---
+  server.tool(
+    'github_close_pr',
+    'Close a PR with optional comment.',
+    {
+      number: z.coerce.number().int().positive().describe('PR number'),
+      comment: z.string().trim().min(1).optional().describe('Closing comment'),
+    },
+    async (params) => closePR(params),
+  );
 
-// --- github_list_reviews ---
-server.tool(
-  'github_list_reviews',
-  'List reviews on a PR. Returns reviewer, state, submittedAt, bodyLength, and commentCount per review. Use to check whether Copilot APPROVED or COMMENTED, and whether inline comments exist (Copilot sometimes posts COMMENTED with 0 inline comments — a quirk that causes bot-review FAILURE but leaves no threads to fix).',
-  {
-    number: z.coerce.number().int().positive().describe('PR number'),
-    reviewer: z
-      .string()
-      .trim()
-      .min(1)
-      .optional()
-      .describe(
-        'Filter by reviewer login (e.g. "copilot-pull-request-reviewer[bot]")',
-      ),
-    latestOnly: coercedBoolean
-      .default(true)
-      .describe(
-        'When true (default), return only the most recent review per reviewer. Set false to return all reviews.',
-      ),
-  },
-  async (params) => listReviews(params),
-);
+  // --- github_create_label ---
+  server.tool(
+    'github_create_label',
+    'Create a label on the repository. Returns success if label already exists.',
+    {
+      name: z.string().trim().min(1).describe('Label name'),
+      color: z
+        .string()
+        .regex(
+          /^#?[0-9a-fA-F]{6}$/,
+          'Must be 6 hex chars, optionally prefixed with #',
+        )
+        .optional()
+        .describe('Hex color code (e.g. "ff0000" or "#ff0000")'),
+      description: z.string().optional().describe('Label description'),
+    },
+    async (params) => createLabel(params),
+  );
 
-// --- github_reply_to_review ---
-server.tool(
-  'github_reply_to_review',
-  'Post a reply to a PR review thread. Provide EITHER threadId (GraphQL node ID) OR both commentId AND number (REST) — not both paths at once.',
-  {
-    body: z
-      .string()
-      .trim()
-      .min(1, 'Reply body cannot be empty')
-      .describe('Markdown body of the reply comment'),
-    threadId: z
-      .string()
-      .optional()
-      .describe(
-        'GraphQL node ID of the review thread (from github_get_review_threads). Use this OR commentId+number, never both.',
-      ),
-    commentId: z.coerce
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .describe(
-        'Numeric REST comment ID (databaseId from github_get_review_threads). Requires "number" param. Use this OR threadId, never both.',
-      ),
-    number: z.coerce
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .describe('PR number. Required when using commentId.'),
-  },
-  async (params) => {
-    const hasThreadId = !!params.threadId;
-    const hasRestPath =
-      params.commentId !== undefined && params.number !== undefined;
-    if (
-      hasThreadId &&
-      (params.commentId !== undefined || params.number !== undefined)
-    ) {
-      return {
-        isError: true,
-        content: [
-          {
-            type: 'text',
-            text: 'Provide EITHER threadId OR (commentId + number) — not both paths at once.',
-          },
-        ],
-      };
-    }
-    if (!hasThreadId && !hasRestPath) {
-      return {
-        isError: true,
-        content: [
-          {
-            type: 'text',
-            text: 'Provide either threadId (GraphQL node ID) or both commentId and number (REST path).',
-          },
-        ],
-      };
-    }
-    return replyToReview(params);
-  },
-);
+  // --- github_list_labels ---
+  server.tool(
+    'github_list_labels',
+    'Prefer this over `gh label list` via shell. List all labels defined in the repository. Use before calling github_manage_labels or github_edit_pr to discover available label names.',
+    {
+      search: z
+        .string()
+        .optional()
+        .describe(
+          'Filter labels by name or description (case-insensitive substring match)',
+        ),
+    },
+    async (params) => listLabels(params),
+  );
 
-// --- github_comment_pr ---
-server.tool(
-  'github_comment_pr',
-  'Post a general (top-level) comment on a PR. Use for diagnostic notes, blocker explanations, and status updates — distinct from review thread replies (use github_reply_to_review for those). Maps to POST /repos/{owner}/{repo}/issues/{number}/comments.',
-  {
-    number: z.coerce.number().int().positive().describe('PR number'),
-    body: z
-      .string()
-      .trim()
-      .min(1, 'Comment body cannot be empty')
-      .describe('Markdown body of the comment'),
-  },
-  async (params) => commentPR(params),
-);
+  // --- github_create_pr ---
+  server.tool(
+    'github_create_pr',
+    'Prefer this over `gh pr create` via shell. Create a pull request. Title should include Jira key.',
+    {
+      title: z.string().describe('PR title with Jira key'),
+      body: z.string().describe('PR body (markdown)'),
+      base: z.string().default('main').describe('Base branch (default: main)'),
+      draft: coercedBoolean.default(false).describe('Create as draft'),
+      head: z
+        .string()
+        .optional()
+        .describe(
+          'Remote branch name to use as PR head. If omitted and worktreePath is provided, auto-detected from the local branch name in that worktree (git rev-parse --abbrev-ref HEAD). If omitted and no worktreePath, auto-detected from the upstream tracking ref (git @{upstream}), falling back to the local branch name. Use this when the local branch name differs from the pushed remote branch name.',
+        ),
+      worktreePath: z
+        .string()
+        .refine((p) => !p || /^([A-Za-z]:[/\\]|\/)/.test(p), {
+          message: 'worktreePath must be an absolute path',
+        })
+        .optional()
+        .describe('Worktree path to run gh from'),
+    },
+    async (params) => createPR(params),
+  );
 
-// --- github_list_pr_comments ---
-server.tool(
-  'github_list_pr_comments',
-  'Read general (top-level) comments on a PR or issue. Returns author, body, created_at, and updated_at for each comment. Use the optional since parameter (ISO 8601) to filter to comments posted after a given timestamp. Handles pagination automatically. Maps to GET /repos/{owner}/{repo}/issues/{number}/comments. Pass the PR number as "prNumber" (preferred) or "number" (alias).',
-  {
-    prNumber: z.coerce
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .describe('PR or issue number'),
-    number: z.coerce
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .describe('Alias for "prNumber" — use either, not both'),
-    since: z
-      .string()
-      .optional()
-      .describe(
-        'ISO 8601 timestamp — only return comments posted at or after this time',
-      ),
-  },
-  async (params) => {
-    const prNum = params.prNumber ?? params.number;
-    if (!prNum) {
-      return {
-        isError: true,
-        content: [
-          {
-            type: 'text',
-            text: 'Missing required parameter: provide "prNumber" (or alias "number") with a positive integer PR or issue number.',
-          },
-        ],
-      };
-    }
-    return listPRComments({ number: prNum, since: params.since });
-  },
-);
+  // --- github_get_repo_info ---
+  server.tool(
+    'github_get_repo_info',
+    'Get repo info: owner, name, default branch, URL.',
+    {},
+    async () => getRepoInfo(),
+  );
 
-// --- github_list_pr_inline_comments ---
-server.tool(
-  'github_list_pr_inline_comments',
-  'Read inline code review comments on a PR (PRRC_* objects attached to specific diff lines). Returns id, inReplyToId, author, body, path, line, diffHunk for each comment. Use path to filter to a specific file. Use since (ISO 8601) to filter by timestamp. Handles pagination automatically. Maps to GET /repos/{owner}/{repo}/pulls/{number}/comments. For thread resolution status (resolved/unresolved), use github_get_review_threads instead.',
-  {
-    number: z.coerce.number().int().positive().describe('PR number'),
-    path: z
-      .string()
-      .trim()
-      .min(1)
-      .optional()
-      .describe('Filter to a specific file path (exact match)'),
-    since: z
-      .string()
-      .optional()
-      .describe(
-        'ISO 8601 timestamp — only return comments posted at or after this time',
-      ),
-  },
-  async (params) => listPRInlineComments(params),
-);
+  // --- github_get_review_threads ---
+  server.tool(
+    'github_get_review_threads',
+    'Fetch review threads on a PR via GraphQL. By default returns only UNRESOLVED threads (the ones blocking merge). Pass includeResolved: true to include all threads. IMPORTANT: isOutdated threads that are NOT resolved still block the merge queue — "outdated" means the code changed after the comment was posted, not that it was dismissed. Always use this tool first when debugging "A conversation must be resolved before this pull request can be merged" merge-queue errors. Each thread includes: id (PRRT_ node ID for github_resolve_threads), isResolved, isOutdated, isCollapsed, path, line, startLine (all thread-level for quick scanning without reading comments), plus per-comment databaseId, author, body, path, line. Pagination is capped at 100 threads and 50 comments per thread; truncated: true is set when results are paginated. Pass the PR number as "number" (preferred) or "prNumber" (alias).',
+    {
+      number: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('PR number'),
+      prNumber: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Alias for "number" — use either, not both'),
+      includeResolved: coercedBoolean
+        .default(false)
+        .describe(
+          'Include resolved threads in results (default: false — returns only unresolved threads, including outdated-but-unresolved threads that still block merge)',
+        ),
+    },
+    async (params) => {
+      const resolved = params.number ?? params.prNumber;
+      if (!resolved) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: 'Missing required parameter: provide "number" (or alias "prNumber") with a positive integer PR number.',
+            },
+          ],
+        };
+      }
+      return getReviewThreads({
+        number: resolved,
+        includeResolved: params.includeResolved,
+      });
+    },
+  );
 
-// --- github_list_review_comments ---
-server.tool(
-  'github_list_review_comments',
-  'Read inline code review comments on a PR, with optional filtering by review ID or timestamp. Use reviewId to isolate comments from a specific Copilot or human review submission (avoids mixing new and historical comments). Use since (ISO 8601) to filter by creation time. Returns id, inReplyToId, user, path, line, body, createdAt, reviewId for each comment. Handles pagination automatically. Maps to GET /repos/{owner}/{repo}/pulls/{number}/comments.',
-  {
-    number: z.coerce.number().int().positive().describe('PR number'),
-    since: z
-      .string()
-      .optional()
-      .describe(
-        'ISO 8601 timestamp — only return comments created at or after this time',
-      ),
-    reviewId: z.coerce
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .describe(
-        'Filter to comments from a specific review submission (pull_request_review_id)',
-      ),
-  },
-  async (params) => listReviewComments(params),
-);
+  // --- github_list_prs ---
+  server.tool(
+    'github_list_prs',
+    'Prefer this over `gh pr list` via shell. List PRs with optional filters. Auto-paginates to return all matching PRs (up to limit). Response includes total and hasMore fields.',
+    {
+      state: z
+        .enum(['open', 'closed', 'merged', 'all'])
+        .default('open')
+        .describe('State filter (default: open)'),
+      branch: z.string().optional().describe('Head branch filter'),
+      author: z.string().optional().describe('Author filter'),
+      label: z.string().optional().describe('Label filter'),
+      search: z.string().optional().describe('Search query'),
+      limit: z.coerce
+        .number()
+        .int()
+        .positive()
+        .max(500)
+        .default(500)
+        .describe(
+          'Max total results across all pages (default: 500, auto-paginates)',
+        ),
+    },
+    async (params) => listPRs(params),
+  );
 
-// --- github_edit_pr ---
-server.tool(
-  'github_edit_pr',
-  "Update a PR's title and/or body. Use when Copilot or reviewers request description fixes. Maps to PATCH /repos/{owner}/{repo}/pulls/{pull_number}.",
-  {
-    number: z.coerce.number().int().positive().describe('PR number'),
-    title: z.string().trim().min(1).optional().describe('New PR title'),
-    body: z.string().optional().describe('New PR body (markdown)'),
-  },
-  async (params) => editPR(params),
-);
+  // --- github_list_reviews ---
+  server.tool(
+    'github_list_reviews',
+    'List reviews on a PR. Returns reviewer, state, submittedAt, bodyLength, and commentCount per review. Use to check whether Copilot APPROVED or COMMENTED, and whether inline comments exist (Copilot sometimes posts COMMENTED with 0 inline comments — a quirk that causes bot-review FAILURE but leaves no threads to fix).',
+    {
+      number: z.coerce.number().int().positive().describe('PR number'),
+      reviewer: z
+        .string()
+        .trim()
+        .min(1)
+        .optional()
+        .describe(
+          'Filter by reviewer login (e.g. "copilot-pull-request-reviewer[bot]")',
+        ),
+      latestOnly: coercedBoolean
+        .default(true)
+        .describe(
+          'When true (default), return only the most recent review per reviewer. Set false to return all reviews.',
+        ),
+    },
+    async (params) => listReviews(params),
+  );
 
-// --- github_clear_ci_failure_labels ---
-server.tool(
-  'github_clear_ci_failure_labels',
-  'Remove all ci-failure-* labels from a PR. Use after successfully fixing and pushing a CI fix — the CI system will re-add labels if the fix did not hold. No-ops if no ci-failure-* labels are present.',
-  {
-    number: z.coerce.number().int().positive().describe('PR number'),
-  },
-  async (params) => clearCiFailureLabels(params),
-);
+  // --- github_reply_to_review ---
+  server.tool(
+    'github_reply_to_review',
+    'Post a reply to a PR review thread. Provide EITHER threadId (GraphQL node ID) OR both commentId AND number (REST) — not both paths at once.',
+    {
+      body: z
+        .string()
+        .trim()
+        .min(1, 'Reply body cannot be empty')
+        .describe('Markdown body of the reply comment'),
+      threadId: z
+        .string()
+        .optional()
+        .describe(
+          'GraphQL node ID of the review thread (from github_get_review_threads). Use this OR commentId+number, never both.',
+        ),
+      commentId: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe(
+          'Numeric REST comment ID (databaseId from github_get_review_threads). Requires "number" param. Use this OR threadId, never both.',
+        ),
+      number: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('PR number. Required when using commentId.'),
+    },
+    async (params) => {
+      const hasThreadId = !!params.threadId;
+      const hasRestPath =
+        params.commentId !== undefined && params.number !== undefined;
+      if (
+        hasThreadId &&
+        (params.commentId !== undefined || params.number !== undefined)
+      ) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: 'Provide EITHER threadId OR (commentId + number) — not both paths at once.',
+            },
+          ],
+        };
+      }
+      if (!hasThreadId && !hasRestPath) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: 'Provide either threadId (GraphQL node ID) or both commentId and number (REST path).',
+            },
+          ],
+        };
+      }
+      return replyToReview(params);
+    },
+  );
 
-// --- github_manage_labels ---
-server.tool(
-  'github_manage_labels',
-  'Prefer this over `gh pr edit --add-label` via shell. Add or remove labels on one or more PRs. Pass a single PR number via "prNumber", or one or more PR numbers via "prs". When multiple PRs are given, all get the same label changes.',
-  {
-    prs: z
-      .preprocess((v) => {
-        if (v === undefined || v === null) return undefined;
-        if (Array.isArray(v)) return v;
-        if (typeof v === 'string' && v.trimStart().startsWith('[')) {
-          try {
-            const parsed = JSON.parse(v);
-            if (Array.isArray(parsed)) return parsed;
-          } catch {
-            // Not valid JSON — fall through to wrap as single element
+  // --- github_comment_pr ---
+  server.tool(
+    'github_comment_pr',
+    'Post a general (top-level) comment on a PR. Use for diagnostic notes, blocker explanations, and status updates — distinct from review thread replies (use github_reply_to_review for those). Maps to POST /repos/{owner}/{repo}/issues/{number}/comments.',
+    {
+      number: z.coerce.number().int().positive().describe('PR number'),
+      body: z
+        .string()
+        .trim()
+        .min(1, 'Comment body cannot be empty')
+        .describe('Markdown body of the comment'),
+    },
+    async (params) => commentPR(params),
+  );
+
+  // --- github_list_pr_comments ---
+  server.tool(
+    'github_list_pr_comments',
+    'Read general (top-level) comments on a PR or issue. Returns author, body, created_at, and updated_at for each comment. Use the optional since parameter (ISO 8601) to filter to comments posted after a given timestamp. Handles pagination automatically. Maps to GET /repos/{owner}/{repo}/issues/{number}/comments. Pass the PR number as "prNumber" (preferred) or "number" (alias).',
+    {
+      prNumber: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('PR or issue number'),
+      number: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Alias for "prNumber" — use either, not both'),
+      since: z
+        .string()
+        .optional()
+        .describe(
+          'ISO 8601 timestamp — only return comments posted at or after this time',
+        ),
+    },
+    async (params) => {
+      const prNum = params.prNumber ?? params.number;
+      if (!prNum) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: 'Missing required parameter: provide "prNumber" (or alias "number") with a positive integer PR or issue number.',
+            },
+          ],
+        };
+      }
+      return listPRComments({ number: prNum, since: params.since });
+    },
+  );
+
+  // --- github_list_pr_inline_comments ---
+  server.tool(
+    'github_list_pr_inline_comments',
+    'Read inline code review comments on a PR (PRRC_* objects attached to specific diff lines). Returns id, inReplyToId, author, body, path, line, diffHunk for each comment. Use path to filter to a specific file. Use since (ISO 8601) to filter by timestamp. Handles pagination automatically. Maps to GET /repos/{owner}/{repo}/pulls/{number}/comments. For thread resolution status (resolved/unresolved), use github_get_review_threads instead.',
+    {
+      number: z.coerce.number().int().positive().describe('PR number'),
+      path: z
+        .string()
+        .trim()
+        .min(1)
+        .optional()
+        .describe('Filter to a specific file path (exact match)'),
+      since: z
+        .string()
+        .optional()
+        .describe(
+          'ISO 8601 timestamp — only return comments posted at or after this time',
+        ),
+    },
+    async (params) => listPRInlineComments(params),
+  );
+
+  // --- github_list_review_comments ---
+  server.tool(
+    'github_list_review_comments',
+    'Read inline code review comments on a PR, with optional filtering by review ID or timestamp. Use reviewId to isolate comments from a specific Copilot or human review submission (avoids mixing new and historical comments). Use since (ISO 8601) to filter by creation time. Returns id, inReplyToId, user, path, line, body, createdAt, reviewId for each comment. Handles pagination automatically. Maps to GET /repos/{owner}/{repo}/pulls/{number}/comments.',
+    {
+      number: z.coerce.number().int().positive().describe('PR number'),
+      since: z
+        .string()
+        .optional()
+        .describe(
+          'ISO 8601 timestamp — only return comments created at or after this time',
+        ),
+      reviewId: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe(
+          'Filter to comments from a specific review submission (pull_request_review_id)',
+        ),
+    },
+    async (params) => listReviewComments(params),
+  );
+
+  // --- github_edit_pr ---
+  server.tool(
+    'github_edit_pr',
+    "Update a PR's title and/or body. Use when Copilot or reviewers request description fixes. Maps to PATCH /repos/{owner}/{repo}/pulls/{pull_number}.",
+    {
+      number: z.coerce.number().int().positive().describe('PR number'),
+      title: z.string().trim().min(1).optional().describe('New PR title'),
+      body: z.string().optional().describe('New PR body (markdown)'),
+    },
+    async (params) => editPR(params),
+  );
+
+  // --- github_clear_ci_failure_labels ---
+  server.tool(
+    'github_clear_ci_failure_labels',
+    'Remove all ci-failure-* labels from a PR. Use after successfully fixing and pushing a CI fix — the CI system will re-add labels if the fix did not hold. No-ops if no ci-failure-* labels are present.',
+    {
+      number: z.coerce.number().int().positive().describe('PR number'),
+    },
+    async (params) => clearCiFailureLabels(params),
+  );
+
+  // --- github_manage_labels ---
+  server.tool(
+    'github_manage_labels',
+    'Prefer this over `gh pr edit --add-label` via shell. Add or remove labels on one or more PRs. Pass a single PR number via "prNumber", or one or more PR numbers via "prs". When multiple PRs are given, all get the same label changes.',
+    {
+      prs: z
+        .preprocess((v) => {
+          if (v === undefined || v === null) return undefined;
+          if (Array.isArray(v)) return v;
+          if (typeof v === 'string' && v.trimStart().startsWith('[')) {
+            try {
+              const parsed = JSON.parse(v);
+              if (Array.isArray(parsed)) return parsed;
+            } catch {
+              // Not valid JSON — fall through to wrap as single element
+            }
           }
-        }
-        return [v];
-      }, z.array(z.coerce.number().int().positive()).min(1).max(100).optional())
-      .describe(
-        'PR number or array of PR numbers (use "prNumber" for a single PR)',
-      ),
-    prNumber: z.coerce
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .describe(
-        'Single PR number — alias for prs:[n]. Use either "prNumber" or "prs", not both.',
-      ),
-    add: labelList.optional().describe('Labels to add'),
-    remove: labelList.optional().describe('Labels to remove'),
-  },
-  async (params) => {
-    const prs =
-      params.prs ??
-      (params.prNumber !== undefined ? [params.prNumber] : undefined);
-    if (!prs?.length) {
-      return {
-        isError: true,
-        content: [
-          {
-            type: 'text',
-            text: 'Missing required parameter: provide "prNumber" (single PR) or "prs" (one or more PR numbers).',
-          },
-        ],
-      };
-    }
-    return manageLabels({ prs, add: params.add, remove: params.remove });
-  },
-);
+          return [v];
+        }, z.array(z.coerce.number().int().positive()).min(1).max(100).optional())
+        .describe(
+          'PR number or array of PR numbers (use "prNumber" for a single PR)',
+        ),
+      prNumber: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe(
+          'Single PR number — alias for prs:[n]. Use either "prNumber" or "prs", not both.',
+        ),
+      add: labelList.optional().describe('Labels to add'),
+      remove: labelList.optional().describe('Labels to remove'),
+    },
+    async (params) => {
+      const prs =
+        params.prs ??
+        (params.prNumber !== undefined ? [params.prNumber] : undefined);
+      if (!prs?.length) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: 'Missing required parameter: provide "prNumber" (single PR) or "prs" (one or more PR numbers).',
+            },
+          ],
+        };
+      }
+      return manageLabels({ prs, add: params.add, remove: params.remove });
+    },
+  );
 
-// --- github_merge_pr ---
-server.tool(
-  'github_merge_pr',
-  'Prefer this over `gh pr merge` via shell. Merge a PR. Default: merge queue (strategy: "queue") — enables auto-merge via GraphQL, no local git checkout. "direct" uses --admin (requires authorization). Pass the PR number as "number" (preferred) or "prNumber" (alias). NOTE: PRs that modify .github/workflows/ files require the PAT to have the `workflow` OAuth scope — if the merge returns a 403 mentioning "workflow scope", escalate to the user to merge manually or reconfigure the token. To enable auto-merge with a configurable merge method, use `github_pr_enable_auto_merge` instead.',
-  {
-    number: z.coerce.number().int().positive().optional().describe('PR number'),
-    prNumber: z.coerce
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .describe('Alias for "number" — use either, not both'),
-    strategy: z
-      .enum(['queue', 'direct'])
-      .default('queue')
-      .describe(
-        '"queue" (default) or "direct" (--admin, requires authorization)',
-      ),
-  },
-  async (params) => {
-    const resolved = params.number ?? params.prNumber;
-    if (!resolved) {
-      return {
-        isError: true,
-        content: [
-          {
-            type: 'text',
-            text: 'Missing required parameter: provide "number" (or alias "prNumber") with a positive integer PR number.',
-          },
-        ],
-      };
-    }
-    return mergePR({ number: resolved, strategy: params.strategy });
-  },
-);
+  // --- github_merge_pr ---
+  server.tool(
+    'github_merge_pr',
+    'Prefer this over `gh pr merge` via shell. Merge a PR. Default: merge queue (strategy: "queue") — enables auto-merge via GraphQL, no local git checkout. "direct" uses --admin (requires authorization). Pass the PR number as "number" (preferred) or "prNumber" (alias). NOTE: PRs that modify .github/workflows/ files require the PAT to have the `workflow` OAuth scope — if the merge returns a 403 mentioning "workflow scope", escalate to the user to merge manually or reconfigure the token. To enable auto-merge with a configurable merge method, use `github_pr_enable_auto_merge` instead.',
+    {
+      number: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('PR number'),
+      prNumber: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Alias for "number" — use either, not both'),
+      strategy: z
+        .enum(['queue', 'direct'])
+        .default('queue')
+        .describe(
+          '"queue" (default) or "direct" (--admin, requires authorization)',
+        ),
+    },
+    async (params) => {
+      const resolved = params.number ?? params.prNumber;
+      if (!resolved) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: 'Missing required parameter: provide "number" (or alias "prNumber") with a positive integer PR number.',
+            },
+          ],
+        };
+      }
+      return mergePR({ number: resolved, strategy: params.strategy });
+    },
+  );
 
-// --- github_pr_enable_auto_merge ---
-server.tool(
-  'github_pr_enable_auto_merge',
-  'Enable auto-merge on a PR via the GitHub GraphQL API. The PR will merge automatically once all required checks pass. Use this instead of `gh pr merge --auto`, which fails in worktree sessions because it tries to check out the base branch locally. Pass the PR number as "number" (preferred) or "prNumber" (alias).',
-  {
-    number: z.coerce.number().int().positive().optional().describe('PR number'),
-    prNumber: z.coerce
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .describe('Alias for "number" — use either, not both'),
-    mergeMethod: z
-      .enum(['SQUASH', 'MERGE', 'REBASE'])
-      .default('SQUASH')
-      .describe('Merge method to use when auto-merging (default: SQUASH)'),
-  },
-  async (params) => {
-    if (params.number !== undefined && params.prNumber !== undefined) {
-      return {
-        isError: true,
-        content: [
-          {
-            type: 'text',
-            text: 'Ambiguous input: both "number" and "prNumber" were provided. Pass only one.',
-          },
-        ],
-      };
-    }
-    const resolved = params.number ?? params.prNumber;
-    if (!resolved) {
-      return {
-        isError: true,
-        content: [
-          {
-            type: 'text',
-            text: 'Missing required parameter: provide "number" (or alias "prNumber") with a positive integer PR number.',
-          },
-        ],
-      };
-    }
-    return enableAutoMerge({
-      prNumber: resolved,
-      mergeMethod: params.mergeMethod,
-    });
-  },
-);
+  // --- github_pr_enable_auto_merge ---
+  server.tool(
+    'github_pr_enable_auto_merge',
+    'Enable auto-merge on a PR via the GitHub GraphQL API. The PR will merge automatically once all required checks pass. Use this instead of `gh pr merge --auto`, which fails in worktree sessions because it tries to check out the base branch locally. Pass the PR number as "number" (preferred) or "prNumber" (alias).',
+    {
+      number: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('PR number'),
+      prNumber: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Alias for "number" — use either, not both'),
+      mergeMethod: z
+        .enum(['SQUASH', 'MERGE', 'REBASE'])
+        .default('SQUASH')
+        .describe('Merge method to use when auto-merging (default: SQUASH)'),
+    },
+    async (params) => {
+      if (params.number !== undefined && params.prNumber !== undefined) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: 'Ambiguous input: both "number" and "prNumber" were provided. Pass only one.',
+            },
+          ],
+        };
+      }
+      const resolved = params.number ?? params.prNumber;
+      if (!resolved) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: 'Missing required parameter: provide "number" (or alias "prNumber") with a positive integer PR number.',
+            },
+          ],
+        };
+      }
+      return enableAutoMerge({
+        prNumber: resolved,
+        mergeMethod: params.mergeMethod,
+      });
+    },
+  );
 
-// --- github_mark_pr_ready ---
-server.tool(
-  'github_mark_pr_ready',
-  'Convert a draft PR to ready for review. Use after validation passes to signal the PR is ready for sweep/review agents.',
-  {
-    number: z.coerce.number().int().positive().describe('PR number'),
-  },
-  async (params) => markPRReady(params),
-);
+  // --- github_mark_pr_ready ---
+  server.tool(
+    'github_mark_pr_ready',
+    'Convert a draft PR to ready for review. Use after validation passes to signal the PR is ready for sweep/review agents.',
+    {
+      number: z.coerce.number().int().positive().describe('PR number'),
+    },
+    async (params) => markPRReady(params),
+  );
 
-// --- github_pr_batch_status ---
-server.tool(
-  'github_pr_batch_status',
-  'Detailed status for specific PRs: mergeable, CI jobs, reviews, unresolved threads. Batched GraphQL.',
-  {
-    numbers: z
-      .array(z.coerce.number().int().positive())
-      .min(1)
-      .max(50)
-      .describe('PR numbers'),
-    compact: coercedBoolean
-      .default(false)
-      .describe(
-        'Return only essential fields (number, branch, mergeable, ciSummary, failedJobs, unresolvedThreads) to reduce token usage',
-      ),
-  },
-  async (params) => prBatchStatus(params),
-);
+  // --- github_pr_batch_status ---
+  server.tool(
+    'github_pr_batch_status',
+    'Detailed status for specific PRs: mergeable, CI jobs, reviews, unresolved threads. Batched GraphQL.',
+    {
+      numbers: z
+        .array(z.coerce.number().int().positive())
+        .min(1)
+        .max(50)
+        .describe('PR numbers'),
+      compact: coercedBoolean
+        .default(false)
+        .describe(
+          'Return only essential fields (number, branch, mergeable, ciSummary, failedJobs, unresolvedThreads) to reduce token usage',
+        ),
+    },
+    async (params) => prBatchStatus(params),
+  );
 
-// --- github_pr_dashboard ---
-server.tool(
-  'github_pr_dashboard',
-  'Triage dashboard: open PRs with mergeable status, CI state, unresolved threads, labels, and summary counts.',
-  {
-    state: z
-      .enum(['open', 'closed', 'merged', 'all'])
-      .default('open')
-      .describe('State filter (default: open)'),
-    author: z.string().optional().describe('Author filter'),
-    label: z.string().optional().describe('Label filter'),
-    limit: z.coerce
-      .number()
-      .int()
-      .positive()
-      .max(100)
-      .default(30)
-      .describe('Max results (default: 30)'),
-    excludeDrafts: coercedBoolean
-      .default(true)
-      .describe(
-        'Exclude draft PRs from dashboard results (default: true). Draft PRs are being worked on by their creating agent.',
-      ),
-  },
-  async (params) => prDashboard(params),
-);
+  // --- github_pr_dashboard ---
+  server.tool(
+    'github_pr_dashboard',
+    'Triage dashboard: open PRs with mergeable status, CI state, unresolved threads, labels, and summary counts.',
+    {
+      state: z
+        .enum(['open', 'closed', 'merged', 'all'])
+        .default('open')
+        .describe('State filter (default: open)'),
+      author: z.string().optional().describe('Author filter'),
+      label: z.string().optional().describe('Label filter'),
+      limit: z.coerce
+        .number()
+        .int()
+        .positive()
+        .max(100)
+        .default(30)
+        .describe('Max results (default: 30)'),
+      excludeDrafts: coercedBoolean
+        .default(true)
+        .describe(
+          'Exclude draft PRs from dashboard results (default: true). Draft PRs are being worked on by their creating agent.',
+        ),
+    },
+    async (params) => prDashboard(params),
+  );
 
-// --- github_pr_scan ---
-server.tool(
-  'github_pr_scan',
-  'Scan open PRs into buckets: conflicting, reviews, ciFailing, ciPending, clean. Syncs CI failure labels by default.',
-  {
-    limit: z.coerce
-      .number()
-      .int()
-      .positive()
-      .max(100)
-      .default(100)
-      .describe('Max PRs to scan (default: 100, max: 100)'),
-    applyLabels: coercedBoolean
-      .default(true)
-      .describe('Sync CI failure labels (default: true)'),
-    compact: coercedBoolean
-      .default(false)
-      .describe(
-        'Return a compact view with essential fields (number, branch, failedChecks, threadCount), plus threadsTruncated for review buckets and labelActions when labels are applied, to reduce token usage',
-      ),
-    excludeDrafts: coercedBoolean
-      .default(true)
-      .describe(
-        'Exclude draft PRs from scan results (default: true). Draft PRs are being worked on by their creating agent and should not be swept.',
-      ),
-    excludeLabels: labelList
-      .optional()
-      .describe(
-        'Exclude PRs that have any of these labels. Useful for filtering out sweep-claimed PRs. Default: no exclusions.',
-      ),
-  },
-  async (params) => prScan(params),
-);
+  // --- github_pr_scan ---
+  server.tool(
+    'github_pr_scan',
+    'Scan open PRs into buckets: conflicting, reviews, ciFailing, ciPending, clean. Syncs CI failure labels by default.',
+    {
+      limit: z.coerce
+        .number()
+        .int()
+        .positive()
+        .max(100)
+        .default(100)
+        .describe('Max PRs to scan (default: 100, max: 100)'),
+      applyLabels: coercedBoolean
+        .default(true)
+        .describe('Sync CI failure labels (default: true)'),
+      compact: coercedBoolean
+        .default(false)
+        .describe(
+          'Return a compact view with essential fields (number, branch, failedChecks, threadCount), plus threadsTruncated for review buckets and labelActions when labels are applied, to reduce token usage',
+        ),
+      excludeDrafts: coercedBoolean
+        .default(true)
+        .describe(
+          'Exclude draft PRs from scan results (default: true). Draft PRs are being worked on by their creating agent and should not be swept.',
+        ),
+      excludeLabels: labelList
+        .optional()
+        .describe(
+          'Exclude PRs that have any of these labels. Useful for filtering out sweep-claimed PRs. Default: no exclusions.',
+        ),
+    },
+    async (params) => prScan(params),
+  );
 
-// --- github_rebase_pr ---
-server.tool(
-  'github_rebase_pr',
-  'Rebase a PR branch onto base and force-push. Returns conflict details on failure.',
-  {
-    number: z.coerce.number().int().positive().describe('PR number'),
-  },
-  async (params) => rebasePR(params),
-);
+  // --- github_rebase_pr ---
+  server.tool(
+    'github_rebase_pr',
+    'Rebase a PR branch onto base and force-push. Returns conflict details on failure.',
+    {
+      number: z.coerce.number().int().positive().describe('PR number'),
+    },
+    async (params) => rebasePR(params),
+  );
 
-// --- github_request_review ---
-server.tool(
-  'github_request_review',
-  'Request reviewers on one or more PRs. Accepts a single PR number or array via "prs", or a single PR number via "prNumber" (alias for prs:[n]). Requests Copilot by default.',
-  {
-    prs: z
-      .preprocess((v) => {
-        if (v === undefined || v === null) return undefined;
-        if (Array.isArray(v)) return v;
-        if (typeof v === 'string' && v.trimStart().startsWith('[')) {
-          try {
-            const parsed = JSON.parse(v);
-            if (Array.isArray(parsed)) return parsed;
-          } catch {
-            // Not valid JSON — fall through to wrap as single element
+  // --- github_request_review ---
+  server.tool(
+    'github_request_review',
+    'Request reviewers on one or more PRs. Accepts a single PR number or array via "prs", or a single PR number via "prNumber" (alias for prs:[n]). Requests Copilot by default.',
+    {
+      prs: z
+        .preprocess((v) => {
+          if (v === undefined || v === null) return undefined;
+          if (Array.isArray(v)) return v;
+          if (typeof v === 'string' && v.trimStart().startsWith('[')) {
+            try {
+              const parsed = JSON.parse(v);
+              if (Array.isArray(parsed)) return parsed;
+            } catch {
+              // Not valid JSON — fall through to wrap as single element
+            }
           }
-        }
-        return [v];
-      }, z.array(z.coerce.number().int().positive()).min(1).max(100).optional())
-      .describe(
-        'PR number or array of PR numbers (use "prNumber" for a single PR)',
-      ),
-    prNumber: z.coerce
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .describe(
-        'Single PR number — alias for prs:[n]. Use either "prNumber" or "prs", not both.',
-      ),
-    reviewers: z
-      .array(z.string())
-      .optional()
-      .describe('Human reviewer usernames'),
-    copilot: coercedBoolean
-      .default(true)
-      .describe('Request Copilot review (default: true)'),
-  },
-  async (params) => {
-    const prs =
-      params.prs ??
-      (params.prNumber !== undefined ? [params.prNumber] : undefined);
-    if (!prs?.length) {
-      return {
-        isError: true,
-        content: [
-          {
-            type: 'text',
-            text: 'Missing required parameter: provide "prNumber" (single PR) or "prs" (one or more PR numbers).',
-          },
-        ],
-      };
-    }
-    return requestReview({ ...params, prs });
-  },
-);
+          return [v];
+        }, z.array(z.coerce.number().int().positive()).min(1).max(100).optional())
+        .describe(
+          'PR number or array of PR numbers (use "prNumber" for a single PR)',
+        ),
+      prNumber: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe(
+          'Single PR number — alias for prs:[n]. Use either "prNumber" or "prs", not both.',
+        ),
+      reviewers: z
+        .array(z.string())
+        .optional()
+        .describe('Human reviewer usernames'),
+      copilot: coercedBoolean
+        .default(true)
+        .describe('Request Copilot review (default: true)'),
+    },
+    async (params) => {
+      const prs =
+        params.prs ??
+        (params.prNumber !== undefined ? [params.prNumber] : undefined);
+      if (!prs?.length) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: 'Missing required parameter: provide "prNumber" (single PR) or "prs" (one or more PR numbers).',
+            },
+          ],
+        };
+      }
+      return requestReview({ ...params, prs });
+    },
+  );
 
-// --- github_resolve_threads ---
-server.tool(
-  'github_resolve_threads',
-  'Batch-resolve review threads (groups of 50). Accepts PRRT_ thread node IDs (from github_get_review_threads) via threadIds, OR numeric comment databaseIds (from mcp__github__* get_review_comments or github_get_review_threads comment entries) via commentDatabaseIds — the tool maps comment IDs to thread IDs internally. When using commentDatabaseIds, prNumber is required. If prNumber is provided and all threads resolved, triggers bot-review recheck.',
-  {
-    threadIds: stringList({ min: 1, max: 100 })
-      .optional()
-      .describe(
-        'Thread node IDs (PRRT_...) from github_get_review_threads. Use this OR commentDatabaseIds.',
-      ),
-    commentDatabaseIds: z
-      .preprocess((val) => {
-        if (Array.isArray(val)) return val;
-        if (typeof val === 'string' && val.trimStart().startsWith('[')) {
-          try {
-            const parsed = JSON.parse(val);
-            if (Array.isArray(parsed)) return parsed;
-          } catch {
-            // Not valid JSON — fall through
-          }
-        }
-        return val;
-      }, z.array(z.coerce.number().int().positive()).min(1).max(100))
-      .optional()
-      .describe(
-        'Numeric comment databaseId values (REST IDs) — alternative to threadIds when you only have comment IDs (e.g. from mcp__github__* get_review_comments). Requires prNumber. The tool fetches thread IDs from the PR and maps each comment ID to its parent thread.',
-      ),
-    prNumber: z.coerce
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .describe(
-        'PR number — required when using commentDatabaseIds; also triggers Copilot Auto-Approve recheck after resolving threads when all resolutions succeed',
-      ),
-  },
-  async (params) => resolveThreads(params),
-);
-
-// --- github_secrets_check ---
-server.tool(
-  'github_secrets_check',
-  'List all repo secret names or check specific secrets exist. Returns names, createdAt, updatedAt (never values). When names are omitted, lists all; when provided, returns per-secret exists status.',
-  {
-    names: z
-      .array(z.string())
-      .min(1)
-      .optional()
-      .describe(
-        'Specific secret names to check for existence. If omitted, lists all secret names.',
-      ),
-  },
-  async (params) => secretsCheck(params),
-);
-
-// --- github_pr_commits ---
-server.tool(
-  'github_pr_commits',
-  'List commits on a pull request. Returns sha, shortSha, message (first line), author, date, and url for each commit. Useful for correlating pushes with review events or inspecting PR history.',
-  {
-    number: z.coerce.number().int().positive().describe('PR number'),
-    limit: z.coerce
-      .number()
-      .int()
-      .positive()
-      .max(100)
-      .default(30)
-      .describe('Max commits to return (default: 30, max: 100)'),
-  },
-  async (params) => prCommits(params),
-);
-
-// --- github_view_pr ---
-server.tool(
-  'github_view_pr',
-  'Prefer this over `gh pr view` or `gh pr diff --name-only` via shell. View PR details: title, body, state, checks, reviews, diff stats, and changed files list (path, additions, deletions, status). Pass the PR number as "number" (preferred) or "prNumber" (alias).',
-  {
-    number: z.coerce.number().int().positive().optional().describe('PR number'),
-    prNumber: z.coerce
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .describe('Alias for "number" — use either, not both'),
-  },
-  async (params) => {
-    const resolved = params.number ?? params.prNumber;
-    if (!resolved) {
-      return {
-        isError: true,
-        content: [
-          {
-            type: 'text',
-            text: 'Missing required parameter: provide "number" (or alias "prNumber") with a positive integer PR number.',
-          },
-        ],
-      };
-    }
-    return viewPR({ number: resolved });
-  },
-);
-
-// --- github_secret_delete ---
-server.tool(
-  'github_secret_delete',
-  'Delete a GitHub Actions secret from the repository.',
-  {
-    name: z
-      .string()
-      .trim()
-      .regex(
-        /^[A-Za-z_][A-Za-z0-9_]*$/,
-        'Secret name must start with a letter or underscore and contain only alphanumeric characters and underscores',
-      )
-      .refine((n) => !n.startsWith('GITHUB_'), {
-        message: 'Secret names cannot start with GITHUB_',
-      })
-      .describe('Secret name to delete'),
-  },
-  async (params) => secretDelete(params),
-);
-
-// --- github_secret_set ---
-server.tool(
-  'github_secret_set',
-  'Set a GitHub Actions secret. Reads value from file to avoid passing secrets through the tool interface.',
-  {
-    name: z
-      .string()
-      .trim()
-      .min(1)
-      .describe('Secret name (e.g. "AGENT_AUTHOR_APP_PRIVATE_KEY")'),
-    value: z.string().optional().describe('Secret value (prefer valueFile)'),
-    valueFile: z
-      .string()
-      .optional()
-      .describe('Path to file containing secret value'),
-  },
-  async (params) => secretSet(params),
-);
-
-// --- github_retrigger_check ---
-server.tool(
-  'github_retrigger_check',
-  'Re-request failed status checks on a PR. Eliminates need for empty commits to clear stale failures.',
-  {
-    number: z.coerce.number().int().positive().describe('PR number'),
-    checkName: z
-      .string()
-      .trim()
-      .min(1)
-      .optional()
-      .describe('Specific check name to re-request (retriggers all matching)'),
-    allFailed: coercedBoolean
-      .default(false)
-      .describe(
-        'When true, retrigger all failed checks. When false (default), retrigger only the named check or all failed checks if no checkName given.',
-      ),
-  },
-  async (params) => retriggerCheck(params),
-);
-
-// --- github_set_commit_status ---
-server.tool(
-  'github_set_commit_status',
-  'Set a commit status on a PR. Auto-resolves head SHA from PR number. Use to update stale bot-review or custom statuses.',
-  {
-    number: z.coerce.number().int().positive().describe('PR number'),
-    context: z
-      .string()
-      .trim()
-      .min(1)
-      .describe('Status context name (e.g. "bot-review")'),
-    state: z
-      .enum(['success', 'failure', 'pending', 'error'])
-      .describe('Status state'),
-    description: z
-      .string()
-      .trim()
-      .optional()
-      .describe('Human-readable description'),
-  },
-  async (params) => setCommitStatus(params),
-);
-
-// --- github_list_commit_statuses ---
-server.tool(
-  'github_list_commit_statuses',
-  'List GitHub commit statuses (Statuses API) for a specific commit SHA or a PR\'s HEAD commit. These are DISTINCT from Check Runs (Checks API) — bot-review and security-scan statuses appear here, not in github_retrigger_check. Use this to diagnose "check not found" errors or confirm whether a bot-review status has updated after threads were resolved. Provide either "sha" (direct SHA), "prNumber", or its alias "number" (both auto-resolve to HEAD SHA). Use "context" to filter to a single status context.',
-  {
-    sha: z
-      .string()
-      .trim()
-      .min(1)
-      .optional()
-      .describe(
-        'Commit SHA to read statuses for. Use this OR prNumber/number, not both.',
-      ),
-    prNumber: z.coerce
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .describe(
-        'PR number — auto-resolves to the HEAD commit SHA. Use this OR sha, not both.',
-      ),
-    number: z.coerce
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .describe('Alias for "prNumber" — use either, not both.'),
-    context: z
-      .string()
-      .trim()
-      .min(1)
-      .optional()
-      .describe(
-        'Filter to a specific status context (e.g. "bot-review", "security-scan"). Omit to return all contexts.',
-      ),
-  },
-  async (params) => {
-    const resolvedPrNumber = params.prNumber ?? params.number;
-    if (!params.sha && !resolvedPrNumber) {
-      return {
-        isError: true,
-        content: [
-          {
-            type: 'text',
-            text: 'Missing required parameter: provide "sha" (commit SHA) or "prNumber"/"number" (PR number to auto-resolve HEAD SHA).',
-          },
-        ],
-      };
-    }
-    return listCommitStatuses({
-      sha: params.sha,
-      prNumber: resolvedPrNumber,
-      context: params.context,
-    });
-  },
-);
-
-// --- github_ensure_sweep_labels ---
-server.tool(
-  'github_ensure_sweep_labels',
-  'Idempotently ensure the sweep coordination labels (sweep-claimed, sweep-stale-claim) exist on the repository. Safe to call at sweep startup every time — creates missing labels and no-ops if they already exist.',
-  {},
-  async () => ensureSweepLabels(),
-);
-
-// --- github_sweep_stale_claims ---
-server.tool(
-  'github_sweep_stale_claims',
-  'Find PRs with a stale sweep-claimed label (agent claimed but did not release). Uses label event timestamps for accuracy — more reliable than PR updatedAt, which reflects the last PR activity rather than when the label was applied.',
-  {
-    olderThanMinutes: z.coerce
-      .number()
-      .int()
-      .positive()
-      .default(30)
-      .describe(
-        'Minimum age in minutes for a claim to be considered stale (default: 30)',
-      ),
-  },
-  async (params) => sweepStaleClaims(params),
-);
-
-// --- github_list_runners ---
-server.tool(
-  'github_list_runners',
-  'List self-hosted GitHub Actions runners for this repository. Returns id, name, OS, status (online/offline), busy flag, and labels.',
-  {
-    status: z
-      .enum(['online', 'offline'])
-      .optional()
-      .describe(
-        'Filter by runner status. Omit to return all runners regardless of status.',
-      ),
-  },
-  async (params) => listRunners(params),
-);
-
-// --- github_webhook_list ---
-server.tool(
-  'github_webhook_list',
-  'List all webhooks configured on this repository. Returns id, active status, events, URL, and last response.',
-  {},
-  async () => webhookList(),
-);
-
-// --- github_webhook_update ---
-server.tool(
-  'github_webhook_update',
-  'Update a repository webhook. Can change active status, event subscriptions, delivery URL, or content type.',
-  {
-    hookId: z.coerce
-      .number()
-      .int()
-      .positive()
-      .describe('Webhook ID (from github_webhook_list).'),
-    active: coercedBoolean
-      .optional()
-      .describe('Enable or disable the webhook.'),
-    events: stringList()
-      .optional()
-      .describe(
-        'GitHub event names to subscribe to (e.g. ["push", "pull_request"]). Replaces the full event list.',
-      ),
-    url: z
-      .string()
-      .url()
-      .optional()
-      .describe('New delivery URL for the webhook.'),
-    contentType: z
-      .enum(['json', 'form'])
-      .optional()
-      .describe('Payload content type (default: json).'),
-  },
-  async (params) => webhookUpdate(params),
-);
-
-// --- github_webhook_ping ---
-server.tool(
-  'github_webhook_ping',
-  'Send a ping event to a repository webhook to verify it is reachable.',
-  {
-    hookId: z.coerce
-      .number()
-      .int()
-      .positive()
-      .describe('Webhook ID (from github_webhook_list).'),
-  },
-  async (params) => webhookPing(params),
-);
-
-// --- github_get_file_content ---
-server.tool(
-  'github_get_file_content',
-  'Read the contents of a file at a specific git ref (branch, tag, or commit SHA) without checking out a worktree. Returns {path, ref, content, sha}. Useful for PR triage and review agents that need to inspect files on remote branches.',
-  {
-    path: z
-      .string()
-      .trim()
-      .min(1)
-      .describe(
-        'File path relative to repo root (e.g. "apps/web/src/pages/Login.tsx").',
-      ),
-    ref: z
-      .string()
-      .optional()
-      .describe('Branch name, tag, or commit SHA (defaults to "main").'),
-  },
-  async (params) => getFileContent(params),
-);
-
-// --- github_get_branch_protection ---
-server.tool(
-  'github_get_branch_protection',
-  'Read branch protection rules and GitHub rulesets for a branch. Returns required status checks (from both classic protection and active rulesets), conversation resolution requirement, required review count, and a summary of all rulesets. Use this to diagnose why a PR is stuck in the merge queue or to understand which checks are truly required vs. informational.',
-  {
-    branch: z
-      .string()
-      .trim()
-      .min(1)
-      .default('main')
-      .describe('Branch name to query (default: "main").'),
-  },
-  async (params) => getBranchProtection(params),
-);
-
-// --- github_resolve_action_sha ---
-server.tool(
-  'github_resolve_action_sha',
-  'Resolve a GitHub Actions tag (e.g. "v4") to its immutable commit SHA for supply-chain pinning. Returns the SHA, original tag, and whether the tag was lightweight or annotated. Use this before pinning action references in workflow files. For bulk resolution use github_resolve_action_shas.',
-  {
-    owner: z
-      .string()
-      .trim()
-      .min(1)
-      .describe(
-        'GitHub organisation or user that owns the action repo (e.g. "actions").',
-      ),
-    repo: z
-      .string()
-      .trim()
-      .min(1)
-      .describe('Repository name of the action (e.g. "checkout").'),
-    tag: z
-      .string()
-      .trim()
-      .min(1)
-      .describe('Mutable tag to resolve (e.g. "v4" or "v4.1.0").'),
-  },
-  async (params) => resolveActionSha(params),
-);
-
-// --- github_resolve_action_shas ---
-server.tool(
-  'github_resolve_action_shas',
-  'Resolve multiple GitHub Actions tags to their immutable commit SHAs in a single call. Runs all resolutions in parallel. Each result includes the action, sha, tag, and tagType ("lightweight" | "annotated"). Failed entries include an "error" field instead of "sha". Use this when pinning many actions at once.',
-  {
-    actions: z
-      .preprocess(
-        (val) => {
+  // --- github_resolve_threads ---
+  server.tool(
+    'github_resolve_threads',
+    'Batch-resolve review threads (groups of 50). Accepts PRRT_ thread node IDs (from github_get_review_threads) via threadIds, OR numeric comment databaseIds (from mcp__github__* get_review_comments or github_get_review_threads comment entries) via commentDatabaseIds — the tool maps comment IDs to thread IDs internally. When using commentDatabaseIds, prNumber is required. If prNumber is provided and all threads resolved, triggers bot-review recheck.',
+    {
+      threadIds: stringList({ min: 1, max: 100 })
+        .optional()
+        .describe(
+          'Thread node IDs (PRRT_...) from github_get_review_threads. Use this OR commentDatabaseIds.',
+        ),
+      commentDatabaseIds: z
+        .preprocess((val) => {
           if (Array.isArray(val)) return val;
-          if (typeof val === 'string') {
+          if (typeof val === 'string' && val.trimStart().startsWith('[')) {
             try {
               const parsed = JSON.parse(val);
               if (Array.isArray(parsed)) return parsed;
             } catch {
-              // Not valid JSON
+              // Not valid JSON — fall through
             }
           }
           return val;
-        },
-        z
-          .array(
-            z.object({
-              owner: z
-                .string()
-                .trim()
-                .min(1)
-                .describe('GitHub org or user (e.g. "actions").'),
-              repo: z
-                .string()
-                .trim()
-                .min(1)
-                .describe('Repository name (e.g. "checkout").'),
-              tag: z
-                .string()
-                .trim()
-                .min(1)
-                .describe('Mutable tag to resolve (e.g. "v4").'),
-            }),
-          )
-          .min(1),
-      )
-      .describe(
-        'Array of actions to resolve. Each entry must have owner, repo, and tag.',
-      ),
-  },
-  async (params) => resolveActionShas(params),
-);
+        }, z.array(z.coerce.number().int().positive()).min(1).max(100))
+        .optional()
+        .describe(
+          'Numeric comment databaseId values (REST IDs) — alternative to threadIds when you only have comment IDs (e.g. from mcp__github__* get_review_comments). Requires prNumber. The tool fetches thread IDs from the PR and maps each comment ID to its parent thread.',
+        ),
+      prNumber: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe(
+          'PR number — required when using commentDatabaseIds; also triggers Copilot Auto-Approve recheck after resolving threads when all resolutions succeed',
+        ),
+    },
+    async (params) => resolveThreads(params),
+  );
 
-// Start the server
-const transport = new StdioServerTransport();
-await server.connect(transport);
+  // --- github_secrets_check ---
+  server.tool(
+    'github_secrets_check',
+    'List all repo secret names or check specific secrets exist. Returns names, createdAt, updatedAt (never values). When names are omitted, lists all; when provided, returns per-secret exists status.',
+    {
+      names: z
+        .array(z.string())
+        .min(1)
+        .optional()
+        .describe(
+          'Specific secret names to check for existence. If omitted, lists all secret names.',
+        ),
+    },
+    async (params) => secretsCheck(params),
+  );
+
+  // --- github_pr_commits ---
+  server.tool(
+    'github_pr_commits',
+    'List commits on a pull request. Returns sha, shortSha, message (first line), author, date, and url for each commit. Useful for correlating pushes with review events or inspecting PR history.',
+    {
+      number: z.coerce.number().int().positive().describe('PR number'),
+      limit: z.coerce
+        .number()
+        .int()
+        .positive()
+        .max(100)
+        .default(30)
+        .describe('Max commits to return (default: 30, max: 100)'),
+    },
+    async (params) => prCommits(params),
+  );
+
+  // --- github_view_pr ---
+  server.tool(
+    'github_view_pr',
+    'Prefer this over `gh pr view` or `gh pr diff --name-only` via shell. View PR details: title, body, state, checks, reviews, diff stats, and changed files list (path, additions, deletions, status). Pass the PR number as "number" (preferred) or "prNumber" (alias).',
+    {
+      number: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('PR number'),
+      prNumber: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Alias for "number" — use either, not both'),
+    },
+    async (params) => {
+      const resolved = params.number ?? params.prNumber;
+      if (!resolved) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: 'Missing required parameter: provide "number" (or alias "prNumber") with a positive integer PR number.',
+            },
+          ],
+        };
+      }
+      return viewPR({ number: resolved });
+    },
+  );
+
+  // --- github_secret_delete ---
+  server.tool(
+    'github_secret_delete',
+    'Delete a GitHub Actions secret from the repository.',
+    {
+      name: z
+        .string()
+        .trim()
+        .regex(
+          /^[A-Za-z_][A-Za-z0-9_]*$/,
+          'Secret name must start with a letter or underscore and contain only alphanumeric characters and underscores',
+        )
+        .refine((n) => !n.startsWith('GITHUB_'), {
+          message: 'Secret names cannot start with GITHUB_',
+        })
+        .describe('Secret name to delete'),
+    },
+    async (params) => secretDelete(params),
+  );
+
+  // --- github_secret_set ---
+  server.tool(
+    'github_secret_set',
+    'Set a GitHub Actions secret. Reads value from file to avoid passing secrets through the tool interface.',
+    {
+      name: z
+        .string()
+        .trim()
+        .min(1)
+        .describe('Secret name (e.g. "AGENT_AUTHOR_APP_PRIVATE_KEY")'),
+      value: z.string().optional().describe('Secret value (prefer valueFile)'),
+      valueFile: z
+        .string()
+        .optional()
+        .describe('Path to file containing secret value'),
+    },
+    async (params) => secretSet(params),
+  );
+
+  // --- github_retrigger_check ---
+  server.tool(
+    'github_retrigger_check',
+    'Re-request failed status checks on a PR. Eliminates need for empty commits to clear stale failures.',
+    {
+      number: z.coerce.number().int().positive().describe('PR number'),
+      checkName: z
+        .string()
+        .trim()
+        .min(1)
+        .optional()
+        .describe(
+          'Specific check name to re-request (retriggers all matching)',
+        ),
+      allFailed: coercedBoolean
+        .default(false)
+        .describe(
+          'When true, retrigger all failed checks. When false (default), retrigger only the named check or all failed checks if no checkName given.',
+        ),
+    },
+    async (params) => retriggerCheck(params),
+  );
+
+  // --- github_set_commit_status ---
+  server.tool(
+    'github_set_commit_status',
+    'Set a commit status on a PR. Auto-resolves head SHA from PR number. Use to update stale bot-review or custom statuses.',
+    {
+      number: z.coerce.number().int().positive().describe('PR number'),
+      context: z
+        .string()
+        .trim()
+        .min(1)
+        .describe('Status context name (e.g. "bot-review")'),
+      state: z
+        .enum(['success', 'failure', 'pending', 'error'])
+        .describe('Status state'),
+      description: z
+        .string()
+        .trim()
+        .optional()
+        .describe('Human-readable description'),
+    },
+    async (params) => setCommitStatus(params),
+  );
+
+  // --- github_list_commit_statuses ---
+  server.tool(
+    'github_list_commit_statuses',
+    'List GitHub commit statuses (Statuses API) for a specific commit SHA or a PR\'s HEAD commit. These are DISTINCT from Check Runs (Checks API) — bot-review and security-scan statuses appear here, not in github_retrigger_check. Use this to diagnose "check not found" errors or confirm whether a bot-review status has updated after threads were resolved. Provide either "sha" (direct SHA), "prNumber", or its alias "number" (both auto-resolve to HEAD SHA). Use "context" to filter to a single status context.',
+    {
+      sha: z
+        .string()
+        .trim()
+        .min(1)
+        .optional()
+        .describe(
+          'Commit SHA to read statuses for. Use this OR prNumber/number, not both.',
+        ),
+      prNumber: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe(
+          'PR number — auto-resolves to the HEAD commit SHA. Use this OR sha, not both.',
+        ),
+      number: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Alias for "prNumber" — use either, not both.'),
+      context: z
+        .string()
+        .trim()
+        .min(1)
+        .optional()
+        .describe(
+          'Filter to a specific status context (e.g. "bot-review", "security-scan"). Omit to return all contexts.',
+        ),
+    },
+    async (params) => {
+      const resolvedPrNumber = params.prNumber ?? params.number;
+      if (!params.sha && !resolvedPrNumber) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: 'Missing required parameter: provide "sha" (commit SHA) or "prNumber"/"number" (PR number to auto-resolve HEAD SHA).',
+            },
+          ],
+        };
+      }
+      return listCommitStatuses({
+        sha: params.sha,
+        prNumber: resolvedPrNumber,
+        context: params.context,
+      });
+    },
+  );
+
+  // --- github_ensure_sweep_labels ---
+  server.tool(
+    'github_ensure_sweep_labels',
+    'Idempotently ensure the sweep coordination labels (sweep-claimed, sweep-stale-claim) exist on the repository. Safe to call at sweep startup every time — creates missing labels and no-ops if they already exist.',
+    {},
+    async () => ensureSweepLabels(),
+  );
+
+  // --- github_sweep_stale_claims ---
+  server.tool(
+    'github_sweep_stale_claims',
+    'Find PRs with a stale sweep-claimed label (agent claimed but did not release). Uses label event timestamps for accuracy — more reliable than PR updatedAt, which reflects the last PR activity rather than when the label was applied.',
+    {
+      olderThanMinutes: z.coerce
+        .number()
+        .int()
+        .positive()
+        .default(30)
+        .describe(
+          'Minimum age in minutes for a claim to be considered stale (default: 30)',
+        ),
+    },
+    async (params) => sweepStaleClaims(params),
+  );
+
+  // --- github_list_runners ---
+  server.tool(
+    'github_list_runners',
+    'List self-hosted GitHub Actions runners for this repository. Returns id, name, OS, status (online/offline), busy flag, and labels.',
+    {
+      status: z
+        .enum(['online', 'offline'])
+        .optional()
+        .describe(
+          'Filter by runner status. Omit to return all runners regardless of status.',
+        ),
+    },
+    async (params) => listRunners(params),
+  );
+
+  // --- github_webhook_list ---
+  server.tool(
+    'github_webhook_list',
+    'List all webhooks configured on this repository. Returns id, active status, events, URL, and last response.',
+    {},
+    async () => webhookList(),
+  );
+
+  // --- github_webhook_update ---
+  server.tool(
+    'github_webhook_update',
+    'Update a repository webhook. Can change active status, event subscriptions, delivery URL, or content type.',
+    {
+      hookId: z.coerce
+        .number()
+        .int()
+        .positive()
+        .describe('Webhook ID (from github_webhook_list).'),
+      active: coercedBoolean
+        .optional()
+        .describe('Enable or disable the webhook.'),
+      events: stringList()
+        .optional()
+        .describe(
+          'GitHub event names to subscribe to (e.g. ["push", "pull_request"]). Replaces the full event list.',
+        ),
+      url: z
+        .string()
+        .url()
+        .optional()
+        .describe('New delivery URL for the webhook.'),
+      contentType: z
+        .enum(['json', 'form'])
+        .optional()
+        .describe('Payload content type (default: json).'),
+    },
+    async (params) => webhookUpdate(params),
+  );
+
+  // --- github_webhook_ping ---
+  server.tool(
+    'github_webhook_ping',
+    'Send a ping event to a repository webhook to verify it is reachable.',
+    {
+      hookId: z.coerce
+        .number()
+        .int()
+        .positive()
+        .describe('Webhook ID (from github_webhook_list).'),
+    },
+    async (params) => webhookPing(params),
+  );
+
+  // --- github_get_file_content ---
+  server.tool(
+    'github_get_file_content',
+    'Read the contents of a file at a specific git ref (branch, tag, or commit SHA) without checking out a worktree. Returns {path, ref, content, sha}. Useful for PR triage and review agents that need to inspect files on remote branches.',
+    {
+      path: z
+        .string()
+        .trim()
+        .min(1)
+        .describe(
+          'File path relative to repo root (e.g. "apps/web/src/pages/Login.tsx").',
+        ),
+      ref: z
+        .string()
+        .optional()
+        .describe('Branch name, tag, or commit SHA (defaults to "main").'),
+    },
+    async (params) => getFileContent(params),
+  );
+
+  // --- github_get_branch_protection ---
+  server.tool(
+    'github_get_branch_protection',
+    'Read branch protection rules and GitHub rulesets for a branch. Returns required status checks (from both classic protection and active rulesets), conversation resolution requirement, required review count, and a summary of all rulesets. Use this to diagnose why a PR is stuck in the merge queue or to understand which checks are truly required vs. informational.',
+    {
+      branch: z
+        .string()
+        .trim()
+        .min(1)
+        .default('main')
+        .describe('Branch name to query (default: "main").'),
+    },
+    async (params) => getBranchProtection(params),
+  );
+
+  // --- github_resolve_action_sha ---
+  server.tool(
+    'github_resolve_action_sha',
+    'Resolve a GitHub Actions tag (e.g. "v4") to its immutable commit SHA for supply-chain pinning. Returns the SHA, original tag, and whether the tag was lightweight or annotated. Use this before pinning action references in workflow files. For bulk resolution use github_resolve_action_shas.',
+    {
+      owner: z
+        .string()
+        .trim()
+        .min(1)
+        .describe(
+          'GitHub organisation or user that owns the action repo (e.g. "actions").',
+        ),
+      repo: z
+        .string()
+        .trim()
+        .min(1)
+        .describe('Repository name of the action (e.g. "checkout").'),
+      tag: z
+        .string()
+        .trim()
+        .min(1)
+        .describe('Mutable tag to resolve (e.g. "v4" or "v4.1.0").'),
+    },
+    async (params) => resolveActionSha(params),
+  );
+
+  // --- github_resolve_action_shas ---
+  server.tool(
+    'github_resolve_action_shas',
+    'Resolve multiple GitHub Actions tags to their immutable commit SHAs in a single call. Runs all resolutions in parallel. Each result includes the action, sha, tag, and tagType ("lightweight" | "annotated"). Failed entries include an "error" field instead of "sha". Use this when pinning many actions at once.',
+    {
+      actions: z
+        .preprocess(
+          (val) => {
+            if (Array.isArray(val)) return val;
+            if (typeof val === 'string') {
+              try {
+                const parsed = JSON.parse(val);
+                if (Array.isArray(parsed)) return parsed;
+              } catch {
+                // Not valid JSON
+              }
+            }
+            return val;
+          },
+          z
+            .array(
+              z.object({
+                owner: z
+                  .string()
+                  .trim()
+                  .min(1)
+                  .describe('GitHub org or user (e.g. "actions").'),
+                repo: z
+                  .string()
+                  .trim()
+                  .min(1)
+                  .describe('Repository name (e.g. "checkout").'),
+                tag: z
+                  .string()
+                  .trim()
+                  .min(1)
+                  .describe('Mutable tag to resolve (e.g. "v4").'),
+              }),
+            )
+            .min(1),
+        )
+        .describe(
+          'Array of actions to resolve. Each entry must have owner, repo, and tag.',
+        ),
+    },
+    async (params) => resolveActionShas(params),
+  );
+
+  return server;
+}
+
+if (!process.env['AWS_LAMBDA_FUNCTION_NAME']) {
+  void (async () => {
+    const transport = new StdioServerTransport();
+    await createServer().connect(transport);
+  })();
+}

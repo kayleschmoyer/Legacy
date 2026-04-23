@@ -12,10 +12,16 @@
       ]
     },
     "legacy-sports-github": {
-      "url": "http://localhost:4196"
+      "url": "${MCP_GITHUB_URL}",
+      "headers": {
+        "Authorization": "Bearer ${MCP_AUTH_TOKEN}"
+      }
     },
     "legacy-sports-jira": {
-      "url": "http://localhost:4195"
+      "url": "${MCP_JIRA_URL}",
+      "headers": {
+        "Authorization": "Bearer ${MCP_AUTH_TOKEN}"
+      }
     },
     "legacy-sports-make": {
       "command": "node",
@@ -48,7 +54,10 @@
       ]
     },
     "legacy-sports-ci": {
-      "url": "http://localhost:4197"
+      "url": "${MCP_CI_URL}",
+      "headers": {
+        "Authorization": "Bearer ${MCP_AUTH_TOKEN}"
+      }
     },
     "legacy-sports-ci-local": {
       "command": "node",

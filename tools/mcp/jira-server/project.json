@@ -10,6 +10,22 @@
       "options": {
         "command": "tsc --noEmit -p tools/mcp/jira-server/tsconfig.json"
       }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["production", "^production"],
+      "outputs": ["{projectRoot}/dist"],
+      "dependsOn": ["^build"],
+      "options": {
+        "command": "vite build",
+        "cwd": "tools/mcp/jira-server"
+      },
+      "configurations": {
+        "production": {
+          "command": "vite build --mode production"
+        }
+      }
     }
   }
 }

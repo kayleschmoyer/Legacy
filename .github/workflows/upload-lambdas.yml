@@ -52,6 +52,9 @@ on:
           - stripe-webhook
           - websocket
           - github-webhook
+          - mcp-jira-server
+          - mcp-github-server
+          - mcp-ci-server
       force-all:
         description: "Force build and deploy all lambdas, bypassing nx affected detection"
         required: false
@@ -355,6 +358,24 @@ jobs:
               "s3Prefix":"github-webhook", "ssmName":"github-webhook",
               "badgeName":"Upload GitHub Webhook Lambda",
               "distPath":"lambdas/github-webhook/dist", "rollbar":false
+            },
+            {
+              "project":"mcp-jira-server", "dir":"tools/mcp/jira-server",
+              "s3Prefix":"mcp-jira", "ssmName":"mcp-jira",
+              "badgeName":"Upload MCP Jira Lambda",
+              "distPath":"tools/mcp/jira-server/dist", "rollbar":true
+            },
+            {
+              "project":"mcp-github-server", "dir":"tools/mcp/github-server",
+              "s3Prefix":"mcp-github", "ssmName":"mcp-github",
+              "badgeName":"Upload MCP GitHub Lambda",
+              "distPath":"tools/mcp/github-server/dist", "rollbar":true
+            },
+            {
+              "project":"mcp-ci-server", "dir":"tools/mcp/ci-server",
+              "s3Prefix":"mcp-ci", "ssmName":"mcp-ci",
+              "badgeName":"Upload MCP CI Lambda",
+              "distPath":"tools/mcp/ci-server/dist", "rollbar":true
             }
           ]'
 

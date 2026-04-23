@@ -21,6 +21,7 @@
 #   aws secretsmanager put-secret-value --secret-id dev/discord-user-signup-webhook-url --secret-string <value>
 #   aws secretsmanager put-secret-value --secret-id dev/discord-stripe-webhook-url --secret-string <value>
 #   aws secretsmanager put-secret-value --secret-id dev/ga-api-secret --secret-string <value>
+#   node scratch/seed-github-app-secret.mjs  # seeds dev/mcp-github-token from AGENT_AUTHOR_APP_PRIVATE_KEY in .env
 #
 # MLB data provider key (only required when mlb_data_provider != "mlb-statsapi"):
 #   Unlike the above, this secret is managed by Terraform only when
@@ -346,6 +347,18 @@ resource "aws_secretsmanager_secret" "discord_stripe_webhook_url" {
 resource "aws_secretsmanager_secret" "ga_api_secret" {
   name        = "${var.environment}/ga-api-secret"
   description = "GA4 Measurement Protocol API secret for server-side event sending"
+
+  tags = local.common_tags
+}
+
+# GitHub App credentials for the MCP GitHub and CI server Lambdas.
+# Both servers read this secret via GITHUB_TOKEN_SECRET_NAME at cold-start and
+# set AGENT_AUTHOR_APP_PRIVATE_KEY / GITHUB_APP_ID / GITHUB_INSTALLATION_ID.
+# Seed from .env after terraform apply:
+#   node scratch/seed-github-app-secret.mjs
+resource "aws_secretsmanager_secret" "mcp_github_token" {
+  name        = "${var.environment}/mcp-github-token"
+  description = "GitHub App credentials (app_id, installation_id, private_key) for MCP GitHub and CI server Lambdas"
 
   tags = local.common_tags
 }

@@ -142,6 +142,54 @@ resource "aws_ssm_parameter" "image_upload_lambda_version" {
   })
 }
 
+resource "aws_ssm_parameter" "mcp_jira_lambda_version" {
+  name        = "/legacy-sports/${var.environment}/lambda/mcp-jira/version"
+  description = "Current version of the MCP Jira server Lambda function"
+  type        = "String"
+  value       = "initial"
+
+  lifecycle {
+    ignore_changes = [value]
+  }
+
+  tags = merge(local.common_tags, {
+    Component = "lambda-versioning"
+    Function  = "mcp-jira"
+  })
+}
+
+resource "aws_ssm_parameter" "mcp_github_lambda_version" {
+  name        = "/legacy-sports/${var.environment}/lambda/mcp-github/version"
+  description = "Current version of the MCP GitHub server Lambda function"
+  type        = "String"
+  value       = "initial"
+
+  lifecycle {
+    ignore_changes = [value]
+  }
+
+  tags = merge(local.common_tags, {
+    Component = "lambda-versioning"
+    Function  = "mcp-github"
+  })
+}
+
+resource "aws_ssm_parameter" "mcp_ci_lambda_version" {
+  name        = "/legacy-sports/${var.environment}/lambda/mcp-ci/version"
+  description = "Current version of the MCP CI server Lambda function"
+  type        = "String"
+  value       = "initial"
+
+  lifecycle {
+    ignore_changes = [value]
+  }
+
+  tags = merge(local.common_tags, {
+    Component = "lambda-versioning"
+    Function  = "mcp-ci"
+  })
+}
+
 # =============================================================================
 # CI INFRASTRUCTURE PARAMETERS
 # =============================================================================
@@ -188,5 +236,8 @@ output "lambda_version_parameters" {
     jira_proxy      = aws_ssm_parameter.jira_proxy_lambda_version.name
     rollbar_discord = aws_ssm_parameter.rollbar_discord_lambda_version.name
     github_webhook  = aws_ssm_parameter.github_webhook_lambda_version.name
+    mcp_jira        = aws_ssm_parameter.mcp_jira_lambda_version.name
+    mcp_github      = aws_ssm_parameter.mcp_github_lambda_version.name
+    mcp_ci          = aws_ssm_parameter.mcp_ci_lambda_version.name
   }
 }
