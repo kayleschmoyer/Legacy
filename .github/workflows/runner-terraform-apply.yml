@@ -114,6 +114,43 @@ jobs:
         working-directory: terraform/runners
         run: terraform init -input=false
 
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 22
+
+      - name: Download runner Lambda zips
+        run: node scripts/download-runner-lambdas.js
+
+      - name: Bootstrap IAM permissions
+        # Targeted apply for the github_actions_runners IAM policy and its role
+        # attachment. This step is a bootstrap guard: the permissions granted by
+        # this policy are required by data sources evaluated during the full plan
+        # (data.aws_iam_openid_connect_provider, data.aws_sns_topic, etc.), so if
+        # the policy has never been applied or needs new permissions added, the
+        # full plan would fail with AccessDenied before it can apply the fix.
+        # Targeting just the IAM resources breaks the circular dependency because
+        # aws_iam_policy.github_actions_runners has no dependency on the failing
+        # data sources. Idempotent: a no-op when permissions are already current.
+        # -refresh=false prevents Terraform from refreshing unrelated state entries
+        # (which would fail with AccessDenied on the same permissions we're granting).
+        working-directory: terraform/runners
+        env:
+          TF_VAR_github_app_id: ${{ secrets.RUNNER_GITHUB_APP_ID }}
+          TF_VAR_github_app_key_base64: ${{ secrets.RUNNER_GITHUB_APP_KEY_BASE64 }}
+          TF_VAR_github_app_webhook_secret: ${{ secrets.RUNNER_GITHUB_APP_WEBHOOK_SECRET }}
+        run: |
+          terraform apply \
+            -target=aws_iam_policy.github_actions_runners \
+            -target=aws_iam_role_policy_attachment.github_actions_runners \
+            -auto-approve \
+            -input=false \
+            -refresh=false \
+            -lock-timeout=5m
+
+      - name: Wait for IAM propagation
+        run: sleep 15
+
       - name: Terraform plan
         id: plan
         working-directory: terraform/runners
