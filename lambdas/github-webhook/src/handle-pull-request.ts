@@ -7,6 +7,7 @@ import {
   getRepoInstallationToken,
   requestCopilotReview,
 } from './github-app';
+import { enqueueRaceCheck, RACE_CHECK_DELAY_SECONDS } from './sqs-client';
 
 const REVIEW_BOT_APP_ID = 3142924;
 
@@ -172,6 +173,32 @@ export async function handlePullRequestEvent(
   }
 
   await requestCopilotReview(token, owner, repo, prNumber);
+
+  // Schedule a self-invoke race-check ~90s out to self-heal the Copilot
+  // re-review race (GitHub occasionally drops the re-request on push without
+  // firing a webhook). See handle-race-check.ts and
+  // .agents/skills/pr-lifecycle/references/copilot-auto-approve-flow.md.
+  try {
+    await enqueueRaceCheck(
+      {
+        type: 'race-check',
+        owner,
+        repo,
+        prNumber,
+        headSha,
+        attempt: 1,
+      },
+      RACE_CHECK_DELAY_SECONDS,
+    );
+  } catch (error) {
+    // Don't fail the main webhook on a queue hiccup — the Copilot request
+    // itself already succeeded. Log and continue.
+    LOGGER.error('Failed to enqueue race-check message', {
+      error,
+      prNumber,
+      headSha,
+    });
+  }
 
   return `Requested Copilot review for PR #${prNumber}`;
 }

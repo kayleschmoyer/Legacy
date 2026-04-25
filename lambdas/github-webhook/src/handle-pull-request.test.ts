@@ -1,7 +1,13 @@
 import { handlePullRequestEvent } from './handle-pull-request';
 import * as githubApp from './github-app';
+import * as sqsClient from './sqs-client';
 
 jest.mock('./github-app');
+jest.mock('./sqs-client', () => ({
+  enqueueRaceCheck: jest.fn(),
+  RACE_CHECK_DELAY_SECONDS: 90,
+  MAX_RACE_CHECK_ATTEMPTS: 3,
+}));
 
 const mockGetInstallationToken = githubApp.getInstallationToken as jest.Mock;
 const mockGetRepoInstallationToken =
@@ -10,6 +16,7 @@ const mockGetPrReviews = githubApp.getPrReviews as jest.Mock;
 const mockCreateCheckRun = githubApp.createCheckRun as jest.Mock;
 const mockRequestCopilotReview = githubApp.requestCopilotReview as jest.Mock;
 const mockAddLabel = githubApp.addLabel as jest.Mock;
+const mockEnqueueRaceCheck = sqsClient.enqueueRaceCheck as jest.Mock;
 
 const SAME_REPO = {
   full_name: 'bkrupa/legacy-sports',
@@ -38,6 +45,7 @@ beforeEach(() => {
   mockCreateCheckRun.mockResolvedValue(undefined);
   mockRequestCopilotReview.mockResolvedValue(undefined);
   mockAddLabel.mockResolvedValue(undefined);
+  mockEnqueueRaceCheck.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -139,6 +147,57 @@ describe('handlePullRequestEvent — normal PR lifecycle', () => {
       expect(mockCreateCheckRun).not.toHaveBeenCalled();
     },
   );
+
+  it.each(['opened', 'synchronize', 'reopened', 'ready_for_review'])(
+    'enqueues race-check after requesting Copilot on %s',
+    async (action) => {
+      await handlePullRequestEvent({ ...BASE_PAYLOAD, action }, 'pk');
+      expect(mockEnqueueRaceCheck).toHaveBeenCalledWith(
+        {
+          type: 'race-check',
+          owner: 'bkrupa',
+          repo: 'legacy-sports',
+          prNumber: 42,
+          headSha: 'abc1234',
+          attempt: 1,
+        },
+        90,
+      );
+    },
+  );
+
+  it('does not fail the webhook when enqueueRaceCheck throws', async () => {
+    mockEnqueueRaceCheck.mockRejectedValue(new Error('SQS down'));
+    const result = await handlePullRequestEvent(
+      { ...BASE_PAYLOAD, action: 'synchronize' },
+      'pk',
+    );
+    expect(result).toMatch(/Requested Copilot review/);
+    expect(mockRequestCopilotReview).toHaveBeenCalled();
+  });
+
+  it('does not enqueue race-check for bot-authored PRs', async () => {
+    const botPr = { ...BASE_PR, user: { login: 'dependabot[bot]' } };
+    await handlePullRequestEvent(
+      { ...BASE_PAYLOAD, action: 'opened', pull_request: botPr },
+      'pk',
+    );
+    expect(mockEnqueueRaceCheck).not.toHaveBeenCalled();
+  });
+
+  it('does not enqueue race-check on review_request_removed', async () => {
+    const promise = handlePullRequestEvent(
+      {
+        ...BASE_PAYLOAD,
+        action: 'review_request_removed',
+        requested_reviewer: { login: 'copilot-pull-request-reviewer[bot]' },
+      },
+      'pk',
+    );
+    await jest.runAllTimersAsync();
+    await promise;
+    expect(mockEnqueueRaceCheck).not.toHaveBeenCalled();
+  });
 });
 
 describe('handlePullRequestEvent — review_request_removed', () => {

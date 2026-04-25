@@ -44,6 +44,12 @@ jest.mock('./handle-jira-transition', () => ({
     ),
 }));
 
+jest.mock('./handle-race-check', () => ({
+  handleRaceCheckMessage: jest
+    .fn()
+    .mockResolvedValue('Race-check handled for PR #42'),
+}));
+
 // Set env vars before importing handler
 process.env['WEBHOOK_SECRET_SECRET_NAME'] = 'test-webhook-secret';
 process.env['BOT_APP_PRIVATE_KEY_SECRET_NAME'] = 'test-bot-key';
@@ -58,6 +64,7 @@ import { handlePullRequestEvent } from './handle-pull-request';
 import { handlePullRequestReviewEvent } from './handle-pull-request-review';
 import { handleReviewThreadEvent } from './handle-review-thread';
 import { handleJiraTransitionEvent } from './handle-jira-transition';
+import { handleRaceCheckMessage } from './handle-race-check';
 import { handler } from './index';
 
 const mockVerify = verifyGitHubSignature as jest.Mock;
@@ -65,6 +72,7 @@ const mockHandlePr = handlePullRequestEvent as jest.Mock;
 const mockHandlePrReview = handlePullRequestReviewEvent as jest.Mock;
 const mockHandle = handleReviewThreadEvent as jest.Mock;
 const mockHandleJira = handleJiraTransitionEvent as jest.Mock;
+const mockHandleRaceCheck = handleRaceCheckMessage as jest.Mock;
 
 function makeEvent(
   overrides: Partial<APIGatewayProxyEvent> = {},
@@ -121,6 +129,7 @@ beforeEach(() => {
   mockHandleJira.mockResolvedValue(
     'Dispatched jira-issue-updated for LS-1234 (In Progress → In Review)',
   );
+  mockHandleRaceCheck.mockResolvedValue('Race-check handled for PR #42');
 });
 
 describe('handler — health check', () => {
@@ -274,5 +283,64 @@ describe('handler — Jira webhook route (/github-webhook/jira)', () => {
       }),
     );
     expect(result.statusCode).toBe(200);
+  });
+});
+
+describe('handler — SQS race-check route', () => {
+  function makeSqsEvent(body: unknown) {
+    return {
+      Records: [
+        {
+          messageId: 'msg-1',
+          receiptHandle: 'rcpt',
+          body: typeof body === 'string' ? body : JSON.stringify(body),
+          attributes: {
+            ApproximateReceiveCount: '1',
+            SentTimestamp: '0',
+            SenderId: 's',
+            ApproximateFirstReceiveTimestamp: '0',
+          },
+          messageAttributes: {},
+          md5OfBody: '',
+          eventSource: 'aws:sqs',
+          eventSourceARN: 'arn:aws:sqs:us-east-1:123:race-check',
+          awsRegion: 'us-east-1',
+        },
+      ],
+    } as unknown as APIGatewayProxyEvent;
+  }
+
+  it('routes SQS race-check events to handleRaceCheckMessage', async () => {
+    const msg = {
+      type: 'race-check',
+      owner: 'bkrupa',
+      repo: 'legacy-sports',
+      prNumber: 42,
+      headSha: 'abc1234',
+      attempt: 1,
+    };
+    await handler(makeSqsEvent(msg));
+    expect(mockHandleRaceCheck).toHaveBeenCalledWith(msg, 'test-secret');
+    // HTTP handlers should not be invoked on SQS path.
+    expect(mockHandlePr).not.toHaveBeenCalled();
+    expect(mockHandle).not.toHaveBeenCalled();
+  });
+
+  it('skips unparseable SQS messages without throwing', async () => {
+    await expect(handler(makeSqsEvent('not-json'))).resolves.toBeDefined();
+    expect(mockHandleRaceCheck).not.toHaveBeenCalled();
+  });
+
+  it('propagates errors from handleRaceCheckMessage so SQS retries', async () => {
+    mockHandleRaceCheck.mockRejectedValueOnce(new Error('GitHub 500'));
+    const msg = {
+      type: 'race-check',
+      owner: 'bkrupa',
+      repo: 'legacy-sports',
+      prNumber: 42,
+      headSha: 'abc1234',
+      attempt: 1,
+    };
+    await expect(handler(makeSqsEvent(msg))).rejects.toThrow(/GitHub 500/);
   });
 });

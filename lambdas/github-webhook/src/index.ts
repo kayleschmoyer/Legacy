@@ -1,12 +1,18 @@
-import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
+import type {
+  APIGatewayProxyEvent,
+  APIGatewayProxyResult,
+  SQSEvent,
+} from 'aws-lambda';
 import { LOGGER } from '@legacy-sports/logging';
 import { retrieveSecretParameterValue } from '@legacy-sports/aws-utils';
 import { verifyGitHubSignature } from './verify-signature';
 import { handlePullRequestEvent } from './handle-pull-request';
 import { handlePullRequestReviewEvent } from './handle-pull-request-review';
+import { handleRaceCheckMessage } from './handle-race-check';
 import { handleReviewThreadEvent } from './handle-review-thread';
 import { handleWorkflowRunEvent } from './handle-workflow-run';
 import { handleJiraTransitionEvent } from './handle-jira-transition';
+import type { RaceCheckMessage } from './sqs-client';
 
 // ── Environment ───────────────────────────────────────────────────────────────
 
@@ -76,9 +82,58 @@ function json(
 
 // ── Handler ───────────────────────────────────────────────────────────────────
 
+function isSqsEvent(event: APIGatewayProxyEvent | SQSEvent): event is SQSEvent {
+  return (
+    'Records' in event &&
+    Array.isArray(event.Records) &&
+    event.Records.length > 0 &&
+    event.Records[0]?.eventSource === 'aws:sqs'
+  );
+}
+
 export const handler = async (
-  event: APIGatewayProxyEvent,
+  event: APIGatewayProxyEvent | SQSEvent,
 ): Promise<APIGatewayProxyResult> => {
+  // ── SQS self-invocation route (race-check messages) ──────────────────────
+  // SQS event source mapping deletes messages on successful completion and
+  // re-delivers on throw; we let errors propagate so the retry/DLQ machinery
+  // does its job. Batch size is 1 (configured in Terraform) so iteration is
+  // nominal but kept for correctness.
+  if (isSqsEvent(event)) {
+    let botKey: string;
+    try {
+      botKey = await getBotAppPrivateKey();
+    } catch (error) {
+      LOGGER.error('Failed to retrieve bot app private key for SQS handler', {
+        error,
+      });
+      throw error;
+    }
+
+    for (const record of event.Records) {
+      let payload: RaceCheckMessage;
+      try {
+        payload = JSON.parse(record.body) as RaceCheckMessage;
+      } catch (error) {
+        // Malformed message — log and skip (do not throw, else SQS redelivers
+        // the same bad message until DLQ).
+        LOGGER.error('Skipping unparseable SQS message', {
+          error,
+          messageId: record.messageId,
+        });
+        continue;
+      }
+
+      const result = await handleRaceCheckMessage(payload, botKey);
+      LOGGER.info('Handled race-check SQS message', {
+        messageId: record.messageId,
+        result,
+      });
+    }
+    // SQS event source mapping ignores the response shape — any 2xx works.
+    return json(200, { status: 'ok' });
+  }
+
   const { httpMethod, path, body: rawBody, isBase64Encoded } = event;
   // API Gateway can send a null headers object at runtime even though the
   // TypeScript type says otherwise — normalise once here for both routes.

@@ -1022,6 +1022,9 @@ importers:
 
   lambdas/github-webhook:
     dependencies:
+      '@aws-sdk/client-sqs':
+        specifier: '*'
+        version: 3.1025.0
       '@legacy-sports/aws-utils':
         specifier: workspace:*
         version: link:../../lib/aws-utils

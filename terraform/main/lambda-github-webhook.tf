@@ -101,6 +101,121 @@ resource "aws_iam_role_policy_attachment" "github_webhook_lambda_secrets" {
   role       = aws_iam_role.github_webhook_lambda.name
 }
 
+# ── Race-check SQS queue (LS-3838) ─────────────────────────────────────────────
+# Delayed self-invocation queue used to close Copilot re-review race condition
+# #2 (documented in `.agents/skills/pr-lifecycle/references/copilot-auto-approve-flow.md`).
+#
+# After each pull_request.synchronize, the Lambda requests a Copilot review and
+# then enqueues a race-check message with DelaySeconds=90 here. SQS invokes the
+# same Lambda 90 s later via the event source mapping below; the Lambda
+# inspects current state and re-requests Copilot if the original request was
+# silently dropped by GitHub.
+
+resource "aws_sqs_queue" "github_webhook_race_check_dlq" {
+  name = "${local.name_prefix}-github-webhook-race-check-dlq"
+
+  message_retention_seconds = 1209600 # 14 days
+
+  tags = local.common_tags
+}
+
+resource "aws_sqs_queue" "github_webhook_race_check" {
+  name = "${local.name_prefix}-github-webhook-race-check"
+
+  # Lambda timeout is 30 s; visibility must exceed that so SQS doesn't
+  # re-deliver before the Lambda finishes. 60 s gives a comfortable margin.
+  visibility_timeout_seconds = 60
+  message_retention_seconds  = 1209600 # 14 days
+  receive_wait_time_seconds  = 10      # Long polling
+
+  # Each message carries an attempt counter (1..3). Infrastructure-level retries
+  # are a safety net for genuine Lambda failures; race-check re-enqueue is
+  # handled by the handler itself (app-level retry) so maxReceiveCount=3 is fine.
+  redrive_policy = jsonencode({
+    deadLetterTargetArn = aws_sqs_queue.github_webhook_race_check_dlq.arn
+    maxReceiveCount     = 3
+  })
+
+  tags = local.common_tags
+}
+
+resource "aws_iam_policy" "github_webhook_lambda_race_check_sqs" {
+  name        = "${local.name_prefix}-github-webhook-lambda-race-check-sqs"
+  description = "Allow the GitHub Webhook Lambda to send and consume race-check SQS messages"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "sqs:SendMessage",
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes",
+        ]
+        Resource = aws_sqs_queue.github_webhook_race_check.arn
+      }
+    ]
+  })
+
+  tags = local.common_tags
+}
+
+resource "aws_iam_role_policy_attachment" "github_webhook_lambda_race_check_sqs" {
+  policy_arn = aws_iam_policy.github_webhook_lambda_race_check_sqs.arn
+  role       = aws_iam_role.github_webhook_lambda.name
+}
+
+# Queue-level policy — explicitly scopes who may poll the queue. Matches the
+# pattern established in terraform/main/sqs.tf for every other Lambda-consumed
+# queue in this project (load_season_stats, load_game_stats, select_game,
+# automatic_drafts).
+resource "aws_sqs_queue_policy" "github_webhook_race_check" {
+  queue_url = aws_sqs_queue.github_webhook_race_check.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Id      = "${local.name_prefix}-github-webhook-race-check-policy"
+    Statement = [
+      {
+        Sid    = "AllowLambdaServiceAccess"
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+        Action = [
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes",
+        ]
+        Resource = aws_sqs_queue.github_webhook_race_check.arn
+        Condition = {
+          ArnEquals = {
+            "aws:SourceArn" = aws_lambda_function.github_webhook.arn
+          }
+        }
+      },
+      {
+        Sid    = "AllowApplicationSendMessages"
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+        }
+        Action = [
+          "sqs:SendMessage"
+        ]
+        Resource = aws_sqs_queue.github_webhook_race_check.arn
+        Condition = {
+          StringEquals = {
+            "aws:RequestedRegion" = data.aws_region.current.id
+          }
+        }
+      }
+    ]
+  })
+}
+
 # ── CloudWatch Log Group ──────────────────────────────────────────────────────
 
 resource "aws_cloudwatch_log_group" "github_webhook_lambda" {
@@ -191,16 +306,32 @@ resource "aws_lambda_function" "github_webhook" {
       AGENT_AUTHOR_APP_PRIVATE_KEY_SECRET_NAME = aws_secretsmanager_secret.agent_author_app_private_key.name
       AGENT_AUTHOR_APP_ID                      = tostring(var.agent_author_app_id)
       GITHUB_REPO                              = "${var.github_username}/${var.project_name}"
+      RACE_CHECK_QUEUE_URL                     = aws_sqs_queue.github_webhook_race_check.url
     }
   }
 
   depends_on = [
     aws_iam_role_policy_attachment.github_webhook_lambda_basic,
     aws_iam_role_policy_attachment.github_webhook_lambda_secrets,
+    aws_iam_role_policy_attachment.github_webhook_lambda_race_check_sqs,
     aws_cloudwatch_log_group.github_webhook_lambda,
   ]
 
   tags = local.common_tags
+}
+
+# Event source mapping: race-check SQS → same Lambda (one-at-a-time processing).
+resource "aws_lambda_event_source_mapping" "github_webhook_race_check_sqs" {
+  event_source_arn = aws_sqs_queue.github_webhook_race_check.arn
+  function_name    = aws_lambda_function.github_webhook.arn
+
+  batch_size                         = 1
+  maximum_batching_window_in_seconds = 0
+
+  depends_on = [
+    aws_lambda_function.github_webhook,
+    aws_iam_role_policy_attachment.github_webhook_lambda_race_check_sqs,
+  ]
 }
 
 # ── API Gateway Integration ───────────────────────────────────────────────────

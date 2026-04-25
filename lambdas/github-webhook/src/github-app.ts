@@ -539,6 +539,92 @@ export async function listPullRequestsForCommit(
 }
 
 /**
+ * Get essential PR metadata for race-check: state, current head SHA, draft
+ * flag, and the logins currently listed as requested reviewers (bots + users).
+ */
+export async function getPrMeta(
+  installationToken: string,
+  owner: string,
+  repo: string,
+  prNumber: number,
+): Promise<{
+  state: string;
+  headSha: string;
+  draft: boolean;
+  requestedReviewerLogins: string[];
+}> {
+  const resp = await fetch(
+    `${GITHUB_API}/repos/${owner}/${repo}/pulls/${prNumber}`,
+    {
+      headers: {
+        Authorization: `Bearer ${installationToken}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    },
+  );
+
+  if (!resp.ok) {
+    const body = await resp.text();
+    throw new Error(`Failed to get PR meta (${resp.status}): ${body}`);
+  }
+
+  const data = (await resp.json()) as {
+    state: string;
+    draft: boolean;
+    head: { sha: string };
+    requested_reviewers?: Array<{ login: string }>;
+  };
+
+  return {
+    state: data.state,
+    headSha: data.head.sha,
+    draft: data.draft,
+    requestedReviewerLogins: (data.requested_reviewers ?? []).map(
+      (r) => r.login,
+    ),
+  };
+}
+
+/**
+ * List check runs on a specific commit SHA, filtered to a single check name.
+ * Returns just the names present on that ref — used to check whether a given
+ * required check (e.g. `bot-review`) has been written for the current headSha.
+ */
+export async function getCheckRunNamesForRef(
+  installationToken: string,
+  owner: string,
+  repo: string,
+  ref: string,
+  checkName: string,
+): Promise<string[]> {
+  const url =
+    `${GITHUB_API}/repos/${owner}/${repo}/commits/${ref}/check-runs` +
+    `?check_name=${encodeURIComponent(checkName)}`;
+  const resp = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${installationToken}`,
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+    },
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+
+  if (!resp.ok) {
+    const body = await resp.text();
+    throw new Error(
+      `Failed to list check runs for ref (${resp.status}): ${body}`,
+    );
+  }
+
+  const data = (await resp.json()) as {
+    check_runs: Array<{ name: string }>;
+  };
+  return data.check_runs.map((r) => r.name);
+}
+
+/**
  * Add a label to a PR (or issue). Idempotent — GitHub ignores duplicate labels.
  */
 export async function addLabel(

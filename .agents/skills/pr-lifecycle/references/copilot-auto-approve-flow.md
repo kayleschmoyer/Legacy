@@ -221,3 +221,24 @@ Before changing `copilot-auto-approve.yml`:
 - `.github/workflows/merge-queue.yml` — consumes `merge-when-ready` label.
 - `.agents/skills/pr-lifecycle/references/ci-checks-reference.md` — lists `bot-review` in the master check table.
 - `.agents/skills/pr-lifecycle/references/fix-reviews.md` — agent workflow for resolving Copilot comments.
+
+---
+
+## Known Races
+
+### Race Condition #2 — GitHub drops Copilot re-review requests on push
+
+**Symptom.** Push a new commit to a PR that already had a Copilot review on a prior SHA. `requestCopilotReview` succeeds, but Copilot never starts the review — no `workflow_run` fires, no `pull_request_review` is submitted, and `bot-review` sits missing/in-progress indefinitely. `requested_reviewers` is empty afterwards.
+
+**Root cause.** GitHub platform bug; the Copilot review assignment is silently dropped a fraction of the time (~1/3 observed). No public API to force re-trigger.
+
+**Mitigation — SQS self-heal (LS-3838).** The `github-webhook` Lambda enqueues a delayed SQS message after every `requestCopilotReview` call on `opened` / `synchronize` / `reopened` / `ready_for_review`. ~90s later, `handle-race-check.ts` re-checks PR state:
+
+1. PR closed/merged / headSha moved / draft → drop.
+2. `bot-review` already written → done.
+3. Copilot reviewed current SHA → normal flow handles it.
+4. Copilot still in `requested_reviewers` → still processing.
+5. Otherwise → re-request Copilot, enqueue next attempt (up to 3 total).
+6. Exhausted → write `bot-review=failure` with instructions to push an empty commit.
+
+Max end-to-end recovery window ≈ 4.5 min. Implementation: `lambdas/github-webhook/src/handle-race-check.ts` + `sqs-client.ts`; Terraform: `terraform/main/lambda-github-webhook.tf` (`aws_sqs_queue.github_webhook_race_check` + DLQ + event source mapping).
