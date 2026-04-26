@@ -12,7 +12,7 @@ Do not `cat` these files — use `Skill` and `Read` to avoid dumping hundreds of
 
 The PR to fix is: $ARGUMENTS
 
-> Specific invocation: `/fix-pr 3027` — pass the PR number directly; omit to use the current branch's PR.
+> Specific invocation: `/fix-pr <N>` — pass the PR number directly; omit to use the current branch's PR.
 
 If no PR number is provided, first discover the current branch's PR number via `gh pr view --json number` or by deriving the branch name and calling `github_list_prs(branch: "<branch>")`; once you have the PR number, use `github_view_pr` with that number.
 
