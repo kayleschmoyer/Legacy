@@ -1391,6 +1391,30 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
       },
     },
     {
+      name: 'worktree_commit_stat',
+      description:
+        'Structured JSON stat for a single commit: author, date, subject, ' +
+        'per-file insertions/deletions with status (A/M/D/R/C), and totals. ' +
+        'Use this instead of `git show <ref> --stat` shell calls when you need ' +
+        'a machine-readable file list (e.g. "what files did this commit touch?"). ' +
+        'Prefer over worktree_show_commit with stat:true when structured output is needed.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          ref: {
+            type: 'string',
+            description:
+              'Commit SHA, HEAD, HEAD~N, or any git rev (default: HEAD)',
+          },
+          worktree: {
+            type: 'string',
+            description:
+              'Ticket key, absolute path, or omit for active worktree',
+          },
+        },
+      },
+    },
+    {
       name: 'worktree_stabilize',
       description:
         'Post-rebase stabilization: install, db:print-schema, codegen. Must run BEFORE push.',
@@ -5678,6 +5702,168 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           String(err);
         return {
           content: [{ type: 'text', text: `Failed to show commit: ${msg}` }],
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_commit_stat
+    // -----------------------------------------------------------------------
+    case 'worktree_commit_stat': {
+      const { ref: rawRef = 'HEAD', worktree: wtKey } = args as {
+        ref?: string;
+        worktree?: string;
+      };
+
+      const target = resolveTargetDir(wtKey);
+      if ('error' in target) {
+        return {
+          content: [{ type: 'text', text: target.error }],
+          isError: true,
+        };
+      }
+      const cwd = target.path;
+
+      if (rawRef.startsWith('-')) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Invalid ref: "${rawRef}". Ref must not start with '-'.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+      if (!/^[a-zA-Z0-9_./~^{}-]+$/.test(rawRef)) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Invalid ref: "${rawRef}". Only rev characters allowed.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      try {
+        const RS = '\x1e'; // record separator
+        const FS = '\x1f'; // field separator
+        const output = runGit(
+          [
+            'log',
+            '-1',
+            `--format=${RS}%H${FS}%h${FS}%s${FS}%an${FS}%aI`,
+            '--numstat',
+            '--name-status',
+            rawRef,
+          ],
+          cwd,
+          { timeout: 10_000 },
+        );
+
+        const records = output.split(RS).filter((b) => b.trim());
+        if (records.length === 0) {
+          return {
+            content: [
+              { type: 'text', text: `No commit found at ref: ${rawRef}` },
+            ],
+            isError: true,
+          };
+        }
+
+        const record = records[0].trim();
+        const lines = record.split('\n');
+        const fields = lines[0].split(FS);
+
+        const sha = fields[0] ?? '';
+        const shortSha = fields[1] ?? '';
+        const subject = fields[2] ?? '';
+        const author = fields[3] ?? '';
+        const date = fields[4] ?? '';
+
+        // Build numstat map: path → {insertions, deletions}
+        // Format: "12\t3\tpath" or "-\t-\tpath" for binary files
+        const numstatByPath = new Map<
+          string,
+          { insertions: number; deletions: number }
+        >();
+        for (let i = 1; i < lines.length; i++) {
+          const m = lines[i].match(/^(\d+|-)\t(\d+|-)\t(.+)$/);
+          if (m) {
+            numstatByPath.set(m[3], {
+              insertions: m[1] === '-' ? 0 : Number.parseInt(m[1], 10),
+              deletions: m[2] === '-' ? 0 : Number.parseInt(m[2], 10),
+            });
+          }
+        }
+
+        // Build file list from --name-status lines (authoritative for status + renames)
+        // Format: "M\tpath", "A\tpath", "D\tpath", "R100\told\tnew", "C50\told\tnew"
+        const files: Array<{
+          path: string;
+          status: string;
+          insertions: number;
+          deletions: number;
+        }> = [];
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i];
+          if (!/^[A-Z]/.test(line)) continue;
+          const parts = line.split('\t');
+          const statusLetter = parts[0][0];
+          const canonicalPath =
+            (statusLetter === 'R' || statusLetter === 'C') && parts[2]
+              ? parts[2]
+              : parts[1];
+          if (!canonicalPath) continue;
+          const counts = numstatByPath.get(canonicalPath);
+          files.push({
+            path: canonicalPath,
+            status: statusLetter,
+            insertions: counts?.insertions ?? 0,
+            deletions: counts?.deletions ?? 0,
+          });
+        }
+
+        const totalInsertions = files.reduce((sum, f) => sum + f.insertions, 0);
+        const totalDeletions = files.reduce((sum, f) => sum + f.deletions, 0);
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  sha,
+                  shortSha,
+                  subject,
+                  author,
+                  date,
+                  files,
+                  totals: {
+                    filesChanged: files.length,
+                    insertions: totalInsertions,
+                    deletions: totalDeletions,
+                  },
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      } catch (err: unknown) {
+        const e = err as { stdout?: string; stderr?: string; message?: string };
+        const output =
+          [e.stdout, e.stderr].filter(Boolean).join('\n') ||
+          e.message ||
+          String(err);
+        return {
+          content: [
+            { type: 'text', text: `Failed to get commit stat: ${output}` },
+          ],
           isError: true,
         };
       }
