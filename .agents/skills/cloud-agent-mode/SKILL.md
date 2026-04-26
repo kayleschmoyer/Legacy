@@ -209,17 +209,17 @@ On **Claude Code on the web**, Claude's native Atlassian plugin (`mcp__claude_ai
 
 **Jira tool mapping** (native Atlassian plugin equivalents):
 
-| Custom MCP tool               | Native plugin equivalent                                                                                                                                                                                                                                              |
-| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `jira_view`                   | `getJiraIssue`                                                                                                                                                                                                                                                        |
-| `jira_search`                 | `searchJiraIssuesUsingJql`                                                                                                                                                                                                                                            |
-| `jira_create_ticket`          | `createJiraIssue`                                                                                                                                                                                                                                                     |
-| `jira_edit_ticket`            | `editJiraIssue`                                                                                                                                                                                                                                                       |
-| `jira_transition`             | `transitionJiraIssue` — **pass transition as an object, not a string**: `transitionJiraIssue({ cloudId: "fb294606-6c8f-4b52-9a41-11fe45b77528", issueIdOrKey: "LS-####", transition: { id: "21" } })`. Call `getTransitionsForJiraIssue` first to get the numeric ID. |
-| `jira_transition(key: [...])` | No native bulk equivalent — call `transitionJiraIssue` per key in parallel. Use for batch claim/release (e.g. claim 5 tickets In Progress at once). Supports: "In Progress", "In Review", "Done" — does not support "To Do".                                          |
-| `jira_get_comments`           | No direct equivalent — use `getJiraIssue` with `comment` field                                                                                                                                                                                                        |
-| `jira_link_issues`            | No native equivalent — use custom `legacy-sports-jira` MCP only (`acli` is not available in cloud)                                                                                                                                                                    |
-| `jira_list_children`          | `searchJiraIssuesUsingJql` with `parent = LS-####`                                                                                                                                                                                                                    |
+| Custom MCP tool               | Native plugin equivalent                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `jira_view`                   | **Do not use `getJiraIssue`** — known bug returns wrong data (see AGENTS.md). Use `searchJiraIssuesUsingJql({ cloudId: "fb294606-6c8f-4b52-9a41-11fe45b77528", jql: "key = LS-####", maxResults: 1 })` instead.                                                                                                                                                                                                                                                |
+| `jira_search`                 | `searchJiraIssuesUsingJql`                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `jira_create_ticket`          | `createJiraIssue`                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `jira_edit_ticket`            | `editJiraIssue`                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `jira_transition`             | `transitionJiraIssue` — **pass transition as an object, not a string**: `transitionJiraIssue({ cloudId: "fb294606-6c8f-4b52-9a41-11fe45b77528", issueIdOrKey: "LS-####", transition: { id: "21" } })`. Use `jira_get_transitions({ key: "LS-####" })` (custom MCP server) to look up the numeric ID; if the custom server is unavailable or returns `fetch failed` (see Quirk 1), use the static LS transition ID table in "Discovering transition IDs" below. |
+| `jira_transition(key: [...])` | No native bulk equivalent — call `transitionJiraIssue` per key in parallel. Use for batch claim/release (e.g. claim 5 tickets In Progress at once). Supports: "In Progress", "In Review", "Done" — does not support "To Do".                                                                                                                                                                                                                                   |
+| `jira_get_comments`           | No direct equivalent — use `searchJiraIssuesUsingJql({ cloudId: "fb294606-6c8f-4b52-9a41-11fe45b77528", jql: "key = LS-####", maxResults: 1 })` with the `comment` field (avoids the buggy `getJiraIssue` tool — see AGENTS.md).                                                                                                                                                                                                                               |
+| `jira_link_issues`            | No native equivalent — use custom `legacy-sports-jira` MCP only (`acli` is not available in cloud)                                                                                                                                                                                                                                                                                                                                                             |
+| `jira_list_children`          | `searchJiraIssuesUsingJql` with `parent = LS-####`                                                                                                                                                                                                                                                                                                                                                                                                             |
 
 ## Copilot Coding Agent: Custom MCP Server Setup
 
@@ -296,9 +296,16 @@ These are environment behaviors that look like bugs but are not — they cost re
 
 > The earlier Jira-auth bullet in AGENTS.md only covers the case where `configured: false`. The `configured: true` + `fetch failed` case is the one that bites you on a fresh Claude Code on the web session — both look identical from a "should I switch tools?" decision point, and the answer is yes.
 
-### Quirk 2: Atlassian plugin `transitionJiraIssue` rejects its `transition` parameter on cold start
+### Quirk 2: Atlassian plugin `transitionJiraIssue`/`createJiraIssue` reject nested object parameters on cold start
 
-**Symptom**: the first 3-4 calls to `mcp__82d0c0eb-...__transitionJiraIssue` (or `mcp__claude_ai_Atlassian__transitionJiraIssue`) return:
+**Affected tools and parameters**:
+
+| Tool                  | Affected parameter  | Notes                                                     |
+| --------------------- | ------------------- | --------------------------------------------------------- |
+| `transitionJiraIssue` | `transition`        | `additionalProperties: false` — cold-start only, warms up |
+| `createJiraIssue`     | `additional_fields` | same encoding bug — use `jira_create_ticket` instead      |
+
+**Symptom**: calls to either tool return:
 
 ```
 MCP error -32602: Input validation error: ...
@@ -308,22 +315,30 @@ MCP error -32602: Input validation error: ...
   "path": ["transition"]
 ```
 
-The call payload is formed correctly (e.g. `{"id": "21"}` as a JSON object literal). The same payload format is accepted by `editJiraIssue`, `createIssueLink`, and `addCommentToJiraIssue` at the same time. After ~5 minutes of unrelated tool calls (Read, Glob, `createJiraIssue`, etc.), the identical `transitionJiraIssue` call succeeds on retry. The same warm-start behavior reproduces when transitioning a ticket back at the end of a session.
+(`"path"` is `["additional_fields"]` when the error comes from `createJiraIssue`.)
 
-**Hypothesis**: a plugin schema cold-start where the wrapper temporarily mis-encodes the strictest object parameter (`transition` has `additionalProperties: false`, unlike `editJiraIssue.fields` which has `additionalProperties: {}`). Cannot be reliably reproduced or root-caused from inside the agent session.
+The call payloads are formed correctly — e.g. `transition: { "id": "21" }` and `additional_fields: { parent: { key: "LS-####" } }` as JSON object literals. The same payload format is accepted by `editJiraIssue`, `createIssueLink`, and `addCommentToJiraIssue` at the same time. After ~30 seconds to ~5 minutes of unrelated tool calls, the identical `transitionJiraIssue` call typically succeeds on retry. The `createJiraIssue.additional_fields` parameter may remain broken for longer and is best avoided entirely (see preferred alternative below).
 
-**Workaround**: retry the same call after any other successful plugin call has completed. ~30 seconds of normal activity is usually enough. **Do not re-architect around the failure** — it warms up on its own.
+**Hypothesis**: a plugin schema cold-start where the harness temporarily mis-encodes parameters declared as `additionalProperties: false` objects (stricter than `additionalProperties: {}` variants used by tools that do work). Cannot be reliably reproduced or root-caused from inside the agent session.
 
-**Correct call pattern** (once warm):
+**Workaround for `transitionJiraIssue`**: retry once after any other successful plugin call has completed. ~30 seconds of normal activity is usually enough. If that retry still fails: in a **cloud session**, use `jira_transition` from the custom `legacy-sports-jira` MCP server if it responds successfully — Copilot Coding Agent sessions have the server available via the signing proxy, but Claude Code on the web may see `fetch failed` (Quirk 1) in which case the server is unreachable; if so, perform the transition manually in the Jira UI. In a **local session**, fall through to `acli jira workitem transition --key LS-#### --status "In Progress" --yes`.
 
-1. Get transition IDs for the ticket:
-   `getTransitionsForJiraIssue({ cloudId: "fb294606-6c8f-4b52-9a41-11fe45b77528", issueIdOrKey: "LS-####" })`
+**Preferred alternative for `createJiraIssue` with parent** — use `jira_create_ticket` from the custom MCP server; it accepts `parent` as a plain string and calls the Jira REST API directly:
+
+```
+jira_create_ticket({ summary: "...", type: "Task", parent: "LS-####", sprint: "current" })
+```
+
+If the custom server is unavailable, create the ticket first (without `additional_fields`) then set the parent separately via `editJiraIssue({ cloudId: "fb294606-6c8f-4b52-9a41-11fe45b77528", issueIdOrKey: "LS-CHILD", fields: { parent: { key: "LS-PARENT" } } })` — the Atlassian plugin's `editJiraIssue` uses `fields: { additionalProperties: {} }` and is unaffected by the cold-start encoding bug.
+
+**Correct call pattern for `transitionJiraIssue`** (once warm):
+
+1. Get transition IDs for the ticket — prefer `jira_get_transitions` (custom MCP server) if available, since the Atlassian plugin's `getTransitionsForJiraIssue` is known to return full issue data instead of the transitions array (see AGENTS.md). If the custom server is unavailable, look up the target status ID from the Jira UI or the static LS transition table in `.agents/skills/workflow-overview/SKILL.md`:
+   `jira_get_transitions({ key: "LS-####" })`
 2. Then pass the transition as a JSON object (NOT a string):
    `transitionJiraIssue({ cloudId: "fb294606-6c8f-4b52-9a41-11fe45b77528", issueIdOrKey: "LS-####", transition: { id: "21" } })`
 
-**Common mistake**: passing a string like `transition: "In Progress"` or `transition: "{\"id\": \"21\"}"`
-causes the `"expected object, received string"` error even when the server is warm.
-The `transition` parameter MUST be a JSON object `{ id: "21" }`, not a string.
+**Common mistake** (distinct from the cold-start bug): passing a string like `transition: "In Progress"` or `transition: "{\"id\": \"21\"}"` causes the `"expected object, received string"` error even when the server is warm. The `transition` parameter MUST be a JSON object `{ id: "21" }`, not a string. This error will never resolve with retries — it requires fixing the call format.
 
 ### Quirk 3: `ci_get_logs` returns step summaries instead of full log text in cloud sessions
 
@@ -351,7 +366,7 @@ followed by a list of step names and `✓`/`✗`/`○` conclusions instead of fu
 
 ### Discovering transition IDs
 
-`transitionJiraIssue` requires a numeric workflow transition ID, and these are **not** stable across projects. `getTransitionsForJiraIssue` is the right way to discover them for any given ticket. For the LS project specifically:
+`transitionJiraIssue` requires a numeric workflow transition ID, and these are **not** stable across projects. Use `jira_get_transitions({ key: "LS-####" })` (custom MCP server) to discover them. **Do not use `getTransitionsForJiraIssue`** — the Atlassian plugin version is known to return full issue data instead of the transitions array. For the LS project specifically, the IDs are stable and listed here:
 
 | Status        | Transition ID |
 | ------------- | ------------- |
@@ -361,7 +376,7 @@ followed by a list of step names and `✓`/`✗`/`○` conclusions instead of fu
 | `Done`        | `31`          |
 | `Won't Do`    | `3`           |
 
-If the IDs above stop working, call `getTransitionsForJiraIssue({ issueIdOrKey: "LS-####" })` and update this table.
+If the IDs above stop working, call `jira_get_transitions({ key: "LS-####" })` (custom MCP server) and update this table.
 
 ### Quirk 3: `ci_dispatch_workflow` returns 403 in cloud — AGENT_AUTHOR_APP lacks `actions:write`
 
