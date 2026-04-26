@@ -379,7 +379,18 @@ resource "aws_secretsmanager_secret" "mcp_github_token" {
 # out-of-band first so the import succeeds. Long-term, this should not exist.
 import {
   to = aws_secretsmanager_secret.mcp_github_token
-  id = "${var.environment}/mcp-github-token"
+  # Full ARN required (not the friendly name) — Secrets Manager appends a
+  # 6-char random suffix to every secret ARN, and the AWS Terraform provider
+  # rejects bare names with `could not parse import ID ... as ARN`. The
+  # suffix below is the dev secret's actual suffix, discovered via:
+  #   aws secretsmanager describe-secret --secret-id dev/mcp-github-token \
+  #     --query ARN --output text --region us-east-1
+  # Region/account/env are interpolated from locals/vars so this can't
+  # silently target a different account if anyone re-runs against a
+  # non-dev workspace; the hardcoded `-L4PIGD` suffix will fail loudly
+  # against any other environment's secret (whose suffix differs),
+  # exactly matching the one-time-migration intent.
+  id = "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/mcp-github-token-L4PIGD"
 }
 
 # Rollbar post_server_item access token for server-side error tracking.
