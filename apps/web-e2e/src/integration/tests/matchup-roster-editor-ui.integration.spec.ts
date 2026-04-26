@@ -41,6 +41,8 @@ interface RosterEditorState {
   inviteCode: string;
   leagueName: string;
   matchupId: number;
+  /** Commissioner's team ID — currently used to scope the Phase 5 GraphQL matchup gate. */
+  commissionerTeamId: number;
   /** Player that was benched in Phase 6 */
   benchedPlayerName: string;
   /** positionId that was freed when player was benched */
@@ -105,6 +107,7 @@ test.describe
       inviteCode: '',
       leagueName: '',
       matchupId: 0,
+      commissionerTeamId: 0,
       benchedPlayerName: '',
       freedPositionId: null,
     };
@@ -265,6 +268,7 @@ test.describe
         { leagueId: state.leagueId },
       );
       expect(userTeamId).toBeGreaterThan(0);
+      state.commissionerTeamId = userTeamId;
 
       // Find week-1 matchup for commissioner's team
       const { getMatchupsForLeague } = await gqlFetch<{
@@ -316,32 +320,40 @@ test.describe
     // 30–60 s; add headroom beyond the default integration timeout.
     test.setTimeout(180_000);
 
-    await test.step('GQL consistency gate: wait for starter positionIds to be set', async () => {
+    await test.step('GQL consistency gate: wait for commissioner team starters to be set', async () => {
       // autoPopulateFirstMatchupLineup runs asynchronously after draft completion
       // and may not have committed when Phase 5 starts. Poll the direct API until
-      // at least one matchup_player with a non-null positionId is returned so the
-      // UI reload loop doesn't time out on stale data.
+      // at least one matchup_player for the commissioner's team has a non-null
+      // positionId — filtering to the commissioner's team prevents a false pass
+      // where only the opponent's players are assigned (LS-3834).
       const deadline = Date.now() + 60_000;
       let hasStarters = false;
       while (!hasStarters && Date.now() < deadline) {
         const { getMatchupPlayers } = await gqlFetch<{
-          getMatchupPlayers: Array<{ id: string; positionId: number | null }>;
+          getMatchupPlayers: Array<{
+            id: string;
+            teamId: number;
+            positionId: number | null;
+          }>;
         }>(
           commissionerJwt,
           `query GetMatchupPlayers($matchupId: Int!) {
             getMatchupPlayers(matchupId: $matchupId) {
               id
+              teamId
               positionId
             }
           }`,
           { matchupId: state.matchupId },
         );
-        hasStarters = getMatchupPlayers.some((mp) => mp.positionId !== null);
+        hasStarters = getMatchupPlayers
+          .filter((mp) => mp.teamId === state.commissionerTeamId)
+          .some((mp) => mp.positionId !== null);
         if (!hasStarters) await new Promise((r) => setTimeout(r, 4_000));
       }
       expect(
         hasStarters,
-        'At least one starter must have a non-null positionId before UI check',
+        `Commissioner team (${state.commissionerTeamId}) must have at least one starter before UI check`,
       ).toBe(true);
     });
 
