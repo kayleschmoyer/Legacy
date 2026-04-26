@@ -363,6 +363,25 @@ resource "aws_secretsmanager_secret" "mcp_github_token" {
   tags = local.common_tags
 }
 
+# ONE-TIME MIGRATION — remove this block in a follow-up PR after the first
+# successful apply on `main` (tracked in LS-3839).
+#
+# The dev secret was created out-of-band by an earlier seeding script before
+# this resource was added to Terraform; without an import, `terraform apply`
+# fails with `ResourceExistsException`. We use a TF 1.5 import block (rather
+# than asking an operator to run `terraform import` against the CI-only state)
+# because no human runs Terraform locally against this state.
+#
+# WARNING — if/when we bootstrap a new environment (staging/prod):
+# Terraform import blocks REQUIRE the target resource to already exist; on a
+# fresh environment the import would fail before the resource is created.
+# Either remove this block before bootstrapping a new env, or seed the secret
+# out-of-band first so the import succeeds. Long-term, this should not exist.
+import {
+  to = aws_secretsmanager_secret.mcp_github_token
+  id = "${var.environment}/mcp-github-token"
+}
+
 # Rollbar post_server_item access token for server-side error tracking.
 # Previously passed as plaintext env var to every Lambda — migrated to Secrets
 # Manager so the token is no longer visible via Lambda GetFunctionConfiguration

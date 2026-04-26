@@ -751,9 +751,12 @@ resource "aws_iam_policy" "github_actions_supplemental" {
       },
       # API Gateway v2 tagging — `apigateway:TagResource`/`UntagResource`
       # are the explicit IAM-managed tagging actions used by
-      # terraform-provider-aws when calling ApiGatewayV2 `CreateStage`;
-      # `PUT /tags/*` alone is insufficient for the v2 API. Required for
-      # the MCP API GW v2 stages (ci/jira/github) to apply.
+      # terraform-provider-aws when calling ApiGatewayV2 `CreateStage` /
+      # `CreateApi` / `CreateIntegration`. The provider invokes these
+      # actions against the resource ARN itself (e.g. `/apis/<id>` or
+      # `/apis/<id>/stages/<name>`), NOT against `/tags/*` — `/tags/*` is
+      # the v1 (REST API) pattern only. Both ARN shapes are required to
+      # cover MCP API GW v2 (ci/jira/github) and any v1 REST APIs.
       {
         Effect = "Allow"
         Action = [
@@ -761,7 +764,28 @@ resource "aws_iam_policy" "github_actions_supplemental" {
           "apigateway:UntagResource"
         ]
         Resource = [
-          "arn:aws:apigateway:${local.region}::/tags/*"
+          "arn:aws:apigateway:${local.region}::/tags/*",
+          "arn:aws:apigateway:${local.region}::/apis",
+          "arn:aws:apigateway:${local.region}::/apis/*",
+          "arn:aws:apigateway:${local.region}::/restapis",
+          "arn:aws:apigateway:${local.region}::/restapis/*"
+        ]
+      },
+      # Lambda event source mapping tagging — event source mapping ARNs use
+      # UUIDs (`event-source-mapping:<uuid>`), so they cannot be scoped by
+      # name_prefix. The lambda tagging actions in the inline policy only
+      # cover `function:${name_prefix}-*`. Required for SQS-triggered
+      # Lambdas (e.g. draft-processor) where the provider tags the event
+      # source mapping after creation.
+      {
+        Effect = "Allow"
+        Action = [
+          "lambda:TagResource",
+          "lambda:UntagResource",
+          "lambda:ListTags"
+        ]
+        Resource = [
+          "arn:aws:lambda:${local.region}:${local.account_id}:event-source-mapping:*"
         ]
       },
       # Secrets Manager write permissions — moved here from the inline policy to stay under the 10 KB limit.
