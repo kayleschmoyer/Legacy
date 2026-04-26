@@ -14,6 +14,7 @@ import type { MlbDataProvider } from '../provider';
 import type {
   GameFeed,
   MlbGame,
+  MlbGameStatus,
   MlbTeamScore,
   PlayerGameStats,
   PlayerSeasonStats,
@@ -59,7 +60,7 @@ interface BdlGamesResponse {
 
 // ─── BDL status → internal status mapping ────────────────────────────────────
 
-function mapBdlStatus(bdlStatus: string): string {
+function mapBdlStatus(bdlStatus: string): MlbGameStatus {
   if (bdlStatus === 'STATUS_FINAL') return 'Final';
   if (bdlStatus === 'STATUS_IN_PROGRESS') return 'Live';
   if (bdlStatus === 'STATUS_POSTPONED') return 'Postponed';

@@ -4,6 +4,7 @@ export type { MlbDataProvider } from './lib/provider';
 export type {
   GameFeed,
   MlbGame,
+  MlbGameStatus,
   MlbTeamScore,
   PlayerGameStats,
   PlayerSeasonStats,

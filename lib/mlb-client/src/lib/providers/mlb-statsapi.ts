@@ -24,6 +24,7 @@ import type { MlbDataProvider } from '../provider';
 import type {
   GameFeed,
   MlbGame,
+  MlbGameStatus,
   MlbTeamScore,
   PlayerGameStats,
   PlayerSeasonStats,
@@ -34,6 +35,23 @@ import type {
   Standings,
   Team,
 } from '../types';
+
+/**
+ * Normalizes an MLB Stats API `detailedState` string to the internal
+ * `MlbGameStatus` union type used across all providers.
+ *
+ * Exported so it can be unit-tested directly without reaching into class
+ * internals.
+ */
+export function mapMlbStatus(detailedState: string | undefined): MlbGameStatus {
+  const s = detailedState ?? '';
+  if (s === 'In Progress' || s === 'Manager Challenge') return 'Live';
+  if (s === 'Final' || s === 'Game Over' || s === 'Completed Early')
+    return 'Final';
+  if (s === 'Postponed' || s === 'Cancelled') return 'Postponed';
+  if (s === 'Suspended') return 'Suspended';
+  return 'Preview';
+}
 
 const BASE_URL = 'https://statsapi.mlb.com/api';
 const LIVE_TTL_MS = 15_000; // 15 seconds for live games
@@ -188,7 +206,7 @@ export class MlbStatsApiProvider implements MlbDataProvider {
 
     return {
       gamePk,
-      status: gameData?.status?.detailedState ?? 'Unknown',
+      status: mapMlbStatus(gameData?.status?.detailedState),
       inning: ls?.currentInning ?? null,
       inningHalf: ls?.inningHalf ?? null,
       outs: ls?.outs ?? null,
@@ -264,7 +282,7 @@ export class MlbStatsApiProvider implements MlbDataProvider {
     const games: ScheduleGame[] = (dateEntry?.games ?? []).map((g) => ({
       gamePk: g.gamePk ?? 0,
       gameDate: g.gameDate ?? '',
-      status: g.status?.detailedState ?? '',
+      status: mapMlbStatus(g.status?.detailedState),
       homeTeamId: g.teams?.home?.team?.id ?? 0,
       awayTeamId: g.teams?.away?.team?.id ?? 0,
       venue: g.venue?.name ?? null,
@@ -319,7 +337,7 @@ export class MlbStatsApiProvider implements MlbDataProvider {
     const ls = g.linescore;
     return {
       gamePk: g.gamePk ?? 0,
-      status: g.status?.detailedState ?? '',
+      status: mapMlbStatus(g.status?.detailedState),
       startTime: g.gameDate ?? null,
       inning: ls?.currentInning ?? null,
       inningHalf: ls?.inningHalf ?? null,

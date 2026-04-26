@@ -6,6 +6,14 @@
 
 // ─── Scoreboard / Game state ──────────────────────────────────────────────────
 
+/** Normalised game-status union shared across all MLB data providers. */
+export type MlbGameStatus =
+  | 'Preview'
+  | 'Live'
+  | 'Final'
+  | 'Postponed'
+  | 'Suspended';
+
 export interface MlbTeamScore {
   teamId: number;
   teamName: string;
@@ -19,8 +27,7 @@ export interface MlbTeamScore {
 
 export interface MlbGame {
   gamePk: number;
-  /** "Preview" | "Live" | "Final" | "Postponed" | "Suspended" */
-  status: string;
+  status: MlbGameStatus;
   /** ISO 8601 scheduled start time */
   startTime: string | null;
   /** Current inning number — null for Preview/Final */
@@ -44,7 +51,7 @@ export interface Scoreboard {
 
 export interface GameFeed {
   gamePk: number;
-  status: string;
+  status: MlbGameStatus;
   inning: number | null;
   inningHalf: string | null;
   outs: number | null;
@@ -132,7 +139,7 @@ export interface PlayerGameStats {
 export interface ScheduleGame {
   gamePk: number;
   gameDate: string;
-  status: string;
+  status: MlbGameStatus;
   homeTeamId: number;
   awayTeamId: number;
   venue: string | null;
