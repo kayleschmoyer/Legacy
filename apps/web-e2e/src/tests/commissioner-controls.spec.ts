@@ -1201,6 +1201,42 @@ test.describe('Final week advance — season completion @regression', () => {
     ).not.toBeVisible();
   });
 
+  test('shows "Season Complete" when currentMatchup is null and totalMatchups is not set (LS-3835)', async ({
+    page,
+  }) => {
+    // Exercises the LS-3835 fix: backend clears currentMatchup AND totalMatchups
+    // may not be set; isSeasonComplete should short-circuit on !hasCurrentMatchup
+    // when highestWeek > 0.
+    await setupGraphQL(page, {
+      league: makeLeague({
+        draftStatus: 'completed',
+        gamesPerMatchup: 3,
+        totalMatchups: null,
+        currentMatchup: null,
+      }),
+      matchups: [
+        makeMatchup({
+          weekNumber: 2,
+          selectedGamesCount: 3,
+          gamesPerMatchup: 3,
+          status: 'completed',
+          team1Id: 3,
+          team2Id: 4,
+        }),
+      ],
+      currentWeek: null,
+    });
+    await page.goto('/baseball/league/1/commissioner');
+    await page.waitForLoadState('load');
+
+    await expect(page.getByText(/season complete/i).first()).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(
+      page.getByRole('button', { name: /advance league week/i }),
+    ).not.toBeVisible();
+  });
+
   test('advancing the final week transitions to season complete state', async ({
     page,
   }) => {

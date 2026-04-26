@@ -142,17 +142,21 @@ export function NextStepControl({
   const currentWeek = currentMatchup?.weekNumber ?? highestWeek;
   const nextWeek = currentWeek + 1;
 
-  // Season is fully complete when all scheduled weeks have been played and
-  // either no currentMatchup remains or the final week's matchup is marked
-  // completed (the server keeps the last week's matchup as "current" after
-  // it finishes).
+  // Season is fully complete when the draft is done, the league isn't frozen,
+  // and either:
+  //   a) the backend cleared currentMatchup (null) — the server already
+  //      signalled completion; just verify at least one week was played, OR
+  //   b) currentMatchup is still set — fall back to the week-count check:
+  //      all scheduled weeks have been played and the final matchup is marked
+  //      completed.
   const isSeasonComplete =
     draftStatus === 'completed' &&
     !frozenAt &&
     highestWeek > 0 &&
-    totalMatchups != null &&
-    highestWeek >= totalMatchups &&
-    (!hasCurrentMatchup || currentMatchup?.status === MatchupStatus.Completed);
+    (!hasCurrentMatchup ||
+      (totalMatchups != null &&
+        highestWeek >= totalMatchups &&
+        currentMatchup?.status === MatchupStatus.Completed));
 
   const handleRenewalConfirm = async () => {
     setRenewalLoading(true);
