@@ -20,6 +20,9 @@ module.exports = {
       'identity-obj-proxy',
     '^@legacy-sports/shared-components/(.*)$':
       '<rootDir>/../../lib/shared-components/src/entry/$1',
+    // Subpath exports need explicit entries before the general pattern because
+    // the general rule maps e.g. rollbar/native → lib/rollbar/native/src (wrong).
+    '^@legacy-sports/rollbar/native$': '<rootDir>/../../lib/rollbar/src/native',
     '^@legacy-sports/(.*)$': '<rootDir>/../../lib/$1/src',
   },
   globals: {

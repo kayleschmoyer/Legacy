@@ -9,21 +9,13 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { getEnvVarOptional } from '@legacy-sports/env-utilities';
 import {
   useBillingPortalSession,
   useCheckoutSession,
   useSubscription,
 } from './useSubscription';
-import {
-  ANNUAL_MONTHLY_EQUIVALENT,
-  ANNUAL_PRICE_DISPLAY,
-  ANNUAL_SAVINGS_PCT,
-  BillingCycle,
-  MONTHLY_PRICE_DISPLAY,
-  PREMIUM_FEATURES,
-} from './constants';
-import { EnvironmentVariable } from '../../common/EnvironmentVariables';
+import { BillingCycle, PREMIUM_FEATURES } from './constants';
+import { useStripePrices } from './useStripePrices';
 
 // Custom URL scheme registered in app.json (scheme: "legacysports").
 const APP_SCHEME = 'legacysports';
@@ -81,9 +73,18 @@ function formatDate(iso: string | null | undefined): string {
 interface BillingToggleProps {
   value: BillingCycle;
   onChange: (v: BillingCycle) => void;
+  monthlyPriceDisplay: string;
+  annualMonthlyEquivalent: string;
+  annualSavingsPct: string;
 }
 
-function BillingToggle({ value, onChange }: BillingToggleProps) {
+function BillingToggle({
+  value,
+  onChange,
+  monthlyPriceDisplay,
+  annualMonthlyEquivalent,
+  annualSavingsPct,
+}: BillingToggleProps) {
   return (
     <XStack
       borderRadius="$4"
@@ -110,7 +111,7 @@ function BillingToggle({ value, onChange }: BillingToggleProps) {
           fontSize="$2"
           color={value === 'monthly' ? BRAND_NAVY_LIGHT : '$colorSubtle'}
         >
-          {MONTHLY_PRICE_DISPLAY}/mo
+          {monthlyPriceDisplay}/mo
         </Text>
       </YStack>
       <YStack
@@ -135,7 +136,7 @@ function BillingToggle({ value, onChange }: BillingToggleProps) {
             paddingHorizontal="$1"
           >
             <Text fontSize="$1" color="white" fontWeight="bold">
-              -{ANNUAL_SAVINGS_PCT}
+              -{annualSavingsPct}
             </Text>
           </YStack>
         </XStack>
@@ -143,7 +144,7 @@ function BillingToggle({ value, onChange }: BillingToggleProps) {
           fontSize="$2"
           color={value === 'annual' ? BRAND_NAVY_LIGHT : '$colorSubtle'}
         >
-          {ANNUAL_MONTHLY_EQUIVALENT}/mo
+          {annualMonthlyEquivalent}/mo
         </Text>
       </YStack>
     </XStack>
@@ -164,14 +165,37 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
 
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('annual');
 
+  const {
+    monthlyPriceDisplay,
+    annualPriceDisplay,
+    annualMonthlyEquivalent,
+    annualSavingsPct,
+    monthlyPriceId: stripeMonthlyPriceId,
+    annualPriceId: stripeAnnualPriceId,
+  } = useStripePrices();
+
+  // Resolve the price ID for the currently selected billing cycle.
+  // Used to guard the upgrade flow — null means both the live query and the
+  // env-var fallbacks are unavailable, so checkout cannot proceed.
+  const selectedPriceId =
+    billingCycle === 'annual' ? stripeAnnualPriceId : stripeMonthlyPriceId;
+
+  // The loading state from useStripePrices() is intentionally excluded:
+  // useStripePrices returns fallback display values immediately, so there is
+  // no need to block the whole UI while the background refetch completes.
+  // The selectedPriceId guard in handleUpgrade handles the case where price
+  // IDs are genuinely unavailable.
   const isLoading = subLoading || checkoutLoading || portalLoading;
 
-  const stripeMonthlyPriceId =
-    getEnvVarOptional(EnvironmentVariable.STRIPE_MONTHLY_PRICE_ID) ?? '';
-  const stripeAnnualPriceId =
-    getEnvVarOptional(EnvironmentVariable.STRIPE_ANNUAL_PRICE_ID) ?? '';
-
   const handleUpgrade = async () => {
+    if (!selectedPriceId) {
+      Alert.alert(
+        'Subscription unavailable',
+        'We could not load the selected subscription price yet. Please try again in a moment.',
+      );
+      return;
+    }
+
     // iOS: Platform-aware purchase flow.
     if (Platform.OS === 'ios') {
       Alert.alert(
@@ -189,8 +213,7 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
   };
 
   const handleStripeCheckout = async () => {
-    const priceId =
-      billingCycle === 'annual' ? stripeAnnualPriceId : stripeMonthlyPriceId;
+    const priceId = selectedPriceId;
 
     if (!priceId) {
       Alert.alert(
@@ -457,24 +480,30 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
             </XStack>
 
             <YStack padding="$5" gap="$4">
-              <BillingToggle value={billingCycle} onChange={setBillingCycle} />
+              <BillingToggle
+                value={billingCycle}
+                onChange={setBillingCycle}
+                monthlyPriceDisplay={monthlyPriceDisplay}
+                annualMonthlyEquivalent={annualMonthlyEquivalent}
+                annualSavingsPct={annualSavingsPct}
+              />
 
               {billingCycle === 'annual' ? (
                 <YStack alignItems="center" gap="$1">
                   <Text fontSize="$7" fontWeight="700" color={BRAND_GOLD}>
-                    {ANNUAL_PRICE_DISPLAY}
+                    {annualPriceDisplay}
                     <Text fontSize="$4" fontWeight="400" color="$colorSubtle">
                       /yr
                     </Text>
                   </Text>
                   <Text fontSize="$3" color="$colorSubtle">
-                    {ANNUAL_MONTHLY_EQUIVALENT}/mo · Save {ANNUAL_SAVINGS_PCT}
+                    {annualMonthlyEquivalent}/mo · Save {annualSavingsPct}
                   </Text>
                 </YStack>
               ) : (
                 <YStack alignItems="center">
                   <Text fontSize="$7" fontWeight="700" color={BRAND_GOLD}>
-                    {MONTHLY_PRICE_DISPLAY}
+                    {monthlyPriceDisplay}
                     <Text fontSize="$4" fontWeight="400" color="$colorSubtle">
                       /mo
                     </Text>
@@ -492,7 +521,7 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
                 <Text color={BRAND_NAVY_LIGHT} fontWeight="700" fontSize="$4">
                   {checkoutLoading
                     ? 'Opening…'
-                    : `Upgrade — ${billingCycle === 'annual' ? ANNUAL_PRICE_DISPLAY + '/yr' : MONTHLY_PRICE_DISPLAY + '/mo'}`}
+                    : `Upgrade — ${billingCycle === 'annual' ? annualPriceDisplay + '/yr' : monthlyPriceDisplay + '/mo'}`}
                 </Text>
               </Button>
 

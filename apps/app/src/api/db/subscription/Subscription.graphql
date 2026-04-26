@@ -31,3 +31,12 @@ mutation CreateBillingPortalSession($returnUrl: String!) {
     url
   }
 }
+
+query GetStripePrices {
+  stripePrices {
+    monthlyPriceCents
+    annualTotalCents
+    monthlyPriceId
+    annualPriceId
+  }
+}

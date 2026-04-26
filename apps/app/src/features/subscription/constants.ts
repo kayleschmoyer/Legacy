@@ -1,8 +1,3 @@
-export const MONTHLY_PRICE_DISPLAY = '$4.99';
-export const ANNUAL_PRICE_DISPLAY = '$39.99';
-export const ANNUAL_MONTHLY_EQUIVALENT = '$3.33';
-export const ANNUAL_SAVINGS_PCT = '33%';
-
 export type BillingCycle = 'monthly' | 'annual';
 
 export interface PremiumFeature {

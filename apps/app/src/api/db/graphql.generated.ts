@@ -5467,6 +5467,19 @@ export type CreateBillingPortalSessionMutation = {
   } | null;
 };
 
+export type GetStripePricesQueryVariables = Exact<{ [key: string]: never }>;
+
+export type GetStripePricesQuery = {
+  __typename?: 'Query';
+  stripePrices?: {
+    __typename?: 'StripePriceInfo';
+    monthlyPriceCents: number;
+    annualTotalCents: number;
+    monthlyPriceId: string;
+    annualPriceId: string;
+  } | null;
+};
+
 export type VerifyApplePurchaseMutationVariables = Exact<{
   jwsTransaction: Scalars['String']['input'];
 }>;
@@ -10212,6 +10225,94 @@ export type CreateBillingPortalSessionMutationResult =
 export type CreateBillingPortalSessionMutationOptions = BaseMutationOptions<
   CreateBillingPortalSessionMutation,
   CreateBillingPortalSessionMutationVariables
+>;
+export const GetStripePrices = gql`
+  query GetStripePrices {
+    stripePrices {
+      monthlyPriceCents
+      annualTotalCents
+      monthlyPriceId
+      annualPriceId
+    }
+  }
+`;
+
+/**
+ * __useGetStripePricesQuery__
+ *
+ * To run a query within a React component, call `useGetStripePricesQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetStripePricesQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetStripePricesQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useGetStripePricesQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    GetStripePricesQuery,
+    GetStripePricesQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<GetStripePricesQuery, GetStripePricesQueryVariables>(
+    GetStripePrices,
+    options,
+  );
+}
+export function useGetStripePricesLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetStripePricesQuery,
+    GetStripePricesQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetStripePricesQuery,
+    GetStripePricesQueryVariables
+  >(GetStripePrices, options);
+}
+export function useGetStripePricesSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetStripePricesQuery,
+        GetStripePricesQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetStripePricesQuery,
+    GetStripePricesQueryVariables
+  >(
+    GetStripePrices,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetStripePricesQuery,
+          GetStripePricesQueryVariables
+        >,
+  );
+}
+export type GetStripePricesQueryHookResult = ReturnType<
+  typeof useGetStripePricesQuery
+>;
+export type GetStripePricesLazyQueryHookResult = ReturnType<
+  typeof useGetStripePricesLazyQuery
+>;
+export type GetStripePricesSuspenseQueryHookResult = ReturnType<
+  typeof useGetStripePricesSuspenseQuery
+>;
+export type GetStripePricesQueryResult = Apollo.QueryResult<
+  GetStripePricesQuery,
+  GetStripePricesQueryVariables
 >;
 export const VerifyApplePurchase = gql`
   mutation VerifyApplePurchase($jwsTransaction: String!) {
