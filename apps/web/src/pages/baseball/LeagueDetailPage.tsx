@@ -3955,7 +3955,9 @@ export function LeagueDetailPage(): React.JSX.Element {
                     fontWeight: 800,
                     textTransform: 'uppercase',
                     letterSpacing: 0.5,
-                    lineHeight: 1.02,
+                    // String bypasses Tamagui's numeric→px conversion (lineHeight: 1.02 → "1.02px").
+                    // See .agents/skills/standards/references/tamagui-web-pitfalls.md
+                    lineHeight: '1.02' as unknown as number,
                   }}
                 >
                   {league.name}

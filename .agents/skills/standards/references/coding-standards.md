@@ -52,6 +52,9 @@ Standards derived from analysis of Copilot code review across recent merged PRs.
 | **Terraform** | S3 buckets: always add `abort_incomplete_multipart_upload` lifecycle rule                    | 2     |
 | **Terraform** | SNS publisher: restrict with `aws:SourceArn`, not just `aws:SourceAccount`                   | 2     |
 | **Terraform** | Don't store secrets in `secret_string` (persisted in TF state); use write-only               | 2     |
+| **Tamagui**   | Numeric `lineHeight` in `style` prop → `1px`; pass as `('1' as unknown as number)` string    | 3     |
+| **Tamagui**   | H1/Paragraph UA margins leak through Tamagui prop overrides; use `style={{ margin: 0 }}`     | 2     |
+| **Tamagui**   | `position: fixed/sticky` elements need a same-height `aria-hidden` spacer sibling            | 2     |
 
 ### Validation Before Push
 
@@ -62,6 +65,7 @@ All code must pass `make pc` before being pushed. This runs formatting, linting,
 ## Detailed Standards
 
 > Full catalog with code examples: [standards-catalog.md](standards-catalog.md)
+> Tamagui web pitfalls (overlapping content, lineHeight, UA margin leaks): [tamagui-web-pitfalls.md](tamagui-web-pitfalls.md)
 
 ### Security & Input Validation
 
