@@ -377,8 +377,10 @@ export function PlayerStatsPage({
                       ? ('clamp(40px, 4.4vw, 60px)' as unknown as number)
                       : 48,
                   // String bypasses Tamagui's numeric→px conversion (lineHeight: 1 → "1px").
+                  // Native uses absolute px; 48 = fontSize * 1 ratio.
                   // See .agents/skills/standards/references/tamagui-web-pitfalls.md
-                  lineHeight: '1' as unknown as number,
+                  lineHeight:
+                    Platform.OS === 'web' ? ('1' as unknown as number) : 48,
                   letterSpacing: '-0.02em',
                   color: '#FFFFFF',
                   margin: 0,
@@ -390,7 +392,8 @@ export function PlayerStatsPage({
                 style={{
                   fontFamily: FONT_BODY,
                   fontSize: 17,
-                  lineHeight: '1.55' as unknown as number,
+                  lineHeight:
+                    Platform.OS === 'web' ? ('1.55' as unknown as number) : 26,
                   color: FG3,
                   maxWidth: '64ch',
                   margin: 0,

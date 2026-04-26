@@ -452,7 +452,7 @@ const ProfileSettingsPage: React.FC = () => {
                         fontSize: 32,
                         fontWeight: '700',
                         color: 'white',
-                        lineHeight: 1,
+                        lineHeight: '1' as unknown as number,
                       }}
                     >
                       {userName.charAt(0).toUpperCase()}

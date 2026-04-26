@@ -637,7 +637,7 @@ export function PublicLandingPage(): React.JSX.Element {
                   fontWeight: '800',
                   fontSize: 14,
                   letterSpacing: '0.04em',
-                  lineHeight: 1,
+                  lineHeight: '1' as unknown as number,
                   color: BRAND_GOLD_LIGHT,
                 }}
               >
@@ -649,7 +649,7 @@ export function PublicLandingPage(): React.JSX.Element {
                   fontWeight: '700',
                   fontSize: 11,
                   letterSpacing: '0.16em',
-                  lineHeight: 1,
+                  lineHeight: '1' as unknown as number,
                   color: '#F8FAFC',
                 }}
               >
