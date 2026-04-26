@@ -503,6 +503,7 @@ test.describe
           id: number;
           firstName: string;
           lastName: string;
+          eligiblePositions: string[] | null;
         }>;
       }>(
         commissionerJwt,
@@ -511,6 +512,7 @@ test.describe
             id
             firstName
             lastName
+            eligiblePositions
           }
         }`,
         { leagueId: state.leagueId },
@@ -518,7 +520,33 @@ test.describe
 
       const players = data.freeAgents;
       expect(players.length).toBeGreaterThan(0);
-      const picked = players[0];
+
+      // The free-agents UI defaults to the "Hitters" tab (position filter =
+      // 'HITTER'). Pure pitchers (eligiblePositions containing only pitching
+      // slots) are excluded from that view. submitWaiverClaimViaUI does not
+      // switch tabs, so picking a pitcher would still fail with a missing
+      // Add-button error. Require a hitter here so failures are explicit
+      // rather than surfacing later as a cryptic missing-button error.
+      //
+      // Mirrors the canonical pitcher set in @legacy-sports/utils
+      // (PITCHING_POSITIONS = {SP, RP, P}); inlined to avoid a cross-package
+      // import that web-e2e's lint configuration cannot resolve.
+      const PITCHER_POSITIONS: ReadonlySet<string> = new Set(['SP', 'RP', 'P']);
+      const isHitter = (p: { eligiblePositions: string[] | null }) => {
+        const positions = p.eligiblePositions ?? [];
+        return (
+          positions.length === 0 ||
+          positions.some((pos) => !PITCHER_POSITIONS.has(pos))
+        );
+      };
+      const picked = players.find(isHitter);
+
+      expect(
+        picked,
+        'Expected at least one hitter free agent because the waiver-claim UI helper only uses the default Hitters tab.',
+      ).toBeTruthy();
+      if (!picked) return; // unreachable — expect above throws; narrows TS type
+
       state.freeAgentPlayerId = picked.id;
       state.freeAgentPlayerName =
         `${picked.firstName} ${picked.lastName}`.trim();
