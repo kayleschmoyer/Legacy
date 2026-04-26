@@ -240,6 +240,11 @@ test.describe
       let pickCount = 0;
       const maxPicks = 200;
       let consecutiveMisses = 0;
+      // Prevent reload death spiral: only reload once per consecutive-miss
+      // streak. Without this guard, every iteration from miss 16 to 30
+      // triggers a full page reload, blocking picks for 75-150 s total and
+      // causing the draft to abort before all picks are made (LS-3833).
+      let hasReloadedThisStreak = false;
       // Track players drafted this session so we never click a button for an
       // already-drafted player whose card is still visible due to WebSocket /
       // Apollo update lag.  Without this guard the test can get a false
@@ -342,6 +347,7 @@ test.describe
           if (wasAccepted) {
             pickCount++;
             consecutiveMisses = 0;
+            hasReloadedThisStreak = false;
             // eslint-disable-next-line no-console
             console.log(
               `[live-draft] Pick #${pickCount} by ${label} accepted — ${ariaLabel}`,
@@ -381,8 +387,12 @@ test.describe
             );
             break;
           }
-          if (consecutiveMisses > 15) {
-            // Reload all pages to resync state
+          if (consecutiveMisses > 15 && !hasReloadedThisStreak) {
+            // Reload all pages to resync state — but only ONCE per streak.
+            // Guard flag prevents the death spiral where every iteration from
+            // miss 16 to 30 triggers a reload, blocking picks for 75-150 s
+            // and causing the draft to abort incomplete (LS-3833).
+            hasReloadedThisStreak = true;
             // eslint-disable-next-line no-console
             console.log('[live-draft] Reloading all pages...');
             for (const { page } of pages) {

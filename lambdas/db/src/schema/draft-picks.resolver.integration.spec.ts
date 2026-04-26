@@ -547,4 +547,89 @@ describe('Draft Picks - Integration Tests', () => {
       expect(matchupRows).toHaveLength(0);
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // LS-3833: Regression integration tests for isDraftComplete boundary and
+  // draftCompletedAt persistence. Two rounds of E2E fixes (LS-3815, LS-3823)
+  // passed CI but the "Draft Complete!" banner still failed because the E2E
+  // test's reload death spiral prevented all picks from being made — so
+  // draftCompletedAt was never written. These integration tests pin the
+  // server-side contract so it never silently regresses.
+  describe('Draft completion — draftCompletedAt and draftStatus (LS-3833)', () => {
+    it('sets draftCompletedAt and draftStatus=completed on the final pick (overallPick === totalPicks)', async () => {
+      // 2 teams × 2 roster slots = 4 total picks; pick 4 is the final pick.
+      const {
+        league,
+        teams: teamFix,
+        draft,
+        players: playerFix,
+      } = await seedDraftFixture(2);
+
+      await commitDraftPick({
+        tx: db as unknown as PublicDb,
+        draftId: draft.id,
+        leagueId: league.id,
+        pickInfo: {
+          teamId: teamFix[0].id, // snake draft: pick 4 (round 2, pick 2) goes back to team 0
+          round: 2,
+          pickNumber: 2,
+          overallPick: 4, // equals totalPicks (2 teams × 2 slots)
+        },
+        playerId: playerFix[0].id,
+        maxRosterSize: 2,
+        pickTimeLimitSeconds: 60,
+        isMockDraft: false,
+      });
+
+      const [updatedDraft] = await db
+        .select()
+        .from(drafts)
+        .where(eq(drafts.id, draft.id));
+      expect(updatedDraft.draftCompletedAt).not.toBeNull();
+
+      const [updatedLeague] = await db
+        .select()
+        .from(leagues)
+        .where(eq(leagues.id, league.id));
+      expect(updatedLeague.draftStatus).toBe('completed');
+    });
+
+    it('does NOT set draftCompletedAt on a non-final pick (overallPick < totalPicks)', async () => {
+      // Pick 3 of 4 — one more pick remains; draft must NOT be marked complete.
+      const {
+        league,
+        teams: teamFix,
+        draft,
+        players: playerFix,
+      } = await seedDraftFixture(2);
+
+      await commitDraftPick({
+        tx: db as unknown as PublicDb,
+        draftId: draft.id,
+        leagueId: league.id,
+        pickInfo: {
+          teamId: teamFix[1].id, // snake draft: pick 3 (round 2, pick 1) is team 1
+          round: 2,
+          pickNumber: 1,
+          overallPick: 3, // less than totalPicks (2 teams × 2 slots = 4)
+        },
+        playerId: playerFix[0].id,
+        maxRosterSize: 2,
+        pickTimeLimitSeconds: 60,
+        isMockDraft: false,
+      });
+
+      const [updatedDraft] = await db
+        .select()
+        .from(drafts)
+        .where(eq(drafts.id, draft.id));
+      expect(updatedDraft.draftCompletedAt).toBeNull();
+
+      const [updatedLeague] = await db
+        .select()
+        .from(leagues)
+        .where(eq(leagues.id, league.id));
+      expect(updatedLeague.draftStatus).not.toBe('completed');
+    });
+  });
 });
