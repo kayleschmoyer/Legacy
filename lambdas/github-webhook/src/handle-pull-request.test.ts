@@ -43,7 +43,7 @@ beforeEach(() => {
   mockGetRepoInstallationToken.mockResolvedValue('tok-test');
   mockGetPrReviews.mockResolvedValue([]);
   mockCreateCheckRun.mockResolvedValue(undefined);
-  mockRequestCopilotReview.mockResolvedValue(undefined);
+  mockRequestCopilotReview.mockResolvedValue({ added: true });
   mockAddLabel.mockResolvedValue(undefined);
   mockEnqueueRaceCheck.mockResolvedValue(undefined);
 });

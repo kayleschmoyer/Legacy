@@ -1,9 +1,11 @@
 import {
   createCheckRun,
+  getCommitTreeSha,
   getInstallationToken,
   getPrReviewThreads,
   getRepoInstallationToken,
   listPullRequestsForCommit,
+  requestCopilotReview,
 } from './github-app';
 
 jest.mock('jsonwebtoken', () => ({ sign: jest.fn(() => 'mock-jwt') }));
@@ -465,5 +467,185 @@ describe('listPullRequestsForCommit', () => {
     await expect(
       listPullRequestsForCommit(MOCK_TOKEN, 'owner', 'repo', 'abc1234'),
     ).rejects.toThrow('404');
+  });
+});
+
+// ── requestCopilotReview ──────────────────────────────────────────────────────
+
+describe('requestCopilotReview', () => {
+  it('returns added=true when Copilot appears in requested_reviewers', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 201,
+      json: () =>
+        Promise.resolve({
+          requested_reviewers: [{ login: 'Copilot' }],
+        }),
+    });
+
+    const result = await requestCopilotReview(MOCK_TOKEN, 'owner', 'repo', 42);
+
+    expect(result.added).toBe(true);
+    const [url, opts] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(
+      'https://api.github.com/repos/owner/repo/pulls/42/requested_reviewers',
+    );
+    expect(opts.method).toBe('POST');
+    expect(JSON.parse(opts.body as string)).toEqual({
+      reviewers: ['copilot-pull-request-reviewer[bot]'],
+    });
+  });
+
+  it('accepts the bot-suffixed login form returned by some endpoints', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 201,
+      json: () =>
+        Promise.resolve({
+          requested_reviewers: [
+            { login: 'copilot-pull-request-reviewer[bot]' },
+          ],
+        }),
+    });
+
+    const result = await requestCopilotReview(MOCK_TOKEN, 'owner', 'repo', 42);
+
+    expect(result.added).toBe(true);
+  });
+
+  it('returns added=false when Copilot is silently dropped (installation token)', async () => {
+    // Real failure mode: GitHub returns 201 OK but Copilot is missing from
+    // the response. The Lambda's installation token is the documented cause.
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 201,
+      json: () => Promise.resolve({ requested_reviewers: [] }),
+    });
+
+    const result = await requestCopilotReview(MOCK_TOKEN, 'owner', 'repo', 42);
+
+    expect(result.added).toBe(false);
+    if (!result.added) {
+      expect(result.kind).toBe('silent-drop');
+      expect(result.reason).toMatch(/silently drop/);
+    }
+  });
+
+  it('returns kind=unparseable-response when the response body is unparseable', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 201,
+      json: () => Promise.reject(new Error('bad json')),
+    });
+
+    const result = await requestCopilotReview(MOCK_TOKEN, 'owner', 'repo', 42);
+
+    expect(result.added).toBe(false);
+    if (!result.added) {
+      expect(result.kind).toBe('unparseable-response');
+      expect(result.reason).toMatch(/could not be parsed/);
+    }
+  });
+
+  it('returns kind=http-422 on HTTP 422 without throwing', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 422,
+      text: () => Promise.resolve('already requested'),
+    });
+
+    const result = await requestCopilotReview(MOCK_TOKEN, 'owner', 'repo', 42);
+
+    expect(result.added).toBe(false);
+    if (!result.added) {
+      expect(result.kind).toBe('http-422');
+      expect(result.reason).toMatch(/422/);
+    }
+  });
+
+  it('throws on other non-2xx responses', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      text: () => Promise.resolve('boom'),
+    });
+
+    await expect(
+      requestCopilotReview(MOCK_TOKEN, 'owner', 'repo', 42),
+    ).rejects.toThrow('500');
+  });
+});
+
+// ── getCommitTreeSha ──────────────────────────────────────────────────────────
+
+describe('getCommitTreeSha', () => {
+  it('returns the tree SHA for a known commit', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          commit: { tree: { sha: 'tree-sha-123' } },
+        }),
+    });
+
+    const tree = await getCommitTreeSha(
+      MOCK_TOKEN,
+      'owner',
+      'repo',
+      'commit-sha',
+    );
+
+    expect(tree).toBe('tree-sha-123');
+    const [url] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(
+      'https://api.github.com/repos/owner/repo/commits/commit-sha',
+    );
+  });
+
+  it('returns null when the commit does not exist (404)', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      text: () => Promise.resolve('Not Found'),
+    });
+
+    const tree = await getCommitTreeSha(
+      MOCK_TOKEN,
+      'owner',
+      'repo',
+      'missing-sha',
+    );
+
+    expect(tree).toBeNull();
+  });
+
+  it('returns null on 422 (e.g. force-pushed away)', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 422,
+      text: () => Promise.resolve('Unprocessable'),
+    });
+
+    const tree = await getCommitTreeSha(
+      MOCK_TOKEN,
+      'owner',
+      'repo',
+      'gone-sha',
+    );
+
+    expect(tree).toBeNull();
+  });
+
+  it('throws on other non-2xx responses', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      text: () => Promise.resolve('boom'),
+    });
+
+    await expect(
+      getCommitTreeSha(MOCK_TOKEN, 'owner', 'repo', 'sha'),
+    ).rejects.toThrow('500');
   });
 });

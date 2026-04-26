@@ -437,15 +437,55 @@ export async function createInProgressCheckRun(
 }
 
 /**
+ * Logins GitHub may return for Copilot in the `requested_reviewers` response.
+ * The REST API normalizes the bot name to "Copilot" in the response even
+ * though we send "copilot-pull-request-reviewer[bot]" in the request.
+ */
+const COPILOT_RESPONSE_LOGINS = new Set([
+  'Copilot',
+  'copilot-pull-request-reviewer',
+  'copilot-pull-request-reviewer[bot]',
+]);
+
+/**
+ * Result of a `requestCopilotReview` call. The `kind` discriminates the
+ * `added: false` cases so callers (and operators reading logs) don't conflate
+ * GitHub's documented installation-token silent-drop with HTTP 422 ("already
+ * reviewing") or an unexpected response shape:
+ *
+ *   - `'silent-drop'`     201 OK, response parsed, Copilot absent from
+ *                         `requested_reviewers`. The documented failure mode
+ *                         for installation tokens.
+ *   - `'http-422'`        Non-fatal validation error from GitHub. Often means
+ *                         Copilot is already a reviewer.
+ *   - `'unparseable-response'`
+ *                         201 OK but the body could not be parsed as JSON.
+ *                         Could indicate API-shape drift or a transient
+ *                         truncation, so we don't assume the silent-drop cause.
+ */
+export type CopilotReviewRequestResult =
+  | { added: true }
+  | {
+      added: false;
+      kind: 'silent-drop' | 'http-422' | 'unparseable-response';
+      reason: string;
+    };
+
+/**
  * Request Copilot as a reviewer on a PR. Idempotent — safe to call when
  * Copilot is already in requested_reviewers.
+ *
+ * Verifies the response includes Copilot in `requested_reviewers`. GitHub's
+ * REST API silently drops Copilot when called with a GitHub App installation
+ * token — it returns HTTP 201 success but the reviewer never appears in the
+ * response. Callers should branch on `added` rather than assume success.
  */
 export async function requestCopilotReview(
   installationToken: string,
   owner: string,
   repo: string,
   prNumber: number,
-): Promise<void> {
+): Promise<CopilotReviewRequestResult> {
   const resp = await fetch(
     `${GITHUB_API}/repos/${owner}/${repo}/pulls/${prNumber}/requested_reviewers`,
     {
@@ -476,14 +516,101 @@ export async function requestCopilotReview(
           body,
         },
       );
-      return;
+      return { added: false, kind: 'http-422', reason: `HTTP 422: ${body}` };
     }
     throw new Error(
       `Failed to request Copilot review (${resp.status}): ${body}`,
     );
   }
 
+  // GitHub's REST API silently drops Copilot when called with an installation
+  // token: 201 OK but Copilot is missing from `requested_reviewers`. Parse the
+  // response to detect this — but a body that fails to parse is a different
+  // failure mode (API-shape drift, truncation) and should be reported as such
+  // rather than misattributed to the installation-token bug.
+  let parsedAddedLogins: string[] | null = null;
+  let parseError: unknown = null;
+  try {
+    const data = (await resp.json()) as {
+      requested_reviewers?: Array<{ login: string }>;
+    };
+    parsedAddedLogins = (data.requested_reviewers ?? []).map((r) => r.login);
+  } catch (err) {
+    parseError = err;
+  }
+
+  if (parsedAddedLogins === null) {
+    LOGGER.warn('Failed to parse requested_reviewers response body', {
+      owner,
+      repo,
+      prNumber,
+      error:
+        parseError instanceof Error ? parseError.message : String(parseError),
+    });
+    return {
+      added: false,
+      kind: 'unparseable-response',
+      reason: 'GitHub returned 201 but the response body could not be parsed',
+    };
+  }
+
+  const added = parsedAddedLogins.some((login) =>
+    COPILOT_RESPONSE_LOGINS.has(login),
+  );
+
+  if (!added) {
+    LOGGER.warn(
+      'Copilot was silently dropped from requested_reviewers — installation tokens cannot trigger Copilot via the REST API',
+      { owner, repo, prNumber },
+    );
+    return {
+      added: false,
+      kind: 'silent-drop',
+      reason:
+        'GitHub returned 201 but Copilot was not added — installation tokens silently drop the Copilot reviewer',
+    };
+  }
+
   LOGGER.info('Requested Copilot review', { owner, repo, prNumber });
+  return { added: true };
+}
+
+/**
+ * Fetch the git tree SHA for a commit. Two commits with the same tree SHA
+ * have byte-identical file contents, so any patch produced against a common
+ * base is also identical. Used by the race-check carry-forward to detect
+ * empty commits (and other rebases that preserve content) — there is nothing
+ * for Copilot to re-review when the tree hasn't changed.
+ *
+ * Returns null when the commit no longer exists (e.g. force-pushed away).
+ */
+export async function getCommitTreeSha(
+  installationToken: string,
+  owner: string,
+  repo: string,
+  commitSha: string,
+): Promise<string | null> {
+  const resp = await fetch(
+    `${GITHUB_API}/repos/${owner}/${repo}/commits/${commitSha}`,
+    {
+      headers: {
+        Authorization: `Bearer ${installationToken}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    },
+  );
+
+  if (resp.status === 404 || resp.status === 422) return null;
+
+  if (!resp.ok) {
+    const body = await resp.text();
+    throw new Error(`Failed to get commit (${resp.status}): ${body}`);
+  }
+
+  const data = (await resp.json()) as { commit: { tree: { sha: string } } };
+  return data.commit.tree.sha;
 }
 
 /**
