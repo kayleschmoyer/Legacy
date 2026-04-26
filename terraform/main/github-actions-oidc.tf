@@ -98,7 +98,13 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "lambda:PutFunctionConcurrency",
           "lambda:DeleteFunctionConcurrency",
           "lambda:PutFunctionEventInvokeConfig",
-          "lambda:DeleteFunctionEventInvokeConfig"
+          "lambda:DeleteFunctionEventInvokeConfig",
+          # Function URL lifecycle (required for mcp-jira and any future
+          # Lambda exposed via a direct function URL).
+          "lambda:CreateFunctionUrlConfig",
+          "lambda:GetFunctionUrlConfig",
+          "lambda:UpdateFunctionUrlConfig",
+          "lambda:DeleteFunctionUrlConfig"
         ]
         Resource = [
           "arn:aws:lambda:${local.region}:${local.account_id}:function:${local.name_prefix}-*"
@@ -427,6 +433,32 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "arn:aws:sqs:${local.region}:${local.account_id}:${local.name_prefix}-*"
         ]
       },
+      # sqs:ListQueues does not support resource-level permissions — it must
+      # use Resource "*". Splitting it into its own statement avoids
+      # AccessDenied during terraform plan/refresh (same pattern as
+      # logs:DescribeLogGroups above).
+      {
+        Effect   = "Allow"
+        Action   = ["sqs:ListQueues"]
+        Resource = "*"
+      },
+      # SQS write permissions for Terraform apply (creating queues, DLQs,
+      # and the github-webhook race-check queue introduced in LS-3838).
+      # SetQueueAttributes is required for visibility-timeout and redrive
+      # policy updates; Tag/UntagQueue is required for resource tagging.
+      {
+        Effect = "Allow"
+        Action = [
+          "sqs:CreateQueue",
+          "sqs:DeleteQueue",
+          "sqs:SetQueueAttributes",
+          "sqs:TagQueue",
+          "sqs:UntagQueue"
+        ]
+        Resource = [
+          "arn:aws:sqs:${local.region}:${local.account_id}:${local.name_prefix}-*"
+        ]
+      },
       # Route 53 read permissions
       {
         Effect = "Allow"
@@ -476,13 +508,21 @@ resource "aws_iam_role_policy" "github_actions_additional" {
       },
       # API Gateway write permissions for Terraform apply (integration responses, methods, domains, account, etc.)
       # /apis (no wildcard) is required for POST when creating new HTTP APIs (apigatewayv2_api).
+      #
+      # `apigateway:TagResource`/`UntagResource` are the explicit IAM-managed
+      # tagging actions used by terraform-provider-aws when calling
+      # ApiGatewayV2 `CreateStage` / `TagResource`; PUT on /tags/* alone is
+      # insufficient for the v2 API. Required for the MCP API GW v2 stages
+      # (ci/jira/github) to apply.
       {
         Effect = "Allow"
         Action = [
           "apigateway:PUT",
           "apigateway:POST",
           "apigateway:PATCH",
-          "apigateway:DELETE"
+          "apigateway:DELETE",
+          "apigateway:TagResource",
+          "apigateway:UntagResource"
         ]
         Resource = [
           "arn:aws:apigateway:${local.region}::/restapis/*",
@@ -740,6 +780,7 @@ resource "aws_iam_policy" "github_actions_supplemental" {
           "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/discord-stripe-webhook-url*",
           "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/ga-api-secret*",
           "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/rollbar-access-token*",
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/mcp-github-token*",
         ]
       }
     ]
