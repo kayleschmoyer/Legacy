@@ -18,6 +18,7 @@ Covers all infrastructure operations: AWS authentication, Terraform changes, Lam
 | AWS credentials expired                                   | [references/aws-sso-login.md](references/aws-sso-login.md)                             |
 | Deploy Lambda code                                        | [references/deploy-lambda.md](references/deploy-lambda.md)                             |
 | Terraform infrastructure changes                          | [references/terraform-apply.md](references/terraform-apply.md)                         |
+| Add IAM permissions to the github-actions deploy role     | [references/iam-policies.md](references/iam-policies.md)                               |
 | Clean up orphaned AWS resources                           | [references/aws-orphan-cleanup.md](references/aws-orphan-cleanup.md)                   |
 | Configure Sentry sourcemaps                               | [references/configure-sentry-sourcemaps.md](references/configure-sentry-sourcemaps.md) |
 | Read CloudWatch Lambda logs                               | [references/cloudwatch-logs.md](references/cloudwatch-logs.md)                         |
@@ -81,6 +82,7 @@ See [references/terraform-common-issues.md](references/terraform-common-issues.m
 - [references/deploy-lambda.md](references/deploy-lambda.md) — Lambda deployment prerequisites and workflow
 - [references/deployment-guide.md](references/deployment-guide.md) — Deployment troubleshooting, rollback, monitoring
 - [references/terraform-apply.md](references/terraform-apply.md) — Terraform commands, workflows, CI/CD IAM
+- [references/iam-policies.md](references/iam-policies.md) — Adding IAM permissions to the github-actions deploy role; size limits, supplemental-policy convention, resource-level gotchas
 - [references/terraform-common-issues.md](references/terraform-common-issues.md) — State locks, credentials, drift, S3 path issues
 - [references/terraform-state-and-operations.md](references/terraform-state-and-operations.md) — State management, file structure, sensitive resources
 - [references/aws-orphan-cleanup.md](references/aws-orphan-cleanup.md) — Audit and clean up untracked AWS resources

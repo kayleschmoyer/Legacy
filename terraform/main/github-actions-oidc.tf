@@ -58,7 +58,14 @@ resource "aws_iam_role_policy_attachment" "github_actions_lambda_deployment" {
   policy_arn = aws_iam_policy.lambda_deployment_policy.arn
 }
 
-# Additional permissions for GitHub Actions
+# Additional permissions for GitHub Actions.
+#
+# *** READ BEFORE EDITING ***
+# This is an INLINE policy with a 10,240-byte AWS limit. It is effectively
+# closed for new statements — add new permissions to the
+# `github_actions_supplemental` managed policy below instead.
+# Run `python scripts/check-iam-policy-size.py` before pushing any change to
+# this file. See `.agents/skills/infrastructure/references/iam-policies.md`.
 resource "aws_iam_role_policy" "github_actions_additional" {
   name = "${local.name_prefix}-github-actions-additional"
   role = aws_iam_role.github_actions.id
@@ -607,6 +614,13 @@ import {
   id = "${local.name_prefix}-github-actions/arn:aws:iam::${local.account_id}:policy/${local.name_prefix}-github-actions-supplemental"
 }
 
+# Supplemental managed policy attached to the same role as
+# `github_actions_additional`. **Default home for new permissions.**
+# AWS limits: inline role policies 10,240 bytes; managed policy versions
+# 6,144 bytes. The inline policy is currently >90% full, so even though
+# this managed policy has a smaller hard limit, it has more remaining
+# headroom in this repo. Run `python scripts/check-iam-policy-size.py`
+# before pushing. See `.agents/skills/infrastructure/references/iam-policies.md`.
 resource "aws_iam_policy" "github_actions_supplemental" {
   name        = "${local.name_prefix}-github-actions-supplemental"
   description = "Supplemental permissions for GitHub Actions OIDC role (overflow from 10KB inline policy limit)"
