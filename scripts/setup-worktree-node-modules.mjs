@@ -21,6 +21,7 @@ import {
   lstatSync,
   readdirSync,
   realpathSync,
+  readFileSync,
   rmSync,
   symlinkSync,
   readlinkSync,
@@ -207,6 +208,22 @@ if (existsSync(nmPath) || lstatExistsSync(nmPath)) {
         nxExists && binPopulated && isSymlinkAccessibleOnWindows(nmPath);
 
       if (healthy) {
+        const vsdCheck = checkVirtualStoreDir(nmPath, mainRepo);
+        if (!vsdCheck.ok) {
+          const detail =
+            vsdCheck.reason === 'points outside main repo node_modules'
+              ? 'points to a sibling worktree (pnpm install ran there last, corrupting this repo)'
+              : 'path no longer exists on disk';
+          console.error(
+            '[ERROR] node_modules symlink exists but pnpm exec paths are corrupted.\n' +
+              `  .modules.yaml virtualStoreDir = ${vsdCheck.virtualStoreDir}\n` +
+              `  Problem: ${detail}.\n` +
+              '\n' +
+              '  Fix: run "make install" in the main repo to rebuild node_modules:\n' +
+              `    cd "${mainRepo}" && make install`,
+          );
+          process.exit(1);
+        }
         console.log(
           '[ok] node_modules symlink already exists and is healthy. Nothing to do.',
         );
@@ -330,4 +347,83 @@ function lstatExistsSync(p) {
   } catch {
     return false;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Utility: validate virtualStoreDir in node_modules/.modules.yaml
+// ---------------------------------------------------------------------------
+/**
+ * Reads .modules.yaml and validates the declared virtualStoreDir. Returns
+ * { ok: true } if the check passes or is skipped (file absent, field absent,
+ * or unreadable). Returns { ok: false, virtualStoreDir, reason } when the
+ * declared path does not exist on disk or resolves outside the main repo's
+ * node_modules (e.g., a stale sibling-worktree reference) — callers must
+ * treat this as unhealthy.
+ */
+function checkVirtualStoreDir(nmPath, mainRepo) {
+  const modulesYamlPath = join(nmPath, '.modules.yaml');
+  if (!existsSync(modulesYamlPath)) return { ok: true };
+
+  let content;
+  try {
+    content = readFileSync(modulesYamlPath, 'utf-8');
+  } catch {
+    return { ok: true };
+  }
+
+  // Simple line-based parse — avoids a yaml-parser dependency.
+  const match = content.match(/^virtualStoreDir:\s*(.+)$/m);
+  if (!match) return { ok: true };
+
+  const rawVsd = match[1].trim().replace(/^['"]|['"]$/g, '');
+
+  // pnpm may write virtualStoreDir as a relative path (relative to node_modules).
+  // Resolve against mainNmPath (the real node_modules location), not the worktree
+  // symlink path, so relative entries resolve correctly regardless of CWD.
+  const mainNmPath = join(mainRepo, 'node_modules');
+  const absoluteVsd = resolve(mainNmPath, rawVsd);
+
+  // Check 1: path must exist on disk.
+  if (!existsSync(absoluteVsd)) {
+    return {
+      ok: false,
+      virtualStoreDir: rawVsd,
+      reason: 'path does not exist',
+    };
+  }
+
+  // Check 2: must be under main repo node_modules, not a sibling worktree.
+  // A stale pointer to a sibling worktree's .pnpm store corrupts pnpm exec even
+  // when the sibling still exists on disk (pnpm uses the raw path for resolution,
+  // not the resolved real path). Use resolve() — not realpathSync() — to avoid
+  // following junctions that mask sibling-worktree references.
+  const normalizeRaw = (p) => {
+    let n = resolve(p);
+    if (process.platform === 'win32') {
+      if (n.startsWith('\\\\?\\')) n = n.slice(4);
+      n = n.toLowerCase();
+    }
+    return n;
+  };
+
+  const pathSep = process.platform === 'win32' ? '\\' : '/';
+  const normalizedVsd = normalizeRaw(absoluteVsd);
+  const normalizedMainNm = normalizeRaw(mainNmPath);
+  // Use a path-separator boundary to prevent false positives from paths that
+  // share a common prefix (e.g. .../node_modules-backup/...).
+  const mainNmPrefix = normalizedMainNm.endsWith(pathSep)
+    ? normalizedMainNm
+    : normalizedMainNm + pathSep;
+  if (
+    normalizedVsd !== normalizedMainNm &&
+    !normalizedVsd.startsWith(mainNmPrefix)
+  ) {
+    return {
+      ok: false,
+      virtualStoreDir: rawVsd,
+      reason: 'points outside main repo node_modules',
+    };
+  }
+
+  return { ok: true, virtualStoreDir: rawVsd };
 }
