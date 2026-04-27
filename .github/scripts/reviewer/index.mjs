@@ -1,4 +1,9 @@
-import { getPullRequestContext, postShadowComment } from './lib/github.mjs';
+import {
+  getPullRequestContext,
+  postShadowComment,
+  addLabel,
+  removeLabel,
+} from './lib/github.mjs';
 import {
   parseFindingsFromText,
   gateFindingsBySeverity,
@@ -7,8 +12,9 @@ import {
 import { buildSystemPrompt, buildUserPrompt } from './lib/prompts/system.mjs';
 import { isTrivialPR, runMultiPass } from './lib/multi-pass.mjs';
 import { consolidate } from './lib/consolidator.mjs';
-import { postRealReview } from './lib/post-review.mjs';
+import { postRealReview, postInfraErrorReview } from './lib/post-review.mjs';
 import { buildRecord, emitTelemetry } from './lib/telemetry.mjs';
+import { withRetry } from './lib/retry.mjs';
 
 async function main() {
   const prNumber = Number(process.env.PR_NUMBER);
@@ -103,18 +109,18 @@ async function main() {
     );
     try {
       const t0 = Date.now();
-      const result = await provider.review({
-        system: systemPrompt,
-        user: userPrompt,
-      });
+      const result = await withRetry(() =>
+        provider.review({ system: systemPrompt, user: userPrompt }),
+      );
       latencyMs = Date.now() - t0;
       reviewText = result.text;
       reviewUsage = result.usage ?? reviewUsage;
     } catch (err) {
       process.stderr.write(
-        `[reviewer] Provider error: ${err instanceof Error ? err.message : String(err)}\n`,
+        `[reviewer] Provider error after all retries: ${err instanceof Error ? err.message : String(err)}\n`,
       );
-      process.exit(0);
+      await handleLlmInfraFailure(prNumber);
+      process.exit(1);
     }
   } else {
     process.stdout.write(
@@ -122,19 +128,18 @@ async function main() {
     );
     try {
       const t0 = Date.now();
-      const { passes, usage: multiPassUsage } = await runMultiPass(
-        provider,
-        systemPrompt,
-        userPrompt,
+      const { passes, usage: multiPassUsage } = await withRetry(() =>
+        runMultiPass(provider, systemPrompt, userPrompt),
       );
       latencyMs = Date.now() - t0;
       reviewText = consolidate(passes);
       reviewUsage = multiPassUsage;
     } catch (err) {
       process.stderr.write(
-        `[reviewer] Multi-pass error: ${err instanceof Error ? err.message : String(err)}\n`,
+        `[reviewer] Multi-pass error after all retries: ${err instanceof Error ? err.message : String(err)}\n`,
       );
-      process.exit(0);
+      await handleLlmInfraFailure(prNumber);
+      process.exit(1);
     }
   }
 
@@ -236,6 +241,38 @@ async function main() {
       );
       process.exit(0);
     }
+    for (const label of ['bot:ready-for-review', 'review-bot-degraded']) {
+      try {
+        removeLabel(prNumber, label);
+      } catch (err) {
+        process.stderr.write(
+          `[reviewer] Failed to remove label '${label}': ${err instanceof Error ? err.message : String(err)}\n`,
+        );
+      }
+    }
+  }
+}
+
+/**
+ * Fail-closed handler: post REQUEST_CHANGES infra error review and apply the
+ * review-bot-degraded label so the labeled trigger can self-heal on retry.
+ *
+ * @param {number} prNumber
+ */
+async function handleLlmInfraFailure(prNumber) {
+  try {
+    await postInfraErrorReview(prNumber);
+  } catch (err) {
+    process.stderr.write(
+      `[reviewer] Failed to post infra error review: ${err instanceof Error ? err.message : String(err)}\n`,
+    );
+  }
+  try {
+    addLabel(prNumber, 'review-bot-degraded');
+  } catch (err) {
+    process.stderr.write(
+      `[reviewer] Failed to apply review-bot-degraded label: ${err instanceof Error ? err.message : String(err)}\n`,
+    );
   }
 }
 

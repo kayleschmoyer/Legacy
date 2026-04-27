@@ -2,6 +2,50 @@ import { execFileSync } from 'node:child_process';
 
 const SHADOW_MARKER = '<!-- reviewer-bot:shadow -->';
 
+/**
+ * Add a label to a PR/issue.
+ *
+ * @param {number} prNumber
+ * @param {string} label
+ */
+export function addLabel(prNumber, label) {
+  execFileSync(
+    'gh',
+    [
+      'api',
+      `repos/{owner}/{repo}/issues/${prNumber}/labels`,
+      '-X',
+      'POST',
+      '--input',
+      '-',
+    ],
+    { encoding: 'utf8', input: JSON.stringify({ labels: [label] }) },
+  );
+}
+
+/**
+ * Remove a label from a PR/issue. Silently ignores 404 (label not present).
+ *
+ * @param {number} prNumber
+ * @param {string} label
+ */
+export function removeLabel(prNumber, label) {
+  try {
+    execFileSync(
+      'gh',
+      [
+        'api',
+        `repos/{owner}/{repo}/issues/${prNumber}/labels/${encodeURIComponent(label)}`,
+        '-X',
+        'DELETE',
+      ],
+      { encoding: 'utf8' },
+    );
+  } catch (err) {
+    if (!/HTTP 404|404 Not Found/.test(String(err))) throw err;
+  }
+}
+
 const PR_FIELDS = [
   'number',
   'title',

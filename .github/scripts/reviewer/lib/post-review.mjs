@@ -244,3 +244,64 @@ export async function postRealReview(prNumber, { blocking, nonBlocking }) {
     `[reviewer] Real review posted (${event}): ${blockingWithIds.length} blocking, ${nonBlockingWithIds.length} non-blocking inline\n`,
   );
 }
+
+/**
+ * Post a REQUEST_CHANGES review indicating a persistent LLM API failure.
+ * Uses the same GitHub App authentication as postRealReview so the review
+ * appears from the bot account.
+ *
+ * @param {number} prNumber
+ */
+export async function postInfraErrorReview(prNumber) {
+  const appId = process.env.REVIEWER_BOT_APP_ID;
+  const privateKeyPem = process.env.REVIEWER_BOT_APP_PRIVATE_KEY;
+
+  if (!appId || !privateKeyPem) {
+    throw new Error(
+      'REVIEWER_BOT_APP_ID and REVIEWER_BOT_APP_PRIVATE_KEY must be set for live review mode',
+    );
+  }
+
+  const repoEnv = process.env.GITHUB_REPOSITORY;
+  if (!repoEnv || !repoEnv.includes('/')) {
+    throw new Error(
+      'GITHUB_REPOSITORY env var is required for live review mode',
+    );
+  }
+  const [owner, repo] = repoEnv.split('/');
+
+  const jwt = mintAppJwt(appId, privateKeyPem);
+  const installToken = await getInstallationToken(jwt, owner, repo);
+
+  const body =
+    '## Review bot infrastructure error\n\n' +
+    'The automated review could not complete due to a persistent LLM API failure (3 retries exhausted).\n\n' +
+    'Apply the `bot:ready-for-review` label to re-trigger, or request a human review.';
+
+  const payload = JSON.stringify({
+    body,
+    event: 'REQUEST_CHANGES',
+    comments: [],
+  });
+
+  execFileSync(
+    'gh',
+    [
+      'api',
+      '--method',
+      'POST',
+      `repos/{owner}/{repo}/pulls/${prNumber}/reviews`,
+      '--input',
+      '-',
+    ],
+    {
+      encoding: 'utf8',
+      input: payload,
+      env: { ...process.env, GH_TOKEN: installToken },
+    },
+  );
+
+  process.stdout.write(
+    `[reviewer] Infra error review posted on PR #${prNumber}\n`,
+  );
+}
