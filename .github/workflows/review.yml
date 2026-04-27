@@ -56,8 +56,8 @@ jobs:
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           LLM_PROVIDER: copilot-cli
           REVIEWER_MODEL: codex
-          REVIEWER_BOT_APP_ID: ${{ vars.REVIEWER_BOT_APP_ID }}
-          REVIEWER_BOT_APP_PRIVATE_KEY: ${{ secrets.REVIEWER_BOT_APP_PRIVATE_KEY }}
+          REVIEWER_BOT_APP_ID: ${{ vars.REVIEWER_BOT_APP_ID || '3142924' }}
+          REVIEWER_BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           REVIEWER_TELEMETRY_BUCKET: ${{ vars.REVIEWER_TELEMETRY_BUCKET || 'legacy-sports-dev-reviewer-telemetry' }}
         run: |
           if [ -f .github/scripts/reviewer/index.mjs ]; then

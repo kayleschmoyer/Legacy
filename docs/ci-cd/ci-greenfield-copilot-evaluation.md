@@ -56,7 +56,7 @@ Use `@github/copilot` CLI with a service account PAT to drive reviews programmat
 |-------------|---------|
 | `COPILOT_SERVICE_ACCOUNT_PAT` | Authenticates the Copilot CLI with a service account |
 | `REVIEWER_BOT_APP_ID` | GitHub App ID for `legacy-sports-review-bot` |
-| `REVIEWER_BOT_APP_PRIVATE_KEY` | Private key for `legacy-sports-review-bot` |
+| `BOT_APP_PRIVATE_KEY` | Private key for `legacy-sports-review-bot` |
 | `REVIEWER_TELEMETRY_BUCKET` | S3 bucket for review telemetry |
 
 ### Model Selection
