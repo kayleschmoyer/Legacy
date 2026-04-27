@@ -13,14 +13,14 @@ describe('computeCycle', () => {
   });
 
   it('returns 2 after one prior bot review', () => {
-    const reviews = [{ userLogin: 'code-reviewer-bot[bot]' }];
+    const reviews = [{ userLogin: 'legacy-sports-review-bot[bot]' }];
     assert.strictEqual(computeCycle(reviews), 2);
   });
 
   it('returns 3 after two prior bot reviews', () => {
     const reviews = [
-      { userLogin: 'code-reviewer-bot[bot]' },
-      { userLogin: 'code-reviewer-bot[bot]' },
+      { userLogin: 'legacy-sports-review-bot[bot]' },
+      { userLogin: 'legacy-sports-review-bot[bot]' },
     ];
     assert.strictEqual(computeCycle(reviews), 3);
   });
@@ -30,7 +30,7 @@ describe('computeCycle', () => {
       { userLogin: 'human-reviewer' },
       { userLogin: 'another-human' },
       { userLogin: 'some-other-bot[bot]' },
-      { userLogin: 'code-reviewer-bot[bot]' },
+      { userLogin: 'legacy-sports-review-bot[bot]' },
     ];
     // Only one bot review matches REVIEWER_BOT_LOGINS → cycle 2
     assert.strictEqual(computeCycle(reviews), 2);
@@ -39,7 +39,7 @@ describe('computeCycle', () => {
   it('handles reviews with null userLogin gracefully', () => {
     const reviews = [
       { userLogin: null },
-      { userLogin: 'code-reviewer-bot[bot]' },
+      { userLogin: 'legacy-sports-review-bot[bot]' },
     ];
     assert.strictEqual(computeCycle(reviews), 2);
   });
@@ -48,7 +48,7 @@ describe('computeCycle', () => {
     const customLogins = new Set(['my-test-bot[bot]']);
     const reviews = [
       { userLogin: 'my-test-bot[bot]' },
-      { userLogin: 'code-reviewer-bot[bot]' }, // not in customLogins
+      { userLogin: 'legacy-sports-review-bot[bot]' }, // not in customLogins
     ];
     assert.strictEqual(computeCycle(reviews, customLogins), 2);
   });
@@ -56,9 +56,9 @@ describe('computeCycle', () => {
   it('is not affected by the order of reviews in the list', () => {
     const reviews = [
       { userLogin: 'human' },
-      { userLogin: 'code-reviewer-bot[bot]' },
+      { userLogin: 'legacy-sports-review-bot[bot]' },
       { userLogin: 'another-human' },
-      { userLogin: 'code-reviewer-bot[bot]' },
+      { userLogin: 'legacy-sports-review-bot[bot]' },
     ];
     assert.strictEqual(computeCycle(reviews), 3);
   });
@@ -87,8 +87,8 @@ describe('isEscalationRequired', () => {
 });
 
 describe('REVIEWER_BOT_LOGINS', () => {
-  it('includes code-reviewer-bot[bot]', () => {
-    assert.ok(REVIEWER_BOT_LOGINS.has('code-reviewer-bot[bot]'));
+  it('includes legacy-sports-review-bot[bot] as the reviewer identity', () => {
+    assert.ok(REVIEWER_BOT_LOGINS.has('legacy-sports-review-bot[bot]'));
   });
 });
 

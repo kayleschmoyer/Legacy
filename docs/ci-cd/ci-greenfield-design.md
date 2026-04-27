@@ -35,7 +35,7 @@ merge-queue.yml           ← Label-based automated merge
 
 | Event | Condition | Action |
 |-------|-----------|--------|
-| `pull_request_review` submitted | Review is from Code Reviewer Bot (`code-reviewer-bot[bot]`) + approved | Run CI pipeline |
+| `pull_request_review` submitted | Review is from Code Reviewer Bot (`legacy-sports-review-bot[bot]`) + approved | Run CI pipeline |
 | `merge_group` | Always | Run CI + security |
 | `workflow_dispatch` | Manual | Run with options |
 

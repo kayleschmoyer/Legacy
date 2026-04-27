@@ -14,7 +14,7 @@
  */
 
 /** Known GitHub login identifiers for the code-reviewer bot. */
-export const REVIEWER_BOT_LOGINS = new Set(['code-reviewer-bot[bot]']);
+export const REVIEWER_BOT_LOGINS = new Set(['legacy-sports-review-bot[bot]']);
 
 /** Reviews posted in cycle > MAX_CYCLE trigger escalation instead. */
 export const MAX_CYCLE = 3;
