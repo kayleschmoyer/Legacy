@@ -11,11 +11,6 @@ on:
         required: false
         type: string
         default: "comprehensive"
-      runner-label:
-        description: "Optional runner label resolved by the orchestrator for LS-1652 runner restrictions; falls back to vars.CI_RUNNER_LABEL or 'ubuntu-latest' when not set"
-        required: false
-        type: string
-        default: ""
 
 permissions:
   actions: read
@@ -136,7 +131,8 @@ jobs:
 
   dependency-scan:
     name: "Dependency Vulnerability Scan"
-    runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    # LS-3884: lockfile parsing + OSV/Snyk CLI — no self-hosted infra needed
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: security-scan-plan
     if: needs.security-scan-plan.outputs.run-dependency-scan == 'true'
@@ -484,7 +480,8 @@ jobs:
 
   sast-scan:
     name: "Static Application Security Testing"
-    runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    # LS-3884: ESLint security rules + CodeQL — no self-hosted infra needed
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: security-scan-plan
     if: needs.security-scan-plan.outputs.run-sast-scan == 'true'

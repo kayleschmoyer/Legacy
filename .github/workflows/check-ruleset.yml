@@ -27,7 +27,8 @@ permissions:
 jobs:
   check-drift:
     name: "Ruleset Drift Detection"
-    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    # LS-3884: gh API call + jq comparison — no monorepo tooling needed
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:

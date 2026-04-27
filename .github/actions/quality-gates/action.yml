@@ -18,6 +18,10 @@ inputs:
     description: "Skip code formatting check"
     required: false
     default: "false"
+  skip-lint:
+    description: "Skip ESLint (used when a dedicated lint-format job runs lint separately)"
+    required: false
+    default: "false"
   timeout-minutes:
     description: "Timeout for quality gates"
     required: false
@@ -256,9 +260,14 @@ runs:
       if: "!cancelled()"
       shell: bash
       run: |
-        echo "::group::⚡ Quality Gates (lint · typecheck · test)"
-
         PARALLEL="${{ inputs.parallel }}"
+        SKIP_LINT="${{ inputs.skip-lint }}"
+
+        if [ "$SKIP_LINT" = "true" ]; then
+          echo "::group::⚡ Quality Gates (typecheck · test)"
+        else
+          echo "::group::⚡ Quality Gates (lint · typecheck · test)"
+        fi
         echo "ℹ️ Running locally with --parallel=$PARALLEL"
         echo "strategy=local" >> $GITHUB_OUTPUT
 
@@ -266,28 +275,41 @@ runs:
         TYPECHECK_SUCCESS=true
         TEST_SUCCESS=true
 
-        # ── Lint + Typecheck + Test (single Nx invocation) ────────────────────
-        # Running all three target types in one `nx affected` call lets Nx's
-        # task scheduler optimise parallelism across all targets simultaneously,
-        # instead of waiting for lint+typecheck to finish before starting tests.
-        if pnpm exec nx affected -t lint typecheck test --parallel="$PARALLEL" 2>&1 | tee quality.log; then
-          echo "✅ Lint, typecheck, and tests passed"
-          echo "lint-result=success" >> $GITHUB_OUTPUT
+        # When skip-lint=true (dedicated lint-format job handles lint on ubuntu-latest),
+        # only run typecheck + test here to avoid duplicate work on the self-hosted runner.
+        if [ "$SKIP_LINT" = "true" ]; then
+          TARGETS="typecheck test"
+          echo "lint-result=skipped" >> $GITHUB_OUTPUT
           echo "lint-failed-projects=" >> $GITHUB_OUTPUT
+        else
+          TARGETS="lint typecheck test"
+        fi
+
+        # ── Run targets (single Nx invocation) ───────────────────────────────
+        # Running targets in one `nx affected` call lets Nx's task scheduler
+        # optimise parallelism across all targets simultaneously.
+        if pnpm exec nx affected -t $TARGETS --parallel="$PARALLEL" 2>&1 | tee quality.log; then
+          echo "✅ Quality gates passed"
+          if [ "$SKIP_LINT" != "true" ]; then
+            echo "lint-result=success" >> $GITHUB_OUTPUT
+            echo "lint-failed-projects=" >> $GITHUB_OUTPUT
+          fi
           echo "typecheck-result=success" >> $GITHUB_OUTPUT
           echo "typecheck-failed-projects=" >> $GITHUB_OUTPUT
           echo "test-result=success" >> $GITHUB_OUTPUT
           echo "test-failed-projects=" >> $GITHUB_OUTPUT
         else
           # Parse individual target failures from the combined log
-          if grep -q "lint.*failed\|ESLint" quality.log; then
-            LINT_FAILED=$(grep -oE "nx run [^:]+:lint" quality.log 2>/dev/null | sed 's/nx run //;s/:lint//' | sort -u | xargs | tr ' ' ',' || echo "")
-            echo "lint-result=failure" >> $GITHUB_OUTPUT
-            echo "lint-failed-projects=${LINT_FAILED:-lint}" >> $GITHUB_OUTPUT
-            LINT_SUCCESS=false
-          else
-            echo "lint-result=success" >> $GITHUB_OUTPUT
-            echo "lint-failed-projects=" >> $GITHUB_OUTPUT
+          if [ "$SKIP_LINT" != "true" ]; then
+            if grep -q "lint.*failed\|ESLint" quality.log; then
+              LINT_FAILED=$(grep -oE "nx run [^:]+:lint" quality.log 2>/dev/null | sed 's/nx run //;s/:lint//' | sort -u | xargs | tr ' ' ',' || echo "")
+              echo "lint-result=failure" >> $GITHUB_OUTPUT
+              echo "lint-failed-projects=${LINT_FAILED:-lint}" >> $GITHUB_OUTPUT
+              LINT_SUCCESS=false
+            else
+              echo "lint-result=success" >> $GITHUB_OUTPUT
+              echo "lint-failed-projects=" >> $GITHUB_OUTPUT
+            fi
           fi
 
           if grep -q "typecheck.*failed\|TypeScript\|TS[0-9]" quality.log; then
@@ -314,12 +336,18 @@ runs:
         # ── Final result ───────────────────────────────────────────────────────
         if [ "$LINT_SUCCESS" = false ] || [ "$TYPECHECK_SUCCESS" = false ] || [ "$TEST_SUCCESS" = false ]; then
           echo "❌ One or more quality gates failed"
-          echo "  Lint:      $([ "$LINT_SUCCESS"      = true ] && echo '✅' || echo '❌')"
+          if [ "$SKIP_LINT" != "true" ]; then
+            echo "  Lint:      $([ "$LINT_SUCCESS"      = true ] && echo '✅' || echo '❌')"
+          fi
           echo "  Typecheck: $([ "$TYPECHECK_SUCCESS" = true ] && echo '✅' || echo '❌')"
           echo "  Tests:     $([ "$TEST_SUCCESS"      = true ] && echo '✅' || echo '❌')"
           echo "To reproduce locally:"
           echo "  Humans: make pc"
-          echo "  Agents: nx_run_affected({ target: 'lint' }) / nx_run_affected({ target: 'typecheck' }) / nx_run_affected({ target: 'test' })"
+          if [ "$SKIP_LINT" = "true" ]; then
+            echo "  Agents: nx_run_affected({ target: 'typecheck' }) / nx_run_affected({ target: 'test' })"
+          else
+            echo "  Agents: nx_run_affected({ target: 'lint' }) / nx_run_affected({ target: 'typecheck' }) / nx_run_affected({ target: 'test' })"
+          fi
           exit 1
         fi
 

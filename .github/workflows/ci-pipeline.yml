@@ -83,7 +83,8 @@ jobs:
   # ============================================================================
   detect-changes:
     name: "Detect Project Changes"
-    runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    # LS-3884: change detection is pure git + paths-filter — no build tooling needed
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-ci') }}
     outputs:
@@ -117,10 +118,102 @@ jobs:
           force-full-build: ${{ github.ref == 'refs/heads/main' || inputs.debug_mode }}
 
   # ============================================================================
-  # STAGE 2 — Quality gates
+  # STAGE 2a — Lint & Format (LS-3884: stateless nx tasks on ubuntu-latest)
   #
-  # Runs lint + typecheck + test via `nx affected` with local parallelism.
-  # Nx remote cache (via GitHub Actions cache) avoids redundant work.
+  # Runs prettier + nx affected lint. No self-hosted infra required.
+  # Runs in parallel with quality-gates (typecheck+test) to keep wall time flat.
+  # ============================================================================
+  lint-format:
+    name: "Lint & Format"
+    needs: [detect-changes]
+    if: >-
+      !contains(github.event.pull_request.labels.*.name, 'skip-ci') &&
+      needs.detect-changes.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NX_VERBOSE_LOGGING: ${{ inputs.debug_mode || contains(github.event.pull_request.labels.*.name, 'ci-debug') }}
+    outputs:
+      result: ${{ steps.check-results.outputs.result }}
+      formatting-result: ${{ steps.format.outputs.result }}
+      formatting-failed-projects: ${{ steps.format.outputs.failed-projects }}
+      lint-result: ${{ steps.lint.outputs.result }}
+      lint-failed-projects: ${{ steps.lint.outputs.failed-projects }}
+    steps:
+      - name: "Checkout Repository"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+          filter: tree:0
+
+      - name: "Setup Workspace"
+        uses: ./.github/actions/setup
+        with:
+          node-version: 22
+          install-dependencies: true
+          set-nx-shas: true
+          include-optional-deps: false
+
+      - name: "Code Formatting Check"
+        id: format
+        if: "!cancelled()"
+        shell: bash
+        run: |
+          echo "::notice::To fix locally — Humans: make fmt  |  Agents: make_run({ target: 'fmt' })"
+          BASE_SHA="${{ github.event.pull_request.base.sha || github.event.before }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha || github.sha }}"
+          CHANGED=$(git diff --name-only --diff-filter=ACMR "$BASE_SHA" "$HEAD_SHA" | sort)
+          if [ -n "$CHANGED" ]; then
+            CHANGED=$(echo "$CHANGED" | while IFS= read -r f; do
+              if [ -f "$f" ] && [ ! -L "$f" ]; then printf '%s\n' "$f"; fi
+            done) || true
+          fi
+          if [ -z "$CHANGED" ]; then
+            echo "result=success" >> $GITHUB_OUTPUT
+            echo "failed-projects=" >> $GITHUB_OUTPUT
+          elif echo "$CHANGED" | xargs pnpm exec prettier --check --ignore-unknown 2>&1 | tee format-check.log; then
+            echo "result=success" >> $GITHUB_OUTPUT
+            echo "failed-projects=" >> $GITHUB_OUTPUT
+          else
+            echo "::error::Code formatting check failed. Run 'make fmt' to fix (agents: make_run({ target: 'fmt' }))."
+            FAILED=$(grep -oE "apps/[^/]+|lib/[^/]+|lambdas/[^/]+" format-check.log 2>/dev/null | sort -u | paste -sd ',' -) || true
+            echo "result=failure" >> $GITHUB_OUTPUT
+            echo "failed-projects=${FAILED:-formatting}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: "ESLint"
+        id: lint
+        if: "!cancelled()"
+        shell: bash
+        run: |
+          if pnpm exec nx affected -t lint --parallel=2 2>&1 | tee lint.log; then
+            echo "result=success" >> $GITHUB_OUTPUT
+            echo "failed-projects=" >> $GITHUB_OUTPUT
+          else
+            FAILED=$(grep -oE "nx run [^:]+:lint" lint.log 2>/dev/null | sed 's/nx run //;s/:lint//' | sort -u | paste -sd ',' -) || true
+            echo "result=failure" >> $GITHUB_OUTPUT
+            echo "failed-projects=${FAILED:-lint}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: "Collect Lint & Format Results"
+        id: check-results
+        if: always()
+        shell: bash
+        run: |
+          FMT="${{ steps.format.outputs.result }}"
+          LINT="${{ steps.lint.outputs.result }}"
+          if [ "$FMT" = "success" ] && [ "$LINT" = "success" ]; then
+            echo "result=success" >> $GITHUB_OUTPUT
+          else
+            echo "result=failure" >> $GITHUB_OUTPUT
+          fi
+
+  # ============================================================================
+  # STAGE 2b — Quality gates (typecheck + test on self-hosted)
+  #
+  # Lint and format run in the parallel lint-format job above (ubuntu-latest).
+  # This job handles typecheck + test which benefit from self-hosted compute
+  # (high memory, fast disk I/O, persistent Nx cache on the runner).
   # ============================================================================
   quality-gates:
     name: "Quality Gates"
@@ -137,10 +230,6 @@ jobs:
     outputs:
       result: ${{ steps.check-results.outputs.result }}
       migration-immutability-result: ${{ steps.quality.outputs.migration-immutability-result }}
-      formatting-result: ${{ steps.quality.outputs.formatting-result }}
-      formatting-failed-projects: ${{ steps.quality.outputs.formatting-failed-projects }}
-      lint-result: ${{ steps.quality.outputs.lint-result }}
-      lint-failed-projects: ${{ steps.quality.outputs.lint-failed-projects }}
       typecheck-result: ${{ steps.quality.outputs.typecheck-result }}
       typecheck-failed-projects: ${{ steps.quality.outputs.typecheck-failed-projects }}
       test-result: ${{ steps.quality.outputs.test-result }}
@@ -171,6 +260,8 @@ jobs:
         uses: ./.github/actions/quality-gates
         with:
           parallel: "2"
+          skip-formatting: "true"
+          skip-lint: "true"
 
       - name: "Collect Quality Gate Results"
         id: check-results
@@ -254,12 +345,14 @@ jobs:
           path: dist/apps/web
 
   # ============================================================================
-  # STAGE 3 — E2E tests (runs after BOTH quality gates AND build pass)
+  # STAGE 3 — E2E tests (runs after lint-format, quality gates, AND build pass)
   # ============================================================================
   e2e:
     name: "E2E Tests (Shard ${{ matrix.shard }})"
-    needs: [detect-changes, quality-gates, build-validation]
+    needs: [detect-changes, lint-format, quality-gates, build-validation]
     if: >-
+      needs.lint-format.result == 'success' &&
+      needs.lint-format.outputs.result == 'success' &&
       needs.quality-gates.result == 'success' &&
       needs.quality-gates.outputs.result == 'success' &&
       needs.build-validation.result == 'success' &&
@@ -480,8 +573,8 @@ jobs:
   # ============================================================================
   summarize:
     name: "Summarize & Report"
-    needs: [detect-changes, quality-gates, build-validation, e2e]
-    if: "!cancelled() && !contains(github.event.pull_request.labels.*.name, 'skip-ci')"
+    needs: [detect-changes, lint-format, quality-gates, build-validation, e2e]
+    if: "always() && !cancelled() && !contains(github.event.pull_request.labels.*.name, 'skip-ci')"
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
@@ -506,6 +599,8 @@ jobs:
         run: |
           echo "::group::Raw needs.*.result values (for phantom-failure debugging)"
           echo "detect-changes.result     = ${{ needs.detect-changes.result }}"
+          echo "lint-format.result        = ${{ needs.lint-format.result }}"
+          echo "lint-format.output        = ${{ needs.lint-format.outputs.result }}"
           echo "quality-gates.result      = ${{ needs.quality-gates.result }}"
           echo "quality-gates.output      = ${{ needs.quality-gates.outputs.result }}"
           echo "build-validation.result   = ${{ needs.build-validation.result }}"
@@ -520,12 +615,13 @@ jobs:
           step-results: |
             {
               "detect-changes":   "${{ needs.detect-changes.result }}",
+              "lint-format":      "${{ needs.lint-format.outputs.result || needs.lint-format.result }}",
               "quality-gates":    "${{ needs.quality-gates.outputs.result || needs.quality-gates.result }}",
               "build-validation": "${{ needs.build-validation.outputs.overall-result || needs.build-validation.result }}",
               "e2e-testing":      "${{ needs.e2e.result }}"
             }
           workflow-start-time: ${{ github.event.head_commit.timestamp || github.event.pull_request.updated_at }}
-          failure-threshold: "quality-gates,build-validation,e2e-testing"
+          failure-threshold: "lint-format,quality-gates,build-validation,e2e-testing"
 
       - name: "Deployment Gate"
         id: deployment-gate
@@ -536,7 +632,7 @@ jobs:
         uses: ./.github/actions/deployment-gate
         with:
           artifacts-ready: ${{ needs.build-validation.outputs.artifacts-ready }}
-          quality-passed: ${{ needs.quality-gates.outputs.result == 'success' }}
+          quality-passed: ${{ needs.lint-format.outputs.result == 'success' && needs.quality-gates.outputs.result == 'success' }}
           execution-plan: "{}"
           environment: "production"
 
@@ -556,15 +652,15 @@ jobs:
           quality-gates-subsections: |
             {
               "migration-immutability": "${{ needs.quality-gates.outputs.migration-immutability-result }}",
-              "formatting": "${{ needs.quality-gates.outputs.formatting-result }}",
-              "lint":        "${{ needs.quality-gates.outputs.lint-result }}",
+              "formatting": "${{ needs.lint-format.outputs.formatting-result }}",
+              "lint":        "${{ needs.lint-format.outputs.lint-result }}",
               "typecheck":   "${{ needs.quality-gates.outputs.typecheck-result }}",
               "test":        "${{ needs.quality-gates.outputs.test-result }}"
             }
           project-failures: |
             {
-              "formatting": "${{ needs.quality-gates.outputs.formatting-failed-projects }}",
-              "lint":        "${{ needs.quality-gates.outputs.lint-failed-projects }}",
+              "formatting": "${{ needs.lint-format.outputs.formatting-failed-projects }}",
+              "lint":        "${{ needs.lint-format.outputs.lint-failed-projects }}",
               "typecheck":   "${{ needs.quality-gates.outputs.typecheck-failed-projects }}",
               "test":        "${{ needs.quality-gates.outputs.test-failed-projects }}"
             }
@@ -598,13 +694,14 @@ jobs:
             if (!prNumber) return;
 
             // Overall job-level results (always available even when outputs are lost)
+            const lfJobResult = '${{ needs.lint-format.result }}';
             const qgJobResult = '${{ needs.quality-gates.result }}';
 
             // Map CI stage results to label names
             const labelMap = {
               'CI: Migration Immutability': '${{ needs.quality-gates.outputs.migration-immutability-result }}',
-              'CI: Formatting': '${{ needs.quality-gates.outputs.formatting-result }}',
-              'CI: Lint Failure': '${{ needs.quality-gates.outputs.lint-result }}',
+              'CI: Formatting': '${{ needs.lint-format.outputs.formatting-result }}',
+              'CI: Lint Failure': '${{ needs.lint-format.outputs.lint-result }}',
               'CI: Type Error': '${{ needs.quality-gates.outputs.typecheck-result }}',
               'CI: Test Failure': '${{ needs.quality-gates.outputs.test-result }}',
               'CI: Build Failure': '${{ needs.build-validation.outputs.overall-result || needs.build-validation.result }}',
@@ -614,16 +711,26 @@ jobs:
             // Determine which labels to add (failed)
             const labelsToAdd = [];
 
-            // Track whether any quality-gate subsection reported failure
-            const qgLabels = ['CI: Migration Immutability', 'CI: Formatting', 'CI: Lint Failure', 'CI: Type Error', 'CI: Test Failure'];
+            // Track whether any quality-gate or lint-format subsection reported failure
+            const lfLabels = ['CI: Formatting', 'CI: Lint Failure'];
+            const qgLabels = ['CI: Migration Immutability', 'CI: Type Error', 'CI: Test Failure'];
+            let anyLfSubsectionFailed = false;
             let anyQgSubsectionFailed = false;
 
             for (const [label, result] of Object.entries(labelMap)) {
               if (result === 'failure' || result === 'cancelled') {
                 labelsToAdd.push(label);
+                if (lfLabels.includes(label)) anyLfSubsectionFailed = true;
                 if (qgLabels.includes(label)) anyQgSubsectionFailed = true;
               }
               // Empty/missing results are left alone (don't add or remove)
+            }
+
+            // Fallback: if lint-format job failed but no subsection reported
+            // failure (outputs lost due to runner interruption), add a generic label
+            if (lfJobResult === 'failure' && !anyLfSubsectionFailed) {
+              labelsToAdd.push('CI: Lint & Format');
+              core.info('Lint & format failed but subsection outputs are missing — adding fallback label');
             }
 
             // Fallback: if quality-gates job failed but no subsection reported
@@ -644,7 +751,7 @@ jobs:
             // Compute final desired label set: preserve non-CI labels, replace CI
             // labels entirely with labelsToAdd. A single PUT avoids the N sequential
             // DELETEs that trigger GitHub's secondary rate limit.
-            const allCiLabels = new Set([...Object.keys(labelMap), 'CI: Quality Gates']);
+            const allCiLabels = new Set([...Object.keys(labelMap), 'CI: Lint & Format', 'CI: Quality Gates']);
             const nonCiLabels = existingLabels.filter(l => !allCiLabels.has(l));
             const finalLabels = [...nonCiLabels, ...labelsToAdd];
 
