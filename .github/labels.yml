@@ -1,23 +1,65 @@
-# GitHub label definitions for the CI/Bot-Review escalation system.
-# Apply with: gh label create --label-file .github/labels.yml
-# or via the actions/github-script labeler action.
+# GitHub label definitions — source of truth for the CI/Bot-Review system.
+#
+# Synced automatically to the repo via .github/workflows/label-sync.yml when
+# this file changes on main. To trigger manually:
+#   gh workflow run label-sync.yml
+#
+# Format: EndBug/label-sync YAML (https://github.com/EndBug/label-sync)
+# Sync is additive — labels not listed here are NOT removed.
+
+# ---------------------------------------------------------------------------
+# Bot-Review Escalation Labels
+# Applied by the Code Reviewer Bot or by operators; trigger W4 label-pager.
+# ---------------------------------------------------------------------------
 
 - name: needs-human-arbitration
   color: "b60205"
   description: "Bot↔author disagreement unresolved after Cycle 3 — requires human decision"
 
 - name: needs-human-security-review
-  color: "d93f0b"
+  color: "b60205"
   description: "Cycle 1 found a critical security issue — requires human security review"
 
 - name: review-bot-degraded
-  color: "e4e669"
-  description: "Reviewer infrastructure failed after retry — bot review unavailable"
+  color: "d93f0b"
+  description: "Reviewer infrastructure failed after retry — re-applying label retriggers W1"
 
 - name: ci-stuck
-  color: "f9d0c4"
+  color: "d93f0b"
   description: "Operator-applied marker: CI pipeline is stuck and requires manual intervention"
 
+# Author-applied; signals code is complete and triggers the next review cycle.
+# NOT an escalation — intentionally excluded from W4 label-pager.
 - name: bot:ready-for-review
   color: "0e8a16"
-  description: "Author Agent has responded to a review cycle and the PR is ready for re-review"
+  description: "Author Agent signals review cycle is complete; triggers next bot review"
+
+# ---------------------------------------------------------------------------
+# Merge Control Labels
+# ---------------------------------------------------------------------------
+
+- name: merge-when-ready
+  color: "0e8a16"
+  description: "Signals that the PR should enter the merge queue when all checks pass"
+
+- name: merge-to-parent
+  color: "1d76db"
+  description: "PR targets a parent feature branch rather than main"
+
+# ---------------------------------------------------------------------------
+# CI Status Labels
+# Set automatically by the CI orchestrator to surface failures on the PR.
+# ---------------------------------------------------------------------------
+
+- name: "CI: Conflicts"
+  color: "ededed"
+  description: "PR has merge conflicts that must be resolved before CI can run"
+
+- name: "CI: Security"
+  color: "e11d48"
+  description: "CI failed due to security scan findings — review required before merge"
+
+# Operator-applied to force a comprehensive security scan on the next CI run.
+- name: security-scan
+  color: "e11d48"
+  description: "Forces a comprehensive security scan on the next CI run"

@@ -1,0 +1,34 @@
+name: Label Sync
+
+# Keeps GitHub labels in sync with .github/labels.yml (source of truth).
+# Fires on push to main when the file changes, or on manual dispatch.
+# Sync is additive: labels not listed in the file are preserved.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/labels.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    name: Sync labels
+    # Guard against workflow_dispatch from non-main branches mutating repo-wide labels
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Sync labels from .github/labels.yml
+        uses: EndBug/label-sync@52074158190acb45f3077f9099fea818aa43f97a # v2
+        with:
+          source-file: .github/labels.yml
+          delete-other-labels: false
+          token: ${{ secrets.GITHUB_TOKEN }}
