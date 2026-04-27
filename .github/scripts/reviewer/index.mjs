@@ -7,6 +7,7 @@ import {
 import { buildSystemPrompt, buildUserPrompt } from './lib/prompts/system.mjs';
 import { isTrivialPR, runMultiPass } from './lib/multi-pass.mjs';
 import { consolidate } from './lib/consolidator.mjs';
+import { postRealReview } from './lib/post-review.mjs';
 
 async function main() {
   const prNumber = Number(process.env.PR_NUMBER);
@@ -124,43 +125,72 @@ async function main() {
     }
   }
 
-  // GitHub issue comment body limit is 65,536 chars. Truncate with a note so
-  // large multi-pass reviews still post rather than silently failing (422).
-  const GITHUB_BODY_LIMIT = 60_000;
-  if (reviewText.length > GITHUB_BODY_LIMIT) {
-    reviewText =
-      reviewText.slice(0, GITHUB_BODY_LIMIT) +
-      '\n\n_[Review truncated — body exceeded GitHub comment size limit]_';
-  }
+  const shadowMode = process.env.REVIEWER_SHADOW_MODE === 'true';
 
-  // Parse findings — if the model output was not valid JSON, fall back to
-  // posting the raw text so the output is visible rather than silently dropped.
+  // Parse findings from the full, untruncated reviewText so that a large
+  // multi-pass response is not silently turned into invalid JSON before
+  // parsing. Truncation is applied later to the formatted output body only.
   const parsed = parseFindingsFromText(reviewText);
-  let shadowBody;
   if (!parsed.ok) {
     process.stderr.write(
       '[reviewer] Model output could not be parsed as JSON — falling back to raw output\n',
     );
-    shadowBody = `> ⚠️ **Unparsed output** — the model did not return valid JSON. Raw output:\n\n${reviewText}`;
-  } else {
-    const gated = gateFindingsBySeverity(parsed.findings);
-    process.stdout.write(
-      `[reviewer] Gating: ${gated.blocking.length} blocking, ${gated.nonBlocking.length} non-blocking, ${gated.dropped.length} trivia dropped\n`,
-    );
-    shadowBody = formatShadowBody(gated);
+    if (shadowMode) {
+      // GitHub issue comment body limit is 65,536 chars; truncate the raw
+      // fallback text (not the findings JSON) before posting.
+      const GITHUB_BODY_LIMIT = 60_000;
+      const truncated =
+        reviewText.length > GITHUB_BODY_LIMIT
+          ? reviewText.slice(0, GITHUB_BODY_LIMIT) +
+            '\n\n_[Review truncated — body exceeded GitHub comment size limit]_'
+          : reviewText;
+      const fallback = `> ⚠️ **Unparsed output** — the model did not return valid JSON. Raw output:\n\n${truncated}`;
+      try {
+        await postShadowComment(prNumber, fallback);
+      } catch (err) {
+        process.stderr.write(
+          `[reviewer] Failed to post fallback comment: ${err instanceof Error ? err.message : String(err)}\n`,
+        );
+      }
+    }
+    return;
   }
 
-  // Post shadow comment — fail open on infra errors
-  try {
-    await postShadowComment(prNumber, shadowBody);
-    process.stdout.write(
-      `[reviewer] Shadow review posted on PR #${prNumber} (${trivial ? 'single' : 'multi'}-pass)\n`,
-    );
-  } catch (err) {
-    process.stderr.write(
-      `[reviewer] Failed to post comment: ${err instanceof Error ? err.message : String(err)}\n`,
-    );
-    process.exit(0);
+  const gated = gateFindingsBySeverity(parsed.findings);
+  process.stdout.write(
+    `[reviewer] Gating: ${gated.blocking.length} blocking, ${gated.nonBlocking.length} non-blocking, ${gated.dropped.length} trivia dropped\n`,
+  );
+
+  // Post shadow comment or real review — fail open on infra errors
+  if (shadowMode) {
+    // Truncate formatted shadow body to GitHub comment size limit.
+    const GITHUB_BODY_LIMIT = 60_000;
+    let shadowBody = formatShadowBody(gated);
+    if (shadowBody.length > GITHUB_BODY_LIMIT) {
+      shadowBody =
+        shadowBody.slice(0, GITHUB_BODY_LIMIT) +
+        '\n\n_[Review truncated — body exceeded GitHub comment size limit]_';
+    }
+    try {
+      await postShadowComment(prNumber, shadowBody);
+      process.stdout.write(
+        `[reviewer] Shadow review posted on PR #${prNumber} (${trivial ? 'single' : 'multi'}-pass)\n`,
+      );
+    } catch (err) {
+      process.stderr.write(
+        `[reviewer] Failed to post shadow comment: ${err instanceof Error ? err.message : String(err)}\n`,
+      );
+      process.exit(0);
+    }
+  } else {
+    try {
+      await postRealReview(prNumber, gated);
+    } catch (err) {
+      process.stderr.write(
+        `[reviewer] Failed to post real review: ${err instanceof Error ? err.message : String(err)}\n`,
+      );
+      process.exit(0);
+    }
   }
 }
 

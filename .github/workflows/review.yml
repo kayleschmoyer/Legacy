@@ -1,8 +1,9 @@
 name: Reviewer (W1)
 
-# Shadow mode: posts a non-blocking comment alongside the existing Copilot
-# review for comparison data collection. T24 tightens triggers per G10
-# (drops synchronize, gates re-review on bot:ready-for-review label).
+# Posts a real GitHub PR review as the Code Reviewer Bot installation.
+# critical/high findings → REQUEST_CHANGES (blocks merge); clean → APPROVE.
+# Triggers on all non-draft PR events; T24 will tighten this (drop
+# synchronize, gate re-review on bot:ready-for-review label) per G10.
 
 on:
   pull_request:
@@ -42,8 +43,8 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           LLM_PROVIDER: copilot-cli
           REVIEWER_MODEL: codex
-          # Shadow mode: post comment, don't post a blocking review
-          REVIEWER_SHADOW_MODE: "true"
+          REVIEWER_BOT_APP_ID: ${{ vars.REVIEWER_BOT_APP_ID }}
+          REVIEWER_BOT_APP_PRIVATE_KEY: ${{ secrets.REVIEWER_BOT_APP_PRIVATE_KEY }}
         run: |
           if [ -f .github/scripts/reviewer/index.mjs ]; then
             node .github/scripts/reviewer/index.mjs
