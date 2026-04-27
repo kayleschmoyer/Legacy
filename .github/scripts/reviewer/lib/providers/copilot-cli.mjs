@@ -40,7 +40,7 @@ export class CopilotCLIProvider {
    * @param {object} params
    * @param {string} params.system
    * @param {string} params.user
-   * @returns {Promise<string>}
+   * @returns {Promise<import('./provider.mjs').ReviewResult>}
    */
   async review({ system, user }) {
     const prompt = `${system}\n\n${user}`;
@@ -51,7 +51,16 @@ export class CopilotCLIProvider {
     await writeFile(promptFile, prompt, 'utf8');
 
     try {
-      return await this._spawn(promptFile);
+      const text = await this._spawn(promptFile);
+      return {
+        text,
+        usage: {
+          inputTokens: 0,
+          cachedInputTokens: 0,
+          outputTokens: 0,
+          costUsd: 0,
+        },
+      };
     } finally {
       await rm(tmpDir, { recursive: true, force: true });
     }
@@ -59,7 +68,7 @@ export class CopilotCLIProvider {
 
   /**
    * @param {string} promptFile - Path to the file containing the review prompt
-   * @returns {Promise<string>}
+   * @returns {Promise<string>} Raw stdout from the Copilot CLI
    */
   _spawn(promptFile) {
     const args = [
