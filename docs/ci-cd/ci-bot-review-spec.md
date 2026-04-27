@@ -745,7 +745,6 @@ PR opened/updated (push to branch)
 | Branch protection ruleset    | `.github/ruleset.json`                                             |
 | Apply ruleset script         | `scripts/apply-ruleset.sh`                                         |
 | Copilot review instructions  | `.github/copilot-instructions.md`                                  |
-| Copilot cloud setup          | `.github/copilot-setup-steps.yml`                                  |
 | Dependabot config            | `.github/dependabot.yml`                                           |
 | Pre-commit Makefile          | `Makefile`                                                         |
 | Change classifier            | `scripts/classify-changes.js`                                      |

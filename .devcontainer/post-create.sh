@@ -2,7 +2,7 @@
 # =============================================================================
 # Devcontainer / Codespace — Post-Create Setup
 # =============================================================================
-# Mirrors copilot-setup-steps.yml for parity across cloud environments.
+# Sets up the cloud coding environment (Node.js, pnpm, PostgreSQL, migrations).
 # Runs once when the container is created (not on restart).
 # =============================================================================
 
