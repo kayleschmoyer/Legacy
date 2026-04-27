@@ -95,8 +95,8 @@ jobs:
               ;;
           esac
 
-          # For PR events, focus on changed files for faster feedback
-          if [ "$EVENT_NAME" == "pull_request" ]; then
+          # For PR events (including post-bot-review runs), focus on changed files for faster feedback
+          if [ "$EVENT_NAME" == "pull_request" ] || [ "$EVENT_NAME" == "pull_request_review" ]; then
             echo "🔍 PR-focused security scan"
             # Always run secret scanning on PRs
             RUN_SECRETS=true
@@ -154,7 +154,7 @@ jobs:
           # OSV scanner only needs the lockfile (no node_modules).
           # Snyk needs node_modules but only runs on non-PR events.
           # Skip install on PRs to save ~1-2 minutes.
-          install-dependencies: ${{ github.event_name != 'pull_request' }}
+          install-dependencies: ${{ github.event_name != 'pull_request' && github.event_name != 'pull_request_review' }}
 
       - name: "🔍 OSV Dependency Scan"
         id: npm-audit
@@ -205,8 +205,8 @@ jobs:
 
           echo "::endgroup::"
 
-      - name: "� Cache Snyk CLI"
-        if: github.event_name != 'pull_request'
+      - name: "💾 Cache Snyk CLI"
+        if: github.event_name != 'pull_request' && github.event_name != 'pull_request_review'
         id: snyk-cache
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
@@ -214,7 +214,7 @@ jobs:
           key: snyk-cli-v1.1293.1-linux
 
       - name: "⬇️ Install Snyk CLI"
-        if: github.event_name != 'pull_request' && steps.snyk-cache.outputs.cache-hit != 'true'
+        if: github.event_name != 'pull_request' && github.event_name != 'pull_request_review' && steps.snyk-cache.outputs.cache-hit != 'true'
         timeout-minutes: 3
         run: |
           # Skip download if Snyk is already baked into the AMI at the expected version
@@ -249,7 +249,7 @@ jobs:
 
       - name: "🛡️ Snyk Vulnerability Scan"
         id: snyk-scan
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && github.event_name != 'pull_request_review'
         continue-on-error: true
         timeout-minutes: 5
         env:
@@ -502,17 +502,17 @@ jobs:
           install-dependencies: true
           set-nx-shas: true
 
-      - name: "� Initialize CodeQL Analysis"
+      - name: "🔬 Initialize CodeQL Analysis"
         # Skip CodeQL on PRs for faster feedback
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && github.event_name != 'pull_request_review'
         uses: github/codeql-action/init@95e58e9a2cdfd71adc6e0353d5c52f41a045d225 # v4
         with:
           languages: javascript,typescript
           queries: security-extended,security-and-quality
 
-      - name: "�📦 Build for Analysis"
+      - name: "🏗️📦 Build for Analysis"
         # Skip build on PRs when CodeQL is skipped
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && github.event_name != 'pull_request_review'
         timeout-minutes: 10
         env:
           NX_NO_CLOUD: "true"
@@ -538,7 +538,7 @@ jobs:
 
       - name: "🔍 Perform CodeQL Analysis"
         # Skip CodeQL on PRs for faster feedback
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && github.event_name != 'pull_request_review'
         uses: github/codeql-action/analyze@95e58e9a2cdfd71adc6e0353d5c52f41a045d225 # v4
         with:
           category: "/language:javascript"
@@ -548,7 +548,7 @@ jobs:
       - name: "📊 Process CodeQL Results"
         id: process-codeql-results
         # Skip CodeQL results processing on PRs
-        if: always() && github.event_name != 'pull_request'
+        if: always() && github.event_name != 'pull_request' && github.event_name != 'pull_request_review'
         run: |
           echo "::group::🔍 CodeQL Results Processing"
 
@@ -602,7 +602,7 @@ jobs:
 
       - name: "📤 Upload CodeQL Results"
         # Skip on PRs since CodeQL is not run
-        if: github.event_name != 'pull_request' && steps.process-codeql-results.outputs.sarif-generated == 'true'
+        if: github.event_name != 'pull_request' && github.event_name != 'pull_request_review' && steps.process-codeql-results.outputs.sarif-generated == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: codeql-sarif-results
@@ -638,7 +638,7 @@ jobs:
             RULE_ARGS+=(--rule "$rule")
           done
 
-          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ] || [ "${GITHUB_EVENT_NAME}" = "pull_request_review" ]; then
             SCAN_SCOPE="changed-files"
             echo "🔍 Pull request detected – targeting changed JS/TS sources"
             mapfile -t CHANGED_FILES < <(git diff --name-only "${NX_BASE:-origin/main}" "${NX_HEAD:-HEAD}" -- '*.ts' '*.tsx' '*.js' '*.jsx' || true)
@@ -725,7 +725,7 @@ jobs:
 
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 📋 Next Steps" >> $GITHUB_STEP_SUMMARY
-          echo "- � Review SARIF results generated in workflow artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "- 📊 Review SARIF results generated in workflow artifacts" >> $GITHUB_STEP_SUMMARY
           echo "- 🔧 Address any high-severity security findings from CodeQL/ESLint" >> $GITHUB_STEP_SUMMARY
           echo "- 📚 Follow secure coding practices and SAST recommendations" >> $GITHUB_STEP_SUMMARY
           echo "- ℹ️ Note: CodeQL runs in private repo mode (no GitHub Security tab upload)" >> $GITHUB_STEP_SUMMARY

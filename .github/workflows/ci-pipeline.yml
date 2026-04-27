@@ -343,7 +343,11 @@ jobs:
     # always fails ("appId option is required"). The Playwright HTML report is
     # cosmetic for dep bumps anyway — skip the job entirely so dependabot PRs
     # do not show a stuck failed required check.
-    if: "!cancelled() && needs.e2e.result != 'skipped' && (github.event_name != 'pull_request' || github.event.pull_request.user.login != 'dependabot[bot]')"
+    if: >-
+      !cancelled() &&
+      needs.e2e.result != 'skipped' &&
+      ((github.event_name != 'pull_request' && github.event_name != 'pull_request_review') ||
+       github.event.pull_request.user.login != 'dependabot[bot]')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
