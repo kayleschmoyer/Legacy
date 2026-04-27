@@ -8,6 +8,7 @@ import { buildSystemPrompt, buildUserPrompt } from './lib/prompts/system.mjs';
 import { isTrivialPR, runMultiPass } from './lib/multi-pass.mjs';
 import { consolidate } from './lib/consolidator.mjs';
 import { postRealReview } from './lib/post-review.mjs';
+import { buildRecord, emitTelemetry } from './lib/telemetry.mjs';
 
 async function main() {
   const prNumber = Number(process.env.PR_NUMBER);
@@ -88,18 +89,27 @@ async function main() {
   }
   const trivial = isTrivialPR(diff);
   let reviewText;
+  let reviewUsage = {
+    inputTokens: 0,
+    cachedInputTokens: 0,
+    outputTokens: 0,
+    costUsd: 0,
+  };
+  let latencyMs = 0;
 
   if (trivial) {
     process.stdout.write(
       '[reviewer] Trivial PR — running single-pass review\n',
     );
     try {
-      reviewText = (
-        await provider.review({
-          system: systemPrompt,
-          user: userPrompt,
-        })
-      ).text;
+      const t0 = Date.now();
+      const result = await provider.review({
+        system: systemPrompt,
+        user: userPrompt,
+      });
+      latencyMs = Date.now() - t0;
+      reviewText = result.text;
+      reviewUsage = result.usage ?? reviewUsage;
     } catch (err) {
       process.stderr.write(
         `[reviewer] Provider error: ${err instanceof Error ? err.message : String(err)}\n`,
@@ -111,12 +121,15 @@ async function main() {
       '[reviewer] Non-trivial PR — running multi-pass review (correctness → security → contract)\n',
     );
     try {
-      const passResults = await runMultiPass(
+      const t0 = Date.now();
+      const { passes, usage: multiPassUsage } = await runMultiPass(
         provider,
         systemPrompt,
         userPrompt,
       );
-      reviewText = consolidate(passResults);
+      latencyMs = Date.now() - t0;
+      reviewText = consolidate(passes);
+      reviewUsage = multiPassUsage;
     } catch (err) {
       process.stderr.write(
         `[reviewer] Multi-pass error: ${err instanceof Error ? err.message : String(err)}\n`,
@@ -131,9 +144,24 @@ async function main() {
   // multi-pass response is not silently turned into invalid JSON before
   // parsing. Truncation is applied later to the formatted output body only.
   const parsed = parseFindingsFromText(reviewText);
+  let verdict = 'UNPARSEABLE';
   if (!parsed.ok) {
     process.stderr.write(
       '[reviewer] Model output could not be parsed as JSON — falling back to raw output\n',
+    );
+    await emitTelemetry(
+      buildRecord({
+        pr: prNumber,
+        sha: process.env.PR_HEAD_SHA ?? '',
+        model: process.env.REVIEWER_MODEL ?? 'codex',
+        provider: providerName,
+        cycle: 1,
+        verdict,
+        findings: [],
+        usage: reviewUsage,
+        latencyMs,
+        shadow: shadowMode,
+      }),
     );
     if (shadowMode) {
       // GitHub issue comment body limit is 65,536 chars; truncate the raw
@@ -159,6 +187,23 @@ async function main() {
   const gated = gateFindingsBySeverity(parsed.findings);
   process.stdout.write(
     `[reviewer] Gating: ${gated.blocking.length} blocking, ${gated.nonBlocking.length} non-blocking, ${gated.dropped.length} trivia dropped\n`,
+  );
+  verdict = gated.blocking.length === 0 ? 'APPROVED' : 'REQUEST_CHANGES';
+
+  // Emit telemetry before posting — survives comment/review API failures
+  await emitTelemetry(
+    buildRecord({
+      pr: prNumber,
+      sha: process.env.PR_HEAD_SHA ?? '',
+      model: process.env.REVIEWER_MODEL ?? 'codex',
+      provider: providerName,
+      cycle: 1,
+      verdict,
+      findings: parsed.findings,
+      usage: reviewUsage,
+      latencyMs,
+      shadow: shadowMode,
+    }),
   );
 
   // Post shadow comment or real review — fail open on infra errors

@@ -13,6 +13,7 @@ permissions:
   contents: read
   pull-requests: write
   issues: write
+  id-token: write # required for OIDC auth to AWS (S3 reviewer telemetry)
 
 concurrency:
   group: reviewer-${{ github.event.pull_request.number }}
@@ -20,7 +21,10 @@ concurrency:
 
 jobs:
   review:
-    if: github.event.pull_request.draft == false
+    # Skip drafts and fork PRs — forks must not mint the OIDC token or assume the CI role.
+    if: >-
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -34,17 +38,24 @@ jobs:
         run: |
           npm install -g @github/copilot
           copilot --version
+      - name: Configure AWS credentials
+        continue-on-error: true # telemetry is best-effort; don't block review on auth failure
+        uses: aws-actions/configure-aws-credentials@ec61189d14ec14c8efccab744f656cffd0e33f37 # v6
+        with:
+          role-to-assume: ${{ vars.AWS_CI_ARTIFACTS_ROLE_ARN || 'arn:aws:iam::176661590736:role/legacy-sports-dev-ci-artifacts' }}
+          aws-region: us-east-1
       - name: Run reviewer
         continue-on-error: true
         env:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_SERVICE_ACCOUNT_PAT }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           LLM_PROVIDER: copilot-cli
           REVIEWER_MODEL: codex
           REVIEWER_BOT_APP_ID: ${{ vars.REVIEWER_BOT_APP_ID }}
           REVIEWER_BOT_APP_PRIVATE_KEY: ${{ secrets.REVIEWER_BOT_APP_PRIVATE_KEY }}
+          REVIEWER_TELEMETRY_BUCKET: ${{ vars.REVIEWER_TELEMETRY_BUCKET || 'legacy-sports-dev-reviewer-telemetry' }}
         run: |
           if [ -f .github/scripts/reviewer/index.mjs ]; then
             node .github/scripts/reviewer/index.mjs

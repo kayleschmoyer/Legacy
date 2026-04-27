@@ -79,14 +79,26 @@ const PASSES = [
  * @param {object} provider  LLMProvider instance
  * @param {string} system    Shared system prompt
  * @param {string} user      Base user prompt (PR context + diff)
- * @returns {Promise<Array<{passName: string, text: string}>>}
+ * @returns {Promise<{passes: Array<{passName: string, text: string}>, usage: import('./providers/provider.mjs').ProviderUsage}>}
  */
 export async function runMultiPass(provider, system, user) {
-  const results = [];
+  const passes = [];
+  const usage = {
+    inputTokens: 0,
+    cachedInputTokens: 0,
+    outputTokens: 0,
+    costUsd: 0,
+  };
   for (const pass of PASSES) {
     const focusedUser = `${user}\n\n---\n\n**Review focus for this pass**: ${pass.focus}`;
-    const { text } = await provider.review({ system, user: focusedUser });
-    results.push({ passName: pass.name, text });
+    const result = await provider.review({ system, user: focusedUser });
+    passes.push({ passName: pass.name, text: result.text });
+    if (result.usage) {
+      usage.inputTokens += result.usage.inputTokens ?? 0;
+      usage.cachedInputTokens += result.usage.cachedInputTokens ?? 0;
+      usage.outputTokens += result.usage.outputTokens ?? 0;
+      usage.costUsd += result.usage.costUsd ?? 0;
+    }
   }
-  return results;
+  return { passes, usage };
 }
