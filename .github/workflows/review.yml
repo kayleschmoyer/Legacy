@@ -1,0 +1,52 @@
+name: Reviewer (W1)
+
+# Shadow mode: posts a non-blocking comment alongside the existing Copilot
+# review for comparison data collection. T24 tightens triggers per G10
+# (drops synchronize, gates re-review on bot:ready-for-review label).
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, labeled]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: reviewer-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 22
+      - name: Install Copilot CLI
+        run: |
+          npm install -g @github/copilot
+          copilot --version
+      - name: Run reviewer
+        continue-on-error: true
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_SERVICE_ACCOUNT_PAT }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          LLM_PROVIDER: copilot-cli
+          REVIEWER_MODEL: codex
+          # Shadow mode: post comment, don't post a blocking review
+          REVIEWER_SHADOW_MODE: "true"
+        run: |
+          if [ -f .github/scripts/reviewer/index.mjs ]; then
+            node .github/scripts/reviewer/index.mjs
+          else
+            echo "Skipping reviewer: .github/scripts/reviewer/index.mjs not found."
+          fi
