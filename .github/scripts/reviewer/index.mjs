@@ -1,4 +1,9 @@
 import { getPullRequestContext, postShadowComment } from './lib/github.mjs';
+import {
+  parseFindingsFromText,
+  gateFindingsBySeverity,
+  formatShadowBody,
+} from './lib/findings.mjs';
 import { buildSystemPrompt, buildUserPrompt } from './lib/prompts/system.mjs';
 import { isTrivialPR, runMultiPass } from './lib/multi-pass.mjs';
 import { consolidate } from './lib/consolidator.mjs';
@@ -128,9 +133,26 @@ async function main() {
       '\n\n_[Review truncated — body exceeded GitHub comment size limit]_';
   }
 
+  // Parse findings — if the model output was not valid JSON, fall back to
+  // posting the raw text so the output is visible rather than silently dropped.
+  const parsed = parseFindingsFromText(reviewText);
+  let shadowBody;
+  if (!parsed.ok) {
+    process.stderr.write(
+      '[reviewer] Model output could not be parsed as JSON — falling back to raw output\n',
+    );
+    shadowBody = `> ⚠️ **Unparsed output** — the model did not return valid JSON. Raw output:\n\n${reviewText}`;
+  } else {
+    const gated = gateFindingsBySeverity(parsed.findings);
+    process.stdout.write(
+      `[reviewer] Gating: ${gated.blocking.length} blocking, ${gated.nonBlocking.length} non-blocking, ${gated.dropped.length} trivia dropped\n`,
+    );
+    shadowBody = formatShadowBody(gated);
+  }
+
   // Post shadow comment — fail open on infra errors
   try {
-    await postShadowComment(prNumber, reviewText);
+    await postShadowComment(prNumber, shadowBody);
     process.stdout.write(
       `[reviewer] Shadow review posted on PR #${prNumber} (${trivial ? 'single' : 'multi'}-pass)\n`,
     );
