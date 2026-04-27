@@ -1,0 +1,46 @@
+name: Required Checks Lint (W3)
+
+# =============================================================================
+# Naming-discipline lint for required status checks (design §6.3, §13.4).
+#
+# Prevents stuck "Expected" required checks caused by naming drift between
+# ruleset.json and CI workflow job names.
+#
+# Three assertions (see .github/scripts/required-checks-lint.mjs):
+#   1. Every required_status_checks context in ruleset.json has a matching
+#      job name in a workflow file (or a script in .github/checks/).
+#   2. No workflow containing a required-check job has paths:/paths-ignore:
+#      filters at the pull_request trigger level — those prevent the check
+#      from running on all PRs, causing stuck "Expected" checks.
+#   3. Every required-check job has timeout-minutes <= 30.
+#
+# STAGED DEPLOYMENT (design §3.7 two-step deploy):
+#   Step 1 (this PR): land workflow, observe it pass on a few PRs.
+#   Step 2 (follow-up PR): add "validate" context to ruleset.json required
+#          checks once it has a clean pass history.
+# =============================================================================
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - .github/workflows/**
+      - .github/ruleset.json
+      - .github/checks/**
+
+concurrency:
+  group: required-checks-lint-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: "Required Checks Lint"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - name: Validate required-check naming discipline
+        run: node .github/scripts/required-checks-lint.mjs
