@@ -66,8 +66,41 @@ permissions:
   id-token: write
 
 jobs:
+  sha-sanity:
+    name: "🔐 SHA Sanity Check"
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Verify head SHA still matches event SHA
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eo pipefail
+          # EVENT_SHA: for pull_request events use head.sha; for merge_group use head_sha.
+          EVENT_SHA="${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}"
+          if [ -z "$EVENT_SHA" ] || [ "$EVENT_SHA" = "$GITHUB_SHA" ]; then
+            echo "SHA matches; proceeding"
+            exit 0
+          fi
+          # Re-fetch the PR's current head SHA to detect a new push that landed
+          # after this event fired but before concurrency cancellation kicked in.
+          PR_NUM="${{ github.event.pull_request.number }}"
+          if [ -n "$PR_NUM" ]; then
+            if CURRENT_SHA=$(gh pr view "$PR_NUM" --json headRefOid -q .headRefOid 2>/dev/null); then
+              if [ "$CURRENT_SHA" != "$EVENT_SHA" ]; then
+                echo "SHA changed since event fired (event=$EVENT_SHA, current=$CURRENT_SHA). Exiting cleanly; new run will pick up."
+                exit 0
+              fi
+            else
+              echo "::warning::Could not fetch current SHA for PR #$PR_NUM; proceeding with run"
+            fi
+          fi
+          echo "SHA still current; proceeding"
+
   determine-scope:
     name: "🔍 Determine Workflow Scope"
+    needs: [sha-sanity]
     runs-on: ubuntu-latest
     outputs:
       run-security: ${{ steps.scope.outputs.run-security }}
