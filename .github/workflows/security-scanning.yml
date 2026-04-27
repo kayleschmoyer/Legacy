@@ -995,10 +995,10 @@ jobs:
               state,
               target_url: `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`,
               description,
-              context: 'security-scan',
+              context: 'security',
             });
 
-            core.info(`Commit status 'security-scan' set to '${state}' on ${sha}`);
+            core.info(`Commit status 'security' set to '${state}' on ${sha}`);
 
             // Fail the job if gate failed (makes the workflow result reflect the gate)
             if (state === 'failure') {

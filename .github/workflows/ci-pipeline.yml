@@ -65,6 +65,7 @@ permissions:
   pull-requests: write
   checks: read
   issues: write
+  statuses: write # Required for granular commit status posting (lint, format, test, build, custom-checks)
   id-token: write # Required for OIDC auth to AWS (S3 CI artifacts)
 
 env:
@@ -345,6 +346,283 @@ jobs:
           path: dist/apps/web
 
   # ============================================================================
+  # STAGE 2c — Granular required checks
+  #
+  # These jobs emit the named commit status contexts that ruleset.json will
+  # require once T17 activates the staged rules. They run in parallel with
+  # quality-gates and build-validation during the transition period (T31→T17).
+  # Each job posts its status via createCommitStatus so the context name exactly
+  # matches the ruleset entry — independent of reusable-workflow name prefixing.
+  # ============================================================================
+  lint:
+    name: "lint"
+    needs: [detect-changes]
+    if: always() && !contains(github.event.pull_request.labels.*.name, 'skip-ci')
+    runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    env:
+      NX_VERBOSE_LOGGING: ${{ inputs.debug_mode || contains(github.event.pull_request.labels.*.name, 'ci-debug') }}
+    steps:
+      - name: "Checkout Repository"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+          filter: tree:0
+
+      - name: "Setup Workspace"
+        uses: ./.github/actions/setup
+        with:
+          node-version: 22
+          install-dependencies: true
+          set-nx-shas: true
+          include-optional-deps: false
+
+      - name: "Lint"
+        run: pnpm exec nx affected -t lint
+
+      - name: "Post Commit Status"
+        if: always()
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const sha = context.payload?.pull_request?.head?.sha || context.sha;
+            if (!sha) { core.warning('No SHA - skipping commit status'); return; }
+            const state = '${{ job.status }}' === 'success' ? 'success' : 'failure';
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha,
+              state,
+              target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              description: state === 'success' ? 'Passed' : 'Failed',
+              context: 'lint',
+            });
+
+  format:
+    name: "format"
+    needs: [detect-changes]
+    if: always() && !contains(github.event.pull_request.labels.*.name, 'skip-ci')
+    runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    steps:
+      - name: "Checkout Repository"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+          filter: tree:0
+
+      - name: "Setup Workspace"
+        uses: ./.github/actions/setup
+        with:
+          node-version: 22
+          install-dependencies: true
+          set-nx-shas: false
+          include-optional-deps: false
+
+      - name: "Format Check"
+        run: |
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha || github.sha }}"
+
+          if [ -z "$BASE_SHA" ]; then
+            echo "No pull request base SHA; running Prettier check on the repository."
+            pnpm exec prettier --check --ignore-unknown .
+            exit 0
+          fi
+
+          git diff --name-only --diff-filter=ACMR -z "$BASE_SHA" "$HEAD_SHA" \
+            | xargs -0 -r pnpm exec prettier --check --ignore-unknown
+
+      - name: "Post Commit Status"
+        if: always()
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const sha = context.payload?.pull_request?.head?.sha || context.sha;
+            if (!sha) { core.warning('No SHA - skipping commit status'); return; }
+            const state = '${{ job.status }}' === 'success' ? 'success' : 'failure';
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha,
+              state,
+              target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              description: state === 'success' ? 'Passed' : 'Failed',
+              context: 'format',
+            });
+
+  test:
+    name: "test"
+    needs: [detect-changes]
+    if: always() && !contains(github.event.pull_request.labels.*.name, 'skip-ci')
+    runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    env:
+      NX_VERBOSE_LOGGING: ${{ inputs.debug_mode || contains(github.event.pull_request.labels.*.name, 'ci-debug') }}
+    steps:
+      - name: "Checkout Repository"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+          filter: tree:0
+
+      - name: "Setup Workspace"
+        uses: ./.github/actions/setup
+        with:
+          node-version: 22
+          install-dependencies: true
+          set-nx-shas: true
+          include-optional-deps: false
+
+      - name: "Test"
+        run: pnpm exec nx affected -t test
+
+      - name: "Post Commit Status"
+        if: always()
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const sha = context.payload?.pull_request?.head?.sha || context.sha;
+            if (!sha) { core.warning('No SHA - skipping commit status'); return; }
+            const state = '${{ job.status }}' === 'success' ? 'success' : 'failure';
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha,
+              state,
+              target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              description: state === 'success' ? 'Passed' : 'Failed',
+              context: 'test',
+            });
+
+  build:
+    name: "build"
+    needs: [detect-changes]
+    if: always() && !contains(github.event.pull_request.labels.*.name, 'skip-ci')
+    runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    env:
+      NX_VERBOSE_LOGGING: ${{ inputs.debug_mode || contains(github.event.pull_request.labels.*.name, 'ci-debug') }}
+    steps:
+      - name: "Checkout Repository"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+
+      - name: "Setup Workspace"
+        uses: ./.github/actions/setup
+        with:
+          node-version: 22
+          install-dependencies: true
+          set-nx-shas: true
+          include-optional-deps: false
+
+      - name: "Build"
+        uses: ./.github/actions/build-validation
+        with:
+          should-build-web: >-
+            ${{
+              needs.detect-changes.outputs.requires-full-build == 'true'
+              || needs.detect-changes.outputs.web == 'true'
+              || needs.detect-changes.outputs.e2e == 'true'
+              || needs.detect-changes.outputs.api-surface == 'true'
+            }}
+          should-build-mobile: >-
+            ${{
+              needs.detect-changes.outputs.requires-full-build == 'true'
+              || needs.detect-changes.outputs.mobile == 'true'
+            }}
+          should-build-lambdas: >-
+            ${{
+              needs.detect-changes.outputs.requires-full-build == 'true'
+              || needs.detect-changes.outputs.lambdas == 'true'
+            }}
+          should-validate-terraform: ${{ needs.detect-changes.outputs.requires-full-build == 'true' || needs.detect-changes.outputs.terraform == 'true' }}
+          execution-mode: "local"
+          optimal-agents: "4"
+
+      - name: "Post Commit Status"
+        if: always()
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const sha = context.payload?.pull_request?.head?.sha || context.sha;
+            if (!sha) { core.warning('No SHA - skipping commit status'); return; }
+            const state = '${{ job.status }}' === 'success' ? 'success' : 'failure';
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha,
+              state,
+              target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              description: state === 'success' ? 'Passed' : 'Failed',
+              context: 'build',
+            });
+
+  custom-checks:
+    name: "custom-checks"
+    needs: [detect-changes]
+    if: always() && !contains(github.event.pull_request.labels.*.name, 'skip-ci')
+    runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    steps:
+      - name: "Checkout Repository"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+          filter: tree:0
+
+      - name: "Setup Workspace"
+        uses: ./.github/actions/setup
+        with:
+          node-version: 22
+          install-dependencies: true
+          set-nx-shas: true
+          include-optional-deps: false
+
+      - name: "Setup uv"
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+
+      - name: "Migration Immutability Check"
+        run: node scripts/check-migration-immutability.js --branch
+
+      - name: "Run Custom Check Scripts"
+        run: |
+          # Each .github/checks/*.sh script is an independent required check.
+          # Per design §9.4: adding a check = adding a script here.
+          CHECKS_DIR=".github/checks"
+          if compgen -G "$CHECKS_DIR/*.sh" > /dev/null 2>&1; then
+            for script in "$CHECKS_DIR"/*.sh; do
+              echo "Running $script..."
+              bash "$script"
+            done
+          fi
+          echo "All custom checks passed"
+
+      - name: "Post Commit Status"
+        if: always()
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const sha = context.payload?.pull_request?.head?.sha || context.sha;
+            if (!sha) { core.warning('No SHA - skipping commit status'); return; }
+            const state = '${{ job.status }}' === 'success' ? 'success' : 'failure';
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha,
+              state,
+              target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              description: state === 'success' ? 'Passed' : 'Failed',
+              context: 'custom-checks',
+            });
+
+  # ============================================================================
   # STAGE 3 — E2E tests (runs after lint-format, quality gates, AND build pass)
   # ============================================================================
   e2e:
@@ -573,7 +851,7 @@ jobs:
   # ============================================================================
   summarize:
     name: "Summarize & Report"
-    needs: [detect-changes, lint-format, quality-gates, build-validation, e2e]
+    needs: [detect-changes, lint-format, quality-gates, build-validation, e2e, lint, format, test, build, custom-checks]
     if: "always() && !cancelled() && !contains(github.event.pull_request.labels.*.name, 'skip-ci')"
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -606,6 +884,11 @@ jobs:
           echo "build-validation.result   = ${{ needs.build-validation.result }}"
           echo "build-validation.output   = ${{ needs.build-validation.outputs.overall-result }}"
           echo "e2e.result                = ${{ needs.e2e.result }}"
+          echo "lint.result               = ${{ needs.lint.result }}"
+          echo "format.result             = ${{ needs.format.result }}"
+          echo "test.result               = ${{ needs.test.result }}"
+          echo "build.result              = ${{ needs.build.result }}"
+          echo "custom-checks.result      = ${{ needs.custom-checks.result }}"
           echo "::endgroup::"
 
       - name: "Collect Results"
