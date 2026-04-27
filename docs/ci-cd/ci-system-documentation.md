@@ -1399,3 +1399,13 @@ The system is **cloud-ready** and will automatically provide 60-80% performance 
 The improved system successfully transforms the development experience from **"impossible to debug"** to **"immediately actionable"** while maintaining all security, performance, and reliability standards for a production monorepo application.
 
 **For updates to this documentation**, please test changes using `.\scripts\test-ci.ps1` locally and validate through the improved CI pipeline before merging to main.
+
+---
+
+### **Phase 3 Cutover Status (CI Rebuild)**
+
+As of 2026-04-27, the CI gate ordering has been updated as part of the [CI/Bot-Review System Rebuild](https://bkrupa.atlassian.net/browse/LS-3857) epic:
+
+- **W1 (Reviewer)** fires on `pull_request` → `ready_for_review`, `opened`, `synchronize`, `labeled` (skips drafts)
+- **W2 (CI Orchestrator)** fires on `pull_request_review` (filtered to bot approvals) + `merge_group`
+- **Result**: CI no longer runs on un-approved PRs — gate ordering is Reviewer → Approval → CI → Merge Queue → Merge
