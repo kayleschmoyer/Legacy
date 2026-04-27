@@ -1,5 +1,7 @@
 import { getPullRequestContext, postShadowComment } from './lib/github.mjs';
 import { buildSystemPrompt, buildUserPrompt } from './lib/prompts/system.mjs';
+import { isTrivialPR, runMultiPass } from './lib/multi-pass.mjs';
+import { consolidate } from './lib/consolidator.mjs';
 
 async function main() {
   const prNumber = Number(process.env.PR_NUMBER);
@@ -16,7 +18,7 @@ async function main() {
     ctx = getPullRequestContext(prNumber);
   } catch (err) {
     process.stderr.write(
-      `[reviewer] Failed to fetch PR context: ${err.message}\n`,
+      `[reviewer] Failed to fetch PR context: ${err instanceof Error ? err.message : String(err)}\n`,
     );
     process.exit(0);
   }
@@ -53,7 +55,7 @@ async function main() {
     }
   } catch (err) {
     process.stderr.write(
-      `[reviewer] Failed to init provider '${providerName}': ${err.message}\n`,
+      `[reviewer] Failed to init provider '${providerName}': ${err instanceof Error ? err.message : String(err)}\n`,
     );
     process.exit(0);
   }
@@ -65,36 +67,84 @@ async function main() {
     userPrompt = buildUserPrompt(ctx);
   } catch (err) {
     process.stderr.write(
-      `[reviewer] Failed to build prompts: ${err.message}\n`,
+      `[reviewer] Failed to build prompts: ${err instanceof Error ? err.message : String(err)}\n`,
     );
     process.exit(0);
   }
 
-  // Invoke provider — fail open on infra errors
+  // Decide between single-pass and multi-pass based on diff size / sensitive paths
+  const diff = typeof ctx.diff === 'string' ? ctx.diff : '';
+  if (!diff.trim()) {
+    process.stdout.write(
+      '[reviewer] Skipping: no diff available (failed or empty diff must not be treated as trivial)\n',
+    );
+    return;
+  }
+  const trivial = isTrivialPR(diff);
   let reviewText;
-  try {
-    reviewText = await provider.review({
-      system: systemPrompt,
-      user: userPrompt,
-    });
-  } catch (err) {
-    process.stderr.write(`[reviewer] Provider error: ${err.message}\n`);
-    process.exit(0);
+
+  if (trivial) {
+    process.stdout.write(
+      '[reviewer] Trivial PR — running single-pass review\n',
+    );
+    try {
+      reviewText = (
+        await provider.review({
+          system: systemPrompt,
+          user: userPrompt,
+        })
+      ).text;
+    } catch (err) {
+      process.stderr.write(
+        `[reviewer] Provider error: ${err instanceof Error ? err.message : String(err)}\n`,
+      );
+      process.exit(0);
+    }
+  } else {
+    process.stdout.write(
+      '[reviewer] Non-trivial PR — running multi-pass review (correctness → security → contract)\n',
+    );
+    try {
+      const passResults = await runMultiPass(
+        provider,
+        systemPrompt,
+        userPrompt,
+      );
+      reviewText = consolidate(passResults);
+    } catch (err) {
+      process.stderr.write(
+        `[reviewer] Multi-pass error: ${err instanceof Error ? err.message : String(err)}\n`,
+      );
+      process.exit(0);
+    }
+  }
+
+  // GitHub issue comment body limit is 65,536 chars. Truncate with a note so
+  // large multi-pass reviews still post rather than silently failing (422).
+  const GITHUB_BODY_LIMIT = 60_000;
+  if (reviewText.length > GITHUB_BODY_LIMIT) {
+    reviewText =
+      reviewText.slice(0, GITHUB_BODY_LIMIT) +
+      '\n\n_[Review truncated — body exceeded GitHub comment size limit]_';
   }
 
   // Post shadow comment — fail open on infra errors
   try {
     await postShadowComment(prNumber, reviewText);
     process.stdout.write(
-      `[reviewer] Shadow review posted on PR #${prNumber}\n`,
+      `[reviewer] Shadow review posted on PR #${prNumber} (${trivial ? 'single' : 'multi'}-pass)\n`,
     );
   } catch (err) {
-    process.stderr.write(`[reviewer] Failed to post comment: ${err.message}\n`);
+    process.stderr.write(
+      `[reviewer] Failed to post comment: ${err instanceof Error ? err.message : String(err)}\n`,
+    );
     process.exit(0);
   }
 }
 
 main().catch((err) => {
-  process.stderr.write(`[reviewer] Unexpected error: ${err.message}\n`);
+  process.stderr.write(
+    `[reviewer] Unexpected error: ${err instanceof Error ? err.message : String(err)}\n`,
+  );
   process.exit(0);
 });
