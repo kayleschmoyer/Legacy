@@ -1,0 +1,41 @@
+# CODEOWNERS — bkrupa/legacy-sports
+#
+# "Require review from Code Owners" is DISABLED in branch protection until T17 (LS-3877).
+# This file is safe to land now; enforcement is a Phase 2 step.
+#
+# Default catch-all (*) is intentionally omitted until T3 (LS-3860) provisions the
+# reviewer service account and its GitHub username is confirmed.  Add it as:
+#   *    @<service-account-username>
+# once T3 is complete.
+#
+# Order matters: last matching pattern wins, so general rules come first,
+# path-specific rules come last.
+#
+# All handles confirmed via LS-3859 (T2) — sole developer, no GitHub org teams.
+
+# Workflows, CI config, and CI scripts
+.github/workflows/**              @bkrupa
+.github/actions/**                @bkrupa
+.github/scripts/**                @bkrupa
+.github/ruleset.json              @bkrupa
+.github/CODEOWNERS                @bkrupa
+.github/reviewer-rules.md         @bkrupa
+
+# Infrastructure
+terraform/**                      @bkrupa
+scripts/apply-ruleset.sh          @bkrupa
+
+# Auth / OAuth
+lambdas/oauth-proxy/**            @bkrupa
+
+# Payments (Stripe + Apple IAP)
+lambdas/stripe-webhook/**         @bkrupa
+lambdas/apple-iap/**              @bkrupa
+
+# Database migrations
+lib/db-client/migrations/**       @bkrupa
+lambdas/db/**                     @bkrupa
+
+# CI design docs
+docs/ci-cd/ci-bot-review-spec.md           @bkrupa
+docs/ci-cd/improved-ci-system-design.md    @bkrupa
