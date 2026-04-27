@@ -620,6 +620,20 @@ permissions:
   actions: write # self-dispatch for retry
 ```
 
+### Reviewer Identity & Token Strategy
+
+The review/bot-review path uses three distinct token identities, each scoped to its component:
+
+| Component                       | Token                | Identity              | Notes                                                                                                                                                  |
+| ------------------------------- | -------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `copilot-review-handler.yml`    | `GITHUB_TOKEN`       | `github-actions[bot]` | Default Actions token; has `checks:write`, `issues:write`, `pull-requests:write` — no external secret needed                                           |
+| Webhook Lambda                  | Review Bot App token | Review Bot GitHub App | Generated from the Review Bot private key read from AWS Secrets Manager via `BOT_APP_PRIVATE_KEY_SECRET_NAME`; infra syncs `BOT_APP_PRIVATE_KEY` there |
+| Future CopilotCLI provider (T7) | Review Bot App token | Review Bot GitHub App | Reuses the existing app; no new service-account user or fine-grained PAT required                                                                      |
+
+**Design decision (LS-3860)**: No dedicated service-account GitHub user with a Copilot seat is provisioned. The planned CopilotCLI integration (T7) will authenticate using the existing Review Bot GitHub App token (`BOT_APP_PRIVATE_KEY` secret) rather than a new user-level PAT. This avoids creating an additional managed GitHub identity and eliminates ongoing seat-management overhead.
+
+Workflows that need to call the Copilot API on behalf of the bot should generate a short-lived installation token via `actions/create-github-app-token` using the Review Bot App credentials. This is the same token-generation pattern used elsewhere in the repo, but with component-specific GitHub App credentials: for example, the merge queue uses `MERGE_QUEUE_APP_ID` / `MERGE_QUEUE_APP_PRIVATE_KEY`, and the Copilot Coding Agent setup steps use `AGENT_AUTHOR_APP_PRIVATE_KEY`. If the Copilot API enforces user-seat requirements that reject App installation tokens, the AnthropicProvider (T8) serves as the primary fallback provider.
+
 ---
 
 ## 15. Edge Cases & Known Limitations
