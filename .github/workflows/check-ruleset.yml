@@ -2,27 +2,21 @@
 # Compares the live ruleset on GitHub against the checked-in JSON config.
 # Posts a warning annotation if they diverge.
 #
-# Runs weekly (Monday 09:00 UTC) as a backstop, on push when ruleset.json
-# changes, and on demand via workflow_dispatch.
-# Note: repository_ruleset is not a valid GitHub Actions trigger event.
-# This workflow still checks checked-in config changes and eventual live drift,
-# but live GitHub UI edits are only detected on the weekly schedule or manual runs.
+# Runs on pull_request when ruleset.json changes, and on demand via
+# workflow_dispatch. Note: repository_ruleset is not a valid GitHub Actions
+# trigger event; live GitHub UI edits are only detected via workflow_dispatch.
 
 name: Check Ruleset Drift
 
 on:
-  push:
-    # Catch drift when the checked-in config changes (e.g. a PR updates
-    # .github/ruleset.json) even if no live ruleset event was emitted.
+  pull_request:
+    # Catch drift when the checked-in config changes in a PR.
     paths:
       - .github/ruleset.json
-  schedule:
-    # Weekly backstop to catch drift from live ruleset edits via GitHub UI.
-    - cron: "0 9 * * 1"
   workflow_dispatch:
 
-# UI edits can emit multiple `edited` events in quick succession; cancel
-# any in-progress run so only the latest ruleset state is checked.
+# Multiple pushes to the same PR can fire in quick succession; cancel
+# any in-progress run so only the latest state is checked.
 concurrency:
   group: check-ruleset-drift
   cancel-in-progress: true
@@ -71,8 +65,8 @@ jobs:
         env:
           RULESET_FILE: .github/ruleset.json
         run: |
-          # Strip _comment keys and null integration_id from the local config for comparison
-          jq 'walk(if type == "object" then del(._comment) else . end)
+          # Strip metadata keys (_comment, _staged) and null integration_id from the local config for comparison
+          jq 'walk(if type == "object" then del(._comment) | del(._staged) else . end)
             | del(."$schema")
             | .rules |= map(
                 if .type == "required_status_checks"

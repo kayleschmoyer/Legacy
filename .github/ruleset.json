@@ -32,6 +32,7 @@
     },
     {
       "_comment": "STAGED DEPLOYMENT — DO NOT APPLY until prerequisites are met (design §3.7 two-step deploy): (1) ci-pipeline.yml is refactored to emit granular per-stage job names below, AND (2) those jobs are confirmed passing on several PRs. The contexts below are the TARGET names per design §9.1; they replace the current Quality Gates / Build Validation rollups. Applying before the CI refactor creates stuck 'Expected' required checks.",
+      "_staged": true,
       "type": "required_status_checks",
       "parameters": {
         "strict_required_status_checks_policy": true,

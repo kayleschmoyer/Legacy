@@ -45,7 +45,7 @@ function loadRequiredContexts() {
   const raw = JSON.parse(readFileSync(RULESET_FILE, 'utf8'));
   const contexts = [];
   for (const rule of raw.rules ?? []) {
-    if (rule.type === 'required_status_checks') {
+    if (rule.type === 'required_status_checks' && !rule._staged) {
       for (const check of rule.parameters?.required_status_checks ?? []) {
         if (typeof check.context === 'string') {
           contexts.push(check.context);
