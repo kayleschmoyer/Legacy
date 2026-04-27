@@ -1,0 +1,198 @@
+/**
+ * Cycle protocol implementation — T22.
+ *
+ * Three-cycle state machine that prevents agent ping-pong:
+ *
+ *   RAISE (cycle 1)      — initial review; may raise any issue
+ *   ADJUDICATE (cycle 2) — adjudicates author FIX/JUSTIFY replies;
+ *                          cannot raise issues unrelated to author's changes
+ *   VERIFY (cycle 3)     — verifies C2 mandate compliance only; no new findings
+ *
+ * Cycle > 3 triggers `needs-human-arbitration` escalation (handled in index.mjs).
+ */
+
+/**
+ * Map of cycle number to role name.
+ * @type {{ [cycle: number]: 'RAISE' | 'ADJUDICATE' | 'VERIFY' }}
+ */
+export const CYCLE_ROLES = { 1: 'RAISE', 2: 'ADJUDICATE', 3: 'VERIFY' };
+
+/**
+ * Returns the role name for the given cycle number.
+ * Cycles beyond MAX_CYCLE are handled by escalation before this is called,
+ * but for safety unknown cycles fall back to 'VERIFY'.
+ *
+ * @param {number} cycle
+ * @returns {'RAISE' | 'ADJUDICATE' | 'VERIFY'}
+ */
+export function getCycleRole(cycle) {
+  return CYCLE_ROLES[cycle] ?? 'VERIFY';
+}
+
+/**
+ * Extract finding titles from a bot review body.
+ *
+ * Parses the format produced by `formatReviewBody`:
+ *   <!-- issue-id: ULID -->
+ *   **[SEVERITY]** <title> — `file:line` | `file` | _PR-level_
+ *
+ * Note: `buildInlineComments` uses a slightly different format that omits the
+ * " — <loc>" suffix, so inline comment bodies are not matched by this function.
+ * C2/C3 validators operate on the formal bot review body only (blocking findings
+ * posted as the main review body via `formatReviewBody`).
+ *
+ * The regex anchors on the ` — ` separator followed by either a backtick (start
+ * of a code-span location) or `_PR-level_`. This prevents premature truncation
+ * when a finding title itself contains a dash or en-dash.
+ *
+ * @param {string | null | undefined} body
+ * @returns {string[]}
+ */
+export function parseTitlesFromReviewBody(body) {
+  if (!body) return [];
+  // Anchor the separator on the loc patterns produced by formatReviewBody so
+  // that titles containing " — " are not truncated prematurely.
+  const matches = [
+    ...body.matchAll(/\*\*\[[A-Z]+\]\*\*\s+(.+?)\s+—\s+(?:`|_PR-level_)/g),
+  ];
+  return matches.map((m) => m[1].trim());
+}
+
+/**
+ * Cycle 2 post-LLM validator.
+ *
+ * Strips findings that are **new** (not present in Cycle 1) and do **not**
+ * reference a commit the author pushed since C1's review.
+ *
+ * "Present in C1" = the finding's title (case-insensitive) matches a title
+ * extracted from the prior bot review body.
+ *
+ * "Cites a post-C1 commit" = the finding's `body` field contains a hex string
+ * of 7–40 characters that prefix-matches any SHA in `postC1CommitShas`.
+ *
+ * @param {import('./findings.mjs').Finding[]} findings
+ * @param {string[]} priorTitles     Titles from Cycle 1's review body
+ * @param {string[]} postC1CommitShas Full 40-char SHAs of commits added after C1
+ * @returns {{ kept: import('./findings.mjs').Finding[], stripped: import('./findings.mjs').Finding[] }}
+ */
+export function filterFindingsCycle2(findings, priorTitles, postC1CommitShas) {
+  const priorSet = new Set(priorTitles.map((t) => t.toLowerCase()));
+
+  const kept = [];
+  const stripped = [];
+
+  for (const f of findings) {
+    // Re-raised from C1 — always keep.
+    if (priorSet.has(f.title.toLowerCase())) {
+      kept.push(f);
+      continue;
+    }
+
+    // New finding: keep only if it cites a post-C1 commit SHA.
+    const bodyLower = f.body.toLowerCase();
+    const citesPostC1 = postC1CommitShas.some((sha) =>
+      bodyLower.includes(sha.slice(0, 7).toLowerCase()),
+    );
+
+    if (citesPostC1) {
+      kept.push(f);
+    } else {
+      stripped.push(f);
+    }
+  }
+
+  return { kept, stripped };
+}
+
+/**
+ * Cycle 3 post-LLM validator.
+ *
+ * Strips any finding whose title (case-insensitive) is not present in the
+ * Cycle 2 mandate list. Cycle 3 may only verify what was mandated in C2;
+ * all other findings are invalid for this cycle.
+ *
+ * @param {import('./findings.mjs').Finding[]} findings
+ * @param {string[]} mandateTitles Titles from Cycle 2's review body
+ * @returns {{ kept: import('./findings.mjs').Finding[], stripped: import('./findings.mjs').Finding[] }}
+ */
+export function filterFindingsCycle3(findings, mandateTitles) {
+  const mandateSet = new Set(mandateTitles.map((t) => t.toLowerCase()));
+
+  const kept = [];
+  const stripped = [];
+
+  for (const f of findings) {
+    if (mandateSet.has(f.title.toLowerCase())) {
+      kept.push(f);
+    } else {
+      stripped.push(f);
+    }
+  }
+
+  return { kept, stripped };
+}
+
+/**
+ * Build the "Your Role This Cycle" section injected into the system prompt.
+ *
+ * @param {number} cycle
+ * @param {string[]} [priorTitles] Titles from the previous cycle's review body
+ * @returns {string}
+ */
+export function buildCycleRoleSection(cycle, priorTitles = []) {
+  if (cycle === 1) {
+    return `\
+## Your Role This Cycle: RAISE (Cycle 1 of 3)
+
+You are performing the **initial review**. Raise ALL genuine issues you find — \
+correctness, security, contract violations, and quality concerns. There are no \
+restrictions on what you may raise in this cycle.`;
+  }
+
+  if (cycle === 2) {
+    const priorBlock =
+      priorTitles.length > 0
+        ? `\n\nIssues from Cycle 1 you must re-evaluate:\n${priorTitles.map((t, i) => `  ${i + 1}. ${t}`).join('\n')}`
+        : '';
+
+    return `\
+## Your Role This Cycle: ADJUDICATE (Cycle 2 of 3)
+
+You are **adjudicating the author's responses** to Cycle 1's review findings. \
+Read the author's \`FIX: <sha>\` and \`JUSTIFY: <rationale>\` replies, then \
+decide whether each prior issue is resolved.${priorBlock}
+
+**Rules — strictly enforced by the post-LLM validator:**
+- **Re-raise** findings from Cycle 1 that were not adequately addressed (these \
+become mandates the author MUST fix before Cycle 3).
+- **Accept** findings where the author's FIX or JUSTIFY response is satisfactory \
+(omit them from your output).
+- **Do NOT raise new issues** unrelated to the author's intermediate changes. \
+New concerns will be automatically stripped.
+- You MAY raise a new issue if it was **directly introduced** by a commit the \
+author pushed since Cycle 1 — cite the commit SHA in your finding body.`;
+  }
+
+  if (cycle === 3) {
+    const mandateBlock =
+      priorTitles.length > 0
+        ? `\n\nMandates from Cycle 2 you must verify:\n${priorTitles.map((t, i) => `  ${i + 1}. ${t}`).join('\n')}`
+        : '';
+
+    return `\
+## Your Role This Cycle: VERIFY (Cycle 3 of 3)
+
+You are **verifying mandate compliance** — checking only whether the author \
+addressed each specific mandate issued in Cycle 2.${mandateBlock}
+
+**Rules — strictly enforced by the post-LLM validator:**
+- Output findings **only** for mandates that are still unaddressed.
+- If a mandate is fulfilled: do NOT include it in your output.
+- If all mandates are fulfilled: output an empty array \`[]\`.
+- **Do NOT raise new issues** — any finding not in the Cycle 2 mandate list \
+will be automatically stripped.`;
+  }
+
+  // Cycle > 3 should trigger escalation before this function is called.
+  return '';
+}

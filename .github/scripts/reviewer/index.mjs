@@ -15,6 +15,20 @@ import { consolidate } from './lib/consolidator.mjs';
 import { postRealReview, postInfraErrorReview } from './lib/post-review.mjs';
 import { buildRecord, emitTelemetry } from './lib/telemetry.mjs';
 import { withRetry } from './lib/retry.mjs';
+import { getPrReviews, getPrCommits } from './lib/review-thread-api.mjs';
+import {
+  computeCycle,
+  isEscalationRequired,
+  REVIEWER_BOT_LOGINS,
+} from './lib/cycle-counter.mjs';
+import {
+  buildCycleRoleSection,
+  parseTitlesFromReviewBody,
+  filterFindingsCycle2,
+  filterFindingsCycle3,
+} from './lib/cycle-protocol.mjs';
+
+const NEEDS_HUMAN_ARBITRATION_LABEL = 'needs-human-arbitration';
 
 async function main() {
   const prNumber = Number(process.env.PR_NUMBER);
@@ -53,6 +67,76 @@ async function main() {
     return;
   }
 
+  // --- Cycle counter (T22) ---
+  // Derive the current cycle from immutable PR review history.
+  // Deleting or editing comments cannot affect the count.
+  let allReviews;
+  try {
+    allReviews = getPrReviews(prNumber);
+  } catch (err) {
+    process.stderr.write(
+      `[reviewer] Failed to fetch PR reviews: ${err instanceof Error ? err.message : String(err)}\n`,
+    );
+    process.exit(0);
+  }
+
+  const cycle = computeCycle(allReviews);
+  process.stdout.write(`[reviewer] Computed review cycle: ${cycle}\n`);
+
+  // Cycle > MAX_CYCLE → escalate instead of reviewing
+  if (isEscalationRequired(cycle)) {
+    process.stdout.write(
+      `[reviewer] Cycle ${cycle} exceeds MAX_CYCLE — applying '${NEEDS_HUMAN_ARBITRATION_LABEL}' label and exiting\n`,
+    );
+    try {
+      addLabel(prNumber, NEEDS_HUMAN_ARBITRATION_LABEL);
+    } catch (err) {
+      process.stderr.write(
+        `[reviewer] Failed to apply escalation label: ${err instanceof Error ? err.message : String(err)}\n`,
+      );
+    }
+    return;
+  }
+
+  // Gather prior review context for C2/C3 post-LLM validators.
+  // Sort by submittedAt ascending so .at(-1) reliably picks the most recent
+  // bot review regardless of the order GitHub returns reviews in the API.
+  const botReviews = allReviews
+    .filter((r) => REVIEWER_BOT_LOGINS.has(r.userLogin))
+    .slice()
+    .sort((a, b) => (a.submittedAt < b.submittedAt ? -1 : 1));
+  const lastBotReview = botReviews.at(-1) ?? null;
+  const priorBotReviewBody = lastBotReview?.body ?? '';
+  const priorTitles = parseTitlesFromReviewBody(priorBotReviewBody);
+
+  // Commits added since the last bot review (used by Cycle 2 validator).
+  let postReviewCommitShas = [];
+  if (cycle === 2 && lastBotReview) {
+    try {
+      const allCommitShas = getPrCommits(prNumber);
+      const reviewedAtIdx = allCommitShas.indexOf(lastBotReview.commitId);
+      if (reviewedAtIdx === -1) {
+        // C1 review commitId not found — likely a force-push or rebase after C1.
+        // Fall back to treating all current commits as post-C1 so new findings
+        // that cite any current PR commit are not incorrectly stripped.
+        postReviewCommitShas = allCommitShas;
+        process.stdout.write(
+          '[reviewer] Cycle 2: C1 review commitId not in current commit list (force-push/rebase?) — treating all commits as post-C1\n',
+        );
+      } else {
+        postReviewCommitShas = allCommitShas.slice(reviewedAtIdx + 1);
+        process.stdout.write(
+          `[reviewer] Cycle 2: ${postReviewCommitShas.length} commit(s) added since C1 review\n`,
+        );
+      }
+    } catch (err) {
+      process.stderr.write(
+        `[reviewer] Failed to fetch PR commits for cycle 2 filter: ${err instanceof Error ? err.message : String(err)}\n`,
+      );
+      // Fail closed: no post-C1 commits known → validator will strip new findings.
+    }
+  }
+
   // Dynamic imports so module resolution doesn't fail when dependency PRs
   // (T7 CopilotCLIProvider, T8 AnthropicProvider) haven't merged yet.
   let provider;
@@ -76,7 +160,8 @@ async function main() {
   // Build prompts — fail open on infra errors (e.g. missing reviewer-rules.md)
   let systemPrompt, userPrompt;
   try {
-    systemPrompt = buildSystemPrompt();
+    const cycleRoleSection = buildCycleRoleSection(cycle, priorTitles);
+    systemPrompt = buildSystemPrompt(cycleRoleSection);
     userPrompt = buildUserPrompt(ctx);
   } catch (err) {
     process.stderr.write(
@@ -160,7 +245,7 @@ async function main() {
         sha: process.env.PR_HEAD_SHA ?? '',
         model: process.env.REVIEWER_MODEL ?? 'codex',
         provider: providerName,
-        cycle: 1,
+        cycle,
         verdict,
         findings: [],
         usage: reviewUsage,
@@ -189,7 +274,35 @@ async function main() {
     return;
   }
 
-  const gated = gateFindingsBySeverity(parsed.findings);
+  // Apply cycle-specific post-LLM validator (T22).
+  // Strips findings that violate cycle rules before severity gating.
+  let filteredFindings = parsed.findings;
+  if (cycle === 2) {
+    const { kept, stripped } = filterFindingsCycle2(
+      parsed.findings,
+      priorTitles,
+      postReviewCommitShas,
+    );
+    if (stripped.length > 0) {
+      process.stdout.write(
+        `[reviewer] Cycle 2 validator: stripped ${stripped.length} finding(s) that raised new issues outside author's changes\n`,
+      );
+    }
+    filteredFindings = kept;
+  } else if (cycle === 3) {
+    const { kept, stripped } = filterFindingsCycle3(
+      parsed.findings,
+      priorTitles,
+    );
+    if (stripped.length > 0) {
+      process.stdout.write(
+        `[reviewer] Cycle 3 validator: stripped ${stripped.length} finding(s) outside Cycle 2 mandates\n`,
+      );
+    }
+    filteredFindings = kept;
+  }
+
+  const gated = gateFindingsBySeverity(filteredFindings);
   process.stdout.write(
     `[reviewer] Gating: ${gated.blocking.length} blocking, ${gated.nonBlocking.length} non-blocking, ${gated.dropped.length} trivia dropped\n`,
   );
@@ -202,9 +315,9 @@ async function main() {
       sha: process.env.PR_HEAD_SHA ?? '',
       model: process.env.REVIEWER_MODEL ?? 'codex',
       provider: providerName,
-      cycle: 1,
+      cycle,
       verdict,
-      findings: parsed.findings,
+      findings: filteredFindings,
       usage: reviewUsage,
       latencyMs,
       shadow: shadowMode,
@@ -224,7 +337,7 @@ async function main() {
     try {
       await postShadowComment(prNumber, shadowBody);
       process.stdout.write(
-        `[reviewer] Shadow review posted on PR #${prNumber} (${trivial ? 'single' : 'multi'}-pass)\n`,
+        `[reviewer] Shadow review posted on PR #${prNumber} (${trivial ? 'single' : 'multi'}-pass, cycle ${cycle})\n`,
       );
     } catch (err) {
       process.stderr.write(

@@ -80,10 +80,14 @@ Example output:
 /**
  * Build the system prompt from the reviewer rules document.
  *
+ * @param {string} [cycleRoleSection] Role-specific section from cycle-protocol.mjs.
+ *   When provided it is injected between the reviewer rules and the severity/output
+ *   addendum so the model sees its current cycle role before output instructions.
  * @returns {string}
  */
-export function buildSystemPrompt() {
-  return `You are a code reviewer bot that reviews pull request diffs on a GitHub repository.\n\nYour job is to provide a thorough, high-value code review following the rules below.\n\n${getReviewerRules()}${SEVERITY_AND_CRITIQUE_ADDENDUM}`;
+export function buildSystemPrompt(cycleRoleSection = '') {
+  const cycleBlock = cycleRoleSection ? `\n\n${cycleRoleSection}` : '';
+  return `You are a code reviewer bot that reviews pull request diffs on a GitHub repository.\n\nYour job is to provide a thorough, high-value code review following the rules below.\n\n${getReviewerRules()}${cycleBlock}${SEVERITY_AND_CRITIQUE_ADDENDUM}`;
 }
 
 /**
