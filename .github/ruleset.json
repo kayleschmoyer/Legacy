@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/github-ruleset.json",
-  "_comment": "Branch protection ruleset for the main branch. Applied via scripts/apply-ruleset.sh.",
+  "_comment": "Branch protection ruleset for the main branch. Applied via scripts/apply-ruleset.sh. STAGED DEPLOYMENT: this file is the target state but is NOT applied until its prerequisites land (see T17/T18 in LS-3857 epic).",
   "name": "main-branch-protection",
   "target": "branch",
   "enforcement": "active",
@@ -20,36 +20,48 @@
       "type": "deletion"
     },
     {
-      "_comment": "Require a pull request before merging into main.",
+      "_comment": "Require a pull request before merging into main. STAGED: require_code_owner_review=true is the target state once CODEOWNERS has a catch-all reviewer entry (pending T3 service-account provisioning). Until that lands, the bot's approval satisfies required_approving_review_count=1 independently of CODEOWNERS. Apply this ruleset only after CODEOWNERS is complete.",
       "type": "pull_request",
       "parameters": {
         "required_approving_review_count": 1,
         "dismiss_stale_reviews_on_push": true,
-        "require_code_owner_review": false,
+        "require_code_owner_review": true,
         "require_last_push_approval": false,
         "required_review_thread_resolution": false
       }
     },
     {
-      "_comment": "Require all three CI status checks to pass before merge.",
+      "_comment": "STAGED DEPLOYMENT — DO NOT APPLY until prerequisites are met (design §3.7 two-step deploy): (1) ci-pipeline.yml is refactored to emit granular per-stage job names below, AND (2) those jobs are confirmed passing on several PRs. The contexts below are the TARGET names per design §9.1; they replace the current Quality Gates / Build Validation rollups. Applying before the CI refactor creates stuck 'Expected' required checks.",
       "type": "required_status_checks",
       "parameters": {
         "strict_required_status_checks_policy": true,
         "required_status_checks": [
           {
-            "_comment": "Linting, typechecking, unit tests, formatting, and migration immutability checks.",
-            "context": "Quality Gates"
+            "_comment": "TARGET (not yet active): ESLint job in refactored ci-pipeline.yml.",
+            "context": "lint"
           },
           {
-            "_comment": "Full project build validation (apps and lambdas).",
-            "context": "Build Validation"
+            "_comment": "TARGET (not yet active): Prettier formatting job in refactored ci-pipeline.yml.",
+            "context": "format"
           },
           {
-            "_comment": "Copilot / bot review gate — set by copilot-auto-approve.yml. Ensures every PR has been reviewed by the bot reviewer before merge.",
-            "context": "bot-review"
+            "_comment": "TARGET (not yet active): Build job (apps, lambdas, libraries) in refactored ci-pipeline.yml.",
+            "context": "build"
           },
           {
-            "_comment": "Fails if the PR branch has merge conflicts with the base branch (check-conflicts.yml).",
+            "_comment": "TARGET (not yet active): Unit/integration test job in refactored ci-pipeline.yml.",
+            "context": "test"
+          },
+          {
+            "_comment": "TARGET (not yet active): Security scanning job in refactored ci-pipeline.yml.",
+            "context": "security"
+          },
+          {
+            "_comment": "TARGET (not yet active): Custom checks job (migration immutability, schema drift, skill linting) in refactored ci-pipeline.yml.",
+            "context": "custom-checks"
+          },
+          {
+            "_comment": "Active now: fails if the PR branch has merge conflicts with the base branch (check-conflicts.yml).",
             "context": "No Merge Conflicts"
           }
         ]
