@@ -15,6 +15,9 @@
 #        `runner_ami_playwright_version` value in runner-ami.auto.tfvars.
 #     4. Commits those updates back to the PR branch using a bot token so the
 #        runner-ami-drift-check workflow re-runs and passes.
+#     5. Prunes old AMIs: retains the 5 most recent by creation date, plus any
+#        version still referenced by main or an open PR branch (LS-3885).
+#        This replaces the former prune-runner-amis.yml scheduled job.
 #
 #   After the PR merges, `runner-terraform-apply.yml` rolls the launch template
 #   to the new AMI automatically.
@@ -287,3 +290,97 @@ jobs:
           been updated on this branch. The runner-ami-drift-check workflow will re-run
           and should now pass. On merge, \`runner-terraform-apply.yml\` will roll the
           launch template to the new AMI."
+
+      - name: Prune old runner AMIs
+        # Retain the 5 most recent AMIs by creation date, plus any version still
+        # referenced by main or an open PR branch. This keeps the AMI count bounded
+        # without a cron job — prune at build time, not on a timer (LS-3885).
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          KEEP_COUNT=5
+
+          echo "=== Post-build AMI prune (retain $KEEP_COUNT most recent) ==="
+
+          # Protected versions = main's runner_ami_playwright_version + every
+          # open PR branch's runner_ami_playwright_version. A PR that has not
+          # yet rebuilt the AMI still references the old version, so we keep
+          # it alive until the PR merges or closes.
+          {
+            awk '
+              /^runner_ami_playwright_version[[:space:]]*=/ {
+                match($0, /"[0-9.]+"/)
+                print substr($0, RSTART + 1, RLENGTH - 2)
+                exit
+              }
+            ' terraform/runners/runner-ami.auto.tfvars
+
+            gh pr list --state open --json headRefName --limit 100 \
+              | jq -r '.[].headRefName' \
+              | while read -r BRANCH; do
+                  gh api "repos/${{ github.repository }}/contents/terraform/runners/runner-ami.auto.tfvars?ref=$BRANCH" \
+                    --jq '.content' 2>/dev/null \
+                    | base64 -d 2>/dev/null \
+                    | awk '
+                        /^runner_ami_playwright_version[[:space:]]*=/ {
+                          match($0, /"[0-9.]+"/)
+                          print substr($0, RSTART + 1, RLENGTH - 2)
+                          exit
+                        }
+                      ' || true
+                done
+          } | sort -u > protected-versions.txt
+
+          echo "Protected versions (main + open PRs):"
+          cat protected-versions.txt
+
+          ALL_AMIS=$(aws ec2 describe-images \
+            --owners self \
+            --filters "Name=name,Values=legacy-sports-runner-*" \
+            --query "sort_by(Images, &CreationDate) | reverse(@) | [*].{Id:ImageId,Name:Name,Created:CreationDate}" \
+            --output json)
+
+          echo "Total AMIs: $(echo "$ALL_AMIS" | jq 'length')"
+
+          KEEP_IDS=$(echo "$ALL_AMIS" | jq -r --argjson n "$KEEP_COUNT" '.[0:$n] | .[].Id')
+
+          while read -r VERSION; do
+            [[ -z "$VERSION" ]] && continue
+            MATCH_IDS=$(echo "$ALL_AMIS" \
+              | jq -r --arg v "$VERSION" '.[] | select(.Name | contains("-pw" + $v + "-")) | .Id')
+            KEEP_IDS=$(printf "%s\n%s" "$KEEP_IDS" "$MATCH_IDS")
+          done < protected-versions.txt
+
+          KEEP_IDS_UNIQUE=$(echo "$KEEP_IDS" | sort -u | grep -v '^$' || true)
+          echo "Keeping AMIs:"
+          printf "%s\n" "$KEEP_IDS_UNIQUE"
+
+          DELETE_IDS=$(echo "$ALL_AMIS" | jq -r '.[].Id' \
+            | grep -vFxf <(echo "$KEEP_IDS_UNIQUE") || true)
+
+          if [[ -z "$DELETE_IDS" ]]; then
+            echo "✅ Nothing to prune."
+            exit 0
+          fi
+
+          echo "Pruning $(echo "$DELETE_IDS" | wc -l | tr -d ' ') AMI(s):"
+          printf "%s\n" "$DELETE_IDS"
+
+          for AMI_ID in $DELETE_IDS; do
+            SNAPSHOTS=$(aws ec2 describe-images \
+              --image-ids "$AMI_ID" \
+              --query "Images[0].BlockDeviceMappings[?Ebs.SnapshotId].Ebs.SnapshotId" \
+              --output text 2>/dev/null || echo "")
+
+            echo "Deregistering $AMI_ID..."
+            aws ec2 deregister-image --image-id "$AMI_ID"
+
+            for SNAPSHOT_ID in $SNAPSHOTS; do
+              echo "  Deleting snapshot $SNAPSHOT_ID..."
+              aws ec2 delete-snapshot --snapshot-id "$SNAPSHOT_ID" || \
+                echo "::warning::Failed to delete snapshot $SNAPSHOT_ID (may be in use)"
+            done
+          done
+
+          echo "✅ Prune complete."
