@@ -1,628 +1,273 @@
 # CI System Troubleshooting & Debugging Guide
 
-## Overview
+> For the full CI architecture, see [ci-greenfield-design.md](ci-greenfield-design.md). For per-check fix commands, see `.agents/skills/pr-lifecycle/references/ci-checks-reference.md`.
 
-This guide provides comprehensive troubleshooting information for the improved Legacy Sports CI system. The new CI prioritizes **visibility and easy debugging** over the previous complex multi-job setup.
+## Quick Start: Diagnosing a CI Failure
 
-## 🚀 Quick Start: Understanding CI Failures
+### Step 1: Read the CI labels on your PR
 
-### Step 1: Check the CI Summary
+The `summarize` job applies a specific label for the failing stage:
 
-Every CI run generates a comprehensive summary at the bottom of the workflow. Look for:
+| Label | Failing stage | First command to run |
+|-------|--------------|---------------------|
+| `CI: Formatting` | Prettier check | `pnpm exec nx format:write` |
+| `CI: Lint Failure` | ESLint | `pnpm exec nx affected -t lint --fix` |
+| `CI: Type Error` | TypeScript | `pnpm exec nx affected -t typecheck` |
+| `CI: Test Failure` | Jest tests | `pnpm exec nx affected -t test` |
+| `CI: Build Failure` | Build validation | `pnpm exec nx affected -t build` |
+| `CI: E2E Failure` | Playwright | `pnpm exec nx e2e web-e2e -- --grep='@critical'` |
+| `CI: Quality Gates` | Setup/infra failure | Rerun the workflow first |
+| `CI: Migration Immutability` | Migration edited | Revert the migration file change |
 
-```markdown
-# 📋 CI Pipeline Report
+### Step 2: Read the PR comment
 
-## Pipeline Status: ❌ FAILED
+The `summarize` job posts a status table on every CI run. This is the fastest way to see which sub-check failed.
 
-### Stage Results
-
-| Stage            | Component    | Status    |
-| ---------------- | ------------ | --------- | ---------------------- |
-| **Code Quality** | Format Check | ✅ Passed |
-|                  | ESLint       | ❌ Failed | ← This is your problem |
-|                  | TypeScript   | ✅ Passed |
-```
-
-### Step 2: Find the Failing Step
-
-Click on the failed step in the GitHub Actions UI. Look for:
-
-- **Red ❌ indicators** showing exactly what failed
-- **Structured error messages** with file names and line numbers
-- **Local reproduction commands** starting with `::notice::`
-
-### Step 3: Reproduce Locally
-
-Every failing step includes a command to reproduce the issue locally:
+### Step 3: Pull the error lines
 
 ```bash
-# Example from a failed ESLint step
-pnpm exec nx affected -t lint --base=origin/main --head=HEAD
+# MCP (preferred)
+ci_get_logs(runId: RUN_ID, failedOnly: true)
+
+# CLI fallback
+gh run view RUN_ID --log-failed
 ```
 
-## 🔍 Debugging by Failure Type
-
-### Code Quality Failures
-
-#### ESLint Failures
-
-**Symptoms**: `🔧 ESLint Validation` step fails
-**Common Causes**:
-
-- New code violating linting rules
-- Import/export ordering issues
-- TypeScript type safety violations
-
-**Debugging Steps**:
+### Step 4: Reproduce locally
 
 ```bash
-# 1. Reproduce locally
-pnpm exec nx affected -t lint --base=origin/main --head=HEAD
-
-# 2. Auto-fix common issues
-pnpm exec nx affected -t lint --fix --base=origin/main --head=HEAD
-
-# 3. Check specific files mentioned in CI logs
-pnpm exec nx lint specific-project-name
+make pc   # Runs format, lint, typecheck, test, build in sequence
 ```
 
-**Example CI Error Message**:
+## Why CI Isn't Running on My PR
 
-```
-❌ ESLint validation failed
-## ESLint Errors Summary
-apps/web/src/components/PlayerCard.tsx
-  42:1  error  'React' is not defined  no-undef
-  45:3  error  Missing return type on function  @typescript-eslint/explicit-function-return-type
-```
+CI runs only when:
 
-**Fix**:
+1. The Code Reviewer Bot approves your PR (fires via `pull_request_review` event)
+2. Your PR enters the merge group
+3. Manual workflow dispatch
 
-```typescript
-// Add missing import
-import React from 'react';
+CI does **not** run on every push. If CI hasn't started, ensure:
+- Your PR is not a draft (`Mark as ready for review`)
+- The Code Reviewer Bot has been invited to review (it triggers automatically on non-draft, non-fork PRs)
 
-// Add return type
-function PlayerCard(): React.ReactElement {
-  return <div>...</div>;
-}
-```
+## Debugging by Failure Type
 
-#### Format Check Failures
-
-**Symptoms**: `🎨 Code Formatting Check` step fails
-**Quick Fix**:
+### `CI: Formatting`
 
 ```bash
-# Fix all formatting issues
+# Fix and commit
 pnpm exec nx format:write
-
-# Check what files need formatting
-pnpm exec nx format:check
+git add -A && git commit -m "chore: fix formatting"
 ```
 
-#### TypeScript Failures
+`make pc` runs this automatically before every pre-commit validation. Formatting failures are rare when `make pc` is used consistently.
 
-**Symptoms**: `📝 TypeScript Type Check` step fails
-**Debugging**:
+### `CI: Lint Failure`
 
 ```bash
-# Check type errors for affected projects
-pnpm exec nx affected -t typecheck --base=origin/main --head=HEAD
+# Auto-fix
+pnpm exec nx affected -t lint --fix
 
-# Check specific project
-pnpm exec nx typecheck specific-project-name
-
-# Build to see compilation errors
-pnpm exec nx build specific-project-name
+# Check which rules fired (read the log for rule names)
+pnpm exec nx affected -t lint
 ```
 
-### Build Failures
+Never use `eslint-disable` suppressions. Fix the root cause. See `.agents/skills/standards/SKILL.md`.
 
-#### Web Build Failures
-
-**Symptoms**: `📦 Build Web Application` step fails
-**Common Causes**:
-
-- Missing environment variables
-- Import/export issues
-- Asset loading problems
-- Bundle size issues
-
-**Debugging Steps**:
+### `CI: Type Error`
 
 ```bash
-# 1. Reproduce the build
+pnpm exec nx affected -t typecheck
+```
+
+Read the error: `file(path,line): error TSxxxx: message`. Never use `@ts-ignore` — fix the underlying type.
+
+### `CI: Test Failure`
+
+```bash
+# All affected tests
+pnpm exec nx affected -t test
+
+# Single spec
+pnpm exec nx run <project>:test --testPathPattern="SpecName"
+```
+
+If the error line is a module-loading warning (`Failed to load the ES module`) above the `FAIL` line, the test framework failed to initialize — fix the config, not the test.
+
+### `CI: Build Failure`
+
+```bash
+pnpm exec nx affected -t build
+```
+
+Read for `Module not found`, `Cannot find`, or `BUILD FAILED`. Common causes:
+- Missing import or incorrect path
+- Environment variable expected at build time
+- Type error that only surfaces during bundling
+
+### `CI: E2E Failure`
+
+```bash
+# Build web first (E2E needs the artifact)
 pnpm exec nx build web
 
-# 2. Check for missing dependencies
-npm ci
-
-# 3. Verify environment setup
-cp apps/web/.env.example apps/web/.env.local
-# Edit .env.local with appropriate values
-
-# 4. Check bundle analysis
-pnpm exec nx build web --analyze
+# Run critical tests
+pnpm exec nx e2e web-e2e -- --grep='@critical'
 ```
 
-**Example Error & Fix**:
+For flaky failures, rerun first: `ci_rerun(runId: RUN_ID, failedOnly: true)`. If consistently failing, read the Playwright report via `ci_get_playwright_report({ reportName: "pr-<PR#>" })`.
 
-```
-❌ Web application build failed
-## Build Errors Summary
-ERROR in ./apps/web/src/main.tsx
-Module not found: Error: Can't resolve '@legacy-sports/shared-components'
-```
+### `CI: Quality Gates` (setup failure)
 
-**Fix**: Check if the import path is correct and the package exists in `lib/shared-components`.
+This label fires when the `quality-gates` job fails before sub-checks produce output — typically a runner OOM, timeout, or setup step failure.
 
-#### Lambda Build Failures
+1. Rerun: `ci_rerun(runId: RUN_ID, failedOnly: true)`
+2. If it fails again, check logs for setup errors like `Nx CLI not available` or `node_modules not found`
 
-**Symptoms**: `⚡ Build Lambda Functions` step fails
-**Debugging**:
+### `CI: Migration Immutability`
+
+A migration file under `lib/db-client/migrations/` was edited after being merged. Migration files are immutable.
+
+**Fix:** Revert the change. If schema behavior needs to change, add a new migration file instead.
+
+## Bot-Review Failures (`bot-review` status)
+
+The `bot-review` commit status is set by the Code Reviewer Bot via the reviewer script. It tracks whether code review findings are resolved.
+
+### `bot-review: failure` — unresolved review threads
+
+1. Get unresolved threads: `github_get_review_threads({ number: PR# })`
+2. Fix the flagged code or prepare structured replies
+3. Commit and push fixes
+4. Reply to each thread: `FIX: <sha>` (fix committed) or `JUSTIFY: <rationale>` (finding incorrect/out of scope)
+5. Apply `bot:ready-for-review` label to trigger Cycle 2
+
+Full protocol in `AGENTS.md §8`. Use `/respond-to-review` to scaffold structured replies.
+
+### `bot-review: pending` — review not started
+
+Ensure the PR is not a draft. The reviewer fires on `opened`/`ready_for_review` events. If the reviewer didn't fire:
+- Check the Actions tab for a `Reviewer (W1)` run
+- If missing, manually trigger: `gh workflow run review.yml -f pull_number=<PR#>`
+
+### Copilot reviewer returned unexpected output
+
+The reviewer script (`review.yml`) runs with `continue-on-error: true`. If it fails silently, check the `Run reviewer` step in the Actions log.
+
+## Standalone Check Failures
+
+### `No Merge Conflicts`
 
 ```bash
-# Build specific lambda
-pnpm exec nx build lambdas-oauth-proxy
-
-# Package lambda for testing
-pnpm exec nx package lambdas-oauth-proxy
-
-# Check lambda dependencies
-cd lambdas/oauth-proxy && npm ci
+git fetch origin
+git rebase origin/main
+# Resolve conflicts, then push
 ```
 
-#### Mobile Build Failures
-
-**Symptoms**: Mobile validation fails or platform builds fail
-**Debugging**:
+### `GraphQL Schema & Codegen`
 
 ```bash
-# Check mobile configuration
-pnpm exec nx build app --dry-run
-
-# For iOS issues (requires macOS)
-pnpm exec nx build app --platform=ios
-
-# For Android issues
-pnpm exec nx build app --platform=android
+pnpm exec nx run db:print-schema
+pnpm run codegen
+git add lambdas/db/schema.graphql lib/**/graphql.generated.ts
 ```
 
-### Test Failures
-
-#### Unit Test Failures
-
-**Symptoms**: `🧪 Unit Tests` step fails
-**Debugging**:
+### `Verify All Migrations Applied`
 
 ```bash
-# Run tests for affected projects
-pnpm exec nx affected -t test --base=origin/main --head=HEAD
+# MCP
+db_migrate()
 
-# Run specific test file
-pnpm exec nx test shared-components --testPathPattern=AuthProvider
-
-# Run tests in watch mode for debugging
-pnpm exec nx test shared-components --watch
+# CLI
+pnpm --prefix lib/db-client run db:up
 ```
 
-**Example CI Test Failure**:
+### `Naming Lint` (W3)
 
-```
-❌ Unit tests failed
-## Failed Tests Summary
- FAIL  lib/shared-components/src/auth/AuthProvider.test.tsx
-   ● AuthProvider › should handle login flow
-     expect(received).toBe(expected) // Object.is equality
-     Expected: "authenticated"
-     Received: "loading"
-```
+PR title must start with `LS-XXXX` or contain a valid conventional commit type. See `.agents/skills/branch-naming/SKILL.md`.
 
-**Fix**: Check if the test is properly waiting for async operations or if the component state is being updated correctly.
+## Debug Mode
 
-#### Integration Test Failures
-
-**Symptoms**: `🔄 Integration Tests` step fails
-**Debugging**:
+Add the `ci-debug` label to enable `NX_VERBOSE_LOGGING` and extended error context:
 
 ```bash
-# Run integration tests locally
-pnpm run test:integration
-
-# Check database connectivity (if applicable)
-pnpm run db:test
-
-# Check environment variables
-pnpm run sync-env
+github_manage_labels(prs: [PR#], add: ["ci-debug"])
 ```
 
-## 🛠 Advanced Debugging Techniques
+## Merge Queue Issues
 
-### Accessing CI Artifacts
+See [merge-queue-guide.md](merge-queue-guide.md) for the full merge queue reference.
 
-Every CI run uploads artifacts for debugging:
+**Common blockers:**
 
-1. **Go to the failed workflow run**
-2. **Scroll to bottom** to find "Artifacts" section
-3. **Download** `ci-pipeline-logs-<run-id>`
-4. **Extract and examine** specific log files
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| PR not merging after CI passes | 30 s debounce | Wait 60 s; check merge queue workflow run |
+| "Unresolved review threads" | Human or bot threads open | Resolve all threads in Files Changed tab |
+| "Status checks failing" | CI or bot-review failure | Fix the failing check |
+| Queue appears stuck | Race condition | Remove and re-add `merge-when-ready` label |
 
-**Key artifact files**:
+## Deployment Issues
 
-- `execution-plan.json` - Shows what the CI planned to do
-- `test-context.json` - Test execution context
-- `ci-report.json` - Complete pipeline status
-- `*.log` files - Detailed logs from each step
+### Web deployment (`deploy-web.yml`)
 
-### Debug Mode
-
-Enable verbose logging by adding the `ci-debug` label to your PR:
+Triggers on push to `main` when `apps/web/**` or `lib/shared-components/**` changes.
 
 ```bash
-# Via GitHub CLI
-gh pr edit --add-label ci-debug
-
-# Via GitHub Web UI
-# Add "ci-debug" label in the PR sidebar
+gh run list --workflow deploy-web.yml --limit 5
+gh run view RUN_ID --log-failed
 ```
 
-This enables:
+Common causes: missing `VITE_*` secrets, Sentry sourcemap upload failure.
 
-- Verbose Nx logging
-- Extended error context
-- Additional debugging output
-- Longer log retention
+### Lambda deployment
 
-### Local CI Simulation
-
-Reproduce the entire CI pipeline locally:
+Two-step: `upload-lambdas.yml` (build + S3 upload) → `lambda-terraform-apply.yml` (Terraform apply).
 
 ```bash
-#!/bin/bash
-# scripts/simulate-ci.sh
-
-echo "🚀 Simulating CI Pipeline Locally"
-
-# Setup (matches CI environment)
-export NX_DAEMON=false
-export NX_PARALLEL=4
-export NODE_OPTIONS="--max_old_space_size=4096"
-
-# Stage 1: Code Quality
-echo "🎨 Code Quality Checks"
-pnpm exec nx format:check --base=origin/main --head=HEAD
-pnpm exec nx affected -t lint --base=origin/main --head=HEAD
-pnpm exec nx affected -t typecheck --base=origin/main --head=HEAD
-
-# Stage 2: Testing
-echo "🧪 Testing"
-pnpm exec nx affected -t test --base=origin/main --head=HEAD
-
-# Stage 3: Building
-echo "📦 Building"
-pnpm exec nx affected -t build --base=origin/main --head=HEAD
-
-echo "✅ Local CI simulation complete"
+gh run list --workflow upload-lambdas.yml --limit 5
+gh run list --workflow lambda-terraform-apply.yml --limit 5
 ```
 
-## 📊 Performance Debugging
-
-### Slow CI Runs
-
-If CI is running slower than expected:
-
-1. **Check Nx Cache**:
-
-   ```bash
-   # Clear local cache if needed
-   pnpm exec nx reset
-
-   # Check cache hit rates in CI logs
-   grep "cache hit" *.log
-   ```
-
-2. **Analyze Build Times**:
-
-   ```bash
-   # Run with verbose timing
-   pnpm exec nx affected -t build --verbose
-
-   # Check for large bundle sizes
-   pnpm exec nx build web --analyze
-   ```
-
-3. **Check Parallelization**:
-   - Verify `NX_PARALLEL=4` is being used
-   - Look for dependency bottlenecks in task graph
-
-### Memory Issues
-
-**Symptoms**: "JavaScript heap out of memory" errors
-**Solutions**:
-
-```bash
-# Increase heap size locally
-export NODE_OPTIONS="--max_old_space_size=8192"
-
-# Check memory usage during builds
-node --max-old-space-size=8192 ./node_modules/.bin/nx build web
-```
-
-## 🚨 Common Issues & Quick Fixes
-
-### Issue: "Deprecated GitHub Actions" errors
-
-**Symptoms**: CI fails with errors like:
-
-```
-Error: This request has been automatically failed because it uses a
-deprecated version of `actions/upload-artifact: v3`. Learn more:
-https://github.blog/changelog/2024-04-16-deprecation-notice-v3-of-the-artifact-actions/
-```
-
-**Cause**: Workflow uses outdated GitHub Actions versions
-**Fix**: Update actions to latest versions in `.github/workflows/ci-pipeline-improved.yml`:
-
-```yaml
-# Update these actions to latest versions:
-- uses: actions/upload-artifact@v4 # was v3
-- uses: actions/cache@v4 # was v3
-- uses: actions/setup-java@v4 # was v3
-- uses: actions/checkout@v4 # should already be v4
-- uses: actions/setup-node@v4 # should already be v4
-```
-
-**Prevention**: Regularly check for action updates using:
-
-```bash
-# Check current action versions
-grep -r "uses: actions/" .github/workflows/
-
-# Look for deprecated versions (v1, v2, v3)
-grep -r "@v[1-3]$" .github/workflows/
-```
-
-### Issue: "Nx affected finds no projects"
-
-**Cause**: Base branch not set correctly
-**Fix**:
-
-```bash
-# Set correct base for affected detection
-git fetch origin main
-pnpm exec nx affected -t build --base=origin/main --head=HEAD
-```
-
-### Issue: "Module not found" errors
-
-**Cause**: Dependencies not installed or stale lockfile
-**Fix**:
-
-```bash
-# Clean install
-rm -rf node_modules package-lock.json
-pnpm install
-
-# Or update specific dependencies
-npm ci --prefer-offline
-```
-
-### Issue: Platform builds failing
-
-**Cause**: Platform-specific dependencies or configuration
-**Fix**:
-
-```bash
-# Check platform requirements
-pnpm exec nx build app --dry-run
-
-# Verify mobile dependencies
-cd apps/app && pnpm exec expo doctor
-
-# Check iOS dependencies (macOS only)
-cd ios && pod install
-```
-
-### Issue: Deployment validation fails
-
-**Cause**: Terraform configuration or AWS credentials
-**Fix**:
-
-```bash
-# Validate terraform locally
-cd terraform
-terraform init -backend=false
-terraform validate
-
-# Check AWS credentials (for maintainers)
-aws sts get-caller-identity
-```
-
-### Issue: Terraform State Lock Errors (Recurring Deployment Failures)
-
-**Symptoms**:
-
-- Deployment workflows fail with "Error acquiring the state lock"
-- Manual deployments required after CI failures
-- Lock persists between deployments
-
-**Common Causes**:
-
-1. Previous deployment was cancelled mid-execution
-2. Deployment workflow crashed without cleanup
-3. Multiple deployments attempted simultaneously
-4. Stale lock from failed CI run
-
-**Automated Fix** (CI handles this automatically as of 2026-02-04):
-
-- CI now auto-detects and clears stale locks (>30 minutes old) before deploying
-- Active locks (<30 minutes) are respected with 10-minute retry timeout
-- Failed deployments automatically cleanup their own locks
-
-**Manual Fix** (if needed locally):
-
-```bash
-# 1. Check for locks and auto-clear
-node scripts/terraform-unlock.js
-
-# 2. If script doesn't work, force unlock manually
-cd terraform
-terraform force-unlock <LOCK_ID>
-
-# 3. Then retry deployment
-.\scripts\deploy-lambda.ps1 -FunctionName <function-name>
-```
-
-**Prevention**:
-
-- ✅ Don't cancel deployment workflows mid-execution
-- ✅ Let CI complete or fail naturally (cleanup happens automatically)
-- ✅ Use workflow concurrency controls (already configured)
-- ✅ Monitor DynamoDB table `terraform-state-locks` for stuck locks
-
-**Lock Information Sources**:
-
-```bash
-# View lock status in DynamoDB
-aws dynamodb scan --table-name terraform-state-locks --region us-east-1
-
-# Check SSM parameter for deployment versions
-aws ssm get-parameters-by-path --path "/legacy-sports/dev/lambda" --recursive
-```
-
-**Recent Improvements** (2026-02-04):
-
-- ✅ Fixed lock detection in `terraform-unlock.js` (was using `-lock=false` which bypassed checks)
-- ✅ Added auto-unlock feature for scripts (no manual lock ID needed)
-- ✅ CI now clears stale locks before deployment starts
-- ✅ Improved lock detection in CI cleanup step
-- ✅ Updated all deployment documentation with correct workflow
-
-## 🔄 Error Recovery Patterns
-
-### Pattern 1: Transient Failures
-
-**Symptoms**: Random failures that don't reproduce locally
-**Recovery**:
-
-1. Re-run the failed workflow
-2. Check GitHub Actions service status
-3. Look for external service dependencies
-
-### Pattern 2: Environment Issues
-
-**Symptoms**: "Permission denied" or "Command not found"
-**Recovery**:
-
-1. Check if CI environment matches local setup
-2. Verify all required tools are installed in CI
-3. Check file permissions and execution flags
-
-### Pattern 3: Race Conditions
-
-**Symptoms**: Tests pass locally but fail in CI
-**Recovery**:
-
-1. Look for async operations without proper awaits
-2. Check test timeouts and timing assumptions
-3. Add appropriate delays or polling in tests
-
-## 📋 Escalation Procedures
-
-### Level 1: Self-Service (First 15 minutes)
-
-- Check CI summary for obvious failures
-- Reproduce locally using provided commands
-- Apply quick fixes (formatting, linting)
-- Re-run workflow if it looks like a transient failure
-
-### Level 2: Team Support (15-30 minutes)
-
-- Post in #engineering Slack with:
-  - Link to failed CI run
-  - Error message from CI summary
-  - Steps you've already tried
-- Check recent commits for similar issues
-- Review recent changes to CI configuration
-
-### Level 3: DevOps Escalation (30+ minutes)
-
-- Create GitHub issue with "ci-issue" label
-- Include complete error logs and reproduction steps
-- Tag @devops-team in Slack
-- Consider temporary workarounds if blocking
-
-### Emergency Procedures
-
-For CI failures blocking critical deployments:
-
-1. **Immediate**: Contact DevOps lead via emergency phone
-2. **Short-term**: Use manual deployment procedures if available
-3. **Communication**: Update #incidents channel with status
-4. **Long-term**: Root cause analysis and prevention plan
+**Terraform state lock:** If a deployment was cancelled mid-run, the Terraform state lock may be held. Check the DynamoDB table `terraform-state-locks` and use `terraform force-unlock <LOCK_ID>` if needed.
 
 ## Discord Notifications
 
-CI/CD workflows post status notifications to Discord via the `.github/actions/discord-notify` action. Each workflow uses a separate GitHub secret pointing to a different webhook/channel:
+CI workflows post to Discord via channel-specific webhooks:
 
-| Secret                            | Used by                                                                                                                    |
-| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `DISCORD_CI_WEBHOOK_URL`          | Playwright tests (`run-playwright-tests.yml`), CI pipeline (`ci-pipeline.yml`)                                             |
-| `DISCORD_DEPLOY_WEBHOOK_URL`      | Web deploys (`deploy-web.yml`), Lambda Terraform (`lambda-terraform-apply.yml`), rollbacks                                 |
-| `DISCORD_RELEASE_WEBHOOK_URL`     | Android app builds (`build-android-app.yml`), iOS app builds (`build-ios-app.yml`), web release summary (`deploy-web.yml`) |
-| `DISCORD_WEBHOOK_URL`             | Terraform variable — rollbar-discord Lambda (Rollbar + CloudWatch alarm/budget notifications)                              |
-| `DISCORD_USER_SIGNUP_WEBHOOK_URL` | Terraform variable — user signup events                                                                                    |
-| `DISCORD_STRIPE_WEBHOOK_URL`      | Terraform variable — Stripe events                                                                                         |
+| Secret | Used by |
+|--------|---------|
+| `DISCORD_CI_WEBHOOK_URL` | Playwright tests, CI pipeline |
+| `DISCORD_DEPLOY_WEBHOOK_URL` | Web deploys, Lambda Terraform, rollbacks |
+| `DISCORD_RELEASE_WEBHOOK_URL` | iOS/Android builds, web release summary |
 
-To update a webhook (e.g. after recreating a channel): **Settings → Secrets and variables → Actions** in GitHub, then update the relevant secret.
+Update webhooks in GitHub **Settings → Secrets and variables → Actions**.
 
-### Thread grouping (Playwright)
+> **Forum channel required for Playwright thread grouping.** The `thread_name` webhook parameter is a Discord API forum-channel-only feature. A regular text channel will cause the finish notification to fail with `code 10003`.
 
-The Playwright workflow groups the "starting" and "results" notifications into a single Discord thread per run using the `thread-name` input on the start notification and `thread-id` on the finish notification.
+## Nx Cache
 
-**This requires a forum channel.** The `thread_name` webhook parameter is a Discord API forum-channel-only feature. If `DISCORD_CI_WEBHOOK_URL` points to a regular text channel:
-
-- The start notification posts successfully (to the channel root)
-- The `channel_id` captured from the response is the text channel's own ID — not a thread
-- The finish notification fails with `http=400, code 10003 ("Unknown Channel")` because Discord rejects that ID as a `thread_id`
-
-**Fix**: point `DISCORD_CI_WEBHOOK_URL` at a webhook for a **forum channel**. Create one in Discord Server Settings → Integrations → Webhooks, targeting your forum channel, then update the GitHub secret.
-
-## 📚 Additional Resources
-
-### Documentation Links
-
-- [Nx Documentation](https://nx.dev/getting-started/intro) - Nx workspace management
-- [GitHub Actions Docs](https://docs.github.com/en/actions) - CI/CD platform documentation
-- [Project Architecture Guide](../AGENTS.md) - Legacy Sports specific architecture
-
-### Useful Commands Reference
+The CI uses local GitHub Actions caching (`NX_NO_CLOUD=true`). If you suspect stale cache:
 
 ```bash
-# Nx Commands
-pnpm exec nx affected -t <task> --base=origin/main --head=HEAD  # Run task on affected projects
-pnpm exec nx show projects --affected --base=origin/main        # See affected projects
-pnpm exec nx graph --affected --base=origin/main               # Visualize affected dependencies
-pnpm exec nx reset                                             # Clear Nx cache
+# Clear local cache
+pnpm exec nx reset
 
-# Git Commands
-git fetch origin main                                    # Update main branch reference
-git log --oneline origin/main..HEAD                     # See commits in current branch
-git diff --name-only origin/main...HEAD                 # See changed files
-
-# Debugging Commands
-pnpm run sync-env                                         # Sync database credentials
-pnpm run db:test                                         # Test database connectivity
-make typecheck                                          # Type check all projects
-make lint:fix                                          # Auto-fix linting issues
+# Verify cache configuration
+echo $NX_NO_CLOUD  # should be: true
 ```
 
-### Team Contacts
+See [nx-remote-caching-implementation.md](nx-remote-caching-implementation.md).
 
-- **DevOps Lead**: @devops-lead (GitHub), #devops-alerts (Slack)
-- **CI Maintainers**: @ci-team (GitHub), #engineering (Slack)
-- **Emergency Contact**: See team directory for 24/7 rotation
+## Performance
 
-This troubleshooting guide should help you quickly identify and resolve most CI issues in the improved system. The key is to follow the structured approach: check the summary, find the failing step, and reproduce locally using the provided commands.
+Target CI times: quality-gates 30 min, build-validation 30 min, E2E 30 min. If significantly slower:
+- Check `NX_PARALLEL` is set (defaults to 3 in `ci-pipeline.yml`)
+- Check for dependency bottlenecks in the Nx task graph
+
+## Escalation
+
+1. **Self-service (< 15 min):** Use commands above; rerun if transient
+2. **Team (15–30 min):** Post in `#engineering` with CI run link and error message
+3. **DevOps (30+ min):** Create GitHub issue with `ci-issue` label; tag `#devops-alerts`

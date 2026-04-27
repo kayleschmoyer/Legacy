@@ -1,90 +1,82 @@
 # CI/CD Documentation
 
-This directory contains all continuous integration and deployment documentation for the Legacy Sports platform, including GitHub Actions, pipeline configuration, and automation.
+This directory contains documentation for the Legacy Sports CI/CD system. The current system was rebuilt from scratch as part of the LS-3857 epic (2026).
 
-## 📑 Contents
+## Canonical References (Start Here)
 
-### Core CI/CD System
+| Document | Purpose |
+|----------|---------|
+| **[ci-greenfield-design.md](ci-greenfield-design.md)** | **← Architecture reference.** Trigger model, pipeline jobs, bot review, merge queue, design decisions |
+| **[ci-greenfield-gap-analysis.md](ci-greenfield-gap-analysis.md)** | **← Why we rebuilt.** Problems with the old system, required checks summary, phase timeline |
+| **[ci-greenfield-copilot-evaluation.md](ci-greenfield-copilot-evaluation.md)** | **← Bot review design.** Copilot CLI integration, RAISE/ADJUDICATE/VERIFY cycle protocol |
 
-- **[CI Pipeline Requirements](ci-pipeline-requirements.md)** ⭐ - Functional requirements, constraints, and design decisions
-- **[CI System Documentation](ci-system-documentation.md)** - Complete CI/CD system overview
-- **[CI Migration Plan](ci-migration-plan.md)** - Migration strategy and timeline
-- **[CI Workflow Migration Status](ci-workflow-migration-status.md)** - Current migration state
-- **[Improved CI System Design](improved-ci-system-design.md)** - Enhanced architecture
-- **[Cloud-Ready CI Configuration](cloud-ready-ci-configuration.md)** - Cloud-optimized setup
+## Operational Guides
 
-### Troubleshooting & Optimization
+- **[ci-system-documentation.md](ci-system-documentation.md)** — Quick reference: workflows, trigger model, common operations
+- **[ci-troubleshooting-guide.md](ci-troubleshooting-guide.md)** — Diagnosing CI failures by label, fixing bot-review failures, merge queue issues
+- **[merge-queue-guide.md](merge-queue-guide.md)** — Full merge queue reference: conditions, labels, troubleshooting, authentication
 
-- **[CI Troubleshooting Guide](ci-troubleshooting-guide.md)** - Debug common pipeline issues
-- **[Intelligent DTE Detection](intelligent-dte-detection.md)** - Smart distributed task execution
-- **[CI Pipeline Evaluation](ci-pipeline-evaluation.md)** - Performance metrics and analysis
-- **[Nx Remote Caching Implementation](nx-remote-caching-implementation.md)** ⭐ - GitHub Actions-based Nx caching
+## Infrastructure & Tooling
 
-### GitHub Actions
+- **[nx-remote-caching-implementation.md](nx-remote-caching-implementation.md)** — GitHub Actions-based Nx caching (still relevant)
+- **[CI_BADGES_SETUP.md](CI_BADGES_SETUP.md)** — Status badge configuration
+- **[badge-logging-improvements.md](badge-logging-improvements.md)** — Badge logging enhancements
 
-- **[GitHub Actions Cleanup](github-actions-cleanup.md)** - Workflow maintenance
-- **[Merge Queue Guide](merge-queue-guide.md)** - GitHub merge queue setup
-- **[Merge Queue Permissions Fix](merge-queue-permissions-fix.md)** - Permission configuration
+## Agent References
 
-### Status & Reporting
+The canonical per-check fix commands and CI triage workflows live in the agent skills directory:
 
-- **[CI Badges Setup](CI_BADGES_SETUP.md)** - Status badge configuration
-- **[Badge Logging Improvements](badge-logging-improvements.md)** - Enhanced badge logging
-- **[PR Comments Implementation](pr-comments-implementation-summary.md)** - Automated PR feedback
-- **[PR Comments & Merge Queue](pr-comments-merge-queue-analysis.md)** - Integration analysis
+- `.agents/skills/pr-lifecycle/references/ci-checks-reference.md` — Per-check fix commands and master lookup table
+- `.agents/skills/debugging/references/ci-pipeline-architecture.md` — Pipeline diagram, timeouts, env vars
+- `.agents/skills/debugging/references/ci-failure.md` — Evidence-first CI triage workflow
+- `.agents/skills/debugging/references/ci-troubleshooting-advanced.md` — Concurrency, E2E, Terraform lock debugging
 
-## 🎯 Quick Start
+## Quick Start
 
-### Understanding the CI System
+### PR failing CI?
 
-1. Start with [CI System Documentation](ci-system-documentation.md)
-2. Review [Improved CI System Design](improved-ci-system-design.md)
-3. Check [Intelligent DTE Detection](intelligent-dte-detection.md) for performance
+1. Check the `CI: *` label applied to the PR (it names the failing stage)
+2. Read the PR comment posted by the `summarize` job
+3. Run `make pc` locally to reproduce and fix
+4. See [ci-troubleshooting-guide.md](ci-troubleshooting-guide.md) for per-failure-type commands
 
-### Troubleshooting Pipeline Issues
+### Bot review blocked (`bot-review: failure`)?
 
-1. Consult [CI Troubleshooting Guide](ci-troubleshooting-guide.md)
-2. Check [CI Pipeline Evaluation](ci-pipeline-evaluation.md) for metrics
-3. Review recent changes in [CI Workflow Migration Status](ci-workflow-migration-status.md)
+1. Run `github_get_review_threads({ number: PR# })` to get open threads
+2. Fix issues and commit
+3. Reply to each thread: `FIX: <sha>` or `JUSTIFY: <rationale>`
+4. Apply `bot:ready-for-review` label to trigger next review cycle
+5. See `AGENTS.md §8` for the full Author Agent Contract
 
-### Setting Up New Workflows
+### PR not merging?
 
-1. Follow [Cloud-Ready CI Configuration](cloud-ready-ci-configuration.md)
-2. Add status badges via [CI Badges Setup](CI_BADGES_SETUP.md)
-3. Configure [Merge Queue](merge-queue-guide.md) if needed
+Add the `merge-when-ready` label. The merge queue checks: no conflicts, `bot-review: success`, all CI passing, no unresolved review threads. See [merge-queue-guide.md](merge-queue-guide.md).
 
-## 🔗 Related Documentation
+## Archived Documentation
 
-- [Nx Cloud Optimization](../build-and-tooling/nx-cloud-optimization-strategy.md) - Build caching
-- [Deployment Guides](../deployment/) - Deployment automation
-- [Security Scanning](../security/security-scanning-implementation.md) - CI security
+Superseded docs have been moved to [`archive/`](archive/). Each carries a banner noting its archival date and pointing to the current canonical doc.
 
-## 💡 Common Tasks
+<details>
+<summary>Archived files (click to expand)</summary>
 
-### CI Pipeline Failing
+| File | Reason archived |
+|------|----------------|
+| [archive/ci-bot-review-spec.md](archive/ci-bot-review-spec.md) | Describes system deliberately built away from |
+| [archive/ci-pipeline-evaluation.md](archive/ci-pipeline-evaluation.md) | Historical analysis |
+| [archive/ci-pipeline-requirements.md](archive/ci-pipeline-requirements.md) | Superseded by greenfield design |
+| [archive/ci-workflow-migration-status.md](archive/ci-workflow-migration-status.md) | Old migration status |
+| [archive/ci-migration-plan.md](archive/ci-migration-plan.md) | Superseded by gap analysis Phase plan |
+| [archive/improved-ci-system-design.md](archive/improved-ci-system-design.md) | Superseded by greenfield design |
+| [archive/cloud-ready-ci-configuration.md](archive/cloud-ready-ci-configuration.md) | Nx Cloud DTE config (now using local execution) |
+| [archive/dte-quota-checking.md](archive/dte-quota-checking.md) | Nx Cloud DTE quota (superseded) |
+| [archive/intelligent-dte-detection.md](archive/intelligent-dte-detection.md) | Nx Cloud DTE detection (superseded) |
+| [archive/github-actions-cleanup.md](archive/github-actions-cleanup.md) | Superseded by this epic |
+| [archive/merge-queue-integration-build-fix.md](archive/merge-queue-integration-build-fix.md) | Historical fix |
+| [archive/merge-queue-permissions-fix.md](archive/merge-queue-permissions-fix.md) | Historical fix |
+| [archive/pr-comments-implementation-summary.md](archive/pr-comments-implementation-summary.md) | Superseded by reviewer's output |
+| [archive/pr-comments-merge-queue-analysis.md](archive/pr-comments-merge-queue-analysis.md) | Historical analysis |
 
-1. Check [CI Troubleshooting Guide](ci-troubleshooting-guide.md)
-2. Review logs in GitHub Actions
-3. Verify Nx Cloud quota in [Nx Cloud Quota Fix](../build-and-tooling/nx-cloud-quota-fix.md)
-4. Check [Intelligent DTE Detection](intelligent-dte-detection.md) status
-
-### Add Status Badge
-
-1. Follow [CI Badges Setup](CI_BADGES_SETUP.md)
-2. Update README with badge markdown
-3. Test badge display
-
-### Configure Merge Queue
-
-1. Read [Merge Queue Guide](merge-queue-guide.md)
-2. Set up permissions via [Merge Queue Permissions Fix](merge-queue-permissions-fix.md)
-3. Test with a PR
-
-### Optimize Build Times
-
-1. Review [Intelligent DTE Detection](intelligent-dte-detection.md)
-2. Check [CI Pipeline Evaluation](ci-pipeline-evaluation.md) for bottlenecks
-3. Implement improvements from [Improved CI System Design](improved-ci-system-design.md)
+</details>
 
 ---
 

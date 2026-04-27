@@ -1,3 +1,7 @@
+> **Archived 2026-04-27.** This document describes a system that has been replaced. See [ci-greenfield-design.md](../ci-greenfield-design.md) for the current architecture.
+
+---
+
 # Fix: Merge Queue Integration Build Trigger (LS-87)
 
 **Issue**: PRs merged via the automated merge queue don't trigger integration builds on the main branch.

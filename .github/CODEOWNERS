@@ -37,5 +37,8 @@ lib/db-client/migrations/**       @bkrupa
 lambdas/db/**                     @bkrupa
 
 # CI design docs
-docs/ci-cd/ci-bot-review-spec.md           @bkrupa
-docs/ci-cd/improved-ci-system-design.md    @bkrupa
+docs/ci-cd/ci-greenfield-design.md         @bkrupa
+docs/ci-cd/ci-greenfield-gap-analysis.md   @bkrupa
+docs/ci-cd/ci-greenfield-copilot-evaluation.md @bkrupa
+docs/ci-cd/archive/ci-bot-review-spec.md          @bkrupa
+docs/ci-cd/archive/improved-ci-system-design.md   @bkrupa

@@ -1,3 +1,7 @@
+> **Archived 2026-04-27.** This document describes a system that has been replaced. See [ci-greenfield-design.md](../ci-greenfield-design.md) for the current architecture.
+
+---
+
 # PR Comments & Enhanced Merge Queue Implementation
 
 ## 🎯 Overview

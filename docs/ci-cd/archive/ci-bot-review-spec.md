@@ -1,3 +1,7 @@
+> **Archived 2026-04-27.** This document describes a system that has been replaced. See [ci-greenfield-design.md](../ci-greenfield-design.md) for the current architecture.
+
+---
+
 # CI & Bot-Review System — End-to-End Specification
 
 > **Scope**: GitHub Actions workflows, custom actions, branch protection, merge queue, Copilot bot-review state machine, pre-commit gates, and Dependabot automation.  

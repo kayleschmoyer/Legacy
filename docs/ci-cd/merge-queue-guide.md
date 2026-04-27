@@ -49,22 +49,22 @@ Draft PRs are never merged. Mark the PR as "Ready for review" first.
 
 The PR must be mergeable (`mergeable: true`). If GitHub hasn't computed the mergeable state yet, the queue polls for up to 60 seconds before giving up (it retries on the next cycle).
 
-### 3. Copilot review passed (`bot-review` status check)
+### 3. Code Reviewer Bot passed (`bot-review` status check)
 
-Every PR requires a passing Copilot code review, enforced via the `bot-review` commit status. This is managed by a separate workflow (`.github/workflows/copilot-auto-approve.yml`) that works as follows:
+Every PR requires a passing code review from the Code Reviewer Bot, enforced via the `bot-review` commit status. This is managed by the `review.yml` workflow (Reviewer W1) and the `.github/scripts/reviewer/index.mjs` script.
 
-1. **PR opened/updated** — the `request-review` job sets `bot-review` to `pending` ("Waiting for Copilot review to complete")
-2. **Copilot reviews the PR** — triggered automatically by the repository ruleset ("Copilot review for default branch" with `review_on_push: true`)
-3. **Copilot review completes** — the `auto-approve` job fires via `workflow_run` off the built-in "Copilot code review" workflow:
-   - **No unresolved threads** → `bot-review` set to `success`, the PR is approved by the review bot (`legacy-sports-review-bot`), and `merge-when-ready` is added automatically
-   - **Unresolved threads exist** → `bot-review` set to `failure`
-   - **Copilot workflow failed/cancelled** → `bot-review` set to `failure`
-4. **Review threads resolved later** — the `review-check` job (triggered by `pull_request_review` events) re-evaluates thread state. If all Copilot threads are resolved or outdated, it flips `bot-review` to `success` and approves
-5. **Rebase/force-push** — if Copilot already has a clean review (approved or all threads resolved/outdated), the status is carried forward to the new SHA without waiting for Copilot to re-review. The carry-forward also re-creates the bot approval and adds the `merge-when-ready` label if missing
+**How it works:**
 
-**Dependabot PRs** get an automatic `bot-review` pass (Copilot review is skipped).
+1. **PR opened / marked ready for review** — `review.yml` fires, the reviewer script analyzes the diff using Copilot CLI (`codex` model)
+2. **Reviewer posts findings:**
+   - **Critical/high findings** → GitHub `REQUEST_CHANGES` review, `bot-review` set to `failure`
+   - **Clean diff** → GitHub `APPROVE` review, `bot-review` set to `success`, `merge-when-ready` label added automatically
+3. **Author responds to threads** — using the RAISE/ADJUDICATE/VERIFY cycle protocol (`FIX: <sha>` or `JUSTIFY: <rationale>` per thread), then applies the `bot:ready-for-review` label to trigger the next review cycle
+4. **Cycle 2 (ADJUDICATE)** — bot re-evaluates; unresolved mandates must be `FIX: <sha>`; if resolved, `bot-review` → `success`
 
-A **manual recheck** is available via workflow dispatch with a PR number, useful when threads are resolved without pushing code.
+See `AGENTS.md §8` (Author Agent Contract) and [ci-greenfield-copilot-evaluation.md](ci-greenfield-copilot-evaluation.md) for the full cycle protocol.
+
+**`bot-review` is a commit status** (not a check run). Use `github_list_commit_statuses({ number: PR# })` to inspect it — `github_retrigger_check` will not find it.
 
 Since `bot-review` is a commit status, the merge queue's status check validation (see below) treats it like any other check — `success` passes, `failure` blocks, `pending` waits.
 
@@ -217,6 +217,8 @@ Both use dedicated app tokens (not `GITHUB_TOKEN`) to ensure their actions trigg
 
 ## Related Documentation
 
-- [CI Pipeline Requirements](ci-pipeline-requirements.md) — CI architecture and check details
-- [Merge Queue Permissions Fix](merge-queue-permissions-fix.md) — GitHub Actions permissions setup
-- [Merge Queue Integration Build Fix](merge-queue-integration-build-fix.md) — post-merge CI dispatch
+- [ci-greenfield-design.md](ci-greenfield-design.md) — Full CI architecture and check details
+- [ci-greenfield-copilot-evaluation.md](ci-greenfield-copilot-evaluation.md) — Code Reviewer Bot design and cycle protocol
+- [ci-troubleshooting-guide.md](ci-troubleshooting-guide.md) — Diagnosing CI and merge queue failures
+- [archive/merge-queue-permissions-fix.md](archive/merge-queue-permissions-fix.md) — Historical: GitHub Actions permissions fix (archived)
+- [archive/merge-queue-integration-build-fix.md](archive/merge-queue-integration-build-fix.md) — Historical: post-merge CI dispatch fix (archived)
