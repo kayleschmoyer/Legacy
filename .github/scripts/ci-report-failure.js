@@ -96,13 +96,6 @@ module.exports = async ({ github, context, core }) => {
 
   // Step analysis for targeted guidance
   const stepAnalysis = {
-    'format-check': {
-      reason: 'Code formatting check failed',
-      command: 'make fmt',
-      agentCommand: 'make_run({ target: "fmt" })',
-      debug:
-        'Code formatting issues detected. Run the command above to auto-fix formatting, then commit the changes.',
-    },
     'quality-gates': {
       reason: 'Code quality validation failed',
       command: 'make pc',

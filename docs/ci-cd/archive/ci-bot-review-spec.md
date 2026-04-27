@@ -197,7 +197,7 @@ detect-changes
 | `.github/actions/quality-gates`    | Parallel: format, lint, typecheck, test, migration check                                                     |
 | `.github/actions/build-validation` | Parallel: web/mobile/lambda/terraform builds, artifact verification                                          |
 | `.github/actions/e2e-testing`      | Playwright orchestration with sharding                                                                       |
-| `.github/actions/ci-reporting`     | Generates PR comment with CI report; posts failure analysis                                                  |
+| `.github/actions/ci-reporting`     | Generates sticky PR comment (`<!-- CI-PIPELINE-STATUS -->`) with CI status and failure analysis. Not label management — that lives in the `summarize` job and the orchestrator. |
 | `.github/actions/nx-cache`         | Nx remote cache via GitHub Actions cache API                                                                 |
 | `.github/actions/s3-artifact`      | S3 artifact upload/download                                                                                  |
 
@@ -211,6 +211,24 @@ detect-changes
 The `summarize` job sets `overall-status` (`success` | `failure`) as a workflow output. The orchestrator's `remove-merge-label-on-failure` job reads this.
 
 > **Historical note (LS-1115)**: internal jobs used `if: always()` which caused `workflow_call` result to always report `failure`. Fixed by replacing with `if: !cancelled()`. The explicit `overall-status` output is an additional safety net.
+
+### PR Comment Surfaces
+
+Two distinct comment surfaces exist on every PR — they do **not** overlap:
+
+| Surface | Who posts | GitHub API | What it contains |
+|---------|-----------|------------|-----------------|
+| Sticky comment `<!-- CI-PIPELINE-STATUS -->` | `ci-reporting` action (in `summarize` job) | `issues.createComment` / `issues.updateComment` | CI pass/fail, step status table, reproduction commands |
+| Formal PR review | `review.yml` (W1) | `pulls.createReview` (APPROVE / REQUEST_CHANGES) | Code quality findings, blocking issues |
+
+These serve different purposes and appear in different UI sections. There is no risk of both posting duplicate "all good" messages.
+
+### Label Management
+
+Labels are managed in two places, not in `ci-reporting`:
+
+- **CI failure labels** (`CI: Lint Failure`, `CI: Test Failure`, etc.) — set by the `Label PR on Failure` step in the `summarize` job.
+- **`merge-when-ready` removal on CI failure** — handled by `ci-orchestrator.yml::remove-merge-label-on-failure`.
 
 ### Nx Affected Scope
 
@@ -563,7 +581,7 @@ All actions live in `.github/actions/`.
 
 | Action                                                            | Purpose                                                                     |
 | ----------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| `ci-reporting`                                                    | Generates comprehensive PR comment with failure analysis; manages PR labels |
+| `ci-reporting`                                                    | Generates sticky PR comment with CI status, failure analysis, and reproduction commands (marker `<!-- CI-PIPELINE-STATUS -->`). Label management lives in the orchestrator and pipeline, not here. |
 | `discord-notify`                                                  | Discord webhook notifications                                               |
 | `rollbar-deploy`                                                  | Tracks deployments in Rollbar                                               |
 | `update-badges`, `update-deployment-badge`, `update-health-badge` | README/docs status badges                                                   |

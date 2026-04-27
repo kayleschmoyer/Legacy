@@ -34,9 +34,6 @@ inputs:
   run-id:
     description: "GitHub Actions run ID"
     required: false
-  job-id:
-    description: "GitHub Actions job ID"
-    required: false
   quality-gates-subsections:
     description: "JSON object with quality gates subsection results (formatting, lint, typecheck, test)"
     required: false
