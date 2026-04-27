@@ -1,0 +1,115 @@
+name: Code Writer Bot (W0)
+
+# Creates bot-authored PRs for cycle-protocol validation (V2–V8).
+#
+# Every step in this workflow runs under the GITHUB_TOKEN identity, which
+# GitHub attributes to the github-actions[bot] user. That account satisfies
+# the reviewer script's bot-author check:
+#   ctx.author.is_bot === true  OR  ctx.author.login.endsWith('[bot]')
+#
+# Supports two call modes:
+#   workflow_dispatch — ad-hoc manual runs and agent-triggered invocations
+#   workflow_call     — called from a validation workflow; outputs pr_number
+#                       and branch_name for the caller to act on
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch_suffix:
+        description: "Unique suffix appended to the validation/ branch prefix"
+        required: true
+        type: string
+      pr_title:
+        description: "PR title"
+        required: true
+        type: string
+      pr_body:
+        description: "PR body (markdown)"
+        required: false
+        type: string
+        default: "Validation probe PR — created by the code-writer-bot workflow for cycle-protocol testing."
+      ready_for_review:
+        description: "Mark PR ready for review immediately (triggers W1 reviewer)"
+        required: false
+        type: boolean
+        default: false
+
+  workflow_call:
+    inputs:
+      branch_suffix:
+        description: "Unique suffix appended to the validation/ branch prefix"
+        required: true
+        type: string
+      pr_title:
+        description: "PR title"
+        required: true
+        type: string
+      pr_body:
+        description: "PR body (markdown)"
+        required: false
+        type: string
+        default: "Validation probe PR — created by the code-writer-bot workflow for cycle-protocol testing."
+      ready_for_review:
+        description: "Mark PR ready for review immediately (triggers W1 reviewer)"
+        required: false
+        type: boolean
+        default: false
+    outputs:
+      pr_number:
+        description: "Number of the created PR"
+        value: ${{ jobs.create-pr.outputs.pr_number }}
+      branch_name:
+        description: "Full branch name (validation/<branch_suffix>)"
+        value: ${{ jobs.create-pr.outputs.branch_name }}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  create-pr:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      pr_number: ${{ steps.create-pr.outputs.pr_number }}
+      branch_name: ${{ steps.create-branch.outputs.branch_name }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Create branch with probe commit
+        id: create-branch
+        run: |
+          BRANCH="validation/${{ inputs.branch_suffix }}"
+          echo "branch_name=$BRANCH" >> "$GITHUB_OUTPUT"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          mkdir -p .github/validation-probes
+          printf 'branch: %s\ncreated: %s\n' \
+            "$BRANCH" \
+            "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            > ".github/validation-probes/${{ inputs.branch_suffix }}.txt"
+          git add ".github/validation-probes/${{ inputs.branch_suffix }}.txt"
+          git commit -m "chore(validation): add probe file for cycle-protocol testing (LS-3925)"
+          git push origin "$BRANCH"
+
+      - name: Create draft PR
+        id: create-pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_URL=$(gh pr create \
+            --draft \
+            --title "${{ inputs.pr_title }}" \
+            --body "${{ inputs.pr_body }}" \
+            --head "${{ steps.create-branch.outputs.branch_name }}" \
+            --base main)
+          PR_NUMBER=$(echo "$PR_URL" | grep -oE '[0-9]+$')
+          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "Created draft PR #$PR_NUMBER: $PR_URL"
+
+      - name: Mark ready for review
+        if: ${{ inputs.ready_for_review }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh pr ready ${{ steps.create-pr.outputs.pr_number }}
