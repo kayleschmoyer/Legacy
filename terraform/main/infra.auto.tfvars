@@ -61,4 +61,4 @@ discord_redirect_uri = "https://legacy-fantasy.com/auth/discord/callback"
 # hardcoded display prices, and the "Upgrade" button shows
 # "Upgrade is temporarily unavailable" (LS-3683).
 stripe_monthly_price_id = "price_1TOAxg359dSHpsyveNJvtJ0i"
-stripe_annual_price_id  = "price_1TOAxh359dSHpsyvDBbxUobZ"
+stripe_annual_price_id  = "price_1TQhp4359dSHpsyv3n7bJTUl"
