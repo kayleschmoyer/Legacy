@@ -27,7 +27,7 @@ REPEAT:
         - clean + approved (mergeable, no failed checks, no unresolved threads) → wait for the merge queue or trigger merge per project policy; leave in in_flight_prs
         - CI failing on a fixable category (lint/format/type/stale-branch/codegen) → fix in the worktree, push, leave in in_flight_prs
         - CONFLICTING with main → run the rebase skill (worktree_rebase → worktree_stabilize → make pc → push), leave in in_flight_prs
-        - unresolved Copilot review threads → fetch threads, fix in worktree, push, reply, resolve, re-request review; increment reviewRounds for that PR once per complete response cycle (respond to all threads + push + re-request review), regardless of whether Copilot has re-reviewed yet
+        - unresolved bot review threads → fetch threads, apply FIX:/JUSTIFY: replies per author-agent contract, fix in worktree, push, apply `bot:ready-for-review` label; increment reviewRounds for that PR once per complete response cycle (respond to all threads + push + label), regardless of whether the bot has re-reviewed yet
         - reviewRounds >= 2 OR an unresolvable failure (genuinely needs the user) → move to all_escalated, drop from in_flight_prs, surface in the final report
      d. After draining, recompute in_flight_prs by filtering out merged/escalated PRs while preserving per-PR reviewRounds for still-pending entries (do not rebuild from scratch — that resets reviewRounds to 0 and defeats the escalation cap).
   2. List children: jira_list_children (or JQL parent = <currentBucketEpicKey> AND status = "To Do" ORDER BY priority DESC, created ASC)

@@ -224,24 +224,24 @@ gh api graphql -f query='mutation($id:ID!) { resolveReviewThread(input:{threadId
 
 **Never leave addressed threads unresolved** — this blocks the merge queue and triggers unnecessary re-review.
 
-## Step 8 — Add `merge-when-ready` Label (if all threads resolved)
+## Step 8 — Apply `bot:ready-for-review` Label (if all threads resolved)
 
-After resolving all threads, add the label:
+After resolving all threads and pushing fixes, apply the label to trigger the next review cycle:
 
 ```
-github_manage_labels(prs: [<PR#>], add: ["merge-when-ready"])
+github_manage_labels(prs: [<PR#>], add: ["bot:ready-for-review"])
 ```
 
-Shell: `gh pr edit <PR#> --add-label "merge-when-ready"`
+Shell: `gh pr edit <PR#> --add-label "bot:ready-for-review"`
 
-Note: The `copilot-auto-approve` bot may add this automatically after all threads are resolved — check first before adding manually.
+**Do not push without applying the label** — pushes alone do not trigger a re-review. See [AGENTS.md](../AGENTS.md) for the full author-agent contract (FIX:/JUSTIFY:/CANNOT-COMPLY: protocol and cycle rules).
 
 ## Step 9 — Handle Re-Review
 
-After you push, Copilot will automatically re-review the PR. New threads from the re-review are a **separate round**. To pick them up:
+After you push and apply the `bot:ready-for-review` label, the bot will automatically re-review the PR. New threads from the re-review are a **separate cycle**. To pick them up:
 
-- Wait for the re-review to complete by polling: call `github_list_reviews({ number: <PR#> })` and watch for a new Copilot review entry, or call `github_get_review_threads({ number: <PR#> })` to detect newly created unresolved threads. Alternatively, check the PR manually on GitHub.
-- Re-run this prompt to address the new round after that re-review completes.
+- Wait for the re-review to complete: call `github_list_reviews({ number: <PR#> })` and watch for a new bot review entry, or call `github_get_review_threads({ number: <PR#> })` to detect newly created unresolved threads. Alternatively, check the PR manually on GitHub.
+- Re-run this prompt to address the new cycle after that re-review completes.
 
 **Two-round cap:** After 2 fix-review rounds, resolve remaining threads as "acknowledged — out of scope for this PR" with a reply, then merge. Do not enter a fix-review loop beyond 2 rounds.
 
