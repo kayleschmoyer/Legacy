@@ -1,0 +1,23 @@
+# GitHub label definitions for the CI/Bot-Review escalation system.
+# Apply with: gh label create --label-file .github/labels.yml
+# or via the actions/github-script labeler action.
+
+- name: needs-human-arbitration
+  color: "b60205"
+  description: "Bot↔author disagreement unresolved after Cycle 3 — requires human decision"
+
+- name: needs-human-security-review
+  color: "d93f0b"
+  description: "Cycle 1 found a critical security issue — requires human security review"
+
+- name: review-bot-degraded
+  color: "e4e669"
+  description: "Reviewer infrastructure failed after retry — bot review unavailable"
+
+- name: ci-stuck
+  color: "f9d0c4"
+  description: "Operator-applied marker: CI pipeline is stuck and requires manual intervention"
+
+- name: bot:ready-for-review
+  color: "0e8a16"
+  description: "Author Agent has responded to a review cycle and the PR is ready for re-review"
