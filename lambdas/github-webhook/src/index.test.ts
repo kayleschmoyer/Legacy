@@ -18,24 +18,6 @@ jest.mock('./verify-signature', () => ({
   verifyGitHubSignature: jest.fn().mockReturnValue(true),
 }));
 
-jest.mock('./handle-pull-request', () => ({
-  handlePullRequestEvent: jest
-    .fn()
-    .mockResolvedValue('Set bot-review=in_progress for PR #1'),
-}));
-
-jest.mock('./handle-pull-request-review', () => ({
-  handlePullRequestReviewEvent: jest
-    .fn()
-    .mockResolvedValue('Set bot-review=success for PR #1'),
-}));
-
-jest.mock('./handle-review-thread', () => ({
-  handleReviewThreadEvent: jest
-    .fn()
-    .mockResolvedValue('Set bot-review=success for PR #1'),
-}));
-
 jest.mock('./handle-jira-transition', () => ({
   handleJiraTransitionEvent: jest
     .fn()
@@ -44,15 +26,7 @@ jest.mock('./handle-jira-transition', () => ({
     ),
 }));
 
-jest.mock('./handle-race-check', () => ({
-  handleRaceCheckMessage: jest
-    .fn()
-    .mockResolvedValue('Race-check handled for PR #42'),
-}));
-
 // Set env vars before importing handler
-process.env['WEBHOOK_SECRET_SECRET_NAME'] = 'test-webhook-secret';
-process.env['BOT_APP_PRIVATE_KEY_SECRET_NAME'] = 'test-bot-key';
 process.env['JIRA_WEBHOOK_SECRET_SECRET_NAME'] = 'test-jira-secret';
 process.env['AGENT_AUTHOR_APP_PRIVATE_KEY_SECRET_NAME'] =
   'test-agent-author-key';
@@ -60,33 +34,27 @@ process.env['AGENT_AUTHOR_APP_ID'] = '3142924';
 process.env['GITHUB_REPO'] = 'bkrupa/legacy-sports';
 
 import { verifyGitHubSignature } from './verify-signature';
-import { handlePullRequestEvent } from './handle-pull-request';
-import { handlePullRequestReviewEvent } from './handle-pull-request-review';
-import { handleReviewThreadEvent } from './handle-review-thread';
 import { handleJiraTransitionEvent } from './handle-jira-transition';
-import { handleRaceCheckMessage } from './handle-race-check';
 import { handler } from './index';
 
 const mockVerify = verifyGitHubSignature as jest.Mock;
-const mockHandlePr = handlePullRequestEvent as jest.Mock;
-const mockHandlePrReview = handlePullRequestReviewEvent as jest.Mock;
-const mockHandle = handleReviewThreadEvent as jest.Mock;
 const mockHandleJira = handleJiraTransitionEvent as jest.Mock;
-const mockHandleRaceCheck = handleRaceCheckMessage as jest.Mock;
 
 function makeEvent(
   overrides: Partial<APIGatewayProxyEvent> = {},
 ): APIGatewayProxyEvent {
   return {
     httpMethod: 'POST',
-    path: '/github-webhook',
-    headers: {
-      'X-Hub-Signature-256': 'sha256=abc123',
-      'X-GitHub-Event': 'pull_request_review_thread',
-    },
+    path: '/github-webhook/jira',
+    headers: { 'X-Hub-Signature': 'sha256=abc123' },
     body: JSON.stringify({
-      action: 'resolved',
-      pull_request: { number: 1, head: { sha: 'abc' } },
+      webhookEvent: 'jira:issue_updated',
+      issue: { key: 'LS-1234' },
+      changelog: {
+        items: [
+          { field: 'status', fromString: 'In Progress', toString: 'In Review' },
+        ],
+      },
     }),
     isBase64Encoded: false,
     queryStringParameters: null,
@@ -100,36 +68,11 @@ function makeEvent(
   };
 }
 
-function makeJiraEvent(
-  overrides: Partial<APIGatewayProxyEvent> = {},
-): APIGatewayProxyEvent {
-  return makeEvent({
-    path: '/github-webhook/jira',
-    // Jira's built-in Secret field sends HMAC-SHA256 in X-Hub-Signature.
-    // The mock for verifyGitHubSignature returns true, so any value works here.
-    headers: { 'X-Hub-Signature': 'sha256=abc123' },
-    body: JSON.stringify({
-      webhookEvent: 'jira:issue_updated',
-      issue: { key: 'LS-1234' },
-      changelog: {
-        items: [
-          { field: 'status', fromString: 'In Progress', toString: 'In Review' },
-        ],
-      },
-    }),
-    ...overrides,
-  });
-}
-
 beforeEach(() => {
   mockVerify.mockReturnValue(true);
-  mockHandlePr.mockResolvedValue('Set bot-review=in_progress for PR #1');
-  mockHandlePrReview.mockResolvedValue('Set bot-review=success for PR #1');
-  mockHandle.mockResolvedValue('Set bot-review=success for PR #1');
   mockHandleJira.mockResolvedValue(
     'Dispatched jira-issue-updated for LS-1234 (In Progress → In Review)',
   );
-  mockHandleRaceCheck.mockResolvedValue('Race-check handled for PR #42');
 });
 
 describe('handler — health check', () => {
@@ -149,121 +92,38 @@ describe('handler — method check', () => {
   });
 });
 
-describe('handler — signature verification', () => {
-  it('returns 401 when X-Hub-Signature-256 header is missing', async () => {
+describe('handler — unrecognised POST path', () => {
+  it('returns 200/ignored for non-/jira POST paths (avoids GitHub webhook retry noise)', async () => {
     const result = await handler(
-      makeEvent({ headers: { 'X-GitHub-Event': 'push' } }),
-    );
-    expect(result.statusCode).toBe(401);
-  });
-
-  it('returns 401 when signature is invalid', async () => {
-    mockVerify.mockReturnValue(false);
-    const result = await handler(makeEvent());
-    expect(result.statusCode).toBe(401);
-  });
-});
-
-describe('handler — event routing', () => {
-  it('returns 200 ignored for unhandled event types (e.g. push)', async () => {
-    const result = await handler(
-      makeEvent({
-        headers: {
-          'X-Hub-Signature-256': 'sha256=abc',
-          'X-GitHub-Event': 'push',
-        },
-      }),
+      makeEvent({ path: '/github-webhook/unknown' }),
     );
     expect(result.statusCode).toBe(200);
-    expect(JSON.parse(result.body)).toMatchObject({
-      status: 'ignored',
-      eventType: 'push',
-    });
-    expect(mockHandle).not.toHaveBeenCalled();
-    expect(mockHandlePr).not.toHaveBeenCalled();
-    expect(mockHandlePrReview).not.toHaveBeenCalled();
-  });
-
-  it('returns 400 for invalid JSON body', async () => {
-    const result = await handler(makeEvent({ body: 'not-json' }));
-    expect(result.statusCode).toBe(400);
-  });
-
-  it('routes pull_request_review_thread to handleReviewThreadEvent', async () => {
-    const result = await handler(makeEvent());
-    expect(result.statusCode).toBe(200);
-    expect(mockHandle).toHaveBeenCalledTimes(1);
-    expect(mockHandlePr).not.toHaveBeenCalled();
-    expect(JSON.parse(result.body)).toMatchObject({ status: 'ok' });
-  });
-
-  it('routes pull_request to handlePullRequestEvent', async () => {
-    const result = await handler(
-      makeEvent({
-        headers: {
-          'X-Hub-Signature-256': 'sha256=abc',
-          'X-GitHub-Event': 'pull_request',
-        },
-      }),
-    );
-    expect(result.statusCode).toBe(200);
-    expect(mockHandlePr).toHaveBeenCalledTimes(1);
-    expect(mockHandle).not.toHaveBeenCalled();
-  });
-
-  it('routes pull_request_review to handlePullRequestReviewEvent', async () => {
-    const result = await handler(
-      makeEvent({
-        headers: {
-          'X-Hub-Signature-256': 'sha256=abc',
-          'X-GitHub-Event': 'pull_request_review',
-        },
-      }),
-    );
-    expect(result.statusCode).toBe(200);
-    expect(mockHandlePrReview).toHaveBeenCalledTimes(1);
-    expect(mockHandle).not.toHaveBeenCalled();
-  });
-
-  it('returns 500 with generic message when handler throws', async () => {
-    mockHandle.mockRejectedValue(new Error('GitHub API unreachable'));
-    const result = await handler(makeEvent());
-    expect(result.statusCode).toBe(500);
-    expect(JSON.parse(result.body)).toEqual({ error: 'Internal server error' });
-  });
-
-  it('decodes base64-encoded bodies', async () => {
-    const jsonBody = JSON.stringify({ action: 'resolved' });
-    const b64 = Buffer.from(jsonBody).toString('base64');
-    const result = await handler(
-      makeEvent({ body: b64, isBase64Encoded: true }),
-    );
-    expect(result.statusCode).toBe(200);
+    expect(JSON.parse(result.body)).toMatchObject({ status: 'ignored' });
   });
 });
 
 describe('handler — Jira webhook route (/github-webhook/jira)', () => {
   it('returns 401 when X-Hub-Signature header is missing', async () => {
-    const result = await handler(makeJiraEvent({ headers: {} }));
+    const result = await handler(makeEvent({ headers: {} }));
     expect(result.statusCode).toBe(401);
     expect(mockHandleJira).not.toHaveBeenCalled();
   });
 
   it('returns 401 when HMAC signature is invalid', async () => {
     mockVerify.mockReturnValueOnce(false);
-    const result = await handler(makeJiraEvent());
+    const result = await handler(makeEvent());
     expect(result.statusCode).toBe(401);
     expect(mockHandleJira).not.toHaveBeenCalled();
   });
 
   it('returns 400 for invalid JSON body', async () => {
-    const result = await handler(makeJiraEvent({ body: 'not-json' }));
+    const result = await handler(makeEvent({ body: 'not-json' }));
     expect(result.statusCode).toBe(400);
     expect(mockHandleJira).not.toHaveBeenCalled();
   });
 
   it('returns 200 and calls handler for valid Jira transition event', async () => {
-    const result = await handler(makeJiraEvent());
+    const result = await handler(makeEvent());
     expect(result.statusCode).toBe(200);
     expect(mockHandleJira).toHaveBeenCalledTimes(1);
     expect(JSON.parse(result.body)).toMatchObject({ status: 'ok' });
@@ -271,76 +131,34 @@ describe('handler — Jira webhook route (/github-webhook/jira)', () => {
 
   it('returns 500 with generic message when handler throws', async () => {
     mockHandleJira.mockRejectedValue(new Error('GitHub dispatch unreachable'));
-    const result = await handler(makeJiraEvent());
+    const result = await handler(makeEvent());
     expect(result.statusCode).toBe(500);
     expect(JSON.parse(result.body)).toEqual({ error: 'Internal server error' });
   });
 
   it('accepts lowercase x-hub-signature header', async () => {
     const result = await handler(
-      makeJiraEvent({
+      makeEvent({
         headers: { 'x-hub-signature': 'sha256=abc123' },
       }),
     );
     expect(result.statusCode).toBe(200);
   });
-});
 
-describe('handler — SQS race-check route', () => {
-  function makeSqsEvent(body: unknown) {
-    return {
-      Records: [
-        {
-          messageId: 'msg-1',
-          receiptHandle: 'rcpt',
-          body: typeof body === 'string' ? body : JSON.stringify(body),
-          attributes: {
-            ApproximateReceiveCount: '1',
-            SentTimestamp: '0',
-            SenderId: 's',
-            ApproximateFirstReceiveTimestamp: '0',
-          },
-          messageAttributes: {},
-          md5OfBody: '',
-          eventSource: 'aws:sqs',
-          eventSourceARN: 'arn:aws:sqs:us-east-1:123:race-check',
-          awsRegion: 'us-east-1',
-        },
-      ],
-    } as unknown as APIGatewayProxyEvent;
-  }
-
-  it('routes SQS race-check events to handleRaceCheckMessage', async () => {
-    const msg = {
-      type: 'race-check',
-      owner: 'bkrupa',
-      repo: 'legacy-sports',
-      prNumber: 42,
-      headSha: 'abc1234',
-      attempt: 1,
-    };
-    await handler(makeSqsEvent(msg));
-    expect(mockHandleRaceCheck).toHaveBeenCalledWith(msg, 'test-secret');
-    // HTTP handlers should not be invoked on SQS path.
-    expect(mockHandlePr).not.toHaveBeenCalled();
-    expect(mockHandle).not.toHaveBeenCalled();
-  });
-
-  it('skips unparseable SQS messages without throwing', async () => {
-    await expect(handler(makeSqsEvent('not-json'))).resolves.toBeDefined();
-    expect(mockHandleRaceCheck).not.toHaveBeenCalled();
-  });
-
-  it('propagates errors from handleRaceCheckMessage so SQS retries', async () => {
-    mockHandleRaceCheck.mockRejectedValueOnce(new Error('GitHub 500'));
-    const msg = {
-      type: 'race-check',
-      owner: 'bkrupa',
-      repo: 'legacy-sports',
-      prNumber: 42,
-      headSha: 'abc1234',
-      attempt: 1,
-    };
-    await expect(handler(makeSqsEvent(msg))).rejects.toThrow(/GitHub 500/);
+  it('decodes base64-encoded bodies', async () => {
+    const jsonBody = JSON.stringify({
+      webhookEvent: 'jira:issue_updated',
+      issue: { key: 'LS-1234' },
+      changelog: {
+        items: [
+          { field: 'status', fromString: 'To Do', toString: 'In Progress' },
+        ],
+      },
+    });
+    const b64 = Buffer.from(jsonBody).toString('base64');
+    const result = await handler(
+      makeEvent({ body: b64, isBase64Encoded: true }),
+    );
+    expect(result.statusCode).toBe(200);
   });
 });
