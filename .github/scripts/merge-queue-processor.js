@@ -314,8 +314,8 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
     const failingChecks = [];
     const pendingChecks = [];
 
-    // Excluded from merge-blocking: process-merge-queue (circular) and delayed-recheck
-    // (housekeeping job that sleeps 3min; bot-review is evaluated independently as a commit status).
+    // Excluded from merge-blocking: process-merge-queue (circular — would block itself) and
+    // delayed-recheck (a 3-minute housekeeping job that is not a quality gate).
     const EXCLUDED_CHECKS = new Set(['process-merge-queue', 'delayed-recheck']);
 
     // Build the set of check runs to evaluate:

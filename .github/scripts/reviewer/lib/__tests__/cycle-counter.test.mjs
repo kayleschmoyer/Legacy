@@ -29,7 +29,7 @@ describe('computeCycle', () => {
     const reviews = [
       { userLogin: 'human-reviewer' },
       { userLogin: 'another-human' },
-      { userLogin: 'copilot-pull-request-reviewer[bot]' },
+      { userLogin: 'some-other-bot[bot]' },
       { userLogin: 'code-reviewer-bot[bot]' },
     ];
     // Only one bot review matches REVIEWER_BOT_LOGINS → cycle 2

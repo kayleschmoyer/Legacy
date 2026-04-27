@@ -454,7 +454,7 @@ jobs:
         # Runs after every successful apply (or when apply was a no-op) to keep
         # the agent_author_app_private_key Secrets Manager entry in sync with
         # the BOT_APP_PRIVATE_KEY GitHub Actions secret (same key used by
-        # copilot-auto-approve.yml for review-bot token generation). This is
+        # review.yml for review-bot token generation). This is
         # idempotent — put-secret-value is safe to call on every workflow run.
         # The step is skipped if apply itself failed (secret resource may not exist).
         #
