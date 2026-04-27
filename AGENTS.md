@@ -75,6 +75,63 @@ Each skill's `SKILL.md` frontmatter includes a `role` field (executor, analyst, 
 
 Jira's GitHub integration links PRs to tickets via **PR title**, **commit messages**, and **branch name** (all scanned independently). For Claude Code launcher-checkbox sessions, do **not** rename branches or use `remoteBranch` overrides — rely on PR title + commits containing `LS-####`. See `.agents/skills/branch-naming/SKILL.md` for patterns by driver and full rules.
 
+## Author Agent Contract (Bot-PR Flow)
+
+When a PR is authored by an agent and reviewed by the Code Reviewer Bot, the agent must follow this protocol exactly. Deviations cause the bot to flag format errors or escalate to a human.
+
+### 1. PR Creation
+
+- Open the PR as a **draft**. Work locally; push freely — pushes do NOT fire bot reviews while in draft.
+- When initial code is complete: mark the PR **ready_for_review**. This fires **Cycle 1**.
+
+### 2. Response to Cycle 1 Review
+
+After the bot posts its Cycle 1 review, the agent must:
+
+1. Reply to **every open thread** with exactly one of:
+   - `FIX: <sha>` — the fix is already committed at `<sha>`
+   - `JUSTIFY: <rationale>` — the finding is incorrect or the suggestion is out of scope; explain why
+2. Push any fix commits.
+3. Apply the **`bot:ready-for-review`** label. This fires **Cycle 2**.
+
+> Skipping a thread is not allowed — unaddressed threads become mandates in Cycle 2.
+
+### 3. Response to Cycle 2 Mandates
+
+After the bot posts its Cycle 2 review, the agent must:
+
+1. Reply to **every open thread** with:
+   - `FIX: <sha>` — the fix is committed at `<sha>` (the only accepted reply in Cycle 2)
+2. Push any fix commits.
+3. Apply **`bot:ready-for-review`** again. This fires **Cycle 3**.
+
+> Neither `JUSTIFY:` nor `CANNOT-COMPLY:` is accepted in Cycle 2. `JUSTIFY:` closed at Cycle 1; `CANNOT-COMPLY:` is only valid in Cycle 3+.
+
+### 4. Response to Cycle 3+ (Escalation)
+
+If a mandate persists into Cycle 3, the agent may reply with:
+
+1. `FIX: <sha>` — fix committed at `<sha>`
+2. `CANNOT-COMPLY: <issue-id>` with the reason on the **next line** — the mandate is genuinely impossible; this escalates to a human reviewer
+
+Example:
+```
+CANNOT-COMPLY: LS-1234
+This change requires modifying a generated file that must not be edited manually.
+```
+
+> `CANNOT-COMPLY:` is a Cycle 3+ token. Using it in Cycle 2 will be treated as malformed.
+
+### Format Rules
+
+- **Format errors get corrective replies** — the bot will reply in-thread when a response is malformed; re-post correctly.
+- **Never edit the bot's review comments or threads** — the bot reads its own thread state to determine cycle progression; mutation breaks this.
+- **No free-form text outside structured replies** — the bot ignores unstructured content and will not count it as a thread response.
+
+### Shortcut
+
+Use `/respond-to-review` to scaffold structured replies for all open threads on the current PR.
+
 ## Workflow
 
 Follow the **Agent Workflow Checklist (Steps 0-16)** in `.agents/skills/workflow-overview/SKILL.md` — it is the single source of truth for procedure. Summary:
