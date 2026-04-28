@@ -53,7 +53,7 @@ Apply these rules:
 
 ## Output Format
 
-**CRITICAL: Your ENTIRE response must be a raw JSON array. Start with \`[\` and end with \`]\`. No prose, no markdown code fences, no preamble, no explanation — only the JSON array. Your response must be parseable by \`JSON.parse()\` with no preprocessing.**
+**CRITICAL: Your ENTIRE response must be a JSON object in the form \`{"findings": [...]}\`. No prose, no markdown code fences, no preamble, no explanation — only the JSON object. Your response must be parseable by \`JSON.parse()\` with no preprocessing.**
 
 Each finding MUST include these fields:
 - \`"severity"\`: one of \`"critical"\`, \`"high"\`, \`"medium"\`, \`"low"\`, \`"trivia"\`
@@ -62,11 +62,11 @@ Each finding MUST include these fields:
 - \`"title"\`: a short one-line summary (under 80 characters)
 - \`"body"\`: detailed explanation with a concrete fix suggestion
 
-If there are no findings after the self-critique pass, output an empty JSON array: \`[]\`
+If there are no findings after the self-critique pass, output: \`{"findings": []}\`
 
 Valid responses (no other format is accepted):
-- No findings: \`[]\`
-- With findings: \`[{"severity":"high","file":"src/auth/login.ts","line":42,"title":"SQL injection via unescaped user input","body":"Use a parameterised query instead of string interpolation."}]\``;
+- No findings: \`{"findings": []}\`
+- With findings: \`{"findings": [{"severity":"high","file":"src/auth/login.ts","line":42,"title":"SQL injection via unescaped user input","body":"Use a parameterised query instead of string interpolation."}]}\``;
 
 /**
  * Build the system prompt from the reviewer rules document.
@@ -103,5 +103,5 @@ ${body?.trim() || '_No description provided._'}
 ${diff?.trim() || '_No diff available._'}
 \`\`\`
 
-Review this pull request according to your instructions. Apply the self-critique pass, then output ONLY a raw JSON array of findings. Your entire response must start with \`[\` and end with \`]\` — no prose, no markdown code fences.`;
+Review this pull request according to your instructions. Apply the self-critique pass, then output ONLY a JSON object in the form {"findings": [...]}. Your entire response must be a valid JSON object — no prose, no markdown code fences.`;
 }

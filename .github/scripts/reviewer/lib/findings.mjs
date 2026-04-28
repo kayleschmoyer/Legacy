@@ -17,13 +17,16 @@ const VALID_SEVERITIES = new Set([
 /**
  * Parse findings from raw LLM output.
  *
- * The system prompt instructs the model to output a JSON array directly (no
- * fencing required), but also accepts fenced ```json blocks in case the model
- * wraps output anyway. Tries parsing the full candidate first, then retries
- * from the first '[' to handle a prose preamble the model may prepend.
+ * Accepts two response shapes produced by different providers:
+ *   - Bare JSON array: `[...]`  (legacy, and any provider without json_object mode)
+ *   - Object wrapper: `{"findings": [...]}` (GitHub Models json_object mode)
  *
- * Returns `{ ok: false }` when the text cannot be parsed as a JSON array at
- * all — distinct from `{ ok: true, findings: [] }` which means the model
+ * Also accepts fenced ```json blocks in case the model wraps output anyway.
+ * Tries parsing the full candidate first, then retries from the first '[' or
+ * '{' to handle a prose preamble the model may prepend.
+ *
+ * Returns `{ ok: false }` when the text cannot be parsed into a findings array
+ * at all — distinct from `{ ok: true, findings: [] }` which means the model
  * legitimately found nothing. Callers should handle the `ok: false` case
  * explicitly (e.g. fall back to posting the raw model output).
  *
@@ -34,12 +37,20 @@ export function parseFindingsFromText(text) {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
   const candidate = (fenced ? fenced[1] : text).trim();
 
-  // Attempt 1: the candidate is exactly a JSON array.
+  // Attempt 1: the candidate is exactly a JSON array or {"findings":[...]} object.
   let parsed = _tryParseJsonArray(candidate);
 
   // Attempt 2: candidate has a prose preamble — retry from the first '['.
   if (parsed === null) {
     const start = candidate.indexOf('[');
+    if (start > 0) {
+      parsed = _tryParseJsonArray(candidate.slice(start));
+    }
+  }
+
+  // Attempt 3: candidate has a prose preamble before a JSON object wrapper.
+  if (parsed === null) {
+    const start = candidate.indexOf('{');
     if (start > 0) {
       parsed = _tryParseJsonArray(candidate.slice(start));
     }
@@ -67,7 +78,9 @@ export function parseFindingsFromText(text) {
 }
 
 /**
- * Try to parse `s` as a JSON array. Returns the array or null on failure.
+ * Try to parse `s` as a findings array. Accepts a bare JSON array `[...]` or
+ * an object wrapper `{"findings": [...]}` produced by json_object mode.
+ * Returns the array or null on failure.
  *
  * @param {string} s
  * @returns {unknown[]|null}
@@ -75,7 +88,9 @@ export function parseFindingsFromText(text) {
 function _tryParseJsonArray(s) {
   try {
     const v = JSON.parse(s);
-    return Array.isArray(v) ? v : null;
+    if (Array.isArray(v)) return v;
+    if (Array.isArray(v?.findings)) return v.findings;
+    return null;
   } catch {
     return null;
   }
@@ -83,16 +98,17 @@ function _tryParseJsonArray(s) {
 
 const REFORMAT_SYSTEM =
   'You are a JSON formatter. Extract code review findings from the input and ' +
-  'return them as a raw JSON array. Your ONLY output must be valid JSON — ' +
-  'no prose, no markdown, no code fences. Start with [ and end with ].';
+  'return them as a JSON object in the form {"findings": [...]}. ' +
+  'Your ONLY output must be valid JSON — no prose, no markdown, no code fences. ' +
+  'If no findings are present, output exactly {"findings": []}.';
 
 const REFORMAT_USER_PREFIX =
-  'Convert the following code review text into a JSON array. ' +
-  'Use this exact schema for each item:\n' +
-  '{"severity":"critical"|"high"|"medium"|"low"|"trivia",' +
-  '"file":string|null,"line":integer|null,"title":string,"body":string}\n\n' +
-  'If no findings are present, return exactly: []\n' +
-  'Your response must start with [ and end with ] — no other text.\n\n' +
+  'Convert the following code review text into a JSON object. ' +
+  'Use this exact schema:\n' +
+  '{"findings": [{"severity":"critical"|"high"|"medium"|"low"|"trivia",' +
+  '"file":string|null,"line":integer|null,"title":string,"body":string}, ...]}\n\n' +
+  'If no findings are present, return exactly: {"findings": []}\n' +
+  'Your response must be a JSON object — no other text.\n\n' +
   'Code review text:\n---\n';
 
 /**

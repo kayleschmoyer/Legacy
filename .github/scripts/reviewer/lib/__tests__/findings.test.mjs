@@ -78,8 +78,29 @@ describe('parseFindingsFromText', () => {
     assert.deepStrictEqual(result, { ok: false, findings: [] });
   });
 
-  it('returns ok:false when the root is a JSON object, not an array', () => {
+  it('accepts {"findings":[]} object wrapper (empty findings)', () => {
     const result = parseFindingsFromText('{"findings": []}');
+    assert.deepStrictEqual(result, { ok: true, findings: [] });
+  });
+
+  it('accepts {"findings":[...]} object wrapper with actual findings', () => {
+    const finding = {
+      severity: 'high',
+      file: 'src/auth.ts',
+      line: 10,
+      title: 'Null deref',
+      body: 'Guard the value.',
+    };
+    const result = parseFindingsFromText(
+      JSON.stringify({ findings: [finding] }),
+    );
+    assert.ok(result.ok);
+    assert.strictEqual(result.findings.length, 1);
+    assert.deepStrictEqual(result.findings[0], finding);
+  });
+
+  it('returns ok:false when the root is a JSON object without a findings key', () => {
+    const result = parseFindingsFromText('{"items": []}');
     assert.deepStrictEqual(result, { ok: false, findings: [] });
   });
 
@@ -150,6 +171,21 @@ describe('tryReformatFindings', () => {
       body: 'Guard this.',
     };
     const provider = makeProvider(JSON.stringify([finding]));
+    const result = await tryReformatFindings('some prose', provider);
+    assert.ok(result.ok);
+    assert.strictEqual(result.findings.length, 1);
+    assert.deepStrictEqual(result.findings[0], finding);
+  });
+
+  it('returns ok:true when the provider returns {"findings":[...]} object wrapper', async () => {
+    const finding = {
+      severity: 'medium',
+      file: 'src/util.ts',
+      line: null,
+      title: 'Missing error handling',
+      body: 'Add try/catch.',
+    };
+    const provider = makeProvider(JSON.stringify({ findings: [finding] }));
     const result = await tryReformatFindings('some prose', provider);
     assert.ok(result.ok);
     assert.strictEqual(result.findings.length, 1);
