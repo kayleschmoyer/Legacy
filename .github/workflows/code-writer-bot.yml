@@ -108,8 +108,18 @@ jobs:
           echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
           echo "Created draft PR #$PR_NUMBER: $PR_URL"
 
+      - name: Generate bot app token for empty-commit push
+        id: bot-token
+        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3
+        with:
+          app-id: ${{ vars.REVIEWER_BOT_APP_ID || '3142924' }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
       - name: Push empty commit to trigger conflict check
+        env:
+          BOT_TOKEN: ${{ steps.bot-token.outputs.token }}
         run: |
+          git remote set-url origin "https://x-access-token:${BOT_TOKEN}@github.com/${{ github.repository }}"
           git commit --allow-empty -m "chore(ci): trigger pull_request synchronize for conflict check"
           git push origin "${{ steps.create-branch.outputs.branch_name }}"
 
