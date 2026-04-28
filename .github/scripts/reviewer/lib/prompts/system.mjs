@@ -53,7 +53,7 @@ Apply these rules:
 
 ## Output Format
 
-Output ONLY a JSON array of surviving findings — no prose outside the JSON.
+**CRITICAL: Your ENTIRE response must be a raw JSON array. Start with \`[\` and end with \`]\`. No prose, no markdown code fences, no preamble, no explanation — only the JSON array. Your response must be parseable by \`JSON.parse()\` with no preprocessing.**
 
 Each finding MUST include these fields:
 - \`"severity"\`: one of \`"critical"\`, \`"high"\`, \`"medium"\`, \`"low"\`, \`"trivia"\`
@@ -64,18 +64,9 @@ Each finding MUST include these fields:
 
 If there are no findings after the self-critique pass, output an empty JSON array: \`[]\`
 
-Example output:
-\`\`\`json
-[
-  {
-    "severity": "high",
-    "file": "src/auth/login.ts",
-    "line": 42,
-    "title": "SQL injection via unescaped user input",
-    "body": "The \`userId\` parameter is interpolated directly into the SQL query string without escaping. Use a parameterised query instead."
-  }
-]
-\`\`\``;
+Valid responses (no other format is accepted):
+- No findings: \`[]\`
+- With findings: \`[{"severity":"high","file":"src/auth/login.ts","line":42,"title":"SQL injection via unescaped user input","body":"Use a parameterised query instead of string interpolation."}]\``;
 
 /**
  * Build the system prompt from the reviewer rules document.
@@ -112,5 +103,5 @@ ${body?.trim() || '_No description provided._'}
 ${diff?.trim() || '_No diff available._'}
 \`\`\`
 
-Review this pull request according to your instructions. Apply the self-critique pass, then output your findings as a JSON array.`;
+Review this pull request according to your instructions. Apply the self-critique pass, then output ONLY a raw JSON array of findings. Your entire response must start with \`[\` and end with \`]\` — no prose, no markdown code fences.`;
 }

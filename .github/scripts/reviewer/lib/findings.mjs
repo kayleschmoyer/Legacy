@@ -81,6 +81,41 @@ function _tryParseJsonArray(s) {
   }
 }
 
+const REFORMAT_SYSTEM =
+  'You are a JSON formatter. Extract code review findings from the input and ' +
+  'return them as a raw JSON array. Your ONLY output must be valid JSON — ' +
+  'no prose, no markdown, no code fences. Start with [ and end with ].';
+
+const REFORMAT_USER_PREFIX =
+  'Convert the following code review text into a JSON array. ' +
+  'Use this exact schema for each item:\n' +
+  '{"severity":"critical"|"high"|"medium"|"low"|"trivia",' +
+  '"file":string|null,"line":integer|null,"title":string,"body":string}\n\n' +
+  'If no findings are present, return exactly: []\n' +
+  'Your response must start with [ and end with ] — no other text.\n\n' +
+  'Code review text:\n---\n';
+
+/**
+ * One-shot attempt to reformat unparseable model output as a valid findings
+ * JSON array by calling the provider with a targeted reformatting prompt.
+ * Returns { ok: false } on any error — callers must handle the failure path.
+ *
+ * @param {string} rawText - The original unparsed model output
+ * @param {{ review: (params: {system: string, user: string}) => Promise<{text: string}> }} provider
+ * @returns {Promise<{ ok: true, findings: Finding[] } | { ok: false, findings: [] }>}
+ */
+export async function tryReformatFindings(rawText, provider) {
+  try {
+    const result = await provider.review({
+      system: REFORMAT_SYSTEM,
+      user: REFORMAT_USER_PREFIX + rawText,
+    });
+    return parseFindingsFromText(result.text);
+  } catch {
+    return { ok: false, findings: [] };
+  }
+}
+
 /**
  * Split findings into blocking (critical/high), nonBlocking (medium/low),
  * and dropped (trivia) groups.

@@ -7,6 +7,7 @@ import {
 } from './lib/github.mjs';
 import {
   parseFindingsFromText,
+  tryReformatFindings,
   gateFindingsBySeverity,
   formatShadowBody,
 } from './lib/findings.mjs';
@@ -283,12 +284,21 @@ async function main() {
   // Parse findings from the full, untruncated reviewText so that a large
   // multi-pass response is not silently turned into invalid JSON before
   // parsing. Truncation is applied later to the formatted output body only.
-  const parsed = parseFindingsFromText(reviewText);
-  let verdict = 'UNPARSEABLE';
+  let parsed = parseFindingsFromText(reviewText);
   if (!parsed.ok) {
     process.stderr.write(
-      '[reviewer] Model output could not be parsed as JSON — falling back to raw output\n',
+      '[reviewer] Model output could not be parsed as JSON — attempting reformat via LLM\n',
     );
+    parsed = await tryReformatFindings(reviewText, provider);
+    if (parsed.ok) {
+      process.stdout.write('[reviewer] Reformat retry succeeded\n');
+    } else {
+      process.stderr.write('[reviewer] Reformat retry also failed\n');
+    }
+  }
+
+  let verdict = 'UNPARSEABLE';
+  if (!parsed.ok) {
     await emitTelemetry(
       buildRecord({
         pr: prNumber,
