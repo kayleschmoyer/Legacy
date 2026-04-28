@@ -22,9 +22,9 @@ export const CODE_WRITER_BOT_LOGIN = 'code-writer-bot[bot]';
 /**
  * Returns true when the PR author is Code Writer Bot.
  *
- * Code Writer Bot PRs use the full RAISE/ADJUDICATE/VERIFY cycle protocol (§7).
- * All other PRs — including agent-authored PRs pushed under the developer's
- * identity — use the §8a relaxed single-pass review path.
+ * This is used for telemetry classification only — author identity does NOT
+ * affect review behavior. All non-draft, non-fork PRs follow the same
+ * RAISE/ADJUDICATE/VERIFY cycle protocol regardless of author.
  *
  * @param {{ login?: string | null, is_bot?: boolean | null } | null | undefined} author
  * @returns {boolean}

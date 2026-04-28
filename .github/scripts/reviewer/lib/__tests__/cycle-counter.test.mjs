@@ -101,7 +101,9 @@ describe('MAX_CYCLE', () => {
 });
 
 // ---------------------------------------------------------------------------
-// isCodeWriterBotAuthor — path selector for §7 vs §8a review semantics
+// isCodeWriterBotAuthor — author type classification for telemetry
+// (author identity does NOT affect review behavior — all PRs use the full
+// cycle protocol regardless of author)
 // ---------------------------------------------------------------------------
 
 describe('isCodeWriterBotAuthor', () => {

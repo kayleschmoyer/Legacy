@@ -25,6 +25,8 @@ import { spawn } from 'node:child_process';
  * @property {number}    cost_usd            - Total cost in USD
  * @property {number}    latency_ms          - Wall-clock latency of the review call in ms
  * @property {boolean}   shadow              - True when running in shadow (non-blocking) mode
+ * @property {string}    author_login        - GitHub login of the PR author (informational)
+ * @property {'bot'|'human'} author_type     - Derived author type for observability
  */
 
 /**
@@ -69,6 +71,8 @@ export async function emitTelemetry(record) {
  * @param {import('./providers/provider.mjs').ProviderUsage} params.usage
  * @param {number}    params.latencyMs
  * @param {boolean}   params.shadow
+ * @param {string}    [params.authorLogin]
+ * @param {'bot'|'human'} [params.authorType]
  * @returns {TelemetryRecord}
  */
 export function buildRecord({
@@ -82,6 +86,8 @@ export function buildRecord({
   usage,
   latencyMs,
   shadow,
+  authorLogin = '',
+  authorType = 'human',
 }) {
   return {
     ts: new Date().toISOString(),
@@ -98,6 +104,8 @@ export function buildRecord({
     cost_usd: usage?.costUsd ?? 0,
     latency_ms: latencyMs,
     shadow: Boolean(shadow),
+    author_login: authorLogin,
+    author_type: authorType,
   };
 }
 

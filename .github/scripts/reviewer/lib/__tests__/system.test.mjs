@@ -49,10 +49,16 @@ describe('buildUserPrompt — with author responses (Cycle 2+)', () => {
 
   it('positions author responses after the diff block and before the review instruction', () => {
     const result = buildUserPrompt(BASE_CTX, authorSection);
-    const diffEnd = result.indexOf('```\n\n##');
+    // The template wraps author replies in HTML comment markers for prompt-injection safety.
+    // The BEGIN wrapper starts with `<!-- BEGIN AUTHOR RESPONSES` and may include
+    // additional text before the closing `-->`, so this assertion matches the stable prefix.
+    const diffEnd = result.indexOf('```\n\n<!-- BEGIN AUTHOR RESPONSES');
     const authorStart = result.indexOf('## Author Responses');
     const reviewInstStart = result.indexOf('Review this pull request');
-    assert.ok(diffEnd !== -1, 'diff end marker must exist');
+    assert.ok(
+      diffEnd !== -1,
+      'diff end marker with HTML safety wrapper must exist',
+    );
     assert.ok(authorStart > diffEnd, 'author section must appear after diff');
     assert.ok(
       reviewInstStart > authorStart,

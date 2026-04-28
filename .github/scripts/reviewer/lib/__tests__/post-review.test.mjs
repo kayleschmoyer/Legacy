@@ -135,6 +135,7 @@ describe('buildInlineComments', () => {
     assert.strictEqual(comments.length, 1);
     assert.strictEqual(comments[0].path, 'src/utils.js');
     assert.strictEqual(comments[0].line, 10);
+    assert.strictEqual(comments[0].side, 'RIGHT');
     assert.match(comments[0].body, new RegExp(`issue-id: ${id}`));
     assert.match(comments[0].body, /Unused var/);
     assert.match(comments[0].body, /LOW/);

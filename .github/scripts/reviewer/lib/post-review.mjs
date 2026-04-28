@@ -203,7 +203,7 @@ export function formatReviewBody(blockingWithIds, event) {
  * for T22 cycle-protocol tracking.
  *
  * @param {Array<import('./findings.mjs').Finding & { issueId: string }>} nonBlockingWithIds
- * @returns {Array<{ path: string, line: number, body: string }>}
+ * @returns {Array<{ path: string, line: number, side: 'RIGHT', body: string }>}
  */
 export function buildInlineComments(nonBlockingWithIds) {
   return nonBlockingWithIds
@@ -211,6 +211,7 @@ export function buildInlineComments(nonBlockingWithIds) {
     .map((f) => ({
       path: f.file,
       line: f.line,
+      side: 'RIGHT',
       body: `<!-- issue-id: ${f.issueId} -->\n**[${f.severity.toUpperCase()}]** ${f.title}\n\n${f.body}`,
     }));
 }
@@ -267,24 +268,41 @@ export async function postRealReview(prNumber, { blocking, nonBlocking }) {
   const jwt = mintAppJwt(appId, privateKeyPem);
   const installToken = await getInstallationToken(jwt, owner, repo);
 
-  const payload = JSON.stringify({ body, event, comments });
+  const ghArgs = [
+    'api',
+    '--method',
+    'POST',
+    `repos/{owner}/{repo}/pulls/${prNumber}/reviews`,
+    '--input',
+    '-',
+  ];
+  const ghEnv = { ...process.env, GH_TOKEN: installToken };
 
-  execFileSync(
-    'gh',
-    [
-      'api',
-      '--method',
-      'POST',
-      `repos/{owner}/{repo}/pulls/${prNumber}/reviews`,
-      '--input',
-      '-',
-    ],
-    {
+  const payload = JSON.stringify({ body, event, comments });
+  try {
+    execFileSync('gh', ghArgs, {
       encoding: 'utf8',
       input: payload,
-      env: { ...process.env, GH_TOKEN: installToken },
-    },
-  );
+      env: ghEnv,
+    });
+  } catch (err) {
+    const is422 =
+      err.message?.includes('422') ||
+      err.stdout?.includes('Unprocessable Entity') ||
+      err.stderr?.includes('Unprocessable Entity');
+    if (!is422 || comments.length === 0) throw err;
+    // Inline comment positions are invalid for this diff (e.g. LLM cited a line
+    // not present in the diff, or missing side). Retry with body-only so the
+    // blocking findings are still posted.
+    process.stderr.write(
+      '[reviewer] Inline comment positions rejected (422); retrying without inline comments\n',
+    );
+    execFileSync('gh', ghArgs, {
+      encoding: 'utf8',
+      input: JSON.stringify({ body, event, comments: [] }),
+      env: ghEnv,
+    });
+  }
 
   process.stdout.write(
     `[reviewer] Real review posted (${event}): ${blockingWithIds.length} blocking, ${nonBlockingWithIds.length} non-blocking inline\n`,
