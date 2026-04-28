@@ -15,7 +15,7 @@ inputs:
   failure-threshold:
     description: "Steps that cause overall failure (comma-separated)"
     required: false
-    default: "quality-gates,build-validation"
+    default: "lint,format,test,build"
 
 outputs:
   step-results:

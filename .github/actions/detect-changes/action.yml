@@ -212,7 +212,7 @@ runs:
         base: ${{ steps.determine-base.outputs.base-ref }}
         ref: ${{ steps.determine-base.outputs.head-ref }}
         # Broad source-category filters only. Nx `affected` handles fine-grained
-        # lib→consumer dependency detection inside quality-gates & build jobs,
+        # lib→consumer dependency detection inside the granular CI jobs,
         # so we do NOT manually map individual libs to consumers here.
         filters: |
           web-code:

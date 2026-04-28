@@ -47,32 +47,6 @@ module.exports = async ({ github, context, core }) => {
     console.log('No step results provided or parsing failed');
   }
 
-  // Parse quality gates subsection results
-  let qualityGatesSubsections = {};
-  try {
-    const qualityGatesInput = process.env.QUALITY_GATES_SUBSECTIONS
-      ? JSON.parse(process.env.QUALITY_GATES_SUBSECTIONS)
-      : null;
-    if (qualityGatesInput && Object.keys(qualityGatesInput).length > 0) {
-      qualityGatesSubsections = qualityGatesInput;
-    }
-  } catch (e) {
-    console.log('No quality gates subsections provided or parsing failed');
-  }
-
-  // Parse project-level failures
-  let projectFailures = {};
-  try {
-    const projectFailuresInput = process.env.PROJECT_FAILURES
-      ? JSON.parse(process.env.PROJECT_FAILURES)
-      : null;
-    if (projectFailuresInput && Object.keys(projectFailuresInput).length > 0) {
-      projectFailures = projectFailuresInput;
-    }
-  } catch (e) {
-    console.log('No project failures provided or parsing failed');
-  }
-
   // Find existing CI comment to update
   const prNumber = parseInt(process.env.PR_NUMBER);
   const comments = await withRetry(() =>
@@ -96,51 +70,43 @@ module.exports = async ({ github, context, core }) => {
 
   // Step analysis for targeted guidance
   const stepAnalysis = {
-    'quality-gates': {
-      reason: 'Code quality validation failed',
-      command: 'make pc',
-      agentCommand: 'make_run({ target: "pc" })',
+    lint: {
+      reason: 'ESLint validation failed',
+      command: 'make lint-fix',
+      agentCommand:
+        'nx_run_affected({ target: "lint", fix: true })  // or: make lint-fix',
       debug:
-        'Quality gates failed. This typically means ESLint errors, TypeScript compilation issues, or failing tests.',
-      subsections: {
-        formatting: {
-          reason: 'Code formatting check failed',
-          command: 'make fmt',
-          agentCommand: 'make_run({ target: "fmt" })',
-          debug:
-            'Code is not properly formatted. Run the command above to auto-fix formatting issues.',
-        },
-        lint: {
-          reason: 'ESLint validation failed',
-          command: 'make lint-fix',
-          agentCommand:
-            'nx_run_affected({ target: "lint", fix: true })  // or: make lint-fix',
-          debug:
-            'ESLint found code quality issues. Run the command above to attempt automatic fixes.',
-        },
-        typecheck: {
-          reason: 'TypeScript type checking failed',
-          command: 'make typecheck',
-          agentCommand:
-            'nx_run_affected({ target: "typecheck" })  // or: make typecheck',
-          debug:
-            'TypeScript compilation errors detected. Fix type errors in the affected files.',
-        },
-        test: {
-          reason: 'Unit tests failed',
-          command: 'make test',
-          agentCommand: 'nx_run_affected({ target: "test" })  // or: make test',
-          debug:
-            'One or more unit tests are failing. Review test output and fix the failing tests.',
-        },
-      },
+        'ESLint found code quality issues. Run the command above to attempt automatic fixes.',
     },
-    'build-validation': {
+    format: {
+      reason: 'Code formatting check failed',
+      command: 'make fmt',
+      agentCommand: 'make_run({ target: "fmt" })',
+      debug:
+        'Code is not properly formatted. Run the command above to auto-fix formatting issues.',
+    },
+    test: {
+      reason: 'TypeScript typecheck or unit tests failed',
+      command: 'make pc',
+      agentCommand:
+        'nx_run_affected({ target: "typecheck" }) && nx_run_affected({ target: "test" })  // or: make pc',
+      debug:
+        'TypeScript type errors or failing unit tests detected. Run typecheck and test to identify the issue.',
+    },
+    build: {
       reason: 'Build validation failed',
       command: 'make build',
       agentCommand: 'nx_run_affected({ target: "build" })  // or: make build',
       debug:
         'Build validation failed. Check for compilation errors, missing dependencies, or configuration issues.',
+    },
+    'custom-checks': {
+      reason: 'Custom checks failed (migration immutability or check scripts)',
+      command: 'node scripts/check-migration-immutability.js --branch',
+      agentCommand:
+        'make_run({ target: "pc" })  // custom-checks run as part of make pc',
+      debug:
+        'Migration immutability check or a custom check script failed. Check which script failed in the CI logs.',
     },
     'e2e-testing': {
       reason: 'End-to-end tests failed',
@@ -153,95 +119,13 @@ module.exports = async ({ github, context, core }) => {
 
   // Analyze step results for specific guidance
   let failedSteps = [];
-  let failedQualityGatesSections = [];
   let detailedFailureReason = failureReason;
 
   Object.entries(stepResults).forEach(([step, result]) => {
     if (result === 'failure') {
       failedSteps.push(step);
 
-      // Check for quality-gates failure and drill down into subsections
-      if (step === 'quality-gates') {
-        // Check if any subsection explicitly reported failure
-        const hasSubsectionFailures =
-          Object.keys(qualityGatesSubsections).length > 0 &&
-          Object.values(qualityGatesSubsections).some((v) => v === 'failure');
-
-        if (hasSubsectionFailures) {
-          Object.entries(qualityGatesSubsections).forEach(
-            ([subsection, subResult]) => {
-              if (subResult === 'failure') {
-                failedQualityGatesSections.push(subsection);
-
-                // Use specific subsection guidance if available
-                if (stepAnalysis['quality-gates'].subsections[subsection]) {
-                  const subsectionInfo =
-                    stepAnalysis['quality-gates'].subsections[subsection];
-                  failureReason = subsectionInfo.reason;
-                  reproCommand = subsectionInfo.command;
-                  agentCommand = subsectionInfo.agentCommand;
-                  debugSection = subsectionInfo.debug;
-                  detailedFailureReason = failureReason;
-
-                  // Add project-specific information if available
-                  if (
-                    projectFailures[subsection] &&
-                    projectFailures[subsection].length > 0
-                  ) {
-                    let failedProjects = projectFailures[subsection];
-
-                    // Handle case where failedProjects might be a comma-separated string or an array
-                    if (typeof failedProjects === 'string') {
-                      failedProjects = failedProjects
-                        .split(',')
-                        .map((p) => p.trim())
-                        .filter((p) => p);
-                    }
-
-                    if (
-                      Array.isArray(failedProjects) &&
-                      failedProjects.length > 0
-                    ) {
-                      failureReason += ` in ${failedProjects.length} project${failedProjects.length > 1 ? 's' : ''}`;
-                      detailedFailureReason = failureReason;
-
-                      // Update repro commands to target specific projects
-                      const projectList = failedProjects.join(',');
-                      const target =
-                        subsection === 'formatting' ? 'fmt' : subsection;
-                      const makeTarget =
-                        subsection === 'formatting'
-                          ? 'fmt'
-                          : subsection === 'lint'
-                            ? 'lint-fix'
-                            : subsection;
-                      reproCommand = `make ${makeTarget}`;
-                      agentCommand =
-                        subsection === 'formatting'
-                          ? 'make_run({ target: "fmt" })'
-                          : `nx_run_affected({ target: "${target}"${subsection === 'lint' ? ', fix: true' : ''} })  // targets: ${projectList}`;
-
-                      debugSection += `\n\n**Failed Projects**: ${failedProjects.map((p) => '`' + p + '`').join(', ')}`;
-                    }
-                  }
-                }
-              }
-            },
-          );
-        } else {
-          // Quality gates failed but subsection outputs are missing (e.g., runner
-          // was interrupted before individual results could be recorded).
-          // Fall back to generic quality-gates guidance.
-          const qgInfo = stepAnalysis['quality-gates'];
-          failureReason = qgInfo.reason;
-          detailedFailureReason =
-            qgInfo.reason +
-            ' (subsection details unavailable — runner may have been interrupted)';
-          reproCommand = qgInfo.command;
-          agentCommand = qgInfo.agentCommand;
-          debugSection = qgInfo.debug;
-        }
-      } else if (stepAnalysis[step] && !reproCommand.includes('make fmt')) {
+      if (stepAnalysis[step] && !reproCommand.includes('make fmt')) {
         failureReason = stepAnalysis[step].reason;
         detailedFailureReason = failureReason;
         reproCommand = stepAnalysis[step].command;
@@ -274,73 +158,6 @@ module.exports = async ({ github, context, core }) => {
         .replace(/[-_]/g, ' ')
         .replace(/\b\w/g, (l) => l.toUpperCase());
       stepStatusTable += `| ${stepName} | ${icon} ${result || 'unknown'} |\n`;
-
-      // Add subsection details for quality-gates
-      if (
-        step === 'quality-gates' &&
-        Object.keys(qualityGatesSubsections).length > 0
-      ) {
-        Object.entries(qualityGatesSubsections).forEach(
-          ([subsection, subResult]) => {
-            // Normalize: treat empty/missing as 'unknown' when quality-gates failed
-            const effectiveResult =
-              subResult || (result === 'failure' ? 'unknown' : 'skipped');
-            const subIcon =
-              effectiveResult === 'success'
-                ? 'PASS'
-                : effectiveResult === 'failure'
-                  ? 'FAIL'
-                  : effectiveResult === 'skipped'
-                    ? 'SKIP'
-                    : 'UNKNOWN';
-            const subName =
-              subsection.charAt(0).toUpperCase() + subsection.slice(1);
-
-            // Add project count if available
-            let projectInfo = '';
-            if (
-              effectiveResult === 'failure' &&
-              projectFailures[subsection] &&
-              projectFailures[subsection].length > 0
-            ) {
-              let failedProjects = projectFailures[subsection];
-              // Handle case where failedProjects might be a comma-separated string
-              if (typeof failedProjects === 'string') {
-                failedProjects = failedProjects
-                  .split(',')
-                  .map((p) => p.trim())
-                  .filter((p) => p);
-              }
-              if (Array.isArray(failedProjects) && failedProjects.length > 0) {
-                projectInfo = ` (${failedProjects.length} project${failedProjects.length > 1 ? 's' : ''})`;
-              }
-            }
-
-            stepStatusTable += `| &nbsp;&nbsp;&nbsp;> ${subName}${projectInfo} | ${subIcon} ${effectiveResult} |\n`;
-
-            // List failed projects under subsection
-            if (
-              effectiveResult === 'failure' &&
-              projectFailures[subsection] &&
-              projectFailures[subsection].length > 0
-            ) {
-              let failedProjects = projectFailures[subsection];
-              // Handle case where failedProjects might be a comma-separated string
-              if (typeof failedProjects === 'string') {
-                failedProjects = failedProjects
-                  .split(',')
-                  .map((p) => p.trim())
-                  .filter((p) => p);
-              }
-              if (Array.isArray(failedProjects)) {
-                failedProjects.forEach((project) => {
-                  stepStatusTable += `| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- \`${project}\` | FAIL failed |\n`;
-                });
-              }
-            }
-          },
-        );
-      }
     });
     stepStatusTable += '\n';
   }
@@ -355,12 +172,6 @@ module.exports = async ({ github, context, core }) => {
   executionContext += '- **Agents/Processes**: ' + agents + '\n';
   if (failedSteps.length > 0) {
     executionContext += '- **Failed Steps**: ' + failedSteps.join(', ') + '\n';
-  }
-  if (failedQualityGatesSections.length > 0) {
-    executionContext +=
-      '- **Failed Quality Gates**: ' +
-      failedQualityGatesSections.join(', ') +
-      '\n';
   }
 
   // Build comment
