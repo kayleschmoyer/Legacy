@@ -9,6 +9,8 @@
 | Scenario | Ticket | Date | Result | Notes |
 |----------|--------|------|--------|-------|
 | V1 — Trivial happy path | LS-3903 | 2026-04-28 | ✅ Pass | 3 design gaps documented (see §2 Deviations) |
+| V1 re-run v3 (LS-3938 + LS-3939 fixes) | LS-3940 | 2026-04-28 | 🟡 Partial | All ACs pass; 1 residual gap: conflict check still needs PAT workaround (see §3) |
+| V1 re-run v4 (LS-3940 fix) | — | 2026-04-28 | ✅ Pass | Fully automated — zero manual steps (see §4) |
 
 ---
 
@@ -109,3 +111,113 @@ empty commit.
   Cancelled manually (`gh run cancel 25002600746`) to unblock. Root cause: the run was triggered
   when the PR was not yet in a mergeable state and the queue processor apparently did not exit
   cleanly, leaving the runner reservation open.
+
+---
+
+## §3 V1 Re-run v3 — LS-3938 + LS-3939 Fix Verification
+
+**Description:** Re-validate the full V1 path after LS-3938 (App-token empty-commit push) and
+LS-3939 (merge queue `workflow_run` condition) fixes landed. Goal was a fully hands-off flow with
+no manual steps; this run exposed one residual gap requiring a PAT workaround (see Deviation).
+
+**Test PR:** https://github.com/bkrupa/legacy-sports/pull/3383
+**Branch:** `validation/v1-full-auto-v3`
+**Probe file:** `.github/validation-probes/v1-full-auto-v3.txt`
+**Date completed:** 2026-04-28
+
+### Acceptance Criteria
+
+| # | Criterion | Result | Evidence |
+|---|-----------|--------|----------|
+| AC1 | No CI or W1 fires while PR is draft | ✅ Pass | No runs on branch while draft |
+| AC2 | W1 fires exactly once on `ready_for_review` | ✅ Pass | [W1 run 25033762747](https://github.com/bkrupa/legacy-sports/actions/runs/25033762747) |
+| AC3 | Bot posts `APPROVE` on first pass | ✅ Pass | `legacy-sports-review-bot[bot]` approved PR #3383 |
+| AC4 | No critical/high inline comments | ✅ Pass | Clean probe file, no findings |
+| AC5 | CI Orchestrator fires after bot approval | ✅ Pass | [CI Orchestrator run 25033774278](https://github.com/bkrupa/legacy-sports/actions/runs/25033774278) triggered by `pull_request_review` from bot |
+| AC6 | Merge queue runs and PR merges to main | ✅ Pass | PR #3383 merged at `2026-04-28T04:36:21Z` |
+
+### Evidence
+
+| Artifact | Link |
+|----------|------|
+| Test PR #3383 | https://github.com/bkrupa/legacy-sports/pull/3383 |
+| W1 Reviewer run | https://github.com/bkrupa/legacy-sports/actions/runs/25033762747 |
+| CI Orchestrator run | https://github.com/bkrupa/legacy-sports/actions/runs/25033774278 |
+| Merge queue run (auto via workflow_run) | https://github.com/bkrupa/legacy-sports/actions/runs/25033774219 |
+| No Merge Conflicts (PAT workaround) | https://github.com/bkrupa/legacy-sports/actions/runs/25034111294 |
+| Merge queue run (final dispatch) | https://github.com/bkrupa/legacy-sports/actions/runs/25034137302 |
+
+### LS-3939 Fix — Confirmed Working
+
+The merge queue fired automatically via `workflow_run` when the CI Orchestrator completed (run
+25033774219). The CI Orchestrator had itself been triggered by the bot's `pull_request_review`
+approval event; its completion then fired the `workflow_run` that re-triggered the merge queue. The
+merge queue evaluated the PR, found `No Merge Conflicts` still pending, and returned `success`
+without merging. Once the conflict check passed, a manual `gh workflow run merge-queue.yml`
+dispatch merged the PR. The automatic re-trigger path is confirmed functional.
+
+### Deviation — LS-3938 Fix Incomplete
+
+**Observed:** The LS-3938 fix (using a GitHub App installation token for the empty-commit push
+in `code-writer-bot.yml`) did **not** trigger `pull_request.synchronize` workflows. The empty
+commit was pushed successfully at `04:22:19Z` using the `legacy-sports-review-bot` App token,
+but no `github-actions` check suite was created on that commit SHA until `gh pr ready` was
+called at `04:22:45Z`.
+
+**Root cause:** GitHub does not deliver `pull_request.synchronize` events to Actions workflows
+when the commit is pushed to a **draft PR**, regardless of the token type used (GITHUB_TOKEN or
+GitHub App installation token). The event is only suppressed by anti-loop protection for
+GITHUB_TOKEN pushes; for App tokens the suppression appears to apply specifically to draft PRs.
+
+**Workaround used:** Pushed a commit via the GitHub REST API using the session PAT (outside a
+workflow context). This fired `pull_request.synchronize` and triggered `check-conflicts.yml`.
+
+**Fix:** Add `ready_for_review` to `check-conflicts.yml`'s `pull_request.types` list. This
+ensures the conflict check fires when a draft PR transitions to ready — the exact moment
+`code-writer-bot.yml` completes and W1 begins reviewing. No token bypass is needed.
+
+**Ticket:** [LS-3940](https://bkrupa.atlassian.net/browse/LS-3940)
+
+---
+
+## §4 V1 Re-run v4 — LS-3940 Fix Verification (Clean Run)
+
+**Description:** Re-validate the full V1 path after LS-3940 (`ready_for_review` trigger added to
+`check-conflicts.yml`). Goal: completely hands-off — zero manual steps from draft creation to
+merge.
+
+**Test PR:** https://github.com/bkrupa/legacy-sports/pull/3386
+**Branch:** `validation/v1-full-auto-v4`
+**Probe file:** `.github/validation-probes/v1-full-auto-v4.txt`
+**Date completed:** 2026-04-28
+
+### Acceptance Criteria
+
+| # | Criterion | Result | Evidence |
+|---|-----------|--------|----------|
+| AC1 | No CI or W1 fires while PR is draft | ✅ Pass | No runs on branch while draft |
+| AC2 | W1 fires exactly once on `ready_for_review` | ✅ Pass | [W1 run 25034743418](https://github.com/bkrupa/legacy-sports/actions/runs/25034743418) |
+| AC3 | Bot posts `APPROVE` on first pass | ✅ Pass | `legacy-sports-review-bot[bot]` approved PR #3386 |
+| AC4 | No critical/high inline comments | ✅ Pass | Clean probe file, no findings |
+| AC5 | CI Orchestrator fires after bot approval | ✅ Pass | [CI Orchestrator run 25034754119](https://github.com/bkrupa/legacy-sports/actions/runs/25034754119) triggered by `pull_request_review` from bot |
+| AC6 | Merge queue runs and PR merges to main | ✅ Pass | PR #3386 merged at `2026-04-28T05:06:07Z` |
+
+### Evidence
+
+| Artifact | Link |
+|----------|------|
+| Test PR #3386 | https://github.com/bkrupa/legacy-sports/pull/3386 |
+| W1 Reviewer run | https://github.com/bkrupa/legacy-sports/actions/runs/25034743418 |
+| No Merge Conflicts (auto via ready_for_review) | https://github.com/bkrupa/legacy-sports/actions/runs/25034743419 |
+| CI Orchestrator run | https://github.com/bkrupa/legacy-sports/actions/runs/25034754119 |
+| Merge queue run 1 (pull_request_review) | https://github.com/bkrupa/legacy-sports/actions/runs/25034754042 |
+| Merge queue run 2 (workflow_run after CI) | https://github.com/bkrupa/legacy-sports/actions/runs/25034961267 |
+
+### Notes
+
+- **Fully automated — no manual steps.** The entire flow from `gh pr ready` to merged took ~8 minutes with zero human intervention.
+- **`check-conflicts.yml` fired on `ready_for_review`** (LS-3940 fix): triggered at the same second as W1 (`04:57:41Z`), completed `No Merge Conflicts: success` before the merge queue evaluated conditions.
+- **Merge queue fired twice as designed:**
+  1. On bot APPROVE (`pull_request_review`, `04:58:06Z`): evaluated conditions, found CI still running, returned success without merging.
+  2. On CI completion (`workflow_run`, `05:05:16Z`): found all conditions met, merged at `05:06:07Z`.
+- **All gap fixes from LS-3857 validation arc confirmed working together:** LS-3931 (merge-when-ready label), LS-3932 (bot-review status), LS-3939 (merge queue workflow_run), LS-3940 (conflict check on ready_for_review).
