@@ -7,27 +7,30 @@ A modern sports data management platform built with React Native CLI, Next.js we
 ## 🚀 CI Status
 
 [![CI Pipeline](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/CI-Pipeline.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml)
+[![Branch](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Branch.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml)
+[![Last Updated](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Last-Updated.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml)
+
+Pipeline stages:
 [![Change Detection](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Change-Detection.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml)
-[![Execution Plan](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Execution-Plan.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml)
 [![Quality Gates](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Quality-Gates.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml)
 [![Build Validation](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Build-Validation.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml)
 [![E2E Testing](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/E2E-Testing.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml)
-[![Deployment Gate](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Deployment-Gate.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml)
 
-[![Branch](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Branch.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml)
-[![Last Updated](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Last-Updated.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml)
 [![Playwright Report](https://img.shields.io/badge/Playwright-Test%20Report-blue?logo=playwright)](https://bkrupa.github.io/legacy-sports-deploys/playwright-report/)
 [![Storybook](https://img.shields.io/badge/Storybook-Component%20Library-ff4785?logo=storybook&logoColor=white)](https://bkrupa.github.io/legacy-sports-deploys/storybook/)
 
 ## 🚢 Deployment Status
 
+[![Deploy Web App](https://github.com/bkrupa/legacy-sports/actions/workflows/deploy-web.yml/badge.svg)](https://github.com/bkrupa/legacy-sports/actions/workflows/deploy-web.yml)
+[![Apply Lambda Infrastructure](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Apply-Lambda-Infrastructure.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/lambda-terraform-apply.yml)
+[![Build Android APK](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Build-Android-APK.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/build-android-app.yml)
+
+Lambda uploads:
 [![Upload Stats Lambda](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Upload-Stats-Lambda.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/upload-lambdas.yml)
 [![Upload Game Selection Lambda](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Upload-Game-Selection-Lambda.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/upload-lambdas.yml)
 [![Upload OAuth Proxy Lambda](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Upload-OAuth-Proxy-Lambda.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/upload-lambdas.yml)
 [![Upload GraphQL Lambda](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Upload-GraphQL-Lambda.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/upload-lambdas.yml)
 [![Upload Draft Processor Lambda](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Upload-Draft-Processor-Lambda.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/upload-lambdas.yml)
-[![Apply Lambda Infrastructure](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Apply-Lambda-Infrastructure.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/lambda-terraform-apply.yml)
-[![Build Android APK](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Build-Android-APK.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/build-android-app.yml)
 
 ## 🗄️ Database
 
@@ -83,26 +86,11 @@ These are published automatically by CI workflows — no manual steps required.
 
 > **Note:** iOS builds are currently disabled as we are not actively using the iOS platform.
 
-## � Security
+## 🔒 Security
 
-[![Security Status](https://img.shields.io/badge/Security-Verified-green?style=flat-square&logo=shield)]()
+[![Security Scanning](https://github.com/bkrupa/legacy-sports/actions/workflows/security-scanning.yml/badge.svg)](https://github.com/bkrupa/legacy-sports/actions/workflows/security-scanning.yml)
 
-All security vulnerabilities have been completely resolved. Run `pnpm audit` to verify **0 vulnerabilities**.
-
-- **esbuild vulnerability (GHSA-67mh-4wv8-2f99):** Fixed via pnpm overrides
-- **axios vulnerability (GHSA-4hjh-wcwx-xvwj):** Fixed via overrides + lockfile regeneration
-- **Automatic protection:** Post-install script provides additional safety layer
-
-### Security Verification
-
-```powershell
-# Verify no vulnerabilities
-pnpm audit
-# Expected output: found 0 vulnerabilities
-
-# Run comprehensive security check
-pnpm audit
-```
+Security scanning is invoked by `ci-orchestrator.yml`, which runs on pull requests, merge groups, pushes to `develop`, manual dispatch, and on a scheduled basis; based on changed paths, the orchestrator selects dependency scanning for dependency-related changes or secrets-only scanning otherwise. Run `pnpm audit` locally to check for vulnerabilities.
 
 For complete security details, see: **[Security Audit Status](docs/security/security-audit-status.md)**
 
@@ -425,19 +413,9 @@ The Legacy Sports backend runs on AWS serverless infrastructure managed with Ter
 
 ### Current Architecture
 
-- **API Gateway**: `https://dtx9mcsty1.execute-api.us-east-1.amazonaws.com/dev`
-- **Lambda Functions**: GraphQL, OAuth, Statistics, Game Selection, User Management
+- **Lambda Functions**: GraphQL, OAuth, Statistics, Game Selection, Draft Processor, WebSocket
 - **Database**: PostgreSQL RDS with VPC networking
 - **Storage**: S3 buckets for deployment artifacts
-
-### Recent Updates
-
-**September 26, 2025**: Completed infrastructure cleanup
-
-- Removed 2 legacy API Gateway instances
-- Decommissioned unused Lambda function and S3 bucket
-- Simplified architecture with cost optimization
-- Zero downtime during cleanup process
 
 ### Documentation
 
