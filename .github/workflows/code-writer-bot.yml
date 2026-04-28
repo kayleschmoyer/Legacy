@@ -65,6 +65,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  actions: write
 
 jobs:
   create-pr:
@@ -107,6 +108,14 @@ jobs:
           PR_NUMBER=$(echo "$PR_URL" | grep -oE '[0-9]+$')
           echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
           echo "Created draft PR #$PR_NUMBER: $PR_URL"
+
+      - name: Trigger No Merge Conflicts check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run check-conflicts.yml \
+            --ref main \
+            --field pr_number=${{ steps.create-pr.outputs.pr_number }}
 
       - name: Mark ready for review
         if: ${{ inputs.ready_for_review }}
