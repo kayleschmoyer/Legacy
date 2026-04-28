@@ -107,6 +107,47 @@ export function postEscalationComment(prNumber, body) {
 }
 
 /**
+ * Fetch all inline review comments on a PR (root comments and thread replies).
+ *
+ * @param {number} prNumber
+ * @returns {{ id: number, inReplyToId: number | null, userLogin: string | null, body: string, createdAt: string }[]}
+ */
+export function getPrReviewComments(prNumber) {
+  const raw = execFileSync(
+    'gh',
+    ['api', `repos/{owner}/{repo}/pulls/${prNumber}/comments`, '--paginate'],
+    { encoding: 'utf8', maxBuffer: MAX_BUFFER },
+  );
+  return flattenPages(raw).map((c) => ({
+    id: c.id,
+    inReplyToId: c.in_reply_to_id ?? null,
+    userLogin: c.user?.login ?? null,
+    body: c.body ?? '',
+    createdAt: c.created_at ?? '',
+  }));
+}
+
+/**
+ * Fetch all PR-level issue comments (conversation tab comments).
+ *
+ * @param {number} prNumber
+ * @returns {{ id: number, userLogin: string | null, body: string, createdAt: string }[]}
+ */
+export function getPrIssueComments(prNumber) {
+  const raw = execFileSync(
+    'gh',
+    ['api', `repos/{owner}/{repo}/issues/${prNumber}/comments`, '--paginate'],
+    { encoding: 'utf8', maxBuffer: MAX_BUFFER },
+  );
+  return flattenPages(raw).map((c) => ({
+    id: c.id,
+    userLogin: c.user?.login ?? null,
+    body: c.body ?? '',
+    createdAt: c.created_at ?? '',
+  }));
+}
+
+/**
  * Add a label to a PR/issue.
  *
  * @param {number} prNumber

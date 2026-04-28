@@ -1,3 +1,5 @@
+import { parseAuthorReply } from './parse-author-response.mjs';
+
 /**
  * Cycle protocol implementation — T22.
  *
@@ -197,4 +199,79 @@ will be automatically stripped.`;
 
   // Cycle > 3 should trigger escalation before this function is called.
   return '';
+}
+
+/**
+ * Build the "## Author Responses" section to inject into the Cycle 2+ user prompt.
+ *
+ * Collects FIX/JUSTIFY/CANNOT-COMPLY tokens from two sources:
+ *   1. Author replies to inline review comment threads (non-blocking findings).
+ *      Each reply is matched to a finding title extracted from the bot's root comment body.
+ *   2. PR-level issue comments posted after the last bot review (blocking findings).
+ *      These have no specific thread to match, so they are listed without a title.
+ *
+ * MALFORMED replies (unrecognised tokens) are silently skipped.
+ * Returns an empty string when no valid responses are found.
+ *
+ * @param {Array<{ id: number, inReplyToId: number | null, userLogin: string | null, body: string, createdAt: string }>} reviewComments
+ * @param {Array<{ id: number, userLogin: string | null, body: string, createdAt: string }>} issueComments
+ * @param {string} lastBotReviewAt     ISO 8601 timestamp of the last bot review; comments at or before this time are excluded from both sources
+ * @param {Set<string>} botLogins      Login names that belong to the reviewer bot
+ * @returns {string}
+ */
+export function buildAuthorResponsesSection(
+  reviewComments,
+  issueComments,
+  lastBotReviewAt,
+  botLogins,
+) {
+  /** @type {Array<{ title: string | null, parsed: import('./parse-author-response.mjs').ParsedResponse }>} */
+  const items = [];
+
+  // --- Part 1: inline review thread replies (non-blocking finding responses) ---
+  // Build a map from bot root comment id → finding title extracted from the
+  // comment body ("**[SEV]** title\n\n..." or "**[SEV]** title — loc").
+  const rootIdToTitle = new Map();
+  for (const c of reviewComments) {
+    if (!botLogins.has(c.userLogin) || c.inReplyToId !== null) continue;
+    const m = c.body.match(/\*\*\[[A-Z]+\]\*\*\s+(.+?)(?:\s+—\s+|\n|$)/m);
+    if (m) rootIdToTitle.set(c.id, m[1].trim());
+  }
+
+  for (const c of reviewComments) {
+    if (botLogins.has(c.userLogin) || c.inReplyToId === null) continue;
+    if (lastBotReviewAt && c.createdAt <= lastBotReviewAt) continue;
+    const parsed = parseAuthorReply(c.body);
+    if (parsed.type === 'MALFORMED') continue;
+    items.push({ title: rootIdToTitle.get(c.inReplyToId) ?? null, parsed });
+  }
+
+  // --- Part 2: PR-level issue comments after the last bot review ---
+  // These are the typical channel for author responses to blocking findings
+  // (critical/high severity), which appear only in the review body and do not
+  // generate their own inline comment threads.
+  for (const c of issueComments) {
+    if (botLogins.has(c.userLogin)) continue;
+    if (lastBotReviewAt && c.createdAt <= lastBotReviewAt) continue;
+    const parsed = parseAuthorReply(c.body);
+    if (parsed.type === 'MALFORMED') continue;
+    items.push({ title: null, parsed });
+  }
+
+  if (items.length === 0) return '';
+
+  const lines = ['## Author Responses'];
+  for (const { title, parsed } of items) {
+    let responseText;
+    if (parsed.type === 'FIX') {
+      responseText = `FIX: ${parsed.sha}`;
+    } else if (parsed.type === 'JUSTIFY') {
+      responseText = `JUSTIFY: ${parsed.rationale}`;
+    } else {
+      responseText = `CANNOT-COMPLY: ${parsed.issueId}\n${parsed.reason}`;
+    }
+    lines.push(title ? `\n**${title}**: ${responseText}` : `\n${responseText}`);
+  }
+
+  return lines.join('\n');
 }

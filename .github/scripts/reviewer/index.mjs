@@ -21,7 +21,12 @@ import {
 } from './lib/post-review.mjs';
 import { buildRecord, emitTelemetry } from './lib/telemetry.mjs';
 import { withRetry } from './lib/retry.mjs';
-import { getPrReviews, getPrCommits } from './lib/review-thread-api.mjs';
+import {
+  getPrReviews,
+  getPrCommits,
+  getPrReviewComments,
+  getPrIssueComments,
+} from './lib/review-thread-api.mjs';
 import {
   computeCycle,
   isEscalationRequired,
@@ -33,6 +38,7 @@ import {
   parseTitlesFromReviewBody,
   filterFindingsCycle2,
   filterFindingsCycle3,
+  buildAuthorResponsesSection,
 } from './lib/cycle-protocol.mjs';
 
 const NEEDS_HUMAN_ARBITRATION_LABEL = 'needs-human-arbitration';
@@ -176,6 +182,36 @@ async function main() {
     }
   }
 
+  // Fetch author replies (JUSTIFY/FIX comments) for Cycle 2+ so the LLM can
+  // evaluate them when adjudicating or verifying findings.
+  let authorResponsesSection = '';
+  if (cycle >= 2 && lastBotReview) {
+    try {
+      const reviewComments = getPrReviewComments(prNumber);
+      const issueComments = getPrIssueComments(prNumber);
+      authorResponsesSection = buildAuthorResponsesSection(
+        reviewComments,
+        issueComments,
+        lastBotReview.submittedAt,
+        REVIEWER_BOT_LOGINS,
+      );
+      if (authorResponsesSection) {
+        process.stdout.write(
+          `[reviewer] Cycle ${cycle}: author response(s) found — injecting into user prompt\n`,
+        );
+      } else {
+        process.stdout.write(
+          `[reviewer] Cycle ${cycle}: no author responses found\n`,
+        );
+      }
+    } catch (err) {
+      process.stderr.write(
+        `[reviewer] Failed to fetch author replies for cycle ${cycle}: ${err instanceof Error ? err.message : String(err)}\n`,
+      );
+      // Non-fatal: proceed without author response context
+    }
+  }
+
   // Dynamic imports so module resolution doesn't fail when dependency PRs
   // (T7 CopilotCLIProvider, T8 AnthropicProvider) haven't merged yet.
   let provider;
@@ -208,7 +244,7 @@ async function main() {
   try {
     const cycleRoleSection = buildCycleRoleSection(cycle, priorTitles);
     systemPrompt = buildSystemPrompt(cycleRoleSection);
-    userPrompt = buildUserPrompt(ctx);
+    userPrompt = buildUserPrompt(ctx, authorResponsesSection);
   } catch (err) {
     process.stderr.write(
       `[reviewer] Failed to build prompts: ${err instanceof Error ? err.message : String(err)}\n`,

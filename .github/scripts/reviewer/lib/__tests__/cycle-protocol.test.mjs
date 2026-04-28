@@ -7,6 +7,7 @@ import {
   filterFindingsCycle2,
   filterFindingsCycle3,
   buildCycleRoleSection,
+  buildAuthorResponsesSection,
 } from '../cycle-protocol.mjs';
 
 // ---------------------------------------------------------------------------
@@ -355,5 +356,354 @@ describe('buildCycleRoleSection', () => {
   it('returns empty string for cycle > 3 (escalation handles those)', () => {
     const section = buildCycleRoleSection(4);
     assert.strictEqual(section, '');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildAuthorResponsesSection
+// ---------------------------------------------------------------------------
+
+const BOT_LOGINS = new Set(['github-actions[bot]', 'copilot-reviewer[bot]']);
+
+// Inline review comment body format produced by buildInlineComments.
+const BOT_INLINE_BODY =
+  '<!-- issue-id: ISSUE01 -->\n**[LOW]** Unused variable in handler\n\nRemove or prefix with _.';
+
+const REVIEW_AT = '2024-01-01T12:00:00Z';
+const AFTER_REVIEW = '2024-01-01T13:00:00Z';
+const BEFORE_REVIEW = '2024-01-01T11:00:00Z';
+
+describe('buildAuthorResponsesSection — empty inputs', () => {
+  it('returns empty string when no review comments or issue comments', () => {
+    const result = buildAuthorResponsesSection([], [], REVIEW_AT, BOT_LOGINS);
+    assert.strictEqual(result, '');
+  });
+
+  it('returns empty string when all replies are MALFORMED', () => {
+    const reviewComments = [
+      {
+        id: 10,
+        inReplyToId: null,
+        userLogin: 'github-actions[bot]',
+        body: BOT_INLINE_BODY,
+        createdAt: REVIEW_AT,
+      },
+      {
+        id: 11,
+        inReplyToId: 10,
+        userLogin: 'author',
+        body: 'Some random comment that is not a valid token',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    const result = buildAuthorResponsesSection(
+      reviewComments,
+      [],
+      REVIEW_AT,
+      BOT_LOGINS,
+    );
+    assert.strictEqual(result, '');
+  });
+
+  it('returns empty string when all inline replies are at or before the last review timestamp', () => {
+    const reviewComments = [
+      {
+        id: 10,
+        inReplyToId: null,
+        userLogin: 'github-actions[bot]',
+        body: BOT_INLINE_BODY,
+        createdAt: REVIEW_AT,
+      },
+      {
+        id: 11,
+        inReplyToId: 10,
+        userLogin: 'author',
+        body: 'JUSTIFY: reply from a previous cycle',
+        createdAt: BEFORE_REVIEW,
+      },
+    ];
+    const result = buildAuthorResponsesSection(
+      reviewComments,
+      [],
+      REVIEW_AT,
+      BOT_LOGINS,
+    );
+    assert.strictEqual(result, '');
+  });
+
+  it('returns empty string when issue comments are all before the last review', () => {
+    const issueComments = [
+      {
+        id: 1,
+        userLogin: 'author',
+        body: 'JUSTIFY: reason from previous cycle',
+        createdAt: BEFORE_REVIEW,
+      },
+    ];
+    const result = buildAuthorResponsesSection(
+      [],
+      issueComments,
+      REVIEW_AT,
+      BOT_LOGINS,
+    );
+    assert.strictEqual(result, '');
+  });
+});
+
+describe('buildAuthorResponsesSection — inline thread replies (non-blocking findings)', () => {
+  it('includes a JUSTIFY reply keyed to the finding title', () => {
+    const reviewComments = [
+      {
+        id: 10,
+        inReplyToId: null,
+        userLogin: 'github-actions[bot]',
+        body: BOT_INLINE_BODY,
+        createdAt: REVIEW_AT,
+      },
+      {
+        id: 11,
+        inReplyToId: 10,
+        userLogin: 'author',
+        body: 'JUSTIFY: This variable is used indirectly via a closure.',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    const result = buildAuthorResponsesSection(
+      reviewComments,
+      [],
+      REVIEW_AT,
+      BOT_LOGINS,
+    );
+    assert.ok(result.includes('## Author Responses'), 'should have header');
+    assert.ok(
+      result.includes('Unused variable in handler'),
+      'should key to finding title',
+    );
+    assert.ok(
+      result.includes(
+        'JUSTIFY: This variable is used indirectly via a closure.',
+      ),
+      'should include rationale',
+    );
+  });
+
+  it('includes a FIX reply keyed to the finding title', () => {
+    const reviewComments = [
+      {
+        id: 10,
+        inReplyToId: null,
+        userLogin: 'github-actions[bot]',
+        body: BOT_INLINE_BODY,
+        createdAt: REVIEW_AT,
+      },
+      {
+        id: 11,
+        inReplyToId: 10,
+        userLogin: 'author',
+        body: 'FIX: abc1234',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    const result = buildAuthorResponsesSection(
+      reviewComments,
+      [],
+      REVIEW_AT,
+      BOT_LOGINS,
+    );
+    assert.ok(
+      result.includes('Unused variable in handler'),
+      'should key to finding title',
+    );
+    assert.ok(result.includes('FIX: abc1234'), 'should include sha');
+  });
+
+  it('includes a CANNOT-COMPLY reply keyed to the finding title', () => {
+    const reviewComments = [
+      {
+        id: 10,
+        inReplyToId: null,
+        userLogin: 'github-actions[bot]',
+        body: BOT_INLINE_BODY,
+        createdAt: REVIEW_AT,
+      },
+      {
+        id: 11,
+        inReplyToId: 10,
+        userLogin: 'author',
+        body: 'CANNOT-COMPLY: LS-1234\nThis is a generated file.',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    const result = buildAuthorResponsesSection(
+      reviewComments,
+      [],
+      REVIEW_AT,
+      BOT_LOGINS,
+    );
+    assert.ok(
+      result.includes('CANNOT-COMPLY: LS-1234'),
+      'should include the token',
+    );
+    assert.ok(
+      result.includes('This is a generated file.'),
+      'should include the reason',
+    );
+  });
+
+  it('skips replies from bot logins', () => {
+    const reviewComments = [
+      {
+        id: 10,
+        inReplyToId: null,
+        userLogin: 'github-actions[bot]',
+        body: BOT_INLINE_BODY,
+        createdAt: REVIEW_AT,
+      },
+      {
+        id: 11,
+        inReplyToId: 10,
+        userLogin: 'copilot-reviewer[bot]',
+        body: 'JUSTIFY: bot self-reply',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    const result = buildAuthorResponsesSection(
+      reviewComments,
+      [],
+      REVIEW_AT,
+      BOT_LOGINS,
+    );
+    assert.strictEqual(result, '');
+  });
+
+  it('includes reply without a title when root comment has no recognisable title', () => {
+    const reviewComments = [
+      {
+        id: 20,
+        inReplyToId: null,
+        userLogin: 'github-actions[bot]',
+        body: 'No bold severity prefix here',
+        createdAt: REVIEW_AT,
+      },
+      {
+        id: 21,
+        inReplyToId: 20,
+        userLogin: 'author',
+        body: 'JUSTIFY: irrelevant context',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    const result = buildAuthorResponsesSection(
+      reviewComments,
+      [],
+      REVIEW_AT,
+      BOT_LOGINS,
+    );
+    assert.ok(result.includes('JUSTIFY: irrelevant context'));
+    assert.ok(!result.includes('**'), 'should not have a bold title prefix');
+  });
+});
+
+describe('buildAuthorResponsesSection — PR issue comments (blocking finding responses)', () => {
+  it('includes a JUSTIFY issue comment posted after the last review', () => {
+    const issueComments = [
+      {
+        id: 1,
+        userLogin: 'author',
+        body: 'JUSTIFY: The string interpolation uses only validated internal values.',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    const result = buildAuthorResponsesSection(
+      [],
+      issueComments,
+      REVIEW_AT,
+      BOT_LOGINS,
+    );
+    assert.ok(result.includes('## Author Responses'), 'should have header');
+    assert.ok(
+      result.includes(
+        'JUSTIFY: The string interpolation uses only validated internal values.',
+      ),
+    );
+  });
+
+  it('excludes a JUSTIFY issue comment posted at exactly the review timestamp', () => {
+    const issueComments = [
+      {
+        id: 1,
+        userLogin: 'author',
+        body: 'JUSTIFY: exact timestamp',
+        createdAt: REVIEW_AT,
+      },
+    ];
+    const result = buildAuthorResponsesSection(
+      [],
+      issueComments,
+      REVIEW_AT,
+      BOT_LOGINS,
+    );
+    assert.strictEqual(result, '');
+  });
+
+  it('skips issue comments from bot logins', () => {
+    const issueComments = [
+      {
+        id: 1,
+        userLogin: 'github-actions[bot]',
+        body: 'JUSTIFY: bot comment',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    const result = buildAuthorResponsesSection(
+      [],
+      issueComments,
+      REVIEW_AT,
+      BOT_LOGINS,
+    );
+    assert.strictEqual(result, '');
+  });
+
+  it('includes both inline thread replies and issue comments together', () => {
+    const reviewComments = [
+      {
+        id: 10,
+        inReplyToId: null,
+        userLogin: 'github-actions[bot]',
+        body: BOT_INLINE_BODY,
+        createdAt: REVIEW_AT,
+      },
+      {
+        id: 11,
+        inReplyToId: 10,
+        userLogin: 'author',
+        body: 'FIX: abc1234',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    const issueComments = [
+      {
+        id: 1,
+        userLogin: 'author',
+        body: 'JUSTIFY: The interpolation is safe due to upstream validation.',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    const result = buildAuthorResponsesSection(
+      reviewComments,
+      issueComments,
+      REVIEW_AT,
+      BOT_LOGINS,
+    );
+    assert.ok(
+      result.includes('FIX: abc1234'),
+      'should include inline thread reply',
+    );
+    assert.ok(
+      result.includes(
+        'JUSTIFY: The interpolation is safe due to upstream validation.',
+      ),
+      'should include issue comment',
+    );
   });
 });
