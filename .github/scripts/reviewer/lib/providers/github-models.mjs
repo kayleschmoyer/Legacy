@@ -89,7 +89,6 @@ export class GitHubModelsProvider {
           ],
           temperature: this.temperature,
           max_tokens: this.maxTokens,
-          response_format: { type: 'json_object' },
         }),
       });
     } catch (err) {
@@ -113,10 +112,7 @@ export class GitHubModelsProvider {
     }
 
     const data = await response.json();
-    // GitHub Models quirk: json_object mode output lands in message.refusal instead of message.content
-    const text =
-      data?.choices?.[0]?.message?.content ??
-      data?.choices?.[0]?.message?.refusal;
+    const text = data?.choices?.[0]?.message?.content;
     if (typeof text !== 'string' || text.length === 0) {
       throw new Error(
         `GitHub Models API returned no content: ${JSON.stringify(data).slice(0, ERROR_BODY_SNIPPET_CHARS)}`,

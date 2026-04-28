@@ -97,18 +97,16 @@ function _tryParseJsonArray(s) {
 }
 
 const REFORMAT_SYSTEM =
-  'You are a JSON formatter. Extract code review findings from the input and ' +
-  'return them as a JSON object in the form {"findings": [...]}. ' +
-  'Your ONLY output must be valid JSON — no prose, no markdown, no code fences. ' +
-  'If no findings are present, output exactly {"findings": []}.';
+  'You are a JSON formatter. Extract code review findings from the input and respond with ONLY valid JSON. ' +
+  'Use this exact format:\n\n' +
+  '{"findings":[{"severity":"high","file":"src/foo.ts","line":10,"title":"Short title","body":"Explanation."}]}\n\n' +
+  'If no findings are present, output exactly: {"findings":[]}';
 
 const REFORMAT_USER_PREFIX =
   'Convert the following code review text into a JSON object. ' +
-  'Use this exact schema:\n' +
-  '{"findings": [{"severity":"critical"|"high"|"medium"|"low"|"trivia",' +
-  '"file":string|null,"line":integer|null,"title":string,"body":string}, ...]}\n\n' +
-  'If no findings are present, return exactly: {"findings": []}\n' +
-  'Your response must be a JSON object — no other text.\n\n' +
+  'Respond with ONLY valid JSON in this exact format — no prose, no markdown fences:\n\n' +
+  '{"findings":[{"severity":"high","file":"src/foo.ts","line":10,"title":"Short title","body":"Explanation."}]}\n\n' +
+  'If no findings are present, return exactly: {"findings":[]}\n\n' +
   'Code review text:\n---\n';
 
 /**

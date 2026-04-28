@@ -103,5 +103,9 @@ ${body?.trim() || '_No description provided._'}
 ${diff?.trim() || '_No diff available._'}
 \`\`\`
 
-Review this pull request according to your instructions. Apply the self-critique pass, then output ONLY a JSON object in the form {"findings": [...]}. Your entire response must be a valid JSON object — no prose, no markdown code fences.`;
+Review this pull request according to your instructions. Apply the self-critique pass, then respond with ONLY valid JSON in this exact format — no prose, no markdown fences:
+
+{"findings":[{"severity":"high","file":"src/foo.ts","line":10,"title":"Short title","body":"Explanation of the issue."}]}
+
+If no issues found: {"findings":[]}`;
 }
