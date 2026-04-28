@@ -15,7 +15,7 @@ import { spawn } from 'node:child_process';
  * @property {number}    pr                  - Pull request number
  * @property {string}    sha                 - Head commit SHA
  * @property {string}    model               - Model identifier string
- * @property {string}    provider            - 'copilot-cli' | 'anthropic'
+ * @property {string}    provider            - 'github-models' | 'copilot-cli' | 'anthropic'
  * @property {1|2|3}     cycle               - Review cycle number
  * @property {string}    verdict             - 'APPROVED' | 'REQUEST_CHANGES' | 'ESCALATE' | string
  * @property {Finding[]} findings            - Structured findings from the review

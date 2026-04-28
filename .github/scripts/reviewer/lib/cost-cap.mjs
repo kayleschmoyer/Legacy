@@ -81,10 +81,11 @@ export class CostCap {
 
   /**
    * Rough cost estimate for an upcoming call, based on prompt character count.
-   * Uses chars/4 ≈ tokens with Anthropic pricing. Returns 0 for Copilot (subscription model).
+   * Uses chars/4 ≈ tokens with Anthropic pricing. Returns 0 for any non-Anthropic
+   * provider (Copilot uses a subscription, GitHub Models is included with the GitHub plan).
    *
    * @param {number} promptChars - Total character count of system + user prompts
-   * @param {string} [provider]  - 'anthropic' | 'copilot-cli'
+   * @param {string} [provider]  - 'anthropic' | 'copilot-cli' | 'github-models'
    * @returns {number} Estimated cost in USD
    */
   estimateCost(promptChars, provider = 'anthropic') {

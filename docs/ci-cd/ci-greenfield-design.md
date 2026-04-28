@@ -88,7 +88,7 @@ The `summarize` job applies labels based on which stage failed:
 
 ### Reviewer W1 (`review.yml`)
 
-The Code Reviewer Bot (`legacy-sports-review-bot`, App ID `3142924`) uses the Copilot CLI (`@github/copilot`, `codex` model) with a custom reviewer script (`.github/scripts/reviewer/index.mjs`) to analyze PR diffs and post structured reviews.
+The Code Reviewer Bot (`legacy-sports-review-bot`, App ID `3142924`) uses GitHub Models (`openai/gpt-4o-mini` by default, configurable via `REVIEWER_MODEL` and `LLM_PROVIDER`) with a custom reviewer script (`.github/scripts/reviewer/index.mjs`) to analyze PR diffs and post structured reviews. Alternate providers (`copilot-cli`, `anthropic`) are selectable via `LLM_PROVIDER`.
 
 **Review outcomes:**
 

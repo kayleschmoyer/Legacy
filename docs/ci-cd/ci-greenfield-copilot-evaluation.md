@@ -1,6 +1,8 @@
-# Code Reviewer Bot: Copilot Evaluation
+# Code Reviewer Bot: LLM Provider
 
-> **Documents the design evaluation and integration of GitHub Copilot as the code review engine.** Part of the LS-3857 greenfield rebuild (LS-3879). See [ci-greenfield-design.md](ci-greenfield-design.md) for the overall CI architecture.
+> **Documents the design evaluation and integration of the LLM that powers W1 code review.** Part of the LS-3857 greenfield rebuild (LS-3879). See [ci-greenfield-design.md](ci-greenfield-design.md) for the overall CI architecture.
+>
+> **Current default**: GitHub Models (`openai/gpt-4o-mini`) — uses the workflow `GITHUB_TOKEN` with `models: read` permission, no service-account PAT required. The original Copilot CLI evaluation is preserved below as historical context; the `CopilotCLIProvider` and `AnthropicProvider` are still selectable via `LLM_PROVIDER`.
 
 ## Motivation
 
@@ -28,7 +30,7 @@ GitHub Copilot's native "Code Review" repository ruleset (`review_on_push: true`
 - Cannot integrate with the RAISE/ADJUDICATE/VERIFY cycle protocol
 - Cannot set `bot-review` commit status with the correct identity
 
-### Option B: Copilot CLI with Service Account (chosen)
+### Option B: Copilot CLI with Service Account (historical — initial choice)
 
 Use `@github/copilot` CLI with a service account PAT to drive reviews programmatically via a custom reviewer script.
 
@@ -38,7 +40,19 @@ Use `@github/copilot` CLI with a service account PAT to drive reviews programmat
 - Full integration with the RAISE/ADJUDICATE/VERIFY cycle protocol
 - `bot-review` commit status set by the reviewer bot under the correct identity
 
-**Selected:** Option B.
+**Initially selected**, then superseded — see Option C. The Copilot CLI provider remains in the codebase and is selectable via `LLM_PROVIDER=copilot-cli`, but is no longer the default.
+
+### Option C: GitHub Models (current default)
+
+Call the GitHub Models REST inference endpoint (`https://models.github.ai/inference/chat/completions`) directly from the reviewer script using the workflow's auto-issued `GITHUB_TOKEN` and a `permissions: { models: read }` grant in `review.yml`.
+
+**Advantages over Option B:**
+- No service-account PAT required — `GITHUB_TOKEN` is auto-issued by Actions
+- Free at the workflow's existing GitHub plan tier (rate limits scale with the plan)
+- Multiple model families available via `{publisher}/{model_name}` ids (`openai/gpt-4o-mini`, `meta/Llama-3.3-70B-Instruct`, `microsoft/Phi-4`, etc.)
+- Programmatic control, identity, and cycle-protocol integration are all preserved (the reviewer script is unchanged; only the provider class swapped)
+
+**Currently selected.** The reviewer's controlled bot identity (`legacy-sports-review-bot`) for posting reviews is unaffected by this swap — that identity comes from `BOT_APP_PRIVATE_KEY`, not from the LLM auth token.
 
 ## Implementation
 
@@ -47,21 +61,28 @@ Use `@github/copilot` CLI with a service account PAT to drive reviews programmat
 | Component | Location | Purpose |
 |-----------|----------|---------|
 | `review.yml` | `.github/workflows/review.yml` | Triggers the reviewer, manages bot credentials |
-| `index.mjs` | `.github/scripts/reviewer/index.mjs` | Orchestrates the review run |
-| `provider.mjs` | `.github/scripts/reviewer/lib/providers/provider.mjs` | Copilot CLI adapter |
+| `index.mjs` | `.github/scripts/reviewer/index.mjs` | Orchestrates the review run, selects provider via `LLM_PROVIDER` |
+| `provider.mjs` | `.github/scripts/reviewer/lib/providers/provider.mjs` | `LLMProvider` interface contract |
+| `github-models.mjs` | `.github/scripts/reviewer/lib/providers/github-models.mjs` | **Default** — calls GitHub Models REST inference |
+| `copilot-cli.mjs` | `.github/scripts/reviewer/lib/providers/copilot-cli.mjs` | Spawns `@github/copilot` CLI (requires PAT) |
+| `anthropic.mjs` | `.github/scripts/reviewer/lib/providers/anthropic.mjs` | Calls Anthropic SDK with prompt caching |
 
 ### Credentials
 
 | Secret / Var | Purpose |
 |-------------|---------|
-| `COPILOT_SERVICE_ACCOUNT_PAT` | Authenticates the Copilot CLI with a service account |
+| `GITHUB_TOKEN` (workflow) | Authenticates GitHub Models inference; `permissions: models: read` granted in `review.yml` |
+| `COPILOT_SERVICE_ACCOUNT_PAT` | Optional: service-account PAT used for `LLM_PROVIDER=copilot-cli`; mapped in the workflow to `COPILOT_GITHUB_TOKEN` for the `@github/copilot` CLI |
+| `ANTHROPIC_API_KEY` | Optional: required for `LLM_PROVIDER=anthropic` to authenticate Anthropic SDK requests |
 | `REVIEWER_BOT_APP_ID` | GitHub App ID for `legacy-sports-review-bot` |
 | `BOT_APP_PRIVATE_KEY` | Private key for `legacy-sports-review-bot` |
 | `REVIEWER_TELEMETRY_BUCKET` | S3 bucket for review telemetry |
 
+The default GitHub Models path requires no extra secrets beyond the auto-issued workflow `GITHUB_TOKEN`. If you switch providers via `LLM_PROVIDER`, also configure the optional provider-specific credentials above: `COPILOT_SERVICE_ACCOUNT_PAT` (mapped to `COPILOT_GITHUB_TOKEN`) for `copilot-cli`, or `ANTHROPIC_API_KEY` for `anthropic`.
+
 ### Model Selection
 
-The reviewer uses the `codex` model (`REVIEWER_MODEL=codex`). Model selection is configurable via the `REVIEWER_MODEL` environment variable in `review.yml`.
+The reviewer uses `openai/gpt-4o-mini` by default (`REVIEWER_MODEL=openai/gpt-4o-mini`). GitHub Models accepts `{publisher}/{model_name}` ids — e.g. `openai/gpt-4o`, `meta/Llama-3.3-70B-Instruct`, `microsoft/Phi-4`. Override via the `REVIEWER_MODEL` env var in `review.yml`.
 
 ## Review Cycle Protocol
 
@@ -135,6 +156,7 @@ Telemetry upload is `continue-on-error: true`; failures do not block the review.
 ## Known Limitations
 
 - Reviews are scoped to the PR diff. Context beyond the diff requires the reviewer script to fetch additional files.
-- The `codex` model selection is configurable but not persisted across runs — defaults to `codex`.
+- Model selection is configurable via `REVIEWER_MODEL` but not persisted across runs — defaults to `openai/gpt-4o-mini` (GitHub Models).
 - Telemetry analysis tooling is not yet built (tracked separately).
-- Review latency depends on Copilot CLI response time (typically 2–8 minutes per PR).
+- GitHub Models free-tier rate limits are shared across the account — heavy bursts may queue. The rate limit scales with the GitHub plan attached to the workflow; see [GitHub Models billing](https://docs.github.com/billing/managing-billing-for-your-products/about-billing-for-github-models).
+- Review latency depends on the chosen provider/model (GitHub Models `gpt-4o-mini`: typically <30s; Copilot CLI: 2–8 min; Anthropic Sonnet 4.6: 30–90s).

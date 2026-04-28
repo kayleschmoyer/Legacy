@@ -37,7 +37,7 @@ async function main() {
     process.exit(1);
   }
 
-  const providerName = process.env.LLM_PROVIDER ?? 'copilot-cli';
+  const providerName = process.env.LLM_PROVIDER ?? 'github-models';
 
   // Fetch PR context — fail open on infra errors
   let ctx;
@@ -145,6 +145,10 @@ async function main() {
       const { AnthropicProvider } =
         await import('./lib/providers/anthropic.mjs');
       provider = new AnthropicProvider();
+    } else if (providerName === 'github-models') {
+      const { GitHubModelsProvider } =
+        await import('./lib/providers/github-models.mjs');
+      provider = new GitHubModelsProvider();
     } else {
       const { CopilotCLIProvider } =
         await import('./lib/providers/copilot-cli.mjs');

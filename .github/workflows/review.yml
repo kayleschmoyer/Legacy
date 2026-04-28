@@ -14,6 +14,7 @@ permissions:
   pull-requests: write
   issues: write
   id-token: write # required for OIDC auth to AWS (S3 reviewer telemetry)
+  models: read # required for GitHub Models inference (W1 LLM provider)
 
 concurrency:
   group: reviewer-${{ github.event.pull_request.number }}
@@ -37,10 +38,6 @@ jobs:
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: 22
-      - name: Install Copilot CLI
-        run: |
-          npm install -g @github/copilot
-          copilot --version
       - name: Configure AWS credentials
         continue-on-error: true # telemetry is best-effort; don't block review on auth failure
         uses: aws-actions/configure-aws-credentials@ec61189d14ec14c8efccab744f656cffd0e33f37 # v6
@@ -50,12 +47,12 @@ jobs:
       - name: Run reviewer
         continue-on-error: true
         env:
-          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_SERVICE_ACCOUNT_PAT }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          LLM_PROVIDER: copilot-cli
-          REVIEWER_MODEL: codex
+          LLM_PROVIDER: github-models
+          REVIEWER_MODEL: openai/gpt-4o-mini
           REVIEWER_BOT_APP_ID: ${{ vars.REVIEWER_BOT_APP_ID || '3142924' }}
           REVIEWER_BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           REVIEWER_TELEMETRY_BUCKET: ${{ vars.REVIEWER_TELEMETRY_BUCKET || 'legacy-sports-dev-reviewer-telemetry' }}
