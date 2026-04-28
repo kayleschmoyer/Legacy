@@ -4,7 +4,7 @@
  * Three-cycle state machine that prevents agent ping-pong:
  *
  *   RAISE (cycle 1)      — initial review; may raise any issue
- *   ADJUDICATE (cycle 2) — adjudicates author FIX/JUSTIFY replies;
+ *   ADJUDICATE (cycle 2) — re-evaluates C1 findings against the current diff;
  *                          cannot raise issues unrelated to author's changes
  *   VERIFY (cycle 3)     — verifies C2 mandate compliance only; no new findings
  *
@@ -158,14 +158,16 @@ restrictions on what you may raise in this cycle.`;
     return `\
 ## Your Role This Cycle: ADJUDICATE (Cycle 2 of 3)
 
-You are **adjudicating the author's responses** to Cycle 1's review findings. \
-Read the author's \`FIX: <sha>\` and \`JUSTIFY: <rationale>\` replies, then \
-decide whether each prior issue is resolved.${priorBlock}
+You are **adjudicating Cycle 1 findings** against the current code state. \
+Re-evaluate each prior finding against the current diff. If the issue is still \
+present, re-raise it (it becomes a mandate). If it is fixed, omit it. Author \
+replies (\`FIX:\`/\`JUSTIFY:\`) are not provided to you — resolution is \
+determined solely by whether the code changed.${priorBlock}
 
 **Rules — strictly enforced by the post-LLM validator:**
-- **Re-raise** findings from Cycle 1 that were not adequately addressed (these \
-become mandates the author MUST fix before Cycle 3).
-- **Accept** findings where the author's FIX or JUSTIFY response is satisfactory \
+- **Re-raise** findings from Cycle 1 that are still present in the current diff \
+(these become mandates the author MUST fix before Cycle 3).
+- **Accept** findings that are no longer present in the current diff \
 (omit them from your output).
 - **Do NOT raise new issues** unrelated to the author's intermediate changes. \
 New concerns will be automatically stripped.
