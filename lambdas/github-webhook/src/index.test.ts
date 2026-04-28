@@ -26,8 +26,17 @@ jest.mock('./handle-jira-transition', () => ({
     ),
 }));
 
+jest.mock('./handle-review-thread-resolved', () => ({
+  handleReviewThreadResolvedEvent: jest
+    .fn()
+    .mockResolvedValue(
+      'Dispatched merge-queue.yml for PR #42 after thread resolved',
+    ),
+}));
+
 // Set env vars before importing handler
 process.env['JIRA_WEBHOOK_SECRET_SECRET_NAME'] = 'test-jira-secret';
+process.env['GITHUB_WEBHOOK_SECRET_SECRET_NAME'] = 'test-github-secret';
 process.env['AGENT_AUTHOR_APP_PRIVATE_KEY_SECRET_NAME'] =
   'test-agent-author-key';
 process.env['AGENT_AUTHOR_APP_ID'] = '3142924';
@@ -35,10 +44,12 @@ process.env['GITHUB_REPO'] = 'bkrupa/legacy-sports';
 
 import { verifyGitHubSignature } from './verify-signature';
 import { handleJiraTransitionEvent } from './handle-jira-transition';
+import { handleReviewThreadResolvedEvent } from './handle-review-thread-resolved';
 import { handler } from './index';
 
 const mockVerify = verifyGitHubSignature as jest.Mock;
 const mockHandleJira = handleJiraTransitionEvent as jest.Mock;
+const mockHandleReviewThread = handleReviewThreadResolvedEvent as jest.Mock;
 
 function makeEvent(
   overrides: Partial<APIGatewayProxyEvent> = {},
@@ -72,6 +83,9 @@ beforeEach(() => {
   mockVerify.mockReturnValue(true);
   mockHandleJira.mockResolvedValue(
     'Dispatched jira-issue-updated for LS-1234 (In Progress → In Review)',
+  );
+  mockHandleReviewThread.mockResolvedValue(
+    'Dispatched merge-queue.yml for PR #42 after thread resolved',
   );
 });
 
@@ -158,6 +172,93 @@ describe('handler — Jira webhook route (/github-webhook/jira)', () => {
     const b64 = Buffer.from(jsonBody).toString('base64');
     const result = await handler(
       makeEvent({ body: b64, isBase64Encoded: true }),
+    );
+    expect(result.statusCode).toBe(200);
+  });
+});
+
+describe('handler — GitHub webhook route (/github-webhook/github)', () => {
+  function makeGitHubEvent(
+    overrides: Partial<APIGatewayProxyEvent> = {},
+  ): APIGatewayProxyEvent {
+    return makeEvent({
+      path: '/github-webhook/github',
+      headers: {
+        'X-Hub-Signature-256': 'sha256=abc123',
+        'X-GitHub-Event': 'pull_request_review_thread',
+      },
+      body: JSON.stringify({
+        action: 'resolved',
+        pull_request: {
+          number: 42,
+          labels: [{ name: 'merge-when-ready' }],
+        },
+      }),
+      ...overrides,
+    });
+  }
+
+  it('returns 401 when X-Hub-Signature-256 header is missing', async () => {
+    const result = await handler(
+      makeGitHubEvent({
+        headers: { 'X-GitHub-Event': 'pull_request_review_thread' },
+      }),
+    );
+    expect(result.statusCode).toBe(401);
+    expect(mockHandleReviewThread).not.toHaveBeenCalled();
+  });
+
+  it('returns 401 when HMAC signature is invalid', async () => {
+    mockVerify.mockReturnValueOnce(false);
+    const result = await handler(makeGitHubEvent());
+    expect(result.statusCode).toBe(401);
+    expect(mockHandleReviewThread).not.toHaveBeenCalled();
+  });
+
+  it('returns 200/ignored for non-pull_request_review_thread events', async () => {
+    const result = await handler(
+      makeGitHubEvent({
+        headers: {
+          'X-Hub-Signature-256': 'sha256=abc123',
+          'X-GitHub-Event': 'push',
+        },
+      }),
+    );
+    expect(result.statusCode).toBe(200);
+    expect(JSON.parse(result.body)).toMatchObject({ status: 'ignored' });
+    expect(mockHandleReviewThread).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for invalid JSON body', async () => {
+    const result = await handler(makeGitHubEvent({ body: 'not-json' }));
+    expect(result.statusCode).toBe(400);
+    expect(mockHandleReviewThread).not.toHaveBeenCalled();
+  });
+
+  it('returns 200 and calls handler for a valid pull_request_review_thread event', async () => {
+    const result = await handler(makeGitHubEvent());
+    expect(result.statusCode).toBe(200);
+    expect(mockHandleReviewThread).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(result.body)).toMatchObject({ status: 'ok' });
+  });
+
+  it('returns 500 with generic message when handler throws', async () => {
+    mockHandleReviewThread.mockRejectedValue(
+      new Error('merge-queue dispatch unreachable'),
+    );
+    const result = await handler(makeGitHubEvent());
+    expect(result.statusCode).toBe(500);
+    expect(JSON.parse(result.body)).toEqual({ error: 'Internal server error' });
+  });
+
+  it('accepts lowercase x-hub-signature-256 header', async () => {
+    const result = await handler(
+      makeGitHubEvent({
+        headers: {
+          'x-hub-signature-256': 'sha256=abc123',
+          'X-GitHub-Event': 'pull_request_review_thread',
+        },
+      }),
     );
     expect(result.statusCode).toBe(200);
   });

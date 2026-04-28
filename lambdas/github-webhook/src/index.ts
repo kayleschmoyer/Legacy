@@ -3,6 +3,7 @@ import { LOGGER } from '@legacy-sports/logging';
 import { retrieveSecretParameterValue } from '@legacy-sports/aws-utils';
 import { verifyGitHubSignature } from './verify-signature';
 import { handleJiraTransitionEvent } from './handle-jira-transition';
+import { handleReviewThreadResolvedEvent } from './handle-review-thread-resolved';
 
 // ── Environment ───────────────────────────────────────────────────────────────
 
@@ -15,6 +16,7 @@ function requireEnv(name: string): string {
 // ── Secret caching (promise memoisation per cold start) ───────────────────────
 
 let jiraWebhookSecretPromise: Promise<string> | null = null;
+let githubWebhookSecretPromise: Promise<string> | null = null;
 let agentAuthorAppKeyPromise: Promise<string> | null = null;
 
 function getJiraWebhookSecret(): Promise<string> {
@@ -24,6 +26,15 @@ function getJiraWebhookSecret(): Promise<string> {
     );
   }
   return jiraWebhookSecretPromise;
+}
+
+function getGitHubWebhookSecret(): Promise<string> {
+  if (!githubWebhookSecretPromise) {
+    githubWebhookSecretPromise = retrieveSecretParameterValue(
+      requireEnv('GITHUB_WEBHOOK_SECRET_SECRET_NAME'),
+    );
+  }
+  return githubWebhookSecretPromise;
 }
 
 function getAgentAuthorAppKey(): Promise<string> {
@@ -121,6 +132,70 @@ export const handler = async (
       return json(200, { status: 'ok', result });
     } catch (error) {
       LOGGER.error('Error handling Jira webhook event', { error });
+      return json(500, { error: 'Internal server error' });
+    }
+  }
+
+  // ── GitHub webhook route (/github-webhook/github) ────────────────────────
+  // Receives pull_request_review_thread events from the GitHub App webhook and
+  // dispatches merge-queue.yml when a thread on a merge-when-ready PR resolves.
+  // GitHub Actions does not support pull_request_review_thread as a workflow
+  // trigger, so this webhook fills the gap.
+  if (path.endsWith('/github')) {
+    try {
+      const githubSigHeader =
+        headers['X-Hub-Signature-256'] ?? headers['x-hub-signature-256'];
+      if (!githubSigHeader) {
+        LOGGER.warn(
+          'GitHub webhook rejected — missing X-Hub-Signature-256 header',
+        );
+        return json(401, { error: 'Unauthorized' });
+      }
+
+      const githubSecret = await getGitHubWebhookSecret();
+      if (!verifyGitHubSignature(bodyStr, githubSigHeader, githubSecret)) {
+        LOGGER.warn('GitHub webhook rejected — invalid HMAC signature');
+        return json(401, { error: 'Unauthorized' });
+      }
+
+      const githubEvent =
+        headers['X-GitHub-Event'] ?? headers['x-github-event'];
+      if (githubEvent !== 'pull_request_review_thread') {
+        LOGGER.info('GitHub webhook ignored — not pull_request_review_thread', {
+          githubEvent,
+        });
+        return json(200, { status: 'ignored' });
+      }
+
+      let githubPayload: unknown;
+      try {
+        githubPayload = JSON.parse(bodyStr) as unknown;
+      } catch {
+        return json(400, { error: 'Invalid JSON payload' });
+      }
+
+      const [appPrivateKey, githubRepo] = await Promise.all([
+        getAgentAuthorAppKey(),
+        Promise.resolve(requireEnv('GITHUB_REPO')),
+      ]);
+      const agentAuthorAppIdRaw = requireEnv('AGENT_AUTHOR_APP_ID');
+      const agentAuthorAppId = Number(agentAuthorAppIdRaw);
+      if (!Number.isFinite(agentAuthorAppId) || agentAuthorAppId <= 0) {
+        throw new Error(
+          `AGENT_AUTHOR_APP_ID must be a positive integer, got: "${agentAuthorAppIdRaw}"`,
+        );
+      }
+
+      const result = await handleReviewThreadResolvedEvent(
+        githubPayload as Parameters<typeof handleReviewThreadResolvedEvent>[0],
+        appPrivateKey,
+        agentAuthorAppId,
+        githubRepo,
+      );
+      LOGGER.info('Handled GitHub webhook event', { result });
+      return json(200, { status: 'ok', result });
+    } catch (error) {
+      LOGGER.error('Error handling GitHub webhook event', error);
       return json(500, { error: 'Internal server error' });
     }
   }

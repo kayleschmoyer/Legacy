@@ -22,6 +22,13 @@ resource "aws_secretsmanager_secret" "agent_author_app_private_key" {
   tags = local.common_tags
 }
 
+resource "aws_secretsmanager_secret" "github_webhook_secret" {
+  name_prefix = "${local.name_prefix}-github-webhook-secret-"
+  description = "Webhook secret configured in the GitHub App to sign pull_request_review_thread payloads with HMAC-SHA256. The Lambda verifies the X-Hub-Signature-256 header against this value before processing the event."
+
+  tags = local.common_tags
+}
+
 # ── IAM role ──────────────────────────────────────────────────────────────────
 
 resource "aws_iam_role" "github_webhook_lambda" {
@@ -65,6 +72,7 @@ resource "aws_iam_policy" "github_webhook_lambda_secrets" {
         Resource = [
           aws_secretsmanager_secret.jira_webhook_secret.arn,
           aws_secretsmanager_secret.agent_author_app_private_key.arn,
+          aws_secretsmanager_secret.github_webhook_secret.arn,
         ]
       }
     ]
@@ -148,6 +156,7 @@ resource "aws_lambda_function" "github_webhook" {
       LOG_LEVEL                                = "info"
       AWS_NODEJS_CONNECTION_REUSE_ENABLED      = "1"
       JIRA_WEBHOOK_SECRET_SECRET_NAME          = aws_secretsmanager_secret.jira_webhook_secret.name
+      GITHUB_WEBHOOK_SECRET_SECRET_NAME        = aws_secretsmanager_secret.github_webhook_secret.name
       AGENT_AUTHOR_APP_PRIVATE_KEY_SECRET_NAME = aws_secretsmanager_secret.agent_author_app_private_key.name
       AGENT_AUTHOR_APP_ID                      = tostring(var.agent_author_app_id)
       GITHUB_REPO                              = "${var.github_username}/${var.project_name}"
@@ -230,4 +239,9 @@ resource "aws_lambda_permission" "github_webhook_api_gateway_paths" {
 output "jira_webhook_url" {
   description = "Jira webhook endpoint URL — configure in Jira Automation 'Send web request' action; set X-Jira-Webhook-Secret header to the secret value stored in Secrets Manager for jira_webhook_secret"
   value       = "${local.api_base_url}/github-webhook/jira"
+}
+
+output "github_webhook_url" {
+  description = "GitHub App webhook endpoint URL — configure as the Webhook URL in the GitHub App settings; set the Webhook secret to the value stored in Secrets Manager for github_webhook_secret; subscribe to pull_request_review_thread events"
+  value       = "${local.api_base_url}/github-webhook/github"
 }
