@@ -10,15 +10,9 @@ name: "Check Merge Conflicts"
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-  workflow_dispatch:
-    inputs:
-      pr_number:
-        description: "PR number to check (used when triggered from bot workflows that cannot rely on pull_request events)"
-        required: true
-        type: string
 
 concurrency:
-  group: check-conflicts-${{ github.event.pull_request.number || github.event.inputs.pr_number }}
+  group: check-conflicts-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 permissions:
@@ -67,9 +61,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const { owner, repo } = context.repo;
-            // workflow_dispatch supplies pr_number as an input; pull_request events carry it in the payload.
-            const prNumber = context.payload.pull_request?.number
-              ?? Number(context.payload.inputs?.pr_number);
+            const prNumber = context.payload.pull_request.number;
 
             // GitHub computes mergeability lazily and returns null until ready.
             // Poll until we get a definitive true/false (up to ~50 s).

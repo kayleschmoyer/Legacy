@@ -65,7 +65,6 @@ on:
 permissions:
   contents: write
   pull-requests: write
-  actions: write
 
 jobs:
   create-pr:
@@ -109,13 +108,10 @@ jobs:
           echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
           echo "Created draft PR #$PR_NUMBER: $PR_URL"
 
-      - name: Trigger No Merge Conflicts check
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Push empty commit to trigger conflict check
         run: |
-          gh workflow run check-conflicts.yml \
-            --ref main \
-            --field pr_number=${{ steps.create-pr.outputs.pr_number }}
+          git commit --allow-empty -m "chore(ci): trigger pull_request synchronize for conflict check"
+          git push origin "${{ steps.create-branch.outputs.branch_name }}"
 
       - name: Mark ready for review
         if: ${{ inputs.ready_for_review }}
