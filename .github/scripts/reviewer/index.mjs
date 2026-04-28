@@ -367,6 +367,18 @@ async function main() {
         );
       }
     }
+    if (verdict === 'APPROVED') {
+      try {
+        addLabel(prNumber, 'merge-when-ready');
+        process.stdout.write(
+          `[reviewer] Added 'merge-when-ready' label to PR #${prNumber}\n`,
+        );
+      } catch (err) {
+        process.stderr.write(
+          `[reviewer] Failed to add label 'merge-when-ready': ${err instanceof Error ? err.message : String(err)}\n`,
+        );
+      }
+    }
   }
 }
 
