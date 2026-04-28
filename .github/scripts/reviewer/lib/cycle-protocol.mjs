@@ -228,7 +228,7 @@ export function buildAuthorResponsesSection(
   /** @type {Array<{ title: string | null, parsed: import('./parse-author-response.mjs').ParsedResponse }>} */
   const items = [];
 
-  // --- Part 1: inline review thread replies (non-blocking finding responses) ---
+  // --- Part 1: inline review thread replies (blocking and non-blocking findings) ---
   // Build a map from bot root comment id → finding title extracted from the
   // comment body ("**[SEV]** title\n\n..." or "**[SEV]** title — loc").
   const rootIdToTitle = new Map();
@@ -247,9 +247,9 @@ export function buildAuthorResponsesSection(
   }
 
   // --- Part 2: PR-level issue comments after the last bot review ---
-  // These are the typical channel for author responses to blocking findings
-  // (critical/high severity), which appear only in the review body and do not
-  // generate their own inline comment threads.
+  // Fallback channel for author responses to blocking findings. Blocking findings
+  // with file+line also appear as inline threads (captured by Part 1 above);
+  // PR-level blocking findings (no file/line) and any issue-comment replies land here.
   for (const c of issueComments) {
     if (botLogins.has(c.userLogin)) continue;
     if (lastBotReviewAt && c.createdAt <= lastBotReviewAt) continue;

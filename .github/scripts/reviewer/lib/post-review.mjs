@@ -198,15 +198,16 @@ export function formatReviewBody(blockingWithIds, event) {
 }
 
 /**
- * Build inline review comments for non-blocking (medium/low) findings that
- * have a specific file + line location. Each comment embeds an issue-id marker
- * for T22 cycle-protocol tracking.
+ * Build inline review comments for findings that have a specific file + line
+ * location. Accepts both blocking (critical/high) and non-blocking (medium/low)
+ * findings; findings without file+line are silently omitted. Each comment embeds
+ * an issue-id marker for T22 cycle-protocol tracking.
  *
- * @param {Array<import('./findings.mjs').Finding & { issueId: string }>} nonBlockingWithIds
+ * @param {Array<import('./findings.mjs').Finding & { issueId: string }>} findingsWithIds
  * @returns {Array<{ path: string, line: number, side: 'RIGHT', body: string }>}
  */
-export function buildInlineComments(nonBlockingWithIds) {
-  return nonBlockingWithIds
+export function buildInlineComments(findingsWithIds) {
+  return findingsWithIds
     .filter((f) => f.file != null && f.line != null)
     .map((f) => ({
       path: f.file,
@@ -219,7 +220,8 @@ export function buildInlineComments(nonBlockingWithIds) {
 /**
  * Post a real GitHub PR review as the Code Reviewer Bot.
  *
- * - critical/high findings → REQUEST_CHANGES (review body lists findings)
+ * - critical/high findings → REQUEST_CHANGES (review body lists findings;
+ *                            those with file+line also become inline threads)
  * - no blocking findings   → APPROVE
  * - medium/low findings    → inline comments on the same review submission
  *
@@ -263,7 +265,7 @@ export async function postRealReview(prNumber, { blocking, nonBlocking }) {
 
   const event = blockingWithIds.length > 0 ? 'REQUEST_CHANGES' : 'APPROVE';
   const body = formatReviewBody(blockingWithIds, event);
-  const comments = buildInlineComments(nonBlockingWithIds);
+  const comments = buildInlineComments([...blockingWithIds, ...nonBlockingWithIds]);
 
   const jwt = mintAppJwt(appId, privateKeyPem);
   const installToken = await getInstallationToken(jwt, owner, repo);
@@ -305,7 +307,7 @@ export async function postRealReview(prNumber, { blocking, nonBlocking }) {
   }
 
   process.stdout.write(
-    `[reviewer] Real review posted (${event}): ${blockingWithIds.length} blocking, ${nonBlockingWithIds.length} non-blocking inline\n`,
+    `[reviewer] Real review posted (${event}): ${blockingWithIds.length} blocking, ${nonBlockingWithIds.length} non-blocking, ${comments.length} total inline threads\n`,
   );
 }
 
