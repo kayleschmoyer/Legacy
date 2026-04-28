@@ -25,6 +25,7 @@ import { getPrReviews, getPrCommits } from './lib/review-thread-api.mjs';
 import {
   computeCycle,
   isEscalationRequired,
+  isCodeWriterBotAuthor,
   REVIEWER_BOT_LOGINS,
 } from './lib/cycle-counter.mjs';
 import {
@@ -67,20 +68,15 @@ async function main() {
     process.stdout.write('[reviewer] Skipping: fork PR\n');
     return;
   }
-  // Prefer the explicit is_bot flag; fall back to the [bot] login suffix convention.
-  const isBot =
-    ctx.author?.is_bot ?? ctx.author?.login?.endsWith('[bot]') ?? false;
-  if (!isBot) {
-    process.stdout.write('[reviewer] Skipping: non-bot author\n');
-    try {
-      setCommitStatus(sha, 'success', 'Not applicable — non-bot PR');
-    } catch (err) {
-      process.stderr.write(
-        `[reviewer] Failed to set bot-review success: ${err instanceof Error ? err.message : String(err)}\n`,
-      );
-    }
-    return;
-  }
+  // Determine review semantics based on PR author identity.
+  // Code Writer Bot PRs → full RAISE/ADJUDICATE/VERIFY cycle protocol (§7).
+  // All other PRs (agent-authored under developer identity, or human-authored)
+  // → §8a relaxed single-pass review (no cycle counter, no C2/C3 validators,
+  //   author replies parsed leniently, each bot:ready-for-review = full re-review).
+  const isCodeWriterBotPr = isCodeWriterBotAuthor(ctx.author);
+  process.stdout.write(
+    `[reviewer] Review mode: ${isCodeWriterBotPr ? 'full cycle protocol (Code Writer Bot)' : 'relaxed single-pass (§8a)'}\n`,
+  );
 
   // Set bot-review to pending — reviewer is starting
   try {
@@ -92,86 +88,91 @@ async function main() {
   }
 
   // --- Cycle counter (T22) ---
-  // Derive the current cycle from immutable PR review history.
-  // Deleting or editing comments cannot affect the count.
-  let allReviews;
-  try {
-    allReviews = getPrReviews(prNumber);
-  } catch (err) {
-    process.stderr.write(
-      `[reviewer] Failed to fetch PR reviews: ${err instanceof Error ? err.message : String(err)}\n`,
-    );
-    try {
-      setCommitStatus(
-        sha,
-        'failure',
-        'Review failed: could not fetch PR history',
-      );
-    } catch (_) {}
-    process.exit(0);
-  }
-
-  const cycle = computeCycle(allReviews);
-  process.stdout.write(`[reviewer] Computed review cycle: ${cycle}\n`);
-
-  // Cycle > MAX_CYCLE → escalate instead of reviewing
-  if (isEscalationRequired(cycle)) {
-    process.stdout.write(
-      `[reviewer] Cycle ${cycle} exceeds MAX_CYCLE — applying '${NEEDS_HUMAN_ARBITRATION_LABEL}' label and exiting\n`,
-    );
-    try {
-      await addLabelAsApp(prNumber, NEEDS_HUMAN_ARBITRATION_LABEL);
-    } catch (err) {
-      process.stderr.write(
-        `[reviewer] Failed to apply escalation label: ${err instanceof Error ? err.message : String(err)}\n`,
-      );
-    }
-    try {
-      setCommitStatus(sha, 'failure', 'Escalated to human arbitration');
-    } catch (err) {
-      process.stderr.write(
-        `[reviewer] Failed to set bot-review failure: ${err instanceof Error ? err.message : String(err)}\n`,
-      );
-    }
-    return;
-  }
-
-  // Gather prior review context for C2/C3 post-LLM validators.
-  // Sort by submittedAt ascending so .at(-1) reliably picks the most recent
-  // bot review regardless of the order GitHub returns reviews in the API.
-  const botReviews = allReviews
-    .filter((r) => REVIEWER_BOT_LOGINS.has(r.userLogin))
-    .slice()
-    .sort((a, b) => (a.submittedAt < b.submittedAt ? -1 : 1));
-  const lastBotReview = botReviews.at(-1) ?? null;
-  const priorBotReviewBody = lastBotReview?.body ?? '';
-  const priorTitles = parseTitlesFromReviewBody(priorBotReviewBody);
-
-  // Commits added since the last bot review (used by Cycle 2 validator).
+  // Full cycle protocol only: derive cycle from immutable PR review history.
+  // §8a relaxed path always uses cycle 1 — no prior-review state to track.
+  let cycle = 1;
+  let priorTitles = [];
   let postReviewCommitShas = [];
-  if (cycle === 2 && lastBotReview) {
+
+  if (isCodeWriterBotPr) {
+    let allReviews;
     try {
-      const allCommitShas = getPrCommits(prNumber);
-      const reviewedAtIdx = allCommitShas.indexOf(lastBotReview.commitId);
-      if (reviewedAtIdx === -1) {
-        // C1 review commitId not found — likely a force-push or rebase after C1.
-        // Fall back to treating all current commits as post-C1 so new findings
-        // that cite any current PR commit are not incorrectly stripped.
-        postReviewCommitShas = allCommitShas;
-        process.stdout.write(
-          '[reviewer] Cycle 2: C1 review commitId not in current commit list (force-push/rebase?) — treating all commits as post-C1\n',
+      allReviews = getPrReviews(prNumber);
+    } catch (err) {
+      process.stderr.write(
+        `[reviewer] Failed to fetch PR reviews: ${err instanceof Error ? err.message : String(err)}\n`,
+      );
+      try {
+        setCommitStatus(
+          sha,
+          'failure',
+          'Review failed: could not fetch PR history',
         );
-      } else {
-        postReviewCommitShas = allCommitShas.slice(reviewedAtIdx + 1);
-        process.stdout.write(
-          `[reviewer] Cycle 2: ${postReviewCommitShas.length} commit(s) added since C1 review\n`,
+      } catch (_) {}
+      process.exit(0);
+    }
+
+    cycle = computeCycle(allReviews);
+    process.stdout.write(`[reviewer] Computed review cycle: ${cycle}\n`);
+
+    // Cycle > MAX_CYCLE → escalate instead of reviewing
+    if (isEscalationRequired(cycle)) {
+      process.stdout.write(
+        `[reviewer] Cycle ${cycle} exceeds MAX_CYCLE — applying '${NEEDS_HUMAN_ARBITRATION_LABEL}' label and exiting\n`,
+      );
+      try {
+        await addLabelAsApp(prNumber, NEEDS_HUMAN_ARBITRATION_LABEL);
+      } catch (err) {
+        process.stderr.write(
+          `[reviewer] Failed to apply escalation label: ${err instanceof Error ? err.message : String(err)}\n`,
         );
       }
-    } catch (err) {
-      process.stderr.write(
-        `[reviewer] Failed to fetch PR commits for cycle 2 filter: ${err instanceof Error ? err.message : String(err)}\n`,
-      );
-      // Fail closed: no post-C1 commits known → validator will strip new findings.
+      try {
+        setCommitStatus(sha, 'failure', 'Escalated to human arbitration');
+      } catch (err) {
+        process.stderr.write(
+          `[reviewer] Failed to set bot-review failure: ${err instanceof Error ? err.message : String(err)}\n`,
+        );
+      }
+      return;
+    }
+
+    // Gather prior review context for C2/C3 post-LLM validators.
+    // Sort by submittedAt ascending so .at(-1) reliably picks the most recent
+    // bot review regardless of the order GitHub returns reviews in the API.
+    const botReviews = allReviews
+      .filter((r) => REVIEWER_BOT_LOGINS.has(r.userLogin))
+      .slice()
+      .sort((a, b) => (a.submittedAt < b.submittedAt ? -1 : 1));
+    const lastBotReview = botReviews.at(-1) ?? null;
+    const priorBotReviewBody = lastBotReview?.body ?? '';
+    priorTitles = parseTitlesFromReviewBody(priorBotReviewBody);
+
+    // Commits added since the last bot review (used by Cycle 2 validator).
+    if (cycle === 2 && lastBotReview) {
+      try {
+        const allCommitShas = getPrCommits(prNumber);
+        const reviewedAtIdx = allCommitShas.indexOf(lastBotReview.commitId);
+        if (reviewedAtIdx === -1) {
+          // C1 review commitId not found — likely a force-push or rebase after C1.
+          // Fall back to treating all current commits as post-C1 so new findings
+          // that cite any current PR commit are not incorrectly stripped.
+          postReviewCommitShas = allCommitShas;
+          process.stdout.write(
+            '[reviewer] Cycle 2: C1 review commitId not in current commit list (force-push/rebase?) — treating all commits as post-C1\n',
+          );
+        } else {
+          postReviewCommitShas = allCommitShas.slice(reviewedAtIdx + 1);
+          process.stdout.write(
+            `[reviewer] Cycle 2: ${postReviewCommitShas.length} commit(s) added since C1 review\n`,
+          );
+        }
+      } catch (err) {
+        process.stderr.write(
+          `[reviewer] Failed to fetch PR commits for cycle 2 filter: ${err instanceof Error ? err.message : String(err)}\n`,
+        );
+        // Fail closed: no post-C1 commits known → validator will strip new findings.
+      }
     }
   }
 
@@ -346,31 +347,33 @@ async function main() {
   }
 
   // Apply cycle-specific post-LLM validator (T22).
-  // Strips findings that violate cycle rules before severity gating.
+  // Full cycle protocol only: §8a relaxed path has no cycle state to filter against.
   let filteredFindings = parsed.findings;
-  if (cycle === 2) {
-    const { kept, stripped } = filterFindingsCycle2(
-      parsed.findings,
-      priorTitles,
-      postReviewCommitShas,
-    );
-    if (stripped.length > 0) {
-      process.stdout.write(
-        `[reviewer] Cycle 2 validator: stripped ${stripped.length} finding(s) that raised new issues outside author's changes\n`,
+  if (isCodeWriterBotPr) {
+    if (cycle === 2) {
+      const { kept, stripped } = filterFindingsCycle2(
+        parsed.findings,
+        priorTitles,
+        postReviewCommitShas,
       );
-    }
-    filteredFindings = kept;
-  } else if (cycle === 3) {
-    const { kept, stripped } = filterFindingsCycle3(
-      parsed.findings,
-      priorTitles,
-    );
-    if (stripped.length > 0) {
-      process.stdout.write(
-        `[reviewer] Cycle 3 validator: stripped ${stripped.length} finding(s) outside Cycle 2 mandates\n`,
+      if (stripped.length > 0) {
+        process.stdout.write(
+          `[reviewer] Cycle 2 validator: stripped ${stripped.length} finding(s) that raised new issues outside author's changes\n`,
+        );
+      }
+      filteredFindings = kept;
+    } else if (cycle === 3) {
+      const { kept, stripped } = filterFindingsCycle3(
+        parsed.findings,
+        priorTitles,
       );
+      if (stripped.length > 0) {
+        process.stdout.write(
+          `[reviewer] Cycle 3 validator: stripped ${stripped.length} finding(s) outside Cycle 2 mandates\n`,
+        );
+      }
+      filteredFindings = kept;
     }
-    filteredFindings = kept;
   }
 
   const gated = gateFindingsBySeverity(filteredFindings);

@@ -16,6 +16,24 @@
 /** Known GitHub login identifiers for the code-reviewer bot. */
 export const REVIEWER_BOT_LOGINS = new Set(['legacy-sports-review-bot[bot]']);
 
+/** GitHub login for Code Writer Bot (the bot that authors PRs via its installation token). */
+export const CODE_WRITER_BOT_LOGIN = 'code-writer-bot[bot]';
+
+/**
+ * Returns true when the PR author is Code Writer Bot.
+ *
+ * Code Writer Bot PRs use the full RAISE/ADJUDICATE/VERIFY cycle protocol (§7).
+ * All other PRs — including agent-authored PRs pushed under the developer's
+ * identity — use the §8a relaxed single-pass review path.
+ *
+ * @param {{ login?: string | null, is_bot?: boolean | null } | null | undefined} author
+ * @returns {boolean}
+ */
+export function isCodeWriterBotAuthor(author) {
+  const isBot = author?.is_bot ?? author?.login?.endsWith('[bot]') ?? false;
+  return isBot && author?.login === CODE_WRITER_BOT_LOGIN;
+}
+
 /** Reviews posted in cycle > MAX_CYCLE trigger escalation instead. */
 export const MAX_CYCLE = 3;
 

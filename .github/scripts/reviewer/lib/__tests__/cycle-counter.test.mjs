@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import {
   computeCycle,
   isEscalationRequired,
+  isCodeWriterBotAuthor,
   REVIEWER_BOT_LOGINS,
+  CODE_WRITER_BOT_LOGIN,
   MAX_CYCLE,
 } from '../cycle-counter.mjs';
 
@@ -95,5 +97,74 @@ describe('REVIEWER_BOT_LOGINS', () => {
 describe('MAX_CYCLE', () => {
   it('is 3', () => {
     assert.strictEqual(MAX_CYCLE, 3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isCodeWriterBotAuthor — path selector for §7 vs §8a review semantics
+// ---------------------------------------------------------------------------
+
+describe('isCodeWriterBotAuthor', () => {
+  it('returns true for code-writer-bot[bot] with is_bot flag', () => {
+    assert.strictEqual(
+      isCodeWriterBotAuthor({ login: 'code-writer-bot[bot]', is_bot: true }),
+      true,
+    );
+  });
+
+  it('returns true for code-writer-bot[bot] inferred from [bot] suffix when is_bot is absent', () => {
+    assert.strictEqual(
+      isCodeWriterBotAuthor({ login: 'code-writer-bot[bot]' }),
+      true,
+    );
+  });
+
+  it('returns false for a human-authored PR (no [bot] suffix)', () => {
+    assert.strictEqual(
+      isCodeWriterBotAuthor({ login: 'bkrupa21', is_bot: false }),
+      false,
+    );
+  });
+
+  it('returns false for a different bot (reviewer bot is not the author bot)', () => {
+    assert.strictEqual(
+      isCodeWriterBotAuthor({
+        login: 'legacy-sports-review-bot[bot]',
+        is_bot: true,
+      }),
+      false,
+    );
+  });
+
+  it('returns false for an agent-authored PR where login is the developer identity', () => {
+    assert.strictEqual(
+      isCodeWriterBotAuthor({ login: 'some-developer', is_bot: false }),
+      false,
+    );
+  });
+
+  it('returns false when author is null', () => {
+    assert.strictEqual(isCodeWriterBotAuthor(null), false);
+  });
+
+  it('returns false when author is undefined', () => {
+    assert.strictEqual(isCodeWriterBotAuthor(undefined), false);
+  });
+
+  it('returns false when author has no login', () => {
+    assert.strictEqual(isCodeWriterBotAuthor({}), false);
+  });
+
+  it('returns false when is_bot is explicitly false even with code-writer-bot login', () => {
+    assert.strictEqual(
+      isCodeWriterBotAuthor({ login: 'code-writer-bot[bot]', is_bot: false }),
+      false,
+    );
+  });
+});
+
+describe('CODE_WRITER_BOT_LOGIN', () => {
+  it('is the expected login string', () => {
+    assert.strictEqual(CODE_WRITER_BOT_LOGIN, 'code-writer-bot[bot]');
   });
 });
