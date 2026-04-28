@@ -14,7 +14,11 @@ import {
 import { buildSystemPrompt, buildUserPrompt } from './lib/prompts/system.mjs';
 import { isTrivialPR, runMultiPass } from './lib/multi-pass.mjs';
 import { consolidate } from './lib/consolidator.mjs';
-import { postRealReview, postInfraErrorReview } from './lib/post-review.mjs';
+import {
+  postRealReview,
+  postInfraErrorReview,
+  addLabelAsApp,
+} from './lib/post-review.mjs';
 import { buildRecord, emitTelemetry } from './lib/telemetry.mjs';
 import { withRetry } from './lib/retry.mjs';
 import { getPrReviews, getPrCommits } from './lib/review-thread-api.mjs';
@@ -116,7 +120,7 @@ async function main() {
       `[reviewer] Cycle ${cycle} exceeds MAX_CYCLE — applying '${NEEDS_HUMAN_ARBITRATION_LABEL}' label and exiting\n`,
     );
     try {
-      addLabel(prNumber, NEEDS_HUMAN_ARBITRATION_LABEL);
+      await addLabelAsApp(prNumber, NEEDS_HUMAN_ARBITRATION_LABEL);
     } catch (err) {
       process.stderr.write(
         `[reviewer] Failed to apply escalation label: ${err instanceof Error ? err.message : String(err)}\n`,

@@ -124,6 +124,52 @@ async function getInstallationToken(jwt, owner, repo) {
 }
 
 /**
+ * Apply a label to a PR using the GitHub App installation token.
+ * Unlike addLabel (which uses GITHUB_TOKEN), labels applied via a GitHub App
+ * token trigger pull_request.labeled events to other workflows — bypassing
+ * GitHub's anti-loop protection so W4 (label-pager) fires on escalation.
+ *
+ * @param {number} prNumber
+ * @param {string} label
+ */
+export async function addLabelAsApp(prNumber, label) {
+  const appId = process.env.REVIEWER_BOT_APP_ID;
+  const privateKeyPem = process.env.REVIEWER_BOT_APP_PRIVATE_KEY;
+
+  if (!appId || !privateKeyPem) {
+    throw new Error(
+      'REVIEWER_BOT_APP_ID and REVIEWER_BOT_APP_PRIVATE_KEY must be set',
+    );
+  }
+
+  const repoEnv = process.env.GITHUB_REPOSITORY;
+  if (!repoEnv || !repoEnv.includes('/')) {
+    throw new Error('GITHUB_REPOSITORY env var is required');
+  }
+  const [owner, repo] = repoEnv.split('/');
+
+  const jwt = mintAppJwt(appId, privateKeyPem);
+  const installToken = await getInstallationToken(jwt, owner, repo);
+
+  execFileSync(
+    'gh',
+    [
+      'api',
+      `repos/{owner}/{repo}/issues/${prNumber}/labels`,
+      '-X',
+      'POST',
+      '--input',
+      '-',
+    ],
+    {
+      encoding: 'utf8',
+      input: JSON.stringify({ labels: [label] }),
+      env: { ...process.env, GH_TOKEN: installToken },
+    },
+  );
+}
+
+/**
  * Format the PR review body for a blocking or approving review.
  * Each blocking finding gets an embedded <!-- issue-id: ... --> marker so
  * T22 (cycle protocol) can correlate author replies to specific findings.
