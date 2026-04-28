@@ -89,6 +89,7 @@ export class GitHubModelsProvider {
           ],
           temperature: this.temperature,
           max_tokens: this.maxTokens,
+          response_format: { type: 'json_object' },
         }),
       });
     } catch (err) {

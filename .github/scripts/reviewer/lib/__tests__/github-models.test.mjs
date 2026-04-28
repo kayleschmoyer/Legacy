@@ -121,6 +121,7 @@ describe('GitHubModelsProvider', () => {
         { role: 'system', content: 'sys' },
         { role: 'user', content: 'usr' },
       ]);
+      assert.deepStrictEqual(body.response_format, { type: 'json_object' });
       assert.strictEqual(calls[0].init.headers.Authorization, 'Bearer stub');
     });
 
