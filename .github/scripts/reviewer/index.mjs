@@ -17,6 +17,7 @@ import { consolidate } from './lib/consolidator.mjs';
 import {
   postRealReview,
   postInfraErrorReview,
+  postKnownLlmFailureReview,
   addLabelAsApp,
 } from './lib/post-review.mjs';
 import { buildRecord, emitTelemetry } from './lib/telemetry.mjs';
@@ -218,6 +219,9 @@ async function main() {
       const { GitHubModelsProvider } =
         await import('./lib/providers/github-models.mjs');
       provider = new GitHubModelsProvider();
+    } else if (providerName === 'gemini') {
+      const { GeminiProvider } = await import('./lib/providers/gemini.mjs');
+      provider = new GeminiProvider();
     } else {
       const { CopilotCLIProvider } =
         await import('./lib/providers/copilot-cli.mjs');
@@ -227,9 +231,13 @@ async function main() {
     process.stderr.write(
       `[reviewer] Failed to init provider '${providerName}': ${err instanceof Error ? err.message : String(err)}\n`,
     );
-    try {
-      setCommitStatus(sha, 'failure', 'Review failed: LLM provider error');
-    } catch (_) {}
+    // Route through the same typed-failure handler as runtime errors so the
+    // PR author gets actionable guidance. Missing-API-key errors (the most
+    // common init failure) are tagged as `auth` so the maintainer-action
+    // message fires; other init failures fall through to the generic
+    // infra-error review.
+    const taggedErr = _classifyInitError(err, providerName);
+    await handleLlmFailure(prNumber, taggedErr);
     process.exit(0);
   }
 
@@ -290,7 +298,7 @@ async function main() {
       process.stderr.write(
         `[reviewer] Provider error after all retries: ${err instanceof Error ? err.message : String(err)}\n`,
       );
-      await handleLlmInfraFailure(prNumber);
+      await handleLlmFailure(prNumber, err);
       process.exit(1);
     }
   } else {
@@ -309,7 +317,7 @@ async function main() {
       process.stderr.write(
         `[reviewer] Multi-pass error after all retries: ${err instanceof Error ? err.message : String(err)}\n`,
       );
-      await handleLlmInfraFailure(prNumber);
+      await handleLlmFailure(prNumber, err);
       process.exit(1);
     }
   }
@@ -499,36 +507,138 @@ async function main() {
 }
 
 /**
- * Fail-closed handler: post REQUEST_CHANGES infra error review and apply the
- * review-bot-degraded label so the labeled trigger can self-heal on retry.
+ * Wrap a provider-init error with a `kind` so it routes through the same
+ * typed-failure path as runtime errors. The most common init failure is a
+ * missing API key (e.g. `GEMINI_CODE_REVIEW_API_KEY` secret unset / typo) —
+ * those get tagged `auth` so the maintainer-action message posts. Anything
+ * else falls through to the generic infra-error review (kind=null).
+ *
+ * The returned object is a plain Error (not a typed provider error class) —
+ * `classifyProviderError` reads `.kind` directly off it.
+ *
+ * @param {unknown} err
+ * @param {string} providerName
+ * @returns {Error & {kind?: string}}
+ */
+function _classifyInitError(err, providerName) {
+  const msg = err instanceof Error ? err.message : String(err);
+  const wrapped = err instanceof Error ? err : new Error(msg);
+  // Missing-API-key signal: every provider's constructor throws with the
+  // word "API key" (Gemini, Anthropic) or "auth token" (GitHub Models) when
+  // its required env var isn't set.
+  if (/no\s+(?:API\s+key|auth\s+token)/i.test(msg)) {
+    wrapped.kind = 'auth';
+  }
+  wrapped.providerName = providerName;
+  return wrapped;
+}
+
+/**
+ * Map a provider error to its known kind. Returns null for errors that aren't
+ * categorized (treated as generic infra failures).
+ *
+ * @param {unknown} err
+ * @returns {'rate-limit'|'quota'|'auth'|'context-too-large'|'cost-cap'|null}
+ */
+function classifyProviderError(err) {
+  if (!err || typeof err !== 'object') return null;
+  if (err.name === 'CostCapExceededError') return 'cost-cap';
+  const k = err.kind;
+  if (
+    k === 'rate-limit' ||
+    k === 'quota' ||
+    k === 'auth' ||
+    k === 'context-too-large'
+  ) {
+    return k;
+  }
+  return null;
+}
+
+/**
+ * Status text shown on the `bot-review` commit status for each known
+ * failure kind. Branch protection treats `failure` as not-passing; the
+ * description disambiguates so maintainers can see the cause without
+ * opening the run logs.
+ *
+ * @param {string|null} kind
+ * @returns {string}
+ */
+function statusDescriptionForFailure(kind) {
+  switch (kind) {
+    case 'rate-limit':
+      return 'Reviewer rate-limited (per-minute quota); re-apply bot:ready-for-review to retry';
+    case 'quota':
+      return 'Reviewer daily quota exhausted (free tier)';
+    case 'auth':
+      return 'Reviewer auth failed — maintainer action required';
+    case 'context-too-large':
+      return 'PR exceeds reviewer model context window';
+    case 'cost-cap':
+      return 'Reviewer cost cap exceeded — split PR or raise cap';
+    default:
+      return 'Review bot encountered an infrastructure error';
+  }
+}
+
+/**
+ * Fail-closed handler: route typed provider errors (rate-limit, daily quota,
+ * auth, context-too-large) and CostCapExceededError to author-facing
+ * messages with actionable guidance. Falls back to the generic
+ * "infrastructure error" review for unknown failures.
  *
  * @param {number} prNumber
+ * @param {unknown} err
  */
-async function handleLlmInfraFailure(prNumber) {
+async function handleLlmFailure(prNumber, err) {
   const sha = process.env.PR_HEAD_SHA ?? '';
+  const kind = classifyProviderError(err);
+
   try {
-    setCommitStatus(
-      sha,
-      'failure',
-      'Review bot encountered an infrastructure error',
-    );
-  } catch (err) {
+    setCommitStatus(sha, 'failure', statusDescriptionForFailure(kind));
+  } catch (statusErr) {
     process.stderr.write(
-      `[reviewer] Failed to set bot-review failure: ${err instanceof Error ? err.message : String(err)}\n`,
+      `[reviewer] Failed to set bot-review failure: ${statusErr instanceof Error ? statusErr.message : String(statusErr)}\n`,
     );
   }
-  try {
-    await postInfraErrorReview(prNumber);
-  } catch (err) {
-    process.stderr.write(
-      `[reviewer] Failed to post infra error review: ${err instanceof Error ? err.message : String(err)}\n`,
-    );
+
+  if (kind) {
+    const details = {};
+    if (typeof err.retryAfterSeconds === 'number') {
+      details.retryAfterSeconds = err.retryAfterSeconds;
+    }
+    if (typeof err.cumulative === 'number') {
+      details.cumulativeUsd = err.cumulative;
+    }
+    if (typeof err.cap === 'number') {
+      details.capUsd = err.cap;
+    }
+    try {
+      await postKnownLlmFailureReview({ prNumber, kind, details });
+    } catch (postErr) {
+      process.stderr.write(
+        `[reviewer] Failed to post known-failure review (kind=${kind}): ${postErr instanceof Error ? postErr.message : String(postErr)}\n`,
+      );
+    }
+  } else {
+    try {
+      await postInfraErrorReview(prNumber);
+    } catch (postErr) {
+      process.stderr.write(
+        `[reviewer] Failed to post infra error review: ${postErr instanceof Error ? postErr.message : String(postErr)}\n`,
+      );
+    }
   }
+
+  // Always apply review-bot-degraded so the labeled trigger can self-heal on
+  // retry — covers transient rate-limit waits and longer-tail infra issues
+  // alike. Daily-quota and auth failures still get the label so a maintainer
+  // can manually retry by re-applying it after the underlying issue is fixed.
   try {
     addLabel(prNumber, 'review-bot-degraded');
-  } catch (err) {
+  } catch (labelErr) {
     process.stderr.write(
-      `[reviewer] Failed to apply review-bot-degraded label: ${err instanceof Error ? err.message : String(err)}\n`,
+      `[reviewer] Failed to apply review-bot-degraded label: ${labelErr instanceof Error ? labelErr.message : String(labelErr)}\n`,
     );
   }
 }

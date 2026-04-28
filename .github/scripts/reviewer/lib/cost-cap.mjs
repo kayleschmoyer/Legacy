@@ -5,10 +5,14 @@ const execFileAsync = promisify(execFile);
 
 const DEFAULT_CAP_USD = 5;
 
-// Anthropic claude-sonnet pricing (approximate, used for pre-call estimation only).
+// Per-provider pricing (approximate, used for pre-call estimation only).
 // Actual costs come from provider usage fields and are authoritative.
 const ANTHROPIC_INPUT_COST_PER_TOK = 3 / 1_000_000; // $3/MTok
 const ANTHROPIC_OUTPUT_COST_PER_TOK = 15 / 1_000_000; // $15/MTok
+// gemini-2.5-flash paid-tier rates. Free tier bills $0; estimate stays
+// conservative since billing can be enabled at any time.
+const GEMINI_INPUT_COST_PER_TOK = 0.3 / 1_000_000;
+const GEMINI_OUTPUT_COST_PER_TOK = 2.5 / 1_000_000;
 const CHARS_PER_TOKEN_ESTIMATE = 4;
 
 /**
@@ -81,23 +85,32 @@ export class CostCap {
 
   /**
    * Rough cost estimate for an upcoming call, based on prompt character count.
-   * Uses chars/4 ≈ tokens with Anthropic pricing. Returns 0 for any non-Anthropic
-   * provider (Copilot uses a subscription, GitHub Models is included with the GitHub plan).
+   * Uses chars/4 ≈ tokens with provider-specific pricing. Returns 0 for
+   * subscription-based providers (Copilot, GitHub Models).
    *
    * @param {number} promptChars - Total character count of system + user prompts
-   * @param {string} [provider]  - 'anthropic' | 'copilot-cli' | 'github-models'
+   * @param {string} [provider]  - 'anthropic' | 'copilot-cli' | 'github-models' | 'gemini'
    * @returns {number} Estimated cost in USD
    */
   estimateCost(promptChars, provider = 'anthropic') {
-    if (provider !== 'anthropic') return 0;
+    let inputRate;
+    let outputRate;
+    if (provider === 'anthropic') {
+      inputRate = ANTHROPIC_INPUT_COST_PER_TOK;
+      outputRate = ANTHROPIC_OUTPUT_COST_PER_TOK;
+    } else if (provider === 'gemini') {
+      inputRate = GEMINI_INPUT_COST_PER_TOK;
+      outputRate = GEMINI_OUTPUT_COST_PER_TOK;
+    } else {
+      return 0;
+    }
     const estimatedInputTokens = Math.ceil(
       promptChars / CHARS_PER_TOKEN_ESTIMATE,
     );
     // Assume ~10% output relative to input for a conservative estimate
     const estimatedOutputTokens = Math.ceil(estimatedInputTokens * 0.1);
     return (
-      estimatedInputTokens * ANTHROPIC_INPUT_COST_PER_TOK +
-      estimatedOutputTokens * ANTHROPIC_OUTPUT_COST_PER_TOK
+      estimatedInputTokens * inputRate + estimatedOutputTokens * outputRate
     );
   }
 

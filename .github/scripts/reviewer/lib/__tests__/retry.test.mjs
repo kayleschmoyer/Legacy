@@ -61,4 +61,34 @@ describe('withRetry', () => {
     );
     assert.strictEqual(calls, 1);
   });
+
+  it('skips retries when an error is marked retryable=false', async () => {
+    let calls = 0;
+    await assert.rejects(
+      () =>
+        withRetry(async () => {
+          calls++;
+          const err = new Error('terminal');
+          err.retryable = false;
+          throw err;
+        }, [0, 0, 0]),
+      { message: 'terminal' },
+    );
+    assert.strictEqual(calls, 1, 'fail-fast: only one attempt');
+  });
+
+  it('still retries when retryable is undefined or true', async () => {
+    let calls = 0;
+    await assert.rejects(
+      () =>
+        withRetry(async () => {
+          calls++;
+          const err = new Error('soft');
+          err.retryable = true;
+          throw err;
+        }, [0, 0]),
+      { message: 'soft' },
+    );
+    assert.strictEqual(calls, 3);
+  });
 });

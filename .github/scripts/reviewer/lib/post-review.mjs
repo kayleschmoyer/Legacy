@@ -265,7 +265,10 @@ export async function postRealReview(prNumber, { blocking, nonBlocking }) {
 
   const event = blockingWithIds.length > 0 ? 'REQUEST_CHANGES' : 'APPROVE';
   const body = formatReviewBody(blockingWithIds, event);
-  const comments = buildInlineComments([...blockingWithIds, ...nonBlockingWithIds]);
+  const comments = buildInlineComments([
+    ...blockingWithIds,
+    ...nonBlockingWithIds,
+  ]);
 
   const jwt = mintAppJwt(appId, privateKeyPem);
   const installToken = await getInstallationToken(jwt, owner, repo);
@@ -370,4 +373,153 @@ export async function postInfraErrorReview(prNumber) {
   process.stdout.write(
     `[reviewer] Infra error review posted on PR #${prNumber}\n`,
   );
+}
+
+/**
+ * Post a categorized author-facing failure review when the LLM call fails for
+ * a known, identifiable reason (rate-limit, daily quota, auth, cost-cap,
+ * context-too-large). Distinct from postInfraErrorReview, which is a
+ * catch-all "we don't know what went wrong" message.
+ *
+ * The review event is REQUEST_CHANGES for author-actionable failures (PR is
+ * too large, cost cap exceeded) and a plain comment-only review for
+ * provider-side failures the author can't fix (rate-limit, auth, daily
+ * quota) — those should not block merge under branch protection.
+ *
+ * @param {object} params
+ * @param {number} params.prNumber
+ * @param {'rate-limit'|'quota'|'auth'|'cost-cap'|'context-too-large'} params.kind
+ * @param {object} [params.details]
+ * @param {number} [params.details.retryAfterSeconds]
+ * @param {number} [params.details.cumulativeUsd]
+ * @param {number} [params.details.capUsd]
+ */
+export async function postKnownLlmFailureReview({
+  prNumber,
+  kind,
+  details = {},
+}) {
+  const appId = process.env.REVIEWER_BOT_APP_ID;
+  const privateKeyPem = process.env.REVIEWER_BOT_APP_PRIVATE_KEY;
+
+  if (!appId || !privateKeyPem) {
+    throw new Error(
+      'REVIEWER_BOT_APP_ID and REVIEWER_BOT_APP_PRIVATE_KEY must be set for live review mode',
+    );
+  }
+
+  const repoEnv = process.env.GITHUB_REPOSITORY;
+  if (!repoEnv || !repoEnv.includes('/')) {
+    throw new Error(
+      'GITHUB_REPOSITORY env var is required for live review mode',
+    );
+  }
+  const [owner, repo] = repoEnv.split('/');
+
+  const { body, event } = buildKnownFailureBody(kind, details);
+
+  const jwt = mintAppJwt(appId, privateKeyPem);
+  const installToken = await getInstallationToken(jwt, owner, repo);
+
+  const payload = JSON.stringify({ body, event, comments: [] });
+
+  execFileSync(
+    'gh',
+    [
+      'api',
+      '--method',
+      'POST',
+      `repos/{owner}/{repo}/pulls/${prNumber}/reviews`,
+      '--input',
+      '-',
+    ],
+    {
+      encoding: 'utf8',
+      input: payload,
+      env: { ...process.env, GH_TOKEN: installToken },
+    },
+  );
+
+  process.stdout.write(
+    `[reviewer] Known LLM failure review posted (kind=${kind}, event=${event}) on PR #${prNumber}\n`,
+  );
+}
+
+/**
+ * @param {string} kind
+ * @param {object} details
+ * @returns {{ body: string, event: 'COMMENT' | 'REQUEST_CHANGES' }}
+ */
+export function buildKnownFailureBody(kind, details = {}) {
+  switch (kind) {
+    case 'rate-limit': {
+      const wait = details.retryAfterSeconds
+        ? `~${Math.ceil(details.retryAfterSeconds)}s`
+        : 'a minute';
+      return {
+        event: 'COMMENT',
+        body:
+          '## Reviewer rate-limited\n\n' +
+          `The Gemini API per-minute rate limit was hit on this run. Wait ${wait}, then re-apply the \`bot:ready-for-review\` label (remove and add it again) to retry. The reviewer workflow does not fire on plain pushes — only on \`opened\` / \`ready_for_review\` / \`labeled\` events.\n\n` +
+          '_This is not a code issue — no review was posted because the LLM API throttled the request._',
+      };
+    }
+    case 'quota':
+      return {
+        event: 'COMMENT',
+        body:
+          '## Reviewer daily quota exhausted\n\n' +
+          'The Gemini API free-tier daily quota has been used up for today. **The reviewer does not retry on its own** — the workflow only fires on `pull_request.opened`, `pull_request.ready_for_review`, and `pull_request.labeled` events, never on a timer (and not on plain pushes).\n\n' +
+          'To get a review on this PR:\n' +
+          "- After Google's daily reset (00:00 Pacific time), re-apply the `bot:ready-for-review` label (remove and add it again) to re-trigger the reviewer.\n" +
+          '- Or, to remove the daily cap entirely, enable billing on the Google AI Studio project tied to `GEMINI_CODE_REVIEW_API_KEY` (a maintainer action).\n\n' +
+          '_This is not a code issue — no review was posted because the API quota is exhausted._',
+      };
+    case 'auth':
+      return {
+        event: 'COMMENT',
+        body:
+          '## Reviewer authentication failed\n\n' +
+          'The Gemini API rejected the request key (`GEMINI_CODE_REVIEW_API_KEY`). The key is missing, invalid, or revoked.\n\n' +
+          '**Maintainer action required**: regenerate the API key at https://aistudio.google.com/apikey and update the `GEMINI_CODE_REVIEW_API_KEY` repository secret. Then re-apply the `bot:ready-for-review` label to retry.\n\n' +
+          '_This is not a code issue — the reviewer cannot authenticate._',
+      };
+    case 'cost-cap': {
+      const cumulative =
+        typeof details.cumulativeUsd === 'number'
+          ? `$${details.cumulativeUsd.toFixed(4)}`
+          : 'over budget';
+      const cap =
+        typeof details.capUsd === 'number'
+          ? `$${details.capUsd.toFixed(2)}`
+          : 'the configured cap';
+      return {
+        event: 'REQUEST_CHANGES',
+        body:
+          '## Reviewer cost cap exceeded\n\n' +
+          `The estimated review cost (${cumulative}) exceeds the per-PR budget (${cap}). The PR is too large to review automatically.\n\n` +
+          '**Recommended actions:**\n' +
+          '- Split this PR into smaller, independently-reviewable changes, **or**\n' +
+          '- Request a human review by tagging a maintainer.\n\n' +
+          'A maintainer can also raise `REVIEWER_COST_CAP_USD` in the workflow if larger PRs should be allowed.',
+      };
+    }
+    case 'context-too-large':
+      return {
+        event: 'REQUEST_CHANGES',
+        body:
+          '## PR exceeds reviewer model context\n\n' +
+          "This PR's diff plus expanded file context is larger than the review model's input window. The review could not run.\n\n" +
+          '**Recommended actions:**\n' +
+          '- Split this PR into smaller pieces, **or**\n' +
+          '- Request a human review.',
+      };
+    default:
+      return {
+        event: 'REQUEST_CHANGES',
+        body:
+          '## Review bot infrastructure error\n\n' +
+          'The automated review could not complete. Apply the `bot:ready-for-review` label to re-trigger, or request a human review.',
+      };
+  }
 }
