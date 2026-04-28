@@ -9,7 +9,7 @@ name: "Check Merge Conflicts"
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, ready_for_review]
 
 concurrency:
   group: check-conflicts-${{ github.event.pull_request.number }}
