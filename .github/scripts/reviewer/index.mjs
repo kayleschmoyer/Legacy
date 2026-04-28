@@ -332,6 +332,10 @@ async function main() {
     process.stderr.write(
       '[reviewer] Model output could not be parsed as JSON — attempting reformat via LLM\n',
     );
+    const RAW_SNIPPET_CHARS = 500;
+    process.stderr.write(
+      `[reviewer] Raw model output (${Math.min(reviewText.length, RAW_SNIPPET_CHARS)} of ${reviewText.length} chars): ${reviewText.slice(0, RAW_SNIPPET_CHARS)}\n`,
+    );
     parsed = await tryReformatFindings(reviewText, provider);
     if (parsed.ok) {
       process.stdout.write('[reviewer] Reformat retry succeeded\n');
@@ -380,6 +384,21 @@ async function main() {
       } catch (err) {
         process.stderr.write(
           `[reviewer] Failed to post fallback comment: ${err instanceof Error ? err.message : String(err)}\n`,
+        );
+      }
+    } else {
+      try {
+        await postInfraErrorReview(prNumber);
+      } catch (err) {
+        process.stderr.write(
+          `[reviewer] Failed to post infra error review: ${err instanceof Error ? err.message : String(err)}\n`,
+        );
+      }
+      try {
+        addLabel(prNumber, 'review-bot-degraded');
+      } catch (err) {
+        process.stderr.write(
+          `[reviewer] Failed to apply review-bot-degraded label: ${err instanceof Error ? err.message : String(err)}\n`,
         );
       }
     }

@@ -402,8 +402,14 @@ export class GeminiProvider {
       costUsd: computeCostUsd(usageMeta, this.model),
     };
 
+    const args = fnCall.functionCall.args ?? {};
+    // Gemini 2.5 Flash (thinking model) may omit 'findings' when it determines
+    // no issues exist, despite the schema marking the field as required.
+    const normalizedArgs = Array.isArray(args.findings)
+      ? args
+      : { ...args, findings: [] };
     return {
-      text: JSON.stringify(fnCall.functionCall.args ?? {}),
+      text: JSON.stringify(normalizedArgs),
       usage,
     };
   }

@@ -359,6 +359,26 @@ describe('GeminiProvider', () => {
         parts: [{ text: largeSystem }],
       });
     });
+
+    it('normalizes missing findings key to empty array (gemini-2.5-flash thinking model omission)', async () => {
+      const p = new GeminiProvider({
+        apiKey: 'stub',
+        useExplicitCache: false,
+      });
+      stubFetch(() =>
+        buildSuccessfulGenerateResponse({
+          // Gemini 2.5 Flash may omit 'findings' despite it being required
+          args: { summary: 'Looks good', verdict: 'APPROVED' },
+        }),
+      );
+
+      const result = await p.review({ system: 's', user: 'u' });
+      const parsed = JSON.parse(result.text);
+
+      assert.deepStrictEqual(parsed.findings, []);
+      assert.strictEqual(parsed.verdict, 'APPROVED');
+      assert.strictEqual(parsed.summary, 'Looks good');
+    });
   });
 
   describe('review (errors)', () => {
