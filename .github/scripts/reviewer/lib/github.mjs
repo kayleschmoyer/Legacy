@@ -87,6 +87,31 @@ export function getPullRequestContext(prNumber) {
 }
 
 /**
+ * Set the bot-review commit status for a given SHA.
+ *
+ * @param {string} sha
+ * @param {'pending'|'success'|'failure'} state
+ * @param {string} description
+ */
+export function setCommitStatus(sha, state, description) {
+  execFileSync(
+    'gh',
+    [
+      'api',
+      `repos/{owner}/{repo}/statuses/${sha}`,
+      '-X',
+      'POST',
+      '--input',
+      '-',
+    ],
+    {
+      encoding: 'utf8',
+      input: JSON.stringify({ state, context: 'bot-review', description }),
+    },
+  );
+}
+
+/**
  * Post a shadow review comment on a PR, replacing any prior comment carrying
  * the shadow marker so re-runs on the same PR never duplicate the comment.
  *

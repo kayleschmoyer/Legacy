@@ -13,6 +13,7 @@ permissions:
   contents: read
   pull-requests: write
   issues: write
+  statuses: write # required to set bot-review commit status
   id-token: write # required for OIDC auth to AWS (S3 reviewer telemetry)
   models: read # required for GitHub Models inference (W1 LLM provider)
 

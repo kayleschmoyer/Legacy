@@ -64,6 +64,10 @@
           {
             "_comment": "Active now: fails if the PR branch has merge conflicts with the base branch (check-conflicts.yml).",
             "context": "No Merge Conflicts"
+          },
+          {
+            "_comment": "Active now: set to pending/success/failure by the Code Reviewer Bot (.github/scripts/reviewer/index.mjs).",
+            "context": "bot-review"
           }
         ]
       }

@@ -3,6 +3,7 @@ import {
   postShadowComment,
   addLabel,
   removeLabel,
+  setCommitStatus,
 } from './lib/github.mjs';
 import {
   parseFindingsFromText,
@@ -50,6 +51,8 @@ async function main() {
     process.exit(0);
   }
 
+  const sha = process.env.PR_HEAD_SHA ?? '';
+
   // Skip conditions
   if (ctx.isDraft) {
     process.stdout.write('[reviewer] Skipping: draft PR\n');
@@ -64,7 +67,23 @@ async function main() {
     ctx.author?.is_bot ?? ctx.author?.login?.endsWith('[bot]') ?? false;
   if (!isBot) {
     process.stdout.write('[reviewer] Skipping: non-bot author\n');
+    try {
+      setCommitStatus(sha, 'success', 'Not applicable — non-bot PR');
+    } catch (err) {
+      process.stderr.write(
+        `[reviewer] Failed to set bot-review success: ${err instanceof Error ? err.message : String(err)}\n`,
+      );
+    }
     return;
+  }
+
+  // Set bot-review to pending — reviewer is starting
+  try {
+    setCommitStatus(sha, 'pending', 'Review in progress');
+  } catch (err) {
+    process.stderr.write(
+      `[reviewer] Failed to set bot-review pending: ${err instanceof Error ? err.message : String(err)}\n`,
+    );
   }
 
   // --- Cycle counter (T22) ---
@@ -77,6 +96,13 @@ async function main() {
     process.stderr.write(
       `[reviewer] Failed to fetch PR reviews: ${err instanceof Error ? err.message : String(err)}\n`,
     );
+    try {
+      setCommitStatus(
+        sha,
+        'failure',
+        'Review failed: could not fetch PR history',
+      );
+    } catch (_) {}
     process.exit(0);
   }
 
@@ -93,6 +119,13 @@ async function main() {
     } catch (err) {
       process.stderr.write(
         `[reviewer] Failed to apply escalation label: ${err instanceof Error ? err.message : String(err)}\n`,
+      );
+    }
+    try {
+      setCommitStatus(sha, 'failure', 'Escalated to human arbitration');
+    } catch (err) {
+      process.stderr.write(
+        `[reviewer] Failed to set bot-review failure: ${err instanceof Error ? err.message : String(err)}\n`,
       );
     }
     return;
@@ -158,6 +191,9 @@ async function main() {
     process.stderr.write(
       `[reviewer] Failed to init provider '${providerName}': ${err instanceof Error ? err.message : String(err)}\n`,
     );
+    try {
+      setCommitStatus(sha, 'failure', 'Review failed: LLM provider error');
+    } catch (_) {}
     process.exit(0);
   }
 
@@ -171,6 +207,9 @@ async function main() {
     process.stderr.write(
       `[reviewer] Failed to build prompts: ${err instanceof Error ? err.message : String(err)}\n`,
     );
+    try {
+      setCommitStatus(sha, 'failure', 'Review failed: prompt build error');
+    } catch (_) {}
     process.exit(0);
   }
 
@@ -180,6 +219,13 @@ async function main() {
     process.stdout.write(
       '[reviewer] Skipping: no diff available (failed or empty diff must not be treated as trivial)\n',
     );
+    try {
+      setCommitStatus(sha, 'failure', 'No diff available — review skipped');
+    } catch (err) {
+      process.stderr.write(
+        `[reviewer] Failed to set bot-review failure: ${err instanceof Error ? err.message : String(err)}\n`,
+      );
+    }
     return;
   }
   const trivial = isTrivialPR(diff);
@@ -257,6 +303,13 @@ async function main() {
         shadow: shadowMode,
       }),
     );
+    try {
+      setCommitStatus(sha, 'failure', 'Review output could not be parsed');
+    } catch (err) {
+      process.stderr.write(
+        `[reviewer] Failed to set bot-review failure: ${err instanceof Error ? err.message : String(err)}\n`,
+      );
+    }
     if (shadowMode) {
       // GitHub issue comment body limit is 65,536 chars; truncate the raw
       // fallback text (not the findings JSON) before posting.
@@ -311,6 +364,21 @@ async function main() {
     `[reviewer] Gating: ${gated.blocking.length} blocking, ${gated.nonBlocking.length} non-blocking, ${gated.dropped.length} trivia dropped\n`,
   );
   verdict = gated.blocking.length === 0 ? 'APPROVED' : 'REQUEST_CHANGES';
+
+  // Set bot-review commit status based on verdict
+  try {
+    setCommitStatus(
+      sha,
+      verdict === 'APPROVED' ? 'success' : 'failure',
+      verdict === 'APPROVED'
+        ? 'Review passed'
+        : 'Blocking findings require changes',
+    );
+  } catch (err) {
+    process.stderr.write(
+      `[reviewer] Failed to set bot-review status: ${err instanceof Error ? err.message : String(err)}\n`,
+    );
+  }
 
   // Emit telemetry before posting — survives comment/review API failures
   await emitTelemetry(
@@ -389,6 +457,18 @@ async function main() {
  * @param {number} prNumber
  */
 async function handleLlmInfraFailure(prNumber) {
+  const sha = process.env.PR_HEAD_SHA ?? '';
+  try {
+    setCommitStatus(
+      sha,
+      'failure',
+      'Review bot encountered an infrastructure error',
+    );
+  } catch (err) {
+    process.stderr.write(
+      `[reviewer] Failed to set bot-review failure: ${err instanceof Error ? err.message : String(err)}\n`,
+    );
+  }
   try {
     await postInfraErrorReview(prNumber);
   } catch (err) {
