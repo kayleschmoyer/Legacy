@@ -386,17 +386,24 @@ export class GeminiProvider {
     }
     const finishReason = candidate.finishReason;
     if (finishReason && finishReason !== 'STOP') {
-      // MAX_TOKENS in Gemini means the response was truncated because it hit
+      // MAX_TOKENS means the response was truncated because it hit
       // `maxOutputTokens` (output cap), NOT that the input exceeded the
       // model's context window. The truncated output is almost always a
-      // partial function-call with malformed JSON, so retrying with a higher
-      // output cap can recover. We classify as `transient` (retryable=true)
-      // so withRetry takes another shot; a persistent failure still falls
-      // through to the generic infra-error path. Other non-STOP reasons
-      // (SAFETY, RECITATION, OTHER) are non-retryable invalid requests.
+      // partial function-call with malformed JSON, so retrying can recover.
+      // MALFORMED_FUNCTION_CALL is intermittent — Gemini occasionally emits
+      // a malformed tool call that a retry resolves (LS-3974). Both are
+      // classified as `transient` (retryable=true) so withRetry takes another
+      // shot; a persistent failure still falls through to the generic
+      // infra-error path. Other non-STOP reasons (SAFETY, RECITATION, OTHER)
+      // are non-retryable invalid requests.
       const kind =
-        finishReason === 'MAX_TOKENS' ? 'transient' : 'invalid-request';
-      const retryable = finishReason === 'MAX_TOKENS';
+        finishReason === 'MAX_TOKENS' ||
+        finishReason === 'MALFORMED_FUNCTION_CALL'
+          ? 'transient'
+          : 'invalid-request';
+      const retryable =
+        finishReason === 'MAX_TOKENS' ||
+        finishReason === 'MALFORMED_FUNCTION_CALL';
       throw new GeminiError(
         `Gemini API stopped with finishReason=${finishReason}`,
         {

@@ -654,6 +654,37 @@ describe('GeminiProvider', () => {
       );
     });
 
+    it('throws GeminiError(kind=transient, retryable=true) when finishReason=MALFORMED_FUNCTION_CALL (LS-3974)', async () => {
+      const p = new GeminiProvider({
+        apiKey: 'stub',
+        useExplicitCache: false,
+      });
+      stubFetch(() =>
+        jsonResponse({
+          candidates: [
+            {
+              finishReason: 'MALFORMED_FUNCTION_CALL',
+              content: { parts: [] },
+            },
+          ],
+          usageMetadata: { promptTokenCount: 100, candidatesTokenCount: 0 },
+        }),
+      );
+      await assert.rejects(
+        () => p.review({ system: 's', user: 'u' }),
+        (err) => {
+          // MALFORMED_FUNCTION_CALL is intermittent — a retry typically
+          // recovers. Must be classified as transient (retryable=true) so
+          // withRetry takes another shot rather than failing fast.
+          assert.ok(err instanceof GeminiError);
+          assert.strictEqual(err.kind, 'transient');
+          assert.strictEqual(err.retryable, true);
+          assert.match(err.message, /MALFORMED_FUNCTION_CALL/);
+          return true;
+        },
+      );
+    });
+
     it('throws GeminiError(kind=invalid-request, retryable=false) for non-MAX_TOKENS bad finishReasons', async () => {
       const p = new GeminiProvider({
         apiKey: 'stub',
