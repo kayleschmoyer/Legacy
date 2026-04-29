@@ -122,6 +122,22 @@ describe('parseFindingsFromText', () => {
     assert.deepStrictEqual(result.findings[0], finding);
   });
 
+  it('normalizes omitted file and line to null (Gemini omits optional fields instead of emitting null)', () => {
+    // Gemini may omit file/line rather than emitting null when they are not required (LS-3962).
+    // parseFindingsFromText normalizes absent fields to null to preserve the Finding contract.
+    const finding = {
+      severity: 'medium',
+      title: 'Missing guard',
+      body: 'Add null check.',
+    };
+    const result = parseFindingsFromText(JSON.stringify([finding]));
+    assert.ok(result.ok);
+    assert.strictEqual(result.findings.length, 1);
+    assert.strictEqual(result.findings[0].title, 'Missing guard');
+    assert.strictEqual(result.findings[0].file, null);
+    assert.strictEqual(result.findings[0].line, null);
+  });
+
   it('strips findings with empty title or body', () => {
     const findings = [
       { severity: 'high', file: null, line: null, title: '', body: 'ok' },

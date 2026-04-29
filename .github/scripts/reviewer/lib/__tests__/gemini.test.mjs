@@ -360,6 +360,35 @@ describe('GeminiProvider', () => {
       });
     });
 
+    it('round-trips through parseFindingsFromText when file and line are omitted (MALFORMED_FUNCTION_CALL fix)', async () => {
+      // Gemini may omit file/line rather than emitting null when they are not
+      // required (LS-3962). parseFindingsFromText accepts missing fields and
+      // normalizes them to null so the Finding contract is preserved.
+      const p = new GeminiProvider({ apiKey: 'stub', useExplicitCache: false });
+      const args = {
+        summary: 'One issue, no location',
+        findings: [
+          {
+            severity: 'high',
+            title: 'Missing input validation',
+            body: 'Sanitise before use.',
+          },
+        ],
+        verdict: 'REQUEST_CHANGES',
+      };
+      stubFetch(() => buildSuccessfulGenerateResponse({ args }));
+
+      const result = await p.review({ system: 's', user: 'u' });
+
+      const { parseFindingsFromText } = await import('../findings.mjs');
+      const parsed = parseFindingsFromText(result.text);
+      assert.strictEqual(parsed.ok, true);
+      assert.strictEqual(parsed.findings.length, 1);
+      assert.strictEqual(parsed.findings[0].title, 'Missing input validation');
+      assert.strictEqual(parsed.findings[0].file, null);
+      assert.strictEqual(parsed.findings[0].line, null);
+    });
+
     it('normalizes missing findings key to empty array (gemini-2.5-flash thinking model omission)', async () => {
       const p = new GeminiProvider({
         apiKey: 'stub',

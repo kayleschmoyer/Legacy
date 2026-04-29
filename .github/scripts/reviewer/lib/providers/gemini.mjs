@@ -140,13 +140,13 @@ const REVIEW_TOOL = {
               type: 'STRING',
               nullable: true,
               description:
-                'Path of the affected file. Must be a non-empty string or null — never omit, never use an empty string.',
+                'Path of the affected file. Include when known; use null when the finding applies to the whole PR rather than a specific file. Never use an empty string.',
             },
             line: {
               type: 'INTEGER',
               nullable: true,
               description:
-                'Line number in the new file. Must be an integer ≥ 1 or null — never omit.',
+                'Line number in the new file (integer ≥ 1). Include when known; use null when no specific line applies.',
             },
             title: {
               type: 'STRING',
@@ -158,9 +158,11 @@ const REVIEW_TOOL = {
                 'Detailed explanation with a concrete fix suggestion.',
             },
           },
-          // file and line are required-but-nullable so the model cannot omit
-          // them; parseFindingsFromText filters undefined as malformed.
-          required: ['severity', 'file', 'line', 'title', 'body'],
+          // file and line are intentionally excluded from required — Gemini 2.5 Flash
+          // rejects required+nullable combinations with MALFORMED_FUNCTION_CALL.
+          // Descriptions strongly hint the model to include them; parseFindingsFromText
+          // treats absent (undefined) the same as null for these two fields.
+          required: ['severity', 'title', 'body'],
         },
       },
       verdict: {

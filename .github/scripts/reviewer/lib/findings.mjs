@@ -58,21 +58,23 @@ export function parseFindingsFromText(text) {
 
   if (parsed === null) return { ok: false, findings: [] };
 
-  const findings = parsed.filter(
-    (f) =>
-      f !== null &&
-      typeof f === 'object' &&
-      VALID_SEVERITIES.has(f.severity) &&
-      typeof f.title === 'string' &&
-      f.title.trim() !== '' &&
-      typeof f.body === 'string' &&
-      f.body.trim() !== '' &&
-      (f.file === null || typeof f.file === 'string') &&
-      (f.line === null ||
-        (typeof f.line === 'number' &&
-          Number.isInteger(f.line) &&
-          f.line >= 1)),
-  );
+  const findings = parsed
+    .filter(
+      (f) =>
+        f !== null &&
+        typeof f === 'object' &&
+        VALID_SEVERITIES.has(f.severity) &&
+        typeof f.title === 'string' &&
+        f.title.trim() !== '' &&
+        typeof f.body === 'string' &&
+        f.body.trim() !== '' &&
+        (f.file == null || typeof f.file === 'string') &&
+        (f.line == null ||
+          (typeof f.line === 'number' &&
+            Number.isInteger(f.line) &&
+            f.line >= 1)),
+    )
+    .map((f) => ({ ...f, file: f.file ?? null, line: f.line ?? null }));
 
   return { ok: true, findings };
 }
