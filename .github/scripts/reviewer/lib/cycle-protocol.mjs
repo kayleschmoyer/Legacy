@@ -290,3 +290,46 @@ export function buildAuthorResponsesSection(
 
   return { section: lines.join('\n'), formatErrors };
 }
+
+/**
+ * Detect whether the PR author has posted a CANNOT-COMPLY reply after the
+ * last bot review. Used by index.mjs to short-circuit the LLM call in
+ * Cycle 3+ and escalate to human arbitration immediately.
+ *
+ * Only comments from `authorLogin` are considered — this prevents a third
+ * party (another commenter, a bot like dependabot) from forcing escalation
+ * by posting a CANNOT-COMPLY token. An empty `authorLogin` is treated as
+ * unknown and returns false (fail-safe: no escalation).
+ *
+ * Uses the same timestamp and bot-login filtering as
+ * {@link buildAuthorResponsesSection}.
+ *
+ * @param {Array<{ id: number, inReplyToId: number | null, userLogin: string | null, body: string, createdAt: string }>} reviewComments
+ * @param {Array<{ id: number, userLogin: string | null, body: string, createdAt: string }>} issueComments
+ * @param {string} lastBotReviewAt  ISO 8601 timestamp; replies at or before this time are excluded
+ * @param {Set<string>} botLogins   Login names belonging to the reviewer bot
+ * @param {string} authorLogin      PR author login; only comments from this user are checked
+ * @returns {boolean}
+ */
+export function hasCannotComplyResponse(
+  reviewComments,
+  issueComments,
+  lastBotReviewAt,
+  botLogins,
+  authorLogin,
+) {
+  if (!authorLogin) return false;
+  for (const c of reviewComments) {
+    if (botLogins.has(c.userLogin) || c.inReplyToId === null) continue;
+    if (c.userLogin !== authorLogin) continue;
+    if (lastBotReviewAt && c.createdAt <= lastBotReviewAt) continue;
+    if (parseAuthorReply(c.body).type === 'CANNOT-COMPLY') return true;
+  }
+  for (const c of issueComments) {
+    if (botLogins.has(c.userLogin)) continue;
+    if (c.userLogin !== authorLogin) continue;
+    if (lastBotReviewAt && c.createdAt <= lastBotReviewAt) continue;
+    if (parseAuthorReply(c.body).type === 'CANNOT-COMPLY') return true;
+  }
+  return false;
+}

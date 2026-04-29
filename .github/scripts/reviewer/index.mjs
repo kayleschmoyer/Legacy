@@ -39,6 +39,7 @@ import {
   filterFindingsCycle2,
   filterFindingsCycle3,
   buildAuthorResponsesSection,
+  hasCannotComplyResponse,
 } from './lib/cycle-protocol.mjs';
 
 const NEEDS_HUMAN_ARBITRATION_LABEL = 'needs-human-arbitration';
@@ -119,23 +120,11 @@ async function main() {
 
   // Cycle > MAX_CYCLE → escalate instead of reviewing
   if (isEscalationRequired(cycle)) {
-    process.stdout.write(
-      `[reviewer] Cycle ${cycle} exceeds MAX_CYCLE — applying '${NEEDS_HUMAN_ARBITRATION_LABEL}' label and exiting\n`,
+    await escalateToHumanArbitration(
+      prNumber,
+      sha,
+      `Cycle ${cycle} exceeds MAX_CYCLE — applying '${NEEDS_HUMAN_ARBITRATION_LABEL}' label and exiting`,
     );
-    try {
-      await addLabelAsApp(prNumber, NEEDS_HUMAN_ARBITRATION_LABEL);
-    } catch (err) {
-      process.stderr.write(
-        `[reviewer] Failed to apply escalation label: ${err instanceof Error ? err.message : String(err)}\n`,
-      );
-    }
-    try {
-      setCommitStatus(sha, 'failure', 'Escalated to human arbitration');
-    } catch (err) {
-      process.stderr.write(
-        `[reviewer] Failed to set bot-review failure: ${err instanceof Error ? err.message : String(err)}\n`,
-      );
-    }
     return;
   }
 
@@ -201,6 +190,27 @@ async function main() {
         process.stdout.write(
           `[reviewer] Cycle ${cycle}: no author responses found\n`,
         );
+      }
+
+      // Cycle 3+: CANNOT-COMPLY short-circuit — escalate before calling the LLM.
+      // The LLM's VERIFY-mode prompt focuses on code state and silently ignores
+      // compliance claims, so escalation must happen here rather than in the prompt.
+      if (
+        cycle >= 3 &&
+        hasCannotComplyResponse(
+          reviewComments,
+          issueComments,
+          lastBotReview.submittedAt,
+          REVIEWER_BOT_LOGINS,
+          authorLogin,
+        )
+      ) {
+        await escalateToHumanArbitration(
+          prNumber,
+          sha,
+          `Cycle ${cycle}: CANNOT-COMPLY detected — applying '${NEEDS_HUMAN_ARBITRATION_LABEL}' label and exiting`,
+        );
+        return;
       }
     } catch (err) {
       process.stderr.write(
@@ -531,6 +541,35 @@ async function main() {
         );
       }
     }
+  }
+}
+
+/**
+ * Apply the `needs-human-arbitration` label and set the bot-review commit
+ * status to failure. Shared by the cycle>MAX_CYCLE and CANNOT-COMPLY
+ * escalation paths so their error-handling stays in sync.
+ *
+ * Caller must `return` after awaiting to exit the review flow.
+ *
+ * @param {number} prNumber
+ * @param {string} sha
+ * @param {string} logReason  Written to stdout before acting
+ */
+async function escalateToHumanArbitration(prNumber, sha, logReason) {
+  process.stdout.write(`[reviewer] ${logReason}\n`);
+  try {
+    await addLabelAsApp(prNumber, NEEDS_HUMAN_ARBITRATION_LABEL);
+  } catch (err) {
+    process.stderr.write(
+      `[reviewer] Failed to apply escalation label: ${err instanceof Error ? err.message : String(err)}\n`,
+    );
+  }
+  try {
+    setCommitStatus(sha, 'failure', 'Escalated to human arbitration');
+  } catch (err) {
+    process.stderr.write(
+      `[reviewer] Failed to set bot-review failure: ${err instanceof Error ? err.message : String(err)}\n`,
+    );
   }
 }
 

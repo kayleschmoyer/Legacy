@@ -8,6 +8,7 @@ import {
   filterFindingsCycle3,
   buildCycleRoleSection,
   buildAuthorResponsesSection,
+  hasCannotComplyResponse,
 } from '../cycle-protocol.mjs';
 
 // ---------------------------------------------------------------------------
@@ -811,5 +812,370 @@ describe('buildAuthorResponsesSection — PR issue comments (blocking finding re
     );
     assert.ok(result.section.includes('JUSTIFY: this one is valid'));
     assert.strictEqual(result.formatErrors, 2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// hasCannotComplyResponse
+// ---------------------------------------------------------------------------
+
+const AUTHOR_LOGIN = 'pr-author';
+
+describe('hasCannotComplyResponse — no responses', () => {
+  it('returns false when both comment arrays are empty', () => {
+    assert.strictEqual(
+      hasCannotComplyResponse([], [], REVIEW_AT, BOT_LOGINS, AUTHOR_LOGIN),
+      false,
+    );
+  });
+
+  it('returns false when authorLogin is empty (fail-safe: unknown author)', () => {
+    const issueComments = [
+      {
+        id: 1,
+        userLogin: 'someone',
+        body: 'CANNOT-COMPLY: LS-1234\nReason.',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    assert.strictEqual(
+      hasCannotComplyResponse([], issueComments, REVIEW_AT, BOT_LOGINS, ''),
+      false,
+    );
+  });
+
+  it('returns false when all replies are FIX or JUSTIFY', () => {
+    const reviewComments = [
+      {
+        id: 10,
+        inReplyToId: null,
+        userLogin: 'github-actions[bot]',
+        body: BOT_INLINE_BODY,
+        createdAt: REVIEW_AT,
+      },
+      {
+        id: 11,
+        inReplyToId: 10,
+        userLogin: AUTHOR_LOGIN,
+        body: 'FIX: abc1234',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    const issueComments = [
+      {
+        id: 1,
+        userLogin: AUTHOR_LOGIN,
+        body: 'JUSTIFY: Validated upstream.',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    assert.strictEqual(
+      hasCannotComplyResponse(
+        reviewComments,
+        issueComments,
+        REVIEW_AT,
+        BOT_LOGINS,
+        AUTHOR_LOGIN,
+      ),
+      false,
+    );
+  });
+});
+
+describe('hasCannotComplyResponse — inline review thread replies', () => {
+  it('returns true when an inline reply from the author is CANNOT-COMPLY', () => {
+    const reviewComments = [
+      {
+        id: 10,
+        inReplyToId: null,
+        userLogin: 'github-actions[bot]',
+        body: BOT_INLINE_BODY,
+        createdAt: REVIEW_AT,
+      },
+      {
+        id: 11,
+        inReplyToId: 10,
+        userLogin: AUTHOR_LOGIN,
+        body: 'CANNOT-COMPLY: LS-1234\nThis is a generated file.',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    assert.strictEqual(
+      hasCannotComplyResponse(
+        reviewComments,
+        [],
+        REVIEW_AT,
+        BOT_LOGINS,
+        AUTHOR_LOGIN,
+      ),
+      true,
+    );
+  });
+
+  it('returns false when a non-author posts CANNOT-COMPLY in an inline thread', () => {
+    const reviewComments = [
+      {
+        id: 10,
+        inReplyToId: null,
+        userLogin: 'github-actions[bot]',
+        body: BOT_INLINE_BODY,
+        createdAt: REVIEW_AT,
+      },
+      {
+        id: 11,
+        inReplyToId: 10,
+        userLogin: 'third-party-reviewer',
+        body: 'CANNOT-COMPLY: LS-1234\nThird-party compliance claim.',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    assert.strictEqual(
+      hasCannotComplyResponse(
+        reviewComments,
+        [],
+        REVIEW_AT,
+        BOT_LOGINS,
+        AUTHOR_LOGIN,
+      ),
+      false,
+    );
+  });
+
+  it('returns false when CANNOT-COMPLY reply is at or before the last review timestamp', () => {
+    const reviewComments = [
+      {
+        id: 10,
+        inReplyToId: null,
+        userLogin: 'github-actions[bot]',
+        body: BOT_INLINE_BODY,
+        createdAt: REVIEW_AT,
+      },
+      {
+        id: 11,
+        inReplyToId: 10,
+        userLogin: AUTHOR_LOGIN,
+        body: 'CANNOT-COMPLY: LS-1234\nStale reply from a prior cycle.',
+        createdAt: BEFORE_REVIEW,
+      },
+    ];
+    assert.strictEqual(
+      hasCannotComplyResponse(
+        reviewComments,
+        [],
+        REVIEW_AT,
+        BOT_LOGINS,
+        AUTHOR_LOGIN,
+      ),
+      false,
+    );
+  });
+
+  it('returns false when CANNOT-COMPLY reply is from a bot login', () => {
+    const reviewComments = [
+      {
+        id: 10,
+        inReplyToId: null,
+        userLogin: 'github-actions[bot]',
+        body: BOT_INLINE_BODY,
+        createdAt: REVIEW_AT,
+      },
+      {
+        id: 11,
+        inReplyToId: 10,
+        userLogin: 'copilot-reviewer[bot]',
+        body: 'CANNOT-COMPLY: LS-1234\nBot self-reply.',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    assert.strictEqual(
+      hasCannotComplyResponse(
+        reviewComments,
+        [],
+        REVIEW_AT,
+        BOT_LOGINS,
+        AUTHOR_LOGIN,
+      ),
+      false,
+    );
+  });
+
+  it('returns false for a root (non-reply) comment even if it contains CANNOT-COMPLY', () => {
+    const reviewComments = [
+      {
+        id: 10,
+        inReplyToId: null,
+        userLogin: AUTHOR_LOGIN,
+        body: 'CANNOT-COMPLY: LS-1234\nRoot comment, not a reply.',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    assert.strictEqual(
+      hasCannotComplyResponse(
+        reviewComments,
+        [],
+        REVIEW_AT,
+        BOT_LOGINS,
+        AUTHOR_LOGIN,
+      ),
+      false,
+    );
+  });
+});
+
+describe('hasCannotComplyResponse — PR issue comments', () => {
+  it('returns true when an issue comment from the author is CANNOT-COMPLY', () => {
+    const issueComments = [
+      {
+        id: 1,
+        userLogin: AUTHOR_LOGIN,
+        body: 'CANNOT-COMPLY: LS-9999\nManually generated — cannot be changed.',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    assert.strictEqual(
+      hasCannotComplyResponse(
+        [],
+        issueComments,
+        REVIEW_AT,
+        BOT_LOGINS,
+        AUTHOR_LOGIN,
+      ),
+      true,
+    );
+  });
+
+  it('returns false when a non-author posts CANNOT-COMPLY as an issue comment', () => {
+    const issueComments = [
+      {
+        id: 1,
+        userLogin: 'dependabot[bot]',
+        body: 'CANNOT-COMPLY: LS-9999\nDependabot compliance claim.',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    assert.strictEqual(
+      hasCannotComplyResponse(
+        [],
+        issueComments,
+        REVIEW_AT,
+        BOT_LOGINS,
+        AUTHOR_LOGIN,
+      ),
+      false,
+    );
+  });
+
+  it('returns false when CANNOT-COMPLY issue comment is at or before the last review timestamp', () => {
+    const issueComments = [
+      {
+        id: 1,
+        userLogin: AUTHOR_LOGIN,
+        body: 'CANNOT-COMPLY: LS-9999\nPrior cycle reply.',
+        createdAt: REVIEW_AT,
+      },
+    ];
+    assert.strictEqual(
+      hasCannotComplyResponse(
+        [],
+        issueComments,
+        REVIEW_AT,
+        BOT_LOGINS,
+        AUTHOR_LOGIN,
+      ),
+      false,
+    );
+  });
+
+  it('returns false when CANNOT-COMPLY issue comment is from a bot login', () => {
+    const issueComments = [
+      {
+        id: 1,
+        userLogin: 'github-actions[bot]',
+        body: 'CANNOT-COMPLY: LS-9999\nBot issue comment.',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    assert.strictEqual(
+      hasCannotComplyResponse(
+        [],
+        issueComments,
+        REVIEW_AT,
+        BOT_LOGINS,
+        AUTHOR_LOGIN,
+      ),
+      false,
+    );
+  });
+});
+
+describe('hasCannotComplyResponse — mixed batch', () => {
+  it('returns true when only one of many replies is CANNOT-COMPLY from the author', () => {
+    const reviewComments = [
+      {
+        id: 10,
+        inReplyToId: null,
+        userLogin: 'github-actions[bot]',
+        body: BOT_INLINE_BODY,
+        createdAt: REVIEW_AT,
+      },
+      {
+        id: 11,
+        inReplyToId: 10,
+        userLogin: AUTHOR_LOGIN,
+        body: 'FIX: abc1234',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    const issueComments = [
+      {
+        id: 1,
+        userLogin: AUTHOR_LOGIN,
+        body: 'JUSTIFY: Validated upstream.',
+        createdAt: AFTER_REVIEW,
+      },
+      {
+        id: 2,
+        userLogin: AUTHOR_LOGIN,
+        body: 'CANNOT-COMPLY: LS-5678\nThis change requires modifying a generated file.',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    assert.strictEqual(
+      hasCannotComplyResponse(
+        reviewComments,
+        issueComments,
+        REVIEW_AT,
+        BOT_LOGINS,
+        AUTHOR_LOGIN,
+      ),
+      true,
+    );
+  });
+
+  it('returns false when CANNOT-COMPLY exists but only from a non-author', () => {
+    const issueComments = [
+      {
+        id: 1,
+        userLogin: AUTHOR_LOGIN,
+        body: 'FIX: abc1234',
+        createdAt: AFTER_REVIEW,
+      },
+      {
+        id: 2,
+        userLogin: 'third-party',
+        body: 'CANNOT-COMPLY: LS-5678\nThird party forced escalation attempt.',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    assert.strictEqual(
+      hasCannotComplyResponse(
+        [],
+        issueComments,
+        REVIEW_AT,
+        BOT_LOGINS,
+        AUTHOR_LOGIN,
+      ),
+      false,
+    );
   });
 });
