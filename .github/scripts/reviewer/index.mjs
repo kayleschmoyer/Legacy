@@ -180,16 +180,19 @@ async function main() {
   // Fetch author replies (JUSTIFY/FIX comments) for Cycle 2+ so the LLM can
   // evaluate them when adjudicating or verifying findings.
   let authorResponsesSection = '';
+  let authorFormatErrors = 0;
   if (cycle >= 2 && lastBotReview) {
     try {
       const reviewComments = getPrReviewComments(prNumber);
       const issueComments = getPrIssueComments(prNumber);
-      authorResponsesSection = buildAuthorResponsesSection(
+      const authorResponses = buildAuthorResponsesSection(
         reviewComments,
         issueComments,
         lastBotReview.submittedAt,
         REVIEWER_BOT_LOGINS,
       );
+      authorResponsesSection = authorResponses.section;
+      authorFormatErrors = authorResponses.formatErrors;
       if (authorResponsesSection) {
         process.stdout.write(
           `[reviewer] Cycle ${cycle}: author response(s) found — injecting into user prompt\n`,
@@ -360,6 +363,7 @@ async function main() {
         shadow: shadowMode,
         authorLogin,
         authorType,
+        formatErrors: authorFormatErrors,
       }),
     );
     try {
@@ -472,6 +476,7 @@ async function main() {
       shadow: shadowMode,
       authorLogin,
       authorType,
+      formatErrors: authorFormatErrors,
     }),
   );
 

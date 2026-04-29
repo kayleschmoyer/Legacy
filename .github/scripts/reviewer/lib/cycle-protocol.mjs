@@ -218,14 +218,14 @@ will be automatically stripped.`;
  *   2. PR-level issue comments posted after the last bot review (blocking findings).
  *      These have no specific thread to match, so they are listed without a title.
  *
- * MALFORMED replies (unrecognised tokens) are silently skipped.
- * Returns an empty string when no valid responses are found.
+ * MALFORMED replies (unrecognised tokens) are silently skipped and counted.
+ * Returns an empty section string when no valid responses are found.
  *
  * @param {Array<{ id: number, inReplyToId: number | null, userLogin: string | null, body: string, createdAt: string }>} reviewComments
  * @param {Array<{ id: number, userLogin: string | null, body: string, createdAt: string }>} issueComments
  * @param {string} lastBotReviewAt     ISO 8601 timestamp of the last bot review; comments at or before this time are excluded from both sources
  * @param {Set<string>} botLogins      Login names that belong to the reviewer bot
- * @returns {string}
+ * @returns {{ section: string, formatErrors: number }}
  */
 export function buildAuthorResponsesSection(
   reviewComments,
@@ -235,6 +235,7 @@ export function buildAuthorResponsesSection(
 ) {
   /** @type {Array<{ title: string | null, parsed: import('./parse-author-response.mjs').ParsedResponse }>} */
   const items = [];
+  let formatErrors = 0;
 
   // --- Part 1: inline review thread replies (blocking and non-blocking findings) ---
   // Build a map from bot root comment id → finding title extracted from the
@@ -250,7 +251,10 @@ export function buildAuthorResponsesSection(
     if (botLogins.has(c.userLogin) || c.inReplyToId === null) continue;
     if (lastBotReviewAt && c.createdAt <= lastBotReviewAt) continue;
     const parsed = parseAuthorReply(c.body);
-    if (parsed.type === 'MALFORMED') continue;
+    if (parsed.type === 'MALFORMED') {
+      formatErrors++;
+      continue;
+    }
     items.push({ title: rootIdToTitle.get(c.inReplyToId) ?? null, parsed });
   }
 
@@ -262,11 +266,14 @@ export function buildAuthorResponsesSection(
     if (botLogins.has(c.userLogin)) continue;
     if (lastBotReviewAt && c.createdAt <= lastBotReviewAt) continue;
     const parsed = parseAuthorReply(c.body);
-    if (parsed.type === 'MALFORMED') continue;
+    if (parsed.type === 'MALFORMED') {
+      formatErrors++;
+      continue;
+    }
     items.push({ title: null, parsed });
   }
 
-  if (items.length === 0) return '';
+  if (items.length === 0) return { section: '', formatErrors };
 
   const lines = ['## Author Responses'];
   for (const { title, parsed } of items) {
@@ -281,5 +288,5 @@ export function buildAuthorResponsesSection(
     lines.push(title ? `\n**${title}**: ${responseText}` : `\n${responseText}`);
   }
 
-  return lines.join('\n');
+  return { section: lines.join('\n'), formatErrors };
 }

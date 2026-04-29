@@ -28,6 +28,7 @@ import { spawn } from 'node:child_process';
  * @property {boolean}   shadow              - True when running in shadow (non-blocking) mode
  * @property {string}    author_login        - GitHub login of the PR author (informational)
  * @property {'bot'|'human'} author_type     - Derived author type for observability
+ * @property {number}    format_errors       - Count of MALFORMED author reply tokens detected
  */
 
 /**
@@ -75,6 +76,7 @@ export async function emitTelemetry(record) {
  * @param {boolean}   params.shadow
  * @param {string}    [params.authorLogin]
  * @param {'bot'|'human'} [params.authorType]
+ * @param {number}    [params.formatErrors]
  * @returns {TelemetryRecord}
  */
 export function buildRecord({
@@ -91,6 +93,7 @@ export function buildRecord({
   shadow,
   authorLogin = '',
   authorType = 'human',
+  formatErrors = 0,
 }) {
   return {
     ts: new Date().toISOString(),
@@ -110,6 +113,7 @@ export function buildRecord({
     shadow: Boolean(shadow),
     author_login: authorLogin,
     author_type: authorType,
+    format_errors: formatErrors,
   };
 }
 

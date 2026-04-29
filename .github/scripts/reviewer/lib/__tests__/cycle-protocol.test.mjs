@@ -390,12 +390,13 @@ const AFTER_REVIEW = '2024-01-01T13:00:00Z';
 const BEFORE_REVIEW = '2024-01-01T11:00:00Z';
 
 describe('buildAuthorResponsesSection — empty inputs', () => {
-  it('returns empty string when no review comments or issue comments', () => {
+  it('returns empty section when no review comments or issue comments', () => {
     const result = buildAuthorResponsesSection([], [], REVIEW_AT, BOT_LOGINS);
-    assert.strictEqual(result, '');
+    assert.strictEqual(result.section, '');
+    assert.strictEqual(result.formatErrors, 0);
   });
 
-  it('returns empty string when all replies are MALFORMED', () => {
+  it('returns empty section and counts formatErrors when all replies are MALFORMED', () => {
     const reviewComments = [
       {
         id: 10,
@@ -418,10 +419,11 @@ describe('buildAuthorResponsesSection — empty inputs', () => {
       REVIEW_AT,
       BOT_LOGINS,
     );
-    assert.strictEqual(result, '');
+    assert.strictEqual(result.section, '');
+    assert.strictEqual(result.formatErrors, 1);
   });
 
-  it('returns empty string when all inline replies are at or before the last review timestamp', () => {
+  it('returns empty section when all inline replies are at or before the last review timestamp', () => {
     const reviewComments = [
       {
         id: 10,
@@ -444,10 +446,11 @@ describe('buildAuthorResponsesSection — empty inputs', () => {
       REVIEW_AT,
       BOT_LOGINS,
     );
-    assert.strictEqual(result, '');
+    assert.strictEqual(result.section, '');
+    assert.strictEqual(result.formatErrors, 0);
   });
 
-  it('returns empty string when issue comments are all before the last review', () => {
+  it('returns empty section when issue comments are all before the last review', () => {
     const issueComments = [
       {
         id: 1,
@@ -462,7 +465,8 @@ describe('buildAuthorResponsesSection — empty inputs', () => {
       REVIEW_AT,
       BOT_LOGINS,
     );
-    assert.strictEqual(result, '');
+    assert.strictEqual(result.section, '');
+    assert.strictEqual(result.formatErrors, 0);
   });
 });
 
@@ -490,17 +494,21 @@ describe('buildAuthorResponsesSection — inline thread replies (non-blocking fi
       REVIEW_AT,
       BOT_LOGINS,
     );
-    assert.ok(result.includes('## Author Responses'), 'should have header');
     assert.ok(
-      result.includes('Unused variable in handler'),
+      result.section.includes('## Author Responses'),
+      'should have header',
+    );
+    assert.ok(
+      result.section.includes('Unused variable in handler'),
       'should key to finding title',
     );
     assert.ok(
-      result.includes(
+      result.section.includes(
         'JUSTIFY: This variable is used indirectly via a closure.',
       ),
       'should include rationale',
     );
+    assert.strictEqual(result.formatErrors, 0);
   });
 
   it('includes a FIX reply keyed to the finding title', () => {
@@ -527,10 +535,11 @@ describe('buildAuthorResponsesSection — inline thread replies (non-blocking fi
       BOT_LOGINS,
     );
     assert.ok(
-      result.includes('Unused variable in handler'),
+      result.section.includes('Unused variable in handler'),
       'should key to finding title',
     );
-    assert.ok(result.includes('FIX: abc1234'), 'should include sha');
+    assert.ok(result.section.includes('FIX: abc1234'), 'should include sha');
+    assert.strictEqual(result.formatErrors, 0);
   });
 
   it('includes a CANNOT-COMPLY reply keyed to the finding title', () => {
@@ -557,13 +566,14 @@ describe('buildAuthorResponsesSection — inline thread replies (non-blocking fi
       BOT_LOGINS,
     );
     assert.ok(
-      result.includes('CANNOT-COMPLY: LS-1234'),
+      result.section.includes('CANNOT-COMPLY: LS-1234'),
       'should include the token',
     );
     assert.ok(
-      result.includes('This is a generated file.'),
+      result.section.includes('This is a generated file.'),
       'should include the reason',
     );
+    assert.strictEqual(result.formatErrors, 0);
   });
 
   it('skips replies from bot logins', () => {
@@ -589,7 +599,8 @@ describe('buildAuthorResponsesSection — inline thread replies (non-blocking fi
       REVIEW_AT,
       BOT_LOGINS,
     );
-    assert.strictEqual(result, '');
+    assert.strictEqual(result.section, '');
+    assert.strictEqual(result.formatErrors, 0);
   });
 
   it('includes reply without a title when root comment has no recognisable title', () => {
@@ -615,8 +626,49 @@ describe('buildAuthorResponsesSection — inline thread replies (non-blocking fi
       REVIEW_AT,
       BOT_LOGINS,
     );
-    assert.ok(result.includes('JUSTIFY: irrelevant context'));
-    assert.ok(!result.includes('**'), 'should not have a bold title prefix');
+    assert.ok(result.section.includes('JUSTIFY: irrelevant context'));
+    assert.ok(
+      !result.section.includes('**'),
+      'should not have a bold title prefix',
+    );
+    assert.strictEqual(result.formatErrors, 0);
+  });
+
+  it('counts MALFORMED inline replies in formatErrors without affecting valid replies', () => {
+    const reviewComments = [
+      {
+        id: 10,
+        inReplyToId: null,
+        userLogin: 'github-actions[bot]',
+        body: BOT_INLINE_BODY,
+        createdAt: REVIEW_AT,
+      },
+      {
+        id: 11,
+        inReplyToId: 10,
+        userLogin: 'author',
+        body: 'not a valid token at all',
+        createdAt: AFTER_REVIEW,
+      },
+      {
+        id: 12,
+        inReplyToId: 10,
+        userLogin: 'author',
+        body: 'FIX: abc1234',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    const result = buildAuthorResponsesSection(
+      reviewComments,
+      [],
+      REVIEW_AT,
+      BOT_LOGINS,
+    );
+    assert.ok(
+      result.section.includes('FIX: abc1234'),
+      'valid reply still included',
+    );
+    assert.strictEqual(result.formatErrors, 1);
   });
 });
 
@@ -636,12 +688,16 @@ describe('buildAuthorResponsesSection — PR issue comments (blocking finding re
       REVIEW_AT,
       BOT_LOGINS,
     );
-    assert.ok(result.includes('## Author Responses'), 'should have header');
     assert.ok(
-      result.includes(
+      result.section.includes('## Author Responses'),
+      'should have header',
+    );
+    assert.ok(
+      result.section.includes(
         'JUSTIFY: The string interpolation uses only validated internal values.',
       ),
     );
+    assert.strictEqual(result.formatErrors, 0);
   });
 
   it('excludes a JUSTIFY issue comment posted at exactly the review timestamp', () => {
@@ -659,7 +715,8 @@ describe('buildAuthorResponsesSection — PR issue comments (blocking finding re
       REVIEW_AT,
       BOT_LOGINS,
     );
-    assert.strictEqual(result, '');
+    assert.strictEqual(result.section, '');
+    assert.strictEqual(result.formatErrors, 0);
   });
 
   it('skips issue comments from bot logins', () => {
@@ -677,7 +734,8 @@ describe('buildAuthorResponsesSection — PR issue comments (blocking finding re
       REVIEW_AT,
       BOT_LOGINS,
     );
-    assert.strictEqual(result, '');
+    assert.strictEqual(result.section, '');
+    assert.strictEqual(result.formatErrors, 0);
   });
 
   it('includes both inline thread replies and issue comments together', () => {
@@ -712,14 +770,46 @@ describe('buildAuthorResponsesSection — PR issue comments (blocking finding re
       BOT_LOGINS,
     );
     assert.ok(
-      result.includes('FIX: abc1234'),
+      result.section.includes('FIX: abc1234'),
       'should include inline thread reply',
     );
     assert.ok(
-      result.includes(
+      result.section.includes(
         'JUSTIFY: The interpolation is safe due to upstream validation.',
       ),
       'should include issue comment',
     );
+    assert.strictEqual(result.formatErrors, 0);
+  });
+
+  it('counts MALFORMED issue comments in formatErrors', () => {
+    const issueComments = [
+      {
+        id: 1,
+        userLogin: 'author',
+        body: 'not a valid token',
+        createdAt: AFTER_REVIEW,
+      },
+      {
+        id: 2,
+        userLogin: 'author',
+        body: 'also not valid',
+        createdAt: AFTER_REVIEW,
+      },
+      {
+        id: 3,
+        userLogin: 'author',
+        body: 'JUSTIFY: this one is valid',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    const result = buildAuthorResponsesSection(
+      [],
+      issueComments,
+      REVIEW_AT,
+      BOT_LOGINS,
+    );
+    assert.ok(result.section.includes('JUSTIFY: this one is valid'));
+    assert.strictEqual(result.formatErrors, 2);
   });
 });
