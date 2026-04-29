@@ -11,7 +11,10 @@
  * Uses Gemini's explicit `cachedContents` API to cache the system prompt across
  * all calls within a workflow run. The system prompt (reviewer-rules.md +
  * persona + severity rubric) is ~2000 tokens and stable across every PR,
- * meeting the 1024-token cachedContents minimum.
+ * meeting the 1024-token cachedContents minimum. The `tools`/`toolConfig`
+ * function-calling schema is stored on the cache too, because the API rejects
+ * any `generateContent` request that sets `systemInstruction`, `tools`, or
+ * `toolConfig` alongside `cachedContent`.
  *
  * The user prompt (diff + expanded context + per-pass focus) is sent fresh per
  * call. Across the three multi-pass calls within a single PR review, the long
@@ -283,14 +286,27 @@ export class GeminiProvider {
     }
 
     try {
-      // Cache only the systemInstruction; omit `contents` so the cache prefix
-      // is exactly the system prompt with no synthetic conversation turns.
-      // Adding a fake "Acknowledge…READY" user/model pair would prepend an
-      // unrelated turn to every real review call and bias the model.
+      // Cache the systemInstruction together with `tools`/`toolConfig`; omit
+      // `contents` so the cache prefix is exactly the system prompt with no
+      // synthetic conversation turns. Adding a fake "Acknowledge…READY"
+      // user/model pair would prepend an unrelated turn to every real review
+      // call and bias the model.
+      //
+      // `tools`/`toolConfig` must live on the cache (not the per-call
+      // `generateContent` request) because the API rejects requests that set
+      // any of `systemInstruction`, `tools`, or `toolConfig` alongside
+      // `cachedContent` with `400 INVALID_ARGUMENT`.
       const url = `${this.endpoint}/cachedContents?key=${encodeURIComponent(this.apiKey)}`;
       const body = {
         model: `models/${this.model}`,
         systemInstruction: { parts: [{ text: system }] },
+        tools: [{ functionDeclarations: [REVIEW_TOOL] }],
+        toolConfig: {
+          functionCallingConfig: {
+            mode: 'ANY',
+            allowedFunctionNames: ['submit_review'],
+          },
+        },
         ttl: `${DEFAULT_CACHE_TTL_SECONDS}s`,
       };
       const response = await this._fetchJson(url, body);
@@ -339,18 +355,23 @@ export class GeminiProvider {
         temperature: this.temperature,
         maxOutputTokens: this.maxTokens,
       },
-      tools: [{ functionDeclarations: [REVIEW_TOOL] }],
-      toolConfig: {
+    };
+    if (cachedContentName) {
+      // `systemInstruction`, `tools`, and `toolConfig` are baked into the
+      // cached resource; the API rejects requests that also set any of them
+      // alongside `cachedContent` with `400 INVALID_ARGUMENT`.
+      body.cachedContent = cachedContentName;
+    } else {
+      body.tools = [{ functionDeclarations: [REVIEW_TOOL] }];
+      body.toolConfig = {
         functionCallingConfig: {
           mode: 'ANY',
           allowedFunctionNames: ['submit_review'],
         },
-      },
-    };
-    if (cachedContentName) {
-      body.cachedContent = cachedContentName;
-    } else if (system) {
-      body.systemInstruction = { parts: [{ text: system }] };
+      };
+      if (system) {
+        body.systemInstruction = { parts: [{ text: system }] };
+      }
     }
 
     const data = await this._fetchJson(url, body);

@@ -189,7 +189,7 @@ describe('GeminiProvider', () => {
       );
     });
 
-    it('creates a cachedContents resource holding only systemInstruction (no synthetic turns)', async () => {
+    it('creates a cachedContents resource holding the systemInstruction and tool config (no synthetic turns)', async () => {
       const p = new GeminiProvider({ apiKey: 'stub' });
       const largeSystem = 'x'.repeat(8000); // ~2000 tokens, above 1024 minimum
       const calls = stubFetch(({ url }) => {
@@ -216,10 +216,29 @@ describe('GeminiProvider', () => {
         undefined,
         'cache should not include synthetic contents',
       );
+      // Tool schema lives on the cache because the API rejects requests that
+      // set `tools`/`toolConfig` alongside `cachedContent`.
+      assert.strictEqual(
+        cacheBody.tools[0].functionDeclarations[0].name,
+        'submit_review',
+      );
+      assert.strictEqual(
+        cacheBody.toolConfig.functionCallingConfig.mode,
+        'ANY',
+      );
+      assert.deepStrictEqual(
+        cacheBody.toolConfig.functionCallingConfig.allowedFunctionNames,
+        ['submit_review'],
+      );
 
       const generateBody = JSON.parse(calls[1].init.body);
       assert.strictEqual(generateBody.cachedContent, 'cachedContents/abc123');
       assert.strictEqual(generateBody.systemInstruction, undefined);
+      // Regression: setting `tools`/`toolConfig` together with `cachedContent`
+      // triggers `400 INVALID_ARGUMENT` from the Gemini API. They must be
+      // absent on the per-call request when the cache is in use (LS-3964).
+      assert.strictEqual(generateBody.tools, undefined);
+      assert.strictEqual(generateBody.toolConfig, undefined);
     });
 
     it('skips explicit caching for small system prompts', async () => {
