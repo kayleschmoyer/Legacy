@@ -19,6 +19,7 @@ import { spawn } from 'node:child_process';
  * @property {1|2|3}     cycle               - Review cycle number
  * @property {string}    verdict             - 'APPROVED' | 'REQUEST_CHANGES' | 'ESCALATE' | string
  * @property {Finding[]} findings            - Structured findings from the review
+ * @property {Finding[]} stripped_findings   - Findings removed by the cycle validator (non-empty for cycles 2 and 3 only)
  * @property {number}    input_tokens        - Total input tokens consumed
  * @property {number}    cached_input_tokens - Tokens served from prompt cache
  * @property {number}    output_tokens       - Total output tokens produced
@@ -68,6 +69,7 @@ export async function emitTelemetry(record) {
  * @param {number}    params.cycle
  * @param {string}    params.verdict
  * @param {Finding[]} params.findings
+ * @param {Finding[]} [params.strippedFindings]
  * @param {import('./providers/provider.mjs').ProviderUsage} params.usage
  * @param {number}    params.latencyMs
  * @param {boolean}   params.shadow
@@ -83,6 +85,7 @@ export function buildRecord({
   cycle,
   verdict,
   findings,
+  strippedFindings,
   usage,
   latencyMs,
   shadow,
@@ -98,6 +101,7 @@ export function buildRecord({
     cycle,
     verdict,
     findings: findings ?? [],
+    stripped_findings: strippedFindings ?? [],
     input_tokens: usage?.inputTokens ?? 0,
     cached_input_tokens: usage?.cachedInputTokens ?? 0,
     output_tokens: usage?.outputTokens ?? 0,

@@ -407,6 +407,7 @@ async function main() {
 
   // Apply cycle-specific post-LLM validator (T22).
   let filteredFindings = parsed.findings;
+  let strippedFindings = [];
   if (cycle === 2) {
     const { kept, stripped } = filterFindingsCycle2(
       parsed.findings,
@@ -419,6 +420,7 @@ async function main() {
       );
     }
     filteredFindings = kept;
+    strippedFindings = stripped;
   } else if (cycle === 3) {
     const { kept, stripped } = filterFindingsCycle3(
       parsed.findings,
@@ -430,6 +432,7 @@ async function main() {
       );
     }
     filteredFindings = kept;
+    strippedFindings = stripped;
   }
 
   const gated = gateFindingsBySeverity(filteredFindings);
@@ -463,6 +466,7 @@ async function main() {
       cycle,
       verdict,
       findings: filteredFindings,
+      strippedFindings,
       usage: reviewUsage,
       latencyMs,
       shadow: shadowMode,
