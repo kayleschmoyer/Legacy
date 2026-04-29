@@ -84,6 +84,11 @@ export function parseFindingsFromText(text) {
  * an object wrapper `{"findings": [...]}` produced by json_object mode.
  * Returns the array or null on failure.
  *
+ * If the first `JSON.parse` attempt fails, tries once more after repairing
+ * literal control characters (U+0000–U+001F) inside JSON string values.
+ * This handles the case where Gemini's function-call serialisation emits raw
+ * newlines in body text that survive into the JSON string (LS-3966).
+ *
  * @param {string} s
  * @returns {unknown[]|null}
  */
@@ -94,8 +99,63 @@ function _tryParseJsonArray(s) {
     if (Array.isArray(v?.findings)) return v.findings;
     return null;
   } catch {
-    return null;
+    // Retry after repairing literal control characters inside string values.
+    const repaired = _repairLiteralControlChars(s);
+    if (repaired === s) return null;
+    try {
+      const v = JSON.parse(repaired);
+      if (Array.isArray(v)) return v;
+      if (Array.isArray(v?.findings)) return v.findings;
+      return null;
+    } catch {
+      return null;
+    }
   }
+}
+
+/**
+ * Re-escape literal control characters (U+0000–U+001F) that appear inside
+ * JSON string values. Returns the input unchanged when no repairs are needed.
+ *
+ * Standard JSON forbids unescaped control characters inside string literals.
+ * Gemini's proto-JSON serialisation occasionally emits literal newlines inside
+ * function-call `body` strings — this helper makes those strings parseable.
+ *
+ * @param {string} s  Raw JSON-like text (may contain unescaped control chars)
+ * @returns {string}  Repaired text with control chars replaced by JSON escapes
+ */
+function _repairLiteralControlChars(s) {
+  let out = '';
+  let inString = false;
+  let escaped = false;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (escaped) {
+      out += ch;
+      escaped = false;
+      continue;
+    }
+    if (ch === '\\') {
+      out += ch;
+      escaped = true;
+      continue;
+    }
+    if (ch === '"') {
+      out += ch;
+      inString = !inString;
+      continue;
+    }
+    if (inString && ch.charCodeAt(0) < 0x20) {
+      const code = ch.charCodeAt(0);
+      if (code === 0x09) out += '\\t';
+      else if (code === 0x0a) out += '\\n';
+      else if (code === 0x0d) out += '\\r';
+      else out += `\\u${code.toString(16).padStart(4, '0')}`;
+      continue;
+    }
+    out += ch;
+  }
+  return out;
 }
 
 const REFORMAT_SYSTEM =

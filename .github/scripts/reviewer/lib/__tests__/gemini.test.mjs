@@ -408,6 +408,104 @@ describe('GeminiProvider', () => {
       assert.strictEqual(parsed.findings[0].line, null);
     });
 
+    it('logs raw args shape to stderr on every successful review (LS-3966)', async () => {
+      const p = new GeminiProvider({ apiKey: 'stub', useExplicitCache: false });
+      const stderrLines = [];
+      const origWrite = process.stderr.write;
+      process.stderr.write = (msg) => {
+        stderrLines.push(typeof msg === 'string' ? msg : String(msg));
+        return true;
+      };
+      try {
+        const args = {
+          summary: 'Two issues',
+          findings: [
+            { severity: 'high', title: 'T1', body: 'Body one.' },
+            { severity: 'low', title: 'T2', body: 'Body two.' },
+          ],
+          verdict: 'REQUEST_CHANGES',
+        };
+        stubFetch(() => buildSuccessfulGenerateResponse({ args }));
+        await p.review({ system: 's', user: 'u' });
+      } finally {
+        process.stderr.write = origWrite;
+      }
+      const logLine = stderrLines.find((l) => l.includes('Gemini raw args:'));
+      assert.ok(logLine, 'raw args log line must be emitted');
+      assert.ok(
+        logLine.includes('findingsCount=2'),
+        'log must include findings count',
+      );
+    });
+
+    it('unwraps double-encoded JSON string args (LS-3966 proto Struct edge case)', async () => {
+      const p = new GeminiProvider({ apiKey: 'stub', useExplicitCache: false });
+      const stderrLines = [];
+      const origWrite = process.stderr.write;
+      process.stderr.write = (msg) => {
+        stderrLines.push(typeof msg === 'string' ? msg : String(msg));
+        return true;
+      };
+      try {
+        const actualArgs = {
+          summary: 'Null check issue',
+          findings: [
+            {
+              severity: 'high',
+              title: 'Missing null check',
+              body: 'Add null guard before accessing nested property.',
+            },
+          ],
+          verdict: 'REQUEST_CHANGES',
+        };
+        // Simulate args arriving as a JSON string (double-encoded) rather than
+        // a structured object — can occur with certain Gemini proto-JSON codecs.
+        const doubleEncodedArgs = JSON.stringify(actualArgs);
+        stubFetch(() =>
+          jsonResponse({
+            candidates: [
+              {
+                finishReason: 'STOP',
+                content: {
+                  parts: [
+                    {
+                      functionCall: {
+                        name: 'submit_review',
+                        args: doubleEncodedArgs,
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+            usageMetadata: {
+              promptTokenCount: 100,
+              cachedContentTokenCount: 0,
+              candidatesTokenCount: 25,
+            },
+          }),
+        );
+
+        const result = await p.review({ system: 's', user: 'u' });
+
+        const { parseFindingsFromText } = await import('../findings.mjs');
+        const parsed = parseFindingsFromText(result.text);
+        assert.strictEqual(
+          parsed.ok,
+          true,
+          'parseFindingsFromText must succeed',
+        );
+        assert.strictEqual(parsed.findings.length, 1);
+        assert.strictEqual(parsed.findings[0].title, 'Missing null check');
+      } finally {
+        process.stderr.write = origWrite;
+      }
+      assert.ok(
+        stderrLines.some((l) => l.includes('double-encoded')),
+        'must log the double-encoded detection',
+      );
+    });
+
     it('normalizes missing findings key to empty array (gemini-2.5-flash thinking model omission)', async () => {
       const p = new GeminiProvider({
         apiKey: 'stub',

@@ -425,7 +425,31 @@ export class GeminiProvider {
       costUsd: computeCostUsd(usageMeta, this.model),
     };
 
-    const args = fnCall.functionCall.args ?? {};
+    const rawArgs = fnCall.functionCall.args;
+    // Guard: Gemini may return args as a JSON string (double-encoded) rather
+    // than a structured proto Struct object in certain edge cases.
+    let args;
+    if (typeof rawArgs === 'string') {
+      process.stderr.write(
+        '[reviewer] Gemini args arrived as a string (double-encoded); attempting JSON.parse\n',
+      );
+      try {
+        args = JSON.parse(rawArgs);
+      } catch {
+        args = {};
+      }
+    } else {
+      args = rawArgs ?? {};
+    }
+
+    const findingsArr = Array.isArray(args.findings) ? args.findings : [];
+    const bodyLengths = findingsArr
+      .map((f) => (typeof f.body === 'string' ? f.body.length : 0))
+      .join(',');
+    process.stderr.write(
+      `[reviewer] Gemini raw args: findingsCount=${findingsArr.length}, bodyLengths=${bodyLengths || '(empty)'}\n`,
+    );
+
     // Gemini 2.5 Flash (thinking model) may omit 'findings' when it determines
     // no issues exist, despite the schema marking the field as required.
     const normalizedArgs = Array.isArray(args.findings)

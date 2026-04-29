@@ -155,6 +155,27 @@ describe('parseFindingsFromText', () => {
     assert.strictEqual(result.findings.length, 1);
     assert.strictEqual(result.findings[0].title, 'Real');
   });
+
+  it('recovers from literal newlines inside JSON string values (LS-3966 Gemini raw-newline edge case)', () => {
+    // Simulate what parseFindingsFromText receives when Gemini's proto-JSON
+    // serialisation emits literal U+000A newlines inside body strings.
+    // Standard JSON.parse rejects these; the repair fallback must handle them.
+    const bodyText =
+      'The `user.profile` property is nullable.\nDirectly accessing `.teams` without a null check causes a TypeError.\nFix: add a null guard.';
+    // Construct a JSON string with a literal newline inside the body value.
+    const brokenJson = `{"findings":[{"severity":"high","title":"Missing null check","body":"${bodyText}"}]}`;
+    // Verify the string is indeed broken JSON (sanity check for the test itself).
+    assert.throws(() => JSON.parse(brokenJson), SyntaxError);
+
+    const result = parseFindingsFromText(brokenJson);
+    assert.strictEqual(result.ok, true, 'parseFindingsFromText must recover');
+    assert.strictEqual(result.findings.length, 1);
+    assert.strictEqual(result.findings[0].title, 'Missing null check');
+    assert.ok(
+      result.findings[0].body.includes('user.profile'),
+      'body text must be preserved',
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
