@@ -326,13 +326,13 @@ describe('buildCycleRoleSection', () => {
     );
   });
 
-  it('cycle 2 mentions ADJUDICATE and prohibition on new issues', () => {
+  it('cycle 2 mentions ADJUDICATE and prohibition on new findings', () => {
     const section = buildCycleRoleSection(2, ['Prior issue']);
     assert.ok(section.includes('ADJUDICATE'), 'should include ADJUDICATE');
     assert.ok(section.includes('Cycle 2'), 'should mention Cycle 2');
     assert.ok(
-      section.includes('Do NOT raise new issues'),
-      'should prohibit new issues',
+      section.includes('Do NOT raise findings'),
+      'should prohibit new findings',
     );
     assert.ok(section.includes('Prior issue'), 'should list the prior title');
   });
@@ -340,6 +340,22 @@ describe('buildCycleRoleSection', () => {
   it('cycle 2 with no prior titles omits the issues enumeration block', () => {
     const section = buildCycleRoleSection(2, []);
     assert.ok(!section.includes('1.'), 'should not have numbered list');
+  });
+
+  it('cycle 2 describes JUSTIFY evaluation and does not claim replies are absent', () => {
+    const section = buildCycleRoleSection(2, ['Prior issue']);
+    assert.ok(
+      section.includes('JUSTIFY'),
+      'should describe JUSTIFY evaluation',
+    );
+    assert.ok(
+      section.includes('Author Responses'),
+      'should reference the author responses section',
+    );
+    assert.ok(
+      !section.includes('not provided to you'),
+      'must not claim author replies are absent (they are injected into the user prompt)',
+    );
   });
 
   it('cycle 3 mentions VERIFY and mandate-only restriction', () => {

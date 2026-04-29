@@ -161,20 +161,28 @@ restrictions on what you may raise in this cycle.`;
 ## Your Role This Cycle: ADJUDICATE (Cycle 2 of 3)
 
 You are **adjudicating Cycle 1 findings** against the current code state. \
-Re-evaluate each prior finding against the current diff. If the issue is still \
-present, re-raise it (it becomes a mandate). If it is fixed, omit it. Author \
-replies (\`FIX:\`/\`JUSTIFY:\`) are not provided to you — resolution is \
-determined solely by whether the code changed.${priorBlock}
+Re-evaluate each prior finding against the current diff **and** any author \
+replies provided below. If the issue is still present and unaddressed, re-raise \
+it (it becomes a mandate). If it is resolved or the justification is sound, omit it.${priorBlock}
 
-**Rules — strictly enforced by the post-LLM validator:**
-- **Re-raise** findings from Cycle 1 that are still present in the current diff \
+**Evaluating author replies (provided as "## Author Responses" in the user prompt):**
+- \`FIX: <sha>\` — verify the fix in the diff. If the issue is resolved, omit the finding.
+- \`JUSTIFY: <rationale>\` — evaluate the justification. If it is sound and the \
+code pattern is demonstrably safe given the rationale, accept it and omit the finding. \
+If the justification is weak or the risk remains, re-raise the finding as a mandate.
+- No reply — treat as unaddressed; re-raise if the issue is still present in the diff.
+
+**Your instructions:**
+- **Re-raise** findings from Cycle 1 that are still present and unaddressed \
 (these become mandates the author MUST fix before Cycle 3).
-- **Accept** findings that are no longer present in the current diff \
-(omit them from your output).
-- **Do NOT raise new issues** unrelated to the author's intermediate changes. \
-New concerns will be automatically stripped.
-- You MAY raise a new issue if it was **directly introduced** by a commit the \
-author pushed since Cycle 1 — cite the commit SHA in your finding body.`;
+- **Accept** findings that are no longer present in the current diff or whose \
+\`JUSTIFY\` rationale is sound (omit them from your output).
+
+**Validator-enforced constraint (post-LLM):**
+- **Do NOT raise findings** that were absent from Cycle 1 and do not cite a \
+post-C1 commit SHA — such findings are automatically stripped. You MAY raise a \
+new finding only if it was **directly introduced** by a commit the author pushed \
+since Cycle 1; cite the commit SHA in your finding body.`;
   }
 
   if (cycle === 3) {
