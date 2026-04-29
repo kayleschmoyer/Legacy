@@ -1,6 +1,10 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseFindingsFromText, tryReformatFindings } from '../findings.mjs';
+import {
+  parseFindingsFromText,
+  tryReformatFindings,
+  hasCriticalBlockingFinding,
+} from '../findings.mjs';
 
 // ---------------------------------------------------------------------------
 // parseFindingsFromText
@@ -261,5 +265,65 @@ describe('tryReformatFindings', () => {
       capturedUser.includes(rawText),
       'Raw text should be included in the reformat user prompt',
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// hasCriticalBlockingFinding
+// ---------------------------------------------------------------------------
+
+describe('hasCriticalBlockingFinding', () => {
+  it('returns true when the only finding is critical', () => {
+    assert.ok(
+      hasCriticalBlockingFinding([
+        {
+          severity: 'critical',
+          file: null,
+          line: null,
+          title: 'SQL injection',
+          body: 'desc',
+        },
+      ]),
+    );
+  });
+
+  it('returns true when one of multiple blocking findings is critical', () => {
+    assert.ok(
+      hasCriticalBlockingFinding([
+        {
+          severity: 'high',
+          file: null,
+          line: null,
+          title: 'High issue',
+          body: 'desc',
+        },
+        {
+          severity: 'critical',
+          file: null,
+          line: null,
+          title: 'Critical issue',
+          body: 'desc',
+        },
+      ]),
+    );
+  });
+
+  it('returns false when all blocking findings are high (not critical)', () => {
+    assert.strictEqual(
+      hasCriticalBlockingFinding([
+        {
+          severity: 'high',
+          file: null,
+          line: null,
+          title: 'High issue',
+          body: 'desc',
+        },
+      ]),
+      false,
+    );
+  });
+
+  it('returns false for an empty blocking array', () => {
+    assert.strictEqual(hasCriticalBlockingFinding([]), false);
   });
 });

@@ -218,6 +218,16 @@ export function gateFindingsBySeverity(findings) {
 }
 
 /**
+ * Returns true if any finding in `blockingFindings` has severity 'critical'.
+ *
+ * @param {Finding[]} blockingFindings
+ * @returns {boolean}
+ */
+export function hasCriticalBlockingFinding(blockingFindings) {
+  return blockingFindings.some((f) => f.severity === 'critical');
+}
+
+/**
  * Format a shadow PR comment body from gated findings.
  * Shows what the reviewer would post in live mode, grouped by gate.
  *

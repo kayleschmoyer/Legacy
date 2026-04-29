@@ -9,6 +9,7 @@ import {
   parseFindingsFromText,
   tryReformatFindings,
   gateFindingsBySeverity,
+  hasCriticalBlockingFinding,
   formatShadowBody,
 } from './lib/findings.mjs';
 import { buildSystemPrompt, buildUserPrompt } from './lib/prompts/system.mjs';
@@ -43,6 +44,7 @@ import {
 } from './lib/cycle-protocol.mjs';
 
 const NEEDS_HUMAN_ARBITRATION_LABEL = 'needs-human-arbitration';
+const NEEDS_HUMAN_SECURITY_REVIEW_LABEL = 'needs-human-security-review';
 
 async function main() {
   const prNumber = Number(process.env.PR_NUMBER);
@@ -512,6 +514,18 @@ async function main() {
       process.exit(0);
     }
   } else {
+    if (hasCriticalBlockingFinding(gated.blocking)) {
+      try {
+        await addLabelAsApp(prNumber, NEEDS_HUMAN_SECURITY_REVIEW_LABEL);
+        process.stdout.write(
+          `[reviewer] Applied '${NEEDS_HUMAN_SECURITY_REVIEW_LABEL}' label to PR #${prNumber} (critical finding)\n`,
+        );
+      } catch (err) {
+        process.stderr.write(
+          `[reviewer] Failed to apply security escalation label: ${err instanceof Error ? err.message : String(err)}\n`,
+        );
+      }
+    }
     try {
       await postRealReview(prNumber, gated);
     } catch (err) {

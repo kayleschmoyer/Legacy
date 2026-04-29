@@ -18,7 +18,7 @@
 
 - name: needs-human-security-review
   color: "b60205"
-  description: "Cycle 1 found a critical security issue — requires human security review"
+  description: "Reviewer found a critical security issue — requires human security review"
 
 - name: review-bot-degraded
   color: "d93f0b"
