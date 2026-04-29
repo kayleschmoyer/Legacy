@@ -2,7 +2,7 @@ name: Label Sync
 
 # Keeps GitHub labels in sync with .github/labels.yml (source of truth).
 # Fires on push to main when the file changes, or on manual dispatch.
-# Sync is additive: labels not listed in the file are preserved.
+# Sync is exhaustive: labels not listed in the file are deleted from the repo.
 
 on:
   push:
@@ -30,5 +30,5 @@ jobs:
         uses: EndBug/label-sync@52074158190acb45f3077f9099fea818aa43f97a # v2
         with:
           source-file: .github/labels.yml
-          delete-other-labels: false
+          delete-other-labels: true
           token: ${{ secrets.GITHUB_TOKEN }}

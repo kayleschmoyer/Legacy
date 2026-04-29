@@ -5,7 +5,7 @@
 #   gh workflow run label-sync.yml
 #
 # Format: EndBug/label-sync YAML (https://github.com/EndBug/label-sync)
-# Sync is additive — labels not listed here are NOT removed.
+# Sync is exhaustive — labels not listed here are deleted from the repo.
 
 # ---------------------------------------------------------------------------
 # Bot-Review Escalation Labels
@@ -49,6 +49,9 @@
 # ---------------------------------------------------------------------------
 # CI Status Labels
 # Set automatically by the CI orchestrator to surface failures on the PR.
+# Auto-applied by .github/workflows/ci-pipeline.yml (cleared and re-applied
+# at the end of every run to match the current set of failing stages),
+# except CI: Migration / CI: Schema Drift, which come from dedicated workflows.
 # ---------------------------------------------------------------------------
 
 - name: "CI: Conflicts"
@@ -59,7 +62,143 @@
   color: "e11d48"
   description: "CI failed due to security scan findings — review required before merge"
 
+- name: "CI: Lint Failure"
+  color: "e11d48"
+  description: "CI failed due to ESLint errors"
+
+- name: "CI: Test Failure"
+  color: "e11d48"
+  description: "CI failed due to unit test failures"
+
+- name: "CI: Build Failure"
+  color: "e11d48"
+  description: "CI failed due to build errors"
+
+- name: "CI: E2E Failure"
+  color: "e11d48"
+  description: "CI failed due to end-to-end test failures"
+
+- name: "CI: Formatting"
+  color: "e11d48"
+  description: "CI failed due to code formatting issues"
+
+- name: "CI: Migration Immutability"
+  color: "e11d48"
+  description: "CI failed due to modification or deletion of previously-landed migration files"
+
+# Applied by .github/workflows/check-migrations-applied.yml
+- name: "CI: Migration"
+  color: "e11d48"
+  description: "CI failed due to unapplied database migrations"
+
+# Applied by .github/workflows/check-schema.yml
+- name: "CI: Schema Drift"
+  color: "e11d48"
+  description: "CI failed due to GraphQL schema out of sync"
+
+# ---------------------------------------------------------------------------
+# Security Labels
+# ---------------------------------------------------------------------------
+
 # Operator-applied to force a comprehensive security scan on the next CI run.
 - name: security-scan
   color: "e11d48"
   description: "Forces a comprehensive security scan on the next CI run"
+
+# Read by .github/workflows/security-scanning.yml to bypass blocking SAST /
+# dependency findings. Apply only after a documented escalation review.
+- name: security-override
+  color: "ededed"
+  description: "Bypasses blocking security findings — apply only after escalation review"
+
+# ---------------------------------------------------------------------------
+# Pipeline & Merge Queue Control
+# ---------------------------------------------------------------------------
+
+# Read by .github/workflows/ci-pipeline.yml — short-circuits the run.
+- name: skip-ci
+  color: "fbca04"
+  description: "Skip CI runs until ready for testing"
+
+# Read by .github/workflows/ci-pipeline.yml — enables NX_VERBOSE_LOGGING for
+# debugging when applied to a PR.
+- name: ci-debug
+  color: "5319e7"
+  description: "Enable verbose NX logging in CI for debugging"
+
+# Managed by .github/scripts/merge-queue-processor.js — set on PRs whose
+# parent branch has not yet merged.
+- name: "Waiting on Parent"
+  color: "eaac83"
+  description: "PR is waiting on a parent PR to merge before the merge queue can pick it up"
+
+# Triggers .github/workflows/rebuild-runner-ami.yml — operator-applied to
+# kick off a Packer AMI rebuild on a Playwright bump PR.
+- name: rebuild-runner-ami
+  color: "0052cc"
+  description: "Trigger a runner-AMI rebuild on this PR (Packer build via OIDC)"
+
+# ---------------------------------------------------------------------------
+# Agent Automation Labels
+# Applied by sweep agents (tools/mcp/github-server) and scripts/ship-pr.js
+# to coordinate parallel work and avoid double-claiming PRs.
+# ---------------------------------------------------------------------------
+
+- name: agent-in-progress
+  color: "0075ca"
+  description: "PR is actively being watched by an agent — sweep agents should skip it"
+
+- name: sweep-claimed
+  color: "e4e669"
+  description: "Sweep agent actively working on this PR"
+
+- name: sweep-stale-claim
+  color: "d93f0b"
+  description: "sweep-claimed was not cleaned up — claiming agent may have crashed"
+
+# ---------------------------------------------------------------------------
+# Review State Labels
+# ---------------------------------------------------------------------------
+
+# Applied by github_manage_labels from sweep skills when a PR has unresolved
+# review threads that need human attention before continuing automation.
+- name: requires-human-review
+  color: "ededed"
+  description: "PR has unresolved review threads requiring human attention"
+
+# Applied by .github/scripts/reviewer/lib/cost-cap.mjs when the reviewer bot
+# exceeds its per-PR cost budget — signals the PR cannot be auto-reviewed.
+- name: needs-human-review
+  color: "ededed"
+  description: "Reviewer bot exceeded its cost cap — manual review required"
+
+# ---------------------------------------------------------------------------
+# Jira Sync Labels
+# Applied automatically by jira-status-audit.yml when PR ↔ Jira status drifts.
+# ---------------------------------------------------------------------------
+
+- name: jira-mismatch
+  color: "d93f0b"
+  description: "PR status doesn't match its Jira ticket status — manual reconciliation needed"
+
+# ---------------------------------------------------------------------------
+# Dependabot Labels
+# Applied automatically by Dependabot to dependency-bump PRs. Listed here so
+# they survive label-sync when delete-other-labels is true.
+# ---------------------------------------------------------------------------
+
+- name: dependencies
+  color: "0366d6"
+  description: "Pull requests that update a dependency file"
+
+- name: javascript
+  color: "168700"
+  description: "Pull requests that update javascript code"
+
+- name: github_actions
+  color: "000000"
+  description: "Pull requests that update GitHub Actions code"
+
+- name: docker
+  color: "21ceff"
+  description: "Pull requests that update docker code"
