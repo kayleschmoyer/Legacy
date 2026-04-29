@@ -28,7 +28,8 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository &&
       (github.event.action != 'labeled' ||
        github.event.label.name == 'bot:ready-for-review' ||
-       github.event.label.name == 'review-bot-degraded')
+       github.event.label.name == 'review-bot-degraded' ||
+       github.event.label.name == 'bot:reset-cycle-counter')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -56,6 +57,7 @@ jobs:
           REVIEWER_BOT_APP_ID: ${{ vars.REVIEWER_BOT_APP_ID || '3142924' }}
           REVIEWER_BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           REVIEWER_TELEMETRY_BUCKET: ${{ vars.REVIEWER_TELEMETRY_BUCKET || 'legacy-sports-dev-reviewer-telemetry' }}
+          CYCLE_RESET_SENDER: ${{ github.event.action == 'labeled' && github.event.label.name == 'bot:reset-cycle-counter' && github.event.sender.login || '' }}
         run: |
           if [ -f .github/scripts/reviewer/index.mjs ]; then
             node .github/scripts/reviewer/index.mjs

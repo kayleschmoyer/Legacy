@@ -3,11 +3,13 @@ import assert from 'node:assert/strict';
 import {
   computeCycle,
   isEscalationRequired,
+  isInfraErrorReview,
   isCodeWriterBotAuthor,
   REVIEWER_BOT_LOGINS,
   CODE_WRITER_BOT_LOGIN,
   MAX_CYCLE,
   INFRA_ERROR_REVIEW_PREFIX,
+  INFRA_ERROR_MARKER,
 } from '../cycle-counter.mjs';
 
 describe('computeCycle', () => {
@@ -116,6 +118,97 @@ describe('computeCycle', () => {
     ];
     assert.strictEqual(computeCycle(reviews), 2);
   });
+
+  it('excludes DISMISSED reviews from the cycle count', () => {
+    const reviews = [
+      {
+        userLogin: 'legacy-sports-review-bot[bot]',
+        state: 'DISMISSED',
+        body: '## Changes Required\n\nSome finding.',
+      },
+    ];
+    assert.strictEqual(computeCycle(reviews), 1);
+  });
+
+  it('returns 2 when one real review is preceded by a DISMISSED review', () => {
+    const realBody = '## Changes Required\n\n**[HIGH]** Bug — `file.ts:1`';
+    const reviews = [
+      {
+        userLogin: 'legacy-sports-review-bot[bot]',
+        state: 'DISMISSED',
+        body: realBody,
+      },
+      {
+        userLogin: 'legacy-sports-review-bot[bot]',
+        state: 'CHANGES_REQUESTED',
+        body: realBody,
+      },
+    ];
+    assert.strictEqual(computeCycle(reviews), 2);
+  });
+
+  it('excludes multiple consecutive DISMISSED reviews, returning cycle 1', () => {
+    const body = '## Changes Required\n\nFinding.';
+    const reviews = [
+      { userLogin: 'legacy-sports-review-bot[bot]', state: 'DISMISSED', body },
+      { userLogin: 'legacy-sports-review-bot[bot]', state: 'DISMISSED', body },
+      { userLogin: 'legacy-sports-review-bot[bot]', state: 'DISMISSED', body },
+    ];
+    assert.strictEqual(computeCycle(reviews), 1);
+  });
+
+  it('counts non-dismissed bot reviews regardless of state value', () => {
+    const body = '## Changes Required\n\nFinding.';
+    const reviews = [
+      {
+        userLogin: 'legacy-sports-review-bot[bot]',
+        state: 'CHANGES_REQUESTED',
+        body,
+      },
+      { userLogin: 'legacy-sports-review-bot[bot]', state: 'APPROVED', body },
+    ];
+    assert.strictEqual(computeCycle(reviews), 3);
+  });
+
+  it('excludes both DISMISSED and infra-error reviews together', () => {
+    const infraBody =
+      INFRA_ERROR_REVIEW_PREFIX +
+      '\n\n<!-- bot-infra-failure: true -->\nError.';
+    const realBody = '## Changes Required\n\nFinding.';
+    const reviews = [
+      {
+        userLogin: 'legacy-sports-review-bot[bot]',
+        state: 'DISMISSED',
+        body: realBody,
+      },
+      {
+        userLogin: 'legacy-sports-review-bot[bot]',
+        state: 'CHANGES_REQUESTED',
+        body: infraBody,
+      },
+      {
+        userLogin: 'legacy-sports-review-bot[bot]',
+        state: 'CHANGES_REQUESTED',
+        body: realBody,
+      },
+    ];
+    // Only the last real review counts → cycle 2
+    assert.strictEqual(computeCycle(reviews), 2);
+  });
+
+  it('excludes new-style infra-error review identified by INFRA_ERROR_MARKER substring', () => {
+    const body =
+      INFRA_ERROR_REVIEW_PREFIX +
+      '\n\n<!-- bot-infra-failure: true -->\nThe automated review could not complete.';
+    const reviews = [
+      {
+        userLogin: 'legacy-sports-review-bot[bot]',
+        state: 'CHANGES_REQUESTED',
+        body,
+      },
+    ];
+    assert.strictEqual(computeCycle(reviews), 1);
+  });
 });
 
 describe('isEscalationRequired', () => {
@@ -156,9 +249,59 @@ describe('INFRA_ERROR_REVIEW_PREFIX', () => {
   it('matches the opening line of postInfraErrorReview bodies', () => {
     const infraBody =
       '## Review bot infrastructure error\n\n' +
+      '<!-- bot-infra-failure: true -->\n' +
       'The automated review could not complete due to a persistent LLM API failure (3 retries exhausted).\n\n' +
       'Apply the `bot:ready-for-review` label to re-trigger, or request a human review.';
     assert.ok(infraBody.startsWith(INFRA_ERROR_REVIEW_PREFIX));
+  });
+});
+
+describe('INFRA_ERROR_MARKER', () => {
+  it('is the substring embedded in infra-error review bodies', () => {
+    assert.strictEqual(INFRA_ERROR_MARKER, 'bot-infra-failure');
+  });
+
+  it('is contained in the HTML comment embedded in new infra-error review bodies', () => {
+    const htmlComment = '<!-- bot-infra-failure: true -->';
+    assert.ok(htmlComment.includes(INFRA_ERROR_MARKER));
+  });
+});
+
+describe('isInfraErrorReview', () => {
+  it('returns true for a review with the legacy heading prefix', () => {
+    const r = { body: '## Review bot infrastructure error\n\nSome text.' };
+    assert.strictEqual(isInfraErrorReview(r), true);
+  });
+
+  it('returns true for a review with the new HTML marker', () => {
+    const r = {
+      body: '## Review bot infrastructure error\n\n<!-- bot-infra-failure: true -->\nSome text.',
+    };
+    assert.strictEqual(isInfraErrorReview(r), true);
+  });
+
+  it('returns false for a normal review body', () => {
+    const r = { body: '## Changes Required\n\n**[HIGH]** Bug — `file.ts:1`' };
+    assert.strictEqual(isInfraErrorReview(r), false);
+  });
+
+  it('returns false for an empty body', () => {
+    assert.strictEqual(isInfraErrorReview({ body: '' }), false);
+  });
+
+  it('returns false for null body', () => {
+    assert.strictEqual(isInfraErrorReview({ body: null }), false);
+  });
+
+  it('returns false for undefined body', () => {
+    assert.strictEqual(isInfraErrorReview({}), false);
+  });
+
+  it('returns false for a review that mentions infrastructure in context but is not an infra-error review', () => {
+    const r = {
+      body: '## Changes Required\n\n**[HIGH]** Cache infrastructure bug',
+    };
+    assert.strictEqual(isInfraErrorReview(r), false);
   });
 });
 

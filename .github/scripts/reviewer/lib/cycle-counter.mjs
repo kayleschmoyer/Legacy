@@ -7,11 +7,13 @@
  *
  * cycle = count(formal reviews authored by the reviewer bot) + 1
  *
- * Infrastructure-error reviews (posted by postInfraErrorReview when the LLM
- * API fails) are excluded from the count. They carry no LLM findings, so
- * treating them as a completed cycle would cause the C2 validator on the
- * subsequent retry to strip all real findings as "new issues outside author's
- * changes" (since the infra-error body has no ## Finding titles to match).
+ * Two review types are excluded from the count:
+ *  1. Infrastructure-error reviews (posted by postInfraErrorReview when the LLM
+ *     API fails). They carry no LLM findings, so treating them as a completed
+ *     cycle would cause the C2 validator on the subsequent retry to strip all
+ *     real findings as "new issues outside author's changes".
+ *  2. DISMISSED reviews — reviews dismissed by "dismiss stale approvals on push"
+ *     are no longer relevant to the current diff and must not count toward the cap.
  *
  * In shadow mode (T9) the bot posts plain PR comments, not formal reviews, so
  * the counter always returns 1 — correct for the first pass. Once the reviewer
@@ -21,6 +23,14 @@
 
 /** Body prefix that identifies an infra-error review (posted by postInfraErrorReview). */
 export const INFRA_ERROR_REVIEW_PREFIX = '## Review bot infrastructure error';
+
+/**
+ * Substring present in the HTML comment marker embedded in infra-error review
+ * bodies. Used by the cycle counter as the primary exclusion signal; the prefix
+ * check above is retained for backward compatibility with reviews posted before
+ * this marker was introduced.
+ */
+export const INFRA_ERROR_MARKER = 'bot-infra-failure';
 
 /** Known GitHub login identifiers for the code-reviewer bot. */
 export const REVIEWER_BOT_LOGINS = new Set(['legacy-sports-review-bot[bot]']);
@@ -47,12 +57,35 @@ export function isCodeWriterBotAuthor(author) {
 export const MAX_CYCLE = 3;
 
 /**
+ * Returns true when a review is an infra-error review that should be excluded
+ * from the cycle count.
+ *
+ * Checks the review body for either:
+ *  - INFRA_ERROR_MARKER substring — new-style marker embedded since this fix
+ *  - INFRA_ERROR_REVIEW_PREFIX heading — legacy format for backward compatibility
+ *
+ * Note: DISMISSED state exclusion is handled separately in computeCycle and
+ * lastBotReview selection — it is not part of this function's responsibility.
+ *
+ * @param {{ body?: string | null }} review
+ * @returns {boolean}
+ */
+export function isInfraErrorReview(review) {
+  const body = review.body ?? '';
+  return (
+    body.includes(INFRA_ERROR_MARKER) ||
+    body.startsWith(INFRA_ERROR_REVIEW_PREFIX)
+  );
+}
+
+/**
  * Compute the current review cycle from PR review history.
  *
- * Infra-error reviews (body starts with INFRA_ERROR_REVIEW_PREFIX) are excluded
- * from the count — they carry no LLM findings and must not advance the cycle.
+ * Excluded from the count:
+ *  - Infra-error reviews (body matches INFRA_ERROR_MARKER or INFRA_ERROR_REVIEW_PREFIX)
+ *  - DISMISSED reviews (dismissed by stale-approval policy on push)
  *
- * @param {Array<{ userLogin: string | null, body?: string | null }>} reviews  All formal reviews on the PR
+ * @param {Array<{ userLogin: string | null, state?: string | null, body?: string | null }>} reviews  All formal reviews on the PR
  * @param {Set<string>} [botLogins]               Override the bot login set (testing)
  * @returns {number}  1 for first review, 2 after one prior bot review, etc.
  */
@@ -60,7 +93,8 @@ export function computeCycle(reviews, botLogins = REVIEWER_BOT_LOGINS) {
   const botReviewCount = reviews.filter(
     (r) =>
       botLogins.has(r.userLogin) &&
-      !(r.body ?? '').startsWith(INFRA_ERROR_REVIEW_PREFIX),
+      r.state !== 'DISMISSED' &&
+      !isInfraErrorReview(r),
   ).length;
   return botReviewCount + 1;
 }

@@ -10,6 +10,13 @@ import { spawn } from 'node:child_process';
  */
 
 /**
+ * @typedef {object} CycleCounterExclusions
+ * @property {number}  infra_failure  - Bot reviews excluded because they are infra-error reviews
+ * @property {number}  dismissed      - Bot reviews excluded because their state is DISMISSED
+ * @property {boolean} admin_reset    - True when an admin applied bot:reset-cycle-counter this run
+ */
+
+/**
  * @typedef {object} TelemetryRecord
  * @property {string}    ts                  - ISO 8601 timestamp (UTC)
  * @property {number}    pr                  - Pull request number
@@ -29,6 +36,7 @@ import { spawn } from 'node:child_process';
  * @property {string}    author_login        - GitHub login of the PR author (informational)
  * @property {'bot'|'human'} author_type     - Derived author type for observability
  * @property {number}    format_errors       - Count of MALFORMED author reply tokens detected
+ * @property {CycleCounterExclusions} cycle_counter_exclusions - Breakdown of reviews excluded from the cycle count
  */
 
 /**
@@ -77,6 +85,7 @@ export async function emitTelemetry(record) {
  * @param {string}    [params.authorLogin]
  * @param {'bot'|'human'} [params.authorType]
  * @param {number}    [params.formatErrors]
+ * @param {CycleCounterExclusions} [params.cycleCounterExclusions]
  * @returns {TelemetryRecord}
  */
 export function buildRecord({
@@ -94,6 +103,11 @@ export function buildRecord({
   authorLogin = '',
   authorType = 'human',
   formatErrors = 0,
+  cycleCounterExclusions = {
+    infra_failure: 0,
+    dismissed: 0,
+    admin_reset: false,
+  },
 }) {
   return {
     ts: new Date().toISOString(),
@@ -114,6 +128,7 @@ export function buildRecord({
     author_login: authorLogin,
     author_type: authorType,
     format_errors: formatErrors,
+    cycle_counter_exclusions: cycleCounterExclusions,
   };
 }
 

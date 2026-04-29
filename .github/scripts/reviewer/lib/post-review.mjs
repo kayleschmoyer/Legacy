@@ -344,6 +344,7 @@ export async function postInfraErrorReview(prNumber) {
 
   const body =
     '## Review bot infrastructure error\n\n' +
+    '<!-- bot-infra-failure: true -->\n' +
     'The automated review could not complete due to a persistent LLM API failure (3 retries exhausted).\n\n' +
     'Apply the `bot:ready-for-review` label to re-trigger, or request a human review.';
 
@@ -519,6 +520,7 @@ export function buildKnownFailureBody(kind, details = {}) {
         event: 'REQUEST_CHANGES',
         body:
           '## Review bot infrastructure error\n\n' +
+          '<!-- bot-infra-failure: true -->\n' +
           'The automated review could not complete. Apply the `bot:ready-for-review` label to re-trigger, or request a human review.',
       };
   }

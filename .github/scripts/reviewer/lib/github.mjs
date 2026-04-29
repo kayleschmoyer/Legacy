@@ -3,6 +3,29 @@ import { execFileSync } from 'node:child_process';
 const SHADOW_MARKER = '<!-- reviewer-bot:shadow -->';
 
 /**
+ * Check whether a GitHub user has admin-level permission on this repository.
+ * Returns false for non-collaborators and on API errors (safe default).
+ *
+ * @param {string} login  GitHub login to check
+ * @returns {boolean}
+ */
+export function isRepoAdmin(login) {
+  try {
+    const result = execFileSync(
+      'gh',
+      [
+        'api',
+        `repos/{owner}/{repo}/collaborators/${encodeURIComponent(login)}/permission`,
+      ],
+      { encoding: 'utf8' },
+    );
+    return JSON.parse(result).role_name === 'admin';
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Add a label to a PR/issue.
  *
  * @param {number} prNumber

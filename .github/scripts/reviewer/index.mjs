@@ -4,6 +4,7 @@ import {
   addLabel,
   removeLabel,
   setCommitStatus,
+  isRepoAdmin,
 } from './lib/github.mjs';
 import {
   parseFindingsFromText,
@@ -28,12 +29,13 @@ import {
   getPrCommits,
   getPrReviewComments,
   getPrIssueComments,
+  postEscalationComment,
 } from './lib/review-thread-api.mjs';
 import {
   computeCycle,
   isEscalationRequired,
+  isInfraErrorReview,
   REVIEWER_BOT_LOGINS,
-  INFRA_ERROR_REVIEW_PREFIX,
 } from './lib/cycle-counter.mjs';
 import {
   buildCycleRoleSection,
@@ -46,6 +48,7 @@ import {
 
 const NEEDS_HUMAN_ARBITRATION_LABEL = 'needs-human-arbitration';
 const NEEDS_HUMAN_SECURITY_REVIEW_LABEL = 'needs-human-security-review';
+const CYCLE_RESET_LABEL = 'bot:reset-cycle-counter';
 
 async function main() {
   const prNumber = Number(process.env.PR_NUMBER);
@@ -121,6 +124,59 @@ async function main() {
   cycle = computeCycle(allReviews);
   process.stdout.write(`[reviewer] Computed review cycle: ${cycle}\n`);
 
+  // Per-reason exclusion counts for telemetry (computed once, reused below).
+  const botReviewsAll = allReviews.filter((r) =>
+    REVIEWER_BOT_LOGINS.has(r.userLogin),
+  );
+  const cycleExcludedDismissed = botReviewsAll.filter(
+    (r) => r.state === 'DISMISSED',
+  ).length;
+  const cycleExcludedInfra = botReviewsAll.filter(
+    (r) => r.state !== 'DISMISSED' && isInfraErrorReview(r),
+  ).length;
+
+  // --- Admin cycle reset (bot:reset-cycle-counter label) ---
+  // CYCLE_RESET_SENDER is set by the workflow when triggered by this label.
+  // If a non-admin applies the label the bot posts a rejection notice and removes it.
+  let cycleResetByAdmin = false;
+  const cycleResetSender = process.env.CYCLE_RESET_SENDER ?? '';
+  if (cycleResetSender) {
+    try {
+      if (isRepoAdmin(cycleResetSender)) {
+        const priorBotReviewCount = allReviews.filter((r) =>
+          REVIEWER_BOT_LOGINS.has(r.userLogin),
+        ).length;
+        const now = new Date().toISOString();
+        postEscalationComment(
+          prNumber,
+          `> [!NOTE]\n> Cycle counter reset by \`${cycleResetSender}\` at ${now}. ` +
+            `Prior ${priorBotReviewCount} bot review(s) excluded from counter. ` +
+            `Bot will treat next review as Cycle 1.`,
+        );
+        removeLabel(prNumber, CYCLE_RESET_LABEL);
+        cycleResetByAdmin = true;
+        cycle = 1;
+        process.stdout.write(
+          `[reviewer] Cycle counter reset by admin '${cycleResetSender}'; prior ${priorBotReviewCount} review(s) excluded\n`,
+        );
+      } else {
+        postEscalationComment(
+          prNumber,
+          `> [!WARNING]\n> The \`${CYCLE_RESET_LABEL}\` label was applied by \`${cycleResetSender}\`, ` +
+            `who does not have admin permission. Label ignored — cycle counter not reset.`,
+        );
+        removeLabel(prNumber, CYCLE_RESET_LABEL);
+        process.stdout.write(
+          `[reviewer] Ignoring ${CYCLE_RESET_LABEL} — sender '${cycleResetSender}' lacks admin permission\n`,
+        );
+      }
+    } catch (err) {
+      process.stderr.write(
+        `[reviewer] Failed to process ${CYCLE_RESET_LABEL}: ${err instanceof Error ? err.message : String(err)}\n`,
+      );
+    }
+  }
+
   // Cycle > MAX_CYCLE → escalate instead of reviewing
   if (isEscalationRequired(cycle)) {
     await escalateToHumanArbitration(
@@ -134,15 +190,15 @@ async function main() {
   // Gather prior review context for C2/C3 post-LLM validators.
   // Sort by submittedAt ascending so findLast reliably picks the most-recent
   // real bot review regardless of the order GitHub returns reviews in the API.
-  // Infra-error reviews are excluded so priorTitles is always populated from
-  // a real review body (mirrors the exclusion in computeCycle).
+  // Infra-error and DISMISSED reviews are excluded so priorTitles is always
+  // populated from a real review body (mirrors the exclusion in computeCycle).
   const botReviews = allReviews
     .filter((r) => REVIEWER_BOT_LOGINS.has(r.userLogin))
     .slice()
     .sort((a, b) => (a.submittedAt < b.submittedAt ? -1 : 1));
   lastBotReview =
     botReviews.findLast(
-      (r) => !(r.body ?? '').startsWith(INFRA_ERROR_REVIEW_PREFIX),
+      (r) => r.state !== 'DISMISSED' && !isInfraErrorReview(r),
     ) ?? null;
   const priorBotReviewBody = lastBotReview?.body ?? '';
   priorTitles = parseTitlesFromReviewBody(priorBotReviewBody);
@@ -382,6 +438,11 @@ async function main() {
         authorLogin,
         authorType,
         formatErrors: authorFormatErrors,
+        cycleCounterExclusions: {
+          infra_failure: cycleExcludedInfra,
+          dismissed: cycleExcludedDismissed,
+          admin_reset: cycleResetByAdmin,
+        },
       }),
     );
     try {
@@ -495,6 +556,11 @@ async function main() {
       authorLogin,
       authorType,
       formatErrors: authorFormatErrors,
+      cycleCounterExclusions: {
+        infra_failure: cycleExcludedInfra,
+        dismissed: cycleExcludedDismissed,
+        admin_reset: cycleResetByAdmin,
+      },
     }),
   );
 
