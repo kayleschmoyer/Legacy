@@ -33,6 +33,7 @@ import {
   computeCycle,
   isEscalationRequired,
   REVIEWER_BOT_LOGINS,
+  INFRA_ERROR_REVIEW_PREFIX,
 } from './lib/cycle-counter.mjs';
 import {
   buildCycleRoleSection,
@@ -131,13 +132,18 @@ async function main() {
   }
 
   // Gather prior review context for C2/C3 post-LLM validators.
-  // Sort by submittedAt ascending so .at(-1) reliably picks the most recent
-  // bot review regardless of the order GitHub returns reviews in the API.
+  // Sort by submittedAt ascending so findLast reliably picks the most-recent
+  // real bot review regardless of the order GitHub returns reviews in the API.
+  // Infra-error reviews are excluded so priorTitles is always populated from
+  // a real review body (mirrors the exclusion in computeCycle).
   const botReviews = allReviews
     .filter((r) => REVIEWER_BOT_LOGINS.has(r.userLogin))
     .slice()
     .sort((a, b) => (a.submittedAt < b.submittedAt ? -1 : 1));
-  lastBotReview = botReviews.at(-1) ?? null;
+  lastBotReview =
+    botReviews.findLast(
+      (r) => !(r.body ?? '').startsWith(INFRA_ERROR_REVIEW_PREFIX),
+    ) ?? null;
   const priorBotReviewBody = lastBotReview?.body ?? '';
   priorTitles = parseTitlesFromReviewBody(priorBotReviewBody);
 
