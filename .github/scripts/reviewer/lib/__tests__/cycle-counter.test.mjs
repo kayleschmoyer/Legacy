@@ -7,6 +7,7 @@ import {
   REVIEWER_BOT_LOGINS,
   CODE_WRITER_BOT_LOGIN,
   MAX_CYCLE,
+  INFRA_ERROR_REVIEW_PREFIX,
 } from '../cycle-counter.mjs';
 
 describe('computeCycle', () => {
@@ -64,6 +65,57 @@ describe('computeCycle', () => {
     ];
     assert.strictEqual(computeCycle(reviews), 3);
   });
+
+  it('excludes infra-error reviews from the cycle count', () => {
+    const infraBody =
+      INFRA_ERROR_REVIEW_PREFIX +
+      '\n\nThe automated review could not complete due to a persistent LLM API failure.';
+    const reviews = [
+      { userLogin: 'legacy-sports-review-bot[bot]', body: infraBody },
+    ];
+    assert.strictEqual(computeCycle(reviews), 1);
+  });
+
+  it('returns 2 when one real bot review is preceded by an infra-error review (infra not counted)', () => {
+    const infraBody = INFRA_ERROR_REVIEW_PREFIX + '\n\nSome failure text.';
+    const realBody =
+      '## Changes Required\n\n**[CRITICAL]** SQL injection — `api.ts:42`\n\nDetails.';
+    const reviews = [
+      { userLogin: 'legacy-sports-review-bot[bot]', body: infraBody },
+      { userLogin: 'legacy-sports-review-bot[bot]', body: realBody },
+    ];
+    assert.strictEqual(computeCycle(reviews), 2);
+  });
+
+  it('does not exclude real reviews that happen to mention infrastructure in the body', () => {
+    const realBody =
+      '## Changes Required\n\n**[HIGH]** Cache infrastructure bug — `cache.ts:10`\n\nDetails.';
+    const reviews = [
+      { userLogin: 'legacy-sports-review-bot[bot]', body: realBody },
+    ];
+    assert.strictEqual(computeCycle(reviews), 2);
+  });
+
+  it('excludes multiple consecutive infra-error reviews, returning cycle 1', () => {
+    const infraBody = INFRA_ERROR_REVIEW_PREFIX + '\n\nRetry exhausted.';
+    const reviews = [
+      { userLogin: 'legacy-sports-review-bot[bot]', body: infraBody },
+      { userLogin: 'legacy-sports-review-bot[bot]', body: infraBody },
+    ];
+    assert.strictEqual(computeCycle(reviews), 1);
+  });
+
+  it('treats reviews with no body field as non-infra (body defaults to empty string)', () => {
+    const reviews = [{ userLogin: 'legacy-sports-review-bot[bot]' }];
+    assert.strictEqual(computeCycle(reviews), 2);
+  });
+
+  it('treats reviews with null body as non-infra', () => {
+    const reviews = [
+      { userLogin: 'legacy-sports-review-bot[bot]', body: null },
+    ];
+    assert.strictEqual(computeCycle(reviews), 2);
+  });
 });
 
 describe('isEscalationRequired', () => {
@@ -97,6 +149,16 @@ describe('REVIEWER_BOT_LOGINS', () => {
 describe('MAX_CYCLE', () => {
   it('is 3', () => {
     assert.strictEqual(MAX_CYCLE, 3);
+  });
+});
+
+describe('INFRA_ERROR_REVIEW_PREFIX', () => {
+  it('matches the opening line of postInfraErrorReview bodies', () => {
+    const infraBody =
+      '## Review bot infrastructure error\n\n' +
+      'The automated review could not complete due to a persistent LLM API failure (3 retries exhausted).\n\n' +
+      'Apply the `bot:ready-for-review` label to re-trigger, or request a human review.';
+    assert.ok(infraBody.startsWith(INFRA_ERROR_REVIEW_PREFIX));
   });
 });
 
