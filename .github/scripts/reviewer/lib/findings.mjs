@@ -100,7 +100,7 @@ function _tryParseJsonArray(s) {
     return null;
   } catch {
     // Retry after repairing literal control characters inside string values.
-    const repaired = _repairLiteralControlChars(s);
+    const repaired = repairLiteralControlChars(s);
     if (repaired === s) return null;
     try {
       const v = JSON.parse(repaired);
@@ -121,10 +121,13 @@ function _tryParseJsonArray(s) {
  * Gemini's proto-JSON serialisation occasionally emits literal newlines inside
  * function-call `body` strings — this helper makes those strings parseable.
  *
+ * Exported so consolidator.mjs can apply the same repair when parsing
+ * individual pass texts before merging (LS-3989).
+ *
  * @param {string} s  Raw JSON-like text (may contain unescaped control chars)
  * @returns {string}  Repaired text with control chars replaced by JSON escapes
  */
-function _repairLiteralControlChars(s) {
+export function repairLiteralControlChars(s) {
   let out = '';
   let inString = false;
   let escaped = false;

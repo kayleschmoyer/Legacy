@@ -1,3 +1,5 @@
+import { repairLiteralControlChars } from './findings.mjs';
+
 /**
  * Split a review text into individual finding blocks.
  *
@@ -96,7 +98,18 @@ function _tryConsolidateStructured(passResults) {
     try {
       obj = JSON.parse(text);
     } catch {
-      return null;
+      // Retry after repairing literal control characters — mirrors the same
+      // repair applied in parseFindingsFromText (LS-3966). Gemini occasionally
+      // emits raw newlines in body strings that make the pass text invalid JSON,
+      // causing _tryConsolidateStructured to fall back to free-form mode and
+      // lose all structured findings (LS-3989).
+      const repaired = repairLiteralControlChars(text);
+      if (repaired === text) return null;
+      try {
+        obj = JSON.parse(repaired);
+      } catch {
+        return null;
+      }
     }
     if (!obj || typeof obj !== 'object' || !Array.isArray(obj.findings)) {
       return null;

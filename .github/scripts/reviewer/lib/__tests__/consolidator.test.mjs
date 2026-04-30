@@ -179,6 +179,39 @@ describe('consolidate — structured JSON mode', () => {
     assert.strictEqual(parsed.ok, true);
     assert.deepStrictEqual(parsed.findings, []);
   });
+
+  it('recovers from literal newlines in pass body text and stays in structured mode (LS-3989)', () => {
+    // Simulate a Gemini pass text that has literal U+000A newlines inside a JSON string
+    // value — invalid JSON that _tryConsolidateStructured must repair before falling
+    // through to free-form mode and losing all structured findings.
+    const bodyWithNewlines =
+      'Use parameterised queries.\nFor example: SELECT * FROM users WHERE id = ?.\nNever interpolate user input directly.';
+    const brokenPassText = `{"findings":[{"severity":"critical","file":"src/db.ts","line":42,"title":"SQL injection","body":"${bodyWithNewlines}"}]}`;
+    // Sanity-check: the string is indeed broken JSON.
+    assert.throws(() => JSON.parse(brokenPassText), SyntaxError);
+
+    const passes = [
+      { passName: 'correctness', text: JSON.stringify({ findings: [] }) },
+      { passName: 'security', text: brokenPassText },
+      { passName: 'contract', text: JSON.stringify({ findings: [] }) },
+    ];
+
+    const out = consolidate(passes);
+    const parsed = parseFindingsFromText(out);
+    assert.strictEqual(
+      parsed.ok,
+      true,
+      'structured path must survive the repair',
+    );
+    assert.strictEqual(parsed.findings.length, 1);
+    assert.strictEqual(parsed.findings[0].title, 'SQL injection');
+    assert.strictEqual(parsed.findings[0].severity, 'critical');
+    assert.match(parsed.findings[0].body, /\[security\]/);
+    assert.ok(
+      parsed.findings[0].body.includes('parameterised queries'),
+      'body text must be preserved through the repair',
+    );
+  });
 });
 
 describe('consolidate — free-form text fallback', () => {
