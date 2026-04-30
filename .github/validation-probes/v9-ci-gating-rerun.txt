@@ -1,0 +1,25 @@
+CI Validation Probe - V9 Re-run (LS-3911 / LS-3977 fix)
+---------------------------------------------------------
+
+Re-validation after LS-3977 fix: dismiss_stale_reviews_on_push
+set to true in the Protect Main ruleset (ruleset ID 1524440).
+
+This probe verifies AC4: after a post-approval push, the bot's
+APPROVE review is now dismissed automatically, and the PR requires
+re-approval before merge.
+
+Design sections under test:
+  SS3.1  cheap before expensive - review gates CI
+  SS6.2  W2 triggers on bot approval
+  SS3.4  fail closed
+  SS14   anti-stale-code - dismiss stale on push (now enforced)
+  G2     CI must not run before review
+
+Probe: intentionally trivial text file, no code.
+Reviewer should return APPROVE with no findings.
+
+Ticket: LS-3911 (re-run after LS-3977 fix)
+Branch: test/ci-validation/v9-rerun
+Date:   2026-04-30
+
+# step-6: post-approval push to test dismiss_stale_reviews_on_push:true
