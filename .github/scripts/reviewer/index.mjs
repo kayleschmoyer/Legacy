@@ -268,7 +268,7 @@ async function main() {
       );
       for (const rootId of malformedRootIds) {
         try {
-          postReviewThreadReply(rootId, FORMAT_ERROR_MESSAGE);
+          postReviewThreadReply(prNumber, rootId, FORMAT_ERROR_MESSAGE);
           process.stdout.write(
             `[reviewer] Cycle ${cycle}: posted format-error reply to thread ${rootId}\n`,
           );

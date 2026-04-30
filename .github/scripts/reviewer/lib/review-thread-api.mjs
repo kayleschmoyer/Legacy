@@ -64,17 +64,18 @@ export function getPrCommits(prNumber) {
 /**
  * Post a reply directly in a PR review thread (in-thread error message).
  *
+ * @param {number} prNumber
  * @param {number} inReplyToId  The `id` of the top-level review comment that
  *                              started the thread (not the thread node ID)
  * @param {string} body
  */
-export function postReviewThreadReply(inReplyToId, body) {
+export function postReviewThreadReply(prNumber, inReplyToId, body) {
   const payload = JSON.stringify({ body });
   execFileSync(
     'gh',
     [
       'api',
-      `repos/{owner}/{repo}/pulls/comments/${inReplyToId}/replies`,
+      `repos/{owner}/{repo}/pulls/${prNumber}/comments/${inReplyToId}/replies`,
       '-X',
       'POST',
       '--input',
