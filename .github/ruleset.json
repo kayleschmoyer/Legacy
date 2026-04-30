@@ -20,12 +20,12 @@
       "type": "deletion"
     },
     {
-      "_comment": "Require a pull request before merging into main. required_approving_review_count:0 is intentional — the merge gate is the bot-review required status check (commit status set by the Code Reviewer Bot), not GitHub's formal approving-review count. require_code_owner_review:false is intentional — no CODEOWNERS file exists, so enabling this would have no effect and could create stuck PRs. dismiss_stale_reviews_on_push:true ensures the bot's APPROVE is dismissed on every new push, forcing re-review of each HEAD SHA (LS-3977).",
+      "_comment": "Require a pull request before merging into main. required_approving_review_count:0 is intentional — the merge gate is the bot-review required status check (commit status set by the Code Reviewer Bot), not GitHub's formal approving-review count. require_code_owner_review:true enforces .github/CODEOWNERS, requiring @bkrupa approval on sensitive paths (auth, payments, migrations, CI, terraform) — enabled in T17 (LS-3998). dismiss_stale_reviews_on_push:true ensures the bot's APPROVE is dismissed on every new push, forcing re-review of each HEAD SHA (LS-3977).",
       "type": "pull_request",
       "parameters": {
         "required_approving_review_count": 0,
         "dismiss_stale_reviews_on_push": true,
-        "require_code_owner_review": false,
+        "require_code_owner_review": true,
         "required_reviewers": [],
         "require_last_push_approval": false,
         "required_review_thread_resolution": false,

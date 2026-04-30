@@ -1,7 +1,7 @@
 # CODEOWNERS — bkrupa/legacy-sports
 #
-# "Require review from Code Owners" is DISABLED in branch protection until T17 (LS-3877).
-# This file is safe to land now; enforcement is a Phase 2 step.
+# "Require review from Code Owners" is ENABLED in branch protection (T17, LS-3998).
+# require_code_owner_review:true is set in .github/ruleset.json.
 #
 # Default catch-all (*) is intentionally omitted until T3 (LS-3860) provisions the
 # reviewer service account and its GitHub username is confirmed.  Add it as:
