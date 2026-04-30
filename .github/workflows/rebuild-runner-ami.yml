@@ -26,6 +26,8 @@
 #   - pull_request with the label `rebuild-runner-ami` (added manually or by a
 #     future dependabot auto-labeller).
 #   - workflow_dispatch with a PR number input (for manual kick).
+#   - workflow_dispatch with prune-only: true (to prune without a full build,
+#     e.g. to bring the AMI count back into bounds after accumulation). LS-4000.
 #
 # Why label-triggered and not automatic:
 #   Packer builds take ~10 min and cost ~$0.50 each. We deliberately require an
@@ -40,9 +42,14 @@ on:
   workflow_dispatch:
     inputs:
       pr-number:
-        description: "PR number to build AMI against (will commit updates back to that PR's branch)"
-        required: true
+        description: "PR number to build AMI against (required unless prune-only is true)"
+        required: false
         type: string
+      prune-only:
+        description: "Skip the build and only run the AMI prune step (no PR needed)"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   id-token: write
@@ -50,15 +57,15 @@ permissions:
   pull-requests: write
 
 concurrency:
-  # One AMI build per PR at a time.
-  group: rebuild-runner-ami-${{ github.event.pull_request.number || github.event.inputs.pr-number }}
+  # One AMI build per PR at a time. Use 'prune' as the group key for prune-only runs.
+  group: rebuild-runner-ami-${{ github.event.pull_request.number || github.event.inputs.pr-number || 'prune' }}
   cancel-in-progress: false
 
 jobs:
   build:
     name: Build runner AMI
-    # For pull_request events, only run when the `rebuild-runner-ami` label is applied.
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.label.name == 'rebuild-runner-ami' }}
+    # Skip the build when prune-only is requested via workflow_dispatch.
+    if: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.prune-only != 'true') || github.event.label.name == 'rebuild-runner-ami' }}
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 25
     env:
@@ -79,6 +86,16 @@ jobs:
             exit 1
           fi
           echo "✅ BOT_GITHUB_TOKEN is configured."
+
+      - name: Validate required inputs
+        run: |
+          set -euo pipefail
+          PR_NUMBER="${{ github.event.inputs.pr-number }}"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -z "$PR_NUMBER" ]]; then
+            echo "::error::pr-number is required when prune-only is false."
+            echo "::error::To run a prune without a build, set prune-only to true."
+            exit 1
+          fi
 
       - name: Resolve PR ref
         id: pr
@@ -290,6 +307,27 @@ jobs:
           been updated on this branch. The runner-ami-drift-check workflow will re-run
           and should now pass. On merge, \`runner-terraform-apply.yml\` will roll the
           launch template to the new AMI."
+
+  prune:
+    name: Prune old runner AMIs
+    needs: [build]
+    # Run after a successful build, OR standalone when prune-only is requested
+    # via workflow_dispatch (LS-4000). The always() guard ensures this job
+    # evaluates its condition even when the build job was skipped.
+    if: ${{ always() && (needs.build.result == 'success' || (github.event_name == 'workflow_dispatch' && github.event.inputs.prune-only == 'true')) }}
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    env:
+      AWS_REGION: us-east-1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Configure AWS credentials (Packer builder role)
+        uses: aws-actions/configure-aws-credentials@ec61189d14ec14c8efccab744f656cffd0e33f37 # v6
+        with:
+          role-to-assume: arn:aws:iam::176661590736:role/legacy-sports-dev-runner-ami-builder
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Prune old runner AMIs
         # Retain the 5 most recent AMIs by creation date, plus any version still
