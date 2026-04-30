@@ -1,4 +1,4 @@
-import { describe, it } from 'node:test';
+import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { CostCap, CostCapExceededError } from '../cost-cap.mjs';
 
@@ -135,6 +135,16 @@ describe('CostCap.estimateCost', () => {
     const large = cap.estimateCost(100_000, 'anthropic');
     assert.ok(large > small, 'larger prompt should cost more');
   });
+
+  it('gemini estimate is significantly lower than anthropic for same input', () => {
+    const cap = new CostCap();
+    const anthropicEst = cap.estimateCost(1_000_000, 'anthropic');
+    const geminiEst = cap.estimateCost(1_000_000, 'gemini');
+    assert.ok(
+      geminiEst < anthropicEst / 5,
+      'gemini should cost much less than anthropic for same input',
+    );
+  });
 });
 
 describe('CostCap constructor', () => {
@@ -168,5 +178,79 @@ describe('CostCap constructor', () => {
       if (saved === undefined) delete process.env.REVIEWER_COST_CAP_USD;
       else process.env.REVIEWER_COST_CAP_USD = saved;
     }
+  });
+});
+
+describe('CostCap — provider-aware default cap', () => {
+  let savedEnv;
+
+  beforeEach(() => {
+    savedEnv = process.env.REVIEWER_COST_CAP_USD;
+    delete process.env.REVIEWER_COST_CAP_USD;
+  });
+
+  afterEach(() => {
+    if (savedEnv === undefined) {
+      delete process.env.REVIEWER_COST_CAP_USD;
+    } else {
+      process.env.REVIEWER_COST_CAP_USD = savedEnv;
+    }
+  });
+
+  it('uses $5 default for anthropic provider', () => {
+    const cap = new CostCap({ provider: 'anthropic' });
+    assert.strictEqual(cap.limitUsd, 5);
+  });
+
+  it('uses $0.50 default for gemini provider', () => {
+    const cap = new CostCap({ provider: 'gemini' });
+    assert.strictEqual(cap.limitUsd, 0.5);
+  });
+
+  it('falls back to $5 for unknown provider', () => {
+    const cap = new CostCap({ provider: 'github-models' });
+    assert.strictEqual(cap.limitUsd, 5);
+  });
+
+  it('explicit limitUsd overrides provider default', () => {
+    const cap = new CostCap({ provider: 'gemini', limitUsd: 2 });
+    assert.strictEqual(cap.limitUsd, 2);
+  });
+
+  it('REVIEWER_COST_CAP_USD env overrides provider default', () => {
+    process.env.REVIEWER_COST_CAP_USD = '1.25';
+    const cap = new CostCap({ provider: 'gemini' });
+    assert.strictEqual(cap.limitUsd, 1.25);
+  });
+
+  it('ignores zero REVIEWER_COST_CAP_USD and falls back to provider default', () => {
+    process.env.REVIEWER_COST_CAP_USD = '0';
+    const cap = new CostCap({ provider: 'gemini' });
+    assert.strictEqual(cap.limitUsd, 0.5);
+  });
+});
+
+describe('CostCap — gemini cap is reachable at realistic thresholds', () => {
+  it('$0.50 gemini cap triggers well below 5M input chars', () => {
+    const cap = new CostCap({ provider: 'gemini' });
+    // Break-even: ~3.64M chars. Use 4M chars to confirm cap triggers.
+    // 4M chars / 4 = 1M tokens * $0.30/MTok = $0.30 input
+    // + 100K output tokens * $2.50/MTok = $0.25 → total $0.55 > $0.50
+    const estimate = cap.estimateCost(4_000_000, 'gemini');
+    assert.ok(
+      estimate > cap.limitUsd,
+      `$${estimate.toFixed(4)} should exceed $${cap.limitUsd} gemini cap at 4M chars`,
+    );
+  });
+
+  it('$5 anthropic cap does not trigger at 4M input chars', () => {
+    const cap = new CostCap({ provider: 'anthropic' });
+    // 4M chars / 4 = 1M tokens * $3/MTok = $3 input
+    // + 100K output tokens * $15/MTok = $1.50 → total $4.50 < $5
+    const estimate = cap.estimateCost(4_000_000, 'anthropic');
+    assert.ok(
+      estimate < cap.limitUsd,
+      `$${estimate.toFixed(4)} should not exceed $${cap.limitUsd} anthropic cap at 4M chars`,
+    );
   });
 });

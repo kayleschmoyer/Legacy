@@ -1,4 +1,10 @@
-const DEFAULT_CAP_USD = 5;
+// Per-provider default caps. Anthropic: $3/MTok input → $5 ≈ 1.67M tokens.
+// Gemini: $0.30/MTok input → $0.50 ≈ 1.67M tokens (10x cheaper, so $5 is unreachable).
+const PROVIDER_DEFAULT_CAPS_USD = new Map([
+  ['anthropic', 5],
+  ['gemini', 0.5],
+]);
+const DEFAULT_CAP_USD = 5; // fallback for subscription/unknown providers
 
 // Per-provider pricing (approximate, used for pre-call estimation only).
 // Actual costs come from provider usage fields and are authoritative.
@@ -46,16 +52,19 @@ export class CostCapExceededError extends Error {
 export class CostCap {
   /**
    * @param {object} [opts]
-   * @param {number} [opts.limitUsd]     - Hard cap in USD (default: REVIEWER_COST_CAP_USD env or $5)
+   * @param {number} [opts.limitUsd]     - Hard cap in USD (default: provider-aware or REVIEWER_COST_CAP_USD env)
+   * @param {string} [opts.provider]     - 'anthropic' | 'gemini' | other — selects per-provider default cap
    * @param {string} [opts.githubToken]  - GitHub token for posting cap-exceeded comments
    * @param {number} [opts.prNumber]     - PR number for posting cap-exceeded comments/labels
    * @param {string} [opts.repo]         - owner/repo slug for GitHub API calls
    */
-  constructor({ limitUsd, githubToken, prNumber, repo } = {}) {
+  constructor({ limitUsd, provider, githubToken, prNumber, repo } = {}) {
     const envCap = Number(process.env.REVIEWER_COST_CAP_USD);
+    const providerDefault =
+      PROVIDER_DEFAULT_CAPS_USD.get(provider) ?? DEFAULT_CAP_USD;
     this.limitUsd =
       limitUsd ??
-      (Number.isFinite(envCap) && envCap > 0 ? envCap : DEFAULT_CAP_USD);
+      (Number.isFinite(envCap) && envCap > 0 ? envCap : providerDefault);
 
     this.githubToken = githubToken ?? process.env.GITHUB_TOKEN ?? '';
     this.prNumber = prNumber;
