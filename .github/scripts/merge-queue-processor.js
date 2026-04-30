@@ -447,6 +447,26 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
     try {
       console.log(`🚀 Merging PR #${pr.number}...`);
 
+      // TOCTOU guard: re-fetch the PR immediately before the merge API call.
+      // A push during the debounce or validation window can advance the HEAD SHA
+      // without invalidating the statuses we already checked (they live on the old
+      // SHA). If the SHA changed, the validated bot-review no longer covers the
+      // current code — abort and let the next trigger re-validate.
+      const freshPR = await github.rest.pulls.get({
+        owner,
+        repo,
+        pull_number: pr.number,
+      });
+      const currentSha = freshPR.data.head.sha;
+      if (currentSha !== pr.head.sha) {
+        console.log(
+          `⚠️ PR #${pr.number}: head SHA changed since validation ` +
+            `(${pr.head.sha} → ${currentSha}). ` +
+            `Skipping merge — will re-evaluate on next trigger.`,
+        );
+        return;
+      }
+
       // Sanitize commit message: remove null bytes and control characters that cause HTTP 500.
       const sanitize = (s) =>
         (s || '')
@@ -487,6 +507,24 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
 
       await findOrCreateComment(pr, successComment);
     } catch (error) {
+      // 422 with a head-SHA mismatch message means the branch advanced between
+      // our pre-merge check and the merge API call (residual race window). This
+      // is not a system error; treat it as a re-queue signal so the next trigger
+      // re-validates the current HEAD. Other 422 causes (invalid params, etc.)
+      // are real errors and should propagate.
+      if (
+        error.status === 422 &&
+        (error.response?.data?.message ?? '').includes(
+          'Head branch was modified',
+        )
+      ) {
+        console.log(
+          `⚠️ PR #${pr.number}: merge rejected with 422 (head branch modified) — ` +
+            `branch advanced during merge window. Will re-evaluate on next trigger.`,
+        );
+        return;
+      }
+
       console.error(`❌ Failed to merge PR #${pr.number}: ${error.message}`);
 
       if (
