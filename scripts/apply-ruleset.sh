@@ -33,16 +33,23 @@ if [[ -z "${REPO:-}" ]]; then
 fi
 
 RULESET_FILE="${RULESET_FILE:-.github/ruleset.json}"
-RULESET_NAME="main-branch-protection"
+RULESET_NAME="Protect Main"
 
 if [[ ! -f "$RULESET_FILE" ]]; then
   echo "ERROR: Ruleset file not found: $RULESET_FILE" >&2
   exit 1
 fi
 
-# Strip UTF-8 BOM (if present) before piping to jq, then remove _comment keys,
-# $schema (not accepted by API), and null integration_id entries.
-payload=$(sed '1s/^\xEF\xBB\xBF//' "$RULESET_FILE" | jq 'del(."$schema") | walk(if type == "object" then del(._comment) | (if .integration_id == null then del(.integration_id) else . end) else . end)')
+# Strip UTF-8 BOM (if present) before piping to jq, then:
+# - Remove _comment keys and $schema (not accepted by API)
+# - Strip null integration_id entries
+# - Filter out rules marked _staged:true — these contain checks not yet active in CI
+#   and must not be applied prematurely.
+payload=$(sed '1s/^\xEF\xBB\xBF//' "$RULESET_FILE" | jq '
+  .rules |= map(select(._staged != true))
+  | del(."$schema")
+  | walk(if type == "object" then del(._comment) | del(._staged) | (if .integration_id == null then del(.integration_id) else . end) else . end)
+')
 
 echo "==> Looking for existing ruleset named '$RULESET_NAME'..."
 existing_id=$(gh api "repos/$REPO/rulesets" --jq ".[] | select(.name == \"$RULESET_NAME\") | .id" || true)
@@ -51,7 +58,7 @@ if [[ "${DRYRUN:-}" == "1" ]]; then
   echo "==> DRY RUN — payload that would be sent:"
   echo "$payload" | jq .
   if [[ -n "$existing_id" ]]; then
-    echo "==> Would UPDATE existing ruleset (id: $existing_id)"
+    echo "==> Would UPDATE existing ruleset (id: $existing_id) — staged rules from live state would be preserved"
   else
     echo "==> Would CREATE new ruleset"
   fi
@@ -59,8 +66,26 @@ if [[ "${DRYRUN:-}" == "1" ]]; then
 fi
 
 if [[ -n "$existing_id" ]]; then
+  echo "==> Fetching live state of ruleset (id: $existing_id)..."
+  live=$(gh api "repos/$REPO/rulesets/$existing_id")
+
+  # Determine which rule types are _staged in the config (before filtering).
+  # Fall back to '[]' so --argjson never receives an empty string.
+  staged_types=$(sed '1s/^\xEF\xBB\xBF//' "$RULESET_FILE" | jq -c '[.rules[] | select(._staged == true) | .type]' 2>/dev/null || echo '[]')
+
+  # Merge: use config metadata + config (non-staged) rules, then append any live
+  # rules whose type was staged in the config (so they are preserved, not deleted).
+  # Use any(. == $t) for membership — avoids type errors if staged_types is empty.
+  merged=$(echo "$payload" | jq \
+    --argjson live "$live" \
+    --argjson staged_types "$staged_types" '
+    . as $config |
+    ($live.rules | map(select(.type as $t | ($staged_types | map(. == $t) | any)))) as $live_staged |
+    $config | .rules = ($config.rules + $live_staged)
+  ')
+
   echo "==> Updating existing ruleset (id: $existing_id)..."
-  echo "$payload" | gh api "repos/$REPO/rulesets/$existing_id" \
+  echo "$merged" | gh api "repos/$REPO/rulesets/$existing_id" \
     --method PUT \
     --input - \
     --silent

@@ -1,12 +1,12 @@
 {
   "$schema": "https://json.schemastore.org/github-ruleset.json",
-  "_comment": "Branch protection ruleset for the main branch. Applied via scripts/apply-ruleset.sh. STAGED DEPLOYMENT: this file is the target state but is NOT applied until its prerequisites land (see T17/T18 in LS-3857 epic).",
-  "name": "main-branch-protection",
+  "_comment": "Branch protection ruleset for the main branch. Applied via scripts/apply-ruleset.sh. Rules marked _staged:true represent target-state checks not yet ready to be managed from this checked-in config; apply-ruleset.sh and check-ruleset.yml filter them out of config-driven apply/drift checks for now, and any currently live rules of those staged types may be retained until the staged config is promoted.",
+  "name": "Protect Main",
   "target": "branch",
   "enforcement": "active",
   "conditions": {
     "ref_name": {
-      "include": ["refs/heads/main"],
+      "include": ["~DEFAULT_BRANCH"],
       "exclude": []
     }
   },
@@ -20,14 +20,16 @@
       "type": "deletion"
     },
     {
-      "_comment": "Require a pull request before merging into main. STAGED: require_code_owner_review=true is the target state once CODEOWNERS has a catch-all reviewer entry (pending T3 service-account provisioning). Until that lands, the bot's approval satisfies required_approving_review_count=1 independently of CODEOWNERS. Apply this ruleset only after CODEOWNERS is complete.",
+      "_comment": "Require a pull request before merging into main. required_approving_review_count:0 is intentional — the merge gate is the bot-review required status check (commit status set by the Code Reviewer Bot), not GitHub's formal approving-review count. require_code_owner_review:false is intentional — no CODEOWNERS file exists, so enabling this would have no effect and could create stuck PRs. dismiss_stale_reviews_on_push:true ensures the bot's APPROVE is dismissed on every new push, forcing re-review of each HEAD SHA (LS-3977).",
       "type": "pull_request",
       "parameters": {
-        "required_approving_review_count": 1,
+        "required_approving_review_count": 0,
         "dismiss_stale_reviews_on_push": true,
-        "require_code_owner_review": true,
+        "require_code_owner_review": false,
+        "required_reviewers": [],
         "require_last_push_approval": false,
-        "required_review_thread_resolution": false
+        "required_review_thread_resolution": false,
+        "allowed_merge_methods": ["squash"]
       }
     },
     {
@@ -78,7 +80,7 @@
       "_comment": "Allow repository admins to bypass in emergencies (e.g., hotfixes).",
       "actor_id": 5,
       "actor_type": "RepositoryRole",
-      "bypass_mode": "always"
+      "bypass_mode": "pull_request"
     }
   ]
 }

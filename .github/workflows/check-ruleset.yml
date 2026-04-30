@@ -42,21 +42,27 @@ jobs:
           # the default token (read-only) for drift detection when it is not set.
           GH_TOKEN: ${{ secrets.RULESET_ADMIN_TOKEN || github.token }}
           REPO: ${{ github.repository }}
-          RULESET_NAME: main-branch-protection
+          RULESET_NAME: Protect Main
         run: |
           echo "==> Fetching rulesets for $REPO..."
-          live_json=$(gh api "repos/$REPO/rulesets" --jq ".[] | select(.name == \"$RULESET_NAME\")")
+          # The list endpoint omits the rules array; extract the ID here and call the
+          # individual endpoint below to get the full ruleset including rules.
+          ruleset_id=$(gh api "repos/$REPO/rulesets" --jq ".[] | select(.name == \"$RULESET_NAME\") | .id")
 
-          if [[ -z "$live_json" ]]; then
+          if [[ -z "$ruleset_id" ]]; then
             echo "::warning::Ruleset '$RULESET_NAME' not found on GitHub. Run scripts/apply-ruleset.sh to create it."
             echo "drift=missing" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          # Normalize: keep only the fields we track (drop id, node_id, created_at, etc.)
-          echo "$live_json" | jq '{
-            name, target, enforcement, conditions, rules,
-            bypass_actors: [.bypass_actors[]? | {actor_id, actor_type, bypass_mode}]
+          echo "==> Found ruleset '$RULESET_NAME' (id: $ruleset_id), fetching full details..."
+          # Normalize: keep only the fields we track (drop id, node_id, created_at, etc.).
+          # bypass_actors is intentionally excluded: the API returns an empty array when the
+          # caller lacks admin scope (github.token in PR context), producing false-positive
+          # drift. bypass_actors require RULESET_ADMIN_TOKEN to read reliably; they are
+          # managed by apply-ruleset.sh and not tracked here.
+          gh api "repos/$REPO/rulesets/$ruleset_id" | jq '{
+            name, target, enforcement, conditions, rules
           }' > /tmp/live-ruleset.json
 
           echo "drift=fetched" >> "$GITHUB_OUTPUT"
@@ -66,23 +72,50 @@ jobs:
         env:
           RULESET_FILE: .github/ruleset.json
         run: |
-          # Strip metadata keys (_comment, _staged) and null integration_id from the local config for comparison
-          jq 'walk(if type == "object" then del(._comment) | del(._staged) else . end)
+          # Collect rule types that are _staged:true in the local config.
+          # These rules are not yet active in CI and must be excluded from both
+          # sides of the comparison to prevent false-positive drift alerts.
+          # Fall back to '[]' so the later --arg staged_str + fromjson path never sees an empty string.
+          staged_types=$(jq -c '[.rules[] | select(._staged == true) | .type]' "$RULESET_FILE" 2>/dev/null || echo '[]')
+
+          # Normalise local config: strip staged rules, metadata keys, and integration_id
+          # (GitHub adds integration_id to required_status_checks entries; we drop it so the
+          # comparison is stable regardless of whether the entry has an app integration or not).
+          # Use a single .rules |= (...) to avoid chained-|= precedence ambiguity.
+          jq '
+            .rules |= map(select(._staged != true))
+            | walk(if type == "object" then del(._comment) | del(._staged) else . end)
             | del(."$schema")
-            | .rules |= map(
-                if .type == "required_status_checks"
-                then .parameters.required_status_checks |= map(del(.integration_id))
-                else .
-                end
+            | del(.bypass_actors)
+            | .rules |= (
+                map(
+                  if .type == "required_status_checks"
+                  then .parameters.required_status_checks |= map(del(.integration_id))
+                  else .
+                  end
+                )
+                | sort_by(.type)
               )' "$RULESET_FILE" > /tmp/local-ruleset.json
 
-          # Normalize the live ruleset the same way
-          jq '.rules |= map(
-                if .type == "required_status_checks"
-                then .parameters.required_status_checks |= map(del(.integration_id))
-                else .
-                end
-              )' /tmp/live-ruleset.json > /tmp/live-ruleset-normalized.json
+          # Normalise live ruleset the same way: strip staged rule types and integration_id.
+          # Use --arg (string) + fromjson // [] so a null-producing jq expression never
+          # causes --argjson to inject JSON null — which would make ($staged | map(…)) fail
+          # with "Cannot iterate over null".
+          # Use a single .rules |= (...) to avoid chained-|= precedence ambiguity.
+          # sort_by(.type) makes comparison order-independent (GitHub may return rules in
+          # a different order than the config defines them).
+          jq --arg staged_str "$staged_types" '
+            (($staged_str | fromjson) // []) as $staged |
+            .rules |= (
+              map(select(.type as $t | ($staged | map(. == $t) | any) | not))
+              | map(
+                  if .type == "required_status_checks"
+                  then .parameters.required_status_checks |= map(del(.integration_id))
+                  else .
+                  end
+                )
+              | sort_by(.type)
+            )' /tmp/live-ruleset.json > /tmp/live-ruleset-normalized.json
 
           if diff <(jq -S . /tmp/local-ruleset.json) <(jq -S . /tmp/live-ruleset-normalized.json) > /tmp/ruleset-diff.txt 2>&1; then
             echo "==> Ruleset is in sync."
