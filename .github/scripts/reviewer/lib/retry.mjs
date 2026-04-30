@@ -28,7 +28,11 @@ export async function withRetry(fn, delays = [30_000, 90_000, 270_000]) {
         throw err;
       }
       if (attempt < delays.length) {
-        const wait = delays[attempt];
+        const retryAfterMs =
+          err && typeof err.retryAfterSeconds === 'number'
+            ? Math.ceil(err.retryAfterSeconds * 1000)
+            : 0;
+        const wait = Math.max(delays[attempt], retryAfterMs);
         process.stderr.write(
           `[reviewer] LLM attempt ${attempt + 1} failed (${err instanceof Error ? err.message : String(err)}), retrying in ${wait / 1000}s\n`,
         );

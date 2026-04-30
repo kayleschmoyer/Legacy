@@ -77,6 +77,60 @@ describe('withRetry', () => {
     assert.strictEqual(calls, 1, 'fail-fast: only one attempt');
   });
 
+  it('uses retryAfterSeconds as a lower bound when greater than the fixed delay', async () => {
+    const waits = [];
+    const realSetTimeout = global.setTimeout;
+    global.setTimeout = (fn, ms) => {
+      waits.push(ms);
+      return realSetTimeout(fn, 0);
+    };
+    try {
+      let calls = 0;
+      await assert.rejects(
+        () =>
+          withRetry(async () => {
+            calls++;
+            const err = new Error('rate-limited');
+            err.retryable = true;
+            err.retryAfterSeconds = 45; // > default 30s first delay
+            throw err;
+          }, [30_000, 90_000]),
+        { message: 'rate-limited' },
+      );
+      assert.strictEqual(calls, 3);
+      // First wait should be ceil(45 * 1000) = 45000, not 30000
+      assert.strictEqual(waits[0], 45_000);
+      // Second wait: max(90000, 45000) = 90000
+      assert.strictEqual(waits[1], 90_000);
+    } finally {
+      global.setTimeout = realSetTimeout;
+    }
+  });
+
+  it('uses the fixed delay when retryAfterSeconds is smaller', async () => {
+    const waits = [];
+    const realSetTimeout = global.setTimeout;
+    global.setTimeout = (fn, ms) => {
+      waits.push(ms);
+      return realSetTimeout(fn, 0);
+    };
+    try {
+      await assert.rejects(
+        () =>
+          withRetry(async () => {
+            const err = new Error('rate-limited');
+            err.retryable = true;
+            err.retryAfterSeconds = 5; // < default 30s first delay
+            throw err;
+          }, [30_000]),
+        { message: 'rate-limited' },
+      );
+      assert.strictEqual(waits[0], 30_000);
+    } finally {
+      global.setTimeout = realSetTimeout;
+    }
+  });
+
   it('still retries when retryable is undefined or true', async () => {
     let calls = 0;
     await assert.rejects(
