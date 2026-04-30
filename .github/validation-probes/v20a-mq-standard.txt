@@ -1,0 +1,8 @@
+V20 validation probe — standard merge queue path (LS-3922)
+Branch A: test/ci-validation/v20a-mq-standard
+
+This file validates that the label-based merge queue picks up a
+PR that has passed bot review and CI, and merges it to main.
+
+Also used as the "first merge" in the concurrent-merge race test.
+Written by PR A. The shared probe below creates a conflict with PR B.
