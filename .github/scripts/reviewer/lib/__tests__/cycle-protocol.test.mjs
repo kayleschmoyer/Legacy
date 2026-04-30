@@ -9,7 +9,9 @@ import {
   buildCycleRoleSection,
   buildAuthorResponsesSection,
   hasCannotComplyResponse,
+  getMalformedInlineReplies,
 } from '../cycle-protocol.mjs';
+import { FORMAT_ERROR_MESSAGE } from '../parse-author-response.mjs';
 
 // ---------------------------------------------------------------------------
 // getCycleRole
@@ -1177,5 +1179,347 @@ describe('hasCannotComplyResponse — mixed batch', () => {
       ),
       false,
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getMalformedInlineReplies
+// ---------------------------------------------------------------------------
+
+describe('getMalformedInlineReplies — returns empty when no MALFORMED replies', () => {
+  it('returns empty array when there are no review comments', () => {
+    const result = getMalformedInlineReplies([], REVIEW_AT, BOT_LOGINS);
+    assert.deepStrictEqual(result, []);
+  });
+
+  it('returns empty array when all replies are valid (FIX/JUSTIFY)', () => {
+    const reviewComments = [
+      {
+        id: 10,
+        inReplyToId: null,
+        userLogin: 'github-actions[bot]',
+        body: BOT_INLINE_BODY,
+        createdAt: REVIEW_AT,
+      },
+      {
+        id: 11,
+        inReplyToId: 10,
+        userLogin: 'author',
+        body: 'FIX: abc1234',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    const result = getMalformedInlineReplies(
+      reviewComments,
+      REVIEW_AT,
+      BOT_LOGINS,
+    );
+    assert.deepStrictEqual(result, []);
+  });
+
+  it('returns empty array when MALFORMED reply is at or before the last review timestamp', () => {
+    const reviewComments = [
+      {
+        id: 10,
+        inReplyToId: null,
+        userLogin: 'github-actions[bot]',
+        body: BOT_INLINE_BODY,
+        createdAt: REVIEW_AT,
+      },
+      {
+        id: 11,
+        inReplyToId: 10,
+        userLogin: 'author',
+        body: 'I will fix this',
+        createdAt: BEFORE_REVIEW,
+      },
+    ];
+    const result = getMalformedInlineReplies(
+      reviewComments,
+      REVIEW_AT,
+      BOT_LOGINS,
+    );
+    assert.deepStrictEqual(result, []);
+  });
+
+  it('returns empty array when MALFORMED reply is from a bot login', () => {
+    const reviewComments = [
+      {
+        id: 10,
+        inReplyToId: null,
+        userLogin: 'github-actions[bot]',
+        body: BOT_INLINE_BODY,
+        createdAt: REVIEW_AT,
+      },
+      {
+        id: 11,
+        inReplyToId: 10,
+        userLogin: 'copilot-reviewer[bot]',
+        body: 'Some unrecognised bot message',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    const result = getMalformedInlineReplies(
+      reviewComments,
+      REVIEW_AT,
+      BOT_LOGINS,
+    );
+    assert.deepStrictEqual(result, []);
+  });
+
+  it('returns empty array when reply targets a non-bot root comment', () => {
+    const reviewComments = [
+      {
+        id: 10,
+        inReplyToId: null,
+        userLogin: 'human-reviewer',
+        body: 'Please check this.',
+        createdAt: REVIEW_AT,
+      },
+      {
+        id: 11,
+        inReplyToId: 10,
+        userLogin: 'author',
+        body: 'Some random text',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    const result = getMalformedInlineReplies(
+      reviewComments,
+      REVIEW_AT,
+      BOT_LOGINS,
+    );
+    assert.deepStrictEqual(result, []);
+  });
+});
+
+describe('getMalformedInlineReplies — detects MALFORMED replies', () => {
+  it('returns the root comment ID when an author posts a MALFORMED reply', () => {
+    const reviewComments = [
+      {
+        id: 10,
+        inReplyToId: null,
+        userLogin: 'github-actions[bot]',
+        body: BOT_INLINE_BODY,
+        createdAt: REVIEW_AT,
+      },
+      {
+        id: 11,
+        inReplyToId: 10,
+        userLogin: 'author',
+        body: "I'll fix this",
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    const result = getMalformedInlineReplies(
+      reviewComments,
+      REVIEW_AT,
+      BOT_LOGINS,
+    );
+    assert.deepStrictEqual(result, [10]);
+  });
+
+  it('deduplicates: two MALFORMED replies in the same thread yield one root ID', () => {
+    const reviewComments = [
+      {
+        id: 10,
+        inReplyToId: null,
+        userLogin: 'github-actions[bot]',
+        body: BOT_INLINE_BODY,
+        createdAt: REVIEW_AT,
+      },
+      {
+        id: 11,
+        inReplyToId: 10,
+        userLogin: 'author',
+        body: 'Looks fine to me',
+        createdAt: AFTER_REVIEW,
+      },
+      {
+        id: 12,
+        inReplyToId: 10,
+        userLogin: 'author',
+        body: 'Another bad reply',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    const result = getMalformedInlineReplies(
+      reviewComments,
+      REVIEW_AT,
+      BOT_LOGINS,
+    );
+    assert.deepStrictEqual(result, [10]);
+  });
+
+  it('returns separate root IDs for MALFORMED replies across different threads', () => {
+    const reviewComments = [
+      {
+        id: 10,
+        inReplyToId: null,
+        userLogin: 'github-actions[bot]',
+        body: BOT_INLINE_BODY,
+        createdAt: REVIEW_AT,
+      },
+      {
+        id: 20,
+        inReplyToId: null,
+        userLogin: 'github-actions[bot]',
+        body: BOT_INLINE_BODY,
+        createdAt: REVIEW_AT,
+      },
+      {
+        id: 11,
+        inReplyToId: 10,
+        userLogin: 'author',
+        body: 'will look at this',
+        createdAt: AFTER_REVIEW,
+      },
+      {
+        id: 21,
+        inReplyToId: 20,
+        userLogin: 'author',
+        body: 'nah this is fine',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    const result = getMalformedInlineReplies(
+      reviewComments,
+      REVIEW_AT,
+      BOT_LOGINS,
+    );
+    assert.strictEqual(result.length, 2);
+    assert.ok(result.includes(10));
+    assert.ok(result.includes(20));
+  });
+
+  it('returns empty when the thread also has a valid author reply after the last review', () => {
+    const reviewComments = [
+      {
+        id: 10,
+        inReplyToId: null,
+        userLogin: 'github-actions[bot]',
+        body: BOT_INLINE_BODY,
+        createdAt: REVIEW_AT,
+      },
+      {
+        id: 11,
+        inReplyToId: 10,
+        userLogin: 'author',
+        body: 'oops wrong format',
+        createdAt: AFTER_REVIEW,
+      },
+      {
+        id: 12,
+        inReplyToId: 10,
+        userLogin: 'author',
+        body: 'FIX: abc1234',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    const result = getMalformedInlineReplies(
+      reviewComments,
+      REVIEW_AT,
+      BOT_LOGINS,
+    );
+    assert.deepStrictEqual(result, []);
+  });
+
+  it('returns empty when the bot already posted a format-error reply in the thread', () => {
+    const reviewComments = [
+      {
+        id: 10,
+        inReplyToId: null,
+        userLogin: 'github-actions[bot]',
+        body: BOT_INLINE_BODY,
+        createdAt: REVIEW_AT,
+      },
+      {
+        id: 11,
+        inReplyToId: 10,
+        userLogin: 'author',
+        body: "I'll look at this later",
+        createdAt: AFTER_REVIEW,
+      },
+      // Bot already warned the thread — suppress duplicate post
+      {
+        id: 12,
+        inReplyToId: 10,
+        userLogin: 'github-actions[bot]',
+        body: FORMAT_ERROR_MESSAGE,
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    const result = getMalformedInlineReplies(
+      reviewComments,
+      REVIEW_AT,
+      BOT_LOGINS,
+    );
+    assert.deepStrictEqual(result, []);
+  });
+
+  it('returns empty when format-error was posted by an identity not in botLogins (body-content detection)', () => {
+    // Simulates the production case: postReviewThreadReply uses GH_TOKEN →
+    // replies appear as 'github-actions[bot]' which is NOT in REVIEWER_BOT_LOGINS.
+    const NON_BOT_ACTOR = 'workflow-runner[bot]';
+    const reviewComments = [
+      {
+        id: 10,
+        inReplyToId: null,
+        userLogin: 'github-actions[bot]',
+        body: BOT_INLINE_BODY,
+        createdAt: REVIEW_AT,
+      },
+      {
+        id: 11,
+        inReplyToId: 10,
+        userLogin: 'author',
+        body: 'no idea what to do here',
+        createdAt: AFTER_REVIEW,
+      },
+      // FORMAT_ERROR_MESSAGE was posted by an identity outside botLogins
+      {
+        id: 12,
+        inReplyToId: 10,
+        userLogin: NON_BOT_ACTOR,
+        body: FORMAT_ERROR_MESSAGE,
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    const result = getMalformedInlineReplies(
+      reviewComments,
+      REVIEW_AT,
+      BOT_LOGINS,
+    );
+    assert.deepStrictEqual(result, []);
+  });
+
+  it('does not classify a FORMAT_ERROR_MESSAGE reply as MALFORMED', () => {
+    // Verifies that a format-error warning reply posted by a non-botLogins
+    // identity (e.g. github-actions[bot] when not in REVIEWER_BOT_LOGINS)
+    // is skipped rather than re-triggering another format-error post.
+    const NON_BOT_ACTOR = 'workflow-runner[bot]';
+    const reviewComments = [
+      {
+        id: 10,
+        inReplyToId: null,
+        userLogin: 'github-actions[bot]',
+        body: BOT_INLINE_BODY,
+        createdAt: REVIEW_AT,
+      },
+      // The only reply is the format-error warning itself — no author reply yet
+      {
+        id: 11,
+        inReplyToId: 10,
+        userLogin: NON_BOT_ACTOR,
+        body: FORMAT_ERROR_MESSAGE,
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    const result = getMalformedInlineReplies(
+      reviewComments,
+      REVIEW_AT,
+      BOT_LOGINS,
+    );
+    assert.deepStrictEqual(result, []);
   });
 });

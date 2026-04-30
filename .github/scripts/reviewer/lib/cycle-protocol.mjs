@@ -1,4 +1,7 @@
-import { parseAuthorReply } from './parse-author-response.mjs';
+import {
+  parseAuthorReply,
+  FORMAT_ERROR_MESSAGE,
+} from './parse-author-response.mjs';
 
 /**
  * Cycle protocol implementation — T22.
@@ -207,6 +210,69 @@ will be automatically stripped.`;
 
   // Cycle > 3 should trigger escalation before this function is called.
   return '';
+}
+
+/**
+ * Find inline review thread root comment IDs where the author posted a MALFORMED
+ * reply (no FIX: / JUSTIFY: / CANNOT-COMPLY: prefix) after the last bot review.
+ *
+ * Returns deduplicated root comment IDs — at most one format-error reply per
+ * thread even if the author posted multiple MALFORMED replies in the same thread.
+ *
+ * Only considers replies to bot-authored root comments so we never post into
+ * human-started threads.
+ *
+ * @param {Array<{ id: number, inReplyToId: number | null, userLogin: string | null, body: string, createdAt: string }>} reviewComments
+ * @param {string} lastBotReviewAt  ISO 8601 timestamp; replies at-or-before this are excluded
+ * @param {Set<string>} botLogins
+ * @returns {number[]}  Deduplicated list of root comment IDs that received a MALFORMED reply
+ */
+export function getMalformedInlineReplies(
+  reviewComments,
+  lastBotReviewAt,
+  botLogins,
+) {
+  const botRootIds = new Set(
+    reviewComments
+      .filter((c) => botLogins.has(c.userLogin) && c.inReplyToId === null)
+      .map((c) => c.id),
+  );
+
+  // Threads where the format-error warning was already posted since lastBotReviewAt.
+  // Detected by body content rather than author login because the reply may be
+  // posted via GH_TOKEN (github-actions[bot]) rather than the bot App identity.
+  const alreadyWarnedThreads = new Set(
+    reviewComments
+      .filter(
+        (c) =>
+          c.inReplyToId !== null &&
+          (!lastBotReviewAt || c.createdAt > lastBotReviewAt) &&
+          c.body === FORMAT_ERROR_MESSAGE,
+      )
+      .map((c) => c.inReplyToId),
+  );
+
+  const malformedThreads = new Set();
+  const validReplyThreads = new Set();
+
+  for (const c of reviewComments) {
+    if (botLogins.has(c.userLogin) || c.inReplyToId === null) continue;
+    if (lastBotReviewAt && c.createdAt <= lastBotReviewAt) continue;
+    if (!botRootIds.has(c.inReplyToId)) continue;
+    // Skip format-error warning replies posted by any identity (e.g. github-actions[bot])
+    // so they are never misclassified as author MALFORMED replies.
+    if (c.body === FORMAT_ERROR_MESSAGE) continue;
+    const { type } = parseAuthorReply(c.body);
+    if (type === 'MALFORMED') {
+      malformedThreads.add(c.inReplyToId);
+    } else {
+      validReplyThreads.add(c.inReplyToId);
+    }
+  }
+
+  return [...malformedThreads].filter(
+    (id) => !validReplyThreads.has(id) && !alreadyWarnedThreads.has(id),
+  );
 }
 
 /**

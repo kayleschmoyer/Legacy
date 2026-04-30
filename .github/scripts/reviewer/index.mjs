@@ -30,6 +30,7 @@ import {
   getPrReviewComments,
   getPrIssueComments,
   postEscalationComment,
+  postReviewThreadReply,
 } from './lib/review-thread-api.mjs';
 import {
   computeCycle,
@@ -44,7 +45,9 @@ import {
   filterFindingsCycle3,
   buildAuthorResponsesSection,
   hasCannotComplyResponse,
+  getMalformedInlineReplies,
 } from './lib/cycle-protocol.mjs';
+import { FORMAT_ERROR_MESSAGE } from './lib/parse-author-response.mjs';
 
 const NEEDS_HUMAN_ARBITRATION_LABEL = 'needs-human-arbitration';
 const NEEDS_HUMAN_SECURITY_REVIEW_LABEL = 'needs-human-security-review';
@@ -254,6 +257,25 @@ async function main() {
         process.stdout.write(
           `[reviewer] Cycle ${cycle}: no author responses found\n`,
         );
+      }
+
+      // Post FORMAT_ERROR_MESSAGE in-thread for each MALFORMED inline reply.
+      const malformedRootIds = getMalformedInlineReplies(
+        reviewComments,
+        lastBotReview.submittedAt,
+        REVIEWER_BOT_LOGINS,
+      );
+      for (const rootId of malformedRootIds) {
+        try {
+          postReviewThreadReply(rootId, FORMAT_ERROR_MESSAGE);
+          process.stdout.write(
+            `[reviewer] Cycle ${cycle}: posted format-error reply to thread ${rootId}\n`,
+          );
+        } catch (postErr) {
+          process.stderr.write(
+            `[reviewer] Failed to post format-error reply to thread ${rootId}: ${postErr instanceof Error ? postErr.message : String(postErr)}\n`,
+          );
+        }
       }
 
       // Cycle 3+: CANNOT-COMPLY short-circuit — escalate before calling the LLM.
