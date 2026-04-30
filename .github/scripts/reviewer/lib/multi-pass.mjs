@@ -79,9 +79,17 @@ const PASSES = [
  * @param {object} provider  LLMProvider instance
  * @param {string} system    Shared system prompt
  * @param {string} user      Base user prompt (PR context + diff)
+ * @param {object} [opts]
+ * @param {import('./cost-cap.mjs').CostCap} [opts.costCap]  Cost cap instance; throws CostCapExceededError if limit is hit
+ * @param {string} [opts.providerName]  Provider name passed to costCap.estimateCost (default: 'anthropic')
  * @returns {Promise<{passes: Array<{passName: string, text: string}>, usage: import('./providers/provider.mjs').ProviderUsage}>}
  */
-export async function runMultiPass(provider, system, user) {
+export async function runMultiPass(
+  provider,
+  system,
+  user,
+  { costCap, providerName = 'anthropic' } = {},
+) {
   const passes = [];
   const usage = {
     inputTokens: 0,
@@ -91,7 +99,18 @@ export async function runMultiPass(provider, system, user) {
   };
   for (const pass of PASSES) {
     const focusedUser = `${user}\n\n---\n\n**Review focus for this pass**: ${pass.focus}`;
+    if (costCap) {
+      const estimate = costCap.estimateCost(
+        system.length + focusedUser.length,
+        providerName,
+      );
+      costCap.checkBefore(estimate);
+    }
     const result = await provider.review({ system, user: focusedUser });
+    if (costCap) {
+      costCap.add(result.usage);
+      costCap.checkAfter();
+    }
     passes.push({ passName: pass.name, text: result.text });
     if (result.usage) {
       usage.inputTokens += result.usage.inputTokens ?? 0;

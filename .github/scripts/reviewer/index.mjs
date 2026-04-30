@@ -24,6 +24,7 @@ import {
 } from './lib/post-review.mjs';
 import { buildRecord, emitTelemetry } from './lib/telemetry.mjs';
 import { withRetry } from './lib/retry.mjs';
+import { CostCap } from './lib/cost-cap.mjs';
 import {
   getPrReviews,
   getPrCommits,
@@ -372,6 +373,7 @@ async function main() {
     return;
   }
   const trivial = isTrivialPR(diff);
+  const costCap = new CostCap({ prNumber });
   let reviewText;
   let reviewUsage = {
     inputTokens: 0,
@@ -387,12 +389,19 @@ async function main() {
     );
     try {
       const t0 = Date.now();
-      const result = await withRetry(() =>
-        provider.review({ system: systemPrompt, user: userPrompt }),
-      );
+      const result = await withRetry(() => {
+        const estimate = costCap.estimateCost(
+          systemPrompt.length + userPrompt.length,
+          providerName,
+        );
+        costCap.checkBefore(estimate);
+        return provider.review({ system: systemPrompt, user: userPrompt });
+      });
       latencyMs = Date.now() - t0;
       reviewText = result.text;
       reviewUsage = result.usage ?? reviewUsage;
+      costCap.add(result.usage);
+      costCap.checkAfter();
     } catch (err) {
       process.stderr.write(
         `[reviewer] Provider error after all retries: ${err instanceof Error ? err.message : String(err)}\n`,
@@ -407,7 +416,10 @@ async function main() {
     try {
       const t0 = Date.now();
       const { passes, usage: multiPassUsage } = await withRetry(() =>
-        runMultiPass(provider, systemPrompt, userPrompt),
+        runMultiPass(provider, systemPrompt, userPrompt, {
+          costCap,
+          providerName,
+        }),
       );
       latencyMs = Date.now() - t0;
       reviewText = consolidate(passes);

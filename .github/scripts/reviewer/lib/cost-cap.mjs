@@ -1,8 +1,3 @@
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
-
-const execFileAsync = promisify(execFile);
-
 const DEFAULT_CAP_USD = 5;
 
 // Per-provider pricing (approximate, used for pre-call estimation only).
@@ -29,6 +24,7 @@ export class CostCapExceededError extends Error {
       `PR review budget exceeded: $${cumulative.toFixed(4)} cumulative cost exceeds $${cap.toFixed(2)} cap`,
     );
     this.name = 'CostCapExceededError';
+    this.retryable = false;
     this.cumulative = cumulative;
     this.cap = cap;
   }
@@ -136,47 +132,6 @@ export class CostCap {
     if (this._costUsd > this.limitUsd) {
       throw new CostCapExceededError(this._costUsd, this.limitUsd);
     }
-  }
-
-  /**
-   * Post a cap-exceeded comment on the PR and apply the needs-human-review label.
-   * Best-effort: errors are swallowed so the main flow can exit cleanly.
-   *
-   * @returns {Promise<void>}
-   */
-  async handleExceeded() {
-    if (!this.prNumber || !this.repo || !this.githubToken) return;
-
-    const ghEnv = { ...process.env, GH_TOKEN: this.githubToken };
-
-    await Promise.allSettled([
-      execFileAsync(
-        'gh',
-        [
-          'pr',
-          'comment',
-          String(this.prNumber),
-          '--body',
-          'PR exceeds automated review budget. Manual review required.',
-          '--repo',
-          this.repo,
-        ],
-        { env: ghEnv },
-      ),
-      execFileAsync(
-        'gh',
-        [
-          'pr',
-          'edit',
-          String(this.prNumber),
-          '--add-label',
-          'needs-human-review',
-          '--repo',
-          this.repo,
-        ],
-        { env: ghEnv },
-      ),
-    ]);
   }
 
   /** Current cumulative totals. */
