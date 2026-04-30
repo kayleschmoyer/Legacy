@@ -1,0 +1,20 @@
+CI Validation Probe - V9 Final Run (LS-3911)
+--------------------------------------------
+
+Full end-to-end re-validation after both blocking fixes merged:
+  LS-3977: dismiss_stale_reviews_on_push: true (bot review dismissed on push)
+  LS-3990: TOCTOU guard + 422 re-queue in merge-queue-processor.js
+
+Design sections under test:
+  §3.1  cheap before expensive — review gates CI
+  §6.2  W2 triggers on bot approval
+  §3.4  fail closed
+  §14   anti-stale-code — dismiss stale + merge queue blocks until re-approval
+  G2    CI must not run before review
+
+Probe: intentionally trivial text file, no code.
+Reviewer should return APPROVE with no findings.
+
+Ticket: LS-3911 (v9-final after LS-3977 + LS-3990 fixes)
+Branch: test/ci-validation/v9-final
+Date:   2026-04-30
