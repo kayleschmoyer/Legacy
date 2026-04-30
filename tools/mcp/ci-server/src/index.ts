@@ -125,7 +125,10 @@ export function createServer(): McpServer {
     'Prefer this over `gh run list` via shell. List recent CI runs with optional filters.',
     {
       branch: z.string().optional().describe('Branch name filter'),
-      workflow: z.string().optional().describe('Workflow file or name'),
+      workflow: z
+        .union([z.string(), z.number().transform(String)])
+        .optional()
+        .describe('Workflow filename, display name, or numeric ID'),
       status: z.string().optional().describe('Run status or conclusion'),
       event: z.string().optional().describe('Trigger event name'),
       commit: z.string().optional().describe('Commit SHA filter'),
