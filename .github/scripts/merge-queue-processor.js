@@ -95,7 +95,8 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
       `⏰ Pending checks detected — scheduling self-retry to re-evaluate after CI settles...`,
     );
     try {
-      // Use GITHUB_TOKEN (not the App token) — `actions: write` only covers GITHUB_TOKEN.
+      // Use the App token (octokit default) — GITHUB_TOKEN cannot trigger workflow_dispatch
+      // by design (GitHub blocks it to prevent infinite loops). The App needs Actions: write.
       await github.request(
         'POST /repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches',
         {
@@ -107,9 +108,6 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
             is_retry: 'true',
             dry_run: isDryRun ? 'true' : 'false',
             force_check: forceCheck ? 'true' : 'false',
-          },
-          headers: {
-            authorization: `token ${process.env.GITHUB_TOKEN}`,
           },
         },
       );
