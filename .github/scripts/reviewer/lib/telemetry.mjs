@@ -37,6 +37,7 @@ import { spawn } from 'node:child_process';
  * @property {'bot'|'human'} author_type     - Derived author type for observability
  * @property {number}    format_errors       - Count of MALFORMED author reply tokens detected
  * @property {CycleCounterExclusions} cycle_counter_exclusions - Breakdown of reviews excluded from the cycle count
+ * @property {boolean}   [cost_cap_exceeded] - True when the run aborted due to the per-PR cost cap
  */
 
 /**
@@ -86,6 +87,7 @@ export async function emitTelemetry(record) {
  * @param {'bot'|'human'} [params.authorType]
  * @param {number}    [params.formatErrors]
  * @param {CycleCounterExclusions} [params.cycleCounterExclusions]
+ * @param {boolean}   [params.costCapExceeded]
  * @returns {TelemetryRecord}
  */
 export function buildRecord({
@@ -108,6 +110,7 @@ export function buildRecord({
     dismissed: 0,
     admin_reset: false,
   },
+  costCapExceeded = false,
 }) {
   return {
     ts: new Date().toISOString(),
@@ -129,6 +132,7 @@ export function buildRecord({
     author_type: authorType,
     format_errors: formatErrors,
     cycle_counter_exclusions: cycleCounterExclusions,
+    cost_cap_exceeded: Boolean(costCapExceeded),
   };
 }
 

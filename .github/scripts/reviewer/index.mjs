@@ -52,6 +52,7 @@ import { FORMAT_ERROR_MESSAGE } from './lib/parse-author-response.mjs';
 
 const NEEDS_HUMAN_ARBITRATION_LABEL = 'needs-human-arbitration';
 const NEEDS_HUMAN_SECURITY_REVIEW_LABEL = 'needs-human-security-review';
+const NEEDS_HUMAN_REVIEW_LABEL = 'needs-human-review';
 const CYCLE_RESET_LABEL = 'bot:reset-cycle-counter';
 
 async function main() {
@@ -406,7 +407,19 @@ async function main() {
       process.stderr.write(
         `[reviewer] Provider error after all retries: ${err instanceof Error ? err.message : String(err)}\n`,
       );
-      await handleLlmFailure(prNumber, err);
+      await handleLlmFailure(prNumber, err, {
+        provider: providerName,
+        cycle,
+        usage: reviewUsage,
+        latencyMs,
+        authorLogin,
+        authorType,
+        cycleCounterExclusions: {
+          infra_failure: cycleExcludedInfra,
+          dismissed: cycleExcludedDismissed,
+          admin_reset: cycleResetByAdmin,
+        },
+      });
       process.exit(1);
     }
   } else {
@@ -428,7 +441,19 @@ async function main() {
       process.stderr.write(
         `[reviewer] Multi-pass error after all retries: ${err instanceof Error ? err.message : String(err)}\n`,
       );
-      await handleLlmFailure(prNumber, err);
+      await handleLlmFailure(prNumber, err, {
+        provider: providerName,
+        cycle,
+        usage: reviewUsage,
+        latencyMs,
+        authorLogin,
+        authorType,
+        cycleCounterExclusions: {
+          infra_failure: cycleExcludedInfra,
+          dismissed: cycleExcludedDismissed,
+          admin_reset: cycleResetByAdmin,
+        },
+      });
       process.exit(1);
     }
   }
@@ -776,8 +801,9 @@ function statusDescriptionForFailure(kind) {
  *
  * @param {number} prNumber
  * @param {unknown} err
+ * @param {{ provider: string, cycle: number, usage: object, latencyMs: number, authorLogin: string, authorType: string, cycleCounterExclusions: object } | null} [ctx]
  */
-async function handleLlmFailure(prNumber, err) {
+async function handleLlmFailure(prNumber, err, ctx = null) {
   const sha = process.env.PR_HEAD_SHA ?? '';
   const kind = classifyProviderError(err);
 
@@ -817,16 +843,46 @@ async function handleLlmFailure(prNumber, err) {
     }
   }
 
-  // Always apply review-bot-degraded so the labeled trigger can self-heal on
-  // retry — covers transient rate-limit waits and longer-tail infra issues
-  // alike. Daily-quota and auth failures still get the label so a maintainer
-  // can manually retry by re-applying it after the underlying issue is fixed.
+  // Cost-cap abort requires human review (split the PR or raise the cap) —
+  // not a transient failure, so review-bot-degraded self-heal retry is wrong.
+  // All other failure kinds get review-bot-degraded so the labeled trigger
+  // can self-heal on retry.
+  const failureLabel =
+    kind === 'cost-cap' ? NEEDS_HUMAN_REVIEW_LABEL : 'review-bot-degraded';
   try {
-    await addLabelAsApp(prNumber, 'review-bot-degraded');
+    await addLabelAsApp(prNumber, failureLabel);
   } catch (labelErr) {
     process.stderr.write(
-      `[reviewer] Failed to apply review-bot-degraded label: ${labelErr instanceof Error ? labelErr.message : String(labelErr)}\n`,
+      `[reviewer] Failed to apply ${failureLabel} label: ${labelErr instanceof Error ? labelErr.message : String(labelErr)}\n`,
     );
+  }
+
+  // Emit telemetry for cost-cap aborts so AC5 of LS-3915 is satisfied.
+  if (kind === 'cost-cap' && ctx) {
+    try {
+      await emitTelemetry(
+        buildRecord({
+          pr: prNumber,
+          sha,
+          model: process.env.REVIEWER_MODEL ?? 'codex',
+          provider: ctx.provider,
+          cycle: ctx.cycle,
+          verdict: 'cost-cap-exceeded',
+          findings: [],
+          usage: ctx.usage,
+          latencyMs: ctx.latencyMs,
+          shadow: process.env.REVIEWER_SHADOW_MODE === 'true',
+          authorLogin: ctx.authorLogin,
+          authorType: ctx.authorType,
+          cycleCounterExclusions: ctx.cycleCounterExclusions,
+          costCapExceeded: true,
+        }),
+      );
+    } catch (telErr) {
+      process.stderr.write(
+        `[reviewer] Failed to emit cost-cap telemetry: ${telErr instanceof Error ? telErr.message : String(telErr)}\n`,
+      );
+    }
   }
 }
 
