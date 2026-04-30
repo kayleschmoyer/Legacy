@@ -6,19 +6,21 @@
 
 ## §1 Status Summary
 
-| Scenario                                                   | Ticket  | Date       | Result     | Notes                                                                                                                                                                                   |
-| ---------------------------------------------------------- | ------- | ---------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| V1 — Trivial happy path                                    | LS-3903 | 2026-04-28 | ✅ Pass    | 3 design gaps documented (see §2 Deviations)                                                                                                                                            |
-| V1 re-run v3 (LS-3938 + LS-3939 fixes)                    | LS-3940 | 2026-04-28 | 🟡 Partial | All ACs pass; 1 residual gap: conflict check still needs PAT workaround (see §3)                                                                                                        |
-| V1 re-run v4 (LS-3940 fix)                                 | —       | 2026-04-28 | ✅ Pass    | Fully automated — zero manual steps (see §4)                                                                                                                                            |
-| V4 — Cycle 2 mandate flow                                  | LS-3906 | 2026-04-28 | ✅ Pass    | JUSTIFY rejected (implicit), Cycle 2 mandated, Cycle 3 APPROVE; 1 design observation (see §12)                                                                                         |
-| V5 — Cycle cap escalation                                  | LS-3907 | 2026-04-28 | 🔴 Partial | AC3 fail: W4 label-pager never fires — GITHUB_TOKEN anti-loop blocks pull_request.labeled delivery (see §5)                                                                             |
-| V5 re-run (LS-3948 fix)                                    | LS-3907 | 2026-04-28 | 🔴 Blocked | `CODE_WRITER_BOT_LOGIN` mismatch: code-writer-bot.yml creates `github-actions[bot]` PRs; `isCodeWriterBotAuthor` requires `code-writer-bot[bot]` → cycle protocol unreachable (see §6) |
-| V5 re-run v9 (LS-3953/3960/3962/3964/3966 fixes)          | LS-3907 | 2026-04-29 | ✅ Pass    | All 5 ACs pass — cycle cap enforced, escalation fires, W4 triggered via App token (see §7)                                                                                              |
-| V3 — Cycle 1 → Cycle 2 JUSTIFY accepted                   | LS-3905 | 2026-04-28 | 🔴 Fail    | AC2 fails — JUSTIFY reply not surfaced to LLM; bot re-raises finding in Cycle 2 (see §8)                                                                                               |
-| V3 re-run (LS-3947 fix)                                    | LS-3905 | 2026-04-28 | 🔴 Fail    | §8a path taken — code-writer-bot.yml creates github-actions[bot] PRs; LS-3947 fix is unreachable (see §9)                                                                              |
-| V3 re-run (LS-3953 + LS-3960 + LS-3962 + LS-3964 fixes)  | LS-3905 | 2026-04-29 | 🔴 Fail    | AC1 ✅; AC2 ❌ — JUSTIFY injected but C2 ADJUDICATE is diff-based; unchanged code → re-raise (see §10)                                                                                  |
-| V3 re-run (LS-3965 + LS-3966 fixes)                       | LS-3905 | 2026-04-29 | ✅ Pass    | AC1 ✅ AC2 ✅ — C2 evaluated JUSTIFY and posted APPROVE "LGTM — no blocking findings" (see §11)                                                                                          |
+| Scenario                                                | Ticket  | Date       | Result     | Notes                                                                                                                                                                                  |
+| ------------------------------------------------------- | ------- | ---------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| V1 — Trivial happy path                                 | LS-3903 | 2026-04-28 | ✅ Pass    | 3 design gaps documented (see §2 Deviations)                                                                                                                                           |
+| V1 re-run v3 (LS-3938 + LS-3939 fixes)                  | LS-3940 | 2026-04-28 | 🟡 Partial | All ACs pass; 1 residual gap: conflict check still needs PAT workaround (see §3)                                                                                                       |
+| V1 re-run v4 (LS-3940 fix)                              | —       | 2026-04-28 | ✅ Pass    | Fully automated — zero manual steps (see §4)                                                                                                                                           |
+| V4 — Cycle 2 mandate flow                               | LS-3906 | 2026-04-28 | ✅ Pass    | JUSTIFY rejected (implicit), Cycle 2 mandated, Cycle 3 APPROVE; 1 design observation (see §12)                                                                                         |
+| V5 — Cycle cap escalation                               | LS-3907 | 2026-04-28 | 🔴 Partial | AC3 fail: W4 label-pager never fires — GITHUB_TOKEN anti-loop blocks pull_request.labeled delivery (see §5)                                                                            |
+| V5 re-run (LS-3948 fix)                                 | LS-3907 | 2026-04-28 | 🔴 Blocked | `CODE_WRITER_BOT_LOGIN` mismatch: code-writer-bot.yml creates `github-actions[bot]` PRs; `isCodeWriterBotAuthor` requires `code-writer-bot[bot]` → cycle protocol unreachable (see §6) |
+| V5 re-run v9 (LS-3953/3960/3962/3964/3966 fixes)        | LS-3907 | 2026-04-29 | ✅ Pass    | All 5 ACs pass — cycle cap enforced, escalation fires, W4 triggered via App token (see §7)                                                                                             |
+| V3 — Cycle 1 → Cycle 2 JUSTIFY accepted                 | LS-3905 | 2026-04-28 | 🔴 Fail    | AC2 fails — JUSTIFY reply not surfaced to LLM; bot re-raises finding in Cycle 2 (see §8)                                                                                               |
+| V3 re-run (LS-3947 fix)                                 | LS-3905 | 2026-04-28 | 🔴 Fail    | §8a path taken — code-writer-bot.yml creates github-actions[bot] PRs; LS-3947 fix is unreachable (see §9)                                                                              |
+| V3 re-run (LS-3953 + LS-3960 + LS-3962 + LS-3964 fixes) | LS-3905 | 2026-04-29 | 🔴 Fail    | AC1 ✅; AC2 ❌ — JUSTIFY injected but C2 ADJUDICATE is diff-based; unchanged code → re-raise (see §10)                                                                                 |
+| V3 re-run (LS-3965 + LS-3966 fixes)                     | LS-3905 | 2026-04-29 | ✅ Pass    | AC1 ✅ AC2 ✅ — C2 evaluated JUSTIFY and posted APPROVE "LGTM — no blocking findings" (see §11)                                                                                        |
+| V7 — Format-error & edge-case author responses          | LS-3909 | 2026-04-29 | 🔴 Fail    | AC1 ❌ AC4 ❌ AC5 ❌ — format-error reply never posted, CANNOT-COMPLY not escalated, no format-error telemetry (see §13)                                                               |
+| V7 re-run (LS-3968/3969/3970 fixes)                     | LS-3909 | 2026-04-30 | 🔴 Fail    | AC1 ❌ still (wrong endpoint in `postReviewThreadReply`); AC4 ✅ AC5 ✅ (LS-3969/3970 verified); LS-3987 filed (see §14)                                                               |
 
 ---
 
@@ -851,14 +853,14 @@ mandate; Cycle 3 must verify the fix and APPROVE.
 
 ### Acceptance Criteria
 
-| # | Criterion | Result | Evidence |
-|---|-----------|--------|----------|
-| AC1 | Cycle 1 raised the bug | ✅ Pass | W1 run [25065763634](https://github.com/bkrupa/legacy-sports/actions/runs/25065763634) posted `REQUEST_CHANGES` with 3 blocking HIGH findings (null-dereference in `getDisplayName`, `formatTeamMembership`, `canAdminRepo`) |
-| AC2 | Cycle 2 rejected the weak JUSTIFY and posted MANDATE on the thread | ✅ Pass | W1 run [25065829459](https://github.com/bkrupa/legacy-sports/actions/runs/25065829459) posted `REQUEST_CHANGES` re-raising all 3 findings; log: `Cycle 2: 0 commit(s) added since C1 review` confirming JUSTIFY was not a code fix |
-| AC3 | Cycle 3 verified the FIX and posted APPROVE | ✅ Pass | W1 run [25065911807](https://github.com/bkrupa/legacy-sports/actions/runs/25065911807) posted `APPROVED` with body `LGTM — no blocking findings.` |
-| AC4 | Cycle 3 did NOT raise any new findings (verification-only role enforced) | ✅ Pass | C3 log: `Gating: 0 blocking, 0 non-blocking, 0 trivia dropped`; `filterFindingsCycle3` stripped any findings not in C2 mandate list |
-| AC5 | No 4th cycle (PR approved at Cycle 3) | ✅ Pass | Exactly 3 bot reviews total; PR in `APPROVED` state after Cycle 3; `merge-when-ready` label applied |
-| AC6 | CI ran after Cycle 3 approval | ✅ Pass | CI Orchestrator run [25065951498](https://github.com/bkrupa/legacy-sports/actions/runs/25065951498) triggered by `pull_request_review` from bot; all pipeline jobs completed (`success`) |
+| #   | Criterion                                                                | Result  | Evidence                                                                                                                                                                                                                           |
+| --- | ------------------------------------------------------------------------ | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AC1 | Cycle 1 raised the bug                                                   | ✅ Pass | W1 run [25065763634](https://github.com/bkrupa/legacy-sports/actions/runs/25065763634) posted `REQUEST_CHANGES` with 3 blocking HIGH findings (null-dereference in `getDisplayName`, `formatTeamMembership`, `canAdminRepo`)       |
+| AC2 | Cycle 2 rejected the weak JUSTIFY and posted MANDATE on the thread       | ✅ Pass | W1 run [25065829459](https://github.com/bkrupa/legacy-sports/actions/runs/25065829459) posted `REQUEST_CHANGES` re-raising all 3 findings; log: `Cycle 2: 0 commit(s) added since C1 review` confirming JUSTIFY was not a code fix |
+| AC3 | Cycle 3 verified the FIX and posted APPROVE                              | ✅ Pass | W1 run [25065911807](https://github.com/bkrupa/legacy-sports/actions/runs/25065911807) posted `APPROVED` with body `LGTM — no blocking findings.`                                                                                  |
+| AC4 | Cycle 3 did NOT raise any new findings (verification-only role enforced) | ✅ Pass | C3 log: `Gating: 0 blocking, 0 non-blocking, 0 trivia dropped`; `filterFindingsCycle3` stripped any findings not in C2 mandate list                                                                                                |
+| AC5 | No 4th cycle (PR approved at Cycle 3)                                    | ✅ Pass | Exactly 3 bot reviews total; PR in `APPROVED` state after Cycle 3; `merge-when-ready` label applied                                                                                                                                |
+| AC6 | CI ran after Cycle 3 approval                                            | ✅ Pass | CI Orchestrator run [25065951498](https://github.com/bkrupa/legacy-sports/actions/runs/25065951498) triggered by `pull_request_review` from bot; all pipeline jobs completed (`success`)                                           |
 
 ### Observed Behavior
 
@@ -910,19 +912,239 @@ branch name is incompatible with that constraint).
 
 ### Evidence
 
-| Artifact | Link |
-|----------|------|
-| Test PR #3404 | https://github.com/bkrupa/legacy-sports/pull/3404 |
-| code-writer-bot run (PR creation) | https://github.com/bkrupa/legacy-sports/actions/runs/25065672154 |
-| W1 Cycle 1 reviewer run | https://github.com/bkrupa/legacy-sports/actions/runs/25065763634 |
-| W1 Cycle 2 reviewer run | https://github.com/bkrupa/legacy-sports/actions/runs/25065829459 |
-| W1 Cycle 3 reviewer run | https://github.com/bkrupa/legacy-sports/actions/runs/25065911807 |
-| CI Orchestrator run (post-C3 APPROVE) | https://github.com/bkrupa/legacy-sports/actions/runs/25065951498 |
-| Cycle 1 review body | 3 HIGH: `Null dereference risk in getDisplayName/formatTeamMembership/canAdminRepo` |
-| Cycle 2 review body | Same 3 HIGH findings re-raised (JUSTIFY not accepted — no code change) |
-| Cycle 3 review body | `LGTM — no blocking findings.` |
-| Fix commit | `e0b0f7582e0f6c853b972ea27fdf07d97d8a672e` (null checks added to all 3 functions) |
+| Artifact                              | Link                                                                                |
+| ------------------------------------- | ----------------------------------------------------------------------------------- |
+| Test PR #3404                         | https://github.com/bkrupa/legacy-sports/pull/3404                                   |
+| code-writer-bot run (PR creation)     | https://github.com/bkrupa/legacy-sports/actions/runs/25065672154                    |
+| W1 Cycle 1 reviewer run               | https://github.com/bkrupa/legacy-sports/actions/runs/25065763634                    |
+| W1 Cycle 2 reviewer run               | https://github.com/bkrupa/legacy-sports/actions/runs/25065829459                    |
+| W1 Cycle 3 reviewer run               | https://github.com/bkrupa/legacy-sports/actions/runs/25065911807                    |
+| CI Orchestrator run (post-C3 APPROVE) | https://github.com/bkrupa/legacy-sports/actions/runs/25065951498                    |
+| Cycle 1 review body                   | 3 HIGH: `Null dereference risk in getDisplayName/formatTeamMembership/canAdminRepo` |
+| Cycle 2 review body                   | Same 3 HIGH findings re-raised (JUSTIFY not accepted — no code change)              |
+| Cycle 3 review body                   | `LGTM — no blocking findings.`                                                      |
+| Fix commit                            | `e0b0f7582e0f6c853b972ea27fdf07d97d8a672e` (null checks added to all 3 functions)   |
 
 ### Issues Spawned
 
 None — all acceptance criteria passed.
+
+---
+
+## §13 V7 — Format-Error & Edge-Case Author Responses
+
+**Description:** Validate the structured-response parser handles all four error/edge conditions:
+Sub-case A (malformed reply), Sub-case B (FIX with invalid SHA), Sub-case C (silent skip), and
+Sub-case D (CANNOT-COMPLY escalation in Cycle 3).
+
+**Test PR:** https://github.com/bkrupa/legacy-sports/pull/3450
+**Branch:** `test/ci-validation/v7-format-errors`
+**Probe file:** `.github/validation-probes/v7-format-errors.js`
+**Date completed:** 2026-04-29
+**Executed by:** Claude (claude-sonnet-4-6), LS-3909 agent run
+
+### Acceptance Criteria
+
+| #   | Criterion                                                                    | Result  | Evidence                                                                                                                                                                                                                                                                                               |
+| --- | ---------------------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| AC1 | Sub-case A: format-error reply posted in-thread; finding mandated in Cycle 2 | ❌ Fail | No format-error reply posted. Author's "I'll fix this" (thread 3158567652) was silently skipped by `buildAuthorResponsesSection`; `FORMAT_ERROR_MESSAGE` is defined but never called. Finding was mandated in C2 (expected) but without the in-thread correction.                                      |
+| AC2 | Sub-case B: invalid SHA detected; finding mandated                           | ✅ Pass | `FIX: deadbee` injected into C2 user prompt. LLM re-raised the null-pointer finding (thread 3158567654) because the SHA doesn't match any PR commit and the code is unchanged. Finding mandated as expected. (SHA validation implicit via LLM, not explicit `isShaInPrHistory` call — see Deviations.) |
+| AC3 | Sub-case C: silent skip → mandated in Cycle 2                                | ✅ Pass | No reply to plaintext-password thread (3158567656). C2 re-raised as mandate. Log: `Cycle 2: 0 commit(s) added since C1 review`.                                                                                                                                                                        |
+| AC4 | Sub-case D: `needs-human-arbitration` applied; pager fires                   | ❌ Fail | `CANNOT-COMPLY` posted to path-traversal thread (3158573487) before C3. C3 run injected it into LLM prompt but `index.mjs` has no CANNOT-COMPLY detection logic. Bot posted REQUEST_CHANGES with 4 blocking findings. No `needs-human-arbitration` label applied. W4 never fired.                      |
+| AC5 | Bot's metrics record format-error events (`bot_review_format_errors`)        | ❌ Fail | `telemetry.mjs` `TelemetryRecord` typedef and `buildRecord()` have no format-error field. MALFORMED replies are silently dropped with no counter incremented. Code analysis confirmed; S3 access not available to verify directly.                                                                     |
+
+### Walkthrough Execution
+
+| Step | Action                                                                 | Observed                                                                                                                                                                    |
+| ---- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | Push probe file + mark PR ready                                        | C1 run 25090805867 fired on `ready_for_review`                                                                                                                              |
+| 2    | C1 fires                                                               | cycle=1, 4 blocking findings (SQL injection CRITICAL, null-pointer HIGH, plaintext password CRITICAL, path traversal CRITICAL), `REQUEST_CHANGES`, 4 inline threads         |
+| 3    | Reply to thread A: `I'll fix this` (malformed)                         | Reply posted (comment 3158569471); no format-error correction from bot                                                                                                      |
+| 4    | Reply to thread B: `FIX: deadbee` (invalid SHA)                        | Reply posted (comment 3158569659)                                                                                                                                           |
+| 5    | Skip threads C and D (no reply)                                        | No replies to threads 3158567656 (plaintext password) and 3158567659 (path traversal)                                                                                       |
+| 6    | Apply `bot:ready-for-review` → C2                                      | C2 run 25090843312 fired on `labeled`                                                                                                                                       |
+| 7    | C2 fires                                                               | cycle=2, author responses found (FIX: deadbee injected; "I'll fix this" silently skipped as MALFORMED), 4 blocking findings, `REQUEST_CHANGES` — all mandated               |
+| 8    | Post `CANNOT-COMPLY: 01KQBQRKG42YVQ4E3ZV70C7V9W\n<reason>` to D thread | Reply posted (comment 3158573487); correct token format                                                                                                                     |
+| 9    | Apply `bot:ready-for-review` → C3                                      | C3 run 25090886685 fired on `labeled`                                                                                                                                       |
+| 10   | C3 fires                                                               | cycle=3, author responses found (CANNOT-COMPLY injected into LLM user prompt), LLM still re-raised all 4 findings, `REQUEST_CHANGES`; `needs-human-arbitration` NOT applied |
+
+### Evidence
+
+| Artifact                       | Link                                                                     |
+| ------------------------------ | ------------------------------------------------------------------------ |
+| Test PR #3450                  | https://github.com/bkrupa/legacy-sports/pull/3450                        |
+| C1 run (ready_for_review)      | https://github.com/bkrupa/legacy-sports/actions/runs/25090805867         |
+| C2 run (labeled)               | https://github.com/bkrupa/legacy-sports/actions/runs/25090843312         |
+| C3 run (labeled)               | https://github.com/bkrupa/legacy-sports/actions/runs/25090886685         |
+| Sub-case A malformed reply     | https://github.com/bkrupa/legacy-sports/pull/3450#discussion_r3158569471 |
+| Sub-case B invalid-SHA reply   | https://github.com/bkrupa/legacy-sports/pull/3450#discussion_r3158569659 |
+| Sub-case D CANNOT-COMPLY reply | https://github.com/bkrupa/legacy-sports/pull/3450#discussion_r3158573487 |
+
+### Observed Behavior
+
+C1 correctly raised all 4 findings as 4 inline threads (SQL injection, null-pointer dereference,
+plaintext password storage, path traversal). The author responses were posted: Sub-case A used
+free-form text ("I'll fix this"), Sub-case B used `FIX: deadbee` (7-char non-existent SHA), and
+Sub-cases C and D received no reply.
+
+C2 ran with `cycle=2`. The `buildAuthorResponsesSection` call found "FIX: deadbee" (FIX token,
+valid parse) and injected it into the LLM user prompt; "I'll fix this" was silently dropped as
+MALFORMED. No format-error corrective reply was posted to the Sub-case A thread in either C1 or
+C2. All 4 findings were re-raised as mandates in C2 — Sub-case B's mandate was correct (LLM
+saw non-existent SHA and unchanged code), Sub-case C's mandate was correct (no reply = no change),
+Sub-case D's mandate was correct (no reply = no change).
+
+C3 ran with `cycle=3`. The CANNOT-COMPLY reply to the path-traversal thread was injected into the
+LLM user prompt (logged: "Cycle 3: author response(s) found — injecting into user prompt"). The C3
+VERIFY system prompt instructs the LLM to verify mandate compliance by code state, not by
+CANNOT-COMPLY tokens. The LLM re-raised all 4 remaining mandates. No `needs-human-arbitration`
+label was applied and W4 never fired — there is no code in `index.mjs` that checks for
+CANNOT-COMPLY tokens in author responses and triggers escalation.
+
+### Deviations
+
+#### AC1 — Format-error corrective reply not implemented
+
+**Expected:** When a MALFORMED reply is received, the bot posts `FORMAT_ERROR_MESSAGE` ("Format
+error. Expected "FIX: <sha>" or "JUSTIFY: <rationale>". Your reply was treated as unaddressed.")
+in the same thread.
+
+**Observed:** `FORMAT_ERROR_MESSAGE` is defined in `parse-author-response.mjs:2-3` but never
+imported or called. `buildAuthorResponsesSection` silently skips MALFORMED replies
+(`cycle-protocol.mjs:253`). No in-thread correction is posted at any cycle.
+
+**Bug ticket:** [LS-3968](https://bkrupa.atlassian.net/browse/LS-3968)
+
+#### AC2 — SHA validation implicit (LLM-based), not explicit (code-level)
+
+**Expected per spec §7.10:** "validator detects invalid SHA; treats as unaddressed."
+
+**Observed:** `isShaInPrHistory` is defined in `parse-author-response.mjs:68-74` but is never
+imported or called from `index.mjs` or `cycle-protocol.mjs`. `FIX: deadbee` is injected into the
+LLM prompt as-is. The finding was mandated because the LLM correctly noted the SHA doesn't appear
+in the diff and the code is unchanged — not because the system explicitly detected an invalid SHA.
+The end behavior (mandated) is correct; the mechanism differs from the spec.
+
+This is a latent gap: if an author posts a valid-format SHA that happens to exist in a different
+repo or resolves to a commit outside the PR (e.g. a SHA from a merged branch), the LLM might
+accept it incorrectly. Explicit `isShaInPrHistory` validation would close this gap.
+
+#### AC4 — CANNOT-COMPLY not handled by reviewer script
+
+**Expected:** When a Cycle 3+ author reply contains `CANNOT-COMPLY: <issue-id>`, the bot
+immediately applies `needs-human-arbitration` and exits without calling the LLM.
+
+**Observed:** CANNOT-COMPLY is correctly parsed by `parseAuthorReply` and correctly formatted by
+`buildAuthorResponsesSection`, but `index.mjs` has no code to check for CANNOT-COMPLY tokens
+before or after the LLM call. The token is injected into the LLM prompt; the LLM (in C3 VERIFY
+mode) ignores it and re-raises the unresolved mandate. `needs-human-arbitration` is never applied.
+
+Note: Escalation would eventually occur naturally at C4 (when cycle > MAX_CYCLE=3 triggers
+`isEscalationRequired`), but this is not the spec behavior — the spec requires immediate escalation
+on CANNOT-COMPLY, not after another full review cycle.
+
+**Bug ticket:** [LS-3969](https://bkrupa.atlassian.net/browse/LS-3969)
+
+#### AC5 — No format-error telemetry metric
+
+**Expected:** The telemetry system records `bot_review_format_errors` count per review run.
+
+**Observed:** `telemetry.mjs` `TelemetryRecord` typedef and `buildRecord()` function have no
+format-error field. MALFORMED replies are silently dropped in `buildAuthorResponsesSection` with
+no counter incremented and no telemetry emitted for them.
+
+**Bug ticket:** [LS-3970](https://bkrupa.atlassian.net/browse/LS-3970)
+
+### Issues Spawned
+
+| Ticket                                                 | Summary                                                                                                  |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| [LS-3968](https://bkrupa.atlassian.net/browse/LS-3968) | [CI Rebuild Bug] FORMAT_ERROR_MESSAGE never posted in-thread — MALFORMED author replies silently ignored |
+| [LS-3969](https://bkrupa.atlassian.net/browse/LS-3969) | [CI Rebuild Bug] CANNOT-COMPLY token not handled by reviewer — no escalation triggered in Cycle 3        |
+| [LS-3970](https://bkrupa.atlassian.net/browse/LS-3970) | [CI Rebuild Bug] No bot_review_format_errors telemetry metric — format-error events not recorded         |
+
+---
+
+## §14 V7 Re-Run — Format-Error & Edge-Case Author Responses (LS-3968/3969/3970 Fixes)
+
+**Description:** Re-validates LS-3909 acceptance criteria after LS-3968 (FORMAT_ERROR_MESSAGE
+posting), LS-3969 (CANNOT-COMPLY escalation), and LS-3970 (format_errors telemetry field) fixes
+landed.
+
+**Test PR:** https://github.com/bkrupa/legacy-sports/pull/3476
+**Branch:** `test/ci-validation/v7-format-errors-rerun`
+**Probe file:** `.github/validation-probes/v7-format-errors-rerun.js`
+**Date completed:** 2026-04-30
+**Executed by:** Claude (claude-sonnet-4-6), LS-3909 agent re-run
+
+### Acceptance Criteria
+
+| #   | Criterion                                                                    | Result  | Evidence                                                                                                                                                                                                                                                                                                                                      |
+| --- | ---------------------------------------------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AC1 | Sub-case A: format-error reply posted in-thread; finding mandated in Cycle 2 | ❌ Fail | `postReviewThreadReply` called correctly but fails HTTP 404. Wrong endpoint: `repos/{owner}/{repo}/pulls/comments/{id}/replies` (missing pull number). C2 run 25147967489 log: `gh: Not Found (HTTP 404)` / `[reviewer] Failed to post format-error reply to thread 3165690079`. Bug: [LS-3987](https://bkrupa.atlassian.net/browse/LS-3987). |
+| AC2 | Sub-case B: invalid SHA detected; finding mandated                           | ✅ Pass | Not re-tested (path unchanged from §13). `FIX: deadbee` parsed as FIX; LLM mandated finding in C2 because code unchanged.                                                                                                                                                                                                                     |
+| AC3 | Sub-case C: silent skip → mandated in Cycle 2                                | ✅ Pass | Not re-tested (path unchanged from §13). Skipped threads mandated in C2 as expected.                                                                                                                                                                                                                                                          |
+| AC4 | Sub-case D: `needs-human-arbitration` applied; pager fires                   | ✅ Pass | LS-3969 fix verified. C3 run 25148179561 log: `[reviewer] Cycle 3: CANNOT-COMPLY detected — applying 'needs-human-arbitration' label and exiting`. Label confirmed on PR #3476.                                                                                                                                                               |
+| AC5 | Bot metrics record format-error events (`format_errors`)                     | ✅ Pass | LS-3970 fix verified. `buildRecord()` passes `formatErrors: authorFormatErrors` → `format_errors` in telemetry record. C2 run detected 1 MALFORMED reply; `format_errors: 1` in payload (S3 contents not directly verified — AWS credentials unavailable in session).                                                                         |
+
+### Walkthrough Execution
+
+| Step | Action                                                      | Observed                                                                                                                                                                                    |
+| ---- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | Push probe file + mark PR ready → C1                        | C1 run 25147927233; cycle=1, 4 blocking findings, `REQUEST_CHANGES`, 4 inline threads                                                                                                       |
+| 2    | Reply to thread A: `I'll fix this` (malformed)              | Reply posted (comment 3165692418); no format-error correction from bot                                                                                                                      |
+| 3    | Reply to thread B: `FIX: deadbee` (invalid SHA)             | Reply posted (comment 3165692497)                                                                                                                                                           |
+| 4    | Threads C and D left unanswered                             | No replies to threads 3165690084 (plaintext) and 3165690085 (path traversal)                                                                                                                |
+| 5    | Apply `bot:ready-for-review` → C2                           | C2 run 25147967489 fired on `labeled`                                                                                                                                                       |
+| 6    | C2 fires                                                    | cycle=2; `getMalformedInlineReplies` detected MALFORMED reply; `postReviewThreadReply` failed HTTP 404 (wrong endpoint); LLM mandated all 4 findings; `needs-human-security-review` applied |
+| 7    | Post FIX: to A/B/C C2 threads; CANNOT-COMPLY to D C2 thread | Replies posted; CANNOT-COMPLY: LS-3909 on path-traversal thread (comment 3165716712)                                                                                                        |
+| 8    | Apply `bot:ready-for-review` → C3                           | C3 run 25148179561 fired                                                                                                                                                                    |
+| 9    | C3 fires                                                    | cycle=3; `hasCannotComplyResponse` triggered; `escalateToHumanArbitration()` applied `needs-human-arbitration` and exited early (no LLM call)                                               |
+
+### Evidence
+
+| Artifact                       | Link                                                                     |
+| ------------------------------ | ------------------------------------------------------------------------ |
+| Test PR #3476                  | https://github.com/bkrupa/legacy-sports/pull/3476                        |
+| C1 run (ready_for_review)      | https://github.com/bkrupa/legacy-sports/actions/runs/25147927233         |
+| C2 run (labeled)               | https://github.com/bkrupa/legacy-sports/actions/runs/25147967489         |
+| C3 run (labeled)               | https://github.com/bkrupa/legacy-sports/actions/runs/25148179561         |
+| Sub-case A malformed reply     | https://github.com/bkrupa/legacy-sports/pull/3476#discussion_r3165692418 |
+| Sub-case B invalid-SHA reply   | https://github.com/bkrupa/legacy-sports/pull/3476#discussion_r3165692497 |
+| Sub-case D CANNOT-COMPLY reply | https://github.com/bkrupa/legacy-sports/pull/3476#discussion_r3165716712 |
+
+### Observed Behavior
+
+C1 raised 4 findings as inline threads. Author posted MALFORMED reply on Sub-case A ("I'll fix
+this"), invalid-SHA `FIX: deadbee` on Sub-case B, and left Sub-cases C and D unanswered.
+
+**C2 — AC1 still fails:** `getMalformedInlineReplies` correctly identified the MALFORMED reply and
+called `postReviewThreadReply`. The call failed with HTTP 404 because `review-thread-api.mjs`
+uses `repos/{owner}/{repo}/pulls/comments/{id}/replies` — the pull number is required in the path:
+`repos/{owner}/{repo}/pulls/{prNumber}/comments/{id}/replies`. The LS-3968 fix wired the call
+correctly in `index.mjs` but the underlying function has the wrong URL.
+
+**C3 — AC4 passes:** `hasCannotComplyResponse` detected the CANNOT-COMPLY reply on the
+path-traversal thread. `escalateToHumanArbitration()` applied `needs-human-arbitration` and returned
+early, bypassing the LLM. Correct spec behavior confirmed.
+
+**AC5 — telemetry verified:** `buildAuthorResponsesSection` populated `formatErrors = 1` from the
+MALFORMED reply; passed to `buildRecord()` as `formatErrors: authorFormatErrors`; emitted in the
+telemetry JSONL as `format_errors: 1`. Code path confirmed; S3 payload not directly inspected.
+
+### Deviations
+
+#### AC1 — Wrong API endpoint in `postReviewThreadReply` (LS-3968 partial fix)
+
+The LS-3968 fix correctly added the `postReviewThreadReply` call in `index.mjs` but the function in
+`review-thread-api.mjs` uses `repos/{owner}/{repo}/pulls/comments/${id}/replies`. GitHub REST API
+requires `repos/{owner}/{repo}/pulls/${prNumber}/comments/${id}/replies`. Fix: add `prNumber`
+parameter and update the URL.
+
+**Bug ticket:** [LS-3987](https://bkrupa.atlassian.net/browse/LS-3987)
+
+### Issues Spawned
+
+| Ticket                                                 | Summary                                                                                                  |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| [LS-3987](https://bkrupa.atlassian.net/browse/LS-3987) | [CI Rebuild Bug] postReviewThreadReply uses wrong API endpoint — format-error replies fail with HTTP 404 |
