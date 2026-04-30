@@ -29,7 +29,8 @@ function log(message, color = 'reset') {
 }
 
 // Fetch JSON schema from URL (handles redirects). Returns null on network errors
-// so callers can skip validation gracefully when offline.
+// or server-side 5xx responses so callers can skip validation gracefully when
+// the schema host is offline or temporarily unavailable.
 async function fetchSchema(url) {
   try {
     const response = await fetch(url, {
@@ -37,7 +38,12 @@ async function fetchSchema(url) {
       redirect: 'follow',
     });
 
+    // Treat 5xx (server-side transient errors) the same as network failures —
+    // skip validation rather than blocking the workflow on an unavailable schema host.
     if (!response.ok) {
+      if (response.status >= 500) {
+        return null;
+      }
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
@@ -134,7 +140,7 @@ async function main() {
 
     if (!workflowSchema || !actionSchema) {
       log(
-        '\n⚠️  Schema fetch failed (network unavailable) — skipping workflow validation',
+        '\n⚠️  Schema fetch failed (network or server error) — skipping workflow validation',
         'yellow',
       );
       process.exit(0);

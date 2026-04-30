@@ -500,7 +500,7 @@ async function main() {
         );
       }
       try {
-        addLabel(prNumber, 'review-bot-degraded');
+        await addLabelAsApp(prNumber, 'review-bot-degraded');
       } catch (err) {
         process.stderr.write(
           `[reviewer] Failed to apply review-bot-degraded label: ${err instanceof Error ? err.message : String(err)}\n`,
@@ -810,7 +810,7 @@ async function handleLlmFailure(prNumber, err) {
   // alike. Daily-quota and auth failures still get the label so a maintainer
   // can manually retry by re-applying it after the underlying issue is fixed.
   try {
-    addLabel(prNumber, 'review-bot-degraded');
+    await addLabelAsApp(prNumber, 'review-bot-degraded');
   } catch (labelErr) {
     process.stderr.write(
       `[reviewer] Failed to apply review-bot-degraded label: ${labelErr instanceof Error ? labelErr.message : String(labelErr)}\n`,

@@ -1,8 +1,8 @@
 name: Label Pager (W4)
 
 # Event-driven escalation paging: fires immediately when an escalation label
-# is applied to a PR. Routes via ESCALATION_WEBHOOK_URL (Discord/Slack/PD);
-# channel/team routing is configured at the webhook side, not here.
+# is applied to a PR. Routes via ESCALATION_WEBHOOK_URL (Discord webhook —
+# payload uses the 'content' field); channel routing is configured at the webhook side.
 # bot:ready-for-review is intentionally excluded — it is NOT an escalation.
 
 on:
@@ -29,4 +29,4 @@ jobs:
           curl -fsS -X POST "$WEBHOOK" \
             -H 'Content-Type: application/json' \
             -d "$(jq -nc --arg pr_url "$PR_URL" --arg label "$LABEL" --arg title "$PR_TITLE" \
-                  '{ text: ("Escalation: \($label) on \($pr_url) — \($title)") }')"
+                  '{ content: ("Escalation: \($label) on \($pr_url) — \($title)") }')"
