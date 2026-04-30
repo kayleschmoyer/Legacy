@@ -1,4 +1,5 @@
-import { DisclosureGameService } from '@legacy-sports/db-client';
+import { count, sql } from 'drizzle-orm';
+import { DisclosureGameService, PublicSchema } from '@legacy-sports/db-client';
 import { builder } from './builder';
 import { AuthenticationError, GameUnavailableError } from './graphql-errors';
 
@@ -124,6 +125,47 @@ DisclosureGameSession.implement({
 // Queries
 // ──────────────────────────────────────────────────────────────
 
+const MinigamesStats = builder.objectRef<{
+  playerSeasons: number;
+  earliestYear: number | null;
+  playersTracked: number;
+}>('MinigamesStats');
+
+MinigamesStats.implement({
+  description:
+    'Aggregate statistics about the baseball database powering the minigames',
+  fields: (t) => ({
+    playerSeasons: t.exposeInt('playerSeasons', {
+      description:
+        'Total number of player-season batting records in the database',
+    }),
+    earliestYear: t.exposeInt('earliestYear', {
+      nullable: true,
+      description: 'Earliest season year in the database',
+    }),
+    playersTracked: t.exposeInt('playersTracked', {
+      description: 'Total number of distinct players tracked',
+    }),
+  }),
+});
+
+// ──────────────────────────────────────────────────────────────
+// In-memory TTL cache for minigamesStats aggregates.
+// These are full-table COUNT/MIN scans; caching avoids hitting
+// the DB on every page load of the hub (same pattern as the
+// Stripe price cache in subscriptions.ts).
+// ──────────────────────────────────────────────────────────────
+
+type MinigamesStatsShape = {
+  playerSeasons: number;
+  earliestYear: number | null;
+  playersTracked: number;
+};
+
+let cachedMinigamesStats: MinigamesStatsShape | null = null;
+let cachedMinigamesStatsExpiresAt = 0;
+const MINIGAMES_STATS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
 builder.queryFields((t) => ({
   disclosureGameSession: t.field({
     type: DisclosureGameSession,
@@ -138,6 +180,64 @@ builder.queryFields((t) => ({
       }
       const svc = new DisclosureGameService(context.db);
       return svc.getSession(args.sessionId, context.user.id);
+    },
+  }),
+
+  disclosureGameBestScore: t.field({
+    type: 'Int',
+    nullable: true,
+    description:
+      "The current user's best score across all won disclosure game sessions",
+    resolve: async (_parent, _args, context) => {
+      if (!context.user) {
+        throw AuthenticationError();
+      }
+      const svc = new DisclosureGameService(context.db);
+      return svc.getBestScore(context.user.id);
+    },
+  }),
+
+  minigamesStats: t.field({
+    type: MinigamesStats,
+    nullable: true,
+    description:
+      'Aggregate statistics about the baseball database powering the minigames hub',
+    resolve: async (_parent, _args, context) => {
+      if (!context.user) {
+        throw AuthenticationError();
+      }
+
+      const now = Date.now();
+      if (cachedMinigamesStats && now < cachedMinigamesStatsExpiresAt) {
+        return cachedMinigamesStats;
+      }
+
+      const [battingResult, playerCountResult] = await Promise.all([
+        context.db
+          .select({
+            playerSeasons: count(PublicSchema.seasonBatting.playerId),
+            earliestYear: sql<
+              number | null
+            >`min(${PublicSchema.seasonBatting.season})`,
+          })
+          .from(PublicSchema.seasonBatting),
+        context.db
+          .select({ playersTracked: count(PublicSchema.players.id) })
+          .from(PublicSchema.players),
+      ]);
+
+      const result = battingResult[0];
+
+      const stats: MinigamesStatsShape = {
+        playerSeasons: Number(result?.playerSeasons ?? 0),
+        earliestYear: result?.earliestYear ?? null,
+        playersTracked: Number(playerCountResult[0]?.playersTracked ?? 0),
+      };
+
+      cachedMinigamesStats = stats;
+      cachedMinigamesStatsExpiresAt = now + MINIGAMES_STATS_CACHE_TTL_MS;
+
+      return stats;
     },
   }),
 }));

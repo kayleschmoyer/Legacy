@@ -1235,6 +1235,17 @@ export type MergeAccountsResult = {
   targetUserId?: Maybe<Scalars['Int']['output']>;
 };
 
+/** Aggregate statistics about the baseball database powering the minigames */
+export type MinigamesStats = {
+  __typename?: 'MinigamesStats';
+  /** Earliest season year in the database */
+  earliestYear?: Maybe<Scalars['Int']['output']>;
+  /** Total number of player-season batting records in the database */
+  playerSeasons?: Maybe<Scalars['Int']['output']>;
+  /** Total number of distinct players tracked */
+  playersTracked?: Maybe<Scalars['Int']['output']>;
+};
+
 /** Identifiers for a newly created mock draft session */
 export type MockDraftInit = {
   __typename?: 'MockDraftInit';
@@ -2363,6 +2374,8 @@ export type Query = {
   /** Commissioner: fetch the audit log for all commissioner actions in a league. */
   commissionerAuditLogs?: Maybe<Array<CommissionerAuditLog>>;
   defaultScoringProfile?: Maybe<ScoringConfig>;
+  /** The current user's best score across all won disclosure game sessions */
+  disclosureGameBestScore?: Maybe<Scalars['Int']['output']>;
   /** Fetch the current state of a disclosure game session */
   disclosureGameSession?: Maybe<DisclosureGameSession>;
   /** Return the Stripe Payment Link URL for one-time donations. No authentication required. Returns null when not configured. */
@@ -2438,6 +2451,8 @@ export type Query = {
   /** Returns all roster entries explicitly listed on the trade block for the given league. */
   leagueTradeBlock?: Maybe<Array<TeamMember>>;
   leagueTradeOffers?: Maybe<Array<TradeOffer>>;
+  /** Aggregate statistics about the baseball database powering the minigames hub */
+  minigamesStats?: Maybe<MinigamesStats>;
   /** Get the current user's votes for a league season */
   myAwardVotes?: Maybe<Array<MyAwardVote>>;
   /** Get all consent records for the authenticated user */

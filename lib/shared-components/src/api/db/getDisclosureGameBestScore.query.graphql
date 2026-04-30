@@ -1,0 +1,4 @@
+# Fetch the current user's best score in the disclosure (Who Am I?) game
+query GetDisclosureGameBestScore {
+  disclosureGameBestScore
+}

@@ -8,6 +8,12 @@ import {
   SURFACE_CARD,
   withAlpha,
 } from '../../utils/colors';
+import {
+  SeasonDraftGameStatus,
+  useGetDisclosureGameBestScoreQuery,
+  useGetMinigamesStatsQuery,
+  useGetSeasonDraftGamesQuery,
+} from '../../api/db/graphql.generated';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -236,7 +242,7 @@ interface GameDef {
   cta: string;
 }
 
-const GAMES: GameDef[] = [
+const GAME_TEMPLATES: Omit<GameDef, 'stat'>[] = [
   {
     id: 'season-draft',
     title: 'Season Draft',
@@ -244,7 +250,6 @@ const GAMES: GameDef[] = [
     desc: 'Draft hitters or pitchers across eras. Pick the right season, fill your roster, rack up the counting stats. Last one standing with the biggest number wins.',
     accent: 'navy',
     icon: <DraftIcon />,
-    stat: { label: 'Games Active', value: '3' },
     meta: ['Pick your stat: HR · SO · RBI · W', 'Season or Career-w/-Team'],
     cta: 'Enter Lobby',
   },
@@ -255,7 +260,6 @@ const GAMES: GameDef[] = [
     desc: 'Clues drop one at a time — birthplace, era, quirks, milestones. Name the player with the fewest clues revealed for a higher score.',
     accent: 'seam',
     icon: <StatsIcon />,
-    stat: { label: 'Your Best', value: '84' },
     meta: ['7 clues per player', 'Hall of Famers to deep cuts'],
     cta: 'Play Now',
   },
@@ -513,6 +517,71 @@ const GameCard: React.FC<{ game: GameDef; onPress: () => void }> = ({
 // ── Main component ─────────────────────────────────────────────────────────
 
 export const MinigamesHub: React.FC<MinigamesHubProps> = ({ onNavigate }) => {
+  const {
+    data: sdGamesData,
+    loading: sdLoading,
+    error: sdError,
+  } = useGetSeasonDraftGamesQuery();
+  const { data: bestScoreData } = useGetDisclosureGameBestScoreQuery();
+  const { data: minigamesStatsData } = useGetMinigamesStatsQuery();
+
+  // Count only in-progress games (setup or drafting).
+  // Show "—" while loading or if the query errored; show "0" for a successful
+  // empty result so the user can distinguish "still loading" from "no games".
+  const activeGamesCount =
+    sdLoading || sdError
+      ? null
+      : (sdGamesData?.seasonDraftGames?.filter(
+          (g) =>
+            g.status === SeasonDraftGameStatus.Setup ||
+            g.status === SeasonDraftGameStatus.Drafting,
+        ).length ?? 0);
+
+  const bestScore = bestScoreData?.disclosureGameBestScore ?? null;
+  const dbStats = minigamesStatsData?.minigamesStats;
+
+  const games: GameDef[] = GAME_TEMPLATES.map((template) => {
+    if (template.id === 'season-draft') {
+      return {
+        ...template,
+        stat: {
+          label: 'Games Active',
+          value: activeGamesCount !== null ? String(activeGamesCount) : '—',
+        },
+      };
+    }
+    return {
+      ...template,
+      stat: {
+        label: 'Your Best',
+        value: bestScore !== null ? String(bestScore) : '—',
+      },
+    };
+  });
+
+  const heroStats: Array<{ n: string; l: string } | null> = [
+    {
+      n:
+        dbStats?.playerSeasons != null
+          ? `${(dbStats.playerSeasons / 1_000_000).toFixed(1)}M`
+          : '—',
+      l: 'Player-Seasons',
+    },
+    null,
+    {
+      n: dbStats?.earliestYear != null ? String(dbStats.earliestYear) : '—',
+      l: 'Earliest Record',
+    },
+    null,
+    {
+      n:
+        dbStats?.playersTracked != null
+          ? `${dbStats.playersTracked.toLocaleString()}+`
+          : '—',
+      l: 'Players Tracked',
+    },
+  ];
+
   return (
     <div
       style={{
@@ -630,13 +699,7 @@ export const MinigamesHub: React.FC<MinigamesHubProps> = ({ onNavigate }) => {
               borderTop: `1px solid ${withAlpha('#ffffff', 0.08)}`,
             }}
           >
-            {[
-              { n: '1.8M', l: 'Player-Seasons' },
-              null,
-              { n: '1871', l: 'Earliest Record' },
-              null,
-              { n: '24,000+', l: 'Players Tracked' },
-            ].map((item, i) =>
+            {heroStats.map((item, i) =>
               item === null ? (
                 <div
                   key={i}
@@ -699,7 +762,7 @@ export const MinigamesHub: React.FC<MinigamesHubProps> = ({ onNavigate }) => {
       <div
         style={{ display: 'flex', gap: 18, marginBottom: 32, flexWrap: 'wrap' }}
       >
-        {GAMES.map((g) => (
+        {games.map((g) => (
           <GameCard key={g.id} game={g} onPress={() => onNavigate(g.id)} />
         ))}
       </div>

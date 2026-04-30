@@ -1,0 +1,8 @@
+# Fetch aggregate statistics about the baseball database for the minigames hub
+query GetMinigamesStats {
+  minigamesStats {
+    playerSeasons
+    earliestYear
+    playersTracked
+  }
+}

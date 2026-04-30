@@ -1241,6 +1241,17 @@ export type MergeAccountsResult = {
   targetUserId?: Maybe<Scalars['Int']['output']>;
 };
 
+/** Aggregate statistics about the baseball database powering the minigames */
+export type MinigamesStats = {
+  __typename?: 'MinigamesStats';
+  /** Earliest season year in the database */
+  earliestYear?: Maybe<Scalars['Int']['output']>;
+  /** Total number of player-season batting records in the database */
+  playerSeasons?: Maybe<Scalars['Int']['output']>;
+  /** Total number of distinct players tracked */
+  playersTracked?: Maybe<Scalars['Int']['output']>;
+};
+
 /** Identifiers for a newly created mock draft session */
 export type MockDraftInit = {
   __typename?: 'MockDraftInit';
@@ -2369,6 +2380,8 @@ export type Query = {
   /** Commissioner: fetch the audit log for all commissioner actions in a league. */
   commissionerAuditLogs?: Maybe<Array<CommissionerAuditLog>>;
   defaultScoringProfile?: Maybe<ScoringConfig>;
+  /** The current user's best score across all won disclosure game sessions */
+  disclosureGameBestScore?: Maybe<Scalars['Int']['output']>;
   /** Fetch the current state of a disclosure game session */
   disclosureGameSession?: Maybe<DisclosureGameSession>;
   /** Return the Stripe Payment Link URL for one-time donations. No authentication required. Returns null when not configured. */
@@ -2444,6 +2457,8 @@ export type Query = {
   /** Returns all roster entries explicitly listed on the trade block for the given league. */
   leagueTradeBlock?: Maybe<Array<TeamMember>>;
   leagueTradeOffers?: Maybe<Array<TradeOffer>>;
+  /** Aggregate statistics about the baseball database powering the minigames hub */
+  minigamesStats?: Maybe<MinigamesStats>;
   /** Get the current user's votes for a league season */
   myAwardVotes?: Maybe<Array<MyAwardVote>>;
   /** Get all consent records for the authenticated user */
@@ -4726,6 +4741,15 @@ export type GetCareerPitchingStatsCountQuery = {
   careerPitchingStatsCount?: number | null;
 };
 
+export type GetDisclosureGameBestScoreQueryVariables = Exact<{
+  [key: string]: never;
+}>;
+
+export type GetDisclosureGameBestScoreQuery = {
+  __typename?: 'Query';
+  disclosureGameBestScore?: number | null;
+};
+
 export type GetLeagueAnalyticsQueryVariables = Exact<{
   leagueId: Scalars['Int']['input'];
 }>;
@@ -5159,6 +5183,18 @@ export type GetMatchupsForLeagueQuery = {
     startTime?: string | null;
     endTime?: string | null;
   }> | null;
+};
+
+export type GetMinigamesStatsQueryVariables = Exact<{ [key: string]: never }>;
+
+export type GetMinigamesStatsQuery = {
+  __typename?: 'Query';
+  minigamesStats?: {
+    __typename?: 'MinigamesStats';
+    playerSeasons?: number | null;
+    earliestYear?: number | null;
+    playersTracked?: number | null;
+  } | null;
 };
 
 export type GetPlayersWithStatsQueryVariables = Exact<{
@@ -10365,6 +10401,89 @@ export type GetCareerPitchingStatsCountQueryResult = Apollo.QueryResult<
   GetCareerPitchingStatsCountQuery,
   GetCareerPitchingStatsCountQueryVariables
 >;
+export const GetDisclosureGameBestScore = gql`
+  query GetDisclosureGameBestScore {
+    disclosureGameBestScore
+  }
+`;
+
+/**
+ * __useGetDisclosureGameBestScoreQuery__
+ *
+ * To run a query within a React component, call `useGetDisclosureGameBestScoreQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetDisclosureGameBestScoreQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetDisclosureGameBestScoreQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useGetDisclosureGameBestScoreQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    GetDisclosureGameBestScoreQuery,
+    GetDisclosureGameBestScoreQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetDisclosureGameBestScoreQuery,
+    GetDisclosureGameBestScoreQueryVariables
+  >(GetDisclosureGameBestScore, options);
+}
+export function useGetDisclosureGameBestScoreLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetDisclosureGameBestScoreQuery,
+    GetDisclosureGameBestScoreQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetDisclosureGameBestScoreQuery,
+    GetDisclosureGameBestScoreQueryVariables
+  >(GetDisclosureGameBestScore, options);
+}
+export function useGetDisclosureGameBestScoreSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetDisclosureGameBestScoreQuery,
+        GetDisclosureGameBestScoreQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetDisclosureGameBestScoreQuery,
+    GetDisclosureGameBestScoreQueryVariables
+  >(
+    GetDisclosureGameBestScore,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetDisclosureGameBestScoreQuery,
+          GetDisclosureGameBestScoreQueryVariables
+        >,
+  );
+}
+export type GetDisclosureGameBestScoreQueryHookResult = ReturnType<
+  typeof useGetDisclosureGameBestScoreQuery
+>;
+export type GetDisclosureGameBestScoreLazyQueryHookResult = ReturnType<
+  typeof useGetDisclosureGameBestScoreLazyQuery
+>;
+export type GetDisclosureGameBestScoreSuspenseQueryHookResult = ReturnType<
+  typeof useGetDisclosureGameBestScoreSuspenseQuery
+>;
+export type GetDisclosureGameBestScoreQueryResult = Apollo.QueryResult<
+  GetDisclosureGameBestScoreQuery,
+  GetDisclosureGameBestScoreQueryVariables
+>;
 export const GetLeagueAnalytics = gql`
   query GetLeagueAnalytics($leagueId: Int!) {
     getLeagueAnalytics(leagueId: $leagueId) {
@@ -11246,6 +11365,93 @@ export type GetMatchupsForLeagueSuspenseQueryHookResult = ReturnType<
 export type GetMatchupsForLeagueQueryResult = Apollo.QueryResult<
   GetMatchupsForLeagueQuery,
   GetMatchupsForLeagueQueryVariables
+>;
+export const GetMinigamesStats = gql`
+  query GetMinigamesStats {
+    minigamesStats {
+      playerSeasons
+      earliestYear
+      playersTracked
+    }
+  }
+`;
+
+/**
+ * __useGetMinigamesStatsQuery__
+ *
+ * To run a query within a React component, call `useGetMinigamesStatsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetMinigamesStatsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetMinigamesStatsQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useGetMinigamesStatsQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    GetMinigamesStatsQuery,
+    GetMinigamesStatsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetMinigamesStatsQuery,
+    GetMinigamesStatsQueryVariables
+  >(GetMinigamesStats, options);
+}
+export function useGetMinigamesStatsLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetMinigamesStatsQuery,
+    GetMinigamesStatsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetMinigamesStatsQuery,
+    GetMinigamesStatsQueryVariables
+  >(GetMinigamesStats, options);
+}
+export function useGetMinigamesStatsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetMinigamesStatsQuery,
+        GetMinigamesStatsQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetMinigamesStatsQuery,
+    GetMinigamesStatsQueryVariables
+  >(
+    GetMinigamesStats,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetMinigamesStatsQuery,
+          GetMinigamesStatsQueryVariables
+        >,
+  );
+}
+export type GetMinigamesStatsQueryHookResult = ReturnType<
+  typeof useGetMinigamesStatsQuery
+>;
+export type GetMinigamesStatsLazyQueryHookResult = ReturnType<
+  typeof useGetMinigamesStatsLazyQuery
+>;
+export type GetMinigamesStatsSuspenseQueryHookResult = ReturnType<
+  typeof useGetMinigamesStatsSuspenseQuery
+>;
+export type GetMinigamesStatsQueryResult = Apollo.QueryResult<
+  GetMinigamesStatsQuery,
+  GetMinigamesStatsQueryVariables
 >;
 export const GetPlayersWithStats = gql`
   query GetPlayersWithStats(

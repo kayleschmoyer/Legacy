@@ -1024,6 +1024,27 @@ export class DisclosureGameService {
   }
 
   /**
+   * Return the user's best score across all won disclosure game sessions.
+   * Returns null if the user has never won a session.
+   */
+  async getBestScore(userId: number): Promise<number | null> {
+    const [row] = await this.db
+      .select({
+        bestScore: sql<
+          number | null
+        >`max(${PublicSchema.disclosureGameSessions.score})`,
+      })
+      .from(PublicSchema.disclosureGameSessions)
+      .where(
+        and(
+          eq(PublicSchema.disclosureGameSessions.userId, userId),
+          eq(PublicSchema.disclosureGameSessions.status, 'won'),
+        ),
+      );
+    return row?.bestScore ?? null;
+  }
+
+  /**
    * Return the most recent sessions for a user (for history/leaderboard).
    */
   async getRecentSessions(
