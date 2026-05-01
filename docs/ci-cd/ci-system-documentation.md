@@ -8,26 +8,26 @@ The Legacy Sports CI/CD system is a **visibility-first, bot-reviewed, label-merg
 
 ## Quick Reference
 
-| What you need | Where to look |
-|--------------|---------------|
-| Full architecture | [ci-greenfield-design.md](ci-greenfield-design.md) |
-| Why we rebuilt the CI | [ci-greenfield-gap-analysis.md](ci-greenfield-gap-analysis.md) |
-| Copilot reviewer design | [ci-greenfield-copilot-evaluation.md](ci-greenfield-copilot-evaluation.md) |
-| CI check failures & fixes | `.agents/skills/pr-lifecycle/references/ci-checks-reference.md` |
-| Pipeline debugging | `.agents/skills/debugging/references/ci-pipeline-architecture.md` |
-| Advanced troubleshooting | [ci-troubleshooting-guide.md](ci-troubleshooting-guide.md) |
-| Merge queue | [merge-queue-guide.md](merge-queue-guide.md) |
-| Nx caching | [nx-remote-caching-implementation.md](nx-remote-caching-implementation.md) |
+| What you need             | Where to look                                                              |
+| ------------------------- | -------------------------------------------------------------------------- |
+| Full architecture         | [ci-greenfield-design.md](ci-greenfield-design.md)                         |
+| Why we rebuilt the CI     | [ci-greenfield-gap-analysis.md](ci-greenfield-gap-analysis.md)             |
+| Copilot reviewer design   | [ci-greenfield-copilot-evaluation.md](ci-greenfield-copilot-evaluation.md) |
+| CI check failures & fixes | `.agents/skills/pr-lifecycle/references/ci-checks-reference.md`            |
+| Pipeline debugging        | `.agents/skills/debugging/references/ci-pipeline-architecture.md`          |
+| Advanced troubleshooting  | [ci-troubleshooting-guide.md](ci-troubleshooting-guide.md)                 |
+| Merge queue               | [merge-queue-guide.md](merge-queue-guide.md)                               |
+| Nx caching                | [nx-remote-caching-implementation.md](nx-remote-caching-implementation.md) |
 
 ## Core Workflows
 
-| Workflow | Purpose |
-|----------|---------|
-| `ci-orchestrator.yml` | Entry point: routes PR events to CI pipeline or security scan |
-| `ci-pipeline.yml` | Main quality gate: format, lint, typecheck, test, build, E2E |
+| Workflow                   | Purpose                                                           |
+| -------------------------- | ----------------------------------------------------------------- |
+| `ci-orchestrator.yml`      | Entry point: routes PR events to CI pipeline or security scan     |
+| `ci-pipeline.yml`          | Main quality gate: format, lint, typecheck, test, build, E2E      |
 | `review.yml` (Reviewer W1) | Bot-driven code review (Copilot CLI + `legacy-sports-review-bot`) |
-| `merge-queue.yml` | Label-based automated merge (`merge-when-ready`) |
-| `security-scanning.yml` | Dep/SAST/secret scans (conditional) |
+| `merge-queue.yml`          | Label-based automated merge (`merge-when-ready`)                  |
+| `security-scanning.yml`    | Dep/SAST/secret scans (conditional)                               |
 
 ## CI Trigger Model
 
@@ -41,12 +41,12 @@ This prevents CI minutes from being consumed by work-in-progress commits.
 
 ## Deployment Architecture
 
-| Target | Workflow | Trigger |
-|--------|----------|---------|
-| Web app | `deploy-web.yml` | Push to `main` (paths: `apps/web/**`, `lib/shared-components/**`) |
-| Lambda functions | `upload-lambdas.yml` → `lambda-terraform-apply.yml` | Push to `main` (paths: `lambdas/**`) |
-| Mobile (iOS) | `build-ios-app.yml` | Manual / tag |
-| Mobile (Android) | `build-android-app.yml` | Manual / tag |
+| Target           | Workflow                                            | Trigger                                                           |
+| ---------------- | --------------------------------------------------- | ----------------------------------------------------------------- |
+| Web app          | `deploy-web.yml`                                    | Push to `main` (paths: `apps/web/**`, `lib/shared-components/**`) |
+| Lambda functions | `upload-lambdas.yml` → `lambda-terraform-apply.yml` | Push to `main` (paths: `lambdas/**`)                              |
+| Mobile (iOS)     | `build-ios-app.yml`                                 | Manual / tag                                                      |
+| Mobile (Android) | `build-android-app.yml`                             | Manual / tag                                                      |
 
 ## Common Operations
 

@@ -1,3 +1,8 @@
+import {
+  extractFirstJsonFencedBlock,
+  normalizeJsonFence,
+} from './text-utils.mjs';
+
 /**
  * @typedef {'critical'|'high'|'medium'|'low'|'trivia'} Severity
  *
@@ -34,8 +39,11 @@ const VALID_SEVERITIES = new Set([
  * @returns {{ ok: true, findings: Finding[] } | { ok: false, findings: [] }}
  */
 export function parseFindingsFromText(text) {
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const candidate = (fenced ? fenced[1] : text).trim();
+  // Normalize any code fences the model may have added: strip outer fences and
+  // extract embedded ```/```json blocks. Fence normalization is handled here in
+  // parseFindingsFromText for all provider output; providers such as Gemini
+  // return raw model text and are not responsible for normalizing fenced JSON.
+  let candidate = normalizeJsonFence(text.trim());
 
   // Attempt 1: the candidate is exactly a JSON array or {"findings":[...]} object.
   let parsed = _tryParseJsonArray(candidate);
@@ -53,6 +61,17 @@ export function parseFindingsFromText(text) {
     const start = candidate.indexOf('{');
     if (start > 0) {
       parsed = _tryParseJsonArray(candidate.slice(start));
+    }
+  }
+
+  // Attempt 4: prose preamble with an embedded ```/```json fenced block.
+  // Handles responses like "Here is the JSON:\n```json\n[...]\n```" where
+  // slicing from '[' or '{' would still include the trailing fence markers.
+  // Also handles a non-JSON fence (e.g. ```js) appearing before the JSON block.
+  if (parsed === null) {
+    const extracted = extractFirstJsonFencedBlock(candidate);
+    if (extracted !== null) {
+      parsed = _tryParseJsonArray(extracted);
     }
   }
 

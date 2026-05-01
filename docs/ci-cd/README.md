@@ -4,11 +4,11 @@ This directory contains documentation for the Legacy Sports CI/CD system. The cu
 
 ## Canonical References (Start Here)
 
-| Document | Purpose |
-|----------|---------|
-| **[ci-greenfield-design.md](ci-greenfield-design.md)** | **← Architecture reference.** Trigger model, pipeline jobs, bot review, merge queue, design decisions |
-| **[ci-greenfield-gap-analysis.md](ci-greenfield-gap-analysis.md)** | **← Why we rebuilt.** Problems with the old system, required checks summary, phase timeline |
-| **[ci-greenfield-copilot-evaluation.md](ci-greenfield-copilot-evaluation.md)** | **← Bot review design.** Copilot CLI integration, RAISE/ADJUDICATE/VERIFY cycle protocol |
+| Document                                                                       | Purpose                                                                                               |
+| ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| **[ci-greenfield-design.md](ci-greenfield-design.md)**                         | **← Architecture reference.** Trigger model, pipeline jobs, bot review, merge queue, design decisions |
+| **[ci-greenfield-gap-analysis.md](ci-greenfield-gap-analysis.md)**             | **← Why we rebuilt.** Problems with the old system, required checks summary, phase timeline           |
+| **[ci-greenfield-copilot-evaluation.md](ci-greenfield-copilot-evaluation.md)** | **← Bot review design.** Copilot CLI integration, RAISE/ADJUDICATE/VERIFY cycle protocol              |
 
 ## Operational Guides
 
@@ -59,22 +59,22 @@ Superseded docs have been moved to [`archive/`](archive/). Each carries a banner
 <details>
 <summary>Archived files (click to expand)</summary>
 
-| File | Reason archived |
-|------|----------------|
-| [archive/ci-bot-review-spec.md](archive/ci-bot-review-spec.md) | Describes system deliberately built away from |
-| [archive/ci-pipeline-evaluation.md](archive/ci-pipeline-evaluation.md) | Historical analysis |
-| [archive/ci-pipeline-requirements.md](archive/ci-pipeline-requirements.md) | Superseded by greenfield design |
-| [archive/ci-workflow-migration-status.md](archive/ci-workflow-migration-status.md) | Old migration status |
-| [archive/ci-migration-plan.md](archive/ci-migration-plan.md) | Superseded by gap analysis Phase plan |
-| [archive/improved-ci-system-design.md](archive/improved-ci-system-design.md) | Superseded by greenfield design |
-| [archive/cloud-ready-ci-configuration.md](archive/cloud-ready-ci-configuration.md) | Nx Cloud DTE config (now using local execution) |
-| [archive/dte-quota-checking.md](archive/dte-quota-checking.md) | Nx Cloud DTE quota (superseded) |
-| [archive/intelligent-dte-detection.md](archive/intelligent-dte-detection.md) | Nx Cloud DTE detection (superseded) |
-| [archive/github-actions-cleanup.md](archive/github-actions-cleanup.md) | Superseded by this epic |
-| [archive/merge-queue-integration-build-fix.md](archive/merge-queue-integration-build-fix.md) | Historical fix |
-| [archive/merge-queue-permissions-fix.md](archive/merge-queue-permissions-fix.md) | Historical fix |
-| [archive/pr-comments-implementation-summary.md](archive/pr-comments-implementation-summary.md) | Superseded by reviewer's output |
-| [archive/pr-comments-merge-queue-analysis.md](archive/pr-comments-merge-queue-analysis.md) | Historical analysis |
+| File                                                                                           | Reason archived                                 |
+| ---------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| [archive/ci-bot-review-spec.md](archive/ci-bot-review-spec.md)                                 | Describes system deliberately built away from   |
+| [archive/ci-pipeline-evaluation.md](archive/ci-pipeline-evaluation.md)                         | Historical analysis                             |
+| [archive/ci-pipeline-requirements.md](archive/ci-pipeline-requirements.md)                     | Superseded by greenfield design                 |
+| [archive/ci-workflow-migration-status.md](archive/ci-workflow-migration-status.md)             | Old migration status                            |
+| [archive/ci-migration-plan.md](archive/ci-migration-plan.md)                                   | Superseded by gap analysis Phase plan           |
+| [archive/improved-ci-system-design.md](archive/improved-ci-system-design.md)                   | Superseded by greenfield design                 |
+| [archive/cloud-ready-ci-configuration.md](archive/cloud-ready-ci-configuration.md)             | Nx Cloud DTE config (now using local execution) |
+| [archive/dte-quota-checking.md](archive/dte-quota-checking.md)                                 | Nx Cloud DTE quota (superseded)                 |
+| [archive/intelligent-dte-detection.md](archive/intelligent-dte-detection.md)                   | Nx Cloud DTE detection (superseded)             |
+| [archive/github-actions-cleanup.md](archive/github-actions-cleanup.md)                         | Superseded by this epic                         |
+| [archive/merge-queue-integration-build-fix.md](archive/merge-queue-integration-build-fix.md)   | Historical fix                                  |
+| [archive/merge-queue-permissions-fix.md](archive/merge-queue-permissions-fix.md)               | Historical fix                                  |
+| [archive/pr-comments-implementation-summary.md](archive/pr-comments-implementation-summary.md) | Superseded by reviewer's output                 |
+| [archive/pr-comments-merge-queue-analysis.md](archive/pr-comments-merge-queue-analysis.md)     | Historical analysis                             |
 
 </details>
 

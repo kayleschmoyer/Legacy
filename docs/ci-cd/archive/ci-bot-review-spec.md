@@ -189,17 +189,17 @@ detect-changes
 
 ### Custom Actions Used
 
-| Action                             | Purpose                                                                                                      |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `.github/actions/setup`            | Node.js + pnpm + Nx SHA setup, validates pnpm-only env                                                       |
-| `.github/actions/detect-changes`   | Outputs `web`, `mobile`, `lambdas`, `terraform`, `e2e`, `api-surface`, `dependencies`, `affected-components` |
-| `.github/actions/execution-plan`   | Generates strategy (skip/run/partial) based on detected changes                                              |
-| `.github/actions/quality-gates`    | Parallel: format, lint, typecheck, test, migration check                                                     |
-| `.github/actions/build-validation` | Parallel: web/mobile/lambda/terraform builds, artifact verification                                          |
-| `.github/actions/e2e-testing`      | Playwright orchestration with sharding                                                                       |
+| Action                             | Purpose                                                                                                                                                                         |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.github/actions/setup`            | Node.js + pnpm + Nx SHA setup, validates pnpm-only env                                                                                                                          |
+| `.github/actions/detect-changes`   | Outputs `web`, `mobile`, `lambdas`, `terraform`, `e2e`, `api-surface`, `dependencies`, `affected-components`                                                                    |
+| `.github/actions/execution-plan`   | Generates strategy (skip/run/partial) based on detected changes                                                                                                                 |
+| `.github/actions/quality-gates`    | Parallel: format, lint, typecheck, test, migration check                                                                                                                        |
+| `.github/actions/build-validation` | Parallel: web/mobile/lambda/terraform builds, artifact verification                                                                                                             |
+| `.github/actions/e2e-testing`      | Playwright orchestration with sharding                                                                                                                                          |
 | `.github/actions/ci-reporting`     | Generates sticky PR comment (`<!-- CI-PIPELINE-STATUS -->`) with CI status and failure analysis. Not label management — that lives in the `summarize` job and the orchestrator. |
-| `.github/actions/nx-cache`         | Nx remote cache via GitHub Actions cache API                                                                 |
-| `.github/actions/s3-artifact`      | S3 artifact upload/download                                                                                  |
+| `.github/actions/nx-cache`         | Nx remote cache via GitHub Actions cache API                                                                                                                                    |
+| `.github/actions/s3-artifact`      | S3 artifact upload/download                                                                                                                                                     |
 
 ### Status Check Names (registered in ruleset)
 
@@ -216,10 +216,10 @@ The `summarize` job sets `overall-status` (`success` | `failure`) as a workflow 
 
 Two distinct comment surfaces exist on every PR — they do **not** overlap:
 
-| Surface | Who posts | GitHub API | What it contains |
-|---------|-----------|------------|-----------------|
-| Sticky comment `<!-- CI-PIPELINE-STATUS -->` | `ci-reporting` action (in `summarize` job) | `issues.createComment` / `issues.updateComment` | CI pass/fail, step status table, reproduction commands |
-| Formal PR review | `review.yml` (W1) | `pulls.createReview` (APPROVE / REQUEST_CHANGES) | Code quality findings, blocking issues |
+| Surface                                      | Who posts                                  | GitHub API                                       | What it contains                                       |
+| -------------------------------------------- | ------------------------------------------ | ------------------------------------------------ | ------------------------------------------------------ |
+| Sticky comment `<!-- CI-PIPELINE-STATUS -->` | `ci-reporting` action (in `summarize` job) | `issues.createComment` / `issues.updateComment`  | CI pass/fail, step status table, reproduction commands |
+| Formal PR review                             | `review.yml` (W1)                          | `pulls.createReview` (APPROVE / REQUEST_CHANGES) | Code quality findings, blocking issues                 |
 
 These serve different purposes and appear in different UI sections. There is no risk of both posting duplicate "all good" messages.
 
@@ -579,12 +579,12 @@ All actions live in `.github/actions/`.
 
 ### Reporting & Notifications
 
-| Action                                                            | Purpose                                                                     |
-| ----------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Action                                                            | Purpose                                                                                                                                                                                            |
+| ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ci-reporting`                                                    | Generates sticky PR comment with CI status, failure analysis, and reproduction commands (marker `<!-- CI-PIPELINE-STATUS -->`). Label management lives in the orchestrator and pipeline, not here. |
-| `discord-notify`                                                  | Discord webhook notifications                                               |
-| `rollbar-deploy`                                                  | Tracks deployments in Rollbar                                               |
-| `update-badges`, `update-deployment-badge`, `update-health-badge` | README/docs status badges                                                   |
+| `discord-notify`                                                  | Discord webhook notifications                                                                                                                                                                      |
+| `rollbar-deploy`                                                  | Tracks deployments in Rollbar                                                                                                                                                                      |
+| `update-badges`, `update-deployment-badge`, `update-health-badge` | README/docs status badges                                                                                                                                                                          |
 
 ---
 

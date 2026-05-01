@@ -21,9 +21,9 @@
 | V3 re-run (LS-3965 + LS-3966 fixes)                     | LS-3905 | 2026-04-29 | ✅ Pass    | AC1 ✅ AC2 ✅ — C2 evaluated JUSTIFY and posted APPROVE "LGTM — no blocking findings" (see §11)                                                                                        |
 | V7 — Format-error & edge-case author responses          | LS-3909 | 2026-04-29 | 🔴 Fail    | AC1 ❌ AC4 ❌ AC5 ❌ — format-error reply never posted, CANNOT-COMPLY not escalated, no format-error telemetry (see §13)                                                               |
 | V7 re-run (LS-3968/3969/3970 fixes)                     | LS-3909 | 2026-04-30 | 🔴 Fail    | AC1 ❌ still (wrong endpoint in `postReviewThreadReply`); AC4 ✅ AC5 ✅ (LS-3969/3970 verified); LS-3987 filed (see §14)                                                               |
-| V9 — CI gating order                                    | LS-3911 | 2026-04-29 | 🟡 Partial | AC1–AC3 ✅ AC5 ✅; AC4 ❌ `dismiss_stale_reviews_on_push: false`; AC6 ⏭️ custom merge queue doesn't fire native `merge_group` (see §15)                                              |
-| V9 re-run (LS-3977 fix)                                 | LS-3911 | 2026-04-30 | 🟡 Partial | AC1–AC3 ✅ AC5 ✅; AC4 🔴 dismiss works ✅ but TOCTOU race merges PR with dismissed review — LS-3990 filed; AC6 ⏭️ skip (see §16)                                                   |
-| V9 final (LS-3977 + LS-3990 fixes)                      | LS-3911 | 2026-04-30 | 🟡 Partial | AC1–AC3 ✅; AC4 ⏭️ PR merged before step-6 push possible (merge queue gates bot-review only); AC5 ⚠️ infra failure (pnpm cache tar); AC6 ⏭️ (see §17)                             |
+| V9 — CI gating order                                    | LS-3911 | 2026-04-29 | 🟡 Partial | AC1–AC3 ✅ AC5 ✅; AC4 ❌ `dismiss_stale_reviews_on_push: false`; AC6 ⏭️ custom merge queue doesn't fire native `merge_group` (see §15)                                                |
+| V9 re-run (LS-3977 fix)                                 | LS-3911 | 2026-04-30 | 🟡 Partial | AC1–AC3 ✅ AC5 ✅; AC4 🔴 dismiss works ✅ but TOCTOU race merges PR with dismissed review — LS-3990 filed; AC6 ⏭️ skip (see §16)                                                      |
+| V9 final (LS-3977 + LS-3990 fixes)                      | LS-3911 | 2026-04-30 | 🟡 Partial | AC1–AC3 ✅; AC4 ⏭️ PR merged before step-6 push possible (merge queue gates bot-review only); AC5 ⚠️ infra failure (pnpm cache tar); AC6 ⏭️ (see §17)                                  |
 | V19 — CODEOWNERS sensitive paths                        | LS-3921 | 2026-05-01 | 🔴 Fail    | AC1 ❌ AC2 ❌ — bot approval + CI pass → merge queue merged WITHOUT human CODEOWNERS approval; `require_code_owner_review:true` not enforced (see §18)                                 |
 
 ---
@@ -1170,26 +1170,26 @@ and G2 (CI must not run before review).
 
 ### Acceptance Criteria
 
-| #   | Criterion                                                                                               | Result     | Evidence                                                                                                                                                                                                                    |
-| --- | ------------------------------------------------------------------------------------------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| AC1 | CI orchestrator did NOT run on PR open                                                                  | ✅ Pass    | PR #3446 opened as draft; no CI Orchestrator runs observed on branch while in draft state                                                                                                                                   |
-| AC2 | CI orchestrator did NOT run on push (synchronize)                                                       | ✅ Pass    | After marking ready: W1 run fired; no CI Orchestrator run on `pull_request` push events; only `check-conflicts.yml` and similar standalone checks fire                                                                      |
-| AC3 | CI orchestrator ran exactly when reviewer's APPROVE was posted                                          | ✅ Pass    | [CI Orchestrator run 25090790310](https://github.com/bkrupa/legacy-sports/actions/runs/25090790310) triggered by `pull_request_review.submitted` from `legacy-sports-review-bot[bot]`                                       |
-| AC4 | After post-approval push: approval dismissed, CI cancelled, no new CI run until re-approval             | ❌ Fail    | Bot APPROVE was NOT dismissed after push — `dismiss_stale_reviews_on_push: false` in Protect Main ruleset. In-progress CI was also NOT cancelled (intentional `cancel-in-progress: false`). LS-3977 filed.                  |
-| AC5 | All 6 required status checks reported on the approved-state SHA                                         | ✅ Pass    | All 5 CI pipeline jobs (format, lint, test, build, custom-checks) ran to `success` on approved SHA; E2E skipped (no affected projects); 6th check `bot-review` set by reviewer script                                      |
-| AC6 | On `merge_group` event (when added to queue), CI runs again on the merge_group commit                   | ⏭️ Skip    | Custom `merge-queue.yml` uses `workflow_run` / `pull_request_review` triggers; GitHub's native `merge_group` event is never generated — `on: merge_group` in `ci-orchestrator.yml` is untested by current tooling           |
+| #   | Criterion                                                                                   | Result  | Evidence                                                                                                                                                                                                          |
+| --- | ------------------------------------------------------------------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AC1 | CI orchestrator did NOT run on PR open                                                      | ✅ Pass | PR #3446 opened as draft; no CI Orchestrator runs observed on branch while in draft state                                                                                                                         |
+| AC2 | CI orchestrator did NOT run on push (synchronize)                                           | ✅ Pass | After marking ready: W1 run fired; no CI Orchestrator run on `pull_request` push events; only `check-conflicts.yml` and similar standalone checks fire                                                            |
+| AC3 | CI orchestrator ran exactly when reviewer's APPROVE was posted                              | ✅ Pass | [CI Orchestrator run 25090790310](https://github.com/bkrupa/legacy-sports/actions/runs/25090790310) triggered by `pull_request_review.submitted` from `legacy-sports-review-bot[bot]`                             |
+| AC4 | After post-approval push: approval dismissed, CI cancelled, no new CI run until re-approval | ❌ Fail | Bot APPROVE was NOT dismissed after push — `dismiss_stale_reviews_on_push: false` in Protect Main ruleset. In-progress CI was also NOT cancelled (intentional `cancel-in-progress: false`). LS-3977 filed.        |
+| AC5 | All 6 required status checks reported on the approved-state SHA                             | ✅ Pass | All 5 CI pipeline jobs (format, lint, test, build, custom-checks) ran to `success` on approved SHA; E2E skipped (no affected projects); 6th check `bot-review` set by reviewer script                             |
+| AC6 | On `merge_group` event (when added to queue), CI runs again on the merge_group commit       | ⏭️ Skip | Custom `merge-queue.yml` uses `workflow_run` / `pull_request_review` triggers; GitHub's native `merge_group` event is never generated — `on: merge_group` in `ci-orchestrator.yml` is untested by current tooling |
 
 ### Walkthrough Execution
 
-| Step | Action                                                        | Observed                                                                                                                             |
-| ---- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| 1    | Opened draft PR #3446 with trivial probe                      | No W1 or CI Orchestrator runs while draft                                                                                            |
-| 2    | Marked PR ready_for_review                                    | W1 fired (ready_for_review); CI Orchestrator did NOT fire                                                                            |
-| 3    | W1 C1 APPROVE (clean probe, 0 findings)                       | [W1 run 25090778150](https://github.com/bkrupa/legacy-sports/actions/runs/25090778150) posted APPROVE                               |
-| 4    | CI Orchestrator triggered by bot APPROVE                      | [Run 25090790310](https://github.com/bkrupa/legacy-sports/actions/runs/25090790310): all 5 pipeline jobs passed                     |
-| 5    | Pushed new commit (step-6 post-approval push)                 | No CI Orchestrator run; only `check-conflicts.yml` fired; bot APPROVE remained active (not dismissed)                                |
-| 6    | Applied `bot:ready-for-review` → re-triggered W1              | [W1 run 25090969581](https://github.com/bkrupa/legacy-sports/actions/runs/25090969581): APPROVE on new SHA                          |
-| 7    | CI Orchestrator triggered by re-APPROVE                       | [Run 25090985575](https://github.com/bkrupa/legacy-sports/actions/runs/25090985575): all 5 pipeline jobs passed on new SHA          |
+| Step | Action                                           | Observed                                                                                                                   |
+| ---- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| 1    | Opened draft PR #3446 with trivial probe         | No W1 or CI Orchestrator runs while draft                                                                                  |
+| 2    | Marked PR ready_for_review                       | W1 fired (ready_for_review); CI Orchestrator did NOT fire                                                                  |
+| 3    | W1 C1 APPROVE (clean probe, 0 findings)          | [W1 run 25090778150](https://github.com/bkrupa/legacy-sports/actions/runs/25090778150) posted APPROVE                      |
+| 4    | CI Orchestrator triggered by bot APPROVE         | [Run 25090790310](https://github.com/bkrupa/legacy-sports/actions/runs/25090790310): all 5 pipeline jobs passed            |
+| 5    | Pushed new commit (step-6 post-approval push)    | No CI Orchestrator run; only `check-conflicts.yml` fired; bot APPROVE remained active (not dismissed)                      |
+| 6    | Applied `bot:ready-for-review` → re-triggered W1 | [W1 run 25090969581](https://github.com/bkrupa/legacy-sports/actions/runs/25090969581): APPROVE on new SHA                 |
+| 7    | CI Orchestrator triggered by re-APPROVE          | [Run 25090985575](https://github.com/bkrupa/legacy-sports/actions/runs/25090985575): all 5 pipeline jobs passed on new SHA |
 
 ### Evidence
 
@@ -1254,8 +1254,8 @@ the merge queue approach.
 
 ### Issues Spawned
 
-| Ticket                                                 | Summary                                                                                                                                              |
-| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Ticket                                                 | Summary                                                                                                                                                |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | [LS-3977](https://bkrupa.atlassian.net/browse/LS-3977) | [CI Rebuild Bug] `dismiss_stale_reviews_on_push: false` — bot APPROVE persists after push; anti-stale-code relies solely on SHA-specific commit status |
 
 ---
@@ -1276,26 +1276,26 @@ race (LS-3990).
 
 ### Acceptance Criteria
 
-| #   | Criterion                                                                                               | Result     | Evidence                                                                                                                                                                                                                                    |
-| --- | ------------------------------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| AC1 | No W1 or CI Orchestrator runs while PR is draft                                                         | ✅ Pass    | PR #3482 opened as draft; no W1 or CI Orchestrator runs observed while in draft state                                                                                                                                                       |
-| AC2 | No CI Orchestrator run on push to a non-draft PR                                                        | ✅ Pass    | After marking ready, no CI Orchestrator run on `pull_request` push events; only standalone checks (`check-conflicts.yml`) fire                                                                                                              |
-| AC3 | CI Orchestrator fires exactly once on bot APPROVE (`pull_request_review.submitted`)                     | ✅ Pass    | [CI Orchestrator run 25179808278](https://github.com/bkrupa/legacy-sports/actions/runs/25179808278) triggered by `pull_request_review.submitted` from `legacy-sports-review-bot[bot]`; all quality jobs passed                              |
-| AC4 | After step-6 push: approval dismissed; CI does NOT re-run until re-approved                             | 🔴 Partial | Dismiss ✅ — `legacy-sports-review-bot DISMISSED` at 17:30:29Z (LS-3977 fix confirmed). Gate ❌ — merge queue merged PR at 17:31:46Z, 37s before re-APPROVE at 17:32:23Z — TOCTOU race (LS-3990)                                            |
-| AC5 | All 6 required status checks reported on approved SHA                                                   | ✅ Pass    | All 6 statuses set to `success` on SHA `3cebbd4f` by CI Orchestrator run 25179808278 (format, lint, test, build, custom-checks, bot-review)                                                                                                 |
-| AC6 | Merge queue fires on `merge_group` event after CI passes                                                | ⏭️ Skip    | Same as §15 — custom `merge-queue.yml` doesn't generate `merge_group` events                                                                                                                                                                |
+| #   | Criterion                                                                           | Result     | Evidence                                                                                                                                                                                                       |
+| --- | ----------------------------------------------------------------------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AC1 | No W1 or CI Orchestrator runs while PR is draft                                     | ✅ Pass    | PR #3482 opened as draft; no W1 or CI Orchestrator runs observed while in draft state                                                                                                                          |
+| AC2 | No CI Orchestrator run on push to a non-draft PR                                    | ✅ Pass    | After marking ready, no CI Orchestrator run on `pull_request` push events; only standalone checks (`check-conflicts.yml`) fire                                                                                 |
+| AC3 | CI Orchestrator fires exactly once on bot APPROVE (`pull_request_review.submitted`) | ✅ Pass    | [CI Orchestrator run 25179808278](https://github.com/bkrupa/legacy-sports/actions/runs/25179808278) triggered by `pull_request_review.submitted` from `legacy-sports-review-bot[bot]`; all quality jobs passed |
+| AC4 | After step-6 push: approval dismissed; CI does NOT re-run until re-approved         | 🔴 Partial | Dismiss ✅ — `legacy-sports-review-bot DISMISSED` at 17:30:29Z (LS-3977 fix confirmed). Gate ❌ — merge queue merged PR at 17:31:46Z, 37s before re-APPROVE at 17:32:23Z — TOCTOU race (LS-3990)               |
+| AC5 | All 6 required status checks reported on approved SHA                               | ✅ Pass    | All 6 statuses set to `success` on SHA `3cebbd4f` by CI Orchestrator run 25179808278 (format, lint, test, build, custom-checks, bot-review)                                                                    |
+| AC6 | Merge queue fires on `merge_group` event after CI passes                            | ⏭️ Skip    | Same as §15 — custom `merge-queue.yml` doesn't generate `merge_group` events                                                                                                                                   |
 
 ### Walkthrough Execution
 
-| Step | Action                                                    | Observed                                                                                                                                                                                 |
-| ---- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1    | Created branch, pushed probe file, opened draft PR #3482  | No W1 or CI Orchestrator runs while draft                                                                                                                                                |
-| 2    | Marked PR ready_for_review                                | W1 triggered; CI Orchestrator did NOT fire                                                                                                                                               |
-| 3    | W1 Cycle 1 APPROVE (clean probe, 0 findings)              | Bot APPROVED at 17:30:16Z                                                                                                                                                                |
-| 4    | CI Orchestrator 25179808278 triggered by bot APPROVE      | All 5 pipeline jobs passed; 6 commit statuses set on SHA `3cebbd4f`; `bot-review: success`                                                                                               |
-| 5    | `merge-when-ready` label confirmed                        | ✅                                                                                                                                                                                       |
-| 6    | Pushed new commit SHA `2aff2388b` (step-6 post-approval)  | Bot APPROVE dismissed at 17:30:29Z (`legacy-sports-review-bot DISMISSED` in review list) — LS-3977 fix confirmed ✅                                                                      |
-| 7    | Observed merge gate before re-approval                    | ❌ PR merged at 17:31:46Z via merge queue run 25180121244 — before re-APPROVE at 17:32:23Z; TOCTOU race between `workflow_run` trigger and post-approve-push (LS-3990)                   |
+| Step | Action                                                   | Observed                                                                                                                                                               |
+| ---- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | Created branch, pushed probe file, opened draft PR #3482 | No W1 or CI Orchestrator runs while draft                                                                                                                              |
+| 2    | Marked PR ready_for_review                               | W1 triggered; CI Orchestrator did NOT fire                                                                                                                             |
+| 3    | W1 Cycle 1 APPROVE (clean probe, 0 findings)             | Bot APPROVED at 17:30:16Z                                                                                                                                              |
+| 4    | CI Orchestrator 25179808278 triggered by bot APPROVE     | All 5 pipeline jobs passed; 6 commit statuses set on SHA `3cebbd4f`; `bot-review: success`                                                                             |
+| 5    | `merge-when-ready` label confirmed                       | ✅                                                                                                                                                                     |
+| 6    | Pushed new commit SHA `2aff2388b` (step-6 post-approval) | Bot APPROVE dismissed at 17:30:29Z (`legacy-sports-review-bot DISMISSED` in review list) — LS-3977 fix confirmed ✅                                                    |
+| 7    | Observed merge gate before re-approval                   | ❌ PR merged at 17:31:46Z via merge queue run 25180121244 — before re-APPROVE at 17:32:23Z; TOCTOU race between `workflow_run` trigger and post-approve-push (LS-3990) |
 
 ### Evidence
 
@@ -1352,9 +1352,9 @@ Same as §15. The `on: merge_group` trigger in `ci-orchestrator.yml` is not exer
 
 ### Issues Spawned
 
-| Ticket                                                 | Summary                                                                                                                                              |
-| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [LS-3990](https://bkrupa.atlassian.net/browse/LS-3990) | [CI Rebuild Bug] Merge queue merges PR with dismissed bot review — TOCTOU race in `workflow_run` trigger path; unreviewed code lands on main          |
+| Ticket                                                 | Summary                                                                                                                                      |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| [LS-3990](https://bkrupa.atlassian.net/browse/LS-3990) | [CI Rebuild Bug] Merge queue merges PR with dismissed bot review — TOCTOU race in `workflow_run` trigger path; unreviewed code lands on main |
 
 ---
 
@@ -1372,34 +1372,34 @@ merged to main. Validates §3.1, §6.2, §3.4, §14, and G2.
 
 ### Acceptance Criteria
 
-| #   | Criterion                                                                                               | Result     | Evidence                                                                                                                                                                                                                                                                                                                  |
-| --- | ------------------------------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| AC1 | No W1 or CI Orchestrator runs while PR is draft                                                         | ✅ Pass    | PR #3499 opened as draft; no W1 or CI Orchestrator runs while in draft state                                                                                                                                                                                                                                              |
-| AC2 | No CI Orchestrator run on push (synchronize); W1 fires on `ready_for_review`                            | ✅ Pass    | W1 run 25189012779 triggered by `ready_for_review`; CI Orchestrator absent on push events                                                                                                                                                                                                                                 |
-| AC3 | CI Orchestrator fires exactly once on bot APPROVE (`pull_request_review.submitted`)                     | ✅ Pass    | [CI Orchestrator run 25189034605](https://github.com/bkrupa/legacy-sports/actions/runs/25189034605) triggered by `pull_request_review.submitted` from `legacy-sports-review-bot[bot]` (W1 run 25189012779)                                                                                                                |
-| AC4 | After step-6 push: approval dismissed; CI does NOT re-run until re-approval                             | ⏭️ Skip    | PR merged by merge queue via `pull_request_review` trigger immediately after W1 APPROVE (at 21:01:05Z, before CI even started at 21:03:03Z). Merge queue gates on `bot-review: success` only (the single required branch-protection check). No window for post-approval push. AC4 verified contextually via §15 and §16.  |
-| AC5 | All 6 required status checks reported on approved SHA                                                   | ⚠️ Infra   | CI Orchestrator run 25189034605: format ✅, lint/test/build/custom-checks ❌ — all failed with `/usr/bin/tar: Cannot mkdir: No such file or directory` for pnpm cache. Transient runner infrastructure failure; unrelated to PR content. `bot-review: success` set by W1. Prior runs confirm pipeline passes on clean probes. |
-| AC6 | Merge queue fires on `merge_group` event after CI passes                                                | ⏭️ Skip    | Same as §15/§16 — custom `merge-queue.yml` doesn't generate `merge_group` events                                                                                                                                                                                                                                          |
+| #   | Criterion                                                                           | Result   | Evidence                                                                                                                                                                                                                                                                                                                      |
+| --- | ----------------------------------------------------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AC1 | No W1 or CI Orchestrator runs while PR is draft                                     | ✅ Pass  | PR #3499 opened as draft; no W1 or CI Orchestrator runs while in draft state                                                                                                                                                                                                                                                  |
+| AC2 | No CI Orchestrator run on push (synchronize); W1 fires on `ready_for_review`        | ✅ Pass  | W1 run 25189012779 triggered by `ready_for_review`; CI Orchestrator absent on push events                                                                                                                                                                                                                                     |
+| AC3 | CI Orchestrator fires exactly once on bot APPROVE (`pull_request_review.submitted`) | ✅ Pass  | [CI Orchestrator run 25189034605](https://github.com/bkrupa/legacy-sports/actions/runs/25189034605) triggered by `pull_request_review.submitted` from `legacy-sports-review-bot[bot]` (W1 run 25189012779)                                                                                                                    |
+| AC4 | After step-6 push: approval dismissed; CI does NOT re-run until re-approval         | ⏭️ Skip  | PR merged by merge queue via `pull_request_review` trigger immediately after W1 APPROVE (at 21:01:05Z, before CI even started at 21:03:03Z). Merge queue gates on `bot-review: success` only (the single required branch-protection check). No window for post-approval push. AC4 verified contextually via §15 and §16.      |
+| AC5 | All 6 required status checks reported on approved SHA                               | ⚠️ Infra | CI Orchestrator run 25189034605: format ✅, lint/test/build/custom-checks ❌ — all failed with `/usr/bin/tar: Cannot mkdir: No such file or directory` for pnpm cache. Transient runner infrastructure failure; unrelated to PR content. `bot-review: success` set by W1. Prior runs confirm pipeline passes on clean probes. |
+| AC6 | Merge queue fires on `merge_group` event after CI passes                            | ⏭️ Skip  | Same as §15/§16 — custom `merge-queue.yml` doesn't generate `merge_group` events                                                                                                                                                                                                                                              |
 
 ### Walkthrough Execution
 
-| Step | Action                                                    | Observed                                                                                                                                                         |
-| ---- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1    | Created branch, pushed probe file, opened draft PR #3499  | No W1 or CI Orchestrator runs while draft                                                                                                                        |
-| 2    | Marked PR ready_for_review                                | W1 run 25189012779 triggered; CI Orchestrator did NOT fire on push                                                                                               |
-| 3    | W1 Cycle 1 APPROVE (clean probe, 0 findings)              | Bot APPROVED at ~20:59:13Z; `bot-review: success` status set on SHA `a3ec3452`                                                                                   |
+| Step | Action                                                    | Observed                                                                                                                                                            |
+| ---- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | Created branch, pushed probe file, opened draft PR #3499  | No W1 or CI Orchestrator runs while draft                                                                                                                           |
+| 2    | Marked PR ready_for_review                                | W1 run 25189012779 triggered; CI Orchestrator did NOT fire on push                                                                                                  |
+| 3    | W1 Cycle 1 APPROVE (clean probe, 0 findings)              | Bot APPROVED at ~20:59:13Z; `bot-review: success` status set on SHA `a3ec3452`                                                                                      |
 | 4    | CI Orchestrator 25189034605 triggered by bot APPROVE      | Triggered by `pull_request_review.submitted`; SHA Sanity ✅, Workflow Scope ✅, Detect Changes ✅, Label PR ✅; pipeline jobs ran but failed (pnpm cache tar error) |
-| 5    | Enhanced Merge Queue 25189034545 triggered by bot APPROVE | PR merged at 21:01:05Z via `pull_request_review` trigger — before CI even started (21:03:03Z). Merge gate: `bot-review: success` on SHA `a3ec3452` ✅             |
-| 6    | Step-6 push (post-approval commit)                        | ⏭️ Not reached — PR already merged at step 5                                                                                                                     |
+| 5    | Enhanced Merge Queue 25189034545 triggered by bot APPROVE | PR merged at 21:01:05Z via `pull_request_review` trigger — before CI even started (21:03:03Z). Merge gate: `bot-review: success` on SHA `a3ec3452` ✅               |
+| 6    | Step-6 push (post-approval commit)                        | ⏭️ Not reached — PR already merged at step 5                                                                                                                        |
 
 ### Evidence
 
-| Artifact                                    | Link                                                             |
-| ------------------------------------------- | ---------------------------------------------------------------- |
-| Test PR #3499 (merged)                      | https://github.com/bkrupa/legacy-sports/pull/3499                |
-| W1 run (APPROVE on first pass)              | https://github.com/bkrupa/legacy-sports/actions/runs/25189012779 |
-| CI Orchestrator run (on bot APPROVE)        | https://github.com/bkrupa/legacy-sports/actions/runs/25189034605 |
-| Enhanced Merge Queue run (merged PR)        | https://github.com/bkrupa/legacy-sports/actions/runs/25189034545 |
+| Artifact                             | Link                                                             |
+| ------------------------------------ | ---------------------------------------------------------------- |
+| Test PR #3499 (merged)               | https://github.com/bkrupa/legacy-sports/pull/3499                |
+| W1 run (APPROVE on first pass)       | https://github.com/bkrupa/legacy-sports/actions/runs/25189012779 |
+| CI Orchestrator run (on bot APPROVE) | https://github.com/bkrupa/legacy-sports/actions/runs/25189034605 |
+| Enhanced Merge Queue run (merged PR) | https://github.com/bkrupa/legacy-sports/actions/runs/25189034545 |
 
 ### Observed Behavior
 
@@ -1413,6 +1413,7 @@ started (21:03:03Z). The merge queue's required-check validation found only `bot
 present (the sole required branch-protection check for `main`), satisfied it, and merged. Because
 the merge completed before we could execute the step-6 post-approval push, AC4 was not testable
 in this run. AC4 is covered contextually:
+
 - §15 confirmed that `bot-review: success` is SHA-specific (new SHA blocks merge after push even without dismiss)
 - §16 confirmed LS-3977 dismiss fires correctly + identified LS-3990 TOCTOU in `workflow_run` path
 - LS-3990 SHA guard closes the `workflow_run` race window; the `pull_request_review` path merges before a push is possible (not a race — it's sequential)
@@ -1464,6 +1465,7 @@ The V9 validation series (§15, §16, §17) has confirmed:
    re-fetch + 422 re-queue handler.
 5. **Merge queue gates on `bot-review: success`** — the sole required branch-protection check;
    CI pipeline jobs are supplementary quality gates, not blocking merge requirements.
+
 ## §18 V19 — CODEOWNERS Sensitive Paths
 
 **Description:** Validate that a PR touching a CODEOWNERS-protected path (`lambdas/oauth-proxy/**`,
@@ -1479,30 +1481,30 @@ and whether the merge queue correctly blocks on unmet CODEOWNERS requirements.
 
 ### Acceptance Criteria
 
-| #   | Criterion                                                                     | Result       | Evidence                                                                                                                                                                                                |
-| --- | ----------------------------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| AC1 | Bot approved but PR still shows pending CODEOWNERS approval for sensitive path | ❌ Fail      | GitHub `mergeStateStatus` = `CLEAN` immediately after bot APPROVE — no CODEOWNERS-pending state ever surfaced. `reviewDecision` field returned empty (not `REVIEW_REQUIRED`).                            |
-| AC2 | PR explicitly cannot merge until human CODEOWNER approval lands                | ❌ Fail      | Merge queue run [25202728370](https://github.com/bkrupa/legacy-sports/actions/runs/25202728370) declared `✅ PR #3539 is ready for merge` and merged it to `main` WITHOUT any `@bkrupa` approval.       |
-| AC3 | After human approval: PR mergeable; merge queue accepts                        | ⏭️ Skip     | Never reached — PR merged before human approval was possible.                                                                                                                                            |
-| AC4 | No additional bot approval needed after human approves                         | ⏭️ Skip     | Never reached — see AC3.                                                                                                                                                                                 |
+| #   | Criterion                                                                      | Result  | Evidence                                                                                                                                                                                          |
+| --- | ------------------------------------------------------------------------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AC1 | Bot approved but PR still shows pending CODEOWNERS approval for sensitive path | ❌ Fail | GitHub `mergeStateStatus` = `CLEAN` immediately after bot APPROVE — no CODEOWNERS-pending state ever surfaced. `reviewDecision` field returned empty (not `REVIEW_REQUIRED`).                     |
+| AC2 | PR explicitly cannot merge until human CODEOWNER approval lands                | ❌ Fail | Merge queue run [25202728370](https://github.com/bkrupa/legacy-sports/actions/runs/25202728370) declared `✅ PR #3539 is ready for merge` and merged it to `main` WITHOUT any `@bkrupa` approval. |
+| AC3 | After human approval: PR mergeable; merge queue accepts                        | ⏭️ Skip | Never reached — PR merged before human approval was possible.                                                                                                                                     |
+| AC4 | No additional bot approval needed after human approves                         | ⏭️ Skip | Never reached — see AC3.                                                                                                                                                                          |
 
 ### Walkthrough Execution
 
-| Step | Action                                                   | Observed                                                                                                                                                                |
-| ---- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1    | Push probe file to `lambdas/oauth-proxy/`; create draft PR #3539; mark ready | W1 run 25202563058 fired on `ready_for_review`; W1 posted APPROVE "LGTM — no blocking findings." at `04:42:37Z` for commit `28fe650c7`                                 |
-| 2    | Check GitHub UI for pending CODEOWNERS state             | `mergeStateStatus: CLEAN`; `reviewDecision: ""`; no CODEOWNERS-pending indicator — GitHub treated the PR as fully approved                                               |
-| 3    | Check if merge blocked without human approval            | Merge queue (25202575526) fired immediately; blocked only on CI-in-progress (not on CODEOWNERS). After CI completed, merge queue (25202728370) merged the PR to `main`. |
-| 4    | (Manual step) Have @bkrupa approve as CODEOWNER          | Never reached — PR merged by merge queue before any human approval                                                                                                      |
+| Step | Action                                                                       | Observed                                                                                                                                                                |
+| ---- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | Push probe file to `lambdas/oauth-proxy/`; create draft PR #3539; mark ready | W1 run 25202563058 fired on `ready_for_review`; W1 posted APPROVE "LGTM — no blocking findings." at `04:42:37Z` for commit `28fe650c7`                                  |
+| 2    | Check GitHub UI for pending CODEOWNERS state                                 | `mergeStateStatus: CLEAN`; `reviewDecision: ""`; no CODEOWNERS-pending indicator — GitHub treated the PR as fully approved                                              |
+| 3    | Check if merge blocked without human approval                                | Merge queue (25202575526) fired immediately; blocked only on CI-in-progress (not on CODEOWNERS). After CI completed, merge queue (25202728370) merged the PR to `main`. |
+| 4    | (Manual step) Have @bkrupa approve as CODEOWNER                              | Never reached — PR merged by merge queue before any human approval                                                                                                      |
 
 ### Evidence
 
-| Artifact                               | Link                                                             |
-| -------------------------------------- | ---------------------------------------------------------------- |
-| Test PR #3539                          | https://github.com/bkrupa/legacy-sports/pull/3539                |
-| W1 Reviewer run (APPROVE posted)       | https://github.com/bkrupa/legacy-sports/actions/runs/25202563058 |
-| CI Orchestrator run (all green)        | https://github.com/bkrupa/legacy-sports/actions/runs/25202575520 |
-| Merge queue run (PR merged)            | https://github.com/bkrupa/legacy-sports/actions/runs/25202728370 |
+| Artifact                                           | Link                                                              |
+| -------------------------------------------------- | ----------------------------------------------------------------- |
+| Test PR #3539                                      | https://github.com/bkrupa/legacy-sports/pull/3539                 |
+| W1 Reviewer run (APPROVE posted)                   | https://github.com/bkrupa/legacy-sports/actions/runs/25202563058  |
+| CI Orchestrator run (all green)                    | https://github.com/bkrupa/legacy-sports/actions/runs/25202575520  |
+| Merge queue run (PR merged)                        | https://github.com/bkrupa/legacy-sports/actions/runs/25202728370  |
 | Merge queue log: "✅ Successfully merged PR #3539" | run 25202728370, `Process Enhanced Merge Queue` step, `04:49:52Z` |
 
 ### Observed Behavior
@@ -1559,6 +1561,6 @@ The CODEOWNERS security model is non-functional.
 
 ### Issues Spawned
 
-| Ticket | Summary |
-| ------ | ------- |
+| Ticket                   | Summary                                                                                                                                                                  |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | (TBD — filed separately) | [CI Rebuild Bug] CODEOWNERS enforcement bypassed — merge queue merges sensitive-path PRs without human CODEOWNER approval; `require_code_owner_review:true` not enforced |

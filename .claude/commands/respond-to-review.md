@@ -55,8 +55,8 @@ Choose the reply body based on the thread content and cycle:
 
 **Cycle 2 (FIX only):**
 
-| Situation       | Reply format |
-| --------------- | ------------ |
+| Situation        | Reply format |
+| ---------------- | ------------ |
 | Fix is committed | `FIX: <sha>` |
 
 > `JUSTIFY:` is rejected in Cycle 2 — that window closed at Cycle 1.

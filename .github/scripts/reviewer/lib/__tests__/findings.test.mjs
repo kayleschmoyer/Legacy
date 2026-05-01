@@ -75,6 +75,67 @@ describe('parseFindingsFromText', () => {
     assert.strictEqual(result.findings.length, 1);
   });
 
+  it('handles a prose preamble followed by an embedded ```json fenced block (Attempt 4)', () => {
+    const finding = {
+      severity: 'high',
+      file: 'src/auth.ts',
+      line: 5,
+      title: 'Missing guard',
+      body: 'Add a null check.',
+    };
+    const text = `Here is my review:\n\`\`\`json\n${JSON.stringify([finding])}\n\`\`\``;
+    const result = parseFindingsFromText(text);
+    assert.ok(result.ok);
+    assert.strictEqual(result.findings.length, 1);
+    assert.strictEqual(result.findings[0].title, 'Missing guard');
+  });
+
+  it('handles a single-line outer fence with no language tag (```{...}```)', () => {
+    const finding = {
+      severity: 'high',
+      file: null,
+      line: null,
+      title: 'Issue',
+      body: 'Fix it.',
+    };
+    const text = `\`\`\`${JSON.stringify([finding])}\`\`\``;
+    const result = parseFindingsFromText(text);
+    assert.ok(result.ok);
+    assert.strictEqual(result.findings.length, 1);
+    assert.strictEqual(result.findings[0].title, 'Issue');
+  });
+
+  it('handles a single-line outer fence with json language tag (```json {...}```)', () => {
+    const finding = {
+      severity: 'medium',
+      file: null,
+      line: null,
+      title: 'Warning',
+      body: 'Check this.',
+    };
+    const text = `\`\`\`json ${JSON.stringify([finding])}\`\`\``;
+    const result = parseFindingsFromText(text);
+    assert.ok(result.ok);
+    assert.strictEqual(result.findings.length, 1);
+    assert.strictEqual(result.findings[0].title, 'Warning');
+  });
+
+  it('handles a non-JSON fence before the ```json block (Attempt 4 scans past non-JSON fences)', () => {
+    const finding = {
+      severity: 'high',
+      file: 'src/auth.ts',
+      line: 5,
+      title: 'Missing guard',
+      body: 'Add a null check.',
+    };
+    // A ```js snippet appears before the actual ```json payload.
+    const text = `Here is an example:\n\`\`\`js\nconsole.log("hi");\n\`\`\`\n\nFindings:\n\`\`\`json\n${JSON.stringify([finding])}\n\`\`\``;
+    const result = parseFindingsFromText(text);
+    assert.ok(result.ok);
+    assert.strictEqual(result.findings.length, 1);
+    assert.strictEqual(result.findings[0].title, 'Missing guard');
+  });
+
   it('returns ok:false for pure prose with no JSON array', () => {
     const result = parseFindingsFromText(
       'This is a great PR! No issues found. Keep up the good work.',

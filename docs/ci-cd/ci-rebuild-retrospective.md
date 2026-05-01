@@ -11,30 +11,30 @@
 Baseline: last 90 days pre-migration (normalized to monthly).  
 Post: 30 days post-T29 (first full cycle available from ≈ 2026-05-27).
 
-| Category | Pre (monthly) | Post (monthly) | Δ | Notes |
-|---|---|---|---|---|
-| GitHub Actions minutes (paid overage) | _pending billing data_ | _pending_ | — | Expect ↓: lightweight jobs migrated to `ubuntu-latest`; cron AMI-prune eliminated |
-| AWS self-hosted runner instance + storage | _pending Cost Explorer_ | _pending_ | — | Runner fleet unchanged; SQS+DLQ removed (minimal line item) |
-| Copilot subscriptions (review-related seats) | _pending billing data_ | _pending_ | — | Copilot Coding Agent sunset (T24); CLI seat retained for CopilotCLIProvider fallback |
-| Anthropic API spend (fallback + steady-state) | $0 (pre-migration, no Anthropic reviewer) | _pending usage export_ | — | AnthropicProvider is fallback-only; per-PR cost cap in place |
-| LLM infra (S3 telemetry bucket, Discord webhook) | $0 | ~$0.01/mo S3 | +$0.01 | Reviewer telemetry S3 bucket added (T4); Discord webhook is free |
-| **Total** | _pending_ | _pending_ | — | |
+| Category                                         | Pre (monthly)                             | Post (monthly)         | Δ      | Notes                                                                                |
+| ------------------------------------------------ | ----------------------------------------- | ---------------------- | ------ | ------------------------------------------------------------------------------------ |
+| GitHub Actions minutes (paid overage)            | _pending billing data_                    | _pending_              | —      | Expect ↓: lightweight jobs migrated to `ubuntu-latest`; cron AMI-prune eliminated    |
+| AWS self-hosted runner instance + storage        | _pending Cost Explorer_                   | _pending_              | —      | Runner fleet unchanged; SQS+DLQ removed (minimal line item)                          |
+| Copilot subscriptions (review-related seats)     | _pending billing data_                    | _pending_              | —      | Copilot Coding Agent sunset (T24); CLI seat retained for CopilotCLIProvider fallback |
+| Anthropic API spend (fallback + steady-state)    | $0 (pre-migration, no Anthropic reviewer) | _pending usage export_ | —      | AnthropicProvider is fallback-only; per-PR cost cap in place                         |
+| LLM infra (S3 telemetry bucket, Discord webhook) | $0                                        | ~$0.01/mo S3           | +$0.01 | Reviewer telemetry S3 bucket added (T4); Discord webhook is free                     |
+| **Total**                                        | _pending_                                 | _pending_              | —      |                                                                                      |
 
 **Action required**: pull GitHub Actions billing and AWS Cost Explorer data once 30-day post-T29 window closes (~2026-05-27) and fill in the table above.
 
 ### Terraform Resources Destroyed (T16)
 
-| Resource | Type |
-|---|---|
-| `github_webhook_secret` | `aws_secretsmanager_secret` |
-| `github_bot_app_private_key` | `aws_secretsmanager_secret` |
-| `github_webhook_secret_name` | `aws_ssm_parameter` |
-| `github_webhook_race_check` | `aws_sqs_queue` |
-| `github_webhook_race_check_dlq` | `aws_sqs_queue` |
-| `github_webhook_lambda_race_check_sqs` | `aws_iam_policy` |
-| `github_webhook_lambda_race_check_sqs` | `aws_iam_role_policy_attachment` |
-| `github_webhook_race_check` (queue policy) | `aws_sqs_queue_policy` |
-| `github_webhook_race_check_sqs` | `aws_lambda_event_source_mapping` |
+| Resource                                   | Type                              |
+| ------------------------------------------ | --------------------------------- |
+| `github_webhook_secret`                    | `aws_secretsmanager_secret`       |
+| `github_bot_app_private_key`               | `aws_secretsmanager_secret`       |
+| `github_webhook_secret_name`               | `aws_ssm_parameter`               |
+| `github_webhook_race_check`                | `aws_sqs_queue`                   |
+| `github_webhook_race_check_dlq`            | `aws_sqs_queue`                   |
+| `github_webhook_lambda_race_check_sqs`     | `aws_iam_policy`                  |
+| `github_webhook_lambda_race_check_sqs`     | `aws_iam_role_policy_attachment`  |
+| `github_webhook_race_check` (queue policy) | `aws_sqs_queue_policy`            |
+| `github_webhook_race_check_sqs`            | `aws_lambda_event_source_mapping` |
 
 **Added**: 1 S3 bucket (`*-reviewer-telemetry`) for JSONL review telemetry (T4).
 
@@ -42,17 +42,17 @@ Post: 30 days post-T29 (first full cycle available from ≈ 2026-05-27).
 
 ## Operational Simplification
 
-| Metric | Value |
-|---|---|
-| Workflows decommissioned | 3 (`copilot-review-handler.yml`, `prune-runner-amis.yml`, `copilot-setup-steps.yml`) |
-| LOC removed from decommissioned workflows | ~398 lines (229 + 169 lines respectively for the two CI workflows) |
-| Lambda bot-review handlers deleted | 6 files (handle-pull-request, handle-pull-request-review, handle-review-thread, handle-workflow-run, handle-race-check, sqs-client + all tests) |
-| Lambda LOC net delta | −4,630 lines (`lambdas/github-webhook/`) |
-| Terraform LOC net delta | −93 lines |
-| Total repo LOC net delta across epic | −711 lines (96 files, +7,380 / −8,091) |
-| Workflows added | 4 (`review.yml`, `label-pager.yml`, `label-sync.yml`, `required-checks-lint.yml`) |
-| AMI lifecycle change | Cron prune workflow → event-driven drift-check + OIDC runner AMI rebuild |
-| Engineer hours/week saved on infra maintenance | ~2–3 hrs/week estimate (SQS queue monitoring, Copilot review triage, AMI cron babysitting eliminated) |
+| Metric                                         | Value                                                                                                                                           |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Workflows decommissioned                       | 3 (`copilot-review-handler.yml`, `prune-runner-amis.yml`, `copilot-setup-steps.yml`)                                                            |
+| LOC removed from decommissioned workflows      | ~398 lines (229 + 169 lines respectively for the two CI workflows)                                                                              |
+| Lambda bot-review handlers deleted             | 6 files (handle-pull-request, handle-pull-request-review, handle-review-thread, handle-workflow-run, handle-race-check, sqs-client + all tests) |
+| Lambda LOC net delta                           | −4,630 lines (`lambdas/github-webhook/`)                                                                                                        |
+| Terraform LOC net delta                        | −93 lines                                                                                                                                       |
+| Total repo LOC net delta across epic           | −711 lines (96 files, +7,380 / −8,091)                                                                                                          |
+| Workflows added                                | 4 (`review.yml`, `label-pager.yml`, `label-sync.yml`, `required-checks-lint.yml`)                                                               |
+| AMI lifecycle change                           | Cron prune workflow → event-driven drift-check + OIDC runner AMI rebuild                                                                        |
+| Engineer hours/week saved on infra maintenance | ~2–3 hrs/week estimate (SQS queue monitoring, Copilot review triage, AMI cron babysitting eliminated)                                           |
 
 ---
 
@@ -60,15 +60,15 @@ Post: 30 days post-T29 (first full cycle available from ≈ 2026-05-27).
 
 Measured 2026-04-27 (T29 merge) through 2026-04-27 (measurement date, ~0 days post-T29).
 
-| Escalation Label | PRs | Notes |
-|---|---|---|
-| `needs-human-arbitration` | 0 | |
-| `review-bot-degraded` | 0 | |
-| `ci-stuck` | 0 | |
-| `needs-human-security-review` | 0 | |
-| **Total escalations** | **0** | |
-| Post-T29 merged PRs | 35 | |
-| **Escalation rate** | **0%** | Target: <1% ✅ |
+| Escalation Label              | PRs    | Notes          |
+| ----------------------------- | ------ | -------------- |
+| `needs-human-arbitration`     | 0      |                |
+| `review-bot-degraded`         | 0      |                |
+| `ci-stuck`                    | 0      |                |
+| `needs-human-security-review` | 0      |                |
+| **Total escalations**         | **0**  |                |
+| Post-T29 merged PRs           | 35     |                |
+| **Escalation rate**           | **0%** | Target: <1% ✅ |
 
 > Note: measurement window is ~0 days (T29 merged same day). Re-run this query after 30 days (~2026-05-27) for a statistically meaningful sample.
 
@@ -90,7 +90,7 @@ Measured 2026-04-27 (T29 merge) through 2026-04-27 (measurement date, ~0 days po
 
 - **T24 (sunset Copilot Coding Agent)** required a separate ticket from T16 (decommission review handler) because the `copilot-setup-steps.yml` file wasn't in scope of the original decommission pass. The two concerns (Copilot review bot vs. Copilot Coding Agent) were conflated in early planning; they should have been split from the start.
 - **Cost reconciliation table remains partially unfilled** — billing data from GitHub Actions, AWS Cost Explorer, and Anthropic API isn't accessible at build time. The table is scaffolded; a human needs to pull actuals after the 30-day post-T29 window closes.
-- **The "30 days post-T29" stuck-PR rate measurement** is inherently deferred — T30 can be completed in code today but the stuck-PR *data* isn't available yet. This is a design limitation of the ticket: a close task that depends on future observability data should either be time-boxed or split into a follow-up ticket.
+- **The "30 days post-T29" stuck-PR rate measurement** is inherently deferred — T30 can be completed in code today but the stuck-PR _data_ isn't available yet. This is a design limitation of the ticket: a close task that depends on future observability data should either be time-boxed or split into a follow-up ticket.
 
 ### Phases That Took Longer Than Estimated
 

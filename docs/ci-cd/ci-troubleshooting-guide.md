@@ -8,16 +8,16 @@
 
 The `summarize` job applies a specific label for the failing stage:
 
-| Label | Failing stage | First command to run |
-|-------|--------------|---------------------|
-| `CI: Formatting` | Prettier check | `pnpm exec nx format:write` |
-| `CI: Lint Failure` | ESLint | `pnpm exec nx affected -t lint --fix` |
-| `CI: Type Error` | TypeScript | `pnpm exec nx affected -t typecheck` |
-| `CI: Test Failure` | Jest tests | `pnpm exec nx affected -t test` |
-| `CI: Build Failure` | Build validation | `pnpm exec nx affected -t build` |
-| `CI: E2E Failure` | Playwright | `pnpm exec nx e2e web-e2e -- --grep='@critical'` |
-| `CI: Quality Gates` | Setup/infra failure | Rerun the workflow first |
-| `CI: Migration Immutability` | Migration edited | Revert the migration file change |
+| Label                        | Failing stage       | First command to run                             |
+| ---------------------------- | ------------------- | ------------------------------------------------ |
+| `CI: Formatting`             | Prettier check      | `pnpm exec nx format:write`                      |
+| `CI: Lint Failure`           | ESLint              | `pnpm exec nx affected -t lint --fix`            |
+| `CI: Type Error`             | TypeScript          | `pnpm exec nx affected -t typecheck`             |
+| `CI: Test Failure`           | Jest tests          | `pnpm exec nx affected -t test`                  |
+| `CI: Build Failure`          | Build validation    | `pnpm exec nx affected -t build`                 |
+| `CI: E2E Failure`            | Playwright          | `pnpm exec nx e2e web-e2e -- --grep='@critical'` |
+| `CI: Quality Gates`          | Setup/infra failure | Rerun the workflow first                         |
+| `CI: Migration Immutability` | Migration edited    | Revert the migration file change                 |
 
 ### Step 2: Read the PR comment
 
@@ -48,6 +48,7 @@ CI runs only when:
 3. Manual workflow dispatch
 
 CI does **not** run on every push. If CI hasn't started, ensure:
+
 - Your PR is not a draft (`Mark as ready for review`)
 - The Code Reviewer Bot has been invited to review (it triggers automatically on non-draft, non-fork PRs)
 
@@ -102,6 +103,7 @@ pnpm exec nx affected -t build
 ```
 
 Read for `Module not found`, `Cannot find`, or `BUILD FAILED`. Common causes:
+
 - Missing import or incorrect path
 - Environment variable expected at build time
 - Type error that only surfaces during bundling
@@ -148,6 +150,7 @@ Full protocol in `AGENTS.md §8`. Use `/respond-to-review` to scaffold structure
 ### `bot-review: pending` — review not started
 
 Ensure the PR is not a draft. The reviewer fires on `opened`/`ready_for_review` events. If the reviewer didn't fire:
+
 - Check the Actions tab for a `Reviewer (W1)` run
 - If missing, manually trigger: `gh workflow run review.yml -f pull_number=<PR#>`
 
@@ -201,12 +204,12 @@ See [merge-queue-guide.md](merge-queue-guide.md) for the full merge queue refere
 
 **Common blockers:**
 
-| Symptom | Cause | Fix |
-|---------|-------|-----|
-| PR not merging after CI passes | 30 s debounce | Wait 60 s; check merge queue workflow run |
-| "Unresolved review threads" | Human or bot threads open | Resolve all threads in Files Changed tab |
-| "Status checks failing" | CI or bot-review failure | Fix the failing check |
-| Queue appears stuck | Race condition | Remove and re-add `merge-when-ready` label |
+| Symptom                        | Cause                     | Fix                                        |
+| ------------------------------ | ------------------------- | ------------------------------------------ |
+| PR not merging after CI passes | 30 s debounce             | Wait 60 s; check merge queue workflow run  |
+| "Unresolved review threads"    | Human or bot threads open | Resolve all threads in Files Changed tab   |
+| "Status checks failing"        | CI or bot-review failure  | Fix the failing check                      |
+| Queue appears stuck            | Race condition            | Remove and re-add `merge-when-ready` label |
 
 ## Deployment Issues
 
@@ -236,11 +239,11 @@ gh run list --workflow lambda-terraform-apply.yml --limit 5
 
 CI workflows post to Discord via channel-specific webhooks:
 
-| Secret | Used by |
-|--------|---------|
-| `DISCORD_CI_WEBHOOK_URL` | Playwright tests, CI pipeline |
-| `DISCORD_DEPLOY_WEBHOOK_URL` | Web deploys, Lambda Terraform, rollbacks |
-| `DISCORD_RELEASE_WEBHOOK_URL` | iOS/Android builds, web release summary |
+| Secret                        | Used by                                  |
+| ----------------------------- | ---------------------------------------- |
+| `DISCORD_CI_WEBHOOK_URL`      | Playwright tests, CI pipeline            |
+| `DISCORD_DEPLOY_WEBHOOK_URL`  | Web deploys, Lambda Terraform, rollbacks |
+| `DISCORD_RELEASE_WEBHOOK_URL` | iOS/Android builds, web release summary  |
 
 Update webhooks in GitHub **Settings → Secrets and variables → Actions**.
 
@@ -263,6 +266,7 @@ See [nx-remote-caching-implementation.md](nx-remote-caching-implementation.md).
 ## Performance
 
 Target CI times: quality-gates 30 min, build-validation 30 min, E2E 30 min. If significantly slower:
+
 - Check `NX_PARALLEL` is set (defaults to 3 in `ci-pipeline.yml`)
 - Check for dependency bottlenecks in the Nx task graph
 

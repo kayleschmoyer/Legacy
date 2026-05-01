@@ -838,6 +838,362 @@ describe('GeminiProvider', () => {
     });
   });
 
+  describe('MALFORMED_FUNCTION_CALL free-form fallback (LS-4109)', () => {
+    function buildMalformedResponse() {
+      return jsonResponse({
+        candidates: [
+          { finishReason: 'MALFORMED_FUNCTION_CALL', content: { parts: [] } },
+        ],
+        usageMetadata: { promptTokenCount: 100, candidatesTokenCount: 0 },
+      });
+    }
+
+    function buildFreeFormResponse(text) {
+      return jsonResponse({
+        candidates: [
+          {
+            finishReason: 'STOP',
+            content: { parts: [{ text }] },
+          },
+        ],
+        usageMetadata: {
+          promptTokenCount: 200,
+          cachedContentTokenCount: 0,
+          candidatesTokenCount: 50,
+        },
+      });
+    }
+
+    it('increments _consecutiveMalformedCount on each MALFORMED_FUNCTION_CALL', async () => {
+      const p = new GeminiProvider({ apiKey: 'stub', useExplicitCache: false });
+      stubFetch(() => buildMalformedResponse());
+
+      await assert.rejects(() => p.review({ system: 's', user: 'u' }));
+      assert.strictEqual(p._consecutiveMalformedCount, 1);
+
+      await assert.rejects(() => p.review({ system: 's', user: 'u' }));
+      assert.strictEqual(p._consecutiveMalformedCount, 2);
+    });
+
+    it('switches to free-form mode after MALFORMED_FREEFORM_THRESHOLD consecutive failures', async () => {
+      const p = new GeminiProvider({ apiKey: 'stub', useExplicitCache: false });
+      const calls = stubFetch(({ callIndex }) => {
+        // First two calls: MALFORMED_FUNCTION_CALL
+        if (callIndex < 2) return buildMalformedResponse();
+        // Third call: free-form text response (no functionCall part)
+        return buildFreeFormResponse('{"findings":[]}');
+      });
+
+      // Two MALFORMED failures
+      await assert.rejects(() => p.review({ system: 's', user: 'u' }));
+      await assert.rejects(() => p.review({ system: 's', user: 'u' }));
+
+      // Third call should use free-form mode
+      const result = await p.review({ system: 's', user: 'u' });
+
+      assert.strictEqual(result.text, '{"findings":[]}');
+
+      // Free-form request must NOT include toolConfig or tools
+      const freeFormBody = JSON.parse(calls[2].init.body);
+      assert.strictEqual(freeFormBody.toolConfig, undefined);
+      assert.strictEqual(freeFormBody.tools, undefined);
+      // System instruction must be sent inline
+      assert.deepStrictEqual(freeFormBody.systemInstruction, {
+        parts: [{ text: 's' }],
+      });
+    });
+
+    it('free-form request bypasses cachedContent even when cache is available', async () => {
+      const p = new GeminiProvider({ apiKey: 'stub', useExplicitCache: true });
+      const largeSystem = 'x'.repeat(8000);
+      const calls = stubFetch(({ url, callIndex }) => {
+        if (url.includes('cachedContents'))
+          return jsonResponse({ name: 'cachedContents/xyz' });
+        // First two generate calls: MALFORMED
+        if (callIndex <= 2) return buildMalformedResponse();
+        // Third generate call: free-form
+        return buildFreeFormResponse('{"findings":[]}');
+      });
+
+      // Two MALFORMED failures before the free-form fallback; the cache may be reused in memory.
+      await assert.rejects(() => p.review({ system: largeSystem, user: 'u' }));
+      await assert.rejects(() => p.review({ system: largeSystem, user: 'u' }));
+
+      // Free-form call — must NOT use cachedContent
+      await p.review({ system: largeSystem, user: 'u' });
+
+      const freeFormBody = JSON.parse(calls[calls.length - 1].init.body);
+      assert.strictEqual(freeFormBody.cachedContent, undefined);
+      assert.strictEqual(freeFormBody.toolConfig, undefined);
+    });
+
+    it('resets counter to zero after a successful tool-call response', async () => {
+      const p = new GeminiProvider({ apiKey: 'stub', useExplicitCache: false });
+      stubFetch(({ callIndex }) => {
+        if (callIndex === 0) return buildMalformedResponse();
+        return buildSuccessfulGenerateResponse();
+      });
+
+      await assert.rejects(() => p.review({ system: 's', user: 'u' }));
+      assert.strictEqual(p._consecutiveMalformedCount, 1);
+
+      await p.review({ system: 's', user: 'u' });
+      assert.strictEqual(p._consecutiveMalformedCount, 0);
+    });
+
+    it('resets counter to zero on any non-MALFORMED_FUNCTION_CALL finish reason', async () => {
+      const p = new GeminiProvider({ apiKey: 'stub', useExplicitCache: false });
+      stubFetch(({ callIndex }) => {
+        if (callIndex === 0) return buildMalformedResponse();
+        return jsonResponse({
+          candidates: [
+            { finishReason: 'MAX_TOKENS', content: { parts: [{ text: 'x' }] } },
+          ],
+          usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 1 },
+        });
+      });
+
+      await assert.rejects(() => p.review({ system: 's', user: 'u' }));
+      assert.strictEqual(p._consecutiveMalformedCount, 1);
+
+      // MAX_TOKENS is a non-MALFORMED outcome — counter resets even though it throws
+      await assert.rejects(() => p.review({ system: 's', user: 'u' }));
+      assert.strictEqual(p._consecutiveMalformedCount, 0);
+    });
+
+    it('resets counter to zero on STOP with no submit_review tool call', async () => {
+      const p = new GeminiProvider({ apiKey: 'stub', useExplicitCache: false });
+      stubFetch(({ callIndex }) => {
+        if (callIndex === 0) return buildMalformedResponse();
+        // STOP but no functionCall — "did not invoke submit_review"
+        return jsonResponse({
+          candidates: [
+            {
+              finishReason: 'STOP',
+              content: { parts: [{ text: 'some prose' }] },
+            },
+          ],
+          usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 5 },
+        });
+      });
+
+      await assert.rejects(() => p.review({ system: 's', user: 'u' }));
+      assert.strictEqual(p._consecutiveMalformedCount, 1);
+
+      // STOP(no tool) is not a MALFORMED — counter resets so the next
+      // MALFORMED starts a fresh streak
+      await assert.rejects(() => p.review({ system: 's', user: 'u' }));
+      assert.strictEqual(p._consecutiveMalformedCount, 0);
+    });
+
+    it('free-form response returns raw model text; parseFindingsFromText strips fences', async () => {
+      const p = new GeminiProvider({ apiKey: 'stub', useExplicitCache: false });
+      // Trigger threshold
+      stubFetch(({ callIndex }) => {
+        if (callIndex < 2) return buildMalformedResponse();
+        return buildFreeFormResponse(
+          '```json\n{"findings":[{"severity":"high","title":"T","body":"B","file":null,"line":null}]}\n```',
+        );
+      });
+
+      await assert.rejects(() => p.review({ system: 's', user: 'u' }));
+      await assert.rejects(() => p.review({ system: 's', user: 'u' }));
+
+      const result = await p.review({ system: 's', user: 'u' });
+
+      // parseFindingsFromText is the authoritative fence-stripping/parsing function
+      const { parseFindingsFromText } = await import('../findings.mjs');
+      const parsed = parseFindingsFromText(result.text);
+      assert.strictEqual(parsed.ok, true);
+      assert.strictEqual(parsed.findings.length, 1);
+      assert.strictEqual(parsed.findings[0].title, 'T');
+    });
+
+    it('free-form response extracts ```json block when response has a prose preamble', async () => {
+      const p = new GeminiProvider({ apiKey: 'stub', useExplicitCache: false });
+      stubFetch(({ callIndex }) => {
+        if (callIndex < 2) return buildMalformedResponse();
+        return buildFreeFormResponse(
+          'Here is my review:\n```json\n{"findings":[]}\n```',
+        );
+      });
+
+      await assert.rejects(() => p.review({ system: 's', user: 'u' }));
+      await assert.rejects(() => p.review({ system: 's', user: 'u' }));
+
+      const result = await p.review({ system: 's', user: 'u' });
+
+      const { parseFindingsFromText } = await import('../findings.mjs');
+      const parsed = parseFindingsFromText(result.text);
+      assert.strictEqual(parsed.ok, true);
+      assert.strictEqual(parsed.findings.length, 0);
+    });
+
+    it('free-form response preserves triple-backticks inside valid JSON string values', async () => {
+      const p = new GeminiProvider({ apiKey: 'stub', useExplicitCache: false });
+      const bodyWithFence = 'Use this snippet:\n```js\nconsole.log("hi");\n```';
+
+      stubFetch(({ callIndex }) => {
+        if (callIndex < 2) return buildMalformedResponse();
+        return buildFreeFormResponse(
+          JSON.stringify({
+            findings: [
+              {
+                severity: 'high',
+                title: 'T',
+                body: bodyWithFence,
+                file: null,
+                line: null,
+              },
+            ],
+          }),
+        );
+      });
+
+      await assert.rejects(() => p.review({ system: 's', user: 'u' }));
+      await assert.rejects(() => p.review({ system: 's', user: 'u' }));
+
+      const result = await p.review({ system: 's', user: 'u' });
+
+      const { parseFindingsFromText } = await import('../findings.mjs');
+      const parsed = parseFindingsFromText(result.text);
+      assert.strictEqual(parsed.ok, true);
+      assert.strictEqual(parsed.findings.length, 1);
+      assert.strictEqual(parsed.findings[0].body, bodyWithFence);
+    });
+
+    it('free-form response extracts ```json block even when a non-JSON fence precedes it', async () => {
+      const p = new GeminiProvider({ apiKey: 'stub', useExplicitCache: false });
+      // Response has a ```js snippet first, then the actual ```json payload.
+      const preambleWithNonJsonFence =
+        'Here is an example:\n```js\nconsole.log("hi");\n```\n\nAnd the findings:\n```json\n{"findings":[]}\n```';
+      stubFetch(({ callIndex }) => {
+        if (callIndex < 2) return buildMalformedResponse();
+        return buildFreeFormResponse(preambleWithNonJsonFence);
+      });
+
+      await assert.rejects(() => p.review({ system: 's', user: 'u' }));
+      await assert.rejects(() => p.review({ system: 's', user: 'u' }));
+
+      const result = await p.review({ system: 's', user: 'u' });
+      const { parseFindingsFromText } = await import('../findings.mjs');
+      const parsed = parseFindingsFromText(result.text);
+      assert.strictEqual(parsed.ok, true);
+      assert.strictEqual(parsed.findings.length, 0);
+    });
+
+    it('free-form response maps usage metadata correctly', async () => {
+      const p = new GeminiProvider({ apiKey: 'stub', useExplicitCache: false });
+      stubFetch(({ callIndex }) => {
+        if (callIndex < 2) return buildMalformedResponse();
+        return jsonResponse({
+          candidates: [
+            {
+              finishReason: 'STOP',
+              content: { parts: [{ text: '{"findings":[]}' }] },
+            },
+          ],
+          usageMetadata: {
+            promptTokenCount: 300,
+            cachedContentTokenCount: 0,
+            candidatesTokenCount: 40,
+          },
+        });
+      });
+
+      await assert.rejects(() => p.review({ system: 's', user: 'u' }));
+      await assert.rejects(() => p.review({ system: 's', user: 'u' }));
+
+      const result = await p.review({ system: 's', user: 'u' });
+
+      assert.strictEqual(result.usage.inputTokens, 300);
+      assert.strictEqual(result.usage.outputTokens, 40);
+    });
+
+    it('free-form mode throws GeminiError(retryable=true) when MAX_TOKENS in free-form', async () => {
+      const p = new GeminiProvider({ apiKey: 'stub', useExplicitCache: false });
+      // Force into free-form mode first
+      stubFetch(({ callIndex }) => {
+        if (callIndex < 2) return buildMalformedResponse();
+        return jsonResponse({
+          candidates: [
+            {
+              finishReason: 'MAX_TOKENS',
+              content: { parts: [{ text: 'trun' }] },
+            },
+          ],
+          usageMetadata: { promptTokenCount: 100, candidatesTokenCount: 50 },
+        });
+      });
+
+      await assert.rejects(() => p.review({ system: 's', user: 'u' }));
+      await assert.rejects(() => p.review({ system: 's', user: 'u' }));
+
+      await assert.rejects(
+        () => p.review({ system: 's', user: 'u' }),
+        (err) => {
+          assert.ok(err instanceof GeminiError);
+          assert.strictEqual(err.retryable, true);
+          assert.match(err.message, /MAX_TOKENS.*free-form/);
+          return true;
+        },
+      );
+    });
+
+    it('free-form mode throws GeminiError(retryable=true) when MALFORMED_FUNCTION_CALL occurs in free-form', async () => {
+      const p = new GeminiProvider({ apiKey: 'stub', useExplicitCache: false });
+      stubFetch(({ callIndex }) => {
+        if (callIndex < 2) return buildMalformedResponse();
+        return jsonResponse({
+          candidates: [
+            {
+              finishReason: 'MALFORMED_FUNCTION_CALL',
+              content: { parts: [] },
+            },
+          ],
+          usageMetadata: { promptTokenCount: 100, candidatesTokenCount: 10 },
+        });
+      });
+
+      await assert.rejects(() => p.review({ system: 's', user: 'u' }));
+      await assert.rejects(() => p.review({ system: 's', user: 'u' }));
+
+      await assert.rejects(
+        () => p.review({ system: 's', user: 'u' }),
+        (err) => {
+          assert.ok(err instanceof GeminiError);
+          assert.strictEqual(err.retryable, true);
+          assert.match(err.message, /MALFORMED_FUNCTION_CALL.*free-form/);
+          return true;
+        },
+      );
+    });
+
+    it('free-form mode throws GeminiError(kind=unknown, retryable=true) when no text part returned', async () => {
+      const p = new GeminiProvider({ apiKey: 'stub', useExplicitCache: false });
+      stubFetch(({ callIndex }) => {
+        if (callIndex < 2) return buildMalformedResponse();
+        return jsonResponse({
+          candidates: [
+            {
+              finishReason: 'STOP',
+              content: { parts: [{ functionCall: { name: 'x', args: {} } }] },
+            },
+          ],
+          usageMetadata: { promptTokenCount: 100, candidatesTokenCount: 10 },
+        });
+      });
+
+      await assert.rejects(() => p.review({ system: 's', user: 'u' }));
+      await assert.rejects(() => p.review({ system: 's', user: 'u' }));
+
+      await assert.rejects(
+        () => p.review({ system: 's', user: 'u' }),
+        /no text part in free-form mode/,
+      );
+    });
+  });
+
   describe('classifyHttpError', () => {
     it('treats 403 as auth (not rate-limit)', () => {
       const err = classifyHttpError(403, '{"error":{"message":"Forbidden"}}');

@@ -43,6 +43,13 @@ const DEFAULT_CACHE_TTL_SECONDS = 600; // 10 min — covers a multi-pass review 
 const MIN_CACHE_TOKENS = 1024;
 const ERROR_BODY_SNIPPET_CHARS = 500;
 
+// After this many consecutive MALFORMED_FUNCTION_CALL errors, abandon the
+// tool-call schema and switch to free-form text mode. The system prompt already
+// instructs the model to emit {"findings":[...]} JSON directly, so free-form
+// mode still produces parseable output while avoiding the schema constraint
+// that triggers MALFORMED_FUNCTION_CALL on large multi-pass inputs (LS-4109).
+const MALFORMED_FREEFORM_THRESHOLD = 2;
+
 // Pricing per million tokens (USD) on the paid tier. Free tier bills nothing
 // but we still attribute estimated cost for telemetry/cost-cap consistency.
 const PRICING = {
@@ -251,6 +258,12 @@ export class GeminiProvider {
     // signal that explicit caching isn't available on this account). Once
     // set, every subsequent call skips the cache attempt entirely.
     this._explicitCacheDisabled = false;
+
+    // Counter incremented on each MALFORMED_FUNCTION_CALL response and reset to
+    // zero on a successful tool-call STOP. Once it reaches
+    // MALFORMED_FREEFORM_THRESHOLD, review() routes to _generateContentFreeForm
+    // for the remaining calls in this session.
+    this._consecutiveMalformedCount = 0;
   }
 
   /**
@@ -260,6 +273,14 @@ export class GeminiProvider {
    * @returns {Promise<import('./provider.mjs').ReviewResult>}
    */
   async review({ system, user }) {
+    // After MALFORMED_FREEFORM_THRESHOLD consecutive MALFORMED_FUNCTION_CALL
+    // errors, skip the tool-call schema entirely. The cachedContent has
+    // toolConfig baked in and cannot be used in free-form mode, so we also
+    // bypass the cache here — the system instruction is sent inline instead.
+    if (this._consecutiveMalformedCount >= MALFORMED_FREEFORM_THRESHOLD) {
+      return await this._generateContentFreeForm({ system, user });
+    }
+
     const cachedContentName = this.useExplicitCache
       ? await this._getOrCreateSystemCache(system)
       : null;
@@ -404,6 +425,16 @@ export class GeminiProvider {
       const retryable =
         finishReason === 'MAX_TOKENS' ||
         finishReason === 'MALFORMED_FUNCTION_CALL';
+      if (finishReason === 'MALFORMED_FUNCTION_CALL') {
+        this._consecutiveMalformedCount++;
+        if (this._consecutiveMalformedCount >= MALFORMED_FREEFORM_THRESHOLD) {
+          process.stderr.write(
+            `[reviewer] ${this._consecutiveMalformedCount} consecutive MALFORMED_FUNCTION_CALL failures — will switch to free-form (non-tool-call) mode on the next call (LS-4109)\n`,
+          );
+        }
+      } else {
+        this._consecutiveMalformedCount = 0;
+      }
       throw new GeminiError(
         `Gemini API stopped with finishReason=${finishReason}`,
         {
@@ -417,6 +448,9 @@ export class GeminiProvider {
     const parts = candidate.content?.parts ?? [];
     const fnCall = parts.find((p) => p.functionCall?.name === 'submit_review');
     if (!fnCall) {
+      // STOP with no tool call is not a MALFORMED streak — reset the counter so
+      // a subsequent MALFORMED starts a fresh consecutive count.
+      this._consecutiveMalformedCount = 0;
       throw new GeminiError('Gemini API did not invoke submit_review tool', {
         kind: 'unknown',
         retryable: true,
@@ -462,10 +496,115 @@ export class GeminiProvider {
     const normalizedArgs = Array.isArray(args.findings)
       ? args
       : { ...args, findings: [] };
+
+    // Successful tool-call response — reset the MALFORMED streak counter so
+    // transient failures don't permanently lock us into free-form mode if the
+    // next multi-pass run works fine with the tool schema.
+    this._consecutiveMalformedCount = 0;
+
     return {
       text: JSON.stringify(normalizedArgs),
       usage,
     };
+  }
+
+  /**
+   * Free-form text generation — no tool-call schema. Used after
+   * MALFORMED_FREEFORM_THRESHOLD consecutive MALFORMED_FUNCTION_CALL failures
+   * to avoid the tool schema that triggers them on large multi-pass inputs.
+   *
+   * The system prompt already instructs the model to return
+   * `{"findings":[...]}` JSON directly. This method returns the raw model text;
+   * downstream parsing via `parseFindingsFromText` is responsible for handling
+   * any markdown code fences or other normalization before extracting findings.
+   *
+   * @param {object} params
+   * @param {string|null} params.system
+   * @param {string} params.user
+   * @returns {Promise<import('./provider.mjs').ReviewResult>}
+   */
+  async _generateContentFreeForm({ system, user }) {
+    process.stderr.write(
+      '[reviewer] Gemini free-form mode: sending request without tool-call schema (LS-4109)\n',
+    );
+    const url = `${this.endpoint}/models/${this.model}:generateContent?key=${encodeURIComponent(this.apiKey)}`;
+
+    const body = {
+      contents: [{ role: 'user', parts: [{ text: user }] }],
+      generationConfig: {
+        temperature: this.temperature,
+        maxOutputTokens: this.maxTokens,
+      },
+    };
+    // No tools, no toolConfig — the model returns plain text.
+    // System instruction is sent inline; cachedContent is not used because
+    // the cache resource has toolConfig baked in and cannot be reused here.
+    if (system) {
+      body.systemInstruction = { parts: [{ text: system }] };
+    }
+
+    const data = await this._fetchJson(url, body);
+
+    const candidate = data?.candidates?.[0];
+    if (!candidate) {
+      throw new GeminiError(
+        'Gemini API returned no candidates (free-form mode)',
+        {
+          kind: 'unknown',
+          retryable: true,
+          raw: JSON.stringify(data).slice(0, ERROR_BODY_SNIPPET_CHARS),
+        },
+      );
+    }
+
+    const finishReason = candidate.finishReason;
+    if (finishReason && finishReason !== 'STOP') {
+      // In free-form mode MAX_TOKENS is always retryable. MALFORMED_FUNCTION_CALL
+      // should not occur without a tool schema, but if it does, treat it as
+      // retryable — free-form mode does not re-enter the tool-call path, so
+      // withRetry can recover from any transient API misbehaviour.
+      const retryable =
+        finishReason === 'MAX_TOKENS' ||
+        finishReason === 'MALFORMED_FUNCTION_CALL';
+      throw new GeminiError(
+        `Gemini API stopped with finishReason=${finishReason} (free-form mode)`,
+        {
+          kind: retryable ? 'transient' : 'invalid-request',
+          retryable,
+          raw: JSON.stringify(candidate).slice(0, ERROR_BODY_SNIPPET_CHARS),
+        },
+      );
+    }
+
+    const parts = candidate.content?.parts ?? [];
+    const textPart = parts.find((p) => typeof p.text === 'string');
+    if (!textPart) {
+      throw new GeminiError(
+        'Gemini API returned no text part in free-form mode',
+        {
+          kind: 'unknown',
+          retryable: true,
+          raw: JSON.stringify(parts).slice(0, ERROR_BODY_SNIPPET_CHARS),
+        },
+      );
+    }
+
+    const usageMeta = data.usageMetadata ?? {};
+    const usage = {
+      inputTokens: usageMeta.promptTokenCount ?? 0,
+      cachedInputTokens: usageMeta.cachedContentTokenCount ?? 0,
+      outputTokens: usageMeta.candidatesTokenCount ?? 0,
+      costUsd: computeCostUsd(usageMeta, this.model),
+    };
+
+    process.stderr.write(
+      `[reviewer] Gemini free-form response: textLength=${textPart.text.length}\n`,
+    );
+
+    // Return raw model text — parseFindingsFromText is the single authoritative
+    // function for fence stripping and JSON extraction, so the provider should
+    // not pre-process the text.
+    return { text: textPart.text, usage };
   }
 
   async _fetchJson(url, body) {

@@ -58,13 +58,13 @@ The Legacy Sports CI system accumulated several critical gaps that required a gr
 
 ## Implementation Phases (LS-3857 Epic)
 
-| Phase | Focus | Key Changes |
-|-------|-------|-------------|
-| Phase 1 | Architecture foundation | CI Orchestrator design, trigger model |
-| Phase 2 | CI Pipeline rebuild | `ci-pipeline.yml`, quality-gates, build-validation |
-| Phase 3 | Bot Review system | Reviewer W1, cycle protocol, `bot-review` status |
-| Phase 4 | Merge Queue | Custom `merge-queue.yml`, condition evaluation |
-| Phase 5 | Cleanup | Cron removal (T29), doc archiving (T34) |
+| Phase   | Focus                   | Key Changes                                        |
+| ------- | ----------------------- | -------------------------------------------------- |
+| Phase 1 | Architecture foundation | CI Orchestrator design, trigger model              |
+| Phase 2 | CI Pipeline rebuild     | `ci-pipeline.yml`, quality-gates, build-validation |
+| Phase 3 | Bot Review system       | Reviewer W1, cycle protocol, `bot-review` status   |
+| Phase 4 | Merge Queue             | Custom `merge-queue.yml`, condition evaluation     |
+| Phase 5 | Cleanup                 | Cron removal (T29), doc archiving (T34)            |
 
 ## Post-Rebuild State (April 2026)
 
@@ -81,12 +81,12 @@ All phases are complete. The greenfield CI system is the production system.
 
 ## Required Checks Summary
 
-| Check | Source | Blocking |
-|-------|--------|---------|
-| `CI Pipeline` | `ci-orchestrator.yml` → `ci-pipeline.yml` | Yes |
-| `bot-review` (commit status) | `review.yml` reviewer script | Yes |
-| `No Merge Conflicts` | `check-conflicts.yml` | Yes |
-| `Naming Lint` (W3) | `required-checks-lint.yml` | Yes |
-| `GraphQL Schema & Codegen` | `check-schema.yml` | Yes (when triggered) |
-| `Verify All Migrations Applied` | `check-migrations-applied.yml` | Yes (when triggered) |
-| `Security Scanning` | `security-scanning.yml` | Advisory |
+| Check                           | Source                                    | Blocking             |
+| ------------------------------- | ----------------------------------------- | -------------------- |
+| `CI Pipeline`                   | `ci-orchestrator.yml` → `ci-pipeline.yml` | Yes                  |
+| `bot-review` (commit status)    | `review.yml` reviewer script              | Yes                  |
+| `No Merge Conflicts`            | `check-conflicts.yml`                     | Yes                  |
+| `Naming Lint` (W3)              | `required-checks-lint.yml`                | Yes                  |
+| `GraphQL Schema & Codegen`      | `check-schema.yml`                        | Yes (when triggered) |
+| `Verify All Migrations Applied` | `check-migrations-applied.yml`            | Yes (when triggered) |
+| `Security Scanning`             | `security-scanning.yml`                   | Advisory             |
