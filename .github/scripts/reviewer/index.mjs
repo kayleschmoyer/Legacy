@@ -371,7 +371,11 @@ async function main() {
   // Build prompts — fail open on infra errors (e.g. missing reviewer-rules.md)
   let systemPrompt, userPrompt;
   try {
-    const cycleRoleSection = buildCycleRoleSection(cycle, priorTitles);
+    const cycleRoleSection = buildCycleRoleSection(
+      cycle,
+      priorTitles,
+      postReviewCommitShas,
+    );
     systemPrompt = buildSystemPrompt(cycleRoleSection);
     userPrompt = buildUserPrompt(ctx, authorResponsesSection);
   } catch (err) {

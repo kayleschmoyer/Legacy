@@ -163,9 +163,14 @@ export function filterFindingsCycle3(findings, mandateTitles) {
  *
  * @param {number} cycle
  * @param {string[]} [priorTitles] Titles from the previous cycle's review body
+ * @param {string[]} [postC1CommitShas] Full 40-char SHAs of commits pushed since C1 (Cycle 2 only)
  * @returns {string}
  */
-export function buildCycleRoleSection(cycle, priorTitles = []) {
+export function buildCycleRoleSection(
+  cycle,
+  priorTitles = [],
+  postC1CommitShas = [],
+) {
   if (cycle === 1) {
     return `\
 ## Your Role This Cycle: RAISE (Cycle 1 of 3)
@@ -179,6 +184,11 @@ restrictions on what you may raise in this cycle.`;
     const priorBlock =
       priorTitles.length > 0
         ? `\n\nIssues from Cycle 1 you must re-evaluate:\n${priorTitles.map((t, i) => `  ${i + 1}. ${t}`).join('\n')}`
+        : '';
+
+    const shaListBlock =
+      postC1CommitShas.length > 0
+        ? `\n\nCommits the author pushed since Cycle 1 — these are the ONLY SHAs you may cite:\n${postC1CommitShas.map((sha) => `  - \`${sha.slice(0, 7)}\``).join('\n')}`
         : '';
 
     return `\
@@ -202,11 +212,18 @@ If the justification is weak or the risk remains, re-raise the finding as a mand
 - **Accept** findings that are no longer present in the current diff or whose \
 \`JUSTIFY\` rationale is sound (omit them from your output).
 
-**Validator-enforced constraint (post-LLM):**
-- **Do NOT raise findings** that were absent from Cycle 1 and do not cite a \
-post-C1 commit SHA — such findings are automatically stripped. You MAY raise a \
-new finding only if it was **directly introduced** by a commit the author pushed \
-since Cycle 1; cite the commit SHA in your finding body.`;
+**⚠️ VALIDATOR-ENFORCED CONSTRAINT — mandatory for any NEW finding:**
+You MAY raise a new finding (not present in Cycle 1) ONLY if the issue was \
+**directly introduced** by a commit the author pushed since Cycle 1. \
+Every new finding MUST include the causal commit SHA in its \`body\` field — \
+the validator checks for this and will automatically strip any new finding \
+whose body does not contain a matching SHA prefix (7+ hex chars).
+
+Required format — include a phrase like this in the \`body\` field:
+  \`"This issue was introduced in commit a1b2c3d."\`${shaListBlock}
+
+**Do NOT raise new findings** that are unrelated to these post-C1 commits — \
+they will be stripped before the review is posted.`;
   }
 
   if (cycle === 3) {

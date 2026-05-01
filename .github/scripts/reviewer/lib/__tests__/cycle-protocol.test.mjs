@@ -423,15 +423,20 @@ describe('buildCycleRoleSection', () => {
     assert.ok(section.includes('ADJUDICATE'), 'should include ADJUDICATE');
     assert.ok(section.includes('Cycle 2'), 'should mention Cycle 2');
     assert.ok(
-      section.includes('Do NOT raise findings'),
-      'should prohibit new findings',
+      section.includes('Do NOT raise new findings'),
+      'should prohibit new findings unrelated to post-C1 commits',
     );
     assert.ok(section.includes('Prior issue'), 'should list the prior title');
   });
 
   it('cycle 2 with no prior titles omits the issues enumeration block', () => {
     const section = buildCycleRoleSection(2, []);
-    assert.ok(!section.includes('1.'), 'should not have numbered list');
+    // Check that the indented numbered-list format used for prior titles is absent.
+    // (The text "Cycle 1." also contains "1." so we match the list item prefix instead.)
+    assert.ok(
+      !section.includes('  1. '),
+      'should not have indented numbered list entry',
+    );
   });
 
   it('cycle 2 describes JUSTIFY evaluation and does not claim replies are absent', () => {
@@ -447,6 +452,50 @@ describe('buildCycleRoleSection', () => {
     assert.ok(
       !section.includes('not provided to you'),
       'must not claim author replies are absent (they are injected into the user prompt)',
+    );
+  });
+
+  it('cycle 2 SHA constraint includes format example in body field', () => {
+    const section = buildCycleRoleSection(2, []);
+    assert.ok(
+      section.includes('body'),
+      'should mention the body field for SHA citation',
+    );
+    assert.ok(
+      section.includes('a1b2c3d'),
+      'should include a concrete SHA example',
+    );
+    assert.ok(
+      section.includes('automatically strip'),
+      'should warn that missing SHA causes automatic stripping',
+    );
+  });
+
+  it('cycle 2 lists post-C1 commit SHAs (short form) when provided', () => {
+    const shas = [
+      'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2',
+      'f7e8d9c0b1a2f7e8d9c0b1a2f7e8d9c0b1a2f7e8',
+    ];
+    const section = buildCycleRoleSection(2, [], shas);
+    assert.ok(
+      section.includes('`a1b2c3d`'),
+      'should include first 7 chars of first SHA',
+    );
+    assert.ok(
+      section.includes('`f7e8d9c`'),
+      'should include first 7 chars of second SHA',
+    );
+    assert.ok(
+      section.includes('ONLY SHAs you may cite'),
+      'should state these are the only permitted SHAs',
+    );
+  });
+
+  it('cycle 2 omits SHA list block when no post-C1 commits provided', () => {
+    const section = buildCycleRoleSection(2, [], []);
+    assert.ok(
+      !section.includes('ONLY SHAs you may cite'),
+      'should not include SHA list when none provided',
     );
   });
 
