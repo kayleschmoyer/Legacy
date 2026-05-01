@@ -4,7 +4,9 @@ import {
   generateUlid,
   formatReviewBody,
   buildInlineComments,
+  buildKnownFailureBody,
 } from '../post-review.mjs';
+import { INFRA_ERROR_MARKER } from '../cycle-counter.mjs';
 
 describe('generateUlid', () => {
   it('returns a 26-character string', () => {
@@ -101,6 +103,82 @@ describe('formatReviewBody', () => {
     const body = formatReviewBody(findings, 'REQUEST_CHANGES');
     assert.match(body, /Issue A/);
     assert.match(body, /Issue B/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildKnownFailureBody — infra-failure marker presence
+// Ensures transient failures carry the INFRA_ERROR_MARKER so they are
+// excluded from the cycle counter (LS-4108).
+// ---------------------------------------------------------------------------
+
+describe('buildKnownFailureBody infra-failure marker', () => {
+  it('rate-limit body contains the infra-failure marker', () => {
+    const { body } = buildKnownFailureBody('rate-limit', {
+      retryAfterSeconds: 60,
+    });
+    assert.ok(
+      body.includes(INFRA_ERROR_MARKER),
+      `expected '${INFRA_ERROR_MARKER}' in rate-limit body`,
+    );
+  });
+
+  it('quota body contains the infra-failure marker', () => {
+    const { body } = buildKnownFailureBody('quota');
+    assert.ok(
+      body.includes(INFRA_ERROR_MARKER),
+      `expected '${INFRA_ERROR_MARKER}' in quota body`,
+    );
+  });
+
+  it('auth body contains the infra-failure marker', () => {
+    const { body } = buildKnownFailureBody('auth');
+    assert.ok(
+      body.includes(INFRA_ERROR_MARKER),
+      `expected '${INFRA_ERROR_MARKER}' in auth body`,
+    );
+  });
+
+  it('cost-cap body does NOT contain the infra-failure marker (author-actionable)', () => {
+    const { body } = buildKnownFailureBody('cost-cap', {
+      cumulativeUsd: 1.0,
+      capUsd: 0.5,
+    });
+    assert.ok(
+      !body.includes(INFRA_ERROR_MARKER),
+      `expected '${INFRA_ERROR_MARKER}' to be absent from cost-cap body`,
+    );
+  });
+
+  it('context-too-large body does NOT contain the infra-failure marker (author-actionable)', () => {
+    const { body } = buildKnownFailureBody('context-too-large');
+    assert.ok(
+      !body.includes(INFRA_ERROR_MARKER),
+      `expected '${INFRA_ERROR_MARKER}' to be absent from context-too-large body`,
+    );
+  });
+
+  it('default (unknown) body contains the infra-failure marker', () => {
+    const { body } = buildKnownFailureBody('unknown-kind');
+    assert.ok(
+      body.includes(INFRA_ERROR_MARKER),
+      `expected '${INFRA_ERROR_MARKER}' in default fallback body`,
+    );
+  });
+
+  it('rate-limit uses COMMENT event (does not block merge)', () => {
+    const { event } = buildKnownFailureBody('rate-limit');
+    assert.strictEqual(event, 'COMMENT');
+  });
+
+  it('quota uses COMMENT event (does not block merge)', () => {
+    const { event } = buildKnownFailureBody('quota');
+    assert.strictEqual(event, 'COMMENT');
+  });
+
+  it('auth uses COMMENT event (does not block merge)', () => {
+    const { event } = buildKnownFailureBody('auth');
+    assert.strictEqual(event, 'COMMENT');
   });
 });
 

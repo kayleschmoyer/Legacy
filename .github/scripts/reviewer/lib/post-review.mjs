@@ -469,6 +469,7 @@ export function buildKnownFailureBody(kind, details = {}) {
         event: 'COMMENT',
         body:
           '## Reviewer rate-limited\n\n' +
+          '<!-- bot-infra-failure: true -->\n' +
           `The Gemini API per-minute rate limit was hit on this run. Wait ${wait}, then re-apply the \`bot:ready-for-review\` label (remove and add it again) to retry. The reviewer workflow does not fire on plain pushes — only on \`opened\` / \`ready_for_review\` / \`labeled\` events.\n\n` +
           '_This is not a code issue — no review was posted because the LLM API throttled the request._',
       };
@@ -478,6 +479,7 @@ export function buildKnownFailureBody(kind, details = {}) {
         event: 'COMMENT',
         body:
           '## Reviewer daily quota exhausted\n\n' +
+          '<!-- bot-infra-failure: true -->\n' +
           'The Gemini API free-tier daily quota has been used up for today. **The reviewer does not retry on its own** — the workflow only fires on `pull_request.opened`, `pull_request.ready_for_review`, and `pull_request.labeled` events, never on a timer (and not on plain pushes).\n\n' +
           'To get a review on this PR:\n' +
           "- After Google's daily reset (00:00 Pacific time), re-apply the `bot:ready-for-review` label (remove and add it again) to re-trigger the reviewer.\n" +
@@ -489,6 +491,7 @@ export function buildKnownFailureBody(kind, details = {}) {
         event: 'COMMENT',
         body:
           '## Reviewer authentication failed\n\n' +
+          '<!-- bot-infra-failure: true -->\n' +
           'The Gemini API rejected the request key (`GEMINI_CODE_REVIEW_API_KEY`). The key is missing, invalid, or revoked.\n\n' +
           '**Maintainer action required**: regenerate the API key at https://aistudio.google.com/apikey and update the `GEMINI_CODE_REVIEW_API_KEY` repository secret. Then re-apply the `bot:ready-for-review` label to retry.\n\n' +
           '_This is not a code issue — the reviewer cannot authenticate._',

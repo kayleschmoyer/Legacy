@@ -107,6 +107,62 @@ describe('computeCycle', () => {
     assert.strictEqual(computeCycle(reviews), 1);
   });
 
+  // AC: 3 consecutive infra failures → cycle counter stays at 1, no escalation
+  it('excludes 3 consecutive infra-error reviews, cycle counter = 1 (no escalation)', () => {
+    const infraBody =
+      INFRA_ERROR_REVIEW_PREFIX +
+      '\n\n<!-- bot-infra-failure: true -->\nThe automated review could not complete.';
+    const reviews = [
+      { userLogin: 'legacy-sports-review-bot[bot]', body: infraBody },
+      { userLogin: 'legacy-sports-review-bot[bot]', body: infraBody },
+      { userLogin: 'legacy-sports-review-bot[bot]', body: infraBody },
+    ];
+    assert.strictEqual(computeCycle(reviews), 1);
+    assert.strictEqual(isEscalationRequired(computeCycle(reviews)), false);
+  });
+
+  // AC: 1 real review followed by 1 infra failure → cycle counter = 2 (1 real prior cycle)
+  it('returns 2 when one real bot review is followed by an infra-error review (infra not counted)', () => {
+    const realBody =
+      '## Changes Required\n\n**[HIGH]** Bug — `file.ts:1`\n\nDetails.';
+    const infraBody =
+      INFRA_ERROR_REVIEW_PREFIX +
+      '\n\n<!-- bot-infra-failure: true -->\nThe automated review could not complete.';
+    const reviews = [
+      { userLogin: 'legacy-sports-review-bot[bot]', body: realBody },
+      { userLogin: 'legacy-sports-review-bot[bot]', body: infraBody },
+    ];
+    assert.strictEqual(computeCycle(reviews), 2);
+  });
+
+  // AC: 3 real review cycles → cycle counter = 4, escalation fires
+  it('returns 4 after 3 real bot reviews, triggering escalation', () => {
+    const realBody = '## Changes Required\n\n**[HIGH]** Bug — `file.ts:1`';
+    const reviews = [
+      { userLogin: 'legacy-sports-review-bot[bot]', body: realBody },
+      { userLogin: 'legacy-sports-review-bot[bot]', body: realBody },
+      { userLogin: 'legacy-sports-review-bot[bot]', body: realBody },
+    ];
+    assert.strictEqual(computeCycle(reviews), 4);
+    assert.strictEqual(isEscalationRequired(computeCycle(reviews)), true);
+  });
+
+  // AC: 2 real + 1 infra + 1 real = 3 real cycles → escalation fires after 3rd real cycle
+  it('escalates only after 3rd real cycle when infra failures are interspersed', () => {
+    const realBody = '## Changes Required\n\n**[HIGH]** Bug — `file.ts:1`';
+    const infraBody =
+      INFRA_ERROR_REVIEW_PREFIX +
+      '\n\n<!-- bot-infra-failure: true -->\nThe automated review could not complete.';
+    const reviews = [
+      { userLogin: 'legacy-sports-review-bot[bot]', body: realBody }, // real #1
+      { userLogin: 'legacy-sports-review-bot[bot]', body: realBody }, // real #2
+      { userLogin: 'legacy-sports-review-bot[bot]', body: infraBody }, // infra (not counted)
+      { userLogin: 'legacy-sports-review-bot[bot]', body: realBody }, // real #3
+    ];
+    assert.strictEqual(computeCycle(reviews), 4);
+    assert.strictEqual(isEscalationRequired(computeCycle(reviews)), true);
+  });
+
   it('treats reviews with no body field as non-infra (body defaults to empty string)', () => {
     const reviews = [{ userLogin: 'legacy-sports-review-bot[bot]' }];
     assert.strictEqual(computeCycle(reviews), 2);

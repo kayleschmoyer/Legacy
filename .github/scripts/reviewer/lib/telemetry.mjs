@@ -31,6 +31,8 @@ import { spawn } from 'node:child_process';
  * @property {string}           provider            - 'github-models' | 'copilot-cli' | 'anthropic'
  * @property {1|2|3}            cycle               - Review cycle number
  * @property {string}           verdict             - 'APPROVED' | 'REQUEST_CHANGES' | 'ESCALATE' | string
+ * @property {'real'|'infra-failure'} review_type   - 'real' for LLM-produced reviews; 'infra-failure' for fail-closed infrastructure-error runs
+ * @property {'rate_limit'|'api_error'|null} infra_failure_cause - Cause of infra failure (null for real reviews or author-actionable failures). Powers the bot_review_infra_failures metric.
  * @property {import('./findings.mjs').Finding[]} findings - Structured findings from the review
  * @property {StrippedFinding[]} stripped_findings  - Findings removed by the cycle validator, annotated with strip_reason (non-empty for cycles 2 and 3 only)
  * @property {number}           input_tokens        - Total input tokens consumed
@@ -84,6 +86,8 @@ export async function emitTelemetry(record) {
  * @param {string}    params.provider
  * @param {number}    params.cycle
  * @param {string}    params.verdict
+ * @param {'real'|'infra-failure'} [params.reviewType]
+ * @param {'rate_limit'|'api_error'|null} [params.infraFailureCause]
  * @param {import('./findings.mjs').Finding[]} params.findings
  * @param {StrippedFinding[]} [params.strippedFindings]
  * @param {import('./providers/provider.mjs').ProviderUsage} params.usage
@@ -103,6 +107,8 @@ export function buildRecord({
   provider,
   cycle,
   verdict,
+  reviewType = 'real',
+  infraFailureCause = null,
   findings,
   strippedFindings,
   usage,
@@ -126,6 +132,8 @@ export function buildRecord({
     provider,
     cycle,
     verdict,
+    review_type: reviewType,
+    infra_failure_cause: infraFailureCause,
     findings: findings ?? [],
     stripped_findings: strippedFindings ?? [],
     input_tokens: usage?.inputTokens ?? 0,

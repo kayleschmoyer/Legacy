@@ -516,6 +516,7 @@ async function main() {
         provider: providerName,
         cycle,
         verdict,
+        reviewType: 'real',
         findings: [],
         usage: reviewUsage,
         latencyMs,
@@ -633,6 +634,7 @@ async function main() {
       provider: providerName,
       cycle,
       verdict,
+      reviewType: 'real',
       findings: filteredFindings,
       strippedFindings,
       usage: reviewUsage,
@@ -883,8 +885,23 @@ async function handleLlmFailure(prNumber, err, ctx = null) {
     );
   }
 
-  // Emit telemetry for cost-cap aborts so AC5 of LS-3915 is satisfied.
-  if (kind === 'cost-cap' && ctx) {
+  // Emit telemetry for all failure kinds so the bot_review_infra_failures metric is
+  // populated and cost-cap aborts (AC5 of LS-3915) continue to be recorded.
+  //
+  // review_type mirrors the <!-- bot-infra-failure --> marker in the review body:
+  //   - transient failures (rate-limit, quota, auth, generic null) → 'infra-failure'
+  //   - author-actionable failures (cost-cap, context-too-large) → 'real'
+  //     (no marker in review body; these represent real signal for the PR author)
+  if (ctx) {
+    const isInfra = _isTransientFailureKind(kind);
+    const infraCause = isInfra ? _infraFailureCauseForKind(kind) : null;
+    const reviewType = isInfra ? 'infra-failure' : 'real';
+    const verdict =
+      kind === 'cost-cap'
+        ? 'cost-cap-exceeded'
+        : kind === 'context-too-large'
+          ? 'context-too-large'
+          : 'infra-failure';
     try {
       await emitTelemetry(
         buildRecord({
@@ -893,7 +910,9 @@ async function handleLlmFailure(prNumber, err, ctx = null) {
           model: process.env.REVIEWER_MODEL ?? 'codex',
           provider: ctx.provider,
           cycle: ctx.cycle,
-          verdict: 'cost-cap-exceeded',
+          verdict,
+          reviewType,
+          infraFailureCause: infraCause,
           findings: [],
           usage: ctx.usage,
           latencyMs: ctx.latencyMs,
@@ -901,15 +920,43 @@ async function handleLlmFailure(prNumber, err, ctx = null) {
           authorLogin: ctx.authorLogin,
           authorType: ctx.authorType,
           cycleCounterExclusions: ctx.cycleCounterExclusions,
-          costCapExceeded: true,
+          costCapExceeded: kind === 'cost-cap',
         }),
       );
     } catch (telErr) {
       process.stderr.write(
-        `[reviewer] Failed to emit cost-cap telemetry: ${telErr instanceof Error ? telErr.message : String(telErr)}\n`,
+        `[reviewer] Failed to emit failure telemetry (kind=${kind ?? 'null'}): ${telErr instanceof Error ? telErr.message : String(telErr)}\n`,
       );
     }
   }
+}
+
+/**
+ * Returns true for transient, non-author-actionable failure kinds that carry the
+ * <!-- bot-infra-failure --> marker and are excluded from the cycle counter.
+ * Author-actionable failures (cost-cap, context-too-large) return false.
+ *
+ * @param {'rate-limit'|'quota'|'auth'|'context-too-large'|'cost-cap'|null} kind
+ * @returns {boolean}
+ */
+function _isTransientFailureKind(kind) {
+  return (
+    kind === 'rate-limit' ||
+    kind === 'quota' ||
+    kind === 'auth' ||
+    kind === null
+  );
+}
+
+/**
+ * Map a transient failure kind to its bot_review_infra_failures metric cause label.
+ * Only call this when _isTransientFailureKind(kind) is true.
+ *
+ * @param {'rate-limit'|'quota'|'auth'|null} kind
+ * @returns {'rate_limit'|'api_error'}
+ */
+function _infraFailureCauseForKind(kind) {
+  return kind === 'rate-limit' ? 'rate_limit' : 'api_error';
 }
 
 main().catch((err) => {
