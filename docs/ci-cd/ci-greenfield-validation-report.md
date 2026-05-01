@@ -21,6 +21,7 @@
 | V3 re-run (LS-3965 + LS-3966 fixes)                     | LS-3905 | 2026-04-29 | ✅ Pass    | AC1 ✅ AC2 ✅ — C2 evaluated JUSTIFY and posted APPROVE "LGTM — no blocking findings" (see §11)                                                                                        |
 | V7 — Format-error & edge-case author responses          | LS-3909 | 2026-04-29 | 🔴 Fail    | AC1 ❌ AC4 ❌ AC5 ❌ — format-error reply never posted, CANNOT-COMPLY not escalated, no format-error telemetry (see §13)                                                               |
 | V7 re-run (LS-3968/3969/3970 fixes)                     | LS-3909 | 2026-04-30 | 🔴 Fail    | AC1 ❌ still (wrong endpoint in `postReviewThreadReply`); AC4 ✅ AC5 ✅ (LS-3969/3970 verified); LS-3987 filed (see §14)                                                               |
+| V19 — CODEOWNERS sensitive paths                        | LS-3921 | 2026-05-01 | 🔴 Fail    | AC1 ❌ AC2 ❌ — bot approval + CI pass → merge queue merged WITHOUT human CODEOWNERS approval; `require_code_owner_review:true` not enforced (see §15)                                 |
 
 ---
 
@@ -1148,3 +1149,104 @@ parameter and update the URL.
 | Ticket                                                 | Summary                                                                                                  |
 | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
 | [LS-3987](https://bkrupa.atlassian.net/browse/LS-3987) | [CI Rebuild Bug] postReviewThreadReply uses wrong API endpoint — format-error replies fail with HTTP 404 |
+
+---
+
+## §15 V19 — CODEOWNERS Sensitive Paths
+
+**Description:** Validate that a PR touching a CODEOWNERS-protected path (`lambdas/oauth-proxy/**`,
+owned by `@bkrupa`) requires human CODEOWNER approval in addition to bot approval. Tests
+§12.2 (CODEOWNERS structure), branch protection's `require_code_owner_review: true` enforcement,
+and whether the merge queue correctly blocks on unmet CODEOWNERS requirements.
+
+**Test PR:** https://github.com/bkrupa/legacy-sports/pull/3539
+**Branch:** `test/ci-validation/v19-codeowners-sensitive`
+**Probe file:** `lambdas/oauth-proxy/v19-codeowners-probe.ts` (~37 LOC, inert constants)
+**Date completed:** 2026-05-01
+**Executed by:** Claude (claude-sonnet-4-6), LS-3921 agent run
+
+### Acceptance Criteria
+
+| #   | Criterion                                                                     | Result       | Evidence                                                                                                                                                                                                |
+| --- | ----------------------------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AC1 | Bot approved but PR still shows pending CODEOWNERS approval for sensitive path | ❌ Fail      | GitHub `mergeStateStatus` = `CLEAN` immediately after bot APPROVE — no CODEOWNERS-pending state ever surfaced. `reviewDecision` field returned empty (not `REVIEW_REQUIRED`).                            |
+| AC2 | PR explicitly cannot merge until human CODEOWNER approval lands                | ❌ Fail      | Merge queue run [25202728370](https://github.com/bkrupa/legacy-sports/actions/runs/25202728370) declared `✅ PR #3539 is ready for merge` and merged it to `main` WITHOUT any `@bkrupa` approval.       |
+| AC3 | After human approval: PR mergeable; merge queue accepts                        | ⏭️ Skip     | Never reached — PR merged before human approval was possible.                                                                                                                                            |
+| AC4 | No additional bot approval needed after human approves                         | ⏭️ Skip     | Never reached — see AC3.                                                                                                                                                                                 |
+
+### Walkthrough Execution
+
+| Step | Action                                                   | Observed                                                                                                                                                                |
+| ---- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | Push probe file to `lambdas/oauth-proxy/`; create draft PR #3539; mark ready | W1 run 25202563058 fired on `ready_for_review`; W1 posted APPROVE "LGTM — no blocking findings." at `04:42:37Z` for commit `28fe650c7`                                 |
+| 2    | Check GitHub UI for pending CODEOWNERS state             | `mergeStateStatus: CLEAN`; `reviewDecision: ""`; no CODEOWNERS-pending indicator — GitHub treated the PR as fully approved                                               |
+| 3    | Check if merge blocked without human approval            | Merge queue (25202575526) fired immediately; blocked only on CI-in-progress (not on CODEOWNERS). After CI completed, merge queue (25202728370) merged the PR to `main`. |
+| 4    | (Manual step) Have @bkrupa approve as CODEOWNER          | Never reached — PR merged by merge queue before any human approval                                                                                                      |
+
+### Evidence
+
+| Artifact                               | Link                                                             |
+| -------------------------------------- | ---------------------------------------------------------------- |
+| Test PR #3539                          | https://github.com/bkrupa/legacy-sports/pull/3539                |
+| W1 Reviewer run (APPROVE posted)       | https://github.com/bkrupa/legacy-sports/actions/runs/25202563058 |
+| CI Orchestrator run (all green)        | https://github.com/bkrupa/legacy-sports/actions/runs/25202575520 |
+| Merge queue run (PR merged)            | https://github.com/bkrupa/legacy-sports/actions/runs/25202728370 |
+| Merge queue log: "✅ Successfully merged PR #3539" | run 25202728370, `Process Enhanced Merge Queue` step, `04:49:52Z` |
+
+### Observed Behavior
+
+PR #3539 touched `lambdas/oauth-proxy/v19-codeowners-probe.ts`, which falls under
+`lambdas/oauth-proxy/**` → `@bkrupa` in `.github/CODEOWNERS`. The ruleset
+(`.github/ruleset.json`) has `require_code_owner_review: true`.
+
+W1 fired on `ready_for_review` and posted `APPROVED` — "LGTM — no blocking findings." — 26 seconds
+after the PR was marked ready. The `bot-review` commit status immediately transitioned to `success`
+and the `merge-when-ready` label was applied. GitHub's `mergeStateStatus` returned `CLEAN` (not
+`BLOCKED` or `DIRTY`), and `reviewDecision` was empty — neither field indicated a pending CODEOWNERS
+requirement.
+
+The merge queue processor evaluated the PR, found all conditions met (not draft, no conflicts, no
+unresolved threads, all status checks passing), and merged it to `main` at `04:49:52Z` — less than
+8 minutes after the PR was marked ready, and without any `@bkrupa` approval.
+
+### Deviations
+
+#### AC1 + AC2 — CODEOWNERS enforcement not enforced by custom merge queue; GitHub ruleset not blocking
+
+**What the spec requires (§12.2, AC1, AC2):** A PR touching a CODEOWNERS-protected path should
+require a human CODEOWNER approval before it can merge. Bot approval alone is insufficient. The
+merge queue should detect the unmet CODEOWNERS requirement and decline to merge.
+
+**What happened:** The merge queue processor (`merge-queue-processor.js`) does not inspect GitHub's
+`reviewDecision` field or any CODEOWNERS-related state. Its `validatePRForMerge` function checks
+only: draft state, `merge-to-parent` label for non-main targets, `mergeable` state (conflicts),
+unresolved review threads, and status checks. There is no CODEOWNERS check.
+
+Furthermore, GitHub's own ruleset enforcement (which normally blocks the merge API call when
+`require_code_owner_review: true` and no CODEOWNER has approved) appears to have been bypassed.
+The most likely cause is that the Merge Queue GitHub App token has admin-level repository access,
+and the ruleset's `bypass_actors` entry (`actor_id: 5, actor_type: RepositoryRole, bypass_mode:
+pull_request`) allows admins to bypass all pull request rules. The app's elevated token causes
+GitHub to skip the CODEOWNERS requirement entirely.
+
+Two distinct issues:
+
+1. **Merge queue processor does not check `reviewDecision`** — it should check GitHub's GraphQL
+   `pullRequest { reviewDecision }` field and block when `reviewDecision == REVIEW_REQUIRED`.
+
+2. **Merge Queue App token has bypass_actors privileges** — even if the merge queue processor
+   added a CODEOWNERS check, the underlying API call uses a token that bypasses the ruleset.
+   The bypass_actors entry should be scoped to a separate emergency-only app identity, not the
+   production Merge Queue App.
+
+**Impact:** Any PR touching a CODEOWNERS-protected path (auth, payments, migrations, CI,
+terraform, docs) can bypass human review entirely — bot approval alone triggers an automatic merge.
+The CODEOWNERS security model is non-functional.
+
+**Bug ticket:** (to be filed — see Issues Spawned)
+
+### Issues Spawned
+
+| Ticket | Summary |
+| ------ | ------- |
+| (TBD — filed separately) | [CI Rebuild Bug] CODEOWNERS enforcement bypassed — merge queue merges sensitive-path PRs without human CODEOWNER approval; `require_code_owner_review:true` not enforced |
