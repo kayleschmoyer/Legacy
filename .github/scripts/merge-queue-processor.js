@@ -5,6 +5,31 @@
  * Called from the "Process Enhanced Merge Queue" step via:
  *   await require('./.github/scripts/merge-queue-processor.js')({ github, context, isDryRun, forceCheck, isRetry });
  */
+
+// Excluded from merge-blocking: process-merge-queue (circular — would block itself) and
+// delayed-recheck (a 3-minute housekeeping job that is not a quality gate).
+const EXCLUDED_CHECKS = new Set(['process-merge-queue', 'delayed-recheck']);
+
+// Lightweight checks that auto-register on every push via pull_request.synchronize
+// (check-conflicts.yml, jira-branch-sync.yml). They complete before the CI Pipeline
+// starts, so their presence must not satisfy the "CI not yet started" guard when
+// branch protection is unavailable (e.g. 403 fallback mode). See LS-4111.
+//
+// Override via MERGE_QUEUE_LIGHTWEIGHT_CHECK_NAMES (comma-separated) to avoid a code
+// change if workflows/jobs are renamed.
+const _defaultLightweightCheckNames = [
+  '🔐 SHA Sanity Check',
+  'No Merge Conflicts',
+  'Sync Jira Ticket',
+];
+const LIGHTWEIGHT_CHECK_NAMES = new Set(
+  process.env.MERGE_QUEUE_LIGHTWEIGHT_CHECK_NAMES
+    ? process.env.MERGE_QUEUE_LIGHTWEIGHT_CHECK_NAMES.split(',')
+        .map((n) => n.trim())
+        .filter(Boolean)
+    : _defaultLightweightCheckNames,
+);
+
 module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
   const { owner, repo } = context.repo;
   const isTriggeredByWorkflow = context.eventName === 'workflow_run';
@@ -300,6 +325,12 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
         console.log(
           `ℹ️ No branch protection found for '${branch}' (404) — evaluating all checks`,
         );
+      } else if (status === 403) {
+        console.log(
+          `⚠️ Branch protection read returned 403 for '${branch}' — Merge Queue App lacks ` +
+            `the "Administration: Read-only" repository permission. Falling back to evaluating all checks. ` +
+            `Fix: grant the Merge Queue GitHub App the "Administration: Read-only" repository permission (LS-4111).`,
+        );
       } else {
         console.log(
           `⚠️ Failed to fetch branch protection for '${branch}' (${status ?? e?.message ?? 'unknown error'}) — treating as no required checks and evaluating all checks`,
@@ -331,10 +362,6 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
 
     const failingChecks = [];
     const pendingChecks = [];
-
-    // Excluded from merge-blocking: process-merge-queue (circular — would block itself) and
-    // delayed-recheck (a 3-minute housekeeping job that is not a quality gate).
-    const EXCLUDED_CHECKS = new Set(['process-merge-queue', 'delayed-recheck']);
 
     // Build the set of check runs to evaluate:
     // - always skip EXCLUDED_CHECKS
@@ -373,7 +400,12 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
       }
     } else {
       // No branch protection — guard against CI not having started at all.
-      if (relevantChecks.length === 0) {
+      // Lightweight checks auto-register before the CI Pipeline starts; exclude
+      // them so their presence does not suppress this guard (LS-4111).
+      const hasNonLightweightCheck = relevantChecks.some(
+        (c) => !LIGHTWEIGHT_CHECK_NAMES.has(c.name),
+      );
+      if (!hasNonLightweightCheck) {
         pendingChecks.push('CI checks not yet registered for this SHA');
       }
     }
