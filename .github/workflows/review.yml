@@ -11,9 +11,6 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write
-  issues: write
-  statuses: write # required to set bot-review commit status
   id-token: write # required for OIDC auth to AWS (S3 reviewer telemetry)
 
 concurrency:
@@ -39,6 +36,12 @@ jobs:
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: 22
+      - name: Generate reviewer app token
+        id: reviewer-token
+        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3
+        with:
+          app-id: ${{ vars.REVIEWER_BOT_APP_ID || '3142924' }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
       - name: Configure AWS credentials
         continue-on-error: true # telemetry is best-effort; don't block review on auth failure
         uses: aws-actions/configure-aws-credentials@ec61189d14ec14c8efccab744f656cffd0e33f37 # v6
@@ -49,7 +52,7 @@ jobs:
         continue-on-error: true
         env:
           GEMINI_CODE_REVIEW_API_KEY: ${{ secrets.GEMINI_CODE_REVIEW_API_KEY }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.reviewer-token.outputs.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           LLM_PROVIDER: gemini
