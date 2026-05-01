@@ -1,0 +1,69 @@
+name: Test V14 Reviewer Failure Path
+
+# Manually trigger the reviewer with REVIEWER_FORCE_FAIL=true to exercise:
+#   - withRetry exhaustion (30s / 90s / 270s backoff)
+#   - postInfraErrorReview (REQUEST_CHANGES with "Review bot infrastructure error" body)
+#   - addLabelAsApp('review-bot-degraded')
+#   - W4 self-healing trigger (label application fires the real reviewer without force-fail)
+#
+# workflow_dispatch is required here so this workflow lives on the default branch
+# (GitHub only runs workflow_dispatch triggers for workflows on the default branch).
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number to run the failure-path reviewer against"
+        required: true
+        type: number
+
+permissions:
+  contents: read
+  id-token: write # required for OIDC auth to AWS (S3 reviewer telemetry)
+
+jobs:
+  reviewer-force-fail:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 22
+      - name: Generate reviewer app token
+        id: reviewer-token
+        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3
+        with:
+          app-id: ${{ vars.REVIEWER_BOT_APP_ID || '3142924' }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+      - name: Configure AWS credentials
+        continue-on-error: true # telemetry is best-effort; don't block on auth failure
+        uses: aws-actions/configure-aws-credentials@ec61189d14ec14c8efccab744f656cffd0e33f37 # v6
+        with:
+          role-to-assume: ${{ vars.AWS_CI_ARTIFACTS_ROLE_ARN || 'arn:aws:iam::176661590736:role/legacy-sports-dev-ci-artifacts' }}
+          aws-region: us-east-1
+      - name: Fetch PR head SHA
+        id: pr-sha
+        env:
+          GH_TOKEN: ${{ steps.reviewer-token.outputs.token }}
+        run: |
+          sha=$(gh pr view ${{ inputs.pr_number }} --json headRefOid --jq '.headRefOid')
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+      - name: Run reviewer (force-fail mode)
+        continue-on-error: true # reviewer exits non-zero after retry exhaustion — expected
+        env:
+          GH_TOKEN: ${{ steps.reviewer-token.outputs.token }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          PR_HEAD_SHA: ${{ steps.pr-sha.outputs.sha }}
+          LLM_PROVIDER: gemini
+          REVIEWER_MODEL: gemini-2.5-flash
+          REVIEWER_BOT_APP_ID: ${{ vars.REVIEWER_BOT_APP_ID || '3142924' }}
+          REVIEWER_BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+          REVIEWER_TELEMETRY_BUCKET: ${{ vars.REVIEWER_TELEMETRY_BUCKET || 'legacy-sports-dev-reviewer-telemetry' }}
+          REVIEWER_FORCE_FAIL: "true"
+        run: |
+          echo "[test-v14] Running reviewer with REVIEWER_FORCE_FAIL=true against PR #${{ inputs.pr_number }}"
+          node .github/scripts/reviewer/index.mjs
+      - name: Verify force-fail completed
+        run: echo "[test-v14] Reviewer force-fail run complete — verify REQUEST_CHANGES and review-bot-degraded label on PR #${{ inputs.pr_number }}"

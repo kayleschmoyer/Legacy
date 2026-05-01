@@ -89,6 +89,16 @@ const NEEDS_HUMAN_SECURITY_REVIEW_LABEL = 'needs-human-security-review';
 const NEEDS_HUMAN_REVIEW_LABEL = 'needs-human-review';
 const CYCLE_RESET_LABEL = 'bot:reset-cycle-counter';
 
+function maybeThrowForceFailError() {
+  if (process.env.REVIEWER_FORCE_FAIL !== 'true') return;
+  const err = new Error(
+    '[REVIEWER_FORCE_FAIL] Simulated transient LLM failure for testing',
+  );
+  err.retryable = true;
+  err.kind = 'transient';
+  throw err;
+}
+
 async function main() {
   const prNumber = Number(process.env.PR_NUMBER);
   if (!prNumber) {
@@ -421,6 +431,7 @@ async function main() {
     try {
       const t0 = Date.now();
       const result = await withRetry(() => {
+        maybeThrowForceFailError();
         const estimate = costCap.estimateCost(
           systemPrompt.length + userPrompt.length,
           providerName,
@@ -458,12 +469,13 @@ async function main() {
     );
     try {
       const t0 = Date.now();
-      const { passes, usage: multiPassUsage } = await withRetry(() =>
-        runMultiPass(provider, systemPrompt, userPrompt, {
+      const { passes, usage: multiPassUsage } = await withRetry(() => {
+        maybeThrowForceFailError();
+        return runMultiPass(provider, systemPrompt, userPrompt, {
           costCap,
           providerName,
-        }),
-      );
+        });
+      });
       latencyMs = Date.now() - t0;
       reviewText = consolidate(passes);
       reviewUsage = multiPassUsage;
