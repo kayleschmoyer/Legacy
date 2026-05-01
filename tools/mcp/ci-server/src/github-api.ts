@@ -247,6 +247,21 @@ async function ensureAuth(): Promise<{ token: string; slug: string }> {
   return { token: cachedToken, slug: cachedSlug };
 }
 
+/**
+ * Log GitHub rate-limit headers for observability.
+ * Writes to stderr to avoid polluting MCP stdout (JSON protocol).
+ */
+function logRateLimit(res: Response, label: string): void {
+  const remaining = res.headers.get('x-ratelimit-remaining');
+  const used = res.headers.get('x-ratelimit-used');
+  const limit = res.headers.get('x-ratelimit-limit');
+  if (remaining !== null) {
+    process.stderr.write(
+      `[ci-server:rate-limit] ${label} remaining=${remaining}/${limit} used=${used}\n`,
+    );
+  }
+}
+
 export function buildHeaders(token: string): Record<string, string> {
   return {
     Authorization: `Bearer ${token}`,
@@ -280,6 +295,7 @@ export async function githubGet<T>(
     throw new Error(`GitHub API ${res.status}: ${sanitizeErrorBody(body)}`);
   }
 
+  logRateLimit(res, `GET ${path}`);
   return (await res.json()) as T;
 }
 
@@ -303,6 +319,7 @@ export async function githubGetText(path: string): Promise<string> {
     throw new Error(`GitHub API ${res.status}: ${sanitizeErrorBody(body)}`);
   }
 
+  logRateLimit(res, `GET ${path} (text)`);
   return res.text();
 }
 
@@ -327,6 +344,7 @@ export async function githubGetArrayBuffer(path: string): Promise<ArrayBuffer> {
     throw new Error(`GitHub API ${res.status}: ${sanitizeErrorBody(body)}`);
   }
 
+  logRateLimit(res, `GET ${path} (arraybuffer)`);
   return res.arrayBuffer();
 }
 
@@ -349,6 +367,7 @@ export async function githubPut<T>(path: string, body?: unknown): Promise<T> {
     throw new Error(`GitHub API ${res.status}: ${sanitizeErrorBody(text)}`);
   }
 
+  logRateLimit(res, `PUT ${path}`);
   // Workflow enable/disable returns 204 No Content
   if (res.status === 204) return {} as T;
   return (await res.json()) as T;
@@ -373,6 +392,7 @@ export async function githubPost<T>(path: string, body?: unknown): Promise<T> {
     throw new Error(`GitHub API ${res.status}: ${sanitizeErrorBody(text)}`);
   }
 
+  logRateLimit(res, `POST ${path}`);
   // Some POST endpoints return 201 with a body, others return 204 with no body
   if (res.status === 204) return {} as T;
   return (await res.json()) as T;

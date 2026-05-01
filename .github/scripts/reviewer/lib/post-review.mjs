@@ -87,6 +87,14 @@ function githubApiRequest(path, method, jwt, body) {
       const chunks = [];
       res.on('data', (c) => chunks.push(c));
       res.on('end', () => {
+        const remaining = res.headers['x-ratelimit-remaining'];
+        const used = res.headers['x-ratelimit-used'];
+        const limit = res.headers['x-ratelimit-limit'];
+        if (remaining !== undefined) {
+          process.stderr.write(
+            `[reviewer:rate-limit] ${method} ${path} remaining=${remaining}/${limit} used=${used}\n`,
+          );
+        }
         const text = Buffer.concat(chunks).toString('utf8');
         if (res.statusCode >= 200 && res.statusCode < 300) {
           resolve(JSON.parse(text));

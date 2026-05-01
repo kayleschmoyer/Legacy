@@ -9,6 +9,26 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
   const { owner, repo } = context.repo;
   const isTriggeredByWorkflow = context.eventName === 'workflow_run';
 
+  // Log X-RateLimit-Remaining/Used after every GitHub API call so run logs
+  // show budget consumption over time. Only log when the bucket (per-100) drops
+  // to avoid flooding: e.g. 4900→4800, 500→400, etc.
+  let _lastRateLimitBucket = Infinity;
+  github.hook.after('request', (response) => {
+    const remaining = response.headers?.['x-ratelimit-remaining'];
+    if (remaining === undefined) return;
+    const n = parseInt(remaining, 10);
+    if (isNaN(n)) return;
+    const bucket = Math.floor(n / 100);
+    if (bucket < _lastRateLimitBucket) {
+      _lastRateLimitBucket = bucket;
+      const used = response.headers?.['x-ratelimit-used'] ?? '?';
+      const limit = response.headers?.['x-ratelimit-limit'] ?? '?';
+      console.log(
+        `📊 GitHub rate-limit: ${n}/${limit} remaining (${used} used)`,
+      );
+    }
+  });
+
   // Cache of required check names per base branch, populated lazily.
   // null means branch protection is absent or has no required checks — fall back to evaluating all.
   const requiredChecksCache = Object.create(null);

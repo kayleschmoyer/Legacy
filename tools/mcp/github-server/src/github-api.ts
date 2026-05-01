@@ -39,6 +39,21 @@ async function buildHeaders(): Promise<Record<string, string>> {
 }
 
 /**
+ * Log GitHub rate-limit headers from a response for observability.
+ * Writes to stderr so it doesn't pollute MCP stdout (JSON protocol).
+ */
+function logRateLimit(headers: Headers, context: string): void {
+  const remaining = headers.get('x-ratelimit-remaining');
+  const used = headers.get('x-ratelimit-used');
+  const limit = headers.get('x-ratelimit-limit');
+  if (remaining !== null) {
+    process.stderr.write(
+      `[github-api:rate-limit] ${context} remaining=${remaining}/${limit} used=${used}\n`,
+    );
+  }
+}
+
+/**
  * Make an authenticated GitHub REST API request.
  *
  * - 401: invalidates token cache and retries once
@@ -94,6 +109,8 @@ async function doRest<T>(opts: RestOptions, canRetry: boolean): Promise<T> {
       `GitHub API ${opts.method} ${opts.path} failed (${response.status}): ${sanitizeErrorBody(text)}`,
     );
   }
+
+  logRateLimit(response.headers, `${opts.method} ${opts.path}`);
 
   // DELETE returns 204 No Content
   if (response.status === 204) {
@@ -164,6 +181,8 @@ async function doGraphQL<T>(
       `GitHub GraphQL failed (${response.status}): ${sanitizeErrorBody(text)}`,
     );
   }
+
+  logRateLimit(response.headers, 'POST /graphql');
 
   const result = (await response.json()) as GraphQLResponse<T>;
   if (result.errors?.length) {
