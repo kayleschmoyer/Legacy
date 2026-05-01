@@ -1,5 +1,4 @@
 import {
-  getPullRequestContext,
   postShadowComment,
   addLabel,
   removeLabel,
@@ -26,13 +25,10 @@ import { buildRecord, emitTelemetry } from './lib/telemetry.mjs';
 import { withRetry } from './lib/retry.mjs';
 import { CostCap } from './lib/cost-cap.mjs';
 import {
-  getPrReviews,
-  getPrCommits,
-  getPrReviewComments,
-  getPrIssueComments,
   postEscalationComment,
   postReviewThreadReply,
 } from './lib/review-thread-api.mjs';
+import { fetchPrData } from './lib/graphql-fetch.mjs';
 import {
   computeCycle,
   isEscalationRequired,
@@ -101,19 +97,36 @@ async function main() {
   }
 
   const providerName = process.env.LLM_PROVIDER ?? 'github-models';
+  const sha = process.env.PR_HEAD_SHA ?? '';
 
-  // Fetch PR context — fail open on infra errors
+  // Batch-fetch all PR data in a single GraphQL request (+ one REST call for
+  // the diff). Replaces 5–6 individual REST reads to reduce rate-limit usage.
   let ctx;
+  let allReviews;
+  let prAllCommits;
+  let prReviewComments;
+  let prIssueComments;
   try {
-    ctx = getPullRequestContext(prNumber);
+    ({
+      prContext: ctx,
+      reviews: allReviews,
+      commits: prAllCommits,
+      reviewComments: prReviewComments,
+      issueComments: prIssueComments,
+    } = fetchPrData(prNumber));
   } catch (err) {
     process.stderr.write(
-      `[reviewer] Failed to fetch PR context: ${err instanceof Error ? err.message : String(err)}\n`,
+      `[reviewer] Failed to fetch PR data: ${err instanceof Error ? err.message : String(err)}\n`,
     );
-    process.exit(0);
+    try {
+      setCommitStatus(sha, 'failure', 'Review failed: could not fetch PR data');
+    } catch (statusErr) {
+      process.stderr.write(
+        `[reviewer] Failed to set commit status: ${statusErr instanceof Error ? statusErr.message : String(statusErr)}\n`,
+      );
+    }
+    process.exit(1);
   }
-
-  const sha = process.env.PR_HEAD_SHA ?? '';
 
   // Skip conditions: draft PRs and fork PRs. Author identity is NOT a skip condition.
   if (ctx.isDraft) {
@@ -146,23 +159,6 @@ async function main() {
   let priorTitles = [];
   let postReviewCommitShas = [];
   let lastBotReview = null;
-
-  let allReviews;
-  try {
-    allReviews = getPrReviews(prNumber);
-  } catch (err) {
-    process.stderr.write(
-      `[reviewer] Failed to fetch PR reviews: ${err instanceof Error ? err.message : String(err)}\n`,
-    );
-    try {
-      setCommitStatus(
-        sha,
-        'failure',
-        'Review failed: could not fetch PR history',
-      );
-    } catch (_) {}
-    process.exit(0);
-  }
 
   cycle = computeCycle(allReviews);
   process.stdout.write(`[reviewer] Computed review cycle: ${cycle}\n`);
@@ -247,43 +243,35 @@ async function main() {
   priorTitles = parseTitlesFromReviewBody(priorBotReviewBody);
 
   // Commits added since the last bot review (used by Cycle 2 validator).
+  // Data already fetched by fetchPrData — no extra API call needed.
   if (cycle === 2 && lastBotReview) {
-    try {
-      const allCommitShas = getPrCommits(prNumber);
-      const reviewedAtIdx = allCommitShas.indexOf(lastBotReview.commitId);
-      if (reviewedAtIdx === -1) {
-        // C1 review commitId not found — likely a force-push or rebase after C1.
-        // Fall back to treating all current commits as post-C1 so new findings
-        // that cite any current PR commit are not incorrectly stripped.
-        postReviewCommitShas = allCommitShas;
-        process.stdout.write(
-          '[reviewer] Cycle 2: C1 review commitId not in current commit list (force-push/rebase?) — treating all commits as post-C1\n',
-        );
-      } else {
-        postReviewCommitShas = allCommitShas.slice(reviewedAtIdx + 1);
-        process.stdout.write(
-          `[reviewer] Cycle 2: ${postReviewCommitShas.length} commit(s) added since C1 review\n`,
-        );
-      }
-    } catch (err) {
-      process.stderr.write(
-        `[reviewer] Failed to fetch PR commits for cycle 2 filter: ${err instanceof Error ? err.message : String(err)}\n`,
+    const reviewedAtIdx = prAllCommits.indexOf(lastBotReview.commitId);
+    if (reviewedAtIdx === -1) {
+      // C1 review commitId not found — likely a force-push or rebase after C1.
+      // Fall back to treating all current commits as post-C1 so new findings
+      // that cite any current PR commit are not incorrectly stripped.
+      postReviewCommitShas = prAllCommits;
+      process.stdout.write(
+        '[reviewer] Cycle 2: C1 review commitId not in current commit list (force-push/rebase?) — treating all commits as post-C1\n',
       );
-      // Fail closed: no post-C1 commits known → validator will strip new findings.
+    } else {
+      postReviewCommitShas = prAllCommits.slice(reviewedAtIdx + 1);
+      process.stdout.write(
+        `[reviewer] Cycle 2: ${postReviewCommitShas.length} commit(s) added since C1 review\n`,
+      );
     }
   }
 
-  // Fetch author replies (JUSTIFY/FIX comments) for Cycle 2+ so the LLM can
+  // Process author replies (JUSTIFY/FIX comments) for Cycle 2+ so the LLM can
   // evaluate them when adjudicating or verifying findings.
+  // Data already fetched by fetchPrData — no extra API calls needed.
   let authorResponsesSection = '';
   let authorFormatErrors = 0;
   if (cycle >= 2 && lastBotReview) {
     try {
-      const reviewComments = getPrReviewComments(prNumber);
-      const issueComments = getPrIssueComments(prNumber);
       const authorResponses = buildAuthorResponsesSection(
-        reviewComments,
-        issueComments,
+        prReviewComments,
+        prIssueComments,
         lastBotReview.submittedAt,
         REVIEWER_BOT_LOGINS,
       );
@@ -301,7 +289,7 @@ async function main() {
 
       // Post FORMAT_ERROR_MESSAGE in-thread for each MALFORMED inline reply.
       const malformedRootIds = getMalformedInlineReplies(
-        reviewComments,
+        prReviewComments,
         lastBotReview.submittedAt,
         REVIEWER_BOT_LOGINS,
       );
@@ -324,8 +312,8 @@ async function main() {
       if (
         cycle >= 3 &&
         hasCannotComplyResponse(
-          reviewComments,
-          issueComments,
+          prReviewComments,
+          prIssueComments,
           lastBotReview.submittedAt,
           REVIEWER_BOT_LOGINS,
           authorLogin,
@@ -340,7 +328,7 @@ async function main() {
       }
     } catch (err) {
       process.stderr.write(
-        `[reviewer] Failed to fetch author replies for cycle ${cycle}: ${err instanceof Error ? err.message : String(err)}\n`,
+        `[reviewer] Failed to process author replies for cycle ${cycle}: ${err instanceof Error ? err.message : String(err)}\n`,
       );
       // Non-fatal: proceed without author response context
     }
