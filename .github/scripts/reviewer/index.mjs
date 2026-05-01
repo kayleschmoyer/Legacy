@@ -50,6 +50,44 @@ import {
 } from './lib/cycle-protocol.mjs';
 import { FORMAT_ERROR_MESSAGE } from './lib/parse-author-response.mjs';
 
+const STRIP_LOG_MAX_FINDINGS = 3;
+const STRIP_LOG_MAX_TITLE_LEN = 60;
+
+/**
+ * Escape a string for safe embedding inside a GitHub Actions workflow command.
+ * The runner parses `::cmd key=value::message` from stdout; unescaped %, CR, and LF
+ * in the message field can corrupt the command or inject additional annotations.
+ *
+ * @param {string} str
+ * @returns {string}
+ */
+function escapeWorkflowCommandValue(str) {
+  return str.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+}
+
+/**
+ * Format a truncated summary of stripped findings for annotation log output.
+ * Caps titles at STRIP_LOG_MAX_TITLE_LEN chars and lists at most STRIP_LOG_MAX_FINDINGS
+ * entries to avoid unbounded log growth from model-generated content.
+ * Titles are sanitized for safe embedding in GitHub Actions workflow commands.
+ *
+ * @param {import('./lib/cycle-protocol.mjs').StrippedFinding[]} stripped
+ * @returns {string}
+ */
+function formatStrippedLog(stripped) {
+  const preview = stripped.slice(0, STRIP_LOG_MAX_FINDINGS).map((f) => {
+    const truncated =
+      f.title.length > STRIP_LOG_MAX_TITLE_LEN
+        ? `${f.title.slice(0, STRIP_LOG_MAX_TITLE_LEN)}…`
+        : f.title;
+    return `"${escapeWorkflowCommandValue(truncated)}" (${f.strip_reason})`;
+  });
+  const overflow = stripped.length - STRIP_LOG_MAX_FINDINGS;
+  return overflow > 0
+    ? `${preview.join(', ')} +${overflow} more`
+    : preview.join(', ');
+}
+
 const NEEDS_HUMAN_ARBITRATION_LABEL = 'needs-human-arbitration';
 const NEEDS_HUMAN_SECURITY_REVIEW_LABEL = 'needs-human-security-review';
 const NEEDS_HUMAN_REVIEW_LABEL = 'needs-human-review';
@@ -558,7 +596,7 @@ async function main() {
     );
     if (stripped.length > 0) {
       process.stdout.write(
-        `::warning::[reviewer] Cycle 2 validator: stripped ${stripped.length} finding(s) that raised new issues outside author's changes — verify LLM SHA-citation compliance\n`,
+        `::warning::[reviewer] Cycle 2 validator: stripped ${stripped.length} finding(s) — ${formatStrippedLog(stripped)}\n`,
       );
     }
     filteredFindings = kept;
@@ -570,7 +608,7 @@ async function main() {
     );
     if (stripped.length > 0) {
       process.stdout.write(
-        `[reviewer] Cycle 3 validator: stripped ${stripped.length} finding(s) outside Cycle 2 mandates\n`,
+        `::warning::[reviewer] Cycle 3 validator: stripped ${stripped.length} finding(s) — ${formatStrippedLog(stripped)}\n`,
       );
     }
     filteredFindings = kept;

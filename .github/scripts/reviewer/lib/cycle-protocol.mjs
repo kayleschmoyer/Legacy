@@ -64,6 +64,12 @@ export function parseTitlesFromReviewBody(body) {
 }
 
 /**
+ * @typedef {'no_title_match_no_sha' | 'no_title_match_sha_not_post_c1' | 'not_in_c2_mandate_list'} StripReason
+ *
+ * @typedef {import('./findings.mjs').Finding & { strip_reason: StripReason }} StrippedFinding
+ */
+
+/**
  * Cycle 2 post-LLM validator.
  *
  * Strips findings that are **new** (not present in Cycle 1) and do **not**
@@ -75,10 +81,14 @@ export function parseTitlesFromReviewBody(body) {
  * "Cites a post-C1 commit" = the finding's `body` field contains a hex string
  * of 7–40 characters that prefix-matches any SHA in `postC1CommitShas`.
  *
+ * Stripped findings are annotated with a `strip_reason` field:
+ *   - `'no_title_match_no_sha'`           — no SHA-like string cited in body at all
+ *   - `'no_title_match_sha_not_post_c1'`  — a SHA is cited but does not match any post-C1 commit
+ *
  * @param {import('./findings.mjs').Finding[]} findings
  * @param {string[]} priorTitles     Titles from Cycle 1's review body
  * @param {string[]} postC1CommitShas Full 40-char SHAs of commits added after C1
- * @returns {{ kept: import('./findings.mjs').Finding[], stripped: import('./findings.mjs').Finding[] }}
+ * @returns {{ kept: import('./findings.mjs').Finding[], stripped: StrippedFinding[] }}
  */
 export function filterFindingsCycle2(findings, priorTitles, postC1CommitShas) {
   const priorSet = new Set(priorTitles.map((t) => t.toLowerCase()));
@@ -102,7 +112,16 @@ export function filterFindingsCycle2(findings, priorTitles, postC1CommitShas) {
     if (citesPostC1) {
       kept.push(f);
     } else {
-      stripped.push(f);
+      // Distinguish: did the LLM cite any SHA at all (false-negative signal)
+      // or did it simply not cite any commit SHA whatsoever?
+      // Require at least one digit to avoid matching pure-letter hex words (e.g. "defaced").
+      const citesAnySha = /(?=[0-9a-f]*[0-9])[0-9a-f]{7,40}/.test(bodyLower);
+      stripped.push({
+        ...f,
+        strip_reason: citesAnySha
+          ? 'no_title_match_sha_not_post_c1'
+          : 'no_title_match_no_sha',
+      });
     }
   }
 
@@ -116,9 +135,11 @@ export function filterFindingsCycle2(findings, priorTitles, postC1CommitShas) {
  * Cycle 2 mandate list. Cycle 3 may only verify what was mandated in C2;
  * all other findings are invalid for this cycle.
  *
+ * Stripped findings are annotated with `strip_reason: 'not_in_c2_mandate_list'`.
+ *
  * @param {import('./findings.mjs').Finding[]} findings
  * @param {string[]} mandateTitles Titles from Cycle 2's review body
- * @returns {{ kept: import('./findings.mjs').Finding[], stripped: import('./findings.mjs').Finding[] }}
+ * @returns {{ kept: import('./findings.mjs').Finding[], stripped: StrippedFinding[] }}
  */
 export function filterFindingsCycle3(findings, mandateTitles) {
   const mandateSet = new Set(mandateTitles.map((t) => t.toLowerCase()));
@@ -130,7 +151,7 @@ export function filterFindingsCycle3(findings, mandateTitles) {
     if (mandateSet.has(f.title.toLowerCase())) {
       kept.push(f);
     } else {
-      stripped.push(f);
+      stripped.push({ ...f, strip_reason: 'not_in_c2_mandate_list' });
     }
   }
 

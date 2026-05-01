@@ -17,27 +17,33 @@ import { spawn } from 'node:child_process';
  */
 
 /**
+ * @typedef {'no_title_match_no_sha' | 'no_title_match_sha_not_post_c1' | 'not_in_c2_mandate_list'} StripReason
+ *
+ * @typedef {import('./findings.mjs').Finding & { strip_reason: StripReason }} StrippedFinding
+ */
+
+/**
  * @typedef {object} TelemetryRecord
- * @property {string}    ts                  - ISO 8601 timestamp (UTC)
- * @property {number}    pr                  - Pull request number
- * @property {string}    sha                 - Head commit SHA
- * @property {string}    model               - Model identifier string
- * @property {string}    provider            - 'github-models' | 'copilot-cli' | 'anthropic'
- * @property {1|2|3}     cycle               - Review cycle number
- * @property {string}    verdict             - 'APPROVED' | 'REQUEST_CHANGES' | 'ESCALATE' | string
- * @property {Finding[]} findings            - Structured findings from the review
- * @property {Finding[]} stripped_findings   - Findings removed by the cycle validator (non-empty for cycles 2 and 3 only)
- * @property {number}    input_tokens        - Total input tokens consumed
- * @property {number}    cached_input_tokens - Tokens served from prompt cache
- * @property {number}    output_tokens       - Total output tokens produced
- * @property {number}    cost_usd            - Total cost in USD
- * @property {number}    latency_ms          - Wall-clock latency of the review call in ms
- * @property {boolean}   shadow              - True when running in shadow (non-blocking) mode
- * @property {string}    author_login        - GitHub login of the PR author (informational)
- * @property {'bot'|'human'} author_type     - Derived author type for observability
- * @property {number}    format_errors       - Count of MALFORMED author reply tokens detected
+ * @property {string}           ts                  - ISO 8601 timestamp (UTC)
+ * @property {number}           pr                  - Pull request number
+ * @property {string}           sha                 - Head commit SHA
+ * @property {string}           model               - Model identifier string
+ * @property {string}           provider            - 'github-models' | 'copilot-cli' | 'anthropic'
+ * @property {1|2|3}            cycle               - Review cycle number
+ * @property {string}           verdict             - 'APPROVED' | 'REQUEST_CHANGES' | 'ESCALATE' | string
+ * @property {import('./findings.mjs').Finding[]} findings - Structured findings from the review
+ * @property {StrippedFinding[]} stripped_findings  - Findings removed by the cycle validator, annotated with strip_reason (non-empty for cycles 2 and 3 only)
+ * @property {number}           input_tokens        - Total input tokens consumed
+ * @property {number}           cached_input_tokens - Tokens served from prompt cache
+ * @property {number}           output_tokens       - Total output tokens produced
+ * @property {number}           cost_usd            - Total cost in USD
+ * @property {number}           latency_ms          - Wall-clock latency of the review call in ms
+ * @property {boolean}          shadow              - True when running in shadow (non-blocking) mode
+ * @property {string}           author_login        - GitHub login of the PR author (informational)
+ * @property {'bot'|'human'}    author_type         - Derived author type for observability
+ * @property {number}           format_errors       - Count of MALFORMED author reply tokens detected
  * @property {CycleCounterExclusions} cycle_counter_exclusions - Breakdown of reviews excluded from the cycle count
- * @property {boolean}   [cost_cap_exceeded] - True when the run aborted due to the per-PR cost cap
+ * @property {boolean}          [cost_cap_exceeded] - True when the run aborted due to the per-PR cost cap
  */
 
 /**
@@ -78,8 +84,8 @@ export async function emitTelemetry(record) {
  * @param {string}    params.provider
  * @param {number}    params.cycle
  * @param {string}    params.verdict
- * @param {Finding[]} params.findings
- * @param {Finding[]} [params.strippedFindings]
+ * @param {import('./findings.mjs').Finding[]} params.findings
+ * @param {StrippedFinding[]} [params.strippedFindings]
  * @param {import('./providers/provider.mjs').ProviderUsage} params.usage
  * @param {number}    params.latencyMs
  * @param {boolean}   params.shadow

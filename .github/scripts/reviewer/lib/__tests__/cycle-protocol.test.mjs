@@ -201,6 +201,64 @@ describe('filterFindingsCycle2 — strips new findings unrelated to author chang
   });
 });
 
+describe('filterFindingsCycle2 — strip_reason annotation', () => {
+  it('annotates with no_title_match_no_sha when body contains no SHA-like string', () => {
+    const newFinding = makeFinding({
+      title: 'New finding with no SHA',
+      body: 'This finding body has no commit hash anywhere.',
+    });
+
+    const { stripped } = filterFindingsCycle2([newFinding], [], []);
+    assert.strictEqual(stripped.length, 1);
+    assert.strictEqual(stripped[0].strip_reason, 'no_title_match_no_sha');
+  });
+
+  it('annotates with no_title_match_sha_not_post_c1 when body cites a SHA that is not post-C1', () => {
+    const postC1Sha = 'aaaaaaa1234567890abcdef1234567890abcdef12';
+    const newFinding = makeFinding({
+      title: 'New finding citing wrong SHA',
+      // dead1234 contains a digit — matches tightened SHA heuristic but is not post-C1
+      body: 'This was introduced in dead1234 (not a post-C1 commit).',
+    });
+
+    const { stripped } = filterFindingsCycle2([newFinding], [], [postC1Sha]);
+    assert.strictEqual(stripped.length, 1);
+    assert.strictEqual(
+      stripped[0].strip_reason,
+      'no_title_match_sha_not_post_c1',
+    );
+  });
+
+  it('annotates with no_title_match_no_sha when post-C1 commits exist but body has no hex string', () => {
+    const postC1Sha = 'abc1234567890abcdef1234567890abcdef123456';
+    const newFinding = makeFinding({
+      title: 'Unrelated finding no SHA',
+      body: 'No commit reference whatsoever.',
+    });
+
+    const { stripped } = filterFindingsCycle2([newFinding], [], [postC1Sha]);
+    assert.strictEqual(stripped.length, 1);
+    assert.strictEqual(stripped[0].strip_reason, 'no_title_match_no_sha');
+  });
+
+  it('preserves all Finding fields on stripped findings alongside strip_reason', () => {
+    const newFinding = makeFinding({
+      title: 'Annotated finding',
+      severity: 'critical',
+      file: 'src/auth.ts',
+      line: 42,
+      body: 'No SHA here.',
+    });
+
+    const { stripped } = filterFindingsCycle2([newFinding], [], []);
+    assert.strictEqual(stripped.length, 1);
+    assert.strictEqual(stripped[0].severity, 'critical');
+    assert.strictEqual(stripped[0].file, 'src/auth.ts');
+    assert.strictEqual(stripped[0].line, 42);
+    assert.strictEqual(stripped[0].strip_reason, 'no_title_match_no_sha');
+  });
+});
+
 describe('filterFindingsCycle2 — keeps new findings that cite post-C1 commits', () => {
   it('keeps a new finding whose body contains a 7-char SHA prefix of a post-C1 commit', () => {
     const postC1Sha = 'abc1234567890abcdef1234567890abcdef123456';
@@ -311,6 +369,37 @@ describe('filterFindingsCycle3 — keeps only C2 mandates', () => {
     assert.strictEqual(kept.length, 2);
     assert.strictEqual(stripped.length, 1);
     assert.strictEqual(stripped[0].title, 'New concern');
+  });
+
+  it('annotates every stripped finding with strip_reason not_in_c2_mandate_list', () => {
+    const mandates = ['Mandate 1'];
+    const findings = [
+      makeFinding({ title: 'Mandate 1' }),
+      makeFinding({ title: 'Brand new finding' }),
+      makeFinding({ title: 'Another unrelated issue' }),
+    ];
+
+    const { stripped } = filterFindingsCycle3(findings, mandates);
+    assert.strictEqual(stripped.length, 2);
+    for (const f of stripped) {
+      assert.strictEqual(f.strip_reason, 'not_in_c2_mandate_list');
+    }
+  });
+
+  it('preserves all Finding fields on stripped findings alongside strip_reason', () => {
+    const finding = makeFinding({
+      title: 'Out-of-mandate finding',
+      severity: 'high',
+      file: 'src/lib.ts',
+      line: 10,
+    });
+
+    const { stripped } = filterFindingsCycle3([finding], []);
+    assert.strictEqual(stripped.length, 1);
+    assert.strictEqual(stripped[0].severity, 'high');
+    assert.strictEqual(stripped[0].file, 'src/lib.ts');
+    assert.strictEqual(stripped[0].line, 10);
+    assert.strictEqual(stripped[0].strip_reason, 'not_in_c2_mandate_list');
   });
 });
 
