@@ -558,7 +558,7 @@ async function main() {
     );
     if (stripped.length > 0) {
       process.stdout.write(
-        `[reviewer] Cycle 2 validator: stripped ${stripped.length} finding(s) that raised new issues outside author's changes\n`,
+        `::warning::[reviewer] Cycle 2 validator: stripped ${stripped.length} finding(s) that raised new issues outside author's changes — verify LLM SHA-citation compliance\n`,
       );
     }
     filteredFindings = kept;
