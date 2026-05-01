@@ -1,0 +1,27 @@
+V9 CI Gating Order - Validation Run v4
+
+Ticket:  LS-3911
+Date:    2026-05-01
+Run:     v4 (final)
+Agent:   claude/mystifying-brattain-990d0f
+
+Purpose
+-------
+Verify that CI does NOT run on pull_request events; it only triggers after
+Code Reviewer Bot approves (pull_request_review.submitted).
+
+Key ACs under test:
+- AC1: No W1 or CI Orchestrator runs while PR is in draft state
+- AC2: W1 fires on ready_for_review; CI orchestrator does NOT start on push
+- AC3: CI Orchestrator fires exactly once on bot APPROVE event
+- AC4: Post-approval push dismisses stale review; CI does not re-run until re-approval
+- AC5: All 6 required status checks reported on the approved SHA
+- AC6: merge_group event triggers CI (architectural skip: custom queue does not generate this)
+
+Design spec refs: section 3.1, 6.2, 3.4, 14, G2
+
+This probe file is intentionally inert - no code dependencies, no linting targets.
+It exists solely to produce a minimal diff that the reviewer bot will APPROVE
+on first pass with zero findings.
+
+# AC4 test: post-approval push at 2026-05-01T20:37:23Z
