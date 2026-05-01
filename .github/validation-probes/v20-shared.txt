@@ -1,2 +1,2 @@
-V20 shared probe — written by PR A (LS-3922)
-This line is intentionally the same position as PR B's version to create a conflict.
+V20 shared probe - written by PR B (LS-3922)
+Modified by PR B -- merge queue race condition validation

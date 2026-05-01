@@ -1,0 +1,6 @@
+V20 validation probe -- race condition (LS-3922)
+Branch B: test/ci-validation/v20b-mq-race
+
+This file was committed AFTER merge-when-ready label was applied
+and WHILE CI was running for the original commit.
+It tests the merge queue race-push behavior.
