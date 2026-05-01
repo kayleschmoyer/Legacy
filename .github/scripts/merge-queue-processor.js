@@ -232,6 +232,22 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
       };
     }
 
+    // Block merges that are not fully approved — reviewDecision values:
+    //   APPROVED           → all required reviews given, allow merge
+    //   REVIEW_REQUIRED    → CODEOWNER approval pending, block
+    //   CHANGES_REQUESTED  → reviewer requested changes, block
+    //   null               → no review requirements on this PR, allow merge
+    const reviewDecision = await getPRReviewDecision(pr.number);
+    if (reviewDecision !== null && reviewDecision !== 'APPROVED') {
+      return {
+        canMerge: false,
+        reason:
+          reviewDecision === 'REVIEW_REQUIRED'
+            ? 'PR requires CODEOWNER approval for sensitive path(s)'
+            : `PR cannot be merged: reviewDecision is ${reviewDecision}`,
+      };
+    }
+
     // Check status checks
     const checksResult = await validateStatusChecks(pr.head.sha, pr.base.ref);
     if (!checksResult.allPassing) {
@@ -254,6 +270,24 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
     }
 
     return { canMerge: true, pr };
+  }
+
+  async function getPRReviewDecision(prNumber) {
+    const query = `
+      query($owner: String!, $repo: String!, $number: Int!) {
+        repository(owner: $owner, name: $repo) {
+          pullRequest(number: $number) {
+            reviewDecision
+          }
+        }
+      }
+    `;
+    const result = await github.graphql(query, {
+      owner,
+      repo,
+      number: prNumber,
+    });
+    return result.repository.pullRequest.reviewDecision;
   }
 
   async function checkUnresolvedReviewThreads(prNumber) {
@@ -623,6 +657,15 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
         pr.head.ref +
         '\n' +
         '   ```';
+    } else if (
+      validation.reason.includes('CODEOWNER approval') ||
+      validation.reason.includes('reviewDecision')
+    ) {
+      comment +=
+        '\n1. A CODEOWNER must approve this PR before it can be merged\n' +
+        '2. Check `.github/CODEOWNERS` to see which reviewer(s) own the files you changed\n' +
+        '3. Request a review from the appropriate CODEOWNER(s)\n' +
+        '4. If a reviewer already requested changes, address them and re-request review';
     } else if (validation.reason.includes('merge-to-parent')) {
       comment +=
         '\n1. Add the `merge-to-parent` label to this PR\n' +

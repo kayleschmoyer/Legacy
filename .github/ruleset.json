@@ -75,12 +75,5 @@
       }
     }
   ],
-  "bypass_actors": [
-    {
-      "_comment": "Allow repository admins to bypass in emergencies (e.g., hotfixes).",
-      "actor_id": 5,
-      "actor_type": "RepositoryRole",
-      "bypass_mode": "pull_request"
-    }
-  ]
+  "bypass_actors": []
 }
