@@ -32,7 +32,7 @@ const PR_DATA_QUERY = `
         reviews(first: 100) {
           nodes {
             databaseId
-            author { login }
+            author { login __typename }
             state
             body
             submittedAt
@@ -101,7 +101,11 @@ export function mapPrGraphQLResponse(pr, diff) {
 
   const reviews = pr.reviews.nodes.map((r) => ({
     id: r.databaseId,
-    userLogin: r.author?.login ?? null,
+    userLogin: r.author
+      ? r.author.__typename === 'Bot' && !r.author.login.endsWith('[bot]')
+        ? `${r.author.login}[bot]`
+        : r.author.login
+      : null,
     state: r.state,
     body: r.body ?? null,
     submittedAt: r.submittedAt,

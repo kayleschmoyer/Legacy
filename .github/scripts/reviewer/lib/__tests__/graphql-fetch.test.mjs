@@ -102,6 +102,63 @@ describe('mapPrGraphQLResponse — reviews', () => {
     assert.strictEqual(reviews[0].body, null);
   });
 
+  it('appends [bot] to login when review author __typename is Bot (LS-4112)', () => {
+    const pr = makePr({
+      reviews: {
+        nodes: [
+          {
+            databaseId: 1004,
+            author: { login: 'legacy-sports-review-bot', __typename: 'Bot' },
+            state: 'CHANGES_REQUESTED',
+            body: 'Cycle 1 review',
+            submittedAt: '2024-01-04T00:00:00Z',
+            commit: { oid: 'def456' },
+          },
+        ],
+      },
+    });
+    const { reviews } = mapPrGraphQLResponse(pr, '');
+    assert.strictEqual(reviews[0].userLogin, 'legacy-sports-review-bot[bot]');
+  });
+
+  it('does not double-append [bot] when bot login already ends with [bot]', () => {
+    const pr = makePr({
+      reviews: {
+        nodes: [
+          {
+            databaseId: 1006,
+            author: { login: 'some-bot[bot]', __typename: 'Bot' },
+            state: 'APPROVED',
+            body: null,
+            submittedAt: '2024-01-06T00:00:00Z',
+            commit: null,
+          },
+        ],
+      },
+    });
+    const { reviews } = mapPrGraphQLResponse(pr, '');
+    assert.strictEqual(reviews[0].userLogin, 'some-bot[bot]');
+  });
+
+  it('does not modify login when review author __typename is User', () => {
+    const pr = makePr({
+      reviews: {
+        nodes: [
+          {
+            databaseId: 1005,
+            author: { login: 'alice', __typename: 'User' },
+            state: 'APPROVED',
+            body: null,
+            submittedAt: '2024-01-05T00:00:00Z',
+            commit: null,
+          },
+        ],
+      },
+    });
+    const { reviews } = mapPrGraphQLResponse(pr, '');
+    assert.strictEqual(reviews[0].userLogin, 'alice');
+  });
+
   it('sets userLogin=null for reviews with null author', () => {
     const pr = makePr({
       reviews: {
