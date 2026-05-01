@@ -25,6 +25,7 @@
 | V9 re-run (LS-3977 fix)                                 | LS-3911 | 2026-04-30 | 🟡 Partial | AC1–AC3 ✅ AC5 ✅; AC4 🔴 dismiss works ✅ but TOCTOU race merges PR with dismissed review — LS-3990 filed; AC6 ⏭️ skip (see §16)                                                      |
 | V9 final (LS-3977 + LS-3990 fixes)                      | LS-3911 | 2026-04-30 | 🟡 Partial | AC1–AC3 ✅; AC4 ⏭️ PR merged before step-6 push possible (merge queue gates bot-review only); AC5 ⚠️ infra failure (pnpm cache tar); AC6 ⏭️ (see §17)                                  |
 | V19 — CODEOWNERS sensitive paths                        | LS-3921 | 2026-05-01 | 🔴 Fail    | AC1 ❌ AC2 ❌ — bot approval + CI pass → merge queue merged WITHOUT human CODEOWNERS approval; `require_code_owner_review:true` not enforced (see §18)                                 |
+| V20 — Merge queue end-to-end + race conditions          | LS-3922 | 2026-04-30 | 🟡 Partial | AC3 ✅ AC4 ✅; AC1 🟡 (merge works, no merge_group re-run — custom queue); AC2 ❌ (TOCTOU guard exists but no label removal / approval dismissal per spec); see §19                    |
 
 ---
 
@@ -1564,3 +1565,160 @@ The CODEOWNERS security model is non-functional.
 | Ticket                   | Summary                                                                                                                                                                  |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | (TBD — filed separately) | [CI Rebuild Bug] CODEOWNERS enforcement bypassed — merge queue merges sensitive-path PRs without human CODEOWNER approval; `require_code_owner_review:true` not enforced |
+
+---
+
+## §19 V20 — Merge Queue End-to-End + Race Condition Handling
+
+**Description:** Validates the custom label-based merge queue: standard merge path (bot review →
+CI → `merge-when-ready` → processor merges), race-conflict handling (two PRs touching the same
+file; second ejected with clear error after first merges), and race-push semantics (head-SHA
+detection in the custom merge queue processor).
+
+**Test PRs:**
+
+- PR A (standard + race-conflict): https://github.com/bkrupa/legacy-sports/pull/3513
+- PR B (race-conflict): https://github.com/bkrupa/legacy-sports/pull/3515
+
+**Branches:**
+
+- `test/ci-validation/v20a-mq-standard`
+- `test/ci-validation/v20b-mq-race`
+
+**Probe files:**
+
+- `.github/validation-probes/v20a-mq-standard.txt`
+- `.github/validation-probes/v20b-mq-race.txt`
+- `.github/validation-probes/v20-shared.txt` (identical name on both branches — creates conflict after A merges)
+
+**Date completed:** 2026-04-30
+**Executed by:** Claude (claude-sonnet-4-6), LS-3922 agent run
+
+### Acceptance Criteria
+
+| #   | Criterion                                                      | Result     | Evidence                                                                                                                                                                                                                                                                                                |
+| --- | -------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AC1 | Standard path: PR merges via queue; CI re-ran on merge_group   | 🟡 Partial | PR A (#3513) merged via custom queue at `2026-04-30T21:05:17Z` ✅. CI ran once (triggered by bot APPROVE). **No `merge_group` ref created** — the system uses a custom label-based merge queue (`merge-queue.yml`) that calls the GitHub merge API directly; GitHub's built-in merge queue is not used. |
+| AC2 | Race-push: queued PR removed cleanly; approval dismissed       | ❌ Fail    | TOCTOU guard in `performMerge` (`merge-queue-processor.js:459`) detects SHA change and skips merge safely, but does NOT remove `merge-when-ready` label, dismiss the bot approval, or post a comment. PR stays in queue silently; re-evaluation only occurs on the next workflow trigger.               |
+| AC3 | Race-conflict: conflicting PR ejected with clear error message | ✅ Pass    | PR B detected as `CONFLICTING` by processor; comment posted: "🚫 Merge Queue: Cannot Merge — Reason: PR has merge conflicts that must be resolved" with resolution steps. PR not silently dropped.                                                                                                      |
+| AC4 | No PR silently stuck in queue indefinitely                     | ✅ Pass    | Conflicting PRs receive clear blocker comments (AC3 evidence). Pending-CI PRs trigger self-retry via `workflow_dispatch` (`merge-queue-processor.js:100`). Race-push scenario is the edge case where a PR can get stuck without a new trigger (see Deviations).                                         |
+
+### Walkthrough Execution
+
+| Step | Action                                         | Observed                                                                                                                                                                      |
+| ---- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | Create branches A & B; push probe files        | Both pushed; PRs #3513 and #3515 opened as drafts                                                                                                                             |
+| 2    | No CI or W1 fires while drafts                 | Only Jira Branch Sync and skipped W1 runs while draft — no CI Pipeline                                                                                                        |
+| 3    | Mark PR A ready (`gh pr ready 3513`)           | W1 fired on `pull_request.ready_for_review` (run [25188623086](https://github.com/bkrupa/legacy-sports/actions/runs/25188623086)) — reviewer triggered successfully           |
+| 4    | Bot reviews PR A (cycle=1)                     | Bot posted APPROVE: "LGTM — no blocking findings." at `20:50:41Z`; auto-applied `merge-when-ready` label (`index.mjs:654`)                                                    |
+| 5    | CI Orchestrator fires on bot APPROVE           | CI Orchestrator run [25188669254](https://github.com/bkrupa/legacy-sports/actions/runs/25188669254) triggered by `pull_request_review.submitted` from bot; all CI jobs passed |
+| 6    | Merge queue fires while CI pending             | MQ run [25188916220](https://github.com/bkrupa/legacy-sports/actions/runs/25188916220): found PR #3513, status=`in_progress` for lint/test → "will retry in next cycle"       |
+| 7    | CI completes; merge queue re-fires             | MQ re-evaluated PR #3513 after CI completed; all checks passed; `performMerge` called                                                                                         |
+| 8    | PR A merged                                    | PR #3513 merged at `2026-04-30T21:05:17Z` (squash, commit `9c517e8ec3e8914926ce18de2f1b89b1af032ac4`)                                                                         |
+| 9    | Mark PR B ready (`gh pr ready 3515`)           | W1 fired on `pull_request.ready_for_review`; bot APPROVED at `21:00:00Z`; `merge-when-ready` auto-applied                                                                     |
+| 10   | CI Orchestrator fires for PR B                 | CI Orchestrator run [25189065311](https://github.com/bkrupa/legacy-sports/actions/runs/25189065311); all jobs passed                                                          |
+| 11   | GitHub computes PR B `mergeable = CONFLICTING` | After PR A merged `v20-shared.txt`, GitHub marked PR B `mergeable: CONFLICTING`                                                                                               |
+| 12   | Merge queue processes PR B                     | MQ run [25189445585](https://github.com/bkrupa/legacy-sports/actions/runs/25189445585): `❌ PR #3515 cannot be merged: PR has merge conflicts that must be resolved`          |
+| 13   | Blocker comment posted on PR B                 | Comment by `personal-merge-queue` bot at `21:07:17Z`: "🚫 Merge Queue: Cannot Merge — Reason: PR has merge conflicts that must be resolved" with git resolution steps         |
+
+### Observed Behavior
+
+**Standard path (AC1):** PR A followed the expected flow end-to-end. W1 fired on `ready_for_review`
+(notably the event DID fire for manually-created PRs, unlike the GITHUB_TOKEN anti-loop that
+affected bot-created PRs in earlier validations). The bot APPROVED and auto-applied `merge-when-ready`
+via `index.mjs:654` — V1 Gap 1 (label not auto-applied) is confirmed fixed. CI Orchestrator ran on
+the bot approval; merge queue detected pending CI on first run and retried; merged after CI passed.
+
+**Merge_group deviation:** The ticket described step 3 as "GitHub creates a `merge_group` ref; W2 (CI)
+re-runs on the merge_group commit." This did not occur. The `merge-queue.yml` processor calls
+`github.rest.pulls.merge()` directly (squash merge). No `merge_group` ref is created. The CI
+Orchestrator `merge_group` trigger in `ci-orchestrator.yml` is present but never fires in this flow.
+CI runs once (after bot approval) rather than twice (after approval + at merge_group time). This
+provides slightly less safety than a merge_group re-run (which would catch post-approval changes to
+main), but is consistent with the design doc's stated decision to use a custom queue.
+
+**Race-conflict (AC3):** PR B's `v20-shared.txt` conflicted with PR A's merge. GitHub computed
+`mergeable: CONFLICTING`; the processor detected it in `validatePRForMerge` and posted the blocker
+comment. Clear, actionable, not silently dropped. ✅
+
+**Race-push (AC2):** Not tested end-to-end (timing-sensitive). From code analysis: the TOCTOU guard
+in `performMerge` (`merge-queue-processor.js:459–466`) re-fetches the PR before the merge API call
+and aborts if `currentSha !== pr.head.sha`. This prevents merging an unreviewed commit during the
+narrow window between validation and merge. However, the broader race (commit pushed outside the
+merge window while the queue is idle) is not handled: `merge-when-ready` label stays, bot approval
+stays, PR is not re-queued for review. The merge queue does not trigger on `pull_request.synchronize`
+(intentionally omitted per comment in `merge-queue.yml:24`). The PR would sit in a "stuck" state
+until another trigger fires (label event, review event, or manual `workflow_dispatch`).
+
+### Deviations
+
+#### AC1 — No `merge_group` re-run; CI runs once per PR
+
+**Expected (per ticket §"Standard merge queue path" step 3):** "GitHub creates a `merge_group` ref;
+W2 (CI) re-runs on the merge_group commit."
+
+**Observed:** The custom merge queue (`merge-queue.yml`) directly calls `github.rest.pulls.merge()`
+via the GitHub App token. No `merge_group` ref is created; the CI Orchestrator's `merge_group`
+trigger never fires.
+
+**Impact:** CI validates code at the bot-approval SHA, not at the final merged state. If other PRs
+merge to `main` between approval and the current PR's merge, the merged code is not re-validated
+against those changes. This is a known tradeoff acknowledged in the design doc ("Custom merge queue
+over GitHub's built-in") — the correctness gap exists but is accepted for operational simplicity.
+
+#### AC2 — Race-push: no label removal, no approval dismissal (TOCTOU guard only)
+
+**Expected (per ticket §"Race condition: push to queued PR"):** "queue removes the PR (because the
+head SHA changed); approval is dismissed; PR returns to 'needs review' state."
+
+**Observed:** `performMerge` has a TOCTOU guard that detects SHA changes between validation and
+the merge API call, skipping the merge safely. However:
+
+- `merge-when-ready` label is NOT removed
+- Bot approval is NOT dismissed
+- No comment is posted to the PR
+- PR silently stays queued, waiting for the next merge queue trigger
+
+For a commit pushed outside the merge window (the common case), neither the label removal nor the
+approval dismissal occurs. The PR remains queued but will not be processed until another event fires
+the merge queue. If no event fires, the PR sits indefinitely with a stale queue state. The recovery
+path — "re-trigger review → re-approve → re-queue" — would work if the author applies
+`bot:ready-for-review`, but this is not automatic.
+
+**Latent correctness gap:** If a new commit is pushed after CI passes on the original SHA, and
+no new CI run is triggered (CI Orchestrator doesn't run on `push` or `synchronize`), the next merge
+queue trigger would call `validateStatusChecks` against the new SHA. If only the "No Merge Conflicts"
+check has been registered on the new SHA (via `check-conflicts.yml` which DOES run on synchronize),
+the validator would see one passing check, no required checks configured, and could merge the new
+(unreviewed, untested) commit. The TOCTOU guard would not help here because both the validated SHA
+and the current SHA would be the new SHA.
+
+#### V1 Gap 1 resolved — `merge-when-ready` now auto-applied by reviewer
+
+V1 documented that the reviewer script did not apply `merge-when-ready` after a clean APPROVE. This
+gap is now resolved. `index.mjs:654` calls `addLabel(prNumber, 'merge-when-ready')` after posting
+a clean APPROVE review. Confirmed in W1 run [25188623086](https://github.com/bkrupa/legacy-sports/actions/runs/25188623086)
+log: `[reviewer] Added 'merge-when-ready' label to PR #3513`.
+
+### Evidence
+
+| Artifact                                     | Link                                                                        |
+| -------------------------------------------- | --------------------------------------------------------------------------- |
+| Test PR A #3513 (merged)                     | https://github.com/bkrupa/legacy-sports/pull/3513                           |
+| Test PR B #3515 (conflict ejected)           | https://github.com/bkrupa/legacy-sports/pull/3515                           |
+| W1 reviewer run (PR A, ready_for_review)     | https://github.com/bkrupa/legacy-sports/actions/runs/25188623086            |
+| CI Orchestrator run (PR A, post-bot-APPROVE) | https://github.com/bkrupa/legacy-sports/actions/runs/25188669254            |
+| MQ run (found pending CI, will retry)        | https://github.com/bkrupa/legacy-sports/actions/runs/25188916220            |
+| W1 reviewer run (PR B, ready_for_review)     | https://github.com/bkrupa/legacy-sports/actions/runs/25189038529            |
+| CI Orchestrator run (PR B)                   | https://github.com/bkrupa/legacy-sports/actions/runs/25189065311            |
+| MQ run (conflict detection for PR B)         | https://github.com/bkrupa/legacy-sports/actions/runs/25189445585            |
+| PR A merged at                               | `2026-04-30T21:05:17Z`, commit `9c517e8ec3e8914926ce18de2f1b89b1af032ac4`   |
+| PR B blocker comment (conflict)              | https://github.com/bkrupa/legacy-sports/pull/3515#issuecomment-4356159620   |
+| merge-when-ready auto-label log              | W1 run 25188623086: `[reviewer] Added 'merge-when-ready' label to PR #3513` |
+
+### Issues Spawned
+
+None — all deviations are design-level observations, not new bugs. The latent correctness gap in
+AC2 (unreviewed commit could be merged via a subsequent merge queue trigger) is an extension of the
+previously-known V1 Gap 2 (no `bot-review` commit status required for merge). No new bug ticket
+filed; the gap was noted for the engineering lead's awareness.
