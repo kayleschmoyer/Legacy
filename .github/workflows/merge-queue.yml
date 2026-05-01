@@ -21,11 +21,13 @@ on:
     types:
       - labeled # When merge-when-ready label is added
       - unlabeled # When label is removed
-      # NOTE: 'synchronize' and 'reopened' are intentionally omitted.
-      # They fire before CI registers check runs on the new SHA, which causes
-      # validateStatusChecks to see an empty check list and incorrectly conclude
-      # all checks are passing — merging the PR before CI has even started.
-      # The 'workflow_run' trigger below handles re-evaluation once CI finishes.
+      - synchronize # When a new commit is pushed — used only by cleanup-on-push job
+      # NOTE: 'synchronize' is included above ONLY for the cleanup-on-push job
+      # (label removal + review dismissal). The process-merge-queue job explicitly
+      # excludes it because synchronize fires before CI registers check runs on the
+      # new SHA, which causes validateStatusChecks to see an empty check list and
+      # incorrectly conclude all checks are passing — merging before CI even starts.
+      # The 'workflow_run' trigger below handles queue re-evaluation once CI finishes.
   # Trigger on PR review events
   pull_request_review:
     types: [submitted] # When someone approves/requests changes
@@ -45,15 +47,10 @@ on:
     branches-ignore:
       - main
 
-# Ensure only one merge queue run processes at a time to prevent race conditions
-concurrency:
-  group: merge-queue
-  cancel-in-progress: false
-
 jobs:
   process-merge-queue:
     if: |
-      github.repository_owner == 'bkrupa' && 
+      github.repository_owner == 'bkrupa' &&
       (
         github.event_name == 'workflow_dispatch' ||
         (github.event_name == 'workflow_run' && (github.event.workflow_run.event == 'pull_request' || github.event.workflow_run.event == 'pull_request_review')) ||
@@ -61,6 +58,12 @@ jobs:
         (github.event_name == 'pull_request' && github.event.action == 'labeled' && (github.event.label.name == 'merge-when-ready' || github.event.label.name == 'merge-to-parent')) ||
         (github.event_name == 'pull_request' && github.event.action == 'unlabeled' && (github.event.label.name == 'merge-when-ready' || github.event.label.name == 'merge-to-parent'))
       )
+    # Ensure only one queue-processing run executes at a time to prevent race conditions.
+    # cancel-in-progress: false means one active + one queued; newer arrivals replace the
+    # queued slot so only the most recent trigger processes after the current run finishes.
+    concurrency:
+      group: merge-queue
+      cancel-in-progress: false
     # Prefer self-hosted runner when available to avoid consuming GitHub Actions
     # budget. This job only makes API calls — no builds or node_modules needed.
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
@@ -200,3 +203,96 @@ jobs:
             const forceCheck = ${{ github.event.inputs.force_check || false }};
             const isRetry = ${{ github.event.inputs.is_retry || false }};
             await require('./.github/scripts/merge-queue-processor.js')({ github, context, isDryRun, forceCheck, isRetry });
+
+  # Fires on every push to a PR branch. If the PR has merge-when-ready, remove
+  # the label and dismiss the bot's stale APPROVE so the PR clearly signals
+  # "needs re-review" rather than relying solely on the TOCTOU SHA guard.
+  cleanup-on-push:
+    if: |
+      github.repository_owner == 'bkrupa' &&
+      github.event_name == 'pull_request' &&
+      github.event.action == 'synchronize' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    # Per-PR concurrency: rapid pushes to the same PR cancel the queued run
+    # (latest commit wins). Independent of the merge-queue concurrency group so
+    # cleanup never blocks or is blocked by queue processing.
+    concurrency:
+      group: cleanup-on-push-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    permissions:
+      pull-requests: write
+      issues: write
+
+    steps:
+      - name: Generate GitHub App Token
+        id: generate-token
+        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3
+        with:
+          app-id: ${{ secrets.MERGE_QUEUE_APP_ID }}
+          private-key: ${{ secrets.MERGE_QUEUE_APP_PRIVATE_KEY }}
+
+      - name: Remove merge-when-ready label and dismiss stale bot approval
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          github-token: ${{ steps.generate-token.outputs.token }}
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const prNumber = context.payload.pull_request.number;
+
+            // Fetch fresh PR state — payload labels can be stale
+            const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: prNumber });
+
+            const hasLabel = pr.labels.some(l => l.name === 'merge-when-ready');
+            if (!hasLabel) {
+              console.log('PR does not have merge-when-ready label — nothing to do.');
+              return;
+            }
+
+            // Remove the merge-when-ready label
+            try {
+              await github.rest.issues.removeLabel({
+                owner,
+                repo,
+                issue_number: prNumber,
+                name: 'merge-when-ready',
+              });
+              console.log(`Removed merge-when-ready label from PR #${prNumber}`);
+            } catch (err) {
+              if (err.status !== 404) throw err;
+              console.log('merge-when-ready label was already removed.');
+            }
+
+            // Paginate all review pages to find the bot's most recent APPROVE
+            let page = 1;
+            let botApproval = null;
+            while (true) {
+              const { data: reviews } = await github.rest.pulls.listReviews({
+                owner,
+                repo,
+                pull_number: prNumber,
+                per_page: 100,
+                page,
+              });
+              const pageApproval = reviews
+                .filter(r => r.user.login === 'legacy-sports-review-bot[bot]' && r.state === 'APPROVED')
+                .pop();
+              if (pageApproval) botApproval = pageApproval;
+              if (reviews.length < 100) break;
+              page++;
+            }
+
+            if (!botApproval) {
+              console.log('No bot APPROVE review found — nothing to dismiss.');
+              return;
+            }
+
+            await github.rest.pulls.dismissReview({
+              owner,
+              repo,
+              pull_number: prNumber,
+              review_id: botApproval.id,
+              message: 'New commit pushed while PR was in the merge queue — re-review required.',
+            });
+            console.log(`Dismissed bot approval review #${botApproval.id} on PR #${prNumber}`);
