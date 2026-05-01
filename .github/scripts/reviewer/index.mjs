@@ -374,7 +374,7 @@ async function main() {
     return;
   }
   const trivial = isTrivialPR(diff);
-  const costCap = new CostCap({ prNumber });
+  const costCap = new CostCap({ prNumber, provider: providerName });
   let reviewText;
   let reviewUsage = {
     inputTokens: 0,
