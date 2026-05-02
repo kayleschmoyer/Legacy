@@ -12,6 +12,17 @@ test.describe('Homepage @smoke', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('load');
+    // Onboarding tutorial auto-opens for users with no leagues; dismiss it so
+    // it doesn't intercept pointer events on the page buttons (LS-3854).
+    // Use waitFor (not isVisible) — isVisible({ timeout }) is a no-op in Playwright v1.40+.
+    const skipTutorial = page.getByRole('button', { name: /skip tutorial/i });
+    try {
+      await skipTutorial.waitFor({ state: 'visible', timeout: 2000 });
+      await skipTutorial.click();
+      await skipTutorial.waitFor({ state: 'hidden' });
+    } catch {
+      // Tutorial not present — proceed
+    }
   });
 
   test('loads and has a meaningful page title', async ({ page }) => {
