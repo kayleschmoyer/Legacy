@@ -1,0 +1,5 @@
+V20 fresh run — PR A (standard merge queue path)
+Branch: test/ci-validation/v20-fresh-a
+Ticket: LS-3922
+Date: 2026-05-01
+Purpose: Validate AC1 (standard path: bot review → CI → merge queue → merged to main)

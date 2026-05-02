@@ -1,0 +1,5 @@
+V20 fresh run — shared probe file (conflict surface between PR A and PR B)
+This file exists on both branch A and branch B with different content.
+After PR A merges, PR B will report CONFLICTING on this file.
+Branch A version: adds line "A was here"
+A was here
