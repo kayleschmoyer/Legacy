@@ -11,10 +11,25 @@ import { execFileSync } from 'node:child_process';
 
 const MAX_BUFFER = 10 * 1024 * 1024;
 
+/**
+ * Normalize a GitHub GraphQL author node to a login string, appending `[bot]`
+ * when the API omits it for Bot accounts. Returns null when author is absent.
+ *
+ * @param {{ login: string, __typename: string } | null | undefined} author
+ * @returns {string | null}
+ */
+export function normalizeBotLogin(author) {
+  if (!author) return null;
+  if (author.__typename === 'Bot' && !author.login.endsWith('[bot]')) {
+    return `${author.login}[bot]`;
+  }
+  return author.login;
+}
+
 // Fetches up to 100 items per collection. pageInfo.hasNextPage is included so
 // we can detect and reject PRs that exceed the limit rather than silently
 // computing cycles or author responses from incomplete data.
-const PR_DATA_QUERY = `
+export const PR_DATA_QUERY = `
   query FetchPRData($owner: String!, $repo: String!, $prNumber: Int!) {
     repository(owner: $owner, name: $repo) {
       pullRequest(number: $prNumber) {
@@ -54,7 +69,7 @@ const PR_DATA_QUERY = `
             comments(first: 100) {
               nodes {
                 databaseId
-                author { login }
+                author { login __typename }
                 body
                 createdAt
               }
@@ -101,11 +116,7 @@ export function mapPrGraphQLResponse(pr, diff) {
 
   const reviews = pr.reviews.nodes.map((r) => ({
     id: r.databaseId,
-    userLogin: r.author
-      ? r.author.__typename === 'Bot' && !r.author.login.endsWith('[bot]')
-        ? `${r.author.login}[bot]`
-        : r.author.login
-      : null,
+    userLogin: normalizeBotLogin(r.author),
     state: r.state,
     body: r.body ?? null,
     submittedAt: r.submittedAt,
@@ -122,7 +133,7 @@ export function mapPrGraphQLResponse(pr, diff) {
     thread.comments.nodes.map((c, i) => ({
       id: c.databaseId,
       inReplyToId: i === 0 ? null : thread.comments.nodes[0].databaseId,
-      userLogin: c.author?.login ?? null,
+      userLogin: normalizeBotLogin(c.author),
       body: c.body ?? '',
       createdAt: c.createdAt ?? '',
     })),

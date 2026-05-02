@@ -1,6 +1,81 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { mapPrGraphQLResponse, fetchPrData } from '../graphql-fetch.mjs';
+import {
+  mapPrGraphQLResponse,
+  fetchPrData,
+  normalizeBotLogin,
+  PR_DATA_QUERY,
+} from '../graphql-fetch.mjs';
+
+// ---------------------------------------------------------------------------
+// normalizeBotLogin
+// ---------------------------------------------------------------------------
+
+describe('normalizeBotLogin', () => {
+  it('appends [bot] when __typename is Bot and login lacks suffix', () => {
+    assert.strictEqual(
+      normalizeBotLogin({
+        login: 'legacy-sports-review-bot',
+        __typename: 'Bot',
+      }),
+      'legacy-sports-review-bot[bot]',
+    );
+  });
+
+  it('does not double-append when login already ends with [bot]', () => {
+    assert.strictEqual(
+      normalizeBotLogin({ login: 'some-bot[bot]', __typename: 'Bot' }),
+      'some-bot[bot]',
+    );
+  });
+
+  it('returns login unchanged for User authors', () => {
+    assert.strictEqual(
+      normalizeBotLogin({ login: 'alice', __typename: 'User' }),
+      'alice',
+    );
+  });
+
+  it('returns null for null author', () => {
+    assert.strictEqual(normalizeBotLogin(null), null);
+  });
+
+  it('returns null for undefined author', () => {
+    assert.strictEqual(normalizeBotLogin(undefined), null);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PR_DATA_QUERY shape — guard against LS-4118 regression
+// ---------------------------------------------------------------------------
+
+describe('PR_DATA_QUERY', () => {
+  it('requests __typename for reviewThreads comment authors', () => {
+    // reviewComments bot-login normalization depends on __typename being present
+    // in this selection. If it is removed, getMalformedInlineReplies silently
+    // returns [] (LS-4118).
+    const reviewThreadsBlock = PR_DATA_QUERY.slice(
+      PR_DATA_QUERY.indexOf('reviewThreads(first: 100)'),
+    );
+    assert.ok(
+      reviewThreadsBlock.includes('__typename'),
+      'reviewThreads.comments.nodes.author must include __typename',
+    );
+  });
+
+  it('requests __typename for review authors', () => {
+    const reviewsBlock = PR_DATA_QUERY.slice(
+      PR_DATA_QUERY.indexOf('reviews(first: 100)'),
+      PR_DATA_QUERY.indexOf('comments(first: 100)'),
+    );
+    assert.ok(
+      reviewsBlock.includes('__typename'),
+      'reviews.nodes.author must include __typename',
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
 
 const makePr = (overrides = {}) => ({
   number: 42,
@@ -327,6 +402,81 @@ describe('mapPrGraphQLResponse — reviewComments', () => {
     });
     const { reviewComments } = mapPrGraphQLResponse(pr, '');
     assert.strictEqual(reviewComments[0].userLogin, null);
+  });
+
+  it('appends [bot] to login when reviewComment author __typename is Bot (LS-4118)', () => {
+    const pr = makePr({
+      reviewThreads: {
+        nodes: [
+          {
+            comments: {
+              nodes: [
+                {
+                  databaseId: 200,
+                  author: {
+                    login: 'legacy-sports-review-bot',
+                    __typename: 'Bot',
+                  },
+                  body: 'Finding',
+                  createdAt: '2024-01-01T00:00:00Z',
+                },
+              ],
+            },
+          },
+        ],
+      },
+    });
+    const { reviewComments } = mapPrGraphQLResponse(pr, '');
+    assert.strictEqual(
+      reviewComments[0].userLogin,
+      'legacy-sports-review-bot[bot]',
+    );
+  });
+
+  it('does not double-append [bot] when reviewComment bot login already ends with [bot]', () => {
+    const pr = makePr({
+      reviewThreads: {
+        nodes: [
+          {
+            comments: {
+              nodes: [
+                {
+                  databaseId: 201,
+                  author: { login: 'some-bot[bot]', __typename: 'Bot' },
+                  body: 'Finding',
+                  createdAt: '2024-01-01T00:00:00Z',
+                },
+              ],
+            },
+          },
+        ],
+      },
+    });
+    const { reviewComments } = mapPrGraphQLResponse(pr, '');
+    assert.strictEqual(reviewComments[0].userLogin, 'some-bot[bot]');
+  });
+
+  it('does not modify login when reviewComment author __typename is User', () => {
+    const pr = makePr({
+      reviewThreads: {
+        nodes: [
+          {
+            comments: {
+              nodes: [
+                {
+                  databaseId: 202,
+                  author: { login: 'alice', __typename: 'User' },
+                  body: 'Comment',
+                  createdAt: '2024-01-01T00:00:00Z',
+                },
+              ],
+            },
+          },
+        ],
+      },
+    });
+    const { reviewComments } = mapPrGraphQLResponse(pr, '');
+    assert.strictEqual(reviewComments[0].userLogin, 'alice');
   });
 });
 
