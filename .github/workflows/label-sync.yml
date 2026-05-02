@@ -30,6 +30,6 @@ jobs:
       - name: Sync labels from .github/labels.yml
         uses: EndBug/label-sync@52074158190acb45f3077f9099fea818aa43f97a # v2
         with:
-          source-file: .github/labels.yml
+          config-file: .github/labels.yml
           delete-other-labels: true
           token: ${{ secrets.GITHUB_TOKEN }}
