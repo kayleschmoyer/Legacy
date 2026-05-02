@@ -172,6 +172,56 @@ export * from './components/UnifiedLoadingPanel';
 // Scoreboard primitives (cross-platform)
 export * from './components/scoreboard';
 
+// Design-system primitives & composites (LS-4146 — Claude Design handoff).
+// Explicit re-exports avoid name collisions with existing legacy exports
+// (e.g. Layout's Separator, navigation's TabItem, features/matchup's
+// MatchupCard / StandingsTable). Matchup-cluster components are NOT
+// re-exported here — import them directly from `./components/<Name>`
+// when consumers want the new design-system version.
+export { Input, Textarea } from './components/Input';
+export type { InputProps, InputSize, TextareaProps } from './components/Input';
+export { Chip, PositionChip } from './components/Chip';
+export type {
+  ChipProps,
+  ChipTone,
+  Position as ChipPosition,
+} from './components/Chip';
+export {
+  Switch,
+  Checkbox,
+  Radio,
+  SegmentedControl,
+} from './components/ToggleControls';
+export type {
+  SwitchProps,
+  CheckboxProps,
+  RadioProps,
+  RadioOption,
+  SegmentedControlProps,
+  SegmentedOption,
+} from './components/ToggleControls';
+export { Spinner, Skeleton, SkeletonRow } from './components/Spinner';
+export type { SpinnerProps, SkeletonProps } from './components/Spinner';
+export { Dialog } from './components/Dialog';
+export type { DialogProps } from './components/Dialog';
+export { Sheet as DSSheet } from './components/Sheet';
+export type { SheetProps as DSSheetProps } from './components/Sheet';
+export { Popover } from './components/Popover';
+export type { PopoverProps } from './components/Popover';
+export { Tabs } from './components/Tabs';
+export type { TabsProps, TabItem as TabsItem } from './components/Tabs';
+export { Select } from './components/Select';
+export type { SelectProps, SelectOption } from './components/Select';
+export { LeagueCard } from './components/LeagueCard';
+export type { LeagueCardProps } from './components/LeagueCard';
+export { NotificationBell } from './components/NotificationBell';
+export type {
+  NotificationBellProps,
+  NotificationItem,
+} from './components/NotificationBell';
+export { NavBar } from './components/NavBar';
+export type { NavBarProps, NavLink } from './components/NavBar';
+
 // Shared formatting utilities
 export * from './utils/scoreFormatting';
 export * from './utils/playerFormatting';

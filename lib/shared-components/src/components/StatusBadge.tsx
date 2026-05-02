@@ -8,12 +8,20 @@ import React from 'react';
 import { Text, XStack } from 'tamagui';
 
 export type StatusBadgeVariant =
+  // Generic semantic variants (legacy API).
   | 'info'
   | 'success'
   | 'warning'
   | 'error'
   | 'neutral'
-  | 'accent';
+  | 'accent'
+  // Brand-aligned product states (per Claude Design handoff).
+  | 'draftLive'
+  | 'preDraft'
+  | 'live'
+  | 'final'
+  | 'active'
+  | 'comingSoon';
 
 export interface StatusBadgeProps {
   /** The label text to display inside the badge. */
@@ -38,6 +46,38 @@ const VARIANT_STYLES: Record<
   error: { bg: '$red3', color: '$red10', border: '$red6' },
   neutral: { bg: '$gray3', color: '$gray10', border: '$gray6' },
   accent: { bg: '$blue3', color: '$blue10', border: '$blue7' },
+
+  // Heritage product states. Tuned for the dark "night stadium" surface.
+  draftLive: {
+    bg: 'rgba(196, 30, 58, 0.18)',
+    color: '#F4B7C0',
+    border: '$brandSeamRed',
+  },
+  preDraft: {
+    bg: 'rgba(27, 58, 92, 0.30)',
+    color: '#C7D6F4',
+    border: '$brandNavyLight',
+  },
+  live: {
+    bg: 'rgba(196, 30, 58, 0.22)',
+    color: '#FFE3E8',
+    border: '$brandSeamRedLight',
+  },
+  final: {
+    bg: 'rgba(124, 135, 148, 0.18)',
+    color: '#D7DEE8',
+    border: '$outlineStrong',
+  },
+  active: {
+    bg: 'rgba(45, 106, 79, 0.22)',
+    color: '#9CE5BA',
+    border: '$green7',
+  },
+  comingSoon: {
+    bg: 'rgba(197, 165, 90, 0.18)',
+    color: '$brandGoldLight',
+    border: '$brandGold',
+  },
 };
 
 export function StatusBadge({
@@ -64,6 +104,7 @@ export function StatusBadge({
         fontWeight="700"
         color={color ?? styles.color}
         textTransform="uppercase"
+        letterSpacing={0.6}
       >
         {label}
       </Text>

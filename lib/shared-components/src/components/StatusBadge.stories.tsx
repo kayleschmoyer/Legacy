@@ -18,7 +18,20 @@ const meta: Meta<typeof StatusBadge> = {
   argTypes: {
     variant: {
       control: 'select',
-      options: ['info', 'success', 'warning', 'error', 'neutral', 'accent'],
+      options: [
+        'info',
+        'success',
+        'warning',
+        'error',
+        'neutral',
+        'accent',
+        'draftLive',
+        'preDraft',
+        'live',
+        'final',
+        'active',
+        'comingSoon',
+      ],
     },
     label: { control: 'text' },
     fontSize: { control: { type: 'number', min: 8, max: 20 } },
@@ -89,6 +102,19 @@ export const AllVariants: Story = {
       <StatusBadge label="Error" variant="error" />
       <StatusBadge label="Neutral" variant="neutral" />
       <StatusBadge label="Accent" variant="accent" />
+    </XStack>
+  ),
+};
+
+export const ProductStates: Story = {
+  render: () => (
+    <XStack gap="$2" flexWrap="wrap">
+      <StatusBadge label="Draft Live" variant="draftLive" />
+      <StatusBadge label="Pre-Draft" variant="preDraft" />
+      <StatusBadge label="Live" variant="live" />
+      <StatusBadge label="Final" variant="final" />
+      <StatusBadge label="Active" variant="active" />
+      <StatusBadge label="Coming Soon" variant="comingSoon" />
     </XStack>
   ),
 };
