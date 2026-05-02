@@ -228,7 +228,6 @@ test.describe
         await expect(page.getByText('LIVE DRAFT').first()).toBeVisible({
           timeout: 30000,
         });
-        // eslint-disable-next-line no-console
         console.log(`[live-draft] ${label} draft board loaded`);
       }
 
@@ -252,6 +251,9 @@ test.describe
       // concurrent refetch re-render) and log a duplicate pick.
       const draftedPlayers = new Set<string>();
 
+      // Anchor for per-pick elapsed-time logs (LS-3851 timing instrumentation).
+      const draftStart = Date.now();
+
       while (pickCount < maxPicks) {
         // Check if draft is complete on any page
         let draftDone = false;
@@ -272,21 +274,41 @@ test.describe
         // (DraftTopBand) shows "Your pick" when isMyPick=true, "On the clock"
         // otherwise. Only click on the page whose turn it actually is.
         //
-        // Use exact:true to avoid false positives from the
-        // PickAnnouncement overlay ("\ud83c\udf89 YOUR PICK") which briefly
-        // appears after a successful pick.
+        // Use exact:true to avoid false positives from the PickAnnouncement
+        // overlay that briefly shows "YOUR PICK" (uppercase) after a pick.
         //
-        // NOTE: isVisible({ timeout }) is deprecated in Playwright
-        // v1.40+ — the timeout is silently ignored.  Use waitFor().
+        // Check all pages in PARALLEL (LS-3851 fix): the previous sequential
+        // loop checked each page with a 2000ms timeout, burning up to
+        // 4x2s = 8s per empty iteration. Between picks, the Apollo refetch
+        // takes ~500-1500ms before "Your pick" appears — meaning 1-3 empty
+        // iterations per pick x 9s each = ~20 min total over 100 picks.
+        // Parallel checking reduces empty iterations from ~9s to ~2.5s.
+        const myTurnResults = await Promise.all(
+          pages.map(async ({ label, page }) => ({
+            label,
+            page,
+            isMyTurn: await page
+              .getByText('Your pick', { exact: true })
+              .first()
+              .waitFor({ state: 'visible', timeout: 2000 })
+              .then(() => true)
+              .catch((e: Error) => {
+                if (e.name !== 'TimeoutError') throw e;
+                return false;
+              }),
+          })),
+        );
+
         let pickAccepted = false;
-        for (const { label, page } of pages) {
-          const isMyTurn = await page
-            .getByText('Your pick', { exact: true })
-            .first()
-            .waitFor({ state: 'visible', timeout: 2000 })
-            .then(() => true)
-            .catch(() => false);
-          if (!isMyTurn) continue;
+        // Try each page that shows "Your pick" in declaration order.
+        // If the first matching page has no undrafted button yet (player
+        // list lag), we continue to the next eligible page rather than
+        // immediately counting a miss — matching the behaviour of the old
+        // sequential loop which would `continue` to the next page.
+        const myTurnEntries = myTurnResults.filter((r) => r.isMyTurn);
+
+        for (const { label, page } of myTurnEntries) {
+          if (pickAccepted) break;
 
           // Find the first DRAFT NOW button whose player has not yet been
           // drafted in this session.  Stale player cards (visible but already
@@ -320,70 +342,73 @@ test.describe
             ariaLabel = btnLabel;
             break;
           }
-          // No undrafted button found on this page — wait for UI to refresh
-          if (draftBtnIdx < 0) continue;
 
-          console.log(
-            `[live-draft] Clicking pick by ${label} (pick #${pickCount + 1}) — ${ariaLabel}`,
-          );
-          await allDraftBtns.nth(draftBtnIdx).click({ force: true });
-
-          // Verify the pick was accepted by checking the turn advanced:
-          // "Your pick" (exact) must disappear from this page, meaning
-          // the server confirmed the pick and moved to the next drafter.
-          //
-          // Do NOT check whether the player button disappears — it can
-          // vanish due to an incoming WebSocket update about another
-          // manager's pick (false positive), causing duplicate-pick logs.
-          //
-          // Timeout raised to 12 s (from 8 s) for CI network latency headroom.
-          const wasAccepted = await page
-            .getByText('Your pick', { exact: true })
-            .first()
-            .waitFor({ state: 'hidden', timeout: 12000 })
-            .then(() => true)
-            .catch(() => false);
-
-          if (wasAccepted) {
-            pickCount++;
-            consecutiveMisses = 0;
-            hasReloadedThisStreak = false;
-            // eslint-disable-next-line no-console
+          if (draftBtnIdx >= 0) {
+            const elapsedS = ((Date.now() - draftStart) / 1000).toFixed(1);
             console.log(
-              `[live-draft] Pick #${pickCount} by ${label} accepted — ${ariaLabel}`,
+              `[live-draft] +${elapsedS}s Clicking pick by ${label} (pick #${pickCount + 1}) — ${ariaLabel}`,
             );
-            // Record player name for post-draft roster assertions.
-            // ariaLabel format: "Draft Bill Lange now"
-            const playerName = ariaLabel
-              ?.replace(/^Draft\s+/i, '')
-              .replace(/\s+now$/i, '');
-            if (playerName) {
-              draftedPlayers.add(playerName);
-              if (label === 'Commissioner')
-                state.commissionerPicks.push(playerName);
-              else if (label === 'Manager 1')
-                state.manager1Picks.push(playerName);
+            const pickStart = Date.now();
+            await allDraftBtns.nth(draftBtnIdx).click({ force: true });
+
+            // Verify the pick was accepted by checking the turn advanced:
+            // "Your pick" (exact) must disappear from this page, meaning
+            // the server confirmed the pick and moved to the next drafter.
+            //
+            // Do NOT check whether the player button disappears — it can
+            // vanish due to an incoming WebSocket update about another
+            // manager's pick (false positive), causing duplicate-pick logs.
+            //
+            // Timeout raised to 12 s (from 8 s) for CI network latency headroom.
+            const wasAccepted = await page
+              .getByText('Your pick', { exact: true })
+              .first()
+              .waitFor({ state: 'hidden', timeout: 12000 })
+              .then(() => true)
+              .catch((e: Error) => {
+                if (e.name !== 'TimeoutError') throw e;
+                return false;
+              });
+
+            if (wasAccepted) {
+              pickCount++;
+              consecutiveMisses = 0;
+              hasReloadedThisStreak = false;
+              console.log(
+                `[live-draft] Pick #${pickCount} by ${label} accepted in ${Date.now() - pickStart}ms — ${ariaLabel}`,
+              );
+              // Record player name for post-draft roster assertions.
+              // ariaLabel format: "Draft Bill Lange now"
+              const playerName = ariaLabel
+                ?.replace(/^Draft\s+/i, '')
+                .replace(/\s+now$/i, '');
+              if (playerName) {
+                draftedPlayers.add(playerName);
+                if (label === 'Commissioner')
+                  state.commissionerPicks.push(playerName);
+                else if (label === 'Manager 1')
+                  state.manager1Picks.push(playerName);
+              }
+              pickAccepted = true;
+            } else {
+              // Pick click did not result in turn advancement within the timeout.
+              // Leave pickAccepted=false so the outer !pickAccepted block
+              // increments consecutiveMisses and triggers reload/break guards.
+              const elapsedS2 = ((Date.now() - draftStart) / 1000).toFixed(1);
+              console.log(
+                `[live-draft] +${elapsedS2}s Pick by ${label} NOT confirmed within timeout (pick #${pickCount + 1}) — ${ariaLabel}`,
+              );
             }
-            pickAccepted = true;
-          } else {
-            // Pick click did not result in turn advancement within the timeout.
-            // Leave pickAccepted=false so the !pickAccepted block below
-            // increments consecutiveMisses and triggers the reload/break guards
-            // — without this the loop spins indefinitely when picks are
-            // silently failing or WS updates are delayed past the timeout.
-            console.log(
-              `[live-draft] Pick by ${label} NOT confirmed within timeout (pick #${pickCount}) — ${ariaLabel}`,
-            );
           }
-          break;
+          // If draftBtnIdx < 0 on this page, continue to the next
+          // myTurnEntry so another eligible page gets a chance.
         }
 
         if (!pickAccepted) {
           consecutiveMisses++;
           if (consecutiveMisses > 30) {
-            // eslint-disable-next-line no-console
             console.log(
-              `[live-draft] Stuck after ${consecutiveMisses} misses at pick ${pickCount}`,
+              `[live-draft] Stuck after ${consecutiveMisses} misses at pick ${pickCount} (+${((Date.now() - draftStart) / 1000).toFixed(1)}s)`,
             );
             break;
           }
@@ -393,7 +418,6 @@ test.describe
             // miss 16 to 30 triggers a reload, blocking picks for 75-150 s
             // and causing the draft to abort incomplete (LS-3833).
             hasReloadedThisStreak = true;
-            // eslint-disable-next-line no-console
             console.log('[live-draft] Reloading all pages...');
             for (const { page } of pages) {
               await page.reload();
@@ -405,8 +429,9 @@ test.describe
         }
       }
 
-      // eslint-disable-next-line no-console
-      console.log(`[live-draft] Completed ${pickCount} total picks`);
+      console.log(
+        `[live-draft] Completed ${pickCount} total picks (+${((Date.now() - draftStart) / 1000).toFixed(1)}s)`,
+      );
       expect(pickCount).toBeGreaterThan(0);
     });
 
@@ -439,7 +464,6 @@ test.describe
       // to refetch leagueDraft — draftCompletedAt in DB ensures the banner
       // renders on a fresh load even when the WS completion event was missed.
       if (!draftComplete) {
-        // eslint-disable-next-line no-console
         console.log(
           '[live-draft] Banner not visible after 30 s polling — reloading commissioner page',
         );
@@ -452,7 +476,6 @@ test.describe
       }
 
       expect(draftComplete).toBe(true);
-      // eslint-disable-next-line no-console
       console.log('[live-draft] Draft verified complete');
     });
   });

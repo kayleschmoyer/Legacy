@@ -8,7 +8,7 @@
 
 import { eq } from 'drizzle-orm';
 import type { PublicDb } from '@legacy-sports/db-client';
-import { commitDraftPick } from './drafts/helpers';
+import { commitDraftPick, getCurrentDraftPickInfo } from './drafts/helpers';
 import { executePickEffects } from './drafts/draft-pick-effects';
 import { createAllMatchupsForLeague } from './matchups/mutations';
 import { getLeague, getTeam, getUser } from '../__fixtures__';
@@ -630,6 +630,110 @@ describe('Draft Picks - Integration Tests', () => {
         .from(leagues)
         .where(eq(leagues.id, league.id));
       expect(updatedLeague.draftStatus).not.toBe('completed');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // LS-3851: Multi-user pick flow unit coverage — regressions should surface
+  // in seconds rather than 20 minutes via E2E.
+  describe('Snake draft — multi-user pick flow (LS-3851)', () => {
+    // SQLite test db is structurally compatible with PublicDb for the subset of
+    // operations used here. Cast once at describe scope rather than per call site.
+    const publicDb = () => db as unknown as PublicDb;
+
+    it('getCurrentDraftPickInfo returns the correct team for all 8 picks in a 4-team snake draft', async () => {
+      const { draft, teams: teamFix } = await seedDraftFixture(4);
+
+      // Snake order for 4 teams, 2 rounds:
+      //   Round 1 (normal):  A B C D  → team indices 0 1 2 3
+      //   Round 2 (reverse): D C B A  → team indices 3 2 1 0
+      const expectedIdx = [0, 1, 2, 3, 3, 2, 1, 0];
+
+      for (let overall = 1; overall <= 8; overall++) {
+        // currentPick in DB is the number of picks *already made* (0-indexed pointer to next)
+        await db
+          .update(drafts)
+          .set({ currentPick: overall - 1 })
+          .where(eq(drafts.id, draft.id));
+
+        const pick = await getCurrentDraftPickInfo(publicDb(), draft.id);
+
+        expect(pick).not.toBeNull();
+        expect(pick!.overallPick).toBe(overall);
+        expect(pick!.teamId).toBe(teamFix[expectedIdx[overall - 1]].id);
+        expect(pick!.round).toBe(overall <= 4 ? 1 : 2);
+        expect(pick!.pickNumber).toBe(overall <= 4 ? overall : overall - 4);
+      }
+    });
+
+    it('commitDraftPick advances currentPick and nextPickInfo through a full 4-team draft', async () => {
+      const {
+        league,
+        draft,
+        teams: teamFix,
+        players: playerFix,
+      } = await seedDraftFixture(4);
+
+      // seedDraftFixture creates 4 players; need 8 total for 4 teams × 2 roster slots
+      const extraPlayers = await db
+        .insert(players)
+        .values([
+          { firstName: 'Eve', lastName: 'Catcher', brefId: 'catchev01' },
+          { firstName: 'Frank', lastName: 'Closer', brefId: 'closefr01' },
+          { firstName: 'Grace', lastName: 'Outfield', brefId: 'outfgr01' },
+          { firstName: 'Hank', lastName: 'Setup', brefId: 'setupha01' },
+        ])
+        .returning();
+
+      const allPlayers = [...playerFix, ...extraPlayers];
+
+      // Snake order for 4 teams: A B C D | D C B A
+      const expectedTeamIndices = [0, 1, 2, 3, 3, 2, 1, 0];
+
+      for (let i = 0; i < 8; i++) {
+        const pickInfo = await getCurrentDraftPickInfo(publicDb(), draft.id);
+
+        expect(pickInfo).not.toBeNull();
+        expect(pickInfo!.teamId).toBe(teamFix[expectedTeamIndices[i]].id);
+        expect(pickInfo!.overallPick).toBe(i + 1);
+
+        const result = await commitDraftPick({
+          tx: publicDb(),
+          draftId: draft.id,
+          leagueId: league.id,
+          pickInfo: pickInfo!,
+          playerId: allPlayers[i].id,
+          maxRosterSize: 2,
+          pickTimeLimitSeconds: 60,
+          isMockDraft: true,
+        });
+
+        const [updatedDraft] = await db
+          .select()
+          .from(drafts)
+          .where(eq(drafts.id, draft.id));
+
+        expect(updatedDraft.currentPick).toBe(i + 1);
+
+        if (i < 7) {
+          expect(result.isDraftComplete).toBe(false);
+          expect(result.nextPickInfo).not.toBeNull();
+          expect(result.nextPickInfo!.teamId).toBe(
+            teamFix[expectedTeamIndices[i + 1]].id,
+          );
+          expect(updatedDraft.draftCompletedAt).toBeNull();
+        } else {
+          expect(result.isDraftComplete).toBe(true);
+          expect(result.nextPickInfo).toBeNull();
+          expect(updatedDraft.draftCompletedAt).not.toBeNull();
+
+          const [updatedLeague] = await db
+            .select()
+            .from(leagues)
+            .where(eq(leagues.id, league.id));
+          expect(updatedLeague.draftStatus).toBe('completed');
+        }
+      }
     });
   });
 });
