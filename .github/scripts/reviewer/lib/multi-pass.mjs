@@ -55,7 +55,7 @@ const PASSES = [
   {
     name: 'correctness',
     focus:
-      'Focus on correctness: bugs, edge cases, error handling, concurrency, off-by-one errors, and null safety. Surface any logic defects.',
+      'Focus on correctness: bugs, edge cases, error handling, concurrency, off-by-one errors, null safety, and subtle business logic. Trace data flow through complex conditional branches. Validate business logic invariants and state machine transition completeness — are all valid states reachable, and are invalid transitions rejected? Surface any logic defect, including those that only manifest with specific input combinations.',
   },
   {
     name: 'security',
@@ -67,10 +67,15 @@ const PASSES = [
     focus:
       'Focus on contracts: API breakage, missing or inadequate tests, type safety violations, and downstream caller impact.',
   },
+  {
+    name: 'docs',
+    focus:
+      'Focus on documentation accuracy following the "Documentation Accuracy" section in reviewer-rules.md: stale inline comments/JSDoc, broken symbol/path references in docs, PR description vs diff mismatches, and inaccurate algorithm claims. Do NOT flag comment style, prose quality, or pre-existing inaccuracies in unchanged code.',
+  },
 ];
 
 /**
- * Run three sequential review passes (correctness → security → contract).
+ * Run four sequential review passes (correctness → security → contract → docs).
  *
  * Each pass receives the same `system` and base `user` prompt so prompt caching
  * is effective on the Anthropic provider; only the focus instruction appended to

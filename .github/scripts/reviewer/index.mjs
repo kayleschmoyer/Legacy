@@ -465,7 +465,7 @@ async function main() {
     }
   } else {
     process.stdout.write(
-      '[reviewer] Non-trivial PR — running multi-pass review (correctness → security → contract)\n',
+      '[reviewer] Non-trivial PR — running multi-pass review (correctness → security → contract → docs)\n',
     );
     try {
       const t0 = Date.now();

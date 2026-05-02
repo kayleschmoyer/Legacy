@@ -16,12 +16,14 @@ describe('runMultiPass', () => {
       { text: 'correctness output', usage: null },
       { text: 'security output', usage: null },
       { text: 'contract output', usage: null },
+      { text: 'docs output', usage: null },
     ]);
     const { passes } = await runMultiPass(provider, 'sys', 'user');
-    assert.strictEqual(passes.length, 3);
+    assert.strictEqual(passes.length, 4);
     assert.strictEqual(passes[0].passName, 'correctness');
     assert.strictEqual(passes[1].passName, 'security');
     assert.strictEqual(passes[2].passName, 'contract');
+    assert.strictEqual(passes[3].passName, 'docs');
     assert.strictEqual(passes[0].text, 'correctness output');
   });
 
@@ -54,12 +56,21 @@ describe('runMultiPass', () => {
           costUsd: 0.003,
         },
       },
+      {
+        text: 'd',
+        usage: {
+          inputTokens: 400,
+          cachedInputTokens: 40,
+          outputTokens: 80,
+          costUsd: 0.004,
+        },
+      },
     ]);
     const { usage } = await runMultiPass(provider, 'sys', 'user');
-    assert.strictEqual(usage.inputTokens, 600);
-    assert.strictEqual(usage.cachedInputTokens, 60);
-    assert.strictEqual(usage.outputTokens, 180);
-    assert.ok(Math.abs(usage.costUsd - 0.006) < 1e-9);
+    assert.strictEqual(usage.inputTokens, 1000);
+    assert.strictEqual(usage.cachedInputTokens, 100);
+    assert.strictEqual(usage.outputTokens, 260);
+    assert.ok(Math.abs(usage.costUsd - 0.01) < 1e-9);
   });
 
   it('handles passes with null usage without throwing', async () => {
@@ -75,6 +86,7 @@ describe('runMultiPass', () => {
         },
       },
       { text: 'c', usage: null },
+      { text: 'd', usage: null },
     ]);
     const { usage } = await runMultiPass(provider, 'sys', 'user');
     assert.strictEqual(usage.inputTokens, 50);
@@ -90,7 +102,7 @@ describe('runMultiPass', () => {
       },
     };
     await runMultiPass(provider, 'sys', 'base-user');
-    assert.strictEqual(seenPrompts.length, 3);
+    assert.strictEqual(seenPrompts.length, 4);
     for (const p of seenPrompts) {
       assert.ok(
         p.startsWith('base-user\n\n---\n\n**Review focus for this pass**:'),
@@ -99,6 +111,7 @@ describe('runMultiPass', () => {
     assert.match(seenPrompts[0], /correctness/);
     assert.match(seenPrompts[1], /security/);
     assert.match(seenPrompts[2], /contract/);
+    assert.match(seenPrompts[3], /docs/);
   });
 
   it('returns zeroed usage when no pass provides usage', async () => {
@@ -106,6 +119,7 @@ describe('runMultiPass', () => {
       { text: 'a', usage: undefined },
       { text: 'b', usage: undefined },
       { text: 'c', usage: undefined },
+      { text: 'd', usage: undefined },
     ]);
     const { usage } = await runMultiPass(provider, 'sys', 'user');
     assert.deepEqual(usage, {
@@ -182,13 +196,14 @@ describe('runMultiPass with cost cap', () => {
     assert.strictEqual(costCap.totals.inputTokens, 60);
   });
 
-  it('is backward compatible — runs all three passes when no costCap is passed', async () => {
+  it('runs all four passes when no costCap is passed', async () => {
     const provider = makeProvider([
       { text: 'a', usage: null },
       { text: 'b', usage: null },
       { text: 'c', usage: null },
+      { text: 'd', usage: null },
     ]);
     const { passes } = await runMultiPass(provider, 'sys', 'user');
-    assert.strictEqual(passes.length, 3);
+    assert.strictEqual(passes.length, 4);
   });
 });

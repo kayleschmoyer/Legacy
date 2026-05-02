@@ -73,6 +73,25 @@ This is an **Nx monorepo** with:
 - **GraphQL**: prefer `.graphql` files + codegen over inline `gql` template literals
 - **E2E tests**: hermetic — `route.fulfill()` only, never `route.continue()` (no backend in CI)
 
+## Documentation Accuracy
+
+The `docs` review pass focuses exclusively on this section. When reviewing documentation, comments, or a PR that changes how something is described:
+
+### What to check
+
+- **Stale inline comments**: when code behavior changes, scan every nearby comment and JSDoc block — does it still accurately describe what the code does? A comment saying "returns the first matching item" when the code now returns all matching items is a `medium` finding.
+- **Broken symbol references**: does the comment reference a function, type, env var, or file path that exists? References to deleted or renamed symbols are `medium` findings; references to security-relevant non-existent config are `high`.
+- **PR description vs diff**: read the PR description against the actual diff. Flag any claim the code does not support (e.g., "this handles edge case X" when the diff has no such handling). Severity: `high` if the mismatch would mislead a reviewer into approving incorrect behavior; `medium` otherwise.
+- **Algorithm accuracy**: if a comment or doc claims "at most N", "always sorted", "equally distributed", or any other mathematical property — verify the code actually guarantees it. Incorrect algorithm claims are `high`.
+- **Agent-facing docs** (`.agents/**`, `SKILL.md`, `AGENTS.md`): check accuracy of tool names, file paths, and behavioral descriptions — not prose style.
+
+### What NOT to check in this pass
+
+- Prose quality, tone, or grammar
+- Missing documentation for unchanged code
+- Comment style (JSDoc vs inline, capitalization, trailing periods)
+- Documentation that was already inaccurate before this PR (out of scope — review the change, not the history)
+
 ## Code Review Conventions
 
 - When suggesting a fix, prefer a concrete `suggestion` block over a prose description
