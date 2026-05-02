@@ -37,7 +37,14 @@ import { createHash } from 'node:crypto';
 const DEFAULT_MODEL = 'gemini-2.5-flash';
 const DEFAULT_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 const DEFAULT_TIMEOUT_MS = 8 * 60 * 1000;
-const DEFAULT_MAX_TOKENS = 4096;
+// Gemini 2.5 Flash is a thinking model — thinking tokens count against
+// maxOutputTokens. 4096 was too low: on large diffs, thinking consumed most
+// of the budget, leaving too little for the structured tool-call JSON and
+// causing MALFORMED_FUNCTION_CALL (LS-4109) or MAX_TOKENS in free-form mode.
+const DEFAULT_MAX_TOKENS = 8192;
+// Free-form responses are prose, not compact JSON, so they can be longer.
+// Used in _generateContentFreeForm to avoid MAX_TOKENS on large PR diffs.
+const FREE_FORM_MAX_TOKENS = 16384;
 const DEFAULT_TEMPERATURE = 0.2;
 const DEFAULT_CACHE_TTL_SECONDS = 600; // 10 min — covers a multi-pass review with margin
 const MIN_CACHE_TOKENS = 1024;
@@ -212,7 +219,7 @@ export class GeminiProvider {
    * @param {string} [opts.model]       - Model id (default: REVIEWER_MODEL env or 'gemini-2.5-flash')
    * @param {string} [opts.endpoint]    - API base URL (default: GEMINI_API_ENDPOINT env or canonical URL)
    * @param {number} [opts.timeoutMs]   - Request timeout (default: REVIEWER_TIMEOUT_MS env or 8 min)
-   * @param {number} [opts.maxTokens]   - Max output tokens (default: 4096)
+   * @param {number} [opts.maxTokens]   - Max output tokens for the tool-call path (default: 8192). Free-form fallback always uses FREE_FORM_MAX_TOKENS regardless of this value.
    * @param {number} [opts.temperature] - Sampling temperature (default: 0.2)
    * @param {boolean} [opts.useExplicitCache] - Enable cachedContents API (default: true)
    */
@@ -533,7 +540,11 @@ export class GeminiProvider {
       contents: [{ role: 'user', parts: [{ text: user }] }],
       generationConfig: {
         temperature: this.temperature,
-        maxOutputTokens: this.maxTokens,
+        // Always use FREE_FORM_MAX_TOKENS, not this.maxTokens. Free-form is a
+        // recovery path for large diffs where the structured tool-call path
+        // failed; using this.maxTokens would silently re-introduce the same
+        // truncation that caused the fallback in the first place.
+        maxOutputTokens: FREE_FORM_MAX_TOKENS,
       },
     };
     // No tools, no toolConfig — the model returns plain text.

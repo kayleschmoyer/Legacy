@@ -117,7 +117,7 @@ describe('GeminiProvider', () => {
         'https://generativelanguage.googleapis.com/v1beta',
       );
       assert.strictEqual(p.timeoutMs, 8 * 60 * 1000);
-      assert.strictEqual(p.maxTokens, 4096);
+      assert.strictEqual(p.maxTokens, 8192);
       assert.strictEqual(p.temperature, 0.2);
       assert.strictEqual(p.useExplicitCache, true);
     });
@@ -901,6 +901,12 @@ describe('GeminiProvider', () => {
       assert.deepStrictEqual(freeFormBody.systemInstruction, {
         parts: [{ text: 's' }],
       });
+      // Free-form must use FREE_FORM_MAX_TOKENS (16384), not the tool-call
+      // default (8192) — ensures future refactors don't regress to truncation.
+      assert.strictEqual(
+        freeFormBody.generationConfig.maxOutputTokens,
+        16384,
+      );
     });
 
     it('free-form request bypasses cachedContent even when cache is available', async () => {
