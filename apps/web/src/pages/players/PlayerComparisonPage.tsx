@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, ScrollView, Spinner, Text, YStack } from 'tamagui';
 import { Lock, Plus, X } from '@tamagui/lucide-icons';
+import { LOGGER } from '@legacy-sports/logging';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import {
   type GetPlayersWithStatsQuery,
@@ -46,6 +47,14 @@ const MAX_PLAYERS = 4;
 
 const FONT_DISPLAY = "'Big Shoulders Display', sans-serif";
 const FONT_BODY = "'Literata', serif";
+
+const SUGGESTION_PLACEHOLDER_STYLE: React.CSSProperties = {
+  padding: '12px 14px',
+  fontFamily: FONT_BODY,
+  fontSize: 13,
+  color: TEXT_MUTED,
+  fontStyle: 'italic',
+};
 
 // Per-slot accent colors matching the mockup spec
 const PLAYER_ACCENTS = [BRAND_GOLD, '#60A5FA', '#34D399', '#F87171'] as const;
@@ -287,10 +296,16 @@ function PlayerSearchInput({
     };
   }, []);
 
-  const { data, loading } = useGetPlayersWithStatsQuery({
+  const { data, loading, error } = useGetPlayersWithStatsQuery({
     variables: { search: query, limit: 8 },
     skip: query.trim().length < 2,
   });
+
+  React.useEffect(() => {
+    if (error) {
+      LOGGER.error('Failed to fetch players', error, { query });
+    }
+  }, [error, query]);
 
   const results = useMemo(
     () =>
@@ -390,7 +405,7 @@ function PlayerSearchInput({
           {loading && <Spinner size="small" color={BRAND_NAVY_LIGHT} />}
         </div>
 
-        {open && results.length > 0 && (
+        {open && query.trim().length >= 2 && (
           <div
             role="listbox"
             aria-label="Player suggestions"
@@ -407,6 +422,15 @@ function PlayerSearchInput({
               overflow: 'hidden',
             }}
           >
+            {results.length === 0 && (
+              <div aria-hidden={true} style={SUGGESTION_PLACEHOLDER_STYLE}>
+                {loading
+                  ? 'Searching…'
+                  : error
+                    ? 'Could not load players. Please try again.'
+                    : 'No players match that search.'}
+              </div>
+            )}
             {results.map((p) => {
               if (!p?.id) return null;
               const name = `${p.firstName ?? ''} ${p.lastName ?? ''}`.trim();
