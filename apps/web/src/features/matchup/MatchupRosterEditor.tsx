@@ -60,10 +60,11 @@ export function MatchupRosterEditor({
     skip: !matchupId,
   });
 
-  const { data: positionsData } = useGetPositionsForLeagueQuery({
-    variables: { leagueId },
-    skip: !leagueId,
-  });
+  const { data: positionsData, loading: positionsLoading } =
+    useGetPositionsForLeagueQuery({
+      variables: { leagueId },
+      skip: !leagueId,
+    });
 
   // ── Mutations ───────────────────────────────────────────────────────────
   const { updatePosition, loading: updateLoading } =
@@ -160,7 +161,7 @@ export function MatchupRosterEditor({
     return null;
   }
 
-  if (playersLoading) {
+  if (playersLoading || positionsLoading) {
     return (
       <Card
         padding="$4"
