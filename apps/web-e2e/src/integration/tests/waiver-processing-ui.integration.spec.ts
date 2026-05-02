@@ -539,6 +539,11 @@ test.describe
           positions.some((pos) => !PITCHER_POSITIONS.has(pos))
         );
       };
+      // Use the same name normalization as the UI Add button (filter empty/null
+      // parts, join with a single space) so the locator and the aria-label always
+      // agree — even for players whose firstName is blank in the database.
+      const buildPlayerName = (p: { firstName: string; lastName: string }) =>
+        [p.firstName, p.lastName].filter((s) => s?.trim()).join(' ');
       const picked = players.find(isHitter);
 
       expect(
@@ -548,8 +553,7 @@ test.describe
       if (!picked) return; // unreachable — expect above throws; narrows TS type
 
       state.freeAgentPlayerId = picked.id;
-      state.freeAgentPlayerName =
-        `${picked.firstName} ${picked.lastName}`.trim();
+      state.freeAgentPlayerName = buildPlayerName(picked);
     });
 
     await test.step('Commissioner submits waiver claim (with drop if roster full)', async () => {

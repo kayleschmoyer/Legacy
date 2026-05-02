@@ -33,6 +33,17 @@ import { SECONDARY_STICKY_TOP } from '../../constants/dimensions';
 
 const PAGE_SIZE = 50;
 
+/** Builds the accessible name used for the free-agent Add button aria-label.
+ * Exported for unit testing. Filters null/empty name parts so a player with a
+ * missing firstName never produces a double-space label like "Add  Adams". */
+export function buildFreeAgentAriaLabel(
+  firstName?: string | null,
+  lastName?: string | null,
+): string {
+  const name = [firstName, lastName].filter((s) => s?.trim()).join(' ');
+  return `Add ${name}`;
+}
+
 /** Editorial typography: Big Shoulders Display for headings & stat labels (see AGENTS.md § Design Context) */
 const FONT_DISPLAY = "'Big Shoulders Display', sans-serif";
 
@@ -1269,7 +1280,10 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
                           eligiblePositions: player.eligiblePositions,
                         })
                       }
-                      aria-label={`Add ${player.firstName} ${player.lastName}`}
+                      aria-label={buildFreeAgentAriaLabel(
+                        player.firstName,
+                        player.lastName,
+                      )}
                     />
                   </XStack>
                 </DataRow>
