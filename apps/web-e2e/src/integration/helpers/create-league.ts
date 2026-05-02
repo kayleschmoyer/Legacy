@@ -150,7 +150,7 @@ export async function createLeagueViaUI(
   // Navigate to overview and extract invite code
   await page.goto(`/baseball/league/${leagueId}/overview`);
   await page.waitForLoadState('load');
-  await expect(page.getByText('Manual Code', { exact: false })).toBeVisible({
+  await expect(page.getByText('Invite Code', { exact: false })).toBeVisible({
     timeout: 15_000,
   });
   const codeLocator = page.locator('text=/^[A-Z0-9]{8}$/').first();

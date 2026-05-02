@@ -130,8 +130,8 @@ test.describe
       state.inviteUrl = displayedUrl.trim();
     });
 
-    await test.step('"Manual Code" section shows an 8-character alphanumeric code', async () => {
-      await expect(page.getByText('Manual Code', { exact: false })).toBeVisible(
+    await test.step('"Invite Code" section shows an 8-character alphanumeric code', async () => {
+      await expect(page.getByText('Invite Code', { exact: false })).toBeVisible(
         { timeout: 10_000 },
       );
       const codeLocator = page.locator('text=/^[A-Z0-9]{8}$/').first();
@@ -199,7 +199,7 @@ test.describe
       .grantPermissions(['clipboard-read', 'clipboard-write']);
 
     await test.step('Wait for invite code button', async () => {
-      await expect(page.getByText('Manual Code', { exact: false })).toBeVisible(
+      await expect(page.getByText('Invite Code', { exact: false })).toBeVisible(
         { timeout: 15_000 },
       );
       const copyCodeBtn = page.getByRole('button', {
