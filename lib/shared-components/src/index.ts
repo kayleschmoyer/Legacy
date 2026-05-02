@@ -169,6 +169,9 @@ export * from './components/ErrorState';
 export * from './components/PanelCard';
 export * from './components/UnifiedLoadingPanel';
 
+// Scoreboard primitives (cross-platform)
+export * from './components/scoreboard';
+
 // Shared formatting utilities
 export * from './utils/scoreFormatting';
 export * from './utils/playerFormatting';

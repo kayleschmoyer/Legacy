@@ -420,7 +420,7 @@ test.describe('Scoreboard — error state @regression', () => {
 
     await expect(page.getByTestId('scoreboard-error')).toBeVisible();
     await expect(page.getByTestId('scoreboard-error')).toContainText(
-      'Error loading scoreboard',
+      'Unable to load the scoreboard',
     );
   });
 
