@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   type LeagueFragment,
   type TeamFragment,
 } from '../../../../api/db/graphql.generated';
 import { useLeagueScoringSettings } from '../../../../lib/scoring';
 import { CommissionerAnnouncementsPanel } from '../../../../features/baseball/CommissionerAnnouncementsPanel';
+import { DraftSettingsControl } from '../../../../components/commissioner/DraftSettingsControl';
+import { NextStepControl } from '../../../../features/commissioner';
 import { LeagueDuesControl } from '../../../../components/commissioner/LeagueDuesControl';
 import { LeagueDuesStatusDashboard } from '../../../../components/commissioner/LeagueDuesStatusDashboard';
 import { SeasonAwardsControl } from '../../../../components/commissioner/SeasonAwardsControl';
@@ -50,6 +53,7 @@ export interface CommishTabProps {
 }
 
 export const CommishTab: React.FC<CommishTabProps> = ({ league }) => {
+  const navigate = useNavigate();
   const [openId, setOpenId] = useState<string>('announcements');
   const leagueId = league.id ?? 0;
 
@@ -68,6 +72,23 @@ export const CommishTab: React.FC<CommishTabProps> = ({ league }) => {
       icon: <I.Bell size={16} />,
       content: leagueId ? (
         <CommissionerAnnouncementsPanel leagueId={leagueId} isCommissioner />
+      ) : null,
+    },
+    {
+      id: 'draft-settings',
+      label: 'Draft Settings',
+      iconClass: 'gold',
+      icon: <I.Settings size={16} />,
+      content: leagueId ? (
+        <DraftSettingsControl
+          leagueId={leagueId}
+          draftStatus={league.draftStatus}
+          playerPool={league.playerPool}
+          eraFilter={league.eraFilter}
+          hofOnly={league.hofOnly}
+          customEraStartYear={league.customEraStartYear ?? undefined}
+          customEraEndYear={league.customEraEndYear ?? undefined}
+        />
       ) : null,
     },
     {
@@ -126,15 +147,34 @@ export const CommishTab: React.FC<CommishTabProps> = ({ league }) => {
   ];
 
   return (
-    <div className="ls-accordion">
-      {sections.map((s) => (
-        <Accord
-          key={s.id}
-          section={s}
-          open={openId === s.id}
-          onToggle={() => setOpenId(openId === s.id ? '' : s.id)}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {leagueId ? (
+        <NextStepControl
+          leagueId={leagueId}
+          currentMatchup={null}
+          gamesPerMatchup={league.gamesPerMatchup ?? 1}
+          draftStatus={league.draftStatus}
+          leagueName={league.name ?? ''}
+          frozenAt={league.frozenAt}
+          totalMatchups={league.totalMatchups ?? undefined}
+          onNavigateToDraftBoard={() =>
+            navigate(`/baseball/league/${leagueId}/draft`)
+          }
+          onNavigateToLeague={(newLeagueId) =>
+            navigate(`/baseball/league/${newLeagueId}`)
+          }
         />
-      ))}
+      ) : null}
+      <div className="ls-accordion">
+        {sections.map((s) => (
+          <Accord
+            key={s.id}
+            section={s}
+            open={openId === s.id}
+            onToggle={() => setOpenId(openId === s.id ? '' : s.id)}
+          />
+        ))}
+      </div>
     </div>
   );
 };
