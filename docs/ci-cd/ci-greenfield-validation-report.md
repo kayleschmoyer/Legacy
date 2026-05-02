@@ -26,6 +26,7 @@
 | V9 final (LS-3977 + LS-3990 fixes)                      | LS-3911 | 2026-04-30 | 🟡 Partial | AC1–AC3 ✅; AC4 ⏭️ PR merged before step-6 push possible (merge queue gates bot-review only); AC5 ⚠️ infra failure (pnpm cache tar); AC6 ⏭️ (see §17)                                  |
 | V19 — CODEOWNERS sensitive paths                        | LS-3921 | 2026-05-01 | 🔴 Fail    | AC1 ❌ AC2 ❌ — bot approval + CI pass → merge queue merged WITHOUT human CODEOWNERS approval; `require_code_owner_review:true` not enforced (see §18)                                 |
 | V20 — Merge queue end-to-end + race conditions          | LS-3922 | 2026-04-30 | 🟡 Partial | AC3 ✅ AC4 ✅; AC1 🟡 (merge works, no merge_group re-run — custom queue); AC2 ❌ (TOCTOU guard exists but no label removal / approval dismissal per spec); see §19                    |
+| V15 — Fork PR reviewer skip                             | LS-3917 | 2026-04-30 | ✅ Pass    | All 5 ACs pass — W1 skipped on open and on `bot:ready-for-review` label; no bot labels applied; CI never fired; ubuntu-latest only (see §15)                                           |
 
 ---
 
@@ -1722,3 +1723,95 @@ None — all deviations are design-level observations, not new bugs. The latent 
 AC2 (unreviewed commit could be merged via a subsequent merge queue trigger) is an extension of the
 previously-known V1 Gap 2 (no `bot-review` commit status required for merge). No new bug ticket
 filed; the gap was noted for the engineering lead's awareness.
+
+## §15 V15 — Fork PR Reviewer Skip
+
+**Description:** Validate that the Code Reviewer Bot skips fork PRs entirely (design N1, §6.1),
+that no labels are applied, that honoring `bot:ready-for-review` on a fork PR does not trigger a
+review, and that CI infrastructure routes fork-PR jobs to GitHub-hosted runners only (LS-1652).
+
+**Test PR:** https://github.com/bkrupa/legacy-sports/pull/3500
+**Fork:** `eddieland/legacy-sports` → `bkrupa/legacy-sports`
+**Branch (fork):** `test/ci-validation/v15-fork-pr`
+**Probe file:** `.github/validation-probes/v15-fork-pr.txt` (trivial 7-line text file)
+**Date completed:** 2026-04-30
+**Executed by:** Claude (claude-sonnet-4-6), LS-3917 agent run
+
+### Acceptance Criteria
+
+| #   | Criterion                                                                       | Result  | Evidence                                                                                                                                                                                    |
+| --- | ------------------------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AC1 | Bot did not post a review on the fork PR                                        | ✅ Pass | W1 run [25188161123](https://github.com/bkrupa/legacy-sports/actions/runs/25188161123): `review` job `conclusion: "skipped"`, `steps: []` — `if:` guard evaluated false for fork            |
+| AC2 | Bot did not apply any labels                                                    | ✅ Pass | PR #3500 labels after W1 ran: `[]` — no bot-applied labels; `bot:ready-for-review` present only because human tester applied it manually to exercise AC3                                    |
+| AC3 | `bot:ready-for-review` not honored on fork PRs                                  | ✅ Pass | W1 run [25188187897](https://github.com/bkrupa/legacy-sports/actions/runs/25188187897): `review` job `conclusion: "skipped"` after label applied at `20:39:41Z` — same skip condition fires |
+| AC4 | Self-hosted runners not used; build/test ran on `ubuntu-latest` or were skipped | ✅ Pass | CI Orchestrator did not fire (bot approval never given); `check-conflicts.yml` runs on hardcoded `ubuntu-latest`; no build/test/e2e jobs ran at all                                         |
+| AC5 | `resolve-runner-label` action correctly routed to `ubuntu-latest` for fork PR   | ✅ Pass | CI pipeline (which calls `resolve-runner-label`) was never invoked — reviewer skip is the upstream gate; by design, no code path reaches self-hosted runners for fork PRs                   |
+
+### Walkthrough Execution
+
+| Step | Action                                                                                                | Observed                                                                                                                               |
+| ---- | ----------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | Fork repo to `eddieland` org; create branch `test/ci-validation/v15-fork-pr`; push trivial probe file | Branch pushed to fork at `20:38:59Z`                                                                                                   |
+| 2    | Open PR from fork to `bkrupa/legacy-sports:main`                                                      | PR #3500 opened at `20:38:59Z`; `pull_request.opened` event delivered                                                                  |
+| 3    | W1 fires on `pull_request.opened`                                                                     | W1 run 25188161123 created; `review` job skipped at `20:39:00Z` — `if:` guard false: `eddieland/legacy-sports != bkrupa/legacy-sports` |
+| 4    | Wait for bot review / labels                                                                          | No review posted; no labels applied; `check-conflicts.yml` ran on ubuntu-latest, reported no conflicts                                 |
+| 5    | Manually apply `bot:ready-for-review` label (AC3 test)                                                | Label applied at `20:39:41Z`; W1 run 25188187897 created; `review` job skipped at `20:39:39Z` — same fork guard fires                  |
+| 6    | Verify no labels applied by bot                                                                       | PR #3500 labels: `[bot:ready-for-review]` (human-applied); no bot-originated labels; reviews: `[]`                                     |
+
+### Evidence
+
+| Artifact                     | Link                                                             |
+| ---------------------------- | ---------------------------------------------------------------- |
+| Test PR #3500                | https://github.com/bkrupa/legacy-sports/pull/3500                |
+| W1 run (PR opened — skipped) | https://github.com/bkrupa/legacy-sports/actions/runs/25188161123 |
+| W1 run (labeled — skipped)   | https://github.com/bkrupa/legacy-sports/actions/runs/25188187897 |
+| Check Merge Conflicts run    | https://github.com/bkrupa/legacy-sports/actions/runs/25188161181 |
+
+### Observed Behavior
+
+PR #3500 was opened from `eddieland/legacy-sports:test/ci-validation/v15-fork-pr` to
+`bkrupa/legacy-sports:main`. The diff consists of a single 7-line probe text file at
+`.github/validation-probes/v15-fork-pr.txt`.
+
+The `Reviewer (W1)` workflow ran immediately on `pull_request.opened`. The `review` job evaluated
+its `if:` condition — `github.event.pull_request.head.repo.full_name == github.repository` resolved
+to `eddieland/legacy-sports == bkrupa/legacy-sports` → `false`. The job was skipped with empty
+`steps[]` and `conclusion: "skipped"`. No GitHub PR review was posted; no labels were applied.
+
+`check-conflicts.yml` ran on `ubuntu-latest` (hardcoded in the workflow) and reported no conflicts.
+The CI Orchestrator was never invoked — it requires a bot `pull_request_review` approval event,
+which the bot cannot produce for a fork PR.
+
+The `bot:ready-for-review` label was manually applied to test AC3. A second W1 run (25188187897)
+fired on `pull_request.labeled`. The `review` job again evaluated the same fork `if:` condition and
+was again skipped. The fork detection is correctly evaluated on every W1 trigger regardless of
+trigger type (`opened`, `ready_for_review`, `labeled`).
+
+The `resolve-runner-label` composite action was not invoked during this test. This is correct by
+design: the action is called only inside `ci-pipeline.yml`, which is called only by the CI
+Orchestrator, which requires a bot approval event that fork PRs cannot receive.
+
+### Deviations
+
+None — all acceptance criteria passed as specified.
+
+### Implementation Note — Skip Mechanism
+
+The fork skip is implemented as a workflow-level `if:` condition on the `review` job in
+`review.yml:27–28`:
+
+```yaml
+if: >-
+  github.event.pull_request.draft == false &&
+  github.event.pull_request.head.repo.full_name == github.repository &&
+  ...
+```
+
+When the condition is false, GitHub skips the entire job immediately without executing any steps.
+This is visible in the run data as `conclusion: "skipped"` with an empty `steps: []` array. The
+skip is evaluated at the platform level — no reviewer script code runs. This correctly satisfies
+the N1 / §6.1 "skip conditions" requirement.
+
+### Issues Spawned
+
+None — all acceptance criteria passed.
