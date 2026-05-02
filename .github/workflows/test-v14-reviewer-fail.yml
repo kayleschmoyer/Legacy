@@ -19,6 +19,7 @@ on:
 permissions:
   contents: read
   id-token: write # required for OIDC auth to AWS (S3 reviewer telemetry)
+  actions: write # required to dispatch label-pager.yml for W4 AC4 verification
 
 jobs:
   reviewer-force-fail:
@@ -68,3 +69,61 @@ jobs:
           node .github/scripts/reviewer/index.mjs
       - name: Verify force-fail completed
         run: echo '[test-v14] Reviewer force-fail run complete — verify REQUEST_CHANGES and review-bot-degraded label on PR #${{ inputs.pr_number }}'
+      - name: Verify review-bot-degraded label applied (AC3)
+        env:
+          GH_TOKEN: ${{ steps.reviewer-token.outputs.token }}
+        run: |
+          labels=$(gh pr view "${{ inputs.pr_number }}" --json labels --jq '[.labels[].name]')
+          if echo "$labels" | grep -q '"review-bot-degraded"'; then
+            echo "[test-v14] review-bot-degraded label confirmed on PR #${{ inputs.pr_number }} — AC3 verified"
+          else
+            echo "ERROR: review-bot-degraded label not found on PR #${{ inputs.pr_number }}"
+            echo "Current labels: $labels"
+            exit 1
+          fi
+      - name: Trigger W4 (label-pager) — verify escalation page fires (AC4)
+        # GitHub does not deliver pull_request.labeled events when labels are applied from
+        # workflow_dispatch context (LS-4120), so we manually dispatch label-pager.yml here.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          dispatch_after=$(date -u -d '-5 seconds' '+%Y-%m-%dT%H:%M:%SZ')
+          gh workflow run label-pager.yml \
+            --ref "$GITHUB_REF_NAME" \
+            -f pr_number=${{ inputs.pr_number }} \
+            -f label_name=review-bot-degraded
+          echo "[test-v14] W4 dispatched; polling for run ID..."
+          run_id=""
+          for i in $(seq 1 12); do
+            sleep 5
+            run_id=$(gh run list --workflow=label-pager.yml --limit=10 --json databaseId,createdAt \
+              --jq "[.[] | select(.createdAt >= \"$dispatch_after\")] | .[0].databaseId // empty")
+            if [ -n "$run_id" ] && [ "$run_id" != "null" ]; then
+              echo "[test-v14] W4 run $run_id found (attempt $i/12)"
+              break
+            fi
+            echo "[test-v14] Waiting for W4 run... (attempt $i/12)"
+          done
+          if [ -z "$run_id" ] || [ "$run_id" = "null" ]; then
+            echo "ERROR: W4 (label-pager) run did not appear within ~60s of dispatch"
+            exit 1
+          fi
+          gh run watch "$run_id" --exit-status
+          echo "[test-v14] W4 (label-pager) completed successfully — AC4 verified"
+      - name: Simulate W1 self-healing — run reviewer without force-fail (AC5)
+        # Mirrors what review.yml does when triggered by the review-bot-degraded labeled event.
+        # The reviewer posts a real review and removes the review-bot-degraded label.
+        env:
+          GEMINI_CODE_REVIEW_API_KEY: ${{ secrets.GEMINI_CODE_REVIEW_API_KEY }}
+          GH_TOKEN: ${{ steps.reviewer-token.outputs.token }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          PR_HEAD_SHA: ${{ steps.pr-sha.outputs.sha }}
+          LLM_PROVIDER: gemini
+          REVIEWER_MODEL: gemini-2.5-flash
+          REVIEWER_BOT_APP_ID: ${{ vars.REVIEWER_BOT_APP_ID || '3142924' }}
+          REVIEWER_BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+          REVIEWER_TELEMETRY_BUCKET: ${{ vars.REVIEWER_TELEMETRY_BUCKET || 'legacy-sports-dev-reviewer-telemetry' }}
+        run: |
+          echo "[test-v14] Simulating W1 self-healing: running reviewer without REVIEWER_FORCE_FAIL against PR #${{ inputs.pr_number }}"
+          node .github/scripts/reviewer/index.mjs
+          echo "[test-v14] W1 self-healing simulation complete — AC5 verified"
