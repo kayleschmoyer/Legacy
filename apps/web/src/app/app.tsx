@@ -54,7 +54,7 @@ const LeagueCreatePage = lazyWithRetry(
   () => import('../pages/baseball/LeagueCreatePage'),
 );
 const LeagueDetailPage = lazyWithRetry(
-  () => import('../pages/baseball/LeagueDetailPage'),
+  () => import('../pages/baseball/league-detail-v2/LeagueDetailPageV2'),
 );
 const TeamDetailPage = lazyWithRetry(() =>
   import('../pages/baseball/TeamDetailPage').then((m) => ({
