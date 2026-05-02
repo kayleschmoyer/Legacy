@@ -318,6 +318,15 @@ jobs:
           execution-mode: "local"
           optimal-agents: "4"
 
+      - name: "Upload Web Build to S3"
+        if: steps.build-validation.outputs.web-result == 'success'
+        uses: ./.github/actions/s3-artifact
+        with:
+          mode: upload
+          name: web-build
+          path: dist/apps/web
+          if-no-files-found: error
+
       - name: "Post Commit Status"
         if: always()
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
