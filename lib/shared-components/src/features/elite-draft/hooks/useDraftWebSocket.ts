@@ -62,8 +62,6 @@ interface UseDraftWebSocketParams {
   token?: string;
   /** Optional callback fired when a pick is made (for analytics). */
   onPlayerDrafted?: (playerId: number, position: string) => void;
-  /** Callback to propagate WebSocket connection state for polling suppression. */
-  setWsConnected: (v: boolean) => void;
 }
 
 export function useDraftWebSocket({
@@ -94,7 +92,6 @@ export function useDraftWebSocket({
   websocketUrl,
   token,
   onPlayerDrafted,
-  setWsConnected,
 }: UseDraftWebSocketParams) {
   // Holds the latest pick notification while debouncing refetches for batch auto-picks.
   const pendingRefetchNotifRef = useRef<DraftPickNotification | null>(null);
@@ -360,10 +357,6 @@ export function useDraftWebSocket({
       if (refetchDebounceRef.current) clearTimeout(refetchDebounceRef.current);
     };
   }, []);
-
-  useEffect(() => {
-    setWsConnected(wsConnected);
-  }, [wsConnected, setWsConnected]);
 
   // Reconnection recovery
   const wsWasConnected = useRef(false);

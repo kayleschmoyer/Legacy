@@ -359,11 +359,14 @@ test.describe
             // vanish due to an incoming WebSocket update about another
             // manager's pick (false positive), causing duplicate-pick logs.
             //
-            // Timeout raised to 12 s (from 8 s) for CI network latency headroom.
+            // 8 s headroom: mutation + DB write + 5 s poll cycle + render margin.
+            // With always-on 5s polling (LS-4132), "Your pick" should hide
+            // within ~6 s of the pick landing; 8 s is safe even with a full
+            // 5 s poll interval plus network jitter.
             const wasAccepted = await page
               .getByText('Your pick', { exact: true })
               .first()
-              .waitFor({ state: 'hidden', timeout: 12000 })
+              .waitFor({ state: 'hidden', timeout: 8000 })
               .then(() => true)
               .catch((e: Error) => {
                 if (e.name !== 'TimeoutError') throw e;
@@ -406,6 +409,14 @@ test.describe
 
         if (!pickAccepted) {
           consecutiveMisses++;
+          const myTurnLabels = myTurnResults
+            .filter((r) => r.isMyTurn)
+            .map((r) => r.label)
+            .join(', ');
+          const elapsedMiss = ((Date.now() - draftStart) / 1000).toFixed(1);
+          console.log(
+            `[live-draft] +${elapsedMiss}s miss #${consecutiveMisses} at pick ${pickCount} — myTurn=[${myTurnLabels || 'none'}]`,
+          );
           if (consecutiveMisses > 30) {
             console.log(
               `[live-draft] Stuck after ${consecutiveMisses} misses at pick ${pickCount} (+${((Date.now() - draftStart) / 1000).toFixed(1)}s)`,

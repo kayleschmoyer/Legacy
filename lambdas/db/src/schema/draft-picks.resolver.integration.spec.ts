@@ -736,4 +736,103 @@ describe('Draft Picks - Integration Tests', () => {
       }
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // LS-4132: Multi-user turn-detection state machine.
+  //
+  // Root cause of the 20-min E2E timeout: non-submitting pages only received
+  // turn updates via WebSocket (5-10 s latency in CI). The fix removes the
+  // `|| wsConnected` guard from `pollInterval` in useDraftQueries so every
+  // client polls every 5 s regardless of WS state.
+  //
+  // These tests verify the server-side state machine that the polling fix
+  // depends on: as `drafts.currentPick` advances (which is what
+  // `commitDraftPick` does on the server), `getCurrentDraftPickInfo` returns
+  // the correct next team — so the 5 s poll always gets accurate data,
+  // never a stale "still your turn" response. We update `currentPick`
+  // directly here (matching the LS-3851 "returns the correct team for all 8
+  // picks" test pattern) because `commitDraftPick` writes via Postgres
+  // `defaultNow()` columns that the SQLite test environment does not support.
+  describe('Multi-user turn-detection — polling state correctness (LS-4132)', () => {
+    const publicDb = () => db as unknown as PublicDb;
+
+    it('getCurrentDraftPickInfo returns the next team immediately after currentPick advances', async () => {
+      // Validates the invariant that the 5 s polling fix (LS-4132) depends on:
+      // after team A's pick is recorded, any client that polls
+      // getCurrentDraftPickInfo gets team B's turn — never team A's again.
+      const { draft, teams: teamFix } = await seedDraftFixture(2);
+
+      const pick1 = await getCurrentDraftPickInfo(publicDb(), draft.id);
+      expect(pick1).not.toBeNull();
+      expect(pick1!.teamId).toBe(teamFix[0].id);
+      expect(pick1!.overallPick).toBe(1);
+
+      // Simulate commitDraftPick advancing the draft state.
+      await db
+        .update(drafts)
+        .set({ currentPick: 1 })
+        .where(eq(drafts.id, draft.id));
+
+      // Any client polling now — including the browser context that did NOT
+      // submit the pick — must see team B's turn, not team A's.
+      const pick2 = await getCurrentDraftPickInfo(publicDb(), draft.id);
+      expect(pick2).not.toBeNull();
+      expect(pick2!.teamId).toBe(teamFix[1].id);
+      expect(pick2!.overallPick).toBe(2);
+    });
+
+    it('stale currentPickInfo is detectably different from fresh state after a pick advances the draft', async () => {
+      // Simulates a non-submitting browser context that holds pickInfo from
+      // before a pick was made. When it polls getCurrentDraftPickInfo (via the
+      // 5 s interval added in LS-4132), the overallPick has advanced — so
+      // isMyPick re-evaluates correctly on the next render cycle.
+      const { draft } = await seedDraftFixture(2);
+
+      const stalePick1Info = await getCurrentDraftPickInfo(
+        publicDb(),
+        draft.id,
+      );
+      expect(stalePick1Info).not.toBeNull();
+
+      // Team A's pick was recorded; draft state advances.
+      await db
+        .update(drafts)
+        .set({ currentPick: 1 })
+        .where(eq(drafts.id, draft.id));
+
+      // Team B's browser context held stalePick1Info. It now polls.
+      const freshPick = await getCurrentDraftPickInfo(publicDb(), draft.id);
+      expect(freshPick).not.toBeNull();
+
+      // The fresh pick is detectably different: different team, advanced overall pick
+      expect(freshPick!.overallPick).toBeGreaterThan(
+        stalePick1Info!.overallPick,
+      );
+      expect(freshPick!.teamId).not.toBe(stalePick1Info!.teamId);
+    });
+
+    it('four-team snake draft: each getCurrentDraftPickInfo call returns the correct team in sequence', async () => {
+      // Validates that polling returns correct isMyPick data for all 4 concurrent
+      // users across a full 4-team × 2-round snake draft (the same scenario as
+      // the Phase 5 E2E test, at the DB layer, in milliseconds).
+      const { draft, teams: teamFix } = await seedDraftFixture(4);
+
+      // Snake: A B C D | D C B A
+      const expectedTeamOrder = [0, 1, 2, 3, 3, 2, 1, 0];
+
+      for (let i = 0; i < 8; i++) {
+        // currentPick is the number of picks already made (0-indexed pointer
+        // to the next pick).
+        await db
+          .update(drafts)
+          .set({ currentPick: i })
+          .where(eq(drafts.id, draft.id));
+
+        const pickInfo = await getCurrentDraftPickInfo(publicDb(), draft.id);
+        expect(pickInfo).not.toBeNull();
+        expect(pickInfo!.teamId).toBe(teamFix[expectedTeamOrder[i]].id);
+        expect(pickInfo!.overallPick).toBe(i + 1);
+      }
+    });
+  });
 });

@@ -92,7 +92,6 @@ function makeDefaultParams() {
     refetchAutoPickStatuses: jest.fn().mockResolvedValue(undefined),
     websocketUrl: 'wss://test.example.com',
     token: 'test-token',
-    setWsConnected: jest.fn(),
   };
 }
 
