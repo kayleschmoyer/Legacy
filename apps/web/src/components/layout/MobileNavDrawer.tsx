@@ -285,7 +285,7 @@ export const MobileNavDrawer: React.FC<Props> = ({
           {
             icon: <Ticket size={18} />,
             label: 'Join with invite code',
-            to: '/baseball/leagues/join',
+            to: '/baseball/league/join',
           },
         ].map((item) => (
           <button
@@ -307,7 +307,7 @@ export const MobileNavDrawer: React.FC<Props> = ({
         ))}
 
         <button
-          onClick={() => handleNav('/baseball/leagues/create')}
+          onClick={() => handleNav('/baseball/league/create')}
           style={{ ...DRAWER_ITEM, color: BRAND_GOLD_LIGHT }}
           onMouseEnter={(e) =>
             ((e.currentTarget as HTMLElement).style.background =

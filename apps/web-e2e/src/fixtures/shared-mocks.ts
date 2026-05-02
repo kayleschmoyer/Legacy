@@ -173,12 +173,14 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = {
 // ---------------------------------------------------------------------------
 
 /**
- * Fulfill a route with a diagnostic GraphQL error for unmocked operations.
+ * Cascade an unmatched GraphQL route to the next handler in the Playwright
+ * LIFO chain (typically the `_apiIsolation` auto-fixture).
  *
- * Use this inside GraphQL route handlers as the fallback for operations not
- * explicitly mocked by the test. Unlike `route.fallback()`, this immediately
- * surfaces missing mocks as a clear error rather than silently passing to the
- * network (which has no backend in CI).
+ * Use this inside GraphQL route handlers as the else/fallback branch for
+ * operations not explicitly mocked by the test. The `_apiIsolation` fixture
+ * (layer 1) handles ambient queries from BASELINE_GRAPHQL_RESPONSES (e.g.
+ * `getUserById`, `getUnreadNotificationCount`) and records any truly unmocked
+ * operations as a post-test assertion error so nothing slips through silently.
  *
  * @example
  * await page.route(isGraphQLEndpoint, async (route) => {
@@ -191,15 +193,7 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = {
  * });
  */
 export async function unmockedGraphQLFallback(route: Route): Promise<void> {
-  const opName = extractOperationName(route);
-  await route.fulfill({
-    status: 200,
-    contentType: 'application/json',
-    body: JSON.stringify({
-      errors: [{ message: `[E2E] Unmocked GraphQL operation: ${opName}` }],
-      data: null,
-    }),
-  });
+  await route.fallback();
 }
 
 /**

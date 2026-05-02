@@ -521,7 +521,7 @@ export const LeagueSwitcherChip: React.FC<Props> = ({ draftLive = false }) => {
               icon: <Ticket size={14} />,
               label: 'Join with invite code',
               hint: undefined,
-              to: '/baseball/leagues/join',
+              to: '/baseball/league/join',
             },
           ].map((item) => (
             <button
@@ -581,7 +581,7 @@ export const LeagueSwitcherChip: React.FC<Props> = ({ draftLive = false }) => {
 
           <button
             onClick={() => {
-              navigate('/baseball/leagues/create');
+              navigate('/baseball/league/create');
               setIsOpen(false);
             }}
             style={{
