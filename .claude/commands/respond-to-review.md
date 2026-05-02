@@ -79,9 +79,19 @@ This change requires modifying a generated file that must not be edited manually
 
 > **Never** edit the bot's own comments or threads — the bot reads its thread state to track cycle progression.
 
-### Step 5 — Apply label to fire next cycle
+### Step 5 — Resolve threads answered with `FIX:`
 
-After all replies are posted, apply the `bot:ready-for-review` label:
+Collect the `threadId` of every thread you replied to with `FIX:` in Step 4, then resolve them in a single batched call:
+
+```
+github_resolve_threads({ threadIds: ["PRRT_...", "PRRT_..."], prNumber: PR# })
+```
+
+> Only resolve `FIX:` threads. Threads answered with `JUSTIFY:` (Cycle 1) or `CANNOT-COMPLY:` (Cycle 3+) must remain open — the bot or a human reviewer adjudicates them in the next cycle.
+
+### Step 6 — Apply label to fire next cycle
+
+After replies are posted and `FIX:` threads are resolved, apply the `bot:ready-for-review` label:
 
 ```
 github_add_labels({ number: PR#, labels: ["bot:ready-for-review"] })
@@ -89,13 +99,14 @@ github_add_labels({ number: PR#, labels: ["bot:ready-for-review"] })
 
 This triggers the next bot review cycle (W1 workflow fires on the `labeled` event).
 
-### Step 6 — Report
+### Step 7 — Report
 
 Summarize:
 
 - PR number and cycle responded to
 - Number of threads replied to
 - Breakdown: how many `FIX:` vs `JUSTIFY:` vs `CANNOT-COMPLY:`
+- Number of `FIX:` threads resolved via `github_resolve_threads`
 - Whether `bot:ready-for-review` label was applied
 - Any threads that could not be replied to (escalate these to the user)
 

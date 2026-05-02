@@ -93,7 +93,8 @@ After the bot posts its Cycle 1 review, the agent must:
    - `FIX: <sha>` — the fix is already committed at `<sha>`
    - `JUSTIFY: <rationale>` — the finding is incorrect or the suggestion is out of scope; explain why
 2. Push any fix commits.
-3. Apply the **`bot:ready-for-review`** label. This fires **Cycle 2**.
+3. **Resolve every thread answered with `FIX:`** in a single batched `github_resolve_threads({ threadIds: [...], prNumber: PR# })` call. Do **not** resolve threads answered with `JUSTIFY:` — those need bot adjudication in the next cycle.
+4. Apply the **`bot:ready-for-review`** label. This fires **Cycle 2**.
 
 > Skipping a thread is not allowed — unaddressed threads become mandates in Cycle 2.
 
@@ -104,7 +105,8 @@ After the bot posts its Cycle 2 review, the agent must:
 1. Reply to **every open thread** with:
    - `FIX: <sha>` — the fix is committed at `<sha>` (the only accepted reply in Cycle 2)
 2. Push any fix commits.
-3. Apply **`bot:ready-for-review`** again. This fires **Cycle 3**.
+3. **Resolve every thread answered with `FIX:`** in a single batched `github_resolve_threads({ threadIds: [...], prNumber: PR# })` call.
+4. Apply **`bot:ready-for-review`** again. This fires **Cycle 3**.
 
 > Neither `JUSTIFY:` nor `CANNOT-COMPLY:` is accepted in Cycle 2. `JUSTIFY:` closed at Cycle 1; `CANNOT-COMPLY:` is only valid in Cycle 3+.
 
@@ -114,6 +116,8 @@ If a mandate persists into Cycle 3, the agent may reply with:
 
 1. `FIX: <sha>` — fix committed at `<sha>`
 2. `CANNOT-COMPLY: <issue-id>` with the reason on the **next line** — the mandate is genuinely impossible; this escalates to a human reviewer
+
+After replying, **resolve every thread answered with `FIX:`** in a single batched `github_resolve_threads({ threadIds: [...], prNumber: PR# })` call. Do **not** resolve `CANNOT-COMPLY:` threads — they must remain open for the human reviewer.
 
 Example:
 
