@@ -30,7 +30,7 @@ The Legacy Sports CI system accumulated several critical gaps that required a gr
 
 **Impact:** Code quality issues reached `main`. No feedback loop between CI and review. Agents had no structured protocol for responding to review findings.
 
-**Resolution (LS-3879):** Reviewer W1 (`review.yml`) implements bot-driven code review with the Copilot CLI (`codex` model). The RAISE/ADJUDICATE/VERIFY cycle protocol (Author Agent Contract, `AGENTS.md §8`) provides a structured, auditable review loop. The `bot-review` commit status enforces review completion before merge.
+**Resolution (LS-3879):** Reviewer W1 (`review.yml`) implements bot-driven code review with Google Gemini (`gemini-2.5-flash`). The RAISE/ADJUDICATE/VERIFY cycle protocol (Author Agent Contract, `AGENTS.md §8`) provides a structured, auditable review loop. The `bot-review` commit status enforces review completion before merge.
 
 ### Gap 4: Merge queue reliability
 

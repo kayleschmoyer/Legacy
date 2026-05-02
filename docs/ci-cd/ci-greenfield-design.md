@@ -88,7 +88,7 @@ The `summarize` job applies labels based on which stage failed:
 
 ### Reviewer W1 (`review.yml`)
 
-The Code Reviewer Bot (`legacy-sports-review-bot`, App ID `3142924`) uses GitHub Models (`openai/gpt-4o-mini` by default, configurable via `REVIEWER_MODEL` and `LLM_PROVIDER`) with a custom reviewer script (`.github/scripts/reviewer/index.mjs`) to analyze PR diffs and post structured reviews. Alternate providers (`copilot-cli`, `anthropic`) are selectable via `LLM_PROVIDER`.
+The Code Reviewer Bot (`legacy-sports-review-bot`, App ID `3142924`) uses Google Gemini (`gemini-2.5-flash` by default, configurable via `REVIEWER_MODEL` and `LLM_PROVIDER`) with a custom reviewer script (`.github/scripts/reviewer/index.mjs`) to analyze PR diffs and post structured reviews. Alternate providers (`github-models`, `copilot-cli`, `anthropic`) are selectable via `LLM_PROVIDER`.
 
 **Review outcomes:**
 
@@ -98,6 +98,19 @@ The Code Reviewer Bot (`legacy-sports-review-bot`, App ID `3142924`) uses GitHub
 | Clean diff       | `APPROVE`            | `success`           |
 
 When `bot-review` transitions to `success`, the bot also adds the `merge-when-ready` label.
+
+### Multi-Pass Review
+
+Non-trivial PRs (>150 LOC or sensitive paths) run four internal passes consolidated into a single review:
+
+| Pass        | Focus                                      |
+| ----------- | ------------------------------------------ |
+| correctness | Logic errors, null safety, race conditions |
+| security    | Injection, auth, secrets, input validation |
+| contract    | API breakage, missing tests, type safety   |
+| docs        | Stale comments, missing JSDoc on exports   |
+
+Trivial PRs run a single pass.
 
 ### Review Cycle Protocol (RAISE / ADJUDICATE / VERIFY)
 
@@ -126,6 +139,10 @@ Two review types are **excluded** from the count and do not advance the cycle:
 
 Author-actionable failures (`cost-cap`, `context-too-large`) are **not** excluded — they represent real feedback requiring the author to reduce PR size.
 
+#### Terminal-State Label Cleanup
+
+At every terminal state (success, escalation, infra failure, cost cap), the reviewer cleans up operational labels (`bot:ready-for-review`, `review-bot-degraded`) to prevent contradictory label combinations like `bot:ready-for-review` + `needs-human-arbitration`. See LS-4125.
+
 ### `bot-review` Commit Status
 
 The `bot-review` commit status (set by the reviewer script via the Checks API) tracks review state:
@@ -135,6 +152,16 @@ The `bot-review` commit status (set by the reviewer script via the Checks API) t
 | `pending` | Review in progress or awaiting Cycle 2 trigger      |
 | `success` | Clean review — no unresolved critical/high findings |
 | `failure` | Unresolved findings block merge                     |
+
+### Per-PR Cost Cap
+
+Each review is bounded by a provider-specific cost cap:
+
+- Anthropic: $5 per PR
+- Gemini: $0.50 per PR (10× cheaper pricing → $5 unreachable, so bound is tightened)
+- Other providers: $5 fallback
+
+Exceeding the cap aborts the review, posts a `cost-cap` comment, and applies `needs-human-review`. See LS-3997 for the provider-aware cap fix.
 
 ## Merge Queue
 
