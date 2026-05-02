@@ -62,8 +62,9 @@ jobs:
           REVIEWER_BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           REVIEWER_TELEMETRY_BUCKET: ${{ vars.REVIEWER_TELEMETRY_BUCKET || 'legacy-sports-dev-reviewer-telemetry' }}
           REVIEWER_FORCE_FAIL: "true"
+          GEMINI_CODE_REVIEW_API_KEY: ${{ secrets.GEMINI_CODE_REVIEW_API_KEY }}
         run: |
           echo "[test-v14] Running reviewer with REVIEWER_FORCE_FAIL=true against PR #${{ inputs.pr_number }}"
           node .github/scripts/reviewer/index.mjs
       - name: Verify force-fail completed
-        run: echo "[test-v14] Reviewer force-fail run complete — verify REQUEST_CHANGES and review-bot-degraded label on PR #${{ inputs.pr_number }}"
+        run: echo '[test-v14] Reviewer force-fail run complete — verify REQUEST_CHANGES and review-bot-degraded label on PR #${{ inputs.pr_number }}'
