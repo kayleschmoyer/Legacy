@@ -261,9 +261,12 @@ test.describe('Player Stats Page — static elements @smoke', () => {
     ).toBeVisible();
   });
 
-  test('shows a Refresh button', async ({ page }) => {
+  test('shows Share and Export action buttons', async ({ page }) => {
     await expect(
-      page.getByRole('button', { name: /refresh/i }).first(),
+      page.getByRole('button', { name: /share/i }).first(),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: /export/i }).first(),
     ).toBeVisible();
   });
 

@@ -561,6 +561,9 @@ export function PlayerStatsPage({
         {/* ── View mode tabs: Combined / Hitters / Pitchers ─────────── */}
         {/* MOTION: crossfade 140ms on tab switch; no layout shift */}
         <XStack
+          role="tablist"
+          accessibilityRole="tablist"
+          aria-label="Player stats view mode"
           style={{
             borderBottom: `1px solid ${OUTLINE_SUBTLE}`,
             gap: 2,
@@ -576,7 +579,9 @@ export function PlayerStatsPage({
             <Pressable
               key={id}
               onPress={() => setViewMode(id)}
+              role="tab"
               accessibilityRole="tab"
+              aria-selected={viewMode === id}
               accessibilityState={{ selected: viewMode === id }}
               style={{
                 paddingVertical: 14,
