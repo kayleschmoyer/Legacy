@@ -307,6 +307,93 @@ jobs:
             }
 
   # ============================================================================
+  # Restore "merge-when-ready" label on CI success
+  # ============================================================================
+  # If a previous run removed the label due to a CI failure, but CI now passes
+  # (e.g. after a fix push or a manual re-run of a flaky failure), re-add the
+  # label automatically — provided the bot approval is still active (not
+  # dismissed by a subsequent push). This avoids requiring the author to
+  # manually re-add the label after every transient failure. (LS-4136)
+  # ============================================================================
+  restore-merge-label-on-success:
+    name: "🏷️ Restore Merge Label on Success"
+    needs: [determine-scope, ci-pipeline]
+    if: >-
+      !cancelled() &&
+      needs.determine-scope.result != 'skipped' &&
+      needs.ci-pipeline.outputs.overall-status == 'success' &&
+      github.event.pull_request.number
+    runs-on: ubuntu-latest
+    steps:
+      - name: Restore merge-when-ready label if bot approval is active
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const prNumber = context.payload.pull_request.number;
+
+            const { data: pr } = await github.rest.pulls.get({
+              owner,
+              repo,
+              pull_number: prNumber,
+            });
+
+            if (pr.labels.some(l => l.name === 'merge-when-ready')) {
+              core.info(`PR #${prNumber} already has merge-when-ready label, nothing to do`);
+              return;
+            }
+
+            // Only restore if the bot approval is still active (not dismissed).
+            // A push dismisses the approval via merge-queue.yml, so absence of
+            // an active approval means the author needs a new review cycle.
+            const BOT_LOGIN = 'legacy-sports-review-bot[bot]';
+            let allReviews = [];
+            let page = 1;
+            let hasMore = true;
+            while (hasMore) {
+              const { data: reviewsPage } = await github.rest.pulls.listReviews({
+                owner,
+                repo,
+                pull_number: prNumber,
+                per_page: 100,
+                page,
+              });
+              allReviews = allReviews.concat(reviewsPage);
+              hasMore = reviewsPage.length === 100;
+              page++;
+            }
+
+            // Determine the latest review state for the bot (reviews are oldest-first).
+            let botState = null;
+            for (const review of allReviews) {
+              if (review.user.login === BOT_LOGIN) {
+                botState = review.state;
+              }
+            }
+
+            if (botState !== 'APPROVED') {
+              core.info(`PR #${prNumber} bot approval is not active (state: ${botState}), skipping`);
+              return;
+            }
+
+            await github.rest.issues.addLabels({
+              owner,
+              repo,
+              issue_number: prNumber,
+              labels: ['merge-when-ready'],
+            });
+            core.info(`Restored merge-when-ready label on PR #${prNumber}`);
+
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: prNumber,
+              body: '✅ **`merge-when-ready` label restored** — CI pipeline passed.\n\n' +
+                    'The label was automatically restored because CI is now green and the bot approval is still active.\n\n' +
+                    '---\n*Automated message from CI pipeline*'
+            });
+
+  # ============================================================================
   # Remove "merge-when-ready" label on CI failure
   # ============================================================================
   # Prevents a failing PR from sitting in the merge queue indefinitely.
