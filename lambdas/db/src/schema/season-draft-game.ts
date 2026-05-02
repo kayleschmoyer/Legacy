@@ -153,6 +153,16 @@ SeasonDraftGamePickHistory.implement({
   }),
 });
 
+const SeasonDraftLobbyPlayer = builder
+  .objectRef<{ id: number; playerName: string }>('SeasonDraftLobbyPlayer')
+  .implement({
+    description: 'Lightweight player entry for lobby/join displays',
+    fields: (t) => ({
+      id: t.exposeInt('id', { nullable: false }),
+      playerName: t.exposeString('playerName', { nullable: false }),
+    }),
+  });
+
 const SeasonDraftGameLobbyInfo = builder.objectRef<{
   id: number;
   name: string;
@@ -161,6 +171,9 @@ const SeasonDraftGameLobbyInfo = builder.objectRef<{
   gameMode: string;
   playerType: string;
   playerCount: number;
+  maxPlayers: number;
+  creatorName: string;
+  players: Array<{ id: number; playerName: string }>;
 }>('SeasonDraftGameLobbyInfo');
 
 SeasonDraftGameLobbyInfo.implement({
@@ -184,6 +197,13 @@ SeasonDraftGameLobbyInfo.implement({
       resolve: (parent) => parent.playerType as 'hitter' | 'pitcher',
     }),
     playerCount: t.exposeInt('playerCount'),
+    maxPlayers: t.exposeInt('maxPlayers'),
+    creatorName: t.exposeString('creatorName', { nullable: true }),
+    players: t.field({
+      type: [SeasonDraftLobbyPlayer],
+      nullable: { list: false, items: false },
+      resolve: (parent) => parent.players,
+    }),
   }),
 });
 
@@ -272,6 +292,12 @@ const SeasonDraftGameSummary = builder.objectRef<{
   playerType: string;
   isMyTurn: boolean;
   inviteCode: string | null;
+  playerCount: number;
+  maxPlayers: number;
+  picksMade: number;
+  totalPicks: number;
+  winnerName: string | null;
+  players: Array<{ id: number; playerName: string }>;
 }>('SeasonDraftGameSummary');
 
 SeasonDraftGameSummary.implement({
@@ -296,6 +322,16 @@ SeasonDraftGameSummary.implement({
     }),
     isMyTurn: t.exposeBoolean('isMyTurn'),
     inviteCode: t.exposeString('inviteCode', { nullable: true }),
+    playerCount: t.exposeInt('playerCount'),
+    maxPlayers: t.exposeInt('maxPlayers'),
+    picksMade: t.exposeInt('picksMade'),
+    totalPicks: t.exposeInt('totalPicks'),
+    winnerName: t.exposeString('winnerName', { nullable: true }),
+    players: t.field({
+      type: [SeasonDraftLobbyPlayer],
+      nullable: { list: false, items: false },
+      resolve: (parent) => parent.players,
+    }),
   }),
 });
 

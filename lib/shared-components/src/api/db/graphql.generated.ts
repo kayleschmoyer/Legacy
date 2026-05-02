@@ -3288,11 +3288,14 @@ export type SeasonDraftGame = {
 /** Basic info about a Season Draft Game for the join page */
 export type SeasonDraftGameLobbyInfo = {
   __typename?: 'SeasonDraftGameLobbyInfo';
+  creatorName?: Maybe<Scalars['String']['output']>;
   gameMode?: Maybe<SeasonDraftGameMode>;
   id?: Maybe<Scalars['Int']['output']>;
+  maxPlayers?: Maybe<Scalars['Int']['output']>;
   name?: Maybe<Scalars['String']['output']>;
   playerCount?: Maybe<Scalars['Int']['output']>;
   playerType?: Maybe<SeasonDraftPlayerType>;
+  players: Array<SeasonDraftLobbyPlayer>;
   statKey?: Maybe<Scalars['String']['output']>;
   status?: Maybe<SeasonDraftGameStatus>;
 };
@@ -3332,10 +3335,23 @@ export type SeasonDraftGameSummary = {
   id?: Maybe<Scalars['Int']['output']>;
   inviteCode?: Maybe<Scalars['String']['output']>;
   isMyTurn?: Maybe<Scalars['Boolean']['output']>;
+  maxPlayers?: Maybe<Scalars['Int']['output']>;
   name?: Maybe<Scalars['String']['output']>;
+  picksMade?: Maybe<Scalars['Int']['output']>;
+  playerCount?: Maybe<Scalars['Int']['output']>;
   playerType?: Maybe<SeasonDraftPlayerType>;
+  players: Array<SeasonDraftLobbyPlayer>;
   statKey?: Maybe<Scalars['String']['output']>;
   status?: Maybe<SeasonDraftGameStatus>;
+  totalPicks?: Maybe<Scalars['Int']['output']>;
+  winnerName?: Maybe<Scalars['String']['output']>;
+};
+
+/** Lightweight player entry for lobby/join displays */
+export type SeasonDraftLobbyPlayer = {
+  __typename?: 'SeasonDraftLobbyPlayer';
+  id: Scalars['Int']['output'];
+  playerName: Scalars['String']['output'];
 };
 
 /** A completed draft pick with player and scoring info */
@@ -5371,6 +5387,13 @@ export type GetSeasonDraftGameByInviteCodeQuery = {
     gameMode?: SeasonDraftGameMode | null;
     playerType?: SeasonDraftPlayerType | null;
     playerCount?: number | null;
+    maxPlayers?: number | null;
+    creatorName?: string | null;
+    players: Array<{
+      __typename?: 'SeasonDraftLobbyPlayer';
+      id: number;
+      playerName: string;
+    }>;
   } | null;
 };
 
@@ -5413,6 +5436,17 @@ export type GetSeasonDraftGamesQuery = {
     gameMode?: SeasonDraftGameMode | null;
     playerType?: SeasonDraftPlayerType | null;
     isMyTurn?: boolean | null;
+    inviteCode?: string | null;
+    playerCount?: number | null;
+    maxPlayers?: number | null;
+    picksMade?: number | null;
+    totalPicks?: number | null;
+    winnerName?: string | null;
+    players: Array<{
+      __typename?: 'SeasonDraftLobbyPlayer';
+      id: number;
+      playerName: string;
+    }>;
   }> | null;
 };
 
@@ -11837,6 +11871,12 @@ export const GetSeasonDraftGameByInviteCode = gql`
       gameMode
       playerType
       playerCount
+      maxPlayers
+      creatorName
+      players {
+        id
+        playerName
+      }
     }
   }
 `;
@@ -12147,6 +12187,16 @@ export const GetSeasonDraftGames = gql`
       gameMode
       playerType
       isMyTurn
+      inviteCode
+      playerCount
+      maxPlayers
+      picksMade
+      totalPicks
+      winnerName
+      players {
+        id
+        playerName
+      }
     }
   }
 `;

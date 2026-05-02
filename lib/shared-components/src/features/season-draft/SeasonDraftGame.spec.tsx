@@ -335,7 +335,7 @@ describe('SeasonDraftGame', () => {
       );
 
       // Game content should still be visible — no full-page spinner
-      expect(queryByText('Loading game...')).toBeNull();
+      expect(queryByText('Loading game…')).toBeNull();
       expect(queryByText('Test Draft')).toBeTruthy();
     });
 
@@ -353,7 +353,7 @@ describe('SeasonDraftGame', () => {
         <SeasonDraftGame gameId={1} currentUserId={1} />,
       );
 
-      expect(getByText('Loading game...')).toBeTruthy();
+      expect(getByText('Loading game…')).toBeTruthy();
     });
   });
 
@@ -421,15 +421,16 @@ describe('SeasonDraftGame', () => {
           typeof useGetSeasonDraftGamePlayerOptionsLazyQuery
         >);
 
-      const { getByText, queryByText } = render(
+      const { getByText, getAllByText, queryByText } = render(
         <SeasonDraftGame gameId={1} currentUserId={1} />,
       );
 
       // Mode label should show "Most Teams"
       expect(getByText('Most Teams')).toBeTruthy();
 
-      // Stat label should show "Teams"
-      expect(getByText('Teams')).toBeTruthy();
+      // Stat key chip should show the short "TM" label for most_teams mode.
+      // Multiple TMs appear (header chip + scoreboard column).
+      expect(getAllByText('TM').length).toBeGreaterThan(0);
 
       // Click the player suggestion to select a player. The
       // TouchableOpacity (mocked as <button onClick={onPress}>) wraps the
@@ -446,8 +447,8 @@ describe('SeasonDraftGame', () => {
       // After selecting a player, team/season picker should still NOT be
       // present in most_teams mode (the picker is gated on
       // `selectedPlayer && !isMostTeamsMode`)
-      expect(queryByText('Select Team:')).toBeNull();
-      expect(queryByText('Select Season:')).toBeNull();
+      expect(queryByText('Choose a Team')).toBeNull();
+      expect(queryByText('Choose a Season')).toBeNull();
     });
 
     it('enables Confirm Pick without selectedOption in most_teams mode', async () => {
@@ -465,9 +466,11 @@ describe('SeasonDraftGame', () => {
         <SeasonDraftGame gameId={1} currentUserId={1} />,
       );
 
-      // The drafting UI should render (it's the current user's turn)
-      expect(getByText('Your Turn!')).toBeTruthy();
-      expect(getByText('Make Your Pick')).toBeTruthy();
+      // The drafting UI should render (it's the current user's turn). The
+      // header on-the-clock card AND the pick panel badge both say
+      // "Your Turn", so use getAllByText to confirm at least one renders.
+      expect(getAllByText('Your Turn').length).toBeGreaterThan(0);
+      expect(getByText('Make your pick.')).toBeTruthy();
 
       // Click the player suggestion to select a player.
       const babeRuthText = getByText('Babe Ruth');
@@ -492,7 +495,7 @@ describe('SeasonDraftGame', () => {
       // Since isMostTeamsMode is true, !selectedOption is not checked.
       // Press the button and verify the mutation is called (proving it's enabled)
       mockMakePickMutation.mockResolvedValue({});
-      fireEvent.click(getByText('Confirm Pick'));
+      fireEvent.click(getByText(/^Confirm Pick/));
 
       await waitFor(() => {
         expect(mockMakePickMutation).toHaveBeenCalledWith(

@@ -6,25 +6,21 @@ import React, {
   useState,
 } from 'react';
 import { LOGGER } from '@legacy-sports/logging';
-import {
-  ActivityIndicator,
-  Alert,
-  ScrollView,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { Alert, TouchableOpacity } from 'react-native';
 import {
   Button,
-  Card,
   Dialog,
-  H2,
+  H1,
   H3,
   Input,
   Paragraph,
+  ScrollView,
+  Spinner,
   Text,
   XStack,
   YStack,
 } from 'tamagui';
+import { Circle, Stack } from './primitives';
 import {
   SeasonDraftGameMode,
   SeasonDraftPlayerType,
@@ -38,23 +34,36 @@ import {
   useTriggerSeasonDraftStatLoadingMutation,
 } from '../../api/db/graphql.generated';
 import { useWebSocket } from '../../hooks/useWebSocket';
+import { BRAND_GOLD, BRAND_SEAM_RED, withAlpha } from '../../utils/colors';
 
 /**
- * Season Draft Game Component
+ * Season Draft Game
  *
  * Turn-based drafting game where players select baseball player + season
  * (or career-with-team) combinations to fill their roster.
  *
- * Features:
- * - Configurable stat key (HR, H, RBI, SB, etc. for hitters; W, SO, SV, etc. for pitchers)
- * - Season mode (player+year) or career_team mode (player+team)
- * - Hitter or pitcher drafts with different roster layouts
- * - On-demand stat loading with WebSocket-based loading state
- * - Turn-based drafting with real-time scoring
+ * Phases: setup (invite + start) | drafting (pick UI / waiting) | completed.
+ * Cross-platform Tamagui implementation.
  */
 
-/** Human-readable labels for stat keys */
 const STAT_LABELS: Record<string, string> = {
+  hr: 'HR',
+  h: 'H',
+  rbi: 'RBI',
+  sb: 'SB',
+  r: 'R',
+  doubles: '2B',
+  triples: '3B',
+  bb: 'BB',
+  tb: 'TB',
+  w: 'W',
+  so: 'SO',
+  sv: 'SV',
+  sho: 'SHO',
+  cg: 'CG',
+};
+
+const STAT_LABELS_LONG: Record<string, string> = {
   hr: 'Home Runs',
   h: 'Hits',
   rbi: 'RBI',
@@ -131,9 +140,6 @@ interface SeasonDraftGameProps {
   onBack?: () => void;
 }
 
-/**
- * Main Season Draft Game Component
- */
 export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
   gameId,
   currentUserId,
@@ -141,8 +147,9 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
   websocketToken,
   onBack,
 }) => {
+  // ── State ────────────────────────────────────────────────────────────────
   const [playerSearch, setPlayerSearch] = useState('');
-  const [selectedOption, setSelectedOption] = useState(''); // team or year
+  const [selectedOption, setSelectedOption] = useState('');
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [selectedPosition, setSelectedPosition] = useState<string>('');
   const [selectedSlotId, setSelectedSlotId] = useState<number | null>(null);
@@ -155,7 +162,7 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [inviteCopied, setInviteCopied] = useState(false);
 
-  // Query game state — polling is managed via startPolling/stopPolling below
+  // ── Data ─────────────────────────────────────────────────────────────────
   const {
     data: gameData,
     loading,
@@ -171,16 +178,6 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
     [gameData?.seasonDraftGame],
   );
 
-  // Poll only while the game is active (drafting/setup). Stop when the game
-  // ends, is not found, or the query errors persistently. Using
-  // startPolling/stopPolling in an effect avoids stale-ref issues when
-  // gameId changes without unmounting (React Router param change).
-  //
-  // Depend only on the primitive status string and the error flag — NOT on
-  // the full `gameState` object. Apollo returns a new `gameState` reference
-  // on every poll response (the cache reconstructs arrays, etc.) which would
-  // cause this effect to call stopPolling()+startPolling() on every poll,
-  // triggering redundant network requests and causing visible flicker.
   const gameStatus = gameState?.status;
   useEffect(() => {
     const shouldPoll =
@@ -193,12 +190,10 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
     return () => stopPolling();
   }, [gameStatus, queryError, startPolling, stopPolling]);
 
-  // Lazy query for player search
   const [searchPlayersQuery, { data: searchData }] =
     useSearchPlayersForDraftLazyQuery();
   const playerSuggestions = (searchData?.players ?? []) as Player[];
 
-  // Lazy query for team/season options after a player is selected
   const [
     fetchPlayerOptions,
     { data: playerOptionsData, loading: optionsLoading },
@@ -206,19 +201,16 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
   const playerOptions: string[] =
     playerOptionsData?.seasonDraftGamePlayerOptions ?? [];
 
-  // Lazy query for stat preview
   const [previewQuery, { data: previewData }] =
     useGetSeasonDraftGameStatValueLazyQuery();
   const previewStatValue: number | null =
     previewData?.seasonDraftGamePlayerSeasonStatValue ?? null;
 
-  // Mutations
   const [makePickMutation] = useMakeSeasonDraftPickMutation();
   const [triggerStatLoading] = useTriggerSeasonDraftStatLoadingMutation();
   const [startGameMutation] = useStartSeasonDraftGameMutation();
   const [cancelGameMutation] = useCancelSeasonDraftGameMutation();
 
-  // WebSocket for real-time stat loading notifications
   const selectedPlayerRef = useRef(selectedPlayer);
   selectedPlayerRef.current = selectedPlayer;
   useWebSocket({
@@ -231,30 +223,64 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
         next.delete(notification.playerId);
         return next;
       });
-      // Refetch game data when stats are loaded (stat values may have changed)
       void refetchGame();
     },
   });
 
+  // ── Derived ──────────────────────────────────────────────────────────────
   const isMostTeamsMode = gameState?.gameMode === SeasonDraftGameMode.MostTeams;
-  const statLabel = gameState
-    ? isMostTeamsMode
-      ? 'Teams'
-      : (STAT_LABELS[gameState.statKey] ?? gameState.statKey)
-    : '';
   const isCareerTeamMode =
     gameState?.gameMode === SeasonDraftGameMode.CareerTeam;
   const isPitcherDraft =
     gameState?.playerType === SeasonDraftPlayerType.Pitcher;
 
-  // Get current player
+  // `gameState.statKey` is nullable in the generated types — coalesce
+  // before any string operations so older rows / partial cache entries
+  // don't throw at runtime.
+  const rawStatKey = gameState?.statKey ?? '';
+  const statKeyShort = gameState
+    ? isMostTeamsMode
+      ? 'TM'
+      : (STAT_LABELS[rawStatKey] ?? rawStatKey.toUpperCase() ?? '—')
+    : '';
+  const statLabelLong = gameState
+    ? isMostTeamsMode
+      ? 'Teams'
+      : (STAT_LABELS_LONG[rawStatKey] ?? rawStatKey)
+    : '';
+
   const currentPlayer = gameState?.players.find(
     (p) => p.draftOrder === gameState.currentTurn,
   );
   const isMyTurn = currentPlayer?.userId === currentUserId;
   const isCreator = gameState?.createdBy === currentUserId;
+  const meAsPlayer = gameState?.players.find((p) => p.userId === currentUserId);
 
-  // Start game (creator only)
+  const totalSlots = gameState
+    ? gameState.players.reduce((sum, p) => sum + p.roster.length, 0)
+    : 0;
+  const filledSlots = gameState
+    ? gameState.players.reduce(
+        (sum, p) => sum + p.roster.filter((s) => s.isFilled).length,
+        0,
+      )
+    : 0;
+
+  const winner = useMemo(() => {
+    if (!gameState || gameState.status !== 'completed') return null;
+    return [...gameState.players].sort(
+      (a, b) => b.totalScore - a.totalScore,
+    )[0];
+  }, [gameState]);
+  const runnerUp = useMemo(() => {
+    if (!gameState || gameState.status !== 'completed') return null;
+    const sorted = [...gameState.players].sort(
+      (a, b) => b.totalScore - a.totalScore,
+    );
+    return sorted[1] ?? null;
+  }, [gameState]);
+
+  // ── Actions ──────────────────────────────────────────────────────────────
   const handleStartGame = async () => {
     if (!gameState || isStartingGame) return;
     setIsStartingGame(true);
@@ -270,22 +296,38 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
     }
   };
 
+  const inviteUrl = useMemo(() => {
+    if (!gameState?.inviteCode) return '';
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    return `${origin}/games/season-draft/join/${gameState.inviteCode}`;
+  }, [gameState?.inviteCode]);
+
   const handleCopyInviteLink = () => {
     if (!gameState?.inviteCode) return;
-    const url = `${typeof window !== 'undefined' ? window.location.origin : ''}/games/season-draft/join/${gameState.inviteCode}`;
-    void navigator.clipboard.writeText(url).then(() => {
-      setInviteCopied(true);
-      setTimeout(() => setInviteCopied(false), 2000);
-    });
+    // `navigator.clipboard` is undefined in non-secure contexts (HTTP, some
+    // sandboxed iframes) and on React Native — bail safely so we don't throw.
+    const writeText =
+      typeof navigator !== 'undefined' &&
+      navigator.clipboard?.writeText.bind(navigator.clipboard);
+    if (!writeText) {
+      setErrorMessage(
+        'Clipboard unavailable in this browser — copy the link manually.',
+      );
+      return;
+    }
+    void writeText(inviteUrl).then(
+      () => {
+        setInviteCopied(true);
+        setTimeout(() => setInviteCopied(false), 2000);
+      },
+      (error: unknown) => {
+        const err = error instanceof Error ? error : new Error(String(error));
+        LOGGER.error('Failed to copy invite link', err);
+        setErrorMessage('Could not copy invite link. Please try again.');
+      },
+    );
   };
 
-  // Cancel game (creator only) — opens the confirmation dialog
-  const handleCancelGame = () => {
-    if (!gameState) return;
-    setCancelConfirmOpen(true);
-  };
-
-  // Performs the actual cancellation after user confirms
   const handleConfirmCancel = () => {
     void cancelGameMutation({ variables: { gameId } }).then(
       () => {
@@ -305,12 +347,9 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
     );
   };
 
-  // Search for players
   const searchPlayers = useCallback(
     (searchTerm: string) => {
-      if (searchTerm.length < 2) {
-        return;
-      }
+      if (searchTerm.length < 2) return;
       void searchPlayersQuery({
         variables: { search: searchTerm, limit: 10 },
       });
@@ -318,33 +357,21 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
     [searchPlayersQuery],
   );
 
-  // Trigger stat loading for a player
   const handleTriggerStatLoading = useCallback(
     async (player: Player) => {
-      if (statsLoadingPlayerIds.has(player.id)) return; // Already loading
-
+      if (statsLoadingPlayerIds.has(player.id)) return;
       setStatsLoadingPlayerIds((prev) => {
         const next = new Set(prev);
         next.add(player.id);
         return next;
       });
-
       try {
-        await triggerStatLoading({
-          variables: { playerId: player.id },
-        });
-        // Stats have been loaded (or were already present on the server).
-        // Clear the loading state here so the draft form becomes usable.
-        // The WebSocket notification also does this cleanup, but it requires
-        // websocketUrl/websocketToken to be connected — clearing here ensures
-        // correct behaviour when WebSocket is unavailable.
+        await triggerStatLoading({ variables: { playerId: player.id } });
         setStatsLoadingPlayerIds((prev) => {
           const next = new Set(prev);
           next.delete(player.id);
           return next;
         });
-        // Only refetch when WebSocket is not connected; when WS is connected,
-        // onPlayerStatsUpdated will trigger the refetch to avoid duplicate calls.
         if (!websocketUrl || !websocketToken) {
           void refetchGame();
         }
@@ -371,14 +398,9 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
     ],
   );
 
-  // Preview stat value for selection
   const previewSelection = useCallback(() => {
-    if (!selectedPlayer || !selectedPosition) {
-      return;
-    }
-
+    if (!selectedPlayer || !selectedPosition) return;
     if (isMostTeamsMode) {
-      // most_teams mode: no team/season needed
       void previewQuery({
         variables: {
           playerId: selectedPlayer.id,
@@ -394,7 +416,7 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
       void previewQuery({
         variables: {
           playerId: selectedPlayer.id,
-          season: 0, // Not used in career_team mode
+          season: 0,
           position: selectedPosition,
           statKey: gameState?.statKey,
           playerType: gameState?.playerType,
@@ -427,13 +449,11 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
     gameState,
   ]);
 
-  // Make a draft pick
   const makePick = async () => {
     if (!selectedPlayer || !selectedSlotId || !selectedPosition) {
       setErrorMessage('Please complete all fields');
       return;
     }
-
     if (!isMostTeamsMode) {
       if (isCareerTeamMode) {
         if (!selectedOption) {
@@ -448,11 +468,9 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
         }
       }
     }
-
     try {
       setSubmitting(true);
       setErrorMessage(null);
-
       await makePickMutation({
         variables: {
           gameId,
@@ -467,15 +485,11 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
           team: isCareerTeamMode ? selectedOption : undefined,
         },
       });
-
-      // Clear selection
       setSelectedPlayer(null);
       setPlayerSearch('');
       setSelectedOption('');
       setSelectedPosition('');
       setSelectedSlotId(null);
-
-      // Reload game state
       await refetchGame();
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
@@ -486,23 +500,17 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
     }
   };
 
-  // Handle player selection
   useEffect(() => {
     const delaySearch = setTimeout(() => {
-      if (playerSearch) {
-        void searchPlayers(playerSearch);
-      }
+      if (playerSearch) void searchPlayers(playerSearch);
     }, 300);
-
     return () => clearTimeout(delaySearch);
   }, [playerSearch, searchPlayers]);
 
-  // Preview selection when all fields are filled
   useEffect(() => {
     void previewSelection();
   }, [previewSelection]);
 
-  // Re-fetch player options when the selected player's stats finish loading
   const prevStatsLoadingRef = useRef(statsLoadingPlayerIds);
   useEffect(() => {
     const prevLoading = prevStatsLoadingRef.current;
@@ -532,31 +540,45 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
     isMostTeamsMode,
   ]);
 
-  // Only block the UI on the very first load (no data yet). During background
-  // poll refetches Apollo sets loading:true but keeps the previous data, so
-  // we should not replace the page content with a spinner — that is what
-  // causes the 5-second flicker reported in LS-3786.
+  // ── Render ───────────────────────────────────────────────────────────────
   if (loading && !gameData) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" />
-        <Text>Loading game...</Text>
-      </View>
+      <YStack flex={1} alignItems="center" justifyContent="center" gap="$3">
+        <Spinner size="large" color="$brandGold" />
+        <Text color="$textMuted">Loading game…</Text>
+      </YStack>
     );
   }
 
   if (!gameState) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <Text>Game not found</Text>
-        {onBack && <Button onPress={onBack}>Go Back</Button>}
-      </View>
+      <YStack flex={1} alignItems="center" justifyContent="center" gap="$3">
+        <Text color="$color">Game not found</Text>
+        {onBack && (
+          <Button
+            backgroundColor="$brandGold"
+            color="$brandNavy"
+            onPress={onBack}
+          >
+            Go Back
+          </Button>
+        )}
+      </YStack>
     );
   }
 
+  const phaseLabel =
+    gameState.status === 'setup'
+      ? 'Waiting Room'
+      : gameState.status === 'completed'
+        ? 'Game Complete'
+        : gameState.status === 'cancelled'
+          ? 'Game Cancelled'
+          : 'Draft Live';
+
   return (
-    <YStack flex={1} backgroundColor="$background">
-      {/* Cancel Game Confirmation Dialog */}
+    <ScrollView flex={1} backgroundColor="$background">
+      {/* Cancel Confirmation Dialog */}
       <Dialog
         modal
         open={cancelConfirmOpen}
@@ -575,14 +597,7 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
             elevate
             key="content"
             role="alertdialog"
-            animation={[
-              'quick',
-              {
-                opacity: {
-                  overshootClamping: true,
-                },
-              },
-            ]}
+            animation={['quick', { opacity: { overshootClamping: true } }]}
             enterStyle={{ x: 0, y: -20, opacity: 0, scale: 0.9 }}
             exitStyle={{ x: 0, y: 10, opacity: 0, scale: 0.95 }}
             x={0}
@@ -591,18 +606,29 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
             y={0}
             maxWidth={400}
             padding="$4"
+            backgroundColor="$surfaceCard"
           >
-            <YStack space="$3">
-              <Dialog.Title>Cancel Game</Dialog.Title>
-              <Dialog.Description>
+            <YStack gap="$3">
+              <Dialog.Title color="$color">Cancel Game</Dialog.Title>
+              <Dialog.Description color="$textMuted">
                 Are you sure you want to cancel this game? This cannot be
                 undone.
               </Dialog.Description>
-              <XStack space="$3" justifyContent="flex-end">
+              <XStack gap="$2" justifyContent="flex-end">
                 <Dialog.Close asChild>
-                  <Button>No, Keep Playing</Button>
+                  <Button
+                    variant="outlined"
+                    borderColor="$surfacePanelBorder"
+                    color="$color"
+                  >
+                    No, Keep Playing
+                  </Button>
                 </Dialog.Close>
-                <Button theme="red" onPress={handleConfirmCancel}>
+                <Button
+                  backgroundColor="$brandSeamRed"
+                  color="$color"
+                  onPress={handleConfirmCancel}
+                >
                   Yes, Cancel Game
                 </Button>
               </XStack>
@@ -611,20 +637,47 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
         </Dialog.Portal>
       </Dialog>
 
-      {/* Inline error message */}
-      {errorMessage !== null && (
-        <Card
-          margin="$4"
-          padding="$3"
-          backgroundColor="$red3"
-          borderColor="$red6"
-          bordered
-        >
-          <XStack justifyContent="space-between" alignItems="center">
-            <Paragraph color="$red11">{errorMessage}</Paragraph>
+      <YStack
+        width="100%"
+        maxWidth={1200}
+        alignSelf="center"
+        padding="$5"
+        $sm={{ padding: '$3' }}
+        gap="$5"
+      >
+        {/* Top bar */}
+        {onBack && (
+          <Button
+            chromeless
+            size="$2"
+            alignSelf="flex-start"
+            color="$textMuted"
+            onPress={onBack}
+            pressStyle={{ opacity: 0.7 }}
+          >
+            ← Back to Lobby
+          </Button>
+        )}
+
+        {/* Inline error */}
+        {errorMessage !== null && (
+          <XStack
+            padding="$3"
+            borderRadius="$3"
+            backgroundColor={withAlpha(BRAND_SEAM_RED, 0.15)}
+            borderWidth={1}
+            borderColor="$brandSeamRed"
+            justifyContent="space-between"
+            alignItems="center"
+            gap="$3"
+          >
+            <Text color="$brandSeamRedLight" flex={1}>
+              {errorMessage}
+            </Text>
             <Button
               size="$2"
               chromeless
+              color="$brandSeamRedLight"
               aria-label="Dismiss error"
               accessibilityLabel="Dismiss error"
               onPress={() => setErrorMessage(null)}
@@ -632,507 +685,1190 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
               ✕
             </Button>
           </XStack>
-        </Card>
-      )}
-
-      {/* Header */}
-      <XStack
-        padding="$4"
-        backgroundColor="$blue10"
-        justifyContent="space-between"
-        alignItems="center"
-      >
-        {onBack && (
-          <Button size="$3" onPress={onBack}>
-            ← Back
-          </Button>
         )}
-        <YStack alignItems="center" flex={1}>
-          <H2 color="white">{gameState.name}</H2>
-          <XStack space="$2">
-            <Text color="$blue3" fontSize="$2">
-              {isPitcherDraft ? 'Pitcher' : 'Hitter'} Draft
-            </Text>
-            <Text color="$blue3" fontSize="$2">
-              •
-            </Text>
-            <Text color="$blue3" fontSize="$2">
-              {statLabel}
-            </Text>
-            <Text color="$blue3" fontSize="$2">
-              •
-            </Text>
-            <Text color="$blue3" fontSize="$2">
-              {isMostTeamsMode
-                ? 'Most Teams'
-                : isCareerTeamMode
-                  ? 'Career w/ Team'
-                  : 'Season'}
-            </Text>
-          </XStack>
-        </YStack>
-        <Text style={{ color: 'white' }}>
-          {gameState.status === 'drafting'
-            ? `Turn: ${currentPlayer?.playerName}`
-            : gameState.status}
-        </Text>
-      </XStack>
 
-      <ScrollView>
-        {/* Setup Phase — Invite Link + Start / Cancel */}
+        {/* Header: phase eyebrow, name, meta + turn card */}
+        <XStack
+          gap="$4"
+          alignItems="flex-start"
+          justifyContent="space-between"
+          flexWrap="wrap"
+        >
+          <YStack flex={1} flexBasis={320} gap="$2">
+            <XStack alignItems="center" gap="$2">
+              <Circle
+                size={8}
+                backgroundColor={
+                  gameState.status === 'drafting'
+                    ? '$brandSeamRedLight'
+                    : gameState.status === 'completed'
+                      ? '$brandGoldLight'
+                      : '$textMuted'
+                }
+              />
+              <Eyebrow
+                color={
+                  gameState.status === 'drafting'
+                    ? '$brandSeamRedLight'
+                    : '$brandGoldLight'
+                }
+              >
+                {phaseLabel}
+              </Eyebrow>
+            </XStack>
+            <H1
+              color="$color"
+              fontSize={36}
+              lineHeight={36}
+              fontWeight="800"
+              letterSpacing={-1}
+            >
+              {gameState.name}
+            </H1>
+            <XStack alignItems="center" gap="$2" flexWrap="wrap">
+              <StatChip>{statKeyShort}</StatChip>
+              <Text color="$textMuted" fontSize={13}>
+                {isPitcherDraft ? 'Pitchers' : 'Hitters'}
+              </Text>
+              <Text color="$textMuted" fontSize={13}>
+                ·
+              </Text>
+              <Text color="$textMuted" fontSize={13}>
+                {isMostTeamsMode
+                  ? 'Most Teams'
+                  : isCareerTeamMode
+                    ? 'Career w/ Team'
+                    : 'Season'}
+              </Text>
+              <Text color="$textMuted" fontSize={13}>
+                ·
+              </Text>
+              <Text color="$textMuted" fontSize={13}>
+                {gameState.players.length} players
+              </Text>
+            </XStack>
+          </YStack>
+
+          {gameState.status === 'drafting' && currentPlayer && (
+            <YStack
+              backgroundColor="$surfaceCard"
+              borderRadius="$4"
+              borderWidth={1}
+              borderColor={isMyTurn ? '$brandGold' : '$surfacePanelBorder'}
+              padding="$3"
+              minWidth={220}
+              gap="$1"
+            >
+              <Eyebrow>On the Clock</Eyebrow>
+              <Text
+                fontSize={22}
+                fontWeight="800"
+                color={isMyTurn ? '$brandGoldLight' : '$color'}
+              >
+                {isMyTurn ? 'Your Turn' : currentPlayer.playerName}
+              </Text>
+              <Text color="$textMuted" fontSize={12}>
+                Pick {filledSlots + 1} / {totalSlots}
+              </Text>
+              {/*
+                TODO(LS-4129): Render a live countdown driven by a
+                server-authoritative `currentPickDeadline` field. Schema
+                addition + frontend wiring tracked in LS-4129.
+              */}
+            </YStack>
+          )}
+
+          {gameState.status === 'completed' && winner && (
+            <YStack
+              backgroundColor="$surfaceCard"
+              borderRadius="$4"
+              borderWidth={1}
+              borderColor="$brandGold"
+              padding="$3"
+              minWidth={220}
+              gap="$1"
+            >
+              <Text fontSize={28} role="img" accessibilityLabel="trophy">
+                {'\u{1F3C6}'}
+              </Text>
+              <Eyebrow color="$brandGoldLight">Winner</Eyebrow>
+              <Text fontSize={22} fontWeight="800" color="$brandGoldLight">
+                {winner.playerName}
+              </Text>
+              <Text color="$textMuted" fontSize={12}>
+                {winner.totalScore} {statKeyShort}
+                {runnerUp != null && winner.totalScore > runnerUp.totalScore
+                  ? ` · +${winner.totalScore - runnerUp.totalScore} over 2nd`
+                  : ''}
+              </Text>
+            </YStack>
+          )}
+        </XStack>
+
+        {gameState.status === 'cancelled' && (
+          <YStack
+            backgroundColor={withAlpha(BRAND_SEAM_RED, 0.1)}
+            borderColor="$brandSeamRed"
+            borderWidth={1}
+            borderRadius="$4"
+            padding="$4"
+          >
+            <Text color="$color" fontSize={16} fontWeight="700">
+              Game Cancelled
+            </Text>
+            <Text color="$textMuted" marginTop="$1">
+              This game has been cancelled.
+            </Text>
+          </YStack>
+        )}
+
+        {/* Setup phase */}
         {gameState.status === 'setup' && (
-          <Card margin="$4" padding="$4" backgroundColor="$yellow3">
-            <H3 marginBottom="$2">Game Setup</H3>
+          <SetupPanel
+            gameState={gameState}
+            inviteUrl={inviteUrl}
+            inviteCopied={inviteCopied}
+            onCopy={handleCopyInviteLink}
+            isCreator={isCreator}
+            isStarting={isStartingGame}
+            onStart={() => void handleStartGame()}
+            onCancelGame={() => setCancelConfirmOpen(true)}
+            currentUserId={currentUserId}
+          />
+        )}
 
-            {/* Invite Link Section */}
-            {gameState.inviteCode && (
-              <YStack marginBottom="$4" space="$2">
-                <Text fontWeight="600">Invite players via link:</Text>
-                <XStack space="$2" alignItems="center" flexWrap="wrap">
-                  <Text
-                    flex={1}
-                    fontSize="$3"
-                    color="$gray11"
-                    numberOfLines={1}
-                    style={{ fontFamily: 'monospace' }}
-                  >
-                    {typeof window !== 'undefined'
-                      ? `${window.location.origin}/games/season-draft/join/${gameState.inviteCode}`
-                      : `/games/season-draft/join/${gameState.inviteCode}`}
-                  </Text>
-                  <Button
-                    size="$3"
-                    backgroundColor={inviteCopied ? '$green10' : '$blue10'}
-                    color="white"
-                    onPress={handleCopyInviteLink}
-                  >
-                    {inviteCopied ? 'Copied!' : 'Copy Link'}
-                  </Button>
-                </XStack>
-              </YStack>
-            )}
-
-            <Text marginBottom="$2">
-              Players: {gameState.players.map((p) => p.playerName).join(', ')} (
-              {gameState.players.length}/6)
-            </Text>
-
-            {isCreator && gameState.players.length < 2 && (
-              <Text marginBottom="$3" color="$orange10" fontSize="$3">
-                Share the invite link above. You need at least 2 players to
-                start.
-              </Text>
-            )}
-
-            {!isCreator && (
-              <Text marginBottom="$3" color="$gray10">
-                Waiting for the game creator to start the draft.
-              </Text>
-            )}
-
-            {isCreator && (
-              <XStack space="$3">
-                <Button
-                  flex={1}
-                  size="$4"
-                  backgroundColor="$green10"
-                  color="white"
-                  disabled={isStartingGame || gameState.players.length < 2}
-                  opacity={
-                    isStartingGame || gameState.players.length < 2 ? 0.5 : 1
+        {/* Drafting / completed: main + side columns */}
+        {gameState.status !== 'setup' && gameState.status !== 'cancelled' && (
+          <XStack gap="$4" flexWrap="wrap" alignItems="flex-start">
+            <YStack flex={2} flexBasis={420} minWidth={300} gap="$4">
+              {gameState.status === 'drafting' && isMyTurn && (
+                <DraftPickPanel
+                  gameState={gameState}
+                  currentPlayer={currentPlayer}
+                  isCareerTeamMode={isCareerTeamMode}
+                  isMostTeamsMode={isMostTeamsMode}
+                  isPitcherDraft={isPitcherDraft}
+                  statKeyShort={statKeyShort}
+                  statLabelLong={statLabelLong}
+                  playerSearch={playerSearch}
+                  setPlayerSearch={setPlayerSearch}
+                  playerSuggestions={playerSuggestions}
+                  statsLoadingPlayerIds={statsLoadingPlayerIds}
+                  onSelectPlayer={(player) => {
+                    setSelectedPlayer(player);
+                    setSelectedOption('');
+                    setPlayerSearch(`${player.firstName} ${player.lastName}`);
+                    if (gameState && !isMostTeamsMode) {
+                      void fetchPlayerOptions({
+                        variables: {
+                          playerId: player.id,
+                          gameMode: gameState.gameMode,
+                          playerType: gameState.playerType,
+                        },
+                      });
+                    }
+                    if (!player.statsLastFetchedAt) {
+                      void handleTriggerStatLoading(player);
+                    }
+                  }}
+                  selectedPlayer={selectedPlayer}
+                  playerOptions={playerOptions}
+                  optionsLoading={optionsLoading}
+                  selectedOption={selectedOption}
+                  setSelectedOption={setSelectedOption}
+                  selectedSlotId={selectedSlotId}
+                  onSelectSlot={(slot) => {
+                    setSelectedSlotId(slot.id);
+                    setSelectedPosition(slot.position);
+                  }}
+                  previewStatValue={previewStatValue}
+                  submitting={submitting}
+                  canSubmit={
+                    !!selectedPlayer &&
+                    !!selectedSlotId &&
+                    (isMostTeamsMode || !!selectedOption) &&
+                    !submitting &&
+                    !(
+                      selectedPlayer &&
+                      statsLoadingPlayerIds.has(selectedPlayer.id)
+                    )
                   }
-                  onPress={() => void handleStartGame()}
-                >
-                  {isStartingGame ? 'Starting...' : 'Start Draft'}
-                </Button>
+                  onConfirm={() => void makePick()}
+                />
+              )}
+              {gameState.status === 'drafting' && !isMyTurn && (
+                <WaitingPanel activeName={currentPlayer?.playerName ?? '—'} />
+              )}
+
+              <RostersCard
+                gameState={gameState}
+                statKeyShort={statKeyShort}
+                isMostTeamsMode={isMostTeamsMode}
+                isCareerTeamMode={isCareerTeamMode}
+                meId={meAsPlayer?.id}
+              />
+            </YStack>
+
+            <YStack flex={1} flexBasis={280} minWidth={260} gap="$4">
+              <ScoreboardCard
+                gameState={gameState}
+                statKeyShort={statKeyShort}
+                meId={meAsPlayer?.id}
+              />
+              <HistoryCard
+                gameState={gameState}
+                statKeyShort={statKeyShort}
+                isMostTeamsMode={isMostTeamsMode}
+                isCareerTeamMode={isCareerTeamMode}
+                meName={meAsPlayer?.playerName}
+              />
+
+              {gameState.status === 'drafting' && isCreator && (
                 <Button
-                  flex={1}
-                  size="$4"
-                  backgroundColor="$red10"
-                  color="white"
-                  onPress={() => void handleCancelGame()}
+                  variant="outlined"
+                  borderColor="$brandSeamRed"
+                  color="$brandSeamRedLight"
+                  onPress={() => setCancelConfirmOpen(true)}
                 >
                   Cancel Game
                 </Button>
-              </XStack>
-            )}
-          </Card>
-        )}
-
-        {/* Cancelled State */}
-        {gameState.status === 'cancelled' && (
-          <Card margin="$4" padding="$4" backgroundColor="$red3">
-            <H3>Game Cancelled</H3>
-            <Text marginTop="$2" color="$gray10">
-              This game has been cancelled.
-            </Text>
-          </Card>
-        )}
-
-        {/* Cancel button during drafting (creator only) */}
-        {gameState.status === 'drafting' && isCreator && (
-          <XStack margin="$4" justifyContent="flex-end">
-            <Button
-              size="$3"
-              backgroundColor="$red10"
-              color="white"
-              onPress={() => void handleCancelGame()}
-            >
-              Cancel Game
-            </Button>
-          </XStack>
-        )}
-
-        {/* Current Turn Indicator */}
-        {gameState.status === 'drafting' && (
-          <Card
-            margin="$4"
-            padding="$4"
-            backgroundColor={isMyTurn ? '$green3' : '$gray3'}
-          >
-            <H3>
-              {isMyTurn
-                ? 'Your Turn!'
-                : `Waiting for ${currentPlayer?.playerName}...`}
-            </H3>
-          </Card>
-        )}
-
-        {/* Draft Interface (only show if it's your turn) */}
-        {isMyTurn && gameState.status === 'drafting' && (
-          <Card margin="$4" padding="$4">
-            <H3 marginBottom="$3">Make Your Pick</H3>
-
-            {/* Player Search */}
-            <YStack marginBottom="$3">
-              <Text fontWeight="bold" marginBottom="$2">
-                Baseball Player:
-              </Text>
-              <Input
-                placeholder="Search player name..."
-                value={playerSearch}
-                onChangeText={setPlayerSearch}
-                size="$4"
-              />
-              {playerSuggestions.length > 0 && (
-                <ScrollView
-                  style={{
-                    maxHeight: 200,
-                    borderWidth: 1,
-                    borderColor: '#ccc',
-                    marginTop: 8,
-                  }}
-                >
-                  {playerSuggestions.map((player) => {
-                    const isLoading = statsLoadingPlayerIds.has(player.id);
-                    const needsStats = !player.statsLastFetchedAt;
-
-                    return (
-                      <TouchableOpacity
-                        key={player.id}
-                        onPress={() => {
-                          setSelectedPlayer(player);
-                          setSelectedOption('');
-                          setPlayerSearch(
-                            `${player.firstName} ${player.lastName}`,
-                          );
-                          // Fetch available teams/seasons for this player (skip in most_teams mode)
-                          if (gameState && !isMostTeamsMode) {
-                            void fetchPlayerOptions({
-                              variables: {
-                                playerId: player.id,
-                                gameMode: gameState.gameMode,
-                                playerType: gameState.playerType,
-                              },
-                            });
-                          }
-                          // Auto-trigger stat loading if needed
-                          if (needsStats && !isLoading) {
-                            void handleTriggerStatLoading(player);
-                          }
-                        }}
-                        style={{
-                          padding: 12,
-                          borderBottomWidth: 1,
-                          borderBottomColor: '#eee',
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                        }}
-                      >
-                        <Text>
-                          {player.firstName} {player.lastName}
-                        </Text>
-                        {isLoading && (
-                          <XStack space="$1" alignItems="center">
-                            <ActivityIndicator size="small" />
-                            <Text fontSize="$2" color="$orange10">
-                              Loading stats...
-                            </Text>
-                          </XStack>
-                        )}
-                        {needsStats && !isLoading && (
-                          <Text fontSize="$2" color="$yellow10">
-                            Stats not loaded
-                          </Text>
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
               )}
             </YStack>
-
-            {/* Selected player stats loading indicator */}
-            {selectedPlayer && statsLoadingPlayerIds.has(selectedPlayer.id) && (
-              <Card backgroundColor="$orange2" padding="$3" marginBottom="$3">
-                <XStack space="$2" alignItems="center">
-                  <ActivityIndicator size="small" />
-                  <Text color="$orange10">
-                    Loading stats for {selectedPlayer.firstName}{' '}
-                    {selectedPlayer.lastName}... Please wait before making your
-                    pick.
-                  </Text>
-                </XStack>
-              </Card>
-            )}
-
-            {/* Team / Season Picker (hidden for most_teams — no selection needed) */}
-            {selectedPlayer && !isMostTeamsMode && (
-              <YStack marginBottom="$3">
-                <Text fontWeight="bold" marginBottom="$2">
-                  {isCareerTeamMode ? 'Select Team:' : 'Select Season:'}
-                </Text>
-                {playerOptions.length === 0 ? (
-                  <Text fontSize="$3" color="$gray9">
-                    {optionsLoading
-                      ? 'Loading options...'
-                      : statsLoadingPlayerIds.has(selectedPlayer.id)
-                        ? 'Loading stats — options will appear once stats are loaded'
-                        : 'No stats available for this player'}
-                  </Text>
-                ) : (
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                    <XStack space="$2" flexWrap="wrap">
-                      {playerOptions.map((option) => {
-                        const isSelected = selectedOption === option;
-                        return (
-                          <Button
-                            key={option}
-                            size="$3"
-                            marginBottom="$1"
-                            variant={isSelected ? undefined : 'outlined'}
-                            theme={isSelected ? 'active' : undefined}
-                            onPress={() => setSelectedOption(option)}
-                          >
-                            {option}
-                          </Button>
-                        );
-                      })}
-                    </XStack>
-                  </ScrollView>
-                )}
-              </YStack>
-            )}
-
-            {/* Position Selection */}
-            <YStack marginBottom="$3">
-              <Text fontWeight="bold" marginBottom="$2">
-                {isPitcherDraft ? 'Pitcher Slot:' : 'Position to Fill:'}
-              </Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <XStack space="$2">
-                  {currentPlayer?.roster
-                    .filter((slot) => !slot.isFilled)
-                    .map((slot) => {
-                      const label =
-                        slot.slotNumber > 0
-                          ? `${slot.position} ${slot.slotNumber + 1}`
-                          : slot.position;
-                      const isSelected = selectedSlotId === slot.id;
-
-                      return (
-                        <Button
-                          key={slot.id}
-                          size="$3"
-                          variant={isSelected ? undefined : 'outlined'}
-                          theme={isSelected ? 'active' : undefined}
-                          onPress={() => {
-                            setSelectedSlotId(slot.id);
-                            setSelectedPosition(slot.position);
-                          }}
-                        >
-                          {label}
-                        </Button>
-                      );
-                    })}
-                </XStack>
-              </ScrollView>
-            </YStack>
-
-            {/* Preview */}
-            {previewStatValue !== null && (
-              <Card backgroundColor="$blue2" padding="$3" marginBottom="$3">
-                <Text fontSize="$5" fontWeight="bold">
-                  Preview: {previewStatValue} {statLabel}
-                </Text>
-                {previewStatValue === 0 && (
-                  <Text fontSize="$3" color="$red10">
-                    Warning:{' '}
-                    {isMostTeamsMode
-                      ? 'Player has no recorded teams'
-                      : isPitcherDraft
-                        ? `Player had 0 ${statLabel.toLowerCase()} in this ${isCareerTeamMode ? 'franchise' : 'season'}`
-                        : `Player had no eligibility at this position in ${isCareerTeamMode ? 'this franchise' : selectedOption}, or had 0 ${statLabel.toLowerCase()}`}
-                  </Text>
-                )}
-              </Card>
-            )}
-
-            {/* Submit Button */}
-            <Button
-              size="$5"
-              backgroundColor="$green10"
-              onPress={() => void makePick()}
-              disabled={
-                !selectedPlayer ||
-                !selectedSlotId ||
-                (!isMostTeamsMode && !selectedOption) ||
-                submitting ||
-                (selectedPlayer && statsLoadingPlayerIds.has(selectedPlayer.id))
-              }
-            >
-              {submitting ? 'Making Pick...' : 'Confirm Pick'}
-            </Button>
-          </Card>
+          </XStack>
         )}
-
-        {/* Scoreboard */}
-        <Card margin="$4" padding="$4">
-          <H3 marginBottom="$3">Scoreboard</H3>
-          {[...gameState.players]
-            .sort((a, b) => b.totalScore - a.totalScore)
-            .map((player, index) => (
-              <XStack
-                key={player.id}
-                justifyContent="space-between"
-                marginBottom="$2"
-                padding="$2"
-                backgroundColor={
-                  player.userId === currentUserId ? '$blue2' : '$gray2'
-                }
-              >
-                <Text fontWeight="bold">
-                  {index + 1}. {player.playerName}
-                </Text>
-                <Text fontWeight="bold">
-                  {player.totalScore} {statLabel}
-                </Text>
-              </XStack>
-            ))}
-        </Card>
-
-        {/* Rosters */}
-        <Card margin="$4" padding="$4">
-          <H3 marginBottom="$3">Rosters</H3>
-          {gameState.players.map((player) => (
-            <YStack
-              key={player.id}
-              marginBottom="$4"
-              padding="$3"
-              backgroundColor="$gray1"
-              borderRadius="$4"
-            >
-              <XStack justifyContent="space-between" marginBottom="$2">
-                <Text fontSize="$6" fontWeight="bold">
-                  {player.playerName}
-                </Text>
-                <Text fontSize="$5" color="$blue10">
-                  {player.totalScore} {statLabel}
-                </Text>
-              </XStack>
-
-              {player.roster.map((slot) => {
-                const label =
-                  slot.slotNumber > 0
-                    ? `${slot.position} ${slot.slotNumber + 1}`
-                    : slot.position;
-
-                return (
-                  <XStack
-                    key={slot.id}
-                    justifyContent="space-between"
-                    padding="$2"
-                    marginBottom="$1"
-                    backgroundColor={slot.isFilled ? '$green2' : '$gray3'}
-                  >
-                    <Text fontWeight="600" minWidth={60}>
-                      {label}
-                    </Text>
-                    {slot.pick ? (
-                      <XStack
-                        space="$2"
-                        flex={1}
-                        justifyContent="space-between"
-                      >
-                        <Text>
-                          {slot.pick.playerName}
-                          {isMostTeamsMode
-                            ? ''
-                            : isCareerTeamMode && slot.pick.team
-                              ? ` (${slot.pick.team})`
-                              : ` (${slot.pick.season})`}
-                        </Text>
-                        <Text fontWeight="bold">
-                          {slot.pick.statValue} {statLabel}
-                        </Text>
-                      </XStack>
-                    ) : (
-                      <Text color="$gray10" fontStyle="italic">
-                        Empty
-                      </Text>
-                    )}
-                  </XStack>
-                );
-              })}
-            </YStack>
-          ))}
-        </Card>
-
-        {/* Pick History */}
-        <Card margin="$4" padding="$4">
-          <H3 marginBottom="$3">Draft History</H3>
-          {gameState.picks.map((pick) => (
-            <XStack
-              key={pick.pickNumber}
-              padding="$2"
-              marginBottom="$1"
-              backgroundColor="$gray2"
-            >
-              <Text fontWeight="600" minWidth={40}>
-                #{pick.pickNumber + 1}
-              </Text>
-              <Text flex={1}>
-                {pick.playerName} selected {pick.baseballPlayerName}
-                {isMostTeamsMode
-                  ? ''
-                  : isCareerTeamMode && pick.team
-                    ? ` (${pick.team})`
-                    : ` (${pick.season})`}
-                {!isPitcherDraft && ` @ ${pick.position}`} - {pick.statValue}{' '}
-                {statLabel}
-              </Text>
-            </XStack>
-          ))}
-          {gameState.picks.length === 0 && (
-            <Text color="$gray10" fontStyle="italic">
-              No picks yet
-            </Text>
-          )}
-        </Card>
-      </ScrollView>
-    </YStack>
+      </YStack>
+    </ScrollView>
   );
 };
+
+// ── Setup phase ──────────────────────────────────────────────────────────────
+
+interface SetupPanelProps {
+  gameState: GameState;
+  inviteUrl: string;
+  inviteCopied: boolean;
+  onCopy: () => void;
+  isCreator: boolean;
+  isStarting: boolean;
+  onStart: () => void;
+  onCancelGame: () => void;
+  currentUserId: number;
+}
+
+function SetupPanel({
+  gameState,
+  inviteUrl,
+  inviteCopied,
+  onCopy,
+  isCreator,
+  isStarting,
+  onStart,
+  onCancelGame,
+  currentUserId,
+}: SetupPanelProps): React.JSX.Element {
+  const seats = Array.from({ length: 6 }).map((_, i) => gameState.players[i]);
+
+  return (
+    <YStack
+      backgroundColor="$surfaceCard"
+      borderRadius="$4"
+      borderWidth={1}
+      borderColor="$surfacePanelBorder"
+      padding="$5"
+      gap="$4"
+    >
+      <Eyebrow>Invite Link</Eyebrow>
+      {gameState.inviteCode ? (
+        <XStack
+          gap="$2"
+          padding="$3"
+          borderRadius="$3"
+          backgroundColor="$background"
+          borderWidth={1}
+          borderColor="$surfacePanelBorder"
+          borderStyle="dashed"
+          alignItems="center"
+          flexWrap="wrap"
+        >
+          <Text
+            flex={1}
+            color="$brandGoldLight"
+            fontFamily="$mono"
+            fontSize={13}
+            numberOfLines={1}
+          >
+            {inviteUrl || `/games/season-draft/join/${gameState.inviteCode}`}
+          </Text>
+          <Button
+            size="$3"
+            backgroundColor={inviteCopied ? '$green9' : '$brandNavyLight'}
+            color="$color"
+            onPress={onCopy}
+          >
+            {inviteCopied ? '✓ Copied!' : 'Copy Link'}
+          </Button>
+        </XStack>
+      ) : (
+        <Text color="$textMuted" fontSize={13}>
+          Invite code unavailable.
+        </Text>
+      )}
+      <Paragraph color="$textMuted">
+        Share the link above. Draft starts when you're ready — minimum 2
+        players.
+      </Paragraph>
+
+      <XStack flexWrap="wrap" gap="$2">
+        {seats.map((p, i) => {
+          const isMe = p?.userId === currentUserId;
+          return (
+            <YStack
+              key={p?.id ?? `empty-${i}`}
+              alignItems="center"
+              gap="$1"
+              width={88}
+              padding="$2"
+              borderRadius="$3"
+              borderWidth={1}
+              borderStyle={p ? undefined : 'dashed'}
+              borderColor={p ? '$surfacePanelBorder' : '$surfacePanelBorder'}
+              backgroundColor={p ? '$background' : 'transparent'}
+            >
+              <Circle
+                size={36}
+                backgroundColor={
+                  p
+                    ? isMe
+                      ? '$brandGold'
+                      : '$surfacePanelBorder'
+                    : 'transparent'
+                }
+                borderWidth={p ? 0 : 1}
+                borderColor="$surfacePanelBorder"
+                borderStyle={p ? undefined : 'dashed'}
+              >
+                <Text
+                  fontWeight="800"
+                  color={p ? (isMe ? '$brandNavy' : '$color') : '$textMuted'}
+                >
+                  {p ? p.playerName.charAt(0).toUpperCase() : '+'}
+                </Text>
+              </Circle>
+              <Text
+                fontSize={11}
+                color="$textMuted"
+                numberOfLines={1}
+                textAlign="center"
+              >
+                {p ? (isMe ? 'You' : p.playerName) : 'Open'}
+              </Text>
+              {i === 0 && p && (
+                <Stack
+                  paddingHorizontal="$1.5"
+                  paddingVertical="$0.5"
+                  borderRadius={999}
+                  backgroundColor={withAlpha(BRAND_GOLD, 0.18)}
+                >
+                  <Text
+                    fontSize={9}
+                    color="$brandGoldLight"
+                    fontWeight="800"
+                    letterSpacing={1}
+                  >
+                    HOST
+                  </Text>
+                </Stack>
+              )}
+            </YStack>
+          );
+        })}
+      </XStack>
+
+      {isCreator && gameState.players.length < 2 && (
+        <Text color="$brandGoldLight" fontSize={13}>
+          You need at least 2 players to start the draft.
+        </Text>
+      )}
+      {!isCreator && (
+        <Text color="$textMuted" fontSize={13}>
+          Waiting for the game creator to start the draft.
+        </Text>
+      )}
+
+      {isCreator && (
+        <XStack gap="$2" justifyContent="flex-end">
+          <Button
+            variant="outlined"
+            borderColor="$brandSeamRed"
+            color="$brandSeamRedLight"
+            onPress={onCancelGame}
+          >
+            Cancel Game
+          </Button>
+          <Button
+            size="$4"
+            backgroundColor="$brandGold"
+            color="$brandNavy"
+            fontWeight="800"
+            disabled={isStarting || gameState.players.length < 2}
+            opacity={isStarting || gameState.players.length < 2 ? 0.5 : 1}
+            onPress={onStart}
+            pressStyle={{ backgroundColor: '$brandGoldDark' }}
+          >
+            {isStarting ? 'Starting…' : 'Start Draft →'}
+          </Button>
+        </XStack>
+      )}
+    </YStack>
+  );
+}
+
+// ── Pick UI ─────────────────────────────────────────────────────────────────
+
+interface DraftPickPanelProps {
+  gameState: GameState;
+  currentPlayer: GamePlayer | undefined;
+  isCareerTeamMode: boolean;
+  isMostTeamsMode: boolean;
+  isPitcherDraft: boolean;
+  statKeyShort: string;
+  statLabelLong: string;
+  playerSearch: string;
+  setPlayerSearch: (s: string) => void;
+  playerSuggestions: Player[];
+  statsLoadingPlayerIds: Set<number>;
+  onSelectPlayer: (p: Player) => void;
+  selectedPlayer: Player | null;
+  playerOptions: string[];
+  optionsLoading: boolean;
+  selectedOption: string;
+  setSelectedOption: (o: string) => void;
+  selectedSlotId: number | null;
+  onSelectSlot: (slot: RosterSlot) => void;
+  previewStatValue: number | null;
+  submitting: boolean;
+  canSubmit: boolean;
+  onConfirm: () => void;
+}
+
+function DraftPickPanel({
+  currentPlayer,
+  isCareerTeamMode,
+  isMostTeamsMode,
+  isPitcherDraft,
+  statKeyShort,
+  statLabelLong,
+  playerSearch,
+  setPlayerSearch,
+  playerSuggestions,
+  statsLoadingPlayerIds,
+  onSelectPlayer,
+  selectedPlayer,
+  playerOptions,
+  optionsLoading,
+  selectedOption,
+  setSelectedOption,
+  selectedSlotId,
+  onSelectSlot,
+  previewStatValue,
+  submitting,
+  canSubmit,
+  onConfirm,
+}: DraftPickPanelProps): React.JSX.Element {
+  const openSlots = (currentPlayer?.roster ?? []).filter((s) => !s.isFilled);
+
+  return (
+    <YStack
+      backgroundColor="$surfaceCard"
+      borderRadius="$4"
+      borderWidth={1}
+      borderColor="$brandGold"
+      padding="$5"
+      gap="$4"
+    >
+      <YStack gap="$1">
+        <Stack
+          alignSelf="flex-start"
+          paddingHorizontal="$2"
+          paddingVertical="$1"
+          borderRadius={999}
+          backgroundColor={withAlpha(BRAND_GOLD, 0.18)}
+        >
+          <Text
+            fontSize={11}
+            color="$brandGoldLight"
+            fontWeight="800"
+            letterSpacing={1.4}
+            textTransform="uppercase"
+          >
+            Your Turn
+          </Text>
+        </Stack>
+        <H1 color="$color" fontSize={26} fontWeight="800">
+          Make your pick.
+        </H1>
+      </YStack>
+
+      <Step n="1">
+        <FieldLabel>
+          {`Find a ${isPitcherDraft ? 'Pitcher' : 'Hitter'}`}
+        </FieldLabel>
+        <Input
+          value={playerSearch}
+          onChangeText={(t: string) => {
+            setPlayerSearch(t);
+          }}
+          placeholder="Search player name…"
+          size="$4"
+          backgroundColor="$background"
+          borderColor="$surfacePanelBorder"
+        />
+        {playerSuggestions.length > 0 && !selectedPlayer && (
+          <YStack
+            marginTop="$2"
+            backgroundColor="$background"
+            borderWidth={1}
+            borderColor="$surfacePanelBorder"
+            borderRadius="$3"
+            maxHeight={240}
+            overflow="hidden"
+          >
+            <ScrollView>
+              {playerSuggestions.map((p) => {
+                const isLoading = statsLoadingPlayerIds.has(p.id);
+                const needsStats = !p.statsLastFetchedAt;
+                return (
+                  <TouchableOpacity
+                    key={p.id}
+                    onPress={() => onSelectPlayer(p)}
+                    accessibilityRole="button"
+                  >
+                    <XStack
+                      padding="$3"
+                      gap="$2"
+                      alignItems="center"
+                      justifyContent="space-between"
+                      borderBottomWidth={1}
+                      borderBottomColor="$surfacePanelBorder"
+                    >
+                      <XStack gap="$2" alignItems="center" flex={1}>
+                        <Circle size={28} backgroundColor="$surfacePanelBorder">
+                          <Text fontSize={12} fontWeight="800" color="$color">
+                            {p.firstName.charAt(0).toUpperCase()}
+                          </Text>
+                        </Circle>
+                        <Text color="$color" fontWeight="700">
+                          {p.firstName} {p.lastName}
+                        </Text>
+                      </XStack>
+                      {isLoading && (
+                        <XStack gap="$1" alignItems="center">
+                          <Spinner size="small" color="$brandGoldLight" />
+                          <Text fontSize={11} color="$brandGoldLight">
+                            Loading…
+                          </Text>
+                        </XStack>
+                      )}
+                      {needsStats && !isLoading && (
+                        <Text fontSize={11} color="$textMuted">
+                          Stats not loaded
+                        </Text>
+                      )}
+                    </XStack>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </YStack>
+        )}
+        {selectedPlayer && statsLoadingPlayerIds.has(selectedPlayer.id) && (
+          <XStack
+            marginTop="$2"
+            padding="$2"
+            gap="$2"
+            alignItems="center"
+            borderRadius="$3"
+            backgroundColor={withAlpha(BRAND_GOLD, 0.12)}
+            borderWidth={1}
+            borderColor={withAlpha(BRAND_GOLD, 0.3)}
+          >
+            <Spinner size="small" color="$brandGoldLight" />
+            <Text color="$brandGoldLight" fontSize={13}>
+              Loading stats for {selectedPlayer.firstName}{' '}
+              {selectedPlayer.lastName}…
+            </Text>
+          </XStack>
+        )}
+      </Step>
+
+      {selectedPlayer && !isMostTeamsMode && (
+        <Step n="2">
+          <FieldLabel>
+            {isCareerTeamMode ? 'Choose a Team' : 'Choose a Season'}
+          </FieldLabel>
+          {playerOptions.length === 0 ? (
+            <Text color="$textMuted" fontSize={13}>
+              {optionsLoading
+                ? 'Loading options…'
+                : statsLoadingPlayerIds.has(selectedPlayer.id)
+                  ? 'Loading stats — options will appear once stats are loaded'
+                  : 'No stats available for this player'}
+            </Text>
+          ) : (
+            <XStack flexWrap="wrap" gap="$2">
+              {playerOptions.map((option) => (
+                <PillButton
+                  key={option}
+                  active={selectedOption === option}
+                  onPress={() => setSelectedOption(option)}
+                >
+                  {option}
+                </PillButton>
+              ))}
+            </XStack>
+          )}
+        </Step>
+      )}
+
+      {selectedPlayer && (isMostTeamsMode || selectedOption) && (
+        <Step n={isMostTeamsMode ? '2' : '3'}>
+          <FieldLabel>
+            {isPitcherDraft ? 'Assign Slot' : 'Assign Position'}
+          </FieldLabel>
+          <XStack flexWrap="wrap" gap="$2">
+            {openSlots.map((slot) => {
+              const label =
+                slot.slotNumber > 0
+                  ? `${slot.position} ${slot.slotNumber + 1}`
+                  : slot.position;
+              return (
+                <PillButton
+                  key={slot.id}
+                  active={selectedSlotId === slot.id}
+                  onPress={() => onSelectSlot(slot)}
+                >
+                  {label}
+                </PillButton>
+              );
+            })}
+          </XStack>
+        </Step>
+      )}
+
+      {selectedPlayer && previewStatValue !== null && (
+        <XStack
+          padding="$3"
+          borderRadius="$3"
+          backgroundColor={withAlpha(BRAND_GOLD, 0.1)}
+          borderWidth={1}
+          borderColor={withAlpha(BRAND_GOLD, 0.4)}
+          alignItems="center"
+          justifyContent="space-between"
+          gap="$3"
+        >
+          <YStack flex={1}>
+            <Eyebrow color="$brandGoldLight">Preview Pick</Eyebrow>
+            <Text color="$color" fontWeight="800" fontSize={18}>
+              {selectedPlayer.firstName} {selectedPlayer.lastName}
+            </Text>
+            <Text color="$textMuted" fontSize={13}>
+              {selectedOption ? `${selectedOption} · ` : ''}
+              {selectedSlotId ? `slot selected` : 'choose a slot'}
+            </Text>
+            {previewStatValue === 0 && (
+              <Text fontSize={11} color="$brandSeamRedLight" marginTop="$1">
+                Warning: stat value is 0 for this selection.
+              </Text>
+            )}
+          </YStack>
+          <YStack alignItems="flex-end">
+            <Text color="$brandGoldLight" fontWeight="800" fontSize={28}>
+              +{previewStatValue}
+            </Text>
+            <Text color="$textMuted" fontSize={11} letterSpacing={1.4}>
+              {statKeyShort}
+            </Text>
+          </YStack>
+        </XStack>
+      )}
+
+      <Button
+        size="$4"
+        backgroundColor="$brandGold"
+        color="$brandNavy"
+        fontWeight="800"
+        disabled={!canSubmit}
+        opacity={canSubmit ? 1 : 0.5}
+        onPress={onConfirm}
+        pressStyle={{ backgroundColor: '$brandGoldDark' }}
+      >
+        {submitting ? 'Locking Pick…' : `Confirm Pick · ${statLabelLong}`}
+      </Button>
+    </YStack>
+  );
+}
+
+// ── Waiting ─────────────────────────────────────────────────────────────────
+
+function WaitingPanel({
+  activeName,
+}: {
+  activeName: string;
+}): React.JSX.Element {
+  return (
+    <YStack
+      backgroundColor="$surfaceCard"
+      borderRadius="$4"
+      borderWidth={1}
+      borderColor="$surfacePanelBorder"
+      padding="$5"
+      gap="$2"
+      alignItems="center"
+    >
+      <Spinner size="large" color="$brandGoldLight" />
+      <Eyebrow>Waiting</Eyebrow>
+      <H3 color="$color">{activeName} is picking…</H3>
+      <Paragraph color="$textMuted" textAlign="center">
+        You'll be up next. In the meantime, scout who's left on the board.
+      </Paragraph>
+    </YStack>
+  );
+}
+
+// ── Rosters ─────────────────────────────────────────────────────────────────
+
+interface RostersCardProps {
+  gameState: GameState;
+  statKeyShort: string;
+  isMostTeamsMode: boolean;
+  isCareerTeamMode: boolean;
+  meId: number | undefined;
+}
+
+function RostersCard({
+  gameState,
+  statKeyShort,
+  isMostTeamsMode,
+  isCareerTeamMode,
+  meId,
+}: RostersCardProps): React.JSX.Element {
+  return (
+    <YStack
+      backgroundColor="$surfaceCard"
+      borderRadius="$4"
+      borderWidth={1}
+      borderColor="$surfacePanelBorder"
+      padding="$4"
+      gap="$3"
+    >
+      <CardHead
+        title="Rosters"
+        trailing={`${gameState.players.length} teams`}
+      />
+      <YStack gap="$3">
+        {gameState.players.map((p) => {
+          const isMe = p.id === meId;
+          return (
+            <YStack
+              key={p.id}
+              padding="$3"
+              borderRadius="$3"
+              borderWidth={1}
+              borderColor={isMe ? '$brandGold' : '$surfacePanelBorder'}
+              backgroundColor={
+                isMe ? withAlpha(BRAND_GOLD, 0.06) : '$background'
+              }
+              gap="$2"
+            >
+              <XStack justifyContent="space-between" alignItems="center">
+                <Text fontWeight="800" color="$color">
+                  {isMe ? 'You' : p.playerName}
+                </Text>
+                <Text color="$brandGoldLight" fontWeight="800">
+                  {p.totalScore}{' '}
+                  <Text color="$textMuted" fontWeight="600" fontSize={11}>
+                    {statKeyShort}
+                  </Text>
+                </Text>
+              </XStack>
+              <YStack gap="$1">
+                {p.roster.map((slot) => {
+                  const label =
+                    slot.slotNumber > 0
+                      ? `${slot.position} ${slot.slotNumber + 1}`
+                      : slot.position;
+                  return (
+                    <XStack
+                      key={slot.id}
+                      gap="$2"
+                      alignItems="center"
+                      paddingVertical="$1.5"
+                      paddingHorizontal="$2"
+                      borderRadius="$2"
+                      backgroundColor={
+                        slot.isFilled ? '$surfaceCard' : 'transparent'
+                      }
+                    >
+                      <Stack
+                        minWidth={36}
+                        paddingHorizontal="$1.5"
+                        paddingVertical="$0.5"
+                        borderRadius="$2"
+                        backgroundColor={
+                          slot.isFilled
+                            ? withAlpha(BRAND_GOLD, 0.18)
+                            : '$surfacePanelBorder'
+                        }
+                      >
+                        <Text
+                          fontSize={11}
+                          color={
+                            slot.isFilled ? '$brandGoldLight' : '$textMuted'
+                          }
+                          fontWeight="800"
+                          textAlign="center"
+                          letterSpacing={1}
+                        >
+                          {label}
+                        </Text>
+                      </Stack>
+                      {slot.pick ? (
+                        <XStack
+                          flex={1}
+                          justifyContent="space-between"
+                          gap="$2"
+                        >
+                          <YStack flex={1}>
+                            <Text color="$color" numberOfLines={1}>
+                              {slot.pick.playerName}
+                            </Text>
+                            <Text color="$textMuted" fontSize={11}>
+                              {isMostTeamsMode
+                                ? ''
+                                : isCareerTeamMode && slot.pick.team
+                                  ? slot.pick.team
+                                  : slot.pick.season}
+                            </Text>
+                          </YStack>
+                          <Text color="$color" fontWeight="700">
+                            {slot.pick.statValue}
+                          </Text>
+                        </XStack>
+                      ) : (
+                        <Text
+                          color="$textMuted"
+                          fontStyle="italic"
+                          fontSize={12}
+                        >
+                          Empty
+                        </Text>
+                      )}
+                    </XStack>
+                  );
+                })}
+              </YStack>
+            </YStack>
+          );
+        })}
+      </YStack>
+    </YStack>
+  );
+}
+
+// ── Scoreboard ──────────────────────────────────────────────────────────────
+
+interface ScoreboardProps {
+  gameState: GameState;
+  statKeyShort: string;
+  meId: number | undefined;
+}
+
+function ScoreboardCard({
+  gameState,
+  statKeyShort,
+  meId,
+}: ScoreboardProps): React.JSX.Element {
+  const sorted = [...gameState.players].sort(
+    (a, b) => b.totalScore - a.totalScore,
+  );
+  const max = sorted[0]?.totalScore ?? 1;
+  return (
+    <YStack
+      backgroundColor="$surfaceCard"
+      borderRadius="$4"
+      borderWidth={1}
+      borderColor="$surfacePanelBorder"
+      padding="$4"
+      gap="$3"
+    >
+      <CardHead title="Scoreboard" trailing="Live" />
+      <YStack gap="$2">
+        {sorted.map((p, i) => {
+          const isMe = p.id === meId;
+          const pct = max > 0 ? (p.totalScore / max) * 100 : 0;
+          return (
+            <XStack
+              key={p.id}
+              alignItems="center"
+              gap="$2"
+              padding="$2"
+              borderRadius="$2"
+              backgroundColor={
+                isMe ? withAlpha(BRAND_GOLD, 0.1) : 'transparent'
+              }
+            >
+              <Text
+                color={i === 0 ? '$brandGoldLight' : '$textMuted'}
+                fontWeight="800"
+                width={18}
+              >
+                {i + 1}
+              </Text>
+              <Text color="$color" fontWeight="700" flex={1}>
+                {isMe ? 'You' : p.playerName}
+              </Text>
+              <YStack flex={1.2} gap="$1">
+                <Stack
+                  height={3}
+                  borderRadius={999}
+                  backgroundColor="$surfacePanelBorder"
+                  overflow="hidden"
+                >
+                  <Stack
+                    height="100%"
+                    width={`${Math.max(2, pct)}%`}
+                    backgroundColor={i === 0 ? '$brandGold' : '$brandNavyLight'}
+                  />
+                </Stack>
+              </YStack>
+              <Text
+                color="$color"
+                fontWeight="800"
+                minWidth={36}
+                textAlign="right"
+              >
+                {p.totalScore}
+              </Text>
+              <Text color="$textMuted" fontSize={11}>
+                {statKeyShort}
+              </Text>
+            </XStack>
+          );
+        })}
+      </YStack>
+    </YStack>
+  );
+}
+
+// ── History ─────────────────────────────────────────────────────────────────
+
+interface HistoryProps {
+  gameState: GameState;
+  statKeyShort: string;
+  isMostTeamsMode: boolean;
+  isCareerTeamMode: boolean;
+  meName: string | undefined;
+}
+
+function HistoryCard({
+  gameState,
+  statKeyShort,
+  isMostTeamsMode,
+  isCareerTeamMode,
+  meName,
+}: HistoryProps): React.JSX.Element {
+  const recent = [...gameState.picks].slice().reverse().slice(0, 8);
+  return (
+    <YStack
+      backgroundColor="$surfaceCard"
+      borderRadius="$4"
+      borderWidth={1}
+      borderColor="$surfacePanelBorder"
+      padding="$4"
+      gap="$3"
+    >
+      <CardHead title="Picks" trailing={`${gameState.picks.length} made`} />
+      <YStack gap="$2">
+        {recent.length === 0 && (
+          <Text color="$textMuted" fontStyle="italic" fontSize={13}>
+            No picks yet
+          </Text>
+        )}
+        {recent.map((h) => {
+          const isMe = meName != null && h.playerName === meName;
+          return (
+            <XStack
+              key={h.pickNumber}
+              alignItems="center"
+              gap="$2"
+              padding="$2"
+              borderRadius="$2"
+              backgroundColor={
+                isMe ? withAlpha(BRAND_GOLD, 0.1) : 'transparent'
+              }
+            >
+              <Text color="$textMuted" fontWeight="800" width={28}>
+                {String(h.pickNumber + 1).padStart(2, '0')}
+              </Text>
+              <YStack flex={1}>
+                <Text color="$color" fontWeight="700" numberOfLines={1}>
+                  {h.baseballPlayerName}
+                </Text>
+                <Text color="$textMuted" fontSize={11} numberOfLines={1}>
+                  {isMe ? 'You' : h.playerName} ·{' '}
+                  {isMostTeamsMode
+                    ? '—'
+                    : isCareerTeamMode && h.team
+                      ? h.team
+                      : h.season}{' '}
+                  · {h.position}
+                </Text>
+              </YStack>
+              <Text color="$brandGoldLight" fontWeight="800">
+                +{h.statValue}{' '}
+                <Text color="$textMuted" fontWeight="600" fontSize={10}>
+                  {statKeyShort}
+                </Text>
+              </Text>
+            </XStack>
+          );
+        })}
+      </YStack>
+    </YStack>
+  );
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+function Eyebrow({
+  children,
+  color = '$textMuted',
+}: {
+  children: React.ReactNode;
+  color?: string;
+}): React.JSX.Element {
+  return (
+    <Text
+      fontSize={11}
+      letterSpacing={1.6}
+      textTransform="uppercase"
+      color={color}
+      fontWeight="700"
+    >
+      {children}
+    </Text>
+  );
+}
+
+function StatChip({
+  children,
+}: {
+  children: React.ReactNode;
+}): React.JSX.Element {
+  return (
+    <Stack
+      paddingHorizontal="$2"
+      paddingVertical="$1"
+      backgroundColor={withAlpha(BRAND_GOLD, 0.14)}
+      borderWidth={1}
+      borderColor={withAlpha(BRAND_GOLD, 0.4)}
+      borderRadius="$2"
+    >
+      <Text
+        fontSize={11}
+        color="$brandGoldLight"
+        fontWeight="800"
+        letterSpacing={1}
+      >
+        {children}
+      </Text>
+    </Stack>
+  );
+}
+
+function FieldLabel({
+  children,
+}: {
+  children: React.ReactNode;
+}): React.JSX.Element {
+  return (
+    <Text
+      fontSize={11}
+      color="$textMuted"
+      letterSpacing={1.4}
+      textTransform="uppercase"
+      fontWeight="700"
+    >
+      {children}
+    </Text>
+  );
+}
+
+function Step({
+  n,
+  children,
+}: {
+  n: string;
+  children: React.ReactNode;
+}): React.JSX.Element {
+  return (
+    <XStack gap="$3" alignItems="flex-start">
+      <Circle size={26} backgroundColor="$brandGold">
+        <Text fontWeight="800" color="$brandNavy" fontSize={13}>
+          {n}
+        </Text>
+      </Circle>
+      <YStack flex={1} gap="$2">
+        {children}
+      </YStack>
+    </XStack>
+  );
+}
+
+function PillButton({
+  active,
+  onPress,
+  children,
+}: {
+  active: boolean;
+  onPress: () => void;
+  children: React.ReactNode;
+}): React.JSX.Element {
+  return (
+    <Button
+      size="$3"
+      backgroundColor={active ? '$brandGold' : 'transparent'}
+      color={active ? '$brandNavy' : '$color'}
+      borderWidth={1}
+      borderColor={active ? '$brandGold' : '$surfacePanelBorder'}
+      fontWeight="800"
+      onPress={onPress}
+      hoverStyle={{ borderColor: '$brandGoldLight' }}
+    >
+      {children}
+    </Button>
+  );
+}
+
+function CardHead({
+  title,
+  trailing,
+}: {
+  title: string;
+  trailing?: string;
+}): React.JSX.Element {
+  return (
+    <XStack alignItems="baseline" justifyContent="space-between" gap="$2">
+      <Text fontSize={16} fontWeight="800" color="$color">
+        {title}
+      </Text>
+      {trailing && (
+        <Text fontSize={11} color="$textMuted" letterSpacing={1.2}>
+          {trailing}
+        </Text>
+      )}
+    </XStack>
+  );
+}
 
 export default SeasonDraftGame;

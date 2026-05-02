@@ -3185,11 +3185,14 @@ type SeasonDraftGame {
 Basic info about a Season Draft Game for the join page
 """
 type SeasonDraftGameLobbyInfo {
+  creatorName: String
   gameMode: SeasonDraftGameMode
   id: Int
+  maxPlayers: Int
   name: String
   playerCount: Int
   playerType: SeasonDraftPlayerType
+  players: [SeasonDraftLobbyPlayer!]!
   statKey: String
   status: SeasonDraftGameStatus
 }
@@ -3233,10 +3236,24 @@ type SeasonDraftGameSummary {
   id: Int
   inviteCode: String
   isMyTurn: Boolean
+  maxPlayers: Int
   name: String
+  picksMade: Int
+  playerCount: Int
   playerType: SeasonDraftPlayerType
+  players: [SeasonDraftLobbyPlayer!]!
   statKey: String
   status: SeasonDraftGameStatus
+  totalPicks: Int
+  winnerName: String
+}
+
+"""
+Lightweight player entry for lobby/join displays
+"""
+type SeasonDraftLobbyPlayer {
+  id: Int!
+  playerName: String!
 }
 
 """

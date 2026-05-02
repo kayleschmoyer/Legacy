@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { LOGGER } from '@legacy-sports/logging';
 import { randomBytes } from 'crypto';
 import * as PublicSchema from '../../drizzle/public/schema';
@@ -17,6 +17,15 @@ import type { PublicDb } from '../client/PublicDbClient';
  *   or most_teams (COUNT(DISTINCT team))
  * - Hitter or pitcher drafts with different roster layouts
  */
+
+/**
+ * Hard cap on participants per Season Draft Game. Enforced both by
+ * `createGame` validation and by the lobby/join displays that show
+ * "X / 6 joined" seat strips. The `season_draft_games.numPlayers`
+ * column tracks the current joined count and is mutated as players
+ * join — it does NOT represent the cap.
+ */
+export const SEASON_DRAFT_MAX_PLAYERS = 6;
 
 /** Valid stat keys for hitter drafts */
 export const HITTER_STAT_KEYS = [
@@ -111,8 +120,10 @@ export class SeasonDraftGameService {
     db: PublicDb,
     params: CreateSeasonDraftGameParams,
   ): Promise<number> {
-    if (params.numPlayers < 1 || params.numPlayers > 6) {
-      throw new Error('Number of players must be between 1 and 6');
+    if (params.numPlayers < 1 || params.numPlayers > SEASON_DRAFT_MAX_PLAYERS) {
+      throw new Error(
+        `Number of players must be between 1 and ${SEASON_DRAFT_MAX_PLAYERS}`,
+      );
     }
 
     if (params.playerNames.length !== params.numPlayers) {
@@ -363,6 +374,9 @@ export class SeasonDraftGameService {
     gameMode: string;
     playerType: string;
     playerCount: number;
+    maxPlayers: number;
+    creatorName: string;
+    players: Array<{ id: number; playerName: string }>;
   } | null> {
     const [game] = await db
       .select()
@@ -372,6 +386,19 @@ export class SeasonDraftGameService {
 
     if (!game) return null;
 
+    const joinedPlayers = await db
+      .select({
+        id: PublicSchema.seasonDraftPlayers.id,
+        playerName: PublicSchema.seasonDraftPlayers.playerName,
+        userId: PublicSchema.seasonDraftPlayers.userId,
+        draftOrder: PublicSchema.seasonDraftPlayers.draftOrder,
+      })
+      .from(PublicSchema.seasonDraftPlayers)
+      .where(eq(PublicSchema.seasonDraftPlayers.gameId, game.id))
+      .orderBy(PublicSchema.seasonDraftPlayers.draftOrder);
+
+    const creator = joinedPlayers.find((p) => p.userId === game.createdBy);
+
     return {
       id: game.id,
       name: game.name,
@@ -379,7 +406,13 @@ export class SeasonDraftGameService {
       statKey: game.statKey,
       gameMode: game.gameMode,
       playerType: game.playerType,
-      playerCount: game.numPlayers,
+      playerCount: joinedPlayers.length,
+      maxPlayers: SEASON_DRAFT_MAX_PLAYERS,
+      creatorName: creator?.playerName ?? joinedPlayers[0]?.playerName ?? '',
+      players: joinedPlayers.map((p) => ({
+        id: p.id,
+        playerName: p.playerName,
+      })),
     };
   }
 
@@ -1041,6 +1074,12 @@ export class SeasonDraftGameService {
       playerType: string;
       isMyTurn: boolean;
       inviteCode: string | null;
+      playerCount: number;
+      maxPlayers: number;
+      picksMade: number;
+      totalPicks: number;
+      winnerName: string | null;
+      players: Array<{ id: number; playerName: string }>;
     }>
   > {
     const games = await db
@@ -1066,15 +1105,97 @@ export class SeasonDraftGameService {
       .where(eq(PublicSchema.seasonDraftPlayers.userId, userId))
       .orderBy(desc(PublicSchema.seasonDraftGames.createdAt));
 
-    return games.map((g) => ({
-      id: g.gameId,
-      name: g.gameName,
-      status: g.gameStatus,
-      statKey: g.statKey,
-      gameMode: g.gameMode,
-      playerType: g.playerType,
-      isMyTurn: g.currentTurn === g.draftOrder,
-      inviteCode: g.inviteCode ?? null,
-    }));
+    if (games.length === 0) return [];
+
+    // Batch all per-game enrichment into three grouped queries to avoid
+    // an N+1 pattern as users accumulate games (LS-4128 review).
+    const gameIds = games.map((g) => g.gameId);
+
+    const allPlayers = await db
+      .select({
+        id: PublicSchema.seasonDraftPlayers.id,
+        gameId: PublicSchema.seasonDraftPlayers.gameId,
+        playerName: PublicSchema.seasonDraftPlayers.playerName,
+        totalScore: PublicSchema.seasonDraftPlayers.totalScore,
+        draftOrder: PublicSchema.seasonDraftPlayers.draftOrder,
+      })
+      .from(PublicSchema.seasonDraftPlayers)
+      .where(inArray(PublicSchema.seasonDraftPlayers.gameId, gameIds))
+      .orderBy(PublicSchema.seasonDraftPlayers.draftOrder);
+
+    const playersByGame = new Map<number, typeof allPlayers>();
+    for (const p of allPlayers) {
+      const list = playersByGame.get(p.gameId);
+      if (list) list.push(p);
+      else playersByGame.set(p.gameId, [p]);
+    }
+
+    const pickCounts = await db
+      .select({
+        gameId: PublicSchema.seasonDraftPicks.gameId,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(PublicSchema.seasonDraftPicks)
+      .where(inArray(PublicSchema.seasonDraftPicks.gameId, gameIds))
+      .groupBy(PublicSchema.seasonDraftPicks.gameId);
+    const pickCountByGame = new Map(
+      pickCounts.map((row) => [row.gameId, row.count]),
+    );
+
+    const allPlayerIds = allPlayers.map((p) => p.id);
+    const slotRows = allPlayerIds.length
+      ? await db
+          .select({
+            seasonDraftPlayerId:
+              PublicSchema.seasonDraftRosterSlots.seasonDraftPlayerId,
+            count: sql<number>`count(*)::int`,
+          })
+          .from(PublicSchema.seasonDraftRosterSlots)
+          .where(
+            inArray(
+              PublicSchema.seasonDraftRosterSlots.seasonDraftPlayerId,
+              allPlayerIds,
+            ),
+          )
+          .groupBy(PublicSchema.seasonDraftRosterSlots.seasonDraftPlayerId)
+      : [];
+    const slotCountByPlayer = new Map(
+      slotRows.map((row) => [row.seasonDraftPlayerId, row.count]),
+    );
+
+    return games.map((g) => {
+      const players = playersByGame.get(g.gameId) ?? [];
+      const pickCount = pickCountByGame.get(g.gameId) ?? 0;
+      const slotCount = players.reduce(
+        (sum, p) => sum + (slotCountByPlayer.get(p.id) ?? 0),
+        0,
+      );
+      const winner =
+        g.gameStatus === 'completed' && players.length > 0
+          ? players.reduce((best, p) =>
+              p.totalScore > best.totalScore ? p : best,
+            )
+          : null;
+
+      return {
+        id: g.gameId,
+        name: g.gameName,
+        status: g.gameStatus,
+        statKey: g.statKey,
+        gameMode: g.gameMode,
+        playerType: g.playerType,
+        isMyTurn: g.currentTurn === g.draftOrder,
+        inviteCode: g.inviteCode ?? null,
+        playerCount: players.length,
+        maxPlayers: SEASON_DRAFT_MAX_PLAYERS,
+        picksMade: pickCount,
+        totalPicks: slotCount,
+        winnerName: winner?.playerName ?? null,
+        players: players.map((p) => ({
+          id: p.id,
+          playerName: p.playerName,
+        })),
+      };
+    });
   }
 }

@@ -8,16 +8,19 @@
 export { SeasonDraftGame } from './SeasonDraftGame';
 export { SeasonDraftGameCreate } from './SeasonDraftGameCreate';
 export { SeasonDraftGameLobby } from './SeasonDraftGameLobby';
+export { SeasonDraftJoin } from './SeasonDraftJoin';
 
 // Re-export generated hooks and types for consumers
 export {
   useGetSeasonDraftGameQuery,
   useGetSeasonDraftGameLazyQuery,
   useGetSeasonDraftGamesQuery,
+  useGetSeasonDraftGameByInviteCodeQuery,
   useGetSeasonDraftGameStatValueLazyQuery,
   useSearchPlayersForDraftLazyQuery,
   useSearchUsersForDraftLazyQuery,
   useCreateSeasonDraftGameMutation,
+  useJoinSeasonDraftGameMutation,
   useStartSeasonDraftGameMutation,
   useMakeSeasonDraftPickMutation,
   useCancelSeasonDraftGameMutation,

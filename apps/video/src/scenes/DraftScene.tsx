@@ -30,23 +30,101 @@ import {
 
 // Storyboard: Round 4 · Pick 41 — available player pool (top 8)
 const AVAILABLE = [
-  { pos: 'P', name: 'Pedro Martínez', sub: '2000 · Boston Red Sox', val: '98.4', posColor: POS_PITCHER },
-  { pos: 'OF', name: 'Ted Williams', sub: '1941 · Boston Red Sox', val: '96.2', posColor: POS_OUTFIELD },
-  { pos: 'SS', name: 'Honus Wagner', sub: '1908 · Pittsburgh Pirates', val: '94.7', posColor: POS_INFIELD },
-  { pos: 'C', name: 'Johnny Bench', sub: '1972 · Cincinnati Reds', val: '93.1', posColor: POS_CATCHER },
-  { pos: 'P', name: 'Sandy Koufax', sub: '1965 · LA Dodgers', val: '92.8', posColor: POS_PITCHER },
-  { pos: '2B', name: 'Joe Morgan', sub: '1976 · Cincinnati Reds', val: '91.3', posColor: POS_INFIELD },
-  { pos: 'CF', name: 'Willie Mays', sub: '1965 · SF Giants', val: '90.6', posColor: POS_OUTFIELD },
-  { pos: 'UT', name: 'Rickey Henderson', sub: "1990 · Oakland A's", val: '89.4', posColor: POS_UTILITY },
+  {
+    pos: 'P',
+    name: 'Pedro Martínez',
+    sub: '2000 · Boston Red Sox',
+    val: '98.4',
+    posColor: POS_PITCHER,
+  },
+  {
+    pos: 'OF',
+    name: 'Ted Williams',
+    sub: '1941 · Boston Red Sox',
+    val: '96.2',
+    posColor: POS_OUTFIELD,
+  },
+  {
+    pos: 'SS',
+    name: 'Honus Wagner',
+    sub: '1908 · Pittsburgh Pirates',
+    val: '94.7',
+    posColor: POS_INFIELD,
+  },
+  {
+    pos: 'C',
+    name: 'Johnny Bench',
+    sub: '1972 · Cincinnati Reds',
+    val: '93.1',
+    posColor: POS_CATCHER,
+  },
+  {
+    pos: 'P',
+    name: 'Sandy Koufax',
+    sub: '1965 · LA Dodgers',
+    val: '92.8',
+    posColor: POS_PITCHER,
+  },
+  {
+    pos: '2B',
+    name: 'Joe Morgan',
+    sub: '1976 · Cincinnati Reds',
+    val: '91.3',
+    posColor: POS_INFIELD,
+  },
+  {
+    pos: 'CF',
+    name: 'Willie Mays',
+    sub: '1965 · SF Giants',
+    val: '90.6',
+    posColor: POS_OUTFIELD,
+  },
+  {
+    pos: 'UT',
+    name: 'Rickey Henderson',
+    sub: "1990 · Oakland A's",
+    val: '89.4',
+    posColor: POS_UTILITY,
+  },
 ];
 
 // Storyboard: Recent picks (pick log, most recent first)
 const PICK_LOG = [
-  { pick: '4.40', pos: 'OF', posColor: POS_OUTFIELD, name: "Hank Aaron, '57", team: 'Bronx Bombers' },
-  { pick: '4.39', pos: 'P', posColor: POS_PITCHER, name: "Greg Maddux, '95", team: 'Diamond Cutters' },
-  { pick: '4.38', pos: '3B', posColor: POS_INFIELD, name: "Mike Schmidt, '80", team: 'Liberty Bells' },
-  { pick: '4.37', pos: 'C', posColor: POS_CATCHER, name: "Yogi Berra, '54", team: 'River Avenue' },
-  { pick: '4.36', pos: '1B', posColor: POS_INFIELD, name: "Lou Gehrig, '36", team: 'Iron Horsemen' },
+  {
+    pick: '4.40',
+    pos: 'OF',
+    posColor: POS_OUTFIELD,
+    name: "Hank Aaron, '57",
+    team: 'Bronx Bombers',
+  },
+  {
+    pick: '4.39',
+    pos: 'P',
+    posColor: POS_PITCHER,
+    name: "Greg Maddux, '95",
+    team: 'Diamond Cutters',
+  },
+  {
+    pick: '4.38',
+    pos: '3B',
+    posColor: POS_INFIELD,
+    name: "Mike Schmidt, '80",
+    team: 'Liberty Bells',
+  },
+  {
+    pick: '4.37',
+    pos: 'C',
+    posColor: POS_CATCHER,
+    name: "Yogi Berra, '54",
+    team: 'River Avenue',
+  },
+  {
+    pick: '4.36',
+    pos: '1B',
+    posColor: POS_INFIELD,
+    name: "Lou Gehrig, '36",
+    team: 'Iron Horsemen',
+  },
 ];
 
 const ACTIVE_TEAM = 'The Old Guard';
@@ -171,7 +249,8 @@ export const DraftScene: React.FC = () => {
             borderRadius: 16,
             background: SURFACE_CARD,
             border: `1px solid ${BRAND_SEAM_RED}`,
-            boxShadow: '0 0 0 1px rgba(196,30,58,0.45), 0 6px 20px rgba(196,30,58,0.3)',
+            boxShadow:
+              '0 0 0 1px rgba(196,30,58,0.45), 0 6px 20px rgba(196,30,58,0.3)',
           }}
         >
           <div>
@@ -420,7 +499,8 @@ export const DraftScene: React.FC = () => {
               alignItems: 'center',
               gap: 14,
               padding: '12px 10px',
-              background: 'linear-gradient(90deg, rgba(196,30,58,0.18), transparent 80%)',
+              background:
+                'linear-gradient(90deg, rgba(196,30,58,0.18), transparent 80%)',
               borderRadius: 8,
               marginBottom: 4,
             }}
@@ -488,7 +568,10 @@ export const DraftScene: React.FC = () => {
                   alignItems: 'center',
                   gap: 14,
                   padding: '12px 0',
-                  borderBottom: i < PICK_LOG.length - 1 ? `1px solid ${OUTLINE_SUBTLE}` : 'none',
+                  borderBottom:
+                    i < PICK_LOG.length - 1
+                      ? `1px solid ${OUTLINE_SUBTLE}`
+                      : 'none',
                   opacity: pickOpacity,
                 }}
               >

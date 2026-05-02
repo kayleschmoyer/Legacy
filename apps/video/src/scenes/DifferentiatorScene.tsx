@@ -26,8 +26,14 @@ const NORMAL_POINTS = [
 ];
 
 const LEGACY_POINTS = [
-  { text: 'Draft any player, any era — 1876 → today', bold: 'any player, any era' },
-  { text: 'Scored on real archived box scores', bold: 'real archived box scores' },
+  {
+    text: 'Draft any player, any era — 1876 → today',
+    bold: 'any player, any era',
+  },
+  {
+    text: 'Scored on real archived box scores',
+    bold: 'real archived box scores',
+  },
   { text: 'No live-game dependency, no rainouts', bold: null },
   { text: 'Play year-round, at your own pace', bold: 'year-round' },
 ];
@@ -74,10 +80,7 @@ export const DifferentiatorScene: React.FC = () => {
     extrapolateRight: 'clamp',
   });
 
-  function renderPoints(
-    points: typeof NORMAL_POINTS,
-    isLegacy: boolean,
-  ) {
+  function renderPoints(points: typeof NORMAL_POINTS, isLegacy: boolean) {
     return points.map((p, i) => {
       const delay = isLegacy ? 22 + i * 8 : 15 + i * 8;
       const itemOpacity = interpolate(frame, [delay, delay + 15], [0, 1], {
@@ -91,9 +94,7 @@ export const DifferentiatorScene: React.FC = () => {
           })
         : 0;
 
-      const parts = p.bold
-        ? p.text.split(p.bold)
-        : [p.text];
+      const parts = p.bold ? p.text.split(p.bold) : [p.text];
 
       return (
         <div
@@ -130,7 +131,12 @@ export const DifferentiatorScene: React.FC = () => {
             {p.bold && parts.length === 2 ? (
               <>
                 {parts[0]}
-                <b style={{ color: isLegacy ? TEXT_PRIMARY : TEXT_MUTED, fontWeight: 600 }}>
+                <b
+                  style={{
+                    color: isLegacy ? TEXT_PRIMARY : TEXT_MUTED,
+                    fontWeight: 600,
+                  }}
+                >
                   {p.bold}
                 </b>
                 {parts[1]}

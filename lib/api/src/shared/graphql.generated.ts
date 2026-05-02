@@ -3282,11 +3282,14 @@ export type SeasonDraftGame = {
 /** Basic info about a Season Draft Game for the join page */
 export type SeasonDraftGameLobbyInfo = {
   __typename?: 'SeasonDraftGameLobbyInfo';
+  creatorName?: Maybe<Scalars['String']['output']>;
   gameMode?: Maybe<SeasonDraftGameMode>;
   id?: Maybe<Scalars['Int']['output']>;
+  maxPlayers?: Maybe<Scalars['Int']['output']>;
   name?: Maybe<Scalars['String']['output']>;
   playerCount?: Maybe<Scalars['Int']['output']>;
   playerType?: Maybe<SeasonDraftPlayerType>;
+  players: Array<SeasonDraftLobbyPlayer>;
   statKey?: Maybe<Scalars['String']['output']>;
   status?: Maybe<SeasonDraftGameStatus>;
 };
@@ -3326,10 +3329,23 @@ export type SeasonDraftGameSummary = {
   id?: Maybe<Scalars['Int']['output']>;
   inviteCode?: Maybe<Scalars['String']['output']>;
   isMyTurn?: Maybe<Scalars['Boolean']['output']>;
+  maxPlayers?: Maybe<Scalars['Int']['output']>;
   name?: Maybe<Scalars['String']['output']>;
+  picksMade?: Maybe<Scalars['Int']['output']>;
+  playerCount?: Maybe<Scalars['Int']['output']>;
   playerType?: Maybe<SeasonDraftPlayerType>;
+  players: Array<SeasonDraftLobbyPlayer>;
   statKey?: Maybe<Scalars['String']['output']>;
   status?: Maybe<SeasonDraftGameStatus>;
+  totalPicks?: Maybe<Scalars['Int']['output']>;
+  winnerName?: Maybe<Scalars['String']['output']>;
+};
+
+/** Lightweight player entry for lobby/join displays */
+export type SeasonDraftLobbyPlayer = {
+  __typename?: 'SeasonDraftLobbyPlayer';
+  id: Scalars['Int']['output'];
+  playerName: Scalars['String']['output'];
 };
 
 /** A completed draft pick with player and scoring info */

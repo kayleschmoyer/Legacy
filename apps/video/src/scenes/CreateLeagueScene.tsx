@@ -27,7 +27,14 @@ const FieldInput: React.FC<{ label: string; value: string }> = ({
   label,
   value,
 }) => (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 22 }}>
+  <div
+    style={{
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 8,
+      marginBottom: 22,
+    }}
+  >
     <div
       style={{
         fontFamily: FONT_DISPLAY,
@@ -140,7 +147,14 @@ const Step1: React.FC = () => (
 
 const Step2: React.FC = () => (
   <>
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 22 }}>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
+        marginBottom: 22,
+      }}
+    >
       <div
         style={{
           fontFamily: FONT_DISPLAY,
@@ -154,11 +168,16 @@ const Step2: React.FC = () => (
         Eras Included
       </div>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-        {['Dead-ball', 'Live-ball', 'Integration', 'Expansion', 'Steroid', 'Modern'].map(
-          (era) => (
-            <Chip key={era} label={era} on />
-          ),
-        )}
+        {[
+          'Dead-ball',
+          'Live-ball',
+          'Integration',
+          'Expansion',
+          'Steroid',
+          'Modern',
+        ].map((era) => (
+          <Chip key={era} label={era} on />
+        ))}
       </div>
     </div>
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -184,7 +203,14 @@ const Step2: React.FC = () => (
 
 const Step3: React.FC = () => (
   <>
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 22 }}>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
+        marginBottom: 22,
+      }}
+    >
       <div
         style={{
           fontFamily: FONT_DISPLAY,
@@ -313,8 +339,7 @@ export const CreateLeagueScene: React.FC = () => {
             margin: 0,
           }}
         >
-          Your league.{' '}
-          <span style={{ color: BRAND_GOLD }}>Your rules.</span>
+          Your league. <span style={{ color: BRAND_GOLD }}>Your rules.</span>
         </h2>
       </div>
 
@@ -372,8 +397,7 @@ export const CreateLeagueScene: React.FC = () => {
                   marginBottom: 0,
                 }}
               >
-                {step.num}{' '}
-                <span style={{ color: '#6C80BA' }}>/ 03</span>
+                {step.num} <span style={{ color: '#6C80BA' }}>/ 03</span>
               </div>
 
               {/* Title */}

@@ -8,5 +8,11 @@ query GetSeasonDraftGameByInviteCode($inviteCode: String!) {
     gameMode
     playerType
     playerCount
+    maxPlayers
+    creatorName
+    players {
+      id
+      playerName
+    }
   }
 }

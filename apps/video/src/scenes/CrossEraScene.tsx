@@ -90,12 +90,12 @@ const TIMELINE_TICKS = [
   { year: '2019', pos: 92, accent: POS_INFIELD },
 ];
 
-const EraPlayerCard: React.FC<{ player: PlayerCardData; frame: number; delay: number; fps: number }> = ({
-  player,
-  frame,
-  delay,
-  fps,
-}) => {
+const EraPlayerCard: React.FC<{
+  player: PlayerCardData;
+  frame: number;
+  delay: number;
+  fps: number;
+}> = ({ player, frame, delay, fps }) => {
   const cardY = spring({
     frame: frame - delay,
     fps,

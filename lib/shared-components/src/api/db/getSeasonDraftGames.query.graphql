@@ -8,5 +8,15 @@ query GetSeasonDraftGames {
     gameMode
     playerType
     isMyTurn
+    inviteCode
+    playerCount
+    maxPlayers
+    picksMade
+    totalPicks
+    winnerName
+    players {
+      id
+      playerName
+    }
   }
 }

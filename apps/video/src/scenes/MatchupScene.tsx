@@ -55,8 +55,20 @@ const ROSTER_A = [
 const ROSTER_B = [
   { pos: 'C', name: 'Johnny Bench', year: "'72", score: '13.1', live: false },
   { pos: '1B', name: 'Albert Pujols', year: "'09", score: '21.4', live: true },
-  { pos: '2B', name: 'Rogers Hornsby', year: "'24", score: '17.2', live: false },
-  { pos: 'SS', name: 'Cal Ripken Jr.', year: "'91", score: '12.8', live: false },
+  {
+    pos: '2B',
+    name: 'Rogers Hornsby',
+    year: "'24",
+    score: '17.2',
+    live: false,
+  },
+  {
+    pos: 'SS',
+    name: 'Cal Ripken Jr.',
+    year: "'91",
+    score: '12.8',
+    live: false,
+  },
   { pos: '3B', name: 'George Brett', year: "'80", score: '14.5', live: false },
   { pos: 'OF', name: 'Ted Williams', year: "'41", score: '23.6', live: true },
   { pos: 'OF', name: 'Mike Trout', year: "'19", score: '16.3', live: false },
@@ -73,10 +85,15 @@ const RosterRow: React.FC<{
   last: boolean;
   frame: number;
 }> = ({ pos, name, year, score, live, index, last, frame }) => {
-  const rowOpacity = interpolate(frame, [20 + index * 5, 34 + index * 5], [0, 1], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
+  const rowOpacity = interpolate(
+    frame,
+    [20 + index * 5, 34 + index * 5],
+    [0, 1],
+    {
+      extrapolateLeft: 'clamp',
+      extrapolateRight: 'clamp',
+    },
+  );
 
   return (
     <div
@@ -108,8 +125,7 @@ const RosterRow: React.FC<{
           fontSize: 24,
         }}
       >
-        {name}{' '}
-        <i style={{ color: TEXT_MUTED }}>{year}</i>
+        {name} <i style={{ color: TEXT_MUTED }}>{year}</i>
       </div>
       <div
         style={{

@@ -154,10 +154,7 @@ export const TitleScene: React.FC = () => {
           opacity: logoOpacity,
         }}
       >
-        <Img
-          src={staticFile('logo.png')}
-          style={{ width: 168, height: 168 }}
-        />
+        <Img src={staticFile('logo.png')} style={{ width: 168, height: 168 }} />
       </div>
 
       {/* Title block */}
