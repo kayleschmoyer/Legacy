@@ -5,6 +5,7 @@ import {
   setCommitStatus,
   isRepoAdmin,
 } from './lib/github.mjs';
+import { cleanupOperationalLabels } from './lib/labels.mjs';
 import {
   parseFindingsFromText,
   tryReformatFindings,
@@ -579,8 +580,13 @@ async function main() {
           `[reviewer] Failed to post infra error review: ${err instanceof Error ? err.message : String(err)}\n`,
         );
       }
+      // Apply the terminal label first; only clean up the operational
+      // labels after it sticks. If `addLabelAsApp` fails, leave the existing
+      // operational labels intact so the labeled-event self-heal trigger
+      // can still fire on the next attempt.
       try {
         await addLabelAsApp(prNumber, 'review-bot-degraded');
+        cleanupOperationalLabels(prNumber, { except: 'review-bot-degraded' });
       } catch (err) {
         process.stderr.write(
           `[reviewer] Failed to apply review-bot-degraded label: ${err instanceof Error ? err.message : String(err)}\n`,
@@ -709,15 +715,6 @@ async function main() {
       );
       process.exit(0);
     }
-    for (const label of ['bot:ready-for-review', 'review-bot-degraded']) {
-      try {
-        removeLabel(prNumber, label);
-      } catch (err) {
-        process.stderr.write(
-          `[reviewer] Failed to remove label '${label}': ${err instanceof Error ? err.message : String(err)}\n`,
-        );
-      }
-    }
     if (verdict === 'APPROVED') {
       try {
         addLabel(prNumber, 'merge-when-ready');
@@ -730,6 +727,7 @@ async function main() {
         );
       }
     }
+    cleanupOperationalLabels(prNumber);
   }
 }
 
@@ -746,8 +744,12 @@ async function main() {
  */
 async function escalateToHumanArbitration(prNumber, sha, logReason) {
   process.stdout.write(`[reviewer] ${logReason}\n`);
+  // Apply the terminal label first; only clean up the operational labels
+  // after it sticks. If `addLabelAsApp` fails the operational labels stay
+  // intact so the next labeled event can still self-heal.
   try {
     await addLabelAsApp(prNumber, NEEDS_HUMAN_ARBITRATION_LABEL);
+    cleanupOperationalLabels(prNumber);
   } catch (err) {
     process.stderr.write(
       `[reviewer] Failed to apply escalation label: ${err instanceof Error ? err.message : String(err)}\n`,
@@ -893,8 +895,12 @@ async function handleLlmFailure(prNumber, err, ctx = null) {
   // can self-heal on retry.
   const failureLabel =
     kind === 'cost-cap' ? NEEDS_HUMAN_REVIEW_LABEL : 'review-bot-degraded';
+  // Apply the terminal label first; only clean up the operational labels
+  // after it sticks. If `addLabelAsApp` fails the operational labels stay
+  // intact so the labeled-event self-heal trigger can still fire on retry.
   try {
     await addLabelAsApp(prNumber, failureLabel);
+    cleanupOperationalLabels(prNumber, { except: failureLabel });
   } catch (labelErr) {
     process.stderr.write(
       `[reviewer] Failed to apply ${failureLabel} label: ${labelErr instanceof Error ? labelErr.message : String(labelErr)}\n`,
