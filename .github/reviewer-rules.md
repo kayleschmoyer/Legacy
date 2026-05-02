@@ -73,6 +73,46 @@ This is an **Nx monorepo** with:
 - **GraphQL**: prefer `.graphql` files + codegen over inline `gql` template literals
 - **E2E tests**: hermetic — `route.fulfill()` only, never `route.continue()` (no backend in CI)
 
+## Frequently Missed Project-Specific Patterns
+
+These patterns appear in the majority of reviews that touch their respective areas. **Scan for every one that is relevant to the diff before submitting.**
+
+### Logging
+
+- **`LOGGER.error` signature**: pass the `Error` instance as the first non-message argument — `LOGGER.error('message', err)` or `LOGGER.error('message', err, { …context })`. Wrapping it in a plain object (`LOGGER.error('message', { error })`) relies on Rollbar heuristics to extract the stack trace and will silently fail when `error` is not an `Error` instance. Treat `{ error }` wrapping as a `high` finding.
+
+### GraphQL & Apollo
+
+- **Input validation errors in resolvers**: use `UserInputError` from `lambdas/db/src/schema/graphql-errors.ts`, not `throw new Error()`. Plain errors surface as `INTERNAL_SERVER_ERROR` to clients; `UserInputError` produces `BAD_USER_INPUT`. Flag any `throw new Error()` used for input validation in `lambdas/db/src/schema/**` resolver/mutation files.
+- **Nullable GraphQL fields in JSX and `aria-label`**: cross-reference the `.graphql` query file — a field typed `String` (no `!`) can be `null`. Direct string interpolation or use in `aria-label` without a null-check produces `"...null..."`. Always require a fallback (`rec.playerName ?? 'Unknown player'`).
+- **Unsafe `as` casts on unvalidated GraphQL args**: casting resolver args directly to a literal union (`args.order as 'snake' | 'linear'`) bypasses type safety. Require a type guard with an allowed-values array and `UserInputError` on failure.
+- **Mock response structure in tests**: Apollo `MockedResponse.result.data` must be keyed by the **root field names from the `.graphql` selection set** (e.g. `{ data: { updateCommissionerNote: … } }`), not the `operationName`. A `{ data: null }` value, a missing `data` wrapper, or field names that don't match the selection set will silently produce no data. Always cross-reference the `.graphql` file for correct field names.
+- **Codegen output**: never edit `*.generated.*` files — they are overwritten by `make codegen`. When a PR includes changes to generated files (even from a rebase), the PR description must explain why.
+
+### E2E Tests
+
+- **`route.continue()` is always forbidden**: it passes requests through to the real network, breaking hermetic CI. Use `route.fulfill()` to stub every response. `route.fallback()` is valid only within the 3-layer mock stack (test layer → `auth.ts` → baseline) to cascade to the next layer — never as an outer-level passthrough.
+- **Broad `postData.includes()` matching**: `postData.includes('getleague')` matches `getleagueteams`, `getleaguemembers`, etc. Require `'"getleague"'` (quoted JSON field) or `extractOperationName()` from `apps/web-e2e/src/fixtures/shared-mocks.ts`.
+- **Missing `UNAUTHENTICATED` guard test**: every new resolver or mutation must have a test calling it with `user: null` and asserting an `UNAUTHENTICATED` error response.
+- **`jest.doMock` module path**: `getDbOptions` lives in `@legacy-sports/utils/node`, not `@legacy-sports/utils`. Mocking only that export without spreading `jest.requireActual` also breaks all sibling imports from the same module.
+- **Test name vs. assertion mismatch**: the test description must match what it actually asserts — not the setup or happy-path assumption.
+
+### Accessibility
+
+- **Collapsed content stays in the a11y tree**: animating `height` or `opacity` to hide content does not remove it from the tab order or screen reader tree. Require `aria-hidden={isCollapsed}`, `visibility: hidden`, and `pointerEvents: none` when collapsed. A `display: none` or the `inert` attribute also satisfies this.
+- **`role="button"` without keyboard support**: non-`<button>` elements with `role="button"` are not focusable without `tabIndex={0}` and an `onKeyDown` handler. Prefer native `<button>` where possible.
+
+### Storage
+
+- **`localStorage`/`sessionStorage` writes without `try/catch`**: storage APIs throw in private browsing mode and on quota exceeded. All writes must be wrapped in `try/catch`; the catch block should silently ignore — this is an **approved exception** to the general "every catch must log or re-throw" rule, because client-side persistence is best-effort and a write failure is never load-bearing.
+
+### MCP Tools & Infrastructure
+
+- **Missing pagination**: Jira REST API defaults to 50 results; GitHub GraphQL defaults to 100 — results silently truncate beyond those limits. Any query against these APIs must pass `maxResults`/`perPage` and handle cursor pagination when the result set can exceed the default.
+- **MCP partial failure must set `isError: true`**: batch operations that fail some items and return `{ success: true }` hide errors from agents. Require `isError: true` and `{ total, succeeded, failed }` when any item fails.
+- **Docs referencing nonexistent MCP tools**: verify tool names exist in `tools/mcp/*/src/` before accepting references in docs or `SKILL.md` files.
+- **`dev`/`prod` ternary forgets `staging`**: `env === 'dev' ? X : Y` assigns `X` to staging. Require `{ dev: X, staging: Y, prod: Z }[env]` for all environment-specific branching.
+
 ## Documentation Accuracy
 
 The `docs` review pass focuses exclusively on this section. When reviewing documentation, comments, or a PR that changes how something is described:

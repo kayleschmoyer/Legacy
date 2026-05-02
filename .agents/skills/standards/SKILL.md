@@ -56,6 +56,14 @@ Run `make pc` before pushing. Skipping saves 5 min but each CI failure costs 40-
 | **Testing**   | Deterministic story data -- no `Math.random()` or `Date.now()`                               | 3     |
 | **Testing**   | Use canonical config values in mock data                                                     | 3     |
 | **Testing**   | Cover non-equal-modulo edge cases for rotation/distribution algorithms                       | 2     |
+| **UI**        | Null-check nullable GraphQL fields before JSX interpolation / aria-label                     | 4     |
+| **UI**        | `role="button"` needs `tabIndex={0}` + `onKeyDown`; prefer native `<button>`                 | 3     |
+| **UI**        | Collapsed content: set `aria-hidden`, `visibility:hidden`, `pointerEvents:none`              | 3     |
+| **UI**        | Never `transition: all` -- enumerate specific properties; only animate transform/opacity     | 3     |
+| **UI**        | Use named constants from `colors.ts` -- no inline hex in `.tsx` files                        | 3     |
+| **UI**        | `localStorage`/`sessionStorage` writes must be wrapped in `try/catch`                        | 3     |
+| **UI**        | Use `UserInputError` in GraphQL resolvers for input validation, not `throw new Error()`      | 3     |
+| **UI**        | Never cast unvalidated external data to a literal union with `as` -- use a type guard        | 3     |
 | **Types**     | Define explicit interfaces -- no `Record<string, unknown>`                                   | 3     |
 | **Regex**     | Anchor patterns: `\.tf$`, `(/&#124;$)` after prefix, `\b` for words                          | 3     |
 | **Reuse**     | Search for existing utils before writing duplicate logic                                     | 4     |

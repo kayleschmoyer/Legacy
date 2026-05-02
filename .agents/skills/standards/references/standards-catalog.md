@@ -228,3 +228,158 @@ Same sanitization, parsing, or classification logic copied across multiple files
 The `withAlpha(color, opacity)` utility only works with `#RRGGBB` hex. Named colors, RGB strings, or other formats produce invalid output.
 
 **Rule**: When using `withAlpha()`, ensure the color argument is `#RRGGBB` hex. For non-hex colors, use CSS `opacity` property or `fill` + `opacity` attributes in SVG instead.
+
+## UI & Component Patterns (from cloud reviewer analysis, April 2026)
+
+These patterns appear consistently in PRs that modify UI components in `apps/web` and `lib/shared-components`. Patterns #22, #24, #25, #26, and #27 are caught automatically by `make lint-review-patterns`; patterns #21, #23, and #28 require manual judgment.
+
+### Nullable GraphQL fields in JSX and aria-labels (#21)
+
+GraphQL fields typed `String` (without `!`) can be `null`. Direct interpolation produces `"...null..."` strings in the UI or aria-labels.
+
+**Rule**: Cross-reference the `.graphql` query file to confirm `!` non-null before interpolating. Always provide a fallback for nullable fields.
+
+```tsx
+// Bad — playerName is nullable (String in schema, not String!)
+aria-label={`Draft ${rec.playerName} now`}
+<span>{rec.playerName}</span>
+
+// Good
+aria-label={rec.playerName ? `Draft ${rec.playerName} now` : 'Draft player'}
+<span>{rec.playerName ?? 'Unknown player'}</span>
+```
+
+**When to check**: any new string interpolation or JSX render using a field from a GraphQL query result.
+
+### `role="button"` without keyboard support (#22)
+
+Non-`<button>` elements with `role="button"` are not focusable by keyboard without `tabIndex={0}`. Also requires a `:focus-visible` style and an `onKeyDown` handler.
+
+**Rule**: Add `tabIndex={0}` and `onKeyDown` when using `role="button"` on a non-button element. Prefer native `<button>` to get this behavior for free.
+
+```tsx
+// Bad — keyboard users can't reach this
+<div role="button" onClick={toggle}>Label</div>
+
+// Good (or better: use <button>)
+<div role="button" tabIndex={0} onKeyDown={handleKeyDown} onClick={toggle}>Label</div>
+```
+
+### Collapsed content stays in the accessibility tree (#23)
+
+Animating `height` or `opacity` to visually hide content does not remove it from the tab order or screen reader tree.
+
+**Rule**: When collapsing content, apply `aria-hidden={isCollapsed}`, `visibility: hidden`, and `pointerEvents: none`. The `display: none` or `inert` attribute are also acceptable.
+
+```tsx
+// Bad — hidden content is still reachable by keyboard and screen reader
+<div style={{ height: isCollapsed ? 0 : 'auto', overflow: 'hidden' }}>
+  {children}
+</div>
+
+// Good — animate only transform/opacity (never layout-triggering properties)
+<div style={{ overflow: 'hidden' }}>
+  <div
+    aria-hidden={isCollapsed}
+    style={{
+      opacity: isCollapsed ? 0 : 1,
+      transform: isCollapsed ? 'scaleY(0)' : 'scaleY(1)',
+      transformOrigin: 'top',
+      transition: 'opacity 0.2s ease, transform 0.2s ease',
+      visibility: isCollapsed ? 'hidden' : 'visible',
+      pointerEvents: isCollapsed ? 'none' : 'auto',
+    }}
+  >
+    {children}
+  </div>
+</div>
+```
+
+### `transition: 'all'` instead of specific properties (#24)
+
+`transition: all` animates unintended properties (including layout-triggering ones) and forces the browser to check every property on every frame.
+
+**Rule**: Always enumerate the specific CSS properties being transitioned. Only animate `transform` and `opacity` for performance; never animate `width`, `height`, `padding`, or `margin`.
+
+```tsx
+// Bad
+style={{ transition: 'all 0.15s ease' }}
+
+// Good
+style={{ transition: 'background-color 0.15s ease, border-color 0.15s ease' }}
+```
+
+### Inline hex literals instead of `colors.ts` constants (#25)
+
+Hex values are centralized in per-package color constants files. Raw hex in component files creates drift and defeats theming.
+
+- `apps/web`: `apps/web/src/constants/colors.ts`
+- `lib/shared-components`: `lib/shared-components/src/utils/colors.ts` (`lib/shared-components` cannot depend on `apps/web` — Nx module boundaries)
+
+**Rule**: Import and use named constants from the appropriate colors file instead of inline hex strings. Never reach across package boundaries for colors.
+
+```tsx
+// Bad
+backgroundColor: '#1B3A5C';
+
+// Good — in apps/web
+import { BRAND_NAVY } from '../../constants/colors';
+backgroundColor: BRAND_NAVY;
+
+// Good — in lib/shared-components
+import { BRAND_NAVY } from '../utils/colors';
+backgroundColor: BRAND_NAVY;
+```
+
+### `throw new Error()` for input validation in GraphQL resolvers (#26)
+
+Client input errors thrown as plain `Error` surface as `INTERNAL_SERVER_ERROR`. Use project-specific error types so clients receive the correct GraphQL error code.
+
+**Rule**: In `lambdas/db/src/schema/**` resolver and mutation files, use `UserInputError` from `../graphql-errors` for all input validation failures.
+
+```typescript
+// Bad — client sees INTERNAL_SERVER_ERROR
+throw new Error(`Invalid draftOrder: ${draftOrder}`);
+
+// Good — client sees BAD_USER_INPUT
+// Note: UserInputError is a function, not a constructor — no `new`
+import { UserInputError } from '../graphql-errors';
+throw UserInputError(`Invalid draftOrder: ${draftOrder}`);
+```
+
+### `localStorage`/`sessionStorage` writes without `try/catch` (#27)
+
+Storage APIs throw synchronously in private browsing mode and when quota is exceeded. An unhandled throw breaks the page.
+
+**Rule**: Wrap all `localStorage` and `sessionStorage` writes in `try/catch`. The catch block should silently ignore — persistence is best-effort, not load-bearing. This is an **approved exception** to the general "every catch must re-throw, log, or return error context" standard; it applies only to client-side storage writes where a failure is never load-bearing.
+
+```typescript
+// Bad — throws and breaks the page in private mode
+localStorage.setItem('prefs', JSON.stringify(value));
+
+// Good
+try {
+  localStorage.setItem('prefs', JSON.stringify(value));
+} catch {
+  // Storage unavailable (private mode / quota) — non-critical
+}
+```
+
+### Unsafe `as 'literal-union'` cast on unvalidated external data (#28)
+
+Casting strings from GraphQL args, user input, or API responses directly to a union type with `as` bypasses runtime safety. An out-of-range value will satisfy TypeScript but fail at runtime.
+
+**Rule**: Use a type guard with an allowed-values array. Throw `UserInputError` (in resolvers) or a runtime error on invalid input instead of relying on `as`.
+
+```typescript
+// Bad — any string passes the type system
+const order = args.draftOrder as 'snake' | 'linear';
+
+// Good
+const VALID_ORDERS = ['snake', 'linear'] as const;
+type DraftOrder = (typeof VALID_ORDERS)[number];
+if (!(VALID_ORDERS as readonly string[]).includes(args.draftOrder)) {
+  throw UserInputError(`Invalid draftOrder: ${args.draftOrder}`);
+}
+const order = args.draftOrder as DraftOrder; // safe after guard
+```
