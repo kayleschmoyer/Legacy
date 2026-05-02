@@ -9,96 +9,50 @@ import {
 import {
   BG_DARK,
   BRAND_GOLD,
-  BRAND_NAVY,
-  BRAND_SEAM_RED,
   FONT_DISPLAY,
   FONT_BODY,
   OUTLINE_SUBTLE,
-  PANEL_BORDER,
   SURFACE_PANEL,
+  SURFACE_CARD,
   TEXT_MUTED,
   TEXT_PRIMARY,
 } from '../theme';
 
 const NORMAL_POINTS = [
-  "Waiting for today's live games",
-  'Only current-season players',
-  'Same pool of active stars every year',
-  'Injuries ruin your season',
-  'Schedule luck matters too much',
+  { text: 'Draft pool capped to active rosters', bold: 'active rosters' },
+  { text: "Scoring depends on tonight's game", bold: "tonight's game" },
+  { text: 'Injuries, rainouts, lineup changes', bold: null },
+  { text: 'Off-season? League goes dark.', bold: 'League goes dark.' },
 ];
 
 const LEGACY_POINTS = [
-  'Scored on archived MLB history',
-  'Any player, any era, any season',
-  'Your 1927 Ruth vs. their 2019 Trout',
-  'No live game dependency',
-  'Pure baseball knowledge wins',
+  { text: 'Draft any player, any era — 1876 → today', bold: 'any player, any era' },
+  { text: 'Scored on real archived box scores', bold: 'real archived box scores' },
+  { text: 'No live-game dependency, no rainouts', bold: null },
+  { text: 'Play year-round, at your own pace', bold: 'year-round' },
 ];
-
-const CheckIcon: React.FC = () => (
-  <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-    <circle
-      cx="10"
-      cy="10"
-      r="9"
-      fill={BRAND_GOLD}
-      fillOpacity={0.15}
-      stroke={BRAND_GOLD}
-      strokeWidth="1.5"
-    />
-    <path
-      d="M6 10l3 3 5-6"
-      stroke={BRAND_GOLD}
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-);
-
-const XIcon: React.FC = () => (
-  <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-    <circle
-      cx="10"
-      cy="10"
-      r="9"
-      fill={BRAND_SEAM_RED}
-      fillOpacity={0.1}
-      stroke={BRAND_SEAM_RED}
-      strokeWidth="1.5"
-      strokeOpacity={0.5}
-    />
-    <path
-      d="M7 7l6 6M13 7l-6 6"
-      stroke={BRAND_SEAM_RED}
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeOpacity={0.7}
-    />
-  </svg>
-);
 
 export const DifferentiatorScene: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  // Scene fade in
-  const sceneOpacity = interpolate(frame, [0, 20], [0, 1], {
+  const sceneOpacity = interpolate(frame, [0, 18], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
+  const exitOpacity = interpolate(frame, [210, 240], [1, 0], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
 
-  // Header entrance
   const headerY = spring({
     frame,
     fps,
-    from: -40,
+    from: -30,
     to: 0,
     config: { damping: 30, stiffness: 200 },
   });
 
-  // Left panel slide in
   const leftX = spring({
     frame: frame - 10,
     fps,
@@ -107,7 +61,6 @@ export const DifferentiatorScene: React.FC = () => {
     config: { damping: 28, stiffness: 160 },
   });
 
-  // Right panel slide in
   const rightX = spring({
     frame: frame - 18,
     fps,
@@ -116,254 +69,315 @@ export const DifferentiatorScene: React.FC = () => {
     config: { damping: 28, stiffness: 160 },
   });
 
-  // Scene exit
-  const exitOpacity = interpolate(frame, [210, 240], [1, 0], {
+  const vsOpacity = interpolate(frame, [20, 40], [0, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
 
+  function renderPoints(
+    points: typeof NORMAL_POINTS,
+    isLegacy: boolean,
+  ) {
+    return points.map((p, i) => {
+      const delay = isLegacy ? 22 + i * 8 : 15 + i * 8;
+      const itemOpacity = interpolate(frame, [delay, delay + 15], [0, 1], {
+        extrapolateLeft: 'clamp',
+        extrapolateRight: 'clamp',
+      });
+      const itemX = isLegacy
+        ? interpolate(frame, [delay, delay + 15], [20, 0], {
+            extrapolateLeft: 'clamp',
+            extrapolateRight: 'clamp',
+          })
+        : 0;
+
+      const parts = p.bold
+        ? p.text.split(p.bold)
+        : [p.text];
+
+      return (
+        <div
+          key={i}
+          style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 0,
+            opacity: itemOpacity,
+            transform: `translateX(${itemX}px)`,
+            paddingLeft: 36,
+            position: 'relative',
+          }}
+        >
+          {/* bullet */}
+          <div
+            style={{
+              position: 'absolute',
+              left: 0,
+              top: 14,
+              width: 18,
+              height: isLegacy ? 3 : 2,
+              background: isLegacy ? BRAND_GOLD : '#6C80BA',
+            }}
+          />
+          <div
+            style={{
+              fontFamily: FONT_BODY,
+              fontSize: 28,
+              lineHeight: 1.4,
+              color: isLegacy ? '#DEE6FF' : TEXT_MUTED,
+            }}
+          >
+            {p.bold && parts.length === 2 ? (
+              <>
+                {parts[0]}
+                <b style={{ color: isLegacy ? TEXT_PRIMARY : TEXT_MUTED, fontWeight: 600 }}>
+                  {p.bold}
+                </b>
+                {parts[1]}
+              </>
+            ) : (
+              p.text
+            )}
+          </div>
+        </div>
+      );
+    });
+  }
+
   return (
     <AbsoluteFill
       style={{
-        background: BG_DARK,
+        background: `
+          radial-gradient(ellipse at 18% 0%, rgba(27,58,92,0.55) 0%, transparent 55%),
+          radial-gradient(ellipse at 82% 8%, rgba(196,30,58,0.18) 0%, transparent 45%),
+          radial-gradient(ellipse at 50% 100%, rgba(197,165,90,0.14) 0%, transparent 55%),
+          ${BG_DARK}
+        `,
         display: 'flex',
         flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '80px 120px',
+        padding: '100px',
         opacity: sceneOpacity * exitOpacity,
-        gap: 56,
+        overflow: 'hidden',
       }}
     >
+      {/* Vignette */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background:
+            'radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(0,0,0,0.45) 100%)',
+          pointerEvents: 'none',
+        }}
+      />
+
       {/* Header */}
       <div
         style={{
           transform: `translateY(${headerY}px)`,
-          textAlign: 'center',
+          marginBottom: 60,
         }}
       >
         <div
           style={{
             fontFamily: FONT_DISPLAY,
             fontWeight: 700,
-            fontSize: 16,
-            color: BRAND_GOLD,
-            letterSpacing: '0.18em',
             textTransform: 'uppercase',
-            marginBottom: 16,
+            letterSpacing: '0.22em',
+            color: BRAND_GOLD,
+            fontSize: 22,
+            marginBottom: 18,
           }}
         >
-          What Makes Legacy Different
+          What makes us different
         </div>
-        <div
+        <h2
           style={{
             fontFamily: FONT_DISPLAY,
             fontWeight: 800,
-            fontSize: 72,
-            color: TEXT_PRIMARY,
-            letterSpacing: '0.02em',
-            textTransform: 'uppercase',
+            fontSize: 88,
             lineHeight: 1,
+            color: TEXT_PRIMARY,
+            letterSpacing: '-0.02em',
+            margin: '0 0 12px 0',
           }}
         >
-          NOT YOUR TYPICAL
-          <br />
-          <span style={{ color: BRAND_GOLD }}>FANTASY LEAGUE</span>
-        </div>
+          Not just another{' '}
+          <em style={{ color: BRAND_GOLD, fontStyle: 'normal' }}>
+            fantasy platform.
+          </em>
+        </h2>
+        <p
+          style={{
+            fontFamily: FONT_BODY,
+            fontSize: 30,
+            color: TEXT_MUTED,
+            margin: 0,
+          }}
+        >
+          Today's apps lock you to today's season. Legacy opens 150 years of
+          baseball.
+        </p>
       </div>
 
-      {/* Two-column comparison */}
+      {/* Columns: Normal | VS | Legacy */}
       <div
         style={{
-          display: 'flex',
-          gap: 40,
-          width: '100%',
-          maxWidth: 1400,
+          display: 'grid',
+          gridTemplateColumns: '1fr 80px 1fr',
+          flex: 1,
+          alignItems: 'stretch',
+          gap: 0,
         }}
       >
-        {/* Normal Fantasy - LEFT */}
+        {/* Normal Fantasy */}
         <div
           style={{
             transform: `translateX(${leftX}px)`,
-            flex: 1,
-            background: SURFACE_PANEL,
+            borderRadius: 20,
+            padding: 48,
+            display: 'flex',
+            flexDirection: 'column',
             border: `1px solid ${OUTLINE_SUBTLE}`,
-            borderRadius: 16,
-            padding: '40px 48px',
-            opacity: 0.65,
+            background: SURFACE_PANEL,
+            opacity: 0.92,
           }}
         >
           <div
             style={{
               fontFamily: FONT_DISPLAY,
               fontWeight: 700,
-              fontSize: 28,
-              color: TEXT_MUTED,
-              letterSpacing: '0.08em',
               textTransform: 'uppercase',
-              marginBottom: 32,
-              paddingBottom: 20,
-              borderBottom: `1px solid ${OUTLINE_SUBTLE}`,
+              letterSpacing: '0.20em',
+              fontSize: 26,
+              marginBottom: 14,
+              color: '#6C80BA',
             }}
           >
-            Normal Fantasy Baseball
+            Normal Fantasy
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-            {NORMAL_POINTS.map((point, i) => {
-              const itemOpacity = interpolate(
-                frame,
-                [15 + i * 8, 30 + i * 8],
-                [0, 1],
-                {
-                  extrapolateLeft: 'clamp',
-                  extrapolateRight: 'clamp',
-                },
-              );
-              return (
-                <div
-                  key={i}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 16,
-                    opacity: itemOpacity,
-                  }}
-                >
-                  <XIcon />
-                  <div
-                    style={{
-                      fontFamily: FONT_BODY,
-                      fontSize: 22,
-                      color: TEXT_MUTED,
-                      lineHeight: 1.4,
-                    }}
-                  >
-                    {point}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* VS divider */}
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 12,
-            flexShrink: 0,
-            opacity: interpolate(frame, [20, 40], [0, 1], {
-              extrapolateLeft: 'clamp',
-              extrapolateRight: 'clamp',
-            }),
-          }}
-        >
-          <div style={{ width: 1, flex: 1, background: PANEL_BORDER }} />
-          <div
+          <h3
             style={{
               fontFamily: FONT_DISPLAY,
               fontWeight: 800,
-              fontSize: 28,
-              color: TEXT_MUTED,
-              letterSpacing: '0.1em',
+              fontSize: 56,
+              color: '#DEE6FF',
+              lineHeight: 1.0,
+              margin: '0 0 32px 0',
+              letterSpacing: '-0.01em',
             }}
           >
-            VS
+            Live games only.
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+            {renderPoints(NORMAL_POINTS, false)}
           </div>
-          <div style={{ width: 1, flex: 1, background: PANEL_BORDER }} />
         </div>
 
-        {/* Legacy Fantasy - RIGHT */}
+        {/* VS */}
+        <div
+          style={{
+            alignSelf: 'center',
+            fontFamily: FONT_DISPLAY,
+            fontWeight: 800,
+            color: '#6C80BA',
+            fontSize: 56,
+            textAlign: 'center',
+            letterSpacing: '0.04em',
+            opacity: vsOpacity,
+          }}
+        >
+          VS
+        </div>
+
+        {/* Legacy Fantasy */}
         <div
           style={{
             transform: `translateX(${rightX}px)`,
-            flex: 1,
-            position: 'relative',
-            background: `linear-gradient(135deg, ${SURFACE_PANEL} 0%, ${BRAND_NAVY}44 100%)`,
-            border: `1px solid ${BRAND_GOLD}44`,
-            borderRadius: 16,
-            padding: '40px 48px',
-            boxShadow: `0 0 60px ${BRAND_GOLD}11`,
+            borderRadius: 20,
+            padding: 48,
+            display: 'flex',
+            flexDirection: 'column',
+            border: `1px solid rgba(197,165,90,0.45)`,
+            background: `linear-gradient(135deg, rgba(197,165,90,0.16) 0%, rgba(27,58,92,0.20) 100%), ${SURFACE_CARD}`,
+            boxShadow:
+              '0 0 0 1px rgba(197,165,90,0.35), 0 6px 24px rgba(197,165,90,0.25)',
           }}
         >
-          {/* Gold accent top bar */}
-          <div
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 40,
-              right: 40,
-              height: 3,
-              background: `linear-gradient(90deg, transparent, ${BRAND_GOLD}, transparent)`,
-              borderRadius: '0 0 4px 4px',
-            }}
-          />
-
           <div
             style={{
               fontFamily: FONT_DISPLAY,
               fontWeight: 700,
-              fontSize: 28,
-              color: BRAND_GOLD,
-              letterSpacing: '0.08em',
               textTransform: 'uppercase',
-              marginBottom: 32,
-              paddingBottom: 20,
-              borderBottom: `1px solid ${BRAND_GOLD}33`,
+              letterSpacing: '0.20em',
+              fontSize: 26,
+              marginBottom: 14,
+              color: BRAND_GOLD,
             }}
           >
-            Legacy Fantasy Baseball
+            Legacy Fantasy
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-            {LEGACY_POINTS.map((point, i) => {
-              const itemOpacity = interpolate(
-                frame,
-                [22 + i * 8, 38 + i * 8],
-                [0, 1],
-                {
-                  extrapolateLeft: 'clamp',
-                  extrapolateRight: 'clamp',
-                },
-              );
-              const itemX = interpolate(
-                frame,
-                [22 + i * 8, 38 + i * 8],
-                [20, 0],
-                {
-                  extrapolateLeft: 'clamp',
-                  extrapolateRight: 'clamp',
-                },
-              );
-              return (
-                <div
-                  key={i}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 16,
-                    opacity: itemOpacity,
-                    transform: `translateX(${itemX}px)`,
-                  }}
-                >
-                  <CheckIcon />
-                  <div
-                    style={{
-                      fontFamily: FONT_BODY,
-                      fontSize: 22,
-                      color: TEXT_PRIMARY,
-                      lineHeight: 1.4,
-                    }}
-                  >
-                    {point}
-                  </div>
-                </div>
-              );
-            })}
+          <h3
+            style={{
+              fontFamily: FONT_DISPLAY,
+              fontWeight: 800,
+              fontSize: 56,
+              color: TEXT_PRIMARY,
+              lineHeight: 1.0,
+              margin: '0 0 32px 0',
+              letterSpacing: '-0.01em',
+            }}
+          >
+            The whole archive.
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+            {renderPoints(LEGACY_POINTS, true)}
           </div>
         </div>
+      </div>
+
+      {/* Scene chrome */}
+      <div
+        style={{
+          position: 'absolute',
+          left: 56,
+          bottom: 40,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 16,
+          color: TEXT_MUTED,
+          fontFamily: FONT_DISPLAY,
+          fontWeight: 700,
+          letterSpacing: '0.18em',
+          fontSize: 24,
+          textTransform: 'uppercase',
+          opacity: vsOpacity,
+        }}
+      >
+        <div
+          style={{
+            width: 6,
+            height: 6,
+            borderRadius: '50%',
+            background: BRAND_GOLD,
+            boxShadow: `0 0 12px ${BRAND_GOLD}`,
+          }}
+        />
+        Scene 02<span style={{ color: '#6C80BA' }}>/</span>Differentiator
+      </div>
+      <div
+        style={{
+          position: 'absolute',
+          right: 56,
+          bottom: 40,
+          fontFamily: "'Roboto Mono', monospace",
+          color: '#6C80BA',
+          fontSize: 24,
+          letterSpacing: '0.08em',
+          opacity: vsOpacity,
+        }}
+      >
+        00:04 — 00:12
       </div>
     </AbsoluteFill>
   );

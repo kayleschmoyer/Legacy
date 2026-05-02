@@ -3,14 +3,20 @@ export const BG_DARK = '#0A0F1A';
 export const SURFACE_SUBTLE = '#0D1526';
 export const SURFACE_PANEL = '#111B2F';
 export const SURFACE_CARD = '#16223A';
+export const SURFACE_RAISED = '#1C2A47';
 export const PANEL_BORDER = '#1F2D48';
 export const OUTLINE_SUBTLE = '#1C2740';
+export const OUTLINE_DEFAULT = '#2F3B53';
+export const GLASS_BORDER = 'rgba(255,255,255,0.08)';
 
 export const BRAND_NAVY = '#1B3A5C';
 export const BRAND_NAVY_LIGHT = '#2C4A7C';
 export const BRAND_GOLD = '#C5A55A';
 export const BRAND_GOLD_LIGHT = '#D4BB78';
+export const BRAND_GOLD_DARK = '#A68B3E';
 export const BRAND_SEAM_RED = '#C41E3A';
+export const BRAND_SEAM_RED_DARK = '#8B1A2B';
+export const BRAND_SEAM_RED_LIGHT = '#E63950';
 export const GREEN = '#22C55E';
 
 export const TEXT_PRIMARY = '#F8FAFC';

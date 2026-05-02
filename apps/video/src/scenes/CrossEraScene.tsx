@@ -6,77 +6,238 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from 'remotion';
-import { PlayerCard, PlayerData } from '../components/PlayerCard';
 import {
   BG_DARK,
   BRAND_GOLD,
-  BRAND_NAVY,
   FONT_DISPLAY,
   FONT_BODY,
-  PANEL_BORDER,
+  FONT_MONO,
+  GLASS_BORDER,
+  OUTLINE_SUBTLE,
+  POS_INFIELD,
+  POS_OUTFIELD,
+  POS_PITCHER,
+  POS_UTILITY,
+  SURFACE_CARD,
   TEXT_MUTED,
   TEXT_PRIMARY,
 } from '../theme';
 
-const PLAYERS: PlayerData[] = [
+interface PlayerCardData {
+  year: number;
+  name: string;
+  team: string;
+  position: string;
+  accent: string;
+  stats: { value: string; key: string }[];
+}
+
+const PLAYERS: PlayerCardData[] = [
   {
-    name: 'Babe Ruth',
     year: 1927,
-    team: 'NYY',
-    position: 'OF',
+    name: 'Babe Ruth',
+    team: 'New York Yankees',
+    position: 'OF · Outfield',
+    accent: POS_OUTFIELD,
     stats: [
-      { label: 'HR', value: '60' },
-      { label: 'RBI', value: '164' },
-      { label: 'AVG', value: '.356' },
+      { value: '.356', key: 'AVG' },
+      { value: '60', key: 'HR' },
+      { value: '165', key: 'RBI' },
     ],
-    highlight: true,
   },
   {
-    name: 'Mickey Mantle',
-    year: 1956,
-    team: 'NYY',
-    position: 'CF',
+    year: 1968,
+    name: 'Bob Gibson',
+    team: 'St. Louis Cardinals',
+    position: 'P · Pitcher',
+    accent: POS_PITCHER,
     stats: [
-      { label: 'HR', value: '52' },
-      { label: 'RBI', value: '130' },
-      { label: 'AVG', value: '.353' },
+      { value: '1.12', key: 'ERA' },
+      { value: '22', key: 'W' },
+      { value: '268', key: 'K' },
     ],
-    highlight: false,
   },
   {
-    name: 'Barry Bonds',
     year: 2001,
-    team: 'SF',
-    position: 'LF',
+    name: 'Barry Bonds',
+    team: 'San Francisco Giants',
+    position: 'OF · Outfield',
+    accent: POS_UTILITY,
     stats: [
-      { label: 'HR', value: '73' },
-      { label: 'RBI', value: '137' },
-      { label: 'OBP', value: '.515' },
+      { value: '.328', key: 'AVG' },
+      { value: '73', key: 'HR' },
+      { value: '137', key: 'RBI' },
     ],
-    highlight: false,
   },
   {
-    name: 'Mike Trout',
     year: 2019,
-    team: 'LAA',
-    position: 'CF',
+    name: 'Mike Trout',
+    team: 'Los Angeles Angels',
+    position: 'CF · Outfield',
+    accent: POS_INFIELD,
     stats: [
-      { label: 'HR', value: '45' },
-      { label: 'RBI', value: '104' },
-      { label: 'AVG', value: '.291' },
+      { value: '.291', key: 'AVG' },
+      { value: '45', key: 'HR' },
+      { value: '104', key: 'RBI' },
     ],
-    highlight: false,
   },
 ];
 
-// Timeline dots
-const ERA_MARKERS = [
-  { year: '1920s', label: 'Dead Ball Era Ends', pos: 8 },
-  { year: '1950s', label: 'Golden Age', pos: 28 },
-  { year: '1990s', label: 'Power Era', pos: 60 },
-  { year: '2010s', label: 'Analytics Era', pos: 82 },
-  { year: 'Today', label: 'Modern Game', pos: 98 },
+const TIMELINE_TICKS = [
+  { year: '1927', pos: 8, accent: POS_OUTFIELD },
+  { year: '1968', pos: 35, accent: POS_PITCHER },
+  { year: '2001', pos: 65, accent: POS_UTILITY },
+  { year: '2019', pos: 92, accent: POS_INFIELD },
 ];
+
+const EraPlayerCard: React.FC<{ player: PlayerCardData; frame: number; delay: number; fps: number }> = ({
+  player,
+  frame,
+  delay,
+  fps,
+}) => {
+  const cardY = spring({
+    frame: frame - delay,
+    fps,
+    from: 60,
+    to: 0,
+    config: { damping: 26, stiffness: 180 },
+  });
+  const cardOpacity = interpolate(frame, [delay, delay + 15], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
+
+  return (
+    <div
+      style={{
+        transform: `translateY(${cardY}px)`,
+        opacity: cardOpacity,
+        background: SURFACE_CARD,
+        border: `1px solid ${GLASS_BORDER}`,
+        borderRadius: 20,
+        padding: '28px 26px',
+        display: 'flex',
+        flexDirection: 'column',
+        position: 'relative',
+        overflow: 'hidden',
+        flex: 1,
+      }}
+    >
+      {/* Left accent stripe */}
+      <div
+        style={{
+          position: 'absolute',
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: 6,
+          background: player.accent,
+        }}
+      />
+
+      {/* Year */}
+      <div
+        style={{
+          fontFamily: FONT_DISPLAY,
+          fontWeight: 800,
+          fontSize: 64,
+          color: player.accent,
+          lineHeight: 1,
+          letterSpacing: '0.02em',
+        }}
+      >
+        {player.year}
+      </div>
+
+      {/* Name */}
+      <div
+        style={{
+          fontFamily: FONT_DISPLAY,
+          fontWeight: 800,
+          fontSize: 38,
+          color: TEXT_PRIMARY,
+          marginTop: 14,
+          lineHeight: 1.05,
+          letterSpacing: '-0.01em',
+        }}
+      >
+        {player.name}
+      </div>
+
+      {/* Team */}
+      <div
+        style={{
+          fontFamily: FONT_BODY,
+          color: TEXT_MUTED,
+          fontSize: 24,
+          marginTop: 6,
+        }}
+      >
+        {player.team}
+      </div>
+
+      {/* Position */}
+      <div
+        style={{
+          marginTop: 18,
+          fontFamily: FONT_DISPLAY,
+          fontWeight: 700,
+          fontSize: 24,
+          letterSpacing: '0.18em',
+          textTransform: 'uppercase',
+          color: player.accent,
+        }}
+      >
+        {player.position}
+      </div>
+
+      {/* Stats */}
+      <div
+        style={{
+          marginTop: 'auto',
+          paddingTop: 22,
+          borderTop: `1px solid ${OUTLINE_SUBTLE}`,
+          display: 'flex',
+          justifyContent: 'space-between',
+          gap: 12,
+        }}
+      >
+        {player.stats.map((stat) => (
+          <div
+            key={stat.key}
+            style={{ display: 'flex', flexDirection: 'column', gap: 2 }}
+          >
+            <div
+              style={{
+                fontFamily: FONT_DISPLAY,
+                fontWeight: 800,
+                fontSize: 36,
+                color: TEXT_PRIMARY,
+                fontVariantNumeric: 'tabular-nums',
+                lineHeight: 1,
+              }}
+            >
+              {stat.value}
+            </div>
+            <div
+              style={{
+                fontFamily: FONT_DISPLAY,
+                fontWeight: 700,
+                fontSize: 24,
+                letterSpacing: '0.18em',
+                textTransform: 'uppercase',
+                color: '#6C80BA',
+              }}
+            >
+              {stat.key}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 export const CrossEraScene: React.FC = () => {
   const frame = useCurrentFrame();
@@ -86,13 +247,11 @@ export const CrossEraScene: React.FC = () => {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
-
   const exitOpacity = interpolate(frame, [210, 240], [1, 0], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
 
-  // Header
   const headerY = spring({
     frame,
     fps,
@@ -101,8 +260,12 @@ export const CrossEraScene: React.FC = () => {
     config: { damping: 30, stiffness: 200 },
   });
 
-  // Timeline line width
-  const timelineWidth = interpolate(frame, [15, 80], [0, 100], {
+  const timelineWidth = interpolate(frame, [20, 90], [0, 100], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
+
+  const footerOpacity = interpolate(frame, [80, 110], [0, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
@@ -110,213 +273,202 @@ export const CrossEraScene: React.FC = () => {
   return (
     <AbsoluteFill
       style={{
-        background: BG_DARK,
+        background: `
+          radial-gradient(ellipse at 18% 0%, rgba(27,58,92,0.55) 0%, transparent 55%),
+          radial-gradient(ellipse at 82% 8%, rgba(196,30,58,0.18) 0%, transparent 45%),
+          radial-gradient(ellipse at 50% 100%, rgba(197,165,90,0.14) 0%, transparent 55%),
+          ${BG_DARK}
+        `,
         display: 'flex',
         flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '60px 120px',
+        padding: '90px 100px 140px',
         opacity: sceneIn * exitOpacity,
-        gap: 48,
+        overflow: 'hidden',
       }}
     >
-      {/* Header */}
+      {/* Vignette */}
       <div
-        style={{ transform: `translateY(${headerY}px)`, textAlign: 'center' }}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background:
+            'radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(0,0,0,0.45) 100%)',
+          pointerEvents: 'none',
+        }}
+      />
+
+      {/* Header row: title left, sub right */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'flex-end',
+          justifyContent: 'space-between',
+          marginBottom: 56,
+          transform: `translateY(${headerY}px)`,
+        }}
       >
-        <div
-          style={{
-            fontFamily: FONT_DISPLAY,
-            fontWeight: 700,
-            fontSize: 16,
-            color: BRAND_GOLD,
-            letterSpacing: '0.18em',
-            textTransform: 'uppercase',
-            marginBottom: 12,
-          }}
-        >
-          Cross-Era Drafting
-        </div>
-        <div
+        <h2
           style={{
             fontFamily: FONT_DISPLAY,
             fontWeight: 800,
-            fontSize: 68,
+            fontSize: 92,
+            lineHeight: 0.95,
             color: TEXT_PRIMARY,
-            letterSpacing: '0.01em',
-            textTransform: 'uppercase',
-            lineHeight: 1,
+            letterSpacing: '-0.02em',
+            margin: 0,
           }}
         >
-          DRAFT LEGENDS FROM <span style={{ color: BRAND_GOLD }}>ANY ERA</span>
-        </div>
+          Ruth in &apos;27.
+          <br />
+          <span style={{ color: BRAND_GOLD }}>Trout in &apos;19.</span>
+          <br />
+          Same lineup card.
+        </h2>
+        <p
+          style={{
+            fontFamily: FONT_BODY,
+            color: TEXT_MUTED,
+            fontSize: 26,
+            maxWidth: 480,
+            textAlign: 'right',
+            margin: 0,
+          }}
+        >
+          Pick from over{' '}
+          <b style={{ color: TEXT_PRIMARY }}>50,000 player-seasons</b> — every
+          name in the history of the game, scored on the numbers they actually
+          posted.
+        </p>
       </div>
 
-      {/* Player cards row */}
+      {/* Player cards grid */}
       <div
         style={{
           display: 'flex',
           gap: 28,
+          flex: 1,
           alignItems: 'stretch',
-          justifyContent: 'center',
         }}
       >
-        {PLAYERS.map((player, i) => {
-          const cardDelay = 20 + i * 14;
-          const cardY = spring({
-            frame: frame - cardDelay,
-            fps,
-            from: 80,
-            to: 0,
-            config: { damping: 26, stiffness: 180 },
-          });
-          const cardOpacity = interpolate(
-            frame,
-            [cardDelay, cardDelay + 15],
-            [0, 1],
-            {
-              extrapolateLeft: 'clamp',
-              extrapolateRight: 'clamp',
-            },
-          );
+        {PLAYERS.map((player, i) => (
+          <EraPlayerCard
+            key={player.name}
+            player={player}
+            frame={frame}
+            delay={20 + i * 14}
+            fps={fps}
+          />
+        ))}
+      </div>
 
+      {/* Timeline */}
+      <div
+        style={{
+          marginTop: 32,
+          marginBottom: 24,
+          position: 'relative',
+          height: 80,
+        }}
+      >
+        {/* Bar */}
+        <div
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            top: 28,
+            height: 2,
+            background: `linear-gradient(90deg, #C41E3A 0%, #2C4A7C 50%, #C5A55A 100%)`,
+            borderRadius: 2,
+            clipPath: `inset(0 ${100 - timelineWidth}% 0 0)`,
+          }}
+        />
+        {/* Tick marks and year labels */}
+        {TIMELINE_TICKS.map((tick) => {
+          const tickOpacity = interpolate(
+            frame,
+            [15 + (tick.pos / 100) * 75, 30 + (tick.pos / 100) * 75],
+            [0, 1],
+            { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
+          );
           return (
-            <div
-              key={player.name}
-              style={{
-                transform: `translateY(${cardY}px)`,
-                opacity: cardOpacity,
-              }}
-            >
-              <PlayerCard player={player} />
-            </div>
+            <React.Fragment key={tick.year}>
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 18,
+                  left: `${tick.pos}%`,
+                  transform: 'translateX(-50%)',
+                  width: 22,
+                  height: 22,
+                  borderRadius: '50%',
+                  background: SURFACE_CARD,
+                  border: `3px solid ${tick.accent}`,
+                  opacity: tickOpacity,
+                }}
+              />
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 48,
+                  left: `${tick.pos}%`,
+                  transform: 'translateX(-50%)',
+                  fontFamily: FONT_MONO,
+                  fontSize: 24,
+                  color: TEXT_MUTED,
+                  opacity: tickOpacity,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {tick.year}
+              </div>
+            </React.Fragment>
           );
         })}
       </div>
 
-      {/* Timeline */}
-      <div style={{ width: '100%', maxWidth: 1400 }}>
-        {/* Line */}
-        <div
-          style={{
-            position: 'relative',
-            height: 2,
-            background: PANEL_BORDER,
-            marginBottom: 16,
-          }}
-        >
-          {/* Filled progress */}
-          <div
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              height: '100%',
-              width: `${timelineWidth}%`,
-              background: `linear-gradient(90deg, ${BRAND_NAVY}, ${BRAND_GOLD})`,
-            }}
-          />
-
-          {/* Era markers */}
-          {ERA_MARKERS.map((m) => {
-            const markerOpacity = interpolate(
-              frame,
-              [15 + (m.pos / 100) * 65, 30 + (m.pos / 100) * 65],
-              [0, 1],
-              { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
-            );
-            return (
-              <div
-                key={m.year}
-                style={{
-                  position: 'absolute',
-                  top: -5,
-                  left: `${m.pos}%`,
-                  transform: 'translateX(-50%)',
-                  opacity: markerOpacity,
-                }}
-              >
-                <div
-                  style={{
-                    width: 12,
-                    height: 12,
-                    borderRadius: '50%',
-                    background:
-                      m.pos <= timelineWidth ? BRAND_GOLD : PANEL_BORDER,
-                    border: `2px solid ${BG_DARK}`,
-                  }}
-                />
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Year labels */}
-        <div style={{ position: 'relative', height: 40 }}>
-          {ERA_MARKERS.map((m) => {
-            const labelOpacity = interpolate(
-              frame,
-              [20 + (m.pos / 100) * 65, 38 + (m.pos / 100) * 65],
-              [0, 1],
-              { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
-            );
-            return (
-              <div
-                key={m.year}
-                style={{
-                  position: 'absolute',
-                  left: `${m.pos}%`,
-                  transform: 'translateX(-50%)',
-                  textAlign: 'center',
-                  opacity: labelOpacity,
-                }}
-              >
-                <div
-                  style={{
-                    fontFamily: FONT_DISPLAY,
-                    fontWeight: 700,
-                    fontSize: 14,
-                    color: m.pos <= timelineWidth ? BRAND_GOLD : TEXT_MUTED,
-                    letterSpacing: '0.06em',
-                    textTransform: 'uppercase',
-                  }}
-                >
-                  {m.year}
-                </div>
-                <div
-                  style={{
-                    fontFamily: FONT_BODY,
-                    fontSize: 11,
-                    color: TEXT_MUTED,
-                    marginTop: 2,
-                    opacity: 0.7,
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {m.label}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Footnote */}
+      {/* Scene chrome */}
       <div
         style={{
-          opacity: interpolate(frame, [100, 130], [0, 1], {
-            extrapolateLeft: 'clamp',
-            extrapolateRight: 'clamp',
-          }),
-          fontFamily: FONT_BODY,
-          fontSize: 22,
+          position: 'absolute',
+          left: 56,
+          bottom: 40,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 16,
           color: TEXT_MUTED,
-          fontStyle: 'italic',
-          textAlign: 'center',
+          fontFamily: FONT_DISPLAY,
+          fontWeight: 700,
+          letterSpacing: '0.18em',
+          fontSize: 24,
+          textTransform: 'uppercase',
+          opacity: footerOpacity,
         }}
       >
-        Every player is assigned their actual statistics from their best seasons
-        — not projections, not averages. Real history.
+        <div
+          style={{
+            width: 6,
+            height: 6,
+            borderRadius: '50%',
+            background: BRAND_GOLD,
+            boxShadow: `0 0 12px ${BRAND_GOLD}`,
+          }}
+        />
+        Scene 03<span style={{ color: '#6C80BA' }}>/</span>Cross-Era
+      </div>
+      <div
+        style={{
+          position: 'absolute',
+          right: 56,
+          bottom: 40,
+          fontFamily: "'Roboto Mono', monospace",
+          color: '#6C80BA',
+          fontSize: 24,
+          letterSpacing: '0.08em',
+          opacity: footerOpacity,
+        }}
+      >
+        00:12 — 00:20
       </div>
     </AbsoluteFill>
   );

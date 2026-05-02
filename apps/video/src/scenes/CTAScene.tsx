@@ -10,35 +10,18 @@ import {
   BG_DARK,
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,
-  BRAND_NAVY,
   FONT_BODY,
   FONT_DISPLAY,
   FONT_MONO,
-  PANEL_BORDER,
-  SURFACE_CARD,
-  SURFACE_PANEL,
   TEXT_MUTED,
   TEXT_PRIMARY,
 } from '../theme';
 
 const STATS = [
-  { value: '1,200+', label: 'Commissioners' },
-  { value: '150', label: 'Years of MLB History' },
-  { value: '50,000+', label: 'Player Seasons' },
-];
-
-const STEPS_SUMMARY = [
-  { num: '01', label: 'Create a League', detail: 'Choose your era and rules' },
-  {
-    num: '02',
-    label: 'Draft Your Legends',
-    detail: 'Snake or auction — across any era',
-  },
-  {
-    num: '03',
-    label: 'Compete Weekly',
-    detail: 'Archived stats — no luck of the schedule',
-  },
+  { value: '150', label: 'Years of Baseball' },
+  { value: '50K+', label: 'Player-Seasons' },
+  { value: '12', label: 'Team Leagues' },
+  { value: '$0', label: 'To Start' },
 ];
 
 export const CTAScene: React.FC = () => {
@@ -56,408 +39,270 @@ export const CTAScene: React.FC = () => {
     extrapolateRight: 'clamp',
   });
 
-  // Logo entrance
-  const logoY = spring({
-    frame,
-    fps,
-    from: -40,
-    to: 0,
-    config: { damping: 30, stiffness: 200 },
-  });
-  const logoOpacity = interpolate(frame, [0, 20], [0, 1], {
+  // Stats row entrance
+  const statsOpacity = interpolate(frame, [0, 20], [0, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
+  });
+  const statsY = spring({
+    frame,
+    fps,
+    from: -30,
+    to: 0,
+    config: { damping: 30, stiffness: 200 },
   });
 
   // Headline entrance
   const headlineY = spring({
-    frame: frame - 10,
+    frame: frame - 14,
     fps,
     from: 40,
     to: 0,
     config: { damping: 28, stiffness: 180 },
   });
-  const headlineOpacity = interpolate(frame, [10, 28], [0, 1], {
+  const headlineOpacity = interpolate(frame, [14, 32], [0, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
 
-  // Steps entrance (staggered)
-  // Stats entrance (staggered)
+  // Lede
+  const ledeOpacity = interpolate(frame, [28, 46], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
 
-  // CTA button pulse
+  // CTA button entrance
   const buttonScale = spring({
-    frame: frame - 100,
+    frame: frame - 46,
     fps,
     from: 0.8,
     to: 1,
     config: { damping: 20, stiffness: 200 },
   });
+  const buttonOpacity = interpolate(frame, [46, 66], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
+
+  // URL
+  const urlOpacity = interpolate(frame, [80, 100], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
 
   return (
     <AbsoluteFill
       style={{
-        background: BG_DARK,
+        background: `
+          radial-gradient(ellipse at 18% 0%, rgba(27,58,92,0.55) 0%, transparent 55%),
+          radial-gradient(ellipse at 82% 8%, rgba(196,30,58,0.18) 0%, transparent 45%),
+          radial-gradient(ellipse at 50% 100%, rgba(197,165,90,0.14) 0%, transparent 55%),
+          ${BG_DARK}
+        `,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        overflow: 'hidden',
+        textAlign: 'center',
+        padding: 80,
         opacity: sceneIn,
+        overflow: 'hidden',
       }}
     >
+      {/* Vignette */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background:
+            'radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(0,0,0,0.45) 100%)',
+          pointerEvents: 'none',
+        }}
+      />
+
       {/* Background glow */}
       <div
         style={{
           position: 'absolute',
           inset: 0,
-          background: `radial-gradient(ellipse 900px 600px at 50% 50%, ${BRAND_NAVY}${Math.round(
-            glowOpacity * 255,
-          )
-            .toString(16)
-            .padStart(2, '0')}, transparent)`,
+          background: `radial-gradient(ellipse 900px 600px at 50% 50%, rgba(27,58,92,${glowOpacity.toFixed(
+            2,
+          )}), transparent)`,
+          pointerEvents: 'none',
         }}
       />
 
-      {/* Gold line top */}
-      <div
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: '20%',
-          right: '20%',
-          height: 3,
-          background: `linear-gradient(90deg, transparent, ${BRAND_GOLD}, transparent)`,
-        }}
-      />
-
+      {/* Stats row */}
       <div
         style={{
           display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: 48,
-          maxWidth: 1200,
-          width: '100%',
-          padding: '0 80px',
-          position: 'relative',
+          gap: 80,
+          marginBottom: 52,
+          opacity: statsOpacity,
+          transform: `translateY(${statsY}px)`,
         }}
       >
-        {/* Logo / brand mark */}
-        <div
-          style={{
-            transform: `translateY(${logoY}px)`,
-            opacity: logoOpacity,
-            textAlign: 'center',
-          }}
-        >
+        {STATS.map((s) => (
           <div
+            key={s.label}
             style={{
-              display: 'inline-flex',
+              display: 'flex',
+              flexDirection: 'column',
               alignItems: 'center',
-              gap: 12,
-              background: BRAND_NAVY + '55',
-              border: `1px solid ${BRAND_GOLD}44`,
-              borderRadius: 12,
-              padding: '10px 24px',
-            }}
-          >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-              <circle
-                cx="12"
-                cy="12"
-                r="10"
-                stroke={BRAND_GOLD}
-                strokeWidth="1.5"
-              />
-              <path
-                d="M7 12c2-2.5 3-4 5-4s3 1.5 5 4c-2 2.5-3 4-5 4s-3-1.5-5-4z"
-                stroke={BRAND_GOLD}
-                strokeWidth="1.5"
-              />
-              <circle cx="12" cy="12" r="2" fill={BRAND_GOLD} />
-            </svg>
-            <div
-              style={{
-                fontFamily: FONT_DISPLAY,
-                fontWeight: 700,
-                fontSize: 18,
-                color: BRAND_GOLD,
-                letterSpacing: '0.16em',
-                textTransform: 'uppercase',
-              }}
-            >
-              Legacy Sports
-            </div>
-          </div>
-        </div>
-
-        {/* Main headline */}
-        <div
-          style={{
-            transform: `translateY(${headlineY}px)`,
-            opacity: headlineOpacity,
-            textAlign: 'center',
-          }}
-        >
-          <div
-            style={{
-              fontFamily: FONT_DISPLAY,
-              fontWeight: 800,
-              fontSize: 88,
-              color: TEXT_PRIMARY,
-              textTransform: 'uppercase',
-              letterSpacing: '0.02em',
-              lineHeight: 1,
-            }}
-          >
-            START YOUR
-          </div>
-          <div
-            style={{
-              fontFamily: FONT_DISPLAY,
-              fontWeight: 800,
-              fontSize: 88,
-              color: BRAND_GOLD,
-              textTransform: 'uppercase',
-              letterSpacing: '0.02em',
-              lineHeight: 1,
-            }}
-          >
-            LEGACY
-          </div>
-          <div
-            style={{
-              fontFamily: FONT_BODY,
-              fontSize: 26,
-              color: TEXT_MUTED,
-              marginTop: 20,
-              fontStyle: 'italic',
-            }}
-          >
-            The only fantasy league powered by 150 years of MLB history.
-          </div>
-        </div>
-
-        {/* How it works — quick steps */}
-        <div
-          style={{
-            display: 'flex',
-            gap: 24,
-            width: '100%',
-            opacity: interpolate(frame, [40, 60], [0, 1], {
-              extrapolateLeft: 'clamp',
-              extrapolateRight: 'clamp',
-            }),
-          }}
-        >
-          {STEPS_SUMMARY.map((s, i) => {
-            const stepOpacity = interpolate(
-              frame,
-              [40 + i * 12, 58 + i * 12],
-              [0, 1],
-              {
-                extrapolateLeft: 'clamp',
-                extrapolateRight: 'clamp',
-              },
-            );
-            const stepY = spring({
-              frame: frame - (40 + i * 12),
-              fps,
-              from: 24,
-              to: 0,
-              config: { damping: 30, stiffness: 220 },
-            });
-
-            return (
-              <div
-                key={s.num}
-                style={{
-                  flex: 1,
-                  background: SURFACE_PANEL,
-                  border: `1px solid ${PANEL_BORDER}`,
-                  borderRadius: 12,
-                  padding: '24px 28px',
-                  display: 'flex',
-                  gap: 18,
-                  alignItems: 'flex-start',
-                  opacity: stepOpacity,
-                  transform: `translateY(${stepY}px)`,
-                }}
-              >
-                <div
-                  style={{
-                    fontFamily: FONT_MONO,
-                    fontWeight: 700,
-                    fontSize: 32,
-                    color: BRAND_GOLD + '66',
-                    lineHeight: 1,
-                    flexShrink: 0,
-                    fontVariantNumeric: 'tabular-nums',
-                  }}
-                >
-                  {s.num}
-                </div>
-                <div>
-                  <div
-                    style={{
-                      fontFamily: FONT_DISPLAY,
-                      fontWeight: 700,
-                      fontSize: 22,
-                      color: TEXT_PRIMARY,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.04em',
-                      marginBottom: 6,
-                    }}
-                  >
-                    {s.label}
-                  </div>
-                  <div
-                    style={{
-                      fontFamily: FONT_BODY,
-                      fontSize: 16,
-                      color: TEXT_MUTED,
-                      lineHeight: 1.4,
-                    }}
-                  >
-                    {s.detail}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Stats row */}
-        <div
-          style={{
-            display: 'flex',
-            gap: 0,
-            borderRadius: 12,
-            overflow: 'hidden',
-            border: `1px solid ${PANEL_BORDER}`,
-            opacity: interpolate(frame, [70, 90], [0, 1], {
-              extrapolateLeft: 'clamp',
-              extrapolateRight: 'clamp',
-            }),
-          }}
-        >
-          {STATS.map((s, i) => (
-            <div
-              key={s.label}
-              style={{
-                padding: '20px 40px',
-                textAlign: 'center',
-                background: i % 2 === 0 ? SURFACE_PANEL : SURFACE_CARD,
-                borderRight:
-                  i < STATS.length - 1 ? `1px solid ${PANEL_BORDER}` : 'none',
-              }}
-            >
-              <div
-                style={{
-                  fontFamily: FONT_DISPLAY,
-                  fontWeight: 800,
-                  fontSize: 36,
-                  color: BRAND_GOLD,
-                  letterSpacing: '0.02em',
-                  fontVariantNumeric: 'tabular-nums',
-                }}
-              >
-                {s.value}
-              </div>
-              <div
-                style={{
-                  fontFamily: FONT_BODY,
-                  fontSize: 14,
-                  color: TEXT_MUTED,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.08em',
-                  marginTop: 4,
-                }}
-              >
-                {s.label}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* CTA Button */}
-        <div
-          style={{
-            transform: `scale(${buttonScale})`,
-            opacity: interpolate(frame, [100, 120], [0, 1], {
-              extrapolateLeft: 'clamp',
-              extrapolateRight: 'clamp',
-            }),
-          }}
-        >
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 16,
-              background: `linear-gradient(135deg, ${BRAND_GOLD}, ${BRAND_GOLD_LIGHT})`,
-              borderRadius: 14,
-              padding: '20px 52px',
-              boxShadow: `0 12px 48px ${BRAND_GOLD}44`,
             }}
           >
             <div
               style={{
                 fontFamily: FONT_DISPLAY,
                 fontWeight: 800,
-                fontSize: 26,
-                color: BG_DARK,
-                letterSpacing: '0.08em',
-                textTransform: 'uppercase',
+                fontSize: 96,
+                color: BRAND_GOLD,
+                lineHeight: 1,
+                fontVariantNumeric: 'tabular-nums',
+                letterSpacing: '-0.01em',
               }}
             >
-              Create Your League — It's Free
+              {s.value}
             </div>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M5 12h14M14 7l5 5-5 5"
-                stroke={BG_DARK}
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+            <div
+              style={{
+                fontFamily: FONT_DISPLAY,
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.20em',
+                fontSize: 24,
+                color: TEXT_MUTED,
+                marginTop: 10,
+              }}
+            >
+              {s.label}
+            </div>
           </div>
-        </div>
+        ))}
+      </div>
 
-        {/* URL */}
+      {/* Main headline */}
+      <h2
+        style={{
+          fontFamily: FONT_DISPLAY,
+          fontWeight: 800,
+          fontSize: 144,
+          lineHeight: 0.92,
+          color: TEXT_PRIMARY,
+          letterSpacing: '-0.025em',
+          margin: '0 0 22px 0',
+          maxWidth: 1500,
+          opacity: headlineOpacity,
+          transform: `translateY(${headlineY}px)`,
+        }}
+      >
+        Build your dynasty.
+        <br />
+        <span style={{ color: BRAND_GOLD }}>Dominate your league.</span>
+      </h2>
+
+      {/* Lede */}
+      <p
+        style={{
+          fontFamily: FONT_BODY,
+          fontStyle: 'italic',
+          fontSize: 32,
+          color: TEXT_MUTED,
+          maxWidth: 1100,
+          margin: '0 0 56px 0',
+          opacity: ledeOpacity,
+        }}
+      >
+        Free to play · No credit card · Year-round play
+      </p>
+
+      {/* CTA Button */}
+      <div
+        style={{
+          transform: `scale(${buttonScale})`,
+          opacity: buttonOpacity,
+        }}
+      >
         <div
           style={{
-            opacity: interpolate(frame, [130, 155], [0, 1], {
-              extrapolateLeft: 'clamp',
-              extrapolateRight: 'clamp',
-            }),
-            fontFamily: FONT_MONO,
-            fontSize: 18,
-            color: TEXT_MUTED,
-            letterSpacing: '0.06em',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 18,
+            padding: '26px 52px',
+            borderRadius: 20,
+            background: `linear-gradient(135deg, ${BRAND_GOLD}, ${BRAND_GOLD_LIGHT})`,
+            color: '#14223A',
+            fontFamily: FONT_DISPLAY,
+            fontWeight: 800,
+            fontSize: 38,
+            letterSpacing: '0.04em',
+            textTransform: 'uppercase',
+            boxShadow:
+              '0 0 0 1px rgba(197,165,90,0.35), 0 6px 24px rgba(197,165,90,0.25)',
           }}
         >
-          legacy.sports
+          Create Your League — It&apos;s Free
+          <span style={{ fontSize: 32 }}>→</span>
         </div>
       </div>
 
-      {/* Gold line bottom */}
+      {/* URL */}
+      <div
+        style={{
+          marginTop: 36,
+          fontFamily: FONT_MONO,
+          color: BRAND_GOLD_LIGHT,
+          fontSize: 26,
+          letterSpacing: '0.12em',
+          opacity: urlOpacity,
+        }}
+      >
+        legacy.sports
+      </div>
+
+      {/* Scene chrome */}
       <div
         style={{
           position: 'absolute',
-          bottom: 0,
-          left: '20%',
-          right: '20%',
-          height: 3,
-          background: `linear-gradient(90deg, transparent, ${BRAND_GOLD}, transparent)`,
-          opacity: interpolate(frame, [20, 40], [0, 1], {
-            extrapolateLeft: 'clamp',
-            extrapolateRight: 'clamp',
-          }),
+          left: 56,
+          bottom: 40,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 16,
+          color: TEXT_MUTED,
+          fontFamily: FONT_DISPLAY,
+          fontWeight: 700,
+          letterSpacing: '0.18em',
+          fontSize: 24,
+          textTransform: 'uppercase',
+          opacity: urlOpacity,
         }}
-      />
+      >
+        <div
+          style={{
+            width: 6,
+            height: 6,
+            borderRadius: '50%',
+            background: BRAND_GOLD,
+            boxShadow: `0 0 12px ${BRAND_GOLD}`,
+          }}
+        />
+        Scene 07<span style={{ color: '#6C80BA' }}>/</span>Call to Action
+      </div>
+      <div
+        style={{
+          position: 'absolute',
+          right: 56,
+          bottom: 40,
+          fontFamily: "'Roboto Mono', monospace",
+          color: '#6C80BA',
+          fontSize: 24,
+          letterSpacing: '0.08em',
+          opacity: urlOpacity,
+        }}
+      >
+        00:51 — 01:00
+      </div>
     </AbsoluteFill>
   );
 };

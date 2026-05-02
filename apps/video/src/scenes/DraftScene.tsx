@@ -9,135 +9,53 @@ import {
 import {
   BG_DARK,
   BRAND_GOLD,
-  BRAND_GOLD_LIGHT,
-  BRAND_NAVY,
   BRAND_SEAM_RED,
+  BRAND_SEAM_RED_LIGHT,
   FONT_BODY,
   FONT_DISPLAY,
   FONT_MONO,
+  GLASS_BORDER,
   OUTLINE_SUBTLE,
   PANEL_BORDER,
   POS_CATCHER,
   POS_INFIELD,
   POS_OUTFIELD,
   POS_PITCHER,
-  GREEN,
+  POS_UTILITY,
   SURFACE_CARD,
   SURFACE_PANEL,
-  SURFACE_SUBTLE,
   TEXT_MUTED,
   TEXT_PRIMARY,
 } from '../theme';
 
-// Draft picks that happen during the scene (one per ~40 frames)
-const DRAFT_PICKS = [
-  {
-    team: 'The Ruthless Yankees',
-    player: 'Babe Ruth',
-    year: 1927,
-    pos: 'OF',
-    round: 1,
-    pick: 1,
-    pos_color: POS_OUTFIELD,
-  },
-  {
-    team: 'Brooklyn Bruisers',
-    player: 'Hank Aaron',
-    year: 1959,
-    pos: 'OF',
-    round: 1,
-    pick: 2,
-    pos_color: POS_OUTFIELD,
-  },
-  {
-    team: 'Chicago Lumber Co.',
-    player: 'Walter Johnson',
-    year: 1913,
-    pos: 'SP',
-    round: 1,
-    pick: 3,
-    pos_color: POS_PITCHER,
-  },
-  {
-    team: "The Joltin' Joes",
-    player: 'Ted Williams',
-    year: 1941,
-    pos: 'LF',
-    round: 1,
-    pick: 4,
-    pos_color: POS_OUTFIELD,
-  },
-  {
-    team: 'Steel City Stars',
-    player: 'Mike Schmidt',
-    year: 1980,
-    pos: '3B',
-    round: 1,
-    pick: 5,
-    pos_color: POS_INFIELD,
-  },
-  {
-    team: 'Mudville Nine',
-    player: 'Johnny Bench',
-    year: 1972,
-    pos: 'C',
-    round: 1,
-    pick: 6,
-    pos_color: POS_CATCHER,
-  },
-];
-
-const YOUR_TEAM = 'The Ruthless Yankees';
-
-// Available players on the board (not yet drafted)
+// Storyboard: Round 4 · Pick 41 — available player pool (top 8)
 const AVAILABLE = [
-  {
-    name: 'Willie Mays',
-    year: 1954,
-    pos: 'CF',
-    team: 'NYG',
-    adp: 7,
-    pos_color: POS_OUTFIELD,
-  },
-  {
-    name: 'Lou Gehrig',
-    year: 1936,
-    pos: '1B',
-    team: 'NYY',
-    adp: 8,
-    pos_color: POS_INFIELD,
-  },
-  {
-    name: 'Sandy Koufax',
-    year: 1963,
-    pos: 'SP',
-    team: 'LAD',
-    adp: 9,
-    pos_color: POS_PITCHER,
-  },
-  {
-    name: 'Ty Cobb',
-    year: 1911,
-    pos: 'CF',
-    team: 'DET',
-    adp: 10,
-    pos_color: POS_OUTFIELD,
-  },
-  {
-    name: 'Cy Young',
-    year: 1901,
-    pos: 'SP',
-    team: 'BOS',
-    adp: 11,
-    pos_color: POS_PITCHER,
-  },
+  { pos: 'P', name: 'Pedro Martínez', sub: '2000 · Boston Red Sox', val: '98.4', posColor: POS_PITCHER },
+  { pos: 'OF', name: 'Ted Williams', sub: '1941 · Boston Red Sox', val: '96.2', posColor: POS_OUTFIELD },
+  { pos: 'SS', name: 'Honus Wagner', sub: '1908 · Pittsburgh Pirates', val: '94.7', posColor: POS_INFIELD },
+  { pos: 'C', name: 'Johnny Bench', sub: '1972 · Cincinnati Reds', val: '93.1', posColor: POS_CATCHER },
+  { pos: 'P', name: 'Sandy Koufax', sub: '1965 · LA Dodgers', val: '92.8', posColor: POS_PITCHER },
+  { pos: '2B', name: 'Joe Morgan', sub: '1976 · Cincinnati Reds', val: '91.3', posColor: POS_INFIELD },
+  { pos: 'CF', name: 'Willie Mays', sub: '1965 · SF Giants', val: '90.6', posColor: POS_OUTFIELD },
+  { pos: 'UT', name: 'Rickey Henderson', sub: "1990 · Oakland A's", val: '89.4', posColor: POS_UTILITY },
 ];
+
+// Storyboard: Recent picks (pick log, most recent first)
+const PICK_LOG = [
+  { pick: '4.40', pos: 'OF', posColor: POS_OUTFIELD, name: "Hank Aaron, '57", team: 'Bronx Bombers' },
+  { pick: '4.39', pos: 'P', posColor: POS_PITCHER, name: "Greg Maddux, '95", team: 'Diamond Cutters' },
+  { pick: '4.38', pos: '3B', posColor: POS_INFIELD, name: "Mike Schmidt, '80", team: 'Liberty Bells' },
+  { pick: '4.37', pos: 'C', posColor: POS_CATCHER, name: "Yogi Berra, '54", team: 'River Avenue' },
+  { pick: '4.36', pos: '1B', posColor: POS_INFIELD, name: "Lou Gehrig, '36", team: 'Iron Horsemen' },
+];
+
+const ACTIVE_TEAM = 'The Old Guard';
 
 export const DraftScene: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  const sceneIn = interpolate(frame, [0, 20], [0, 1], {
+  const sceneIn = interpolate(frame, [0, 18], [0, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
@@ -146,548 +64,526 @@ export const DraftScene: React.FC = () => {
     extrapolateRight: 'clamp',
   });
 
-  // Which picks have happened?
-  const PICK_INTERVAL = 42;
-  const picksVisible = Math.min(
-    Math.floor(frame / PICK_INTERVAL) + 1,
-    DRAFT_PICKS.length,
-  );
+  const headY = spring({
+    frame,
+    fps,
+    from: -30,
+    to: 0,
+    config: { damping: 30, stiffness: 200 },
+  });
 
-  // Timer — counts down each pick
-  const frameInCurrentPick = frame % PICK_INTERVAL;
-  const timerValue = Math.round(
-    interpolate(frameInCurrentPick, [0, PICK_INTERVAL], [90, 1], {
+  // Countdown timer ticks from 47 → 0
+  const timerValue = Math.max(0, 47 - Math.floor(frame / 6));
+
+  const gridOpacity = interpolate(frame, [12, 30], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
+
+  const footerOpacity = interpolate(frame, [60, 80], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
+
+  // Rows animate in one by one
+  function playerRowOpacity(i: number) {
+    return interpolate(frame, [20 + i * 6, 35 + i * 6], [0, 1], {
       extrapolateLeft: 'clamp',
       extrapolateRight: 'clamp',
-    }),
-  );
-
-  // Active pick (the current one being made — highlighted)
-  const activePick = Math.min(
-    Math.floor(frame / PICK_INTERVAL),
-    DRAFT_PICKS.length - 1,
-  );
-
-  // "ON THE CLOCK" pulse
-  const pulseOpacity = interpolate(
-    frameInCurrentPick % 20,
-    [0, 10, 20],
-    [0.6, 1, 0.6],
-    {
-      extrapolateLeft: 'clamp',
-      extrapolateRight: 'clamp',
-    },
-  );
+    });
+  }
 
   return (
     <AbsoluteFill
       style={{
-        background: BG_DARK,
+        background: `
+          radial-gradient(ellipse at 18% 0%, rgba(27,58,92,0.55) 0%, transparent 55%),
+          radial-gradient(ellipse at 82% 8%, rgba(196,30,58,0.18) 0%, transparent 45%),
+          radial-gradient(ellipse at 50% 100%, rgba(197,165,90,0.14) 0%, transparent 55%),
+          ${BG_DARK}
+        `,
         display: 'flex',
         flexDirection: 'column',
+        padding: '60px 80px 90px',
         opacity: sceneIn * exitOpacity,
+        overflow: 'hidden',
       }}
     >
-      {/* Top bar: draft status */}
+      {/* Vignette */}
       <div
         style={{
-          height: 72,
-          background: SURFACE_SUBTLE,
-          borderBottom: `1px solid ${PANEL_BORDER}`,
+          position: 'absolute',
+          inset: 0,
+          background:
+            'radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(0,0,0,0.45) 100%)',
+          pointerEvents: 'none',
+        }}
+      />
+
+      {/* Header row */}
+      <div
+        style={{
           display: 'flex',
+          justifyContent: 'space-between',
           alignItems: 'center',
-          padding: '0 48px',
-          gap: 32,
-          flexShrink: 0,
+          marginBottom: 30,
+          transform: `translateY(${headY}px)`,
         }}
       >
-        <div
+        <h2
           style={{
             fontFamily: FONT_DISPLAY,
             fontWeight: 800,
-            fontSize: 22,
-            color: BRAND_GOLD,
-            letterSpacing: '0.08em',
-            textTransform: 'uppercase',
-          }}
-        >
-          Live Draft
-        </div>
-        <div style={{ width: 1, height: 32, background: PANEL_BORDER }} />
-        <div
-          style={{
-            fontFamily: FONT_DISPLAY,
-            fontWeight: 600,
-            fontSize: 16,
-            color: TEXT_MUTED,
-            letterSpacing: '0.06em',
-            textTransform: 'uppercase',
-          }}
-        >
-          Round 1 · Pick {activePick + 1} of {DRAFT_PICKS.length}
-        </div>
-
-        <div
-          style={{
-            marginLeft: 'auto',
+            fontSize: 64,
+            color: TEXT_PRIMARY,
+            margin: 0,
+            letterSpacing: '-0.01em',
             display: 'flex',
             alignItems: 'center',
-            gap: 24,
+            gap: 14,
           }}
         >
-          {/* On the clock indicator */}
-          <div
+          <span
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 10,
-              background: BRAND_NAVY + '44',
-              border: `1px solid ${BRAND_GOLD}44`,
-              borderRadius: 8,
-              padding: '8px 18px',
-              opacity:
-                DRAFT_PICKS[activePick]?.team === YOUR_TEAM
-                  ? pulseOpacity
-                  : 0.3,
+              color: BRAND_SEAM_RED_LIGHT,
+              fontSize: 28,
+              padding: '8px 14px',
+              border: `1px solid ${BRAND_SEAM_RED}`,
+              borderRadius: 9999,
+              background: 'rgba(196,30,58,0.18)',
+              letterSpacing: '0.18em',
+              textTransform: 'uppercase',
+              verticalAlign: 'middle',
             }}
           >
-            <div
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: '50%',
-                background: BRAND_GOLD,
-              }}
-            />
+            ▶ LIVE DRAFT
+          </span>
+          Round 4 · Pick 41
+        </h2>
+
+        {/* Timer card */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 22,
+            padding: '14px 24px',
+            borderRadius: 16,
+            background: SURFACE_CARD,
+            border: `1px solid ${BRAND_SEAM_RED}`,
+            boxShadow: '0 0 0 1px rgba(196,30,58,0.45), 0 6px 20px rgba(196,30,58,0.3)',
+          }}
+        >
+          <div>
             <div
               style={{
                 fontFamily: FONT_DISPLAY,
                 fontWeight: 700,
-                fontSize: 14,
-                color: BRAND_GOLD_LIGHT,
-                letterSpacing: '0.1em',
                 textTransform: 'uppercase',
+                letterSpacing: '0.16em',
+                color: TEXT_MUTED,
+                fontSize: 24,
               }}
             >
-              {DRAFT_PICKS[activePick]?.team === YOUR_TEAM
-                ? 'YOUR PICK'
-                : 'On the Clock'}
+              On the clock
+            </div>
+            <div
+              style={{
+                fontFamily: FONT_DISPLAY,
+                fontWeight: 700,
+                color: TEXT_PRIMARY,
+                fontSize: 24,
+                marginTop: 2,
+              }}
+            >
+              {ACTIVE_TEAM}
             </div>
           </div>
-
-          {/* Timer */}
           <div
             style={{
-              fontFamily: FONT_MONO,
-              fontWeight: 700,
-              fontSize: 36,
-              color: timerValue < 15 ? BRAND_SEAM_RED : TEXT_PRIMARY,
+              fontFamily: FONT_DISPLAY,
+              fontWeight: 800,
+              fontSize: 56,
+              color: BRAND_SEAM_RED_LIGHT,
               fontVariantNumeric: 'tabular-nums',
-              minWidth: 60,
+              lineHeight: 1,
+              minWidth: 72,
               textAlign: 'right',
             }}
           >
-            {timerValue}s
+            0:{timerValue.toString().padStart(2, '0')}
           </div>
         </div>
       </div>
 
-      {/* Main content */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-        {/* Draft log: left side */}
+      {/* Draft grid: player pool (1.7fr) | pick log (1fr) */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1.7fr 1fr',
+          gap: 28,
+          flex: 1,
+          opacity: gridOpacity,
+        }}
+      >
+        {/* Available player pool */}
         <div
           style={{
-            width: 440,
             background: SURFACE_PANEL,
-            borderRight: `1px solid ${PANEL_BORDER}`,
+            border: `1px solid ${PANEL_BORDER}`,
+            borderRadius: 20,
+            padding: 24,
             display: 'flex',
             flexDirection: 'column',
-            overflow: 'hidden',
-            flexShrink: 0,
           }}
         >
           <div
             style={{
-              padding: '20px 28px',
-              borderBottom: `1px solid ${PANEL_BORDER}`,
-              fontFamily: FONT_DISPLAY,
-              fontWeight: 600,
-              fontSize: 13,
-              color: TEXT_MUTED,
-              letterSpacing: '0.12em',
-              textTransform: 'uppercase',
-            }}
-          >
-            Draft Board
-          </div>
-
-          <div
-            style={{
-              padding: '16px 0',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 2,
-            }}
-          >
-            {DRAFT_PICKS.slice(0, picksVisible).map((pick, i) => {
-              const isYours = pick.team === YOUR_TEAM;
-              const pickEntrance = spring({
-                frame: frame - i * PICK_INTERVAL,
-                fps,
-                from: -20,
-                to: 0,
-                config: { damping: 30, stiffness: 280 },
-              });
-              const pickOpacity = interpolate(
-                frame,
-                [i * PICK_INTERVAL, i * PICK_INTERVAL + 12],
-                [0, 1],
-                {
-                  extrapolateLeft: 'clamp',
-                  extrapolateRight: 'clamp',
-                },
-              );
-
-              return (
-                <div
-                  key={i}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 14,
-                    padding: '12px 28px',
-                    background: isYours ? BRAND_NAVY + '44' : 'transparent',
-                    borderLeft: `3px solid ${isYours ? BRAND_GOLD : 'transparent'}`,
-                    transform: `translateX(${pickEntrance}px)`,
-                    opacity: pickOpacity,
-                  }}
-                >
-                  {/* Pick number */}
-                  <div
-                    style={{
-                      fontFamily: FONT_MONO,
-                      fontSize: 12,
-                      color: TEXT_MUTED,
-                      minWidth: 28,
-                      fontVariantNumeric: 'tabular-nums',
-                    }}
-                  >
-                    {pick.pick}.
-                  </div>
-
-                  {/* Position badge */}
-                  <div
-                    style={{
-                      width: 36,
-                      height: 26,
-                      borderRadius: 5,
-                      background: pick.pos_color + '33',
-                      border: `1px solid ${pick.pos_color}55`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontFamily: FONT_DISPLAY,
-                      fontWeight: 700,
-                      fontSize: 11,
-                      color: pick.pos_color,
-                      letterSpacing: '0.04em',
-                      flexShrink: 0,
-                    }}
-                  >
-                    {pick.pos}
-                  </div>
-
-                  {/* Name + year */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div
-                      style={{
-                        fontFamily: FONT_DISPLAY,
-                        fontWeight: 700,
-                        fontSize: 18,
-                        color: isYours ? TEXT_PRIMARY : TEXT_MUTED,
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.02em',
-                      }}
-                    >
-                      {pick.player}
-                    </div>
-                    <div
-                      style={{
-                        fontFamily: FONT_BODY,
-                        fontSize: 12,
-                        color: TEXT_MUTED,
-                        marginTop: 1,
-                      }}
-                    >
-                      {pick.year} · {pick.team}
-                    </div>
-                  </div>
-
-                  {isYours && (
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                      <path
-                        d="M7 1l1.7 4.5H13l-3.6 2.6 1.4 4.4L7 10.1 3.2 12.5l1.4-4.4L1 5.5h4.3L7 1z"
-                        fill={BRAND_GOLD}
-                      />
-                    </svg>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Player pool: right side */}
-        <div
-          style={{
-            flex: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
-          }}
-        >
-          <div
-            style={{
-              padding: '20px 32px',
-              borderBottom: `1px solid ${PANEL_BORDER}`,
               display: 'flex',
               alignItems: 'center',
-              gap: 20,
+              justifyContent: 'space-between',
+              marginBottom: 18,
             }}
           >
             <div
               style={{
                 fontFamily: FONT_DISPLAY,
-                fontWeight: 600,
-                fontSize: 13,
+                fontWeight: 800,
+                fontSize: 26,
                 color: TEXT_MUTED,
-                letterSpacing: '0.12em',
                 textTransform: 'uppercase',
+                letterSpacing: '0.12em',
               }}
             >
-              Available Players
+              Available · Top 8
             </div>
-            <div
-              style={{
-                fontFamily: FONT_MONO,
-                fontSize: 12,
-                color: TEXT_MUTED,
-                background: SURFACE_CARD,
-                border: `1px solid ${PANEL_BORDER}`,
-                borderRadius: 6,
-                padding: '3px 10px',
-              }}
-            >
-              2,847 players
-            </div>
-          </div>
-
-          {/* Position filters — mirrors real draft page filter tabs */}
-          <div
-            style={{
-              display: 'flex',
-              gap: 8,
-              padding: '10px 32px',
-              borderBottom: `1px solid ${OUTLINE_SUBTLE}`,
-              flexWrap: 'wrap',
-              opacity: interpolate(frame, [5, 20], [0, 1], {
-                extrapolateLeft: 'clamp',
-                extrapolateRight: 'clamp',
-              }),
-            }}
-          >
-            {['ALL', 'SP', 'RP', 'C', '1B', '2B', '3B', 'SS', 'OF'].map(
-              (pos) => {
-                const isSelected = pos === 'ALL';
-                return (
-                  <div
-                    key={pos}
-                    style={{
-                      padding: '6px 14px',
-                      borderRadius: 8,
-                      border: `2px solid ${isSelected ? BRAND_GOLD : PANEL_BORDER}`,
-                      background: isSelected
-                        ? BRAND_GOLD + '22'
-                        : 'transparent',
-                      fontFamily: FONT_DISPLAY,
-                      fontWeight: isSelected ? 700 : 400,
-                      fontSize: 13,
-                      color: isSelected ? TEXT_PRIMARY : TEXT_MUTED,
-                      letterSpacing: '0.04em',
-                    }}
-                  >
-                    {pos}
-                  </div>
-                );
-              },
-            )}
-          </div>
-
-          {/* Column headers */}
-          <div
-            style={{
-              display: 'flex',
-              padding: '10px 32px',
-              borderBottom: `1px solid ${OUTLINE_SUBTLE}`,
-            }}
-          >
-            {['#', 'Player', 'Year', 'Pos', 'Team', 'ADP'].map((col, i) => (
-              <div
-                key={col}
-                style={{
-                  fontFamily: FONT_DISPLAY,
-                  fontWeight: 600,
-                  fontSize: 11,
-                  color: TEXT_MUTED,
-                  letterSpacing: '0.1em',
-                  textTransform: 'uppercase',
-                  flex: i === 1 ? 3 : 1,
-                  textAlign: i > 2 ? 'center' : 'left',
-                }}
-              >
-                {col}
-              </div>
-            ))}
-          </div>
-
-          {/* Player rows */}
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {AVAILABLE.map((p, i) => {
-              const rowOpacity = interpolate(
-                frame,
-                [10 + i * 6, 25 + i * 6],
-                [0, 1],
-                {
-                  extrapolateLeft: 'clamp',
-                  extrapolateRight: 'clamp',
-                },
-              );
-              const isHighlighted = i === 0;
-
-              return (
+            {/* Position filters */}
+            <div style={{ display: 'flex', gap: 8 }}>
+              {['All', 'P', 'C', 'IF', 'OF'].map((f, i) => (
                 <div
-                  key={p.name}
+                  key={f}
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    padding: '14px 32px',
-                    borderBottom: `1px solid ${OUTLINE_SUBTLE}`,
-                    background: isHighlighted
-                      ? BRAND_NAVY + '22'
-                      : 'transparent',
-                    opacity: rowOpacity,
+                    fontFamily: FONT_DISPLAY,
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.12em',
+                    fontSize: 24,
+                    padding: '10px 20px',
+                    borderRadius: 9999,
+                    border: `1px solid ${i === 0 ? '#2C4A7C' : PANEL_BORDER}`,
+                    color: i === 0 ? TEXT_PRIMARY : TEXT_MUTED,
+                    background: i === 0 ? '#1B3A5C' : 'transparent',
                   }}
                 >
+                  {f}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 2-column grid of player rows */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: 14,
+              flex: 1,
+            }}
+          >
+            {AVAILABLE.map((p, i) => (
+              <div
+                key={p.name}
+                style={{
+                  background: SURFACE_CARD,
+                  border: `1px solid ${GLASS_BORDER}`,
+                  borderRadius: 12,
+                  padding: '14px 18px',
+                  display: 'grid',
+                  gridTemplateColumns: '56px 1fr auto',
+                  alignItems: 'center',
+                  gap: 14,
+                  position: 'relative',
+                  overflow: 'hidden',
+                  opacity: playerRowOpacity(i),
+                }}
+              >
+                {/* Left accent */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: 4,
+                    background: p.posColor,
+                  }}
+                />
+                {/* Position tag */}
+                <div
+                  style={{
+                    fontFamily: FONT_DISPLAY,
+                    fontWeight: 800,
+                    fontSize: 24,
+                    color: '#fff',
+                    background: p.posColor,
+                    borderRadius: 6,
+                    padding: '8px 0',
+                    textAlign: 'center',
+                    letterSpacing: '0.06em',
+                  }}
+                >
+                  {p.pos}
+                </div>
+                <div>
                   <div
                     style={{
-                      flex: 1,
-                      fontFamily: FONT_MONO,
-                      fontSize: 13,
-                      color: TEXT_MUTED,
-                      fontVariantNumeric: 'tabular-nums',
-                    }}
-                  >
-                    {p.adp}
-                  </div>
-                  <div
-                    style={{
-                      flex: 3,
                       fontFamily: FONT_DISPLAY,
                       fontWeight: 700,
-                      fontSize: 20,
+                      fontSize: 26,
                       color: TEXT_PRIMARY,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.01em',
+                      lineHeight: 1.1,
                     }}
                   >
                     {p.name}
                   </div>
                   <div
                     style={{
-                      flex: 1,
-                      fontFamily: FONT_MONO,
-                      fontSize: 13,
+                      fontFamily: FONT_BODY,
+                      fontSize: 24,
                       color: TEXT_MUTED,
-                      fontVariantNumeric: 'tabular-nums',
+                      marginTop: 4,
                     }}
                   >
-                    {p.year}
-                  </div>
-                  <div style={{ flex: 1, textAlign: 'center' }}>
-                    <span
-                      style={{
-                        fontFamily: FONT_DISPLAY,
-                        fontWeight: 700,
-                        fontSize: 13,
-                        color: p.pos_color,
-                        background: p.pos_color + '22',
-                        borderRadius: 5,
-                        padding: '3px 8px',
-                        letterSpacing: '0.04em',
-                      }}
-                    >
-                      {p.pos}
-                    </span>
-                  </div>
-                  <div style={{ flex: 1, textAlign: 'center' }}>
-                    <span
-                      style={{
-                        fontFamily: FONT_MONO,
-                        fontSize: 12,
-                        color: BRAND_GOLD,
-                        background: BRAND_GOLD + '18',
-                        borderRadius: 4,
-                        padding: '2px 8px',
-                      }}
-                    >
-                      {p.team}
-                    </span>
-                  </div>
-                  <div
-                    style={{
-                      flex: 1,
-                      textAlign: 'center',
-                      fontFamily: FONT_MONO,
-                      fontSize: 13,
-                      color: TEXT_MUTED,
-                      fontVariantNumeric: 'tabular-nums',
-                    }}
-                  >
-                    {p.adp}.0
-                  </div>
-
-                  {/* Add-to-queue button — mirrors real draft player row action */}
-                  <div
-                    style={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: 8,
-                      background: isHighlighted ? GREEN + '33' : GREEN + '18',
-                      border: `1px solid ${GREEN}${isHighlighted ? '66' : '33'}`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                      marginLeft: 8,
-                    }}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                      <path
-                        d="M7 2v10M2 7h10"
-                        stroke={GREEN}
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                      />
-                    </svg>
+                    {p.sub}
                   </div>
                 </div>
-              );
-            })}
+                <div>
+                  <div
+                    style={{
+                      fontFamily: FONT_DISPLAY,
+                      fontWeight: 800,
+                      fontSize: 26,
+                      color: BRAND_GOLD,
+                      fontVariantNumeric: 'tabular-nums',
+                    }}
+                  >
+                    {p.val}
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: FONT_DISPLAY,
+                      fontSize: 24,
+                      letterSpacing: '0.18em',
+                      color: '#6C80BA',
+                      textTransform: 'uppercase',
+                      display: 'block',
+                    }}
+                  >
+                    VAL
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
+
+        {/* Pick log */}
+        <div
+          style={{
+            background: SURFACE_PANEL,
+            border: `1px solid ${PANEL_BORDER}`,
+            borderRadius: 20,
+            padding: 24,
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          <div
+            style={{
+              fontFamily: FONT_DISPLAY,
+              fontWeight: 800,
+              fontSize: 26,
+              color: TEXT_MUTED,
+              textTransform: 'uppercase',
+              letterSpacing: '0.12em',
+              marginBottom: 16,
+            }}
+          >
+            Recent Picks
+          </div>
+
+          {/* "On the clock" row */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '60px 40px 1fr',
+              alignItems: 'center',
+              gap: 14,
+              padding: '12px 10px',
+              background: 'linear-gradient(90deg, rgba(196,30,58,0.18), transparent 80%)',
+              borderRadius: 8,
+              marginBottom: 4,
+            }}
+          >
+            <div
+              style={{
+                fontFamily: FONT_MONO,
+                fontSize: 24,
+                color: BRAND_SEAM_RED_LIGHT,
+              }}
+            >
+              4.41
+            </div>
+            <div
+              style={{
+                fontFamily: FONT_DISPLAY,
+                fontWeight: 800,
+                fontSize: 24,
+                textAlign: 'center',
+                padding: '6px 0',
+                borderRadius: 6,
+                color: '#fff',
+                background: BRAND_SEAM_RED,
+              }}
+            >
+              —
+            </div>
+            <div>
+              <div
+                style={{
+                  fontFamily: FONT_DISPLAY,
+                  fontWeight: 700,
+                  fontSize: 26,
+                  color: BRAND_SEAM_RED_LIGHT,
+                }}
+              >
+                On the clock…
+              </div>
+              <div
+                style={{
+                  fontFamily: FONT_BODY,
+                  fontSize: 24,
+                  color: TEXT_MUTED,
+                }}
+              >
+                {ACTIVE_TEAM}
+              </div>
+            </div>
+          </div>
+
+          {/* Past picks */}
+          {PICK_LOG.map((pick, i) => {
+            const pickOpacity = interpolate(
+              frame,
+              [18 + i * 8, 32 + i * 8],
+              [0, 1],
+              { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
+            );
+            return (
+              <div
+                key={pick.pick}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '60px 40px 1fr',
+                  alignItems: 'center',
+                  gap: 14,
+                  padding: '12px 0',
+                  borderBottom: i < PICK_LOG.length - 1 ? `1px solid ${OUTLINE_SUBTLE}` : 'none',
+                  opacity: pickOpacity,
+                }}
+              >
+                <div
+                  style={{
+                    fontFamily: FONT_MONO,
+                    fontSize: 24,
+                    color: '#6C80BA',
+                  }}
+                >
+                  {pick.pick}
+                </div>
+                <div
+                  style={{
+                    fontFamily: FONT_DISPLAY,
+                    fontWeight: 800,
+                    fontSize: 24,
+                    textAlign: 'center',
+                    padding: '6px 0',
+                    borderRadius: 6,
+                    color: '#fff',
+                    background: pick.posColor,
+                  }}
+                >
+                  {pick.pos}
+                </div>
+                <div>
+                  <div
+                    style={{
+                      fontFamily: FONT_DISPLAY,
+                      fontWeight: 700,
+                      fontSize: 26,
+                      color: TEXT_PRIMARY,
+                    }}
+                  >
+                    {pick.name}
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: FONT_BODY,
+                      fontSize: 24,
+                      color: TEXT_MUTED,
+                    }}
+                  >
+                    {pick.team}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Scene chrome */}
+      <div
+        style={{
+          position: 'absolute',
+          left: 56,
+          bottom: 40,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 16,
+          color: TEXT_MUTED,
+          fontFamily: FONT_DISPLAY,
+          fontWeight: 700,
+          letterSpacing: '0.18em',
+          fontSize: 24,
+          textTransform: 'uppercase',
+          opacity: footerOpacity,
+        }}
+      >
+        <div
+          style={{
+            width: 6,
+            height: 6,
+            borderRadius: '50%',
+            background: BRAND_GOLD,
+            boxShadow: `0 0 12px ${BRAND_GOLD}`,
+          }}
+        />
+        Scene 05<span style={{ color: '#6C80BA' }}>/</span>Live Draft
+      </div>
+      <div
+        style={{
+          position: 'absolute',
+          right: 56,
+          bottom: 40,
+          fontFamily: "'Roboto Mono', monospace",
+          color: '#6C80BA',
+          fontSize: 24,
+          letterSpacing: '0.08em',
+          opacity: footerOpacity,
+        }}
+      >
+        00:31 — 00:41
       </div>
     </AbsoluteFill>
   );

@@ -1,8 +1,10 @@
 import React from 'react';
 import {
   AbsoluteFill,
+  Img,
   interpolate,
   spring,
+  staticFile,
   useCurrentFrame,
   useVideoConfig,
 } from 'remotion';
@@ -10,92 +12,112 @@ import {
   BG_DARK,
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,
-  BRAND_SEAM_RED,
-  FONT_DISPLAY,
   FONT_BODY,
-  PANEL_BORDER,
+  FONT_DISPLAY,
   TEXT_MUTED,
   TEXT_PRIMARY,
 } from '../theme';
-
-// Animated seam-stitch decoration
-const BaseballSeam: React.FC<{
-  x: number;
-  y: number;
-  size: number;
-  opacity: number;
-}> = ({ x, y, size, opacity }) => (
-  <div
-    style={{
-      position: 'absolute',
-      left: x,
-      top: y,
-      width: size,
-      height: size,
-      borderRadius: '50%',
-      border: `2px solid ${BRAND_SEAM_RED}`,
-      opacity,
-      boxShadow: `0 0 ${size * 0.3}px ${BRAND_SEAM_RED}22`,
-    }}
-  />
-);
 
 export const TitleScene: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  // "LEGACY" word entrance — spring from left
-  const legacyX = spring({
+  // Logo circle entrance
+  const logoScale = spring({
     frame,
     fps,
-    from: -300,
-    to: 0,
-    config: { damping: 28, mass: 1, stiffness: 180 },
+    from: 0.6,
+    to: 1,
+    config: { damping: 28, stiffness: 200 },
+  });
+  const logoOpacity = interpolate(frame, [0, 18], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
   });
 
-  // "FANTASY BASEBALL" — spring from right
-  const fantasyX = spring({
-    frame: frame - 8,
+  // "LEGACY" entrance — slide from left
+  const legacyX = spring({
+    frame: frame - 6,
     fps,
-    from: 300,
+    from: -200,
     to: 0,
     config: { damping: 28, mass: 1, stiffness: 180 },
   });
 
-  // Tagline fade in
-  const taglineOpacity = interpolate(frame, [25, 55], [0, 1], {
+  // "FANTASY BASEBALL" entrance — slide from right
+  const fantasyX = spring({
+    frame: frame - 14,
+    fps,
+    from: 200,
+    to: 0,
+    config: { damping: 28, mass: 1, stiffness: 180 },
+  });
+
+  // Tagline fade
+  const taglineOpacity = interpolate(frame, [28, 52], [0, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
+  const taglineY = spring({
+    frame: frame - 28,
+    fps,
+    from: 20,
+    to: 0,
+    config: { damping: 30, stiffness: 200 },
+  });
 
-  // Badge line
-  const badgeOpacity = interpolate(frame, [40, 70], [0, 1], {
+  // Badges stagger
+  const badgesOpacity = interpolate(frame, [48, 72], [0, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
-
-  // Gold underline width
-  const lineWidth = interpolate(frame, [18, 55], [0, 100], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
+  const badgesY = spring({
+    frame: frame - 48,
+    fps,
+    from: 20,
+    to: 0,
+    config: { damping: 30, stiffness: 200 },
   });
 
-  // Background circles (decorative)
-  const circleScale = interpolate(frame, [0, 60], [0, 1], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
-
-  // Scene exit fade
+  // Scene exit
   const exitOpacity = interpolate(frame, [100, 120], [1, 0], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
 
+  const BADGES = [
+    { label: 'Cross-Era Drafting', style: 'gold' as const },
+    { label: 'Historical Stats', style: 'red' as const },
+    { label: 'Free to Play', style: 'navy' as const },
+  ];
+
+  const BADGE_STYLES = {
+    gold: {
+      color: BRAND_GOLD_LIGHT,
+      borderColor: 'rgba(197,165,90,0.45)',
+      background: 'rgba(197,165,90,0.08)',
+    },
+    red: {
+      color: '#F2A6B2',
+      borderColor: 'rgba(196,30,58,0.55)',
+      background: 'rgba(196,30,58,0.10)',
+    },
+    navy: {
+      color: '#B7C8E6',
+      borderColor: 'rgba(91,132,196,0.55)',
+      background: 'rgba(91,132,196,0.12)',
+    },
+  };
+
   return (
     <AbsoluteFill
       style={{
-        background: BG_DARK,
+        background: `
+          radial-gradient(ellipse at 18% 0%, rgba(27,58,92,0.55) 0%, transparent 55%),
+          radial-gradient(ellipse at 82% 8%, rgba(196,30,58,0.18) 0%, transparent 45%),
+          radial-gradient(ellipse at 50% 100%, rgba(197,165,90,0.14) 0%, transparent 55%),
+          ${BG_DARK}
+        `,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -104,115 +126,75 @@ export const TitleScene: React.FC = () => {
         opacity: exitOpacity,
       }}
     >
-      {/* Decorative background circles */}
+      {/* Vignette overlay */}
       <div
         style={{
           position: 'absolute',
-          right: -200,
-          top: -200,
-          width: 800,
-          height: 800,
-          borderRadius: '50%',
-          border: `1px solid ${PANEL_BORDER}`,
-          transform: `scale(${circleScale})`,
-          opacity: 0.4,
-        }}
-      />
-      <div
-        style={{
-          position: 'absolute',
-          right: -100,
-          top: -100,
-          width: 500,
-          height: 500,
-          borderRadius: '50%',
-          border: `1px solid ${BRAND_GOLD}22`,
-          transform: `scale(${circleScale})`,
-          opacity: 0.6,
-        }}
-      />
-      <div
-        style={{
-          position: 'absolute',
-          left: -200,
-          bottom: -200,
-          width: 700,
-          height: 700,
-          borderRadius: '50%',
-          border: `1px solid ${PANEL_BORDER}`,
-          transform: `scale(${circleScale})`,
-          opacity: 0.3,
+          inset: 0,
+          background:
+            'radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(0,0,0,0.45) 100%)',
+          pointerEvents: 'none',
         }}
       />
 
-      {/* Baseball seam decorations */}
-      <BaseballSeam x={120} y={80} size={24} opacity={badgeOpacity * 0.5} />
-      <BaseballSeam x={1750} y={900} size={18} opacity={badgeOpacity * 0.4} />
-      <BaseballSeam x={80} y={920} size={14} opacity={badgeOpacity * 0.3} />
-      <BaseballSeam x={1820} y={100} size={20} opacity={badgeOpacity * 0.35} />
-
-      {/* Horizontal rule top */}
+      {/* Logo circle */}
       <div
         style={{
-          position: 'absolute',
-          top: 100,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          width: 120,
-          height: 2,
-          background: `linear-gradient(90deg, transparent, ${BRAND_GOLD}, transparent)`,
-          opacity: badgeOpacity,
+          width: 200,
+          height: 200,
+          borderRadius: '50%',
+          background:
+            'radial-gradient(circle at 50% 40%, rgba(197,165,90,0.35) 0%, transparent 70%)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: 36,
+          filter: 'drop-shadow(0 14px 40px rgba(8,12,20,0.7))',
+          transform: `scale(${logoScale})`,
+          opacity: logoOpacity,
         }}
-      />
+      >
+        <Img
+          src={staticFile('logo.png')}
+          style={{ width: 168, height: 168 }}
+        />
+      </div>
 
-      {/* Main title block */}
+      {/* Title block */}
       <div
         style={{
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           gap: 0,
-          position: 'relative',
+          overflow: 'hidden',
         }}
       >
-        {/* "LEGACY" */}
+        {/* LEGACY */}
         <div
           style={{
             transform: `translateX(${legacyX}px)`,
             fontFamily: FONT_DISPLAY,
             fontWeight: 800,
-            fontSize: 196,
-            color: BRAND_GOLD,
-            letterSpacing: '0.04em',
-            lineHeight: 1,
+            fontSize: 168,
+            lineHeight: 0.92,
+            color: TEXT_PRIMARY,
+            letterSpacing: '-0.025em',
             textTransform: 'uppercase',
-            WebkitTextStroke: `2px ${BRAND_GOLD_LIGHT}44`,
           }}
         >
           LEGACY
         </div>
-
-        {/* Gold underline */}
-        <div
-          style={{
-            width: `${lineWidth}%`,
-            height: 4,
-            background: `linear-gradient(90deg, transparent, ${BRAND_GOLD}, transparent)`,
-            margin: '4px 0 8px',
-            alignSelf: 'center',
-          }}
-        />
-
-        {/* "FANTASY BASEBALL" */}
+        {/* FANTASY BASEBALL — gold */}
         <div
           style={{
             transform: `translateX(${fantasyX}px)`,
             fontFamily: FONT_DISPLAY,
-            fontWeight: 700,
-            fontSize: 96,
-            color: TEXT_PRIMARY,
-            letterSpacing: '0.12em',
-            lineHeight: 1,
+            fontWeight: 800,
+            fontSize: 168,
+            lineHeight: 0.92,
+            color: BRAND_GOLD,
+            letterSpacing: '-0.025em',
             textTransform: 'uppercase',
           }}
         >
@@ -223,82 +205,100 @@ export const TitleScene: React.FC = () => {
       {/* Tagline */}
       <div
         style={{
-          marginTop: 48,
+          marginTop: 28,
           opacity: taglineOpacity,
+          transform: `translateY(${taglineY}px)`,
           fontFamily: FONT_BODY,
-          fontSize: 32,
-          color: TEXT_MUTED,
-          letterSpacing: '0.06em',
           fontStyle: 'italic',
+          fontSize: 38,
+          color: TEXT_MUTED,
+          textAlign: 'center',
+          maxWidth: 1100,
         }}
       >
-        Draft legends. Compete on history.
+        Year-round fantasy baseball, powered by 150 years of history.
       </div>
 
-      {/* Badge row */}
+      {/* Badges */}
       <div
         style={{
-          marginTop: 64,
-          opacity: badgeOpacity,
+          marginTop: 56,
+          opacity: badgesOpacity,
+          transform: `translateY(${badgesY}px)`,
           display: 'flex',
-          gap: 32,
-          alignItems: 'center',
+          gap: 18,
         }}
       >
-        {[
-          '150 YEARS OF MLB HISTORY',
-          '50,000+ PLAYER SEASONS',
-          'CROSS-ERA DRAFTS',
-        ].map((label, i) => (
-          <div
-            key={i}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: i > 0 ? 32 : 0,
-            }}
-          >
-            {i > 0 && (
-              <div
-                style={{
-                  width: 4,
-                  height: 4,
-                  borderRadius: '50%',
-                  background: BRAND_GOLD,
-                  marginRight: 0,
-                }}
-              />
-            )}
+        {BADGES.map((badge) => {
+          const s = BADGE_STYLES[badge.style];
+          return (
             <div
-              key={label}
+              key={badge.label}
               style={{
                 fontFamily: FONT_DISPLAY,
-                fontWeight: 600,
-                fontSize: 18,
-                color: TEXT_MUTED,
-                letterSpacing: '0.1em',
+                fontWeight: 700,
                 textTransform: 'uppercase',
+                letterSpacing: '0.16em',
+                fontSize: 24,
+                padding: '14px 28px',
+                borderRadius: 9999,
+                border: `1px solid ${s.borderColor}`,
+                color: s.color,
+                background: s.background,
               }}
             >
-              {label}
+              {badge.label}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
-      {/* Bottom rule */}
+      {/* Scene chrome */}
       <div
         style={{
           position: 'absolute',
-          bottom: 100,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          width: 120,
-          height: 2,
-          background: `linear-gradient(90deg, transparent, ${BRAND_GOLD}, transparent)`,
-          opacity: badgeOpacity,
+          left: 56,
+          bottom: 40,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 16,
+          color: TEXT_MUTED,
+          fontFamily: FONT_DISPLAY,
+          fontWeight: 700,
+          letterSpacing: '0.18em',
+          fontSize: 24,
+          textTransform: 'uppercase',
+          opacity: badgesOpacity,
         }}
-      />
+      >
+        <div
+          style={{
+            width: 6,
+            height: 6,
+            borderRadius: '50%',
+            background: BRAND_GOLD,
+            boxShadow: `0 0 12px ${BRAND_GOLD}`,
+          }}
+        />
+        Scene 01
+        <span style={{ color: '#6C80BA' }}>/</span>
+        Title
+      </div>
+
+      <div
+        style={{
+          position: 'absolute',
+          right: 56,
+          bottom: 40,
+          fontFamily: "'Roboto Mono', monospace",
+          color: '#6C80BA',
+          fontSize: 24,
+          letterSpacing: '0.08em',
+          opacity: badgesOpacity,
+        }}
+      >
+        00:00 — 00:04
+      </div>
     </AbsoluteFill>
   );
 };

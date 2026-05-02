@@ -9,596 +9,119 @@ import {
 import {
   BG_DARK,
   BRAND_GOLD,
-  BRAND_GOLD_LIGHT,
   BRAND_NAVY,
+  BRAND_SEAM_RED_DARK,
   FONT_BODY,
   FONT_DISPLAY,
   FONT_MONO,
-  GREEN,
+  GLASS_BORDER,
   OUTLINE_SUBTLE,
   PANEL_BORDER,
-  POS_INFIELD,
-  POS_OUTFIELD,
-  POS_PITCHER,
-  POS_CATCHER,
   SURFACE_CARD,
   SURFACE_PANEL,
-  SURFACE_SUBTLE,
   TEXT_MUTED,
   TEXT_PRIMARY,
 } from '../theme';
 
-const HOME_TEAM = {
-  name: 'The Ruthless Yankees',
-  record: '6-2',
-  players: [
-    {
-      name: 'Babe Ruth',
-      year: 1927,
-      pos: 'OF',
-      pts: 38.5,
-      gp: 3,
-      pos_color: POS_OUTFIELD,
-    },
-    {
-      name: 'Lou Gehrig',
-      year: 1936,
-      pos: '1B',
-      pts: 29.0,
-      gp: 3,
-      pos_color: POS_INFIELD,
-    },
-    {
-      name: 'Walter Johnson',
-      year: 1913,
-      pos: 'SP',
-      pts: 22.5,
-      gp: 1,
-      pos_color: POS_PITCHER,
-    },
-    {
-      name: 'Mickey Mantle',
-      year: 1956,
-      pos: 'CF',
-      pts: 18.0,
-      gp: 2,
-      pos_color: POS_OUTFIELD,
-    },
-    {
-      name: 'Johnny Bench',
-      year: 1972,
-      pos: 'C',
-      pts: 14.5,
-      gp: 3,
-      pos_color: POS_CATCHER,
-    },
-  ],
-  total: 122.5,
+// Storyboard: Week 14 Matchup data
+const TEAM_A = {
+  initials: 'OG',
+  name: 'The Old Guard',
+  record: '9-4-0 · 1st place · East',
+  score: '142.7',
+  win: true,
+  gradient: 'linear-gradient(135deg, #1B3A5C 0%, #C5A55A 100%)',
+};
+const TEAM_B = {
+  initials: 'DC',
+  name: 'Diamond Cutters',
+  record: '8-5-0 · 2nd place · East',
+  score: '128.3',
+  win: false,
+  gradient: `linear-gradient(135deg, ${BRAND_SEAM_RED_DARK} 0%, ${BRAND_NAVY} 100%)`,
 };
 
-const AWAY_TEAM = {
-  name: 'Brooklyn Bruisers',
-  record: '5-3',
-  players: [
-    {
-      name: 'Hank Aaron',
-      year: 1959,
-      pos: 'OF',
-      pts: 31.0,
-      gp: 3,
-      pos_color: POS_OUTFIELD,
-    },
-    {
-      name: 'Willie Mays',
-      year: 1954,
-      pos: 'CF',
-      pts: 27.5,
-      gp: 3,
-      pos_color: POS_OUTFIELD,
-    },
-    {
-      name: 'Sandy Koufax',
-      year: 1963,
-      pos: 'SP',
-      pts: 19.0,
-      gp: 1,
-      pos_color: POS_PITCHER,
-    },
-    {
-      name: 'Mike Schmidt',
-      year: 1980,
-      pos: '3B',
-      pts: 16.5,
-      gp: 2,
-      pos_color: POS_INFIELD,
-    },
-    {
-      name: 'Roy Campanella',
-      year: 1953,
-      pos: 'C',
-      pts: 11.0,
-      gp: 3,
-      pos_color: POS_CATCHER,
-    },
-  ],
-  total: 105.0,
-};
+const ROSTER_A = [
+  { pos: 'C', name: 'Yogi Berra', year: "'54", score: '14.2', live: true },
+  { pos: '1B', name: 'Lou Gehrig', year: "'36", score: '22.8', live: true },
+  { pos: '2B', name: 'Joe Morgan', year: "'76", score: '11.4', live: false },
+  { pos: 'SS', name: 'Honus Wagner', year: "'08", score: '18.6', live: true },
+  { pos: '3B', name: 'Mike Schmidt', year: "'80", score: '15.0', live: false },
+  { pos: 'OF', name: 'Babe Ruth', year: "'27", score: '28.4', live: true },
+  { pos: 'OF', name: 'Hank Aaron', year: "'57", score: '19.7', live: false },
+  { pos: 'P', name: 'Bob Gibson', year: "'68", score: '12.6', live: false },
+];
 
-const ScoreboardCard: React.FC<{ frame: number; fps: number }> = ({
-  frame,
-}) => {
-  const cardOpacity = interpolate(frame, [0, 18], [0, 1], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
+const ROSTER_B = [
+  { pos: 'C', name: 'Johnny Bench', year: "'72", score: '13.1', live: false },
+  { pos: '1B', name: 'Albert Pujols', year: "'09", score: '21.4', live: true },
+  { pos: '2B', name: 'Rogers Hornsby', year: "'24", score: '17.2', live: false },
+  { pos: 'SS', name: 'Cal Ripken Jr.', year: "'91", score: '12.8', live: false },
+  { pos: '3B', name: 'George Brett', year: "'80", score: '14.5', live: false },
+  { pos: 'OF', name: 'Ted Williams', year: "'41", score: '23.6', live: true },
+  { pos: 'OF', name: 'Mike Trout', year: "'19", score: '16.3', live: false },
+  { pos: 'P', name: 'Pedro Martínez', year: "'00", score: '9.4', live: false },
+];
 
-  const homeScore = interpolate(frame, [15, 75], [0, HOME_TEAM.total], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
-  const awayScore = interpolate(frame, [15, 75], [0, AWAY_TEAM.total], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
-  const gamesCompleted = Math.floor(
-    interpolate(frame, [0, 200], [0, 4], {
-      extrapolateLeft: 'clamp',
-      extrapolateRight: 'clamp',
-    }),
-  );
-
-  return (
-    <div
-      style={{
-        background: SURFACE_PANEL,
-        border: `1px solid ${PANEL_BORDER}`,
-        borderRadius: 14,
-        overflow: 'hidden',
-        opacity: cardOpacity,
-        flexShrink: 0,
-      }}
-    >
-      {/* Top bar */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 16,
-          padding: '14px 28px',
-          borderBottom: `1px solid ${PANEL_BORDER}`,
-          background: SURFACE_SUBTLE,
-        }}
-      >
-        {/* Swords icon */}
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <path
-            d="M3 3l10 10M13 3L3 13"
-            stroke={BRAND_GOLD}
-            strokeWidth="1.5"
-            strokeLinecap="round"
-          />
-          <circle cx="8" cy="8" r="1.5" fill={BRAND_GOLD} fillOpacity="0.6" />
-        </svg>
-        <span
-          style={{
-            fontFamily: FONT_DISPLAY,
-            fontWeight: 700,
-            fontSize: 14,
-            color: BRAND_GOLD,
-            textTransform: 'uppercase',
-            letterSpacing: '0.1em',
-          }}
-        >
-          Week 7
-        </span>
-        <div style={{ width: 1, height: 16, background: PANEL_BORDER }} />
-        <span
-          style={{
-            fontFamily: FONT_BODY,
-            fontSize: 13,
-            color: TEXT_MUTED,
-          }}
-        >
-          {gamesCompleted} of 8 games completed
-        </span>
-
-        {/* IN PROGRESS badge */}
-        <div
-          style={{
-            marginLeft: 'auto',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 7,
-            background: GREEN + '1A',
-            border: `1px solid ${GREEN}44`,
-            borderRadius: 999,
-            padding: '5px 14px',
-          }}
-        >
-          <div
-            style={{
-              width: 6,
-              height: 6,
-              borderRadius: '50%',
-              background: GREEN,
-            }}
-          />
-          <span
-            style={{
-              fontFamily: FONT_DISPLAY,
-              fontWeight: 700,
-              fontSize: 12,
-              color: GREEN,
-              letterSpacing: '0.1em',
-              textTransform: 'uppercase',
-            }}
-          >
-            In Progress
-          </span>
-        </div>
-      </div>
-
-      {/* Score panels */}
-      <div style={{ display: 'flex' }}>
-        {/* Home team — leading */}
-        <div
-          style={{
-            flex: 1,
-            padding: '24px 48px',
-            textAlign: 'center',
-            background: BRAND_NAVY + '22',
-          }}
-        >
-          <div
-            style={{
-              fontFamily: FONT_DISPLAY,
-              fontWeight: 700,
-              fontSize: 18,
-              color: BRAND_GOLD,
-              textTransform: 'uppercase',
-              letterSpacing: '0.04em',
-              marginBottom: 8,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-            }}
-          >
-            {HOME_TEAM.name}
-          </div>
-          <div
-            style={{
-              fontFamily: FONT_DISPLAY,
-              fontWeight: 800,
-              fontSize: 56,
-              color: BRAND_GOLD_LIGHT,
-              fontVariantNumeric: 'tabular-nums',
-              letterSpacing: '-1px',
-              lineHeight: 1,
-            }}
-          >
-            {homeScore.toFixed(2)}
-          </div>
-          <div
-            style={{
-              fontFamily: FONT_BODY,
-              fontSize: 13,
-              color: BRAND_GOLD + 'AA',
-              marginTop: 8,
-              textTransform: 'uppercase',
-              letterSpacing: '0.08em',
-            }}
-          >
-            Leading · {HOME_TEAM.record}
-          </div>
-        </div>
-
-        {/* VS divider */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '0 32px',
-            flexShrink: 0,
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: 8,
-            }}
-          >
-            <div style={{ width: 1, height: 32, background: PANEL_BORDER }} />
-            <span
-              style={{
-                fontFamily: FONT_DISPLAY,
-                fontWeight: 900,
-                fontSize: 16,
-                color: TEXT_MUTED,
-                letterSpacing: '0.1em',
-              }}
-            >
-              VS
-            </span>
-            <div style={{ width: 1, height: 32, background: PANEL_BORDER }} />
-          </div>
-        </div>
-
-        {/* Away team */}
-        <div
-          style={{
-            flex: 1,
-            padding: '24px 48px',
-            textAlign: 'center',
-          }}
-        >
-          <div
-            style={{
-              fontFamily: FONT_DISPLAY,
-              fontWeight: 700,
-              fontSize: 18,
-              color: TEXT_MUTED,
-              textTransform: 'uppercase',
-              letterSpacing: '0.04em',
-              marginBottom: 8,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-            }}
-          >
-            {AWAY_TEAM.name}
-          </div>
-          <div
-            style={{
-              fontFamily: FONT_DISPLAY,
-              fontWeight: 800,
-              fontSize: 56,
-              color: TEXT_PRIMARY,
-              fontVariantNumeric: 'tabular-nums',
-              letterSpacing: '-1px',
-              lineHeight: 1,
-            }}
-          >
-            {awayScore.toFixed(2)}
-          </div>
-          <div
-            style={{
-              fontFamily: FONT_BODY,
-              fontSize: 13,
-              color: TEXT_MUTED,
-              marginTop: 8,
-              textTransform: 'uppercase',
-              letterSpacing: '0.08em',
-            }}
-          >
-            {AWAY_TEAM.record}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const TeamColumn: React.FC<{
-  team: typeof HOME_TEAM;
-  isHome: boolean;
+const RosterRow: React.FC<{
+  pos: string;
+  name: string;
+  year: string;
+  score: string;
+  live: boolean;
+  index: number;
+  last: boolean;
   frame: number;
-  fps: number;
-  showAll: boolean;
-}> = ({ team, isHome, frame, fps, showAll }) => {
-  const slideX = spring({
-    frame,
-    fps,
-    from: isHome ? -80 : 80,
-    to: 0,
-    config: { damping: 28, stiffness: 180 },
+}> = ({ pos, name, year, score, live, index, last, frame }) => {
+  const rowOpacity = interpolate(frame, [20 + index * 5, 34 + index * 5], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
   });
 
   return (
     <div
       style={{
-        flex: 1,
-        transform: `translateX(${slideX}px)`,
-        opacity: interpolate(frame, [0, 15], [0, 1], {
-          extrapolateLeft: 'clamp',
-          extrapolateRight: 'clamp',
-        }),
+        display: 'grid',
+        gridTemplateColumns: '56px 1fr 80px',
+        alignItems: 'center',
+        padding: '7px 0',
+        borderBottom: last ? 'none' : `1px solid ${OUTLINE_SUBTLE}`,
+        gap: 14,
+        opacity: rowOpacity,
       }}
     >
-      {/* Team header */}
       <div
         style={{
-          padding: '28px 32px',
-          background: `linear-gradient(135deg, ${SURFACE_PANEL} 0%, ${isHome ? BRAND_NAVY + '44' : SURFACE_CARD} 100%)`,
-          border: `1px solid ${isHome ? BRAND_GOLD + '44' : PANEL_BORDER}`,
-          borderRadius: '14px 14px 0 0',
-          borderBottom: `3px solid ${isHome ? BRAND_GOLD : PANEL_BORDER}`,
+          fontFamily: FONT_DISPLAY,
+          fontWeight: 800,
+          color: TEXT_MUTED,
+          fontSize: 24,
+          letterSpacing: '0.14em',
         }}
       >
-        <div
-          style={{
-            fontFamily: FONT_DISPLAY,
-            fontWeight: 800,
-            fontSize: 26,
-            color: TEXT_PRIMARY,
-            textTransform: 'uppercase',
-            letterSpacing: '0.02em',
-            marginBottom: 6,
-          }}
-        >
-          {team.name}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div
-            style={{
-              fontFamily: FONT_BODY,
-              fontSize: 15,
-              color: TEXT_MUTED,
-            }}
-          >
-            Record:{' '}
-            <span style={{ color: TEXT_PRIMARY, fontWeight: 600 }}>
-              {team.record}
-            </span>
-          </div>
-        </div>
+        {pos}
       </div>
-
-      {/* Player rows */}
       <div
         style={{
-          background: SURFACE_PANEL,
-          border: `1px solid ${PANEL_BORDER}`,
-          borderTop: 'none',
-          borderRadius: '0 0 14px 14px',
-          overflow: 'hidden',
+          fontFamily: FONT_BODY,
+          color: TEXT_PRIMARY,
+          fontSize: 24,
         }}
       >
-        {team.players.map((p, i) => {
-          const rowDelay = 12 + i * 10;
-          const rowOpacity = showAll
-            ? interpolate(frame, [rowDelay, rowDelay + 12], [0, 1], {
-                extrapolateLeft: 'clamp',
-                extrapolateRight: 'clamp',
-              })
-            : 0;
-
-          // Animated score counter
-          const displayedPts = interpolate(
-            frame,
-            [rowDelay + 8, rowDelay + 35],
-            [0, p.pts],
-            { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
-          );
-
-          return (
-            <div
-              key={p.name}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                padding: '14px 32px',
-                borderBottom:
-                  i < team.players.length - 1
-                    ? `1px solid ${OUTLINE_SUBTLE}`
-                    : 'none',
-                gap: 14,
-                opacity: rowOpacity,
-              }}
-            >
-              {/* Position */}
-              <div
-                style={{
-                  width: 40,
-                  height: 28,
-                  borderRadius: 5,
-                  background: p.pos_color + '22',
-                  border: `1px solid ${p.pos_color}44`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontFamily: FONT_DISPLAY,
-                  fontWeight: 700,
-                  fontSize: 12,
-                  color: p.pos_color,
-                  flexShrink: 0,
-                }}
-              >
-                {p.pos}
-              </div>
-
-              {/* Name + year */}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div
-                  style={{
-                    fontFamily: FONT_DISPLAY,
-                    fontWeight: 700,
-                    fontSize: 18,
-                    color: TEXT_PRIMARY,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.01em',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                  }}
-                >
-                  {p.name}
-                </div>
-                <div
-                  style={{
-                    fontFamily: FONT_BODY,
-                    fontSize: 12,
-                    color: TEXT_MUTED,
-                  }}
-                >
-                  {p.year} · {p.gp} GP
-                </div>
-              </div>
-
-              {/* Points */}
-              <div
-                style={{
-                  fontFamily: FONT_MONO,
-                  fontWeight: 700,
-                  fontSize: 22,
-                  color: isHome ? BRAND_GOLD : TEXT_PRIMARY,
-                  fontVariantNumeric: 'tabular-nums',
-                  textAlign: 'right',
-                  minWidth: 64,
-                }}
-              >
-                {displayedPts.toFixed(1)}
-              </div>
-            </div>
-          );
-        })}
-
-        {/* Total row */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            padding: '16px 32px',
-            background: isHome ? BRAND_NAVY + '55' : SURFACE_CARD,
-            borderTop: `2px solid ${isHome ? BRAND_GOLD + '55' : PANEL_BORDER}`,
-            opacity: showAll
-              ? interpolate(frame, [80, 95], [0, 1], {
-                  extrapolateLeft: 'clamp',
-                  extrapolateRight: 'clamp',
-                })
-              : 0,
-          }}
-        >
-          <div
-            style={{
-              flex: 1,
-              fontFamily: FONT_DISPLAY,
-              fontWeight: 700,
-              fontSize: 16,
-              color: TEXT_MUTED,
-              textTransform: 'uppercase',
-              letterSpacing: '0.1em',
-            }}
-          >
-            Total Points
-          </div>
-          <div
-            style={{
-              fontFamily: FONT_MONO,
-              fontWeight: 700,
-              fontSize: 32,
-              color: isHome ? BRAND_GOLD : TEXT_PRIMARY,
-              fontVariantNumeric: 'tabular-nums',
-            }}
-          >
-            {interpolate(frame, [80, 130], [0, team.total], {
-              extrapolateLeft: 'clamp',
-              extrapolateRight: 'clamp',
-            }).toFixed(1)}
-          </div>
-        </div>
+        {name}{' '}
+        <i style={{ color: TEXT_MUTED }}>{year}</i>
+      </div>
+      <div
+        style={{
+          fontFamily: FONT_DISPLAY,
+          fontWeight: 800,
+          fontSize: 26,
+          color: live ? BRAND_GOLD : TEXT_PRIMARY,
+          textAlign: 'right',
+          fontVariantNumeric: 'tabular-nums',
+        }}
+      >
+        {score}
       </div>
     </div>
   );
@@ -608,7 +131,7 @@ export const MatchupScene: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  const sceneIn = interpolate(frame, [0, 20], [0, 1], {
+  const sceneIn = interpolate(frame, [0, 18], [0, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
@@ -617,115 +140,386 @@ export const MatchupScene: React.FC = () => {
     extrapolateRight: 'clamp',
   });
 
-  const showAll = frame > 8;
+  const headY = spring({
+    frame,
+    fps,
+    from: -30,
+    to: 0,
+    config: { damping: 30, stiffness: 200 },
+  });
+
+  const scoreboardOpacity = interpolate(frame, [8, 24], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
+  const scoreboardY = spring({
+    frame: frame - 8,
+    fps,
+    from: 30,
+    to: 0,
+    config: { damping: 28, stiffness: 200 },
+  });
+
+  const rostersOpacity = interpolate(frame, [20, 36], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
+  const rostersY = spring({
+    frame: frame - 20,
+    fps,
+    from: 30,
+    to: 0,
+    config: { damping: 28, stiffness: 200 },
+  });
+
+  const footerOpacity = interpolate(frame, [60, 80], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
 
   return (
     <AbsoluteFill
       style={{
-        background: BG_DARK,
+        background: `
+          radial-gradient(ellipse at 18% 0%, rgba(27,58,92,0.55) 0%, transparent 55%),
+          radial-gradient(ellipse at 82% 8%, rgba(196,30,58,0.18) 0%, transparent 45%),
+          radial-gradient(ellipse at 50% 100%, rgba(197,165,90,0.14) 0%, transparent 55%),
+          ${BG_DARK}
+        `,
         display: 'flex',
         flexDirection: 'column',
-        padding: '40px 80px',
-        gap: 24,
+        padding: '70px 100px 140px',
         opacity: sceneIn * exitOpacity,
+        overflow: 'hidden',
       }}
     >
-      {/* Scoreboard — mirrors the real MatchupScoreboard component */}
-      <ScoreboardCard frame={frame} fps={fps} />
-
-      {/* Matchup columns */}
+      {/* Vignette */}
       <div
-        style={{ flex: 1, display: 'flex', gap: 28, alignItems: 'flex-start' }}
-      >
-        <TeamColumn
-          team={HOME_TEAM}
-          isHome={true}
-          frame={frame}
-          fps={fps}
-          showAll={showAll}
-        />
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background:
+            'radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(0,0,0,0.45) 100%)',
+          pointerEvents: 'none',
+        }}
+      />
 
-        {/* VS divider */}
+      {/* Header row */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-end',
+          marginBottom: 36,
+          transform: `translateY(${headY}px)`,
+        }}
+      >
+        <h2
+          style={{
+            fontFamily: FONT_DISPLAY,
+            fontWeight: 800,
+            fontSize: 72,
+            color: TEXT_PRIMARY,
+            margin: 0,
+            letterSpacing: '-0.01em',
+          }}
+        >
+          Week 14 Matchup
+        </h2>
+        <div
+          style={{
+            fontFamily: FONT_MONO,
+            color: TEXT_MUTED,
+            fontSize: 24,
+          }}
+        >
+          Week 14 / 22 · Sep 8 — Sep 14
+        </div>
+      </div>
+
+      {/* Scoreboard */}
+      <div
+        style={{
+          background: SURFACE_CARD,
+          border: `1px solid ${GLASS_BORDER}`,
+          borderRadius: 24,
+          padding: '44px 56px',
+          display: 'grid',
+          gridTemplateColumns: '1fr auto 1fr',
+          alignItems: 'center',
+          marginBottom: 28,
+          boxShadow: '0 4px 14px rgba(8,12,20,0.55)',
+          opacity: scoreboardOpacity,
+          transform: `translateY(${scoreboardY}px)`,
+        }}
+      >
+        {/* Team A */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
+          <div
+            style={{
+              width: 96,
+              height: 96,
+              borderRadius: 16,
+              background: TEAM_A.gradient,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontFamily: FONT_DISPLAY,
+              fontWeight: 800,
+              fontSize: 36,
+              color: '#fff',
+              border: '1px solid rgba(255,255,255,0.15)',
+              flexShrink: 0,
+            }}
+          >
+            {TEAM_A.initials}
+          </div>
+          <div>
+            <div
+              style={{
+                fontFamily: FONT_DISPLAY,
+                fontWeight: 800,
+                fontSize: 38,
+                color: TEXT_PRIMARY,
+                lineHeight: 1,
+              }}
+            >
+              {TEAM_A.name}
+            </div>
+            <div
+              style={{
+                fontFamily: FONT_BODY,
+                color: TEXT_MUTED,
+                fontSize: 26,
+                marginTop: 4,
+              }}
+            >
+              {TEAM_A.record}
+            </div>
+          </div>
+        </div>
+
+        {/* Scores */}
         <div
           style={{
             display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            paddingTop: 80,
-            gap: 8,
-            flexShrink: 0,
-            opacity: interpolate(frame, [15, 30], [0, 1], {
-              extrapolateLeft: 'clamp',
-              extrapolateRight: 'clamp',
-            }),
+            alignItems: 'baseline',
+            gap: 26,
+            padding: '0 30px',
           }}
         >
           <div
             style={{
               fontFamily: FONT_DISPLAY,
               fontWeight: 800,
-              fontSize: 24,
-              color: TEXT_MUTED,
-              letterSpacing: '0.1em',
+              fontSize: 132,
+              lineHeight: 1,
+              color: BRAND_GOLD,
+              fontVariantNumeric: 'tabular-nums',
+              letterSpacing: '-0.02em',
             }}
           >
-            VS
+            {TEAM_A.score}
           </div>
           <div
             style={{
-              width: 1,
-              height: 40,
-              background: PANEL_BORDER,
+              fontFamily: FONT_DISPLAY,
+              color: '#6C80BA',
+              fontSize: 64,
             }}
-          />
+          >
+            –
+          </div>
+          <div
+            style={{
+              fontFamily: FONT_DISPLAY,
+              fontWeight: 800,
+              fontSize: 132,
+              lineHeight: 1,
+              color: TEXT_PRIMARY,
+              fontVariantNumeric: 'tabular-nums',
+              letterSpacing: '-0.02em',
+            }}
+          >
+            {TEAM_B.score}
+          </div>
         </div>
 
-        <TeamColumn
-          team={AWAY_TEAM}
-          isHome={false}
-          frame={frame}
-          fps={fps}
-          showAll={showAll}
-        />
-      </div>
-
-      {/* Bottom: archived stats note */}
-      <div
-        style={{
-          opacity: interpolate(frame, [150, 175], [0, 1], {
-            extrapolateLeft: 'clamp',
-            extrapolateRight: 'clamp',
-          }),
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          padding: '14px 24px',
-          background: SURFACE_PANEL,
-          border: `1px solid ${PANEL_BORDER}`,
-          borderRadius: 10,
-        }}
-      >
-        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-          <circle cx="9" cy="9" r="8" stroke={BRAND_GOLD} strokeWidth="1.5" />
-          <path
-            d="M9 5v5l3 2"
-            stroke={BRAND_GOLD}
-            strokeWidth="1.5"
-            strokeLinecap="round"
-          />
-        </svg>
+        {/* Team B */}
         <div
           style={{
-            fontFamily: FONT_BODY,
-            fontSize: 16,
-            color: TEXT_MUTED,
-            fontStyle: 'italic',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            gap: 28,
+            flexDirection: 'row-reverse',
           }}
         >
-          All points are calculated from real, archived MLB box scores — every
-          stat is final before the week begins.
+          <div
+            style={{
+              width: 96,
+              height: 96,
+              borderRadius: 16,
+              background: TEAM_B.gradient,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontFamily: FONT_DISPLAY,
+              fontWeight: 800,
+              fontSize: 36,
+              color: '#fff',
+              border: '1px solid rgba(255,255,255,0.15)',
+              flexShrink: 0,
+            }}
+          >
+            {TEAM_B.initials}
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div
+              style={{
+                fontFamily: FONT_DISPLAY,
+                fontWeight: 800,
+                fontSize: 38,
+                color: TEXT_PRIMARY,
+                lineHeight: 1,
+              }}
+            >
+              {TEAM_B.name}
+            </div>
+            <div
+              style={{
+                fontFamily: FONT_BODY,
+                color: TEXT_MUTED,
+                fontSize: 26,
+                marginTop: 4,
+              }}
+            >
+              {TEAM_B.record}
+            </div>
+          </div>
         </div>
+      </div>
+
+      {/* Roster comparison */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: 24,
+          flex: 1,
+          opacity: rostersOpacity,
+          transform: `translateY(${rostersY}px)`,
+        }}
+      >
+        {/* Team A roster */}
+        <div
+          style={{
+            background: SURFACE_PANEL,
+            border: `1px solid ${PANEL_BORDER}`,
+            borderRadius: 20,
+            padding: '22px 24px',
+          }}
+        >
+          <div
+            style={{
+              fontFamily: FONT_DISPLAY,
+              fontWeight: 800,
+              fontSize: 26,
+              color: TEXT_MUTED,
+              textTransform: 'uppercase',
+              letterSpacing: '0.14em',
+              marginBottom: 12,
+            }}
+          >
+            {TEAM_A.name} · Starters
+          </div>
+          {ROSTER_A.map((row, i) => (
+            <RosterRow
+              key={row.name}
+              {...row}
+              index={i}
+              last={i === ROSTER_A.length - 1}
+              frame={frame}
+            />
+          ))}
+        </div>
+
+        {/* Team B roster */}
+        <div
+          style={{
+            background: SURFACE_PANEL,
+            border: `1px solid ${PANEL_BORDER}`,
+            borderRadius: 20,
+            padding: '22px 24px',
+          }}
+        >
+          <div
+            style={{
+              fontFamily: FONT_DISPLAY,
+              fontWeight: 800,
+              fontSize: 26,
+              color: TEXT_MUTED,
+              textTransform: 'uppercase',
+              letterSpacing: '0.14em',
+              marginBottom: 12,
+            }}
+          >
+            {TEAM_B.name} · Starters
+          </div>
+          {ROSTER_B.map((row, i) => (
+            <RosterRow
+              key={row.name}
+              {...row}
+              index={i}
+              last={i === ROSTER_B.length - 1}
+              frame={frame}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Scene chrome */}
+      <div
+        style={{
+          position: 'absolute',
+          left: 56,
+          bottom: 40,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 16,
+          color: TEXT_MUTED,
+          fontFamily: FONT_DISPLAY,
+          fontWeight: 700,
+          letterSpacing: '0.18em',
+          fontSize: 24,
+          textTransform: 'uppercase',
+          opacity: footerOpacity,
+        }}
+      >
+        <div
+          style={{
+            width: 6,
+            height: 6,
+            borderRadius: '50%',
+            background: BRAND_GOLD,
+            boxShadow: `0 0 12px ${BRAND_GOLD}`,
+          }}
+        />
+        Scene 06<span style={{ color: '#6C80BA' }}>/</span>Weekly Matchup
+      </div>
+      <div
+        style={{
+          position: 'absolute',
+          right: 56,
+          bottom: 40,
+          fontFamily: "'Roboto Mono', monospace",
+          color: '#6C80BA',
+          fontSize: 24,
+          letterSpacing: '0.08em',
+          opacity: footerOpacity,
+        }}
+      >
+        00:41 — 00:51
       </div>
     </AbsoluteFill>
   );
