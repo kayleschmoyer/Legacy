@@ -269,10 +269,18 @@ export function MatchupRosterEditorView({
     const playerName =
       `${player.player?.firstName ?? ''} ${player.player?.lastName ?? ''}`.trim();
 
+    const rowTestId = `matchup-player-row-${player.id}`;
+    // Tamagui forwards `testID` to react-native-web on web, but in this app's
+    // version it is silently dropped on a styled XStack with `onPress` — the
+    // rendered element ends up with no `data-testid` (LS-4133). Setting
+    // `data-testid` directly guarantees Playwright's
+    // `getByTestId(/^matchup-player-row-/)` resolves on web; `testID` is kept
+    // for the native mobile build.
     return (
       <XStack
         key={player.id}
-        testID={`matchup-player-row-${player.id}`}
+        testID={rowTestId}
+        data-testid={rowTestId}
         paddingVertical="$2.5"
         paddingHorizontal="$3"
         backgroundColor={

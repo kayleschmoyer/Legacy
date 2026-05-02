@@ -98,4 +98,54 @@ describe('MatchupRosterEditorView', () => {
       expect(screen.getByText('Test Playerp2')).toBeTruthy();
     });
   });
+
+  describe('player row data-testid attribute (LS-4133)', () => {
+    // Tamagui forwards `testID` to react-native-web on web, but in this app's
+    // version it is dropped on a styled XStack with `onPress` — the rendered
+    // element ends up with no `data-testid`. The view sets `data-testid`
+    // directly on each row so Playwright's `getByTestId(/^matchup-player-row-/)`
+    // resolves on the live web build.  This test fails the moment the explicit
+    // `data-testid` is removed, catching the E2E regression in <1s.
+    it('emits data-testid="matchup-player-row-{id}" on each starter row', () => {
+      const players = [makePlayer('p1', 101), makePlayer('p2', 102)];
+      const positionMap = new Map<number, string>([
+        [101, 'SP'],
+        [102, 'C'],
+      ]);
+      const { container } = render(
+        <MatchupRosterEditorView
+          players={players}
+          positionMap={positionMap}
+          positionOptions={[SP_SLOT, C_SLOT]}
+          onSwapPositions={noop}
+          onMoveToPosition={noop}
+        />,
+      );
+      const ids = Array.from(
+        container.querySelectorAll('[data-testid^="matchup-player-row-"]'),
+      ).map((el) => el.getAttribute('data-testid'));
+      expect(ids).toEqual(
+        expect.arrayContaining([
+          'matchup-player-row-p1',
+          'matchup-player-row-p2',
+        ]),
+      );
+    });
+
+    it('emits data-testid on bench rows as well', () => {
+      const players = [makePlayer('b1', null)];
+      const { container } = render(
+        <MatchupRosterEditorView
+          players={players}
+          positionMap={new Map()}
+          positionOptions={[SP_SLOT]}
+          onSwapPositions={noop}
+          onMoveToPosition={noop}
+        />,
+      );
+      expect(
+        container.querySelector('[data-testid="matchup-player-row-b1"]'),
+      ).not.toBeNull();
+    });
+  });
 });
