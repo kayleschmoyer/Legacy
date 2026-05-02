@@ -1,5 +1,5 @@
 /**
- * Roster Management UI Integration Test (LS-589)
+ * Roster Management UI Integration Test (LS-589, LS-3856)
  *
  * Validates three roster management features against the **live** backend
  * (no mocks) with real browser interactions and JWT swapping for multi-user
@@ -548,6 +548,16 @@ test.describe
     await test.step('Verify My Team tab shows the renamed team name', async () => {
       await page.goto(`/baseball/league/${state.leagueId}/team-settings`);
       await page.waitForLoadState('load');
+      await expect(page.locator('body')).not.toContainText(
+        'Unexpected Application Error',
+        { timeout: 30000 },
+      );
+      // Wait for the Team Settings card to render before checking the name.
+      // This heading only appears once getUserTeamId resolves and confirms
+      // the user has a team — mirrors the guard used in Phase 5.
+      await expect(page.getByText('Team Settings').first()).toBeVisible({
+        timeout: 30000,
+      });
       await expect(
         page.getByText(state.renamedTeamName, { exact: false }).first(),
       ).toBeVisible({ timeout: 15000 });
