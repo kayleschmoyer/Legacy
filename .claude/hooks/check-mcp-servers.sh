@@ -37,6 +37,15 @@ WARNINGS=()
 # (pnpm stores binaries as symlinks) also triggers the warning. With "! -L",
 # a broken symlink would pass silently: -L is true for any symlink, broken or not.
 TSX="$WORKTREE/node_modules/.bin/tsx"
+# Claude Code runs all SessionStart hooks concurrently. The setup-worktree-symlink
+# hook may still be creating the symlink when we reach this check. Poll briefly
+# (up to 3 s) so a slow-but-successful setup doesn't produce a false-positive warning.
+if [ ! -f "$TSX" ]; then
+  for _tsx_wait in 1 2 3; do
+    sleep 1
+    [ -f "$TSX" ] && break
+  done
+fi
 if [ ! -f "$TSX" ]; then
   WARNINGS+=("[MCP WARNING] node_modules/.bin/tsx is missing — all 7 stdio MCP servers will fail to connect silently.")
   if [ "$IS_WORKTREE" = "true" ]; then

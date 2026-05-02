@@ -1,86 +1,66 @@
 # SessionStart hook: create node_modules symlink in ephemeral worktrees.
 # Handles both Claude Code (.claude/worktrees/<name>) and Copilot (<repo>.worktrees/<name>) patterns.
 #
-# Why symlinks (not junctions):
-#   Directory symlinks (mklink /D) are NOT followed by recursive-delete tools.
-#   When a worktree directory is deleted, only the link is removed — the target
-#   node_modules in the main repo stays intact. Requires Windows Developer Mode.
+# Delegates to scripts/setup-worktree-node-modules.mjs — same script as the bash hook.
+# The PS hook may run concurrently with the bash hook; the setup script is intended
+# to be idempotent, but concurrent callers can still race during symlink creation.
 #
 # Claude Code equivalent: .claude/hooks/setup-worktree-symlink.sh
 
 $worktree = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { $PWD.Path }
 
-# --- 1. Detect worktree pattern and derive main repo path ----------------------
+# --- 0. Defensive input validation --------------------------------------------
+# $worktree arrives from CLAUDE_PROJECT_DIR or $PWD. Even though the PowerShell
+# call operator (& cmd arg1 arg2) passes argv directly without shell evaluation,
+# reject malformed values up front so a stray env var produces a silent no-op
+# instead of a confusing partial run.
+#
+# 1. Must be a non-empty rooted path (System.IO.Path treats e.g. C:\, D:\, /usr
+#    as rooted; relative paths are rejected).
+# 2. Must NOT contain characters that are illegal in Windows paths (these
+#    cannot reach a shell interpreter from here, but rejecting them keeps the
+#    contract simple and surface area minimal).
+# 3. Must exist as a directory on disk.
+if ([string]::IsNullOrWhiteSpace($worktree)) { exit 0 }
+if (-not [System.IO.Path]::IsPathRooted($worktree)) { exit 0 }
+$invalidChars = [System.IO.Path]::GetInvalidPathChars()
+foreach ($ch in $invalidChars) {
+    if ($worktree.Contains($ch)) { exit 0 }
+}
+if (-not (Test-Path -LiteralPath $worktree -PathType Container)) { exit 0 }
+# Canonicalize so downstream uses see a consistent absolute path.
+$worktree = (Resolve-Path -LiteralPath $worktree).Path
+
+# --- 1. Detect worktree pattern -----------------------------------------------
 $parentDir  = Split-Path $worktree -Parent
 $parentName = Split-Path $parentDir -Leaf
 
-$mainRepo = $null
+$isWorktree = $false
 
 # Pattern A: Copilot — <root>\<repo>.worktrees\<name>
 if ($parentName -like '*.worktrees') {
-    $rootDir      = Split-Path $parentDir -Parent
-    $mainRepoName = $parentName -replace '\.worktrees$', ''
-    $mainRepo     = Join-Path $rootDir $mainRepoName
+    $isWorktree = $true
 }
 # Pattern B: Claude Code — <root>\<repo>\.claude\worktrees\<name>
 elseif ($worktree -match [regex]::Escape('\.claude\worktrees\') + '[^\\]+$') {
-    $mainRepo = $worktree -replace ([regex]::Escape('\.claude\worktrees\') + '[^\\]+$'), ''
-}
-else {
-    exit 0  # Not in a known worktree pattern
+    $isWorktree = $true
 }
 
-$mainNm = Join-Path $mainRepo 'node_modules'
-if (-not (Test-Path $mainNm -PathType Container)) {
-    exit 0  # Main repo node_modules missing — nothing to symlink
-}
+if (-not $isWorktree) { exit 0 }
 
-# --- 2. Check if symlink needs creation/repair --------------------------------
-$nm  = Join-Path $worktree 'node_modules'
-$bin = Join-Path $nm '.bin'
-
-$needsRecreate = $false
-
-if (-not (Test-Path $nm)) {
-    $needsRecreate = $true
-} else {
-    $item = Get-Item $nm -Force -ErrorAction SilentlyContinue
-    if ($null -eq $item) {
-        $needsRecreate = $true
-    } elseif ($item.LinkType -eq 'Junction') {
-        # NTFS junctions are dangerous: `git worktree remove` follows them and
-        # recursively deletes the target, destroying the main repo's node_modules.
-        # Directory symlinks (mklink /D) are safe — recreate as symlink (LS-3084).
-        $needsRecreate = $true
-    } elseif ($item.LinkType -ne 'SymbolicLink' -and $null -eq $item.LinkType) {
-        # Real directory (no link type) — leave it alone
-        exit 0
-    } elseif (-not (Test-Path $bin -PathType Container) -or
-              -not (Get-ChildItem $bin -ErrorAction SilentlyContinue | Select-Object -First 1)) {
-        # .bin missing or empty — symlink is broken/stale
-        $needsRecreate = $true
-    }
-}
-
-if (-not $needsRecreate) { exit 0 }
-
-# --- 3. Remove stale/broken entry (non-recursive, safe) -----------------------
-if (Test-Path $nm) {
-    cmd /c "rmdir `"$nm`"" 2>$null
-}
-
-# --- 4. Create directory symlink via cmd mklink /D ----------------------------
-cmd /c "mklink /D `"$nm`" `"$mainNm`"" 2>$null | Out-Null
-
-if (-not (Test-Path $nm -PathType Container)) {
-    try {
-        New-Item -ItemType SymbolicLink -Path $nm -Target $mainNm -ErrorAction Stop | Out-Null
-    } catch {
-        Write-Warning "[hook] Failed to create node_modules symlink. Enable Windows Developer Mode."
-        Write-Warning "  Source: $nm"
-        Write-Warning "  Target: $mainNm"
-        exit 1
-    }
+# --- 2. Delegate to the Node.js setup script ----------------------------------
+# node is available system-wide; the script is dependency-free (no node_modules needed).
+# Capture stderr to a log file rather than discarding it — the hook must never
+# block session startup, but we still want the root cause visible when node
+# fails (missing node, script bug, mklink permission denied, etc.).
+$tempDir = if ($env:TEMP) { $env:TEMP } elseif ($env:TMP) { $env:TMP } else { '/tmp' }
+$setupLog = Join-Path $tempDir 'claude-setup-worktree-symlink.log'
+"--- $((Get-Date).ToUniversalTime().ToString('o')) worktree=$worktree ---" | Out-File -FilePath $setupLog -Append -Encoding utf8
+& node "$worktree\scripts\setup-worktree-node-modules.mjs" "--worktree=$worktree" *>> $setupLog
+# Cap log at 500 lines so it doesn't grow unbounded over many sessions.
+if (Test-Path $setupLog) {
+    $tail = Get-Content -LiteralPath $setupLog -Tail 500 -ErrorAction SilentlyContinue
+    if ($tail) { $tail | Set-Content -LiteralPath $setupLog -Encoding utf8 }
 }
 
 exit 0
