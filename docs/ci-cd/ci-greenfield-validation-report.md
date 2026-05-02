@@ -6,27 +6,27 @@
 
 ## §1 Status Summary
 
-| Scenario                                                | Ticket  | Date       | Result     | Notes                                                                                                                                                                                  |
-| ------------------------------------------------------- | ------- | ---------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| V1 — Trivial happy path                                 | LS-3903 | 2026-04-28 | ✅ Pass    | 3 design gaps documented (see §2 Deviations)                                                                                                                                           |
-| V1 re-run v3 (LS-3938 + LS-3939 fixes)                  | LS-3940 | 2026-04-28 | 🟡 Partial | All ACs pass; 1 residual gap: conflict check still needs PAT workaround (see §3)                                                                                                       |
-| V1 re-run v4 (LS-3940 fix)                              | —       | 2026-04-28 | ✅ Pass    | Fully automated — zero manual steps (see §4)                                                                                                                                           |
-| V4 — Cycle 2 mandate flow                               | LS-3906 | 2026-04-28 | ✅ Pass    | JUSTIFY rejected (implicit), Cycle 2 mandated, Cycle 3 APPROVE; 1 design observation (see §12)                                                                                         |
-| V5 — Cycle cap escalation                               | LS-3907 | 2026-04-28 | 🔴 Partial | AC3 fail: W4 label-pager never fires — GITHUB_TOKEN anti-loop blocks pull_request.labeled delivery (see §5)                                                                            |
-| V5 re-run (LS-3948 fix)                                 | LS-3907 | 2026-04-28 | 🔴 Blocked | `CODE_WRITER_BOT_LOGIN` mismatch: code-writer-bot.yml creates `github-actions[bot]` PRs; `isCodeWriterBotAuthor` requires `code-writer-bot[bot]` → cycle protocol unreachable (see §6) |
-| V5 re-run v9 (LS-3953/3960/3962/3964/3966 fixes)        | LS-3907 | 2026-04-29 | ✅ Pass    | All 5 ACs pass — cycle cap enforced, escalation fires, W4 triggered via App token (see §7)                                                                                             |
-| V3 — Cycle 1 → Cycle 2 JUSTIFY accepted                 | LS-3905 | 2026-04-28 | 🔴 Fail    | AC2 fails — JUSTIFY reply not surfaced to LLM; bot re-raises finding in Cycle 2 (see §8)                                                                                               |
-| V3 re-run (LS-3947 fix)                                 | LS-3905 | 2026-04-28 | 🔴 Fail    | §8a path taken — code-writer-bot.yml creates github-actions[bot] PRs; LS-3947 fix is unreachable (see §9)                                                                              |
-| V3 re-run (LS-3953 + LS-3960 + LS-3962 + LS-3964 fixes) | LS-3905 | 2026-04-29 | 🔴 Fail    | AC1 ✅; AC2 ❌ — JUSTIFY injected but C2 ADJUDICATE is diff-based; unchanged code → re-raise (see §10)                                                                                 |
-| V3 re-run (LS-3965 + LS-3966 fixes)                     | LS-3905 | 2026-04-29 | ✅ Pass    | AC1 ✅ AC2 ✅ — C2 evaluated JUSTIFY and posted APPROVE "LGTM — no blocking findings" (see §11)                                                                                        |
-| V7 — Format-error & edge-case author responses          | LS-3909 | 2026-04-29 | 🔴 Fail    | AC1 ❌ AC4 ❌ AC5 ❌ — format-error reply never posted, CANNOT-COMPLY not escalated, no format-error telemetry (see §13)                                                               |
-| V7 re-run (LS-3968/3969/3970 fixes)                     | LS-3909 | 2026-04-30 | 🔴 Fail    | AC1 ❌ still (wrong endpoint in `postReviewThreadReply`); AC4 ✅ AC5 ✅ (LS-3969/3970 verified); LS-3987 filed (see §14)                                                               |
-| V9 — CI gating order                                    | LS-3911 | 2026-04-29 | 🟡 Partial | AC1–AC3 ✅ AC5 ✅; AC4 ❌ `dismiss_stale_reviews_on_push: false`; AC6 ⏭️ custom merge queue doesn't fire native `merge_group` (see §15)                                                |
-| V9 re-run (LS-3977 fix)                                 | LS-3911 | 2026-04-30 | 🟡 Partial | AC1–AC3 ✅ AC5 ✅; AC4 🔴 dismiss works ✅ but TOCTOU race merges PR with dismissed review — LS-3990 filed; AC6 ⏭️ skip (see §16)                                                      |
-| V9 final (LS-3977 + LS-3990 fixes)                      | LS-3911 | 2026-04-30 | 🟡 Partial | AC1–AC3 ✅; AC4 ⏭️ PR merged before step-6 push possible (merge queue gates bot-review only); AC5 ⚠️ infra failure (pnpm cache tar); AC6 ⏭️ (see §17)                                  |
-| V19 — CODEOWNERS sensitive paths                        | LS-3921 | 2026-05-01 | 🔴 Fail    | AC1 ❌ AC2 ❌ — bot approval + CI pass → merge queue merged WITHOUT human CODEOWNERS approval; `require_code_owner_review:true` not enforced (see §18)                                 |
-| V20 — Merge queue end-to-end + race conditions          | LS-3922 | 2026-04-30 | 🟡 Partial | AC3 ✅ AC4 ✅; AC1 🟡 (merge works, no merge_group re-run — custom queue); AC2 ❌ (TOCTOU guard exists but no label removal / approval dismissal per spec); see §19                    |
-| V15 — Fork PR reviewer skip                             | LS-3917 | 2026-04-30 | ✅ Pass    | All 5 ACs pass — W1 skipped on open and on `bot:ready-for-review` label; no bot labels applied; CI never fired; ubuntu-latest only (see §15)                                           |
+| Scenario                                                | Ticket  | Date       | Result     | Notes                                                                                                                                                                                                                                                              |
+| ------------------------------------------------------- | ------- | ---------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| V1 — Trivial happy path                                 | LS-3903 | 2026-04-28 | ✅ Pass    | 3 design gaps documented (see §2 Deviations)                                                                                                                                                                                                                       |
+| V1 re-run v3 (LS-3938 + LS-3939 fixes)                  | LS-3940 | 2026-04-28 | 🟡 Partial | All ACs pass; 1 residual gap: conflict check still needs PAT workaround (see §3)                                                                                                                                                                                   |
+| V1 re-run v4 (LS-3940 fix)                              | —       | 2026-04-28 | ✅ Pass    | Fully automated — zero manual steps (see §4)                                                                                                                                                                                                                       |
+| V4 — Cycle 2 mandate flow                               | LS-3906 | 2026-04-28 | ✅ Pass    | JUSTIFY rejected (implicit), Cycle 2 mandated, Cycle 3 APPROVE; 1 design observation (see §12)                                                                                                                                                                     |
+| V5 — Cycle cap escalation                               | LS-3907 | 2026-04-28 | 🔴 Partial | AC3 fail: W4 label-pager never fires — GITHUB_TOKEN anti-loop blocks pull_request.labeled delivery (see §5)                                                                                                                                                        |
+| V5 re-run (LS-3948 fix)                                 | LS-3907 | 2026-04-28 | 🔴 Blocked | `CODE_WRITER_BOT_LOGIN` mismatch: code-writer-bot.yml creates `github-actions[bot]` PRs; `isCodeWriterBotAuthor` requires `code-writer-bot[bot]` → cycle protocol unreachable (see §6)                                                                             |
+| V5 re-run v9 (LS-3953/3960/3962/3964/3966 fixes)        | LS-3907 | 2026-04-29 | ✅ Pass    | All 5 ACs pass — cycle cap enforced, escalation fires, W4 triggered via App token (see §7)                                                                                                                                                                         |
+| V3 — Cycle 1 → Cycle 2 JUSTIFY accepted                 | LS-3905 | 2026-04-28 | 🔴 Fail    | AC2 fails — JUSTIFY reply not surfaced to LLM; bot re-raises finding in Cycle 2 (see §8)                                                                                                                                                                           |
+| V3 re-run (LS-3947 fix)                                 | LS-3905 | 2026-04-28 | 🔴 Fail    | §8a path taken — code-writer-bot.yml creates github-actions[bot] PRs; LS-3947 fix is unreachable (see §9)                                                                                                                                                          |
+| V3 re-run (LS-3953 + LS-3960 + LS-3962 + LS-3964 fixes) | LS-3905 | 2026-04-29 | 🔴 Fail    | AC1 ✅; AC2 ❌ — JUSTIFY injected but C2 ADJUDICATE is diff-based; unchanged code → re-raise (see §10)                                                                                                                                                             |
+| V3 re-run (LS-3965 + LS-3966 fixes)                     | LS-3905 | 2026-04-29 | ✅ Pass    | AC1 ✅ AC2 ✅ — C2 evaluated JUSTIFY and posted APPROVE "LGTM — no blocking findings" (see §11)                                                                                                                                                                    |
+| V7 — Format-error & edge-case author responses          | LS-3909 | 2026-04-29 | 🔴 Fail    | AC1 ❌ AC4 ❌ AC5 ❌ — format-error reply never posted, CANNOT-COMPLY not escalated, no format-error telemetry (see §13)                                                                                                                                           |
+| V7 re-run (LS-3968/3969/3970 fixes)                     | LS-3909 | 2026-04-30 | 🔴 Fail    | AC1 ❌ still (wrong endpoint in `postReviewThreadReply`); AC4 ✅ AC5 ✅ (LS-3969/3970 verified); LS-3987 filed (see §14)                                                                                                                                           |
+| V9 — CI gating order                                    | LS-3911 | 2026-04-29 | 🟡 Partial | AC1–AC3 ✅ AC5 ✅; AC4 ❌ `dismiss_stale_reviews_on_push: false`; AC6 ⏭️ custom merge queue doesn't fire native `merge_group` (see §15)                                                                                                                            |
+| V9 re-run (LS-3977 fix)                                 | LS-3911 | 2026-04-30 | 🟡 Partial | AC1–AC3 ✅ AC5 ✅; AC4 🔴 dismiss works ✅ but TOCTOU race merges PR with dismissed review — LS-3990 filed; AC6 ⏭️ skip (see §16)                                                                                                                                  |
+| V9 final (LS-3977 + LS-3990 fixes)                      | LS-3911 | 2026-04-30 | 🟡 Partial | AC1–AC3 ✅; AC4 ⏭️ PR merged before step-6 push possible (merge queue gates bot-review only); AC5 ⚠️ infra failure (pnpm cache tar); AC6 ⏭️ (see §17)                                                                                                              |
+| V19 — CODEOWNERS sensitive paths (re-run)               | LS-3921 | 2026-05-01 | 🟡 Partial | AC1 ❌ `reviewDecision: null` (GitHub not surfacing CODEOWNERS via this field); AC2 ⚠️ merge queue blocked by CI failures before reaching merge API — CODEOWNERS enforcement at API level unverified; AC3/AC4 ⏭️ self-review impossible in solo-dev repo (see §18) |
+| V20 — Merge queue end-to-end + race conditions          | LS-3922 | 2026-04-30 | 🟡 Partial | AC3 ✅ AC4 ✅; AC1 🟡 (merge works, no merge_group re-run — custom queue); AC2 ❌ (TOCTOU guard exists but no label removal / approval dismissal per spec); see §19                                                                                                |
+| V15 — Fork PR reviewer skip                             | LS-3917 | 2026-04-30 | ✅ Pass    | All 5 ACs pass — W1 skipped on open and on `bot:ready-for-review` label; no bot labels applied; CI never fired; ubuntu-latest only (see §20)                                                                                                                       |
 
 ---
 
@@ -1468,104 +1468,123 @@ The V9 validation series (§15, §16, §17) has confirmed:
 5. **Merge queue gates on `bot-review: success`** — the sole required branch-protection check;
    CI pipeline jobs are supplementary quality gates, not blocking merge requirements.
 
-## §18 V19 — CODEOWNERS Sensitive Paths
+## §18 V19 — CODEOWNERS Sensitive Paths (Fresh Re-run)
 
-**Description:** Validate that a PR touching a CODEOWNERS-protected path (`lambdas/oauth-proxy/**`,
-owned by `@bkrupa`) requires human CODEOWNER approval in addition to bot approval. Tests
-§12.2 (CODEOWNERS structure), branch protection's `require_code_owner_review: true` enforcement,
-and whether the merge queue correctly blocks on unmet CODEOWNERS requirements.
+**Description:** Re-validate (fresh run, prior results replaced) that a PR touching a
+CODEOWNERS-protected path requires human CODEOWNER approval in addition to bot approval. This run
+follows fixes from LS-4110 (merge queue `reviewDecision` check + `bypass_actors` set to `[]`).
+Tests §12.2, `require_code_owner_review: true` enforcement, and merge queue blocking behavior.
 
-**Test PR:** https://github.com/bkrupa/legacy-sports/pull/3539
+**Test PR:** https://github.com/bkrupa/legacy-sports/pull/3565
 **Branch:** `test/ci-validation/v19-codeowners-sensitive`
-**Probe file:** `lambdas/oauth-proxy/v19-codeowners-probe.ts` (~37 LOC, inert constants)
+**Probe file:** `lib/db-client/migrations/20260501_000000_v19_codeowners_probe.ts` (no-op migration)
+**CODEOWNERS path tested:** `lib/db-client/migrations/**` → `@bkrupa`
 **Date completed:** 2026-05-01
-**Executed by:** Claude (claude-sonnet-4-6), LS-3921 agent run
+**Executed by:** Claude (claude-sonnet-4-6), LS-3921 fresh agent run
 
 ### Acceptance Criteria
 
-| #   | Criterion                                                                      | Result  | Evidence                                                                                                                                                                                          |
-| --- | ------------------------------------------------------------------------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| AC1 | Bot approved but PR still shows pending CODEOWNERS approval for sensitive path | ❌ Fail | GitHub `mergeStateStatus` = `CLEAN` immediately after bot APPROVE — no CODEOWNERS-pending state ever surfaced. `reviewDecision` field returned empty (not `REVIEW_REQUIRED`).                     |
-| AC2 | PR explicitly cannot merge until human CODEOWNER approval lands                | ❌ Fail | Merge queue run [25202728370](https://github.com/bkrupa/legacy-sports/actions/runs/25202728370) declared `✅ PR #3539 is ready for merge` and merged it to `main` WITHOUT any `@bkrupa` approval. |
-| AC3 | After human approval: PR mergeable; merge queue accepts                        | ⏭️ Skip | Never reached — PR merged before human approval was possible.                                                                                                                                     |
-| AC4 | No additional bot approval needed after human approves                         | ⏭️ Skip | Never reached — see AC3.                                                                                                                                                                          |
+| #   | Criterion                                                                      | Result     | Evidence / Notes                                                                                                                                                                                                                                                                             |
+| --- | ------------------------------------------------------------------------------ | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AC1 | Bot approved but PR still shows pending CODEOWNERS approval for sensitive path | ❌ Fail    | `reviewDecision: null` after bot APPROVE at `22:52:03Z` — GitHub does not surface CODEOWNERS pending state via this field for ruleset-based requirements. No "1 of 2 required approvals" indicator appeared.                                                                                 |
+| AC2 | PR explicitly cannot merge until human CODEOWNER approval lands                | 🟡 Partial | Merge queue run [25237712527](https://github.com/bkrupa/legacy-sports/actions/runs/25237712527) blocked PR #3565 with "Status checks failing: E2E Tests (failure), Verify All Migrations Applied (failure)" — blocked by CI failures, not by CODEOWNERS check specifically (see Deviations). |
+| AC3 | After human approval: PR mergeable; merge queue accepts                        | ⏭️ Skip    | Cannot test: `@bkrupa` is both the PR author and the sole CODEOWNER — GitHub blocks self-approval (`Review: Can not approve your own pull request`). Additionally, CI failures would have prevented merge regardless.                                                                        |
+| AC4 | No additional bot approval needed after human approves                         | ⏭️ Skip    | Not reached; see AC3.                                                                                                                                                                                                                                                                        |
 
 ### Walkthrough Execution
 
-| Step | Action                                                                       | Observed                                                                                                                                                                |
-| ---- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1    | Push probe file to `lambdas/oauth-proxy/`; create draft PR #3539; mark ready | W1 run 25202563058 fired on `ready_for_review`; W1 posted APPROVE "LGTM — no blocking findings." at `04:42:37Z` for commit `28fe650c7`                                  |
-| 2    | Check GitHub UI for pending CODEOWNERS state                                 | `mergeStateStatus: CLEAN`; `reviewDecision: ""`; no CODEOWNERS-pending indicator — GitHub treated the PR as fully approved                                              |
-| 3    | Check if merge blocked without human approval                                | Merge queue (25202575526) fired immediately; blocked only on CI-in-progress (not on CODEOWNERS). After CI completed, merge queue (25202728370) merged the PR to `main`. |
-| 4    | (Manual step) Have @bkrupa approve as CODEOWNER                              | Never reached — PR merged by merge queue before any human approval                                                                                                      |
+| Step | Action                                                                            | Observed                                                                                                                                                                                                                                                                                                                                    |
+| ---- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | Push probe file to `lib/db-client/migrations/`; create draft PR #3565; mark ready | W1 run [25236562048](https://github.com/bkrupa/legacy-sports/actions/runs/25236562048) fired; bot posted APPROVE "LGTM — no blocking findings." at `22:52:03Z` on commit `cc7018e2f`. `bot-review` status → SUCCESS. `merge-when-ready` label applied.                                                                                      |
+| 2    | Check GitHub for pending CODEOWNERS state                                         | GraphQL: `reviewDecision: null`; `mergeStateStatus: UNSTABLE` (CI in progress). No CODEOWNERS-pending indicator surfaced. Prior run also observed `reviewDecision: null` — consistent GitHub behavior for ruleset-based CODEOWNERS.                                                                                                         |
+| 3    | Check if merge blocked without human approval                                     | Merge queue run [25237712527](https://github.com/bkrupa/legacy-sports/actions/runs/25237712527) blocked PR #3565 — but due to failing CI checks (migration check + E2E), not CODEOWNERS. Merge queue App received 403 on branch protection read (LS-4111), causing it to evaluate ALL checks instead of only required "No Merge Conflicts". |
+| 4    | Have @bkrupa approve as CODEOWNER                                                 | Attempted via `gh pr review 3565 --approve` — rejected: "Can not approve your own pull request". @bkrupa authored the PR and is the sole CODEOWNER; self-review impossible.                                                                                                                                                                 |
+| 5–6  | PR shows all approvals satisfied; CI runs; merges via merge queue                 | Not reached — blocked at step 4.                                                                                                                                                                                                                                                                                                            |
 
 ### Evidence
 
-| Artifact                                           | Link                                                              |
-| -------------------------------------------------- | ----------------------------------------------------------------- |
-| Test PR #3539                                      | https://github.com/bkrupa/legacy-sports/pull/3539                 |
-| W1 Reviewer run (APPROVE posted)                   | https://github.com/bkrupa/legacy-sports/actions/runs/25202563058  |
-| CI Orchestrator run (all green)                    | https://github.com/bkrupa/legacy-sports/actions/runs/25202575520  |
-| Merge queue run (PR merged)                        | https://github.com/bkrupa/legacy-sports/actions/runs/25202728370  |
-| Merge queue log: "✅ Successfully merged PR #3539" | run 25202728370, `Process Enhanced Merge Queue` step, `04:49:52Z` |
+| Artifact                                                   | Link                                                                                |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Test PR #3565                                              | https://github.com/bkrupa/legacy-sports/pull/3565                                   |
+| W1 run (APPROVE posted on clean commit cc7018e2f)          | https://github.com/bkrupa/legacy-sports/actions/runs/25236562048                    |
+| CI Orchestrator run (E2E+migration failures)               | https://github.com/bkrupa/legacy-sports/actions/runs/25236585705                    |
+| Merge queue run (blocked — CI failure, not CODEOWNERS)     | https://github.com/bkrupa/legacy-sports/actions/runs/25237712527                    |
+| Merge queue log: "cannot be merged: Status checks failing" | run 25237712527, `Process Enhanced Merge Queue` step, `23:33:36Z`                   |
+| Live ruleset API — `bypass_actors: []`                     | `gh api repos/bkrupa/legacy-sports/rulesets/1524440 --jq '.bypass_actors'` → `[]`   |
+| Live ruleset API — `require_code_owner_review: true`       | same API call — filter `.rules[]` for `type=="pull_request"`, inspect `.parameters` |
+| GraphQL `reviewDecision: null` after bot APPROVE           | confirmed via `gh api graphql` query on PR #3565                                    |
+| Self-approval rejection                                    | `gh pr review 3565 --approve` → "Can not approve your own pull request"             |
 
 ### Observed Behavior
 
-PR #3539 touched `lambdas/oauth-proxy/v19-codeowners-probe.ts`, which falls under
-`lambdas/oauth-proxy/**` → `@bkrupa` in `.github/CODEOWNERS`. The ruleset
-(`.github/ruleset.json`) has `require_code_owner_review: true`.
+PR #3565 touched `lib/db-client/migrations/20260501_000000_v19_codeowners_probe.ts`, which falls
+under `lib/db-client/migrations/**` → `@bkrupa` in `.github/CODEOWNERS`. The live GitHub ruleset
+(id: 1524440, "Protect Main") has `require_code_owner_review: true` and `bypass_actors: []`
+confirmed via the GitHub Rulesets API.
 
-W1 fired on `ready_for_review` and posted `APPROVED` — "LGTM — no blocking findings." — 26 seconds
-after the PR was marked ready. The `bot-review` commit status immediately transitioned to `success`
-and the `merge-when-ready` label was applied. GitHub's `mergeStateStatus` returned `CLEAN` (not
-`BLOCKED` or `DIRTY`), and `reviewDecision` was empty — neither field indicated a pending CODEOWNERS
-requirement.
+W1 fired on `bot:ready-for-review` label and posted APPROVE "LGTM — no blocking findings." at
+`22:52:03Z` on commit `cc7018e2f`. After bot approval, GraphQL returned `reviewDecision: null`
+(not `REVIEW_REQUIRED`) — GitHub does not reflect ruleset-based CODEOWNER requirements via the
+`reviewDecision` field. The merge queue processor's new `reviewDecision` check (added in LS-4110)
+therefore would not fire for this setup.
 
-The merge queue processor evaluated the PR, found all conditions met (not draft, no conflicts, no
-unresolved threads, all status checks passing), and merged it to `main` at `04:49:52Z` — less than
-8 minutes after the PR was marked ready, and without any `@bkrupa` approval.
+The merge queue ran (25237712527) and blocked PR #3565 due to failing CI status checks (E2E tests
+and "Verify All Migrations Applied"), NOT due to CODEOWNERS. The merge queue App received a 403
+when reading classic branch protection for main (missing "Administration: Read-only" permission,
+LS-4111) and fell back to evaluating ALL check runs — including the non-required CI failures. Note:
+CI checks are normally supplementary quality gates (not blocking merge requirements) because the
+merge queue processor only gates on the required "No Merge Conflicts" check when branch protection
+is readable. The LS-4111 403 fallback is what made them effectively blocking here — a pre-existing
+bug, not the intended design.
+
+Self-approval attempt confirmed GitHub blocks CODEOWNER-as-author scenario.
 
 ### Deviations
 
-#### AC1 + AC2 — CODEOWNERS enforcement not enforced by custom merge queue; GitHub ruleset not blocking
+#### Deviation 1 — `reviewDecision: null` for ruleset-based CODEOWNERS (persistent from prior run)
 
-**What the spec requires (§12.2, AC1, AC2):** A PR touching a CODEOWNERS-protected path should
-require a human CODEOWNER approval before it can merge. Bot approval alone is insufficient. The
-merge queue should detect the unmet CODEOWNERS requirement and decline to merge.
+**Root cause:** GitHub's `reviewDecision` GraphQL field reflects review requirements from classic
+branch protection rules, not from repository rulesets. With `require_code_owner_review: true` set
+only in a ruleset (not in classic branch protection), GitHub returns `null` — meaning the merge
+queue processor's `reviewDecision` check (added in LS-4110) provides no CODEOWNERS gating in this
+configuration. The actual enforcement would need to happen at the GitHub merge API call level,
+relying on `bypass_actors: []` to prevent the App token from bypassing ruleset requirements.
 
-**What happened:** The merge queue processor (`merge-queue-processor.js`) does not inspect GitHub's
-`reviewDecision` field or any CODEOWNERS-related state. Its `validatePRForMerge` function checks
-only: draft state, `merge-to-parent` label for non-main targets, `mergeable` state (conflicts),
-unresolved review threads, and status checks. There is no CODEOWNERS check.
+**This enforcement at the merge API level was NOT tested** because CI failures blocked the merge
+queue from reaching the merge attempt.
 
-Furthermore, GitHub's own ruleset enforcement (which normally blocks the merge API call when
-`require_code_owner_review: true` and no CODEOWNER has approved) appears to have been bypassed.
-The most likely cause is that the Merge Queue GitHub App token has admin-level repository access,
-and the ruleset's `bypass_actors` entry (`actor_id: 5, actor_type: RepositoryRole, bypass_mode:
-pull_request`) allows admins to bypass all pull request rules. The app's elevated token causes
-GitHub to skip the CODEOWNERS requirement entirely.
+#### Deviation 2 — Migration probe path triggers cascade CI failures (new in this run)
 
-Two distinct issues:
+**Root cause:** Using `lib/db-client/migrations/**` as the CODEOWNERS test path was suboptimal.
+The "Check Migrations Applied" workflow verifies that every migration file is applied to the dev
+database. A probe migration that is never applied will always fail this check. Future runs should
+use a non-migration CODEOWNERS path (e.g., `lambdas/stripe-webhook/**`,
+`lambdas/apple-iap/**`, or `lambdas/oauth-proxy/**` as in the prior run).
 
-1. **Merge queue processor does not check `reviewDecision`** — it should check GitHub's GraphQL
-   `pullRequest { reviewDecision }` field and block when `reviewDecision == REVIEW_REQUIRED`.
+Additionally, E2E tests failed in both CI runs due to "Nx workspace detection" infrastructure
+issues unrelated to the probe file.
 
-2. **Merge Queue App token has bypass_actors privileges** — even if the merge queue processor
-   added a CODEOWNERS check, the underlying API call uses a token that bypasses the ruleset.
-   The bypass_actors entry should be scoped to a separate emergency-only app identity, not the
-   production Merge Queue App.
+The combination caused `merge-when-ready` to be replaced with `CI: E2E Failure` and
+`CI: Migration` labels by the CI Orchestrator's labeling step, preventing the merge queue from
+reaching the CODEOWNERS enforcement step.
 
-**Impact:** Any PR touching a CODEOWNERS-protected path (auth, payments, migrations, CI,
-terraform, docs) can bypass human review entirely — bot approval alone triggers an automatic merge.
-The CODEOWNERS security model is non-functional.
+#### Deviation 3 — Self-review impossible in solo-developer setup (structural)
 
-**Bug ticket:** (to be filed — see Issues Spawned)
+**Root cause:** In this repository, `@bkrupa` is both the only developer (PR author) and the sole
+CODEOWNER for all sensitive paths. GitHub blocks self-approval, making AC3 and AC4 structurally
+untestable without an external collaborator.
+
+#### Deviation 4 — Merge queue App 403 on branch protection (pre-existing, LS-4111)
+
+The Merge Queue GitHub App lacks the "Administration: Read-only" permission, causing a 403 when
+reading classic branch protection. It falls back to evaluating ALL check runs, not just the
+required "No Merge Conflicts" check. This is a pre-existing known issue tracked in LS-4111.
 
 ### Issues Spawned
 
-| Ticket                   | Summary                                                                                                                                                                  |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| (TBD — filed separately) | [CI Rebuild Bug] CODEOWNERS enforcement bypassed — merge queue merges sensitive-path PRs without human CODEOWNER approval; `require_code_owner_review:true` not enforced |
+| Ticket | Summary                                                                                                                                                                                              |
+| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| —      | No new bugs filed — the core issues from the previous run are tracked. The `reviewDecision: null` behavior is GitHub's documented behavior for ruleset-based CODEOWNERS (not a fixable product bug). |
 
 ---
 
@@ -1724,7 +1743,7 @@ AC2 (unreviewed commit could be merged via a subsequent merge queue trigger) is 
 previously-known V1 Gap 2 (no `bot-review` commit status required for merge). No new bug ticket
 filed; the gap was noted for the engineering lead's awareness.
 
-## §15 V15 — Fork PR Reviewer Skip
+## §20 V15 — Fork PR Reviewer Skip
 
 **Description:** Validate that the Code Reviewer Bot skips fork PRs entirely (design N1, §6.1),
 that no labels are applied, that honoring `bot:ready-for-review` on a fork PR does not trigger a
