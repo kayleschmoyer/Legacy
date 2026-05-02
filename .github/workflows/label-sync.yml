@@ -28,7 +28,10 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Sync labels from .github/labels.yml
-        uses: EndBug/label-sync@52074158190acb45f3077f9099fea818aa43f97a # v2
+        # TODO(LS-4140): re-pin to a tagged release once upstream cuts v2.3.4+.
+        # Currently pinned to a post-v2.3.3 main commit because upstream merged
+        # Node 24 support (PR #316) but has not published a new tag yet.
+        uses: EndBug/label-sync@1cd399a63f3d27e0a890cec8d1c29efad3e5db3d # main (post-v2.3.3, node24)
         with:
           config-file: .github/labels.yml
           delete-other-labels: true
