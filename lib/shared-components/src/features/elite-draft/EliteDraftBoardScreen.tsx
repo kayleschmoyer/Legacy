@@ -9,6 +9,7 @@ import { PreDraftLobby } from './PreDraftLobby';
 import { DraftTopBand } from './DraftTopBand';
 import { DraftRail } from './DraftRail';
 import {
+  AutomatedDraftScreen,
   LeagueErrorScreen,
   LoadingScreen,
   NoLeagueScreen,
@@ -346,6 +347,10 @@ export function EliteDraftBoardScreen({
         myTeamId={queries.myTeamId ?? undefined}
       />
     );
+  }
+
+  if (queries.leagueDraft?.selectionMethod === 'random') {
+    return <AutomatedDraftScreen />;
   }
 
   // ---- Main Live Draft UI ----

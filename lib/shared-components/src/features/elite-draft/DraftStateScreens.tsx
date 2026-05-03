@@ -137,3 +137,14 @@ export function PlayersErrorScreen({
     />
   );
 }
+
+export function AutomatedDraftScreen(): React.JSX.Element {
+  return (
+    <StateScreen
+      icon="⚙️"
+      iconLabel="gear"
+      title="Draft in Progress"
+      description="Results will appear when the automated draft is complete."
+    />
+  );
+}
