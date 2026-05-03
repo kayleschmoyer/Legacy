@@ -21,7 +21,7 @@ Pipeline stages:
 
 ## 🚢 Deployment Status
 
-[![Deploy Web App](https://github.com/bkrupa/legacy-sports/actions/workflows/deploy-web.yml/badge.svg)](https://github.com/bkrupa/legacy-sports/actions/workflows/deploy-web.yml)
+[![Deploy](https://github.com/bkrupa/legacy-sports/actions/workflows/deploy.yml/badge.svg?branch=main)](https://github.com/bkrupa/legacy-sports/actions/workflows/deploy.yml)
 [![Apply Lambda Infrastructure](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Apply-Lambda-Infrastructure.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/lambda-terraform-apply.yml)
 [![Build Android APK](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Build-Android-APK.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/build-android-app.yml)
 
