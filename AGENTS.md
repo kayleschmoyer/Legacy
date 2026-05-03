@@ -100,7 +100,9 @@ After the bot posts its Cycle 1 review, the agent must:
 
 ### 3. Response to Cycle 2 Mandates
 
-After the bot posts its Cycle 2 review, the agent must:
+> **If the Cycle 2 review is LGTM/APPROVED with no new findings, stop — no action is needed.** JUSTIFY threads that were not escalated into mandates are considered accepted by the bot. Do **not** post any further replies (not `FIX:`, not `CANNOT-COMPLY:`, nothing). The PR is ready to merge pending CI.
+
+If the Cycle 2 review contains mandates (CHANGES_REQUESTED), the agent must:
 
 1. Reply to **every open thread** with:
    - `FIX: <sha>` — the fix is committed at `<sha>` (the only accepted reply in Cycle 2)
