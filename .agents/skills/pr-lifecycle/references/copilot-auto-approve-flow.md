@@ -129,7 +129,13 @@ Copilot submits review (may be after workflow_run completes)
 ```
 pull_request.synchronize
   │
-  └─> request-review
+  ├─> merge-queue.yml — cleanup-on-push job (if PR has merge-when-ready)
+  │     ├─ Remove merge-when-ready label
+  │     ├─ Dismiss bot APPROVE review (signals: needs re-review)
+  │     └─ Apply bot:ready-for-review → triggers Reviewer W1 for the new commit
+  │           (W1 does not listen on synchronize — this label is the only way to re-trigger it)
+  │
+  └─> copilot-auto-approve.yml — request-review job
         ├─ Carry-forward check:
         │    • latest Copilot review APPROVED → bot-review=success + approve + label
         │    • "wasn't able to review any files" → bot-review=success + approve + label
@@ -141,6 +147,8 @@ pull_request.synchronize
 ```
 
 **Why carry-forward exists:** `workflow_run` only fires when the "Copilot code review" workflow actually runs. On a rebase where Copilot already approved and the ruleset doesn't re-trigger, there's no event that would flip `bot-review` to success on the new SHA. Carry-forward reads the previous review + thread state and writes the new `bot-review` directly.
+
+**Merge-queue recovery:** The `cleanup-on-push` job applies `bot:ready-for-review` automatically after dismissing the bot approval, so Reviewer W1 re-runs without any manual intervention. If for some reason the label is not applied (e.g. `cleanup-on-push` was skipped because `merge-when-ready` was already absent), apply it manually: `github_manage_labels(prs: [PR#], add: ["bot:ready-for-review"])`.
 
 ## Flow: Copilot Never Posts / Never Gets Removed
 

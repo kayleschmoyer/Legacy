@@ -205,8 +205,10 @@ jobs:
             await require('./.github/scripts/merge-queue-processor.js')({ github, context, isDryRun, forceCheck, isRetry });
 
   # Fires on every push to a PR branch. If the PR has merge-when-ready, remove
-  # the label and dismiss the bot's stale APPROVE so the PR clearly signals
-  # "needs re-review" rather than relying solely on the TOCTOU SHA guard.
+  # the label, dismiss the bot's stale APPROVE, and re-apply bot:ready-for-review
+  # so Reviewer W1 automatically re-evaluates the new commit. Without this last
+  # step the PR is left stuck: no merge-when-ready, no active approval, and W1
+  # never re-triggers because synchronize is not one of its event triggers.
   cleanup-on-push:
     if: |
       github.repository_owner == 'bkrupa' &&
@@ -296,3 +298,18 @@ jobs:
               message: 'New commit pushed while PR was in the merge queue — re-review required.',
             });
             console.log(`Dismissed bot approval review #${botApproval.id} on PR #${prNumber}`);
+
+            // Re-apply bot:ready-for-review to trigger Reviewer W1 for the new commit.
+            // W1 does not listen on synchronize events — without this label the PR would
+            // be stuck: merge-when-ready gone, approval dismissed, W1 never re-triggered.
+            try {
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number: prNumber,
+                labels: ['bot:ready-for-review'],
+              });
+              console.log(`Applied bot:ready-for-review to PR #${prNumber} — Reviewer W1 will re-run.`);
+            } catch (err) {
+              console.warn(`Failed to apply bot:ready-for-review: ${err.message}`);
+            }
