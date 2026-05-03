@@ -89,6 +89,27 @@ outputs:
 runs:
   using: "composite"
   steps:
+    - name: "Read Playwright version"
+      if: inputs.should-run-e2e == 'true'
+      id: playwright-version
+      shell: bash
+      run: |
+        # Pinned via @playwright/test in devDependencies. Used as the cache key
+        # so a version bump invalidates the cache automatically and avoids the
+        # AMI-cache version-drift problem documented in the e2e-tests step below.
+        VERSION=$(node -pe "require('./package.json').devDependencies['@playwright/test']")
+        echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+        echo "Playwright version: $VERSION"
+
+    - name: "Cache Playwright browsers"
+      if: inputs.should-run-e2e == 'true'
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+      with:
+        path: ~/.cache/ms-playwright
+        key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ steps.playwright-version.outputs.version }}-${{ inputs.browser }}
+        restore-keys: |
+          ${{ runner.os }}-${{ runner.arch }}-playwright-${{ steps.playwright-version.outputs.version }}-
+
     - name: "🎭 E2E Tests (Critical User Paths)"
       id: e2e-tests
       if: inputs.should-run-e2e == 'true'

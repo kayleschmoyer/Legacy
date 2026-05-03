@@ -238,7 +238,8 @@ jobs:
           set-nx-shas: false
           include-optional-deps: false
 
-      - name: "Install Playwright Browsers"
+      - name: "Resolve Playwright config"
+        id: playwright-config
         shell: bash
         run: |
           # Nightly-like runs always use chromium; manual dispatch respects the browser input.
@@ -252,6 +253,26 @@ jobs:
               *) BROWSER_ENGINE="$BROWSER" ;;
             esac
           fi
+          # Pinned via @playwright/test in devDependencies. Used as the cache key
+          # so a version bump invalidates the cache automatically.
+          VERSION=$(node -pe "require('./package.json').devDependencies['@playwright/test']")
+          echo "browser-engine=$BROWSER_ENGINE" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Playwright $VERSION / browser engine: $BROWSER_ENGINE"
+
+      - name: "Cache Playwright browsers"
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ steps.playwright-config.outputs.version }}-${{ steps.playwright-config.outputs.browser-engine }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-playwright-${{ steps.playwright-config.outputs.version }}-
+
+      - name: "Install Playwright Browsers"
+        shell: bash
+        env:
+          BROWSER_ENGINE: ${{ steps.playwright-config.outputs.browser-engine }}
+        run: |
           # The self-hosted AMI prebakes Chromium at /opt/playwright-browsers via
           # the Packer build, but that cache has two failure modes that broke E2E
           # for every PR since the 2026-04-04 nightly:
