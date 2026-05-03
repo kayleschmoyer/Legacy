@@ -178,6 +178,7 @@ When the merge queue rejects a PR with **"Repository rule violations found: A co
 11. **`ci_list_runs`, `ci_view_run`, `github_view_pr`, `github_list_prs` are instant snapshots — use for targeted lookups only.** Calling them in a loop burns 1–2M tokens per session (each call re-reads the full conversation context). Use them exactly once for a targeted lookup.
 12. **Re-dispatch `bot-review` via MCP — never `gh workflow run`** -- if `bot-review` remains stuck after resolving threads, use `ci_dispatch_workflow(workflow: "copilot-auto-approve.yml", inputs: { pr_number: "<PR#>" })`. Never use `gh workflow run copilot-auto-approve.yml` via Bash — always use the `ci_dispatch_workflow` MCP tool. See [cloud-agent-mode/SKILL.md](../cloud-agent-mode/SKILL.md#quirk-3-ci_dispatch_workflow-returns-403-in-cloud--agent_author_app-lacks-actionswrite) for the 403 fallback in cloud sessions.
 13. **Never `sleep`-poll waiting for a Copilot review submission** -- after calling `github_request_review({ prs: [PR#] })`, use `mcp__github__subscribe_pr_activity({ owner, repo, pullNumber: PR# })` (Claude Code built-in, local sessions only) to receive the review event rather than polling with `sleep N && gh api repos/{owner}/{repo}/pulls/{pr}/reviews`. The sleep-polling pattern wastes 4–5 minutes per review cycle, may miss the event if the sleep is too short, and burns context tokens on repeated API calls — the same anti-pattern as CI polling (see Rule 9). If `subscribe_pr_activity` is unavailable (cloud/headless sessions or MCP servers not loaded), fall back to a **capped** retry: poll at most 5 times with 30-second gaps. Note the degraded mode explicitly in session output.
+14. **Apply `bot:ready-for-review` after every fix-push to trigger Cycle 2+ review and CI** -- the `Reviewer (W1)` workflow only fires on `opened`, `ready_for_review`, or `labeled` (with `bot:ready-for-review`/`review-bot-degraded`/`bot:reset-cycle-counter`). The `Legacy Sports CI Orchestrator` only runs after the bot emits a `pull_request_review`. **A plain push triggers neither.** After resolving review threads and pushing fix commits, you MUST call `github_manage_labels({ prs: [<PR#>], add: ["bot:ready-for-review"] })` — otherwise the PR sits with stale CI failure labels from a prior commit, no new review fires, and no CI runs (this is exactly how PRs get "stuck"). Not needed at PR creation — `github_mark_pr_ready` already fires `ready_for_review` for Cycle 1. The label is auto-removed by the reviewer workflow when it picks up the run; if it's still present (e.g., a prior cycle was rate-limited), remove and re-add it to re-trigger. Shell fallback: `gh pr edit <PR#> --add-label "bot:ready-for-review"`.
 
 **CI tool reference — instant snapshots:**
 
@@ -199,6 +200,10 @@ github_mark_pr_ready(number: <PR#>)
 mcp__github__subscribe_pr_activity(pullRequestNumber: <PR#>)  # Claude Code built-in ONLY — NOT in legacy-sports-github; unavailable in cloud/headless; fallback: poll via github_view_pr + ci_list_runs with ScheduleWakeup
 github_request_review(prs: [<PR#>])
 jira_transition(key: "LS-####", status: "In Review")
+
+# After EACH fix-and-push round (resolve threads → push → re-trigger review + CI)
+github_resolve_threads(threadIds: [...], prNumber: <PR#>)
+github_manage_labels(prs: [<PR#>], add: ["bot:ready-for-review"])  # MANDATORY — fires Reviewer (W1) → bot review → CI Orchestrator. Plain pushes do NOT trigger CI.
 
 # Enable auto-merge (worktree-safe — use instead of `gh pr merge --auto`)
 github_pr_enable_auto_merge(number: <PR#>)                         # SQUASH (default)

@@ -94,7 +94,7 @@ github_resolve_threads({ threadIds: ["PRRT_...", "PRRT_..."], prNumber: PR# })
 After replies are posted and `FIX:` threads are resolved, apply the `bot:ready-for-review` label:
 
 ```
-github_add_labels({ number: PR#, labels: ["bot:ready-for-review"] })
+github_manage_labels({ prs: [PR#], add: ["bot:ready-for-review"] })
 ```
 
 This triggers the next bot review cycle (W1 workflow fires on the `labeled` event).
