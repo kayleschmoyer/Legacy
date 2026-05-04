@@ -381,9 +381,10 @@ test.describe('Overview Tab — navigation @smoke', () => {
     await page.goto('/baseball/league/1/overview');
     await page.waitForLoadState('load');
 
-    await expect(page.getByTestId('league-title')).toHaveText(
-      'Playoff Push League',
-    );
+    // V2: league name is in an <h1> element (no data-testid="league-title")
+    await expect(
+      page.getByRole('heading', { name: 'Playoff Push League', level: 1 }),
+    ).toBeVisible();
   });
 
   test('overview tab button is active when on the overview route', async ({
@@ -601,8 +602,9 @@ test.describe('my-team URL alias — LS-2940 regression @regression', () => {
     await expect(page.locator('body')).not.toContainText(
       'Unexpected Application Error',
     );
-    // The team settings panel should be mounted
-    await expect(page.locator('#panel-team-settings')).toBeAttached();
+    // V2: The team settings panel is identified by the team name input
+    // (no #panel-team-settings ID in V2 — that was the legacy page)
+    await expect(page.locator('#team-name-input')).toBeAttached();
   });
 });
 
@@ -629,9 +631,16 @@ test.describe('Unknown Tab Redirect — LS-1303 regression @regression', () => {
     await page.goto('/baseball/league/1/overview');
     await page.waitForLoadState('load');
 
-    // Then navigate to an unknown tab — replace-navigate means history stays clean
-    await page.goto('/baseball/league/1/not-a-real-tab');
-    await page.waitForLoadState('load');
+    // Then navigate to an unknown tab — replace-navigate means history stays clean.
+    // Firefox throws NS_BINDING_ABORTED when a React replace-navigate fires during
+    // page load; use waitUntil:'commit' so we don't wait for the aborted load,
+    // then wait for the final redirected URL explicitly.
+    await page
+      .goto('/baseball/league/1/not-a-real-tab', { waitUntil: 'commit' })
+      .catch(() => {
+        /* Firefox: aborted load is expected */
+      });
+    await page.waitForURL(/\/baseball\/league\/1\/overview/, { timeout: 8000 });
 
     await expect(page).toHaveURL(/\/baseball\/league\/1\/overview/);
 

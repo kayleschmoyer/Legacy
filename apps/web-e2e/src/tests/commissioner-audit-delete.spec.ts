@@ -383,10 +383,10 @@ test.describe('Commissioner Audit Log — commissioner access @regression', () =
       'Unexpected Application Error',
     );
 
-    // The commissioner page should render for the league owner
-    await expect(page.getByTestId('league-title')).toHaveText(
-      'Test Commissioner League',
-    );
+    // V2: league name is in an <h1> element (no data-testid="league-title")
+    await expect(
+      page.getByRole('heading', { name: 'Test Commissioner League', level: 1 }),
+    ).toBeVisible();
   });
 
   test('audit log entries display action text when rendered', async ({
@@ -466,8 +466,10 @@ test.describe('Delete League — danger zone section @critical', () => {
     await page.waitForLoadState('load');
     await expandDangerZone(page);
 
+    // V2: the accordion header is a role="button", not a heading element.
+    // After expansion the toggle button itself is the visible section title.
     await expect(
-      page.getByRole('heading', { name: 'Danger Zone' }),
+      page.getByRole('button', { name: 'Danger Zone', exact: true }),
     ).toBeVisible();
   });
 
@@ -563,12 +565,12 @@ test.describe('Delete League — confirmation dialog @critical', () => {
   });
 
   test('cancel button closes the confirmation dialog', async ({ page }) => {
-    // Scope the delete button to the danger zone region to avoid ambiguity
-    // with the dialog's own "Delete League" button.
-    const dangerZoneRegion = page.getByRole('region', { name: 'Danger Zone' });
-    const deleteBtn = dangerZoneRegion.getByRole('button', {
-      name: /delete league/i,
-    });
+    // Scope the delete button to the accordion body to avoid ambiguity
+    // with the dialog's own "Delete League" button when the dialog is open.
+    // V2 accordion uses .ls-accord-body, not role="region".
+    const deleteBtn = page
+      .locator('.ls-accord-body')
+      .getByRole('button', { name: /delete league/i });
     await expect(deleteBtn).toBeVisible();
     await deleteBtn.click();
 

@@ -18,15 +18,41 @@ const RELOAD_KEY = 'chunk-load-reload-attempted';
 export function lazyWithRetry<T extends React.ComponentType>(
   factory: () => Promise<{ default: T }>,
 ): React.LazyExoticComponent<T> {
-  return React.lazy(() =>
-    factory()
+  return React.lazy(() => {
+    // Suppress CSS-only preload errors from Vite's chunk-loading runtime.
+    //
+    // When Playwright (Chromium) serves a production build via `vite preview`,
+    // Vite's runtime creates `<link rel="preload" as="style" crossOrigin="">` for
+    // lazy-chunk CSS. Chromium's CORS preflight for that preload link fires
+    // `onerror` even when the server sends `Access-Control-Allow-Origin: *`.
+    // This triggers the `vite:preloadError` cancelable event on `window`.
+    //
+    // Canceling it (event.preventDefault()) tells Vite NOT to rethrow the error,
+    // which lets `factory()` resolve normally. Vite has a separate stylesheet-
+    // injection mechanism (`<link rel="stylesheet">`) that runs independently of
+    // the preload, so the CSS still loads — just slightly later.
+    //
+    // JS module 404s (stale-chunk scenario) are NOT suppressed: their error
+    // message does not contain "preload CSS", so they still trigger the reload
+    // flow below.
+    const handlePreloadError = (event: Event) => {
+      const err = (event as CustomEvent & { payload?: unknown }).payload;
+      if (err instanceof Error && err.message.includes('preload CSS')) {
+        event.preventDefault();
+      }
+    };
+    window.addEventListener('vite:preloadError', handlePreloadError);
+
+    return factory()
       .then((module) => {
+        window.removeEventListener('vite:preloadError', handlePreloadError);
         // Successful load: clear any prior retry flag so future chunk failures
         // (e.g. after another deployment) can trigger a fresh reload.
         sessionStorage.removeItem(RELOAD_KEY);
         return module;
       })
       .catch((error: unknown) => {
+        window.removeEventListener('vite:preloadError', handlePreloadError);
         const alreadyRetried = sessionStorage.getItem(RELOAD_KEY) === 'true';
         if (!alreadyRetried) {
           sessionStorage.setItem(RELOAD_KEY, 'true');
@@ -40,6 +66,6 @@ export function lazyWithRetry<T extends React.ComponentType>(
         // then let the error bubble to the nearest ErrorBoundary.
         sessionStorage.removeItem(RELOAD_KEY);
         throw error;
-      }),
-  );
+      });
+  });
 }

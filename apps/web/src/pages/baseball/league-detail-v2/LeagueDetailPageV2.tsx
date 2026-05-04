@@ -141,6 +141,20 @@ export function LeagueDetailPageV2(): React.JSX.Element {
     return 'overview';
   }, [routeTab]);
 
+  // Replace unknown tab slugs in the URL with /overview so bookmarks to
+  // invalid routes (or mistyped URLs) resolve cleanly without silently
+  // rendering Overview content at a non-overview URL.  Uses replace so the
+  // bogus slug never enters browser history and the back button works cleanly.
+  useEffect(() => {
+    if (!routeTab) return;
+    const isKnown =
+      routeTab in TAB_ALIASES ||
+      (TAB_IDS as readonly string[]).includes(routeTab);
+    if (!isKnown && Number.isFinite(leagueId)) {
+      navigate(`/baseball/league/${leagueId}/overview`, { replace: true });
+    }
+  }, [routeTab, leagueId, navigate]);
+
   const [tab, setTabState] = useState<TabId>(tabFromRoute);
   useEffect(() => setTabState(tabFromRoute), [tabFromRoute]);
 
@@ -154,10 +168,38 @@ export function LeagueDetailPageV2(): React.JSX.Element {
 
   // Gate role-restricted tabs when role flips
   useEffect(() => {
-    if (tab === 'commish' && !effIsCommish) setTab('overview');
-    if ((tab === 'roster' || tab === 'team') && !effIsMember)
-      setTab('overview');
-  }, [tab, effIsCommish, effIsMember, setTab]);
+    if (leagueLoading) return; // Don't redirect while league data is still loading
+    if (tab === 'commish' && !effIsCommish) {
+      if (isCommissioner) {
+        // Commissioner is on the commish tab but role state hasn't caught up yet
+        // (race condition on first load) or they're viewing as member/spectator.
+        // Auto-switch to commish role so the tab content renders immediately
+        // instead of redirecting away.
+        setRole('commish');
+      } else {
+        setTab('overview');
+      }
+    }
+    if ((tab === 'roster' || tab === 'team') && !effIsMember) {
+      if (isMember) {
+        // User IS a member but role state hasn't synced yet (first-render race).
+        // Auto-switch to the appropriate role so the tab renders immediately
+        // instead of incorrectly redirecting to overview.
+        setRole(isCommissioner ? 'commish' : 'member');
+      } else {
+        setTab('overview');
+      }
+    }
+  }, [
+    tab,
+    effIsCommish,
+    effIsMember,
+    isCommissioner,
+    isMember,
+    setRole,
+    setTab,
+    leagueLoading,
+  ]);
 
   const onTeamNav = useCallback(
     (teamId: number) => {

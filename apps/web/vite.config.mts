@@ -91,8 +91,35 @@ export default defineConfig(({ mode }) => {
       port: 4200,
       host: 'localhost',
       strictPort: true,
+      // Vite 6 changed cors default to false. Enable it so that Vite's
+      // module-preload polyfill can successfully fetch lazy-chunk CSS
+      // files via `<link rel="preload" as="style" crossOrigin="">` during
+      // E2E tests (playwright webServer uses `vite preview`). Without CORS
+      // headers the browser rejects the preload despite a 200 response,
+      // causing lazyWithRetry to crash with "Unable to preload CSS for …".
+      cors: true,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+      },
     },
     plugins: [
+      // Ensure CORS headers are set on ALL preview-server responses so that
+      // Vite's module-preload polyfill can fetch lazy-chunk CSS via
+      // `<link rel="preload" as="style" crossOrigin="">` without a CORS error.
+      // Vite 6 changed `cors` default to false and the `cors: true` option
+      // does not reliably apply to sirv-served static files, so this plugin
+      // injects the header unconditionally via the connect middleware chain.
+      {
+        name: 'cors-preview-headers',
+        configurePreviewServer(server) {
+          server.middlewares.use((_req, res, next) => {
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+            res.setHeader('Access-Control-Allow-Headers', '*');
+            next();
+          });
+        },
+      },
       // Load TS paths first to ensure proper resolution
       nxViteTsPaths({ debug: false }),
       reactNativeWeb(),
@@ -154,6 +181,14 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: '../../dist/web',
       emptyOutDir: true,
+      // Disable Vite's modulePreload polyfill so lazy-chunk CSS is NOT preloaded
+      // via `<link rel="preload" as="style" crossOrigin="">`. The polyfill's
+      // anonymous-CORS preload links fire onerror in Playwright's Chromium even
+      // when the server sends Access-Control-Allow-Origin: * (a known quirk in
+      // Chromium's preload implementation vs. same-origin static servers).
+      // All browsers that can run this app support native ES-module preloading,
+      // so the polyfill is redundant in production as well.
+      modulePreload: { polyfill: false },
       // Report compressed size for deploy builds to track bundle growth
       reportCompressedSize:
         isDeployBuild || process.env.NX_VERBOSE_LOGGING === 'true',

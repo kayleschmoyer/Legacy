@@ -146,7 +146,15 @@ export default defineConfig({
    *   • reuseExistingServer only locally — CI always starts a fresh server
    *     so startup failures are caught immediately. */
   webServer: {
-    command: `pnpm dlx serve@14.2.4 -s dist/apps/web -l ${E2E_PORT} --no-clipboard`,
+    // Use vite preview instead of a plain static server so that Vite's
+    // production CSS preloading and chunk-splitting work correctly.  Plain
+    // static servers (serve, http-server) don't set the headers that
+    // Chromium requires when it validates <link rel="preload" as="style"
+    // crossOrigin=""> requests, causing lazyWithRetry to crash.
+    // --filter web runs the command in apps/web/ where Vite's config lives;
+    // --outDir ../../dist/apps/web points at the nx build output (the nx
+    // @nx/vite:build executor overrides vite.config's outDir to dist/apps/web).
+    command: `pnpm --filter web exec vite preview --port ${E2E_PORT} --host 127.0.0.1 --outDir ../../dist/apps/web`,
     cwd: path.resolve(__dirname, '../..'),
     url: `http://127.0.0.1:${E2E_PORT}`,
     reuseExistingServer: !process.env.CI,

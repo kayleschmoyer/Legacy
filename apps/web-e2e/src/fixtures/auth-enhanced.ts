@@ -160,6 +160,35 @@ const isolated = base.extend<{ _apiIsolation: void }>({
     ) => {
       const unmockedOps: string[] = [];
 
+      // WebKit (Safari) does not reliably apply the `storageState` localStorage
+      // entries defined in playwright.config.ts before the app's auth check runs.
+      // Playwright's storageState applies cookies correctly but localStorage
+      // can arrive "late" in WebKit's context initialisation, causing the
+      // EnhancedAuthGuard to see an empty profile and redirect to the login page.
+      //
+      // Fix: inject an initScript that seeds the hermetic auth state into
+      // localStorage *before* any page scripts run.  The script is idempotent —
+      // it only writes when the key is absent so it is a no-op when the
+      // storageState was applied correctly (Chromium/Firefox).
+      //
+      // Values match the global-setup.ts CI-mode hermetic JWT (id=1, admin).
+      await page.addInitScript(() => {
+        if (!window.localStorage.getItem('ls_user_profile')) {
+          const expiry = Math.floor(Date.now() / 1000) + 3600;
+          window.localStorage.setItem(
+            'ls_user_profile',
+            JSON.stringify({
+              id: 1,
+              email: 'e2e-test@legacysports.dev',
+              username: 'testuser',
+              accessLevel: 'admin',
+            }),
+          );
+          window.localStorage.setItem('ls_token_expiry', String(expiry));
+          window.localStorage.setItem('ls_csrf_token', 'e2e-csrf-token');
+        }
+      });
+
       // Intercept every request that is NOT fetching a static asset from our
       // E2E server (port 4280).  This catches localhost:5000 (GraphQL),
       // localhost:5001 (OAuth proxy), external CDNs, AWS endpoints, etc.
@@ -322,6 +351,21 @@ const isolated = base.extend<{ _apiIsolation: void }>({
               });
               return;
             }
+
+            // No valid cookie token and no bearer token.  Return 503 (not
+            // 401) so AuthService treats this as a transient network error
+            // rather than an AuthSessionExpiredError, which would log the
+            // user out and break tests that rely on the cached localStorage
+            // profile for authentication (e.g. WebKit, where storageState
+            // ls_jwt cookie is not reliably sent with intercepted requests).
+            await route.fulfill({
+              status: 503,
+              contentType: 'application/json',
+              body: JSON.stringify({
+                error: 'Token refresh unavailable in E2E isolation mode',
+              }),
+            });
+            return;
           }
 
           // Any other non-GraphQL external request: reject outright.
@@ -407,10 +451,30 @@ export function createCustomAuthTest(
 // Use this for tests that verify the login flow itself.
 // ---------------------------------------------------------------------------
 
-export const unauthTest = isolated.extend({
+export const unauthTest = isolated.extend<{
+  _unauthClearAuth: void;
+}>({
   storageState: async ({}, use) => {
     await use({ cookies: [], origins: [] });
   },
+  // The base _apiIsolation fixture injects an initScript that seeds
+  // ls_user_profile into localStorage when it's absent (needed for WebKit
+  // where storageState localStorage is not reliably applied).  That script
+  // runs for every test — including unauthTest, which intentionally has no
+  // auth state.  This auto-fixture adds a second initScript that clears the
+  // seeded auth keys, ensuring WebKit and Chromium/Firefox both start the
+  // unauthenticated test contexts with no cached user profile.
+  _unauthClearAuth: [
+    async ({ page }: { page: Page }, use: () => Promise<void>) => {
+      await page.addInitScript(() => {
+        window.localStorage.removeItem('ls_user_profile');
+        window.localStorage.removeItem('ls_token_expiry');
+        window.localStorage.removeItem('ls_csrf_token');
+      });
+      await use();
+    },
+    { auto: true },
+  ],
 });
 
 export { expect };

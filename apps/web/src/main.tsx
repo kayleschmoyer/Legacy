@@ -117,7 +117,48 @@ LOGGER.info('Starting app with unified authentication flow...');
 try {
   root.render(
     <StrictMode>
-      <ErrorBoundary>
+      {/* Plain-HTML fallback prevents a cascade "Missing theme." error when the
+          ErrorBoundary renders its Tamagui fallback without a TamaguiProvider
+          above it. The inner error boundary (inside ThemedTamaguiProvider below)
+          catches component-level errors and shows the full Tamagui error UI. */}
+      <ErrorBoundary
+        fallback={
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: '100vh',
+              padding: '20px',
+              fontFamily: 'sans-serif',
+              color: '#c41e3a',
+              textAlign: 'center',
+            }}
+          >
+            <h1 style={{ margin: '0 0 12px', fontSize: '24px' }}>
+              Oops! Something went wrong
+            </h1>
+            <p style={{ margin: '0 0 20px', color: '#666' }}>
+              We&apos;re sorry for the inconvenience. Please refresh the page.
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              style={{
+                padding: '10px 20px',
+                backgroundColor: '#c41e3a',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '16px',
+              }}
+            >
+              Refresh
+            </button>
+          </div>
+        }
+      >
         <ThemeProvider>
           <ThemedTamaguiProvider>
             <AuthProvider

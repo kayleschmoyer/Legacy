@@ -8,6 +8,7 @@ import {
   useSwapTeamMemberPositionsMutation,
   useUpdateTeamMemberPositionMutation,
 } from '../../../../api/db/graphql.generated';
+import { PendingWaiverClaims } from '../../../../features/roster';
 import { LeagueRosterManagement } from '../../../../features/roster/LeagueRosterManagement';
 import { Empty, Section } from '../Shared';
 import { I } from '../Icons';
@@ -99,6 +100,7 @@ export const RosterTab: React.FC<RosterTabProps> = ({ league, myTeamId }) => {
       title="My Roster"
       sub={`${teamPlayers.length} of ${league.maxRosterSize ?? '?'} players · Lineup, bench, and free-agent moves`}
     >
+      <PendingWaiverClaims teamId={myTeamId} />
       <LeagueRosterManagement
         positions={positions}
         teamPlayers={teamPlayers}
