@@ -208,8 +208,10 @@ test.describe('Scoreboard — page structure @regression', () => {
 
   test('shows team abbreviations for live game', async ({ page }) => {
     const liveCard = page.getByTestId('game-card-1001');
-    await expect(liveCard.getByText('NYY')).toBeVisible();
-    await expect(liveCard.getByText('BOS')).toBeVisible();
+    // V2 game cards render the team abbreviation in two places (compact
+    // header label + linescore row), so disambiguate via .first().
+    await expect(liveCard.getByText('NYY').first()).toBeVisible();
+    await expect(liveCard.getByText('BOS').first()).toBeVisible();
   });
 
   test('shows run score for live game', async ({ page }) => {
@@ -228,8 +230,9 @@ test.describe('Scoreboard — page structure @regression', () => {
 
   test('shows team abbreviations for final game', async ({ page }) => {
     const finalCard = page.getByTestId('game-card-1002');
-    await expect(finalCard.getByText('CHC')).toBeVisible();
-    await expect(finalCard.getByText('STL')).toBeVisible();
+    // Same dual-render pattern as NYY in the live-card test above.
+    await expect(finalCard.getByText('CHC').first()).toBeVisible();
+    await expect(finalCard.getByText('STL').first()).toBeVisible();
   });
 
   test('shows dash for preview game score instead of 0', async ({ page }) => {

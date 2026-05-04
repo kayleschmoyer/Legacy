@@ -188,7 +188,7 @@ export const StandingsTab: React.FC<StandingsTabProps> = ({
         }
       >
         <div className="ls-table-wrap">
-          <table className="ls-table">
+          <table className="ls-table" aria-label="League Standings">
             <thead>
               <tr>
                 <th>Rank</th>

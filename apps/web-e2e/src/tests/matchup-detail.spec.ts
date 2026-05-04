@@ -259,7 +259,13 @@ test.describe('Matchup Detail – loading state @regression', () => {
 
     await page.goto(MATCHUP_URL, { waitUntil: 'commit' });
 
-    await expect(page.getByText('Loading matchup details...')).toBeVisible();
+    // The loading branch renders both a Tamagui Spinner and the text.  Match
+    // by text but allow more time — V2 main bundle hydration plus the Apollo
+    // query setup can take several seconds before the loading branch paints
+    // when the network request is gated.
+    await expect(page.getByText('Loading matchup details...')).toBeVisible({
+      timeout: 15_000,
+    });
 
     // Release the gate so the page can finish loading and cleanup
     if (resolveMatchup) resolveMatchup();

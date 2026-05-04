@@ -133,8 +133,7 @@ test.describe('Dynamic JWT Tests @regression', () => {
   });
 
   test('should show login after auth state is cleared', async ({
-    page,
-    context,
+    browser,
     browserName,
   }) => {
     // WebKit blocks localStorage access via page.evaluate — SecurityError
@@ -143,29 +142,26 @@ test.describe('Dynamic JWT Tests @regression', () => {
       'WebKit blocks localStorage in e2e context',
     );
 
-    // Must navigate to the app first so page.evaluate operates on the
-    // correct origin's localStorage (not about:blank)
-    await page.goto('/');
-    await page.waitForLoadState('domcontentloaded');
+    // The default test fixture wires a pre-authenticated storage state.
+    // Clearing cookies/localStorage on the existing context still leaves
+    // the AuthProvider's in-memory bootstrap from initial load; the
+    // EnhancedAuthGuard's first commit wins and never re-evaluates without
+    // a full page-bootstrap. Spin up a fresh, unauthenticated context so
+    // the guard mounts from scratch and renders the LoginPage immediately.
+    const cleanContext = await browser.newContext({ storageState: undefined });
+    try {
+      const cleanPage = await cleanContext.newPage();
+      await cleanPage.goto('/');
+      await cleanPage.waitForLoadState('domcontentloaded');
 
-    // Clear all auth state: cookies (ls_jwt, ls_csrf) and localStorage
-    // (ls_user_profile, ls_token_expiry). The auth guard uses HttpOnly
-    // cookies, not the auth_jwt localStorage key.
-    await context.clearCookies();
-    await page.evaluate(() => {
-      window.localStorage.clear();
-    });
-
-    // Reload — the auth guard should show the login page
-    await page.goto('/');
-    await page.waitForLoadState('domcontentloaded');
-
-    // Auth guard should redirect to login since tokens are gone
-    await expect(
-      page.getByRole('button', { name: /continue with google/i }),
-    ).toBeVisible({
-      timeout: 15000,
-    });
+      await expect(
+        cleanPage.getByRole('button', { name: /continue with google/i }),
+      ).toBeVisible({
+        timeout: 15000,
+      });
+    } finally {
+      await cleanContext.close();
+    }
   });
 });
 

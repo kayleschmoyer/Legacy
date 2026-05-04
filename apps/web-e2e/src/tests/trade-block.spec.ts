@@ -1,8 +1,11 @@
 /**
  * Trade Block Management — E2E Tests (LS-610)
  *
- * Covers LeagueTradeBlock on the League Overview page:
- *   /baseball/league/:id
+ * Covers LeagueTradeBlock on the League Trades tab:
+ *   /baseball/league/:id/trades
+ *
+ * (LS-4171: V2 moved Trade Block from the league overview to the dedicated
+ * Trades tab — see apps/web/src/pages/baseball/league-detail-v2/tabs/Trades.tsx.)
  *
  *   - "Trade Block" heading is displayed
  *   - Empty state: "No players on the trade block"
@@ -253,16 +256,21 @@ async function setupGraphQL(
 test.describe('Trade Block Management @regression', () => {
   test('should display Trade Block heading', async ({ page }) => {
     await setupGraphQL(page);
-    await page.goto('/baseball/league/1');
+    await page.goto('/baseball/league/1/trades');
 
-    await expect(page.getByText('Trade Block')).toBeVisible();
+    // V2 wraps LeagueTradeBlock in a <Section title="Trade Block">, which
+    // renders an <h3>; the inner LeagueTradeBlock card also renders the text
+    // "Trade Block". Target the section heading specifically.
+    await expect(
+      page.getByRole('heading', { name: 'Trade Block', exact: true }),
+    ).toBeVisible();
   });
 
   test('should show empty state when no players on trade block', async ({
     page,
   }) => {
     await setupGraphQL(page, { tradeBlock: MOCK_TRADE_BLOCK_EMPTY });
-    await page.goto('/baseball/league/1');
+    await page.goto('/baseball/league/1/trades');
 
     await expect(page.getByText('No players on the trade block')).toBeVisible();
     await expect(
@@ -274,7 +282,7 @@ test.describe('Trade Block Management @regression', () => {
     await setupGraphQL(page, {
       tradeBlock: MOCK_TRADE_BLOCK_WITH_PLAYERS,
     });
-    await page.goto('/baseball/league/1');
+    await page.goto('/baseball/league/1/trades');
 
     await expect(page.getByText('Mike Johnson')).toBeVisible();
     await expect(page.getByText('Chris Davis')).toBeVisible();
@@ -287,7 +295,7 @@ test.describe('Trade Block Management @regression', () => {
     await setupGraphQL(page, {
       tradeBlock: MOCK_TRADE_BLOCK_WITH_PLAYERS,
     });
-    await page.goto('/baseball/league/1');
+    await page.goto('/baseball/league/1/trades');
 
     await expect(page.getByText('3 available')).toBeVisible();
   });
@@ -298,7 +306,7 @@ test.describe('Trade Block Management @regression', () => {
     await setupGraphQL(page, {
       tradeBlock: MOCK_TRADE_BLOCK_WITH_PLAYERS,
     });
-    await page.goto('/baseball/league/1');
+    await page.goto('/baseball/league/1/trades');
 
     const availableBadges = page.getByText('AVAILABLE');
     await expect(availableBadges.first()).toBeVisible();
@@ -310,7 +318,7 @@ test.describe('Trade Block Management @regression', () => {
     await setupGraphQL(page, {
       tradeBlock: MOCK_TRADE_BLOCK_WITH_PLAYERS,
     });
-    await page.goto('/baseball/league/1');
+    await page.goto('/baseball/league/1/trades');
 
     // Mike Johnson is on teamId=1 (user's team), should have Remove button
     await expect(page.getByRole('button', { name: 'Remove' })).toBeVisible();
@@ -322,7 +330,7 @@ test.describe('Trade Block Management @regression', () => {
     await setupGraphQL(page, {
       tradeBlock: MOCK_TRADE_BLOCK_MANY,
     });
-    await page.goto('/baseball/league/1');
+    await page.goto('/baseball/league/1/trades');
 
     await expect(
       page.getByRole('button', { name: /show.*more/i }),
@@ -333,7 +341,7 @@ test.describe('Trade Block Management @regression', () => {
     await setupGraphQL(page, {
       tradeBlock: MOCK_TRADE_BLOCK_MANY,
     });
-    await page.goto('/baseball/league/1');
+    await page.goto('/baseball/league/1/trades');
 
     // 6th player should not be visible before expansion
     await expect(page.getByText('Ryan Brown')).not.toBeVisible();
@@ -349,7 +357,7 @@ test.describe('Trade Block Management @regression', () => {
     await setupGraphQL(page, {
       tradeBlock: MOCK_TRADE_BLOCK_WITH_PLAYERS,
     });
-    await page.goto('/baseball/league/1');
+    await page.goto('/baseball/league/1/trades');
 
     await expect(page.getByText('Asking: 2nd round pick')).toBeVisible();
     await expect(page.getByText('Asking: Top 10 pitcher')).toBeVisible();
@@ -361,7 +369,7 @@ test.describe('Trade Block Management @regression', () => {
     await setupGraphQL(page, {
       tradeBlock: [makeTradeBlockEntry(1, 1, 'Mike', 'Johnson')],
     });
-    await page.goto('/baseball/league/1');
+    await page.goto('/baseball/league/1/trades');
 
     await expect(page.getByRole('button', { name: 'Set Price' })).toBeVisible();
   });
@@ -372,7 +380,7 @@ test.describe('Trade Block Management @regression', () => {
     await setupGraphQL(page, {
       tradeBlock: MOCK_TRADE_BLOCK_WITH_PLAYERS,
     });
-    await page.goto('/baseball/league/1');
+    await page.goto('/baseball/league/1/trades');
 
     // Mike Johnson (own team) has an asking price, so button should say "Edit Price"
     await expect(
@@ -415,7 +423,7 @@ test.describe('Trade Block Management @regression', () => {
       },
     );
 
-    await page.goto('/baseball/league/1');
+    await page.goto('/baseball/league/1/trades');
 
     // Click "Set Price" button
     await page.getByRole('button', { name: 'Set Price' }).click();
@@ -439,7 +447,7 @@ test.describe('Trade Block Management @regression', () => {
 
   test('should display error state when query fails', async ({ page }) => {
     await setupGraphQL(page, { tradeBlockError: true });
-    await page.goto('/baseball/league/1');
+    await page.goto('/baseball/league/1/trades');
 
     await expect(page.getByText('Failed to load trade block.')).toBeVisible();
   });

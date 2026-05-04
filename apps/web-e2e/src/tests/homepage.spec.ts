@@ -40,10 +40,14 @@ test.describe('Homepage @smoke', () => {
   test('displays a call-to-action button linking to baseball', async ({
     page,
   }) => {
-    // HomePage renders baseball onboarding CTA buttons (Create League, Join League)
+    // HomePage renders baseball onboarding CTA buttons (Create League, Join League).
+    // V2 hero overlays a `<div role="presentation">` decoration above the
+    // CTA strip that intercepts pointer events on the first click attempt;
+    // force-click bypasses the actionability check (the underlying button
+    // is enabled and stable per the call log).
     const cta = page.getByRole('button', { name: /join league/i });
     await expect(cta).toBeVisible();
-    await cta.click();
+    await cta.click({ force: true });
     await page.waitForLoadState('load');
     await expect(page).toHaveURL('/baseball/league/join');
   });

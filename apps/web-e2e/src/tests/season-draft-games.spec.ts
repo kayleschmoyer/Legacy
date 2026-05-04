@@ -154,7 +154,7 @@ test.describe('Season Draft Games Lobby @critical', () => {
 
     // V2 LobbyCard shows abbreviated stat chips (STAT_LABELS): 'HR', 'SO' — not full names
     await expect(page.getByText('HR').first()).toBeVisible();
-    await expect(page.getByText('SO')).toBeVisible();
+    await expect(page.getByText('SO').first()).toBeVisible();
   });
 
   test('navigates to create page when New Game clicked @critical', async ({
@@ -256,16 +256,17 @@ test.describe('Season Draft Game Create Page @critical', () => {
     await mockCreatePageGraphQL(page);
     await page.goto('/games/season-draft/create');
 
-    await expect(page.getByText(/hitter/i)).toBeVisible();
-    await expect(page.getByText(/pitcher/i)).toBeVisible();
+    await expect(page.getByText(/hitter/i).first()).toBeVisible();
+    await expect(page.getByText(/pitcher/i).first()).toBeVisible();
   });
 
   test('shows stat key selection options @regression', async ({ page }) => {
     await mockCreatePageGraphQL(page);
     await page.goto('/games/season-draft/create');
 
-    // Home Runs is the default/first hitter stat option
-    await expect(page.getByText(/home runs/i)).toBeVisible();
+    // Home Runs is the default/first hitter stat option. The label appears
+    // both as the selected pill and as a row in the picker menu.
+    await expect(page.getByText(/home runs/i).first()).toBeVisible();
   });
 
   test('shows invite players info section on create page @regression', async ({

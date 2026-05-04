@@ -223,16 +223,10 @@ async function setupCommissionerGraphQL(
 
 // ── Accordion helpers ─────────────────────────────────────────────────────
 
-async function expandDraftOrder(page: import('@playwright/test').Page) {
-  const toggle = page.getByRole('button', {
-    name: 'Draft Pick Order',
-    exact: true,
-  });
-  await toggle.waitFor({ state: 'visible' });
-  await toggle.click();
-  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-}
-
+// LS-4171: The "Draft Pick Order" accordion section was removed from the V2
+// commissioner tab; only "Draft Settings" remains. Tests targeting Draft Pick
+// Order (heading, team list, Randomize button, drag handles, locked state)
+// were removed in this change.
 async function expandDraftSettings(page: import('@playwright/test').Page) {
   const toggle = page.getByRole('button', {
     name: 'Draft Settings',
@@ -242,60 +236,6 @@ async function expandDraftSettings(page: import('@playwright/test').Page) {
   await toggle.click();
   await expect(toggle).toHaveAttribute('aria-expanded', 'true');
 }
-
-// ── Draft Order Control ────────────────────────────────────────────────────
-
-test.describe('Draft Order Control @regression', () => {
-  test.beforeEach(async ({ page }) => {
-    await setupCommissionerGraphQL(page, makeLeague('not-started'));
-    await page.goto('/baseball/league/1/commissioner');
-    await expandDraftOrder(page);
-  });
-
-  test('shows Draft Pick Order heading @smoke', async ({ page }) => {
-    // Verify the accordion trigger button has aria-expanded="true" (expanded)
-    // and the content region is visible
-    const trigger = page.getByRole('button', {
-      name: 'Draft Pick Order',
-      exact: true,
-    });
-    await expect(trigger).toHaveAttribute('aria-expanded', 'true');
-    await expect(
-      page.getByRole('region', { name: 'Draft Pick Order' }),
-    ).toBeVisible();
-  });
-
-  test('shows team names in the draft order list @regression', async ({
-    page,
-  }) => {
-    await expect(page.getByText('Alpha Squad')).toBeVisible();
-    await expect(page.getByText('Beta Force')).toBeVisible();
-    await expect(page.getByText('Gamma Raiders')).toBeVisible();
-    await expect(page.getByText('Delta Stars')).toBeVisible();
-  });
-
-  test('shows Randomize button @regression', async ({ page }) => {
-    const randomizeBtn = page.getByRole('button', {
-      name: /randomize.*draft order|randomize/i,
-    });
-    await expect(randomizeBtn).toBeVisible();
-  });
-
-  test('shows drag handles for each team @regression', async ({ page }) => {
-    // Each drag handle has aria-label "Drag to reorder <teamName>"
-    await expect(
-      page.getByRole('button', { name: /drag to reorder alpha squad/i }),
-    ).toBeVisible();
-  });
-
-  test('shows drag-to-reorder instruction text @regression', async ({
-    page,
-  }) => {
-    await expect(
-      page.getByText(/drag to reorder|randomize the pick order/i).first(),
-    ).toBeVisible();
-  });
-});
 
 // ── Draft Settings Control ─────────────────────────────────────────────────
 
@@ -327,45 +267,5 @@ test.describe('Draft Settings Control @regression', () => {
     // Save button is rendered in the draft settings card
     const saveBtn = page.getByRole('button', { name: /save.*settings|save/i });
     await expect(saveBtn.first()).toBeVisible();
-  });
-});
-
-// ── Locked state when draft is in progress ─────────────────────────────────
-
-test.describe('Draft controls locked when draft is in progress @regression', () => {
-  test('Randomize button is disabled when draft is in-progress @regression', async ({
-    page,
-  }) => {
-    await setupCommissionerGraphQL(page, makeLeague('in-progress'));
-    await page.goto('/baseball/league/1/commissioner');
-    await expandDraftOrder(page);
-
-    // When draftStatus is 'in-progress' the controls should be locked/disabled
-    await expect(
-      page.getByRole('heading', { name: /draft pick order/i }),
-    ).toBeVisible();
-
-    const randomizeBtn = page.getByRole('button', {
-      name: /randomize.*draft order|randomize/i,
-    });
-    // Button may not exist or be disabled when draft is in progress
-    if (await randomizeBtn.isVisible()) {
-      await expect(randomizeBtn).toBeDisabled();
-    }
-  });
-
-  test('shows locked indicator or text when draft is in-progress @regression', async ({
-    page,
-  }) => {
-    await setupCommissionerGraphQL(page, makeLeague('in-progress'));
-    await page.goto('/baseball/league/1/commissioner');
-    await expandDraftOrder(page);
-
-    // A lock icon or text should indicate settings cannot be changed
-    await expect(
-      page
-        .getByText(/draft.*in progress|locked|cannot.*change|started/i)
-        .first(),
-    ).toBeVisible();
   });
 });

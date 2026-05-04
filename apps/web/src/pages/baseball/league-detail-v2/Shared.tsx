@@ -89,7 +89,10 @@ export const Section: React.FC<{
   <div className={`ls-card ${className}`}>
     <div className="ls-card-head">
       <div>
-        <h3 className="ls-card-title">{title}</h3>
+        {/* h2 (not h3) so each Section sits one level below the league
+            page's h1 (LeagueHero), satisfying the heading hierarchy a11y
+            check (LS-4171). */}
+        <h2 className="ls-card-title">{title}</h2>
         {sub ? <p className="ls-card-sub">{sub}</p> : null}
       </div>
       {right}

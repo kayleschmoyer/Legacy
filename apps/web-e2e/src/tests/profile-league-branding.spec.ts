@@ -1,24 +1,19 @@
 /**
- * Profile Settings & League Branding — Additional E2E Tests (LS-1623)
+ * Profile Settings — Additional E2E Tests (LS-1623)
  *
- * Covers UI flows not tested by profile-settings.spec.ts and league-branding.spec.ts:
- *
- * Profile Settings (/profile/settings):
+ * Covers Profile Settings (/profile/settings) UI flows not tested by
+ * profile-settings.spec.ts:
  *   - Avatar picker renders with preset options and actions
  *   - Username edit form shows Save/Cancel buttons and validates input
  *   - Username save triggers the UpdateUsername mutation
  *
- * League Branding (/baseball/league/:id/commissioner):
- *   - Banner picker renders preset thumbnails and custom URL input
- *   - Color customization shows swatch previews alongside inputs
- *   - Saving colors triggers the UpdateLeagueBranding mutation
+ * League Branding describe blocks were removed in LS-4171 — the V2
+ * commissioner tab no longer renders LeagueBrandingControl.
  *
  * All GraphQL queries are mocked — tests run without a live backend.
  */
 
 import { expect, test } from '../fixtures/auth-enhanced';
-import { LeaguePage } from '../pages/league.page';
-import { updateLeagueBrandingResponse } from '../mocks/graphql/league.mocks';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -313,144 +308,9 @@ test.describe('Profile Settings — Username Edit @regression', () => {
   });
 });
 
-// ── League Branding — Banner Picker @regression ──────────────────────────────
-
-test.describe('League Branding — Banner Picker @regression', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/baseball/league/1/commissioner');
-    await page.waitForLoadState('networkidle');
-
-    const brandingHeader = page.getByRole('button', {
-      name: /League Branding/i,
-    });
-    await brandingHeader.click();
-    await expect(
-      page.getByRole('heading', { name: /League Branding/i }).nth(1),
-    ).toBeVisible({ timeout: 5000 });
-  });
-
-  test('should display the Header Banner section with description', async ({
-    page,
-  }) => {
-    await expect(
-      page.getByText('Header Banner', { exact: true }),
-    ).toBeVisible();
-    await expect(
-      page.getByText(/Wide image displayed at the top of your league page/),
-    ).toBeVisible();
-  });
-
-  test('should render banner preset thumbnails with labels', async ({
-    page,
-  }) => {
-    // The BannerPicker renders preset labels
-    await expect(page.getByText('Blue & Gold')).toBeVisible();
-    await expect(page.getByText('Red & Black')).toBeVisible();
-  });
-
-  test('should display the banner PREVIEW section', async ({ page }) => {
-    // BannerPicker has a PREVIEW label
-    const previewLabels = page.getByText('PREVIEW');
-    await expect(previewLabels.first()).toBeVisible();
-    await expect(page.getByText('No banner selected')).toBeVisible();
-  });
-
-  test('should render the custom banner URL input with Apply button', async ({
-    page,
-  }) => {
-    await expect(
-      page.getByPlaceholder('https://example.com/banner.png'),
-    ).toBeVisible();
-  });
-});
-
-// ── League Branding — Color Customization @regression ────────────────────────
-
-test.describe('League Branding — Color Customization @regression', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/baseball/league/1/commissioner');
-    await page.waitForLoadState('networkidle');
-
-    const brandingHeader = page.getByRole('button', {
-      name: /League Branding/i,
-    });
-    await brandingHeader.click();
-    await expect(
-      page.getByRole('heading', { name: /League Branding/i }).nth(1),
-    ).toBeVisible({ timeout: 5000 });
-  });
-
-  test('should display the Brand Colors section with description', async ({
-    page,
-  }) => {
-    await expect(page.getByText('Brand Colors', { exact: true })).toBeVisible();
-    await expect(
-      page.getByText(/Used for accents in standings and team displays/),
-    ).toBeVisible();
-  });
-
-  test('should display Primary and Secondary color labels', async ({
-    page,
-  }) => {
-    await expect(page.getByText('Primary Color')).toBeVisible();
-    await expect(page.getByText('Secondary Color')).toBeVisible();
-  });
-
-  test('should render color swatch previews next to inputs', async ({
-    page,
-  }) => {
-    const leaguePage = new LeaguePage(page);
-
-    // Both inputs are visible (swatch is rendered as a sibling YStack)
-    await expect(leaguePage.primaryColorInput).toBeVisible();
-    await expect(leaguePage.secondaryColorInput).toBeVisible();
-  });
-
-  test('saving valid colors triggers the UpdateLeagueBranding mutation', async ({
-    page,
-  }) => {
-    let mutationCalled = false;
-
-    await page.route(isGraphQLEndpoint, async (route) => {
-      const postData = route.request().postData()?.toLowerCase() ?? '';
-      if (postData.includes('updateleaguebranding')) {
-        mutationCalled = true;
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(
-            updateLeagueBrandingResponse({
-              primaryColor: '#FF0000',
-              secondaryColor: '#00FF00',
-            }),
-          ),
-        });
-      } else {
-        await route.fallback();
-      }
-    });
-
-    // Re-navigate so the new route handler is active
-    await page.goto('/baseball/league/1/commissioner');
-    await page.waitForLoadState('networkidle');
-
-    const brandingHeader = page.getByRole('button', {
-      name: /League Branding/i,
-    });
-    await brandingHeader.click();
-    await expect(
-      page.getByRole('heading', { name: /League Branding/i }).nth(1),
-    ).toBeVisible({ timeout: 5000 });
-
-    const leaguePage = new LeaguePage(page);
-    await expect(leaguePage.primaryColorInput).toBeVisible();
-
-    await leaguePage.primaryColorInput.fill('#FF0000');
-    await leaguePage.secondaryColorInput.fill('#00FF00');
-    await expect(leaguePage.saveColorsButton).toBeEnabled();
-    await leaguePage.saveColorsButton.click();
-
-    // Verify the mutation was called
-    expect(mutationCalled).toBe(true);
-  });
-});
+// LS-4171: League Branding sections were removed from the V2 commissioner tab
+// (apps/web/src/pages/baseball/league-detail-v2/tabs/Commish.tsx no longer
+// renders LeagueBrandingControl). The Banner Picker / Color Customization
+// describe blocks that targeted /baseball/league/:id/commissioner were
+// removed. Re-add them when League Branding returns to V2 with selectors
+// that match the V2 implementation.

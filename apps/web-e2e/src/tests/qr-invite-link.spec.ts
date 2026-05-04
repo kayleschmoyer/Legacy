@@ -203,8 +203,11 @@ test.describe('QR Invite Link @critical', () => {
       page.getByRole('button', { name: /show qr code/i }),
     ).toBeVisible();
 
-    // Header quick-share invite button
-    await expect(page.getByRole('button', { name: 'Invite' })).toBeVisible();
+    // Header quick-share invite button. Use exact match because the invite
+    // card also renders copy buttons whose accessible names contain "invite".
+    await expect(
+      page.getByRole('button', { name: 'Invite', exact: true }),
+    ).toBeVisible();
   });
 
   test('non-commissioner does not see invite controls', async ({ page }) => {

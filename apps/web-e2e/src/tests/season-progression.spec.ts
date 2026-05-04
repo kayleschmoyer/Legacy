@@ -550,9 +550,12 @@ test.describe('Season Progression — multi-phase UI @regression', () => {
 });
 
 test.describe('Season Progression — state-machine walkthrough @regression', () => {
+  // 8 phase navigations + load-state waits routinely exceed the default 20s
+  // test timeout (especially on cold worker startup); allot a generous budget.
   test('advances through all season phases via mutable phase ref', async ({
     page,
   }) => {
+    test.setTimeout(60_000);
     const phaseRef = { current: 'pre_selection' as SeasonPhase };
     await setupSeasonGraphQL(page, phaseRef);
 

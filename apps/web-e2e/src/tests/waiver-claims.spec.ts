@@ -509,6 +509,11 @@ test.describe('Pending Waiver Claims — error state @regression', () => {
     await page.goto(ROSTER_URL);
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Failed to load waiver claims')).toBeVisible();
+    // V2 renders the failure message in two places (the alert role for
+    // assistive tech, plus the visible error text in the main content
+    // region). Target the alert region to avoid the strict-mode collision.
+    await expect(
+      page.getByRole('alert').getByText('Failed to load waiver claims'),
+    ).toBeVisible();
   });
 });

@@ -350,7 +350,7 @@ test.describe('Season Draft Games Flow @critical', () => {
 
     // V2 LobbyCard shows abbreviated stat chips (STAT_LABELS): 'HR', 'SO' — not full names
     await expect(page.getByText('HR').first()).toBeVisible();
-    await expect(page.getByText('SO')).toBeVisible();
+    await expect(page.getByText('SO').first()).toBeVisible();
   });
 
   test('create game button opens configuration form @critical', async ({

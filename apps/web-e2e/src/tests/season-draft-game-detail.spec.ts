@@ -438,7 +438,7 @@ test.describe('Season Draft Game – setup phase @critical', () => {
     await setupGameMocks(page, DRAFTING_MY_TURN);
     await gotoGamePage(page);
 
-    await expect(page.getByText('Picks')).toBeVisible();
+    await expect(page.getByText('Picks', { exact: true })).toBeVisible();
     await expect(page.getByText(/no picks yet/i)).toBeVisible();
   });
 });
@@ -482,11 +482,19 @@ test.describe('Season Draft Game – drafting (my turn) @critical', () => {
     // Step 3: season options load via GetSeasonDraftGamePlayerOptions — pick one
     await expect(page.getByRole('button', { name: '2022' })).toBeVisible();
     await page.getByRole('button', { name: '2022' }).click();
-    // Now "Assign Position" step is visible with open-slot buttons
+    // Now "Assign Position" step is visible with open-slot buttons. Use
+    // exact match — V2 also renders an avatar trigger button whose
+    // accessible name happens to contain "OF".
     await expect(page.getByText('Assign Position')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'OF' })).toBeVisible();
-    await expect(page.getByRole('button', { name: '1B' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'SS' })).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'OF', exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: '1B', exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'SS', exact: true }),
+    ).toBeVisible();
   });
 
   test('shows Confirm Pick button (disabled by default)', async ({ page }) => {
@@ -577,7 +585,7 @@ test.describe('Season Draft Game – completed @regression', () => {
     await gotoGamePage(page);
 
     // Section title is "Picks" (not "Draft History") in HistoryCard
-    await expect(page.getByText('Picks')).toBeVisible();
+    await expect(page.getByText('Picks', { exact: true })).toBeVisible();
     // Pick numbers are zero-padded (pickNumber+1 padStart 2): "01", "02"
     await expect(page.getByText('01', { exact: true })).toBeVisible();
     // Baseball player names from picks
@@ -601,7 +609,9 @@ test.describe('Season Draft Game – cancelled @regression', () => {
     await setupGameMocks(page, CANCELLED_GAME);
     await gotoGamePage(page);
 
-    await expect(page.getByText('Game Cancelled')).toBeVisible();
+    // V2 renders the cancelled label twice (chip + body); .first() is enough
+    // to confirm at least one is on-screen.
+    await expect(page.getByText('Game Cancelled').first()).toBeVisible();
     await expect(page.getByText(/this game has been cancelled/i)).toBeVisible();
   });
 
