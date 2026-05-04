@@ -379,8 +379,9 @@ test.describe('Season Draft Game – setup phase @critical', () => {
     await setupGameMocks(page, SETUP_GAME);
     await gotoGamePage(page);
 
-    await expect(page.getByText('Hitter Draft')).toBeVisible();
-    await expect(page.getByText('Home Runs').first()).toBeVisible();
+    // New design shows abbreviated stat chip "HR" and "Hitters" player type label
+    await expect(page.getByText('Hitters').first()).toBeVisible();
+    await expect(page.getByText('HR').first()).toBeVisible();
   });
 
   test('shows Game Setup card with start controls for creator', async ({
@@ -389,7 +390,8 @@ test.describe('Season Draft Game – setup phase @critical', () => {
     await setupGameMocks(page, SETUP_GAME);
     await gotoGamePage(page);
 
-    await expect(page.getByText('Game Setup')).toBeVisible();
+    // Phase label is "Waiting Room"; setup panel shows "Invite Link" eyebrow
+    await expect(page.getByText('Invite Link').first()).toBeVisible();
     // Creator sees Start Draft and Cancel Game buttons (not a "waiting" message)
     await expect(page.getByText('Start Draft')).toBeVisible();
     await expect(page.getByText('Cancel Game').first()).toBeVisible();
@@ -414,25 +416,28 @@ test.describe('Season Draft Game – setup phase @critical', () => {
   });
 
   test('shows Scoreboard section with both players', async ({ page }) => {
-    await setupGameMocks(page, SETUP_GAME);
+    // Scoreboard renders in drafting/completed phase (not setup)
+    await setupGameMocks(page, DRAFTING_MY_TURN);
     await gotoGamePage(page);
 
     await expect(page.getByText('Scoreboard')).toBeVisible();
   });
 
   test('shows Rosters section with empty slots', async ({ page }) => {
-    await setupGameMocks(page, SETUP_GAME);
+    // Rosters renders in drafting/completed phase (not setup)
+    await setupGameMocks(page, DRAFTING_MY_TURN);
     await gotoGamePage(page);
 
     await expect(page.getByText('Rosters')).toBeVisible();
     await expect(page.getByText('Empty').first()).toBeVisible();
   });
 
-  test('shows Draft History with "No picks yet"', async ({ page }) => {
-    await setupGameMocks(page, SETUP_GAME);
+  test('shows Picks history with "No picks yet"', async ({ page }) => {
+    // Picks history renders in drafting/completed phase (not setup); section title is "Picks"
+    await setupGameMocks(page, DRAFTING_MY_TURN);
     await gotoGamePage(page);
 
-    await expect(page.getByText('Draft History')).toBeVisible();
+    await expect(page.getByText('Picks')).toBeVisible();
     await expect(page.getByText(/no picks yet/i)).toBeVisible();
   });
 });
@@ -444,49 +449,45 @@ test.describe('Season Draft Game – drafting (my turn) @critical', () => {
     await setupGameMocks(page, DRAFTING_MY_TURN);
     await gotoGamePage(page);
 
-    await expect(page.getByText('Your Turn!')).toBeVisible();
+    // Component renders "Your Turn" (no exclamation mark) as badge text
+    await expect(page.getByText('Your Turn').first()).toBeVisible();
   });
 
   test('shows Make Your Pick section', async ({ page }) => {
     await setupGameMocks(page, DRAFTING_MY_TURN);
     await gotoGamePage(page);
 
-    await expect(page.getByText('Make Your Pick')).toBeVisible();
+    // H1 in DraftPickPanel reads "Make your pick." (lowercase, with period)
+    await expect(page.getByText(/make your pick/i)).toBeVisible();
   });
 
   test('shows player search input', async ({ page }) => {
     await setupGameMocks(page, DRAFTING_MY_TURN);
     await gotoGamePage(page);
 
-    await expect(page.getByPlaceholder('Search player name...')).toBeVisible();
+    // Placeholder uses Unicode ellipsis (…), match by regex
+    await expect(page.getByPlaceholder(/search player name/i)).toBeVisible();
   });
 
   test('shows position slot selection', async ({ page }) => {
     await setupGameMocks(page, DRAFTING_MY_TURN);
     await gotoGamePage(page);
 
-    const positionLabel = page.getByText('Position to Fill:');
+    // Field label is "Assign Position" (not "Position to Fill:")
+    const positionLabel = page.getByText('Assign Position');
     await expect(positionLabel).toBeVisible();
-    // Scope to the position section to avoid matching unrelated buttons
-    // (e.g. the user profile menu trigger whose initials may collide).
-    const positionSection = positionLabel.locator('..');
-    // OF, 1B, SS slots from mock data (verify the slot-selection buttons)
-    await expect(
-      positionSection.getByRole('button', { name: 'OF' }),
-    ).toBeVisible();
-    await expect(
-      positionSection.getByRole('button', { name: '1B' }),
-    ).toBeVisible();
-    await expect(
-      positionSection.getByRole('button', { name: 'SS' }),
-    ).toBeVisible();
+    // Slot buttons are PillButtons (Tamagui buttons) — OF, 1B, SS from mock roster
+    await expect(page.getByRole('button', { name: 'OF' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '1B' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'SS' })).toBeVisible();
   });
 
   test('shows Confirm Pick button (disabled by default)', async ({ page }) => {
     await setupGameMocks(page, DRAFTING_MY_TURN);
     await gotoGamePage(page);
 
-    const confirmBtn = page.getByRole('button', { name: 'Confirm Pick' });
+    // Button text is "Confirm Pick · Home Runs" — match by partial name
+    const confirmBtn = page.getByRole('button', { name: /Confirm Pick/i });
     await expect(confirmBtn).toBeVisible();
     await expect(confirmBtn).toBeDisabled();
   });
@@ -508,14 +509,15 @@ test.describe('Season Draft Game – drafting (opponent turn) @regression', () =
     await setupGameMocks(page, DRAFTING_OPPONENT_TURN);
     await gotoGamePage(page);
 
-    await expect(page.getByText(/waiting for opponent/i)).toBeVisible();
+    // WaitingPanel renders "{activeName} is picking…" (opponent's name at currentTurn=1)
+    await expect(page.getByText(/Opponent is picking/i)).toBeVisible();
   });
 
   test('does NOT show Make Your Pick section', async ({ page }) => {
     await setupGameMocks(page, DRAFTING_OPPONENT_TURN);
     await gotoGamePage(page);
 
-    await expect(page.getByText('Make Your Pick')).not.toBeVisible();
+    await expect(page.getByText(/make your pick/i)).not.toBeVisible();
   });
 
   test('still shows Scoreboard and Rosters', async ({ page }) => {
@@ -534,7 +536,8 @@ test.describe('Season Draft Game – completed @regression', () => {
     await setupGameMocks(page, COMPLETED_GAME);
     await gotoGamePage(page);
 
-    await expect(page.getByText(/completed/i)).toBeVisible();
+    // Phase label for completed game is "Game Complete" (eyebrow in header)
+    await expect(page.getByText('Game Complete').first()).toBeVisible();
   });
 
   test('shows final scores in scoreboard', async ({ page }) => {
@@ -566,23 +569,20 @@ test.describe('Season Draft Game – completed @regression', () => {
     await setupGameMocks(page, COMPLETED_GAME);
     await gotoGamePage(page);
 
-    await expect(page.getByText('Draft History')).toBeVisible();
-    // Pick #1: TestUser selected Aaron Judge
-    await expect(page.getByText(/#1/).first()).toBeVisible();
-    await expect(
-      page.getByText(/TestUser selected Aaron Judge/).first(),
-    ).toBeVisible();
-    // Pick #2: Opponent selected Shohei Ohtani
-    await expect(
-      page.getByText(/Opponent selected Shohei Ohtani/).first(),
-    ).toBeVisible();
+    // Section title is "Picks" (not "Draft History") in HistoryCard
+    await expect(page.getByText('Picks')).toBeVisible();
+    // Pick numbers are zero-padded (pickNumber+1 padStart 2): "01", "02"
+    await expect(page.getByText('01', { exact: true })).toBeVisible();
+    // Baseball player names from picks
+    await expect(page.getByText('Aaron Judge').first()).toBeVisible();
+    await expect(page.getByText('Shohei Ohtani').first()).toBeVisible();
   });
 
   test('does NOT show Make Your Pick or setup card', async ({ page }) => {
     await setupGameMocks(page, COMPLETED_GAME);
     await gotoGamePage(page);
 
-    await expect(page.getByText('Make Your Pick')).not.toBeVisible();
+    await expect(page.getByText(/make your pick/i)).not.toBeVisible();
     await expect(page.getByText('Game Setup')).not.toBeVisible();
   });
 });
@@ -637,11 +637,11 @@ test.describe('Season Draft Game – cancel confirmation @regression', () => {
 
     await page.getByText('No, Keep Playing').click();
 
-    // Dialog should close, game setup should still be visible
+    // Dialog should close; setup panel "Invite Link" eyebrow still visible
     await expect(
       page.getByText(/are you sure you want to cancel/i),
     ).not.toBeVisible();
-    await expect(page.getByText('Game Setup')).toBeVisible();
+    await expect(page.getByText('Invite Link').first()).toBeVisible();
   });
 });
 
@@ -652,7 +652,8 @@ test.describe('Season Draft Game – player search @regression', () => {
     await setupGameMocks(page, DRAFTING_MY_TURN);
     await gotoGamePage(page);
 
-    const searchInput = page.getByPlaceholder('Search player name...');
+    // Placeholder uses Unicode ellipsis (…), match by regex
+    const searchInput = page.getByPlaceholder(/search player name/i);
     await searchInput.fill('Aaron');
 
     // Wait for search results from mock
@@ -665,15 +666,16 @@ test.describe('Season Draft Game – player search @regression', () => {
     await setupGameMocks(page, DRAFTING_MY_TURN);
     await gotoGamePage(page);
 
-    const searchInput = page.getByPlaceholder('Search player name...');
+    // Placeholder uses Unicode ellipsis (…), match by regex
+    const searchInput = page.getByPlaceholder(/search player name/i);
     await searchInput.fill('Aaron');
 
     await expect(async () => {
       await page.getByText('Aaron Judge').first().click({ timeout: 2000 });
     }).toPass({ timeout: 15000 });
 
-    // Season picker should appear
-    await expect(page.getByText('Select Season:')).toBeVisible();
+    // Field label is "Choose a Season" (not "Select Season:")
+    await expect(page.getByText('Choose a Season')).toBeVisible();
   });
 });
 

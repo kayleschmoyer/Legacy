@@ -49,7 +49,11 @@ const Accord: React.FC<{
       </div>
       <I.ChevronDown className="ls-chev" size={16} />
     </button>
-    {open ? <div className="ls-accord-body">{section.content}</div> : null}
+    {open ? (
+      <div className="ls-accord-body" role="region" aria-label={section.label}>
+        {section.content}
+      </div>
+    ) : null}
   </div>
 );
 
@@ -187,10 +191,13 @@ export const CommishTab: React.FC<CommishTabProps> = ({ league }) => {
       iconClass: 'red',
       icon: <I.AlertTriangle size={16} />,
       content: leagueId ? (
-        <DeleteLeagueControl
-          leagueId={leagueId}
-          leagueName={league.name ?? 'this league'}
-        />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <h4 style={{ margin: 0, fontWeight: 600 }}>Danger Zone</h4>
+          <DeleteLeagueControl
+            leagueId={leagueId}
+            leagueName={league.name ?? 'this league'}
+          />
+        </div>
       ) : null,
     },
   ];

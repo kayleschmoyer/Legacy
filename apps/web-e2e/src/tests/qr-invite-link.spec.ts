@@ -160,19 +160,20 @@ test.describe('QR Invite Link @critical', () => {
       timeout: 15_000,
     });
 
-    // Manual Code section shows the invite code (scoped to overview panel — hero also shows invite code)
-    await expect(page.getByText('Manual Code')).toBeVisible();
+    // Invite Code section shows the invite code (hero also shows invite code in a div)
+    await expect(page.getByText('Invite Code')).toBeVisible();
     await expect(
-      page.locator('#panel-overview').getByText('INVITE123', { exact: true }),
+      page.getByText('INVITE123', { exact: true }).first(),
     ).toBeVisible();
 
-    // Share Link section shows a URL containing the join path
-    await expect(page.getByText('Share Link')).toBeVisible();
+    // Invite Link section shows a URL containing the join path (in a readonly input)
+    await expect(page.getByText('Invite Link')).toBeVisible();
     const urlBox = page
-      .locator('text=/\\/baseball\\/league\\/join\\//')
+      .locator('input')
+      .filter({ hasValue: /\/baseball\/league\/join\// })
       .first();
     await expect(urlBox).toBeVisible({ timeout: 10_000 });
-    const displayedUrl = (await urlBox.textContent()) ?? '';
+    const displayedUrl = await urlBox.inputValue();
     expect(displayedUrl).toContain('/baseball/league/join/INVITE123');
   });
 
@@ -185,28 +186,25 @@ test.describe('QR Invite Link @critical', () => {
       timeout: 15_000,
     });
 
-    // Share Link section with copy button
-    await expect(page.getByText('Share Link')).toBeVisible();
+    // Invite Link section with copy button
+    await expect(page.getByText('Invite Link')).toBeVisible();
     await expect(
       page.getByRole('button', { name: /copy invite link/i }),
     ).toBeVisible();
 
-    // Manual Code section with copy button
-    await expect(page.getByText('Manual Code')).toBeVisible();
+    // Invite Code section with copy button
+    await expect(page.getByText('Invite Code')).toBeVisible();
     await expect(
       page.getByRole('button', { name: /copy invite code/i }),
     ).toBeVisible();
 
-    // QR Code section with show/hide toggle
-    await expect(page.getByText('QR Code', { exact: true })).toBeVisible();
+    // QR Code toggle button
     await expect(
       page.getByRole('button', { name: /show qr code/i }),
     ).toBeVisible();
 
     // Header quick-share invite button
-    await expect(
-      page.getByRole('button', { name: /share invite link/i }),
-    ).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Invite' })).toBeVisible();
   });
 
   test('non-commissioner does not see invite controls', async ({ page }) => {
@@ -214,13 +212,12 @@ test.describe('QR Invite Link @critical', () => {
     await page.goto('/baseball/league/1/overview');
     await page.waitForLoadState('domcontentloaded');
 
-    // The Invite Friends card still renders, but without a real invite code
-    // the code display shows "..." and the invite URL shows "Loading..."
-    await expect(page.getByText('Invite Friends')).toBeVisible({
+    // InviteCard returns null when inviteCode is null — the whole section is absent
+    await expect(page.getByText('Invite Friends')).not.toBeVisible({
       timeout: 15_000,
     });
 
-    // Invite code should NOT be visible (null invite code renders "...")
+    // Invite code should NOT be visible (null invite code means no card at all)
     await expect(page.getByText('INVITE123')).not.toBeVisible();
 
     // The share link URL should not contain a join path (inviteCode is null)

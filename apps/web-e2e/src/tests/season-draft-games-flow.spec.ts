@@ -348,8 +348,8 @@ test.describe('Season Draft Games Flow @critical', () => {
     await expect(page.getByText('Setup', { exact: true })).toBeVisible();
     await expect(page.getByText('Completed', { exact: true })).toBeVisible();
 
-    // Verify stat labels
-    await expect(page.getByText(/home runs/i)).toBeVisible();
+    // Verify stat labels (may appear multiple times in the page — use first)
+    await expect(page.getByText(/home runs/i).first()).toBeVisible();
     await expect(page.getByText(/strikeouts/i)).toBeVisible();
   });
 
@@ -366,7 +366,7 @@ test.describe('Season Draft Games Flow @critical', () => {
 
     // Verify the create form heading appears
     await expect(
-      page.getByRole('heading', { name: /new season draft/i }),
+      page.getByRole('heading', { name: /build a draft/i }),
     ).toBeVisible();
 
     // Verify form fields are present
@@ -387,8 +387,8 @@ test.describe('Season Draft Games Flow @critical', () => {
     await expect(page.getByText(/season/i).first()).toBeVisible();
     await expect(page.getByText(/career/i).first()).toBeVisible();
 
-    // Stat key options — hitter stats shown by default
-    await expect(page.getByText(/home runs/i)).toBeVisible();
+    // Stat key options — hitter stats shown by default (may appear multiple times in page)
+    await expect(page.getByText(/home runs/i).first()).toBeVisible();
 
     // Invite link flow — page subtitle explains invite link sharing
     await expect(page.getByText(/invite link/i).first()).toBeVisible();
@@ -405,17 +405,17 @@ test.describe('Season Draft Games Flow @critical', () => {
       page.getByRole('heading', { name: /strikeout masters/i }),
     ).toBeVisible();
 
-    // Game setup card — creator sees Start Draft button
-    await expect(page.getByText(/game setup/i)).toBeVisible();
+    // Game setup card — creator sees Start Draft button (phase label is "Waiting Room")
+    await expect(page.getByText(/waiting room/i)).toBeVisible();
     await expect(page.getByText(/start draft/i)).toBeVisible();
 
     // Players listed in the setup card
     await expect(page.getByText(/testuser/i).first()).toBeVisible();
     await expect(page.getByText(/opponent1/i).first()).toBeVisible();
 
-    // Game configuration details in the header
+    // Game configuration details in the header (stat chip shows abbreviated form "SO")
     await expect(page.getByText(/pitcher/i).first()).toBeVisible();
-    await expect(page.getByText(/strikeouts/i).first()).toBeVisible();
+    await expect(page.getByText('SO').first()).toBeVisible();
     await expect(page.getByText(/career/i).first()).toBeVisible();
   });
 
@@ -450,17 +450,13 @@ test.describe('Season Draft Games Flow @critical', () => {
     // "Your Turn!" indicator (current user is draftOrder 0 and currentTurn is 0)
     await expect(page.getByText(/your turn/i).first()).toBeVisible();
 
-    // Scoreboard section
-    await expect(
-      page.getByRole('heading', { name: /scoreboard/i }),
-    ).toBeVisible();
+    // Scoreboard section (CardHead renders as Text, not a heading element)
+    await expect(page.getByText('Scoreboard').first()).toBeVisible();
     await expect(page.getByText(/testuser/i).first()).toBeVisible();
     await expect(page.getByText(/opponent1/i).first()).toBeVisible();
 
-    // Draft history section
-    await expect(
-      page.getByRole('heading', { name: /draft history/i }),
-    ).toBeVisible();
+    // Picks history section (title is "Picks", not "Draft History")
+    await expect(page.getByText('Picks').first()).toBeVisible();
     await expect(page.getByText(/babe ruth/i).first()).toBeVisible();
   });
 });

@@ -115,7 +115,7 @@ test.describe('Season Draft Games Lobby @critical', () => {
 
     await expect(page.getByText(/no games yet/i)).toBeVisible();
     await expect(
-      page.getByRole('button', { name: /create game/i }),
+      page.getByRole('button', { name: /create.*game/i }),
     ).toBeVisible();
   });
 
@@ -152,8 +152,8 @@ test.describe('Season Draft Games Lobby @critical', () => {
     await mockSeasonDraftGamesGraphQL(page, GAMES_RESPONSE_WITH_GAMES);
     await page.goto('/games/season-draft');
 
-    // Home Runs is the STAT_LABELS entry for 'hr'
-    await expect(page.getByText(/home runs/i)).toBeVisible();
+    // Home Runs is the STAT_LABELS entry for 'hr' (may appear multiple times — use first)
+    await expect(page.getByText(/home runs/i).first()).toBeVisible();
     // Strikeouts is the STAT_LABELS entry for 'so'
     await expect(page.getByText(/strikeouts/i)).toBeVisible();
   });
@@ -229,7 +229,7 @@ test.describe('Season Draft Game Create Page @critical', () => {
     await page.goto('/games/season-draft/create');
 
     await expect(
-      page.getByRole('heading', { name: /new season draft/i }),
+      page.getByRole('heading', { name: /build a draft/i }),
     ).toBeVisible();
   });
 

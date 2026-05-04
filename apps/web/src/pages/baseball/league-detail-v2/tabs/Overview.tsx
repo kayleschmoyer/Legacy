@@ -154,6 +154,7 @@ const InviteCard: React.FC<{ league: LeagueFragment }> = ({ league }) => {
             <input readOnly value={inviteUrl} />
             <button
               type="button"
+              aria-label="Copy invite link"
               className={`ls-copy-btn ${copied === 'link' ? 'ok' : ''}`}
               onClick={() => copy('link', inviteUrl)}
             >
@@ -187,6 +188,7 @@ const InviteCard: React.FC<{ league: LeagueFragment }> = ({ league }) => {
             <input readOnly value={league.inviteCode} />
             <button
               type="button"
+              aria-label="Copy invite code"
               className={`ls-copy-btn ${copied === 'code' ? 'ok' : ''}`}
               onClick={() => copy('code', league.inviteCode ?? '')}
             >

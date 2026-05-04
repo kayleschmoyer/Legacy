@@ -1,5 +1,5 @@
 import type { GestureResponderEvent } from 'react-native';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   H1,
   Paragraph,
@@ -8,18 +8,21 @@ import {
 } from '@legacy-sports/shared-components/ui';
 import { Button, ScrollView, Spinner, styled } from 'tamagui';
 import {
+  AlertTriangle,
   Bell,
   CheckCheck,
   ChevronLeft,
   ChevronRight,
   Eye,
 } from '@tamagui/lucide-icons';
+import { LOGGER } from '@legacy-sports/logging';
 import { PageMeta } from '../../components/PageMeta';
 import {
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,
   BRAND_NAVY,
   BRAND_NAVY_LIGHT,
+  BRAND_SEAM_RED,
   withAlpha,
 } from '../../constants/colors';
 import { useThemeContext } from '../../context/ThemeContext';
@@ -117,13 +120,19 @@ const NotificationsPage: React.FC = () => {
 
   const [page, setPage] = useState(0);
 
-  const { data, loading } = useGetNotificationHistoryQuery({
+  const { data, loading, error, refetch } = useGetNotificationHistoryQuery({
     variables: { limit: PAGE_SIZE, offset: page * PAGE_SIZE },
     fetchPolicy: 'cache-and-network',
   });
   const { data: countData } = useGetUnreadNotificationCountQuery();
   const [markAsRead] = useMarkNotificationAsReadMutation();
   const [markAllAsRead] = useMarkAllNotificationsAsReadMutation();
+
+  useEffect(() => {
+    if (error) {
+      LOGGER.error('Failed to fetch notification history', error);
+    }
+  }, [error]);
 
   const notifications = data?.getNotificationHistory ?? [];
   const unreadCount = countData?.getUnreadNotificationCount ?? 0;
@@ -196,7 +205,43 @@ const NotificationsPage: React.FC = () => {
             )}
           </PageHeader>
 
-          {loading && notifications.length === 0 ? (
+          {error != null && notifications.length === 0 ? (
+            <YStack
+              padding="$10"
+              alignItems="center"
+              gap="$4"
+              borderRadius="$6"
+              borderWidth={1}
+              borderColor={withAlpha(BRAND_SEAM_RED, 0.35)}
+              backgroundColor="$background"
+              role="alert"
+            >
+              <AlertTriangle size={40} color={BRAND_SEAM_RED} />
+              <YStack alignItems="center" gap="$2">
+                <Paragraph size="$5" fontWeight="600" color="$color">
+                  Failed to load notifications
+                </Paragraph>
+                <Paragraph size="$3" color="$colorPress" textAlign="center">
+                  There was a problem fetching your notifications. Check your
+                  connection and try again.
+                </Paragraph>
+              </YStack>
+              <Button
+                size="$3"
+                backgroundColor="$color2"
+                borderWidth={1}
+                borderColor="$borderColor"
+                borderRadius="$4"
+                onPress={() => void refetch()}
+                hoverStyle={{ backgroundColor: '$color3' }}
+                pressStyle={{ backgroundColor: '$color4' }}
+              >
+                <Paragraph size="$3" fontWeight="500">
+                  Retry
+                </Paragraph>
+              </Button>
+            </YStack>
+          ) : loading && notifications.length === 0 ? (
             <XStack justifyContent="center" padding="$8">
               <Spinner
                 size="large"

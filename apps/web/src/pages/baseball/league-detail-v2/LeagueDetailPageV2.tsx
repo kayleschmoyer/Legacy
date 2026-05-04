@@ -58,7 +58,7 @@ export function LeagueDetailPageV2(): React.JSX.Element {
     matchupId?: string;
   }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const leagueId = id ? parseInt(id, 10) : NaN;
 
   const {
@@ -168,7 +168,7 @@ export function LeagueDetailPageV2(): React.JSX.Element {
 
   // Gate role-restricted tabs when role flips
   useEffect(() => {
-    if (leagueLoading) return; // Don't redirect while league data is still loading
+    if (leagueLoading || authLoading || !league) return;
     if (tab === 'commish' && !effIsCommish) {
       if (isCommissioner) {
         // Commissioner is on the commish tab but role state hasn't caught up yet
@@ -199,6 +199,8 @@ export function LeagueDetailPageV2(): React.JSX.Element {
     setRole,
     setTab,
     leagueLoading,
+    authLoading,
+    league,
   ]);
 
   const onTeamNav = useCallback(
@@ -354,7 +356,7 @@ export function LeagueDetailPageV2(): React.JSX.Element {
             myTeam={teams.find((t) => t.id === userTeamId) ?? null}
           />
         )}
-        {tab === 'commish' && effIsCommish && (
+        {tab === 'commish' && isCommissioner && (
           <CommishTab league={league} teams={teams} />
         )}
       </div>

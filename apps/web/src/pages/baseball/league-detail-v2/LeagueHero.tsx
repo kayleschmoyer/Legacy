@@ -70,7 +70,7 @@ export const LeagueHero: React.FC<{
         <I.Shield size={44} style={{ color: 'var(--brand-gold-light)' }} />
       </div>
       <div className="ls-hero-body">
-        <h1>{league.name}</h1>
+        <h1 data-testid="league-title">{league.name}</h1>
         <div
           style={{
             display: 'flex',
