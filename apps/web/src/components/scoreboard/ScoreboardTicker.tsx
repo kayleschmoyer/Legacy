@@ -280,6 +280,13 @@ export function ScoreboardTicker() {
 
   const games: TickerGame[] = (data?.scoreboard?.games ?? []) as TickerGame[];
   const isAnyGameLive = games.some((g) => g.status === 'Live');
+  // Also poll while upcoming games exist — games can transition from Upcoming
+  // → Live without triggering a re-fetch otherwise. The ticker always shows
+  // today's schedule, so no date guard is needed here.
+  const isAnyGameUpcoming = games.some(
+    (g) => g.status !== 'Live' && g.status !== 'Final',
+  );
+  const shouldPoll = isAnyGameLive || isAnyGameUpcoming;
 
   // Detect reduced-motion preference once on mount (synchronous so there is no
   // flash of the animated layout before switching to the static one).
@@ -288,13 +295,13 @@ export function ScoreboardTicker() {
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   useEffect(() => {
-    if (isAnyGameLive) {
+    if (shouldPoll) {
       startPolling(LIVE_POLL_MS);
     } else {
       stopPolling();
     }
     return () => stopPolling();
-  }, [isAnyGameLive, startPolling, stopPolling]);
+  }, [shouldPoll, startPolling, stopPolling]);
 
   const [paused, setPaused] = useState(false);
   const innerRef = useRef<HTMLDivElement>(null);

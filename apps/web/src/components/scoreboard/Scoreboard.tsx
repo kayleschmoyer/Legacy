@@ -319,12 +319,16 @@ export function Scoreboard() {
     (g) => g.status !== 'Live' && g.status !== 'Final',
   );
   const isAnyGameLive = liveGames.length > 0;
+  // Also poll while upcoming games exist for today — games can transition
+  // from Upcoming → Live without triggering a re-fetch otherwise.
+  const shouldPoll =
+    isAnyGameLive || (upcomingGames.length > 0 && date === todayISO());
 
   useEffect(() => {
-    if (isAnyGameLive) startPolling(LIVE_POLL_MS);
+    if (shouldPoll) startPolling(LIVE_POLL_MS);
     else stopPolling();
     return () => stopPolling();
-  }, [isAnyGameLive, startPolling, stopPolling]);
+  }, [shouldPoll, startPolling, stopPolling]);
 
   return (
     <YStack
