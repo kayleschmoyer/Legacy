@@ -401,7 +401,8 @@ test.describe('Season Draft Game – setup phase @critical', () => {
     await setupGameMocks(page, SETUP_GAME);
     await gotoGamePage(page);
 
-    await expect(page.getByText(/TestUser/).first()).toBeVisible();
+    // V2 SetupPanel shows 'You' for the current user (userId=1), not the raw playerName
+    await expect(page.getByText('You').first()).toBeVisible();
     await expect(page.getByText(/Opponent/).first()).toBeVisible();
   });
 
@@ -473,10 +474,16 @@ test.describe('Season Draft Game – drafting (my turn) @critical', () => {
     await setupGameMocks(page, DRAFTING_MY_TURN);
     await gotoGamePage(page);
 
-    // Field label is "Assign Position" (not "Position to Fill:")
-    const positionLabel = page.getByText('Assign Position');
-    await expect(positionLabel).toBeVisible();
-    // Slot buttons are PillButtons (Tamagui buttons) — OF, 1B, SS from mock roster
+    // "Assign Position" only renders after selecting a player AND a season.
+    // Step 1: type in search to trigger SearchPlayersForDraft (300ms debounce)
+    await page.getByPlaceholder(/search player name/i).fill('Aaron');
+    // Step 2: select the player suggestion
+    await page.getByText('Aaron Judge').click();
+    // Step 3: season options load via GetSeasonDraftGamePlayerOptions — pick one
+    await expect(page.getByRole('button', { name: '2022' })).toBeVisible();
+    await page.getByRole('button', { name: '2022' }).click();
+    // Now "Assign Position" step is visible with open-slot buttons
+    await expect(page.getByText('Assign Position')).toBeVisible();
     await expect(page.getByRole('button', { name: 'OF' })).toBeVisible();
     await expect(page.getByRole('button', { name: '1B' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'SS' })).toBeVisible();

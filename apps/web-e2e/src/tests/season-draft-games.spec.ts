@@ -152,10 +152,9 @@ test.describe('Season Draft Games Lobby @critical', () => {
     await mockSeasonDraftGamesGraphQL(page, GAMES_RESPONSE_WITH_GAMES);
     await page.goto('/games/season-draft');
 
-    // Home Runs is the STAT_LABELS entry for 'hr' (may appear multiple times — use first)
-    await expect(page.getByText(/home runs/i).first()).toBeVisible();
-    // Strikeouts is the STAT_LABELS entry for 'so'
-    await expect(page.getByText(/strikeouts/i)).toBeVisible();
+    // V2 LobbyCard shows abbreviated stat chips (STAT_LABELS): 'HR', 'SO' — not full names
+    await expect(page.getByText('HR').first()).toBeVisible();
+    await expect(page.getByText('SO')).toBeVisible();
   });
 
   test('navigates to create page when New Game clicked @critical', async ({

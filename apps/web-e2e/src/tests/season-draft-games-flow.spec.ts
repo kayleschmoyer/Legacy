@@ -348,9 +348,9 @@ test.describe('Season Draft Games Flow @critical', () => {
     await expect(page.getByText('Setup', { exact: true })).toBeVisible();
     await expect(page.getByText('Completed', { exact: true })).toBeVisible();
 
-    // Verify stat labels (may appear multiple times in the page — use first)
-    await expect(page.getByText(/home runs/i).first()).toBeVisible();
-    await expect(page.getByText(/strikeouts/i)).toBeVisible();
+    // V2 LobbyCard shows abbreviated stat chips (STAT_LABELS): 'HR', 'SO' — not full names
+    await expect(page.getByText('HR').first()).toBeVisible();
+    await expect(page.getByText('SO')).toBeVisible();
   });
 
   test('create game button opens configuration form @critical', async ({
@@ -409,8 +409,8 @@ test.describe('Season Draft Games Flow @critical', () => {
     await expect(page.getByText(/waiting room/i)).toBeVisible();
     await expect(page.getByText(/start draft/i)).toBeVisible();
 
-    // Players listed in the setup card
-    await expect(page.getByText(/testuser/i).first()).toBeVisible();
+    // V2 SetupPanel shows 'You' for the current user (userId=1), not the raw playerName
+    await expect(page.getByText('You').first()).toBeVisible();
     await expect(page.getByText(/opponent1/i).first()).toBeVisible();
 
     // Game configuration details in the header (stat chip shows abbreviated form "SO")
@@ -452,7 +452,8 @@ test.describe('Season Draft Games Flow @critical', () => {
 
     // Scoreboard section (CardHead renders as Text, not a heading element)
     await expect(page.getByText('Scoreboard').first()).toBeVisible();
-    await expect(page.getByText(/testuser/i).first()).toBeVisible();
+    // V2 ScoreboardCard shows 'You' for the current user (userId=1)
+    await expect(page.getByText('You').first()).toBeVisible();
     await expect(page.getByText(/opponent1/i).first()).toBeVisible();
 
     // Picks history section (title is "Picks", not "Draft History")

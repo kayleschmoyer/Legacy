@@ -263,7 +263,12 @@ function getStandingsForPhase(phase: SeasonPhase): MockTeamStanding[] {
   switch (phase) {
     case 'season_complete':
     case 'playoffs':
-      return mockStandings(4);
+      // Override teamNames with MOCK_TEAMS names so the Standings component
+      // renders the same names the tests assert ('Alpha Squad', 'Beta Force', …).
+      return mockStandings(MOCK_TEAMS.length).map((s, i) => ({
+        ...s,
+        teamName: MOCK_TEAMS[i].name,
+      }));
     default:
       return [];
   }
