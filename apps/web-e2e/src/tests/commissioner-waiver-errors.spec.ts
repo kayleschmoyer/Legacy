@@ -368,8 +368,11 @@ test.describe('Waiver Processing — commissioner control @critical', () => {
   });
 
   test('shows "Waiver Processing" section heading', async ({ page }) => {
+    // V2 accordion uses role="button" for the section title (no heading element).
+    // expandWaiverProcessing already clicked the button — verify the toggle
+    // remains visible after expansion (its text IS the section heading).
     await expect(
-      page.getByRole('heading', { name: /waiver processing/i }),
+      page.getByRole('button', { name: 'Waiver Processing', exact: true }),
     ).toBeVisible();
   });
 

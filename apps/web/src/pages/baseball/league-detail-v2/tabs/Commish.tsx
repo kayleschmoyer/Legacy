@@ -1,9 +1,13 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   type LeagueFragment,
   type TeamFragment,
 } from '../../../../api/db/graphql.generated';
+import {
+  useCurrentWeek,
+  useMatchupsForLeague,
+} from '../../../../hooks/useMatchup';
 import { useLeagueScoringSettings } from '../../../../lib/scoring';
 import { CommissionerAnnouncementsPanel } from '../../../../features/baseball/CommissionerAnnouncementsPanel';
 import { DraftSettingsControl } from '../../../../components/commissioner/DraftSettingsControl';
@@ -13,6 +17,8 @@ import { LeagueDuesStatusDashboard } from '../../../../components/commissioner/L
 import { SeasonAwardsControl } from '../../../../components/commissioner/SeasonAwardsControl';
 import { LeagueScoringEditor } from '../../../../features/baseball/LeagueScoringEditor';
 import { DeleteLeagueControl } from '../../../../features/commissioner/DeleteLeagueControl';
+import { LeagueSettingsControl } from '../../../../components/commissioner/LeagueSettingsControl';
+import { WaiverProcessControl } from '../../../../features/commissioner';
 import { I } from '../Icons';
 
 interface AccordSection {
@@ -55,6 +61,7 @@ export interface CommishTabProps {
 export const CommishTab: React.FC<CommishTabProps> = ({ league }) => {
   const navigate = useNavigate();
   const [openId, setOpenId] = useState<string>('announcements');
+  const [nextStepError, setNextStepError] = useState<string | null>(null);
   const leagueId = league.id ?? 0;
 
   const {
@@ -64,6 +71,19 @@ export const CommishTab: React.FC<CommishTabProps> = ({ league }) => {
     refetch: refetchScoring,
   } = useLeagueScoringSettings(leagueId);
 
+  // NextStepControl needs the current matchup to render game-selection /
+  // advance-week states.  Fetch league matchups + current week and pick
+  // any matchup for the current week (NextStep uses league-level fields
+  // selectedGamesCount/status/weekNumber, not user-specific).
+  const { matchups: allLeagueMatchups } = useMatchupsForLeague(
+    leagueId || null,
+  );
+  const { currentWeek } = useCurrentWeek(leagueId || null);
+  const currentMatchup = useMemo(() => {
+    if (!currentWeek || !allLeagueMatchups.length) return null;
+    return allLeagueMatchups.find((m) => m.weekNumber === currentWeek) ?? null;
+  }, [allLeagueMatchups, currentWeek]);
+
   const sections: AccordSection[] = [
     {
       id: 'announcements',
@@ -72,6 +92,28 @@ export const CommishTab: React.FC<CommishTabProps> = ({ league }) => {
       icon: <I.Bell size={16} />,
       content: leagueId ? (
         <CommissionerAnnouncementsPanel leagueId={leagueId} isCommissioner />
+      ) : null,
+    },
+    {
+      id: 'league-settings',
+      label: 'League Settings',
+      iconClass: 'gold',
+      icon: <I.Settings size={16} />,
+      content: leagueId ? (
+        <LeagueSettingsControl
+          leagueId={leagueId}
+          draftStatus={league.draftStatus}
+          currentGamesPerMatchup={league.gamesPerMatchup ?? 1}
+          currentSpStartsPerMatchup={league.spStartsPerMatchup ?? 1}
+          currentMinCareerGames={league.minCareerGames ?? 50}
+          currentMinCareerSeasons={league.minCareerSeasons ?? 3}
+          currentTotalMatchups={league.totalMatchups ?? 10}
+          currentPlayoffEnabled={league.playoffEnabled ?? true}
+          currentPlayoffFormat={league.playoffFormat ?? '4-team'}
+          currentPlayoffMultiWeek={league.playoffMultiWeek ?? false}
+          currentSalaryCapEnabled={league.salaryCapEnabled ?? false}
+          currentSalaryCap={league.salaryCap ?? null}
+        />
       ) : null,
     },
     {
@@ -133,6 +175,13 @@ export const CommishTab: React.FC<CommishTabProps> = ({ league }) => {
       ) : null,
     },
     {
+      id: 'waivers',
+      label: 'Waiver Processing',
+      iconClass: 'gold',
+      icon: <I.Refresh size={16} />,
+      content: leagueId ? <WaiverProcessControl leagueId={leagueId} /> : null,
+    },
+    {
       id: 'danger',
       label: 'Danger Zone',
       iconClass: 'red',
@@ -151,12 +200,14 @@ export const CommishTab: React.FC<CommishTabProps> = ({ league }) => {
       {leagueId ? (
         <NextStepControl
           leagueId={leagueId}
-          currentMatchup={null}
+          currentMatchup={currentMatchup}
           gamesPerMatchup={league.gamesPerMatchup ?? 1}
           draftStatus={league.draftStatus}
           leagueName={league.name ?? ''}
           frozenAt={league.frozenAt}
           totalMatchups={league.totalMatchups ?? undefined}
+          onError={(err) => setNextStepError(err.message)}
+          onSuccess={() => setNextStepError(null)}
           onNavigateToDraftBoard={() =>
             navigate(`/baseball/league/${leagueId}/draft`)
           }
@@ -164,6 +215,22 @@ export const CommishTab: React.FC<CommishTabProps> = ({ league }) => {
             navigate(`/baseball/league/${newLeagueId}`)
           }
         />
+      ) : null}
+      {nextStepError ? (
+        <div
+          role="alert"
+          aria-live="assertive"
+          style={{
+            background: 'rgba(196, 30, 58, 0.1)',
+            border: '1px solid rgba(196, 30, 58, 0.4)',
+            borderRadius: 8,
+            padding: 12,
+            color: '#c41e3a',
+            fontWeight: 600,
+          }}
+        >
+          Error: {nextStepError}
+        </div>
       ) : null}
       <div className="ls-accordion">
         {sections.map((s) => (

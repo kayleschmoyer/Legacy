@@ -354,10 +354,10 @@ test.describe('Season Awards — accordion panel @regression', () => {
 
     await expandSeasonAwards(page);
 
-    // Verify the section content is now visible (heading inside the panel).
-    // Use .nth(1) — the accordion toggle <h4> and the content <h4> both match.
+    // V2: accordion toggle is a button (not heading); only the content's
+    // SeasonAwardsControl renders a heading. .first() handles either count.
     await expect(
-      page.getByRole('heading', { name: /season awards/i }).nth(1),
+      page.getByRole('heading', { name: /season awards/i }).first(),
     ).toBeVisible();
   });
 

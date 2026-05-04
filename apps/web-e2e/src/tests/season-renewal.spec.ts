@@ -283,10 +283,17 @@ async function setupGraphQL(
   );
 }
 
-/** Expand the "Next Step" section (open by default, but ensure it's visible). */
+/** Wait for the NextStepControl to be visible. */
 async function ensureNextStepVisible(page: import('@playwright/test').Page) {
-  // "Next Step" section is open by default; just confirm the heading is present
-  await expect(page.getByRole('heading', { name: 'Next Step' })).toBeVisible();
+  // V2 renders NextStepControl at the top of the commissioner tab without
+  // a "Next Step" accordion wrapper (legacy used a section title heading).
+  // Wait for the commissioner tab to be selected in the league-sections
+  // tablist (RoleBar has its own "Commissioner" tab, so scope explicitly).
+  await expect(
+    page
+      .getByRole('tablist', { name: 'League sections' })
+      .getByRole('tab', { name: 'Commissioner' }),
+  ).toHaveAttribute('aria-selected', 'true');
 }
 
 // ── Tests: Visibility Conditions ──────────────────────────────────────────────

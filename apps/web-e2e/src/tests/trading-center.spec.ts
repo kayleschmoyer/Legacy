@@ -273,7 +273,13 @@ test.describe('Trading Center — header and layout @critical', () => {
   });
 
   test('shows "Trading Center" heading', async ({ page }) => {
-    await expect(page.getByText('Trading Center')).toBeVisible();
+    // V2 wraps TradingCenter in a Section with title "Trading Center"
+    // (as an <h3>). The legacy TradingCenter component also renders its own
+    // "Trading Center" header inside #panel-trades, so scope to the first
+    // heading-style match to avoid strict-mode violation.
+    await expect(
+      page.getByRole('heading', { name: 'Trading Center' }).first(),
+    ).toBeVisible();
   });
 
   test('shows "Propose Trade" button', async ({ page }) => {
@@ -327,7 +333,8 @@ test.describe('Trading Center — incoming pending trade @critical', () => {
   });
 
   test('shows PENDING status badge', async ({ page }) => {
-    await expect(page.getByText('PENDING')).toBeVisible();
+    // Multiple PENDING badges may render (one per offer); just verify any visible.
+    await expect(page.getByText('PENDING').first()).toBeVisible();
   });
 
   test('shows player name being offered (Mike Trout)', async ({ page }) => {

@@ -7,6 +7,7 @@ import {
   type TeamMemberFragment,
   useGetLeagueStandingsQuery,
 } from '../../../../api/db/graphql.generated';
+import { CommissionerAnnouncementsPanel } from '../../../../features/baseball/CommissionerAnnouncementsPanel';
 import { LeagueActivityFeed } from '../../../../features/baseball/LeagueActivityFeed';
 import { LeagueChatTab } from '../../../../features/baseball/LeagueChatTab';
 import { useLeagueScoringSettings } from '../../../../lib/scoring';
@@ -332,6 +333,17 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
           icon={<I.Bell size={20} />}
           title="Commissioner Announcement"
           sub={league.lmNotes}
+        />
+      ) : null}
+
+      {/* Commissioner Announcements panel — mirrors legacy LeagueDetailPage,
+          where every member could see announcements on the overview. The
+          panel itself hides when there are no announcements and the viewer
+          is not the commissioner. */}
+      {league.id != null ? (
+        <CommissionerAnnouncementsPanel
+          leagueId={league.id}
+          isCommissioner={isCommissioner}
         />
       ) : null}
 
