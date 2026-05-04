@@ -94,16 +94,24 @@ export class CostCap {
    * subscription-based providers (Copilot, GitHub Models).
    *
    * @param {number} promptChars - Total character count of system + user prompts
-   * @param {string} [provider]  - 'anthropic' | 'copilot-cli' | 'github-models' | 'gemini'
+   * @param {string} [provider]  - Provider name ('gemini', 'anthropic', …) or a
+   *   model ID like 'gemini-2.5-flash-lite'. Model IDs whose prefix matches a known
+   *   provider (e.g. 'gemini-*') are normalised to their provider key automatically.
    * @returns {number} Estimated cost in USD
    */
   estimateCost(promptChars, provider = 'anthropic') {
+    // Normalise model IDs to provider keys so callers can pass either
+    // providerName ('gemini') or a specific model ID ('gemini-2.5-flash-lite').
+    const key =
+      typeof provider === 'string' && /^gemini-/i.test(provider)
+        ? 'gemini'
+        : provider;
     let inputRate;
     let outputRate;
-    if (provider === 'anthropic') {
+    if (key === 'anthropic') {
       inputRate = ANTHROPIC_INPUT_COST_PER_TOK;
       outputRate = ANTHROPIC_OUTPUT_COST_PER_TOK;
-    } else if (provider === 'gemini') {
+    } else if (key === 'gemini') {
       inputRate = GEMINI_INPUT_COST_PER_TOK;
       outputRate = GEMINI_OUTPUT_COST_PER_TOK;
     } else {

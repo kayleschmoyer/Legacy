@@ -104,6 +104,39 @@ describe('formatReviewBody', () => {
     assert.match(body, /Issue A/);
     assert.match(body, /Issue B/);
   });
+
+  it('prepends fallback banner when fallbackModel is set (REQUEST_CHANGES)', () => {
+    const findings = [
+      {
+        issueId: generateUlid(),
+        severity: 'high',
+        title: 'Some finding',
+        body: 'Fix it.',
+        file: null,
+        line: null,
+      },
+    ];
+    const body = formatReviewBody(findings, 'REQUEST_CHANGES', {
+      fallbackModel: 'gemini-2.5-flash-lite',
+    });
+    assert.match(body, /gemini-2\.5-flash-lite/);
+    assert.match(body, /fallback/);
+    assert.match(body, /Some finding/);
+  });
+
+  it('prepends fallback banner when fallbackModel is set (APPROVE)', () => {
+    const body = formatReviewBody([], 'APPROVE', {
+      fallbackModel: 'gemini-2.5-flash-lite',
+    });
+    assert.match(body, /gemini-2\.5-flash-lite/);
+    assert.match(body, /LGTM/);
+  });
+
+  it('omits fallback banner when fallbackModel is not set', () => {
+    const body = formatReviewBody([], 'APPROVE');
+    assert.doesNotMatch(body, /fallback/);
+    assert.doesNotMatch(body, /gemini-2\.5-flash-lite/);
+  });
 });
 
 // ---------------------------------------------------------------------------

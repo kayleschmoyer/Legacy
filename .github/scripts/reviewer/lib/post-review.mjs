@@ -184,14 +184,23 @@ export async function addLabelAsApp(prNumber, label) {
  *
  * @param {Array<import('./findings.mjs').Finding & { issueId: string }>} blockingWithIds
  * @param {'REQUEST_CHANGES'|'APPROVE'} event
+ * @param {{ fallbackModel?: string }} [opts]
  * @returns {string}
  */
-export function formatReviewBody(blockingWithIds, event) {
+export function formatReviewBody(
+  blockingWithIds,
+  event,
+  { fallbackModel } = {},
+) {
+  const banner = fallbackModel
+    ? `> [!NOTE]\n> This review was generated using **${fallbackModel}** (fallback) because the primary model was temporarily unavailable. Quality may differ slightly.\n\n`
+    : '';
+
   if (event === 'APPROVE') {
-    return 'LGTM — no blocking findings.';
+    return `${banner}LGTM — no blocking findings.`;
   }
 
-  const parts = ['## Changes Required\n'];
+  const parts = [`${banner}## Changes Required\n`];
   for (const f of blockingWithIds) {
     const loc = f.file
       ? f.line != null
@@ -240,9 +249,13 @@ export function buildInlineComments(findingsWithIds) {
  *
  * @param {number} prNumber
  * @param {{ blocking: import('./findings.mjs').Finding[],
- *            nonBlocking: import('./findings.mjs').Finding[] }} gated
+ *            nonBlocking: import('./findings.mjs').Finding[],
+ *            fallbackModel?: string }} gated
  */
-export async function postRealReview(prNumber, { blocking, nonBlocking }) {
+export async function postRealReview(
+  prNumber,
+  { blocking, nonBlocking, fallbackModel },
+) {
   const appId = process.env.REVIEWER_BOT_APP_ID;
   const privateKeyPem = process.env.REVIEWER_BOT_APP_PRIVATE_KEY;
 
@@ -272,7 +285,7 @@ export async function postRealReview(prNumber, { blocking, nonBlocking }) {
   }));
 
   const event = blockingWithIds.length > 0 ? 'REQUEST_CHANGES' : 'APPROVE';
-  const body = formatReviewBody(blockingWithIds, event);
+  const body = formatReviewBody(blockingWithIds, event, { fallbackModel });
   const comments = buildInlineComments([
     ...blockingWithIds,
     ...nonBlockingWithIds,

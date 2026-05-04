@@ -57,6 +57,7 @@ jobs:
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           LLM_PROVIDER: gemini
           REVIEWER_MODEL: gemini-2.5-flash
+          REVIEWER_FALLBACK_MODEL: ${{ vars.REVIEWER_FALLBACK_MODEL || 'gemini-2.5-flash-lite' }}
           REVIEWER_BOT_APP_ID: ${{ vars.REVIEWER_BOT_APP_ID || '3142924' }}
           REVIEWER_BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           REVIEWER_TELEMETRY_BUCKET: ${{ vars.REVIEWER_TELEMETRY_BUCKET || 'legacy-sports-dev-reviewer-telemetry' }}

@@ -78,6 +78,36 @@ const PRICING = {
     cacheRead: 0.31,
     cacheStoragePerHour: 4.5,
   },
+  'gemini-2.0-flash': {
+    input: 0.1,
+    output: 0.4,
+    cacheRead: 0.025,
+    cacheStoragePerHour: 1.0,
+  },
+  'gemini-2.0-flash-lite': {
+    input: 0.075,
+    output: 0.3,
+    cacheRead: 0.019,
+    cacheStoragePerHour: 0.25,
+  },
+  'gemini-1.5-flash': {
+    input: 0.075,
+    output: 0.3,
+    cacheRead: 0.019,
+    cacheStoragePerHour: 1.0,
+  },
+  'gemini-1.5-flash-8b': {
+    input: 0.0375,
+    output: 0.15,
+    cacheRead: 0.01,
+    cacheStoragePerHour: 0.25,
+  },
+  'gemini-1.5-pro': {
+    input: 1.25,
+    output: 5.0,
+    cacheRead: 0.3125,
+    cacheStoragePerHour: 4.5,
+  },
 };
 
 /**

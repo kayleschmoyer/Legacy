@@ -46,6 +46,7 @@ import {
   getMalformedInlineReplies,
 } from './lib/cycle-protocol.mjs';
 import { FORMAT_ERROR_MESSAGE } from './lib/parse-author-response.mjs';
+import { createFallbackProvider } from './lib/fallback.mjs';
 
 const STRIP_LOG_MAX_FINDINGS = 3;
 const STRIP_LOG_MAX_TITLE_LEN = 60;
@@ -424,6 +425,7 @@ async function main() {
     costUsd: 0,
   };
   let latencyMs = 0;
+  let usedFallbackModel = null;
 
   if (trivial) {
     process.stdout.write(
@@ -449,20 +451,54 @@ async function main() {
       process.stderr.write(
         `[reviewer] Provider error after all retries: ${err instanceof Error ? err.message : String(err)}\n`,
       );
-      await handleLlmFailure(prNumber, err, {
-        provider: providerName,
-        cycle,
-        usage: reviewUsage,
-        latencyMs,
-        authorLogin,
-        authorType,
-        cycleCounterExclusions: {
-          infra_failure: cycleExcludedInfra,
-          dismissed: cycleExcludedDismissed,
-          admin_reset: cycleResetByAdmin,
-        },
-      });
-      process.exit(1);
+      const fallbackProvider = await createFallbackProvider(err, providerName);
+      let lastErr = err;
+      if (fallbackProvider) {
+        process.stdout.write(
+          `[reviewer] Primary model unavailable; retrying with fallback model ${fallbackProvider.model}\n`,
+        );
+        try {
+          const t0 = Date.now();
+          const result = await withRetry(() => {
+            const estimate = costCap.estimateCost(
+              systemPrompt.length + userPrompt.length,
+              fallbackProvider.model,
+            );
+            costCap.checkBefore(estimate);
+            return fallbackProvider.review({
+              system: systemPrompt,
+              user: userPrompt,
+            });
+          }, [30_000]);
+          latencyMs = Date.now() - t0;
+          reviewText = result.text;
+          reviewUsage = result.usage ?? reviewUsage;
+          costCap.add(result.usage);
+          costCap.checkAfter();
+          usedFallbackModel = fallbackProvider.model;
+        } catch (fallbackErr) {
+          lastErr = fallbackErr;
+          process.stderr.write(
+            `[reviewer] Fallback model also failed: ${fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr)}\n`,
+          );
+        }
+      }
+      if (!usedFallbackModel) {
+        await handleLlmFailure(prNumber, lastErr, {
+          provider: providerName,
+          cycle,
+          usage: reviewUsage,
+          latencyMs,
+          authorLogin,
+          authorType,
+          cycleCounterExclusions: {
+            infra_failure: cycleExcludedInfra,
+            dismissed: cycleExcludedDismissed,
+            admin_reset: cycleResetByAdmin,
+          },
+        });
+        process.exit(1);
+      }
     }
   } else {
     process.stdout.write(
@@ -484,20 +520,47 @@ async function main() {
       process.stderr.write(
         `[reviewer] Multi-pass error after all retries: ${err instanceof Error ? err.message : String(err)}\n`,
       );
-      await handleLlmFailure(prNumber, err, {
-        provider: providerName,
-        cycle,
-        usage: reviewUsage,
-        latencyMs,
-        authorLogin,
-        authorType,
-        cycleCounterExclusions: {
-          infra_failure: cycleExcludedInfra,
-          dismissed: cycleExcludedDismissed,
-          admin_reset: cycleResetByAdmin,
-        },
-      });
-      process.exit(1);
+      const fallbackProvider = await createFallbackProvider(err, providerName);
+      let lastErr = err;
+      if (fallbackProvider) {
+        process.stdout.write(
+          `[reviewer] Primary model unavailable; retrying multi-pass with fallback model ${fallbackProvider.model}\n`,
+        );
+        try {
+          const t0 = Date.now();
+          const { passes, usage: multiPassUsage } = await withRetry(() => {
+            return runMultiPass(fallbackProvider, systemPrompt, userPrompt, {
+              costCap,
+              providerName: fallbackProvider.model,
+            });
+          }, [30_000]);
+          latencyMs = Date.now() - t0;
+          reviewText = consolidate(passes);
+          reviewUsage = multiPassUsage;
+          usedFallbackModel = fallbackProvider.model;
+        } catch (fallbackErr) {
+          lastErr = fallbackErr;
+          process.stderr.write(
+            `[reviewer] Fallback model also failed: ${fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr)}\n`,
+          );
+        }
+      }
+      if (!usedFallbackModel) {
+        await handleLlmFailure(prNumber, lastErr, {
+          provider: providerName,
+          cycle,
+          usage: reviewUsage,
+          latencyMs,
+          authorLogin,
+          authorType,
+          cycleCounterExclusions: {
+            infra_failure: cycleExcludedInfra,
+            dismissed: cycleExcludedDismissed,
+            admin_reset: cycleResetByAdmin,
+          },
+        });
+        process.exit(1);
+      }
     }
   }
 
@@ -708,7 +771,10 @@ async function main() {
       }
     }
     try {
-      await postRealReview(prNumber, gated);
+      await postRealReview(prNumber, {
+        ...gated,
+        fallbackModel: usedFallbackModel ?? undefined,
+      });
     } catch (err) {
       process.stderr.write(
         `[reviewer] Failed to post real review: ${err instanceof Error ? err.message : String(err)}\n`,
