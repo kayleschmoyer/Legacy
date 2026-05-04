@@ -24,6 +24,8 @@ import {
 import { useThemeContext } from '../../context/ThemeContext';
 
 interface OnboardingTutorialProps {
+  /** Whether the tutorial overlay is visible */
+  isOpen: boolean;
   /** Called when the user completes or explicitly skips the tutorial */
   onClose: () => void;
 }
@@ -558,9 +560,20 @@ const STEPS: TutorialStep[] = [
  * A multi-step onboarding tutorial that explains the historical-stats
  * game mechanic to new users.  Displayed as a dismissible modal overlay.
  */
-export function OnboardingTutorial({ onClose }: OnboardingTutorialProps) {
+export function OnboardingTutorial({
+  isOpen,
+  onClose,
+}: OnboardingTutorialProps) {
   const [currentStep, setCurrentStep] = React.useState(0);
+
+  React.useEffect(() => {
+    if (isOpen) setCurrentStep(0);
+  }, [isOpen]);
+
   const { resolvedTheme } = useThemeContext();
+
+  if (!isOpen) return null;
+
   const isLight = resolvedTheme === 'light';
   const step = STEPS[currentStep];
   const isFirst = currentStep === 0;

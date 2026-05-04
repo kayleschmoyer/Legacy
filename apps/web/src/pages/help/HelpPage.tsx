@@ -315,9 +315,10 @@ export default function HelpPage() {
 
   return (
     <>
-      {tutorialOpen && (
-        <OnboardingTutorial onClose={() => setTutorialOpen(false)} />
-      )}
+      <OnboardingTutorial
+        isOpen={tutorialOpen}
+        onClose={() => setTutorialOpen(false)}
+      />
       <BugReportButton
         controlledOpen={bugReportOpen}
         onDialogOpenChange={setBugReportOpen}

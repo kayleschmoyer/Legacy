@@ -2148,7 +2148,7 @@ export function HomePage(): React.JSX.Element {
   /* ─── Getting-started view (new users) ─── */
   return (
     <>
-      {tutorialOpen && <OnboardingTutorial onClose={handleTutorialClose} />}
+      <OnboardingTutorial isOpen={tutorialOpen} onClose={handleTutorialClose} />
       <ScrollView>
         <PageMeta
           title="Fantasy Baseball League Manager"
