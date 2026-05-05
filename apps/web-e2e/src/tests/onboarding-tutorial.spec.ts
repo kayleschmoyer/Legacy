@@ -213,7 +213,10 @@ test.describe('Onboarding Tutorial — final step navigation links @regression',
   }) => {
     await openTutorialAtLastStep(page);
 
-    await page.getByRole('link', { name: /create league/i }).click();
+    await page
+      .locator('[role="dialog"]')
+      .getByRole('link', { name: /create league/i })
+      .click();
 
     await expect(page.getByRole('dialog')).not.toBeVisible({
       timeout: 10000,
@@ -225,7 +228,10 @@ test.describe('Onboarding Tutorial — final step navigation links @regression',
   }) => {
     await openTutorialAtLastStep(page);
 
-    await page.getByRole('link', { name: /create league/i }).click();
+    await page
+      .locator('[role="dialog"]')
+      .getByRole('link', { name: /create league/i })
+      .click();
 
     await expect(page).toHaveURL(/\/baseball\/league\/create/, {
       timeout: 10000,
