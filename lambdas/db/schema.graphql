@@ -1014,6 +1014,7 @@ type League {
   """
   tierFrozenAt: String
   totalMatchups: Int
+  tradeDeadlineWeek: Int
   userMembership: LeagueMember
   waiverEnabled: Boolean
   waiverType: String

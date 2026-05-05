@@ -886,6 +886,7 @@ export type League = {
   /** ISO timestamp set when this league was frozen due to a subscription tier downgrade. Null when the league is active or frozen for a different reason (season retirement). Cleared on re-upgrade or when the owner re-selects this league as one of their active free-tier leagues. */
   tierFrozenAt?: Maybe<Scalars['String']['output']>;
   totalMatchups?: Maybe<Scalars['Int']['output']>;
+  tradeDeadlineWeek?: Maybe<Scalars['Int']['output']>;
   userMembership?: Maybe<LeagueMember>;
   waiverEnabled?: Maybe<Scalars['Boolean']['output']>;
   waiverType?: Maybe<Scalars['String']['output']>;

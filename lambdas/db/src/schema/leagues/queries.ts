@@ -92,6 +92,8 @@ builder.queryField('league', (t) =>
             hofOnly: PublicSchema.leagues.hofOnly,
             customEraStartYear: PublicSchema.leagues.customEraStartYear,
             customEraEndYear: PublicSchema.leagues.customEraEndYear,
+            // Trade deadline (LS-4099)
+            tradeDeadlineWeek: PublicSchema.leagues.tradeDeadlineWeek,
           })
           .from(PublicSchema.leagues)
           .where(eq(PublicSchema.leagues.id, leagueId))
@@ -185,6 +187,8 @@ builder.queryField('league', (t) =>
           hofOnly: league.hofOnly,
           customEraStartYear: league.customEraStartYear,
           customEraEndYear: league.customEraEndYear,
+          // Trade deadline (LS-4099)
+          tradeDeadlineWeek: league.tradeDeadlineWeek,
           userMembership,
         };
       } catch (error) {

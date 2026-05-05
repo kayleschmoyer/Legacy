@@ -21,6 +21,7 @@ import {
   Separator,
   Spinner,
   Text,
+  Tooltip,
   XStack,
   YStack,
 } from 'tamagui';
@@ -50,6 +51,7 @@ import {
   TradeOfferFragment,
   useAcceptTradeMutation,
   useCancelTradeMutation,
+  useGetLeagueByIdQuery,
   useGetLeagueTeamsQuery,
   useGetLeagueTradeOffersQuery,
   useGetTeamMembersLazyQuery,
@@ -506,6 +508,7 @@ function TradeOfferCard({
 interface ProposeTradeDialogProps {
   leagueId: number;
   userTeamId: number;
+  isPastDeadline: boolean;
   onDismiss: () => void;
   onSuccess: () => void;
 }
@@ -513,6 +516,7 @@ interface ProposeTradeDialogProps {
 function ProposeTradeDialog({
   leagueId,
   userTeamId,
+  isPastDeadline,
   onDismiss,
   onSuccess,
 }: ProposeTradeDialogProps) {
@@ -582,6 +586,10 @@ function ProposeTradeDialog({
   };
 
   const handleSubmit = useCallback(async () => {
+    if (isPastDeadline) {
+      setErrorMsg('Trade deadline has passed. No new trades can be proposed.');
+      return;
+    }
     if (
       !draft.receivingTeamId ||
       draft.offeringPlayerIds.length === 0 ||
@@ -647,7 +655,7 @@ function ProposeTradeDialog({
     } finally {
       setSubmitting(false);
     }
-  }, [draft, leagueId, userTeamId, proposeTrade, onSuccess]);
+  }, [draft, isPastDeadline, leagueId, userTeamId, proposeTrade, onSuccess]);
 
   // Cycle through expiry options on press
   const currentExpiryIdx = EXPIRY_OPTIONS.findIndex(
@@ -1109,6 +1117,23 @@ function ProposeTradeDialog({
                 </Button>
               </XStack>
 
+              {isPastDeadline && (
+                <XStack
+                  backgroundColor="$red2"
+                  borderColor="$red6"
+                  borderWidth={1}
+                  borderRadius="$3"
+                  padding="$2"
+                  gap="$2"
+                  alignItems="center"
+                >
+                  <Clock size={14} color="$red11" />
+                  <Text color="$red11" fontSize="$2" fontWeight="600">
+                    Trade deadline has passed
+                  </Text>
+                </XStack>
+              )}
+
               {errorMsg && (
                 <Text color="$red11" fontSize="$2">
                   {errorMsg}
@@ -1132,9 +1157,9 @@ function ProposeTradeDialog({
                 <Button
                   flex={2}
                   onPress={() => void handleSubmit()}
-                  backgroundColor={BRAND_NAVY_LIGHT}
+                  backgroundColor={isPastDeadline ? '$gray6' : BRAND_NAVY_LIGHT}
                   borderRadius="$4"
-                  disabled={submitting}
+                  disabled={submitting || isPastDeadline}
                   animation="quick"
                   pressStyle={{ scale: 0.98 }}
                   icon={
@@ -1170,6 +1195,17 @@ export function TradingCenter({
   const [showHistory, setShowHistory] = useState(false);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  const { data: leagueData } = useGetLeagueByIdQuery({
+    variables: { id: leagueId },
+    fetchPolicy: 'cache-first',
+  });
+
+  const isPastDeadline = useMemo(() => {
+    const { tradeDeadlineWeek, currentWeekNumber } = leagueData?.league ?? {};
+    if (tradeDeadlineWeek == null || currentWeekNumber == null) return false;
+    return currentWeekNumber >= tradeDeadlineWeek;
+  }, [leagueData]);
 
   // Pending trades for the user's team
   const {
@@ -1264,20 +1300,46 @@ export function TradingCenter({
           </YStack>
         </XStack>
 
-        <Button
-          size="$3"
-          backgroundColor={BRAND_NAVY_LIGHT}
-          borderRadius="$4"
-          onPress={() => setShowProposeDialog(true)}
-          animation="quick"
-          pressStyle={{ scale: 0.97 }}
-          hoverStyle={{ backgroundColor: withAlpha(BRAND_NAVY, 1) }}
-          icon={<Zap size={14} color="white" />}
-        >
-          <Text fontSize="$3" fontWeight="700" color="white">
-            Propose Trade
-          </Text>
-        </Button>
+        <Tooltip placement="bottom" delay={0}>
+          <Tooltip.Trigger>
+            <Button
+              size="$3"
+              backgroundColor={isPastDeadline ? '$gray6' : BRAND_NAVY_LIGHT}
+              borderRadius="$4"
+              onPress={() => {
+                if (!isPastDeadline) setShowProposeDialog(true);
+              }}
+              disabled={isPastDeadline}
+              animation="quick"
+              pressStyle={{ scale: 0.97 }}
+              hoverStyle={
+                isPastDeadline
+                  ? {}
+                  : { backgroundColor: withAlpha(BRAND_NAVY, 1) }
+              }
+              icon={<Zap size={14} color="white" />}
+            >
+              <Text fontSize="$3" fontWeight="700" color="white">
+                Propose Trade
+              </Text>
+            </Button>
+          </Tooltip.Trigger>
+          {isPastDeadline && (
+            <Tooltip.Content
+              backgroundColor="$gray9"
+              borderRadius="$3"
+              padding="$2"
+              enterStyle={{ opacity: 0, scale: 0.9 }}
+              exitStyle={{ opacity: 0, scale: 0.9 }}
+              animation="quick"
+            >
+              <Tooltip.Arrow />
+              <Text fontSize="$2" color="white">
+                Trade deadline has passed
+              </Text>
+            </Tooltip.Content>
+          )}
+        </Tooltip>
       </XStack>
 
       {actionError && (
@@ -1490,6 +1552,7 @@ export function TradingCenter({
         <ProposeTradeDialog
           leagueId={leagueId}
           userTeamId={userTeamId}
+          isPastDeadline={isPastDeadline}
           onDismiss={() => setShowProposeDialog(false)}
           onSuccess={() => {
             setShowProposeDialog(false);

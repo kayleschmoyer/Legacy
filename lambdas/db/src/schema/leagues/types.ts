@@ -84,6 +84,8 @@ export const League = builder.objectRef<{
   /** ISO timestamp set when the league is frozen due to a subscription
    *  tier downgrade (distinct from frozenAt which marks season retirement). */
   tierFrozenAt?: string | null;
+  /** Week number after which trades are locked (inclusive). Null means no deadline. */
+  tradeDeadlineWeek?: number | null;
   /** Monotonic season counter (1 = founding, incremented on renewal) */
   seasonNumber?: number;
   // ── Salary cap settings (LS-634/LS-646) ─────────────────────────────
@@ -156,6 +158,7 @@ League.implement({
         'the owner re-selects this league as one of their active free-tier leagues.',
     }),
     seasonNumber: t.exposeInt('seasonNumber', { nullable: true }),
+    tradeDeadlineWeek: t.exposeInt('tradeDeadlineWeek', { nullable: true }),
     currentWeekNumber: t.int({
       nullable: true,
       description: 'The current active week number for the league',
