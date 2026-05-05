@@ -166,6 +166,10 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = {
   getleagueduesstatus: {
     data: { leagueDuesSettings: null, leagueDuesStatus: [] },
   },
+
+  // ── History tab ─────────────────────────────────────────────────
+  getleaguehistory: { data: { getLeagueHistory: [] } },
+  getalltimerecords: { data: { getAllTimeRecords: [] } },
 };
 
 // ---------------------------------------------------------------------------

@@ -13,7 +13,11 @@
  */
 
 import { expect, test } from '../fixtures/auth-enhanced';
-import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import {
+  BASELINE_GRAPHQL_RESPONSES,
+  extractOperationName,
+} from '../fixtures/shared-mocks';
+import { E2E_SIGNING_SECRET, signE2EJwt } from '../utils/jwt';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -179,6 +183,26 @@ async function setupGraphQL(
     onDeleteLeague,
   } = opts;
 
+  // Intercept the background auth refresh so user stays logged in throughout
+  // the test. Without this, useAuth fires a non-blocking /refresh-jwt request
+  // that can fail under Playwright's cookie isolation (cross-port localhost),
+  // dispatching AUTH_LOGOUT → user=null → isCommissioner=false → CommishTab unmounts.
+  // Use a glob pattern (not a function predicate) — glob patterns are evaluated
+  // by Playwright's core routing engine before dispatching, so they reliably
+  // take LIFO priority over the broad _apiIsolation catch-all handler.
+  await page.route('**/refresh-jwt', async (route) => {
+    const freshJwt = signE2EJwt(
+      { id: 1, email: 'e2e-test@legacysports.dev', accessLevel: 'admin' },
+      E2E_SIGNING_SECRET,
+      '1h',
+    );
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ jwt: freshJwt, csrfToken: 'e2e-csrf-token' }),
+    });
+  });
+
   await page.route(isGraphQLEndpoint, async (route) => {
     const postData = route.request().postData()?.toLowerCase() ?? '';
 
@@ -339,7 +363,13 @@ async function setupGraphQL(
         body: JSON.stringify({ data: null }),
       });
     } else {
-      await unmockedGraphQLFallback(route);
+      const op = extractOperationName(route).toLowerCase();
+      const baseline = BASELINE_GRAPHQL_RESPONSES[op];
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(baseline ?? { data: null }),
+      });
     }
   });
 }
@@ -347,9 +377,13 @@ async function setupGraphQL(
 // ── Accordion helpers ─────────────────────────────────────────────────────────
 
 async function expandDangerZone(page: import('@playwright/test').Page) {
-  // The commissioner section headers are Tamagui styled components rendered as
-  // role="button" with the section title as text content.
-  const toggle = page.getByRole('button', { name: 'Danger Zone', exact: true });
+  // Wait for the CommishTab accordion to be visible — this confirms the page
+  // has rendered past the loading state and the commish tab is mounted.
+  // page.goto() already drains the initial navigation; waitForURL is not used
+  // here because it can latch onto a second React Router client-side navigation
+  // that fires during app initialization, causing it to resolve while #root is
+  // still empty (before React re-mounts on the second navigation).
+  const toggle = page.getByTestId('danger-zone-toggle');
   await toggle.waitFor({ state: 'visible' });
   await toggle.click();
   await expect(toggle).toHaveAttribute('aria-expanded', 'true');
@@ -376,7 +410,10 @@ test.describe('Commissioner Audit Log — commissioner access @regression', () =
     });
 
     await page.goto('/baseball/league/1/commissioner');
-    await page.waitForLoadState('load');
+    await page.waitForURL(/\/baseball\/league\/\d+\/(commissioner|commish)/, {
+      waitUntil: 'networkidle',
+      timeout: 15000,
+    });
 
     // Verify the page loads without error
     await expect(page.locator('body')).not.toContainText(
@@ -398,7 +435,10 @@ test.describe('Commissioner Audit Log — commissioner access @regression', () =
     });
 
     await page.goto('/baseball/league/1/commissioner');
-    await page.waitForLoadState('load');
+    await page.waitForURL(/\/baseball\/league\/\d+\/(commissioner|commish)/, {
+      waitUntil: 'networkidle',
+      timeout: 15000,
+    });
 
     // The commissioner page loads — audit log mock data is available
     // Verify the page renders without errors
@@ -418,7 +458,10 @@ test.describe('Commissioner Audit Log — non-commissioner access @regression', 
       auditLogs: [],
     });
     await page.goto('/baseball/league/1/overview');
-    await page.waitForLoadState('load');
+    await page.waitForURL(/\/baseball\/league\/\d+\/overview/, {
+      waitUntil: 'networkidle',
+      timeout: 15000,
+    });
 
     // Wait for tabs to render
     await expect(
@@ -442,7 +485,10 @@ test.describe('Commissioner Audit Log — non-commissioner access @regression', 
       auditLogs: [],
     });
     await page.goto('/baseball/league/1/commissioner');
-    await page.waitForLoadState('load');
+    await page.waitForURL(/\/baseball\/league\/\d+\/(commissioner|commish)/, {
+      waitUntil: 'networkidle',
+      timeout: 15000,
+    });
 
     // Non-commissioner navigating directly to the commissioner tab
     // should not see commissioner controls — the page either redirects
@@ -463,7 +509,6 @@ test.describe('Delete League — danger zone section @critical', () => {
   }) => {
     await setupGraphQL(page, { league: makeLeague({ owner: 1 }) });
     await page.goto('/baseball/league/1/commissioner');
-    await page.waitForLoadState('load');
     await expandDangerZone(page);
 
     // V2: the accordion header is a role="button", not a heading element.
@@ -476,7 +521,6 @@ test.describe('Delete League — danger zone section @critical', () => {
   test('shows "Delete League" button in danger zone', async ({ page }) => {
     await setupGraphQL(page, { league: makeLeague({ owner: 1 }) });
     await page.goto('/baseball/league/1/commissioner');
-    await page.waitForLoadState('load');
     await expandDangerZone(page);
 
     await expect(
@@ -487,7 +531,6 @@ test.describe('Delete League — danger zone section @critical', () => {
   test('shows permanent deletion warning text', async ({ page }) => {
     await setupGraphQL(page, { league: makeLeague({ owner: 1 }) });
     await page.goto('/baseball/league/1/commissioner');
-    await page.waitForLoadState('load');
     await expandDangerZone(page);
 
     await expect(
@@ -502,7 +545,6 @@ test.describe('Delete League — confirmation dialog @critical', () => {
   test.beforeEach(async ({ page }) => {
     await setupGraphQL(page, { league: makeLeague({ owner: 1 }) });
     await page.goto('/baseball/league/1/commissioner');
-    await page.waitForLoadState('load');
     await expandDangerZone(page);
   });
 
@@ -604,7 +646,6 @@ test.describe('Delete League — confirm mutation @regression', () => {
       },
     });
     await page.goto('/baseball/league/1/commissioner');
-    await page.waitForLoadState('load');
     await expandDangerZone(page);
 
     // Open the confirmation dialog
@@ -635,7 +676,10 @@ test.describe('Delete League — non-commissioner cannot see delete controls @re
     // League owned by user 2 — the test user (id=1) is NOT the commissioner
     await setupGraphQL(page, { league: makeLeague({ owner: 2 }) });
     await page.goto('/baseball/league/1/overview');
-    await page.waitForLoadState('load');
+    await page.waitForURL(/\/baseball\/league\/\d+\/overview/, {
+      waitUntil: 'networkidle',
+      timeout: 15000,
+    });
 
     // Wait for tabs to render
     await expect(
@@ -663,7 +707,10 @@ test.describe('Delete League — non-commissioner cannot see delete controls @re
   }) => {
     await setupGraphQL(page, { league: makeLeague({ owner: 2 }) });
     await page.goto('/baseball/league/1/commissioner');
-    await page.waitForLoadState('load');
+    await page.waitForURL(/\/baseball\/league\/\d+\/(commissioner|commish)/, {
+      waitUntil: 'networkidle',
+      timeout: 15000,
+    });
 
     // Delete League button should not be visible for non-commissioners
     const deleteBtn = page.getByRole('button', { name: /delete league/i });

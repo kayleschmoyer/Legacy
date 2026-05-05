@@ -27,6 +27,7 @@ interface AccordSection {
   iconClass?: 'gold' | 'red' | '';
   icon: React.ReactNode;
   content: React.ReactNode;
+  testId?: string;
 }
 
 const Accord: React.FC<{
@@ -40,6 +41,7 @@ const Accord: React.FC<{
       className="ls-accord-head"
       onClick={onToggle}
       aria-expanded={open}
+      data-testid={section.testId}
     >
       <div className="ls-accord-title">
         <div className={`icon-wrap ${section.iconClass ?? ''}`}>
@@ -190,6 +192,7 @@ export const CommishTab: React.FC<CommishTabProps> = ({ league }) => {
       label: 'Danger Zone',
       iconClass: 'red',
       icon: <I.AlertTriangle size={16} />,
+      testId: 'danger-zone-toggle',
       content: leagueId ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <h4 style={{ margin: 0, fontWeight: 600 }}>Danger Zone</h4>

@@ -84,14 +84,15 @@ make pc
 ## Critical Rules
 
 1. **Always run new/modified tests before committing** -- never push untested test code. For bulk test writing (>5 files), run tests per-file as you write rather than batching at the end.
-2. **Hermetic E2E -- no `route.continue()`** -- there is no backend in CI. Use `route.fulfill()` for explicit responses and `route.fallback()` to cascade to baseline mocks.
-3. **Assert behavior, not pixels** -- use web-first assertions (`await expect(locator).toBeVisible()`) over manual checks. Never use `toHaveScreenshot()` or `toMatchSnapshot()` in E2E tests -- visual regression belongs in Storybook/Chromatic.
-4. **Never use `waitForTimeout()`** -- use condition-based waits. Never use `waitForLoadState('networkidle')` -- wait for specific elements.
-5. **No `@ts-ignore` or `eslint-disable`** in tests -- fix root causes.
-6. **Tag test suites** (`@critical`, `@smoke`, `@regression`, `@slow`) for CI filtering. `@visual` is deprecated. See [references/test-tagging-guide.md](references/test-tagging-guide.md).
-7. **Selector sync rule** -- when a PR changes login/landing page UI, update E2E selectors in the same PR.
-8. **Kill background servers when done** -- stale processes hold native `.node` addons. Use `make kill-stale`.
-9. **Prefer Glob/Grep for file discovery and counting** -- when exploring test file structure (finding spec files, counting baselines, listing snapshot dirs), use the Glob and Grep tools instead of `find`/`wc`. `ls` is fine for quick one-off orientation when there's no equivalent tool or when tool output would be noisier.
+2. **Run E2E tests locally before pushing when you modify E2E files** -- `make pc` does NOT run Playwright tests. When you add or change any file under `apps/web-e2e/src/`, run the affected tests locally and confirm they pass before committing. Use `E2E_AUTH_MODE=ci` to skip the OAuth device flow (required for local runs -- without it global setup calls `api.legacysports.dev` and fails). Run the specific spec file you changed, or the full `@critical` suite if you touched shared fixtures/helpers. See [references/e2e-ci-and-validation.md](references/e2e-ci-and-validation.md) for the exact commands.
+3. **Hermetic E2E -- no `route.continue()`** -- there is no backend in CI. Use `route.fulfill()` for explicit responses and `route.fallback()` to cascade to baseline mocks.
+4. **Assert behavior, not pixels** -- use web-first assertions (`await expect(locator).toBeVisible()`) over manual checks. Never use `toHaveScreenshot()` or `toMatchSnapshot()` in E2E tests -- visual regression belongs in Storybook/Chromatic.
+5. **Never use `waitForTimeout()`** -- use condition-based waits. Never use `waitForLoadState('networkidle')` after `page.goto()` -- it does not drain Playwright's CDP navigation tracking, causing `locator.waitFor()` to block. Use `page.waitForURL(pattern, { waitUntil: 'networkidle' })` instead, which fully commits the navigation before any locator action runs. **Exception**: avoid `waitForURL` when the app may trigger a second client-side navigation to the same URL during initialization (e.g., React Router `pushState` during mount) -- in that case, `waitForURL` latches onto the second navigation and resolves while `#root` is empty. Prefer direct element waits after `page.goto()` whenever possible.
+6. **No `@ts-ignore` or `eslint-disable`** in tests -- fix root causes.
+7. **Tag test suites** (`@critical`, `@smoke`, `@regression`, `@slow`) for CI filtering. `@visual` is deprecated. See [references/test-tagging-guide.md](references/test-tagging-guide.md).
+8. **Selector sync rule** -- when a PR changes login/landing page UI, update E2E selectors in the same PR.
+9. **Kill background servers when done** -- stale processes hold native `.node` addons. Use `make kill-stale`.
+10. **Prefer Glob/Grep for file discovery and counting** -- when exploring test file structure (finding spec files, counting baselines, listing snapshot dirs), use the Glob and Grep tools instead of `find`/`wc`. `ls` is fine for quick one-off orientation when there's no equivalent tool or when tool output would be noisier.
 
 ## File Naming Convention
 

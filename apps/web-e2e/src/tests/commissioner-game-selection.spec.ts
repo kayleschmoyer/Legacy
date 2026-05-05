@@ -9,7 +9,11 @@
  */
 
 import { expect, test } from '../fixtures/auth-enhanced';
-import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import {
+  BASELINE_GRAPHQL_RESPONSES,
+  extractOperationName,
+} from '../fixtures/shared-mocks';
+import { E2E_SIGNING_SECRET, signE2EJwt } from '../utils/jwt';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -165,6 +169,19 @@ async function setupGraphQL(
     onAutoAdvanceMatchups,
     onProcessWaiverClaims,
   } = opts;
+
+  await page.route('**/refresh-jwt', async (route) => {
+    const freshJwt = signE2EJwt(
+      { id: 1, email: 'e2e-test@legacysports.dev', accessLevel: 'admin' },
+      E2E_SIGNING_SECRET,
+      '1h',
+    );
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ jwt: freshJwt, csrfToken: 'e2e-csrf-token' }),
+    });
+  });
 
   await page.route(isGraphQLEndpoint, async (route) => {
     const postData = route.request().postData()?.toLowerCase() ?? '';
@@ -336,7 +353,13 @@ async function setupGraphQL(
         body: JSON.stringify({ data: null }),
       });
     } else {
-      await unmockedGraphQLFallback(route);
+      const op = extractOperationName(route).toLowerCase();
+      const baseline = BASELINE_GRAPHQL_RESPONSES[op];
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(baseline ?? { data: null }),
+      });
     }
   });
 }
@@ -359,11 +382,14 @@ test.describe('Next Step — game selection state @critical', () => {
       currentWeek: 1,
     });
     await page.goto('/baseball/league/1/commissioner');
-    await page.waitForLoadState('load');
+    await page.waitForURL(/\/baseball\/league\/\d+\/(commissioner|commish)/, {
+      waitUntil: 'networkidle',
+      timeout: 15000,
+    });
 
-    await expect(
-      page.getByRole('button', { name: /select game 1/i }),
-    ).toBeVisible();
+    await page
+      .getByRole('button', { name: /select game 1/i })
+      .waitFor({ state: 'visible' });
   });
 
   test('shows "Select Game 3 of 5" when 2 games are already selected', async ({
@@ -381,11 +407,14 @@ test.describe('Next Step — game selection state @critical', () => {
       currentWeek: 1,
     });
     await page.goto('/baseball/league/1/commissioner');
-    await page.waitForLoadState('load');
+    await page.waitForURL(/\/baseball\/league\/\d+\/(commissioner|commish)/, {
+      waitUntil: 'networkidle',
+      timeout: 15000,
+    });
 
-    await expect(
-      page.getByRole('button', { name: /select game 3/i }),
-    ).toBeVisible();
+    await page
+      .getByRole('button', { name: /select game 3/i })
+      .waitFor({ state: 'visible' });
   });
 
   test('game selection button opens a confirmation dialog', async ({
@@ -403,10 +432,13 @@ test.describe('Next Step — game selection state @critical', () => {
       currentWeek: 1,
     });
     await page.goto('/baseball/league/1/commissioner');
-    await page.waitForLoadState('load');
+    await page.waitForURL(/\/baseball\/league\/\d+\/(commissioner|commish)/, {
+      waitUntil: 'networkidle',
+      timeout: 15000,
+    });
 
     const selectBtn = page.getByRole('button', { name: /select game 1/i });
-    await expect(selectBtn).toBeVisible();
+    await selectBtn.waitFor({ state: 'visible' });
     await selectBtn.click();
 
     // Confirmation dialog should appear
@@ -429,7 +461,10 @@ test.describe('Next Step — game selection state @critical', () => {
       currentWeek: 1,
     });
     await page.goto('/baseball/league/1/commissioner');
-    await page.waitForLoadState('load');
+    await page.waitForURL(/\/baseball\/league\/\d+\/(commissioner|commish)/, {
+      waitUntil: 'networkidle',
+      timeout: 15000,
+    });
 
     const selectBtn = page.getByRole('button', { name: /select game 1/i });
     await expect(selectBtn).toBeVisible();
@@ -466,7 +501,10 @@ test.describe('Next Step — game selection state @critical', () => {
       },
     });
     await page.goto('/baseball/league/1/commissioner');
-    await page.waitForLoadState('load');
+    await page.waitForURL(/\/baseball\/league\/\d+\/(commissioner|commish)/, {
+      waitUntil: 'networkidle',
+      timeout: 15000,
+    });
 
     const selectBtn = page.getByRole('button', { name: /select game 1/i });
     await expect(selectBtn).toBeVisible();
@@ -497,7 +535,10 @@ test.describe('Next Step — matchup advancement state @critical', () => {
       currentWeek: 1,
     });
     await page.goto('/baseball/league/1/commissioner');
-    await page.waitForLoadState('load');
+    await page.waitForURL(/\/baseball\/league\/\d+\/(commissioner|commish)/, {
+      waitUntil: 'networkidle',
+      timeout: 15000,
+    });
 
     await expect(
       page.getByRole('button', { name: /advance league week/i }),
@@ -519,7 +560,10 @@ test.describe('Next Step — matchup advancement state @critical', () => {
       currentWeek: 1,
     });
     await page.goto('/baseball/league/1/commissioner');
-    await page.waitForLoadState('load');
+    await page.waitForURL(/\/baseball\/league\/\d+\/(commissioner|commish)/, {
+      waitUntil: 'networkidle',
+      timeout: 15000,
+    });
 
     const advanceBtn = page.getByRole('button', {
       name: /advance league week/i,
@@ -553,7 +597,10 @@ test.describe('Next Step — matchup advancement state @critical', () => {
       },
     });
     await page.goto('/baseball/league/1/commissioner');
-    await page.waitForLoadState('load');
+    await page.waitForURL(/\/baseball\/league\/\d+\/(commissioner|commish)/, {
+      waitUntil: 'networkidle',
+      timeout: 15000,
+    });
 
     const advanceBtn = page.getByRole('button', {
       name: /advance league week/i,
@@ -594,7 +641,10 @@ test.describe('Sequential game selection — multi-round @critical', () => {
       },
     });
     await page.goto('/baseball/league/1/commissioner');
-    await page.waitForLoadState('load');
+    await page.waitForURL(/\/baseball\/league\/\d+\/(commissioner|commish)/, {
+      waitUntil: 'networkidle',
+      timeout: 15000,
+    });
 
     // Verify initial state
     const selectBtn1 = page.getByRole('button', {
@@ -625,7 +675,10 @@ test.describe('Sequential game selection — multi-round @critical', () => {
       },
     });
     await page.goto('/baseball/league/1/commissioner');
-    await page.waitForLoadState('load');
+    await page.waitForURL(/\/baseball\/league\/\d+\/(commissioner|commish)/, {
+      waitUntil: 'networkidle',
+      timeout: 15000,
+    });
 
     // Verify button says "Select Game 2 of 3"
     const selectBtn2 = page.getByRole('button', {
@@ -656,7 +709,10 @@ test.describe('Sequential game selection — multi-round @critical', () => {
       },
     });
     await page.goto('/baseball/league/1/commissioner');
-    await page.waitForLoadState('load');
+    await page.waitForURL(/\/baseball\/league\/\d+\/(commissioner|commish)/, {
+      waitUntil: 'networkidle',
+      timeout: 15000,
+    });
 
     // Verify button says "Select Game 3 of 3"
     const selectBtn3 = page.getByRole('button', {
@@ -683,7 +739,10 @@ test.describe('Sequential game selection — multi-round @critical', () => {
       currentWeek: 1,
     });
     await page.goto('/baseball/league/1/commissioner');
-    await page.waitForLoadState('load');
+    await page.waitForURL(/\/baseball\/league\/\d+\/(commissioner|commish)/, {
+      waitUntil: 'networkidle',
+      timeout: 15000,
+    });
 
     // After all games selected, "Advance League Week" should appear instead
     await expect(
@@ -715,7 +774,10 @@ test.describe('Advance blocked when games incomplete @critical', () => {
       currentWeek: 1,
     });
     await page.goto('/baseball/league/1/commissioner');
-    await page.waitForLoadState('load');
+    await page.waitForURL(/\/baseball\/league\/\d+\/(commissioner|commish)/, {
+      waitUntil: 'networkidle',
+      timeout: 15000,
+    });
 
     // "Advance League Week" should NOT be visible with incomplete games
     await expect(
@@ -743,7 +805,10 @@ test.describe('Advance blocked when games incomplete @critical', () => {
       currentWeek: 1,
     });
     await page.goto('/baseball/league/1/commissioner');
-    await page.waitForLoadState('load');
+    await page.waitForURL(/\/baseball\/league\/\d+\/(commissioner|commish)/, {
+      waitUntil: 'networkidle',
+      timeout: 15000,
+    });
 
     // Should show "Select Game 5 of 5" — the last remaining game
     await expect(
@@ -786,7 +851,10 @@ test.describe('Advance week flow — UI refresh @critical', () => {
       },
     });
     await page.goto('/baseball/league/1/commissioner');
-    await page.waitForLoadState('load');
+    await page.waitForURL(/\/baseball\/league\/\d+\/(commissioner|commish)/, {
+      waitUntil: 'networkidle',
+      timeout: 15000,
+    });
 
     // Verify we see "Advance League Week"
     const advanceBtn = page.getByRole('button', {
@@ -821,7 +889,10 @@ test.describe('Advance week flow — UI refresh @critical', () => {
       currentWeek: 2,
     });
     await page.goto('/baseball/league/1/commissioner');
-    await page.waitForLoadState('load');
+    await page.waitForURL(/\/baseball\/league\/\d+\/(commissioner|commish)/, {
+      waitUntil: 'networkidle',
+      timeout: 15000,
+    });
 
     // After advance, UI should show week 2 and game selection for the new week
     await expect(page.getByText(/week 2/i).first()).toBeVisible();

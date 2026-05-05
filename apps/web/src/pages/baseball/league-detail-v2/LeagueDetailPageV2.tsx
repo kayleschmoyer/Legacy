@@ -166,7 +166,12 @@ export function LeagueDetailPageV2(): React.JSX.Element {
     [navigate, leagueId],
   );
 
-  // Gate role-restricted tabs when role flips
+  // Gate role-restricted tabs once both league and user have loaded.
+  //
+  // Uses isCommissioner/isMember (ground-truth authorization) rather than
+  // effIsCommish/effIsMember (which lag by one render while the roleSync
+  // effect catches up), so there is no race between the redirect check
+  // and the role state update.
   useEffect(() => {
     if (leagueLoading || authLoading || !league) return;
     if (tab === 'commish' && !effIsCommish) {
@@ -323,7 +328,7 @@ export function LeagueDetailPageV2(): React.JSX.Element {
             onTeam={onTeamNav}
           />
         )}
-        {tab === 'roster' && effIsMember && (
+        {tab === 'roster' && (isMember || authLoading) && (
           <RosterTab league={league} myTeamId={userTeamId ?? null} />
         )}
         {tab === 'free-agents' && (
@@ -349,16 +354,14 @@ export function LeagueDetailPageV2(): React.JSX.Element {
           />
         )}
         {tab === 'history' && <HistoryTab league={league} />}
-        {tab === 'team' && effIsMember && (
+        {tab === 'team' && (isMember || authLoading) && (
           <TeamTab
             league={league}
             myTeamId={userTeamId ?? null}
             myTeam={teams.find((t) => t.id === userTeamId) ?? null}
           />
         )}
-        {tab === 'commish' && isCommissioner && (
-          <CommishTab league={league} teams={teams} />
-        )}
+        {tab === 'commish' && <CommishTab league={league} teams={teams} />}
       </div>
     </div>
   );
