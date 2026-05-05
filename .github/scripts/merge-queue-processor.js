@@ -233,43 +233,13 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
       };
     }
 
-    // When strict_required_status_checks_policy is enabled, GitHub rejects the merge
-    // API call if the PR is behind the base branch — even when all checks are green.
-    // Trigger a branch update so CI re-runs against the current base; the workflow_run
-    // trigger on this workflow will re-evaluate the PR once CI completes.
-    if (pr.mergeable_state === 'behind') {
-      console.log(
-        `⏳ PR #${pr.number}: branch is behind base (mergeable_state=behind) — triggering update...`,
-      );
-      try {
-        await github.rest.pulls.updateBranch({
-          owner,
-          repo,
-          pull_number: pr.number,
-          expected_head_sha: pr.head.sha,
-        });
-        console.log(
-          `✅ PR #${pr.number}: branch update triggered — will re-evaluate after CI completes`,
-        );
-      } catch (updateError) {
-        if (updateError.status === 422) {
-          // HEAD advanced concurrently between our check and the update call — safe to ignore,
-          // the next workflow_run trigger will re-evaluate against the new SHA.
-          console.log(
-            `⚠️ PR #${pr.number}: branch update rejected (head SHA changed concurrently) — will re-evaluate next cycle`,
-          );
-        } else {
-          console.warn(
-            `⚠️ PR #${pr.number}: branch update failed (${updateError.message}) — skipping`,
-          );
-        }
-      }
-      return {
-        canMerge: false,
-        isPending: true,
-        reason: 'Branch updated to latest base — waiting for CI to re-run',
-      };
-    }
+    // LS-4183: behind-base PRs are intentionally allowed to merge directly.
+    // strict_required_status_checks_policy is now false in .github/ruleset.json, so
+    // GitHub no longer rejects the merge API when a branch is behind base. The queue
+    // therefore does NOT call pulls.updateBranch() — that call previously created
+    // Merge-main commits on every queued PR and serialized merges (~1 PR per CI cycle).
+    // Textual conflicts are still blocked above by the mergeable===false guard;
+    // semantic conflicts (rare) are caught by post-merge CI on main.
 
     // If the bot has an active (non-dismissed) APPROVED review, it has already
     // adjudicated all threads — including JUSTIFY threads accepted in Cycle 2.

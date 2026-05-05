@@ -3,7 +3,7 @@
  *
  * Covers:
  *  - Bot approval / unresolved-thread interaction (LS-4174)
- *  - mergeable_state=behind handling (LS-4173 strict-mode support)
+ *  - mergeable_state=behind merges directly (LS-4183: strict policy disabled)
  *
  * The processor is a CommonJS closure; helpers are not exported, so tests
  * exercise the behaviour through the public module interface with mocked
@@ -45,14 +45,12 @@ function makePR(overrides = {}) {
 
 // Builds a minimal GitHub mock. `reviews` controls what listReviews returns;
 // `unresolvedThreads` controls the reviewThreads GraphQL response;
-// `pr` overrides the PR returned by paginate/get; `updateBranchImpl` lets
-// tests inject behaviour for the behind-base branch update path.
+// `pr` overrides the PR returned by paginate/get.
 function makeGithub({
   reviews = [],
   unresolvedThreads = [],
   reviewDecision = 'APPROVED',
   pr = makePR(),
-  updateBranchImpl = async () => ({}),
 } = {}) {
   const calls = { merges: [], comments: [], updateBranch: [] };
 
@@ -91,7 +89,7 @@ function makeGithub({
         },
         updateBranch: async (args) => {
           calls.updateBranch.push(args);
-          return updateBranchImpl(args);
+          return {};
         },
         // retargetDependentPRs
         list: async () => ({ data: [] }),
@@ -353,10 +351,15 @@ describe('merge-queue-processor — bot approval skips unresolved-thread check',
   });
 });
 
-describe('merge-queue-processor — mergeable_state=behind handling', () => {
-  it('calls updateBranch and does not merge when PR is behind base', async () => {
+describe('merge-queue-processor — mergeable_state=behind merges directly (LS-4183)', () => {
+  it('merges a behind PR without calling updateBranch', async () => {
     const behindPR = makePR({ mergeable_state: 'behind' });
-    const { github, calls } = makeGithub({ pr: behindPR });
+    const { github, calls } = makeGithub({
+      pr: behindPR,
+      reviews: [
+        { user: { login: 'legacy-sports-review-bot[bot]' }, state: 'APPROVED' },
+      ],
+    });
 
     await processor({
       github,
@@ -368,80 +371,14 @@ describe('merge-queue-processor — mergeable_state=behind handling', () => {
 
     assert.strictEqual(
       calls.updateBranch.length,
-      1,
-      'updateBranch should be called once',
+      0,
+      'updateBranch must not be called — strict policy is disabled',
     );
-    assert.deepEqual(calls.updateBranch[0], {
-      owner: 'test-owner',
-      repo: 'test-repo',
-      pull_number: behindPR.number,
-      expected_head_sha: behindPR.head.sha,
-    });
     assert.strictEqual(
       calls.merges.length,
-      0,
-      'merge should not be called when branch is behind',
-    );
-  });
-
-  it('does not merge and handles 422 gracefully when updateBranch rejects with head-SHA mismatch', async () => {
-    const behindPR = makePR({ mergeable_state: 'behind' });
-    const updateBranchImpl = async () => {
-      throw Object.assign(new Error('Conflict'), { status: 422 });
-    };
-    const { github, calls } = makeGithub({
-      pr: behindPR,
-      updateBranchImpl,
-    });
-
-    await assert.doesNotReject(
-      () =>
-        processor({
-          github,
-          context,
-          isDryRun: false,
-          forceCheck: false,
-          isRetry: false,
-        }),
-      'processor should not throw on 422 from updateBranch',
-    );
-
-    assert.strictEqual(
-      calls.updateBranch.length,
       1,
-      'updateBranch should be attempted',
+      'behind PR with all gates green should merge directly',
     );
-    assert.strictEqual(calls.merges.length, 0, 'merge should not be called');
-  });
-
-  it('does not merge and handles unexpected updateBranch errors gracefully', async () => {
-    const behindPR = makePR({ mergeable_state: 'behind' });
-    const updateBranchImpl = async () => {
-      throw Object.assign(new Error('Internal Server Error'), { status: 500 });
-    };
-    const { github, calls } = makeGithub({
-      pr: behindPR,
-      updateBranchImpl,
-    });
-
-    await assert.doesNotReject(
-      () =>
-        processor({
-          github,
-          context,
-          isDryRun: false,
-          forceCheck: false,
-          isRetry: false,
-        }),
-      'processor should not throw on unexpected updateBranch error',
-    );
-
-    assert.strictEqual(
-      calls.updateBranch.length,
-      1,
-      'updateBranch should be attempted',
-    );
-    assert.strictEqual(calls.merges.length, 0, 'merge should not be called');
   });
 });
 
