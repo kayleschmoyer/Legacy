@@ -90,6 +90,7 @@ const makePr = (overrides = {}) => ({
   comments: { nodes: [] },
   reviewThreads: { nodes: [] },
   commits: { nodes: [] },
+  labels: { nodes: [], pageInfo: { hasNextPage: false } },
   ...overrides,
 });
 
@@ -128,6 +129,33 @@ describe('mapPrGraphQLResponse — prContext', () => {
     const { prContext } = mapPrGraphQLResponse(makePr({ author: null }), '');
     assert.strictEqual(prContext.author.login, '');
     assert.strictEqual(prContext.author.is_bot, false);
+  });
+
+  it('exposes label names as a flat string array (LS-4178)', () => {
+    const { prContext } = mapPrGraphQLResponse(
+      makePr({
+        labels: {
+          nodes: [
+            { name: 'bot:reset-cycle-counter' },
+            { name: 'merge-when-ready' },
+          ],
+          pageInfo: { hasNextPage: false },
+        },
+      }),
+      '',
+    );
+    assert.deepEqual(prContext.labels, [
+      'bot:reset-cycle-counter',
+      'merge-when-ready',
+    ]);
+  });
+
+  it('defaults labels to an empty array when the field is absent', () => {
+    const { prContext } = mapPrGraphQLResponse(
+      makePr({ labels: undefined }),
+      '',
+    );
+    assert.deepEqual(prContext.labels, []);
   });
 });
 
@@ -518,6 +546,7 @@ const makeFullPr = (overrides = {}) => ({
   comments: { nodes: [], pageInfo: noPagination },
   reviewThreads: { nodes: [], pageInfo: noPagination },
   commits: { nodes: [], pageInfo: noPagination },
+  labels: { nodes: [], pageInfo: noPagination },
   ...overrides,
 });
 
@@ -564,6 +593,14 @@ describe('fetchPrData', () => {
     });
     const exec = makeExec({ data: { repository: { pullRequest: pr } } });
     assert.throws(() => fetchPrData(42, exec), /exceeds 100-item.*commits/);
+  });
+
+  it('throws when labels collection is truncated', () => {
+    const pr = makeFullPr({
+      labels: { nodes: [], pageInfo: { hasNextPage: true } },
+    });
+    const exec = makeExec({ data: { repository: { pullRequest: pr } } });
+    assert.throws(() => fetchPrData(42, exec), /exceeds 100-item.*labels/);
   });
 
   it('throws when a review thread inner comments are truncated', () => {

@@ -4,6 +4,7 @@ import {
   removeLabel,
   setCommitStatus,
   isRepoAdmin,
+  findLatestLabelActor,
 } from './lib/github.mjs';
 import { cleanupOperationalLabels } from './lib/labels.mjs';
 import {
@@ -189,8 +190,22 @@ async function main() {
   // --- Admin cycle reset (bot:reset-cycle-counter label) ---
   // CYCLE_RESET_SENDER is set by the workflow when triggered by this label.
   // If a non-admin applies the label the bot posts a rejection notice and removes it.
+  //
+  // Fallback (LS-4178): if the label is currently present on the PR but the env
+  // var is empty, the original reset-trigger run was likely cancelled by a sibling
+  // labeled event (cancel-in-progress concurrency). Recover the labeler from the
+  // timeline so the reset still applies on whichever surviving run picks it up.
   let cycleResetByAdmin = false;
-  const cycleResetSender = process.env.CYCLE_RESET_SENDER ?? '';
+  let cycleResetSender = process.env.CYCLE_RESET_SENDER ?? '';
+  const prLabels = ctx.labels ?? [];
+  if (!cycleResetSender && prLabels.includes(CYCLE_RESET_LABEL)) {
+    cycleResetSender = findLatestLabelActor(prNumber, CYCLE_RESET_LABEL);
+    if (cycleResetSender) {
+      process.stdout.write(
+        `[reviewer] Recovered cycle-reset labeler '${cycleResetSender}' from timeline (env var was empty)\n`,
+      );
+    }
+  }
   if (cycleResetSender) {
     try {
       if (isRepoAdmin(cycleResetSender)) {

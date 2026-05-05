@@ -47,6 +47,42 @@ export function addLabel(prNumber, label) {
 }
 
 /**
+ * Find the GitHub login of the most recent actor who applied a given label
+ * to the PR. Returns '' if the label was never applied or the API call fails.
+ *
+ * Used to recover the cycle-reset sender when the workflow run that GitHub
+ * triggered for the `bot:reset-cycle-counter` label was cancelled by a sibling
+ * `labeled` event (cancel-in-progress concurrency). Without this fallback the
+ * surviving run sees CYCLE_RESET_SENDER='' and skips the reset (LS-4178).
+ *
+ * @param {number} prNumber
+ * @param {string} label
+ * @param {typeof execFileSync} [exec]
+ * @returns {string}
+ */
+export function findLatestLabelActor(prNumber, label, exec = execFileSync) {
+  try {
+    const raw = exec(
+      'gh',
+      ['api', `repos/{owner}/{repo}/issues/${prNumber}/timeline`, '--paginate'],
+      { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 },
+    );
+    const events = raw
+      .trim()
+      .split(/\n(?=\[)/)
+      .flatMap((chunk) => JSON.parse(chunk));
+    const labeledEvents = events.filter(
+      (e) => e.event === 'labeled' && e.label?.name === label,
+    );
+    if (labeledEvents.length === 0) return '';
+    const latest = labeledEvents[labeledEvents.length - 1];
+    return latest.actor?.login ?? '';
+  } catch {
+    return '';
+  }
+}
+
+/**
  * Remove a label from a PR/issue. Silently ignores 404 (label not present).
  *
  * @param {number} prNumber

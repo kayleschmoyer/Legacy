@@ -84,6 +84,10 @@ export const PR_DATA_QUERY = `
           }
           pageInfo { hasNextPage }
         }
+        labels(first: 100) {
+          nodes { name }
+          pageInfo { hasNextPage }
+        }
       }
     }
   }
@@ -111,6 +115,7 @@ export function mapPrGraphQLResponse(pr, diff) {
       login: pr.author?.login ?? '',
       is_bot: pr.author?.__typename === 'Bot',
     },
+    labels: (pr.labels?.nodes ?? []).map((l) => l.name),
     diff,
   };
 
@@ -212,6 +217,7 @@ export function fetchPrData(prNumber, exec = execFileSync) {
   if (pr.comments.pageInfo.hasNextPage) truncated.push('issue comments');
   if (pr.reviewThreads.pageInfo.hasNextPage) truncated.push('review threads');
   if (pr.commits.pageInfo.hasNextPage) truncated.push('commits');
+  if (pr.labels?.pageInfo?.hasNextPage) truncated.push('labels');
   if (pr.reviewThreads.nodes.some((t) => t.comments.pageInfo.hasNextPage))
     truncated.push('comments within a review thread');
   if (truncated.length > 0) {
