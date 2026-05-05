@@ -205,6 +205,8 @@ jobs:
 
       - name: Process Enhanced Merge Queue
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          ESCALATION_WEBHOOK_URL: ${{ secrets.ESCALATION_WEBHOOK_URL }}
         with:
           github-token: ${{ steps.generate-token.outputs.token }}
           script: |

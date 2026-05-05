@@ -39,6 +39,7 @@ function makePR(overrides = {}) {
     base: { ref: 'main' },
     head: { sha: HEAD_SHA, ref: 'feature/test' },
     labels: [{ name: 'merge-when-ready' }],
+    user: { login: 'test-author' },
     ...overrides,
   };
 }
@@ -515,6 +516,115 @@ describe('merge-queue-processor — 405 required-checks-expected handling (LS-41
       ).length,
       1,
       'should post a Processing Error comment for unrelated 405 errors',
+    );
+  });
+});
+
+// ── LS-4185 ──────────────────────────────────────────────────────────────────
+
+describe('merge-queue-processor — Discord CODEOWNER notification (LS-4185)', () => {
+  it('posts CODEOWNER blocker comment and skips Discord when env var unset', async () => {
+    delete process.env.ESCALATION_WEBHOOK_URL;
+    const { github, calls } = makeGithub({ reviewDecision: 'REVIEW_REQUIRED' });
+
+    await assert.doesNotReject(
+      () =>
+        processor({
+          github,
+          context,
+          isDryRun: false,
+          forceCheck: false,
+          isRetry: false,
+        }),
+      'processor should not throw when ESCALATION_WEBHOOK_URL is unset',
+    );
+
+    assert.strictEqual(calls.merges.length, 0, 'should not merge');
+    assert.ok(
+      calls.comments.some((c) => c.body?.includes('CODEOWNER approval')),
+      'should post CODEOWNER blocker comment',
+    );
+  });
+
+  it('attempts Discord webhook when env var is set for CODEOWNER block', async () => {
+    process.env.ESCALATION_WEBHOOK_URL =
+      'https://discord.com/api/webhooks/test/token';
+    const { github, calls } = makeGithub({ reviewDecision: 'REVIEW_REQUIRED' });
+
+    const https = require('https');
+    const requestCalls = [];
+    const originalRequest = https.request;
+    https.request = (opts, cb) => {
+      requestCalls.push(opts);
+      // Simulate a minimal IncomingMessage-like response
+      const res = {
+        statusCode: 204,
+        resume: () => {},
+        on: () => res,
+      };
+      if (cb) cb(res);
+      return { on: () => {}, write: () => {}, end: () => {} };
+    };
+
+    try {
+      await processor({
+        github,
+        context,
+        isDryRun: false,
+        forceCheck: false,
+        isRetry: false,
+      });
+    } finally {
+      https.request = originalRequest;
+      delete process.env.ESCALATION_WEBHOOK_URL;
+    }
+
+    assert.strictEqual(calls.merges.length, 0, 'should not merge');
+    assert.strictEqual(
+      requestCalls.length,
+      1,
+      'should make exactly one Discord webhook request',
+    );
+    assert.strictEqual(
+      requestCalls[0].hostname,
+      'discord.com',
+      'request should target discord.com',
+    );
+  });
+
+  it('does not send Discord notification for non-CODEOWNER blockers', async () => {
+    process.env.ESCALATION_WEBHOOK_URL =
+      'https://discord.com/api/webhooks/test/token';
+    const conflictPR = makePR({ mergeable: false });
+    const { github } = makeGithub({ pr: conflictPR });
+
+    const https = require('https');
+    const requestCalls = [];
+    const originalRequest = https.request;
+    https.request = (opts, cb) => {
+      requestCalls.push(opts);
+      const res = { statusCode: 204, resume: () => {}, on: () => res };
+      if (cb) cb(res);
+      return { on: () => {}, write: () => {}, end: () => {} };
+    };
+
+    try {
+      await processor({
+        github,
+        context,
+        isDryRun: false,
+        forceCheck: false,
+        isRetry: false,
+      });
+    } finally {
+      https.request = originalRequest;
+      delete process.env.ESCALATION_WEBHOOK_URL;
+    }
+
+    assert.strictEqual(
+      requestCalls.length,
+      0,
+      'should not send Discord notification for merge conflict blocker',
     );
   });
 });

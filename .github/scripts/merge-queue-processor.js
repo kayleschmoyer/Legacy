@@ -762,6 +762,71 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
       '---\n*Automated message from merge queue system*';
 
     await findOrCreateComment(pr, comment);
+
+    if (validation.reason.includes('CODEOWNER approval')) {
+      await notifyDiscordCodeownerRequired(pr);
+    }
+  }
+
+  async function notifyDiscordCodeownerRequired(pr) {
+    const webhookUrl = process.env.ESCALATION_WEBHOOK_URL;
+    if (!webhookUrl) return;
+
+    const prUrl = `https://github.com/${owner}/${repo}/pull/${pr.number}`;
+    const payload = JSON.stringify({
+      embeds: [
+        {
+          title: '🔐 Code Owner Review Required',
+          description:
+            `PR **[#${pr.number}: ${pr.title}](${prUrl})** is in the merge queue ` +
+            `but requires CODEOWNER approval before it can be merged.`,
+          color: 0xfee75c,
+          fields: [
+            { name: 'Author', value: `@${pr.user.login}`, inline: true },
+            { name: 'Branch', value: `\`${pr.head.ref}\``, inline: true },
+          ],
+          url: prUrl,
+          timestamp: new Date().toISOString(),
+          footer: { text: 'Merge Queue · legacy-sports' },
+        },
+      ],
+    });
+
+    const url = new URL(webhookUrl);
+    await new Promise((resolve) => {
+      const req = require('https').request(
+        {
+          hostname: url.hostname,
+          path: url.pathname + url.search,
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(payload),
+          },
+        },
+        (res) => {
+          res.resume();
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            console.log(
+              `📣 Discord CODEOWNER notification sent for PR #${pr.number}`,
+            );
+          } else {
+            console.warn(
+              `⚠️ Discord webhook returned ${res.statusCode} for PR #${pr.number}`,
+            );
+          }
+          resolve();
+        },
+      );
+      req.on('error', (err) => {
+        console.warn(
+          `⚠️ Discord webhook error for PR #${pr.number}: ${err.message}`,
+        );
+        resolve();
+      });
+      req.write(payload);
+      req.end();
+    });
   }
 
   async function reportProcessingError(pr, error) {
