@@ -306,6 +306,65 @@ test.describe
       state.matchupId = Number(matchup.id);
       expect(state.matchupId).toBeGreaterThan(0);
     });
+
+    await test.step('Assert league positions are seeded and lineup is populated', async () => {
+      // Verify leaguePositions returns slots — required for STARTERS section to
+      // render player cards. MatchupRosterEditor skips the positions query when
+      // leaguePositions is empty or leagueId is unresolved, leaving STARTERS (0/0)
+      // with no player rows even when matchup_players has starters (LS-4192).
+      const { leaguePositions } = await gqlFetch<{
+        leaguePositions: Array<{ id: number; positionType: string }> | null;
+      }>(
+        commissionerJwt,
+        `query GetLeaguePositions($leagueId: Int!) {
+          leaguePositions(leagueId: $leagueId) {
+            id
+            positionType
+          }
+        }`,
+        { leagueId: state.leagueId },
+      );
+      expect(
+        leaguePositions?.length ?? 0,
+        `League ${state.leagueId} must have position slots seeded — roster editor needs leaguePositions to map starters to STARTERS slots`,
+      ).toBeGreaterThan(0);
+
+      // Poll until at least one of the commissioner's matchup players has a
+      // non-null positionId. autoPopulateFirstMatchupLineup runs asynchronously
+      // after draft completion and may not have committed when Phase 4 runs.
+      // Gate here (before Phase 5 page navigation) so a lineup-population
+      // failure surfaces with a clear API assertion message rather than a
+      // 60-second UI timeout in Phase 5.
+      const deadline = Date.now() + 60_000;
+      let hasStarters = false;
+      while (!hasStarters && Date.now() < deadline) {
+        const { getMatchupPlayers } = await gqlFetch<{
+          getMatchupPlayers: Array<{
+            id: string;
+            teamId: number;
+            positionId: number | null;
+          }>;
+        }>(
+          commissionerJwt,
+          `query GetMatchupPlayers($matchupId: Int!) {
+            getMatchupPlayers(matchupId: $matchupId) {
+              id
+              teamId
+              positionId
+            }
+          }`,
+          { matchupId: state.matchupId },
+        );
+        hasStarters = getMatchupPlayers
+          .filter((mp) => mp.teamId === state.commissionerTeamId)
+          .some((mp) => mp.positionId !== null);
+        if (!hasStarters) await new Promise((r) => setTimeout(r, 4_000));
+      }
+      expect(
+        hasStarters,
+        `Commissioner team (${state.commissionerTeamId}) must have at least one starter in matchup ${state.matchupId} — autoPopulateFirstMatchupLineup must complete before the UI test`,
+      ).toBe(true);
+    });
   });
 
   // -------------------------------------------------------------------------
