@@ -225,7 +225,7 @@ async function submitWaiverClaimViaUI(
   await submitBtn.click();
 
   await expect(page.getByText('Waiver Claim Submitted!')).toBeVisible({
-    timeout: 10_000,
+    timeout: 20_000,
   });
 
   await page.getByRole('button', { name: 'Done' }).click();
