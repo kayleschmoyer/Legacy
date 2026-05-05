@@ -400,9 +400,17 @@ jobs:
       github.event.pull_request.number
     runs-on: ubuntu-latest
     steps:
+      - name: Generate GitHub App Token
+        id: generate-token
+        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3
+        with:
+          app-id: ${{ secrets.MERGE_QUEUE_APP_ID }}
+          private-key: ${{ secrets.MERGE_QUEUE_APP_PRIVATE_KEY }}
+
       - name: Restore merge-when-ready label if bot approval is active
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
+          github-token: ${{ steps.generate-token.outputs.token }}
           script: |
             const { owner, repo } = context.repo;
             const prNumber = context.payload.pull_request.number;
@@ -414,7 +422,28 @@ jobs:
             });
 
             if (pr.labels.some(l => l.name === 'merge-when-ready')) {
-              core.info(`PR #${prNumber} already has merge-when-ready label, nothing to do`);
+              // Label already present — no labeled event will fire, so the EMQ won't
+              // get its normal post-CI trigger. The workflow_run trigger on CI Orchestrator
+              // completion is supposed to handle this, but it can be filtered out when
+              // the triggering workflow's head_branch resolves to the base branch (main).
+              // Dispatch the merge queue explicitly to guarantee it evaluates this PR.
+              core.info(`PR #${prNumber} already has merge-when-ready — dispatching EMQ directly`);
+              try {
+                await github.request(
+                  'POST /repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches',
+                  {
+                    owner,
+                    repo,
+                    workflow_id: 'merge-queue.yml',
+                    ref: 'main',
+                    inputs: { dry_run: 'false', force_check: 'false', is_retry: 'false' },
+                  }
+                );
+                core.info('Dispatched merge-queue.yml to re-evaluate merge-ready PRs');
+              } catch (error) {
+                core.error(`Failed to dispatch merge-queue.yml: ${error.message}`);
+                throw error;
+              }
               return;
             }
 
