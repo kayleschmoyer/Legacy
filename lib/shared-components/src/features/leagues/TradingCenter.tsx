@@ -26,6 +26,7 @@ import {
   YStack,
 } from 'tamagui';
 import {
+  AlertTriangle,
   ArrowLeftRight,
   Check,
   ChevronDown,
@@ -225,6 +226,45 @@ function TradeOfferCard({
 
   const isLoading = actionLoading === trade.id;
 
+  // For incoming pending trades, cross-reference the offering team's current roster
+  // to detect players who were dropped after the trade was proposed.
+  const [
+    loadProposerRoster,
+    { data: proposerRosterData, error: rosterFetchError },
+  ] = useGetTeamMembersLazyQuery();
+
+  useEffect(() => {
+    if (
+      isIncoming &&
+      trade.status === 'pending' &&
+      trade.proposingTeamId != null
+    ) {
+      void loadProposerRoster({ variables: { teamId: trade.proposingTeamId } });
+    }
+  }, [isIncoming, trade.status, trade.proposingTeamId, loadProposerRoster]);
+
+  const proposerCurrentPlayerIds = useMemo<Set<number> | null>(() => {
+    if (!proposerRosterData?.teamMembers) return null;
+    const ids = new Set<number>();
+    for (const m of proposerRosterData.teamMembers) {
+      if (m.playerId != null) ids.add(m.playerId);
+    }
+    return ids;
+  }, [proposerRosterData]);
+
+  const hasStaleOfferingPlayers = useMemo(
+    () =>
+      proposerCurrentPlayerIds != null &&
+      offeringPlayers.some(
+        (p) => p.playerId != null && !proposerCurrentPlayerIds.has(p.playerId),
+      ),
+    [offeringPlayers, proposerCurrentPlayerIds],
+  );
+
+  // If the roster fetch errored we can't verify player eligibility — disable Accept as a safe default.
+  const hasRosterFetchError =
+    isIncoming && trade.status === 'pending' && rosterFetchError != null;
+
   const statusBarColor =
     trade.status === 'pending'
       ? '$amber9'
@@ -295,33 +335,44 @@ function TradeOfferCard({
               —
             </Text>
           ) : (
-            offeringPlayers.map((p, index) => (
-              <XStack
-                key={p.id ?? `${p.playerId}-${p.fromTeamId}-${index}`}
-                alignItems="center"
-                gap="$1.5"
-              >
-                {p.playerPosition && (
-                  <XStack
-                    backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.18)}
-                    borderRadius="$2"
-                    paddingHorizontal="$1"
-                    paddingVertical={2}
-                  >
-                    <Text
-                      fontSize="$1"
-                      color={BRAND_GOLD_LIGHT}
-                      fontWeight="700"
+            offeringPlayers.map((p, index) => {
+              const isStale =
+                proposerCurrentPlayerIds != null &&
+                p.playerId != null &&
+                !proposerCurrentPlayerIds.has(p.playerId);
+              return (
+                <XStack
+                  key={p.id ?? `${p.playerId}-${p.fromTeamId}-${index}`}
+                  alignItems="center"
+                  gap="$1.5"
+                >
+                  {p.playerPosition && (
+                    <XStack
+                      backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.18)}
+                      borderRadius="$2"
+                      paddingHorizontal="$1"
+                      paddingVertical={2}
                     >
-                      {p.playerPosition}
-                    </Text>
-                  </XStack>
-                )}
-                <Text fontSize="$2" color="$color">
-                  {p.playerName ?? 'Unknown Player'}
-                </Text>
-              </XStack>
-            ))
+                      <Text
+                        fontSize="$1"
+                        color={isStale ? '$red11' : BRAND_GOLD_LIGHT}
+                        fontWeight="700"
+                      >
+                        {p.playerPosition}
+                      </Text>
+                    </XStack>
+                  )}
+                  <Text
+                    fontSize="$2"
+                    color={isStale ? '$red11' : '$color'}
+                    textDecorationLine={isStale ? 'line-through' : 'none'}
+                  >
+                    {p.playerName ?? 'Unknown Player'}
+                  </Text>
+                  {isStale && <AlertTriangle size={12} color="$red11" />}
+                </XStack>
+              );
+            })
           )}
         </YStack>
 
@@ -398,6 +449,43 @@ function TradeOfferCard({
         </XStack>
       )}
 
+      {/* Roster fetch error — can't verify player eligibility, block Accept */}
+      {hasRosterFetchError && (
+        <XStack
+          backgroundColor="$red2"
+          borderTopWidth={1}
+          borderTopColor="$red6"
+          paddingHorizontal="$3"
+          paddingVertical="$2"
+          gap="$1.5"
+          alignItems="center"
+        >
+          <AlertTriangle size={12} color="$red11" />
+          <Text color="$red11" fontSize="$2" flex={1}>
+            Unable to verify this team's roster. Accepting is disabled.
+          </Text>
+        </XStack>
+      )}
+
+      {/* Stale player warning — shown when offered players are no longer on the proposing roster */}
+      {isIncoming && trade.status === 'pending' && hasStaleOfferingPlayers && (
+        <XStack
+          backgroundColor="$red2"
+          borderTopWidth={1}
+          borderTopColor="$red6"
+          paddingHorizontal="$3"
+          paddingVertical="$2"
+          gap="$1.5"
+          alignItems="center"
+        >
+          <AlertTriangle size={12} color="$red11" />
+          <Text color="$red11" fontSize="$2" flex={1}>
+            One or more offered players are no longer on this team's roster.
+            Accepting will fail.
+          </Text>
+        </XStack>
+      )}
+
       {/* Footer: date + actions */}
       <XStack
         alignItems="center"
@@ -430,7 +518,12 @@ function TradeOfferCard({
                   if (trade.id == null) return;
                   onAccept?.(trade.id);
                 }}
-                disabled={isLoading || trade.id == null}
+                disabled={
+                  isLoading ||
+                  trade.id == null ||
+                  hasStaleOfferingPlayers ||
+                  hasRosterFetchError
+                }
                 icon={<Check size={12} color="$green11" />}
               >
                 <Text fontSize="$2" color="$green11" fontWeight="700">
