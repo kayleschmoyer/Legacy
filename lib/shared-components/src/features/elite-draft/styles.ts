@@ -1148,6 +1148,23 @@ export const CSS = `
   font-size: 14px; color: var(--d-text-secondary);
   max-width: 320px; margin: 0 auto 20px;
 }
+.d-paused-resume-btn {
+  margin-top: 20px;
+  padding: 12px 32px;
+  background: var(--d-accent-primary, #1B3A5C);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: var(--d-radius-md);
+  color: #fff; font-size: 14px; font-weight: 700;
+  letter-spacing: 0.5px; cursor: pointer;
+  transition: background 0.2s ease, transform 0.15s ease;
+  font-family: inherit;
+}
+.d-paused-resume-btn:hover:not(:disabled) {
+  background: rgba(27, 58, 92, 0.9);
+  transform: translateY(-1px);
+}
+.d-paused-resume-btn:active:not(:disabled) { transform: translateY(0) scale(0.98); }
+.d-paused-resume-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
 /* ===== Commissioner Controls ===== */
 .d-comm-controls {

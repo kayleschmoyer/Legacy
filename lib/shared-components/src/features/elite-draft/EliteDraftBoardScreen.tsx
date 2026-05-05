@@ -444,7 +444,7 @@ export function EliteDraftBoardScreen({
       </div>
 
       {/* Overlays */}
-      {ui.draftPaused && !queries.isOwner && (
+      {ui.draftPaused && (
         <div className="d-paused-overlay" role="alert" aria-live="assertive">
           <div className="d-paused-card">
             <div className="d-paused-icon">
@@ -453,10 +453,20 @@ export function EliteDraftBoardScreen({
               </span>
             </div>
             <div className="d-paused-title">DRAFT PAUSED</div>
-            <div className="d-paused-desc">
-              The commissioner has paused the draft. You&apos;ll be notified
-              when it resumes.
-            </div>
+            {queries.isOwner ? (
+              <button
+                className="d-paused-resume-btn"
+                onClick={() => void actions.handleResumeDraft()}
+                disabled={actions.resumeLoading}
+              >
+                {actions.resumeLoading ? 'Resuming…' : 'Resume Draft'}
+              </button>
+            ) : (
+              <div className="d-paused-desc">
+                The commissioner has paused the draft. You&apos;ll be notified
+                when it resumes.
+              </div>
+            )}
           </div>
         </div>
       )}

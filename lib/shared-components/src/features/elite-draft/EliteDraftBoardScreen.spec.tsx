@@ -1,7 +1,6 @@
 import React from 'react';
 import { AutomatedDraftScreen } from './DraftStateScreens';
 import { EliteDraftBoardScreen } from './EliteDraftBoardScreen';
-
 import {
   useDraftActions,
   useDraftEffects,
@@ -11,24 +10,23 @@ import {
   useDraftWebSocket,
   usePlayerData,
 } from './hooks';
-import { render } from '../../test-utils';
 import { useAuth } from '../../features/auth';
+import { fireEvent, render } from '../../test-utils';
 
 jest.mock('./hooks', () => ({
-  useDraftUIState: jest.fn(),
-  useDraftQueries: jest.fn(),
-  usePlayerData: jest.fn(),
   useDraftActions: jest.fn(),
-  useDraftWebSocket: jest.fn(),
-  useDraftTimer: jest.fn(),
   useDraftEffects: jest.fn(),
+  useDraftQueries: jest.fn(),
+  useDraftTimer: jest.fn(),
+  useDraftUIState: jest.fn(),
+  useDraftWebSocket: jest.fn(),
+  usePlayerData: jest.fn(),
 }));
 
 jest.mock('../../features/auth', () => ({
   useAuth: jest.fn(),
 }));
 
-// Heavy sub-screens are not under test here — stub them out
 jest.mock('./auction/AuctionDraftRoom', () => ({
   AuctionDraftRoom: () => <div data-testid="auction-draft-room" />,
 }));
@@ -53,68 +51,73 @@ jest.mock('./DraftChatOverlay', () => ({
 jest.mock('./PickAnnouncement', () => ({
   PickAnnouncement: () => null,
 }));
+jest.mock('./styles', () => ({ CSS: '' }));
 
-const mockUseAuth = useAuth as jest.Mock;
-const mockUseDraftUIState = useDraftUIState as jest.Mock;
-const mockUseDraftQueries = useDraftQueries as jest.Mock;
-const mockUsePlayerData = usePlayerData as jest.Mock;
-const mockUseDraftActions = useDraftActions as jest.Mock;
-const mockUseDraftWebSocket = useDraftWebSocket as jest.Mock;
-const mockUseDraftTimer = useDraftTimer as jest.Mock;
-const mockUseDraftEffects = useDraftEffects as jest.Mock;
+const mockUseAuth = jest.mocked(useAuth);
+const mockUseDraftUIState = jest.mocked(useDraftUIState);
+const mockUseDraftQueries = jest.mocked(useDraftQueries);
+const mockUsePlayerData = jest.mocked(usePlayerData);
+const mockUseDraftActions = jest.mocked(useDraftActions);
 
-function makeUiState() {
+function makeBaseUI(
+  overrides: Partial<ReturnType<typeof useDraftUIState>> = {},
+) {
   return {
-    selectedPosition: 'ALL',
-    searchTerm: '',
-    viewMode: 'grid' as const,
-    watchlist: [],
-    chatOpen: false,
-    draftComplete: false,
-    initError: null,
     draftPaused: false,
-    pickDeadline: null,
-    pickTimeLimitSeconds: 90,
-    commPickMode: false,
-    autoPickDisabled: false,
-    toastMessage: null,
-    onlineUserIds: new Set<number>(),
+    draftComplete: false,
     draftOrderMissing: false,
-    currentPickLoadError: null,
-    customDraftOrder: null,
     announcement: null,
     announcementLeaving: false,
-    liveMessage: '',
+    toastMessage: null,
     urgentMessage: '',
+    liveMessage: '',
+    searchTerm: '',
     playerSearch: '',
+    selectedPosition: 'ALL',
+    viewMode: 'grid' as const,
+    commPickMode: false,
+    autoPickDisabled: false,
+    initError: null,
+    chatOpen: false,
+    currentPickLoadError: null,
+    pickDeadline: null,
+    pickTimeLimitSeconds: 90,
+    onlineUserIds: new Set<number>(),
+    customDraftOrder: null,
+    watchlist: [],
     notifiedPicksRef: { current: new Set<number>() },
-    showAnnouncement: jest.fn(),
     showToast: jest.fn(),
+    showAnnouncement: jest.fn(),
     dismissAnnouncement: jest.fn(),
-    setSelectedPosition: jest.fn(),
-    setSearchTerm: jest.fn(),
-    setViewMode: jest.fn(),
-    setWatchlist: jest.fn(),
-    setChatOpen: jest.fn(),
-    setDraftComplete: jest.fn(),
-    setInitError: jest.fn(),
     setDraftPaused: jest.fn(),
-    setPickDeadline: jest.fn(),
-    setPickTimeLimitSeconds: jest.fn(),
+    setDraftComplete: jest.fn(),
+    setDraftOrderMissing: jest.fn(),
+    setAnnouncement: jest.fn(),
+    setAnnouncementLeaving: jest.fn(),
+    setToastMessage: jest.fn(),
+    setUrgentMessage: jest.fn(),
+    setLiveMessage: jest.fn(),
+    setSearchTerm: jest.fn(),
+    setPlayerSearch: jest.fn(),
+    setSelectedPosition: jest.fn(),
+    setViewMode: jest.fn(),
     setCommPickMode: jest.fn(),
     setAutoPickDisabled: jest.fn(),
-    setToastMessage: jest.fn(),
-    setOnlineUserIds: jest.fn(),
-    setDraftOrderMissing: jest.fn(),
+    setInitError: jest.fn(),
+    setChatOpen: jest.fn(),
     setCurrentPickLoadError: jest.fn(),
+    setPickDeadline: jest.fn(),
+    setPickTimeLimitSeconds: jest.fn(),
+    setOnlineUserIds: jest.fn(),
     setCustomDraftOrder: jest.fn(),
-    setLiveMessage: jest.fn(),
-    setUrgentMessage: jest.fn(),
-    setPlayerSearch: jest.fn(),
-  };
+    setWatchlist: jest.fn(),
+    ...overrides,
+  } as unknown as ReturnType<typeof useDraftUIState>;
 }
 
-function makeQueries(overrides: Record<string, unknown> = {}) {
+function makeBaseQueries(
+  overrides: Partial<ReturnType<typeof useDraftQueries>> = {},
+) {
   return {
     leagueLoading: false,
     availablePlayersLoading: false,
@@ -125,10 +128,11 @@ function makeQueries(overrides: Record<string, unknown> = {}) {
     availablePlayersError: undefined,
     currentPickErrorMessage: null,
     league: {
+      id: 1,
       name: 'Test League',
       draftStatus: 'in-progress',
       isMockDraft: false,
-      userMembership: { permissionLevel: 'owner', teamId: 1 },
+      userMembership: { permissionLevel: 'member', teamId: 1 },
     },
     leagueTeams: [],
     leagueDraft: {
@@ -138,8 +142,8 @@ function makeQueries(overrides: Record<string, unknown> = {}) {
     },
     draftId: 42,
     myTeamId: 1,
-    isOwner: true,
-    isCommissioner: true,
+    isOwner: false,
+    isCommissioner: false,
     isAuctionDraft: false,
     currentPickInfo: null,
     currentPickTeamId: null,
@@ -149,7 +153,7 @@ function makeQueries(overrides: Record<string, unknown> = {}) {
     loadingMore: false,
     boardOrderedTeams: [],
     queuedPlayerIds: [],
-    autoPickTeamIds: [],
+    autoPickTeamIds: new Set(),
     playerStatsMap: new Map(),
     pitchingStatsMap: new Map(),
     teamNameById: jest.fn(() => 'Test Team'),
@@ -162,57 +166,68 @@ function makeQueries(overrides: Record<string, unknown> = {}) {
     refetchAutoPickStatuses: jest.fn(),
     handleLoadMorePlayers: jest.fn(),
     ...overrides,
-  };
+  } as unknown as ReturnType<typeof useDraftQueries>;
 }
 
-function makeActions() {
+function makeBaseActions(
+  overrides: Partial<ReturnType<typeof useDraftActions>> = {},
+) {
   return {
-    initDraftLoading: false,
+    handleResumeDraft: jest.fn(),
+    handlePauseDraft: jest.fn(),
+    handleMakePick: jest.fn(),
+    handleCommissionerPick: jest.fn(),
+    handleToggleQueue: jest.fn(),
+    handleInitializeDraft: jest.fn(),
+    handleToggleAutoPickDisabled: jest.fn(),
+    handleToggleUserAutoPick: jest.fn(),
+    nudgeExpiredDraftPick: jest.fn(),
     pauseLoading: false,
     resumeLoading: false,
     pickLoading: false,
     autoPickDisabledLoading: false,
     toggleAutoPickLoading: false,
+    initDraftLoading: false,
     isMyTeamAutoPick: false,
-    commPickMode: false,
-    handleInitializeDraft: jest.fn(),
-    handleMakePick: jest.fn(),
-    handleCommissionerPick: jest.fn(),
-    handleToggleQueue: jest.fn(),
-    handlePauseDraft: jest.fn(),
-    handleResumeDraft: jest.fn(),
-    handleToggleCommPickMode: jest.fn(),
-    handleToggleAutoPickDisabled: jest.fn(),
-    handleToggleUserAutoPick: jest.fn(),
-    nudgeExpiredDraftPick: jest.fn(),
-  };
-}
-
-function makePlayerData() {
-  return {
-    enrichedPlayers: [],
-    statsLookup: new Map(),
-    myTeam: [],
-    myTeamPicks: [],
-  };
+    ...overrides,
+  } as unknown as ReturnType<typeof useDraftActions>;
 }
 
 const defaultProps = {
   leagueId: 1,
   onNavigate: jest.fn(),
-  websocketUrl: 'wss://test.example.com',
+  websocketUrl: 'ws://test',
 };
 
 beforeEach(() => {
   jest.clearAllMocks();
-  mockUseAuth.mockReturnValue({ user: { id: 1, accessLevel: 'member' } });
-  mockUseDraftUIState.mockReturnValue(makeUiState());
-  mockUseDraftQueries.mockReturnValue(makeQueries());
-  mockUsePlayerData.mockReturnValue(makePlayerData());
-  mockUseDraftActions.mockReturnValue(makeActions());
-  mockUseDraftWebSocket.mockReturnValue(undefined);
-  mockUseDraftTimer.mockReturnValue({ timeRemaining: 0 });
-  mockUseDraftEffects.mockReturnValue(undefined);
+  mockUseAuth.mockReturnValue({
+    user: { id: 1, accessLevel: 'member' },
+  } as unknown as ReturnType<typeof useAuth>);
+  mockUseDraftUIState.mockReturnValue(makeBaseUI());
+  mockUseDraftQueries.mockReturnValue(makeBaseQueries());
+  mockUseDraftActions.mockReturnValue(makeBaseActions());
+  mockUsePlayerData.mockReturnValue({
+    enrichedPlayers: [],
+    myTeam: null,
+    myTeamPicks: [],
+    statsLookup: new Map(),
+  } as unknown as ReturnType<typeof usePlayerData>);
+  jest
+    .mocked(useDraftWebSocket)
+    .mockReturnValue(
+      undefined as unknown as ReturnType<typeof useDraftWebSocket>,
+    );
+  jest
+    .mocked(useDraftTimer)
+    .mockReturnValue({ timeRemaining: null } as unknown as ReturnType<
+      typeof useDraftTimer
+    >);
+  jest
+    .mocked(useDraftEffects)
+    .mockReturnValue(
+      undefined as unknown as ReturnType<typeof useDraftEffects>,
+    );
 });
 
 describe('AutomatedDraftScreen', () => {
@@ -232,7 +247,7 @@ describe('AutomatedDraftScreen', () => {
 describe('EliteDraftBoardScreen — selectionMethod branching', () => {
   it('shows AutomatedDraftScreen for random selectionMethod', () => {
     mockUseDraftQueries.mockReturnValue(
-      makeQueries({
+      makeBaseQueries({
         leagueDraft: {
           selectionMethod: 'random',
           draftCompletedAt: null,
@@ -251,7 +266,7 @@ describe('EliteDraftBoardScreen — selectionMethod branching', () => {
 
   it('does not show AutomatedDraftScreen for standard selectionMethod', () => {
     mockUseDraftQueries.mockReturnValue(
-      makeQueries({
+      makeBaseQueries({
         leagueDraft: {
           selectionMethod: 'standard',
           draftCompletedAt: null,
@@ -263,5 +278,77 @@ describe('EliteDraftBoardScreen — selectionMethod branching', () => {
 
     const { queryByText } = render(<EliteDraftBoardScreen {...defaultProps} />);
     expect(queryByText('Draft in Progress')).toBeNull();
+  });
+});
+
+describe('EliteDraftBoardScreen — paused overlay', () => {
+  it('does not show paused overlay when draft is not paused', () => {
+    mockUseDraftUIState.mockReturnValue(makeBaseUI({ draftPaused: false }));
+    mockUseDraftQueries.mockReturnValue(makeBaseQueries({ isOwner: false }));
+    mockUseDraftActions.mockReturnValue(makeBaseActions());
+
+    const { queryByText } = render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    expect(queryByText('DRAFT PAUSED')).toBeNull();
+  });
+
+  it('shows paused overlay for non-owner when draft is paused', () => {
+    mockUseDraftUIState.mockReturnValue(makeBaseUI({ draftPaused: true }));
+    mockUseDraftQueries.mockReturnValue(makeBaseQueries({ isOwner: false }));
+    mockUseDraftActions.mockReturnValue(makeBaseActions());
+
+    const { getByText } = render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    expect(getByText('DRAFT PAUSED')).toBeTruthy();
+    expect(getByText(/commissioner has paused/i)).toBeTruthy();
+  });
+
+  it('shows paused overlay for commissioner (owner) when draft is paused', () => {
+    mockUseDraftUIState.mockReturnValue(makeBaseUI({ draftPaused: true }));
+    mockUseDraftQueries.mockReturnValue(makeBaseQueries({ isOwner: true }));
+    mockUseDraftActions.mockReturnValue(makeBaseActions());
+
+    const { getByText } = render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    expect(getByText('DRAFT PAUSED')).toBeTruthy();
+  });
+
+  it('shows Resume Draft button for commissioner instead of wait message', () => {
+    mockUseDraftUIState.mockReturnValue(makeBaseUI({ draftPaused: true }));
+    mockUseDraftQueries.mockReturnValue(makeBaseQueries({ isOwner: true }));
+    mockUseDraftActions.mockReturnValue(makeBaseActions());
+
+    const { getByText, queryByText } = render(
+      <EliteDraftBoardScreen {...defaultProps} />,
+    );
+
+    expect(getByText('Resume Draft')).toBeTruthy();
+    expect(queryByText(/commissioner has paused/i)).toBeNull();
+  });
+
+  it('calls handleResumeDraft when commissioner clicks Resume Draft', () => {
+    const handleResumeDraft = jest.fn().mockResolvedValue(undefined);
+    mockUseDraftUIState.mockReturnValue(makeBaseUI({ draftPaused: true }));
+    mockUseDraftQueries.mockReturnValue(makeBaseQueries({ isOwner: true }));
+    mockUseDraftActions.mockReturnValue(makeBaseActions({ handleResumeDraft }));
+
+    const { getByText } = render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    fireEvent.click(getByText('Resume Draft'));
+    expect(handleResumeDraft).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows Resuming… and disables button when resumeLoading is true', () => {
+    mockUseDraftUIState.mockReturnValue(makeBaseUI({ draftPaused: true }));
+    mockUseDraftQueries.mockReturnValue(makeBaseQueries({ isOwner: true }));
+    mockUseDraftActions.mockReturnValue(
+      makeBaseActions({ resumeLoading: true }),
+    );
+
+    const { getByText } = render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    const btn = getByText('Resuming…').closest('button');
+    expect(btn).toBeTruthy();
+    expect((btn as HTMLButtonElement).disabled).toBe(true);
   });
 });
