@@ -190,8 +190,17 @@ jobs:
       # This sleep works WITH that behavior — while the running job sleeps, new triggers
       # replace the single queued slot, so when this run finishes processing, only the
       # most recent trigger remains to execute (which then scans all merge-ready PRs).
+      #
+      # The labeled (merge-when-ready) case fires when the "Restore Merge Label on
+      # Success" CI job re-adds the label after CI completes. At that instant GitHub's
+      # branch protection may not yet have registered all required commit statuses for
+      # the SHA, causing the merge API to return 405 "N of M required status checks are
+      # expected." The 30s delay gives GitHub's backend time to flush all statuses.
       - name: Debounce (let concurrent triggers settle)
-        if: github.event_name == 'workflow_run' || github.event_name == 'pull_request_review'
+        if: |
+          github.event_name == 'workflow_run' ||
+          github.event_name == 'pull_request_review' ||
+          (github.event_name == 'pull_request' && github.event.action == 'labeled' && github.event.label.name == 'merge-when-ready')
         run: sleep 30
 
       - name: Process Enhanced Merge Queue

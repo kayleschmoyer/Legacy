@@ -222,14 +222,22 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
       };
     }
 
-    // Check for unresolved review threads (including Copilot)
-    const unresolvedResult = await checkUnresolvedReviewThreads(pr.number);
-    if (unresolvedResult.hasUnresolved) {
-      return {
-        canMerge: false,
-        reason: `PR has ${unresolvedResult.count} unresolved review comment thread(s)`,
-        unresolvedThreads: unresolvedResult.threads,
-      };
+    // If the bot has an active (non-dismissed) APPROVED review, it has already
+    // adjudicated all threads — including JUSTIFY threads accepted in Cycle 2.
+    // cleanup-on-push dismisses the bot approval on every new push, so a
+    // non-dismissed APPROVED review is always current. Skip the thread check to
+    // avoid false positives where Cycle-1 threads remain physically unresolved
+    // after a Cycle-2 LGTM.
+    const hasBotApproval = await checkBotApproval(pr.number);
+    if (!hasBotApproval) {
+      const unresolvedResult = await checkUnresolvedReviewThreads(pr.number);
+      if (unresolvedResult.hasUnresolved) {
+        return {
+          canMerge: false,
+          reason: `PR has ${unresolvedResult.count} unresolved review comment thread(s)`,
+          unresolvedThreads: unresolvedResult.threads,
+        };
+      }
     }
 
     // Block merges that are not fully approved — reviewDecision values:
@@ -332,6 +340,20 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
         (t) => t.comments.nodes[0]?.author?.login ?? 'unknown',
       ),
     };
+  }
+
+  async function checkBotApproval(prNumber) {
+    const reviews = await github.paginate(github.rest.pulls.listReviews, {
+      owner,
+      repo,
+      pull_number: prNumber,
+      per_page: 100,
+    });
+    return reviews.some(
+      (r) =>
+        r.user.login === 'legacy-sports-review-bot[bot]' &&
+        r.state === 'APPROVED',
+    );
   }
 
   async function getRequiredChecks(branch) {
