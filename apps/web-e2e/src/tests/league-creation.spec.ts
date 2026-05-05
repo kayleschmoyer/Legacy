@@ -338,6 +338,22 @@ test.describe('League Creation @critical', () => {
     await expect(datePickerButton.first()).toBeVisible();
   });
 
+  test('timezone label is shown when no draft date is selected @regression', async ({
+    page,
+  }) => {
+    await page.goto('/baseball/league/create');
+    await page.waitForLoadState('domcontentloaded');
+    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible();
+
+    await expandSection(page, 'draft');
+    await expect(page.getByText('Draft Date & Time')).toBeVisible();
+
+    // Before a date is selected the page shows "Times shown in <timezone>"
+    await expect(page.getByText(/times shown in/i)).toBeVisible();
+    // The timezone label contains a UTC offset in the expected format
+    await expect(page.getByText(/utc[+-]\d{2}:\d{2}/i)).toBeVisible();
+  });
+
   test('should display loading state during submission', async ({ page }) => {
     // Mock slow GraphQL response to test loading state
     await page.route(isGraphQLEndpoint, async (route) => {

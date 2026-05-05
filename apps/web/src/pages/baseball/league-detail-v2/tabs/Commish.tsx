@@ -196,13 +196,10 @@ export const CommishTab: React.FC<CommishTabProps> = ({ league }) => {
       icon: <I.AlertTriangle size={16} />,
       testId: 'danger-zone-toggle',
       content: leagueId ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <h4 style={{ margin: 0, fontWeight: 600 }}>Danger Zone</h4>
-          <DeleteLeagueControl
-            leagueId={leagueId}
-            leagueName={league.name ?? 'this league'}
-          />
-        </div>
+        <DeleteLeagueControl
+          leagueId={leagueId}
+          leagueName={league.name ?? 'this league'}
+        />
       ) : null,
     },
   ];

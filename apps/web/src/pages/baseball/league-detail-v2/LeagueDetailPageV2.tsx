@@ -102,20 +102,22 @@ export function LeagueDetailPageV2(): React.JSX.Element {
     league?.id ?? undefined,
   );
 
-  const initialRole: LeagueRole = useMemo(() => {
-    const stored =
-      (typeof window !== 'undefined' &&
-        window.localStorage.getItem(ROLE_KEY)) ||
-      '';
-    if (stored === 'commish' && isCommissioner) return 'commish';
-    if (stored === 'member' && isMember) return 'member';
-    if (stored === 'spectator') return 'spectator';
+  const [storedRole, setStoredRole] = useState<string>(() => {
+    if (typeof window === 'undefined') return '';
+    try {
+      return window.localStorage.getItem(ROLE_KEY) ?? '';
+    } catch {
+      return '';
+    }
+  });
+  const role: LeagueRole = useMemo(() => {
+    if (storedRole === 'commish' && isCommissioner) return 'commish';
+    if (storedRole === 'member' && isMember) return 'member';
+    if (storedRole === 'spectator') return 'spectator';
     return isCommissioner ? 'commish' : isMember ? 'member' : 'spectator';
-  }, [isCommissioner, isMember]);
-
-  const [role, setRoleState] = useState<LeagueRole>(initialRole);
+  }, [isCommissioner, isMember, storedRole]);
   const setRole = useCallback((r: LeagueRole) => {
-    setRoleState(r);
+    setStoredRole(r);
     try {
       window.localStorage.setItem(ROLE_KEY, r);
     } catch (err: unknown) {
@@ -125,9 +127,6 @@ export function LeagueDetailPageV2(): React.JSX.Element {
       LOGGER.debug('LeagueDetailV2: localStorage unavailable', errorArg);
     }
   }, []);
-  useEffect(() => {
-    setRoleState(initialRole);
-  }, [initialRole]);
 
   const effIsCommish = role === 'commish' && isCommissioner;
   const effIsMember = effIsCommish || role === 'member';
@@ -168,45 +167,15 @@ export function LeagueDetailPageV2(): React.JSX.Element {
 
   // Gate role-restricted tabs once both league and user have loaded.
   //
-  // Uses isCommissioner/isMember (ground-truth authorization) rather than
-  // effIsCommish/effIsMember (which lag by one render while the roleSync
-  // effect catches up), so there is no race between the redirect check
-  // and the role state update.
+  // Uses isCommissioner/isMember (ground-truth booleans) rather than
+  // effIsCommish/effIsMember, which reflect the stored role *preference*
+  // and may disagree with actual permissions (e.g. a commissioner viewing
+  // as 'member' role has effIsCommish=false but isCommissioner=true).
   useEffect(() => {
-    if (leagueLoading || authLoading || !league) return;
-    if (tab === 'commish' && !effIsCommish) {
-      if (isCommissioner) {
-        // Commissioner is on the commish tab but role state hasn't caught up yet
-        // (race condition on first load) or they're viewing as member/spectator.
-        // Auto-switch to commish role so the tab content renders immediately
-        // instead of redirecting away.
-        setRole('commish');
-      } else {
-        setTab('overview');
-      }
-    }
-    if ((tab === 'roster' || tab === 'team') && !effIsMember) {
-      if (isMember) {
-        // User IS a member but role state hasn't synced yet (first-render race).
-        // Auto-switch to the appropriate role so the tab renders immediately
-        // instead of incorrectly redirecting to overview.
-        setRole(isCommissioner ? 'commish' : 'member');
-      } else {
-        setTab('overview');
-      }
-    }
-  }, [
-    tab,
-    effIsCommish,
-    effIsMember,
-    isCommissioner,
-    isMember,
-    setRole,
-    setTab,
-    leagueLoading,
-    authLoading,
-    league,
-  ]);
+    if (leagueLoading || authLoading) return;
+    if (tab === 'commish' && !isCommissioner) setTab('overview');
+    if ((tab === 'roster' || tab === 'team') && !isMember) setTab('overview');
+  }, [tab, isCommissioner, isMember, setTab, leagueLoading, authLoading]);
 
   const onTeamNav = useCallback(
     (teamId: number) => {

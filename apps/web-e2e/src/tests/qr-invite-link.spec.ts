@@ -155,25 +155,25 @@ test.describe('QR Invite Link @critical', () => {
     await page.goto('/baseball/league/1/overview');
     await page.waitForLoadState('domcontentloaded');
 
-    // "Invite Friends" card heading is visible
+    // V2 InviteCard renders "Invite Friends" as the section title
     await expect(page.getByText('Invite Friends')).toBeVisible({
       timeout: 15_000,
     });
 
-    // Invite Code section shows the invite code (hero also shows invite code in a div)
+    // V2 InviteCard uses "Invite Code" (not "Manual Code")
     await expect(page.getByText('Invite Code')).toBeVisible();
+    // invite code is in an <input readOnly value=...>, not a text node
     await expect(
-      page.getByText('INVITE123', { exact: true }).first(),
+      page.locator('input[value="INVITE123"]').first(),
     ).toBeVisible();
 
-    // Invite Link section shows a URL containing the join path (in a readonly input)
+    // V2 InviteCard uses "Invite Link" (not "Share Link")
     await expect(page.getByText('Invite Link')).toBeVisible();
-    const urlBox = page
-      .locator('input')
-      .filter({ hasValue: /\/baseball\/league\/join\// })
+    const urlInput = page
+      .locator('input[value*="/baseball/league/join/"]')
       .first();
-    await expect(urlBox).toBeVisible({ timeout: 10_000 });
-    const displayedUrl = await urlBox.inputValue();
+    await expect(urlInput).toBeVisible({ timeout: 10_000 });
+    const displayedUrl = await urlInput.inputValue();
     expect(displayedUrl).toContain('/baseball/league/join/INVITE123');
   });
 
@@ -198,13 +198,12 @@ test.describe('QR Invite Link @critical', () => {
       page.getByRole('button', { name: /copy invite code/i }),
     ).toBeVisible();
 
-    // QR Code toggle button
+    // QR toggle button (V2 renders "Show QR Code to Invite", no separate section heading)
     await expect(
-      page.getByRole('button', { name: /show qr code/i }),
+      page.getByRole('button', { name: /show qr code to invite/i }),
     ).toBeVisible();
 
-    // Header quick-share invite button. Use exact match because the invite
-    // card also renders copy buttons whose accessible names contain "invite".
+    // Hero quick-share invite button (LeagueHero renders this when onInvite is provided)
     await expect(
       page.getByRole('button', { name: 'Invite', exact: true }),
     ).toBeVisible();
@@ -215,18 +214,21 @@ test.describe('QR Invite Link @critical', () => {
     await page.goto('/baseball/league/1/overview');
     await page.waitForLoadState('domcontentloaded');
 
-    // InviteCard returns null when inviteCode is null — the whole section is absent
-    await expect(page.getByText('Invite Friends')).not.toBeVisible({
-      timeout: 15_000,
-    });
+    // Wait for page to settle — the hero "Invite" button is always shown
+    await expect(
+      page.getByRole('button', { name: 'Invite', exact: true }),
+    ).toBeVisible({ timeout: 15_000 });
 
-    // Invite code should NOT be visible (null invite code means no card at all)
+    // V2 InviteCard returns null when inviteCode is null — no "Invite Friends" section
+    await expect(page.getByText('Invite Friends')).not.toBeVisible();
+
+    // Invite code should NOT be visible
     await expect(page.getByText('INVITE123')).not.toBeVisible();
 
-    // The share link URL should not contain a join path (inviteCode is null)
-    const urlBox = page
-      .locator('text=/\\/baseball\\/league\\/join\\//')
+    // No invite URL input rendered
+    const urlInput = page
+      .locator('input[value*="/baseball/league/join/"]')
       .first();
-    await expect(urlBox).not.toBeVisible({ timeout: 5_000 });
+    await expect(urlInput).not.toBeVisible({ timeout: 5_000 });
   });
 });

@@ -16,6 +16,11 @@ import { AlertCircle, Check, ChevronRight, Lock } from '@tamagui/lucide-icons';
 import { Button, DateTimePicker } from '@legacy-sports/shared-components/ui';
 import { LOGGER } from '@legacy-sports/logging';
 import {
+  formatDateAsUTC,
+  formatDraftDate,
+  getUserTimezoneLabel,
+} from '../../utils/draftDateUtils';
+import {
   DEFAULT_NUM_DIVISIONS,
   DEFAULT_NUM_TEAMS,
   MAX_LEAGUE_NAME_LENGTH,
@@ -143,17 +148,6 @@ function poolDisplayLabel(v: string): string {
   return (
     { all: 'All MLB', nl: 'National League', al: 'American League' }[v] ?? '—'
   );
-}
-
-function formatDraftDate(d?: Date): string {
-  if (!d) return 'whenever you schedule it';
-  return d.toLocaleString('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
 }
 
 // ── Validation (returns all errors, not just first) ──────────────────────────
@@ -1623,22 +1617,47 @@ export function LeagueCreatePage(): React.JSX.Element {
                     label="Draft Date & Time"
                     hint="Optional. Leave blank to schedule later from league settings."
                   >
-                    <DateTimePicker
-                      value={formData.draftDate}
-                      onChange={(date: Date) =>
-                        handleInputChange('draftDate', date)
-                      }
-                      onClear={() =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          draftDate: undefined,
-                        }))
-                      }
-                      placeholder="Select draft date and time"
-                      disabled={isFormDisabled}
-                      minDate={new Date()}
-                      useNativeInput={false}
-                    />
+                    <>
+                      <DateTimePicker
+                        value={formData.draftDate}
+                        onChange={(date: Date) =>
+                          handleInputChange('draftDate', date)
+                        }
+                        onClear={() =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            draftDate: undefined,
+                          }))
+                        }
+                        placeholder="Select draft date and time"
+                        disabled={isFormDisabled}
+                        minDate={new Date()}
+                        useNativeInput={false}
+                      />
+                      {formData.draftDate ? (
+                        <YStack gap="$1">
+                          <Text
+                            fontFamily="$body"
+                            fontSize={12}
+                            color="$gray10"
+                          >
+                            Local: {formatDraftDate(formData.draftDate)} —{' '}
+                            {getUserTimezoneLabel()}
+                          </Text>
+                          <Text
+                            fontFamily="$body"
+                            fontSize={12}
+                            color="$gray10"
+                          >
+                            UTC: {formatDateAsUTC(formData.draftDate)}
+                          </Text>
+                        </YStack>
+                      ) : (
+                        <Text fontFamily="$body" fontSize={12} color="$gray10">
+                          Times shown in {getUserTimezoneLabel()}
+                        </Text>
+                      )}
+                    </>
                   </FieldRow>
 
                   {/* Auction settings — conditional */}
