@@ -194,6 +194,57 @@ test.describe('Onboarding Tutorial — skip and close @regression', () => {
   });
 });
 
+// ── Tests: Navigation links on final step ────────────────────────────────────
+
+test.describe('Onboarding Tutorial — final step navigation links @regression', () => {
+  // Helper: open tutorial and advance to the final "Get Started" step
+  async function openTutorialAtLastStep(page: import('@playwright/test').Page) {
+    await openTutorial(page);
+    for (let i = 0; i < 5; i++) {
+      await page.getByRole('button', { name: /next/i }).click();
+    }
+    await expect(page.getByText(/step 6 of 6/i)).toBeVisible({
+      timeout: 10000,
+    });
+  }
+
+  test('"Create League →" link closes the tutorial overlay', async ({
+    page,
+  }) => {
+    await openTutorialAtLastStep(page);
+
+    await page.getByRole('link', { name: /create league/i }).click();
+
+    await expect(page.getByRole('dialog')).not.toBeVisible({
+      timeout: 10000,
+    });
+  });
+
+  test('"Create League →" link navigates to /baseball/league/create', async ({
+    page,
+  }) => {
+    await openTutorialAtLastStep(page);
+
+    await page.getByRole('link', { name: /create league/i }).click();
+
+    await expect(page).toHaveURL(/\/baseball\/league\/create/, {
+      timeout: 10000,
+    });
+  });
+
+  test('"View Leagues →" link closes the tutorial overlay', async ({
+    page,
+  }) => {
+    await openTutorialAtLastStep(page);
+
+    await page.getByRole('link', { name: /view leagues/i }).click();
+
+    await expect(page.getByRole('dialog')).not.toBeVisible({
+      timeout: 10000,
+    });
+  });
+});
+
 // ── Tests: "New to Legacy Sports?" section ────────────────────────────────────
 
 test.describe('Help Page — tutorial launcher section @regression', () => {
