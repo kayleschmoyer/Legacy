@@ -290,10 +290,12 @@ test.describe
       await expect(page.getByText('Team Identity').first()).toBeVisible({
         timeout: 30000,
       });
-      // Now wait for leagueTeams to populate and display the correct name.
-      await expect(
-        page.getByText(state.managerTeamName, { exact: false }).first(),
-      ).toBeVisible({ timeout: 15000 });
+      // Team.tsx V2 renders the name inside an <input> — use toHaveValue
+      // instead of getByText, which only matches text nodes, not input values.
+      await expect(page.locator('#team-name-input')).toHaveValue(
+        state.managerTeamName,
+        { timeout: 15000 },
+      );
     });
 
     await test.step('Verify team name input is directly editable', async () => {
@@ -322,9 +324,10 @@ test.describe
 
     await test.step('Verify updated name persists on the page', async () => {
       // The team name field should now show the new name
-      await expect(
-        page.getByText(state.renamedTeamName, { exact: false }).first(),
-      ).toBeVisible({ timeout: 10000 });
+      await expect(page.locator('#team-name-input')).toHaveValue(
+        state.renamedTeamName,
+        { timeout: 10000 },
+      );
     });
   });
 
@@ -553,9 +556,10 @@ test.describe
       await expect(page.getByText('Team Identity').first()).toBeVisible({
         timeout: 30000,
       });
-      await expect(
-        page.getByText(state.renamedTeamName, { exact: false }).first(),
-      ).toBeVisible({ timeout: 15000 });
+      await expect(page.locator('#team-name-input')).toHaveValue(
+        state.renamedTeamName,
+        { timeout: 15000 },
+      );
     });
   });
 });
