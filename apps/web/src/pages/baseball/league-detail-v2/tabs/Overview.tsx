@@ -204,6 +204,14 @@ const InviteCard: React.FC<{ league: LeagueFragment }> = ({ league }) => {
             </button>
           </div>
         </div>
+        {copied && (
+          <div
+            role="status"
+            style={{ fontSize: 12, color: 'var(--fg-ok, #6fd39a)' }}
+          >
+            {copied === 'link' ? 'Invite link copied' : 'Invite code copied'}
+          </div>
+        )}
         <button
           type="button"
           className="ls-btn ls-btn-gold block"
