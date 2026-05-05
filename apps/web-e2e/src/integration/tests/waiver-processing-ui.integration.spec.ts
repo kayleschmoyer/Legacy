@@ -472,11 +472,17 @@ test.describe
       );
     });
 
-    await test.step('Verify waiver-order badges are rendered for all four teams', async () => {
-      // LeagueStandings renders each team's waiverOrder as "#N" text
-      const waiverBadges = page.locator('text=/^#\\d+$/');
-      await expect(waiverBadges.first()).toBeVisible({ timeout: 15000 });
-      const count = await waiverBadges.count();
+    await test.step('Verify standings table renders rows for all four teams', async () => {
+      // The LS-4127 StandingsTab redesign uses a plain <table> with Rank/Team/W/L/T/PF/PA columns.
+      // Waiver order is no longer displayed in the standings UI; the GQL steps above already
+      // capture and assert waiverOrder values for both teams.
+      const standingsTable = page.locator(
+        'table[aria-label="League Standings"]',
+      );
+      await expect(standingsTable).toBeVisible({ timeout: 15000 });
+      const teamRows = standingsTable.locator('tbody tr');
+      await expect(teamRows.first()).toBeVisible({ timeout: 5000 });
+      const count = await teamRows.count();
       expect(count).toBeGreaterThanOrEqual(4);
     });
   });
