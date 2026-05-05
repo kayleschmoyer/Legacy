@@ -30,6 +30,15 @@ const LIGHTWEIGHT_CHECK_NAMES = new Set(
     : _defaultLightweightCheckNames,
 );
 
+// GitHub Actions parses `##[…]` workflow-command escapes from any line of
+// stdout/stderr regardless of code-fence context. PR titles, bodies, and
+// upstream API error messages occasionally contain quoted `##[error]` or
+// similar sequences (e.g. PRs documenting a CI bug). When those strings flow
+// into log lines, Actions creates phantom annotations on the merge-queue run.
+// Inserting U+200B between the two `#` keeps the text readable while breaking
+// the workflow-command escape.
+const sanitizeLog = (s) => String(s).replace(/##\[/g, '#\u200b#[');
+
 module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
   const { owner, repo } = context.repo;
   const isTriggeredByWorkflow = context.eventName === 'workflow_run';
@@ -119,7 +128,9 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
         await reportMergeBlocker(prDetails.data, validationResult);
       }
     } catch (error) {
-      console.error(`💥 Error processing PR #${pr.number}: ${error.message}`);
+      console.error(
+        `💥 Error processing PR #${pr.number}: ${sanitizeLog(error.message)}`,
+      );
       await reportProcessingError(pr, error);
     }
   }
@@ -669,7 +680,29 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
         return;
       }
 
-      console.error(`❌ Failed to merge PR #${pr.number}: ${error.message}`);
+      // 405 with "N of M required status checks are expected" means branch
+      // protection is waiting for required checks to register against this
+      // SHA — i.e. CI is still spinning up. Treat as pending and re-queue,
+      // mirroring the 422 head-modified fast path. Other 405 causes propagate.
+      const mergeErrMsg =
+        (error.response?.data?.message ?? '') + '\n' + (error.message ?? '');
+      if (
+        error.status === 405 &&
+        /\d+ of \d+ required status checks? (are|is) expected/i.test(
+          mergeErrMsg,
+        )
+      ) {
+        console.log(
+          `⏳ PR #${pr.number}: merge rejected with 405 (required checks not yet registered) — ` +
+            `CI still spinning up. Will re-evaluate on next trigger.`,
+        );
+        hasPendingPRs = true;
+        return;
+      }
+
+      console.error(
+        `❌ Failed to merge PR #${pr.number}: ${sanitizeLog(error.message)}`,
+      );
 
       if (
         error.message.includes('Resource not accessible') ||
@@ -761,7 +794,16 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
   }
 
   async function reportProcessingError(pr, error) {
-    console.error('Processing error for PR #' + pr.number + ':', error);
+    // Don't pass the raw error object to console.error — Node renders it via
+    // util.inspect, which dumps the entire Octokit request body (including
+    // pr.body via commit_message). Log a sanitized one-line summary instead;
+    // see `sanitizeLog` for why ##[ escapes must be neutralized.
+    const summary =
+      (error.status ? '[' + error.status + '] ' : '') +
+      (error.message || String(error));
+    console.error(
+      'Processing error for PR #' + pr.number + ': ' + sanitizeLog(summary),
+    );
 
     let errorComment =
       '## ⚠️ Merge Queue Processing Error\n\n' +

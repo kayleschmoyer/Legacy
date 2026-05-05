@@ -444,3 +444,151 @@ describe('merge-queue-processor — mergeable_state=behind handling', () => {
     assert.strictEqual(calls.merges.length, 0, 'merge should not be called');
   });
 });
+
+// ── LS-4181 ──────────────────────────────────────────────────────────────────
+
+describe('merge-queue-processor — 405 required-checks-expected handling (LS-4181)', () => {
+  function make405CheckExpectedError() {
+    const err = Object.assign(new Error('Repository rule violations found'), {
+      status: 405,
+      response: {
+        data: {
+          message:
+            'Repository rule violations found\n\n' +
+            '5 of 7 required status checks are expected.',
+        },
+      },
+    });
+    return err;
+  }
+
+  it('treats 405 "N of M required status checks are expected" as pending — no error comment, no throw', async () => {
+    const { github, calls } = makeGithub({
+      reviews: [
+        { user: { login: 'legacy-sports-review-bot[bot]' }, state: 'APPROVED' },
+      ],
+      unresolvedThreads: [],
+    });
+    github.rest.pulls.merge = async () => {
+      calls.merges.push({});
+      throw make405CheckExpectedError();
+    };
+
+    await assert.doesNotReject(
+      () =>
+        processor({
+          github,
+          context,
+          isDryRun: false,
+          forceCheck: false,
+          isRetry: false,
+        }),
+      'processor should not throw when checks-not-yet-registered race occurs',
+    );
+
+    assert.strictEqual(
+      calls.merges.length,
+      1,
+      'merge attempt should have been made',
+    );
+    assert.strictEqual(
+      calls.comments.filter((c) =>
+        c.body?.includes('Merge Queue Processing Error'),
+      ).length,
+      0,
+      'should NOT post a Processing Error comment for the pending-checks race',
+    );
+  });
+
+  it('still surfaces other 405 causes as real errors with a comment', async () => {
+    const { github, calls } = makeGithub({
+      reviews: [
+        { user: { login: 'legacy-sports-review-bot[bot]' }, state: 'APPROVED' },
+      ],
+      unresolvedThreads: [],
+    });
+    github.rest.pulls.merge = async () => {
+      calls.merges.push({});
+      throw Object.assign(new Error('Method Not Allowed'), {
+        status: 405,
+        response: {
+          data: { message: 'Pull Request is not mergeable' },
+        },
+      });
+    };
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.strictEqual(
+      calls.comments.filter((c) =>
+        c.body?.includes('Merge Queue Processing Error'),
+      ).length,
+      1,
+      'should post a Processing Error comment for unrelated 405 errors',
+    );
+  });
+});
+
+describe('merge-queue-processor — log sanitization (LS-4181)', () => {
+  it('does not emit raw ##[ workflow command escapes from PR body content', async () => {
+    const injectedPR = makePR({
+      body:
+        'Description with quoted error:\n\n' +
+        '```\n' +
+        '##[error]injected from pr body\n' +
+        '```\n',
+    });
+    const { github } = makeGithub({
+      reviews: [
+        { user: { login: 'legacy-sports-review-bot[bot]' }, state: 'APPROVED' },
+      ],
+      unresolvedThreads: [],
+      pr: injectedPR,
+    });
+    // Force a non-fast-path merge failure that goes through reportProcessingError.
+    github.rest.pulls.merge = async () => {
+      throw Object.assign(new Error('boom ##[error]from-error-message'), {
+        status: 500,
+        response: {
+          data: {
+            message: 'Internal ##[error]from-response-body',
+          },
+        },
+      });
+    };
+
+    const captured = [];
+    const originalErr = console.error;
+    console.error = (...args) => {
+      captured.push(args.map((a) => String(a)).join(' '));
+    };
+    try {
+      await processor({
+        github,
+        context,
+        isDryRun: false,
+        forceCheck: false,
+        isRetry: false,
+      });
+    } finally {
+      console.error = originalErr;
+    }
+
+    const all = captured.join('\n');
+    assert.ok(
+      !/##\[error\]/.test(all),
+      'no raw ##[error] escape should appear in stderr; got:\n' + all,
+    );
+    // The sanitized form (with U+200B between `#` and `#[`) should still carry the original text.
+    assert.ok(
+      /from-error-message/.test(all),
+      'sanitized output should still contain the underlying message',
+    );
+  });
+});
