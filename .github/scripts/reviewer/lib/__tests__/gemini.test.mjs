@@ -903,10 +903,7 @@ describe('GeminiProvider', () => {
       });
       // Free-form must use FREE_FORM_MAX_TOKENS (16384), not the tool-call
       // default (8192) — ensures future refactors don't regress to truncation.
-      assert.strictEqual(
-        freeFormBody.generationConfig.maxOutputTokens,
-        16384,
-      );
+      assert.strictEqual(freeFormBody.generationConfig.maxOutputTokens, 16384);
     });
 
     it('free-form request bypasses cachedContent even when cache is available', async () => {

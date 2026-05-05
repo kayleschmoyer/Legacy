@@ -267,11 +267,11 @@ lint-skills: ## Validate all agent skills conform to agentskills.io format
 
 format: ## Format code across all projects
 	@$(call echo_blue,Formatting code...)
-	@pnpm exec nx format:write
+	@pnpm exec prettier --write --ignore-unknown .
 
 fmt: format ## Alias for format command
 
-format-commit: ## Run nx format:write, stage formatting changes, and commit as 'style: apply formatting'. Working tree must be clean first.
+format-commit: ## Run prettier --write, stage formatting changes, and commit as 'style: apply formatting'. Working tree must be clean first.
 	@$(call echo_blue,Checking working tree is clean before formatting...)
 ifeq ($(DETECTED_OS),Windows)
 	@powershell -NoProfile -Command "$$status = git status --porcelain; if ($$status) { Write-Host 'ERROR: Working tree is not clean. Commit or stash changes before running make format-commit.' -ForegroundColor Red; exit 1 }"
@@ -283,7 +283,7 @@ else
 	fi
 endif
 	@$(call echo_blue,Applying formatting and committing...)
-	@pnpm exec nx format:write
+	@pnpm exec prettier --write --ignore-unknown .
 ifeq ($(DETECTED_OS),Windows)
 	@powershell -NoProfile -Command "$$changed = git diff --name-only; if ($$changed) { git add -A; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }; git commit -m 'style: apply formatting'; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }; Write-Host '' ; Write-Host 'Formatting committed. Re-run make pc.' -ForegroundColor Green } else { Write-Host 'No formatting changes to commit.' -ForegroundColor Yellow }"
 else
@@ -861,10 +861,10 @@ pre-commit: ## Run all pre-commit validation checks
 	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,4/9 Type checking...) && pnpm exec nx affected -t typecheck --base=$(NX_BASE),@$(call echo_yellow,4/9 Type checking... SKIPPED (docs-only changes)))
 	@$(call echo_plain,5/9 Formatting...)
 ifeq ($(DETECTED_OS),Windows)
-	@powershell -NoProfile -Command "$$preState = @(git status --porcelain -uno); pnpm exec nx format:write; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }; $$changed = @(git status --porcelain -uno); $$newChanges = @(); foreach ($$line in $$changed) { if (-not ($$preState -contains $$line)) { $$newChanges += $$line } }; if ($$newChanges.Count -eq 0) { $$diffFiles = @(git diff --name-only); if ($$diffFiles.Count -gt 0) { $$newChanges = $$diffFiles | ForEach-Object { '?? ' + $$_ } } }; if ($$newChanges.Count -gt 0) { if ($$preState.Count -gt 0) { Write-Host ''; Write-Host 'ERROR: Formatting rewrote the following files:' -ForegroundColor Red; $$newChanges | ForEach-Object { Write-Host ('  ' + $$_.Substring(3)) -ForegroundColor Yellow }; Write-Host ''; Write-Host 'You have other uncommitted changes alongside the format fixes. Commit or stash them first, then re-run make pc.' -ForegroundColor Red; exit 1 } else { Write-Host '  Formatting changed files; auto-amending last commit...' -ForegroundColor Yellow; git add -A; git commit --amend --no-edit; Write-Host '  ✓ Format fixes folded into previous commit.' -ForegroundColor Green } }"
+	@powershell -NoProfile -Command "$$preState = @(git status --porcelain -uno); pnpm exec prettier --write --ignore-unknown .; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }; $$changed = @(git status --porcelain -uno); $$newChanges = @(); foreach ($$line in $$changed) { if (-not ($$preState -contains $$line)) { $$newChanges += $$line } }; if ($$newChanges.Count -eq 0) { $$diffFiles = @(git diff --name-only); if ($$diffFiles.Count -gt 0) { $$newChanges = $$diffFiles | ForEach-Object { '?? ' + $$_ } } }; if ($$newChanges.Count -gt 0) { if ($$preState.Count -gt 0) { Write-Host ''; Write-Host 'ERROR: Formatting rewrote the following files:' -ForegroundColor Red; $$newChanges | ForEach-Object { Write-Host ('  ' + $$_.Substring(3)) -ForegroundColor Yellow }; Write-Host ''; Write-Host 'You have other uncommitted changes alongside the format fixes. Commit or stash them first, then re-run make pc.' -ForegroundColor Red; exit 1 } else { Write-Host '  Formatting changed files; auto-amending last commit...' -ForegroundColor Yellow; git add -A; git commit --amend --no-edit; Write-Host '  ✓ Format fixes folded into previous commit.' -ForegroundColor Green } }"
 else
 	@pre_state=$$(git status --porcelain -uno); \
-	pnpm exec nx format:write; \
+	pnpm exec prettier --write --ignore-unknown .; \
 	post_state=$$(git status --porcelain -uno); \
 	changed=$$(comm -13 <(echo "$$pre_state" | sort) <(echo "$$post_state" | sort)); \
 	if [ -z "$$changed" ]; then \
