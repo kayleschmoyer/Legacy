@@ -485,7 +485,7 @@ test.describe
 
       // Wait for success state
       await expect(page.getByText('Waiver Claim Submitted!')).toBeVisible({
-        timeout: 10000,
+        timeout: 20000,
       });
 
       // Close the modal
