@@ -835,4 +835,132 @@ describe('Draft Picks - Integration Tests', () => {
       }
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // LS-4191: "Draft Complete!" banner missing after final pick.
+  //
+  // Root cause: getCurrentDraftPickInfo always returned isComplete:false even
+  // after the draft was finished. This kept isMyPick=true on the page that made
+  // the last pick (the 5-second poll returned the phantom "pick N+1" assigned to
+  // the same team as pick N in a snake draft), preventing "Your pick" from hiding
+  // and blocking the wasAccepted check. The fix: return isComplete:true once
+  // draftCompletedAt is set in the drafts row.
+  describe('Draft completion — getCurrentDraftPickInfo.isComplete (LS-4191)', () => {
+    const publicDb = () => db as unknown as PublicDb;
+
+    it('returns isComplete:false while the draft is still in progress', async () => {
+      const { draft } = await seedDraftFixture(2);
+
+      // currentPick=0: no picks made yet — draft is not complete
+      const pickInfo = await getCurrentDraftPickInfo(publicDb(), draft.id);
+      expect(pickInfo).not.toBeNull();
+      expect(pickInfo!.isComplete).toBe(false);
+    });
+
+    it('returns isComplete:false on a mid-draft pick (overallPick < totalPicks)', async () => {
+      const { draft } = await seedDraftFixture(2);
+
+      // Advance to pick 2 of 4 — two more picks remain
+      await db
+        .update(drafts)
+        .set({ currentPick: 2 })
+        .where(eq(drafts.id, draft.id));
+
+      const pickInfo = await getCurrentDraftPickInfo(publicDb(), draft.id);
+      expect(pickInfo).not.toBeNull();
+      expect(pickInfo!.isComplete).toBe(false);
+    });
+
+    it('returns isComplete:true once draftCompletedAt is set (final pick committed)', async () => {
+      // 2 teams × 2 roster slots = 4 total picks.  After commitDraftPick writes
+      // draftCompletedAt the next poll must return isComplete:true so that:
+      //   1. isMyPick collapses to false — "Your pick" hides correctly
+      //   2. useDraftEffects latches draftComplete=true — banner appears without
+      //      requiring a page reload or a WebSocket DraftCompleted event
+      const {
+        league,
+        draft,
+        teams: teamFix,
+        players: playerFix,
+      } = await seedDraftFixture(2);
+
+      await commitDraftPick({
+        tx: publicDb(),
+        draftId: draft.id,
+        leagueId: league.id,
+        pickInfo: {
+          teamId: teamFix[0].id, // snake: pick 4 (round 2, pick 2) → team 0
+          round: 2,
+          pickNumber: 2,
+          overallPick: 4, // equals totalPicks (2 × 2)
+        },
+        playerId: playerFix[0].id,
+        maxRosterSize: 2,
+        pickTimeLimitSeconds: 60,
+        isMockDraft: false,
+      });
+
+      const pickInfo = await getCurrentDraftPickInfo(publicDb(), draft.id);
+      expect(pickInfo).not.toBeNull();
+      expect(pickInfo!.isComplete).toBe(true);
+    });
+
+    it('four-team snake draft: last pick (D, round 2) sets isComplete on next poll', async () => {
+      // In a 4-team snake draft the last pick of round 2 is team D (index 3 in
+      // round 1, index 0 in round 2 reversed).  After it commits, both this team
+      // AND all other teams must see isComplete:true on their next poll — the
+      // old behaviour (hardcoded false) caused team D to see isMyPick=true for
+      // a phantom pick N+1 that was also assigned to them.
+      const {
+        league,
+        draft,
+        teams: teamFix,
+        players: playerFix,
+      } = await seedDraftFixture(4);
+
+      const extraPlayers = await db
+        .insert(players)
+        .values([
+          { firstName: 'Eve', lastName: 'E', brefId: 'eeeee01' },
+          { firstName: 'Frank', lastName: 'F', brefId: 'fffff01' },
+          { firstName: 'Grace', lastName: 'G', brefId: 'ggggg01' },
+          { firstName: 'Hank', lastName: 'H', brefId: 'hhhhh01' },
+        ])
+        .returning();
+
+      const allPlayers = [...playerFix, ...extraPlayers];
+
+      // Snake order for 4 teams × 2 rounds: A B C D | D C B A (indices 0-3,3-0)
+      const expectedTeamIndices = [0, 1, 2, 3, 3, 2, 1, 0];
+
+      for (let i = 0; i < 8; i++) {
+        const pickInfo = await getCurrentDraftPickInfo(publicDb(), draft.id);
+        expect(pickInfo).not.toBeNull();
+
+        await commitDraftPick({
+          tx: publicDb(),
+          draftId: draft.id,
+          leagueId: league.id,
+          pickInfo: pickInfo!,
+          playerId: allPlayers[i].id,
+          maxRosterSize: 2,
+          pickTimeLimitSeconds: 60,
+          isMockDraft: false,
+        });
+
+        const afterPick = await getCurrentDraftPickInfo(publicDb(), draft.id);
+        expect(afterPick).not.toBeNull();
+
+        const isLastPick = i === 7;
+        expect(afterPick!.isComplete).toBe(isLastPick);
+
+        if (!isLastPick) {
+          // Verify next team is also correct while we're here
+          expect(afterPick!.teamId).toBe(
+            teamFix[expectedTeamIndices[i + 1]].id,
+          );
+        }
+      }
+    });
+  });
 });

@@ -286,7 +286,15 @@ export function EliteDraftBoardScreen({
 
   // Check draft completion before any error screens — once the draft is done
   // the available-players query is irrelevant (LS-3823).
-  if (ui.draftComplete || queries.leagueDraft?.draftCompletedAt) {
+  // currentPickInfo?.isComplete is a poll-based fallback: if the DraftCompleted
+  // WebSocket event was missed and leagueDraft hasn't been refetched yet, the 5-second
+  // GET_CURRENT_DRAFT_PICK poll returns isComplete:true once draftCompletedAt lands in
+  // the DB, triggering the banner without requiring a page reload (LS-4191).
+  if (
+    ui.draftComplete ||
+    queries.leagueDraft?.draftCompletedAt ||
+    queries.currentPickInfo?.isComplete
+  ) {
     return (
       <DraftCompleteView
         league={

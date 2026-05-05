@@ -44,12 +44,22 @@ export function useDraftEffects({
   setLiveMessage,
   setPlayerSearch,
 }: UseDraftEffectsParams) {
-  // Mark draft complete when server data indicates it
+  // Mark draft complete when server data indicates it (either source)
   useEffect(() => {
     if (leagueDraft?.draftCompletedAt) {
       setDraftComplete(true);
     }
   }, [leagueDraft?.draftCompletedAt, setDraftComplete]);
+
+  // Mark draft complete when the current-pick poll signals completion.
+  // getCurrentDraftPickInfo returns isComplete:true once draftCompletedAt is set
+  // in the DB, so this fires within one 5-second poll cycle even if the
+  // DraftCompletedNotification WebSocket event was missed (LS-4191).
+  useEffect(() => {
+    if (currentPickInfo?.isComplete) {
+      setDraftComplete(true);
+    }
+  }, [currentPickInfo?.isComplete, setDraftComplete]);
 
   // Detect paused status from league data
   useEffect(() => {

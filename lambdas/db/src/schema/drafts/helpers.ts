@@ -221,7 +221,11 @@ export async function getCurrentDraftPickInfo(
     round,
     pickNumber: pickInRound,
     overallPick: currentOverallPick,
-    isComplete: false,
+    // True once the draft has been marked complete in the DB (draftCompletedAt set).
+    // Previously hardcoded false, which caused the 5-second poll to never signal
+    // completion and kept isMyPick=true for the team assigned the phantom "next" pick
+    // (LS-4191).
+    isComplete: draft.draftCompletedAt != null,
   };
 }
 
