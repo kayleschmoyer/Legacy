@@ -72,12 +72,29 @@ permissions:
   id-token: write
 
 jobs:
-  sha-sanity:
-    name: "🔐 SHA Sanity Check"
+  # The "🔐 SHA Sanity Check" check-run is owned by .github/workflows/check-conflicts.yml
+  # to avoid a duplicate row on PR check rollups (LS-4199). The diagnostic SHA
+  # verification still runs here as a step inside determine-scope so coverage on
+  # merge_group / workflow_dispatch events (which check-conflicts does not see)
+  # is preserved — but as a step it does not surface as a separate check-run.
+
+  determine-scope:
+    name: "🔍 Determine Workflow Scope"
     runs-on: ubuntu-latest
-    timeout-minutes: 1
+    if: |
+      github.event_name == 'merge_group' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request_review' &&
+       github.event.review.user.login == 'legacy-sports-review-bot[bot]' &&
+       github.event.review.state == 'approved')
+    outputs:
+      run-security: ${{ steps.scope.outputs.run-security }}
+      security-scan-type: ${{ steps.scope.outputs.security-scan-type }}
+      runner-label: ${{ steps.runner-access.outputs.runner-label }}
+      ci-already-passed: ${{ steps.check-prior-success.outputs.ci-already-passed }}
+
     steps:
-      - name: Verify head SHA still matches event SHA
+      - name: "🔐 Verify head SHA still matches event SHA"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
@@ -104,23 +121,6 @@ jobs:
           fi
           echo "SHA still current; proceeding"
 
-  determine-scope:
-    name: "🔍 Determine Workflow Scope"
-    needs: [sha-sanity]
-    runs-on: ubuntu-latest
-    if: |
-      github.event_name == 'merge_group' ||
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'pull_request_review' &&
-       github.event.review.user.login == 'legacy-sports-review-bot[bot]' &&
-       github.event.review.state == 'approved')
-    outputs:
-      run-security: ${{ steps.scope.outputs.run-security }}
-      security-scan-type: ${{ steps.scope.outputs.security-scan-type }}
-      runner-label: ${{ steps.runner-access.outputs.runner-label }}
-      ci-already-passed: ${{ steps.check-prior-success.outputs.ci-already-passed }}
-
-    steps:
       - name: "🚀 Checkout Repository"
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
