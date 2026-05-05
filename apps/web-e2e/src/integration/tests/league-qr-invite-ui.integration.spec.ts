@@ -120,12 +120,14 @@ test.describe
     });
 
     await test.step('"Share Link" section shows a URL containing the join path', async () => {
-      // The invite URL rendered inside the Share Link box contains /baseball/league/join/
-      const urlBox = page
-        .locator('text=/\\/baseball\\/league\\/join\\//')
-        .first();
-      await expect(urlBox).toBeVisible({ timeout: 15_000 });
-      const displayedUrl = (await urlBox.textContent()) ?? '';
+      // The invite URL is rendered as a read-only input value inside the Invite Link section.
+      // Text locators don't match input values — use the .ls-invite-link scoped input instead.
+      const urlInput = page
+        .locator('.ls-invite-link')
+        .first()
+        .locator('input[readonly]');
+      await expect(urlInput).toBeVisible({ timeout: 15_000 });
+      const displayedUrl = await urlInput.inputValue();
       expect(displayedUrl).toMatch(/\/baseball\/league\/join\/[A-Z0-9]+/);
       state.inviteUrl = displayedUrl.trim();
     });
@@ -134,9 +136,13 @@ test.describe
       await expect(page.getByText('Invite Code', { exact: false })).toBeVisible(
         { timeout: 10_000 },
       );
-      const codeLocator = page.locator('text=/^[A-Z0-9]{8}$/').first();
-      await expect(codeLocator).toBeVisible({ timeout: 10_000 });
-      state.inviteCode = (await codeLocator.textContent()) ?? '';
+      // The invite code is also a read-only input — the second .ls-invite-link container.
+      const codeInput = page
+        .locator('.ls-invite-link')
+        .nth(1)
+        .locator('input[readonly]');
+      await expect(codeInput).toBeVisible({ timeout: 10_000 });
+      state.inviteCode = await codeInput.inputValue();
       expect(state.inviteCode).toMatch(/^[A-Z0-9]{8}$/);
     });
   });
