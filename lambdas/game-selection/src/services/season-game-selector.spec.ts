@@ -18,7 +18,21 @@ jest.mock('@legacy-sports/utils', () => ({
   cryptoRandomFloat: jest.fn(() => 0.5),
 }));
 
+const mockGetMatchupPlayerGameStats = jest.fn().mockResolvedValue([]);
+const mockGetScoringMultipliersForLeague = jest.fn().mockResolvedValue({
+  batting: {},
+  pitching: {},
+  fielding: {},
+});
+const mockUpdateMatchupScore = jest.fn().mockResolvedValue(undefined);
+
 jest.mock('@legacy-sports/db-client', () => ({
+  getMatchupPlayerGameStats: (...args: unknown[]) =>
+    mockGetMatchupPlayerGameStats(...args) as unknown,
+  getScoringMultipliersForLeague: (...args: unknown[]) =>
+    mockGetScoringMultipliersForLeague(...args) as unknown,
+  updateMatchupScore: (...args: unknown[]) =>
+    mockUpdateMatchupScore(...args) as unknown,
   PublicSchema: {
     gameBatting: {
       playerId: 'playerId',
@@ -57,6 +71,25 @@ jest.mock('@legacy-sports/db-client', () => ({
     },
     leaguePosition: { id: 'id', positionType: 'positionType' },
   },
+}));
+
+const mockCalculateMatchupScore = jest.fn().mockReturnValue({
+  matchupId: 1,
+  team1Score: { totalScore: 10.5, gamesSelected: 1 },
+  team2Score: { totalScore: 8.0, gamesSelected: 1 },
+  gamesPerMatchup: 2,
+});
+const mockGetDefaultScoringSettings = jest.fn().mockReturnValue({
+  batting: {},
+  pitching: {},
+  fielding: {},
+});
+
+jest.mock('@legacy-sports/scoring', () => ({
+  calculateMatchupScore: (...args: unknown[]) =>
+    mockCalculateMatchupScore(...args) as unknown,
+  getDefaultScoringSettings: (...args: unknown[]) =>
+    mockGetDefaultScoringSettings(...args) as unknown,
 }));
 
 jest.mock('drizzle-orm', () => ({
@@ -512,6 +545,177 @@ describe('season-game-selector', () => {
       // Player was skipped - no season assigned
       expect(insertValues).not.toHaveBeenCalled();
       expect(playersNeedingStatsLoading).toHaveLength(0);
+    });
+
+    it('calculates and persists scores before marking completed when all stats are cached (regression: LS-4145)', async () => {
+      // Reproduces the LS-3817 race condition in the cached-stats path:
+      // when all players already have stats in the DB (e.g. week 2 reuses
+      // week 1 data), the game-selection lambda sets statsLoadingStatus =
+      // 'completed' directly without invoking the stats-lambda. Without the
+      // fix, team1Score / team2Score stay null because calculateMatchupScore
+      // was never called for that matchup.
+
+      jest.clearAllMocks();
+      mockGetMatchupPlayerGameStats.mockResolvedValue([]);
+      mockGetScoringMultipliersForLeague.mockResolvedValue({
+        batting: {},
+        pitching: {},
+        fielding: {},
+      });
+      mockCalculateMatchupScore.mockReturnValue({
+        matchupId: 1,
+        team1Score: { totalScore: 12.5, gamesSelected: 2 },
+        team2Score: { totalScore: 9.0, gamesSelected: 2 },
+        gamesPerMatchup: 2,
+      });
+
+      let selectIndex = 0;
+      const mockUpdateSet = jest.fn().mockReturnValue({
+        where: jest.fn().mockResolvedValue(undefined),
+      });
+      const mockUpdate = jest.fn().mockReturnValue({ set: mockUpdateSet });
+
+      const selectResults = [
+        // 1. get matchup (all stats cached path)
+        [
+          {
+            id: 1,
+            leagueId: 10,
+            weekNumber: 2,
+            team1Id: 5,
+            team2Id: 6,
+            spStartsPerMatchup: 1,
+            gamesPerMatchup: 2,
+          },
+        ],
+        // 2. get matchup players
+        [{ id: 200, playerId: 99, matchupId: 1 }],
+        // 3. get player seasons
+        [{ playerId: 99, season: 2020 }],
+        // 4. batch pitcher roles
+        [],
+        // 5. existingGames check — already has games (skip)
+        [{ gameNum: 1, matchupPlayerId: 200 }],
+      ];
+
+      const mockDb = {
+        select: jest.fn().mockImplementation(() => {
+          const result = selectResults[selectIndex++] ?? [];
+          return {
+            from: jest.fn().mockReturnValue({
+              where: jest.fn().mockReturnValue({
+                limit: jest.fn().mockReturnValue(result),
+                then: (cb: (rows: unknown[]) => unknown) =>
+                  Promise.resolve(cb(result)),
+                ...result,
+              }),
+              innerJoin: jest.fn().mockReturnValue({
+                where: jest.fn().mockReturnValue(result),
+              }),
+            }),
+          };
+        }),
+        update: mockUpdate,
+        insert: jest.fn().mockReturnValue({
+          values: jest.fn().mockResolvedValue(undefined),
+        }),
+      } as unknown as PublicDb;
+
+      const { playersNeedingStatsLoading } = await selectGamesForMatchup(
+        mockDb,
+        1,
+        1,
+      );
+
+      // All stats were cached → no players queued for loading
+      expect(playersNeedingStatsLoading).toHaveLength(0);
+
+      // Score calculation must run before statsLoadingStatus is set to 'completed'
+      expect(mockGetMatchupPlayerGameStats).toHaveBeenCalledWith(mockDb, 1);
+      expect(mockCalculateMatchupScore).toHaveBeenCalled();
+      expect(mockUpdateMatchupScore).toHaveBeenCalledWith(mockDb, 1, 12.5, 9.0);
+
+      // statsLoadingStatus must be set to 'completed' after scores are persisted
+      expect(mockUpdateSet).toHaveBeenCalledWith({
+        statsLoadingStatus: 'completed',
+      });
+
+      // Verify ordering: updateMatchupScore before the 'completed' status update.
+      // Note: mockUpdateSet[0] is the 'loading' call at function start; [1] is 'completed'.
+      const updateScoreOrder =
+        mockUpdateMatchupScore.mock.invocationCallOrder[0];
+      const completedStatusIndex = (
+        mockUpdateSet.mock.calls as Array<[Record<string, unknown>]>
+      ).findIndex(([firstArg]) => firstArg?.statsLoadingStatus === 'completed');
+      const updateStatusOrder =
+        mockUpdateSet.mock.invocationCallOrder[completedStatusIndex];
+      expect(updateScoreOrder).toBeLessThan(updateStatusOrder);
+    });
+
+    it('does not mark statsLoadingStatus completed when score calculation fails (regression: LS-4145)', async () => {
+      jest.clearAllMocks();
+      const calcError = new Error('DB connection failed');
+      mockGetMatchupPlayerGameStats.mockRejectedValue(calcError);
+
+      let selectIndex = 0;
+      const mockUpdateSet = jest.fn().mockReturnValue({
+        where: jest.fn().mockResolvedValue(undefined),
+      });
+      const mockUpdate = jest.fn().mockReturnValue({ set: mockUpdateSet });
+
+      const selectResults = [
+        [
+          {
+            id: 1,
+            leagueId: 10,
+            weekNumber: 2,
+            team1Id: 5,
+            team2Id: 6,
+            spStartsPerMatchup: 1,
+            gamesPerMatchup: 2,
+          },
+        ],
+        [{ id: 200, playerId: 99, matchupId: 1 }],
+        [{ playerId: 99, season: 2020 }],
+        [],
+        // existingGames check — already has games so playersNeedingStatsLoading stays empty
+        [{ gameNum: 1, matchupPlayerId: 200 }],
+      ];
+
+      const mockDb = {
+        select: jest.fn().mockImplementation(() => {
+          const result = selectResults[selectIndex++] ?? [];
+          return {
+            from: jest.fn().mockReturnValue({
+              where: jest.fn().mockReturnValue({
+                limit: jest.fn().mockReturnValue(result),
+                then: (cb: (rows: unknown[]) => unknown) =>
+                  Promise.resolve(cb(result)),
+                ...result,
+              }),
+              innerJoin: jest.fn().mockReturnValue({
+                where: jest.fn().mockReturnValue(result),
+              }),
+            }),
+          };
+        }),
+        update: mockUpdate,
+        insert: jest.fn().mockReturnValue({
+          values: jest.fn().mockResolvedValue(undefined),
+        }),
+      } as unknown as PublicDb;
+
+      await expect(selectGamesForMatchup(mockDb, 1, 1)).rejects.toThrow(
+        'DB connection failed',
+      );
+
+      // statsLoadingStatus must NOT be set to 'completed' when scoring fails
+      const setArgs = (
+        mockUpdateSet.mock.calls as Array<[Record<string, unknown>]>
+      ).map(([firstArg]) => firstArg);
+      expect(setArgs).not.toContainEqual(
+        expect.objectContaining({ statsLoadingStatus: 'completed' }),
+      );
     });
   });
 });

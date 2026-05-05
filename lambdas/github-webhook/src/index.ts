@@ -195,7 +195,10 @@ export const handler = async (
       LOGGER.info('Handled GitHub webhook event', { result });
       return json(200, { status: 'ok', result });
     } catch (error) {
-      LOGGER.error('Error handling GitHub webhook event', error);
+      LOGGER.error(
+        'Error handling GitHub webhook event',
+        error instanceof Error ? error : new Error(String(error)),
+      );
       return json(500, { error: 'Internal server error' });
     }
   }

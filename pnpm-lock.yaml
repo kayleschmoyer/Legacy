@@ -994,6 +994,9 @@ importers:
       '@legacy-sports/rollbar':
         specifier: workspace:*
         version: link:../../lib/rollbar
+      '@legacy-sports/scoring':
+        specifier: workspace:*
+        version: link:../../lib/scoring
       '@legacy-sports/utils':
         specifier: workspace:*
         version: link:../../lib/utils

@@ -1,5 +1,17 @@
-import { PublicDb, PublicSchema } from '@legacy-sports/db-client';
+import {
+  getMatchupPlayerGameStats,
+  getScoringMultipliersForLeague,
+  PublicDb,
+  PublicSchema,
+  updateMatchupScore,
+} from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
+import {
+  calculateMatchupScore,
+  getDefaultScoringSettings,
+  type PlayerGameStats,
+  type ScoringSettings,
+} from '@legacy-sports/scoring';
 import { cryptoRandomFloat, cryptoRandomInt } from '@legacy-sports/utils';
 import {
   and,
@@ -24,6 +36,151 @@ export interface GameSelectionResult {
 
 /** Player's roster position type for game selection purposes */
 type PitcherRole = 'SP' | 'RP' | 'non-pitcher';
+
+/**
+ * Calculate and persist matchup scores using already-cached player game stats.
+ *
+ * Called from the "all stats cached" path in selectGamesForMatchup so that
+ * team1Score / team2Score are written to the matchups row *before*
+ * statsLoadingStatus is set to 'completed'. Without this, any consumer
+ * polling statsLoadingStatus would see 'completed' while the scores are
+ * still null — the same race condition fixed by LS-3817 for the uncached path.
+ */
+async function computeAndPersistMatchupScores(
+  db: PublicDb,
+  matchupId: number,
+  leagueId: number,
+  team1Id: number | null,
+  team2Id: number | null,
+  gamesPerMatchup: number | null,
+): Promise<void> {
+  try {
+    const rawMultipliers = await getScoringMultipliersForLeague(db, leagueId);
+    const toCamelCase = (
+      record: Record<string, number>,
+    ): Record<string, number> => {
+      const out: Record<string, number> = {};
+      for (const [k, v] of Object.entries(record)) {
+        out[k.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())] = v;
+      }
+      return out;
+    };
+    const scoringSettings: ScoringSettings = rawMultipliers
+      ? {
+          batting: toCamelCase(rawMultipliers.batting),
+          pitching: toCamelCase(rawMultipliers.pitching),
+          fielding: toCamelCase(rawMultipliers.fielding),
+        }
+      : getDefaultScoringSettings();
+
+    const statsRows = await getMatchupPlayerGameStats(db, matchupId);
+    const team1Stats = new Map<number, PlayerGameStats[]>();
+    const team2Stats = new Map<number, PlayerGameStats[]>();
+
+    for (const stat of statsRows) {
+      const entry: PlayerGameStats = {
+        playerId: stat.playerId,
+        season: stat.season,
+        gameNum: stat.gameNum,
+        batting: stat.battingStats
+          ? {
+              pa: stat.battingStats.pa,
+              ab: stat.battingStats.ab,
+              r: stat.battingStats.r,
+              h: stat.battingStats.h,
+              doubles: stat.battingStats.doubles,
+              triples: stat.battingStats.triples,
+              hr: stat.battingStats.hr,
+              rbi: stat.battingStats.rbi,
+              sb: stat.battingStats.sb,
+              cs: stat.battingStats.cs,
+              bb: stat.battingStats.bb,
+              so: stat.battingStats.so,
+              gidp: stat.battingStats.gidp,
+              hbp: stat.battingStats.hbp,
+              sh: stat.battingStats.sh,
+              sf: stat.battingStats.sf,
+              ibb: stat.battingStats.ibb,
+            }
+          : undefined,
+        pitching: stat.pitchingStats
+          ? {
+              w: stat.pitchingStats.w,
+              l: stat.pitchingStats.l,
+              gs: stat.pitchingStats.gs,
+              gf: stat.pitchingStats.gf,
+              cg: stat.pitchingStats.cg,
+              sho: stat.pitchingStats.sho,
+              sv: stat.pitchingStats.sv,
+              ip: stat.pitchingStats.ip,
+              h: stat.pitchingStats.h,
+              r: stat.pitchingStats.r,
+              er: stat.pitchingStats.er,
+              hr: stat.pitchingStats.hr,
+              bb: stat.pitchingStats.bb,
+              ibb: stat.pitchingStats.ibb,
+              so: stat.pitchingStats.so,
+              hbp: stat.pitchingStats.hbp,
+              battersFaced: stat.pitchingStats.battersFaced,
+              outsRecorded: stat.pitchingStats.outsRecorded,
+            }
+          : undefined,
+        fielding: stat.fieldingStats
+          ? {
+              innDef: stat.fieldingStats.innDef,
+              chances: stat.fieldingStats.chances,
+              po: stat.fieldingStats.po,
+              a: stat.fieldingStats.a,
+              eDef: stat.fieldingStats.eDef,
+              dpDef: stat.fieldingStats.dpDef,
+            }
+          : undefined,
+      };
+
+      if (stat.teamId === team1Id) {
+        const existing = team1Stats.get(stat.playerId);
+        if (existing) existing.push(entry);
+        else team1Stats.set(stat.playerId, [entry]);
+      } else if (stat.teamId === team2Id) {
+        const existing = team2Stats.get(stat.playerId);
+        if (existing) existing.push(entry);
+        else team2Stats.set(stat.playerId, [entry]);
+      }
+    }
+
+    const scores = calculateMatchupScore(
+      matchupId,
+      team1Id,
+      team2Id,
+      team1Stats,
+      team2Stats,
+      gamesPerMatchup ?? 5,
+      scoringSettings,
+    );
+
+    await updateMatchupScore(
+      db,
+      matchupId,
+      scores.team1Score?.totalScore ?? null,
+      scores.team2Score?.totalScore ?? null,
+    );
+
+    LOGGER.info(
+      `Calculated scores for matchup ${matchupId} (all-cached path)`,
+      {
+        team1Score: scores.team1Score?.totalScore ?? null,
+        team2Score: scores.team2Score?.totalScore ?? null,
+      },
+    );
+  } catch (err) {
+    LOGGER.error(
+      `Failed to calculate scores for matchup ${matchupId} (all-cached path)`,
+      err instanceof Error ? err : new Error(String(err)),
+      { matchupId },
+    );
+    throw err;
+  }
+}
 
 /**
  * Get the primary fielding position for a player in a season.
@@ -719,8 +876,21 @@ export async function selectGamesForMatchup(
     }
   }
 
-  // If all players had cached stats, set matchup to completed immediately
+  // If all players had cached stats, calculate scores then mark completed.
+  // Scores must be persisted before statsLoadingStatus = 'completed' so that
+  // any consumer polling that field sees non-null scores immediately — the
+  // same ordering guarantee enforced by LS-3817 in the uncached (stats-lambda)
+  // path.
   if (playersNeedingStatsLoading.length === 0) {
+    await computeAndPersistMatchupScores(
+      db,
+      matchupId,
+      matchup.leagueId,
+      matchup.team1Id,
+      matchup.team2Id,
+      matchup.gamesPerMatchup,
+    );
+
     await db
       .update(PublicSchema.matchups)
       .set({ statsLoadingStatus: 'completed' })
