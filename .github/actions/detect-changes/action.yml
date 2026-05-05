@@ -66,8 +66,11 @@ runs:
         git branch -r || true
         git log --oneline -5 || true
 
-        if [ "${{ github.event_name }}" = "pull_request" ]; then
-          # For PRs, use the base branch (target branch)
+        if [[ "${{ github.event_name }}" =~ ^pull_request ]]; then
+          # For PR-context events (pull_request, pull_request_review,
+          # pull_request_review_comment, pull_request_target), the canonical
+          # base is the PR's target-branch SHA, present on the payload for all
+          # of them. This matches what GitHub's listFiles API uses internally.
           BASE_REF="${{ github.event.pull_request.base.sha }}"
           echo "Using PR base SHA: $BASE_REF"
         elif [ "${{ github.event_name }}" = "push" ]; then
@@ -207,8 +210,13 @@ runs:
 
     - name: "Detect Changed Files"
       id: detect-changes
+      # token: '' forces local git diff instead of the GitHub API (listFiles).
+      # For pull_request* events, paths-filter calls the API by default, which
+      # consumes the shared 5,000/hr installation rate limit. With fetch-depth: 0
+      # in checkout above, local git has the full history needed for the diff.
       uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4
       with:
+        token: ""
         base: ${{ steps.determine-base.outputs.base-ref }}
         ref: ${{ steps.determine-base.outputs.head-ref }}
         # Broad source-category filters only. Nx `affected` handles fine-grained
