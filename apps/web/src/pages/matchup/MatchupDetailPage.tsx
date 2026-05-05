@@ -262,10 +262,15 @@ export function MatchupDetailPage() {
 
       {/* Roster Editor — shown when the matchup is scheduled or in progress */}
       {userTeamId &&
+        leagueIdNum &&
         (matchup.status === MatchupStatus.Scheduled ||
           matchup.status === MatchupStatus.InProgress) &&
         (matchup.team1Id === userTeamId || matchup.team2Id === userTeamId) && (
-          <MatchupRosterEditor matchup={matchup} userTeamId={userTeamId} />
+          <MatchupRosterEditor
+            matchup={matchup}
+            userTeamId={userTeamId}
+            leagueId={leagueIdNum}
+          />
         )}
 
       {/* Narrative Recap — shown only for completed matchups */}

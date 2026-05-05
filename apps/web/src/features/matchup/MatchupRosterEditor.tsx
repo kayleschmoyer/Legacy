@@ -27,6 +27,12 @@ const parseId = (id: string | null | undefined): number => {
 export interface MatchupRosterEditorProps {
   matchup: MatchupFragment;
   userTeamId: number;
+  /**
+   * League ID sourced from the URL param — passed explicitly so the positions
+   * query never falls back to `matchup.leagueId ?? 0` (which is nullable in the
+   * generated GQL types and would silently skip the query, leaving STARTERS empty).
+   */
+  leagueId: number;
   /** When true the lineup is displayed read-only (e.g. matchup is in-progress). */
   locked?: boolean;
 }
@@ -41,6 +47,7 @@ export interface MatchupRosterEditorProps {
 export function MatchupRosterEditor({
   matchup,
   userTeamId,
+  leagueId,
   locked = false,
 }: MatchupRosterEditorProps) {
   // ── Fetch data ──────────────────────────────────────────────────────────
@@ -48,8 +55,6 @@ export function MatchupRosterEditor({
     typeof matchup.id === 'string'
       ? parseInt(matchup.id, 10)
       : (matchup.id ?? 0);
-
-  const leagueId = matchup.leagueId ?? 0;
 
   const {
     data: playersData,
