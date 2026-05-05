@@ -445,6 +445,22 @@ export function LeagueScoringEditor(
       return;
     }
 
+    // Validate every field before saving. handleValueChange only runs validation
+    // on user input, so fields that started blank (e.g. a stat whose server-side
+    // multiplier is non-finite) never have their errors set. Without this guard,
+    // valuesToUpdates silently drops those fields from the save payload.
+    const freshErrors: FieldErrorState = {};
+    let hasAnyError = false;
+    for (const stat of stats) {
+      const err = validateStat(stat, formValues[stat.id]);
+      freshErrors[stat.id] = err;
+      if (err !== null) hasAnyError = true;
+    }
+    if (hasAnyError) {
+      setFieldErrors(freshErrors);
+      return;
+    }
+
     // Snapshot the updates, current baseline, and current form values before the
     // async gap — state may change mid-flight and we need them for rollback on
     // error so the user's edits are fully restored.
