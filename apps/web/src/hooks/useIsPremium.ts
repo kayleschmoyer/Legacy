@@ -27,6 +27,7 @@ export function useIsPremiumStatus(): {
   const { data, loading: userLoading } = useGetUserByIdQuery({
     variables: { id: user?.id ?? 0 },
     skip: !user?.id,
+    pollInterval: 5 * 60 * 1000, // re-fetch so Stripe cancellations take effect mid-session
   });
 
   const isLoading = authLoading || userLoading;

@@ -92,4 +92,21 @@ describe('useIsPremiumStatus', () => {
     expect(result.current.isPremium).toBe(false);
     expect(result.current.isLoading).toBe(false);
   });
+
+  it('polls every 5 minutes so mid-session cancellations take effect', () => {
+    useAuth.mockReturnValue({
+      user: { id: 42, accessLevel: 'user' },
+      isLoading: false,
+    });
+    useGetUserByIdQuery.mockReturnValue({
+      data: { user: { subscriptionTier: 'premium' } },
+      loading: false,
+    });
+
+    renderHook(() => useIsPremiumStatus());
+
+    expect(useGetUserByIdQuery).toHaveBeenCalledWith(
+      expect.objectContaining({ pollInterval: 5 * 60 * 1000 }),
+    );
+  });
 });
