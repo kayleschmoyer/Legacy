@@ -650,21 +650,22 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
         return;
       }
 
-      // 405 with "N of M required status checks are expected" means branch
-      // protection is waiting for required checks to register against this
-      // SHA — i.e. CI is still spinning up. Treat as pending and re-queue,
+      // 405 with either "N of M required status checks are expected" or
+      // "N of M required status checks have not succeeded" means branch
+      // protection is waiting for required checks against this SHA — i.e.
+      // CI is still registering or in-progress. Treat as pending and re-queue,
       // mirroring the 422 head-modified fast path. Other 405 causes propagate.
       const mergeErrMsg =
         (error.response?.data?.message ?? '') + '\n' + (error.message ?? '');
       if (
         error.status === 405 &&
-        /\d+ of \d+ required status checks? (are|is) expected/i.test(
+        /\d+ of \d+ required status checks? (?:(?:are|is) expected|(?:have|has) not succeeded)/i.test(
           mergeErrMsg,
         )
       ) {
         console.log(
-          `⏳ PR #${pr.number}: merge rejected with 405 (required checks not yet registered) — ` +
-            `CI still spinning up. Will re-evaluate on next trigger.`,
+          `⏳ PR #${pr.number}: merge rejected with 405 (required checks pending) — ` +
+            `CI still registering or in-progress. Will re-evaluate on next trigger.`,
         );
         hasPendingPRs = true;
         return;

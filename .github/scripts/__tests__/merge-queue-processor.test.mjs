@@ -437,6 +437,53 @@ describe('merge-queue-processor — 405 required-checks-expected handling (LS-41
     );
   });
 
+  it('treats 405 "N of M required status checks have not succeeded" as pending — no error comment, no throw (LS-4184)', async () => {
+    const { github, calls } = makeGithub({
+      reviews: [
+        { user: { login: 'legacy-sports-review-bot[bot]' }, state: 'APPROVED' },
+      ],
+      unresolvedThreads: [],
+    });
+    github.rest.pulls.merge = async () => {
+      calls.merges.push({});
+      throw Object.assign(new Error('Repository rule violations found'), {
+        status: 405,
+        response: {
+          data: {
+            message:
+              'Repository rule violations found\n\n' +
+              '5 of 7 required status checks have not succeeded: .',
+          },
+        },
+      });
+    };
+
+    await assert.doesNotReject(
+      () =>
+        processor({
+          github,
+          context,
+          isDryRun: false,
+          forceCheck: false,
+          isRetry: false,
+        }),
+      'processor should not throw when checks-pending race occurs',
+    );
+
+    assert.strictEqual(
+      calls.merges.length,
+      1,
+      'merge attempt should have been made',
+    );
+    assert.strictEqual(
+      calls.comments.filter((c) =>
+        c.body?.includes('Merge Queue Processing Error'),
+      ).length,
+      0,
+      'should NOT post a Processing Error comment for the pending-checks race',
+    );
+  });
+
   it('still surfaces other 405 causes as real errors with a comment', async () => {
     const { github, calls } = makeGithub({
       reviews: [
