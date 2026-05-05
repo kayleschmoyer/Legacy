@@ -29,14 +29,12 @@ on:
     branches-ignore:
       - main
 
-  # Cleanup still needs the pull_request trigger (workflow_run doesn't fire on close)
+  # Cleanup still needs the pull_request trigger (workflow_run doesn't fire on close).
+  # No paths filter here — cleanup must fire on every PR close regardless of what
+  # files were touched, so previews and playwright-report/pr-N/ dirs for PRs that
+  # never touched web paths still get removed.
   pull_request:
     types: [closed]
-    paths:
-      - "apps/web/**"
-      - "lib/shared-components/**"
-      - "lib/ui-abstractions/**"
-      - ".github/workflows/deploy-pr-preview.yml"
 
 concurrency:
   # Use PR number for both event types so deploy (workflow_run) and cleanup
