@@ -470,51 +470,58 @@ jobs:
         run: |
           set -euo pipefail
           REPO_URL="https://x-access-token:${DEPLOY_TOKEN}@github.com/bkrupa/legacy-sports-deploys.git"
+          WORKSPACE="$(pwd)"
+          REPORT_SRC="${WORKSPACE}/playwright-report"
 
-          # Retry clone to handle transient GitHub App token propagation delays.
-          # The token mint and clone race — GitHub's auth backend may not have
-          # propagated the new installation token by the time git clone fires,
-          # causing a spurious "repository not found" (~once per PR).
-          CLONE_RETRIES=5
-          for attempt in $(seq 1 $CLONE_RETRIES); do
-            rm -rf _deploy
-            if git clone --depth 1 --single-branch --branch gh-pages "$REPO_URL" _deploy; then
-              break
-            fi
-            [ "$attempt" -eq "$CLONE_RETRIES" ] && { echo "Clone failed after ${CLONE_RETRIES} attempts"; exit 1; }
-            echo "Clone attempt ${attempt} failed — retrying in ${attempt}s..."
-            sleep "$attempt"
-          done
-          cd _deploy
-
-          rm -rf "${DEST_DIR}"
-          mkdir -p "${DEST_DIR}"
-          cp -r ../playwright-report/. "${DEST_DIR}/"
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .
-
-          if git diff --cached --quiet; then
-            echo "No changes to deploy"
-            exit 0
-          fi
-
-          git commit -m "deploy ${DEST_DIR}"
-
-          # Push with pull-rebase retry to handle races from other workflows
-          # pushing to the same gh-pages branch between our clone and push.
-          # Jitter avoids thundering-herd when multiple deploys retry together.
           MAX_RETRIES=7
           for attempt in $(seq 1 $MAX_RETRIES); do
-            if git push origin gh-pages; then
+            rm -rf "${WORKSPACE}/_deploy"
+            # Retry clone to handle transient GitHub App token propagation delays
+            # (~once per PR the token hasn't propagated by the time git clone fires).
+            CLONE_OK=false
+            for clone_attempt in $(seq 1 3); do
+              if git clone --depth 1 --single-branch --branch gh-pages "$REPO_URL" "${WORKSPACE}/_deploy" 2>/dev/null; then
+                CLONE_OK=true; break
+              fi
+              echo "Clone attempt ${clone_attempt} failed — retrying in ${clone_attempt}s..."
+              sleep "$clone_attempt"
+            done
+            if [ "$CLONE_OK" != "true" ]; then
+              cd "${WORKSPACE}"
+              JITTER=$((RANDOM % 5))
+              echo "Clone failed on attempt ${attempt} — retrying in $((attempt * 2 + JITTER))s..."
+              sleep $((attempt * 2 + JITTER))
+              continue
+            fi
+
+            rm -rf "${WORKSPACE}/_deploy/${DEST_DIR}"
+            mkdir -p "${WORKSPACE}/_deploy/${DEST_DIR}"
+            cp -r "${REPORT_SRC}/." "${WORKSPACE}/_deploy/${DEST_DIR}/"
+
+            cd "${WORKSPACE}/_deploy"
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add .
+
+            if git diff --cached --quiet; then
+              echo "No changes to deploy"
+              exit 0
+            fi
+
+            # Squash all history: orphan commit keeps the deploy repo at constant size.
+            git checkout --orphan squashed
+            git add -A
+            git commit -m "deploy ${DEST_DIR}"
+
+            if git push --force origin squashed:gh-pages; then
               echo "Push succeeded (attempt ${attempt})"
               exit 0
             fi
+
+            cd "${WORKSPACE}"
             JITTER=$((RANDOM % 5))
             echo "Push failed (attempt ${attempt}) — retrying in $((attempt * 2 + JITTER))s..."
             sleep $((attempt * 2 + JITTER))
-            git pull --rebase origin gh-pages
           done
 
           echo "Push failed after ${MAX_RETRIES} attempts"

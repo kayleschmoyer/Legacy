@@ -111,37 +111,48 @@ jobs:
         run: |
           set -euo pipefail
           REPO_URL="https://x-access-token:${DEPLOY_TOKEN}@github.com/${{ env.DEPLOY_REPO }}.git"
+          WORKSPACE="$(pwd)"
+          STORYBOOK_SRC="${WORKSPACE}/dist/storybook"
 
-          git clone --depth 1 --single-branch --branch gh-pages "$REPO_URL" _deploy
-          cd _deploy
-
-          rm -rf storybook
-          mkdir -p storybook
-          cp -r ../dist/storybook/. storybook/
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .
-
-          if git diff --cached --quiet; then
-            echo "No changes to deploy"
-            exit 0
-          fi
-
-          git commit -m "deploy storybook"
-
-          # Push with pull-rebase retry to handle races from other workflows
-          # pushing to the same gh-pages branch between our clone and push.
+          # Each attempt re-clones the current gh-pages state so we incorporate
+          # concurrent pushes from other workflows before force-pushing our squash
+          # commit. Using orphan commits keeps the deploy repo at a constant size
+          # regardless of deployment frequency — git history is not retained.
           MAX_RETRIES=7
           for attempt in $(seq 1 $MAX_RETRIES); do
-            if git push origin gh-pages; then
+            rm -rf "${WORKSPACE}/_deploy"
+            git clone --depth 1 --single-branch --branch gh-pages "$REPO_URL" "${WORKSPACE}/_deploy"
+
+            rm -rf "${WORKSPACE}/_deploy/storybook"
+            mkdir -p "${WORKSPACE}/_deploy/storybook"
+            cp -r "${STORYBOOK_SRC}/." "${WORKSPACE}/_deploy/storybook/"
+
+            cd "${WORKSPACE}/_deploy"
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add .
+
+            if git diff --cached --quiet; then
+              echo "No changes to deploy"
+              exit 0
+            fi
+
+            # Squash all history: create an orphan commit with the full current
+            # state (storybook + any pr-N/ previews we just cloned). Force-push
+            # replaces the entire branch history with this single commit.
+            git checkout --orphan squashed
+            git add -A
+            git commit -m "deploy storybook"
+
+            if git push --force origin squashed:gh-pages; then
               echo "Push succeeded (attempt ${attempt})"
               exit 0
             fi
+
+            cd "${WORKSPACE}"
             JITTER=$((RANDOM % 5))
             echo "Push failed (attempt ${attempt}) — retrying in $((attempt * 2 + JITTER))s..."
             sleep $((attempt * 2 + JITTER))
-            git pull --rebase origin gh-pages
           done
 
           echo "Push failed after ${MAX_RETRIES} attempts"

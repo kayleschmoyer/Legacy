@@ -221,37 +221,43 @@ jobs:
         run: |
           set -euo pipefail
           REPO_URL="https://x-access-token:${DEPLOY_TOKEN}@github.com/${{ env.DEPLOY_REPO }}.git"
+          WORKSPACE="$(pwd)"
+          WEB_SRC="${WORKSPACE}/dist/apps/web"
 
-          git clone --depth 1 --single-branch --branch gh-pages "$REPO_URL" _deploy
-          cd _deploy
-
-          rm -rf "${DEST_DIR}"
-          mkdir -p "${DEST_DIR}"
-          cp -r ../dist/apps/web/. "${DEST_DIR}/"
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .
-
-          if git diff --cached --quiet; then
-            echo "No changes to deploy"
-            exit 0
-          fi
-
-          git commit -m "deploy pr-${{ steps.pr.outputs.number }} preview"
-
-          # Push with pull-rebase retry to handle races from other workflows
-          # pushing to the same gh-pages branch between our clone and push.
           MAX_RETRIES=7
           for attempt in $(seq 1 $MAX_RETRIES); do
-            if git push origin gh-pages; then
+            rm -rf "${WORKSPACE}/_deploy"
+            git clone --depth 1 --single-branch --branch gh-pages "$REPO_URL" "${WORKSPACE}/_deploy"
+
+            rm -rf "${WORKSPACE}/_deploy/${DEST_DIR}"
+            mkdir -p "${WORKSPACE}/_deploy/${DEST_DIR}"
+            cp -r "${WEB_SRC}/." "${WORKSPACE}/_deploy/${DEST_DIR}/"
+
+            cd "${WORKSPACE}/_deploy"
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add .
+
+            if git diff --cached --quiet; then
+              echo "No changes to deploy"
+              exit 0
+            fi
+
+            # Squash all history: orphan commit with full current state so the
+            # deploy repo stays at a constant size regardless of preview frequency.
+            git checkout --orphan squashed
+            git add -A
+            git commit -m "deploy pr-${{ steps.pr.outputs.number }} preview"
+
+            if git push --force origin squashed:gh-pages; then
               echo "Push succeeded (attempt ${attempt})"
               exit 0
             fi
+
+            cd "${WORKSPACE}"
             JITTER=$((RANDOM % 5))
             echo "Push failed (attempt ${attempt}) — retrying in $((attempt * 2 + JITTER))s..."
             sleep $((attempt * 2 + JITTER))
-            git pull --rebase origin gh-pages
           done
 
           echo "Push failed after ${MAX_RETRIES} attempts"
@@ -277,7 +283,7 @@ jobs:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    # Push conflicts handled by retry-with-rebase in the deploy step below.
+    # Push conflicts handled by re-clone-and-force-push retry in the deploy step below.
 
     steps:
       - name: Generate App Token
@@ -294,41 +300,54 @@ jobs:
         run: |
           set -euo pipefail
           PR_NUM="${{ github.event.pull_request.number }}"
+          REPO_URL="https://x-access-token:${GH_TOKEN}@github.com/${{ env.DEPLOY_REPO }}.git"
+          WORKSPACE="$(pwd)"
 
-          git clone --depth 1 --branch gh-pages \
-            "https://x-access-token:${GH_TOKEN}@github.com/${{ env.DEPLOY_REPO }}.git" deploy-repo || {
-            echo "gh-pages branch not found, nothing to clean"
-            exit 0
-          }
+          MAX_RETRIES=7
+          for attempt in $(seq 1 $MAX_RETRIES); do
+            rm -rf "${WORKSPACE}/_cleanup"
+            git clone --depth 1 --branch gh-pages "$REPO_URL" "${WORKSPACE}/_cleanup" 2>/dev/null || {
+              echo "gh-pages branch not found, nothing to clean"
+              exit 0
+            }
 
-          cd deploy-repo
+            cd "${WORKSPACE}/_cleanup"
 
-          if [ -d "pr-$PR_NUM" ]; then
+            if [ ! -d "pr-$PR_NUM" ]; then
+              echo "No preview found for PR #$PR_NUM, skipping"
+              exit 0
+            fi
+
             rm -rf "pr-$PR_NUM"
+            rm -rf "playwright-report/pr-$PR_NUM"
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
             git add -A
-            git commit -m "cleanup: remove pr-$PR_NUM preview" || { echo "Nothing to commit"; exit 0; }
 
-            # Push with pull-rebase retry to handle races from other workflows
-            MAX_RETRIES=7
-            for attempt in $(seq 1 $MAX_RETRIES); do
-              if git push origin gh-pages; then
-                echo "Push succeeded (attempt ${attempt})"
-                echo "Cleaned up preview for PR #$PR_NUM"
-                exit 0
-              fi
-              JITTER=$((RANDOM % 5))
-              echo "Push failed (attempt ${attempt}) — retrying in $((attempt * 2 + JITTER))s..."
-              sleep $((attempt * 2 + JITTER))
-              git pull --rebase origin gh-pages
-            done
+            if git diff --cached --quiet; then
+              echo "Nothing to commit"
+              exit 0
+            fi
 
-            echo "Push failed after ${MAX_RETRIES} attempts"
-            exit 1
-          else
-            echo "No preview found for PR #$PR_NUM, skipping"
-          fi
+            # Squash all history: orphan commit keeps the deploy repo at constant size.
+            git checkout --orphan squashed
+            git add -A
+            git commit -m "cleanup: remove pr-$PR_NUM preview"
+
+            if git push --force origin squashed:gh-pages; then
+              echo "Push succeeded (attempt ${attempt})"
+              echo "Cleaned up preview for PR #$PR_NUM"
+              exit 0
+            fi
+
+            cd "${WORKSPACE}"
+            JITTER=$((RANDOM % 5))
+            echo "Push failed (attempt ${attempt}) — retrying in $((attempt * 2 + JITTER))s..."
+            sleep $((attempt * 2 + JITTER))
+          done
+
+          echo "Push failed after ${MAX_RETRIES} attempts"
+          exit 1
 
       - name: Remove Preview Comment
         if: always()
