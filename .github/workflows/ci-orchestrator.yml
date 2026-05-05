@@ -118,6 +118,7 @@ jobs:
       run-security: ${{ steps.scope.outputs.run-security }}
       security-scan-type: ${{ steps.scope.outputs.security-scan-type }}
       runner-label: ${{ steps.runner-access.outputs.runner-label }}
+      ci-already-passed: ${{ steps.check-prior-success.outputs.ci-already-passed }}
 
     steps:
       - name: "🚀 Checkout Repository"
@@ -219,10 +220,84 @@ jobs:
         with:
           runner-label: ${{ vars.CI_RUNNER_LABEL }}
 
+      # LS-4182: Idempotency guard — if all 5 required CI checks already
+      # succeeded for this exact SHA, skip the CI Pipeline re-run. A second
+      # pull_request_review event (e.g. from a review dismissal) for an
+      # unchanged SHA must not overwrite successful check_runs with IN_PROGRESS.
+      - name: "🔍 Check for prior CI success"
+        id: check-prior-success
+        if: github.event_name == 'pull_request_review'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const sha = context.sha;
+            const { owner, repo } = context.repo;
+
+            // Load required CI check names dynamically from .github/ruleset.json so
+            // this list stays automatically in sync with branch protection rules.
+            // If the file cannot be read or parsed, CI always runs (fail-safe).
+            let requiredChecks;
+            try {
+              const rulesetPath = path.join(process.env.GITHUB_WORKSPACE, '.github', 'ruleset.json');
+              const ruleset = JSON.parse(fs.readFileSync(rulesetPath, 'utf8'));
+              const statusRule = (ruleset.rules ?? []).find(
+                r => r.type === 'required_status_checks' && !r._staged
+              );
+              const checks = (statusRule?.parameters?.required_status_checks ?? [])
+                .filter(c => c._calledWorkflow && !c._staged)
+                .map(c => c.context);
+              if (checks.length === 0) throw new Error('No _calledWorkflow contexts found in ruleset.json');
+              requiredChecks = checks;
+              core.info(`Loaded ${requiredChecks.length} required CI checks from ruleset.json: ${requiredChecks.join(', ')}`);
+            } catch (rulesetErr) {
+              core.error(`check-prior-success: Cannot read required checks from ruleset.json (${rulesetErr.message}) — running CI.`);
+              core.setOutput('ci-already-passed', 'false');
+              return;
+            }
+
+            try {
+              let allCheckRuns = [];
+              let page = 1;
+              while (true) {
+                const { data } = await github.rest.checks.listForRef({
+                  owner,
+                  repo,
+                  ref: sha,
+                  per_page: 100,
+                  page,
+                });
+                allCheckRuns = allCheckRuns.concat(data.check_runs);
+                if (data.check_runs.length < 100) break;
+                page++;
+              }
+
+              const passedNames = new Set(
+                allCheckRuns
+                  .filter(cr => cr.status === 'completed' && cr.conclusion === 'success')
+                  .map(cr => cr.name)
+              );
+
+              const allPassed = requiredChecks.every(name => passedNames.has(name));
+
+              if (allPassed) {
+                core.info(`All required CI checks already succeeded for SHA ${sha} — skipping CI re-run.`);
+                core.setOutput('ci-already-passed', 'true');
+              } else {
+                const pending = requiredChecks.filter(name => !passedNames.has(name));
+                core.info(`CI not yet fully green. Missing or in-progress: ${pending.join(', ')}`);
+                core.setOutput('ci-already-passed', 'false');
+              }
+            } catch (err) {
+              core.error(`check-prior-success: Checks API error — ${err.message}. Falling back to running CI.`);
+              core.setOutput('ci-already-passed', 'false');
+            }
+
   ci-pipeline:
     name: "🚀 CI Pipeline"
     needs: [determine-scope]
-    if: ${{ !cancelled() && needs.determine-scope.result != 'skipped' }}
+    if: ${{ !cancelled() && needs.determine-scope.result != 'skipped' && needs.determine-scope.outputs.ci-already-passed != 'true' }}
     uses: ./.github/workflows/ci-pipeline.yml
     with:
       debug_mode: ${{ github.event_name == 'workflow_dispatch' && inputs.debug_mode || false }}
