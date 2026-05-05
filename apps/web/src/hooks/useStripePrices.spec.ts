@@ -43,6 +43,7 @@ describe('useStripePrices', () => {
     expect(result.current.monthlyPriceDisplay).toBe('$5.99');
     expect(result.current.annualPriceDisplay).toBe('$49.99');
     expect(result.current.loading).toBe(false);
+    expect(result.current.pricesFailed).toBe(false);
     expect(result.current.monthlyPriceId).toBe('price_monthly123');
     expect(result.current.annualPriceId).toBe('price_annual456');
   });
@@ -61,6 +62,7 @@ describe('useStripePrices', () => {
     expect(result.current.monthlyPriceDisplay).toBe('$4.99');
     expect(result.current.annualPriceDisplay).toBe('$39.99');
     expect(result.current.annualSavingsPct).toBe('33%');
+    expect(result.current.pricesFailed).toBe(true);
     expect(result.current.monthlyPriceId).toBeNull();
     expect(result.current.annualPriceId).toBeNull();
   });
@@ -77,6 +79,7 @@ describe('useStripePrices', () => {
     expect(result.current.monthlyPrice).toBe(4.99);
     expect(result.current.annualTotal).toBe(39.99);
     expect(result.current.loading).toBe(true);
+    expect(result.current.pricesFailed).toBe(false);
   });
 
   it('returns fallbacks and warns on error', () => {
@@ -91,6 +94,7 @@ describe('useStripePrices', () => {
 
     expect(result.current.monthlyPrice).toBe(4.99);
     expect(result.current.annualTotal).toBe(39.99);
+    expect(result.current.pricesFailed).toBe(true);
     expect(captureWarning).toHaveBeenCalledWith(
       expect.any(Error),
       expect.objectContaining({ context: 'useStripePrices' }),

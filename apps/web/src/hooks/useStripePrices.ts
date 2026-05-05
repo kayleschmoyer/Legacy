@@ -68,13 +68,22 @@ export function useStripePrices() {
   const monthlyPriceId = stripePrices?.monthlyPriceId ?? null;
   const annualPriceId = stripePrices?.annualPriceId ?? null;
 
+  const pricesFailed = !loading && (!!error || hasNullPrices);
+
   if (typeof monthly !== 'number' || typeof annual !== 'number') {
-    return { ...fallbackPricing, loading, monthlyPriceId, annualPriceId };
+    return {
+      ...fallbackPricing,
+      loading,
+      pricesFailed,
+      monthlyPriceId,
+      annualPriceId,
+    };
   }
 
   return {
     ...derivePricing(monthly, annual),
     loading: false,
+    pricesFailed: false,
     monthlyPriceId,
     annualPriceId,
   };

@@ -1,8 +1,9 @@
 import React from 'react';
 import { Button, Text, XStack, YStack } from 'tamagui';
-import { Check, Star } from '@tamagui/lucide-icons';
+import { AlertCircle, Check, Star } from '@tamagui/lucide-icons';
 import { BaseModal } from './BaseModal';
 import {
+  AMBER,
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,
   BRAND_NAVY,
@@ -62,6 +63,7 @@ export function UpgradeModal({
     monthlyPriceDisplay: MONTHLY_PRICE_DISPLAY,
     annualPriceDisplay: ANNUAL_PRICE_DISPLAY,
     annualSavingsPct: ANNUAL_SAVINGS_PCT,
+    pricesFailed,
   } = useStripePrices();
 
   return (
@@ -107,6 +109,15 @@ export function UpgradeModal({
           <Text color={TEXT_MUTED} fontSize="$2">
             or {ANNUAL_PRICE_DISPLAY} / year — save {ANNUAL_SAVINGS_PCT}
           </Text>
+          {pricesFailed && (
+            <XStack alignItems="center" gap="$1" marginTop="$2">
+              <AlertCircle size={12} color={AMBER} />
+              <Text color={AMBER} fontSize="$2">
+                Pricing information could not be loaded. Displayed prices may be
+                outdated.
+              </Text>
+            </XStack>
+          )}
         </YStack>
 
         {/* ── Full feature list ── */}
