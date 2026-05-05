@@ -89,10 +89,14 @@ runs:
         node-version: ${{ inputs.node-version }}
         cache: ${{ inputs.install-dependencies == 'true' && 'pnpm' || '' }}
 
-    - name: Cache pnpm Store
+    # Cache restore/save are split so only pushes to main write to the cache.
+    # PR runs restore (via the default-branch fallback) but never save, which
+    # prevents PR-scoped duplicates of identical content from filling the
+    # repo's 10 GB cache budget. See LS-4186.
+    - name: Restore pnpm Store
       if: inputs.install-dependencies == 'true'
       id: cache-pnpm-store
-      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+      uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
       with:
         path: ~/.local/share/pnpm/store
         key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}${{ inputs.cache-key-suffix != '' && format('-{0}', inputs.cache-key-suffix) || '' }}
@@ -102,10 +106,10 @@ runs:
     # Note: npm support removed as this repository is pnpm-only
     # Legacy npm cache and install steps consolidated into pnpm-only workflow
 
-    - name: Cache node_modules
+    - name: Restore node_modules
       if: inputs.install-dependencies == 'true'
       id: cache-node-modules
-      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+      uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
       with:
         path: node_modules
         # yamllint disable-line rule:line-length
@@ -257,6 +261,30 @@ runs:
         fi
 
         echo "✅ Dependencies verified successfully!"
+
+    # Save only on pushes to main. PR runs restore from main via the
+    # default-branch fallback but never write their own copy. See LS-4186.
+    - name: Save pnpm Store
+      if: |
+        inputs.install-dependencies == 'true'
+        && github.event_name == 'push'
+        && github.ref == 'refs/heads/main'
+        && steps.cache-pnpm-store.outputs.cache-hit != 'true'
+      uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+      with:
+        path: ~/.local/share/pnpm/store
+        key: ${{ steps.cache-pnpm-store.outputs.cache-primary-key }}
+
+    - name: Save node_modules
+      if: |
+        inputs.install-dependencies == 'true'
+        && github.event_name == 'push'
+        && github.ref == 'refs/heads/main'
+        && steps.cache-node-modules.outputs.cache-hit != 'true'
+      uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+      with:
+        path: node_modules
+        key: ${{ steps.cache-node-modules.outputs.cache-primary-key }}
 
     - name: Set NX SHAs
       if: inputs.set-nx-shas == 'true'
