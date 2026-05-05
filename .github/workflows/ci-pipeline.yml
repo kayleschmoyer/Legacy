@@ -121,9 +121,10 @@ jobs:
   # ============================================================================
   # STAGE 2 — Granular required checks (run in parallel)
   #
-  # Each job emits a named commit status context matching ruleset.json so
-  # branch protection can require them individually. Jobs run in parallel
-  # after detect-changes; e2e gates on all of these passing.
+  # When this workflow is invoked via workflow_call from ci-orchestrator.yml's
+  # "🚀 CI Pipeline" job, GitHub creates check runs named
+  # "🚀 CI Pipeline / <job-id>" — these are what ruleset.json requires.
+  # Jobs run in parallel after detect-changes; e2e gates on all of these passing.
   # ============================================================================
   lint:
     name: "lint"
@@ -150,25 +151,6 @@ jobs:
 
       - name: "Lint"
         run: pnpm exec nx affected -t lint
-
-      - name: "Post Commit Status"
-        if: always()
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const sha = context.payload?.pull_request?.head?.sha || context.sha;
-            if (!sha) { core.warning('No SHA - skipping commit status'); return; }
-            const state = '${{ job.status }}' === 'success' ? 'success' : 'failure';
-            await github.rest.repos.createCommitStatus({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              sha,
-              state,
-              target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
-              description: state === 'success' ? 'Passed' : 'Failed',
-              context: 'lint',
-            });
 
   format:
     name: "format"
@@ -205,25 +187,6 @@ jobs:
           git diff --name-only --diff-filter=ACMR -z "$BASE_SHA" "$HEAD_SHA" \
             | xargs -0 -r pnpm exec prettier --check --ignore-unknown
 
-      - name: "Post Commit Status"
-        if: always()
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const sha = context.payload?.pull_request?.head?.sha || context.sha;
-            if (!sha) { core.warning('No SHA - skipping commit status'); return; }
-            const state = '${{ job.status }}' === 'success' ? 'success' : 'failure';
-            await github.rest.repos.createCommitStatus({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              sha,
-              state,
-              target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
-              description: state === 'success' ? 'Passed' : 'Failed',
-              context: 'format',
-            });
-
   test:
     name: "test"
     needs: [detect-changes]
@@ -249,25 +212,6 @@ jobs:
 
       - name: "Typecheck & Test"
         run: pnpm exec nx affected -t typecheck test
-
-      - name: "Post Commit Status"
-        if: always()
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const sha = context.payload?.pull_request?.head?.sha || context.sha;
-            if (!sha) { core.warning('No SHA - skipping commit status'); return; }
-            const state = '${{ job.status }}' === 'success' ? 'success' : 'failure';
-            await github.rest.repos.createCommitStatus({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              sha,
-              state,
-              target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
-              description: state === 'success' ? 'Passed' : 'Failed',
-              context: 'test',
-            });
 
   build:
     name: "build"
@@ -327,25 +271,6 @@ jobs:
           path: dist/apps/web
           if-no-files-found: error
 
-      - name: "Post Commit Status"
-        if: always()
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const sha = context.payload?.pull_request?.head?.sha || context.sha;
-            if (!sha) { core.warning('No SHA - skipping commit status'); return; }
-            const state = '${{ job.status }}' === 'success' ? 'success' : 'failure';
-            await github.rest.repos.createCommitStatus({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              sha,
-              state,
-              target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
-              description: state === 'success' ? 'Passed' : 'Failed',
-              context: 'build',
-            });
-
   custom-checks:
     name: "custom-checks"
     needs: [detect-changes]
@@ -388,25 +313,6 @@ jobs:
             done
           fi
           echo "All custom checks passed"
-
-      - name: "Post Commit Status"
-        if: always()
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const sha = context.payload?.pull_request?.head?.sha || context.sha;
-            if (!sha) { core.warning('No SHA - skipping commit status'); return; }
-            const state = '${{ job.status }}' === 'success' ? 'success' : 'failure';
-            await github.rest.repos.createCommitStatus({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              sha,
-              state,
-              target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
-              description: state === 'success' ? 'Passed' : 'Failed',
-              context: 'custom-checks',
-            });
 
   # ============================================================================
   # STAGE 3 — E2E tests (runs after lint, format, test, AND build all pass)
