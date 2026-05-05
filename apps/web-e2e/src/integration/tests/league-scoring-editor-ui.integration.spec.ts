@@ -94,11 +94,11 @@ async function openScoringSection(page: Page, leagueId: number): Promise<void> {
   await page.goto(`/baseball/league/${leagueId}/commissioner`);
   await page.waitForLoadState('load');
   const scoringHeader = page.getByRole('button', {
-    name: 'Scoring',
+    name: 'Scoring Rules',
     exact: true,
   });
   await expect(scoringHeader).toBeVisible({ timeout: 15_000 });
-  // The "Scoring" section starts collapsed — click to expand.
+  // The "Scoring Rules" section starts collapsed — click to expand.
   await scoringHeader.click();
   await expect(page.getByText('Scoring Settings')).toBeVisible({
     timeout: 10_000,
@@ -352,7 +352,7 @@ test.describe
       // A non-commissioner should not see the Commissioner tab content at all,
       // or at minimum should not see the Scoring accordion header.
       await expect(
-        page.getByRole('button', { name: 'Scoring', exact: true }),
+        page.getByRole('button', { name: 'Scoring Rules', exact: true }),
       ).not.toBeVisible({ timeout: 10_000 });
     });
 
