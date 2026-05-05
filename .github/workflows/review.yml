@@ -2,12 +2,13 @@ name: Reviewer (W1)
 
 # Posts a real GitHub PR review as the Code Reviewer Bot installation.
 # critical/high findings → REQUEST_CHANGES (blocks merge); clean → APPROVE.
-# Fires on opened/ready_for_review, and on labeled only when the applied
-# label is bot:ready-for-review or review-bot-degraded (G10).
+# Fires on opened/ready_for_review; on labeled for specific labels (G10);
+# and on synchronize when bot:ready-for-review is present so agents don't
+# need to re-apply the label after each push to trigger a new cycle.
 
 on:
   pull_request:
-    types: [opened, ready_for_review, labeled]
+    types: [opened, ready_for_review, labeled, synchronize]
 
 permissions:
   contents: read
@@ -19,11 +20,13 @@ concurrency:
 
 jobs:
   review:
-    # Skip drafts, fork PRs, and labeled events for irrelevant labels.
+    # Skip drafts, fork PRs, labeled events for irrelevant labels, and
+    # synchronize events when bot:ready-for-review is not present.
     if: >-
       github.event.pull_request.draft == false &&
       github.event.pull_request.head.repo.full_name == github.repository &&
-      (github.event.action != 'labeled' ||
+      (github.event.action != 'labeled' && github.event.action != 'synchronize' ||
+       github.event.action == 'synchronize' && contains(github.event.pull_request.labels.*.name, 'bot:ready-for-review') ||
        github.event.label.name == 'bot:ready-for-review' ||
        github.event.label.name == 'review-bot-degraded' ||
        github.event.label.name == 'bot:reset-cycle-counter')

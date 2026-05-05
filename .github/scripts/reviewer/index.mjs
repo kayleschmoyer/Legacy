@@ -649,7 +649,10 @@ async function main() {
       // can still fire on the next attempt.
       try {
         await addLabelAsApp(prNumber, 'review-bot-degraded');
-        cleanupOperationalLabels(prNumber, { except: 'review-bot-degraded' });
+        cleanupOperationalLabels(prNumber, {
+          except: 'review-bot-degraded',
+          preserveReadyLabel: true,
+        });
       } catch (err) {
         process.stderr.write(
           `[reviewer] Failed to apply review-bot-degraded label: ${err instanceof Error ? err.message : String(err)}\n`,
@@ -793,7 +796,9 @@ async function main() {
         );
       }
     }
-    cleanupOperationalLabels(prNumber);
+    cleanupOperationalLabels(prNumber, {
+      preserveReadyLabel: verdict !== 'APPROVED',
+    });
   }
 }
 
@@ -966,7 +971,10 @@ async function handleLlmFailure(prNumber, err, ctx = null) {
   // intact so the labeled-event self-heal trigger can still fire on retry.
   try {
     await addLabelAsApp(prNumber, failureLabel);
-    cleanupOperationalLabels(prNumber, { except: failureLabel });
+    cleanupOperationalLabels(prNumber, {
+      except: failureLabel,
+      preserveReadyLabel: failureLabel === 'review-bot-degraded',
+    });
   } catch (labelErr) {
     process.stderr.write(
       `[reviewer] Failed to apply ${failureLabel} label: ${labelErr instanceof Error ? labelErr.message : String(labelErr)}\n`,

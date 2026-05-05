@@ -30,6 +30,12 @@ export const OPERATIONAL_LABELS = Object.freeze([
  * (currently only `review-bot-degraded` from the infra-failure paths) so the
  * just-applied label is not removed.
  *
+ * Pass `{ preserveReadyLabel: true }` when the cycle is still in progress
+ * (CHANGES_REQUESTED verdict, transient infra failures) so the
+ * `bot:ready-for-review` label stays on the PR. The reviewer workflow fires
+ * on `synchronize` events when this label is present, meaning agents no
+ * longer need to re-apply the label after each push to trigger the next cycle.
+ *
  * Not called from:
  *   - Shadow-mode paths — shadow runs are observation-only and do not mutate
  *     labels.
@@ -38,15 +44,21 @@ export const OPERATIONAL_LABELS = Object.freeze([
  *     leaving operational labels intact preserves the option to retrigger.
  *
  * @param {number} prNumber
- * @param {{ except?: string, removeLabel?: (prNumber: number, label: string) => void }} [opts]
+ * @param {{ except?: string, preserveReadyLabel?: boolean, removeLabel?: (prNumber: number, label: string) => void }} [opts]
  *   `except` skips a single label (used when the terminal label is itself
- *   operational). `removeLabel` is a test override; defaults to the live
- *   `removeLabel` from `./github.mjs`.
+ *   operational). `preserveReadyLabel` keeps `bot:ready-for-review` so the
+ *   next push auto-triggers a new review. `removeLabel` is a test override;
+ *   defaults to the live `removeLabel` from `./github.mjs`.
  */
 export function cleanupOperationalLabels(prNumber, opts = {}) {
-  const { except, removeLabel = _removeLabel } = opts;
+  const {
+    except,
+    preserveReadyLabel = false,
+    removeLabel = _removeLabel,
+  } = opts;
   for (const label of OPERATIONAL_LABELS) {
     if (label === except) continue;
+    if (label === 'bot:ready-for-review' && preserveReadyLabel) continue;
     try {
       removeLabel(prNumber, label);
     } catch (err) {

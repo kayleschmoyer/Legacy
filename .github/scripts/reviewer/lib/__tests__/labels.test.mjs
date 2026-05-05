@@ -95,4 +95,38 @@ describe('cleanupOperationalLabels', () => {
       process.stderr.write = origWrite;
     }
   });
+
+  it('preserves bot:ready-for-review when preserveReadyLabel is true', () => {
+    const calls = [];
+    const removeLabel = (_prNumber, label) => {
+      calls.push(label);
+    };
+    cleanupOperationalLabels(5, { preserveReadyLabel: true, removeLabel });
+    assert.deepStrictEqual(calls, ['review-bot-degraded']);
+  });
+
+  it('still removes bot:ready-for-review when preserveReadyLabel is false', () => {
+    const calls = [];
+    const removeLabel = (_prNumber, label) => {
+      calls.push(label);
+    };
+    cleanupOperationalLabels(5, { preserveReadyLabel: false, removeLabel });
+    assert.deepStrictEqual(calls, [
+      'bot:ready-for-review',
+      'review-bot-degraded',
+    ]);
+  });
+
+  it('preserveReadyLabel and except can both be set without conflict', () => {
+    const calls = [];
+    const removeLabel = (_prNumber, label) => {
+      calls.push(label);
+    };
+    cleanupOperationalLabels(5, {
+      except: 'review-bot-degraded',
+      preserveReadyLabel: true,
+      removeLabel,
+    });
+    assert.deepStrictEqual(calls, []);
+  });
 });
