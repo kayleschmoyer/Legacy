@@ -41,14 +41,15 @@ if [[ ! -f "$RULESET_FILE" ]]; then
 fi
 
 # Strip UTF-8 BOM (if present) before piping to jq, then:
-# - Remove _comment keys and $schema (not accepted by API)
-# - Strip null integration_id entries
 # - Filter out rules marked _staged:true — these contain checks not yet active in CI
 #   and must not be applied prematurely.
+# - Remove $schema (not accepted by API)
+# - Strip internal metadata keys: _comment, _staged, _commitStatus, _calledWorkflow
+# - Strip null integration_id entries
 payload=$(sed '1s/^\xEF\xBB\xBF//' "$RULESET_FILE" | jq '
   .rules |= map(select(._staged != true))
   | del(."$schema")
-  | walk(if type == "object" then del(._comment) | del(._staged) | (if .integration_id == null then del(.integration_id) else . end) else . end)
+  | walk(if type == "object" then del(._comment) | del(._staged) | del(._commitStatus) | del(._calledWorkflow) | (if .integration_id == null then del(.integration_id) else . end) else . end)
 ')
 
 echo "==> Looking for existing ruleset named '$RULESET_NAME'..."
@@ -69,9 +70,16 @@ if [[ -n "$existing_id" ]]; then
   echo "==> Fetching live state of ruleset (id: $existing_id)..."
   live=$(gh api "repos/$REPO/rulesets/$existing_id")
 
-  # Determine which rule types are _staged in the config (before filtering).
-  # Fall back to '[]' so --argjson never receives an empty string.
-  staged_types=$(sed '1s/^\xEF\xBB\xBF//' "$RULESET_FILE" | jq -c '[.rules[] | select(._staged == true) | .type]' 2>/dev/null || echo '[]')
+  # Determine which rule types appear ONLY in staged rules (not in any active rule).
+  # Types that have both a staged and an active entry are fully managed by the config
+  # payload and must not be re-appended from the live state (prevents duplicates on
+  # idempotent re-runs). Fall back to '[]' so --argjson never receives an empty string.
+  staged_types=$(sed '1s/^\xEF\xBB\xBF//' "$RULESET_FILE" | jq -c '
+    (.rules // []) as $rules |
+    ([$rules[] | select(._staged == true) | .type] | unique) as $staged |
+    ([$rules[] | select(._staged != true) | .type] | unique) as $active |
+    ($staged - $active)
+  ' 2>/dev/null || echo '[]')
 
   # Merge: use config metadata + config (non-staged) rules, then append any live
   # rules whose type was staged in the config (so they are preserved, not deleted).

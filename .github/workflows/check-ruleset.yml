@@ -72,32 +72,41 @@ jobs:
         env:
           RULESET_FILE: .github/ruleset.json
         run: |
-          # Collect rule types that are _staged:true in the local config.
-          # These rules are not yet active in CI and must be excluded from both
-          # sides of the comparison to prevent false-positive drift alerts.
+          # Collect rule types that appear ONLY in staged rules (not in any active rule).
+          # Types with both a staged and an active entry are managed by the config and
+          # must not be stripped from the live side — stripping them would produce a
+          # false-positive drift alert against the active rule that was applied.
           # Fall back to '[]' so the later --arg staged_str + fromjson path never sees an empty string.
-          staged_types=$(jq -c '[.rules[] | select(._staged == true) | .type]' "$RULESET_FILE" 2>/dev/null || echo '[]')
+          staged_types=$(jq -c '
+            (.rules // []) as $rules |
+            ([$rules[] | select(._staged == true) | .type] | unique) as $staged |
+            ([$rules[] | select(._staged != true) | .type] | unique) as $active |
+            ($staged - $active)
+          ' "$RULESET_FILE" 2>/dev/null || echo '[]')
 
-          # Normalise local config: strip staged rules, metadata keys, and integration_id
-          # (GitHub adds integration_id to required_status_checks entries; we drop it so the
-          # comparison is stable regardless of whether the entry has an app integration or not).
+          # Normalise local config: strip staged rules, metadata keys, integration_id, and
+          # do_not_enforce_on_create (GitHub auto-adds this with a false default when a
+          # required_status_checks rule is created; we don't track it in the config).
           # Use a single .rules |= (...) to avoid chained-|= precedence ambiguity.
           jq '
             .rules |= map(select(._staged != true))
-            | walk(if type == "object" then del(._comment) | del(._staged) else . end)
+            | walk(if type == "object" then del(._comment) | del(._staged) | del(._commitStatus) | del(._calledWorkflow) else . end)
             | del(."$schema")
             | del(.bypass_actors)
             | .rules |= (
                 map(
                   if .type == "required_status_checks"
-                  then .parameters.required_status_checks |= map(del(.integration_id))
+                  then
+                    .parameters |= del(.do_not_enforce_on_create) |
+                    .parameters.required_status_checks |= (map(del(.integration_id)) | sort_by(.context))
                   else .
                   end
                 )
                 | sort_by(.type)
               )' "$RULESET_FILE" > /tmp/local-ruleset.json
 
-          # Normalise live ruleset the same way: strip staged rule types and integration_id.
+          # Normalise live ruleset the same way: strip staged rule types, integration_id,
+          # and do_not_enforce_on_create.
           # Use --arg (string) + fromjson // [] so a null-producing jq expression never
           # causes --argjson to inject JSON null — which would make ($staged | map(…)) fail
           # with "Cannot iterate over null".
@@ -110,7 +119,9 @@ jobs:
               map(select(.type as $t | ($staged | map(. == $t) | any) | not))
               | map(
                   if .type == "required_status_checks"
-                  then .parameters.required_status_checks |= map(del(.integration_id))
+                  then
+                    .parameters |= del(.do_not_enforce_on_create) |
+                    .parameters.required_status_checks |= (map(del(.integration_id)) | sort_by(.context))
                   else .
                   end
                 )
