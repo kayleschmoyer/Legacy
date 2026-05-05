@@ -1,12 +1,19 @@
 import React, { useMemo } from 'react';
 import {
   type LeagueFragment,
+  PlayoffMatchupStatus,
   type TeamFragment,
   useGetLeagueStandingsQuery,
   useGetPlayoffBracketQuery,
 } from '../../../../api/db/graphql.generated';
 import { I } from '../Icons';
-import { colorFromString, initialsFromName, Rank, Section } from '../Shared';
+import {
+  Banner,
+  colorFromString,
+  initialsFromName,
+  Rank,
+  Section,
+} from '../Shared';
 
 interface PlayoffBracketTeam {
   name?: string | null;
@@ -297,6 +304,16 @@ export const StandingsTab: React.FC<StandingsTabProps> = ({
             </span>
           }
         >
+          {bracketData?.getPlayoffBracket?.status ===
+            PlayoffMatchupStatus.Completed &&
+          bracketData.getPlayoffBracket.championTeam ? (
+            <Banner
+              kind="gold"
+              icon={<I.Trophy size={16} />}
+              title="Champion"
+              sub={bracketData.getPlayoffBracket.championTeam.name ?? undefined}
+            />
+          ) : null}
           <BracketView matches={bracketMatches} />
         </Section>
       ) : null}
