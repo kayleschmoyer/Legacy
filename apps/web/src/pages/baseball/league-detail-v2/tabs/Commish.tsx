@@ -68,6 +68,7 @@ export const CommishTab: React.FC<CommishTabProps> = ({ league }) => {
   const navigate = useNavigate();
   const [openId, setOpenId] = useState<string>('announcements');
   const [nextStepError, setNextStepError] = useState<string | null>(null);
+  const [settingsSuccess, setSettingsSuccess] = useState<string | null>(null);
   const leagueId = league.id ?? 0;
 
   const {
@@ -119,6 +120,7 @@ export const CommishTab: React.FC<CommishTabProps> = ({ league }) => {
           currentPlayoffMultiWeek={league.playoffMultiWeek ?? false}
           currentSalaryCapEnabled={league.salaryCapEnabled ?? false}
           currentSalaryCap={league.salaryCap ?? null}
+          onSuccess={(msg) => setSettingsSuccess(msg)}
         />
       ) : null,
     },
@@ -240,6 +242,22 @@ export const CommishTab: React.FC<CommishTabProps> = ({ league }) => {
           }}
         >
           Error: {nextStepError}
+        </div>
+      ) : null}
+      {settingsSuccess ? (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            background: 'rgba(34, 197, 94, 0.1)',
+            border: '1px solid rgba(34, 197, 94, 0.4)',
+            borderRadius: 8,
+            padding: 12,
+            color: '#16a34a',
+            fontWeight: 600,
+          }}
+        >
+          {settingsSuccess}
         </div>
       ) : null}
       <div className="ls-accordion">
