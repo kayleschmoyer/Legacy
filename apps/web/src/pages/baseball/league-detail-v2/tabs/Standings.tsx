@@ -191,14 +191,26 @@ export const StandingsTab: React.FC<StandingsTabProps> = ({
           <table className="ls-table" aria-label="League Standings">
             <thead>
               <tr>
-                <th>Rank</th>
-                <th>Team</th>
-                <th className="num">W</th>
-                <th className="num">L</th>
-                <th className="num">T</th>
-                <th className="num">PF</th>
-                <th className="num">PA</th>
-                <th className="num">Diff</th>
+                <th scope="col">Rank</th>
+                <th scope="col">Team</th>
+                <th scope="col" className="num">
+                  W
+                </th>
+                <th scope="col" className="num">
+                  L
+                </th>
+                <th scope="col" className="num">
+                  T
+                </th>
+                <th scope="col" className="num">
+                  PF
+                </th>
+                <th scope="col" className="num">
+                  PA
+                </th>
+                <th scope="col" className="num">
+                  Diff
+                </th>
               </tr>
             </thead>
             <tbody>

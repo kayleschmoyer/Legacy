@@ -498,13 +498,15 @@ test.describe('Commissioner Announcements — commissioner view @regression', ()
     // Submit
     await page.getByRole('button', { name: /post announcement/i }).click();
 
-    // The posted announcement text should appear in the list
-    await expect(page.getByText(announcementText)).toBeVisible();
-
-    // Compose form should be closed after posting
+    // Wait for compose form to close before checking the list — avoids a strict
+    // mode violation where getByText resolves to both the textarea and the list
+    // item simultaneously.
     await expect(
       page.getByPlaceholder(/write an announcement/i),
     ).not.toBeVisible();
+
+    // The posted announcement text should appear in the list
+    await expect(page.getByText(announcementText)).toBeVisible();
   });
 
   test('count badge appears when there are announcements', async ({ page }) => {

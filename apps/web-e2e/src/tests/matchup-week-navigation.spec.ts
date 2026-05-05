@@ -530,8 +530,11 @@ premiumTest.describe(
       async ({ page }) => {
         // The MatchupWinProbabilityPanel header contains "Win Probability".
         // Use first() because the label appears in both the header and the
-        // ProbabilityBar ("WIN PROBABILITY").
-        await expect(page.getByText('Win Probability').first()).toBeVisible();
+        // ProbabilityBar ("WIN PROBABILITY"). The panel renders asynchronously
+        // after the matchup data loads, so allow extra time.
+        await expect(page.getByText('Win Probability').first()).toBeVisible({
+          timeout: 10000,
+        });
       },
     );
 

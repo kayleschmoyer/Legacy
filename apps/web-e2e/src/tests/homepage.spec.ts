@@ -48,8 +48,9 @@ test.describe('Homepage @smoke', () => {
     const cta = page.getByRole('button', { name: /join league/i });
     await expect(cta).toBeVisible();
     await cta.click({ force: true });
-    await page.waitForLoadState('load');
-    await expect(page).toHaveURL('/baseball/league/join');
+    // waitForURL is more reliable than waitForLoadState + toHaveURL for SPA
+    // navigation where the load event may fire before the router updates.
+    await page.waitForURL('/baseball/league/join', { timeout: 10000 });
   });
 
   test('displays the Baseball sport card', async ({ page }) => {
