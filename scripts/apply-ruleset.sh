@@ -9,6 +9,14 @@
 
 set -euo pipefail
 
+# On Windows, winget installs tools into a Links directory that Git Bash does not
+# include in PATH by default. Prepend it so jq is discoverable without a manual
+# PATH export. $LOCALAPPDATA is a Windows-style path; cygpath converts it for bash.
+if ! command -v jq &>/dev/null && command -v cygpath &>/dev/null && [[ -n "${LOCALAPPDATA:-}" ]]; then
+  _winget_links="$(cygpath -u "$LOCALAPPDATA")/Microsoft/WinGet/Links"
+  [[ -d "$_winget_links" ]] && export PATH="$_winget_links:$PATH"
+fi
+
 # --- Dependency checks ---
 for cmd in jq gh; do
   if ! command -v "$cmd" &>/dev/null; then

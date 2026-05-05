@@ -1,5 +1,9 @@
 /**
- * Unit tests for merge-queue-processor.js — bot approval / thread check interaction.
+ * Unit tests for merge-queue-processor.js.
+ *
+ * Covers:
+ *  - Bot approval / unresolved-thread interaction (LS-4174)
+ *  - mergeable_state=behind handling (LS-4173 strict-mode support)
  *
  * The processor is a CommonJS closure; helpers are not exported, so tests
  * exercise the behaviour through the public module interface with mocked
@@ -31,6 +35,7 @@ function makePR(overrides = {}) {
     body: 'Test body',
     draft: false,
     mergeable: true,
+    mergeable_state: 'clean',
     base: { ref: 'main' },
     head: { sha: HEAD_SHA, ref: 'feature/test' },
     labels: [{ name: 'merge-when-ready' }],
@@ -39,13 +44,17 @@ function makePR(overrides = {}) {
 }
 
 // Builds a minimal GitHub mock. `reviews` controls what listReviews returns;
-// `unresolvedThreads` controls the reviewThreads GraphQL response.
+// `unresolvedThreads` controls the reviewThreads GraphQL response;
+// `pr` overrides the PR returned by paginate/get; `updateBranchImpl` lets
+// tests inject behaviour for the behind-base branch update path.
 function makeGithub({
   reviews = [],
   unresolvedThreads = [],
   reviewDecision = 'APPROVED',
+  pr = makePR(),
+  updateBranchImpl = async () => ({}),
 } = {}) {
-  const calls = { merges: [], comments: [] };
+  const calls = { merges: [], comments: [], updateBranch: [] };
 
   const github = {
     hook: { after: () => {} },
@@ -54,7 +63,7 @@ function makeGithub({
     paginate: async (fn, args) => {
       if (fn === github.rest.pulls.listReviews) return reviews;
       // default: PR list
-      return [makePR()];
+      return [pr];
     },
 
     graphql: async (query) => {
@@ -74,11 +83,15 @@ function makeGithub({
     rest: {
       pulls: {
         // Called twice per merge attempt: initial fetch + TOCTOU guard
-        get: async () => ({ data: makePR() }),
+        get: async () => ({ data: pr }),
         listReviews: async () => ({ data: reviews }),
         merge: async (args) => {
           calls.merges.push(args);
           return { data: { sha: 'merged-sha' } };
+        },
+        updateBranch: async (args) => {
+          calls.updateBranch.push(args);
+          return updateBranchImpl(args);
         },
         // retargetDependentPRs
         list: async () => ({ data: [] }),
@@ -337,5 +350,97 @@ describe('merge-queue-processor — bot approval skips unresolved-thread check',
       1,
       'outdated thread should not block merge',
     );
+  });
+});
+
+describe('merge-queue-processor — mergeable_state=behind handling', () => {
+  it('calls updateBranch and does not merge when PR is behind base', async () => {
+    const behindPR = makePR({ mergeable_state: 'behind' });
+    const { github, calls } = makeGithub({ pr: behindPR });
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.strictEqual(
+      calls.updateBranch.length,
+      1,
+      'updateBranch should be called once',
+    );
+    assert.deepEqual(calls.updateBranch[0], {
+      owner: 'test-owner',
+      repo: 'test-repo',
+      pull_number: behindPR.number,
+      expected_head_sha: behindPR.head.sha,
+    });
+    assert.strictEqual(
+      calls.merges.length,
+      0,
+      'merge should not be called when branch is behind',
+    );
+  });
+
+  it('does not merge and handles 422 gracefully when updateBranch rejects with head-SHA mismatch', async () => {
+    const behindPR = makePR({ mergeable_state: 'behind' });
+    const updateBranchImpl = async () => {
+      throw Object.assign(new Error('Conflict'), { status: 422 });
+    };
+    const { github, calls } = makeGithub({
+      pr: behindPR,
+      updateBranchImpl,
+    });
+
+    await assert.doesNotReject(
+      () =>
+        processor({
+          github,
+          context,
+          isDryRun: false,
+          forceCheck: false,
+          isRetry: false,
+        }),
+      'processor should not throw on 422 from updateBranch',
+    );
+
+    assert.strictEqual(
+      calls.updateBranch.length,
+      1,
+      'updateBranch should be attempted',
+    );
+    assert.strictEqual(calls.merges.length, 0, 'merge should not be called');
+  });
+
+  it('does not merge and handles unexpected updateBranch errors gracefully', async () => {
+    const behindPR = makePR({ mergeable_state: 'behind' });
+    const updateBranchImpl = async () => {
+      throw Object.assign(new Error('Internal Server Error'), { status: 500 });
+    };
+    const { github, calls } = makeGithub({
+      pr: behindPR,
+      updateBranchImpl,
+    });
+
+    await assert.doesNotReject(
+      () =>
+        processor({
+          github,
+          context,
+          isDryRun: false,
+          forceCheck: false,
+          isRetry: false,
+        }),
+      'processor should not throw on unexpected updateBranch error',
+    );
+
+    assert.strictEqual(
+      calls.updateBranch.length,
+      1,
+      'updateBranch should be attempted',
+    );
+    assert.strictEqual(calls.merges.length, 0, 'merge should not be called');
   });
 });
