@@ -709,7 +709,7 @@ async function main() {
 
   const gated = gateFindingsBySeverity(filteredFindings);
   process.stdout.write(
-    `[reviewer] Gating: ${gated.blocking.length} blocking, ${gated.nonBlocking.length} non-blocking, ${gated.dropped.length} trivia dropped\n`,
+    `[reviewer] Gating: ${gated.blocking.length} blocking, ${gated.nonBlocking.length} non-blocking, ${gated.observations.length} observations, ${gated.dropped.length} trivia dropped\n`,
   );
   verdict = gated.blocking.length === 0 ? 'APPROVED' : 'REQUEST_CHANGES';
 

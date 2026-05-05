@@ -105,6 +105,92 @@ describe('formatReviewBody', () => {
     assert.match(body, /Issue B/);
   });
 
+  it('appends Observations section when observations are provided on APPROVE', () => {
+    const obs = [
+      {
+        severity: 'observation',
+        title: 'Race condition correctly handled',
+        body: 'The mutex now prevents concurrent writes.',
+        file: 'src/queue.ts',
+        line: 55,
+      },
+    ];
+    const body = formatReviewBody([], 'APPROVE', obs);
+    assert.match(body, /LGTM/);
+    assert.match(body, /## Observations/);
+    assert.match(body, /Race condition correctly handled/);
+    assert.match(body, /`src\/queue\.ts:55`/);
+  });
+
+  it('appends Observations section when observations are provided on REQUEST_CHANGES', () => {
+    const blocking = [
+      {
+        issueId: '01HZ000000000000000000003',
+        severity: 'high',
+        title: 'SQL injection risk',
+        body: 'Use parameterised queries.',
+        file: 'src/db.js',
+        line: 42,
+      },
+    ];
+    const obs = [
+      {
+        severity: 'observation',
+        title: 'Error boundary correctly placed',
+        body: 'The fallback renders outside the theme provider.',
+        file: 'src/main.tsx',
+        line: 117,
+      },
+    ];
+    const body = formatReviewBody(blocking, 'REQUEST_CHANGES', obs);
+    assert.match(body, /## Changes Required/);
+    assert.match(body, /SQL injection risk/);
+    assert.match(body, /## Observations/);
+    assert.match(body, /Error boundary correctly placed/);
+  });
+
+  it('observations have no issue-id markers', () => {
+    const obs = [
+      {
+        severity: 'observation',
+        title: 'Handled correctly',
+        body: 'desc',
+        file: null,
+        line: null,
+      },
+    ];
+    const body = formatReviewBody([], 'APPROVE', obs);
+    assert.ok(
+      !body.includes('<!-- issue-id:'),
+      'observations must not embed issue-id markers',
+    );
+  });
+
+  it('observations have no [OBSERVATION] severity tag so parseTitlesFromReviewBody ignores them', () => {
+    const obs = [
+      {
+        severity: 'observation',
+        title: 'Should not be tracked',
+        body: 'desc',
+        file: 'src/foo.ts',
+        line: 1,
+      },
+    ];
+    const body = formatReviewBody([], 'APPROVE', obs);
+    assert.ok(
+      !body.includes('[OBSERVATION]'),
+      'severity tag must be absent from observations',
+    );
+  });
+
+  it('omits Observations section when observations array is empty', () => {
+    const body = formatReviewBody([], 'APPROVE', []);
+    assert.ok(
+      !body.includes('## Observations'),
+      'Observations section must be absent when empty',
+    );
+  });
+
   it('prepends fallback banner when fallbackModel is set (REQUEST_CHANGES)', () => {
     const findings = [
       {
@@ -116,7 +202,7 @@ describe('formatReviewBody', () => {
         line: null,
       },
     ];
-    const body = formatReviewBody(findings, 'REQUEST_CHANGES', {
+    const body = formatReviewBody(findings, 'REQUEST_CHANGES', [], {
       fallbackModel: 'gemini-2.5-flash-lite',
     });
     assert.match(body, /gemini-2\.5-flash-lite/);
@@ -125,7 +211,7 @@ describe('formatReviewBody', () => {
   });
 
   it('prepends fallback banner when fallbackModel is set (APPROVE)', () => {
-    const body = formatReviewBody([], 'APPROVE', {
+    const body = formatReviewBody([], 'APPROVE', [], {
       fallbackModel: 'gemini-2.5-flash-lite',
     });
     assert.match(body, /gemini-2\.5-flash-lite/);

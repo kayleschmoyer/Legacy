@@ -17,6 +17,7 @@ const VALID_SEVERITIES = new Set([
   'medium',
   'low',
   'trivia',
+  'observation',
 ]);
 
 /**
@@ -216,14 +217,18 @@ export async function tryReformatFindings(rawText, provider) {
 
 /**
  * Split findings into blocking (critical/high), nonBlocking (medium/low),
- * and dropped (trivia) groups.
+ * observations (observation), and dropped (trivia) groups.
+ *
+ * Observations are confirmatory notes about what the PR correctly implements.
+ * They appear in the review body under "## Observations" but never block the PR.
  *
  * @param {Finding[]} findings
- * @returns {{ blocking: Finding[], nonBlocking: Finding[], dropped: Finding[] }}
+ * @returns {{ blocking: Finding[], nonBlocking: Finding[], observations: Finding[], dropped: Finding[] }}
  */
 export function gateFindingsBySeverity(findings) {
   const blocking = [];
   const nonBlocking = [];
+  const observations = [];
   const dropped = [];
 
   for (const finding of findings) {
@@ -231,12 +236,14 @@ export function gateFindingsBySeverity(findings) {
       blocking.push(finding);
     } else if (NON_BLOCKING_SEVERITIES.has(finding.severity)) {
       nonBlocking.push(finding);
+    } else if (finding.severity === 'observation') {
+      observations.push(finding);
     } else {
       dropped.push(finding);
     }
   }
 
-  return { blocking, nonBlocking, dropped };
+  return { blocking, nonBlocking, observations, dropped };
 }
 
 /**
@@ -253,10 +260,15 @@ export function hasCriticalBlockingFinding(blockingFindings) {
  * Format a shadow PR comment body from gated findings.
  * Shows what the reviewer would post in live mode, grouped by gate.
  *
- * @param {{ blocking: Finding[], nonBlocking: Finding[], dropped: Finding[] }} gated
+ * @param {{ blocking: Finding[], nonBlocking: Finding[], observations: Finding[], dropped: Finding[] }} gated
  * @returns {string}
  */
-export function formatShadowBody({ blocking, nonBlocking, dropped }) {
+export function formatShadowBody({
+  blocking,
+  nonBlocking,
+  observations = [],
+  dropped,
+}) {
   const parts = [];
 
   if (blocking.length > 0) {
@@ -273,6 +285,13 @@ export function formatShadowBody({ blocking, nonBlocking, dropped }) {
     }
   }
 
+  if (observations.length > 0) {
+    parts.push('### 🔵 Observations (informational — would not block)');
+    for (const f of observations) {
+      parts.push(_formatFinding(f));
+    }
+  }
+
   if (parts.length === 0) {
     parts.push(
       '_No findings after self-critique and severity gating. Would APPROVE._',
@@ -282,6 +301,7 @@ export function formatShadowBody({ blocking, nonBlocking, dropped }) {
   const counts =
     `${blocking.length} blocking · ` +
     `${nonBlocking.length} non-blocking · ` +
+    `${observations.length} observations · ` +
     `${dropped.length} trivia dropped`;
   parts.push(`---\n_Severity gating: ${counts}_`);
 

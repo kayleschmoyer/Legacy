@@ -4,6 +4,7 @@ import {
   parseFindingsFromText,
   tryReformatFindings,
   hasCriticalBlockingFinding,
+  gateFindingsBySeverity,
 } from '../findings.mjs';
 
 // ---------------------------------------------------------------------------
@@ -45,6 +46,20 @@ describe('parseFindingsFromText', () => {
     assert.ok(result.ok);
     assert.strictEqual(result.findings.length, 1);
     assert.strictEqual(result.findings[0].title, 'Valid');
+  });
+
+  it('accepts observation severity', () => {
+    const finding = {
+      severity: 'observation',
+      file: 'src/auth.ts',
+      line: 10,
+      title: 'Race condition correctly handled',
+      body: 'The mutex now prevents concurrent writes.',
+    };
+    const result = parseFindingsFromText(JSON.stringify([finding]));
+    assert.ok(result.ok);
+    assert.strictEqual(result.findings.length, 1);
+    assert.deepStrictEqual(result.findings[0], finding);
   });
 
   it('handles a prose preamble before the JSON array (Attempt 2)', () => {
@@ -326,6 +341,68 @@ describe('tryReformatFindings', () => {
       capturedUser.includes(rawText),
       'Raw text should be included in the reformat user prompt',
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// gateFindingsBySeverity
+// ---------------------------------------------------------------------------
+
+describe('gateFindingsBySeverity', () => {
+  const make = (severity, title = 'T') => ({
+    severity,
+    file: null,
+    line: null,
+    title,
+    body: 'desc',
+  });
+
+  it('routes critical and high to blocking', () => {
+    const { blocking } = gateFindingsBySeverity([
+      make('critical'),
+      make('high'),
+    ]);
+    assert.strictEqual(blocking.length, 2);
+  });
+
+  it('routes medium and low to nonBlocking', () => {
+    const { nonBlocking } = gateFindingsBySeverity([
+      make('medium'),
+      make('low'),
+    ]);
+    assert.strictEqual(nonBlocking.length, 2);
+  });
+
+  it('routes observation to observations bucket', () => {
+    const { observations, blocking, nonBlocking, dropped } =
+      gateFindingsBySeverity([make('observation', 'Correctly handled')]);
+    assert.strictEqual(observations.length, 1);
+    assert.strictEqual(observations[0].title, 'Correctly handled');
+    assert.strictEqual(blocking.length, 0);
+    assert.strictEqual(nonBlocking.length, 0);
+    assert.strictEqual(dropped.length, 0);
+  });
+
+  it('routes trivia to dropped', () => {
+    const { dropped } = gateFindingsBySeverity([make('trivia')]);
+    assert.strictEqual(dropped.length, 1);
+  });
+
+  it('observations do not affect verdict (blocking stays empty)', () => {
+    const { blocking, observations } = gateFindingsBySeverity([
+      make('observation'),
+      make('observation'),
+    ]);
+    assert.strictEqual(blocking.length, 0);
+    assert.strictEqual(observations.length, 2);
+  });
+
+  it('returns empty arrays for all buckets when given no findings', () => {
+    const result = gateFindingsBySeverity([]);
+    assert.strictEqual(result.blocking.length, 0);
+    assert.strictEqual(result.nonBlocking.length, 0);
+    assert.strictEqual(result.observations.length, 0);
+    assert.strictEqual(result.dropped.length, 0);
   });
 });
 

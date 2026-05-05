@@ -181,7 +181,14 @@ const REVIEW_TOOL = {
           properties: {
             severity: {
               type: 'STRING',
-              enum: ['critical', 'high', 'medium', 'low', 'trivia'],
+              enum: [
+                'critical',
+                'high',
+                'medium',
+                'low',
+                'trivia',
+                'observation',
+              ],
             },
             file: {
               type: 'STRING',

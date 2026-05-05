@@ -71,7 +71,14 @@ const REVIEW_TOOL = {
           properties: {
             severity: {
               type: 'string',
-              enum: ['critical', 'high', 'medium', 'low', 'trivia'],
+              enum: [
+                'critical',
+                'high',
+                'medium',
+                'low',
+                'trivia',
+                'observation',
+              ],
             },
             category: {
               type: 'string',
@@ -110,7 +117,7 @@ const CLASSIFY_TOOL = {
     properties: {
       severity: {
         type: 'string',
-        enum: ['critical', 'high', 'medium', 'low', 'trivia'],
+        enum: ['critical', 'high', 'medium', 'low', 'trivia', 'observation'],
       },
       confidence: {
         type: 'number',

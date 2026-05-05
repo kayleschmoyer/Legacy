@@ -182,35 +182,60 @@ export async function addLabelAsApp(prNumber, label) {
  * Each blocking finding gets an embedded <!-- issue-id: ... --> marker so
  * T22 (cycle protocol) can correlate author replies to specific findings.
  *
+ * Observations are appended as a separate "## Observations" section with no
+ * issue-id markers — they are informational and do not require author responses.
+ * They are intentionally excluded from the cycle-protocol title regex so they
+ * are not tracked across review cycles.
+ *
  * @param {Array<import('./findings.mjs').Finding & { issueId: string }>} blockingWithIds
  * @param {'REQUEST_CHANGES'|'APPROVE'} event
+ * @param {import('./findings.mjs').Finding[]} [observations]
  * @param {{ fallbackModel?: string }} [opts]
  * @returns {string}
  */
 export function formatReviewBody(
   blockingWithIds,
   event,
+  observations = [],
   { fallbackModel } = {},
 ) {
   const banner = fallbackModel
     ? `> [!NOTE]\n> This review was generated using **${fallbackModel}** (fallback) because the primary model was temporarily unavailable. Quality may differ slightly.\n\n`
     : '';
 
+  const parts = [];
+
   if (event === 'APPROVE') {
-    return `${banner}LGTM — no blocking findings.`;
+    parts.push(`${banner}LGTM — no blocking findings.`);
+  } else {
+    parts.push(`${banner}## Changes Required\n`);
+    for (const f of blockingWithIds) {
+      const loc = f.file
+        ? f.line != null
+          ? `\`${f.file}:${f.line}\``
+          : `\`${f.file}\``
+        : '_PR-level_';
+      parts.push(
+        `<!-- issue-id: ${f.issueId} -->\n**[${f.severity.toUpperCase()}]** ${f.title} — ${loc}\n\n${f.body}`,
+      );
+    }
   }
 
-  const parts = [`${banner}## Changes Required\n`];
-  for (const f of blockingWithIds) {
-    const loc = f.file
-      ? f.line != null
-        ? `\`${f.file}:${f.line}\``
-        : `\`${f.file}\``
-      : '_PR-level_';
-    parts.push(
-      `<!-- issue-id: ${f.issueId} -->\n**[${f.severity.toUpperCase()}]** ${f.title} — ${loc}\n\n${f.body}`,
-    );
+  if (observations.length > 0) {
+    parts.push('## Observations\n');
+    for (const f of observations) {
+      const loc = f.file
+        ? f.line != null
+          ? `\`${f.file}:${f.line}\``
+          : `\`${f.file}\``
+        : '_PR-level_';
+      // No issue-id marker: observations are informational and not tracked by
+      // the cycle protocol. No [OBSERVATION] severity tag so parseTitlesFromReviewBody
+      // does not pick up these titles and carry them into the next cycle.
+      parts.push(`**${f.title}** — ${loc}\n\n${f.body}`);
+    }
   }
+
   return parts.join('\n\n');
 }
 
@@ -241,6 +266,8 @@ export function buildInlineComments(findingsWithIds) {
  *                            those with file+line also become inline threads)
  * - no blocking findings   → APPROVE
  * - medium/low findings    → inline comments on the same review submission
+ * - observation findings   → appended to the review body as "## Observations";
+ *                            no inline threads, no issue-id markers
  *
  * Requires env vars:
  *   REVIEWER_BOT_APP_ID          — GitHub App numeric ID (public variable)
@@ -250,11 +277,12 @@ export function buildInlineComments(findingsWithIds) {
  * @param {number} prNumber
  * @param {{ blocking: import('./findings.mjs').Finding[],
  *            nonBlocking: import('./findings.mjs').Finding[],
+ *            observations?: import('./findings.mjs').Finding[],
  *            fallbackModel?: string }} gated
  */
 export async function postRealReview(
   prNumber,
-  { blocking, nonBlocking, fallbackModel },
+  { blocking, nonBlocking, observations = [], fallbackModel },
 ) {
   const appId = process.env.REVIEWER_BOT_APP_ID;
   const privateKeyPem = process.env.REVIEWER_BOT_APP_PRIVATE_KEY;
@@ -285,7 +313,9 @@ export async function postRealReview(
   }));
 
   const event = blockingWithIds.length > 0 ? 'REQUEST_CHANGES' : 'APPROVE';
-  const body = formatReviewBody(blockingWithIds, event, { fallbackModel });
+  const body = formatReviewBody(blockingWithIds, event, observations, {
+    fallbackModel,
+  });
   const comments = buildInlineComments([
     ...blockingWithIds,
     ...nonBlockingWithIds,

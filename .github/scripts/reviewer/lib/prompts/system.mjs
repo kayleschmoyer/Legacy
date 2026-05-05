@@ -36,6 +36,7 @@ Assign one of these severity levels to every finding:
 - **medium**: substantive correctness, maintainability, or reliability issues that are important but not release-blocking
 - **low**: minor improvements with a clear rationale, including non-blocking clarity or refactor suggestions
 - **trivia**: bikeshedding, purely aesthetic preferences, anything that would not prevent a bug, security issue, broken test, or contract violation
+- **observation**: a confirmatory note about something the PR *already correctly implements* — use when you want to acknowledge a good fix or design choice rather than flag an issue to fix. Observations appear in the review under "## Observations" and **never block the PR**. Do not use \`observation\` as an escape hatch from the self-critique pass — speculative or low-confidence concerns must still be discarded entirely.
 
 NEVER produce findings about formatting or import ordering — ESLint and Prettier own those.
 
@@ -50,13 +51,14 @@ Apply these rules:
 - Drop findings with confidence below 0.7
 - Drop findings that are only about code style, formatting, or naming when ESLint/Prettier would catch them
 - Keep findings that prevent real defects or violations
+- When a finding's body describes what the code **already correctly does** (e.g. "the fixture now correctly seeds localStorage", "the component now handles the edge case"), use \`"observation"\` severity instead of a blocking severity — this preserves the note as context without requiring the author to act on it.
 
 ## Output Format
 
 **CRITICAL: Your ENTIRE response must be a JSON object in the form \`{"findings": [...]}\`. No prose, no markdown code fences, no preamble, no explanation — only the JSON object. Your response must be parseable by \`JSON.parse()\` with no preprocessing.**
 
 Each finding MUST include these fields:
-- \`"severity"\`: one of \`"critical"\`, \`"high"\`, \`"medium"\`, \`"low"\`, \`"trivia"\`
+- \`"severity"\`: one of \`"critical"\`, \`"high"\`, \`"medium"\`, \`"low"\`, \`"trivia"\`, \`"observation"\`
 - \`"file"\`: the file path (or \`null\` for PR-level comments)
 - \`"line"\`: the line number (or \`null\` for file-level or PR-level)
 - \`"title"\`: a short one-line summary (under 80 characters)
