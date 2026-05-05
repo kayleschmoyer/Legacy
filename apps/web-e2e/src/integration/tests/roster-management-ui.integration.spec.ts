@@ -284,10 +284,10 @@ test.describe
     });
 
     await test.step('Verify current team name is displayed', async () => {
-      // Wait for the Team Settings card to render first — this heading only
+      // Wait for the Team Identity section to render — this heading only
       // appears once getUserTeamId resolves and confirms the user has a team.
       // Using a 30 s budget to account for Lambda cold starts in CI.
-      await expect(page.getByText('Team Settings').first()).toBeVisible({
+      await expect(page.getByText('Team Identity').first()).toBeVisible({
         timeout: 30000,
       });
       // Now wait for leagueTeams to populate and display the correct name.
@@ -296,19 +296,14 @@ test.describe
       ).toBeVisible({ timeout: 15000 });
     });
 
-    await test.step('Click Edit button to open inline input', async () => {
-      // The "Edit" button sits beside the team name when not in edit mode
-      const editBtn = page.getByRole('button', {
-        name: /Edit/i,
-      });
-      await expect(editBtn.first()).toBeVisible({ timeout: 10000 });
-      await editBtn.first().click();
+    await test.step('Verify team name input is directly editable', async () => {
+      // Team.tsx renders the name input always visible — no "Edit" toggle needed
+      const nameInput = page.locator('input[type="text"]').first();
+      await expect(nameInput).toBeVisible({ timeout: 5000 });
     });
 
     await test.step('Type new team name and save', async () => {
-      // After clicking Edit, an inline <input> appears with the current name
       const nameInput = page.locator('input[type="text"]').first();
-      await expect(nameInput).toBeVisible({ timeout: 5000 });
       await nameInput.clear();
       await nameInput.fill(state.renamedTeamName);
 
@@ -552,10 +547,10 @@ test.describe
         'Unexpected Application Error',
         { timeout: 30000 },
       );
-      // Wait for the Team Settings card to render before checking the name.
+      // Wait for the Team Identity section to render before checking the name.
       // This heading only appears once getUserTeamId resolves and confirms
       // the user has a team — mirrors the guard used in Phase 5.
-      await expect(page.getByText('Team Settings').first()).toBeVisible({
+      await expect(page.getByText('Team Identity').first()).toBeVisible({
         timeout: 30000,
       });
       await expect(
