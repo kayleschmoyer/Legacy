@@ -75,6 +75,11 @@ export const seasonDraftGames = pgTable(
       withTimezone: true,
       mode: 'string',
     }),
+    pickDeadlineSeconds: integer('pick_deadline_seconds').notNull().default(60),
+    currentPickDeadline: timestamp('current_pick_deadline', {
+      withTimezone: true,
+      mode: 'string',
+    }),
   },
   (table) => {
     return {

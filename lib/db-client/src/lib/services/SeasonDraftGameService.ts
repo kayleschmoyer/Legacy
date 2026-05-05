@@ -80,6 +80,8 @@ export interface GameState {
   gameMode: string;
   playerType: string;
   inviteCode: string | null;
+  pickDeadlineSeconds: number;
+  currentPickDeadline: string | null;
   players: {
     id: number;
     userId: number;
@@ -248,12 +250,26 @@ export class SeasonDraftGameService {
       throw new Error('At least 2 players must join before starting the draft');
     }
 
+    const [game] = await db
+      .select({
+        pickDeadlineSeconds: PublicSchema.seasonDraftGames.pickDeadlineSeconds,
+      })
+      .from(PublicSchema.seasonDraftGames)
+      .where(eq(PublicSchema.seasonDraftGames.id, gameId))
+      .limit(1);
+
+    const deadlineSeconds = game?.pickDeadlineSeconds ?? 60;
+    const deadline = new Date(
+      Date.now() + deadlineSeconds * 1000,
+    ).toISOString();
+
     await db
       .update(PublicSchema.seasonDraftGames)
       .set({
         status: 'drafting',
         numPlayers: players.length,
         startedAt: new Date().toISOString(),
+        currentPickDeadline: deadline,
       })
       .where(eq(PublicSchema.seasonDraftGames.id, gameId));
 
@@ -550,6 +566,9 @@ export class SeasonDraftGameService {
       gameMode: game.gameMode,
       playerType: game.playerType,
       inviteCode: game.inviteCode ?? null,
+      pickDeadlineSeconds: game.pickDeadlineSeconds,
+      currentPickDeadline:
+        game.status === 'drafting' ? (game.currentPickDeadline ?? null) : null,
       players: playersWithRosters,
       picks: picks.map((p) => ({
         pickNumber: p.pickNumber,
@@ -1030,11 +1049,14 @@ export class SeasonDraftGameService {
       })
       .where(eq(PublicSchema.seasonDraftPlayers.id, currentPlayer.id));
 
-    // Advance to next turn
+    // Advance to next turn and set new pick deadline
     const nextTurn = (game.currentTurn + 1) % game.numPlayers;
+    const nextDeadline = new Date(
+      Date.now() + game.pickDeadlineSeconds * 1000,
+    ).toISOString();
     await db
       .update(PublicSchema.seasonDraftGames)
-      .set({ currentTurn: nextTurn })
+      .set({ currentTurn: nextTurn, currentPickDeadline: nextDeadline })
       .where(eq(PublicSchema.seasonDraftGames.id, params.gameId));
 
     // Check if game is complete (all slots filled)
@@ -1047,6 +1069,7 @@ export class SeasonDraftGameService {
         .set({
           status: 'completed',
           completedAt: new Date().toISOString(),
+          currentPickDeadline: null,
         })
         .where(eq(PublicSchema.seasonDraftGames.id, params.gameId));
 

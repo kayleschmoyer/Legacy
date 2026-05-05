@@ -119,6 +119,8 @@ interface GameState {
   gameMode: SeasonDraftGameMode;
   playerType: SeasonDraftPlayerType;
   inviteCode?: string | null;
+  pickDeadlineSeconds?: number | null;
+  currentPickDeadline?: string | null;
   players: GamePlayer[];
   picks: Array<{
     pickNumber: number;
@@ -770,11 +772,13 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
               <Text color="$textMuted" fontSize={12}>
                 Pick {filledSlots + 1} / {totalSlots}
               </Text>
-              {/*
-                TODO(LS-4129): Render a live countdown driven by a
-                server-authoritative `currentPickDeadline` field. Schema
-                addition + frontend wiring tracked in LS-4129.
-              */}
+              {gameState.currentPickDeadline &&
+                gameState.pickDeadlineSeconds != null && (
+                  <PickDeadlineCountdown
+                    deadline={gameState.currentPickDeadline}
+                    totalSeconds={gameState.pickDeadlineSeconds}
+                  />
+                )}
             </YStack>
           )}
 
@@ -1847,6 +1851,60 @@ function PillButton({
     >
       {children}
     </Button>
+  );
+}
+
+interface PickDeadlineCountdownProps {
+  deadline: string;
+  totalSeconds: number;
+}
+
+function PickDeadlineCountdown({
+  deadline,
+  totalSeconds,
+}: PickDeadlineCountdownProps): React.JSX.Element {
+  const [remaining, setRemaining] = useState(() => {
+    const end = new Date(deadline).getTime();
+    return Math.max(0, Math.ceil((end - Date.now()) / 1000));
+  });
+
+  useEffect(() => {
+    const tick = () => {
+      const end = new Date(deadline).getTime();
+      setRemaining(Math.max(0, Math.ceil((end - Date.now()) / 1000)));
+    };
+    const id = setInterval(tick, 250);
+    return () => clearInterval(id);
+  }, [deadline]);
+
+  const pct = totalSeconds > 0 ? Math.min(1, remaining / totalSeconds) : 0;
+  const isLow = remaining <= 10;
+  const mins = Math.floor(remaining / 60);
+  const secs = remaining % 60;
+  const label = `${mins}:${String(secs).padStart(2, '0')}`;
+
+  return (
+    <YStack gap="$1" marginTop="$1">
+      <Text
+        fontSize={18}
+        fontWeight="800"
+        color={isLow ? '$brandSeamRedLight' : '$textMuted'}
+      >
+        {label}
+      </Text>
+      <Stack
+        height={3}
+        borderRadius={999}
+        backgroundColor="$surfacePanelBorder"
+        overflow="hidden"
+      >
+        <Stack
+          height="100%"
+          width={`${Math.max(0, Math.round(pct * 100))}%`}
+          backgroundColor={isLow ? '$brandSeamRed' : '$brandGold'}
+        />
+      </Stack>
+    </YStack>
   );
 }
 

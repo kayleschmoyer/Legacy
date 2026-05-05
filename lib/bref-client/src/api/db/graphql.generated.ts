@@ -3268,11 +3268,13 @@ export type SeasonBatting = {
 export type SeasonDraftGame = {
   __typename?: 'SeasonDraftGame';
   createdBy?: Maybe<Scalars['Int']['output']>;
+  currentPickDeadline?: Maybe<Scalars['String']['output']>;
   currentTurn?: Maybe<Scalars['Int']['output']>;
   gameMode?: Maybe<SeasonDraftGameMode>;
   id?: Maybe<Scalars['Int']['output']>;
   inviteCode?: Maybe<Scalars['String']['output']>;
   name?: Maybe<Scalars['String']['output']>;
+  pickDeadlineSeconds?: Maybe<Scalars['Int']['output']>;
   picks?: Maybe<Array<SeasonDraftGamePickHistory>>;
   playerType?: Maybe<SeasonDraftPlayerType>;
   players?: Maybe<Array<SeasonDraftPlayer>>;

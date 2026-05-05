@@ -3170,11 +3170,13 @@ A Season Draft Game with full state
 """
 type SeasonDraftGame {
   createdBy: Int
+  currentPickDeadline: String
   currentTurn: Int
   gameMode: SeasonDraftGameMode
   id: Int
   inviteCode: String
   name: String
+  pickDeadlineSeconds: Int
   picks: [SeasonDraftGamePickHistory!]
   playerType: SeasonDraftPlayerType
   players: [SeasonDraftPlayer!]

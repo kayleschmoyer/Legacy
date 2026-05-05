@@ -217,6 +217,8 @@ const SeasonDraftGame = builder.objectRef<{
   gameMode: string;
   playerType: string;
   inviteCode: string | null;
+  pickDeadlineSeconds: number;
+  currentPickDeadline: string | null;
   players: Array<{
     id: number;
     userId: number;
@@ -272,6 +274,10 @@ SeasonDraftGame.implement({
       resolve: (parent) => parent.playerType as 'hitter' | 'pitcher',
     }),
     inviteCode: t.exposeString('inviteCode', { nullable: true }),
+    pickDeadlineSeconds: t.exposeInt('pickDeadlineSeconds'),
+    currentPickDeadline: t.exposeString('currentPickDeadline', {
+      nullable: true,
+    }),
     players: t.field({
       type: [SeasonDraftPlayer],
       resolve: (parent) => parent.players,
