@@ -433,10 +433,10 @@ export async function postInfraErrorReview(prNumber) {
  * context-too-large). Distinct from postInfraErrorReview, which is a
  * catch-all "we don't know what went wrong" message.
  *
- * The review event is REQUEST_CHANGES for author-actionable failures (PR is
- * too large, cost cap exceeded) and a plain comment-only review for
- * provider-side failures the author can't fix (rate-limit, auth, daily
- * quota) — those should not block merge under branch protection.
+ * All failure kinds post REQUEST_CHANGES so the outcome is unambiguous in the
+ * automated workflow: a PR either has APPROVE or it needs attention. Re-apply
+ * the `bot:ready-for-review` label to re-trigger after provider-side issues
+ * resolve.
  *
  * @param {object} params
  * @param {number} params.prNumber
@@ -500,7 +500,7 @@ export async function postKnownLlmFailureReview({
 /**
  * @param {string} kind
  * @param {object} details
- * @returns {{ body: string, event: 'COMMENT' | 'REQUEST_CHANGES' }}
+ * @returns {{ body: string, event: 'REQUEST_CHANGES' }}
  */
 export function buildKnownFailureBody(kind, details = {}) {
   switch (kind) {
@@ -509,7 +509,7 @@ export function buildKnownFailureBody(kind, details = {}) {
         ? `~${Math.ceil(details.retryAfterSeconds)}s`
         : 'a minute';
       return {
-        event: 'COMMENT',
+        event: 'REQUEST_CHANGES',
         body:
           '## Reviewer rate-limited\n\n' +
           '<!-- bot-infra-failure: true -->\n' +
@@ -519,7 +519,7 @@ export function buildKnownFailureBody(kind, details = {}) {
     }
     case 'quota':
       return {
-        event: 'COMMENT',
+        event: 'REQUEST_CHANGES',
         body:
           '## Reviewer daily quota exhausted\n\n' +
           '<!-- bot-infra-failure: true -->\n' +
@@ -531,7 +531,7 @@ export function buildKnownFailureBody(kind, details = {}) {
       };
     case 'auth':
       return {
-        event: 'COMMENT',
+        event: 'REQUEST_CHANGES',
         body:
           '## Reviewer authentication failed\n\n' +
           '<!-- bot-infra-failure: true -->\n' +

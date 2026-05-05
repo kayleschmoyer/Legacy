@@ -285,19 +285,19 @@ describe('buildKnownFailureBody infra-failure marker', () => {
     );
   });
 
-  it('rate-limit uses COMMENT event (does not block merge)', () => {
+  it('rate-limit uses REQUEST_CHANGES event', () => {
     const { event } = buildKnownFailureBody('rate-limit');
-    assert.strictEqual(event, 'COMMENT');
+    assert.strictEqual(event, 'REQUEST_CHANGES');
   });
 
-  it('quota uses COMMENT event (does not block merge)', () => {
+  it('quota uses REQUEST_CHANGES event', () => {
     const { event } = buildKnownFailureBody('quota');
-    assert.strictEqual(event, 'COMMENT');
+    assert.strictEqual(event, 'REQUEST_CHANGES');
   });
 
-  it('auth uses COMMENT event (does not block merge)', () => {
+  it('auth uses REQUEST_CHANGES event', () => {
     const { event } = buildKnownFailureBody('auth');
-    assert.strictEqual(event, 'COMMENT');
+    assert.strictEqual(event, 'REQUEST_CHANGES');
   });
 });
 
