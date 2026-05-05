@@ -14,6 +14,7 @@ import { createAllMatchupsForLeague } from './matchups/mutations';
 import { getLeague, getTeam, getUser } from '../__fixtures__';
 import {
   cleanupTestData,
+  getTestClient,
   getTestDatabase,
   integrationTestSchema,
 } from '../../integration-test-setup';
@@ -43,6 +44,9 @@ describe('Draft Picks - Integration Tests', () => {
 
   beforeAll(async () => {
     db = await getTestDatabase();
+    // Drizzle's defaultNow() emits now() in SQL; SQLite has no built-in now().
+    const client = await getTestClient();
+    client.function('now', () => new Date().toISOString());
   });
 
   beforeEach(async () => {
@@ -578,7 +582,7 @@ describe('Draft Picks - Integration Tests', () => {
         playerId: playerFix[0].id,
         maxRosterSize: 2,
         pickTimeLimitSeconds: 60,
-        isMockDraft: false,
+        isMockDraft: true,
       });
 
       const [updatedDraft] = await db
@@ -616,7 +620,7 @@ describe('Draft Picks - Integration Tests', () => {
         playerId: playerFix[0].id,
         maxRosterSize: 2,
         pickTimeLimitSeconds: 60,
-        isMockDraft: false,
+        isMockDraft: true,
       });
 
       const [updatedDraft] = await db
@@ -897,7 +901,7 @@ describe('Draft Picks - Integration Tests', () => {
         playerId: playerFix[0].id,
         maxRosterSize: 2,
         pickTimeLimitSeconds: 60,
-        isMockDraft: false,
+        isMockDraft: true,
       });
 
       const pickInfo = await getCurrentDraftPickInfo(publicDb(), draft.id);
@@ -945,7 +949,7 @@ describe('Draft Picks - Integration Tests', () => {
           playerId: allPlayers[i].id,
           maxRosterSize: 2,
           pickTimeLimitSeconds: 60,
-          isMockDraft: false,
+          isMockDraft: true,
         });
 
         const afterPick = await getCurrentDraftPickInfo(publicDb(), draft.id);
@@ -961,6 +965,88 @@ describe('Draft Picks - Integration Tests', () => {
           );
         }
       }
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // LS-4205: "Draft Complete!" banner not shown (7th consecutive run).
+  //
+  // The banner has three render conditions in EliteDraftBoardScreen:
+  //   ui.draftComplete  (in-memory, set by WS/poll effects)
+  //   leagueDraft?.draftCompletedAt  (Apollo cache, hydrated via refetchDraft)
+  //   currentPickInfo?.isComplete  (Apollo cache, hydrated by 5s poll)
+  //
+  // All three paths depend on the server atomically writing draftCompletedAt
+  // and draftStatus='completed' in the same transaction as the final pick so
+  // that a page reload (cache miss) always finds a consistent completed state.
+  // This test pins that contract end-to-end across a full pick sequence.
+  describe('Draft completion — banner persistence across page reloads (LS-4205)', () => {
+    const publicDb = () => db as unknown as PublicDb;
+
+    it('atomically sets draftCompletedAt and draftStatus=completed only on the final pick', async () => {
+      // 4 teams × 2 roster slots = 8 total picks in a snake draft.
+      // Picks 1-7 must NOT set draftCompletedAt or draftStatus=completed;
+      // pick 8 must set both in the same transaction.  This is what makes the
+      // "Draft Complete!" banner reliable on page reload (Apollo cache hydration
+      // via refetchDraft/getLeagueDraft) regardless of WS delivery (LS-4205).
+      const { league, draft, players: playerFix } = await seedDraftFixture(4);
+
+      const extraPlayers = await db
+        .insert(players)
+        .values([
+          { firstName: 'Eve', lastName: 'E', brefId: 'ls4205e01' },
+          { firstName: 'Frank', lastName: 'F', brefId: 'ls4205f01' },
+          { firstName: 'Grace', lastName: 'G', brefId: 'ls4205g01' },
+          { firstName: 'Hank', lastName: 'H', brefId: 'ls4205h01' },
+        ])
+        .returning();
+
+      const allPlayers = [...playerFix, ...extraPlayers];
+
+      for (let i = 0; i < 8; i++) {
+        const pickInfo = await getCurrentDraftPickInfo(publicDb(), draft.id);
+        expect(pickInfo).not.toBeNull();
+
+        await commitDraftPick({
+          tx: publicDb(),
+          draftId: draft.id,
+          leagueId: league.id,
+          pickInfo: pickInfo!,
+          playerId: allPlayers[i].id,
+          maxRosterSize: 2,
+          pickTimeLimitSeconds: 60,
+          isMockDraft: true,
+        });
+
+        const [draftRow] = await db
+          .select()
+          .from(drafts)
+          .where(eq(drafts.id, draft.id));
+        const [leagueRow] = await db
+          .select()
+          .from(leagues)
+          .where(eq(leagues.id, league.id));
+
+        const isLastPick = i === 7;
+
+        if (isLastPick) {
+          // getLeagueDraft (Apollo refetchDraft) will see draftCompletedAt != null,
+          // causing the banner's second render condition to evaluate true on reload.
+          expect(draftRow.draftCompletedAt).not.toBeNull();
+          expect(leagueRow.draftStatus).toBe('completed');
+        } else {
+          // Earlier picks must not prematurely complete the draft.
+          expect(draftRow.draftCompletedAt).toBeNull();
+          expect(leagueRow.draftStatus).not.toBe('completed');
+        }
+      }
+
+      // getCurrentDraftPickInfo (5s poll / refetchCurrentPick) must return
+      // isComplete:true after the final pick, triggering setDraftComplete(true)
+      // in useDraftEffects even without a WebSocket DraftCompleted event.
+      const finalPickInfo = await getCurrentDraftPickInfo(publicDb(), draft.id);
+      expect(finalPickInfo).not.toBeNull();
+      expect(finalPickInfo!.isComplete).toBe(true);
     });
   });
 });
