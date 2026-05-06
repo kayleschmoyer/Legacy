@@ -71,6 +71,13 @@ if (args['main-repo']) {
     );
     if (siblingMatch) {
       mainRepo = join(siblingMatch[1], siblingMatch[2]);
+    } else if (isMainRepo(worktree)) {
+      // Running from the main repo itself — nothing to set up here.
+      console.log(
+        '[skip] This directory appears to be the main repo, not a worktree.\n' +
+          '       Run this script from inside a worktree directory to set up its node_modules and .env.local.',
+      );
+      process.exit(0);
     } else {
       console.error(
         `[setup-worktree-node-modules] Cannot auto-detect main repo from worktree path:\n  ${worktree}\n` +
@@ -87,6 +94,23 @@ const mainNmPath = join(mainRepo, 'node_modules');
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Returns true when `dir` is the main (primary) git worktree.
+ *
+ * In the primary worktree `.git` is a real directory.
+ * In every linked worktree `.git` is a plain file whose contents start with
+ * "gitdir: " (git places a gitfile there instead of the directory).
+ * This works regardless of whether `.claude/worktrees/` exists yet.
+ */
+function isMainRepo(dir) {
+  const gitPath = join(dir, '.git');
+  try {
+    return lstatSync(gitPath).isDirectory();
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Normalize a path for comparison. On Windows, realpathSync may return
@@ -235,10 +259,6 @@ if (existsSync(nmPath) || lstatExistsSync(nmPath)) {
         linkSecretEnvFiles();
         process.exit(0);
       }
-      console.log(
-        '[info] Symlink exists and points to correct target but is unhealthy ' +
-          '(empty .bin or inaccessible). Removing and recreating.',
-      );
     } else if (isJunction) {
       console.log(
         '[info] Junction detected — converting to a directory symlink (safe for recursive-delete).',
