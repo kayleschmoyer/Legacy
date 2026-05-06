@@ -2,6 +2,24 @@
 
 Commands, Nx targets, environment setup, and troubleshooting for integration tests.
 
+## Integration tests CAN be run locally
+
+Agents commonly assume integration auth requires credentials only available in CI. **It does not.** Test-user credentials live in the main repo's gitignored `.env` (`E2E_COMMISSIONER_EMAIL/PASSWORD`, `E2E_MANAGER_1..3_EMAIL/PASSWORD`, `VITE_OAUTH_PROXY_URL`), and the worktree bootstrap script symlinks that file into every native worktree. After running:
+
+```
+node scripts/setup-worktree-node-modules.mjs
+```
+
+…integration tests will pick up auth automatically — `playwright.integration.config.ts` loads `<repo>/.env` and the API/UI fixtures call `getTestUserJwt()` against the live OAuth proxy to obtain JWTs at runtime. No additional setup is required for the standard fixtures (`api`, `api2`, `apiCommissioner`, `commissionerPage`, `managerPage1..3`).
+
+Caveats:
+
+- **Google OAuth tests only**: a small subset of tests need `GOOGLE_TEST_EMAIL` / `GOOGLE_TEST_PASSWORD`. These are not in the main `.env` by default. If you need to run those specifically, ask the user to populate the values; otherwise filter them out with `--grep-invert='@google'` or similar.
+- **`INTEGRATION_BASE_URL`** defaults to production (`https://api.legacy-fantasy.com/`) when unset. Override only if you need to target staging or a local backend.
+- **`make install`-based worktrees**: if you opted for an independent `node_modules` (no symlink), the bootstrap script's env-linking step still runs the next time you call it — but if you skipped it entirely, copy `.env` and `.env.local` from main manually.
+
+## Nx Targets
+
 ## Nx Targets
 
 The following targets are already configured in `apps/web-e2e/project.json` using the `nx:run-commands` executor:

@@ -32,15 +32,17 @@ The Claude Code session was spawned with the launcher `worktree` checkbox checke
    ```
    worktree_set(key: "<absolute .claude/worktrees/... path from pwd>")
    ```
-7. **Symlink `node_modules` from the main repo** (REQUIRED before any pnpm/make command — LS-2903/LS-3003):
+7. **Symlink `node_modules` and secret env files from the main repo** (REQUIRED before any pnpm/make command — LS-2903/LS-3003):
 
    ```
    node scripts/setup-worktree-node-modules.mjs
    ```
 
-   Run from the worktree root. Uses Node.js `fs` APIs internally — no shell escaping needed. Idempotent (safe to call if symlink already exists). Requires Windows Developer Mode for directory symlinks. **Never** use `New-Item -ItemType SymbolicLink`, `New-Item -ItemType Junction`, or raw `mklink /J` — they bypass `.modules.yaml` path consistency checks and cause Nx graph failures.
+   Run from the worktree root. Uses Node.js `fs` APIs internally — no shell escaping needed. Idempotent (safe to call if symlinks already exist). Requires Windows Developer Mode for symlinks. **Never** use `New-Item -ItemType SymbolicLink`, `New-Item -ItemType Junction`, or raw `mklink /J` — they bypass `.modules.yaml` path consistency checks and cause Nx graph failures.
 
-   If Windows Developer Mode is not available, use `make install` inside the worktree instead — this creates an independent `node_modules` and is always safe.
+   In addition to `node_modules`, the script also links the main repo's gitignored secret files (`.env`, `.env.local`) into the worktree as file symlinks. This is what lets agents run integration tests locally — `playwright.integration.config.ts` loads `<repo>/.env` for `E2E_COMMISSIONER_*`, `E2E_MANAGER_*`, `VITE_OAUTH_PROXY_URL`, etc. — without manual per-worktree credential copying. Symlinks (not copies) ensure secret rotations in main propagate automatically. If a real file is already present in the worktree (not a symlink), the script leaves it alone — delete it manually if you want to switch to the linked copy.
+
+   If Windows Developer Mode is not available, use `make install` inside the worktree instead — this creates an independent `node_modules` and is always safe. You will need to copy `.env` / `.env.local` from main manually in that case.
 
    > **Verify after setup — main repo `node_modules` may be empty**: The symlink target (`D:\code\legacy-sports\node_modules`) may contain **0 packages** if the last `make install` ran inside a sibling worktree rather than the main repo — the symlink resolves without error but all tools (`nx`, `prettier`, etc.) are missing. After running the script, confirm the install is populated:
    >

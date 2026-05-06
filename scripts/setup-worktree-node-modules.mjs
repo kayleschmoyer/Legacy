@@ -1,6 +1,12 @@
 #!/usr/bin/env node
 /**
- * Bootstrap script: symlink <worktree>/node_modules → <main-repo>/node_modules.
+ * Bootstrap script: symlink <worktree>/node_modules → <main-repo>/node_modules,
+ * plus link gitignored secret env files (.env, .env.local) the same way so
+ * worktrees inherit the main repo's local credentials without manual copying.
+ *
+ * The .env link in particular is what lets agents run integration tests
+ * (apps/web-e2e/playwright.integration.config.ts loads <repo>/.env at startup
+ * for E2E_COMMISSIONER_*, E2E_MANAGER_*, VITE_OAUTH_PROXY_URL, etc.).
  *
  * Run with plain `node` — no tsx, no pnpm, no MCP required. This is intentionally
  * dependency-free so it works when node_modules is absent and MCP servers have not
@@ -224,9 +230,9 @@ if (existsSync(nmPath) || lstatExistsSync(nmPath)) {
           );
           process.exit(1);
         }
-        console.log(
-          '[ok] node_modules symlink already exists and is healthy. Nothing to do.',
-        );
+        console.log('[ok] node_modules symlink already exists and is healthy.');
+        // Fall through to env-file linking so re-runs still refresh those.
+        linkSecretEnvFiles();
         process.exit(0);
       }
       console.log(
@@ -335,6 +341,101 @@ if (verified) {
     '[warn] Symlink created but .bin is empty — main repo node_modules may be incomplete.\n' +
       "       Run 'make install' in the main repo, then re-run this script.",
   );
+}
+
+// ---------------------------------------------------------------------------
+// 5. Link gitignored secret env files (.env, .env.local) from main repo
+// ---------------------------------------------------------------------------
+// These files live only in the main repo (gitignored, contain local creds).
+// Symlinking — rather than copying — means rotations in main propagate to all
+// worktrees automatically. Failures here are non-fatal: the primary mission
+// (node_modules) is done; missing env files just mean some local-only flows
+// (integration tests, MCP auth) won't work until the user fixes them.
+
+linkSecretEnvFiles();
+
+function linkSecretEnvFiles() {
+  console.log('');
+  for (const name of ['.env', '.env.local']) {
+    linkEnvFile(name);
+  }
+}
+
+function linkEnvFile(name) {
+  const mainPath = join(mainRepo, name);
+  const wtPath = join(worktree, name);
+
+  if (!existsSync(mainPath)) {
+    console.log(`[skip] ${name}: not present in main repo, nothing to link.`);
+    return;
+  }
+
+  if (lstatExistsSync(wtPath)) {
+    let stat;
+    try {
+      stat = lstatSync(wtPath);
+    } catch {
+      stat = null;
+    }
+    if (stat && stat.isSymbolicLink()) {
+      let target;
+      try {
+        target = realpathSync(wtPath);
+      } catch {
+        target = null;
+      }
+      if (target && normalizePath(target) === normalizePath(mainPath)) {
+        console.log(`[ok] ${name}: symlink already points to main repo.`);
+        return;
+      }
+      console.log(`[info] ${name}: symlink points elsewhere — replacing.`);
+      try {
+        rmSync(wtPath);
+      } catch (err) {
+        console.warn(
+          `[warn] ${name}: failed to remove existing link: ${String(err.message ?? err)}`,
+        );
+        return;
+      }
+    } else {
+      console.log(
+        `[skip] ${name}: real file present in worktree (not a symlink). ` +
+          'Delete it manually if you want to link to the main-repo copy.',
+      );
+      return;
+    }
+  }
+
+  if (process.platform === 'win32') {
+    // mklink without /D = file symlink. Requires Windows Developer Mode (or admin).
+    try {
+      execFileSync('cmd', ['/c', 'mklink', wtPath, mainPath], {
+        encoding: 'utf-8',
+        timeout: 10_000,
+      });
+    } catch (err) {
+      const msg = String(err.message ?? err);
+      const needsDeveloperMode = /privilege|EPERM|1314/i.test(msg);
+      console.warn(
+        `[warn] ${name}: failed to create symlink: ${msg}` +
+          (needsDeveloperMode
+            ? '\n       File symlinks require Windows Developer Mode.\n' +
+              `       Workaround: copy main repo's ${name} into this worktree manually.`
+            : ''),
+      );
+      return;
+    }
+  } else {
+    try {
+      symlinkSync(mainPath, wtPath, 'file');
+    } catch (err) {
+      console.warn(
+        `[warn] ${name}: failed to create symlink: ${String(err.message ?? err)}`,
+      );
+      return;
+    }
+  }
+  console.log(`[ok] ${name}: linked → ${mainPath}`);
 }
 
 // ---------------------------------------------------------------------------
