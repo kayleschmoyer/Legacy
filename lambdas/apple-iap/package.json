@@ -19,7 +19,8 @@
     "@legacy-sports/rollbar": "workspace:*",
     "@legacy-sports/utils": "workspace:*",
     "aws-lambda": "*",
-    "jose": "*"
+    "jose": "*",
+    "zod": "*"
   },
   "devDependencies": {
     "@types/aws-lambda": "*",

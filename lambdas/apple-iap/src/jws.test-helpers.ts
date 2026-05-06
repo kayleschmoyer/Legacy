@@ -3,6 +3,8 @@
  * This module must not import `jose` or any other ESM-only dependency so
  * it can be required from both production code and jest specs.
  */
+import { z } from 'zod';
+import type { JwsTransactionDecodedPayload } from './types';
 
 /**
  * Convert a base64-encoded DER certificate to PEM format.
@@ -91,4 +93,69 @@ export function validateNotificationBundleId(
       `Bundle ID mismatch: expected ${expectedBundleId}, got ${actualBundleId}`,
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// Runtime payload validation schemas
+// ---------------------------------------------------------------------------
+
+const transactionPayloadSchema = z.object({
+  originalTransactionId: z.string().min(1),
+  transactionId: z.string().min(1),
+  productId: z.string().min(1),
+  bundleId: z.string().min(1),
+  purchaseDate: z.number().int(),
+  expiresDate: z.number().int().optional(),
+  appAccountToken: z.string().optional(),
+  subscriptionGroupIdentifier: z.string().optional(),
+});
+
+const notificationDataSchema = z
+  .object({
+    bundleId: z.string().min(1),
+    bundleVersion: z.string().optional(),
+    environment: z.enum(['Sandbox', 'Production']),
+  })
+  .passthrough();
+
+/**
+ * Parse and validate a raw decoded JWS transaction payload against the
+ * required fields. Throws a descriptive Error (not a ZodError) if validation
+ * fails so callers get a clean rejection message.
+ */
+export function parseTransactionPayload(
+  raw: unknown,
+): JwsTransactionDecodedPayload {
+  const result = transactionPayloadSchema.safeParse(raw);
+  if (!result.success) {
+    const fields = result.error.issues
+      .map((i) => (i.path.length > 0 ? i.path.join('.') : i.message))
+      .join(', ');
+    throw new Error(
+      `Invalid transaction payload: missing or invalid fields (${fields})`,
+    );
+  }
+  return result.data;
+}
+
+/**
+ * Parse and validate the outer notification data object. Throws a descriptive
+ * Error if required fields (bundleId, environment) are absent or malformed.
+ */
+export function parseNotificationData(raw: unknown): {
+  bundleId: string;
+  bundleVersion?: string;
+  environment: 'Sandbox' | 'Production';
+  [key: string]: unknown;
+} {
+  const result = notificationDataSchema.safeParse(raw);
+  if (!result.success) {
+    const fields = result.error.issues
+      .map((i) => (i.path.length > 0 ? i.path.join('.') : i.message))
+      .join(', ');
+    throw new Error(
+      `Invalid notification data: missing or invalid fields (${fields})`,
+    );
+  }
+  return result.data;
 }

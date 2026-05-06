@@ -868,6 +868,9 @@ importers:
       jose:
         specifier: '*'
         version: 6.2.2
+      zod:
+        specifier: '*'
+        version: 4.3.6
     devDependencies:
       '@types/aws-lambda':
         specifier: '*'

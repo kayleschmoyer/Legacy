@@ -4,6 +4,8 @@ import {
   assertChainNameLinkage,
   assertLeafKeyUsageAllowsSigning,
   derToPem,
+  parseNotificationData,
+  parseTransactionPayload,
   validateNotificationBundleId,
 } from './jws.test-helpers';
 
@@ -119,6 +121,112 @@ describe('JWS helpers', () => {
       expect(() =>
         validateNotificationBundleId('com.my.app', 'com.my.app'),
       ).not.toThrow();
+    });
+  });
+
+  describe('parseTransactionPayload', () => {
+    const validTransaction = {
+      originalTransactionId: 'txn-orig-001',
+      transactionId: 'txn-001',
+      productId: 'com.my.app.premium',
+      bundleId: 'com.my.app',
+      purchaseDate: 1700000000000,
+    };
+
+    it('accepts a valid transaction payload', () => {
+      expect(() => parseTransactionPayload(validTransaction)).not.toThrow();
+      const result = parseTransactionPayload(validTransaction);
+      expect(result.originalTransactionId).toBe('txn-orig-001');
+      expect(result.productId).toBe('com.my.app.premium');
+    });
+
+    it('accepts optional fields when present', () => {
+      const withOptional = {
+        ...validTransaction,
+        expiresDate: 1800000000000,
+        appAccountToken: 'uuid-token',
+        subscriptionGroupIdentifier: 'group-1',
+      };
+      const result = parseTransactionPayload(withOptional);
+      expect(result.expiresDate).toBe(1800000000000);
+      expect(result.appAccountToken).toBe('uuid-token');
+    });
+
+    it('throws when originalTransactionId is missing', () => {
+      const { originalTransactionId: _omit, ...rest } = validTransaction;
+      expect(() => parseTransactionPayload(rest)).toThrow(
+        /originalTransactionId/,
+      );
+    });
+
+    it('throws when productId is missing', () => {
+      const { productId: _omit, ...rest } = validTransaction;
+      expect(() => parseTransactionPayload(rest)).toThrow(/productId/);
+    });
+
+    it('throws when bundleId is missing', () => {
+      const { bundleId: _omit, ...rest } = validTransaction;
+      expect(() => parseTransactionPayload(rest)).toThrow(/bundleId/);
+    });
+
+    it('throws when a required string field is empty', () => {
+      expect(() =>
+        parseTransactionPayload({ ...validTransaction, productId: '' }),
+      ).toThrow(/productId/);
+    });
+
+    it('throws when the raw value is not an object', () => {
+      expect(() => parseTransactionPayload(null)).toThrow(
+        /Invalid transaction payload/,
+      );
+      expect(() => parseTransactionPayload('not-an-object')).toThrow(
+        /Invalid transaction payload/,
+      );
+    });
+  });
+
+  describe('parseNotificationData', () => {
+    const validData = {
+      bundleId: 'com.my.app',
+      environment: 'Sandbox' as const,
+    };
+
+    it('accepts valid notification data', () => {
+      const result = parseNotificationData(validData);
+      expect(result.bundleId).toBe('com.my.app');
+      expect(result.environment).toBe('Sandbox');
+    });
+
+    it('accepts Production environment', () => {
+      const result = parseNotificationData({
+        ...validData,
+        environment: 'Production',
+      });
+      expect(result.environment).toBe('Production');
+    });
+
+    it('accepts optional bundleVersion', () => {
+      const result = parseNotificationData({
+        ...validData,
+        bundleVersion: '1.2.3',
+      });
+      expect(result.bundleVersion).toBe('1.2.3');
+    });
+
+    it('throws when bundleId is missing', () => {
+      const { bundleId: _omit, ...rest } = validData;
+      expect(() => parseNotificationData(rest)).toThrow(/bundleId/);
+    });
+
+    it('throws when environment is an invalid value', () => {
+      expect(() =>
+        parseNotificationData({ ...validData, environment: 'staging' }),
+      ).toThrow(/environment/);
+    });
+
+    it('throws when environment is missing', () => {
+      const { environment: _omit, ...rest } = validData;
+      expect(() => parseNotificationData(rest)).toThrow(/environment/);
     });
   });
 });

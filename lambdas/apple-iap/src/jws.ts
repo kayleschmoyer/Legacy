@@ -19,12 +19,10 @@ import {
   assertChainNameLinkage,
   assertLeafKeyUsageAllowsSigning,
   derToPem,
+  parseNotificationData,
+  parseTransactionPayload,
 } from './jws.test-helpers';
-import type {
-  AppStoreNotification,
-  AppStoreNotificationData,
-  JwsTransactionDecodedPayload,
-} from './types';
+import type { AppStoreNotification, AppStoreNotificationData } from './types';
 
 // Apple Root CA G3 — the root that signs App Store certificates.
 // Downloaded from: https://www.apple.com/certificateauthority/
@@ -85,21 +83,27 @@ export async function decodeAndVerifyJws(
   );
   const outerPayload = outerPayloadBytes as Record<string, unknown>;
 
-  // Step 6: Decode signedTransactionInfo (nested JWS)
-  const transactionInfo = await decodeNestedJws(
-    outerPayload['data'] as Record<string, unknown>,
-    'signedTransactionInfo',
-  );
+  // Step 6: Validate outerPayload.data before further processing
+  const validatedData = parseNotificationData(outerPayload['data']);
 
-  // Step 7: Build the notification object
-  const data = outerPayload['data'] as Record<string, unknown>;
+  // Step 7: Decode and validate signedTransactionInfo (nested JWS)
+  let rawTransactionInfo: Record<string, unknown>;
+  try {
+    rawTransactionInfo = await decodeNestedJws(
+      validatedData,
+      'signedTransactionInfo',
+    );
+  } catch (err) {
+    throw new Error(
+      `Failed to decode nested JWS signedTransactionInfo: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+  const transactionPayload = parseTransactionPayload(rawTransactionInfo);
   const notificationData: AppStoreNotificationData = {
-    bundleId: (data['bundleId'] as string) ?? '',
-    bundleVersion: data['bundleVersion'] as string | undefined,
-    environment:
-      (data['environment'] as 'Sandbox' | 'Production') ?? 'Production',
-    signedTransactionInfo:
-      transactionInfo as unknown as JwsTransactionDecodedPayload,
+    bundleId: validatedData.bundleId,
+    bundleVersion: validatedData.bundleVersion,
+    environment: validatedData.environment,
+    signedTransactionInfo: transactionPayload,
   };
 
   // Verify bundle ID matches
