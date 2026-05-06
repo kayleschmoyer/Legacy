@@ -24,6 +24,7 @@ register({
     '@legacy-sports/tamagui-config': ['lib/tamagui-config/src/index.ts'],
     '@legacy-sports/ui-abstractions': ['lib/ui-abstractions/src/index.ts'],
     '@legacy-sports/utils': ['lib/utils/src/index.ts'],
+    '@legacy-sports/utils/node': ['lib/utils/src/node.ts'],
   },
 });
 

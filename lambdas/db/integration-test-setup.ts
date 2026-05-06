@@ -1,317 +1,151 @@
-import Database from 'better-sqlite3';
-import { BetterSQLite3Database, drizzle } from 'drizzle-orm/better-sqlite3';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { Pool } from 'pg';
 import { sql } from 'drizzle-orm';
-import * as integrationTestSchema from './integration-test-schema';
+import { InternalSchema, PublicSchema } from '@legacy-sports/db-client';
 
-// Global SQLite database instance
-let sqliteDb: Database.Database;
-let db: BetterSQLite3Database<typeof integrationTestSchema>;
+// Re-export the real production schemas — no hand-maintained SQLite mirror.
+export { PublicSchema as integrationTestSchema };
+// Export internal schema for inserting into app_internal.users (public.users is a view).
+export { InternalSchema as integrationTestInternalSchema };
 
-/**
- * Create essential tables for integration tests
- * We create a minimal schema needed for testing - not the full production schema
- */
-async function createTestSchema(
-  db: BetterSQLite3Database<typeof integrationTestSchema>,
-) {
-  // Intentionally quiet: Jest treats noisy console output as signal.
+let pool: Pool | undefined;
+let db: ReturnType<typeof drizzle<typeof PublicSchema>> | undefined;
 
-  // For now, let's create the minimal tables needed for existing integration tests
-  // We'll expand this as we add more integration tests
-
-  // Create leagues table (matching Drizzle schema from Leagues.ts)
-  await db.run(sql`
-    CREATE TABLE IF NOT EXISTS leagues (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      owner INTEGER NOT NULL,
-      max_roster_size INTEGER DEFAULT 25,
-      current_matchup INTEGER,
-      current_week INTEGER,
-      draft_status TEXT DEFAULT 'not-started',
-      league_phase TEXT,
-      invite_code TEXT UNIQUE NOT NULL,
-      min_games_per_season INTEGER DEFAULT 10,
-      games_per_matchup INTEGER DEFAULT 5,
-      trade_deadline_week INTEGER,
-      roster_lock_timing TEXT DEFAULT 'matchup_start',
-      scheduling_strategy TEXT DEFAULT 'round-robin',
-      created_at INTEGER DEFAULT (strftime('%s', 'now')),
-      is_mock_draft INTEGER DEFAULT 0
-    )
-  `);
-
-  // Create teams table
-  await db.run(sql`
-    CREATE TABLE IF NOT EXISTS teams (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      league_id INTEGER NOT NULL,
-      FOREIGN KEY (league_id) REFERENCES leagues(id) ON DELETE CASCADE
-    )
-  `);
-
-  // Create users table (simplified for tests)
-  await db.run(sql`
-    CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      email TEXT UNIQUE NOT NULL,
-      username TEXT UNIQUE NOT NULL,
-      password TEXT,
-      access_level TEXT DEFAULT 'none',
-      created_at INTEGER DEFAULT (strftime('%s', 'now'))
-    )
-  `);
-
-  // Create league_members table
-  await db.run(sql`
-    CREATE TABLE IF NOT EXISTS league_members (
-      league_id INTEGER NOT NULL,
-      user_id INTEGER NOT NULL,
-      team_id INTEGER,
-      permission_level TEXT,
-      PRIMARY KEY (league_id, user_id),
-      FOREIGN KEY (league_id) REFERENCES leagues(id) ON DELETE CASCADE,
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-      FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE SET NULL
-    )
-  `);
-
-  // Create players table (required for team_members foreign key)
-  await db.run(sql`
-    CREATE TABLE IF NOT EXISTS players (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      first_name TEXT NOT NULL,
-      last_name TEXT NOT NULL,
-      bref_id TEXT UNIQUE NOT NULL
-    )
-  `);
-
-  // team_members is created later (after draft_picks) with full draft columns
-
-  // Create matchups table
-  await db.run(sql`
-    CREATE TABLE IF NOT EXISTS matchups (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      league_id INTEGER NOT NULL,
-      week_number INTEGER NOT NULL,
-      team1_id INTEGER,
-      team2_id INTEGER,
-      team1_score TEXT,
-      team2_score TEXT,
-      status TEXT DEFAULT 'scheduled',
-      selected_season INTEGER,
-      games_per_matchup INTEGER,
-      start_time INTEGER,
-      end_time INTEGER,
-      UNIQUE(league_id, week_number),
-      FOREIGN KEY (league_id) REFERENCES leagues(id) ON DELETE CASCADE,
-      FOREIGN KEY (team1_id) REFERENCES teams(id) ON DELETE SET NULL,
-      FOREIGN KEY (team2_id) REFERENCES teams(id) ON DELETE SET NULL
-    )
-  `);
-
-  // Create matchup_players table
-  await db.run(sql`
-    CREATE TABLE IF NOT EXISTS matchup_players (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      matchup_id INTEGER NOT NULL,
-      player_id INTEGER NOT NULL,
-      team_id INTEGER NOT NULL,
-      FOREIGN KEY (matchup_id) REFERENCES matchups(id) ON DELETE CASCADE
-    )
-  `);
-
-  // Create drafts table
-  await db.run(sql`
-    CREATE TABLE IF NOT EXISTS drafts (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      league_id INTEGER NOT NULL,
-      draft_mode TEXT NOT NULL,
-      selection_method TEXT NOT NULL,
-      date TEXT,
-      draft_order TEXT NOT NULL,
-      current_pick INTEGER NOT NULL DEFAULT 0,
-      pick_time_limit_seconds INTEGER DEFAULT 120,
-      current_pick_deadline TEXT,
-      draft_started_at TEXT,
-      draft_completed_at TEXT,
-      scheduled_at TEXT,
-      auto_pick_disabled INTEGER DEFAULT 0,
-      created_at INTEGER,
-      updated_at TEXT,
-      FOREIGN KEY (league_id) REFERENCES leagues(id) ON DELETE CASCADE
-    )
-  `);
-
-  // Create draft_teams table
-  await db.run(sql`
-    CREATE TABLE IF NOT EXISTS draft_teams (
-      draft_id INTEGER NOT NULL,
-      team_id INTEGER NOT NULL,
-      league_id INTEGER NOT NULL,
-      draft_order INTEGER NOT NULL,
-      auto_pick INTEGER NOT NULL DEFAULT 0,
-      FOREIGN KEY (draft_id) REFERENCES drafts(id) ON DELETE CASCADE,
-      FOREIGN KEY (team_id) REFERENCES teams(id),
-      FOREIGN KEY (league_id) REFERENCES leagues(id),
-      CONSTRAINT draft_teams_uk_order UNIQUE (draft_id, draft_order)
-    )
-  `);
-
-  // Create draft_picks table
-  await db.run(sql`
-    CREATE TABLE IF NOT EXISTS draft_picks (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      draft_id INTEGER NOT NULL,
-      team_id INTEGER NOT NULL,
-      player_id INTEGER NOT NULL,
-      round INTEGER NOT NULL,
-      pick_number INTEGER NOT NULL,
-      overall_pick INTEGER NOT NULL,
-      picked_at TEXT NOT NULL,
-      bid_amount INTEGER,
-      created_at TEXT,
-      updated_at TEXT,
-      FOREIGN KEY (draft_id) REFERENCES drafts(id) ON DELETE CASCADE,
-      FOREIGN KEY (team_id) REFERENCES teams(id),
-      FOREIGN KEY (player_id) REFERENCES players(id),
-      UNIQUE (draft_id, player_id),
-      UNIQUE (draft_id, overall_pick)
-    )
-  `);
-
-  // Create team_members table
-  await db.run(sql`
-    CREATE TABLE IF NOT EXISTS team_members (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      team_id INTEGER,
-      league_id INTEGER NOT NULL,
-      player_id INTEGER NOT NULL,
-      position_id INTEGER,
-      draft_round INTEGER,
-      draft_pick INTEGER,
-      acquisition_type TEXT DEFAULT 'draft',
-      FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,
-      FOREIGN KEY (league_id) REFERENCES leagues(id) ON DELETE CASCADE,
-      FOREIGN KEY (player_id) REFERENCES players(id),
-      UNIQUE(team_id, player_id)
-    )
-  `);
-
-  // Schema created
+function connectionString(): string {
+  const url = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL;
+  if (!url) {
+    throw new Error(
+      'DB integration tests require TEST_DATABASE_URL or DATABASE_URL.\n' +
+        'Local: start Docker with `docker compose up -d postgres` then set DATABASE_URL in .env\n' +
+        'CI:    provided automatically by the db-integration workflow.',
+    );
+  }
+  return url;
 }
 
+// Shared test fixtures — seeded once per test run, never deleted.
+// Tests that need a league owner reference these; only users.db.spec.ts
+// creates and removes its own isolated test users.
+export const TEST_USERS = [
+  {
+    id: 1,
+    email: 'test.user@example.com',
+    username: 'testuser',
+    accessLevel: 'none' as const,
+  },
+  {
+    id: 2,
+    email: 'admin@example.com',
+    username: 'admin',
+    accessLevel: 'admin' as const,
+  },
+  {
+    id: 3,
+    email: 'league.owner@example.com',
+    username: 'leagueowner',
+    accessLevel: 'none' as const,
+  },
+] as const;
+
+export type TestPlayer = {
+  id: number;
+  firstName: string;
+  lastName: string;
+  brefId: string;
+};
+
+// Populated by ensureTestFixtures() with real players from the DB.
+let _testPlayers: TestPlayer[] = [];
+
 /**
- * Start in-memory SQLite database and create test schema
- * Called once before all integration tests
- * Idempotent: safe to call multiple times (lazy initialization)
+ * Returns real players fetched from the DB at setup time.
+ * Guaranteed to have at least 8 entries (enough for 4-team snake-draft tests).
+ * Must be called after setupIntegrationTestDatabase().
  */
+export function getTestPlayers(): TestPlayer[] {
+  if (_testPlayers.length === 0) {
+    throw new Error(
+      'No test players loaded — call setupIntegrationTestDatabase() first',
+    );
+  }
+  return _testPlayers;
+}
+
+// Upsert test users so they exist before any test runs.
+// Players are real data already in the DB — no insert needed.
+async function ensureTestFixtures(): Promise<void> {
+  await db!.execute(sql`
+    INSERT INTO app_internal.users (id, email, username, access_level)
+    VALUES
+      (1, 'test.user@example.com', 'testuser', 'none'),
+      (2, 'admin@example.com', 'admin', 'admin'),
+      (3, 'league.owner@example.com', 'leagueowner', 'none')
+    ON CONFLICT (id) DO UPDATE SET
+      email = EXCLUDED.email,
+      username = EXCLUDED.username,
+      access_level = EXCLUDED.access_level
+  `);
+
+  // Load real players from the DB for use in tests
+  const { players } = PublicSchema;
+  const rows = await db!
+    .select({
+      id: players.id,
+      firstName: players.firstName,
+      lastName: players.lastName,
+      brefId: players.brefId,
+    })
+    .from(players)
+    .limit(20);
+
+  if (rows.length < 8) {
+    throw new Error(
+      `DB integration tests require at least 8 players in the players table (found ${rows.length})`,
+    );
+  }
+  _testPlayers = rows;
+}
+
 export async function setupIntegrationTestDatabase(): Promise<void> {
-  // Already initialized - skip
-  if (db && sqliteDb) {
-    return;
-  }
-
-  // Create in-memory SQLite database
-  sqliteDb = new Database(':memory:');
-
-  // Enable foreign keys (required for constraint enforcement)
-  sqliteDb.pragma('foreign_keys = ON');
-
-  // Initialize Drizzle ORM with SQLite schema for integration tests
-  db = drizzle(sqliteDb, { schema: integrationTestSchema });
-
-  // Create test schema
-  await createTestSchema(db);
+  if (pool) return;
+  pool = new Pool({
+    connectionString: connectionString(),
+    max: 3,
+    ssl: { rejectUnauthorized: false },
+  });
+  db = drizzle(pool, { schema: PublicSchema });
+  await ensureTestFixtures();
 }
 
-/**
- * Get the database instance for use in tests
- * Auto-initializes on first access (lazy initialization)
- */
 export async function getTestDatabase() {
-  await setupIntegrationTestDatabase();
-  if (!db) {
-    throw new Error('Test database not initialized after setup');
-  }
-  return db;
+  if (!db) await setupIntegrationTestDatabase();
+  return db!;
 }
 
-/**
- * Get the database client for direct SQL queries
- * Auto-initializes on first access (lazy initialization)
- */
-export async function getTestClient(): Promise<Database.Database> {
-  await setupIntegrationTestDatabase();
-  if (!sqliteDb) {
-    throw new Error('Test client not initialized after setup');
-  }
-  return sqliteDb;
-}
-
-/**
- * Clean up all data from database tables
- * Called before/after each test for isolation
- */
+// Delete only league-graph data created by tests. Leagues cascade-delete
+// teams, drafts, matchups, draft_picks, league_members, etc.
+// Test users (IDs 1–3) and real players are never deleted.
 export async function cleanupTestData(): Promise<void> {
-  if (!sqliteDb) {
-    throw new Error('Test client not initialized');
-  }
-
-  // Delete in order respecting foreign key constraints
-  const tables = [
-    'league_week_player_seasons',
-    'matchup_player_games',
-    'matchup_players',
-    'matchups',
-    'team_members',
-    'draft_picks',
-    'draft_teams',
-    'league_members', // must be before teams (references teams.id)
-    'teams',
-    'league_positions',
-    'league_messages',
-    'league_scoring_change_log',
-    'league_scoring_profile_entries',
-    'league_scoring_profiles',
-    'drafts',
-    'leagues',
-    'users',
-    'players',
-  ];
-
-  // SQLite doesn't have TRUNCATE, use DELETE instead
-  for (const table of tables) {
-    try {
-      sqliteDb.prepare(`DELETE FROM ${table}`).run();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      // Some tables are not part of the minimal integration schema.
-      if (/no such table/i.test(message)) {
-        continue;
-      }
-      throw error;
-    }
-  }
-
-  // Reset auto-increment counters
-  try {
-    sqliteDb.prepare('DELETE FROM sqlite_sequence').run();
-  } catch (error) {
-    // Ignore if no auto-increment tables yet
-  }
+  if (!db)
+    throw new Error(
+      'DB not initialized — call setupIntegrationTestDatabase first',
+    );
+  await db.execute(sql`
+    DELETE FROM leagues WHERE owner IN (1, 2, 3)
+  `);
+  // Also clean up any leagues created with bulk-test users (IDs 100–119)
+  await db.execute(sql`
+    DELETE FROM leagues WHERE owner BETWEEN 100 AND 119
+  `);
+  // Remove bulk test users themselves (created by leagues.db.spec bulk test)
+  await db.execute(sql`
+    DELETE FROM app_internal.users WHERE id BETWEEN 100 AND 119
+  `);
 }
 
-/**
- * Stop the database and cleanup resources
- * Called once after all integration tests
- */
 export async function teardownIntegrationTestDatabase(): Promise<void> {
-  if (sqliteDb) {
-    sqliteDb.close();
-  }
+  await pool?.end();
+  pool = undefined;
+  db = undefined;
+  _testPlayers = [];
 }
-
-// Export the schema for use in integration tests
-export { integrationTestSchema };

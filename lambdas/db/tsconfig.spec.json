@@ -11,8 +11,10 @@
   },
   "include": [
     "jest.config.ts",
+    "jest.db.config.ts",
     "src/**/*.ts",
     "integration-test-setup.ts",
-    "integration-test-schema.ts"
+    "integration-test-global-setup.ts",
+    "integration-test-global-teardown.ts"
   ]
 }

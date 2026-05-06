@@ -87,22 +87,22 @@
         "cwd": "lambdas/db"
       }
     },
-    "test:integration": {
+    "test:db": {
       "executor": "@nx/jest:jest",
       "cache": true,
       "inputs": ["default", "^production"],
-      "outputs": ["{workspaceRoot}/coverage/lambdas/db-integration"],
+      "outputs": ["{workspaceRoot}/coverage/lambdas/db"],
       "options": {
-        "jestConfig": "lambdas/db/jest.integration.config.ts",
-        "testPathPattern": "\\.integration\\.spec\\.ts$",
+        "jestConfig": "lambdas/db/jest.db.config.ts",
+        "testPathPattern": "\\.db\\.spec\\.ts$",
         "runInBand": true
       }
     },
-    "test:integration:watch": {
+    "test:db:watch": {
       "executor": "@nx/jest:jest",
       "options": {
-        "jestConfig": "lambdas/db/jest.integration.config.ts",
-        "testPathPattern": "\\.integration\\.spec\\.ts$",
+        "jestConfig": "lambdas/db/jest.db.config.ts",
+        "testPathPattern": "\\.db\\.spec\\.ts$",
         "watch": true,
         "runInBand": true
       }

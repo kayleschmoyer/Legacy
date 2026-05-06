@@ -79,6 +79,21 @@ Use this as the **first stop** before running Glob/Grep exploration. If the conc
 
 ---
 
+## DB Integration Tests
+
+| What                            | Path                                          |
+| ------------------------------- | --------------------------------------------- |
+| Test spec files                 | `lambdas/db/src/schema/*.db.spec.ts`          |
+| Test setup / fixtures / cleanup | `lambdas/db/integration-test-setup.ts`        |
+| Jest config                     | `lambdas/db/jest.db.config.ts`                |
+| Global setup / teardown         | `lambdas/db/integration-test-global-setup.ts` |
+| Test data fixtures (JSON)       | `lambdas/db/src/__fixtures__/`                |
+| Nx target                       | `db:test:db`                                  |
+
+See `.agents/skills/testing/references/db-integration-tests.md` for patterns and rules.
+
+---
+
 ## Authentication
 
 | What                       | Path                                                                          |

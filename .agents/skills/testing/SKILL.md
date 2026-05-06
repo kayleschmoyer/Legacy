@@ -1,37 +1,43 @@
 ---
 name: testing
-description: 'Write, run, and debug tests: Jest unit tests, Playwright E2E tests (hermetic, mocked), and Playwright integration tests (real services). Covers test type selection, commands, tagging, API isolation, and CI pipeline.'
+description: 'Write, run, and debug tests: Jest unit tests, Playwright E2E tests (hermetic, mocked), Playwright integration tests (real services), and DB integration tests (Jest + real PostgreSQL). Covers test type selection, commands, tagging, API isolation, and CI pipeline.'
 ---
 
 # Skill: Testing
 
 ## When to Use
 
-- Writing or modifying any test (unit, E2E, or integration)
+- Writing or modifying any test (unit, E2E, integration, or DB)
 - Running tests before committing changes
 - Debugging test failures locally or in CI
 - Deciding which test type to use for a feature
 
 ## Test Type Selection Guide
 
-| Type             | Tool       | When to Use                                                                  | Reference                                                              |
-| ---------------- | ---------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| **Unit**         | Jest       | Isolated logic, utilities, components, resolvers with mocked deps            | [references/unit-testing.md](references/unit-testing.md)               |
-| **E2E (mocked)** | Playwright | Full user flows against a static build; hermetic (no backend)                | [references/e2e-testing.md](references/e2e-testing.md)                 |
-| **Integration**  | Playwright | Cross-service validation against real APIs, multi-user flows, async backends | [references/integration-testing.md](references/integration-testing.md) |
+There are **four** test layers. Three use Jest; two use Playwright.
+
+| Type             | Tool       | Layer | When to Use                                                                  | Reference                                                              |
+| ---------------- | ---------- | ----- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| **Unit**         | Jest       | 1     | Isolated logic, utilities, components, resolvers with mocked deps            | [references/unit-testing.md](references/unit-testing.md)               |
+| **DB**           | Jest       | 2     | Schema constraints, FK cascade, query correctness against real PostgreSQL    | See [DB Integration Tests](#db-integration-tests) below                |
+| **E2E (mocked)** | Playwright | 3     | Full user flows against a static build; hermetic (no backend)                | [references/e2e-testing.md](references/e2e-testing.md)                 |
+| **Integration**  | Playwright | 4     | Cross-service validation against real APIs, multi-user flows, async backends | [references/integration-testing.md](references/integration-testing.md) |
 
 ### Quick Decision Table
 
-| Scenario                                          | Unit | E2E | Integration |
-| ------------------------------------------------- | ---- | --- | ----------- |
-| Pure function / utility logic                     | x    |     |             |
-| React component renders correctly with known data |      | x   |             |
-| Empty/loading/error states                        |      | x   |             |
-| Button disabled when input empty                  |      | x   |             |
-| Data written to DB and visible to another user    |      |     | x           |
-| Role-based access verified against real identity  |      |     | x           |
-| Multi-step workflow across multiple users         |      |     | x           |
-| Backend async processes complete correctly        |      |     | x           |
+| Scenario                                          | Unit | DB  | E2E | Integration |
+| ------------------------------------------------- | ---- | --- | --- | ----------- |
+| Pure function / utility logic                     | x    |     |     |             |
+| FK constraint or schema default enforced          |      | x   |     |             |
+| Cascade delete works correctly in DB              |      | x   |     |             |
+| Draft pick state machine correctness              |      | x   |     |             |
+| React component renders correctly with known data |      |     | x   |             |
+| Empty/loading/error states                        |      |     | x   |             |
+| Button disabled when input empty                  |      |     | x   |             |
+| Data written to DB and visible to another user    |      |     |     | x           |
+| Role-based access verified against real identity  |      |     |     | x           |
+| Multi-step workflow across multiple users         |      |     |     | x           |
+| Backend async processes complete correctly        |      |     |     | x           |
 
 ## Commands
 
@@ -96,12 +102,68 @@ make pc
 
 ## File Naming Convention
 
-| Test Type                           | File Pattern                                                     | Example                                |
-| ----------------------------------- | ---------------------------------------------------------------- | -------------------------------------- |
-| Unit test                           | `*.spec.ts`                                                      | `scoring.spec.ts`                      |
-| Integration test (Jest + DB)        | `*.integration.spec.ts`                                          | `leagues.resolver.integration.spec.ts` |
-| Mocked E2E (Playwright)             | `*.spec.ts` in `apps/web-e2e/src/tests/`                         | `league-overview.spec.ts`              |
-| Full-stack integration (Playwright) | `*.integration.spec.ts` in `apps/web-e2e/src/integration/tests/` | `live-draft-ui.integration.spec.ts`    |
+| Test Type                           | File Pattern                                                     | Example                             |
+| ----------------------------------- | ---------------------------------------------------------------- | ----------------------------------- |
+| Unit test                           | `*.spec.ts`                                                      | `scoring.spec.ts`                   |
+| DB integration (Jest + PostgreSQL)  | `*.db.spec.ts` in `lambdas/db/src/schema/`                       | `leagues.db.spec.ts`                |
+| Mocked E2E (Playwright)             | `*.spec.ts` in `apps/web-e2e/src/tests/`                         | `league-overview.spec.ts`           |
+| Full-stack integration (Playwright) | `*.integration.spec.ts` in `apps/web-e2e/src/integration/tests/` | `live-draft-ui.integration.spec.ts` |
+
+## DB Integration Tests
+
+DB integration tests live in `lambdas/db/src/schema/*.db.spec.ts`. They use **Jest + real PostgreSQL** (not SQLite, not mocks) via the `jest.db.config.ts` config and the Nx `test:db` target.
+
+**Key files:**
+
+- `lambdas/db/integration-test-setup.ts` — pool setup, `getTestDatabase()`, `cleanupTestData()`, `getTestPlayers()`, exports `integrationTestSchema` (= `PublicSchema` from `@legacy-sports/db-client`)
+- `lambdas/db/integration-test-global-setup.ts` / `…teardown.ts` — Jest globalSetup/Teardown hooks
+- `lambdas/db/jest.db.config.ts` — Jest config (`testMatch: ['**/*.db.spec.ts']`, `testTimeout: 30000`)
+
+**Running locally (Docker Postgres):**
+
+```bash
+# Start Docker Postgres first
+docker compose up -d postgres
+
+# Run via Nx MCP tool (preferred)
+nx_run(project: "db", target: "test:db")
+
+# Shell fallback
+pnpm exec nx run db:test:db
+```
+
+**Running against the dev RDS via SSM tunnel:**
+
+```bash
+# 1. Start SSM port-forward (NAT instance as proxy into VPC)
+aws ssm start-session --region us-east-1 --target <NAT_INSTANCE_ID> \
+  --document-name AWS-StartPortForwardingSessionToRemoteHost \
+  --parameters 'host=legacy-sports-dev-postgres.cep4b6aynyet.us-east-1.rds.amazonaws.com,portNumber=5432,localPortNumber=15432' &
+
+# 2. Fetch creds from Secrets Manager
+aws secretsmanager get-secret-value --region us-east-1 \
+  --secret-id legacy-sports-dev-db-creds-20250925194630368900000002 \
+  --query SecretString --output text > scratch/migcreds.json
+
+# 3. Run (NODE_TLS_REJECT_UNAUTHORIZED=0 bypasses self-signed cert over tunnel)
+TEST_DATABASE_URL="postgresql://$(jq -r .username scratch/migcreds.json):$(jq -r .password scratch/migcreds.json)@127.0.0.1:15432/postgres" \
+  NODE_TLS_REJECT_UNAUTHORIZED=0 \
+  pnpm exec nx run db:test:db --skip-nx-cache
+```
+
+See `.agents/skills/repo-tooling/references/db-dump-and-restore.md` for the full tunnel setup and the current NAT instance ID.
+
+**Environment variable:** tests read `TEST_DATABASE_URL` (preferred) or `DATABASE_URL`. Must point to a real PostgreSQL instance.
+
+**Schema access:** always import `integrationTestSchema` from `../../integration-test-setup` — never create a manual SQLite schema mirror. `integrationTestSchema` re-exports `PublicSchema`, so tests always run against the exact production schema.
+
+**Fixtures and cleanup:** see [references/db-integration-tests.md](references/db-integration-tests.md) for the full fixture model, cleanup strategy, and required patterns when writing new DB tests.
+
+**Cleanup summary:** `cleanupTestData()` deletes only test-owned rows — `DELETE FROM leagues WHERE owner IN (1, 2, 3)` (which cascade-deletes teams, drafts, matchups, draft_picks, etc.) plus bulk-test users 100–119. It never truncates: the DB may contain real production data (real players, real leagues) that must be preserved. See the reference doc for the full invariant.
+
+## DB Integration Test Reference Files
+
+- [DB Integration Tests Guide](references/db-integration-tests.md) — fixture model, cleanup strategy, ID collision rules, query scoping, player data
 
 ## E2E Reference Files
 

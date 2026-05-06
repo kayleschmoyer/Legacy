@@ -1,25 +1,21 @@
 import type { Config } from 'jest';
 
 const config: Config = {
-  displayName: 'db-integration',
+  displayName: 'db',
   preset: '../../jest.preset.js',
   testEnvironment: 'node',
-  coverageDirectory: '../../coverage/lambdas/db-integration',
+  coverageDirectory: '../../coverage/lambdas/db',
 
-  // Only run integration test files
-  testMatch: ['**/*.integration.spec.ts'],
+  testMatch: ['**/*.db.spec.ts'],
 
-  // Setup and teardown
   globalSetup: '<rootDir>/integration-test-global-setup.ts',
   globalTeardown: '<rootDir>/integration-test-global-teardown.ts',
 
-  // Increase timeout for database operations
-  testTimeout: 10000, // 10 seconds (SQLite in-memory is very fast)
+  // PostgreSQL operations are slower than SQLite in-memory.
+  testTimeout: 30000,
 
   transformIgnorePatterns: ['node_modules/(?!@legacy-sports)'],
 
-  // Explicitly map workspace packages for Jest module resolution
-  // This is required for globalSetup to find monorepo packages
   moduleNameMapper: {
     '^@legacy-sports/analytics$': '<rootDir>/../../lib/analytics/src/index.ts',
     '^@legacy-sports/api$': '<rootDir>/../../lib/api/src/index.ts',
@@ -46,7 +42,6 @@ const config: Config = {
     '^@legacy-sports/utils/node$': '<rootDir>/../../lib/utils/src/node.ts',
   },
 
-  // Run tests serially to avoid database conflicts
   maxWorkers: 1,
 };
 
