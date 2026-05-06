@@ -75,9 +75,29 @@ After reviewing, produce a structured summary. This summary is your proof that s
 
 If the summary is empty or says only "No issues found" without listing the files reviewed, the self-review was not thorough enough — go back and read the files.
 
+## ⛔ After the Summary — Do NOT Stop Here
+
+**Producing the Self-Review Summary is NOT the end of the task.** This skill is a gate, not a destination. The summary is your proof that the gate was passed; it is not a completion signal.
+
+If you arrived here from `/work-ticket`, `/fix-pr`, `/drive-pr`, `/sweep-prs`, `/respond-to-review`, or any other workflow that opens or updates a PR, the **next mandatory action** after the summary is to return to that workflow and continue from where you left off. For a fresh ticket implementation that means, in order:
+
+1. `worktree_commit({ message: "type(scope): LS-#### msg" })` (if there are unstaged review fixes)
+2. `worktree_push({ setUpstream: true })` (first push) or `worktree_push()` (subsequent pushes)
+3. `github_create_pr({ title: "LS-#### type(scope): msg", body: "...", draft: true, worktreePath: "..." })`
+4. `github_manage_labels({ prs: [<PR#>], add: ["agent-in-progress"] })`
+5. `github_mark_pr_ready({ number: <PR#> })`
+6. `github_request_review({ prs: [<PR#>] })`
+7. `jira_transition({ key: "LS-####", status: "In Review" })`
+8. Watch the PR through to merge — prefer native PR-event subscriptions / push notifications when the harness streams them (Claude Code on the desktop and web); fall back to a capped, explicit degraded-mode poll only when subscriptions are unavailable (e.g. some headless cloud sessions). The hard prohibition is on **unbounded polling loops** (`sleep N && gh pr view ...` repeated indefinitely, or one-shot snapshot tools called in a loop) — see the `pr-lifecycle` skill's CI-operations guidance.
+
+**A clean Self-Review Summary with "no issues found" is the most common point at which agents incorrectly conclude the task.** It feels like an ending; it is not. If your todo list still has `commit`, `push`, `create-pr`, `mark-ready`, `watch-pr`, or `merge` items pending, they are still pending — keep going.
+
+The only time it is correct to stop after producing the summary is when `/review` was invoked **standalone** (not as part of a ticket workflow) for the user to inspect the report.
+
 ## Guardrails
 
 - **Never** add `@ts-ignore` or `eslint-disable` to suppress issues
 - **Never** skip reading the full file — diff-only reviews miss context bugs
 - **Never** refactor code unrelated to the branch's changes
 - If you're unsure whether something is a bug, flag it — don't silently skip it
+- **Never** treat the Self-Review Summary as a stopping point when invoked from a PR-bound workflow — see the section above
