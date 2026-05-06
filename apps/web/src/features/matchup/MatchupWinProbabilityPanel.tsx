@@ -44,17 +44,17 @@ export interface MatchupWinProbabilityPanelProps {
 
 function ProbabilityBar({
   team1Prob,
-  team2Prob,
   team1Name,
   team2Name,
 }: {
   team1Prob: number;
-  team2Prob: number;
   team1Name: string;
   team2Name: string;
 }) {
   const t1Pct = Math.round(team1Prob * 100);
-  const t2Pct = Math.round(team2Prob * 100);
+  // Always complement so displayed values sum to exactly 100 (ties are excluded
+  // from the win-probability display).
+  const t2Pct = 100 - t1Pct;
 
   return (
     <YStack gap="$2">
@@ -390,7 +390,6 @@ export function MatchupWinProbabilityPanel({
         {/* Split probability bar */}
         <ProbabilityBar
           team1Prob={winProb.team1WinProbability}
-          team2Prob={winProb.team2WinProbability}
           team1Name={team1Name}
           team2Name={team2Name}
         />
