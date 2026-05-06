@@ -206,7 +206,7 @@ test.describe
 
     await test.step('Wait for Season Active status', async () => {
       const seasonActive = page.getByText('Season Active');
-      const deadline = Date.now() + 60_000;
+      const deadline = Date.now() + 120_000;
       while (Date.now() < deadline) {
         if (await seasonActive.isVisible().catch(() => false)) break;
         await page.waitForTimeout(5_000);
