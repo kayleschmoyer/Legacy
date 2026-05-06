@@ -138,9 +138,11 @@ test.describe
       await draftSettingsBtn.click();
 
       // Default mode is "Live Draft" — verify it is selected (active state)
-      await expect(
-        page.getByRole('button', { name: /Live Draft/i }),
-      ).toBeVisible({ timeout: 5000 });
+      // Use data-testid to avoid collision with LeagueSwitcherChip whose aria-label
+      // also contains "Live Draft" (added in LS-3692).
+      await expect(page.getByTestId('option-live')).toBeVisible({
+        timeout: 5000,
+      });
 
       // Default selection method is "Standard"
       await expect(
@@ -418,10 +420,142 @@ test.describe
             `[live-draft] +${elapsedMiss}s miss #${consecutiveMisses} at pick ${pickCount} — myTurn=[${myTurnLabels || 'none'}]`,
           );
           if (consecutiveMisses > 30) {
+            // No human page is showing "Your pick" — an unattended team slot
+            // (e.g. the commissioner has no player team) is on the clock.
+            // The EventBridge cron fires `autoProcessDraftPicks` once per minute
+            // to handle expired timers, but we can nudge it directly every 10 s
+            // so expired slots are processed immediately (LS-4214).
+            const elapsedStuck = ((Date.now() - draftStart) / 1000).toFixed(1);
             console.log(
-              `[live-draft] Stuck after ${consecutiveMisses} misses at pick ${pickCount} (+${((Date.now() - draftStart) / 1000).toFixed(1)}s)`,
+              `[live-draft] Stuck at pick ${pickCount} (+${elapsedStuck}s) — nudging auto-pick every 10 s for up to 5 min`,
             );
-            break;
+
+            // Initial reload so pages have fresh Apollo state.
+            for (const { page } of pages) {
+              await page.reload();
+              await page.waitForLoadState('load');
+            }
+            await pages[0].page.waitForTimeout(5000);
+
+            const stuckDeadline = Date.now() + 300_000; // 5-minute headroom
+            let lastPageReloadAt = Date.now();
+            let resolved = false;
+
+            while (Date.now() < stuckDeadline) {
+              // 1. Check if the draft completed via auto-picks.
+              for (const { page } of pages) {
+                if (
+                  await page
+                    .getByText('Draft Complete!')
+                    .isVisible()
+                    .catch(() => false)
+                ) {
+                  draftDone = true;
+                  resolved = true;
+                  break;
+                }
+              }
+              if (resolved) break;
+
+              // 2. Check if any human is now on the clock (instant isVisible).
+              const stuckTurnResults = await Promise.all(
+                pages.map(async ({ label, page }) => ({
+                  label,
+                  isMyTurn: await page
+                    .getByText('Your pick', { exact: true })
+                    .first()
+                    .isVisible()
+                    .catch(() => false),
+                })),
+              );
+              const onClock = stuckTurnResults
+                .filter((r) => r.isMyTurn)
+                .map((r) => r.label);
+              if (onClock.length > 0) {
+                const elapsedResume = (
+                  (Date.now() - draftStart) /
+                  1000
+                ).toFixed(1);
+                console.log(
+                  `[live-draft] +${elapsedResume}s Recovery resolved: ${onClock.join(', ')} on clock`,
+                );
+                consecutiveMisses = 0;
+                hasReloadedThisStreak = false;
+                resolved = true;
+                break;
+              }
+
+              // 3. Nudge the backend: call autoProcessDraftPicks so expired
+              //    pick timers are handled immediately instead of waiting up
+              //    to 60 s for the EventBridge cron. Idempotent — safe for
+              //    any league member to call (Manager 1 here).
+              //    Must use the absolute API URL — page.request resolves
+              //    relative URLs against the browser context's baseURL
+              //    (legacy-fantasy.com), not the API base (api.legacy-fantasy.com).
+              const nudgeResult = await pages[1].page.request
+                .post('https://api.legacy-fantasy.com/graphql', {
+                  data: {
+                    query: `mutation { autoProcessDraftPicks(leagueId: ${state.leagueId}) { picksAutoMade draftsCompleted } }`,
+                  },
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'x-csrf-token': 'integration-csrf-token',
+                  },
+                })
+                .catch(() => null);
+              if (nudgeResult) {
+                const nudgeBody = (await nudgeResult
+                  .json()
+                  .catch(() => null)) as {
+                  data?: {
+                    autoProcessDraftPicks?: {
+                      picksAutoMade: number;
+                      draftsCompleted: number;
+                    };
+                  };
+                } | null;
+                const nudgeData = nudgeBody?.data?.autoProcessDraftPicks;
+                const elapsedNudge = ((Date.now() - draftStart) / 1000).toFixed(
+                  1,
+                );
+                console.log(
+                  `[live-draft] +${elapsedNudge}s nudge result: picksAutoMade=${nudgeData?.picksAutoMade ?? 'n/a'} draftsCompleted=${nudgeData?.draftsCompleted ?? 'n/a'}`,
+                );
+              }
+
+              // 4. Reload all pages every 30 s to force fresh Apollo queries.
+              //    Fresh loads surface the current pick state without relying
+              //    on WebSocket delivery, which may miss events after reload.
+              if (Date.now() - lastPageReloadAt > 30_000) {
+                const elapsedRld = ((Date.now() - draftStart) / 1000).toFixed(
+                  1,
+                );
+                console.log(
+                  `[live-draft] +${elapsedRld}s Recovery: reloading pages for fresh state`,
+                );
+                const draftUrl = `/baseball/league/${state.leagueId}/draft`;
+                for (const { page } of pages) {
+                  await page.goto(draftUrl);
+                  await page.waitForLoadState('load');
+                }
+                await pages[0].page.waitForTimeout(5000);
+                lastPageReloadAt = Date.now();
+              }
+
+              await pages[0].page.waitForTimeout(10_000);
+            }
+
+            if (!resolved) {
+              const elapsedFail = ((Date.now() - draftStart) / 1000).toFixed(1);
+              console.log(
+                `[live-draft] Still stuck after 5-min wait at pick ${pickCount} (+${elapsedFail}s) — bailing out`,
+              );
+              break;
+            }
+            if (draftDone) break;
+            // resolved && !draftDone → a human is on the clock; fall through
+            // to the next while-loop iteration to pick normally.
+            continue;
           }
           if (consecutiveMisses > 15 && !hasReloadedThisStreak) {
             // Reload all pages to resync state — but only ONCE per streak.
@@ -611,12 +745,26 @@ test.describe
 
   test('Phase 7: Manager verifies their roster', async ({ managerPage1 }) => {
     await test.step('Navigate to Manager 1 roster', async () => {
-      await managerPage1.goto(`/baseball/league/${state.leagueId}/roster`);
+      // Navigate to the league overview first.  Going directly to /roster
+      // from a fresh browser context races the membership access gate in
+      // LeagueDetailPageV2: the gate fires when leagueLoading and authLoading
+      // both become false, but the getUserTeamId lazy query may not have
+      // returned yet — so isMember=false and the app redirects to /overview.
+      // Loading /overview first lets the lazy query complete, then clicking
+      // the My Roster tab (client-side navigation) keeps the Apollo cache
+      // warm so isMember is already true and no redirect fires.
+      await managerPage1.goto(`/baseball/league/${state.leagueId}/overview`);
       await managerPage1.waitForLoadState('load');
       await expect(managerPage1.locator('body')).not.toContainText(
         'Unexpected Application Error',
         { timeout: 30000 },
       );
+      // Wait for the league tabs to render (confirms league + auth data loaded),
+      // then click My Roster — client-side navigation avoids the race condition.
+      await expect(
+        managerPage1.getByRole('tab', { name: 'My Roster' }),
+      ).toBeVisible({ timeout: 15_000 });
+      await managerPage1.getByRole('tab', { name: 'My Roster' }).click();
     });
 
     await test.step('Verify manager roster has players', async () => {
@@ -627,6 +775,7 @@ test.describe
         .getByText('Lineup', { exact: true })
         .first()
         .locator('..');
+      // After clicking the My Roster tab, wait for the roster section to render.
       await expect(managerPage1.getByText('Lineup').first()).toBeVisible({
         timeout: Math.max(1, lineupDeadline - Date.now()),
       });
@@ -640,12 +789,20 @@ test.describe
         if (remaining <= 0) break;
         await managerPage1.waitForTimeout(Math.min(5_000, remaining));
         if (Date.now() >= lineupDeadline) break;
-        await managerPage1.reload();
+        // Reload navigates back to /overview (last full-page URL before the
+        // client-side tab click).  Re-click My Roster to reach the roster tab.
+        await managerPage1.goto(`/baseball/league/${state.leagueId}/overview`);
         await managerPage1.waitForLoadState('load');
-        const remainingAfterReload = lineupDeadline - Date.now();
-        if (remainingAfterReload <= 0) break;
+        const remainingAfterNav = lineupDeadline - Date.now();
+        if (remainingAfterNav <= 0) break;
+        await expect(
+          managerPage1.getByRole('tab', { name: 'My Roster' }),
+        ).toBeVisible({ timeout: remainingAfterNav });
+        await managerPage1.getByRole('tab', { name: 'My Roster' }).click();
+        const remainingAfterClick = lineupDeadline - Date.now();
+        if (remainingAfterClick <= 0) break;
         await expect(managerPage1.getByText('Lineup').first()).toBeVisible({
-          timeout: remainingAfterReload,
+          timeout: remainingAfterClick,
         });
       }
       expect(lineupCount).toBeGreaterThan(0);
