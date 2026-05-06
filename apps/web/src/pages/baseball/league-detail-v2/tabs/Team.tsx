@@ -131,6 +131,7 @@ export const TeamTab: React.FC<TeamTabProps> = ({
             <label htmlFor="team-name-input">Team Name</label>
             <input
               id="team-name-input"
+              type="text"
               className="ls-input text"
               value={name}
               onChange={(e) => setName(e.target.value)}
