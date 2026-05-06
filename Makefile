@@ -6,7 +6,7 @@
 	lint lint-fix lint-workflows lint-skills format fmt typecheck validate \
 	test test-all test-watch test-e2e check-skipped-tests check-skipped-tests-verbose \
 	build build-all build-web build-mobile build-lambdas build-libs \
-	start dev dev-web dev-mobile dev-db dev-graphql dev-storybook graphiql docker-up \
+	start dev dev-web dev-mobile dev-db dev-graphql dev-storybook graphiql mcp-proxy docker-up \
 	android ios build-android build-ios \
 	db-migrate db-studio db-reset db-tunnel db-dump db-restore db-dump-dev db-restore-dev db-check-connections codegen \
 	deploy-lambdas terraform-init terraform-plan terraform-apply terraform-apply-auto terraform-destroy gen-tfvars \
@@ -401,6 +401,10 @@ dev-storybook: ## Start Storybook for component development
 graphiql: ## Start GraphQL explorer
 	@$(call echo_blue,Starting GraphQL explorer...)
 	pnpm run graphiql
+
+mcp-proxy: ## Start MCP signing proxy (required for Jira/GitHub/CI MCP servers)
+	@$(call echo_blue,Starting MCP signing proxy...)
+	pnpm exec nx run mcp-signing-proxy:start
 
 docker-up: ## Start Docker Compose services in detached mode
 	@$(call echo_blue,Starting Docker Compose services in detached mode...)
