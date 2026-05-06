@@ -522,13 +522,15 @@ jobs:
 
   # ===========================================================================
   # DB suite: Jest + real PostgreSQL (no Playwright involved)
-  # Runs when test-suite=db is selected, or nightly (all suites).
+  # Manual dispatch only (test-suite=db or all). Excluded from the nightly
+  # schedule because these tests target dev RDS (real schema + real players)
+  # and cannot run against the GitHub-hosted postgres service container until
+  # CI is wired to dev RDS via a writable role + self-hosted runner.
   # ===========================================================================
   run-db-tests:
     name: "DB Integration Tests"
     needs: [prepare]
     if: |
-      github.event_name == 'schedule' ||
       inputs['test-suite'] == 'db' ||
       inputs['test-suite'] == 'all'
     runs-on: ubuntu-latest
