@@ -84,6 +84,11 @@ export const WaiverClaimModal: React.FC<WaiverClaimModalProps> = ({
   );
   const isFaab = waiverType === 'faab';
 
+  // When userTeamId hasn't loaded yet, skip the roster query but treat the
+  // modal as loading — prevents a false "Roster has space (0/25)" state that
+  // would skip the required drop-player step (LS-4226).
+  const rosterUnknown = userTeamId === null;
+
   const { data: rosterData, loading: rosterLoading } = useGetTeamMembersQuery({
     variables: { teamId: userTeamId ?? 0 },
     skip: !userTeamId || !open,
@@ -103,10 +108,20 @@ export const WaiverClaimModal: React.FC<WaiverClaimModalProps> = ({
 
   const canSubmit = useMemo(() => {
     if (claiming || success) return false;
+    if (rosterLoading || rosterUnknown) return false;
     if (rosterFull && !dropPlayerId) return false;
     if (isFaab && (parsedFaabBid == null || parsedFaabBid < 0)) return false;
     return true;
-  }, [claiming, success, rosterFull, dropPlayerId, isFaab, parsedFaabBid]);
+  }, [
+    claiming,
+    success,
+    rosterLoading,
+    rosterUnknown,
+    rosterFull,
+    dropPlayerId,
+    isFaab,
+    parsedFaabBid,
+  ]);
 
   const handleSubmit = useCallback(async () => {
     if (!canSubmit) return;
@@ -285,7 +300,7 @@ export const WaiverClaimModal: React.FC<WaiverClaimModalProps> = ({
               </XStack>
 
               {/* Roster status / drop player section */}
-              {rosterLoading ? (
+              {rosterLoading || rosterUnknown ? (
                 <YStack alignItems="center" padding="$4">
                   <Spinner size="small" color={BRAND_NAVY_LIGHT} />
                   <Text fontSize="$2" color="$color9" marginTop="$2">
@@ -524,7 +539,7 @@ export const WaiverClaimModal: React.FC<WaiverClaimModalProps> = ({
                   >
                     {claiming
                       ? 'Submitting…'
-                      : rosterFull && dropPlayerId
+                      : !rosterUnknown && rosterFull && dropPlayerId
                         ? 'Submit Claim & Drop'
                         : 'Submit Claim'}
                   </Text>

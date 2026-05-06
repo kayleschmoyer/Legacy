@@ -444,7 +444,12 @@ test.describe
   }) => {
     await test.step('Fetch a free agent to claim', async () => {
       const { freeAgents } = await gqlFetch<{
-        freeAgents: Array<{ id: number; firstName: string; lastName: string }>;
+        freeAgents: Array<{
+          id: number;
+          firstName: string;
+          lastName: string;
+          eligiblePositions: string[] | null;
+        }>;
       }>(
         commissionerJwt,
         `query GetFreeAgents($leagueId: Int!) {
@@ -452,14 +457,34 @@ test.describe
             id
             firstName
             lastName
+            eligiblePositions
           }
         }`,
         { leagueId: state.leagueId },
       );
       expect(freeAgents.length).toBeGreaterThan(0);
-      const picked = freeAgents[0];
-      state.freeAgentPlayerName =
-        `${picked.firstName} ${picked.lastName}`.trim();
+
+      // The free-agents UI defaults to the "Hitters" tab — picking a pure
+      // pitcher would mean the Add button is never rendered (LS-4226).
+      const PITCHER_POSITIONS: ReadonlySet<string> = new Set(['SP', 'RP', 'P']);
+      const isHitter = (p: { eligiblePositions: string[] | null }) => {
+        const positions = p.eligiblePositions ?? [];
+        return (
+          positions.length === 0 ||
+          positions.some((pos) => !PITCHER_POSITIONS.has(pos))
+        );
+      };
+      const buildPlayerName = (p: { firstName: string; lastName: string }) =>
+        [p.firstName, p.lastName].filter((s) => s?.trim()).join(' ');
+
+      const picked = freeAgents.find(isHitter);
+      expect(
+        picked,
+        'Expected at least one hitter free agent because the waiver-claim UI only shows the Hitters tab by default.',
+      ).toBeTruthy();
+      if (!picked) return;
+
+      state.freeAgentPlayerName = buildPlayerName(picked);
     });
 
     await test.step('Navigate to Free Agents', async () => {
@@ -469,14 +494,21 @@ test.describe
     });
 
     await test.step('Claim a free agent via the UI', async () => {
-      // Search by last name to reliably surface the specific player row
+      // Search by last name to reliably surface the specific player row.
+      // NOTE: isVisible({ timeout }) is deprecated in Playwright v1.40+ —
+      // the timeout is silently ignored.  Use waitFor() instead.
       const searchInput = page.getByPlaceholder(/search players/i);
-      if (await searchInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
+      const searchVisible = await searchInput
+        .waitFor({ state: 'visible', timeout: 5_000 })
+        .then(() => true)
+        .catch(() => false);
+      if (searchVisible) {
         const lastName =
           state.freeAgentPlayerName.split(' ').pop() ??
           state.freeAgentPlayerName;
         await searchInput.fill(lastName);
-        await page.waitForTimeout(500);
+        // 1 s covers the 300 ms debounce + GQL round-trip + re-render.
+        await page.waitForTimeout(1_000);
       }
 
       // Use the exact player name in the aria-label to avoid clicking a
@@ -484,13 +516,19 @@ test.describe
       const exactAddBtn = page.locator(
         `button[aria-label="Add ${state.freeAgentPlayerName}"]`,
       );
-      const firstAddBtn = page.locator('button[aria-label^="Add "]').first();
-      const hasExact = await exactAddBtn
-        .isVisible({ timeout: 10_000 })
+      const isInDom = await exactAddBtn
+        .waitFor({ state: 'attached', timeout: 15_000 })
+        .then(() => true)
         .catch(() => false);
-      const addBtn = hasExact ? exactAddBtn : firstAddBtn;
-      await expect(addBtn).toBeVisible({ timeout: 5_000 });
-      await addBtn.click();
+      if (!isInDom) {
+        throw new Error(
+          `Add button for "${state.freeAgentPlayerName}" was not found in the free-agents list. ` +
+            `The player may no longer be a free agent or the page failed to render.`,
+        );
+      }
+      await exactAddBtn.scrollIntoViewIfNeeded();
+      await expect(exactAddBtn).toBeVisible({ timeout: 5_000 });
+      await exactAddBtn.click();
 
       // WaiverClaimModal opens
       await expect(page.getByText('Claim Free Agent')).toBeVisible({
@@ -509,33 +547,44 @@ test.describe
         const byTestId = page.locator('[data-testid^="drop-player-"]').first();
         const byRole = page.getByRole('option', { name: /^Drop /i }).first();
 
-        if (await byTestId.isVisible({ timeout: 3_000 }).catch(() => false)) {
+        const foundByTestId = await byTestId
+          .waitFor({ state: 'visible', timeout: 5_000 })
+          .then(() => true)
+          .catch(() => false);
+        if (foundByTestId) {
           await byTestId.click();
-        } else if (
-          await byRole.isVisible({ timeout: 2_000 }).catch(() => false)
-        ) {
-          await byRole.click();
         } else {
-          // Fallback: find cursor:pointer element inside the modal
-          const rect = await page.evaluate(() => {
-            const modal = document.querySelector<HTMLElement>(
-              '[aria-labelledby="claim-title"]',
-            );
-            if (!modal) return null;
-            const divs = modal.querySelectorAll<HTMLElement>('div');
-            for (const div of divs) {
-              if (
-                getComputedStyle(div).cursor === 'pointer' &&
-                div.children.length >= 2
-              ) {
-                const box = div.getBoundingClientRect();
-                return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+          const foundByRole = await byRole
+            .waitFor({ state: 'visible', timeout: 3_000 })
+            .then(() => true)
+            .catch(() => false);
+          if (foundByRole) {
+            await byRole.click();
+          } else {
+            // Fallback: find cursor:pointer element inside the modal
+            const rect = await page.evaluate(() => {
+              const modal = document.querySelector<HTMLElement>(
+                '[aria-labelledby="claim-title"]',
+              );
+              if (!modal) return null;
+              const divs = modal.querySelectorAll<HTMLElement>('div');
+              for (const div of divs) {
+                if (
+                  getComputedStyle(div).cursor === 'pointer' &&
+                  div.children.length >= 2
+                ) {
+                  const box = div.getBoundingClientRect();
+                  return {
+                    x: box.x + box.width / 2,
+                    y: box.y + box.height / 2,
+                  };
+                }
               }
+              return null;
+            });
+            if (rect) {
+              await page.mouse.click(rect.x, rect.y);
             }
-            return null;
-          });
-          if (rect) {
-            await page.mouse.click(rect.x, rect.y);
           }
         }
         await expect(page.getByText('Dropping')).toBeVisible({
