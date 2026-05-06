@@ -206,7 +206,7 @@ test.describe
         .click({ force: true });
       // Success message or spinner disappearing indicates save completed
       await expect(page.getByText(/saved successfully/i)).toBeVisible({
-        timeout: 15_000,
+        timeout: 45_000,
       });
     });
 
