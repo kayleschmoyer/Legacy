@@ -9,13 +9,8 @@ name: "Check Merge Conflicts"
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-  # Re-run when the bot approves — mirrors the CI Orchestrator trigger so the
-  # conflict check is always fresh by the time CI finishes and the EMQ fires.
-  # Guards against the case where a prior run was cancelled by a subsequent push
-  # and the branch later settles back at the same SHA without a new synchronize.
-  pull_request_review:
-    types: [submitted]
+    # Include 'edited' to re-run when the PR base branch is retargeted.
+    types: [opened, synchronize, reopened, ready_for_review, edited]
 
 concurrency:
   group: check-conflicts-${{ github.event.pull_request.number }}
@@ -58,13 +53,6 @@ jobs:
   check-conflicts:
     name: "No Merge Conflicts"
     needs: [sha-sanity]
-    if: |
-      github.event_name == 'pull_request' ||
-      (
-        github.event_name == 'pull_request_review' &&
-        github.event.review.user.login == 'legacy-sports-review-bot[bot]' &&
-        github.event.review.state == 'approved'
-      )
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
