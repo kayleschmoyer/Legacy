@@ -378,6 +378,9 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
   async function getRequiredChecks(branch) {
     if (branch in requiredChecksCache) return requiredChecksCache[branch];
 
+    const names = new Set();
+
+    // Classic branch protection required checks
     try {
       const bp = await github.rest.repos.getBranchProtection({
         owner,
@@ -385,36 +388,66 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
         branch,
       });
       const rsc = bp.data.required_status_checks;
-      if (!rsc) {
-        requiredChecksCache[branch] = null;
-        return null;
+      if (rsc) {
+        for (const ctx of rsc.contexts || []) names.add(ctx);
+        for (const c of rsc.checks || []) names.add(c.context);
       }
-      const names = new Set([
-        ...(rsc.contexts || []),
-        ...(rsc.checks || []).map((c) => c.context),
-      ]);
-      requiredChecksCache[branch] = names.size > 0 ? names : null;
     } catch (e) {
       const status = e && typeof e === 'object' ? e.status : undefined;
       if (status === 404) {
         console.log(
-          `ℹ️ No branch protection found for '${branch}' (404) — evaluating all checks`,
+          `ℹ️ No classic branch protection found for '${branch}' (404)`,
         );
       } else if (status === 403) {
         console.log(
-          `⚠️ Branch protection read returned 403 for '${branch}' — Merge Queue App lacks ` +
-            `the "Administration: Read-only" repository permission. Falling back to evaluating all checks. ` +
+          `⚠️ Classic branch protection read returned 403 for '${branch}' — Merge Queue App lacks ` +
+            `the "Administration: Read-only" repository permission. ` +
             `Fix: grant the Merge Queue GitHub App the "Administration: Read-only" repository permission (LS-4111).`,
         );
       } else {
         console.log(
-          `⚠️ Failed to fetch branch protection for '${branch}' (${status ?? e?.message ?? 'unknown error'}) — treating as no required checks and evaluating all checks`,
+          `⚠️ Failed to fetch classic branch protection for '${branch}' (${status ?? e?.message ?? 'unknown error'})`,
         );
       }
-      requiredChecksCache[branch] = null;
     }
 
-    return requiredChecksCache[branch];
+    // Repository ruleset required checks — the primary source for CI Pipeline checks.
+    // Classic branch protection does not surface ruleset-defined required_status_checks.
+    try {
+      const { data: branchRules } = await github.request(
+        'GET /repos/{owner}/{repo}/rules/branches/{branch}',
+        { owner, repo, branch },
+      );
+      for (const rule of branchRules) {
+        if (
+          rule.type === 'required_status_checks' &&
+          rule.parameters?.required_status_checks
+        ) {
+          for (const check of rule.parameters.required_status_checks) {
+            names.add(check.context);
+          }
+        }
+      }
+      console.log(
+        `📋 Branch rules for '${branch}': ${branchRules.length} rule(s), ` +
+          `${names.size} required check name(s) total`,
+      );
+    } catch (e) {
+      const status = e && typeof e === 'object' ? e.status : undefined;
+      console.log(
+        `⚠️ Failed to fetch branch rules for '${branch}' (${status ?? e?.message ?? 'unknown error'}) — ` +
+          `ruleset checks excluded; relying on classic branch protection checks only`,
+      );
+    }
+
+    const result = names.size > 0 ? names : null;
+    if (result === null) {
+      console.log(
+        `ℹ️ No required checks found for '${branch}' — evaluating all checks`,
+      );
+    }
+    requiredChecksCache[branch] = result;
+    return result;
   }
 
   async function validateStatusChecks(sha, baseBranch) {
