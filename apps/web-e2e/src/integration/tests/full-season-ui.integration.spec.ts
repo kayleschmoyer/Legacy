@@ -143,20 +143,17 @@ test.describe
       await page.goto(`/baseball/league/${state.leagueId}/team-settings`);
       await page.waitForLoadState('load');
 
-      // Click the edit (pencil) button next to the team name
-      const editBtn = page
-        .getByRole('button')
-        .filter({ has: page.locator('[data-testid="edit-icon"], svg') })
-        .first();
-      if (await editBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
-        await editBtn.click();
-        // If an inline input appears, type the new name and save
-        const nameInput = page.getByRole('textbox').first();
-        if (await nameInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-          await nameInput.fill('The Commissioners');
-          await page.getByRole('button', { name: /save/i }).first().click();
-          await page.waitForTimeout(1000);
-        }
+      // V2 Team tab: name input is always editable — no edit-toggle button.
+      // Wait for "Save Name" to be enabled (team data loaded) before filling,
+      // then wait again to ensure no concurrent mutation holds the button.
+      const nameInput = page.locator('#team-name-input');
+      if (await nameInput.isVisible({ timeout: 10_000 }).catch(() => false)) {
+        const saveNameBtn = page.getByRole('button', { name: /Save Name/i });
+        await expect(saveNameBtn).toBeEnabled({ timeout: 10_000 });
+        await nameInput.fill('The Commissioners');
+        await expect(saveNameBtn).toBeEnabled({ timeout: 5_000 });
+        await saveNameBtn.click();
+        await page.waitForTimeout(1000);
       }
     });
 
