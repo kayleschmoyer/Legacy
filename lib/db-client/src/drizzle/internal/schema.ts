@@ -170,6 +170,7 @@ export const subscriptions = appInternal.table(
     appleOriginalTransactionId: text('apple_original_transaction_id'),
     appleProductId: text('apple_product_id'),
     appleEnvironment: text('apple_environment'),
+    appleLastNotificationType: text('apple_last_notification_type'),
     googlePurchaseToken: text('google_purchase_token'),
     googleProductId: text('google_product_id'),
     status: text('status').notNull().default('inactive'),

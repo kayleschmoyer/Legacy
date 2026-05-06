@@ -10,6 +10,7 @@ export interface UserSubscription {
   stripeSubscriptionId: string | null;
   appleOriginalTransactionId: string | null;
   appleProductId: string | null;
+  appleLastNotificationType: string | null;
   googlePurchaseToken: string | null;
   googleProductId: string | null;
   status: string;

@@ -195,6 +195,7 @@ async function upsertAppleSubscription(
   userId: number,
   originalTransactionId: string,
   productId: string,
+  notificationType: NotificationType,
   status: string,
   tier: 'free' | 'premium',
   currentPeriodEnd: Date | null,
@@ -225,6 +226,7 @@ async function upsertAppleSubscription(
         appleOriginalTransactionId: originalTransactionId,
         appleProductId: productId,
         appleEnvironment: environment,
+        appleLastNotificationType: notificationType,
         status,
         tier,
         currentPeriodEnd,
@@ -235,6 +237,7 @@ async function upsertAppleSubscription(
         set: {
           appleProductId: productId,
           appleEnvironment: environment,
+          appleLastNotificationType: notificationType,
           status,
           tier,
           currentPeriodEnd,
@@ -297,9 +300,11 @@ async function applyTierChangeSideEffects(
 
 // ── Notification handler ──────────────────────────────────────────────────────
 
+const NOOP_NOTIFICATION_RESULT = 'noop';
+
 async function handleNotification(
   notification: AppStoreNotification,
-): Promise<number | null> {
+): Promise<number | null | typeof NOOP_NOTIFICATION_RESULT> {
   const { notificationType, subtype, data } = notification;
   const transactionInfo = data.signedTransactionInfo;
 
@@ -313,7 +318,7 @@ async function handleNotification(
       'Apple IAP — informational notification; acknowledging without DB writes',
       { notificationType, subtype },
     );
-    return null;
+    return NOOP_NOTIFICATION_RESULT;
   }
 
   // Look up the userId from the existing subscription row (set by verifyApplePurchase
@@ -342,6 +347,7 @@ async function handleNotification(
     userId,
     originalTransactionId,
     productId,
+    notificationType,
     status,
     tier,
     currentPeriodEnd,
@@ -375,9 +381,19 @@ async function handleNotification(
       break;
     case 'EXPIRED':
     case 'GRACE_PERIOD_EXPIRED':
-    case 'REFUND':
-    case 'REVOKE':
       await sendGa4ServerEvent(userId, 'subscription_cancelled', {
+        tier: 'premium',
+        source: 'apple_iap',
+      });
+      break;
+    case 'REFUND':
+      await sendGa4ServerEvent(userId, 'subscription_refunded', {
+        tier: 'premium',
+        source: 'apple_iap',
+      });
+      break;
+    case 'REVOKE':
+      await sendGa4ServerEvent(userId, 'subscription_revoked', {
         tier: 'premium',
         source: 'apple_iap',
       });
@@ -522,11 +538,13 @@ const baseAppleIapHandler = async (
   }
 
   let userId: number | null = null;
+  let notificationResult: number | null | typeof NOOP_NOTIFICATION_RESULT =
+    null;
   const originalTransactionId =
     notification.data.signedTransactionInfo.originalTransactionId;
 
   try {
-    userId = await handleNotification(notification);
+    notificationResult = await handleNotification(notification);
   } catch (err) {
     captureError(err instanceof Error ? err : new Error(String(err)), {
       tags: {
@@ -559,6 +577,12 @@ const baseAppleIapHandler = async (
       body: JSON.stringify({ error: 'Internal server error' }),
     };
   }
+
+  if (notificationResult === NOOP_NOTIFICATION_RESULT) {
+    return { statusCode: 200, body: JSON.stringify({ received: true }) };
+  }
+
+  userId = notificationResult;
 
   if (userId === null) {
     // Race: ASN arrived before verifyApplePurchase created the subscription row.

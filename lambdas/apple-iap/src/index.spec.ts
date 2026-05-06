@@ -52,6 +52,7 @@ describe('apple-iap handler', () => {
   let handler: HandlerModule['handler'];
   let mockDecodeAndVerifyJws: jest.Mock;
   let mockRunWithInternalClient: jest.Mock;
+  let mockSendGa4ServerEvent: jest.Mock;
 
   beforeEach(() => {
     process.env['APPLE_BUNDLE_ID'] = 'com.legacy.sports';
@@ -60,6 +61,7 @@ describe('apple-iap handler', () => {
 
     mockDecodeAndVerifyJws = jest.fn();
     mockRunWithInternalClient = jest.fn();
+    mockSendGa4ServerEvent = jest.fn();
 
     jest.doMock('@legacy-sports/rollbar', () => ({
       getRollbarConfigFromEnv: jest.fn(() => null),
@@ -89,6 +91,7 @@ describe('apple-iap handler', () => {
         appleEvents: { eventId: 'eventId' },
         subscriptions: {
           appleOriginalTransactionId: 'appleOriginalTransactionId',
+          appleLastNotificationType: 'appleLastNotificationType',
           tier: 'tier',
           status: 'status',
           userId: 'userId',
@@ -102,7 +105,7 @@ describe('apple-iap handler', () => {
     }));
 
     jest.doMock('./ga4', () => ({
-      sendGa4ServerEvent: jest.fn(),
+      sendGa4ServerEvent: mockSendGa4ServerEvent,
     }));
 
     // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires synchronous require() after mock setup
@@ -316,7 +319,7 @@ describe('apple-iap handler', () => {
   });
 
   describe('happy path — environment persisted on upsert', () => {
-    it('passes apple_environment to the subscription upsert for a SUBSCRIBED notification', async () => {
+    it('passes apple_environment and apple_last_notification_type to the subscription upsert for a SUBSCRIBED notification', async () => {
       mockDecodeAndVerifyJws.mockResolvedValue(
         fakeNotification({
           notificationType: 'SUBSCRIBED',
@@ -398,7 +401,141 @@ describe('apple-iap handler', () => {
 
       expect(result.statusCode).toBe(200);
       expect(insertValues).toHaveBeenCalledWith(
-        expect.objectContaining({ appleEnvironment: 'Sandbox' }),
+        expect.objectContaining({
+          appleEnvironment: 'Sandbox',
+          appleLastNotificationType: 'SUBSCRIBED',
+        }),
+      );
+    });
+  });
+
+  describe('GA4 event mapping', () => {
+    function mockClaimAndLookup(
+      notificationType: NotificationType,
+      previousTier: 'free' | 'premium' = 'premium',
+    ) {
+      mockDecodeAndVerifyJws.mockResolvedValue(
+        fakeNotification({ notificationType }),
+      );
+
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb({
+            insert: () => ({
+              values: () => ({
+                onConflictDoNothing: () => ({
+                  returning: () =>
+                    Promise.resolve([{ eventId: 'uuid-test-123' }]),
+                }),
+              }),
+            }),
+          }),
+      );
+
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb({
+            select: () => ({
+              from: () => ({
+                where: () => ({
+                  limit: () => Promise.resolve([{ userId: 42 }]),
+                }),
+              }),
+            }),
+          }),
+      );
+
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb({
+            select: () => ({
+              from: () => ({
+                where: () => ({
+                  limit: () => Promise.resolve([{ tier: previousTier }]),
+                }),
+              }),
+            }),
+          }),
+      );
+
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb({
+            insert: () => ({
+              values: () => ({
+                onConflictDoUpdate: () => Promise.resolve(),
+              }),
+            }),
+            update: () => ({
+              set: () => ({
+                where: () => Promise.resolve(),
+              }),
+            }),
+          }),
+      );
+    }
+
+    it('fires subscription_refunded for REFUND notifications', async () => {
+      mockClaimAndLookup('REFUND');
+
+      const result = await handler(makeEvent());
+
+      expect(result.statusCode).toBe(200);
+      expect(mockSendGa4ServerEvent).toHaveBeenCalledWith(
+        42,
+        'subscription_refunded',
+        expect.objectContaining({
+          tier: 'premium',
+          source: 'apple_iap',
+        }),
+      );
+    });
+
+    it('fires subscription_revoked for REVOKE notifications', async () => {
+      mockClaimAndLookup('REVOKE');
+
+      const result = await handler(makeEvent());
+
+      expect(result.statusCode).toBe(200);
+      expect(mockSendGa4ServerEvent).toHaveBeenCalledWith(
+        42,
+        'subscription_revoked',
+        expect.objectContaining({
+          tier: 'premium',
+          source: 'apple_iap',
+        }),
+      );
+    });
+
+    it('fires subscription_cancelled for EXPIRED notifications', async () => {
+      mockClaimAndLookup('EXPIRED');
+
+      const result = await handler(makeEvent());
+
+      expect(result.statusCode).toBe(200);
+      expect(mockSendGa4ServerEvent).toHaveBeenCalledWith(
+        42,
+        'subscription_cancelled',
+        expect.objectContaining({
+          tier: 'premium',
+          source: 'apple_iap',
+        }),
+      );
+    });
+
+    it('fires subscription_cancelled for GRACE_PERIOD_EXPIRED notifications', async () => {
+      mockClaimAndLookup('GRACE_PERIOD_EXPIRED');
+
+      const result = await handler(makeEvent());
+
+      expect(result.statusCode).toBe(200);
+      expect(mockSendGa4ServerEvent).toHaveBeenCalledWith(
+        42,
+        'subscription_cancelled',
+        expect.objectContaining({
+          tier: 'premium',
+          source: 'apple_iap',
+        }),
       );
     });
   });
