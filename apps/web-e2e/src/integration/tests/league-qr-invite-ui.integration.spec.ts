@@ -10,7 +10,7 @@
  *   3. Copy invite link button shows "Copied" feedback after click
  *   4. Copy invite code button shows "Copied" feedback after click
  *   5. QR code toggle — "Show" reveals the SVG; "Hide" removes it
- *   6. Header "Invite" button (quick-share) shows "Copied!" feedback after click
+ *   6. Header "Invite" button navigates to overview tab showing the invite section
  *   7. End-to-end: manager navigates to invite URL and joins the league
  *   8. Backend verification: league member count increases after join
  *
@@ -238,8 +238,11 @@ test.describe
     await page.goto(`/baseball/league/${state.leagueId}/overview`);
     await page.waitForLoadState('load');
 
-    await test.step('QR Code section is visible', async () => {
-      await expect(page.getByText('QR Code', { exact: true })).toBeVisible({
+    await test.step('QR Code toggle button is visible', async () => {
+      // V2 renders a single "Show QR Code to Invite" toggle button; no separate section heading
+      await expect(
+        page.getByRole('button', { name: /show qr code/i }),
+      ).toBeVisible({
         timeout: 15_000,
       });
     });
@@ -262,15 +265,11 @@ test.describe
       await expect(
         page.getByRole('button', { name: /hide qr code/i }),
       ).toBeVisible({ timeout: 5_000 });
-      // "Scan to join league" caption should appear below the QR code
-      await expect(page.getByText('Scan to join league')).toBeVisible({
-        timeout: 5_000,
-      });
     });
 
     await test.step('Clicking "Hide" removes the QR code', async () => {
       await page.getByRole('button', { name: /hide qr code/i }).click();
-      await expect(page.getByText('Scan to join league')).not.toBeVisible({
+      await expect(page.getByTestId('qr-code-svg')).not.toBeVisible({
         timeout: 5_000,
       });
       // Toggle button flips back to "Show"
@@ -281,31 +280,26 @@ test.describe
   });
 
   // -----------------------------------------------------------------------
-  // PHASE 6 — HEADER INVITE QUICK-SHARE BUTTON
+  // PHASE 6 — HEADER INVITE BUTTON
   // -----------------------------------------------------------------------
 
-  test('Phase 6: Header "Invite" quick-share button shows "Copied!" feedback', async ({
+  test('Phase 6: Header "Invite" button is visible and surfaces the invite section', async ({
     commissionerPage: page,
   }) => {
     await page.goto(`/baseball/league/${state.leagueId}/overview`);
     await page.waitForLoadState('load');
 
-    await page
-      .context()
-      .grantPermissions(['clipboard-read', 'clipboard-write']);
-
     await test.step('Header "Invite" button is visible', async () => {
-      const inviteBtn = page.getByRole('button', {
-        name: /share invite link/i,
-      });
+      // V2 header: button text is "Invite"; clicking navigates to the overview tab
+      const inviteBtn = page.getByRole('button', { name: /^invite$/i });
       await expect(inviteBtn).toBeVisible({ timeout: 15_000 });
       await inviteBtn.click();
     });
 
-    await test.step('Button changes to "Copied!" state', async () => {
-      await expect(
-        page.getByRole('button', { name: /share invite link/i }),
-      ).toContainText('Copied!', { timeout: 5_000 });
+    await test.step('"Invite Friends" section is visible', async () => {
+      await expect(page.getByText('Invite Friends')).toBeVisible({
+        timeout: 5_000,
+      });
     });
   });
 
