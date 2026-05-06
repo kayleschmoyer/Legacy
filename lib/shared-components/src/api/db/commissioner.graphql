@@ -158,6 +158,23 @@ mutation UpdateLeagueBranding($input: UpdateLeagueSettingsInput!) {
 
 mutation UpdateLeagueSettings($input: UpdateLeagueSettingsInput!) {
   updateLeagueSettings(input: $input) {
-    ...League
+    id
+    gamesPerMatchup
+    spStartsPerMatchup
+    minCareerGames
+    minCareerSeasons
+    totalMatchups
+    playoffEnabled
+    playoffFormat
+    playoffMultiWeek
+    salaryCapEnabled
+    salaryCap
+    salaryFloor
+    luxuryTaxThreshold
+    minSalary
+    salaryEscalationPct
+    salaryDecayPct
+    auctionBudget
+    auctionMinBid
   }
 }

@@ -69,6 +69,7 @@ export const CommishTab: React.FC<CommishTabProps> = ({ league }) => {
   const [openId, setOpenId] = useState<string>('announcements');
   const [nextStepError, setNextStepError] = useState<string | null>(null);
   const [settingsSuccess, setSettingsSuccess] = useState<string | null>(null);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
   const leagueId = league.id ?? 0;
 
   const {
@@ -120,7 +121,14 @@ export const CommishTab: React.FC<CommishTabProps> = ({ league }) => {
           currentPlayoffMultiWeek={league.playoffMultiWeek ?? false}
           currentSalaryCapEnabled={league.salaryCapEnabled ?? false}
           currentSalaryCap={league.salaryCap ?? null}
-          onSuccess={(msg) => setSettingsSuccess(msg)}
+          onSuccess={(msg) => {
+            setSettingsError(null);
+            setSettingsSuccess(msg);
+          }}
+          onError={(err) => {
+            setSettingsSuccess(null);
+            setSettingsError(err.message);
+          }}
         />
       ) : null,
     },
@@ -239,6 +247,22 @@ export const CommishTab: React.FC<CommishTabProps> = ({ league }) => {
           }}
         >
           Error: {nextStepError}
+        </div>
+      ) : null}
+      {settingsError ? (
+        <div
+          role="alert"
+          aria-live="assertive"
+          style={{
+            background: 'rgba(196, 30, 58, 0.1)',
+            border: '1px solid rgba(196, 30, 58, 0.4)',
+            borderRadius: 8,
+            padding: 12,
+            color: '#c41e3a',
+            fontWeight: 600,
+          }}
+        >
+          Error saving settings: {settingsError}
         </div>
       ) : null}
       {settingsSuccess ? (

@@ -4540,37 +4540,14 @@ export type UpdateLeagueSettingsMutation = {
   updateLeagueSettings?: {
     __typename?: 'League';
     id?: number | null;
-    name?: string | null;
-    owner?: number | null;
-    maxRosterSize?: number | null;
-    currentMatchup?: number | null;
-    currentWeekNumber?: number | null;
-    draftStatus?: string | null;
-    leaguePhase?: string | null;
-    inviteCode?: string | null;
-    playerPool?: string | null;
-    weekAdvanceStatus?: string | null;
-    waiverType?: string | null;
-    waiverEnabled?: boolean | null;
-    faabBudgetDefault?: number | null;
-    spStartsPerMatchup?: number | null;
     gamesPerMatchup?: number | null;
+    spStartsPerMatchup?: number | null;
     minCareerGames?: number | null;
     minCareerSeasons?: number | null;
     totalMatchups?: number | null;
     playoffEnabled?: boolean | null;
     playoffFormat?: string | null;
     playoffMultiWeek?: boolean | null;
-    lmNotes?: string | null;
-    isMockDraft?: boolean | null;
-    isPublic?: boolean | null;
-    logoUrl?: string | null;
-    bannerUrl?: string | null;
-    primaryColor?: string | null;
-    secondaryColor?: string | null;
-    previousLeagueId?: number | null;
-    frozenAt?: string | null;
-    seasonNumber?: number | null;
     salaryCapEnabled?: boolean | null;
     salaryCap?: number | null;
     salaryFloor?: number | null;
@@ -4580,19 +4557,6 @@ export type UpdateLeagueSettingsMutation = {
     salaryDecayPct?: number | null;
     auctionBudget?: number | null;
     auctionMinBid?: number | null;
-    eraFilter?: string | null;
-    hofOnly?: boolean | null;
-    customEraStartYear?: number | null;
-    customEraEndYear?: number | null;
-    tradeDeadlineWeek?: number | null;
-    userMembership?: {
-      __typename?: 'LeagueMember';
-      leagueId?: number | null;
-      userId?: number | null;
-      teamId?: number | null;
-      permissionLevel?: string | null;
-      username?: string | null;
-    } | null;
   } | null;
 };
 
@@ -9883,10 +9847,26 @@ export type UpdateLeagueBrandingMutationOptions = BaseMutationOptions<
 export const UpdateLeagueSettings = gql`
   mutation UpdateLeagueSettings($input: UpdateLeagueSettingsInput!) {
     updateLeagueSettings(input: $input) {
-      ...League
+      id
+      gamesPerMatchup
+      spStartsPerMatchup
+      minCareerGames
+      minCareerSeasons
+      totalMatchups
+      playoffEnabled
+      playoffFormat
+      playoffMultiWeek
+      salaryCapEnabled
+      salaryCap
+      salaryFloor
+      luxuryTaxThreshold
+      minSalary
+      salaryEscalationPct
+      salaryDecayPct
+      auctionBudget
+      auctionMinBid
     }
   }
-  ${LeagueFragmentDoc}
 `;
 export type UpdateLeagueSettingsMutationFn = MutationFunction<
   UpdateLeagueSettingsMutation,
