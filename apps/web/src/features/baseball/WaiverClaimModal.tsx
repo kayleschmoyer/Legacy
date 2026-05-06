@@ -124,8 +124,10 @@ export const WaiverClaimModal: React.FC<WaiverClaimModalProps> = ({
         // normalized cache can't know which list queries it belongs to.
         // Refetch the team's waiver list and the league activity feed by
         // name so every active observer updates regardless of variables
-        // (LS-3769).
-        awaitRefetchQueries: true,
+        // (LS-3769). awaitRefetchQueries intentionally omitted — the
+        // refetches run in the background so setSuccess(true) fires as
+        // soon as the mutation resolves, not after the refetches complete
+        // (LS-4213).
         refetchQueries: ['GetTeamWaiverClaims', 'GetLeagueActivity'],
       });
       setSuccess(true);
