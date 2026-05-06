@@ -384,9 +384,11 @@ test.describe
     });
 
     await test.step('Verify all 4 teams appear in standings', async () => {
-      // Each team row has role="listitem" in the standings component
-      const teamRows = page.getByRole('listitem');
-      // Allow for nested listitems — just assert at least 4 are present
+      // LeagueDetailPageV2 renders StandingsTab, which uses a <table> not a list.
+      // Each team occupies a <tr> in the <table aria-label="League Standings"> tbody.
+      const teamRows = page.locator(
+        'table[aria-label="League Standings"] tbody tr',
+      );
       await expect
         .poll(async () => teamRows.count(), {
           timeout: 15_000,
@@ -409,33 +411,34 @@ test.describe
     });
 
     await test.step('Verify rank badges (seeds) are rendered', async () => {
-      // Each team row's rank badge contains the rank number (#1, #2, etc.)
-      // Standings may be divided into divisions, so only ranks within each
-      // division are shown (e.g. 1,2 per division rather than 1,2,3,4 globally).
+      // StandingsTab (LeagueDetailPageV2) renders rank numbers via the <Rank>
+      // component as .ls-rank divs inside <table aria-label="League Standings">.
       // Always expect at least rank 1 to be visible.
       await expect(page.getByText('1', { exact: true }).first()).toBeVisible({
         timeout: 10000,
       });
-      // Expect at least 2 team rows total
-      await expect(page.locator('[role="listitem"]').first()).toBeVisible({
+      // Expect at least one team row in the table
+      await expect(
+        page.locator('table[aria-label="League Standings"] tbody tr').first(),
+      ).toBeVisible({
         timeout: 10000,
       });
     });
 
-    await test.step('Verify waiver-order seed values are displayed (≥sm viewport)', async () => {
-      // Set viewport wide enough to show the waiver-order column (hidden below sm)
+    await test.step('Verify team rank badges are visible in standings', async () => {
+      // StandingsTab does not have a waiver-order column. Rank numbers (1, 2, ...)
+      // are rendered via <Rank> as .ls-rank elements inside the standings table.
       await page.setViewportSize({ width: 1280, height: 800 });
       await page.reload();
       await page.waitForLoadState('load');
 
-      // Waiver order values are rendered as "#1", "#2", "#3", "#4"
-      // The standings component shows waiverOrder as `#${team.waiverOrder}` when
-      // waiverType is not 'faab'. After a fresh draft all teams have an order.
-      const waiverSeeds = page.locator('text=/^#[1-9]$/');
-      // Wait for at least one seed to render before counting
-      await expect(waiverSeeds.first()).toBeVisible({ timeout: 15_000 });
-      const seedCount = await waiverSeeds.count();
-      expect(seedCount).toBeGreaterThanOrEqual(1);
+      const rankBadges = page.locator(
+        'table[aria-label="League Standings"] .ls-rank',
+      );
+      // Wait for at least one rank badge to render before counting
+      await expect(rankBadges.first()).toBeVisible({ timeout: 15_000 });
+      const rankCount = await rankBadges.count();
+      expect(rankCount).toBeGreaterThanOrEqual(1);
     });
   });
 
