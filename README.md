@@ -78,9 +78,13 @@ These are published automatically by CI workflows — no manual steps required.
 
 **Latest Release:** [View all Android releases →](https://github.com/bkrupa/legacy-sports/releases)
 
+**Scan to download on your phone:**
+
+<a href="https://github.com/bkrupa/legacy-sports/releases/latest"><img src="docs/assets/apk-qr.svg" alt="QR code linking to the latest Android APK release" width="180" height="180" /></a>
+
 **Installation Instructions:**
 
-1. Download the APK file from the link above
+1. Download the APK file from the link above (or scan the QR code on your phone)
 2. Enable "Install from Unknown Sources" in your Android settings
 3. Install the APK on your Android device
 
