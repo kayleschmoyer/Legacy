@@ -23,6 +23,7 @@ import {
   type TeamMemberFragment,
   useClaimFreeAgentMutation,
   useGetTeamMembersQuery,
+  useGetUserTeamIdQuery,
 } from '../../api/db/graphql.generated';
 import { useAppSelector } from '../../store/hooks';
 import {
@@ -72,7 +73,19 @@ export const WaiverClaimModal: React.FC<WaiverClaimModalProps> = ({
   const [success, setSuccess] = useState(false);
   const [faabBidInput, setFaabBidInput] = useState('');
 
-  const userTeamId = useAppSelector((s) => s.league.userTeamId);
+  // userTeamId is fetched directly here rather than read from Redux:
+  // LeagueDetailPageV2 (the active route handler) keeps userTeamId in local
+  // component state and never dispatches setUserTeamId, so the Redux value is
+  // permanently null on the v2 path. Combined with LS-4226's rosterUnknown
+  // gate that locked the modal in "Loading roster…" indefinitely whenever the
+  // modal was opened from the v2 free-agents tab (LS-4235). Apollo dedupes
+  // this query against the parent page's identical fetch via the cache.
+  const { data: userTeamData, loading: userTeamLoading } =
+    useGetUserTeamIdQuery({
+      variables: { leagueId },
+      skip: !open,
+    });
+  const userTeamId = userTeamData?.userTeamId ?? null;
   const maxRosterSize = useAppSelector(
     (s) => s.league.leagueData?.maxRosterSize ?? 25,
   );
@@ -84,10 +97,10 @@ export const WaiverClaimModal: React.FC<WaiverClaimModalProps> = ({
   );
   const isFaab = waiverType === 'faab';
 
-  // When userTeamId hasn't loaded yet, skip the roster query but treat the
-  // modal as loading — prevents a false "Roster has space (0/25)" state that
-  // would skip the required drop-player step (LS-4226).
-  const rosterUnknown = userTeamId === null;
+  // While the userTeamId query is still in flight, treat the modal as loading
+  // so we don't render a false "Roster has space (0/25)" state that would
+  // skip the required drop-player step (LS-4226).
+  const rosterUnknown = userTeamLoading || userTeamId === null;
 
   const { data: rosterData, loading: rosterLoading } = useGetTeamMembersQuery({
     variables: { teamId: userTeamId ?? 0 },
