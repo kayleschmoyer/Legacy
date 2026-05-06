@@ -79,17 +79,34 @@ After `jira_view` returns, **rename the current session** to include the ticket 
 worktree_rename_session(title: "LS-#### <summary, truncated to 80 chars>")
 ```
 
-**⚠️ Critical — read the full description before continuing.** The ticket summary is never sufficient. Immediately after the rename, extract and internalize the following from the `jira_view` response body:
+**⚠️ Critical — read the full description before continuing.** The ticket summary is never sufficient. The single most common failure mode for this skill is agents skimming the title, building a mental model from the summary alone, and producing a PR that misses ACs or violates `Out of Scope`. Defeat that mode here:
 
-- **Problem / Context** — why does this work need to happen?
-- **Acceptance Criteria** — what conditions must be true for the ticket to be Done?
-- **Technical Approach** — what files, systems, or APIs are involved?
-- **Out of Scope** — what explicitly should _not_ change?
-- **Open Questions** — anything still unresolved?
+1. **Read the full `jira_view` response body** — every section, end to end. No skimming.
+2. **Always call `jira_get_comments(key: "LS-####")`** — not just when the description looks truncated. Clarifications, scope adjustments, and additional ACs are routinely added as comments after ticket creation.
+3. **Quote back the ticket structure into your next assistant message** before any state-changing tool call (no transitions, no worktree creation, no code edits until this is done). Use this exact format. If a section is missing from the ticket, write `MISSING` — do not invent content:
 
-If the `jira_view` response truncates the description, call `jira_get_comments(key: "LS-####")` as well — implementation details are sometimes clarified there.
+   ```
+   Ticket: LS-####
+   Problem / Context: <quote or paraphrase>
+   Acceptance Criteria:
+     AC1: <verbatim>
+     AC2: <verbatim>
+     AC3: <verbatim>
+     ...
+   Technical Approach: <quote or paraphrase>
+   Out of Scope: <quote or list MISSING>
+   Open Questions: <quote or list MISSING>
+   ```
 
-> **Do NOT proceed to Step 1b until you can answer:** "What specifically must be true when this ticket is Done, and what must I build or change to get there?" If you cannot answer that from the ticket body alone, the ticket is underspecified — go to Step 1c for clarification **before planning begins**.
+   Numbering ACs (`AC1`, `AC2`, ...) is required — you will check each one off explicitly in step 5 (Self-review) before being allowed to mark `self-review` complete.
+
+4. **Self-quiz before proceeding.** You may not move past this gate until you can answer all of the following from the ticket body alone:
+   - What specifically must be true when this ticket is Done?
+   - What must I build, change, or delete to get there?
+   - Which files or systems are in scope, and which are explicitly out of scope?
+   - Is there any AC I cannot currently see a path to satisfying?
+
+> ⛔ **Never start implementation while any AC is unread, ambiguous, or marked `MISSING`.** If you cannot answer the self-quiz from the ticket body alone, the ticket is underspecified — go to Step 1c for enrichment **before planning begins**. Misunderstanding scope at this stage produces a PR that gets rejected; fixing it later costs more than reading carefully now.
 
 Determine the ticket type and whether it has children:
 
@@ -204,14 +221,39 @@ Follow the full [worktree-workflow skill](../worktree-workflow/SKILL.md):
 
       Mark each item `in_progress` when you start it and `completed` when done. **The workflow is not complete until every item is `completed`.** Arriving at `self-review` or `make-pc` with pending items still in the list is NOT the finish line — keep going.
 
-4.  **Implement**: Before writing any code, re-read the **full ticket description** from the `jira_view` response (not just the summary). Confirm you are implementing against the Acceptance Criteria — if you cannot cite at least one AC from the description, stop and return to Step 1c. Then investigate the codebase and write code + tests.
+4.  **Implement**: Before writing any code, re-read the **full ticket description** from the `jira_view` response (not just the summary) and re-read your numbered AC list from Step 1. Every code change you make must trace back to a specific `ACn`. If you cannot cite at least one AC from the description, stop and return to Step 1c.
+
+    **Scope discipline (hard rule):**
+    - Only touch files required by the ACs, the Technical Approach, or directly-implied dependencies.
+    - Do not refactor neighboring code, fix unrelated lint warnings, rename unrelated symbols, tidy imports, or upgrade unrelated dependencies on the way through. If you spot something worth fixing, file a separate Jira ticket — never bundle it into this PR.
+    - If `Out of Scope` lists something, treat it as a hard boundary. Touching it is a defect.
+    - One ticket = one worktree = one PR. If a change feels like it belongs in a different ticket, it does — split it out.
+
+    Then investigate the codebase and write code + tests.
     - **Bug tickets**: follow the [bug verification workflow](../debugging/SKILL.md#verification-by-bug-type) — reproduce the bug **before** writing any fix, then verify the fix resolves the reported behavior **after**. Include before/after evidence in the PR body under a `## Verification` section (appended after the standard template). `make pc` passing is necessary but not sufficient for bugs. The `## Verification` section is not part of the standard PR template -- add it manually for bug-fix PRs.
     - **Write implementation notes to Jira** (all tickets): after completing the implementation (before committing), append an `## Implementation Notes` section to the Jira ticket description so sweep agents have context when fixing review feedback later. First read the current description via `jira_view`, then append:
       ```
       jira_edit_ticket(key: "LS-####", fields: { description: "<existing description>\n\n## Implementation Notes\n\n**Approach:** <1-2 sentences on what was done and why>\n\n**Key files changed:**\n- `path/to/file.ts` — reason\n- ...\n\n**Design decisions / constraints discovered:**\n- <any non-obvious choices, tradeoffs, or codebase constraints the agent found>\n\n**Testing:** <how correctness was verified — unit tests, manual repro, etc.>" })
       ```
       Preserve the original description and only append/refresh the `## Implementation Notes` section at the end. Keep notes factual and brief. Focus on information that is _not_ derivable from reading the diff: constraints, considered alternatives, and context that informs whether a review comment's suggested change is safe or problematic.
-5.  **Self-review** (MANDATORY — do not skip): invoke the `/review` skill to catch rule violations and common review patterns before proceeding. This is not optional reading — execute `Skill(skill: "review")` and let it run its full checklist (project rules, code quality scan, reuse check, and common Copilot patterns). Fix all issues it identifies before moving to step 7.
+
+5.  **Self-review** (MANDATORY — do not skip):
+
+    **5a. Acceptance criteria verification gate.** Walk back through the numbered AC list you quoted in Step 1 and **explicitly check each one off** before invoking `/review`:
+    - For every AC, state the concrete evidence that proves it is satisfied — a code change at `file:line`, a test name, a screenshot, a manual repro step. "I think this is covered" is not evidence.
+    - If any AC is **not** satisfied by your current diff, you are not done — return to step 4 and keep working. Do not proceed to `/review`.
+    - If an AC is **genuinely impossible** to satisfy (missing data, contradictory constraints, requires access you do not have, conflicts with another AC), **stop and ask the user for help**. Do not silently drop, weaken, or reinterpret it. Surface the conflict in plain English with the AC text quoted, your specific blocker, and the option(s) you see. Wait for the user's decision before proceeding.
+    - Append the AC verification list to the ticket's `## Implementation Notes` section (the same section you wrote in step 4) under an `**Acceptance criteria verification**` sub-bullet so reviewers can see the AC → evidence mapping:
+
+      ```
+      **Acceptance criteria verification:**
+      - AC1: <quote> — satisfied by <evidence>
+      - AC2: <quote> — satisfied by <evidence>
+      - AC3: <quote> — BLOCKED, see comment to user
+      ```
+
+    **5b. Code review.** Then invoke the `/review` skill to catch rule violations and common review patterns. This is not optional reading — execute `Skill(skill: "review")` and let it run its full checklist (project rules, code quality scan, reuse check, and common Copilot patterns). Fix all issues it identifies before moving to step 7.
+
 6.  **Validate**: `db_migration_status(worktreePath: "$wt")` + `db_migrate(worktreePath: "$wt")`, then `make_run(target: "pc", worktreePath: "$wt")`. Shell fallback: `make pc`
 
     > **⛔ Do NOT run individual targets (`format`, `lint`, `typecheck`, `test`) instead of or before `make pc`.** `make pc` runs all steps in one shot and handles formatter auto-commits internally. Running targets individually multiplies turns and bypasses the auto-commit logic. If `make pc` fails, read the `steps[]` JSON to find the failing step, fix the code — you may optionally run that specific failing target to iterate faster — then always finish with a full `make_run(target: "pc")` pass before pushing.
@@ -354,30 +396,70 @@ The skill is responsible for shepherding the PR all the way to "merged" (step 8 
   Agent(
     isolation: "worktree",
     prompt: """
-      Implement Jira ticket LS-<child_key>. Follow these steps:
+      Implement Jira ticket LS-<child_key>. Load the authoritative procedure
+      with Skill(skill: "work-ticket") FIRST, before any other tool call, and
+      follow every step in it. The steps below are a quick reference — they
+      do NOT override SKILL.md.
 
       Setup:
       1. git fetch origin main
       2. node scripts/setup-worktree-node-modules.mjs
       3. Skip jira_transition — the orchestrator already claimed this ticket.
 
-      Work:
-      4. Read the ticket: jira_view(key: "LS-<child_key>")
-      5. Implement the ticket (code + tests)
-      6. Self-review: read .agents/skills/pr-lifecycle/references/self-review.md
-         and .agents/skills/pr-lifecycle/references/common-review-patterns.md,
-         then run Skill(skill: "review"). Fix all issues before proceeding.
-      7. db_migration_status() + db_migrate()
-      8. make_run(target: "pc") — must pass
-      9. worktree_commit(message: "type(scope): LS-<child_key> description")
-      10. worktree_push(setUpstream: true)
-      11. github_create_pr(title: "LS-<child_key> ...", draft: true)
-      12. github_manage_labels(add: ["agent-in-progress"])
-      13. github_mark_pr_ready
-      14. github_request_review
-      15. jira_transition(key: "LS-<child_key>", status: "In Review")
+      Read the ticket (MANDATORY — do not skim):
+      4. jira_view(key: "LS-<child_key>") — read the full response body, end to end.
+      5. jira_get_comments(key: "LS-<child_key>") — clarifications routinely
+         live here, even when the description looks complete.
+      6. Quote back the ticket structure into your next assistant message
+         before any state-changing tool call. Number every AC (AC1, AC2, ...).
+         If a section is missing, write MISSING — do not invent content:
+            Ticket: LS-<child_key>
+            Problem / Context: <quote or paraphrase>
+            Acceptance Criteria:
+              AC1: <verbatim>
+              AC2: <verbatim>
+              ...
+            Technical Approach: <quote or paraphrase>
+            Out of Scope: <quote or MISSING>
+            Open Questions: <quote or MISSING>
+      7. Self-quiz: do NOT proceed until you can answer from the ticket body alone:
+         - What specifically must be true when this ticket is Done?
+         - What must I build, change, or delete?
+         - Which files/systems are in scope, and what is explicitly Out of Scope?
+         - Is there any AC I cannot see a path to satisfying?
+         If any answer is unclear, the ticket is underspecified — invoke
+         Skill(skill: "define") autonomously, then re-read and re-quote.
 
-      Return the PR number and any issues encountered.
+      Implement:
+      8. Every code change must trace to a specific ACn. Touch only files
+         required by the ACs / Technical Approach / direct dependencies.
+         Do NOT refactor neighboring code, fix unrelated lint, rename unrelated
+         symbols, or upgrade unrelated dependencies. Out of Scope is a hard
+         boundary. One ticket = one worktree = one PR.
+      9. Write code + tests against the numbered ACs.
+
+      AC verification gate (before self-review):
+      10. Walk back through AC1, AC2, ... and state concrete evidence per AC
+          (file:line, test name, screenshot, manual repro). If any AC is
+          unsatisfied, return to step 9. If an AC is genuinely impossible
+          (missing data, contradictory constraints), STOP and ask the user —
+          never silently drop or weaken an AC. Append the AC -> evidence
+          mapping to the ticket's ## Implementation Notes section under an
+          **Acceptance criteria verification** sub-bullet.
+
+      Self-review and ship:
+      11. Skill(skill: "review") — fix all issues before proceeding.
+      12. db_migration_status() + db_migrate()
+      13. make_run(target: "pc") — must pass
+      14. worktree_commit(message: "type(scope): LS-<child_key> description")
+      15. worktree_push(setUpstream: true)
+      16. github_create_pr(title: "LS-<child_key> ...", draft: true)
+      17. github_manage_labels(add: ["agent-in-progress"])
+      18. github_mark_pr_ready
+      19. github_request_review
+      20. jira_transition(key: "LS-<child_key>", status: "In Review")
+
+      Return the PR number, the AC verification list, and any issues encountered.
 
       Tool preferences:
       - Use worktree_commit/worktree_push for commits and pushes

@@ -44,7 +44,7 @@ REPEAT:
      b. Transition only the remaining revalidated "To Do" tickets to "In Progress": `jira_transition(key: [...], status: "In Progress")`.
      c. Verify: call `jira_view` on each claimed ticket to confirm the transition succeeded. Drop any that failed.
      d. If the entire batch was dropped (all tickets were no longer "To Do"), loop back to step 2 to find more work.
-  7. Work each ticket: Leaf Mode flow. Append the new PR to in_flight_prs as { ticket, prNumber, branch, reviewRounds: 0 }.
+  7. Work each ticket: dispatch a subagent that loads `Skill(skill: "work-ticket")` FIRST and follows it (Leaf Mode flow). The skill is authoritative — it owns the read-the-full-ticket gate (quote back ACs as AC1, AC2, ... before any state-changing tool call), the scope discipline rules (Out of Scope is a hard boundary; one ticket = one PR), and the AC verification gate that runs before self-review. Use the subagent prompt template at the bottom of `.agents/skills/work-ticket/SKILL.md` (Gotchas section); do not paraphrase a shorter version. Append the new PR to in_flight_prs as { ticket, prNumber, branch, reviewRounds: 0 }.
      [client-bugs] (worktree → reproduce bug → implement fix → verify → validate → PR → github_mark_pr_ready → github_request_review → Jira "In Review")
      [mcp-gaps]    (worktree → implement → validate → PR → github_mark_pr_ready → github_request_review → Jira "In Review")
   8. Clean up: after each ticket's PR is created, clean up its worktree (the PR is now tracked in in_flight_prs and will be drained in the next iteration's step 1).
