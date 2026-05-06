@@ -270,120 +270,118 @@ export function MatchupRosterEditorView({
       `${player.player?.firstName ?? ''} ${player.player?.lastName ?? ''}`.trim();
 
     const rowTestId = `matchup-player-row-${player.id}`;
-    // Tamagui forwards `testID` to react-native-web on web, but in this app's
-    // version it is silently dropped on a styled XStack with `onPress` — the
-    // rendered element ends up with no `data-testid` (LS-4133). Setting
-    // `data-testid` directly guarantees Playwright's
-    // `getByTestId(/^matchup-player-row-/)` resolves on web; `testID` is kept
-    // for the native mobile build.
+    // Tamagui drops `data-testid` on animated XStack with onPress in Chromium
+    // (LS-4133, LS-4215). A plain div wrapper guarantees the attribute reaches
+    // the real DOM and gives Playwright a clickable bounding box.
+    // `testID` stays on XStack for native mobile.
     return (
-      <XStack
-        key={player.id}
-        testID={rowTestId}
-        data-testid={rowTestId}
-        paddingVertical="$2.5"
-        paddingHorizontal="$3"
-        backgroundColor={
-          !locked && isSelected
-            ? '$blue3'
-            : !locked && isSwapTarget
-              ? '$blue2'
-              : undefined
-        }
-        borderWidth={!locked && isSelected ? 2 : 0}
-        borderColor={!locked && isSelected ? '$blue8' : undefined}
-        borderRadius="$3"
-        hoverStyle={
-          locked
-            ? undefined
-            : {
-                backgroundColor: isSwapTarget ? '$blue2' : '$gray3',
-                cursor: 'pointer',
-              }
-        }
-        pressStyle={locked ? undefined : { scale: 0.99 }}
-        animation="quick"
-        onPress={locked ? undefined : () => handlePlayerClick(player)}
-        alignItems="center"
-        gap="$2"
-      >
-        {/* Position badge */}
-        <YStack
-          width={36}
-          height={36}
-          borderRadius={18}
-          backgroundColor={badge.bg}
-          justifyContent="center"
+      <div key={player.id} data-testid={rowTestId}>
+        <XStack
+          testID={rowTestId}
+          paddingVertical="$2.5"
+          paddingHorizontal="$3"
+          backgroundColor={
+            !locked && isSelected
+              ? '$blue3'
+              : !locked && isSwapTarget
+                ? '$blue2'
+                : undefined
+          }
+          borderWidth={!locked && isSelected ? 2 : 0}
+          borderColor={!locked && isSelected ? '$blue8' : undefined}
+          borderRadius="$3"
+          hoverStyle={
+            locked
+              ? undefined
+              : {
+                  backgroundColor: isSwapTarget ? '$blue2' : '$gray3',
+                  cursor: 'pointer',
+                }
+          }
+          pressStyle={locked ? undefined : { scale: 0.99 }}
+          animation="quick"
+          onPress={locked ? undefined : () => handlePlayerClick(player)}
           alignItems="center"
-          flexShrink={0}
+          gap="$2"
         >
-          <Text fontSize="$2" fontWeight="800" color={badge.text}>
-            {posType ?? 'BN'}
-          </Text>
-        </YStack>
-
-        {/* Player info */}
-        <YStack flex={1} minWidth={0}>
-          <Text
-            fontSize="$3"
-            fontWeight="600"
-            color={isSelected ? '$yellow10' : '$gray12'}
-            numberOfLines={1}
+          {/* Position badge */}
+          <YStack
+            width={36}
+            height={36}
+            borderRadius={18}
+            backgroundColor={badge.bg}
+            justifyContent="center"
+            alignItems="center"
+            flexShrink={0}
           >
-            {playerName || '—'}
-          </Text>
-          <Text fontSize="$1" color="$gray10" numberOfLines={1}>
-            {player.player?.eligiblePositions?.join(', ') ?? ''}
-            {player.season ? ` • Season ${player.season}` : ''}
-          </Text>
-        </YStack>
+            <Text fontSize="$2" fontWeight="800" color={badge.text}>
+              {posType ?? 'BN'}
+            </Text>
+          </YStack>
 
-        {/* Actions — shown only when this card is selected */}
-        {!locked && isSelected && section === 'starter' && (
-          <Button
-            size="$2"
-            theme="red"
-            onPress={(e: { stopPropagation: () => void }) => {
-              e.stopPropagation();
-              handleMoveToBench(player);
-            }}
-            disabled={mutating}
-          >
-            Bench
-          </Button>
-        )}
+          {/* Player info */}
+          <YStack flex={1} minWidth={0}>
+            <Text
+              fontSize="$3"
+              fontWeight="600"
+              color={isSelected ? '$yellow10' : '$gray12'}
+              numberOfLines={1}
+            >
+              {playerName || '—'}
+            </Text>
+            <Text fontSize="$1" color="$gray10" numberOfLines={1}>
+              {player.player?.eligiblePositions?.join(', ') ?? ''}
+              {player.season ? ` • Season ${player.season}` : ''}
+            </Text>
+          </YStack>
 
-        {!locked &&
-          isSelected &&
-          section === 'bench' &&
-          positionOptions.length > 0 && (
-            <XStack gap="$1" flexWrap="wrap" maxWidth={200}>
-              {positionOptions.map((opt) => (
-                <Button
-                  key={opt.id}
-                  size="$2"
-                  backgroundColor="$blue8"
-                  color="white"
-                  pressStyle={{ backgroundColor: '$blue10' }}
-                  hoverStyle={{ backgroundColor: '$blue9' }}
-                  onPress={(e: { stopPropagation: () => void }) => {
-                    e.stopPropagation();
-                    handleAssignPosition(player, opt.id);
-                  }}
-                  disabled={mutating}
-                >
-                  {opt.type}
-                </Button>
-              ))}
-            </XStack>
+          {/* Actions — shown only when this card is selected */}
+          {!locked && isSelected && section === 'starter' && (
+            <Button
+              size="$2"
+              theme="red"
+              onPress={(e: { stopPropagation: () => void }) => {
+                e.stopPropagation();
+                handleMoveToBench(player);
+              }}
+              disabled={mutating}
+            >
+              Bench
+            </Button>
           )}
 
-        {!locked && isSwapTarget && (
-          <Text fontSize="$1" color="$yellow10" fontWeight="600">
-            Tap to swap
-          </Text>
-        )}
-      </XStack>
+          {!locked &&
+            isSelected &&
+            section === 'bench' &&
+            positionOptions.length > 0 && (
+              <XStack gap="$1" flexWrap="wrap" maxWidth={200}>
+                {positionOptions.map((opt) => (
+                  <Button
+                    key={opt.id}
+                    size="$2"
+                    backgroundColor="$blue8"
+                    color="white"
+                    pressStyle={{ backgroundColor: '$blue10' }}
+                    hoverStyle={{ backgroundColor: '$blue9' }}
+                    onPress={(e: { stopPropagation: () => void }) => {
+                      e.stopPropagation();
+                      handleAssignPosition(player, opt.id);
+                    }}
+                    disabled={mutating}
+                  >
+                    {opt.type}
+                  </Button>
+                ))}
+              </XStack>
+            )}
+
+          {!locked && isSwapTarget && (
+            <Text fontSize="$1" color="$yellow10" fontWeight="600">
+              Tap to swap
+            </Text>
+          )}
+        </XStack>
+      </div>
     );
   };
 

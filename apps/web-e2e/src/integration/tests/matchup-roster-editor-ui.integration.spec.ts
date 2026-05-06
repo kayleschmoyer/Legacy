@@ -177,6 +177,7 @@ test.describe
 
   test('Phase 3: Automated draft and season activation', async ({
     commissionerPage: page,
+    commissionerJwt,
   }) => {
     test.setTimeout(300_000);
 
@@ -222,16 +223,44 @@ test.describe
       await confirmBtn.last().click();
     });
 
-    await test.step('Wait for Season Active status', async () => {
-      const seasonActive = page.getByText('Season Active');
-      const deadline = Date.now() + 120_000;
-      while (Date.now() < deadline) {
-        if (await seasonActive.isVisible().catch(() => false)) break;
-        await page.waitForTimeout(5_000);
-        await page.reload();
-        await page.waitForLoadState('load');
+    await test.step('Wait for draft to complete via API poll', async () => {
+      // Poll the GraphQL API directly for draftStatus === 'completed' rather
+      // than navigating the browser to the commissioner URL on every iteration.
+      // Browser-based polling was unreliable because the SPA occasionally
+      // renders "This league does not exist" during the automated draft's async
+      // status transition — the getLeagueById query returns null transiently
+      // while the backend is updating the league record.  A direct API poll
+      // avoids that rendering race condition entirely.
+      const deadline = Date.now() + 180_000;
+      let draftDone = false;
+      while (!draftDone && Date.now() < deadline) {
+        const { league } = await gqlFetch<{
+          league: { draftStatus: string } | null;
+        }>(
+          commissionerJwt,
+          `query GetLeagueDraftStatus($id: Int!) {
+            league(id: $id) { draftStatus }
+          }`,
+          { id: state.leagueId },
+        ).catch(() => ({ league: null }));
+        draftDone = league?.draftStatus === 'completed';
+        if (!draftDone) await new Promise((r) => setTimeout(r, 5_000));
       }
-      await expect(seasonActive).toBeVisible({ timeout: 15_000 });
+      expect(draftDone, 'Draft must complete within 3 minutes').toBe(true);
+    });
+
+    await test.step('Season Active chip is visible in UI', async () => {
+      // Navigate to the commissioner panel exactly once after the API confirms
+      // the draft is complete.  The "Season Active" chip is rendered by
+      // LeagueHero (top of LeagueDetailPageV2) whenever draftStatus is
+      // 'active' or 'completed', so it is visible on any tab.
+      await page.goto(`/baseball/league/${state.leagueId}/commissioner`);
+      await page
+        .waitForLoadState('networkidle', { timeout: 20_000 })
+        .catch(() => undefined);
+      await expect(page.getByText('Season Active')).toBeVisible({
+        timeout: 15_000,
+      });
     });
   });
 
@@ -242,23 +271,6 @@ test.describe
   test('Phase 4: Identify the commissioner matchup ID', async ({
     commissionerJwt,
   }) => {
-    await test.step('Run autoSelectGames to activate week-1 matchup', async () => {
-      // autoSelectGames transitions 'scheduled' matchups to 'in_progress' and
-      // sends SQS messages for game selection. matchup_players is populated
-      // during the draft via populateMatchupPlayersAndSeasons; this call is
-      // needed so the matchup status is Scheduled or InProgress (both are
-      // accepted by the roster editor).
-      await gqlFetch<{
-        autoSelectGames: { gamesTriggered: number } | null;
-      }>(
-        commissionerJwt,
-        `mutation AutoSelectGames($leagueId: Int) {
-          autoSelectGames(leagueId: $leagueId) { gamesTriggered }
-        }`,
-        { leagueId: state.leagueId },
-      );
-    });
-
     await test.step('Fetch commissioner team ID', async () => {
       const { userTeamId } = await gqlFetch<{ userTeamId: number }>(
         commissionerJwt,
@@ -300,8 +312,11 @@ test.describe
       );
       expect(matchup).toBeTruthy();
       if (!matchup) throw new Error('matchup should be defined');
-      // Roster editor works for both scheduled and in-progress matchups
-      expect(['scheduled', 'in_progress']).toContain(matchup.status);
+      // Roster edits require the matchup to be in 'scheduled' status —
+      // the server rejects updateMatchupPlayerPosition for in_progress/completed.
+      // autoSelectGames is intentionally NOT called here so the matchup stays
+      // scheduled and Phases 6-8 can modify the lineup.
+      expect(matchup.status).toBe('scheduled');
 
       state.matchupId = Number(matchup.id);
       expect(state.matchupId).toBeGreaterThan(0);
@@ -461,20 +476,16 @@ test.describe
         .filter({ hasText: 'STARTERS' })
         .first();
 
-      // After an automated draft the autoPopulateFirstMatchupLineup transaction
-      // may still be committing when the page first loads. Poll with page reloads
-      // (same pattern as live-draft-ui.integration.spec.ts, fixed by LS-3794)
-      // until at least one STARTER player row appears.
-      //
-      // Scope to the STARTERS container (a div that contains "STARTERS" text
-      // but not "BENCH" — the bench section is a sibling, not a descendant) so
-      // bench-only rows don't satisfy this check before starters are assigned.
-      const startersSection = editorCard
-        .locator('div')
-        .filter({ hasText: /STARTERS/ })
-        .filter({ hasNotText: /BENCH/ })
-        .first();
-      const playerRows = startersSection.getByTestId(/^matchup-player-row-/);
+      // The previous step already asserts "STARTERS (N/N)" is visible, which
+      // means the slot count is correct. Here we additionally verify that the
+      // player rows carry their `data-testid` attribute (needed by Phases 6-8
+      // for bench/swap interactions). We scope to `editorCard` rather than a
+      // starters-only sub-locator because the `filter({ hasNotText: /BENCH/ })`
+      // chain can resolve to the starters HEADER element rather than the full
+      // container, leaving player rows outside its scope. Since the previous
+      // step gates on STARTERS (N/N), false-positives from bench rows are not
+      // possible — if the step passed, starters are assigned.
+      const playerRows = editorCard.getByTestId(/^matchup-player-row-/);
       const deadline = Date.now() + 60_000;
       while (
         !(await playerRows

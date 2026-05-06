@@ -92,6 +92,12 @@ function buildIntegrationStorageState(jwt: string) {
     url.hostname === 'localhost' || !url.hostname.includes('.') || isIpAddress;
   const cookieDomain = isHostOnly ? url.hostname : `.${url.hostname}`;
 
+  // SameSite=None requires Secure=true. For HTTP origins (localhost/dev
+  // servers) the cookie must be Lax so Chrome does not silently drop it.
+  const sameSite =
+    url.protocol === 'https:' ? ('None' as const) : ('Lax' as const);
+  const secure = url.protocol === 'https:';
+
   return {
     cookies: [
       {
@@ -100,8 +106,8 @@ function buildIntegrationStorageState(jwt: string) {
         domain: cookieDomain,
         path: '/',
         httpOnly: true,
-        secure: url.protocol === 'https:',
-        sameSite: 'None' as const,
+        secure,
+        sameSite,
         expires: expiry,
       },
       {
@@ -110,8 +116,8 @@ function buildIntegrationStorageState(jwt: string) {
         domain: cookieDomain,
         path: '/',
         httpOnly: false,
-        secure: url.protocol === 'https:',
-        sameSite: 'None' as const,
+        secure,
+        sameSite,
         expires: expiry,
       },
     ],
@@ -288,6 +294,8 @@ export async function switchUser(
     !webUrl.hostname.includes('.') ||
     isIpAddress;
   const cookieDomain = isHostOnly ? webUrl.hostname : `.${webUrl.hostname}`;
+  const sameSiteSwitch = webUrl.protocol === 'https:' ? 'None' : 'Lax';
+  const secureSwitch = webUrl.protocol === 'https:';
 
   // Update cookies in the browser context
   await page.context().addCookies([
@@ -297,8 +305,8 @@ export async function switchUser(
       domain: cookieDomain,
       path: '/',
       httpOnly: true,
-      secure: webUrl.protocol === 'https:',
-      sameSite: 'None',
+      secure: secureSwitch,
+      sameSite: sameSiteSwitch,
       expires: expiry,
     },
     {
@@ -307,8 +315,8 @@ export async function switchUser(
       domain: cookieDomain,
       path: '/',
       httpOnly: false,
-      secure: webUrl.protocol === 'https:',
-      sameSite: 'None',
+      secure: secureSwitch,
+      sameSite: sameSiteSwitch,
       expires: expiry,
     },
   ]);
