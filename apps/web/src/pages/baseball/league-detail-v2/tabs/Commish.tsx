@@ -70,6 +70,8 @@ export const CommishTab: React.FC<CommishTabProps> = ({ league }) => {
   const [nextStepError, setNextStepError] = useState<string | null>(null);
   const [settingsSuccess, setSettingsSuccess] = useState<string | null>(null);
   const [settingsError, setSettingsError] = useState<string | null>(null);
+  const [waiverSuccess, setWaiverSuccess] = useState<string | null>(null);
+  const [waiverError, setWaiverError] = useState<string | null>(null);
   const leagueId = league.id ?? 0;
 
   const {
@@ -195,7 +197,19 @@ export const CommishTab: React.FC<CommishTabProps> = ({ league }) => {
       label: 'Waiver Processing',
       iconClass: 'gold',
       icon: <I.Refresh size={16} />,
-      content: leagueId ? <WaiverProcessControl leagueId={leagueId} /> : null,
+      content: leagueId ? (
+        <WaiverProcessControl
+          leagueId={leagueId}
+          onSuccess={(msg) => {
+            setWaiverError(null);
+            setWaiverSuccess(msg);
+          }}
+          onError={(err) => {
+            setWaiverSuccess(null);
+            setWaiverError(err.message);
+          }}
+        />
+      ) : null,
     },
     {
       id: 'danger',
@@ -281,6 +295,38 @@ export const CommishTab: React.FC<CommishTabProps> = ({ league }) => {
           }}
         >
           {settingsSuccess}
+        </div>
+      ) : null}
+      {waiverError ? (
+        <div
+          role="alert"
+          aria-live="assertive"
+          style={{
+            background: 'rgba(196, 30, 58, 0.1)',
+            border: '1px solid rgba(196, 30, 58, 0.4)',
+            borderRadius: 8,
+            padding: 12,
+            color: '#c41e3a',
+            fontWeight: 600,
+          }}
+        >
+          Error processing waivers: {waiverError}
+        </div>
+      ) : null}
+      {waiverSuccess ? (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            background: 'rgba(34, 197, 94, 0.1)',
+            border: '1px solid rgba(34, 197, 94, 0.4)',
+            borderRadius: 8,
+            padding: 12,
+            color: '#16a34a',
+            fontWeight: 600,
+          }}
+        >
+          {waiverSuccess}
         </div>
       ) : null}
       <div className="ls-accordion">
