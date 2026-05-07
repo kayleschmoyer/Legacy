@@ -74,13 +74,13 @@ These are published automatically by CI workflows — no manual steps required.
 
 ### Android APK
 
-[![Download Latest APK](https://img.shields.io/badge/Download-Latest%20APK-green?style=for-the-badge&logo=android)](https://github.com/bkrupa/legacy-sports/releases/latest)
+[![Download Latest APK](https://img.shields.io/badge/Download-Latest%20APK-green?style=for-the-badge&logo=android)](https://github.com/bkrupa/legacy-sports/releases/tag/android-latest)
 
-**Latest Release:** [View all Android releases →](https://github.com/bkrupa/legacy-sports/releases)
+**Latest Release:** [View all Android releases →](https://github.com/bkrupa/legacy-sports/releases?q=android)
 
 **Scan to download on your phone:**
 
-<a href="https://github.com/bkrupa/legacy-sports/releases/latest"><img src="docs/assets/apk-qr.svg" alt="QR code linking to the latest Android APK release" width="180" height="180" /></a>
+<a href="https://github.com/bkrupa/legacy-sports/releases/tag/android-latest"><img src="docs/assets/apk-qr.svg" alt="QR code linking to the latest Android APK release" width="180" height="180" /></a>
 
 **Installation Instructions:**
 
@@ -301,7 +301,7 @@ pnpm exec nx e2e web-e2e
 
 Android APKs are automatically built and released on every push to `main`:
 
-- **📱 Download**: [Latest Android APK](https://github.com/bkrupa/legacy-sports/releases/latest)
+- **📱 Download**: [Latest Android APK](https://github.com/bkrupa/legacy-sports/releases/tag/android-latest)
 - **🔄 Auto-builds**: Triggered on app code changes
 - **⚙️ Workflow**: `.github/workflows/build-android-app.yml`
 

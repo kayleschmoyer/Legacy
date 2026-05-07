@@ -167,6 +167,7 @@ jobs:
           name: "Android Release v${{ needs.build-android.outputs.version }} (${{ needs.build-android.outputs.commit_sha }})"
           draft: false
           prerelease: ${{ needs.build-android.outputs.build_type == 'debug' }}
+          make_latest: ${{ needs.build-android.outputs.build_type == 'release' }}
           generate_release_notes: true
           body: |
             ## 🤖 Android APK Release
@@ -187,6 +188,15 @@ jobs:
             - **Java Version:** ${{ env.JAVA_VERSION }}
             - **Built with:** React Native 0.81 + Expo SDK 54
           files: ./artifacts/${{ needs.build-android.outputs.apk_name }}
+
+      - name: Update android-latest tag
+        if: needs.build-android.outputs.build_type == 'release'
+        run: |
+          # Force-push a stable pointer tag so /releases/tag/android-latest always
+          # resolves to the latest APK release. This intentionally overwrites the
+          # previous pointer — it is not a versioned tag and carries no history.
+          git tag -f android-latest ${{ github.sha }}
+          git push origin android-latest --force
 
   notify:
     name: Notify Build Results
