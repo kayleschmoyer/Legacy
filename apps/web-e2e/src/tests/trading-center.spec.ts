@@ -342,7 +342,7 @@ test.describe('Trading Center — incoming pending trade @critical', () => {
   });
 
   test('shows Accept button for incoming pending trade', async ({ page }) => {
-    await expect(page.getByText('Accept')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Accept' })).toBeVisible();
   });
 
   test('shows Reject button for incoming pending trade', async ({ page }) => {
