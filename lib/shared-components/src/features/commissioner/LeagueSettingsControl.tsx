@@ -443,7 +443,6 @@ export function LeagueSettingsControl({
             salaryCap: salaryCapEnabled ? salaryCap : null,
           },
         },
-        refetchQueries: ['GetLeagueById'],
       });
 
       setHasChanges(false);

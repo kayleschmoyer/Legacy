@@ -15,6 +15,8 @@ import { TradesTab } from './tabs/Trades';
 import { HistoryTab } from './tabs/History';
 import { TeamTab } from './tabs/Team';
 import { CommishTab } from './tabs/Commish';
+import { setUserTeamId } from '../../../store/leagueSlice';
+import { useAppDispatch } from '../../../store/hooks';
 import { PageMeta } from '../../../components/PageMeta';
 import {
   type LeagueFragment,
@@ -58,6 +60,7 @@ export function LeagueDetailPageV2(): React.JSX.Element {
     matchupId?: string;
   }>();
   const navigate = useNavigate();
+  const dispatch = useAppDispatch();
   const { user, isLoading: authLoading } = useAuth();
   const leagueId = id ? parseInt(id, 10) : NaN;
 
@@ -84,6 +87,12 @@ export function LeagueDetailPageV2(): React.JSX.Element {
     }
   }, [leagueId, user?.id, getUserTeamId]);
   const userTeamId = userTeamData?.userTeamId ?? undefined;
+
+  useEffect(() => {
+    if (userTeamData?.userTeamId !== undefined) {
+      dispatch(setUserTeamId(userTeamData.userTeamId ?? null));
+    }
+  }, [userTeamData, dispatch]);
 
   const isCommissioner = !!(user && league?.owner === user.id);
   const isMember = isCommissioner || userTeamId != null;
