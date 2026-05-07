@@ -54,9 +54,9 @@ test.describe('Homepage @smoke', () => {
   });
 
   test('displays the Baseball sport card', async ({ page }) => {
-    // Sports grid card with "Baseball" label — use .first() to avoid strict
-    // mode violation when multiple elements contain the word "Baseball"
-    await expect(page.getByText('Baseball').first()).toBeVisible();
+    // data-testid avoids matching the hidden SVG <title>Baseball</title> that
+    // precedes the visible sport card title in DOM order (LS-4264).
+    await expect(page.getByTestId('sport-card-title-baseball')).toBeVisible();
   });
 
   test('Create League quick-action navigates to league creation', async ({

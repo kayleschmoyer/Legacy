@@ -2089,6 +2089,7 @@ export function HomePage(): React.JSX.Element {
                           }}
                         >
                           <div
+                            data-testid={`sport-card-title-${sport.key}`}
                             style={{
                               fontFamily: 'Big Shoulders Display, system-ui',
                               fontWeight: 800,
@@ -2395,6 +2396,7 @@ export function HomePage(): React.JSX.Element {
 
                     <div>
                       <div
+                        data-testid={`sport-card-title-${sport.key}`}
                         style={{
                           fontFamily: 'Big Shoulders Display, system-ui',
                           fontWeight: 800,
