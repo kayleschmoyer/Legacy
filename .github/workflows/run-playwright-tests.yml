@@ -597,7 +597,10 @@ jobs:
       - name: "Checkout Repository"
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
-          sparse-checkout: .github/actions/s3-artifact
+          sparse-checkout: |
+            .github/actions/s3-artifact
+            scripts/rewrite-pw-attachment-paths.py
+          sparse-checkout-cone-mode: false
           fetch-depth: 1
 
       - name: "Setup Node.js"
@@ -638,6 +641,10 @@ jobs:
             echo "has-report=false" >> $GITHUB_OUTPUT
             echo "No blob reports found — skipping deploy"
           fi
+
+      - name: "Rewrite Attachment Paths in test-results.json"
+        if: steps.merge.outputs.has-report == 'true'
+        run: python3 scripts/rewrite-pw-attachment-paths.py
 
       - name: "Generate App Token"
         id: app-token
