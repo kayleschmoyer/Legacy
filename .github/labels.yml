@@ -115,6 +115,12 @@
 # Pipeline & Merge Queue Control
 # ---------------------------------------------------------------------------
 
+# Operator-applied to trigger CI immediately without waiting for a bot review.
+# Useful for early validation on drafts or infra-only changes.
+- name: ci:run
+  color: "0e8a16"
+  description: "Trigger CI immediately without requiring a bot review approval"
+
 # Read by .github/workflows/ci-pipeline.yml — short-circuits the run.
 - name: skip-ci
   color: "fbca04"
