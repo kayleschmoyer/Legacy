@@ -34,6 +34,59 @@ mutation($threadId: ID!, $body: String!) {
   }
 }`;
 
+interface ReplyToReviewRawInput {
+  body: string;
+  threadId?: string;
+  commentId?: number;
+  number?: number;
+  prNumber?: number;
+}
+
+/**
+ * Validates and resolves the raw tool input (which accepts both `number` and
+ * `prNumber` as aliases) into a canonical `ReplyToReviewParams` shape, or
+ * returns an `{ error }` object describing why the input is invalid.
+ */
+export function resolveReplyToReviewInput(
+  params: ReplyToReviewRawInput,
+): ReplyToReviewParams | { error: string } {
+  if (params.number !== undefined && params.prNumber !== undefined) {
+    return {
+      error:
+        'Ambiguous input: both "number" and "prNumber" were provided. Pass only one.',
+    };
+  }
+
+  const resolvedNumber = params.number ?? params.prNumber;
+  const hasThreadId = !!params.threadId;
+  const hasRestPath =
+    params.commentId !== undefined && resolvedNumber !== undefined;
+
+  if (
+    hasThreadId &&
+    (params.commentId !== undefined || resolvedNumber !== undefined)
+  ) {
+    return {
+      error:
+        'Provide EITHER threadId OR (commentId + number/prNumber) — not both paths at once.',
+    };
+  }
+
+  if (!hasThreadId && !hasRestPath) {
+    return {
+      error:
+        'Provide either threadId (GraphQL node ID) or both commentId and number/prNumber (REST path).',
+    };
+  }
+
+  return {
+    body: params.body,
+    threadId: params.threadId,
+    commentId: params.commentId,
+    number: resolvedNumber,
+  };
+}
+
 /** Post a reply to a PR review thread or comment. Accepts either a GraphQL threadId or a REST commentId+PR number. */
 export async function replyToReview(
   params: ReplyToReviewParams,

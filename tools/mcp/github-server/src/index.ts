@@ -19,7 +19,10 @@ import { mergePR } from './tools/merge-pr.js';
 import { prDashboard } from './tools/pr-dashboard.js';
 import { prScan } from './tools/pr-scan.js';
 import { rebasePR } from './tools/rebase-pr.js';
-import { replyToReview } from './tools/reply-to-review.js';
+import {
+  replyToReview,
+  resolveReplyToReviewInput,
+} from './tools/reply-to-review.js';
 import { commentPR } from './tools/comment-pr.js';
 import { editPR } from './tools/edit-pr.js';
 import { listCommitStatuses } from './tools/list-commit-statuses.js';
@@ -589,7 +592,7 @@ export function createServer(): McpServer {
   // --- github_reply_to_review ---
   server.tool(
     'github_reply_to_review',
-    'Post a reply to a PR review thread. Provide EITHER threadId (GraphQL node ID) OR both commentId AND number (REST) — not both paths at once.',
+    'Post a reply to a PR review thread. Provide EITHER threadId (GraphQL node ID) OR both commentId AND number/prNumber (REST) — not both paths at once.',
     {
       body: z
         .string()
@@ -608,45 +611,30 @@ export function createServer(): McpServer {
         .positive()
         .optional()
         .describe(
-          'Numeric REST comment ID (databaseId from github_get_review_threads). Requires "number" param. Use this OR threadId, never both.',
+          'Numeric REST comment ID (databaseId from github_get_review_threads). Requires "number" or "prNumber" param. Use this OR threadId, never both.',
         ),
       number: z.coerce
         .number()
         .int()
         .positive()
         .optional()
-        .describe('PR number. Required when using commentId.'),
+        .describe('PR number. Required when using commentId. Alias: prNumber.'),
+      prNumber: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Alias for "number" — use either, not both.'),
     },
     async (params) => {
-      const hasThreadId = !!params.threadId;
-      const hasRestPath =
-        params.commentId !== undefined && params.number !== undefined;
-      if (
-        hasThreadId &&
-        (params.commentId !== undefined || params.number !== undefined)
-      ) {
+      const validation = resolveReplyToReviewInput(params);
+      if ('error' in validation) {
         return {
           isError: true,
-          content: [
-            {
-              type: 'text',
-              text: 'Provide EITHER threadId OR (commentId + number) — not both paths at once.',
-            },
-          ],
+          content: [{ type: 'text', text: validation.error }],
         };
       }
-      if (!hasThreadId && !hasRestPath) {
-        return {
-          isError: true,
-          content: [
-            {
-              type: 'text',
-              text: 'Provide either threadId (GraphQL node ID) or both commentId and number (REST path).',
-            },
-          ],
-        };
-      }
-      return replyToReview(params);
+      return replyToReview(validation);
     },
   );
 
