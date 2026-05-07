@@ -205,7 +205,9 @@ test.describe
         .getByRole('button', { name: 'Save Settings' })
         .click({ force: true });
       // Success message or spinner disappearing indicates save completed
-      await expect(page.getByText(/saved successfully/i)).toBeVisible({
+      await expect(
+        page.getByRole('status').filter({ hasText: /saved successfully/i }),
+      ).toBeVisible({
         timeout: 15_000,
       });
     });
