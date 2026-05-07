@@ -96,6 +96,13 @@ export function LeagueDetailPageV2(): React.JSX.Element {
 
   const isCommissioner = !!(user && league?.owner === user.id);
   const isMember = isCommissioner || userTeamId != null;
+  // True once we know the user's membership status: auth done AND either the
+  // user is unauthenticated or the userTeamId query has returned at least once.
+  // Used to block the tab-gate redirect and the roster/team render guards until
+  // we have enough data to make the right decision (prevents Manager1 from being
+  // bounced to /overview while the lazy userTeamId query is in-flight).
+  const userTeamIdSettled =
+    !authLoading && (!user?.id || userTeamData !== undefined);
 
   const { data: teamMembersData } = useGetTeamMembersQuery({
     variables: { teamId: userTeamId ?? 0 },
@@ -180,11 +187,15 @@ export function LeagueDetailPageV2(): React.JSX.Element {
   // effIsCommish/effIsMember, which reflect the stored role *preference*
   // and may disagree with actual permissions (e.g. a commissioner viewing
   // as 'member' role has effIsCommish=false but isCommissioner=true).
+  //
+  // Also blocks on !userTeamIdSettled so non-commissioner members aren't
+  // redirected while the userTeamId lazy query is in-flight (the auth-done
+  // → team-query-resolved gap that caused Phase 6 failures for Manager1).
   useEffect(() => {
-    if (leagueLoading || authLoading) return;
+    if (leagueLoading || !userTeamIdSettled) return;
     if (tab === 'commish' && !isCommissioner) setTab('overview');
     if ((tab === 'roster' || tab === 'team') && !isMember) setTab('overview');
-  }, [tab, isCommissioner, isMember, setTab, leagueLoading, authLoading]);
+  }, [tab, isCommissioner, isMember, setTab, leagueLoading, userTeamIdSettled]);
 
   const onTeamNav = useCallback(
     (teamId: number) => {
@@ -306,7 +317,7 @@ export function LeagueDetailPageV2(): React.JSX.Element {
             onTeam={onTeamNav}
           />
         )}
-        {tab === 'roster' && (isMember || authLoading) && (
+        {tab === 'roster' && (isMember || !userTeamIdSettled) && (
           <RosterTab league={league} myTeamId={userTeamId ?? null} />
         )}
         {tab === 'free-agents' && (
@@ -332,7 +343,7 @@ export function LeagueDetailPageV2(): React.JSX.Element {
           />
         )}
         {tab === 'history' && <HistoryTab league={league} />}
-        {tab === 'team' && (isMember || authLoading) && (
+        {tab === 'team' && (isMember || !userTeamIdSettled) && (
           <TeamTab
             league={league}
             myTeamId={userTeamId ?? null}
