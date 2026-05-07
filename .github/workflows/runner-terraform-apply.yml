@@ -42,7 +42,7 @@ env:
 jobs:
   apply:
     name: Apply runner infrastructure
-    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - name: Validate runner secrets
