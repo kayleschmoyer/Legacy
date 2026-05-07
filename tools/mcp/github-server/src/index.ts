@@ -113,6 +113,20 @@ const labelList = z.preprocess(
 );
 
 /**
+ * Shared Zod schema for PR-number-style integer parameters. Replaces the bare
+ * z.coerce.number().int().positive() pattern so that invalid inputs (NaN,
+ * objects, non-numeric strings, negatives) produce a single clear, named
+ * error instead of Zod's generic "received NaN" / "Too small" messages.
+ */
+function prNumberField(fieldName: string) {
+  const message = `${fieldName} must be a valid positive integer`;
+  return z.coerce
+    .number({ error: () => message })
+    .refine((n) => Number.isInteger(n), { error: () => message })
+    .refine((n) => n > 0, { error: () => message });
+}
+
+/**
  * Shared Zod schema for boolean parameters. Accepts a real boolean OR a
  * string "true"/"false"/"1"/"0" (MCP callers sometimes serialise booleans to
  * strings). Use in place of z.boolean() for all tool schema parameters.
@@ -493,16 +507,8 @@ export function createServer(): McpServer {
     'github_get_review_threads',
     'Fetch review threads on a PR via GraphQL. By default returns only UNRESOLVED threads (the ones blocking merge). Pass includeResolved: true to include all threads. IMPORTANT: isOutdated threads that are NOT resolved still block the merge queue — "outdated" means the code changed after the comment was posted, not that it was dismissed. Always use this tool first when debugging "A conversation must be resolved before this pull request can be merged" merge-queue errors. Each thread includes: id (PRRT_ node ID for github_resolve_threads), isResolved, isOutdated, isCollapsed, path, line, startLine (all thread-level for quick scanning without reading comments), plus per-comment databaseId, author, body, path, line. Pagination is capped at 100 threads and 50 comments per thread; truncated: true is set when results are paginated. Pass the PR number as "number" (preferred) or "prNumber" (alias).',
     {
-      number: z.coerce
-        .number()
-        .int()
-        .positive()
-        .optional()
-        .describe('PR number'),
-      prNumber: z.coerce
-        .number()
-        .int()
-        .positive()
+      number: prNumberField('number').optional().describe('PR number'),
+      prNumber: prNumberField('prNumber')
         .optional()
         .describe('Alias for "number" — use either, not both'),
       includeResolved: coercedBoolean
@@ -774,26 +780,26 @@ export function createServer(): McpServer {
     'Prefer this over `gh pr edit --add-label` via shell. Add or remove labels on one or more PRs. Pass a single PR number via "prNumber", or one or more PR numbers via "prs". When multiple PRs are given, all get the same label changes.',
     {
       prs: z
-        .preprocess((v) => {
-          if (v === undefined || v === null) return undefined;
-          if (Array.isArray(v)) return v;
-          if (typeof v === 'string' && v.trimStart().startsWith('[')) {
-            try {
-              const parsed = JSON.parse(v);
-              if (Array.isArray(parsed)) return parsed;
-            } catch {
-              // Not valid JSON — fall through to wrap as single element
+        .preprocess(
+          (v) => {
+            if (v === undefined || v === null) return undefined;
+            if (Array.isArray(v)) return v;
+            if (typeof v === 'string' && v.trimStart().startsWith('[')) {
+              try {
+                const parsed = JSON.parse(v);
+                if (Array.isArray(parsed)) return parsed;
+              } catch {
+                // Not valid JSON — fall through to wrap as single element
+              }
             }
-          }
-          return [v];
-        }, z.array(z.coerce.number().int().positive()).min(1).max(100).optional())
+            return [v];
+          },
+          z.array(prNumberField('prs[]')).min(1).max(100).optional(),
+        )
         .describe(
           'PR number or array of PR numbers (use "prNumber" for a single PR)',
         ),
-      prNumber: z.coerce
-        .number()
-        .int()
-        .positive()
+      prNumber: prNumberField('prNumber')
         .optional()
         .describe(
           'Single PR number — alias for prs:[n]. Use either "prNumber" or "prs", not both.',
