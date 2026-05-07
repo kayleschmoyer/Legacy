@@ -255,22 +255,26 @@ test.describe
 
       // Anchor for per-pick elapsed-time logs (LS-3851 timing instrumentation).
       const draftStart = Date.now();
+      // Set to true when the stuck-loop recovery detects completion so the
+      // outer pick loop can break cleanly (LS-4260).
+      let draftDone = false;
 
       while (pickCount < maxPicks) {
-        // Check if draft is complete on any page
-        let draftDone = false;
-        for (const { page } of pages) {
-          if (
-            await page
+        // Check if draft is complete on any page.
+        // Use a short waitFor (500 ms, parallel) instead of instant isVisible so
+        // the banner has time to render after the last pick via WebSocket or the
+        // 5 s currentPickInfo poll — avoids a false-negative that bleeds into the
+        // stuck-loop recovery path (LS-4260 regression of LS-4214).
+        const pickLoopCompleteChecks = await Promise.all(
+          pages.map(({ page }) =>
+            page
               .getByText('Draft Complete!')
-              .isVisible()
-              .catch(() => false)
-          ) {
-            draftDone = true;
-            break;
-          }
-        }
-        if (draftDone) break;
+              .waitFor({ state: 'visible', timeout: 500 })
+              .then(() => true)
+              .catch(() => false),
+          ),
+        );
+        if (pickLoopCompleteChecks.some(Boolean)) break;
 
         // Find the page showing "Your pick" — the draft board's top band
         // (DraftTopBand) shows "Your pick" when isMyPick=true, "On the clock"
@@ -443,17 +447,22 @@ test.describe
 
             while (Date.now() < stuckDeadline) {
               // 1. Check if the draft completed via auto-picks.
-              for (const { page } of pages) {
-                if (
-                  await page
+              // Use waitFor with a 5 s timeout (parallel across pages) so the
+              // banner has time to render after Apollo loads draftCompletedAt
+              // from a fresh page load — avoids a false-negative from the
+              // instant isVisible check (LS-4260 regression of LS-4214).
+              const stuckCompleteChecks = await Promise.all(
+                pages.map(({ page }) =>
+                  page
                     .getByText('Draft Complete!')
-                    .isVisible()
-                    .catch(() => false)
-                ) {
-                  draftDone = true;
-                  resolved = true;
-                  break;
-                }
+                    .waitFor({ state: 'visible', timeout: 5000 })
+                    .then(() => true)
+                    .catch(() => false),
+                ),
+              );
+              if (stuckCompleteChecks.some(Boolean)) {
+                draftDone = true;
+                resolved = true;
               }
               if (resolved) break;
 
