@@ -48,6 +48,7 @@ import {
   resolveActionShas,
 } from './tools/resolve-action-sha.js';
 import { enableAutoMerge } from './tools/enable-auto-merge.js';
+import { prDiff } from './tools/pr-diff.js';
 
 // Node.js native fetch (undici) does not respect HTTPS_PROXY / GLOBAL_AGENT_HTTPS_PROXY
 // by default. In cloud sessions the egress proxy is required; set the global dispatcher
@@ -1175,6 +1176,28 @@ export function createServer(): McpServer {
       }
       return viewPR({ number: resolved });
     },
+  );
+
+  // --- github_pr_diff ---
+  server.tool(
+    'github_pr_diff',
+    'Prefer this over `gh pr diff` via shell. Returns the unified diff for a pull request. Useful for inspecting the exact code changes introduced by a PR, especially dependency PRs that have not yet merged. Pass the PR number as "prNumber". Use maxBytes to cap response size for very large PRs (default: 500 000 bytes).',
+    {
+      prNumber: z.coerce
+        .number()
+        .int()
+        .positive()
+        .describe('PR number to fetch the unified diff for'),
+      maxBytes: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe(
+          'Maximum bytes of diff to return (default: 500 000). Increase for large PRs.',
+        ),
+    },
+    async (params) => prDiff(params),
   );
 
   // --- github_secret_delete ---
