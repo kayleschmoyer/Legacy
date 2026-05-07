@@ -463,8 +463,6 @@ export function DraftSettingsControl({
               : null,
           },
         },
-        refetchQueries: ['GetLeagueById', 'GetLeagueDraft'],
-        awaitRefetchQueries: true,
       });
 
       setHasChanges(false);
