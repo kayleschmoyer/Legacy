@@ -738,6 +738,10 @@ test.describe
     // Capture initial positions of the first two starters via API
     let player1Name = '';
     let player2Name = '';
+    let player1FirstName = '';
+    let player1LastName = '';
+    let player2FirstName = '';
+    let player2LastName = '';
     let player1InitialPositionId: number | null = null;
     let player2InitialPositionId: number | null = null;
 
@@ -781,8 +785,12 @@ test.describe
       expect(starters.length).toBeGreaterThanOrEqual(2);
 
       const [first, second] = starters;
-      player1Name = `${first.player.firstName} ${first.player.lastName}`;
-      player2Name = `${second.player.firstName} ${second.player.lastName}`;
+      player1FirstName = first.player.firstName;
+      player1LastName = first.player.lastName;
+      player2FirstName = second.player.firstName;
+      player2LastName = second.player.lastName;
+      player1Name = `${player1FirstName} ${player1LastName}`;
+      player2Name = `${player2FirstName} ${player2LastName}`;
       player1InitialPositionId = first.positionId;
       player2InitialPositionId = second.positionId;
     });
@@ -843,16 +851,15 @@ test.describe
         { matchupId: state.matchupId },
       );
 
-      const [p1First, p1Last] = player1Name.split(' ');
-      const [p2First, p2Last] = player2Name.split(' ');
-
       const player1Record = getMatchupPlayers.find(
         (mp) =>
-          mp.player.firstName === p1First && mp.player.lastName === p1Last,
+          mp.player.firstName === player1FirstName &&
+          mp.player.lastName === player1LastName,
       );
       const player2Record = getMatchupPlayers.find(
         (mp) =>
-          mp.player.firstName === p2First && mp.player.lastName === p2Last,
+          mp.player.firstName === player2FirstName &&
+          mp.player.lastName === player2LastName,
       );
 
       expect(player1Record).toBeTruthy();
