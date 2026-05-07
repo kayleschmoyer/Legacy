@@ -189,6 +189,7 @@ describe('runMultiPass with cost cap', () => {
           costUsd: 0.003,
         },
       },
+      { text: 'd', usage: null },
     ]);
     const costCap = new CostCap({ limitUsd: 10 });
     await runMultiPass(provider, 'sys', 'user', { costCap });
