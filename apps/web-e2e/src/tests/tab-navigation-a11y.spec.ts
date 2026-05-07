@@ -77,6 +77,21 @@ test.describe('Tab component ARIA semantics @regression', () => {
   test('league detail sub-tabs have proper ARIA roles', async ({ page }) => {
     await page.goto(LEAGUE_URL);
     await page.waitForLoadState('networkidle');
+    // Wait for tab selection to converge — initial render can momentarily
+    // show multiple tabs with aria-selected="true" before React settles.
+    // Return false when no tabs are present so we keep polling until they
+    // mount; only resolve once tabs exist AND at most one is selected.
+    await page.waitForFunction(
+      () => {
+        const tabs = Array.from(document.querySelectorAll('[role="tab"]'));
+        if (tabs.length === 0) return false;
+        const selected = tabs.filter(
+          (t) => t.getAttribute('aria-selected') === 'true',
+        );
+        return selected.length <= 1;
+      },
+      { timeout: 10_000 },
+    );
 
     const { hasTabPattern, issues } = await evaluateTabSemantics(page);
 
@@ -94,6 +109,20 @@ test.describe('Tab component ARIA semantics @regression', () => {
   test('exactly one tab is selected at a time', async ({ page }) => {
     await page.goto(LEAGUE_URL);
     await page.waitForLoadState('networkidle');
+    // Wait for tab selection to converge — same stabilization guard as the
+    // "proper ARIA roles" test above: keep polling until tabs mount, then
+    // wait until at most one carries aria-selected="true".
+    await page.waitForFunction(
+      () => {
+        const tabs = Array.from(document.querySelectorAll('[role="tab"]'));
+        if (tabs.length === 0) return false;
+        const selected = tabs.filter(
+          (t) => t.getAttribute('aria-selected') === 'true',
+        );
+        return selected.length <= 1;
+      },
+      { timeout: 10_000 },
+    );
 
     const { hasTabPattern, selectedTabs } = await evaluateTabSemantics(page);
     if (!hasTabPattern) {

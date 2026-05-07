@@ -187,13 +187,14 @@ test.describe('Management Page — delete all leagues dialogs @regression', () =
       page.getByRole('heading', { name: /final confirmation/i }),
     ).toBeVisible();
 
-    // Handle the success alert that follows
-    page.once('dialog', (dialog) => void dialog.accept());
-
+    // Arm the dialog handler before clicking so the event is never missed
+    const dialogPromise = page.waitForEvent('dialog');
     const finalDialog = page.locator('div[role="alertdialog"]');
     await finalDialog
       .getByRole('button', { name: /yes, delete everything/i })
       .click();
+    const successDialog = await dialogPromise;
+    await successDialog.accept();
 
     // Mutation should have been called
     await expect.poll(() => mutationCalled).toBe(true);

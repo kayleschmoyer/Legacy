@@ -80,6 +80,7 @@ test.describe('Heading hierarchy — /about @regression', () => {
     await page.goto('/about');
     await page.waitForLoadState('load');
     await waitForPageContent(page);
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   });
 
   test('About page has exactly one h1', async ({ page }) => {
