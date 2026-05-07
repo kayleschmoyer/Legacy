@@ -1,7 +1,7 @@
 # =============================================================================
 # Run Playwright Tests
 # =============================================================================
-# Nightly schedule (03:00 UTC): integration suite (real server, 1 shard) and
+# Nightly schedule (03:00 UTC): integration suite (real server, 3 shards) and
 # full E2E suite including @slow tests (3 shards) — no grep filters.
 #
 # Manual dispatch: run any suite/browser/grep combination on demand.
@@ -127,9 +127,12 @@ jobs:
         shell: bash
         run: |
           if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ inputs.test-suite }}" = "all" ]; then
-            # Nightly or manual "all": integration (1 shard) + e2e (3 shards), all tests, no filters
+            # Nightly or manual "all": integration (3 shards) + e2e (3 shards), all tests, no filters
             # db suite runs as a separate job (run-db-tests), not in this Playwright matrix
-            echo 'matrix=[{"suite":"integration","shard":"1/1"},{"suite":"e2e","shard":"1/3"},{"suite":"e2e","shard":"2/3"},{"suite":"e2e","shard":"3/3"}]' >> "$GITHUB_OUTPUT"
+            MATRIX='[{"suite":"integration","shard":"1/3"},{"suite":"integration","shard":"2/3"},'
+            MATRIX+='{"suite":"integration","shard":"3/3"},{"suite":"e2e","shard":"1/3"},'
+            MATRIX+='{"suite":"e2e","shard":"2/3"},{"suite":"e2e","shard":"3/3"}]'
+            echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
           elif [ "${{ inputs.test-suite }}" = "db" ]; then
             # db suite skips this Playwright matrix; run-db-tests job handles it
             echo 'matrix=[]' >> "$GITHUB_OUTPUT"
