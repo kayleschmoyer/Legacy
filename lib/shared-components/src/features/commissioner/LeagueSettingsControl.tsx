@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   Button,
   Card,
@@ -155,11 +155,6 @@ export function LeagueSettingsControl({
   );
   const [salaryCap, setSalaryCap] = useState<number | null>(currentSalaryCap);
   const [hasChanges, setHasChanges] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (hasChanges) setSaveSuccess(null);
-  }, [hasChanges]);
 
   const isLocked = draftStatus === 'completed';
   const [updateLeagueSettings, { loading: saving }] =
@@ -446,7 +441,6 @@ export function LeagueSettingsControl({
       });
 
       setHasChanges(false);
-      setSaveSuccess('League settings saved successfully!');
       onSuccess?.('League settings saved successfully!');
     } catch (err) {
       const errorMessage =
@@ -1146,25 +1140,6 @@ export function LeagueSettingsControl({
             {saving ? 'Saving...' : 'Save Settings'}
           </Button>
         </XStack>
-
-        {saveSuccess ? (
-          <Card
-            backgroundColor="rgba(34, 197, 94, 0.1)"
-            borderColor="rgba(34, 197, 94, 0.4)"
-            borderWidth={1}
-            padding="$3"
-            borderRadius="$4"
-            role="status"
-            aria-live="polite"
-          >
-            <XStack alignItems="center" gap="$2">
-              <Check size={16} color="#16a34a" />
-              <Text fontSize="$3" color="#16a34a" fontWeight="600">
-                {saveSuccess}
-              </Text>
-            </XStack>
-          </Card>
-        ) : null}
       </YStack>
     </Card>
   );
