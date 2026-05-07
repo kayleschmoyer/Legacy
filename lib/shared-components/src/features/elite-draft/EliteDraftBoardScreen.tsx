@@ -328,6 +328,15 @@ export function EliteDraftBoardScreen({
     );
   }
 
+  // Guard against a race where GetLeagueById resolves first with draftStatus='completed'
+  // but GetLiveDraftLeagueDraft is still loading (leagueDraft=null, draftId=null).
+  // Without this, the !draftId && draftStatus!=='in-progress' condition below would fire
+  // and show PreDraftLobby instead of DraftCompleteView. Hold at LoadingScreen until
+  // leagueDraft arrives — its draftCompletedAt will trigger DraftCompleteView above (LS-4263).
+  if (queries.league?.draftStatus === 'completed' && !queries.leagueDraft) {
+    return <LoadingScreen />;
+  }
+
   if (!queries.draftId && queries.league?.draftStatus !== 'in-progress') {
     return (
       <PreDraftLobby
