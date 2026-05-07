@@ -94,7 +94,7 @@ After the bot posts its Cycle 1 review, the agent must:
    - `JUSTIFY: <rationale>` — the finding is incorrect or the suggestion is out of scope; explain why
 2. Push any fix commits.
 3. **Resolve every thread answered with `FIX:`** in a single batched `github_resolve_threads({ threadIds: [...], prNumber: PR# })` call. Do **not** resolve threads answered with `JUSTIFY:` — those need bot adjudication in the next cycle.
-4. Apply the **`bot:ready-for-review`** label. This fires **Cycle 2**.
+4. Apply the **`bot:ready-for-review`** label via `github_manage_labels(prs: [<PR#>], add: ["bot:ready-for-review"])`. This fires **Cycle 2**. If the label is already present (e.g., a prior cycle was rate-limited), remove then re-add it — `github_manage_labels(prs: [<PR#>], remove: ["bot:ready-for-review"])` followed by `github_manage_labels(prs: [<PR#>], add: ["bot:ready-for-review"])` — so GitHub emits a fresh `labeled` event.
 
 > Skipping a thread is not allowed — unaddressed threads become mandates in Cycle 2.
 
@@ -108,7 +108,7 @@ If the Cycle 2 review contains mandates (CHANGES_REQUESTED), the agent must:
    - `FIX: <sha>` — the fix is committed at `<sha>` (the only accepted reply in Cycle 2)
 2. Push any fix commits.
 3. **Resolve every thread answered with `FIX:`** in a single batched `github_resolve_threads({ threadIds: [...], prNumber: PR# })` call.
-4. Apply **`bot:ready-for-review`** again. This fires **Cycle 3**.
+4. Apply **`bot:ready-for-review`** again via `github_manage_labels(prs: [<PR#>], add: ["bot:ready-for-review"])`. This fires **Cycle 3**. If the label is already present, remove then re-add it as above.
 
 > Neither `JUSTIFY:` nor `CANNOT-COMPLY:` is accepted in Cycle 2. `JUSTIFY:` closed at Cycle 1; `CANNOT-COMPLY:` is only valid in Cycle 3+.
 
