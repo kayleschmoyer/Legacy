@@ -197,11 +197,12 @@ function createMcpServer(): McpServer {
   );
   server.tool(
     'jira_search',
-    'Search Jira issues using JQL.',
+    'Search Jira issues using JQL. Returns compact results — no metadata blobs. Use compact=true for large result sets to get { issues: [{key, summary, status}], nextPageToken? }. When the response includes nextPageToken, pass it as pageToken to fetch the next page.',
     {
       jql: z.string(),
       maxResults: z.coerce.number().int().positive().max(50).default(15),
       compact: z.boolean().default(false),
+      pageToken: z.string().min(1).optional(),
     },
     async (p) => search(p),
   );

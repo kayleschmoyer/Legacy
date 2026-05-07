@@ -5,6 +5,7 @@ interface SearchParams {
   jql: string;
   maxResults?: number;
   compact?: boolean;
+  pageToken?: string;
 }
 
 interface SearchFields {
@@ -26,7 +27,7 @@ const COMPACT_FIELDS = ['summary', 'status'];
 
 /** Search Jira issues using JQL via the v3 search/jql endpoint. */
 export async function search(params: SearchParams): Promise<CallToolResult> {
-  const { jql, maxResults: rawMax = 15, compact = false } = params;
+  const { jql, maxResults: rawMax = 15, compact = false, pageToken } = params;
   const maxResults = Math.max(1, Math.min(50, Math.floor(rawMax)));
 
   try {
@@ -34,6 +35,7 @@ export async function search(params: SearchParams): Promise<CallToolResult> {
       jql,
       fields: compact ? COMPACT_FIELDS : DEFAULT_FIELDS,
       maxResults,
+      pageToken,
     });
 
     if (compact) {
@@ -42,8 +44,12 @@ export async function search(params: SearchParams): Promise<CallToolResult> {
         summary: issue.fields.summary,
         status: issue.fields.status.name,
       }));
+      const output: Record<string, unknown> = { issues };
+      if (result.nextPageToken) {
+        output.nextPageToken = result.nextPageToken;
+      }
       return {
-        content: [{ type: 'text', text: JSON.stringify(issues) }],
+        content: [{ type: 'text', text: JSON.stringify(output) }],
       };
     }
 
@@ -56,11 +62,19 @@ export async function search(params: SearchParams): Promise<CallToolResult> {
       priority: issue.fields.priority?.name ?? '',
     }));
 
+    const output: Record<string, unknown> = {
+      returned: issues.length,
+      issues,
+    };
+    if (result.nextPageToken) {
+      output.nextPageToken = result.nextPageToken;
+    }
+
     return {
       content: [
         {
           type: 'text',
-          text: JSON.stringify({ returned: issues.length, issues }, null, 2),
+          text: JSON.stringify(output, null, 2),
         },
       ],
     };
