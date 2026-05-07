@@ -52,6 +52,7 @@ import {
 } from './tools/resolve-action-sha.js';
 import { enableAutoMerge } from './tools/enable-auto-merge.js';
 import { prDiff } from './tools/pr-diff.js';
+import { getCheckRuns } from './tools/get-check-runs.js';
 
 // Node.js native fetch (undici) does not respect HTTPS_PROXY / GLOBAL_AGENT_HTTPS_PROXY
 // by default. In cloud sessions the egress proxy is required; set the global dispatcher
@@ -1254,6 +1255,37 @@ export function createServer(): McpServer {
         ),
     },
     async (params) => retriggerCheck(params),
+  );
+
+  // --- github_get_check_runs ---
+  server.tool(
+    'github_get_check_runs',
+    'List check runs for a PR or commit SHA. Returns the latest run per check name — includes name, status, conclusion, output (title + summary), and app slug. Use instead of `gh api repos/.../commits/$SHA/check-runs` to inspect required status checks (bot-review, Quality Gates, Build Validation, etc.).',
+    {
+      prNumber: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('PR number — auto-resolves to the current HEAD SHA'),
+      sha: z
+        .string()
+        .trim()
+        .min(1)
+        .optional()
+        .describe(
+          'Commit SHA (full or abbreviated). Takes precedence over prNumber if both are given.',
+        ),
+      checkName: z
+        .string()
+        .trim()
+        .min(1)
+        .optional()
+        .describe(
+          'Filter results to a specific check name (e.g. "bot-review")',
+        ),
+    },
+    async (params) => getCheckRuns(params),
   );
 
   // --- github_set_commit_status ---

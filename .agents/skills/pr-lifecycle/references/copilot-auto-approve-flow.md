@@ -131,10 +131,11 @@ Work through these steps in order:
 
 1. **Check what check runs exist for the current SHA:**
 
-   ```bash
-   gh api repos/{owner}/{repo}/commits/{SHA}/check-runs \
-     --jq '[.check_runs[] | {name, status, conclusion, app: .app.name}]'
    ```
+   github_get_check_runs({ prNumber: <PR#> })
+   ```
+
+   Returns `[{name, status, conclusion, output: {title, summary}, app: {slug, name}}]` filtered to the latest run per check name.
 
 2. **Check if Copilot has reviewed the current SHA:**
 
