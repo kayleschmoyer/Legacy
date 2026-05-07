@@ -410,33 +410,17 @@ test.describe
       await page.waitForLoadState('load');
     });
 
-    await test.step('Verify rank badges (seeds) are rendered', async () => {
-      // StandingsTab (LeagueDetailPageV2) renders rank numbers via the <Rank>
-      // component as .ls-rank divs inside <table aria-label="League Standings">.
-      // Always expect at least rank 1 to be visible.
-      await expect(page.getByText('1', { exact: true }).first()).toBeVisible({
-        timeout: 10000,
-      });
-      // Expect at least one team row in the table
+    await test.step('Verify team rank badges are visible in standings', async () => {
+      // Wait for a table row to confirm standings data has loaded; <Rank> badges
+      // render in the same pass, so this gates the .ls-rank check below.
       await expect(
         page.locator('table[aria-label="League Standings"] tbody tr').first(),
-      ).toBeVisible({
-        timeout: 10000,
-      });
-    });
-
-    await test.step('Verify team rank badges are visible in standings', async () => {
-      // StandingsTab does not have a waiver-order column. Rank numbers (1, 2, ...)
-      // are rendered via <Rank> as .ls-rank elements inside the standings table.
-      await page.setViewportSize({ width: 1280, height: 800 });
-      await page.reload();
-      await page.waitForLoadState('load');
+      ).toBeVisible({ timeout: 15_000 });
 
       const rankBadges = page.locator(
         'table[aria-label="League Standings"] .ls-rank',
       );
-      // Wait for at least one rank badge to render before counting
-      await expect(rankBadges.first()).toBeVisible({ timeout: 15_000 });
+      await expect(rankBadges.first()).toBeVisible({ timeout: 10_000 });
       const rankCount = await rankBadges.count();
       expect(rankCount).toBeGreaterThanOrEqual(1);
     });
