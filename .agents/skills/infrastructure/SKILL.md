@@ -25,6 +25,7 @@ Covers all infrastructure operations: AWS authentication, Terraform changes, Lam
 | Parse GitHub Actions CI logs                              | [references/github-actions-logs.md](references/github-actions-logs.md)                 |
 | Sync environment variables from AWS                       | [references/sync-env.md](references/sync-env.md)                                       |
 | Rebuild self-hosted runner AMI                            | [references/ami-build.md](references/ami-build.md)                                     |
+| Diagnose offline runners / rotate GitHub App key          | [references/runner-operations.md](references/runner-operations.md)                     |
 | Run CLI / Nx targets against dev RDS via SSM port-forward | [references/ssm-db-access.md](references/ssm-db-access.md)                             |
 
 ## Critical Rules
@@ -93,6 +94,7 @@ See [references/terraform-common-issues.md](references/terraform-common-issues.m
 - [references/version-information.md](references/version-information.md) — Build version info for debugging deployments, health endpoints, and adding version metadata to new services
 - [references/sync-env.md](references/sync-env.md) — Sync environment variables from AWS Parameter Store to local `.env` files
 - [references/ami-build.md](references/ami-build.md) — Build self-hosted runner AMI with Packer, verify rollout, troubleshoot
+- [references/runner-operations.md](references/runner-operations.md) — Diagnose offline runners, rotate GitHub App key (base64 encoding requirement), verify health end-to-end
 
 ## Related Documentation
 
