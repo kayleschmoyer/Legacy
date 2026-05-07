@@ -11,6 +11,8 @@ pnpm-lock.yaml
 .env*
 # Migrations are append-only and immutable once merged — never reformat them
 lib/db-client/migrations/
+# Ephemeral agent lock file — stores sessionId/PID/timestamp, not source code
+.claude/scheduled_tasks.lock
 # Unparseable files — corrupted introspection result (UTF-16) and fully-commented-out GraphQL
 apps/web/schema-introspection.json
 lib/data-loaders/src/api/db/stats/Stats.graphql
