@@ -215,23 +215,25 @@ export const CommishTab: React.FC<CommishTabProps> = ({ league }) => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {leagueId ? (
-        <NextStepControl
-          leagueId={leagueId}
-          currentMatchup={currentMatchup}
-          gamesPerMatchup={league.gamesPerMatchup ?? 1}
-          draftStatus={league.draftStatus}
-          leagueName={league.name ?? ''}
-          frozenAt={league.frozenAt}
-          totalMatchups={league.totalMatchups ?? undefined}
-          onError={(err) => setNextStepError(err.message)}
-          onSuccess={() => setNextStepError(null)}
-          onNavigateToDraftBoard={() =>
-            navigate(`/baseball/league/${leagueId}/draft`)
-          }
-          onNavigateToLeague={(newLeagueId) =>
-            navigate(`/baseball/league/${newLeagueId}`)
-          }
-        />
+        <section aria-label="Next Step">
+          <NextStepControl
+            leagueId={leagueId}
+            currentMatchup={currentMatchup}
+            gamesPerMatchup={league.gamesPerMatchup ?? 1}
+            draftStatus={league.draftStatus}
+            leagueName={league.name ?? ''}
+            frozenAt={league.frozenAt}
+            totalMatchups={league.totalMatchups ?? undefined}
+            onError={(err) => setNextStepError(err.message)}
+            onSuccess={() => setNextStepError(null)}
+            onNavigateToDraftBoard={() =>
+              navigate(`/baseball/league/${leagueId}/draft`)
+            }
+            onNavigateToLeague={(newLeagueId) =>
+              navigate(`/baseball/league/${newLeagueId}`)
+            }
+          />
+        </section>
       ) : null}
       {nextStepError ? (
         <div
