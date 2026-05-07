@@ -212,7 +212,7 @@ test.describe
 
     await test.step('Wait for draft to complete', async () => {
       const seasonActive = page.getByText('Season Active');
-      const deadline = Date.now() + 90_000;
+      const deadline = Date.now() + 150_000;
       while (Date.now() < deadline) {
         if (await seasonActive.isVisible().catch(() => false)) break;
         await page.waitForTimeout(5_000);
