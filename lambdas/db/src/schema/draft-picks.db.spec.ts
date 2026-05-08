@@ -908,6 +908,64 @@ describe('Draft Picks - DB Integration Tests', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // LS-4281: "Draft Complete!" missing — regression coverage for the
+  // commissioner-as-managed-team fix (LS-4277) and the round-boundary
+  // consecutive-pick scenario that triggered State B.
+  describe('Draft completion — commissioner makes final pick in snake round boundary (LS-4281)', () => {
+    const publicDb = () => db as unknown as PublicDb;
+
+    it('4-team snake draft: isDraftComplete fires correctly when team A (commissioner slot) makes the last pick', async () => {
+      // In a 4-team snake draft the pick order is A B C D D C B A.
+      // teamFix[0] (A) makes pick #1 AND pick #8 (the final pick).
+      // Before LS-4277, A was marked autoPick=true (commissioner bug), so the
+      // auto-pick chain at the round boundary caused the "Your pick" indicator
+      // to briefly disappear then reappear, breaking the wasAccepted check.
+      // Here we verify through commitDraftPick directly (no auto-pick chaining)
+      // that the final pick correctly sets isDraftComplete=true.
+      const {
+        league,
+        draft,
+        teams: teamFix,
+        players: playerFix,
+      } = await seedDraftFixture(4);
+
+      const expectedTeamIndices = [0, 1, 2, 3, 3, 2, 1, 0];
+
+      for (let i = 0; i < 8; i++) {
+        const pickInfo = await getCurrentDraftPickInfo(publicDb(), draft.id);
+        expect(pickInfo).not.toBeNull();
+        expect(pickInfo!.teamId).toBe(teamFix[expectedTeamIndices[i]].id);
+        expect(pickInfo!.overallPick).toBe(i + 1);
+
+        const result = await commitDraftPick({
+          tx: publicDb(),
+          draftId: draft.id,
+          leagueId: league.id,
+          pickInfo: pickInfo!,
+          playerId: playerFix[i].id,
+          maxRosterSize: 2,
+          pickTimeLimitSeconds: 60,
+          isMockDraft: true,
+        });
+
+        const isLastPick = i === 7;
+        expect(result.isDraftComplete).toBe(isLastPick);
+      }
+
+      // After the final pick by team A, the next poll must return isComplete:true.
+      const afterComplete = await getCurrentDraftPickInfo(publicDb(), draft.id);
+      expect(afterComplete).not.toBeNull();
+      expect(afterComplete!.isComplete).toBe(true);
+
+      const [leagueRow] = await db
+        .select()
+        .from(leagues)
+        .where(eq(leagues.id, league.id));
+      expect(leagueRow.draftStatus).toBe('completed');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   describe('enableAutoPickForUnmanagedTeams', () => {
     async function seedLeagueWithDraft() {
       const owner = getUser(1);

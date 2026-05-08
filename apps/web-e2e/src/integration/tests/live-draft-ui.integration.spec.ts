@@ -600,22 +600,26 @@ test.describe
       // WebSocket notification arrived between iterations it may not be visible
       // yet on every page. Give up to 30 s for the banner to propagate via WS
       // before falling back to a page reload.
+      //
+      // Use waitFor (parallel across all pages) instead of isVisible (instant):
+      // the banner can take up to ~5 s to appear after a page load because it
+      // relies on Apollo's 5 s currentPickInfo poll returning isComplete:true.
+      // An instant check misses the brief window between poll fire and React
+      // render — the same race LS-4260 fixed in the pick-loop and stuck-loop.
       let draftComplete = false;
       const pollDeadline = Date.now() + 30_000;
       while (!draftComplete && Date.now() < pollDeadline) {
-        for (const { page } of pages) {
-          if (
-            await page
+        const completeChecks = await Promise.all(
+          pages.map(({ page }) =>
+            page
               .getByText('Draft Complete!')
-              .isVisible()
-              .catch(() => false)
-          ) {
-            draftComplete = true;
-            break;
-          }
-        }
-        if (!draftComplete) {
-          await pages[0].page.waitForTimeout(2000);
+              .waitFor({ state: 'visible', timeout: 2000 })
+              .then(() => true)
+              .catch(() => false),
+          ),
+        );
+        if (completeChecks.some(Boolean)) {
+          draftComplete = true;
         }
       }
 
