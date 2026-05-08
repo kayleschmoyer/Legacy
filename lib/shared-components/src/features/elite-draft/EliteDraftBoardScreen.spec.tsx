@@ -281,6 +281,94 @@ describe('EliteDraftBoardScreen — selectionMethod branching', () => {
   });
 });
 
+// Regression gate: LS-4268 / LS-4260 / LS-4214 / LS-3823
+// The "Draft Complete!" banner must appear via all three propagation paths:
+// 1. WebSocket DraftCompleted event → ui.draftComplete=true
+// 2. Apollo query / fresh page load → leagueDraft.draftCompletedAt set
+// 3. 5-second GET_CURRENT_DRAFT_PICK poll → currentPickInfo.isComplete=true
+// Each path guards against a different race: WS miss, reload, poll fallback.
+// A fourth test verifies the LS-4263 race (draftStatus=completed but leagueDraft
+// still loading) shows LoadingScreen instead of PreDraftLobby or DraftCompleteView.
+describe('EliteDraftBoardScreen — draft completion paths (LS-4268 regression gate)', () => {
+  it('renders DraftCompleteView via WebSocket path (ui.draftComplete=true)', () => {
+    mockUseDraftUIState.mockReturnValue(makeBaseUI({ draftComplete: true }));
+
+    const { getByTestId, queryByTestId } = render(
+      <EliteDraftBoardScreen {...defaultProps} />,
+    );
+
+    expect(getByTestId('draft-complete-view')).toBeTruthy();
+    expect(queryByTestId('draft-player-board')).toBeNull();
+  });
+
+  it('renders DraftCompleteView via Apollo path (leagueDraft.draftCompletedAt set, covers fresh page reload)', () => {
+    mockUseDraftQueries.mockReturnValue(
+      makeBaseQueries({
+        leagueDraft: {
+          selectionMethod: 'standard',
+          draftCompletedAt: '2024-01-01T00:00:00.000Z',
+          id: '42',
+        },
+      }),
+    );
+
+    const { getByTestId, queryByTestId } = render(
+      <EliteDraftBoardScreen {...defaultProps} />,
+    );
+
+    expect(getByTestId('draft-complete-view')).toBeTruthy();
+    expect(queryByTestId('draft-player-board')).toBeNull();
+  });
+
+  it('renders DraftCompleteView via poll path (currentPickInfo.isComplete=true)', () => {
+    mockUseDraftQueries.mockReturnValue(
+      makeBaseQueries({
+        currentPickInfo: {
+          isComplete: true,
+          draftId: 42,
+          teamId: 1,
+          round: 10,
+          pickNumber: 4,
+          overallPick: 40,
+        },
+      }),
+    );
+
+    const { getByTestId, queryByTestId } = render(
+      <EliteDraftBoardScreen {...defaultProps} />,
+    );
+
+    expect(getByTestId('draft-complete-view')).toBeTruthy();
+    expect(queryByTestId('draft-player-board')).toBeNull();
+  });
+
+  it('shows LoadingScreen (not DraftCompleteView or PreDraftLobby) when draftStatus=completed but leagueDraft is still loading (LS-4263 race)', () => {
+    mockUseDraftUIState.mockReturnValue(makeBaseUI({ draftComplete: false }));
+    mockUseDraftQueries.mockReturnValue(
+      makeBaseQueries({
+        league: {
+          id: 1,
+          name: 'Test League',
+          draftStatus: 'completed',
+          isMockDraft: false,
+          userMembership: { permissionLevel: 'member', teamId: 1 },
+        },
+        leagueDraft: null,
+        draftId: null,
+        currentPickInfo: null,
+      }),
+    );
+
+    const { queryByTestId, getByText } = render(
+      <EliteDraftBoardScreen {...defaultProps} />,
+    );
+
+    expect(queryByTestId('draft-complete-view')).toBeNull();
+    expect(queryByTestId('pre-draft-lobby')).toBeNull();
+    expect(getByText('Loading draft board...')).toBeTruthy();
+  });
+});
+
 describe('EliteDraftBoardScreen — paused overlay', () => {
   it('does not show paused overlay when draft is not paused', () => {
     mockUseDraftUIState.mockReturnValue(makeBaseUI({ draftPaused: false }));

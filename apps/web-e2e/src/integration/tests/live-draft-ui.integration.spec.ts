@@ -205,6 +205,7 @@ test.describe
     managerPage1,
     managerPage2,
     managerPage3,
+    managerJwt1,
   }) => {
     // Allow up to 20 minutes for all picks (4 teams × ~25 rounds = ~100 picks)
     test.setTimeout(1_200_000);
@@ -508,7 +509,7 @@ test.describe
                   },
                   headers: {
                     'Content-Type': 'application/json',
-                    'x-csrf-token': 'integration-csrf-token',
+                    Authorization: `Bearer ${managerJwt1}`,
                   },
                 })
                 .catch(() => null);
