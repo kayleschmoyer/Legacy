@@ -239,7 +239,7 @@ test.describe
     commissionerPage: page,
   }) => {
     await test.step('Open Scoring accordion', async () => {
-      await openCommissionerSection(page, state.leagueId, 'Scoring');
+      await openCommissionerSection(page, state.leagueId, 'Scoring Rules');
       await expect(page.getByText('Scoring Settings')).toBeVisible({
         timeout: 10_000,
       });
