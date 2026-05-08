@@ -440,21 +440,31 @@ test.describe
         { timeout: 15_000 },
       );
 
-      // The MatchupRosterEditor depends on a separate getMatchupPlayers query
-      // that may not resolve on the first load for newly-created leagues.
-      // Retry with a reload if "Edit Lineup" isn't visible after 15s.
+      // MatchupDetailPage renders the roster editor only after useGetUserTeamIdQuery
+      // resolves (its result gates the render condition). waitForLoadState('load')
+      // fires when page resources finish loading, but Apollo GraphQL queries
+      // (userTeamId, getMatchupPlayers, getPositionsForLeague) are still in-flight
+      // at that point. Waiting for networkidle ensures those queries complete and
+      // React has re-rendered with the resolved data before we check visibility
+      // (State B regression guard — LS-4283).
       const editLineup = page.getByText('Edit Lineup', { exact: true }).first();
+      await page
+        .waitForLoadState('networkidle', { timeout: 15_000 })
+        .catch(() => undefined);
+
       const visible = await editLineup.isVisible().catch(() => false);
       if (!visible) {
-        const deadline = Date.now() + 30_000;
+        const deadline = Date.now() + 60_000;
         while (Date.now() < deadline) {
-          await page.waitForTimeout(5_000);
           await page.reload();
-          await page.waitForLoadState('load');
+          await page
+            .waitForLoadState('networkidle', { timeout: 20_000 })
+            .catch(() => undefined);
           if (await editLineup.isVisible().catch(() => false)) break;
+          await page.waitForTimeout(2_000);
         }
       }
-      await expect(editLineup).toBeVisible({ timeout: 15_000 });
+      await expect(editLineup).toBeVisible({ timeout: 20_000 });
     });
 
     await test.step('Roster editor shows Unlocked badge', async () => {

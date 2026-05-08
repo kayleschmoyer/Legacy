@@ -99,6 +99,121 @@ describe('MatchupRosterEditorView', () => {
     });
   });
 
+  describe('heading rendering — State B regression guards (LS-4283)', () => {
+    // State B: "Edit Lineup" heading itself missing — the view does not render
+    // at all. These tests pin the heading text so a rename or a guard that
+    // erroneously returns null is caught at the unit level in <1 s.
+
+    it('renders "Edit Lineup" heading when not locked', () => {
+      const players = [makePlayer('p1', 101)];
+      const positionMap = new Map<number, string>([[101, 'SP']]);
+      render(
+        <MatchupRosterEditorView
+          players={players}
+          positionMap={positionMap}
+          positionOptions={[SP_SLOT]}
+          onSwapPositions={noop}
+          onMoveToPosition={noop}
+          locked={false}
+        />,
+      );
+      expect(screen.getByText('Edit Lineup')).toBeTruthy();
+    });
+
+    it('renders "Current Lineup" heading when locked', () => {
+      const players = [makePlayer('p1', 101)];
+      const positionMap = new Map<number, string>([[101, 'SP']]);
+      render(
+        <MatchupRosterEditorView
+          players={players}
+          positionMap={positionMap}
+          positionOptions={[SP_SLOT]}
+          onSwapPositions={noop}
+          onMoveToPosition={noop}
+          locked={true}
+        />,
+      );
+      expect(screen.getByText('Current Lineup')).toBeTruthy();
+    });
+
+    it('returns null (renders nothing) when players array is empty', () => {
+      const { container } = render(
+        <MatchupRosterEditorView
+          players={[]}
+          positionMap={new Map()}
+          positionOptions={[SP_SLOT]}
+          onSwapPositions={noop}
+          onMoveToPosition={noop}
+        />,
+      );
+      expect(container.firstChild).toBeNull();
+    });
+  });
+
+  describe('STARTERS section rendering — State A regression guards (LS-4283)', () => {
+    // State A: "Edit Lineup" heading IS visible but player rows are missing
+    // inside the STARTERS section. These tests pin both the section header and
+    // at least one data-testid player row so both failure modes are caught at
+    // the unit level.
+
+    it('renders STARTERS section header with correct slot count', () => {
+      const players = [makePlayer('p1', 101), makePlayer('p2', 102)];
+      const positionMap = new Map<number, string>([
+        [101, 'SP'],
+        [102, 'C'],
+      ]);
+      render(
+        <MatchupRosterEditorView
+          players={players}
+          positionMap={positionMap}
+          positionOptions={[SP_SLOT, C_SLOT]}
+          onSwapPositions={noop}
+          onMoveToPosition={noop}
+        />,
+      );
+      expect(screen.getByText(/STARTERS \(2\/2\)/)).toBeTruthy();
+    });
+
+    it('renders at least one data-testid player row in the starters section', () => {
+      const players = [makePlayer('p1', 101)];
+      const positionMap = new Map<number, string>([[101, 'SP']]);
+      const { container } = render(
+        <MatchupRosterEditorView
+          players={players}
+          positionMap={positionMap}
+          positionOptions={[SP_SLOT]}
+          onSwapPositions={noop}
+          onMoveToPosition={noop}
+        />,
+      );
+      const rows = container.querySelectorAll(
+        '[data-testid^="matchup-player-row-"]',
+      );
+      expect(rows.length).toBeGreaterThan(0);
+    });
+
+    it('renders both "Edit Lineup" heading AND STARTERS rows simultaneously', () => {
+      const players = [makePlayer('p1', 101), makePlayer('p2', null)];
+      const positionMap = new Map<number, string>([[101, 'SP']]);
+      const { container } = render(
+        <MatchupRosterEditorView
+          players={players}
+          positionMap={positionMap}
+          positionOptions={[SP_SLOT]}
+          onSwapPositions={noop}
+          onMoveToPosition={noop}
+        />,
+      );
+      // State B check: heading visible
+      expect(screen.getByText('Edit Lineup')).toBeTruthy();
+      // State A check: at least one player row rendered
+      expect(
+        container.querySelectorAll('[data-testid^="matchup-player-row-"]')
+          .length,
+      ).toBeGreaterThan(0);
+    });
+  });
+
   describe('player row data-testid attribute (LS-4133)', () => {
     // Tamagui forwards `testID` to react-native-web on web, but in this app's
     // version it is dropped on a styled XStack with `onPress` — the rendered
