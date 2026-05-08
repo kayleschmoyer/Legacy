@@ -346,8 +346,15 @@ builder.mutationField('makeDraftPick', (t) =>
         let effectiveDraftComplete = result.isDraftComplete;
         let chainedNextPickInfo = result.nextPickInfo;
 
+        // Idempotent picks (same player already drafted this slot) return
+        // nextPickInfo:null with isDraftComplete:false. Sending a WS notification
+        // for those causes the frontend to prematurely call setDraftComplete(true)
+        // because handleDraftPickMade treats !nextPick as "draft is over" (LS-4286).
+        const isIdempotentPick =
+          !result.isDraftComplete && result.nextPickInfo === null;
+
         // Send WebSocket notification for the pick (outside transaction)
-        if (context.notificationService) {
+        if (context.notificationService && !isIdempotentPick) {
           await context.notificationService.notifyDraftPickMade(
             result.leagueId,
             draftId,

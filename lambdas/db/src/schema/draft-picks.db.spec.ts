@@ -1122,4 +1122,114 @@ describe('Draft Picks - DB Integration Tests', () => {
       expect(rows.every((r) => r.autoPick)).toBe(true);
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // LS-4286: autoProcessDraftPicks must not mark managed teams as autoPick.
+  // The same bug that LS-4277 fixed at initialization was present mid-draft:
+  // any timed-out team was marked autoPick=true even if a GM/commissioner was
+  // actively managing it. Fix reuses enableAutoPickForUnmanagedTeams.
+  describe('autoProcessDraftPicks — managed-team exclusion (LS-4286)', () => {
+    const publicDb = () => db as unknown as PublicDb;
+
+    it('does not mark a commissioner-managed team autoPick when their turn times out', async () => {
+      const { league, draft, teams: teamFix } = await seedDraftFixture(2);
+
+      // teamFix[0] already has a general_manager member from seedDraftFixture.
+      // Override to commissioner to match the exact scenario from LS-4286.
+      await db
+        .update(leagueMembers)
+        .set({ permissionLevel: 'commissioner' })
+        .where(eq(leagueMembers.leagueId, league.id));
+
+      // Simulate enableAutoPickForUnmanagedTeams being called for teamFix[0]
+      // (the commissioner's team) — it must NOT be marked autoPick.
+      const marked = await enableAutoPickForUnmanagedTeams(
+        publicDb(),
+        league.id,
+        draft.id,
+        [teamFix[0].id],
+      );
+
+      expect(marked).toHaveLength(0);
+      expect(marked).not.toContain(teamFix[0].id);
+
+      const [row] = await db
+        .select({ autoPick: draftTeams.autoPick })
+        .from(draftTeams)
+        .where(eq(draftTeams.teamId, teamFix[0].id));
+      expect(row.autoPick).toBe(false);
+    });
+
+    it('marks an unmanaged team autoPick when their turn times out', async () => {
+      const { league, draft, teams: teamFix } = await seedDraftFixture(2);
+
+      // teamFix[1] has no league member → unmanaged.
+      const marked = await enableAutoPickForUnmanagedTeams(
+        publicDb(),
+        league.id,
+        draft.id,
+        [teamFix[1].id],
+      );
+
+      expect(marked).toContain(teamFix[1].id);
+
+      const [row] = await db
+        .select({ autoPick: draftTeams.autoPick })
+        .from(draftTeams)
+        .where(eq(draftTeams.teamId, teamFix[1].id));
+      expect(row.autoPick).toBe(true);
+    });
+
+    it('full pick-to-completion: commissioner team makes every pick and draft completes', async () => {
+      const {
+        league,
+        draft,
+        teams: teamFix,
+        players: playerFix,
+      } = await seedDraftFixture(2);
+
+      // Both teams managed — no team should ever get autoPick=true.
+      const user2 = getUser(2);
+      await db.insert(leagueMembers).values({
+        leagueId: league.id,
+        userId: user2.id,
+        teamId: teamFix[1].id,
+        permissionLevel: 'general_manager',
+      });
+
+      // Snake order for 2 teams, maxRosterSize=2: A B B A
+      const expectedOrder = [0, 1, 1, 0];
+
+      for (let i = 0; i < 4; i++) {
+        const pickInfo = await getCurrentDraftPickInfo(publicDb(), draft.id);
+        expect(pickInfo).not.toBeNull();
+        expect(pickInfo!.teamId).toBe(teamFix[expectedOrder[i]].id);
+
+        // Verify neither team has been incorrectly marked autoPick
+        const dtRows = await db
+          .select({ teamId: draftTeams.teamId, autoPick: draftTeams.autoPick })
+          .from(draftTeams)
+          .where(eq(draftTeams.draftId, draft.id));
+        for (const row of dtRows) {
+          expect(row.autoPick).toBe(false);
+        }
+
+        const result = await commitDraftPick({
+          tx: publicDb(),
+          draftId: draft.id,
+          leagueId: league.id,
+          pickInfo: pickInfo!,
+          playerId: playerFix[i].id,
+          maxRosterSize: 2,
+          pickTimeLimitSeconds: 60,
+          isMockDraft: true,
+        });
+
+        expect(result.isDraftComplete).toBe(i === 3);
+      }
+
+      const finalPick = await getCurrentDraftPickInfo(publicDb(), draft.id);
+      expect(finalPick!.isComplete).toBe(true);
+    });
+  });
 });

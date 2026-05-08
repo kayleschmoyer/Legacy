@@ -22,6 +22,7 @@ import { and, count, eq, sql } from 'drizzle-orm';
 
 import {
   commitDraftPick,
+  enableAutoPickForUnmanagedTeams,
   getCurrentDraftPickInfo,
   getUnfilledPositionTypes,
 } from './helpers';
@@ -344,19 +345,15 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                   isMockDraft: league.isMockDraft,
                 });
 
-                // Mark this team as auto-pick going forward (LS-427)
-                await tx
-                  .update(PublicSchema.draftTeams)
-                  .set({ autoPick: true })
-                  .where(
-                    and(
-                      eq(PublicSchema.draftTeams.draftId, draftId),
-                      eq(
-                        PublicSchema.draftTeams.teamId,
-                        currentPickInfo.teamId,
-                      ),
-                    ),
-                  );
+                // Mark this team as auto-pick going forward, but only if
+                // unmanaged (no GM or commissioner). Reuses the same guard as
+                // initialization-time enableAutoPickForUnmanagedTeams (LS-4286).
+                await enableAutoPickForUnmanagedTeams(
+                  tx,
+                  draftLeagueId,
+                  draftId,
+                  [currentPickInfo.teamId],
+                );
 
                 // If the next team has auto-pick enabled, immediately expire
                 // their deadline so the inner loop chains right away (LS-427).
