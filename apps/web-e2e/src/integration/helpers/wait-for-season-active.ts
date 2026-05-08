@@ -1,0 +1,42 @@
+import type { Page } from '@playwright/test';
+import { expect } from '@playwright/test';
+
+/**
+ * Poll the commissioner panel until the "Season Active" badge appears.
+ *
+ * After an automated draft starts, the backend Lambda processes picks
+ * asynchronously. The frontend does not push updates — the spec must poll
+ * by navigating back to the commissioner page on each cycle.
+ *
+ * Using page.goto() (not page.reload()) is critical: starting an automated
+ * draft may trigger a client-side route change. reload() would re-fetch the
+ * transient URL rather than the commissioner panel, and "Season Active" would
+ * never appear there. This helper always navigates to a stable URL.
+ *
+ * Regression history (LS-4237 → LS-4261 → LS-4278 → LS-4282):
+ *   - LS-4237: matchup-detail, 120 s deadline
+ *   - LS-4261: roster-management 200 s, season-renewal 150 s
+ *   - LS-4278: playoff-bracket reload→goto + 150 s, roster-management 300 s,
+ *              season-renewal 240 s
+ *   - LS-4282: full-season-ui reload→goto + 180 s, roster-management 480 s;
+ *              extracted into this shared helper so all specs share one
+ *              implementation and deadline drift can't re-emerge silently.
+ */
+export async function waitForSeasonActive(
+  page: Page,
+  leagueId: number,
+  { deadlineMs = 300_000 }: { deadlineMs?: number } = {},
+): Promise<void> {
+  const commissionerUrl = `/baseball/league/${leagueId}/commissioner`;
+  const seasonActive = page.getByText('Season Active');
+  const deadline = Date.now() + deadlineMs;
+
+  while (Date.now() < deadline) {
+    if (await seasonActive.isVisible().catch(() => false)) break;
+    await page.waitForTimeout(5_000);
+    await page.goto(commissionerUrl);
+    await page.waitForLoadState('load');
+  }
+
+  await expect(seasonActive).toBeVisible({ timeout: 15_000 });
+}

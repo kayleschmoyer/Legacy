@@ -32,6 +32,7 @@
 import { expect } from '@playwright/test';
 import { createLeagueViaUI } from '../helpers/create-league';
 import { waitForJoinPageValidation } from '../helpers/wait-for-join-page';
+import { waitForSeasonActive } from '../helpers/wait-for-season-active';
 import { switchUser, test } from '../fixtures/ui';
 
 // ---------------------------------------------------------------------------
@@ -205,15 +206,7 @@ test.describe
     });
 
     await test.step('Wait for Season Active status', async () => {
-      const seasonActive = page.getByText('Season Active');
-      const deadline = Date.now() + 120_000;
-      while (Date.now() < deadline) {
-        if (await seasonActive.isVisible().catch(() => false)) break;
-        await page.waitForTimeout(5_000);
-        await page.reload();
-        await page.waitForLoadState('load');
-      }
-      await expect(seasonActive).toBeVisible({ timeout: 15_000 });
+      await waitForSeasonActive(page, state.leagueId, { deadlineMs: 120_000 });
     });
   });
 

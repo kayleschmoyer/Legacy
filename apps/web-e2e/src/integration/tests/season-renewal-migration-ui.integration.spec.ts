@@ -33,6 +33,7 @@
 import { expect } from '@playwright/test';
 import { createLeagueViaUI } from '../helpers/create-league';
 import { waitForJoinPageValidation } from '../helpers/wait-for-join-page';
+import { waitForSeasonActive } from '../helpers/wait-for-season-active';
 import { switchUser, test } from '../fixtures/ui';
 
 // ---------------------------------------------------------------------------
@@ -256,20 +257,7 @@ test.describe
     });
 
     await test.step('Wait for Season Active badge', async () => {
-      const deadline = Date.now() + 240_000;
-      while (Date.now() < deadline) {
-        const isActive = await page
-          .getByText('Season Active')
-          .isVisible()
-          .catch(() => false);
-        if (isActive) break;
-        await page.waitForTimeout(5_000);
-        await page.goto(`/baseball/league/${state.leagueId}/commissioner`);
-        await page.waitForLoadState('load');
-      }
-      await expect(page.getByText('Season Active')).toBeVisible({
-        timeout: 15_000,
-      });
+      await waitForSeasonActive(page, state.leagueId, { deadlineMs: 240_000 });
     });
   });
 

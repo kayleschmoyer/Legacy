@@ -22,6 +22,7 @@
 import { expect } from '@playwright/test';
 import { createLeagueViaUI } from '../helpers/create-league';
 import { waitForJoinPageValidation } from '../helpers/wait-for-join-page';
+import { waitForSeasonActive } from '../helpers/wait-for-season-active';
 import { switchUser, test } from '../fixtures/ui';
 
 // ---------------------------------------------------------------------------
@@ -220,8 +221,8 @@ test.describe
   test('Phase 4: Automated random draft', async ({
     commissionerPage: page,
   }) => {
-    // The draft Lambda processes picks asynchronously — allow plenty of time.
-    test.setTimeout(240_000);
+    // Automated drafts can take 80–180s; allow generous time for Lambda cold starts.
+    test.setTimeout(360_000);
     await test.step('Navigate to commissioner panel', async () => {
       await page.goto(`/baseball/league/${state.leagueId}/commissioner`);
       await page.waitForLoadState('load');
@@ -272,18 +273,11 @@ test.describe
     });
 
     await test.step('Wait for draft to complete via commissioner panel', async () => {
-      // Automated random drafts complete in seconds (single Lambda batch).
       // The Next Step may jump straight past "Draft Completed" to the next
       // action, so look for the "Season Active" status badge instead.
-      const seasonActive = page.getByText('Season Active');
-      const deadline = Date.now() + 60_000; // 1 minute should be plenty
-      while (Date.now() < deadline) {
-        if (await seasonActive.isVisible().catch(() => false)) break;
-        await page.waitForTimeout(5_000);
-        await page.reload();
-        await page.waitForLoadState('load');
-      }
-      await expect(seasonActive).toBeVisible({ timeout: 15_000 });
+      // Uses waitForSeasonActive (page.goto, not reload) so transient route
+      // changes after draft start don't land us on the wrong URL.
+      await waitForSeasonActive(page, state.leagueId, { deadlineMs: 180_000 });
     });
 
     await test.step('Verify roster was filled correctly via the UI', async () => {

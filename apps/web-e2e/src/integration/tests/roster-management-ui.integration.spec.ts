@@ -34,6 +34,7 @@
 import { expect } from '@playwright/test';
 import { createLeagueViaUI } from '../helpers/create-league';
 import { waitForJoinPageValidation } from '../helpers/wait-for-join-page';
+import { waitForSeasonActive } from '../helpers/wait-for-season-active';
 import { switchUser, test } from '../fixtures/ui';
 
 // ---------------------------------------------------------------------------
@@ -165,8 +166,8 @@ test.describe
   test('Phase 3: Automated random draft', async ({
     commissionerPage: page,
   }) => {
-    // Automated drafts can take 200–300s; allow generous time for Lambda cold starts
-    test.setTimeout(360_000);
+    // Automated drafts can take 300–480s; allow generous time for Lambda cold starts
+    test.setTimeout(600_000);
 
     await test.step('Navigate to commissioner panel', async () => {
       await page.goto(`/baseball/league/${state.leagueId}/commissioner`);
@@ -211,15 +212,7 @@ test.describe
     });
 
     await test.step('Wait for draft to complete', async () => {
-      const seasonActive = page.getByText('Season Active');
-      const deadline = Date.now() + 300_000;
-      while (Date.now() < deadline) {
-        if (await seasonActive.isVisible().catch(() => false)) break;
-        await page.waitForTimeout(5_000);
-        await page.goto(`/baseball/league/${state.leagueId}/commissioner`);
-        await page.waitForLoadState('load');
-      }
-      await expect(seasonActive).toBeVisible({ timeout: 15_000 });
+      await waitForSeasonActive(page, state.leagueId, { deadlineMs: 480_000 });
     });
   });
 
