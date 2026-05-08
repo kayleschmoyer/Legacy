@@ -432,14 +432,20 @@ export async function enableAutoPickForUnmanagedTeams(
 ): Promise<number[]> {
   if (teamIds.length === 0) return [];
 
-  // Find team IDs that already have a general-manager member with a real user
+  // Find team IDs that already have a managed member (general_manager or
+  // commissioner) — both roles mean a real user is actively running the team.
+  // Excluding 'commissioner' was a bug: commissioner teams were incorrectly
+  // marked autoPick=true and auto-processed as if unattended (LS-4277).
   const teamsWithGM = await db
     .select({ teamId: PublicSchema.leagueMembers.teamId })
     .from(PublicSchema.leagueMembers)
     .where(
       and(
         eq(PublicSchema.leagueMembers.leagueId, leagueId),
-        eq(PublicSchema.leagueMembers.permissionLevel, 'general_manager'),
+        inArray(PublicSchema.leagueMembers.permissionLevel, [
+          'general_manager',
+          'commissioner',
+        ]),
         isNotNull(PublicSchema.leagueMembers.teamId),
       ),
     );

@@ -467,14 +467,18 @@ test.describe
               }
               if (resolved) break;
 
-              // 2. Check if any human is now on the clock (instant isVisible).
+              // 2. Check if any human is now on the clock.
+              // Use a short waitFor (3 s, parallel) instead of instant isVisible
+              // so the Apollo poll and React render have time to reflect the new
+              // current-pick state after a nudge or page reload (LS-4277).
               const stuckTurnResults = await Promise.all(
                 pages.map(async ({ label, page }) => ({
                   label,
                   isMyTurn: await page
                     .getByText('Your pick', { exact: true })
                     .first()
-                    .isVisible()
+                    .waitFor({ state: 'visible', timeout: 3000 })
+                    .then(() => true)
                     .catch(() => false),
                 })),
               );

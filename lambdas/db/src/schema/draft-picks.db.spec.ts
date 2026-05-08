@@ -8,7 +8,11 @@
 
 import { eq } from 'drizzle-orm';
 import type { PublicDb } from '@legacy-sports/db-client';
-import { commitDraftPick, getCurrentDraftPickInfo } from './drafts/helpers';
+import {
+  commitDraftPick,
+  enableAutoPickForUnmanagedTeams,
+  getCurrentDraftPickInfo,
+} from './drafts/helpers';
 import { executePickEffects } from './drafts/draft-pick-effects';
 import { createAllMatchupsForLeague } from './matchups/mutations';
 import { getLeague, getTeam, getUser } from '../__fixtures__';
@@ -900,6 +904,164 @@ describe('Draft Picks - DB Integration Tests', () => {
       const finalPickInfo = await getCurrentDraftPickInfo(publicDb(), draft.id);
       expect(finalPickInfo).not.toBeNull();
       expect(finalPickInfo!.isComplete).toBe(true);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  describe('enableAutoPickForUnmanagedTeams', () => {
+    async function seedLeagueWithDraft() {
+      const owner = getUser(1);
+      const leagueFixture = getLeague(0);
+
+      const [league] = await db
+        .insert(leagues)
+        .values({
+          name: leagueFixture.name,
+          owner: owner.id,
+          inviteCode: leagueFixture.inviteCode,
+          draftStatus: 'pre-draft',
+        })
+        .returning();
+
+      const teamFixtures = Array.from({ length: 3 }, (_, i) => ({
+        ...getTeam(i),
+        leagueId: league.id,
+      }));
+      await db.insert(teams).values(teamFixtures);
+
+      const [draft] = await db
+        .insert(drafts)
+        .values({
+          leagueId: league.id,
+          draftMode: 'live',
+          selectionMethod: 'standard',
+          draftOrder: 'snake',
+          currentPick: 0,
+        })
+        .returning();
+
+      await db.insert(draftTeams).values(
+        teamFixtures.map((t, i) => ({
+          draftId: draft.id,
+          teamId: t.id,
+          leagueId: league.id,
+          draftOrder: i + 1,
+          autoPick: false,
+        })),
+      );
+
+      return { owner, league, teams: teamFixtures, draft };
+    }
+
+    it('does not mark the commissioner team as autoPick', async () => {
+      const {
+        owner,
+        league,
+        teams: teamFix,
+        draft,
+      } = await seedLeagueWithDraft();
+
+      // Commissioner membership — only team[0] has a commissioner member
+      await db.insert(leagueMembers).values({
+        leagueId: league.id,
+        userId: owner.id,
+        teamId: teamFix[0].id,
+        permissionLevel: 'commissioner',
+      });
+
+      const allTeamIds = teamFix.map((t) => t.id);
+      const markedIds = await enableAutoPickForUnmanagedTeams(
+        db,
+        league.id,
+        draft.id,
+        allTeamIds,
+      );
+
+      // Commissioner's team must NOT be marked
+      expect(markedIds).not.toContain(teamFix[0].id);
+
+      const rows = await db
+        .select({ teamId: draftTeams.teamId, autoPick: draftTeams.autoPick })
+        .from(draftTeams)
+        .where(eq(draftTeams.draftId, draft.id));
+
+      const byTeam = Object.fromEntries(
+        rows.map((r) => [r.teamId, r.autoPick]),
+      );
+      expect(byTeam[teamFix[0].id]).toBe(false); // commissioner — not auto-picked
+      expect(byTeam[teamFix[1].id]).toBe(true); // unmanaged slot
+      expect(byTeam[teamFix[2].id]).toBe(true); // unmanaged slot
+    });
+
+    it('does not mark teams with a general_manager as autoPick', async () => {
+      const {
+        owner,
+        league,
+        teams: teamFix,
+        draft,
+      } = await seedLeagueWithDraft();
+
+      const otherUser = getUser(2);
+      await db.insert(leagueMembers).values([
+        {
+          leagueId: league.id,
+          userId: owner.id,
+          teamId: teamFix[0].id,
+          permissionLevel: 'general_manager',
+        },
+        {
+          leagueId: league.id,
+          userId: otherUser.id,
+          teamId: teamFix[1].id,
+          permissionLevel: 'general_manager',
+        },
+      ]);
+
+      const allTeamIds = teamFix.map((t) => t.id);
+      const markedIds = await enableAutoPickForUnmanagedTeams(
+        db,
+        league.id,
+        draft.id,
+        allTeamIds,
+      );
+
+      expect(markedIds).not.toContain(teamFix[0].id);
+      expect(markedIds).not.toContain(teamFix[1].id);
+      expect(markedIds).toContain(teamFix[2].id); // no member → auto-pick
+
+      const rows = await db
+        .select({ teamId: draftTeams.teamId, autoPick: draftTeams.autoPick })
+        .from(draftTeams)
+        .where(eq(draftTeams.draftId, draft.id));
+
+      const byTeam = Object.fromEntries(
+        rows.map((r) => [r.teamId, r.autoPick]),
+      );
+      expect(byTeam[teamFix[0].id]).toBe(false);
+      expect(byTeam[teamFix[1].id]).toBe(false);
+      expect(byTeam[teamFix[2].id]).toBe(true);
+    });
+
+    it('marks all teams as autoPick when no managed members exist', async () => {
+      const { league, teams: teamFix, draft } = await seedLeagueWithDraft();
+
+      const allTeamIds = teamFix.map((t) => t.id);
+      const markedIds = await enableAutoPickForUnmanagedTeams(
+        db,
+        league.id,
+        draft.id,
+        allTeamIds,
+      );
+
+      expect(markedIds).toHaveLength(3);
+      expect(markedIds).toEqual(expect.arrayContaining(allTeamIds));
+
+      const rows = await db
+        .select({ autoPick: draftTeams.autoPick })
+        .from(draftTeams)
+        .where(eq(draftTeams.draftId, draft.id));
+
+      expect(rows.every((r) => r.autoPick)).toBe(true);
     });
   });
 });
