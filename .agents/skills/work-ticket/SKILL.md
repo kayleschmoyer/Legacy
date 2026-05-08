@@ -207,7 +207,10 @@ Follow the full [worktree-workflow skill](../worktree-workflow/SKILL.md):
         { id: "jira-notes",     content: "Write implementation notes to Jira (jira_edit_ticket)",                                         status: "pending" },
         { id: "self-review",    content: "Self-review: Skill(skill: 'review') — fix all issues before continuing",                        status: "pending" },
         { id: "make-pc",        content: "Validate: make_run(target: 'pc') — must pass",                                                  status: "pending" },
-        // E2E/spec tickets only — add this item if the ticket description requires a local spec run:
+        // Add this item if ANY of the following are true: the ticket description contains a "failing test"
+        // section, a "run the spec locally" requirement, or a "DO NOT SUBMIT" block; the ticket names a
+        // specific spec as a verification gate; or you modified any .integration.spec.ts file.
+        // When in doubt, add it — skipping is worse than a false positive.
         // { id: "local-spec",  content: "Local spec gate: verify playwright installed, run failing spec against live backend, confirm it passes", status: "pending" },
         { id: "commit",         content: "Commit: worktree_commit",                                                                        status: "pending" },
         { id: "push",           content: "Push: worktree_push",                                                                            status: "pending" },
@@ -262,7 +265,16 @@ Follow the full [worktree-workflow skill](../worktree-workflow/SKILL.md):
 
     > **⛔ Do NOT stop here.** `make pc` passing is a checkpoint, not the finish line. If you exit the workflow at this point, the work is unfinished — keep going.
     >
-    > **⚠️ E2E/integration spec gate (E2E bug and spec tickets only)**: If the ticket description contains a "failing test" section, a "run the spec locally" requirement, or other explicit local-run instructions, local spec execution is **mandatory before `worktree_push()`** — `make pc` passing is not sufficient for these tickets. Before running the spec: (1) verify `node_modules/.bin/playwright` exists — if not, run `node scripts/setup-worktree-node-modules.mjs` first (the binary will be missing in freshly set up worktrees); (2) run the specific failing spec against the live backend and confirm it passes. Only after the spec passes should you proceed to Ship.
+    > **⚠️ E2E/integration spec gate**: If **any** of the following are true, local spec execution is **mandatory before `worktree_push()`**: the ticket description contains a "failing test" section, a "run the spec locally" requirement, or a "DO NOT SUBMIT" block; the ticket names a specific spec as a verification gate; or **you modified any `.integration.spec.ts` file during implementation**. — `make pc` passing is not sufficient for these tickets. Before running the spec: (1) verify `node_modules/.bin/playwright` exists — if not, run `node scripts/setup-worktree-node-modules.mjs` first (the binary will be missing in freshly set up worktrees); (2) run the specific failing spec against the live backend and confirm it passes. Only after the spec passes should you proceed to Ship.
+    >
+    > The following are **not** valid reasons to skip this gate — each is a stop-and-ask, not a skip:
+    >
+    > - **⛔ "Requires real infrastructure"** — integration specs run against the live backend using test-user credentials auto-linked from the main repo's `.env`. No additional setup is needed in a standard worktree. If credentials are absent, ask the user.
+    > - **⛔ "CI passed anyway"** — integration tests are **not run in CI on PRs** (too slow). A CI green is zero signal for integration test correctness. Local execution is the only gate that exists.
+    > - **⛔ "Risk of data races with CI"** — CI does not run integration tests on PRs (see above), so there is no concurrent run to race against. This premise is false.
+    > - **⛔ "Credentials may not be set up"** — credentials are auto-linked from the main repo's `.env` by the worktree bootstrap script. If genuinely absent after setup, stop and ask the user — do not silently skip.
+    > - **⛔ "Fix is structurally identical to a verified fix"** — structural similarity is not evidence of correctness in a different runtime context. Code analysis does not substitute for local observation.
+    > - **⛔ "make pc passed"** — `make pc` does not run Playwright tests. It is necessary but not sufficient.
     >
     > **⛔ NEXT ACTION IS MANDATORY: after completing any required local spec gate above, proceed immediately to Step 7 and create the PR.** Any ticket that required a code change MUST produce a PR. There is no scenario — not "the change is small", not "I'm not sure it's ready", not "the user can review it locally" — that permits skipping PR creation. If you are tempted to stop here, you are in the most common agent failure mode. Do not stop. Create the PR.
 

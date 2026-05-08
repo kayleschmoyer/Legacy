@@ -268,10 +268,11 @@ const isolated = base.extend<{ _apiIsolation: void }>({
             try {
               // The app uses oauthProxyUrl = 'http://localhost:5001' (no /oauth prefix),
               // so the actual path is /refresh-jwt. Accept both to be future-proof.
+              // Also match paths with a stage prefix (e.g. /dev/refresh-jwt,
+              // /dev/oauth/refresh-jwt) for local production builds that bake in
+              // the full AWS API Gateway URL.
               const pathname = new URL(reqUrl).pathname;
-              return (
-                pathname === '/refresh-jwt' || pathname === '/oauth/refresh-jwt'
-              );
+              return pathname.endsWith('/refresh-jwt');
             } catch {
               return false;
             }
