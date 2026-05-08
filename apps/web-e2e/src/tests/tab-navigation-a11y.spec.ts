@@ -37,35 +37,64 @@ async function evaluateTabSemantics(page: import('@playwright/test').Page) {
         tablists: 0,
         tabs: 0,
         tabpanels: 0,
-        selectedTabs: 0,
+        tablistSelectedCounts: [] as number[],
         issues,
       };
     }
 
-    const selectedTabs = tabs.filter(
-      (t) => t.getAttribute('aria-selected') === 'true',
-    );
-
-    if (selectedTabs.length === 0 && tabs.length > 0) {
-      issues.push('No tab has aria-selected="true"');
-    }
-    if (selectedTabs.length > 1) {
-      issues.push(
-        `Multiple tabs have aria-selected="true": ${selectedTabs.length}`,
+    // ARIA requires at most one selected tab within each tablist, not globally.
+    // A page may have multiple independent tablists (e.g. main nav + sub-tabs),
+    // each carrying its own selection — that is correct behaviour.
+    if (tablists.length > 0) {
+      tablists.forEach((tablist, idx) => {
+        const listTabs = Array.from(tablist.querySelectorAll('[role="tab"]'));
+        const listSelected = listTabs.filter(
+          (t) => t.getAttribute('aria-selected') === 'true',
+        );
+        if (listSelected.length === 0 && listTabs.length > 0) {
+          issues.push(`Tablist ${idx + 1}: No tab has aria-selected="true"`);
+        }
+        if (listSelected.length > 1) {
+          issues.push(
+            `Tablist ${idx + 1}: Multiple tabs have aria-selected="true": ${listSelected.length}`,
+          );
+        }
+      });
+    } else {
+      // Tabs present but no tablist wrapper
+      const selected = tabs.filter(
+        (t) => t.getAttribute('aria-selected') === 'true',
       );
+      if (selected.length === 0) {
+        issues.push('No tab has aria-selected="true"');
+      }
+      if (selected.length > 1) {
+        issues.push(
+          `Multiple tabs have aria-selected="true": ${selected.length}`,
+        );
+      }
     }
+
     if (tabs.length > 0 && tablists.length === 0) {
       issues.push(
         'role="tab" elements exist but no role="tablist" ancestor was found',
       );
     }
 
+    // Per-tablist selected counts; each should equal 1 when healthy.
+    const tablistSelectedCounts = tablists.map(
+      (tablist) =>
+        Array.from(tablist.querySelectorAll('[role="tab"]')).filter(
+          (t) => t.getAttribute('aria-selected') === 'true',
+        ).length,
+    );
+
     return {
       hasTabPattern: tablists.length > 0 || tabs.length > 0,
       tablists: tablists.length,
       tabs: tabs.length,
       tabpanels: tabpanels.length,
-      selectedTabs: selectedTabs.length,
+      tablistSelectedCounts,
       issues,
     };
   });
@@ -77,18 +106,24 @@ test.describe('Tab component ARIA semantics @regression', () => {
   test('league detail sub-tabs have proper ARIA roles', async ({ page }) => {
     await page.goto(LEAGUE_URL);
     await page.waitForLoadState('networkidle');
-    // Wait for tab selection to converge — initial render can momentarily
-    // show multiple tabs with aria-selected="true" before React settles.
-    // Return false when no tabs are present so we keep polling until they
-    // mount; only resolve once tabs exist AND at most one is selected.
+    // Wait for tab selection to converge within every tablist.
+    // The page may render multiple independent tablists (e.g. main nav +
+    // sub-tabs); each must have at most one selected tab, but different
+    // tablists may both carry a selection simultaneously — that is valid.
     await page.waitForFunction(
       () => {
-        const tabs = Array.from(document.querySelectorAll('[role="tab"]'));
-        if (tabs.length === 0) return false;
-        const selected = tabs.filter(
-          (t) => t.getAttribute('aria-selected') === 'true',
+        const tablists = Array.from(
+          document.querySelectorAll('[role="tablist"]'),
         );
-        return selected.length <= 1;
+        if (tablists.length === 0) return false;
+        return tablists.every((tablist) => {
+          const tabs = Array.from(tablist.querySelectorAll('[role="tab"]'));
+          if (tabs.length === 0) return false;
+          const selected = tabs.filter(
+            (t) => t.getAttribute('aria-selected') === 'true',
+          );
+          return selected.length <= 1;
+        });
       },
       { timeout: 10_000 },
     );
@@ -109,28 +144,37 @@ test.describe('Tab component ARIA semantics @regression', () => {
   test('exactly one tab is selected at a time', async ({ page }) => {
     await page.goto(LEAGUE_URL);
     await page.waitForLoadState('networkidle');
-    // Wait for tab selection to converge — same stabilization guard as the
-    // "proper ARIA roles" test above: keep polling until tabs mount, then
-    // wait until at most one carries aria-selected="true".
+    // Same per-tablist convergence guard as the "proper ARIA roles" test:
+    // keep polling until every mounted tablist has at most one selected tab.
     await page.waitForFunction(
       () => {
-        const tabs = Array.from(document.querySelectorAll('[role="tab"]'));
-        if (tabs.length === 0) return false;
-        const selected = tabs.filter(
-          (t) => t.getAttribute('aria-selected') === 'true',
+        const tablists = Array.from(
+          document.querySelectorAll('[role="tablist"]'),
         );
-        return selected.length <= 1;
+        if (tablists.length === 0) return false;
+        return tablists.every((tablist) => {
+          const tabs = Array.from(tablist.querySelectorAll('[role="tab"]'));
+          if (tabs.length === 0) return false;
+          const selected = tabs.filter(
+            (t) => t.getAttribute('aria-selected') === 'true',
+          );
+          return selected.length <= 1;
+        });
       },
       { timeout: 10_000 },
     );
 
-    const { hasTabPattern, selectedTabs } = await evaluateTabSemantics(page);
+    const { hasTabPattern, tablistSelectedCounts } =
+      await evaluateTabSemantics(page);
     if (!hasTabPattern) {
       // No tabs on this page — acceptable
       return;
     }
 
-    expect(selectedTabs).toBe(1);
+    // Each tablist must have exactly one selected tab.
+    for (const count of tablistSelectedCounts) {
+      expect(count).toBe(1);
+    }
   });
 
   test('active tab has aria-selected="true", inactive tabs have aria-selected="false"', async ({
