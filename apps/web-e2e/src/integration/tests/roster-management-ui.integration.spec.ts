@@ -166,8 +166,8 @@ test.describe
   test('Phase 3: Automated random draft', async ({
     commissionerPage: page,
   }) => {
-    // Automated drafts can take 300–480s; allow generous time for Lambda cold starts
-    test.setTimeout(600_000);
+    // Automated drafts can take 480–900s; allow generous time for Lambda cold starts
+    test.setTimeout(1_200_000);
 
     await test.step('Navigate to commissioner panel', async () => {
       await page.goto(`/baseball/league/${state.leagueId}/commissioner`);
@@ -212,7 +212,7 @@ test.describe
     });
 
     await test.step('Wait for draft to complete', async () => {
-      await waitForSeasonActive(page, state.leagueId, { deadlineMs: 480_000 });
+      await waitForSeasonActive(page, state.leagueId, { deadlineMs: 900_000 });
     });
   });
 

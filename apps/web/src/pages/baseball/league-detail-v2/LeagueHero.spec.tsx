@@ -1,7 +1,7 @@
-// Regression guard (LS-4278, LS-4282): DraftStatusChip label mapping for
+// Regression guard (LS-4278, LS-4282, LS-4287): DraftStatusChip label mapping for
 // 'completed' → 'Season Active' has regressed 3 times — keep it tested for
 // every draftStatus value and for both commissioner and manager roles, since
-// all 5 E2E specs poll the commissioner panel for this badge post-draft.
+// all 6 E2E specs poll the commissioner panel for this badge post-draft.
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { LeagueHero } from './LeagueHero';
@@ -69,7 +69,42 @@ describe('LeagueHero — DraftStatusChip (manager view)', () => {
   });
 });
 
-// All 5 E2E specs poll the commissioner panel — verify the badge renders
+// LS-4287: All 6 E2E specs poll the commissioner panel — verify the badge
+// renders for every league variant (2-team, 4-team, renewal/era) so a future
+// structural change cannot silently hide the badge the specs are waiting for.
+describe.each([
+  { label: '2-team first-season', teamCount: 2, era: null },
+  { label: '4-team first-season', teamCount: 4, era: null },
+  { label: '2-team renewal', teamCount: 2, era: '2025-Season 2' },
+  { label: '4-team renewal', teamCount: 4, era: '2025-Season 2' },
+])(
+  'LeagueHero — Season Active for $label league variant',
+  ({ teamCount, era }) => {
+    it('shows "Season Active" for completed draft (manager)', () => {
+      render(
+        <LeagueHero
+          league={{ ...baseLeague, draftStatus: 'completed', teamCount, era }}
+          onBack={jest.fn()}
+          isCommissioner={false}
+        />,
+      );
+      expect(screen.getByText('Season Active')).toBeInTheDocument();
+    });
+
+    it('shows "Season Active" for completed draft (commissioner)', () => {
+      render(
+        <LeagueHero
+          league={{ ...baseLeague, draftStatus: 'completed', teamCount, era }}
+          onBack={jest.fn()}
+          isCommissioner={true}
+        />,
+      );
+      expect(screen.getByText('Season Active')).toBeInTheDocument();
+    });
+  },
+);
+
+// All 6 E2E specs poll the commissioner panel — verify the badge renders
 // identically for isCommissioner={true} so a future role-gating change
 // cannot silently hide the badge the specs are waiting for.
 describe('LeagueHero — DraftStatusChip (commissioner view)', () => {

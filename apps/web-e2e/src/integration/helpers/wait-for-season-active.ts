@@ -13,7 +13,7 @@ import { expect } from '@playwright/test';
  * transient URL rather than the commissioner panel, and "Season Active" would
  * never appear there. This helper always navigates to a stable URL.
  *
- * Regression history (LS-4237 → LS-4261 → LS-4278 → LS-4282):
+ * Regression history (LS-4237 → LS-4261 → LS-4278 → LS-4282 → LS-4287):
  *   - LS-4237: matchup-detail, 120 s deadline
  *   - LS-4261: roster-management 200 s, season-renewal 150 s
  *   - LS-4278: playoff-bracket reload→goto + 150 s, roster-management 300 s,
@@ -21,6 +21,10 @@ import { expect } from '@playwright/test';
  *   - LS-4282: full-season-ui reload→goto + 180 s, roster-management 480 s;
  *              extracted into this shared helper so all specs share one
  *              implementation and deadline drift can't re-emerge silently.
+ *   - LS-4287: trade-flow-ui never migrated (still used page.reload() + 120 s);
+ *              matchup-detail 120 s → 360 s (144 s observed), roster-management
+ *              480 s → 900 s (504 s observed, growing trend); trade-flow migrated
+ *              here with 240 s deadline.
  */
 export async function waitForSeasonActive(
   page: Page,
