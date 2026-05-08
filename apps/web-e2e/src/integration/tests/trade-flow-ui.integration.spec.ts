@@ -177,9 +177,13 @@ async function proposeTradeViaUI(
     timeout: 10000,
   });
 
-  // Wait for player list to load
+  // Wait for player list to load. The 'request' step always has 2 non-player
+  // buttons (X close + ← Back), so poll until count > 2 to ensure at least
+  // one player button has rendered (mirrors Step 2's poll but with threshold 2).
   const dialogButtons2 = dialog.getByRole('button');
-  await expect(dialogButtons2.first()).toBeVisible({ timeout: 15_000 });
+  await expect
+    .poll(async () => dialogButtons2.count(), { timeout: 15_000 })
+    .toBeGreaterThan(2);
   const dialogCount2 = await dialogButtons2.count();
 
   let requestPlayerClicked = false;
