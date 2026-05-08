@@ -150,7 +150,7 @@ Repeat until CI passes. Do NOT push without `make pc` passing first.
 | Find Node warnings | `ci_search_logs(runId: RUN_ID, pattern: "(node:.*Warning")` | `gh run view RUN_ID --log \| Select-String "(node:.*Warning"`       |
 | Find type errors   | `ci_search_logs(runId: RUN_ID, pattern: "error TS")`        | `gh run view RUN_ID --log \| Select-String "error TS"`              |
 | Find failed tasks  | `ci_search_logs(runId: RUN_ID, pattern: "Failed tasks")`    | `gh run view RUN_ID --log \| Select-String "Failed tasks"`          |
-| Rerun failed jobs  | `ci_rerun(runId: RUN_ID, onlyFailedJobs: true)`             | `gh run rerun RUN_ID --failed`                                      |
+| Rerun failed jobs  | `ci_rerun_failed_jobs(runId: RUN_ID)`                       | `gh run rerun RUN_ID --failed`                                      |
 | Check PR status    | `github_pr_batch_status(prNumbers: [PR_NUMBER])`            | `gh pr checks`                                                      |
 
 ### Workflow-Specific Runs

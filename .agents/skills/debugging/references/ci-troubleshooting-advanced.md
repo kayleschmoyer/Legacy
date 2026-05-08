@@ -144,7 +144,7 @@ gh run view RUN_ID --log-failed | Select-String "Nx CLI not available|node_modul
 **MCP (preferred):**
 
 ```
-ci_rerun(runId: RUN_ID, onlyFailedJobs: true)
+ci_rerun_failed_jobs(runId: RUN_ID)
 ```
 
 **Shell fallback:**

@@ -144,7 +144,7 @@ ci_list_runs(branch: "BRANCH_NAME", limit: 5)
 ci_get_logs(runId: RUN_ID, failedOnly: true)
 
 # Re-run failed jobs (only for flaky / transient failures)
-ci_rerun(runId: RUN_ID, onlyFailedJobs: true)
+ci_rerun_failed_jobs(runId: RUN_ID)
 ```
 
 **Shell fallback:**

@@ -146,7 +146,7 @@ export function createServer(): McpServer {
 
   server.tool(
     'ci_rerun',
-    'Prefer this over `gh run rerun` via shell. Rerun failed jobs, a specific job, or an entire CI run.',
+    'Prefer this over `gh run rerun` or `gh run rerun --failed` via shell. Rerun failed jobs, a specific job, or an entire CI run. Defaults to failed-only (equivalent to `gh run rerun --failed`). Use ci_rerun_failed_jobs when you want a dedicated name that mirrors the shell command and makes the intent explicit.',
     {
       runId: z.coerce.number().int().positive().describe('Run ID'),
       failedOnly: coercedBoolean
@@ -161,6 +161,24 @@ export function createServer(): McpServer {
       debug: coercedBoolean.default(false).describe('Enable debug logging'),
     },
     async (params) => rerun(params),
+  );
+
+  server.tool(
+    'ci_rerun_failed_jobs',
+    'Prefer this over `gh run rerun --failed` via shell. Re-run only the failed jobs of a GitHub Actions run. ' +
+      'Equivalent to ci_rerun({ runId, failedOnly: true }) but with a dedicated name for discoverability. ' +
+      'Use when a transient CI failure (flaky test, runner timeout, network hiccup) needs a re-run without touching the full workflow.',
+    {
+      runId: z.coerce
+        .number()
+        .int()
+        .positive()
+        .describe(
+          'Run ID. Use the "id" field from ci_list_runs output ("databaseId" is an alias for the same value).',
+        ),
+      debug: coercedBoolean.default(false).describe('Enable debug logging'),
+    },
+    async (params) => rerun({ ...params, failedOnly: true }),
   );
 
   server.tool(
