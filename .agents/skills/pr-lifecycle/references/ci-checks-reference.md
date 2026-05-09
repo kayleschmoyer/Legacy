@@ -301,6 +301,32 @@ Removing the label sets `bot-review` back to `pending` and re-enables the normal
 
 ---
 
+### `needs-human-security-review` Label (CODEOWNER gate)
+
+**Applied by:** `.github/scripts/reviewer/index.mjs` when the reviewer detects a critical security finding (`hasCriticalBlockingFinding(...)` returns true). The label itself is informational — the actual merge gate is the **CODEOWNER review requirement** on the Protect Main ruleset (`require_code_owner_review: true`). When the reviewer flags a critical finding, the bot's review verdict is typically `CHANGES_REQUESTED` rather than `APPROVED`, so the PR cannot satisfy CODEOWNER review without a human.
+
+**Why this gets stuck:** the PR author cannot satisfy CODEOWNER review on their own PR. For agent-authored PRs (where the human operator is also the author), there is no second human in the loop to approve.
+
+**Fix (override — finding has been reviewed by a human):** A maintainer applies the `security-review-override` label:
+
+```
+github_manage_labels(prs: [PR#], add: ["security-review-override"])
+```
+
+This triggers `.github/workflows/security-review-override.yml` (W6), which:
+
+1. Submits an `APPROVE` review on the PR as the Code Reviewer Bot App, satisfying the CODEOWNER requirement with a non-author identity
+2. Removes the `needs-human-security-review` label
+3. Posts an audit comment on the PR identifying the applier and recording the override
+
+Removing the label dismisses the override APPROVE review and re-applies `needs-human-security-review`, restoring the security gate. The `security-review-override` label is the **formal escape hatch** for the CODEOWNER deadlock on bot-flagged security findings — apply only after a human security reviewer has examined the finding and confirmed it inapplicable, mitigated, or accepted.
+
+> **Difference from `review-bot-override`:** `review-bot-override` (W5) flips the `bot-review` commit status when the bot has applied a rule incorrectly. `security-review-override` (W6) provides an APPROVE review when the bot has correctly identified a critical finding that has since been resolved or accepted by a human. The two are not interchangeable: use W5 to reject a finding, W6 to ratify one.
+
+> **Maintenance contract:** the `unlabeled` path identifies the prior override approval to dismiss by matching the string `Security Review Override Applied` (the `OVERRIDE_MARKER` constant in W6) in the review body. GitHub does not share state between separate `labeled` and `unlabeled` workflow runs, so a `review_id` cannot be persisted — the marker string is the most robust available identification. **If you change the marker text in the workflow, the matcher constant in the same file must be updated in lockstep**, or the dismiss step will silently miss the prior approval and leave a stale APPROVE on the PR.
+
+---
+
 ## Advisory Checks (Not Blocking Merge)
 
 These produce GitHub check runs or commit statuses but are **not** required by branch protection. Failures add labels and delay the merge queue but do not permanently block merge.

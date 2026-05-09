@@ -1,0 +1,256 @@
+name: Security Review Override (W6)
+
+# Provides an audit-able escape hatch for the `needs-human-security-review`
+# label, which the reviewer bot applies when it detects a critical security
+# finding. The label itself is informational, but the underlying gate is
+# CODEOWNER review (require_code_owner_review: true on the Protect Main
+# ruleset) — the PR author cannot satisfy that on their own PR. When a
+# maintainer applies the `security-review-override` label, this workflow
+# submits an APPROVE review as the Code Reviewer Bot App so the CODEOWNER
+# requirement is met by a non-author identity, removes the security label,
+# and posts an audit comment.
+#
+# Mirrors the override pattern in review-bot-override.yml (W5) and the
+# security-override path in security-scanning.yml.
+#
+# Fires on:
+#   labeled   — override label applied → APPROVE as bot, clear security
+#               label, audit comment
+#   unlabeled — override label removed → dismiss override approval, re-add
+#               security label, audit comment
+#
+# Failure invariants (defense-in-depth):
+#   - Labeled path: APPROVE is submitted BEFORE the security label is
+#     removed. If APPROVE fails the security label stays, so the PR cannot
+#     silently bypass CODEOWNER review.
+#   - Unlabeled path: the security label is re-applied BEFORE the override
+#     approval is dismissed. If dismissReview fails the label is already
+#     restored, surfacing the unresolved finding.
+#   - Audit comments and run-summary writes are best-effort: they log on
+#     failure but do not flip the job status, since the load-bearing
+#     state changes have already happened.
+
+on:
+  pull_request:
+    types: [labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  override:
+    if: github.event.label.name == 'security-review-override'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Generate reviewer app token
+        id: reviewer-token
+        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3
+        with:
+          app-id: ${{ vars.REVIEWER_BOT_APP_ID || '3142924' }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+      - name: Apply or remove security review override
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          github-token: ${{ steps.reviewer-token.outputs.token }}
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const sha = context.payload.pull_request.head.sha;
+            const applier = context.payload.sender.login;
+            const isLabeled = context.payload.action === 'labeled';
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const prUrl = context.payload.pull_request.html_url;
+            const SECURITY_LABEL = 'needs-human-security-review';
+
+            // Load-bearing string: the unlabeled path searches for prior
+            // override approvals by matching this exact phrase in the review
+            // body. If you change the wording here you MUST update the
+            // matcher below (search for OVERRIDE_MARKER) — otherwise the
+            // dismiss step will not find the approval to dismiss.
+            const OVERRIDE_MARKER = 'Security Review Override Applied';
+
+            // Best-effort: log on failure but do not flip job status.
+            // Used for audit comments and run-summary writes that are
+            // observability, not gate state.
+            async function bestEffort(label, fn) {
+              try {
+                await fn();
+              } catch (err) {
+                core.warning(`${label} failed: ${err.message || err}`);
+              }
+            }
+
+            if (isLabeled) {
+              // STEP 1 (load-bearing): submit the APPROVE review FIRST. If
+              // this throws, setFailed and exit before touching the label —
+              // leaving the security label in place preserves the gate.
+              try {
+                await github.rest.pulls.createReview({
+                  owner,
+                  repo,
+                  pull_number: prNumber,
+                  commit_id: sha,
+                  event: 'APPROVE',
+                  body: [
+                    '> [!WARNING]',
+                    `> **${OVERRIDE_MARKER}**`,
+                    `> Approval submitted on behalf of @${applier} via the \`security-review-override\` label.`,
+                    '>',
+                    'This bypasses the bot\'s critical security finding so the PR can satisfy CODEOWNER review.' +
+                    ' Apply only after the finding has been reviewed by a human security reviewer and confirmed' +
+                    ' inapplicable, mitigated, or accepted.',
+                  ].join('\n'),
+                });
+              } catch (err) {
+                core.setFailed(
+                  `Failed to submit override APPROVE review: ${err.message || err}.` +
+                  ` Security label NOT removed — re-apply the override label to retry.`,
+                );
+                return;
+              }
+
+              // STEP 2 (load-bearing): remove the security label only after
+              // APPROVE succeeded. 404 means already absent, which is fine.
+              // Any other failure is a hard error: the PR is now in a
+              // partially-overridden state and a maintainer needs to know.
+              try {
+                await github.rest.issues.removeLabel({
+                  owner,
+                  repo,
+                  issue_number: prNumber,
+                  name: SECURITY_LABEL,
+                });
+              } catch (err) {
+                if (err.status !== 404) {
+                  core.setFailed(
+                    `APPROVE was submitted but failed to remove \`${SECURITY_LABEL}\` label: ` +
+                    `${err.message || err}. Remove the label manually.`,
+                  );
+                  return;
+                }
+              }
+
+              // Best-effort: audit comment for PR timeline visibility.
+              await bestEffort('createComment (apply audit)', () =>
+                github.rest.issues.createComment({
+                  owner,
+                  repo,
+                  issue_number: prNumber,
+                  body: [
+                    '> [!WARNING]',
+                    `> **${OVERRIDE_MARKER}**`,
+                    `> The \`security-review-override\` label was applied by @${applier}.` +
+                    ' The Code Reviewer Bot has submitted an APPROVE review to satisfy the CODEOWNER' +
+                    ` requirement, and the \`${SECURITY_LABEL}\` label has been removed.`,
+                    '>',
+                    '> This override bypasses the reviewer bot\'s critical security finding. Apply only after a' +
+                    ' human security reviewer has examined the finding and confirmed it inapplicable, mitigated,' +
+                    ' or accepted. Remove the label to dismiss the override approval and restore the security gate.',
+                  ].join('\n'),
+                }),
+              );
+
+              await bestEffort('summary write (apply)', async () => {
+                core.summary.addRaw(`## ✅ Security Review Override Applied\n\n`);
+                core.summary.addRaw(`**Applied by:** @${applier}\n\n`);
+                core.summary.addRaw(`**PR:** ${prUrl}\n\n`);
+                core.summary.addRaw(
+                  `The Code Reviewer Bot has approved \`${sha.slice(0, 7)}\` and ` +
+                  `the \`${SECURITY_LABEL}\` label has been removed.\n`,
+                );
+                await core.summary.write();
+              });
+            } else {
+              // STEP 1 (load-bearing): re-apply the security label FIRST so
+              // the gate is restored even if the dismiss step later fails.
+              // addLabels is idempotent — no-ops if already present.
+              try {
+                await github.rest.issues.addLabels({
+                  owner,
+                  repo,
+                  issue_number: prNumber,
+                  labels: [SECURITY_LABEL],
+                });
+              } catch (err) {
+                core.setFailed(
+                  `Failed to re-apply \`${SECURITY_LABEL}\` label: ${err.message || err}.` +
+                  ` Add the label manually before proceeding.`,
+                );
+                return;
+              }
+
+              // STEP 2 (load-bearing): find and dismiss the prior override
+              // approval. We identify it by matching OVERRIDE_MARKER in the
+              // review body — see the load-bearing-string comment above.
+              // Cross-event state isn't shared between labeled/unlabeled
+              // runs, so we can't persist a review_id; this string match is
+              // the most robust available identification.
+              let overrideApproval = null;
+              try {
+                const { data: reviews } = await github.rest.pulls.listReviews({
+                  owner,
+                  repo,
+                  pull_number: prNumber,
+                  per_page: 100,
+                });
+                overrideApproval = reviews
+                  .filter(
+                    r => r.state === 'APPROVED' && (r.body || '').includes(OVERRIDE_MARKER),
+                  )
+                  .pop();
+              } catch (err) {
+                core.setFailed(
+                  `Failed to list reviews to find override approval: ${err.message || err}.` +
+                  ` Security label has been restored; dismiss the prior approval manually.`,
+                );
+                return;
+              }
+
+              if (overrideApproval) {
+                try {
+                  await github.rest.pulls.dismissReview({
+                    owner,
+                    repo,
+                    pull_number: prNumber,
+                    review_id: overrideApproval.id,
+                    message: `Security review override removed by @${applier} — dismissing override approval.`,
+                  });
+                } catch (err) {
+                  core.setFailed(
+                    `Failed to dismiss override APPROVE review (id=${overrideApproval.id}): ` +
+                    `${err.message || err}. Security label has been restored; dismiss the review manually.`,
+                  );
+                  return;
+                }
+              }
+
+              await bestEffort('createComment (remove audit)', () =>
+                github.rest.issues.createComment({
+                  owner,
+                  repo,
+                  issue_number: prNumber,
+                  body: [
+                    '> [!NOTE]',
+                    '> **Security Review Override Removed**',
+                    `> The \`security-review-override\` label was removed by @${applier}.` +
+                    (overrideApproval
+                      ? ` The override APPROVE review has been dismissed and the \`${SECURITY_LABEL}\` label has been restored.`
+                      : ` The \`${SECURITY_LABEL}\` label has been restored. (No override approval was found to dismiss.)`),
+                  ].join('\n'),
+                }),
+              );
+
+              await bestEffort('summary write (remove)', async () => {
+                core.summary.addRaw(`## ⏳ Security Review Override Removed\n\n`);
+                core.summary.addRaw(`**Removed by:** @${applier}\n\n`);
+                core.summary.addRaw(`**PR:** ${prUrl}\n\n`);
+                core.summary.addRaw(
+                  `The override approval has been dismissed and the ` +
+                  `\`${SECURITY_LABEL}\` label has been restored.\n`,
+                );
+                await core.summary.write();
+              });
+            }

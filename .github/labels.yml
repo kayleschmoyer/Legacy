@@ -118,6 +118,15 @@
   color: "b60205"
   description: "Bypasses bot-review required check — apply only after documented bot disagreement"
 
+# Read by .github/workflows/security-review-override.yml to satisfy the
+# CODEOWNER review gate when the reviewer bot has applied
+# `needs-human-security-review`. Apply only after a human security reviewer
+# has examined the finding and confirmed it inapplicable, mitigated, or
+# accepted.
+- name: security-review-override
+  color: "b60205"
+  description: "Bypasses needs-human-security-review gate — apply only after human security review"
+
 # ---------------------------------------------------------------------------
 # Pipeline & Merge Queue Control
 # ---------------------------------------------------------------------------

@@ -140,6 +140,16 @@ github_manage_labels(prs: [PR#], add: ["review-bot-override"])
 
 This triggers W5 (`.github/workflows/review-bot-override.yml`), which sets `bot-review` to `success` and posts an audit comment. It is the **formal escape hatch** for persistent bot disagreement — prefer it over GitHub's admin "Merge without waiting for requirements" button, which leaves no audit trail. See [ci-checks-reference.md](.agents/skills/pr-lifecycle/references/ci-checks-reference.md#bot-review-commit-status) for details.
 
+### 6. If `needs-human-security-review` is applied and the author can't satisfy CODEOWNER review
+
+When the reviewer flags a critical security finding it applies the `needs-human-security-review` label. The label itself is informational — the actual gate is the **CODEOWNER review requirement**, which the PR author cannot satisfy on their own PR. After a human security reviewer has examined the finding and confirmed it inapplicable, mitigated, or accepted, a maintainer applies the `security-review-override` label:
+
+```
+github_manage_labels(prs: [PR#], add: ["security-review-override"])
+```
+
+This triggers W6 (`.github/workflows/security-review-override.yml`), which submits an `APPROVE` review as the Code Reviewer Bot App (satisfying the CODEOWNER requirement with a non-author identity), removes `needs-human-security-review`, and posts an audit comment. Removing the label dismisses the override approval and re-applies the security label. See [ci-checks-reference.md](.agents/skills/pr-lifecycle/references/ci-checks-reference.md#needs-human-security-review-label-codeowner-gate) for details.
+
 ### Format Rules
 
 - **Format errors get corrective replies** — the bot will reply in-thread when a response is malformed; re-post correctly.
