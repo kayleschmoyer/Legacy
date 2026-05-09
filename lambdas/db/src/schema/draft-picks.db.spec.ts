@@ -1232,4 +1232,116 @@ describe('Draft Picks - DB Integration Tests', () => {
       expect(finalPick!.isComplete).toBe(true);
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // LS-4289: Regression guard for State A (banner missing after reload) and
+  // State B (pickCount=0 when all picks are auto-processed).
+  //
+  // These tests verify the two invariants the E2E fix depends on:
+  //   State A: isComplete persists in DB — a fresh getCurrentDraftPickInfo
+  //            call (simulating a page reload + next 5s poll) still returns
+  //            isComplete:true after draftCompletedAt is set.
+  //   State B: all-auto-pick draft commits exactly totalPicks rows — the
+  //            pick count in DB is totalPicks, not 0, even when no human
+  //            click triggered the picks.
+  describe('Phase 5 oscillation regression guard (LS-4289)', () => {
+    const publicDb = () => db as unknown as PublicDb;
+
+    it('State A: isComplete:true persists across simulated page reload (fresh DB query)', async () => {
+      // Simulate the banner-missing race: the draft completes, then a page
+      // reload cold-starts Apollo cache. The next GET_CURRENT_DRAFT_PICK poll
+      // (modelled here as a second getCurrentDraftPickInfo call) must still
+      // return isComplete:true — the flag is stored in draftCompletedAt, not
+      // in ephemeral React state.
+      const {
+        league,
+        draft,
+        teams: teamFix,
+        players: playerFix,
+      } = await seedDraftFixture(2);
+
+      // Commit all 4 picks (2 teams × 2 rounds).
+      const expectedTeamIndices = [0, 1, 1, 0];
+      for (let i = 0; i < 4; i++) {
+        const pickInfo = await getCurrentDraftPickInfo(publicDb(), draft.id);
+        expect(pickInfo).not.toBeNull();
+        expect(pickInfo!.teamId).toBe(teamFix[expectedTeamIndices[i]].id);
+
+        await commitDraftPick({
+          tx: publicDb(),
+          draftId: draft.id,
+          leagueId: league.id,
+          pickInfo: pickInfo!,
+          playerId: playerFix[i].id,
+          maxRosterSize: 2,
+          pickTimeLimitSeconds: 60,
+          isMockDraft: true,
+        });
+      }
+
+      // "Page reload" — simulate a cold-cache poll by calling
+      // getCurrentDraftPickInfo again from scratch. Must still be complete.
+      const afterReload = await getCurrentDraftPickInfo(publicDb(), draft.id);
+      expect(afterReload).not.toBeNull();
+      expect(afterReload!.isComplete).toBe(true);
+
+      // The underlying draftCompletedAt must be persisted.
+      const [draftRow] = await db
+        .select({ draftCompletedAt: drafts.draftCompletedAt })
+        .from(drafts)
+        .where(eq(drafts.id, draft.id));
+      expect(draftRow.draftCompletedAt).not.toBeNull();
+    });
+
+    it('State B: all-auto-pick draft (4 teams, no human picks) commits exactly 8 pick rows', async () => {
+      // Simulate the all-auto-pick scenario: all 4 teams auto-pick all rounds.
+      // The pick count in the DB must be exactly totalPicks (8), not 0 — the
+      // old stuck-loop produced pickCount=0 in the E2E test because it detected
+      // completion *before* the test incremented its counter, but the DB always
+      // holds the authoritative record.
+      const {
+        league,
+        draft,
+        teams: teamFix,
+        players: playerFix,
+      } = await seedDraftFixture(4);
+
+      // Snake order for 4 teams, 2 rounds: A B C D D C B A
+      const expectedTeamIndices = [0, 1, 2, 3, 3, 2, 1, 0];
+
+      let commitCount = 0;
+      for (let i = 0; i < 8; i++) {
+        const pickInfo = await getCurrentDraftPickInfo(publicDb(), draft.id);
+        expect(pickInfo).not.toBeNull();
+        expect(pickInfo!.teamId).toBe(teamFix[expectedTeamIndices[i]].id);
+
+        const result = await commitDraftPick({
+          tx: publicDb(),
+          draftId: draft.id,
+          leagueId: league.id,
+          pickInfo: pickInfo!,
+          playerId: playerFix[i].id,
+          maxRosterSize: 2,
+          pickTimeLimitSeconds: 60,
+          isMockDraft: true,
+        });
+        commitCount++;
+
+        const isLastPick = i === 7;
+        expect(result.isDraftComplete).toBe(isLastPick);
+      }
+
+      expect(commitCount).toBe(8);
+
+      const allPicks = await db
+        .select()
+        .from(draftPicks)
+        .where(eq(draftPicks.draftId, draft.id));
+      expect(allPicks).toHaveLength(8);
+
+      const afterComplete = await getCurrentDraftPickInfo(publicDb(), draft.id);
+      expect(afterComplete).not.toBeNull();
+      expect(afterComplete!.isComplete).toBe(true);
+    });
+  });
 });

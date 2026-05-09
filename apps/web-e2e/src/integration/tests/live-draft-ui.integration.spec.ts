@@ -256,16 +256,12 @@ test.describe
 
       // Anchor for per-pick elapsed-time logs (LS-3851 timing instrumentation).
       const draftStart = Date.now();
-      // Set to true when the stuck-loop recovery detects completion so the
-      // outer pick loop can break cleanly (LS-4260).
-      let draftDone = false;
 
       while (pickCount < maxPicks) {
         // Check if draft is complete on any page.
         // Use a short waitFor (500 ms, parallel) instead of instant isVisible so
         // the banner has time to render after the last pick via WebSocket or the
-        // 5 s currentPickInfo poll — avoids a false-negative that bleeds into the
-        // stuck-loop recovery path (LS-4260 regression of LS-4214).
+        // 5 s currentPickInfo poll — avoids a false-negative on rapid auto-picks.
         const pickLoopCompleteChecks = await Promise.all(
           pages.map(({ page }) =>
             page
@@ -424,153 +420,57 @@ test.describe
           console.log(
             `[live-draft] +${elapsedMiss}s miss #${consecutiveMisses} at pick ${pickCount} — myTurn=[${myTurnLabels || 'none'}]`,
           );
-          if (consecutiveMisses > 30) {
-            // No human page is showing "Your pick" — an unattended team slot
-            // (e.g. the commissioner has no player team) is on the clock.
-            // The EventBridge cron fires `autoProcessDraftPicks` once per minute
-            // to handle expired timers, but we can nudge it directly every 10 s
-            // so expired slots are processed immediately (LS-4214).
-            const elapsedStuck = ((Date.now() - draftStart) / 1000).toFixed(1);
+          // Every 10 consecutive misses, nudge the auto-pick processor so
+          // expired pick timers are handled immediately instead of waiting
+          // for the EventBridge cron (LS-4289). Replaces the old 5-minute
+          // stuck-loop that caused the draftDone/pickCount=0 oscillation.
+          if (consecutiveMisses % 10 === 0) {
+            const elapsedNudge = ((Date.now() - draftStart) / 1000).toFixed(1);
             console.log(
-              `[live-draft] Stuck at pick ${pickCount} (+${elapsedStuck}s) — nudging auto-pick every 10 s for up to 5 min`,
+              `[live-draft] +${elapsedNudge}s miss #${consecutiveMisses} — nudging autoProcessDraftPicks`,
             );
-
-            // Initial reload so pages have fresh Apollo state.
-            for (const { page } of pages) {
-              await page.reload();
-              await page.waitForLoadState('load');
-            }
-            await pages[0].page.waitForTimeout(5000);
-
-            const stuckDeadline = Date.now() + 300_000; // 5-minute headroom
-            let lastPageReloadAt = Date.now();
-            let resolved = false;
-
-            while (Date.now() < stuckDeadline) {
-              // 1. Check if the draft completed via auto-picks.
-              // Use waitFor with a 5 s timeout (parallel across pages) so the
-              // banner has time to render after Apollo loads draftCompletedAt
-              // from a fresh page load — avoids a false-negative from the
-              // instant isVisible check (LS-4260 regression of LS-4214).
-              const stuckCompleteChecks = await Promise.all(
-                pages.map(({ page }) =>
-                  page
-                    .getByText('Draft Complete!')
-                    .waitFor({ state: 'visible', timeout: 5000 })
-                    .then(() => true)
-                    .catch(() => false),
-                ),
-              );
-              if (stuckCompleteChecks.some(Boolean)) {
-                draftDone = true;
-                resolved = true;
-              }
-              if (resolved) break;
-
-              // 2. Check if any human is now on the clock.
-              // Use a short waitFor (3 s, parallel) instead of instant isVisible
-              // so the Apollo poll and React render have time to reflect the new
-              // current-pick state after a nudge or page reload (LS-4277).
-              const stuckTurnResults = await Promise.all(
-                pages.map(async ({ label, page }) => ({
-                  label,
-                  isMyTurn: await page
-                    .getByText('Your pick', { exact: true })
-                    .first()
-                    .waitFor({ state: 'visible', timeout: 3000 })
-                    .then(() => true)
-                    .catch(() => false),
-                })),
-              );
-              const onClock = stuckTurnResults
-                .filter((r) => r.isMyTurn)
-                .map((r) => r.label);
-              if (onClock.length > 0) {
-                const elapsedResume = (
-                  (Date.now() - draftStart) /
-                  1000
-                ).toFixed(1);
-                console.log(
-                  `[live-draft] +${elapsedResume}s Recovery resolved: ${onClock.join(', ')} on clock`,
-                );
-                consecutiveMisses = 0;
-                hasReloadedThisStreak = false;
-                resolved = true;
-                break;
-              }
-
-              // 3. Nudge the backend: call autoProcessDraftPicks so expired
-              //    pick timers are handled immediately instead of waiting up
-              //    to 60 s for the EventBridge cron. Idempotent — safe for
-              //    any league member to call (Manager 1 here).
-              //    Must use the absolute API URL — page.request resolves
-              //    relative URLs against the browser context's baseURL
-              //    (legacy-fantasy.com), not the API base (api.legacy-fantasy.com).
-              const nudgeResult = await pages[1].page.request
-                .post('https://api.legacy-fantasy.com/graphql', {
-                  data: {
-                    query: `mutation { autoProcessDraftPicks(leagueId: ${state.leagueId}) { picksAutoMade draftsCompleted } }`,
-                  },
-                  headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${managerJwt1}`,
-                  },
-                })
-                .catch(() => null);
-              if (nudgeResult) {
-                const nudgeBody = (await nudgeResult
-                  .json()
-                  .catch(() => null)) as {
-                  data?: {
-                    autoProcessDraftPicks?: {
-                      picksAutoMade: number;
-                      draftsCompleted: number;
-                    };
+            // Must use the absolute API URL — page.request resolves
+            // relative URLs against the browser context's baseURL
+            // (legacy-fantasy.com), not the API base (api.legacy-fantasy.com).
+            const nudgeResult = await pages[1].page.request
+              .post('https://api.legacy-fantasy.com/graphql', {
+                data: {
+                  query: `mutation { autoProcessDraftPicks(leagueId: ${state.leagueId}) { picksAutoMade draftsCompleted } }`,
+                },
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${managerJwt1}`,
+                },
+              })
+              .catch(() => null);
+            if (nudgeResult) {
+              const nudgeBody = (await nudgeResult
+                .json()
+                .catch(() => null)) as {
+                data?: {
+                  autoProcessDraftPicks?: {
+                    picksAutoMade: number;
+                    draftsCompleted: number;
                   };
-                } | null;
-                const nudgeData = nudgeBody?.data?.autoProcessDraftPicks;
-                const elapsedNudge = ((Date.now() - draftStart) / 1000).toFixed(
-                  1,
-                );
-                console.log(
-                  `[live-draft] +${elapsedNudge}s nudge result: picksAutoMade=${nudgeData?.picksAutoMade ?? 'n/a'} draftsCompleted=${nudgeData?.draftsCompleted ?? 'n/a'}`,
-                );
-              }
-
-              // 4. Reload all pages every 30 s to force fresh Apollo queries.
-              //    Fresh loads surface the current pick state without relying
-              //    on WebSocket delivery, which may miss events after reload.
-              if (Date.now() - lastPageReloadAt > 30_000) {
-                const elapsedRld = ((Date.now() - draftStart) / 1000).toFixed(
-                  1,
-                );
-                console.log(
-                  `[live-draft] +${elapsedRld}s Recovery: reloading pages for fresh state`,
-                );
-                const draftUrl = `/baseball/league/${state.leagueId}/draft`;
-                for (const { page } of pages) {
-                  await page.goto(draftUrl);
-                  await page.waitForLoadState('load');
-                }
-                await pages[0].page.waitForTimeout(5000);
-                lastPageReloadAt = Date.now();
-              }
-
-              await pages[0].page.waitForTimeout(10_000);
-            }
-
-            if (!resolved) {
-              const elapsedFail = ((Date.now() - draftStart) / 1000).toFixed(1);
+                };
+              } | null;
+              const nudgeData = nudgeBody?.data?.autoProcessDraftPicks;
               console.log(
-                `[live-draft] Still stuck after 5-min wait at pick ${pickCount} (+${elapsedFail}s) — bailing out`,
+                `[live-draft] nudge result: picksAutoMade=${nudgeData?.picksAutoMade ?? 'n/a'} draftsCompleted=${nudgeData?.draftsCompleted ?? 'n/a'}`,
               );
-              break;
             }
-            if (draftDone) break;
-            // resolved && !draftDone → a human is on the clock; fall through
-            // to the next while-loop iteration to pick normally.
-            continue;
           }
+
+          // Bail out if no progress for ~60 seconds of consecutive misses.
+          // Unlike the old stuck-loop, this surfaces as a test failure with
+          // diagnostics rather than silently breaking with pickCount=0.
+          if (consecutiveMisses > 60) {
+            const elapsedFail = ((Date.now() - draftStart) / 1000).toFixed(1);
+            throw new Error(
+              `[live-draft] No pick progress after ${consecutiveMisses} consecutive misses (+${elapsedFail}s at pick ${pickCount}). Draft appears stuck — check autoProcessDraftPicks logs above.`,
+            );
+          }
+
           if (consecutiveMisses > 15 && !hasReloadedThisStreak) {
             // Reload all pages to resync state — but only ONCE per streak.
             // Guard flag prevents the death spiral where every iteration from
@@ -604,8 +504,7 @@ test.describe
       // Use waitFor (parallel across all pages) instead of isVisible (instant):
       // the banner can take up to ~5 s to appear after a page load because it
       // relies on Apollo's 5 s currentPickInfo poll returning isComplete:true.
-      // An instant check misses the brief window between poll fire and React
-      // render — the same race LS-4260 fixed in the pick-loop and stuck-loop.
+      // An instant check misses the brief window between poll fire and React render.
       let draftComplete = false;
       const pollDeadline = Date.now() + 30_000;
       while (!draftComplete && Date.now() < pollDeadline) {
