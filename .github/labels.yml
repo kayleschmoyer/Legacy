@@ -157,6 +157,12 @@
 # to coordinate parallel work and avoid double-claiming PRs.
 # ---------------------------------------------------------------------------
 
+# Applied by operators to reset the bot review cycle counter to 1.
+# Consumed by .github/scripts/reviewer/index.mjs (CYCLE_RESET_LABEL).
+- name: bot:reset-cycle-counter
+  color: "0075ca"
+  description: "Admin: reset the bot review cycle counter to 1"
+
 - name: agent-in-progress
   color: "0075ca"
   description: "PR is actively being watched by an agent — sweep agents should skip it"
