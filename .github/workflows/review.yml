@@ -22,9 +22,12 @@ jobs:
   review:
     # Skip drafts, fork PRs, labeled events for irrelevant labels, and
     # synchronize events when bot:ready-for-review is not present.
+    # Also skip when review-bot-override is present — W5 owns the bot-review
+    # status in that case and the reviewer must not overwrite it.
     if: >-
       github.event.pull_request.draft == false &&
       github.event.pull_request.head.repo.full_name == github.repository &&
+      !contains(github.event.pull_request.labels.*.name, 'review-bot-override') &&
       (github.event.action != 'labeled' && github.event.action != 'synchronize' ||
        github.event.action == 'synchronize' && contains(github.event.pull_request.labels.*.name, 'bot:ready-for-review') ||
        github.event.label.name == 'bot:ready-for-review' ||

@@ -270,20 +270,34 @@ Resolve any conflicts, then push. The check re-runs automatically on the next `s
 
 ### `bot-review` Commit Status
 
-**Source:** `copilot-auto-approve.yml` — a commit status (not a check run) set by the Review Bot (GitHub App ID 3142924).
+**Source:** `.github/workflows/review.yml` (W1) — a commit status (not a check run) set by the Review Bot (GitHub App ID 3142924) via `setCommitStatus` in `.github/scripts/reviewer/lib/github.mjs`.
 
-**What it does:** Tracks whether Copilot's code review is clean. Set to `pending` when a PR is opened/synchronized, `success` when Copilot has reviewed with no unresolved threads, `failure` when unresolved threads remain.
+**What it does:** Tracks the reviewer bot's verdict. Set to `pending` when a review starts, `success` when no blocking findings remain, `failure` when blocking findings require changes.
 
-**Why it fails:** One or more Copilot review threads are unresolved.
+**Why it fails:** The reviewer bot found one or more blocking findings (critical or high severity) that require changes.
 
-**Important:** `bot-review` is a **commit status**, not a check run. `github_retrigger_check` will NOT find it — use `github_list_commit_statuses({ number: PR# })` to see it. It clears automatically when threads are resolved; no manual dispatch is needed.
+**Important:** `bot-review` is a **commit status**, not a check run. `github_retrigger_check` will NOT find it — use `github_list_commit_statuses({ number: PR# })` to see it.
 
-**Fix:** Follow the [Review Thread Workflow](../SKILL.md#review-thread-workflow-bot-review-failures):
+**Fix (normal path):** Follow the [Review Thread Workflow](../SKILL.md#review-thread-workflow-bot-review-failures):
 
 1. `github_get_review_threads({ number: PR#, unresolvedOnly: true })`
 2. Fix the flagged code
 3. Commit and push
 4. `github_resolve_threads({ threadIds: [...], prNumber: PR# })`
+
+**Fix (override — bot misapplied a rule):** If the bot persistently flags code that is correct (e.g. after filing `CANNOT-COMPLY` responses across Cycle 3), a maintainer can apply the `review-bot-override` label:
+
+```
+github_manage_labels(prs: [PR#], add: ["review-bot-override"])
+```
+
+This triggers `.github/workflows/review-bot-override.yml` (W5), which:
+
+1. Sets `bot-review` to `success` with description "Bot review overridden via review-bot-override label"
+2. Posts an audit comment on the PR identifying the applier
+3. Prevents W1 from running again while the label is present
+
+Removing the label sets `bot-review` back to `pending` and re-enables the normal review gate. The `review-bot-override` label is the **formal escape hatch** for persistent bot disagreement — prefer it over GitHub's admin "Merge without waiting for requirements" button, which leaves no audit trail.
 
 ---
 

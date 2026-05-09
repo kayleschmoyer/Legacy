@@ -111,6 +111,13 @@
   color: "ededed"
   description: "Bypasses blocking security findings — apply only after escalation review"
 
+# Read by .github/workflows/review-bot-override.yml to set bot-review commit
+# status to success. Use when the reviewer bot misapplies a rule after
+# CANNOT-COMPLY has been filed. Apply only after documented bot disagreement.
+- name: review-bot-override
+  color: "b60205"
+  description: "Bypasses bot-review required check — apply only after documented bot disagreement"
+
 # ---------------------------------------------------------------------------
 # Pipeline & Merge Queue Control
 # ---------------------------------------------------------------------------

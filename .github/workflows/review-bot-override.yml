@@ -1,0 +1,108 @@
+name: Review Bot Override (W5)
+
+# Sets the bot-review commit status to success when the review-bot-override
+# label is applied by a maintainer, providing an audit-able escape hatch for
+# cases where the reviewer bot persistently misapplies a rule.
+#
+# Mirrors the security-override pattern in security-scanning.yml.
+#
+# Fires on:
+#   labeled   — override label applied → flip bot-review to success + audit comment
+#   unlabeled — override label removed → flip bot-review to pending + audit comment
+#
+# The reviewer workflow (W1) skips its run when this label is present, so the
+# override status is preserved across subsequent push/label events.
+
+on:
+  pull_request:
+    types: [labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: write
+  statuses: write
+
+jobs:
+  override:
+    if: github.event.label.name == 'review-bot-override'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Apply or remove bot-review override
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const sha = context.payload.pull_request.head.sha;
+            const prNumber = context.payload.pull_request.number;
+            const applier = context.payload.sender.login;
+            const isLabeled = context.payload.action === 'labeled';
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const prUrl = context.payload.pull_request.html_url;
+
+            if (isLabeled) {
+              // Flip bot-review to success
+              await github.rest.repos.createCommitStatus({
+                owner,
+                repo,
+                sha,
+                state: 'success',
+                context: 'bot-review',
+                description: 'Bot review overridden via review-bot-override label',
+                target_url: `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`,
+              });
+
+              // Audit comment
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: prNumber,
+                body: [
+                  '> [!WARNING]',
+                  '> **Bot Review Override Applied**',
+                  `> The \`review-bot-override\` label was applied by @${applier}. The \`bot-review\` required check has been set to \`success\`.`,
+                  '>',
+                  '> This override bypasses the reviewer bot\'s blocking findings. Apply only after the' +
+                  ' bot\'s findings have been reviewed and confirmed inapplicable or incorrect' +
+                  ' (e.g. after filing `CANNOT-COMPLY` in Cycle 3). Remove the label to restore the' +
+                  ' normal review gate.',
+                ].join('\n'),
+              });
+
+              core.summary.addRaw(`## ✅ Bot Review Override Applied\n\n`);
+              core.summary.addRaw(`**Applied by:** @${applier}\n\n`);
+              core.summary.addRaw(`**PR:** ${prUrl}\n\n`);
+              core.summary.addRaw(`The \`bot-review\` commit status on \`${sha.slice(0, 7)}\` has been set to \`success\`.\n`);
+              await core.summary.write();
+            } else {
+              // Label removed — set back to pending so the next reviewer run
+              // or human can re-evaluate. Does not automatically re-trigger W1.
+              await github.rest.repos.createCommitStatus({
+                owner,
+                repo,
+                sha,
+                state: 'pending',
+                context: 'bot-review',
+                description: 'Override removed — re-apply bot:ready-for-review to re-run review',
+                target_url: `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`,
+              });
+
+              // Audit comment
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: prNumber,
+                body: [
+                  '> [!NOTE]',
+                  '> **Bot Review Override Removed**',
+                  `> The \`review-bot-override\` label was removed by @${applier}. The \`bot-review\` check is now \`pending\` — re-apply \`bot:ready-for-review\` to trigger a new review cycle.`,
+                ].join('\n'),
+              });
+
+              core.summary.addRaw(`## ⏳ Bot Review Override Removed\n\n`);
+              core.summary.addRaw(`**Removed by:** @${applier}\n\n`);
+              core.summary.addRaw(`**PR:** ${prUrl}\n\n`);
+              core.summary.addRaw(`The \`bot-review\` commit status on \`${sha.slice(0, 7)}\` has been set to \`pending\`.\n`);
+              await core.summary.write();
+            }

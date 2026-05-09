@@ -130,6 +130,16 @@ This change requires modifying a generated file that must not be edited manually
 
 > `CANNOT-COMPLY:` is a Cycle 3+ token. Using it in Cycle 2 will be treated as malformed.
 
+### 5. If bot-review remains blocked after CANNOT-COMPLY
+
+When `CANNOT-COMPLY` is filed but the `bot-review` check remains `failure` (blocking merge), a maintainer must apply the `review-bot-override` label:
+
+```
+github_manage_labels(prs: [PR#], add: ["review-bot-override"])
+```
+
+This triggers W5 (`.github/workflows/review-bot-override.yml`), which sets `bot-review` to `success` and posts an audit comment. It is the **formal escape hatch** for persistent bot disagreement — prefer it over GitHub's admin "Merge without waiting for requirements" button, which leaves no audit trail. See [ci-checks-reference.md](.agents/skills/pr-lifecycle/references/ci-checks-reference.md#bot-review-commit-status) for details.
+
 ### Format Rules
 
 - **Format errors get corrective replies** — the bot will reply in-thread when a response is malformed; re-post correctly.
