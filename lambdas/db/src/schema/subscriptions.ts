@@ -600,10 +600,25 @@ builder.mutationField('setActiveLeagues', (t) =>
   }),
 );
 
+// Project only the columns the callers actually use. A bare `db.select()`
+// asks Drizzle to enumerate every column defined in the schema, which makes
+// the resolver fail with INTERNAL_SERVER_ERROR whenever the deployed DB is
+// behind the bundled schema by even a single column (LS-4297). Explicit
+// projection keeps the query forward-compatible with future column additions.
 async function getSubscriptionForUser(userId: number) {
   return runWithInternalClient(getDbOptions(), async (db) => {
     const rows = await db
-      .select()
+      .select({
+        id: InternalSchema.subscriptions.id,
+        status: InternalSchema.subscriptions.status,
+        tier: InternalSchema.subscriptions.tier,
+        currentPeriodEnd: InternalSchema.subscriptions.currentPeriodEnd,
+        cancelAtPeriodEnd: InternalSchema.subscriptions.cancelAtPeriodEnd,
+        trialEndsAt: InternalSchema.subscriptions.trialEndsAt,
+        gracePeriodEndsAt: InternalSchema.subscriptions.gracePeriodEndsAt,
+        stripeCustomerId: InternalSchema.subscriptions.stripeCustomerId,
+        stripeSubscriptionId: InternalSchema.subscriptions.stripeSubscriptionId,
+      })
       .from(InternalSchema.subscriptions)
       .where(eq(InternalSchema.subscriptions.userId, userId))
       .limit(1);
