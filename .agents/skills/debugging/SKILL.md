@@ -60,6 +60,7 @@ What type of failure are you debugging?
 ├── Distributed system failure (Lambda / SQS / EventBridge / WebSocket)
 │   → Load references/distributed-debugging.md
 │   → Scenarios: references/common-failure-scenarios.md
+│   → Test stdout is opaque (n/a, stuck, timeout, silent count mismatch): cloudwatch-archaeology
 │
 ├── Bug report / code defect (exceptions, incorrect behavior, error handling)
 │   → Load references/bug-fixing.md
@@ -91,4 +92,4 @@ What type of failure are you debugging?
 
 ## Related Skills
 
-`planning` · `fix-lint` · `fix-types` · `standards` · `cloudwatch-logs` · `database` · `architecture` · `deploy-lambda`
+`planning` · `fix-lint` · `fix-types` · `standards` · `cloudwatch-archaeology` · `database` · `architecture` · `deploy-lambda`

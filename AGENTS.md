@@ -246,6 +246,8 @@ Fantasy sports players (25–45) who are league commissioners and active partici
 
 Detailed how-to docs live in `.agents/skills/<name>/SKILL.md`. The `description` frontmatter field enables skill auto-discovery; agents can also browse the directory directly. CSV reference data is in `docs/agents/*.csv`.
 
+Debugging distributed system failures where test stdout is opaque (e.g. `n/a`, "stuck", "timeout") — use **`cloudwatch-archaeology`** to query CloudWatch logs and the live RDS before chasing client-side hypotheses. See `.agents/skills/cloudwatch-archaeology/SKILL.md`.
+
 ## MCP Servers
 
 See `.agents/skills/mcp-first/SKILL.md` for the full server list, per-server tool mapping, and load-order notes. Always prefer MCP tools over equivalent shell commands.
