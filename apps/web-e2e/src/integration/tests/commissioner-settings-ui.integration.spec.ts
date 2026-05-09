@@ -102,11 +102,18 @@ async function openCommissionerSection(
 ): Promise<void> {
   await page.goto(`/baseball/league/${leagueId}/commissioner`);
   await page.waitForLoadState('load');
+  // Wait for CommishTab to mount: the Announcements accordion is always the
+  // first section rendered and is a reliable sentinel that the league data
+  // and auth checks have settled (without it, the GraphQL-gated render can
+  // silently redirect to /overview before the 15 s toBeVisible window opens).
+  await expect(
+    page.getByRole('button', { name: 'Announcements', exact: true }),
+  ).toBeVisible({ timeout: 30_000 });
   const sectionHeader = page.getByRole('button', {
     name: sectionName,
     exact: true,
   });
-  await expect(sectionHeader).toBeVisible({ timeout: 15_000 });
+  await expect(sectionHeader).toBeVisible({ timeout: 5_000 });
   await sectionHeader.click();
 }
 
