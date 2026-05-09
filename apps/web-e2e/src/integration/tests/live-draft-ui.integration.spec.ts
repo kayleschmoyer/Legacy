@@ -435,7 +435,7 @@ test.describe
             const nudgeResult = await pages[1].page.request
               .post('https://api.legacy-fantasy.com/graphql', {
                 data: {
-                  query: `mutation { autoProcessDraftPicks(leagueId: ${state.leagueId}) { picksAutoMade draftsCompleted } }`,
+                  query: `mutation { autoProcessDraftPicks(leagueId: ${state.leagueId}) { picksAutoMade draftsCompleted errors } }`,
                 },
                 headers: {
                   'Content-Type': 'application/json',
@@ -451,13 +451,58 @@ test.describe
                   autoProcessDraftPicks?: {
                     picksAutoMade: number;
                     draftsCompleted: number;
-                  };
-                };
+                    errors?: string[];
+                  } | null;
+                } | null;
+                errors?: Array<{
+                  message?: string;
+                  extensions?: { code?: string };
+                  path?: Array<string | number>;
+                }>;
               } | null;
               const nudgeData = nudgeBody?.data?.autoProcessDraftPicks;
+              const resultErrors = nudgeData?.errors ?? [];
+              const gqlErrors = nudgeBody?.errors ?? [];
+              const status = nudgeResult.status();
+              // Log full diagnostic info — the bare numeric fields hide
+              // server-side problems (auth failures, schema drift, etc.) that
+              // explain why a draft is stuck. LS-4295: previous "n/a" output
+              // gave investigators no actionable info across 4+ nudge cycles.
               console.log(
-                `[live-draft] nudge result: picksAutoMade=${nudgeData?.picksAutoMade ?? 'n/a'} draftsCompleted=${nudgeData?.draftsCompleted ?? 'n/a'}`,
+                `[live-draft] nudge result: status=${status} picksAutoMade=${nudgeData?.picksAutoMade ?? 'n/a'} draftsCompleted=${nudgeData?.draftsCompleted ?? 'n/a'}` +
+                  (resultErrors.length
+                    ? ` resultErrors=${JSON.stringify(resultErrors)}`
+                    : '') +
+                  (gqlErrors.length
+                    ? ` gqlErrors=${JSON.stringify(
+                        gqlErrors.map((e) => ({
+                          message: e.message,
+                          code: e.extensions?.code,
+                          path: e.path,
+                        })),
+                      )}`
+                    : ''),
               );
+
+              // Programmatic regression guard: a member-authenticated nudge
+              // that comes back rejected means the resolver itself is broken
+              // (e.g. the LS-4295 Bearer-vs-cookie membership-lookup
+              // divergence). Fail fast at the first failed nudge with the
+              // server's actual error message, instead of letting the draft
+              // stall through 60 misses and reporting a generic "stuck" error.
+              const nudgeRejected =
+                gqlErrors.length > 0 ||
+                resultErrors.some((e) => e.startsWith('UNAUTHENTICATED:'));
+              if (nudgeRejected) {
+                const detail = gqlErrors.length
+                  ? gqlErrors
+                      .map((e) => `${e.extensions?.code ?? '?'}: ${e.message}`)
+                      .join('; ')
+                  : resultErrors.join('; ');
+                throw new Error(
+                  `[live-draft] autoProcessDraftPicks rejected the nudge — ${detail}`,
+                );
+              }
             }
           }
 

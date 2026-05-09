@@ -19,6 +19,7 @@
 import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
 import { and, count, eq, sql } from 'drizzle-orm';
+import { GraphQLError } from 'graphql';
 
 import {
   commitDraftPick,
@@ -138,9 +139,6 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
       'Process expired draft pick deadlines. Idempotent — safe to call from any client as a nudge. EventBridge also calls this every minute as a fallback.',
     resolve: async (_parent, args, context) => {
       const leagueId = args.leagueId ?? null;
-      await assertLeagueMemberOrSystem(context, leagueId);
-
-      LOGGER.info('[autoProcessDraftPicks] Starting expired draft pick scan');
 
       const result: AutoProcessDraftPicksResultShape = {
         draftsProcessed: 0,
@@ -148,6 +146,30 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
         draftsCompleted: 0,
         errors: [],
       };
+
+      // UNAUTHENTICATED failures are surfaced via result.errors rather than
+      // thrown so the LS-4289 client nudge always gets a structured response
+      // it can diagnose against. A thrown GraphQLError nulls out
+      // `data.autoProcessDraftPicks`, leaving the test logging "n/a" with no
+      // actionable info (LS-4295). FORBIDDEN keeps its top-level GraphQLError
+      // semantics — a non-member trying to nudge another league's draft is a
+      // genuine authorization failure that callers should see as such.
+      try {
+        await assertLeagueMemberOrSystem(context, leagueId);
+      } catch (authError) {
+        const isUnauthenticated =
+          authError instanceof GraphQLError &&
+          authError.extensions?.code === 'UNAUTHENTICATED';
+        if (!isUnauthenticated) throw authError;
+        LOGGER.warn(
+          '[autoProcessDraftPicks] Unauthenticated nudge — surfacing via result.errors',
+          { errMsg: authError.message, leagueId, hasUser: !!context.user },
+        );
+        result.errors.push(`UNAUTHENTICATED: ${authError.message}`);
+        return result;
+      }
+
+      LOGGER.info('[autoProcessDraftPicks] Starting expired draft pick scan');
 
       try {
         // Find all in-progress drafts with expired deadlines
