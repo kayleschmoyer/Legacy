@@ -8,7 +8,7 @@ import type { WebSocketNotificationService } from '@legacy-sports/aws-utils';
 import type { GenericDatabase } from '@legacy-sports/db-client';
 import type * as PublicSchema from '@legacy-sports/db-client/src/drizzle/public/schema';
 import { LOGGER } from '@legacy-sports/logging';
-import { extractUserFromApiEvent, getSystemApiKey, type User } from './context';
+import { extractUserFromApiEvent, getSystemApiKey } from './context';
 import {
   MAX_QUERY_COMPLEXITY,
   MAX_QUERY_DEPTH,
@@ -111,7 +111,7 @@ export function createApolloHandler(
     {
       context: async ({ event }) => {
         // Extract JWT from Authorization header or HttpOnly cookie (with CSRF)
-        const user: User | null = await extractUserFromApiEvent(event);
+        const { user, authSource } = await extractUserFromApiEvent(event);
 
         // Check for system API key (EventBridge / admin CLI invocations).
         // Only resolve the secret when the header is present so normal user
@@ -145,6 +145,7 @@ export function createApolloHandler(
         return {
           notificationService, // WebSocket notification service
           user,
+          authSource,
           isSystemRequest,
           loaders: createLoaders(db), // Pass shared connection to loaders
           db, // Shared connection for all resolvers in this request

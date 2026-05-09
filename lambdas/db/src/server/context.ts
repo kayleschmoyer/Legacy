@@ -223,6 +223,12 @@ function timingSafeEqual(a: string, b: string): boolean {
   return result === 0;
 }
 
+export interface AuthResult {
+  user: User | null;
+  /** Which auth path resolved this request. null means unauthenticated. */
+  authSource: 'bearer' | 'cookie' | null;
+}
+
 /**
  * Extract and verify the user from an API Gateway event.
  *
@@ -236,12 +242,13 @@ function timingSafeEqual(a: string, b: string): boolean {
  */
 export async function extractUserFromApiEvent(
   event: APIGatewayProxyEvent,
-): Promise<User | null> {
+): Promise<AuthResult> {
   // 1. Try Authorization header first (mobile, CLI, system callers)
   const authorization =
     event.headers.authorization || event.headers.Authorization;
   if (authorization?.startsWith('Bearer ')) {
-    return extractUserFromEvent(authorization);
+    const user = await extractUserFromEvent(authorization);
+    return { user, authSource: user ? 'bearer' : null };
   }
 
   // 2. Try HttpOnly cookies (impersonation cookie takes priority over regular JWT)
@@ -250,7 +257,7 @@ export async function extractUserFromApiEvent(
   // Check for impersonation cookie first, fall back to regular JWT
   const impersonationJwt = parseImpersonationJwtFromCookieHeader(cookieHeader);
   const cookieJwt = impersonationJwt ?? parseJwtFromCookieHeader(cookieHeader);
-  if (!cookieJwt) return null;
+  if (!cookieJwt) return { user: null, authSource: null };
 
   // Validate CSRF double-submit: header must match cookie
   const csrfHeader =
@@ -259,7 +266,7 @@ export async function extractUserFromApiEvent(
 
   if (!csrfHeader || !csrfCookie || !timingSafeEqual(csrfHeader, csrfCookie)) {
     LOGGER.warn('CSRF validation failed for cookie-based auth');
-    return null;
+    return { user: null, authSource: null };
   }
 
   try {
@@ -267,11 +274,11 @@ export async function extractUserFromApiEvent(
     const decoded = verify(cookieJwt, jwtSecret, {
       algorithms: ['HS256'],
     }) as JWTPayload;
-    return parseUserFromJwtPayload(decoded);
+    return { user: parseUserFromJwtPayload(decoded), authSource: 'cookie' };
   } catch (error) {
     LOGGER.warn('Failed to decode JWT from cookie', {
       error: error instanceof Error ? error.message : String(error),
     });
-    return null;
+    return { user: null, authSource: null };
   }
 }

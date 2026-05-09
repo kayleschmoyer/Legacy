@@ -32,6 +32,8 @@ export interface Context {
   notificationService?: WebSocketNotificationService | null; // WebSocket notification service
   /** True when the request was authenticated via the system API key (EventBridge / admin CLI). */
   isSystemRequest: boolean;
+  /** Which auth path resolved this request: 'bearer' (Authorization header), 'cookie' (HttpOnly JWT+CSRF), or null (unauthenticated/system). */
+  authSource: 'bearer' | 'cookie' | null;
 }
 
 // Define the schema builder with comprehensive types

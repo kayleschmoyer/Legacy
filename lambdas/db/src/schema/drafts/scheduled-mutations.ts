@@ -59,6 +59,13 @@ async function assertLeagueMemberOrSystem(
   }
 
   // Any league member can nudge the auto-pick (the mutation is idempotent)
+  LOGGER.info('[assertLeagueMemberOrSystem] Membership check', {
+    userId: context.user.id,
+    userIdType: typeof context.user.id,
+    leagueId,
+    authSource: context.authSource,
+  });
+
   const membership = await context.db
     .select({ leagueId: PublicSchema.leagueMembers.leagueId })
     .from(PublicSchema.leagueMembers)
@@ -69,6 +76,13 @@ async function assertLeagueMemberOrSystem(
       ),
     )
     .limit(1);
+
+  LOGGER.info('[assertLeagueMemberOrSystem] Membership query result', {
+    userId: context.user.id,
+    leagueId,
+    membershipRowCount: membership.length,
+    authSource: context.authSource,
+  });
 
   if (membership.length === 0) {
     throw ForbiddenError('You are not a member of this league');
@@ -155,6 +169,23 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
 
         if (expiredDrafts.rows.length === 0) {
           LOGGER.info('[autoProcessDraftPicks] No expired draft picks found');
+
+          // Diagnostic: when a specific league was requested, surface its draft state
+          // so we can distinguish H3 scenarios (deadline nulled, status changed,
+          // auto_pick_disabled set) from "no draft exists" cases.
+          if (leagueId) {
+            const draftDiag = await context.db.execute(sql`
+              SELECT d.id, d.current_pick_deadline, d.auto_pick_disabled, l.draft_status
+              FROM drafts d
+              INNER JOIN leagues l ON l.id = d.league_id
+              WHERE d.league_id = ${leagueId}
+            `);
+            LOGGER.info('[autoProcessDraftPicks] Draft state diagnostic', {
+              leagueId,
+              drafts: draftDiag.rows,
+            });
+          }
+
           return result;
         }
 
