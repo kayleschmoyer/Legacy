@@ -29,7 +29,7 @@ import type { Page } from '@playwright/test';
 import { createLeagueViaUI } from '../helpers/create-league';
 import { waitForJoinPageValidation } from '../helpers/wait-for-join-page';
 import { waitForSeasonActive } from '../helpers/wait-for-season-active';
-import { switchUser, test } from '../fixtures/ui';
+import { test } from '../fixtures/ui';
 
 // ---------------------------------------------------------------------------
 // Shared state accumulated across serial phases.
@@ -263,39 +263,30 @@ test.describe
   // PHASE 2 — MANAGER JOINS THE LEAGUE
   // -----------------------------------------------------------------
 
-  test('Phase 2: Manager joins the league', async ({
-    commissionerPage: page,
-    commissionerJwt,
-    managerJwt1,
-  }) => {
+  test('Phase 2: Manager joins the league', async ({ managerPage1 }) => {
+    // Dedicated managerPage1 context instead of switchUser — avoids the
+    // AUTH_LOGOUT race documented in LS-3672/LS-3705 and applied to
+    // playoff-bracket-ui Phase 2 in LS-4270. The commissioner's browser
+    // context is untouched, so no "Restore commissioner identity" step
+    // is needed before later phases reuse `commissionerPage`.
     await test.step('Manager 1 joins via the invite code UI', async () => {
       const joinUrl = `/baseball/league/join/${state.inviteCode}`;
-      await switchUser(page, managerJwt1, joinUrl);
-      await page.waitForLoadState('load');
+      await managerPage1.goto(joinUrl);
+      await managerPage1.waitForLoadState('load');
 
-      await waitForJoinPageValidation(page);
+      await waitForJoinPageValidation(managerPage1);
 
-      const teamNameInput = page.locator('#team-name');
+      const teamNameInput = managerPage1.locator('#team-name');
       await expect(teamNameInput).toBeVisible({ timeout: 5_000 });
       await teamNameInput.fill('Trade Busters');
-      const joinBtn = page.getByRole('button', { name: /Join League/i });
+      const joinBtn = managerPage1.getByRole('button', {
+        name: /Join League/i,
+      });
       await expect(joinBtn).toBeEnabled({ timeout: 5000 });
       await joinBtn.click();
-      await expect(page).toHaveURL(/\/baseball\/league\/\d+/, {
+      await expect(managerPage1).toHaveURL(/\/baseball\/league\/\d+/, {
         timeout: 15000,
       });
-    });
-
-    await test.step('Restore commissioner identity', async () => {
-      await switchUser(
-        page,
-        commissionerJwt,
-        `/baseball/league/${state.leagueId}/overview`,
-      );
-      await page.waitForLoadState('load');
-      await expect(page.locator('body')).not.toContainText(
-        'Unexpected Application Error',
-      );
     });
   });
 
