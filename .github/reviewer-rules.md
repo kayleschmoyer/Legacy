@@ -71,7 +71,7 @@ This is an **Nx monorepo** with:
 - **Logging**: `LOGGER` from `@legacy-sports/logging` — `console.*` is banned (ESLint enforced)
 - **Lint suppression**: `@ts-ignore` and `eslint-disable` are banned — fix root causes
 - **GraphQL**: prefer `.graphql` files + codegen over inline `gql` template literals
-- **E2E tests**: hermetic — `route.fulfill()` only, never `route.continue()` (no backend in CI)
+- **E2E tests** (`apps/web-e2e/src/tests/`): hermetic — `route.fulfill()` only, never `route.continue()` (no backend in CI). Tests under `apps/web-e2e/src/integration/tests/` are a separate live-backend suite — direct API calls are expected there and are not violations.
 
 ## Frequently Missed Project-Specific Patterns
 
@@ -91,7 +91,7 @@ These patterns appear in the majority of reviews that touch their respective are
 
 ### E2E Tests
 
-- **`route.continue()` is always forbidden**: it passes requests through to the real network, breaking hermetic CI. Use `route.fulfill()` to stub every response. `route.fallback()` is valid only within the 3-layer mock stack (test layer → `auth.ts` → baseline) to cascade to the next layer — never as an outer-level passthrough.
+- **`route.continue()` is forbidden in `apps/web-e2e/src/tests/`**: it passes requests through to the real network, breaking hermetic CI. Use `route.fulfill()` to stub every response. `route.fallback()` is valid only within the 3-layer mock stack (test layer → `auth.ts` → baseline) to cascade to the next layer — never as an outer-level passthrough. **Do not flag `page.request` calls in `apps/web-e2e/src/integration/tests/`** — that suite runs against the live backend (`playwright.integration.config.ts`, `baseURL: api.legacy-fantasy.com`) and direct API calls are intentional there.
 - **Broad `postData.includes()` matching**: `postData.includes('getleague')` matches `getleagueteams`, `getleaguemembers`, etc. Require `'"getleague"'` (quoted JSON field) or `extractOperationName()` from `apps/web-e2e/src/fixtures/shared-mocks.ts`.
 - **Missing `UNAUTHENTICATED` guard test**: every new resolver or mutation must have a test calling it with `user: null` and asserting an `UNAUTHENTICATED` error response.
 - **`jest.doMock` module path**: `getDbOptions` lives in `@legacy-sports/utils/node`, not `@legacy-sports/utils`. Mocking only that export without spreading `jest.requireActual` also breaks all sibling imports from the same module.

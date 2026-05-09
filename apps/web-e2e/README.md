@@ -1,239 +1,66 @@
-# Draft Status E2E Tests
+# web-e2e
 
-This directory contains E2E tests for the draft functionality that validate the fix for the database persistence issue.
+Playwright test suite for the `web` app. Contains two distinct suites with different network contracts.
 
-## 🎯 What These Tests Validate
+## Directory Structure
 
-### **Core Bug Fix**
+| Directory                | Suite type   | Network                                 | Playwright config                  |
+| ------------------------ | ------------ | --------------------------------------- | ---------------------------------- |
+| `src/tests/`             | E2E (mocked) | Hermetic — no real backend              | `playwright.config.ts`             |
+| `src/integration/tests/` | Integration  | Live backend (`api.legacy-fantasy.com`) | `playwright.integration.config.ts` |
 
-The main issue was that the `startDraft` mutation would return "queued" status, but on page refresh, the status would revert to "not-started". This was caused by a transaction boundary issue where:
+### E2E suite — `src/tests/`
 
-1. Database update succeeded and committed
-2. SQS call happened after transaction closed
-3. If SQS failed, database was already committed (no rollback possible)
-4. Mutation returned "queued" but database showed "not-started" on refresh
+Runs in CI against a static build with no backend. All network calls are intercepted and fulfilled by a 3-layer mock stack:
 
-### **Test Coverage**
+1. **Test layer** (`route.fulfill()` inline in each spec)
+2. **Auth fixture layer** (`src/fixtures/auth.ts`)
+3. **Baseline layer** (`src/fixtures/shared-mocks.ts`)
 
-#### **UI Tests (`draft-functionality.spec.ts`)**
+Rules:
 
-- ✅ Display draft button and status correctly
-- ✅ Update draft status when button is clicked
-- ✅ **Maintain draft status after page refresh (key persistence test)**
-- ✅ Handle rapid interactions gracefully
-- ✅ Display appropriate error messages
-- ✅ Maintain accessibility standards
+- **Never use `route.continue()`** — there is no backend; it will hang. Use `route.fulfill()` for explicit responses and `route.fallback()` to cascade to the next mock layer.
+- Test files use the `*.spec.ts` naming pattern.
+- Suites are tagged (`@critical`, `@smoke`, `@regression`) for CI filtering.
 
-#### **GraphQL Integration Tests (`draft-graphql-integration.spec.ts`)**
-
-- ✅ Make correct GraphQL queries and handle responses
-- ✅ Send startDraft mutation with proper variables
-- ✅ Handle GraphQL errors gracefully in UI
-- ✅ Update Apollo Client cache correctly after mutation
-
-## 🚀 Running the Tests
-
-### **Prerequisites**
-
-1. **Install Playwright browsers:**
-
-   ```bash
-   cd apps/web-e2e
-   pnpm exec playwright install
-   ```
-
-2. **Start the web application:**
-
-   ```bash
-   # In one terminal - start GraphQL API
-   cd lambdas/db
-   pnpm run dev
-
-   # In another terminal - start web app
-   cd apps/web
-   pnpm run dev
-   ```
-
-3. **Ensure test data exists:**
-   - League with ID 1 should exist in the database
-   - League should be in "not-started" draft status initially
-
-## Running Tests
-
-To run the E2E tests:
+Run locally:
 
 ```bash
-# Run all tests
-pnpm exec playwright test
-
-# Run tests in headed mode (see browser)
-pnpm exec playwright test --headed
-
-# Run specific test file
-pnpm exec playwright test draft-functionality.spec.ts
-
-# Run tests and generate HTML report
-pnpm exec playwright test --reporter=html
+pnpm exec nx e2e web-e2e -- --config=apps/web-e2e/playwright.config.ts
+# or via Make
+make e2e-scope  # detect minimum scope based on changed files
 ```
 
-## ✅ Authentication Bypass Setup
+See [`.agents/skills/testing/references/e2e-testing.md`](../../.agents/skills/testing/references/e2e-testing.md) for the full mock architecture.
 
-The tests are configured with an authentication bypass fixture that:
+### Integration suite — `src/integration/tests/`
 
-- **Automatically authenticates tests** using a mock JWT token
-- **Mocks GraphQL responses** for league data and draft operations
-- **Bypasses OAuth login flow** completely for faster test execution
-- **Works across all test files** that import from `../fixtures/auth`
+Runs against the live backend. Uses test-user credentials auto-linked from the main repo's `.env` by the worktree bootstrap script.
 
-### Usage in Tests
+Rules:
 
-```typescript
-import { test, expect } from '../fixtures/auth';
+- Direct `page.request` API calls are **expected** — this is not a hermeticity violation.
+- Not run in CI for PRs (too slow) — local execution is the only gate.
+- Test files use the `*.integration.spec.ts` naming pattern.
+- Test names include `(Live Backend) @integration @critical`.
 
-test('your test name', async ({ page }) => {
-  // Authentication is automatically handled
-  // Navigate directly to protected routes
-  await page.goto('/baseball/league/1');
-
-  // Your test assertions here
-});
-```
-
-The authentication fixture is located in `src/fixtures/auth.ts` and provides:
-
-- Mock JWT token with admin access level
-- GraphQL response mocking for league operations
-- Automatic localStorage setup for authentication state
-
-### **Test Configuration**
-
-The tests are configured to:
-
-- Use `http://localhost:4200` as the base URL (web app)
-- Target league ID 1 at `/baseball/league/1`
-- Test across multiple browsers (Chrome, Firefox, Safari)
-- Include mobile viewport testing
-
-## 📊 Test Results Interpretation
-
-### **Success Criteria**
-
-✅ **Persistence Test Passes** - The critical test that validates our fix:
-
-```typescript
-// This assertion was failing before the fix
-expect(postRefreshStatus).toMatch(/queued|progress|completed/i);
-```
-
-✅ **GraphQL Integration** - Validates proper API communication:
-
-```typescript
-expect(startDraftResponse.data.startDraft.draftStatus).toBe('queued');
-```
-
-### **Expected Behavior After Fix**
-
-1. Click "Start Draft" button
-2. UI immediately shows "Draft Queued" or similar
-3. **Page refresh maintains the queued status** ← Key test
-4. No reversion to "not-started"
-5. Consistent state across all queries
-
-## 🔧 Troubleshooting
-
-### **Test Failures**
-
-**"Page timeout" errors:**
-
-- Ensure web app is running on localhost:4200
-- Check that GraphQL API is running on localhost:5000
-- Verify league with ID 1 exists in database
-
-**"Button not found" errors:**
-
-- Check that the league page has draft functionality
-- Verify user permissions (tests assume user can start drafts)
-- Ensure league is in "not-started" state
-
-**"Status assertion" failures:**
-
-- This indicates the original bug is still present
-- Check that our fix in `leagues.ts` is deployed
-- Verify SQS configuration for local development
-
-### **Environment Setup**
-
-**Database Setup:**
+Run locally:
 
 ```bash
-# Ensure test league exists
-cd apps/cli
-pnpm run db:test-connection
-# Create test league if needed
+pnpm exec nx integration web-e2e -- --grep='Flow Name'
 ```
 
-**GraphQL API:**
+See [`.agents/skills/testing/references/integration-commands.md`](../../.agents/skills/testing/references/integration-commands.md) for credentials and setup details.
 
-```bash
-cd lambdas/db
-pnpm run build
-pnpm run dev
-# Should show "Server ready at localhost:5000"
-```
+## Why two suites?
 
-**Web App:**
+The split mirrors the distinction between unit tests and integration tests in the backend:
 
-```bash
-cd apps/web
-pnpm run dev
-# Should show app running on localhost:4200
-```
+- **E2E (mocked)**: fast, deterministic, runs in CI — catches UI regressions and user-flow correctness without requiring a live backend.
+- **Integration**: validates cross-service behavior (live draft state machine, real auth, async backend processes) that cannot be meaningfully mocked.
 
-## 🎯 Integration with CI/CD
+The same carve-out pattern already applies to `console.log` — `apps/web-e2e/.eslintrc.json` sets `"no-console": "off"` for `src/**/*.ts` because test files legitimately use console output.
 
-These tests should be run in CI to prevent regression:
+## Precedent
 
-```yaml
-# Example GitHub Actions step
-- name: Run Draft E2E Tests
-  run: |
-    # Start services
-    pnpm run start:api &
-    pnpm run start:web &
-
-    # Wait for services
-    pnpm exec wait-on http://localhost:5000/graphql
-    pnpm exec wait-on http://localhost:4200
-
-    # Run tests
-    cd apps/web-e2e
-    pnpm exec playwright test draft-functionality
-    pnpm exec playwright test draft-graphql-integration
-```
-
-## 📈 Test Maintenance
-
-**When to Update Tests:**
-
-- UI changes to draft button/status display
-- GraphQL schema changes for startDraft mutation
-- New draft types or status values added
-- Authentication/permission changes
-
-**Adding New Test Cases:**
-
-- Test different draft types (snake-draft, auction, etc.)
-- Test with different user permission levels
-- Test concurrent draft attempts
-- Test draft cancellation functionality
-
-## 🐛 Related Issues
-
-This test suite addresses:
-
-- **Database Transaction Boundary Issue** - Fixed with proper rollback handling
-- **SQS Local Development** - Added fallback for missing SQS configuration
-- **Apollo Client Cache Consistency** - Validated mutation response updates cache
-- **User Experience** - Ensured UI reflects persistent state changes
-
-The comprehensive E2E coverage ensures this critical user workflow remains stable across future changes.
+[PR #3763](https://github.com/bkrupa/legacy-sports/pull/3763) (LS-4289) — the reviewer bot incorrectly flagged `page.request.post` in a live-draft integration spec as a hermeticity violation across 3 review cycles. This documentation and the corresponding rule updates in `AGENTS.md`, `.github/reviewer-rules.md`, and `.agents/skills/testing/SKILL.md` were added (LS-4290) to prevent that from recurring.

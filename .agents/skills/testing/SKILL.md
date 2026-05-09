@@ -94,7 +94,7 @@ make pc
    - **Also run any spec named in the ticket as a verification gate**, even if you did not modify E2E files — e.g. "run the Phase 5 spec locally before submitting" is a mandatory gate, not a suggestion.
    - **Also run any `.integration.spec.ts` file you modified**, regardless of what the ticket description says. Touching an integration spec triggers the local spec gate automatically.
    - **"Requires real infrastructure" is not a valid reason to skip.** Integration specs (`.integration.spec.ts`) run against the live backend using test-user credentials that are auto-linked from the main repo's `.env` by the worktree bootstrap script — no additional setup is required in a standard worktree. See [references/integration-commands.md](references/integration-commands.md). If credentials are missing, ask the user rather than skipping the gate.
-3. **Hermetic E2E -- no `route.continue()`** -- there is no backend in CI. Use `route.fulfill()` for explicit responses and `route.fallback()` to cascade to baseline mocks.
+3. **Hermetic E2E -- no `route.continue()`** -- applies to `apps/web-e2e/src/tests/` only (no backend in CI). Use `route.fulfill()` for explicit responses and `route.fallback()` to cascade to baseline mocks. **`apps/web-e2e/src/integration/tests/` is exempt** — those specs run against the live backend by design; direct `page.request` calls are expected and correct there. See [Integration vs E2E directory distinction](#integration-vs-e2e-directory-distinction).
 4. **Assert behavior, not pixels** -- use web-first assertions (`await expect(locator).toBeVisible()`) over manual checks. Never use `toHaveScreenshot()` or `toMatchSnapshot()` in E2E tests -- visual regression belongs in Storybook/Chromatic.
 5. **Never use `waitForTimeout()`** -- use condition-based waits. Never use `waitForLoadState('networkidle')` after `page.goto()` -- it does not drain Playwright's CDP navigation tracking, causing `locator.waitFor()` to block. Use `page.waitForURL(pattern, { waitUntil: 'networkidle' })` instead, which fully commits the navigation before any locator action runs. **Exception**: avoid `waitForURL` when the app may trigger a second client-side navigation to the same URL during initialization (e.g., React Router `pushState` during mount) -- in that case, `waitForURL` latches onto the second navigation and resolves while `#root` is empty. Prefer direct element waits after `page.goto()` whenever possible.
 6. **No `@ts-ignore` or `eslint-disable`** in tests -- fix root causes.
@@ -182,6 +182,23 @@ See `.agents/skills/repo-tooling/references/db-dump-and-restore.md` for the full
 - [Integration Commands](references/integration-commands.md) -- Nx targets, CLI commands, environment setup
 - [UI Integration Patterns](references/ui-integration-patterns.md) -- Playwright+Tamagui interaction patterns
 - [UI Serial Phases](references/ui-serial-phases.md) -- serial phase template, switchUser helper, decision table
+
+## Integration vs E2E Directory Distinction
+
+`apps/web-e2e/` contains two distinct test suites with different network contracts:
+
+| Directory                             | Test type    | Network                                                   | Playwright config                  |
+| ------------------------------------- | ------------ | --------------------------------------------------------- | ---------------------------------- |
+| `apps/web-e2e/src/tests/`             | E2E (mocked) | Hermetic — `route.fulfill()` only, no real backend        | `playwright.config.ts`             |
+| `apps/web-e2e/src/integration/tests/` | Integration  | Live backend — `baseURL: https://api.legacy-fantasy.com/` | `playwright.integration.config.ts` |
+
+**Why this matters for reviewers and agents:**
+
+- The hermeticity rule (`route.continue()` is forbidden) applies **only** to `apps/web-e2e/src/tests/`. Flagging `page.request.post` or direct API calls in `src/integration/tests/` as a hermeticity violation is incorrect — those specs are designed to hit the live API.
+- Integration specs use `*.integration.spec.ts` naming and carry `@integration @critical` tags. Their test names typically include `(Live Backend)`.
+- A similar carve-out already exists for `console.log`: `apps/web-e2e/.eslintrc.json` sets `"no-console": "off"` for `src/**/*.ts`.
+
+**Precedent**: [PR #3763](https://github.com/bkrupa/legacy-sports/pull/3763) (LS-4289) — the reviewer bot incorrectly flagged `page.request.post` in a live-draft integration spec across 3 review cycles, requiring `CANNOT-COMPLY` escalation each time. This rule split was created to prevent that from recurring.
 
 ## Integration with Workflow
 

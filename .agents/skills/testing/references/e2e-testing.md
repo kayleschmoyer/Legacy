@@ -201,8 +201,10 @@ test.beforeEach(async ({ page }) => {
 });
 ```
 
-> **NEVER use `route.continue()`** — E2E tests are hermetic (no backend in CI).
+> **NEVER use `route.continue()`** — E2E tests in `src/tests/` are hermetic (no backend in CI).
 > Use `route.fallback()` for unhandled operations — they cascade through the 3-layer architecture.
+>
+> **Exception**: `apps/web-e2e/src/integration/tests/` runs against the live backend — `page.request` calls are expected there and are not violations.
 >
 > ```typescript
 > await route.fallback();        // ✅ cascades to baseline mocks
