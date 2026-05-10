@@ -1,3 +1,4 @@
+import type { FullConfig } from '@playwright/test';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -107,7 +108,16 @@ function isTestLeague(name: string): boolean {
   );
 }
 
-export default async function globalTeardown(): Promise<void> {
+export default async function globalTeardown(
+  config: FullConfig,
+): Promise<void> {
+  // In sharded CI runs, multiple Playwright processes share the same
+  // commissioner test user. The fastest shard finishing first would call
+  // userLeagues, see leagues created by slower shards still mid-test, and
+  // delete them — yanking the league row out from under an in-flight test
+  // (LS-4318). Skip teardown in that case; the next run's globalSetup
+  // deletes any leagues left behind, so accumulation is bounded.
+  if (config.shard) return;
   // Always run cleanup after integration tests to prevent league accumulation
   // across runs. Previously gated by INTEGRATION_TEARDOWN=true, but skipping
   // cleanup was the root cause of free-tier league limit failures (LS-1502).
