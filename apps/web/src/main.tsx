@@ -65,6 +65,60 @@ const authConfig: OAuthConfig = {
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 /**
+ * Paths that are accessible without authentication.
+ * Matched against window.location.pathname as an exact path or as a prefix
+ * when the current pathname continues with a trailing slash (LS-4312).
+ */
+const PUBLIC_PATHS = [
+  `${basePath}/about`,
+  // /pricing is publicly accessible so unauthenticated users can
+  // view plans and CTAs before signing up (LS-3557, LS-3561).
+  `${basePath}/pricing`,
+  // /faq redirects to /pricing (LS-3557, LS-3562). Adding it here
+  // ensures the client-side <Navigate> inside App fires for
+  // unauthenticated users — without it the auth guard intercepts
+  // before App renders.
+  `${basePath}/faq`,
+  // /draft/mock is a legacy alias that redirects to
+  // /baseball/mock-draft (LS-3074). Adding it here so the
+  // client-side <Navigate> fires for unauthenticated users.
+  `${basePath}/draft/mock`,
+  // /players/stats shows public MLB player statistics — no
+  // auth required (LS-3548).
+  `${basePath}/players/stats`,
+  `${basePath}/scoreboard`,
+  // /help shows help documentation and FAQs — publicly accessible
+  // so unauthenticated users can get support without signing in
+  // (LS-3513).
+  `${basePath}/help`,
+  // /players/compare is publicly accessible so unauthenticated
+  // users see a "Get Started Free" CTA gate instead of being
+  // redirected away (LS-3668).
+  `${basePath}/players/compare`,
+  // /baseball/league/join and sub-paths (/baseball/league/join/:code)
+  // are publicly accessible so invite links work without requiring
+  // prior authentication. The join mutation itself requires auth and
+  // will surface an error if the user is not signed in (LS-3702).
+  `${basePath}/baseball/league/join`,
+  // /terms and /privacy are legal pages linked from the login page —
+  // must be accessible without authentication (LS-3696).
+  `${basePath}/terms`,
+  `${basePath}/privacy`,
+  // /donate is publicly accessible so unauthenticated users can
+  // support the platform without signing in (LS-3777).
+  `${basePath}/donate`,
+];
+
+// /baseball hub is publicly accessible (LS-3532). Using publicExactPaths
+// (not publicPaths) so only the landing page is public — sub-routes like
+// /baseball/league/create remain authenticated-only.
+// /players directory is publicly accessible so unauthenticated users can
+// browse the player roster (LS-3493, LS-3497). Using publicExactPaths so
+// only the listing page is public — sub-routes like /players/:id
+// remain authenticated-only (/players/compare is in publicPaths above).
+const PUBLIC_EXACT_PATHS = [`${basePath}/baseball`, `${basePath}/players`];
+
+/**
  * Inner component — reads the resolved theme from ThemeContext and passes it
  * to AppProvider so TamaguiProvider re-renders with the correct active theme
  * whenever the user changes their preference.
@@ -176,56 +230,8 @@ try {
                   </ApolloProvider>
                 }
                 testMode={env.authTestMode}
-                publicPaths={[
-                  `${basePath}/about`,
-                  // /pricing is publicly accessible so unauthenticated users can
-                  // view plans and CTAs before signing up (LS-3557, LS-3561).
-                  `${basePath}/pricing`,
-                  // /faq redirects to /pricing (LS-3557, LS-3562). Adding it here
-                  // ensures the client-side <Navigate> inside App fires for
-                  // unauthenticated users — without it the auth guard intercepts
-                  // before App renders.
-                  `${basePath}/faq`,
-                  // /draft/mock is a legacy alias that redirects to
-                  // /baseball/mock-draft (LS-3074). Adding it here so the
-                  // client-side <Navigate> fires for unauthenticated users.
-                  `${basePath}/draft/mock`,
-                  // /players/stats shows public MLB player statistics — no
-                  // auth required (LS-3548).
-                  `${basePath}/players/stats`,
-                  `${basePath}/scoreboard`,
-                  // /help shows help documentation and FAQs — publicly accessible
-                  // so unauthenticated users can get support without signing in
-                  // (LS-3513).
-                  `${basePath}/help`,
-                  // /players/compare is publicly accessible so unauthenticated
-                  // users see a "Get Started Free" CTA gate instead of being
-                  // redirected away (LS-3668).
-                  `${basePath}/players/compare`,
-                  // /baseball/league/join and sub-paths (/baseball/league/join/:code)
-                  // are publicly accessible so invite links work without requiring
-                  // prior authentication. The join mutation itself requires auth and
-                  // will surface an error if the user is not signed in (LS-3702).
-                  `${basePath}/baseball/league/join`,
-                  // /terms and /privacy are legal pages linked from the login page —
-                  // must be accessible without authentication (LS-3696).
-                  `${basePath}/terms`,
-                  `${basePath}/privacy`,
-                  // /donate is publicly accessible so unauthenticated users can
-                  // support the platform without signing in (LS-3777).
-                  `${basePath}/donate`,
-                ]}
-                // /baseball hub is publicly accessible (LS-3532). Using publicExactPaths
-                // (not publicPaths) so only the landing page is public — sub-routes like
-                // /baseball/league/create remain authenticated-only.
-                // /players directory is publicly accessible so unauthenticated users can
-                // browse the player roster (LS-3493, LS-3497). Using publicExactPaths so
-                // only the listing page is public — sub-routes like /players/:id
-                // remain authenticated-only (/players/compare is in publicPaths above).
-                publicExactPaths={[
-                  `${basePath}/baseball`,
-                  `${basePath}/players`,
-                ]}
+                publicPaths={PUBLIC_PATHS}
+                publicExactPaths={PUBLIC_EXACT_PATHS}
                 onLoginSuccess={() => {
                   LOGGER.info('Web app login successful!');
                   trackLogin('google');
