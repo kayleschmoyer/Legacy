@@ -4,36 +4,37 @@ These issues appear in 80%+ of Copilot reviews. Knowing them speeds up fixes.
 
 ## Pattern Summary
 
-| #   | Pattern                                                        | Fix                                                                         | Caught by              |
-| --- | -------------------------------------------------------------- | --------------------------------------------------------------------------- | ---------------------- |
-| 1   | `jest.doMock('@legacy-sports/utils', ...)` for `getDbOptions`  | Change to `@legacy-sports/utils/node` + `...jest.requireActual(...)` spread | Manual                 |
-| 2   | `postData.includes('getleague')` matches `getLeagueTeams` etc. | Use quoted `'"getleague"'` or reorder specific-first                        | Manual                 |
-| 3   | Header comment overclaims test coverage                        | Audit actual test names and trim header to match                            | Manual                 |
-| 4   | Missing UNAUTHENTICATED guard test                             | Add test calling resolver with `user: null`, assert `UNAUTHENTICATED`       | Manual                 |
-| 5   | `route.fallback()` leaks to real network                       | Replace with `route.fulfill({ json: { data: {} } })`                        | `lint-review-patterns` |
-| 6   | `LOGGER.error({ error })` — Rollbar ignores wrapped object     | Use `LOGGER.error('message', error)` with Error as direct arg               | `lint-review-patterns` |
-| 7   | `data: null` mock response                                     | Use `{ data: { queryName: null } }` or `{ data: { queryName: [] } }`        | Manual                 |
-| 8   | Wrong GraphQL field names in mocks                             | Check actual `.graphql` query files for correct field names                 | Manual                 |
-| 9   | Test name doesn't match assertion                              | Rename test to describe what it actually asserts                            | Manual                 |
-| 10  | Process/scope comments (PR title, splitting)                   | Resolve thread directly — no code change needed                             | Manual                 |
-| 11  | Silent error swallowing in catch blocks                        | Return `{ success: false, error }` or re-throw                              | `lint-review-patterns` |
-| 12  | Git ref injection via args starting with `-`                   | Validate ref doesn't start with `-` before passing to git                   | `lint-review-patterns` |
-| 13  | Missing pagination for Jira/GitHub API queries                 | Add `maxResults`/`perPage` and handle nextPage cursor                       | Manual                 |
-| 14  | `shell: true` with user input enables injection                | Use array args with `shell: false`                                          | `lint-review-patterns` |
-| 15  | Codegen output manually edited                                 | Fix source `.graphql` or schema and run `make codegen`                      | Manual                 |
-| 16  | PR description doesn't explain codegen diff                    | Add explanation in PR body when generated files change                      | Manual                 |
-| 17  | MCP tools return success on partial failure                    | Set `isError: true` and report `{ total, succeeded, failed }`               | Manual                 |
-| 18  | Docs reference nonexistent MCP tools                           | Verify tool names exist in `tools/mcp/*/src/` before referencing            | Manual                 |
-| 19  | Dev/prod ternary forgets staging                               | Use `{ dev: X, staging: Y, prod: Z }[env]`                                  | `lint-review-patterns` |
-| 20  | Unbounded tool output                                          | Cap with `.slice(0, N)` and include `{ truncated: true, total }`            | `lint-review-patterns` |
-| 21  | Nullable GraphQL field in string interpolation / aria-label    | Null-check or provide fallback before interpolating                         | Manual                 |
-| 22  | `role="button"` without `tabIndex={0}`                         | Add `tabIndex={0}` and `onKeyDown`; prefer native `<button>`                | `lint-review-patterns` |
-| 23  | Collapsed content stays in accessibility tree                  | Add `aria-hidden`, `visibility: hidden`, `pointerEvents: none` when hidden  | Manual                 |
-| 24  | `transition: 'all'` instead of specific properties             | Enumerate only the properties being transitioned                            | `lint-review-patterns` |
-| 25  | Inline hex literal instead of `colors.ts` constant             | Import and use named constant from `apps/web/src/constants/colors.ts`       | `lint-review-patterns` |
-| 26  | `throw new Error()` in GraphQL resolver for input validation   | Use `UserInputError` from `lambdas/db/src/schema/graphql-errors.ts`         | `lint-review-patterns` |
-| 27  | `localStorage`/`sessionStorage` write without try/catch        | Wrap in try/catch — storage throws in private mode and on quota exceeded    | `lint-review-patterns` |
-| 28  | Unsafe `as 'literal-union'` cast on unvalidated external data  | Use type guard with allowed-values array instead of bare `as` assertion     | Manual                 |
+| #   | Pattern                                                          | Fix                                                                                                   | Caught by              |
+| --- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ---------------------- |
+| 1   | `jest.doMock('@legacy-sports/utils', ...)` for `getDbOptions`    | Change to `@legacy-sports/utils/node` + `...jest.requireActual(...)` spread                           | Manual                 |
+| 2   | `postData.includes('getleague')` matches `getLeagueTeams` etc.   | Use quoted `'"getleague"'` or reorder specific-first                                                  | Manual                 |
+| 3   | Header comment overclaims test coverage                          | Audit actual test names and trim header to match                                                      | Manual                 |
+| 4   | Missing UNAUTHENTICATED guard test                               | Add test calling resolver with `user: null`, assert `UNAUTHENTICATED`                                 | Manual                 |
+| 5   | `route.fallback()` leaks to real network                         | Replace with `route.fulfill({ json: { data: {} } })`                                                  | `lint-review-patterns` |
+| 6   | `LOGGER.error({ error })` — Rollbar ignores wrapped object       | Use `LOGGER.error('message', error)` with Error as direct arg                                         | `lint-review-patterns` |
+| 7   | `data: null` mock response                                       | Use `{ data: { queryName: null } }` or `{ data: { queryName: [] } }`                                  | Manual                 |
+| 8   | Wrong GraphQL field names in mocks                               | Check actual `.graphql` query files for correct field names                                           | Manual                 |
+| 9   | Test name doesn't match assertion                                | Rename test to describe what it actually asserts                                                      | Manual                 |
+| 10  | Process/scope comments (PR title, splitting)                     | Resolve thread directly — no code change needed                                                       | Manual                 |
+| 11  | Silent error swallowing in catch blocks                          | Return `{ success: false, error }` or re-throw                                                        | `lint-review-patterns` |
+| 12  | Git ref injection via args starting with `-`                     | Validate ref doesn't start with `-` before passing to git                                             | `lint-review-patterns` |
+| 13  | Missing pagination for Jira/GitHub API queries                   | Add `maxResults`/`perPage` and handle nextPage cursor                                                 | Manual                 |
+| 14  | `shell: true` with user input enables injection                  | Use array args with `shell: false`                                                                    | `lint-review-patterns` |
+| 15  | Codegen output manually edited                                   | Fix source `.graphql` or schema and run `make codegen`                                                | Manual                 |
+| 16  | PR description doesn't explain codegen diff                      | Add explanation in PR body when generated files change                                                | Manual                 |
+| 17  | MCP tools return success on partial failure                      | Set `isError: true` and report `{ total, succeeded, failed }`                                         | Manual                 |
+| 18  | Docs reference nonexistent MCP tools                             | Verify tool names exist in `tools/mcp/*/src/` before referencing                                      | Manual                 |
+| 19  | Dev/prod ternary forgets staging                                 | Use `{ dev: X, staging: Y, prod: Z }[env]`                                                            | `lint-review-patterns` |
+| 20  | Unbounded tool output                                            | Cap with `.slice(0, N)` and include `{ truncated: true, total }`                                      | `lint-review-patterns` |
+| 21  | Nullable GraphQL field in string interpolation / aria-label      | Null-check or provide fallback before interpolating                                                   | Manual                 |
+| 22  | `role="button"` without `tabIndex={0}`                           | Add `tabIndex={0}` and `onKeyDown`; prefer native `<button>`                                          | `lint-review-patterns` |
+| 23  | Collapsed content stays in accessibility tree                    | Add `aria-hidden`, `visibility: hidden`, `pointerEvents: none` when hidden                            | Manual                 |
+| 24  | `transition: 'all'` instead of specific properties               | Enumerate only the properties being transitioned                                                      | `lint-review-patterns` |
+| 25  | Inline hex literal instead of `colors.ts` constant               | Import and use named constant from `apps/web/src/constants/colors.ts`                                 | `lint-review-patterns` |
+| 26  | `throw new Error()` in GraphQL resolver for input validation     | Use `UserInputError` from `lambdas/db/src/schema/graphql-errors.ts`                                   | `lint-review-patterns` |
+| 27  | `localStorage`/`sessionStorage` write without try/catch          | Wrap in try/catch — storage throws in private mode and on quota exceeded                              | `lint-review-patterns` |
+| 28  | Unsafe `as 'literal-union'` cast on unvalidated external data    | Use type guard with allowed-values array instead of bare `as` assertion                               | Manual                 |
+| 29  | PR touches `apps/web-e2e/**` without a passing Playwright report | Dispatch `run-playwright-tests.yml` or run locally; paste report URL/evidence in PR body before merge | Manual                 |
 
 ## Pattern Details
 

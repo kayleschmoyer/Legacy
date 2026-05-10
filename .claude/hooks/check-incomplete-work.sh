@@ -32,10 +32,14 @@ BRANCH=$(git -C "$WORKTREE" rev-parse --abbrev-ref HEAD 2>/dev/null || true)
 ISSUES=()
 
 # --- 1. Uncommitted changes (tracked files only — excludes untracked scratch/) ---
+# Bare uncommitted changes are NOT a strong abandonment signal on their own — they
+# can mean the user is reviewing edits, paused mid-iteration, or considering whether
+# to ship at all. We only flag them when paired with another mid-ship-flow signal
+# (unpushed commits or a draft PR), where the combination clearly indicates the
+# agent stopped mid-workflow rather than the user pausing for review.
 DIRTY=$(git -C "$WORKTREE" status --porcelain 2>/dev/null | grep -v '^??' || true)
-if [ -n "$DIRTY" ]; then
-  ISSUES+=("⛔ UNCOMMITTED CHANGES: staged or modified files exist. Commit them before stopping.")
-fi
+HAS_DIRTY=0
+[ -n "$DIRTY" ] && HAS_DIRTY=1
 
 # --- 2. Unpushed commits ---
 UPSTREAM=$(git -C "$WORKTREE" rev-parse --abbrev-ref "@{u}" 2>/dev/null || true)
@@ -59,6 +63,11 @@ if command -v gh >/dev/null 2>&1; then
   if [ -n "$DRAFT_PR" ]; then
     ISSUES+=("⛔ DRAFT PR: PR $DRAFT_PR is still a draft — the reviewer bot and all orchestrated CI are blocked. Call github_mark_pr_ready(number: <PR#>) now.")
   fi
+fi
+
+# Only escalate uncommitted changes when paired with another mid-ship-flow signal.
+if [ "$HAS_DIRTY" -eq 1 ] && [ "${#ISSUES[@]}" -gt 0 ]; then
+  ISSUES+=("⛔ UNCOMMITTED CHANGES: staged or modified files exist alongside the issue(s) above. Commit them before stopping.")
 fi
 
 # --- Allow stop if nothing outstanding ---

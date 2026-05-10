@@ -35,6 +35,10 @@ You are a **code reviewer** for this project. Your job is to read all changes on
    - No `route.continue()` in E2E tests — use `route.fulfill()`
    - Prefer `.graphql` + codegen over inline `gql` in `apps/web` and `lib/shared-components`
    - **Bug-fix proof required** — if the branch name contains `fix(` or any commit uses the `fix` type, verify that before/after evidence has been collected (screenshots captured, failing test written, query results saved). If no evidence exists yet, flag this as a hard failure — the agent must collect it before proceeding to PR creation. See [bug-verification-templates.md](bug-verification-templates.md) for the required format.
+   - **Playwright report required for E2E/integration changes** — if the diff touches any file under `apps/web-e2e/src/` or any `apps/web-e2e/playwright*.config.ts`, a passing Playwright report covering the touched specs is required before the PR can land. The integration suite does **not** run on PRs (only nightly + manual dispatch), so the report must come from one of:
+     1. **Manual workflow dispatch** — trigger `run-playwright-tests.yml` against the PR branch (`gh workflow run run-playwright-tests.yml --ref <branch> -f test-suite=<e2e|integration> -f test-file=<changed.spec.ts>`) and wait for the deployed report URL printed in the run summary (`https://bkrupa.github.io/legacy-sports-deploys/playwright-report/manual-<run_number>/`).
+     2. **Local run** — `pnpm exec playwright test --config=apps/web-e2e/playwright.config.ts <changed-files>` (or `playwright.integration.config.ts` for integration specs), then `pnpm exec playwright show-report` to confirm. Capture the local HTML report path or a screenshot of the green summary.
+        Paste the report URL (or local-run evidence) into the PR body under a `## Playwright Evidence` section before marking the PR ready for review. If the report shows any failures in the touched specs, this is a hard failure — fix the tests or the code under test and re-run until green.
 
 5. **Code quality scan**:
    - Dead code or unused imports
