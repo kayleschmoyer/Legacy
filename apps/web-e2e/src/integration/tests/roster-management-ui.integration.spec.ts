@@ -436,10 +436,17 @@ test.describe
       );
     });
 
+    // Filled roster slots have accessible name "{Player Name} at {POS}".
+    // Use getByRole's name match (accessible name) rather than a raw
+    // [aria-label$="..."] CSS selector — the underlying Tamagui XStack does
+    // not always emit aria-label as a verbatim HTML attribute, but the
+    // accessible name (which Playwright's getByRole reads) is stable. This
+    // mirrors the selector used in Phase 4.
+    const filledSlots = page.getByRole('button', {
+      name: / at (SP|RP|C|1B|2B|3B|SS|OF|DH|LF|CF|RF)$/i,
+    });
+
     await test.step('Verify at least two filled roster slots exist', async () => {
-      const filledSlots = page.locator(
-        '[aria-label$=" at SP"],[aria-label$=" at RP"],[aria-label$=" at C"],[aria-label$=" at 1B"],[aria-label$=" at 2B"],[aria-label$=" at 3B"],[aria-label$=" at SS"],[aria-label$=" at OF"],[aria-label$=" at DH"],[aria-label$=" at LF"],[aria-label$=" at CF"],[aria-label$=" at RF"]',
-      );
       await expect(filledSlots.first()).toBeVisible({ timeout: 15000 });
       const count = await filledSlots.count();
       expect(count).toBeGreaterThanOrEqual(2);
@@ -447,7 +454,6 @@ test.describe
 
     await test.step('Click first filled slot to select a player', async () => {
       // Clicking a player slot selects them (aria-pressed transitions to true)
-      const filledSlots = page.locator('[role="button"][aria-label*=" at "]');
       await filledSlots.first().click();
       // Give the UI a moment to register the selection
       await page.waitForTimeout(500);
@@ -458,7 +464,6 @@ test.describe
       //   a) swaps the selected player into that slot (both now filled), or
       //   b) deselects if clicking the same slot
       // We click a different filled slot to execute a swap.
-      const filledSlots = page.locator('[role="button"][aria-label*=" at "]');
       const slotCount = await filledSlots.count();
       if (slotCount >= 2) {
         await filledSlots.nth(1).click();
