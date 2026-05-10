@@ -39,7 +39,7 @@ import { AuthenticationError, ForbiddenError } from '../graphql-errors';
  * The mutation itself is fully idempotent — it only processes picks whose
  * deadline has actually passed, so there is no abuse vector.
  */
-async function assertLeagueMemberOrSystem(
+export async function assertLeagueMemberOrSystem(
   context: Context,
   leagueId: number | null | undefined,
 ): Promise<void> {

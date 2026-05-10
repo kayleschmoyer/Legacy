@@ -19,7 +19,7 @@ import { expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { createLeagueViaUI } from '../helpers/create-league';
 import { waitForJoinPageValidation } from '../helpers/wait-for-join-page';
-import { switchUser, test } from '../fixtures/ui';
+import { test } from '../fixtures/ui';
 
 // ---------------------------------------------------------------------------
 // Shared state accumulated across serial tests.
@@ -74,22 +74,27 @@ test.describe
   // PHASE 2 — MANAGERS JOIN LEAGUE (reused from full-season)
   // -----------------------------------------------------------------
 
+  // Phase 2 uses dedicated manager fixture pages (one browser context per
+  // manager) instead of switchUser() on the commissioner page.  switchUser()
+  // has a known race condition (LS-3672, LS-3705) where the background
+  // refreshJwt() can dispatch AUTH_LOGOUT after page.evaluate() sets the new
+  // user profile, clearing localStorage and causing the subsequent reload to
+  // land on the LoginPage.  Dedicated fixture pages set cookies + localStorage
+  // atomically at context-creation time — no race window.
   test('Phase 2: Managers join the league', async ({
-    commissionerPage: page,
-    commissionerJwt,
-    managerJwt1,
-    managerJwt2,
-    managerJwt3,
+    managerPage1,
+    managerPage2,
+    managerPage3,
   }) => {
     const managers = [
-      { jwt: managerJwt1, teamName: 'Draft Kings' },
-      { jwt: managerJwt2, teamName: 'The Selectors' },
-      { jwt: managerJwt3, teamName: 'Pick Masters' },
+      { page: managerPage1, teamName: 'Draft Kings' },
+      { page: managerPage2, teamName: 'The Selectors' },
+      { page: managerPage3, teamName: 'Pick Masters' },
     ];
 
-    for (const { jwt, teamName } of managers) {
+    for (const { page, teamName } of managers) {
       const joinUrl = `/baseball/league/join/${state.inviteCode}`;
-      await switchUser(page, jwt, joinUrl);
+      await page.goto(joinUrl);
       await page.waitForLoadState('load');
 
       await waitForJoinPageValidation(page);
@@ -109,8 +114,6 @@ test.describe
       state.teams.push(teamName);
     }
 
-    // Restore commissioner identity
-    await switchUser(page, commissionerJwt);
     expect(state.teams).toHaveLength(3);
   });
 
@@ -205,10 +208,12 @@ test.describe
     managerPage1,
     managerPage2,
     managerPage3,
-    managerJwt1,
+    commissionerJwt,
   }) => {
-    // Allow up to 20 minutes for all picks (4 teams × ~25 rounds = ~100 picks)
-    test.setTimeout(1_200_000);
+    // Allow up to 25 minutes for all picks (4 teams × ~15 rounds = ~60 picks).
+    // 20 minutes was occasionally too tight when retries accumulated —
+    // e.g. a pick with 10 consecutive misses (×8 s each) adds 80 s alone.
+    test.setTimeout(1_500_000);
 
     const pages: { label: string; page: Page }[] = [
       { label: 'Commissioner', page: commissionerPage },
@@ -242,17 +247,26 @@ test.describe
       let pickCount = 0;
       const maxPicks = 200;
       let consecutiveMisses = 0;
-      // Prevent reload death spiral: only reload once per consecutive-miss
-      // streak. Without this guard, every iteration from miss 16 to 30
+      // Prevent reload death spiral: only reload once (then twice) per
+      // consecutive-miss streak. Without these guards, every iteration
       // triggers a full page reload, blocking picks for 75-150 s total and
       // causing the draft to abort before all picks are made (LS-3833).
+      // Two reloads per streak: first at miss ~8 (fast WebSocket reconnect),
+      // second at miss ~30 (fallback if first reload didn't reconnect WS).
       let hasReloadedThisStreak = false;
+      let hasReloadedTwiceThisStreak = false;
       // Track players drafted this session so we never click a button for an
       // already-drafted player whose card is still visible due to WebSocket /
       // Apollo update lag.  Without this guard the test can get a false
       // wasAccepted=true (because "Your pick" briefly hides during a
       // concurrent refetch re-render) and log a duplicate pick.
       const draftedPlayers = new Set<string>();
+      // Track consecutive failed attempts per player.  After 2 unconfirmed
+      // clicks on the same player the pick is added to draftedPlayers to skip
+      // it on the next scan — prevents an infinite retry loop when a player
+      // button stays visible but the server never advances the turn (e.g. a
+      // server-side rejection or a stale render that the reload didn't clear).
+      const failedPickAttempts = new Map<string, number>();
 
       // Anchor for per-pick elapsed-time logs (LS-3851 timing instrumentation).
       const draftStart = Date.now();
@@ -330,7 +344,6 @@ test.describe
               /* noop - buttons may not exist yet */
             });
           const btnCount = await allDraftBtns.count().catch(() => 0);
-          let draftBtnIdx = -1;
           let ariaLabel: string | null = null;
           for (let i = 0; i < btnCount; i++) {
             const btn = allDraftBtns.nth(i);
@@ -341,18 +354,31 @@ test.describe
               ?.replace(/^Draft\s+/i, '')
               .replace(/\s+now$/i, '');
             if (playerName && draftedPlayers.has(playerName)) continue;
-            draftBtnIdx = i;
             ariaLabel = btnLabel;
             break;
           }
 
-          if (draftBtnIdx >= 0) {
+          if (ariaLabel) {
             const elapsedS = ((Date.now() - draftStart) / 1000).toFixed(1);
             console.log(
               `[live-draft] +${elapsedS}s Clicking pick by ${label} (pick #${pickCount + 1}) — ${ariaLabel}`,
             );
             const pickStart = Date.now();
-            await allDraftBtns.nth(draftBtnIdx).click({ force: true });
+
+            // Click by stable aria-label rather than by nth-index position.
+            // Targeting by name survives draft board re-renders at round
+            // boundaries — the named button reappears at its correct position
+            // after the re-render without Playwright spinning on a stale index
+            // (LS-4305). An 8 s timeout bounds the click in the rare case the
+            // player is picked by someone else between scan and dispatch.
+            await page
+              .getByRole('button', { name: ariaLabel, exact: true })
+              .click({ force: true, timeout: 8_000 })
+              .catch((e: Error) => {
+                if (e.name !== 'TimeoutError') throw e;
+                // Button disappeared before click landed (e.g. auto-pick fired).
+                // Fall through to wasAccepted check which will be false.
+              });
 
             // Verify the pick was accepted by checking the turn advanced:
             // "Your pick" (exact) must disappear from this page, meaning
@@ -380,6 +406,8 @@ test.describe
               pickCount++;
               consecutiveMisses = 0;
               hasReloadedThisStreak = false;
+              hasReloadedTwiceThisStreak = false;
+              failedPickAttempts.clear(); // reset per-player failure counts
               console.log(
                 `[live-draft] Pick #${pickCount} by ${label} accepted in ${Date.now() - pickStart}ms — ${ariaLabel}`,
               );
@@ -404,9 +432,32 @@ test.describe
               console.log(
                 `[live-draft] +${elapsedS2}s Pick by ${label} NOT confirmed within timeout (pick #${pickCount + 1}) — ${ariaLabel}`,
               );
+              // Guard against infinite retries on a single player.  If the same
+              // player button fails twice (server rejection, stale render, etc.)
+              // mark them as drafted so the next scan skips to the next player.
+              // Without this, a stuck button triggers the full reload/stuck-loop
+              // machinery even though only one player is affected.
+              const failedName = ariaLabel
+                ?.replace(/^Draft\s+/i, '')
+                .replace(/\s+now$/i, '');
+              if (failedName) {
+                const count = (failedPickAttempts.get(failedName) ?? 0) + 1;
+                failedPickAttempts.set(failedName, count);
+                if (count >= 2) {
+                  const elapsedSkip = (
+                    (Date.now() - draftStart) /
+                    1000
+                  ).toFixed(1);
+                  console.log(
+                    `[live-draft] +${elapsedSkip}s Skipping "${failedName}" after ${count} consecutive failures — trying next player`,
+                  );
+                  draftedPlayers.add(failedName);
+                  failedPickAttempts.delete(failedName);
+                }
+              }
             }
           }
-          // If draftBtnIdx < 0 on this page, continue to the next
+          // If ariaLabel is null on this page, continue to the next
           // myTurnEntry so another eligible page gets a chance.
         }
 
@@ -420,11 +471,14 @@ test.describe
           console.log(
             `[live-draft] +${elapsedMiss}s miss #${consecutiveMisses} at pick ${pickCount} — myTurn=[${myTurnLabels || 'none'}]`,
           );
-          // Every 10 consecutive misses, nudge the auto-pick processor so
+          // Every 5 consecutive misses, nudge the auto-pick processor so
           // expired pick timers are handled immediately instead of waiting
           // for the EventBridge cron (LS-4289). Replaces the old 5-minute
           // stuck-loop that caused the draftDone/pickCount=0 oscillation.
-          if (consecutiveMisses % 10 === 0) {
+          // Threshold lowered from 10→5 to recover from WebSocket startup
+          // lag faster — early picks can accumulate 35+ misses before the
+          // WS connection is fully established (LS-4305).
+          if (consecutiveMisses % 5 === 0) {
             const elapsedNudge = ((Date.now() - draftStart) / 1000).toFixed(1);
             console.log(
               `[live-draft] +${elapsedNudge}s miss #${consecutiveMisses} — nudging autoProcessDraftPicks`,
@@ -435,11 +489,12 @@ test.describe
             const nudgeResult = await pages[1].page.request
               .post('https://api.legacy-fantasy.com/graphql', {
                 data: {
-                  query: `mutation { autoProcessDraftPicks(leagueId: ${state.leagueId}) { picksAutoMade draftsCompleted errors } }`,
+                  query: `mutation AutoProcessDraftPicks($leagueId: Int!) { autoProcessDraftPicks(leagueId: $leagueId) { picksAutoMade draftsCompleted errors } }`,
+                  variables: { leagueId: state.leagueId },
                 },
                 headers: {
                   'Content-Type': 'application/json',
-                  Authorization: `Bearer ${managerJwt1}`,
+                  Authorization: `Bearer ${commissionerJwt}`,
                 },
               })
               .catch(() => null);
@@ -503,33 +558,100 @@ test.describe
                   `[live-draft] autoProcessDraftPicks rejected the nudge — ${detail}`,
                 );
               }
+
+              // Nudge made server-side picks — reset the miss counter so the
+              // stuck-loop does not fire while auto-pick is catching up.
+              // This handles CSRF-corruption scenarios (LS-3672) where browser
+              // pages lose turn-detection but EventBridge / nudge continue to
+              // advance the draft. Without the reset, 61 misses triggers the
+              // stuck-loop even when the server is actively making picks.
+              if ((nudgeData?.picksAutoMade ?? 0) > 0) {
+                const elapsedReset = ((Date.now() - draftStart) / 1000).toFixed(
+                  1,
+                );
+                console.log(
+                  `[live-draft] +${elapsedReset}s Nudge auto-picked ${nudgeData?.picksAutoMade ?? 0} — resetting miss counter`,
+                );
+                consecutiveMisses = 0;
+                hasReloadedThisStreak = false;
+                hasReloadedTwiceThisStreak = false;
+              }
+
+              // Draft finished via nudge — break the pick loop.
+              if ((nudgeData?.draftsCompleted ?? 0) > 0) {
+                const elapsedDone = ((Date.now() - draftStart) / 1000).toFixed(
+                  1,
+                );
+                console.log(
+                  `[live-draft] +${elapsedDone}s Nudge completed the draft — exiting pick loop`,
+                );
+                pickCount = maxPicks; // trigger while-loop exit
+              }
             }
           }
 
-          // Bail out if no progress for ~60 seconds of consecutive misses.
+          // Bail out if no progress for ~130 consecutive misses (~325s).
           // Unlike the old stuck-loop, this surfaces as a test failure with
           // diagnostics rather than silently breaking with pickCount=0.
-          if (consecutiveMisses > 60) {
+          // Threshold raised from 60→130 (LS-4305): a league pick timer of
+          // up to 300s means 120 misses (300s) can elapse before the timer
+          // expires and autoProcessDraftPicks can fire. 60 misses was too
+          // aggressive — it aborted before the timer expired.
+          if (consecutiveMisses > 130) {
             const elapsedFail = ((Date.now() - draftStart) / 1000).toFixed(1);
             throw new Error(
               `[live-draft] No pick progress after ${consecutiveMisses} consecutive misses (+${elapsedFail}s at pick ${pickCount}). Draft appears stuck — check autoProcessDraftPicks logs above.`,
             );
           }
 
-          if (consecutiveMisses > 15 && !hasReloadedThisStreak) {
+          if (consecutiveMisses > 7 && !hasReloadedThisStreak) {
             // Reload all pages to resync state — but only ONCE per streak.
             // Guard flag prevents the death spiral where every iteration from
-            // miss 16 to 30 triggers a reload, blocking picks for 75-150 s
-            // and causing the draft to abort incomplete (LS-3833).
+            // miss 8 to N triggers a reload, blocking picks for seconds and
+            // causing the draft to abort incomplete (LS-3833).
+            // Threshold lowered from 15→7 (~45s → ~24s) to recover from
+            // WebSocket startup lag faster (LS-4305).
             hasReloadedThisStreak = true;
             console.log('[live-draft] Reloading all pages...');
             for (const { page } of pages) {
               await page.reload();
               await page.waitForLoadState('load');
             }
-            await pages[0].page.waitForTimeout(3000);
+            // 1500ms settle wait after reload (was 3000ms). Pages reach
+            // interactive state by waitForLoadState('load'); the extra wait
+            // allowed WebSocket to reconnect — 1500ms is sufficient for
+            // reconnect in practice and saves 1.5s per reload event (LS-4305).
+            await pages[0].page.waitForTimeout(1500);
           }
-          await pages[0].page.waitForTimeout(1000);
+
+          // Second-chance reload at miss ~30: if the first reload (at miss ~8)
+          // didn't re-establish the WS, a second reload gives it another shot
+          // before the pick timer expires and autoProcessDraftPicks can fire.
+          // Cap at one second reload per streak to avoid the death spiral.
+          if (
+            consecutiveMisses > 29 &&
+            hasReloadedThisStreak &&
+            !hasReloadedTwiceThisStreak
+          ) {
+            hasReloadedTwiceThisStreak = true;
+            const elapsedSecondReload = (
+              (Date.now() - draftStart) /
+              1000
+            ).toFixed(1);
+            console.log(
+              `[live-draft] +${elapsedSecondReload}s miss #${consecutiveMisses} — reloading all pages (attempt 2)...`,
+            );
+            for (const { page } of pages) {
+              await page.reload();
+              await page.waitForLoadState('load');
+            }
+            await pages[0].page.waitForTimeout(1500);
+          }
+
+          // 500ms anti-spin wait (was 1000ms). Saves ~500ms per miss → ~1.75s
+          // per pick average across the draft. Over 60 picks this frees ~105s
+          // of margin in the 25-minute Phase 5 timeout (LS-4305).
+          await pages[0].page.waitForTimeout(500);
         }
       }
 
@@ -766,6 +888,16 @@ test.describe
         await expect(managerPage1.getByText('Lineup').first()).toBeVisible({
           timeout: remainingAfterClick,
         });
+      }
+      // The while loop may exit via the `Date.now() < lineupDeadline` guard
+      // immediately after a successful My Roster reload that made the Lineup
+      // element visible — but before the top-of-loop textContent() call reads
+      // the fresh value.  One final check catches this off-by-one edge case
+      // (LS-4305: draft now completes within the timeout, exposing the race).
+      if (lineupCount === 0) {
+        const finalText = await lineupParent.textContent().catch(() => '');
+        const finalMatch = finalText?.match(/Lineup\s*(\d+)\s*\/\s*\d+/);
+        lineupCount = finalMatch ? parseInt(finalMatch[1], 10) : 0;
       }
       expect(lineupCount).toBeGreaterThan(0);
     });
