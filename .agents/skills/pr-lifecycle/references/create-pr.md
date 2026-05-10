@@ -94,6 +94,8 @@ If the branch name contains `fix(` or the Jira ticket type is Bug, use this exte
 
 ## After PR Creation
 
+> **⛔ COMMON FAILURE MODE — never stop after `github_create_pr`.** A draft PR is skipped by the reviewer bot, the CI Orchestrator (which is gated on bot review events), and sweep agents — it will receive no automated review or orchestrated CI until you explicitly mark it ready. All 7 steps below are required — `github_create_pr` with `draft: true` is only step 1 of 7.
+
 1. If you used the `gh` CLI with `--body-file`, clean up the temp body file: `bash scripts/cleanup-pr-body.sh` (no-op if `.github/tmp-pr-body.md` does not exist)
 2. **Apply `agent-in-progress` label** (while still a draft): `github_manage_labels(prs: [<PR#>], add: ["agent-in-progress"])` — marks the PR as actively watched so sweep and review agents skip it. Applying before marking ready closes the race window. **Remove this label when you exit the task** (PR merged or session ends without completion). Shell fallback: `gh pr edit <PR#> --add-label "agent-in-progress"`
 3. **Mark ready for review**: `github_mark_pr_ready(number: <PR#>)` — this fires the `ready_for_review` event that triggers the `Reviewer (W1)` workflow (Cycle 1 of the [Author Agent Contract](../../../../AGENTS.md#author-agent-contract-bot-pr-flow)). The bot's resulting `pull_request_review` event then fires the `Legacy Sports CI Orchestrator`. **No `bot:ready-for-review` label is needed at PR creation** — the `ready_for_review` event is sufficient for Cycle 1. The label is only needed to fire Cycle 2+ after pushing fix commits (see [fix-reviews.md](fix-reviews.md) step 8). Shell fallback (only if MCP unavailable): `gh pr ready <PR#>`
