@@ -163,10 +163,17 @@ test.describe
       await page.waitForTimeout(3_000);
       await page.reload();
       await page.waitForLoadState('load');
+      // LeagueHero (V2) renders a status chip driven solely by `league.draftStatus`:
+      //   queued      -> "Draft Queued"
+      //   in-progress -> "Drafting · Live"
+      //   completed   -> "Season Active"
+      // (apps/web/src/pages/baseball/league-detail-v2/LeagueHero.tsx). The chip is
+      // the most stable post-Start-Draft signal because it doesn't depend on the
+      // useGetLeagueDraftQuery roundtrip that gates NextStepControl's "Go to Draft
+      // Board" button. The previous regex matched the NextStepControl button text,
+      // but only when that secondary query had resolved — racy after a cold reload.
       await expect(
-        page
-          .getByText(/Draft.*In Progress|Go to Draft|Draft Completed/i)
-          .first(),
+        page.getByText(/Drafting|Draft Queued|Season Active/i).first(),
       ).toBeVisible({ timeout: 30_000 });
     });
   });
