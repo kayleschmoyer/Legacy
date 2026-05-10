@@ -215,11 +215,11 @@ jobs:
             const isRetry = ${{ github.event.inputs.is_retry || false }};
             await require('./.github/scripts/merge-queue-processor.js')({ github, context, isDryRun, forceCheck, isRetry });
 
-  # Fires on every push to a PR branch. If the PR has merge-when-ready, remove
-  # the label, dismiss the bot's stale APPROVE, and re-apply bot:ready-for-review
-  # so Reviewer W1 automatically re-evaluates the new commit. Without this last
-  # step the PR is left stuck: no merge-when-ready, no active approval, and W1
-  # never re-triggers because synchronize is not one of its event triggers.
+  # Fires on every push to a PR branch. Removes merge-when-ready (if present),
+  # dismisses any stale bot APPROVE, and re-applies bot:ready-for-review so
+  # Reviewer W1 re-evaluates the new commit. W1 does not fire on plain synchronize
+  # events, so without this step any push leaves the PR stuck — no active approval
+  # and no way for W1 to re-trigger automatically.
   cleanup-on-push:
     if: |
       github.repository_owner == 'bkrupa' &&
@@ -257,24 +257,21 @@ jobs:
             // Fetch fresh PR state — payload labels can be stale
             const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: prNumber });
 
-            const hasLabel = pr.labels.some(l => l.name === 'merge-when-ready');
-            if (!hasLabel) {
-              console.log('PR does not have merge-when-ready label — nothing to do.');
-              return;
-            }
-
-            // Remove the merge-when-ready label
-            try {
-              await github.rest.issues.removeLabel({
-                owner,
-                repo,
-                issue_number: prNumber,
-                name: 'merge-when-ready',
-              });
-              console.log(`Removed merge-when-ready label from PR #${prNumber}`);
-            } catch (err) {
-              if (err.status !== 404) throw err;
-              console.log('merge-when-ready label was already removed.');
+            // Remove merge-when-ready if present (PR was in the queue)
+            const hasMergeLabel = pr.labels.some(l => l.name === 'merge-when-ready');
+            if (hasMergeLabel) {
+              try {
+                await github.rest.issues.removeLabel({
+                  owner,
+                  repo,
+                  issue_number: prNumber,
+                  name: 'merge-when-ready',
+                });
+                core.info(`Removed merge-when-ready label from PR #${prNumber}`);
+              } catch (err) {
+                if (err.status !== 404) throw err;
+                core.info('merge-when-ready label was already removed.');
+              }
             }
 
             // Paginate all review pages to find the bot's most recent APPROVE
@@ -296,23 +293,22 @@ jobs:
               page++;
             }
 
-            if (!botApproval) {
-              console.log('No bot APPROVE review found — nothing to dismiss.');
-              return;
+            if (botApproval) {
+              await github.rest.pulls.dismissReview({
+                owner,
+                repo,
+                pull_number: prNumber,
+                review_id: botApproval.id,
+                message: 'New commit pushed — re-review required.',
+              });
+              core.info(`Dismissed bot approval review #${botApproval.id} on PR #${prNumber}`);
+            } else {
+              core.info('No bot APPROVE review found — skipping dismissal.');
             }
 
-            await github.rest.pulls.dismissReview({
-              owner,
-              repo,
-              pull_number: prNumber,
-              review_id: botApproval.id,
-              message: 'New commit pushed while PR was in the merge queue — re-review required.',
-            });
-            console.log(`Dismissed bot approval review #${botApproval.id} on PR #${prNumber}`);
-
-            // Re-apply bot:ready-for-review to trigger Reviewer W1 for the new commit.
-            // W1 does not listen on synchronize events — without this label the PR would
-            // be stuck: merge-when-ready gone, approval dismissed, W1 never re-triggered.
+            // Re-apply bot:ready-for-review so Reviewer W1 re-evaluates the new commit.
+            // W1 does not fire on plain synchronize events, so any push without this
+            // step leaves the PR stuck with no active approval and W1 never re-triggering.
             try {
               await github.rest.issues.addLabels({
                 owner,
@@ -320,7 +316,7 @@ jobs:
                 issue_number: prNumber,
                 labels: ['bot:ready-for-review'],
               });
-              console.log(`Applied bot:ready-for-review to PR #${prNumber} — Reviewer W1 will re-run.`);
+              core.info(`Applied bot:ready-for-review to PR #${prNumber} — Reviewer W1 will re-run.`);
             } catch (err) {
-              console.warn(`Failed to apply bot:ready-for-review: ${err.message}`);
+              core.warning(`Failed to apply bot:ready-for-review: ${err.message}`);
             }
