@@ -468,7 +468,11 @@ export function NextStepControl({
 
           <XStack justifyContent="flex-start" gap="$3">
             {isDraftInProgress && isLiveDraft ? (
-              <Button theme="green" onPress={() => onNavigateToDraftBoard?.()}>
+              <Button
+                data-testid="go-to-draft-board"
+                theme="green"
+                onPress={() => onNavigateToDraftBoard?.()}
+              >
                 Go to Draft Board
               </Button>
             ) : (

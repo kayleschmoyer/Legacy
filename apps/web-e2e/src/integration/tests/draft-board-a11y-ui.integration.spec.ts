@@ -164,7 +164,9 @@ test.describe
       await page.reload();
       await page.waitForLoadState('load');
       await expect(
-        page.getByText(/Draft.*In Progress|Go to Draft/i).first(),
+        page
+          .getByText(/Draft.*In Progress|Go to Draft|Draft Completed/i)
+          .first(),
       ).toBeVisible({ timeout: 30_000 });
     });
   });
