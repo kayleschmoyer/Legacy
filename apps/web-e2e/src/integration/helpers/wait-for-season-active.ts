@@ -1,50 +1,77 @@
-import type { Page } from '@playwright/test';
+import type { APIRequestContext, Page } from '@playwright/test';
 import { expect } from '@playwright/test';
+import { graphqlOk } from './graphql';
 
 /**
- * Poll the commissioner panel until the "Season Active" badge appears.
+ * Poll until the league reports the draft as completed, then assert the
+ * commissioner panel shows the "Season Active" badge.
  *
- * After an automated draft starts, the backend Lambda processes picks
- * asynchronously. The frontend does not push updates — the spec must poll
- * by navigating back to the commissioner page on each cycle.
+ * When `api` is provided (preferred), this polls the backend GraphQL
+ * `league.draftStatus` directly. That field is the same source of truth the
+ * UI binds to, so once it reports `active` or `completed` we know the
+ * transition has fully landed server-side — eliminating the UI-render race
+ * that has caused this assertion to flake repeatedly across specs
+ * (LS-4237 → LS-4321). The UI assertion afterwards has a generous timeout
+ * to absorb Apollo round-trip time on a cold cache; it is not a polling
+ * loop.
  *
- * Using page.goto() (not page.reload()) is critical: starting an automated
- * draft may trigger a client-side route change. reload() would re-fetch the
- * transient URL rather than the commissioner panel, and "Season Active" would
- * never appear there. This helper always navigates to a stable URL.
+ * When `api` is omitted, falls back to the legacy UI-polling behavior
+ * (re-navigate, wait for `networkidle`, re-check). Kept for compatibility
+ * with spec files not yet migrated to the deterministic path.
  *
- * Regression history (LS-4237 → LS-4261 → LS-4278 → LS-4282 → LS-4287):
+ * Regression history (full context):
  *   - LS-4237: matchup-detail, 120 s deadline
  *   - LS-4261: roster-management 200 s, season-renewal 150 s
  *   - LS-4278: playoff-bracket reload→goto + 150 s, roster-management 300 s,
  *              season-renewal 240 s
  *   - LS-4282: full-season-ui reload→goto + 180 s, roster-management 480 s;
- *              extracted into this shared helper so all specs share one
- *              implementation and deadline drift can't re-emerge silently.
- *   - LS-4287: trade-flow-ui never migrated (still used page.reload() + 120 s);
- *              matchup-detail 120 s → 360 s (144 s observed), roster-management
- *              480 s → 900 s (504 s observed, growing trend); trade-flow migrated
- *              here with 240 s deadline.
- *   - LS-4296: 'load' event fires before Apollo XHR completes — isVisible() check
- *              ran on a page where React had not yet received draftStatus from the
- *              server, so the badge was never detected. Fixed: 'load' → 'networkidle'
- *              so the loop only checks after the GetLeagueById query has returned.
- *   - LS-4306: league-activity-feed-ui Phase 3 had an inline copy of this loop
- *              using page.reload() + 'load' — the exact pre-LS-4296 pattern. After
- *              draft start, the app can navigate away from the commissioner URL;
- *              reload() re-fetches the transient URL, so "Season Active" is never
- *              visible on the commissioner panel. Fixed: migrated the spec to use
- *              this shared helper (goto + networkidle) with a 180 s deadline.
+ *              extracted into this shared helper.
+ *   - LS-4287: trade-flow migrated to helper; deadlines extended.
+ *   - LS-4296: 'load' → 'networkidle' to wait for the Apollo XHR before checks.
+ *   - LS-4306: league-activity-feed migrated to helper (had inline reload loop).
+ *   - LS-4321: deterministic backend signal via direct GraphQL poll. The UI
+ *              re-navigate loop is timing-sensitive because Apollo cache update
+ *              must propagate within the `networkidle` window; backend polling
+ *              removes the race entirely by gating on `draftStatus` server-side.
  */
 export async function waitForSeasonActive(
   page: Page,
   leagueId: number,
-  { deadlineMs = 300_000 }: { deadlineMs?: number } = {},
+  {
+    deadlineMs = 300_000,
+    api,
+  }: { deadlineMs?: number; api?: APIRequestContext } = {},
 ): Promise<void> {
   const commissionerUrl = `/baseball/league/${leagueId}/commissioner`;
   const seasonActive = page.getByText('Season Active');
-  const deadline = Date.now() + deadlineMs;
 
+  if (api) {
+    // Deterministic path: gate on server state, then assert UI once.
+    await expect
+      .poll(
+        async () => {
+          const r = await graphqlOk<{ league: { draftStatus: string } }>(
+            api,
+            `query { league(id: ${leagueId}) { draftStatus } }`,
+          );
+          return r.league.draftStatus;
+        },
+        {
+          timeout: deadlineMs,
+          intervals: [2_000, 5_000],
+          message: `league.draftStatus never reached active/completed within ${deadlineMs}ms`,
+        },
+      )
+      .toMatch(/^(active|completed)$/);
+
+    await page.goto(commissionerUrl);
+    await page.waitForLoadState('networkidle');
+    await expect(seasonActive).toBeVisible({ timeout: 30_000 });
+    return;
+  }
+
+  // Legacy fallback: UI-polling loop (kept for unmigrated callers).
+  const deadline = Date.now() + deadlineMs;
   while (Date.now() < deadline) {
     if (await seasonActive.isVisible().catch(() => false)) break;
     await page.waitForTimeout(5_000);

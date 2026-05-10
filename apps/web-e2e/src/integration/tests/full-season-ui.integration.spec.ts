@@ -220,6 +220,7 @@ test.describe
 
   test('Phase 4: Automated random draft', async ({
     commissionerPage: page,
+    apiCommissioner,
   }) => {
     // Automated drafts can take 80–180s; allow generous time for Lambda cold starts.
     test.setTimeout(360_000);
@@ -273,11 +274,13 @@ test.describe
     });
 
     await test.step('Wait for draft to complete via commissioner panel', async () => {
-      // The Next Step may jump straight past "Draft Completed" to the next
-      // action, so look for the "Season Active" status badge instead.
-      // Uses waitForSeasonActive (page.goto, not reload) so transient route
-      // changes after draft start don't land us on the wrong URL.
-      await waitForSeasonActive(page, state.leagueId, { deadlineMs: 180_000 });
+      // Gate on the backend `league.draftStatus` field (the same source the
+      // UI binds to) before asserting the badge — eliminates the Apollo
+      // cache/render race that produced the LS-4237→LS-4321 flake cluster.
+      await waitForSeasonActive(page, state.leagueId, {
+        deadlineMs: 180_000,
+        api: apiCommissioner,
+      });
     });
 
     await test.step('Verify roster was filled correctly via the UI', async () => {

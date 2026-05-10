@@ -1,4 +1,8 @@
-import { test as base, type Page } from '@playwright/test';
+import {
+  type APIRequestContext,
+  test as base,
+  type Page,
+} from '@playwright/test';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -51,10 +55,19 @@ export interface UIIntegrationFixtures {
   managerPage2: Page;
   /** Separate browser context page authenticated as Manager 3. */
   managerPage3: Page;
+  /**
+   * GraphQL API request context authenticated as the commissioner.
+   * Use for backend polling of server-side state from UI specs (e.g. waiting
+   * on draft completion via `league.draftStatus` instead of UI rendering).
+   */
+  apiCommissioner: APIRequestContext;
 }
 
 const WEB_BASE =
   process.env.INTEGRATION_WEB_URL ?? 'https://legacy-fantasy.com';
+const GQL_BASE = (
+  process.env.INTEGRATION_BASE_URL ?? 'https://api.legacy-fantasy.com/'
+).replace(/\/?$/, '/');
 /**
  * Build a Playwright storageState for cookie-based auth (integration tests).
  * Sets ls_jwt cookie, ls_csrf cookie, and caches user profile in localStorage.
@@ -233,6 +246,18 @@ export const test = base.extend<UIIntegrationFixtures>({
     const page = await context.newPage();
     await use(page);
     await context.close();
+  },
+
+  apiCommissioner: async ({ playwright, commissionerJwt }, use) => {
+    const api = await playwright.request.newContext({
+      baseURL: GQL_BASE,
+      extraHTTPHeaders: {
+        Authorization: `Bearer ${commissionerJwt}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    await use(api);
+    await api.dispose();
   },
 });
 
