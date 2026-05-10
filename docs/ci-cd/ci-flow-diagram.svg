@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 1080" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="13">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 1260" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="13">
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#334155"/>
@@ -37,262 +37,288 @@
 
   <!-- Legend -->
   <g transform="translate(820,22)">
-    <rect width="400" height="44" rx="6" fill="#f8fafc" stroke="#cbd5e1"/>
+    <rect width="420" height="48" rx="6" fill="#f8fafc" stroke="#cbd5e1"/>
     <circle cx="14" cy="16" r="5" fill="#3b82f6"/><text x="24" y="20" class="box-sub">Trigger / event</text>
     <circle cx="120" cy="16" r="5" fill="#64748b"/><text x="130" y="20" class="box-sub">Workflow (W#)</text>
     <circle cx="230" cy="16" r="5" fill="#dc2626"/><text x="240" y="20" class="box-sub">Blocking state</text>
     <circle cx="340" cy="16" r="5" fill="#ea580c"/><text x="350" y="20" class="box-sub">Override</text>
-    <circle cx="14" cy="34" r="5" fill="#16a34a"/><text x="24" y="38" class="box-sub">Success / merge</text>
-    <line x1="120" y1="34" x2="146" y2="34" class="edge" stroke-dasharray="5 4"/><text x="152" y="38" class="box-sub">Conditional</text>
-    <text x="240" y="38" class="box-sub">Solid arrow = primary path</text>
+    <circle cx="14" cy="36" r="5" fill="#16a34a"/><text x="24" y="40" class="box-sub">Success / merge</text>
+    <line x1="120" y1="36" x2="146" y2="36" class="edge" stroke-dasharray="5 4"/><text x="152" y="40" class="box-sub">Conditional / parallel</text>
+    <text x="260" y="40" class="box-sub">Solid arrow = primary path</text>
   </g>
 
   <!-- ===================== ENTRY ===================== -->
-  <text x="40" y="100" class="swim">Entry</text>
+  <text x="40" y="100" class="swim">1 · Entry</text>
 
-  <!-- PR opened (draft) -->
   <g>
-    <rect x="40" y="112" width="200" height="58" rx="8" fill="#dbeafe" stroke="#3b82f6"/>
-    <text x="140" y="135" text-anchor="middle" class="box-label">PR opened (draft)</text>
-    <text x="140" y="152" text-anchor="middle" class="box-sub">Author pushes commits freely.</text>
-    <text x="140" y="165" text-anchor="middle" class="box-meta">No bot review fires while draft.</text>
+    <rect x="40" y="112" width="220" height="64" rx="8" fill="#dbeafe" stroke="#3b82f6"/>
+    <text x="150" y="135" text-anchor="middle" class="box-label">PR opened (draft)</text>
+    <text x="150" y="152" text-anchor="middle" class="box-sub">Author pushes commits freely.</text>
+    <text x="150" y="167" text-anchor="middle" class="box-meta">No bot review fires while draft.</text>
   </g>
 
-  <!-- ready_for_review -->
   <g>
-    <rect x="290" y="112" width="200" height="58" rx="8" fill="#dbeafe" stroke="#3b82f6"/>
-    <text x="390" y="135" text-anchor="middle" class="box-label">ready_for_review</text>
-    <text x="390" y="152" text-anchor="middle" class="box-sub">Author marks PR ready.</text>
-    <text x="390" y="165" text-anchor="middle" class="box-meta">Fires Cycle 1 of W1 reviewer.</text>
+    <rect x="320" y="112" width="220" height="64" rx="8" fill="#dbeafe" stroke="#3b82f6"/>
+    <text x="430" y="135" text-anchor="middle" class="box-label">ready_for_review</text>
+    <text x="430" y="152" text-anchor="middle" class="box-sub">Author marks PR ready.</text>
+    <text x="430" y="167" text-anchor="middle" class="box-meta">Fires Cycle 1 of W1 reviewer.</text>
   </g>
 
-  <path d="M 240 141 L 290 141" class="edge" marker-end="url(#arrow)"/>
+  <!-- A → B -->
+  <path d="M 260 144 L 320 144" class="edge" marker-end="url(#arrow)"/>
+
+  <!-- ready_for_review → W1 (down through gutter at y=200) -->
+  <path d="M 430 176 L 430 200 L 160 200 L 160 230" class="edge" marker-end="url(#arrow)"/>
 
   <!-- ===================== REVIEW CYCLE ===================== -->
-  <text x="40" y="220" class="swim">Reviewer cycle (Cycle 1 → Cycle N)</text>
+  <text x="40" y="192" class="swim">2 · Reviewer cycle (Cycle 1 → Cycle N)</text>
 
   <!-- W1 Reviewer -->
   <g>
-    <rect x="40" y="232" width="280" height="120" rx="8" fill="#f1f5f9" stroke="#64748b"/>
-    <text x="180" y="254" text-anchor="middle" class="box-label">W1 — Reviewer (review.yml)</text>
-    <text x="180" y="272" text-anchor="middle" class="box-sub">Runs `.github/scripts/reviewer/index.mjs`.</text>
-    <text x="180" y="288" text-anchor="middle" class="box-sub">Multi-pass: correctness → security →</text>
-    <text x="180" y="302" text-anchor="middle" class="box-sub">contract → docs. Posts a real GitHub</text>
-    <text x="180" y="316" text-anchor="middle" class="box-sub">review as the Code Reviewer Bot App.</text>
-    <text x="180" y="338" text-anchor="middle" class="box-meta">Skipped when `review-bot-override` label present.</text>
+    <rect x="40" y="232" width="240" height="130" rx="8" fill="#f1f5f9" stroke="#64748b"/>
+    <text x="160" y="254" text-anchor="middle" class="box-label">W1 — Reviewer (review.yml)</text>
+    <text x="160" y="272" text-anchor="middle" class="box-sub">Runs `.github/scripts/reviewer/index.mjs`.</text>
+    <text x="160" y="288" text-anchor="middle" class="box-sub">Multi-pass: correctness → security →</text>
+    <text x="160" y="304" text-anchor="middle" class="box-sub">contract → docs. Posts a GitHub review</text>
+    <text x="160" y="320" text-anchor="middle" class="box-sub">as the Code Reviewer Bot App.</text>
+    <text x="160" y="346" text-anchor="middle" class="box-meta">Skipped when `review-bot-override` is present.</text>
   </g>
-
-  <path d="M 390 170 L 390 200 L 180 200 L 180 232" class="edge" marker-end="url(#arrow)"/>
 
   <!-- Verdicts -->
   <g>
-    <rect x="370" y="232" width="200" height="48" rx="8" fill="#dcfce7" stroke="#16a34a"/>
-    <text x="470" y="252" text-anchor="middle" class="box-label">Verdict: APPROVED</text>
-    <text x="470" y="268" text-anchor="middle" class="box-sub">Bot adds `merge-when-ready`.</text>
+    <rect x="320" y="232" width="220" height="58" rx="8" fill="#dcfce7" stroke="#16a34a"/>
+    <text x="430" y="254" text-anchor="middle" class="box-label">Verdict: APPROVED</text>
+    <text x="430" y="272" text-anchor="middle" class="box-sub">Bot adds `merge-when-ready`.</text>
   </g>
 
   <g>
-    <rect x="370" y="296" width="200" height="48" rx="8" fill="#fef3c7" stroke="#d97706"/>
-    <text x="470" y="316" text-anchor="middle" class="box-label">Verdict: CHANGES_REQUESTED</text>
-    <text x="470" y="332" text-anchor="middle" class="box-sub">Bot opens review threads.</text>
+    <rect x="320" y="304" width="220" height="58" rx="8" fill="#fef3c7" stroke="#d97706"/>
+    <text x="430" y="326" text-anchor="middle" class="box-label">Verdict: CHANGES_REQUESTED</text>
+    <text x="430" y="344" text-anchor="middle" class="box-sub">Bot opens review threads.</text>
   </g>
-
-  <g>
-    <rect x="600" y="232" width="220" height="68" rx="8" fill="#fee2e2" stroke="#dc2626"/>
-    <text x="710" y="254" text-anchor="middle" class="box-label">Critical security finding</text>
-    <text x="710" y="272" text-anchor="middle" class="box-sub">Reviewer adds label:</text>
-    <text x="710" y="288" text-anchor="middle" class="box-sub" font-family="monospace">needs-human-security-review</text>
-  </g>
-
-  <path d="M 320 256 L 370 256" class="edge-green" marker-end="url(#arrow-green)"/>
-  <path d="M 320 320 L 370 320" class="edge" marker-end="url(#arrow)"/>
-  <path d="M 320 280 L 600 266" class="edge-red" marker-end="url(#arrow-red)"/>
-  <text x="440" y="218" class="edge-label-red">if hasCriticalBlockingFinding</text>
 
   <!-- Author response -->
   <g>
-    <rect x="600" y="316" width="220" height="84" rx="8" fill="#f1f5f9" stroke="#64748b"/>
-    <text x="710" y="338" text-anchor="middle" class="box-label">Author response (per thread)</text>
-    <text x="710" y="356" text-anchor="middle" class="box-sub">Cycle 1: FIX | JUSTIFY</text>
-    <text x="710" y="370" text-anchor="middle" class="box-sub">Cycle 2: FIX</text>
-    <text x="710" y="384" text-anchor="middle" class="box-sub">Cycle 3+: FIX | CANNOT-COMPLY</text>
+    <rect x="580" y="232" width="220" height="130" rx="8" fill="#f1f5f9" stroke="#64748b"/>
+    <text x="690" y="254" text-anchor="middle" class="box-label">Author response</text>
+    <text x="690" y="270" text-anchor="middle" class="box-sub">(per open thread)</text>
+    <text x="690" y="292" text-anchor="middle" class="box-sub">Cycle 1: FIX | JUSTIFY</text>
+    <text x="690" y="308" text-anchor="middle" class="box-sub">Cycle 2: FIX</text>
+    <text x="690" y="324" text-anchor="middle" class="box-sub">Cycle 3+: FIX | CANNOT-COMPLY</text>
+    <text x="690" y="350" text-anchor="middle" class="box-meta">Pushes commits, replies to threads.</text>
   </g>
 
-  <path d="M 570 320 L 600 350" class="edge" marker-end="url(#arrow)"/>
-
-  <!-- Re-trigger via bot:ready-for-review -->
+  <!-- Re-fire reviewer -->
   <g>
-    <rect x="850" y="316" width="200" height="84" rx="8" fill="#dbeafe" stroke="#3b82f6"/>
-    <text x="950" y="338" text-anchor="middle" class="box-label">Re-fire reviewer</text>
-    <text x="950" y="356" text-anchor="middle" class="box-sub">Author adds label:</text>
-    <text x="950" y="370" text-anchor="middle" class="box-sub" font-family="monospace">bot:ready-for-review</text>
-    <text x="950" y="386" text-anchor="middle" class="box-meta">→ next cycle of W1</text>
+    <rect x="840" y="232" width="220" height="130" rx="8" fill="#dbeafe" stroke="#3b82f6"/>
+    <text x="950" y="254" text-anchor="middle" class="box-label">Re-fire reviewer</text>
+    <text x="950" y="278" text-anchor="middle" class="box-sub">Author adds label:</text>
+    <text x="950" y="296" text-anchor="middle" class="box-sub" font-family="monospace">bot:ready-for-review</text>
+    <text x="950" y="320" text-anchor="middle" class="box-sub">→ next cycle of W1</text>
+    <text x="950" y="350" text-anchor="middle" class="box-meta">Remove+re-add if label already present.</text>
   </g>
 
-  <path d="M 820 358 L 850 358" class="edge" marker-end="url(#arrow)"/>
-  <path d="M 950 316 C 950 220, 280 200, 180 232" class="edge edge-dash" marker-end="url(#arrow)"/>
-  <text x="700" y="208" class="edge-label">labeled `bot:ready-for-review` → Cycle N+1</text>
-
-  <!-- Cycle 3+ escalation -->
+  <!-- Critical security escalation (top-right) -->
   <g>
-    <rect x="850" y="232" width="200" height="68" rx="8" fill="#fee2e2" stroke="#dc2626"/>
-    <text x="950" y="254" text-anchor="middle" class="box-label">CANNOT-COMPLY at C3+</text>
-    <text x="950" y="270" text-anchor="middle" class="box-sub">Reviewer escalates: adds</text>
-    <text x="950" y="286" text-anchor="middle" class="box-sub" font-family="monospace">needs-human-arbitration</text>
+    <rect x="1080" y="232" width="180" height="58" rx="8" fill="#fee2e2" stroke="#dc2626"/>
+    <text x="1170" y="252" text-anchor="middle" class="box-label">Critical security</text>
+    <text x="1170" y="266" text-anchor="middle" class="box-sub" font-family="monospace">needs-human-</text>
+    <text x="1170" y="280" text-anchor="middle" class="box-sub" font-family="monospace">security-review</text>
   </g>
 
-  <path d="M 820 380 C 880 380, 950 320, 950 300" class="edge-red edge-dash" marker-end="url(#arrow-red)"/>
+  <g>
+    <rect x="1080" y="304" width="180" height="58" rx="8" fill="#fee2e2" stroke="#dc2626"/>
+    <text x="1170" y="324" text-anchor="middle" class="box-label">CANNOT-COMPLY (C3+)</text>
+    <text x="1170" y="340" text-anchor="middle" class="box-sub" font-family="monospace">needs-human-arbitration</text>
+  </g>
+
+  <!-- W1 → APPROVED (green) -->
+  <path d="M 280 258 L 320 258" class="edge-green" marker-end="url(#arrow-green)"/>
+  <!-- W1 → CHANGES_REQUESTED -->
+  <path d="M 280 330 L 320 330" class="edge" marker-end="url(#arrow)"/>
+
+  <!-- CHANGES_REQUESTED → Author response -->
+  <path d="M 540 330 L 580 330" class="edge" marker-end="url(#arrow)"/>
+  <!-- Author response → Re-fire reviewer -->
+  <path d="M 800 296 L 840 296" class="edge" marker-end="url(#arrow)"/>
+
+  <!-- Re-fire → W1 loop (over the top, y=208) -->
+  <path d="M 950 232 L 950 208 L 160 208 L 160 232" class="edge edge-dash" marker-end="url(#arrow)"/>
+  <text x="450" y="204" class="edge-label">labeled `bot:ready-for-review` → Cycle N+1</text>
+
+  <!-- W1 → Critical security (conditional, red, y=222) -->
+  <path d="M 280 244 L 300 244 L 300 222 L 1170 222 L 1170 232" class="edge-red edge-dash" marker-end="url(#arrow-red)"/>
+  <text x="1060" y="218" class="edge-label-red" text-anchor="end">if hasCriticalBlockingFinding</text>
+
+  <!-- Author response (CANNOT-COMPLY at C3+) → CANNOT-COMPLY label box -->
+  <path d="M 800 340 L 820 340 L 820 380 L 1170 380 L 1170 362" class="edge-red edge-dash" marker-end="url(#arrow-red)"/>
 
   <!-- ===================== OVERRIDES ===================== -->
-  <text x="40" y="430" class="swim">Override escape hatches (maintainer-applied labels)</text>
+  <text x="40" y="420" class="swim">3 · Override escape hatches (maintainer-applied labels)</text>
 
   <g>
-    <rect x="40" y="442" width="260" height="98" rx="8" fill="#ffedd5" stroke="#ea580c"/>
-    <text x="170" y="464" text-anchor="middle" class="box-label">W5 — Review Bot Override</text>
-    <text x="170" y="480" text-anchor="middle" class="box-sub">Label: <tspan font-family="monospace">review-bot-override</tspan></text>
-    <text x="170" y="497" text-anchor="middle" class="box-sub">Use after persistent CANNOT-COMPLY</text>
-    <text x="170" y="510" text-anchor="middle" class="box-sub">when bot misapplies a rule.</text>
-    <text x="170" y="528" text-anchor="middle" class="box-meta">Flips `bot-review` commit status → success.</text>
+    <rect x="40" y="432" width="240" height="110" rx="8" fill="#ffedd5" stroke="#ea580c"/>
+    <text x="160" y="454" text-anchor="middle" class="box-label">W5 — Review Bot Override</text>
+    <text x="160" y="472" text-anchor="middle" class="box-sub">Label: <tspan font-family="monospace">review-bot-override</tspan></text>
+    <text x="160" y="489" text-anchor="middle" class="box-sub">Use after persistent CANNOT-COMPLY</text>
+    <text x="160" y="504" text-anchor="middle" class="box-sub">when bot misapplies a rule.</text>
+    <text x="160" y="525" text-anchor="middle" class="box-meta">Flips `bot-review` status → success.</text>
   </g>
 
   <g>
-    <rect x="320" y="442" width="260" height="98" rx="8" fill="#ffedd5" stroke="#ea580c"/>
-    <text x="450" y="464" text-anchor="middle" class="box-label">W6 — Security Review Override</text>
-    <text x="450" y="480" text-anchor="middle" class="box-sub">Label: <tspan font-family="monospace">security-review-override</tspan></text>
-    <text x="450" y="497" text-anchor="middle" class="box-sub">Use after a human security reviewer</text>
-    <text x="450" y="510" text-anchor="middle" class="box-sub">accepts/mitigates a critical finding.</text>
-    <text x="450" y="528" text-anchor="middle" class="box-meta">Bot APPROVE review → satisfies CODEOWNER.</text>
+    <rect x="300" y="432" width="240" height="110" rx="8" fill="#ffedd5" stroke="#ea580c"/>
+    <text x="420" y="454" text-anchor="middle" class="box-label">W6 — Security Review Override</text>
+    <text x="420" y="472" text-anchor="middle" class="box-sub">Label: <tspan font-family="monospace">security-review-override</tspan></text>
+    <text x="420" y="489" text-anchor="middle" class="box-sub">Human security reviewer accepts</text>
+    <text x="420" y="504" text-anchor="middle" class="box-sub">or mitigates a critical finding.</text>
+    <text x="420" y="525" text-anchor="middle" class="box-meta">Bot APPROVE → satisfies CODEOWNER.</text>
   </g>
 
   <g>
-    <rect x="600" y="442" width="260" height="98" rx="8" fill="#ffedd5" stroke="#ea580c"/>
-    <text x="730" y="464" text-anchor="middle" class="box-label">Security Scanning Override</text>
-    <text x="730" y="480" text-anchor="middle" class="box-sub">Label: <tspan font-family="monospace">security-override</tspan></text>
-    <text x="730" y="497" text-anchor="middle" class="box-sub">Bypasses blocking SAST/dependency</text>
-    <text x="730" y="510" text-anchor="middle" class="box-sub">findings on `CI: Security`.</text>
-    <text x="730" y="528" text-anchor="middle" class="box-meta">In security-scanning.yml.</text>
+    <rect x="560" y="432" width="240" height="110" rx="8" fill="#ffedd5" stroke="#ea580c"/>
+    <text x="680" y="454" text-anchor="middle" class="box-label">Security Scanning Override</text>
+    <text x="680" y="472" text-anchor="middle" class="box-sub">Label: <tspan font-family="monospace">security-override</tspan></text>
+    <text x="680" y="489" text-anchor="middle" class="box-sub">Bypasses blocking SAST /</text>
+    <text x="680" y="504" text-anchor="middle" class="box-sub">dependency findings on `CI: Security`.</text>
+    <text x="680" y="525" text-anchor="middle" class="box-meta">In security-scanning.yml.</text>
   </g>
 
   <g>
-    <rect x="880" y="442" width="320" height="98" rx="8" fill="#fef3c7" stroke="#d97706"/>
-    <text x="1040" y="464" text-anchor="middle" class="box-label">W4 — Label Pager</text>
-    <text x="1040" y="480" text-anchor="middle" class="box-sub">Pages on escalation labels via Discord:</text>
-    <text x="1040" y="497" text-anchor="middle" class="box-sub" font-family="monospace">needs-human-arbitration / -security-review /</text>
-    <text x="1040" y="510" text-anchor="middle" class="box-sub" font-family="monospace">-review, review-bot-degraded, ci-stuck</text>
-    <text x="1040" y="528" text-anchor="middle" class="box-meta">Notification only — does not gate merge.</text>
+    <rect x="820" y="432" width="320" height="110" rx="8" fill="#fef3c7" stroke="#d97706"/>
+    <text x="980" y="454" text-anchor="middle" class="box-label">W4 — Label Pager</text>
+    <text x="980" y="472" text-anchor="middle" class="box-sub">Pages on escalation labels via Discord:</text>
+    <text x="980" y="489" text-anchor="middle" class="box-sub" font-family="monospace">needs-human-arbitration / -security-review</text>
+    <text x="980" y="504" text-anchor="middle" class="box-sub" font-family="monospace">needs-human-review / ci-stuck</text>
+    <text x="980" y="525" text-anchor="middle" class="box-meta">Notification only — does not gate merge.</text>
   </g>
 
-  <!-- Override arrows pointing back into the cycle area -->
-  <path d="M 710 300 C 800 380, 750 442, 730 442" class="edge-orange edge-dash" marker-end="url(#arrow-orange)"/>
-  <text x="540" y="416" class="edge-label-orange">human reviews finding → maintainer applies override</text>
-  <path d="M 950 300 C 350 420, 250 440, 170 442" class="edge-orange edge-dash" marker-end="url(#arrow-orange)"/>
+  <!-- Critical security → W6 (route right side, down through right gutter) -->
+  <path d="M 1170 290 L 1170 405 L 420 405 L 420 432" class="edge-orange edge-dash" marker-end="url(#arrow-orange)"/>
+  <text x="540" y="400" class="edge-label-orange">human reviewer applies override</text>
+
+  <!-- CANNOT-COMPLY → W5 -->
+  <path d="M 1170 362 L 1170 395 L 160 395 L 160 432" class="edge-orange edge-dash" marker-end="url(#arrow-orange)"/>
+
+  <!-- Critical security → W4 pager -->
+  <path d="M 1170 290 L 1170 392 L 980 392 L 980 432" class="edge edge-dash" marker-end="url(#arrow)" opacity="0.5"/>
 
   <!-- ===================== MERGE PATH ===================== -->
-  <text x="40" y="592" class="swim">Merge path — gated on `merge-when-ready`</text>
+  <text x="40" y="562" class="swim">4 · Merge path — gated on `merge-when-ready`</text>
 
-  <!-- Orchestrator + Pipeline -->
   <g>
-    <rect x="40" y="606" width="260" height="120" rx="8" fill="#f1f5f9" stroke="#64748b"/>
-    <text x="170" y="628" text-anchor="middle" class="box-label">CI Orchestrator</text>
-    <text x="170" y="644" text-anchor="middle" class="box-sub">ci-orchestrator.yml — decides scope:</text>
-    <text x="170" y="660" text-anchor="middle" class="box-sub">change detection, runner sizing, dispatches</text>
-    <text x="170" y="676" text-anchor="middle" class="box-sub">CI Pipeline + Security Scanning workflows.</text>
-    <text x="170" y="700" text-anchor="middle" class="box-meta">Restores `merge-when-ready` on success;</text>
-    <text x="170" y="714" text-anchor="middle" class="box-meta">strips it on failure.</text>
+    <rect x="40" y="594" width="240" height="130" rx="8" fill="#f1f5f9" stroke="#64748b"/>
+    <text x="160" y="616" text-anchor="middle" class="box-label">CI Orchestrator</text>
+    <text x="160" y="634" text-anchor="middle" class="box-sub">ci-orchestrator.yml — decides scope,</text>
+    <text x="160" y="650" text-anchor="middle" class="box-sub">change detection, runner sizing,</text>
+    <text x="160" y="666" text-anchor="middle" class="box-sub">dispatches CI Pipeline + Security.</text>
+    <text x="160" y="690" text-anchor="middle" class="box-meta">Restores `merge-when-ready` on success;</text>
+    <text x="160" y="706" text-anchor="middle" class="box-meta">strips it on failure.</text>
   </g>
 
   <g>
-    <rect x="320" y="606" width="280" height="120" rx="8" fill="#f1f5f9" stroke="#64748b"/>
-    <text x="460" y="628" text-anchor="middle" class="box-label">CI Pipeline (ci-pipeline.yml)</text>
-    <text x="460" y="648" text-anchor="middle" class="box-sub">Detect changes → lint → format → test →</text>
-    <text x="460" y="664" text-anchor="middle" class="box-sub">build → custom-checks → E2E shards →</text>
-    <text x="460" y="680" text-anchor="middle" class="box-sub">Summarize &amp; Report.</text>
-    <text x="460" y="704" text-anchor="middle" class="box-meta">Required: lint, format, test, build, custom-checks.</text>
-    <text x="460" y="718" text-anchor="middle" class="box-meta">Failures add `CI: *` labels to the PR.</text>
+    <rect x="320" y="594" width="240" height="130" rx="8" fill="#f1f5f9" stroke="#64748b"/>
+    <text x="440" y="616" text-anchor="middle" class="box-label">CI Pipeline (ci-pipeline.yml)</text>
+    <text x="440" y="636" text-anchor="middle" class="box-sub">Detect changes → lint → format →</text>
+    <text x="440" y="652" text-anchor="middle" class="box-sub">test → build → custom-checks →</text>
+    <text x="440" y="668" text-anchor="middle" class="box-sub">E2E shards → summarize &amp; report.</text>
+    <text x="440" y="690" text-anchor="middle" class="box-meta">Required: lint, format, test, build,</text>
+    <text x="440" y="706" text-anchor="middle" class="box-meta">custom-checks. Failures add `CI: *` labels.</text>
   </g>
 
   <g>
-    <rect x="620" y="606" width="260" height="120" rx="8" fill="#f1f5f9" stroke="#64748b"/>
-    <text x="750" y="628" text-anchor="middle" class="box-label">Security Scanning</text>
-    <text x="750" y="648" text-anchor="middle" class="box-sub">security-scanning.yml — pnpm audit,</text>
-    <text x="750" y="664" text-anchor="middle" class="box-sub">Snyk, Trivy, secret detection, SAST.</text>
-    <text x="750" y="680" text-anchor="middle" class="box-sub">Modes: deps-only, secrets-only, comprehensive.</text>
-    <text x="750" y="704" text-anchor="middle" class="box-meta">Advisory; only blocks at merge_group with</text>
-    <text x="750" y="718" text-anchor="middle" class="box-meta">critical findings (overridable by W-override).</text>
+    <rect x="600" y="594" width="240" height="130" rx="8" fill="#f1f5f9" stroke="#64748b"/>
+    <text x="720" y="616" text-anchor="middle" class="box-label">Security Scanning</text>
+    <text x="720" y="636" text-anchor="middle" class="box-sub">security-scanning.yml — pnpm audit,</text>
+    <text x="720" y="652" text-anchor="middle" class="box-sub">Snyk, Trivy, secret detection, SAST.</text>
+    <text x="720" y="668" text-anchor="middle" class="box-sub">Modes: deps, secrets, comprehensive.</text>
+    <text x="720" y="690" text-anchor="middle" class="box-meta">Advisory; blocks at merge_group with</text>
+    <text x="720" y="706" text-anchor="middle" class="box-meta">critical findings (overridable).</text>
   </g>
 
   <g>
-    <rect x="900" y="606" width="300" height="120" rx="8" fill="#f1f5f9" stroke="#64748b"/>
-    <text x="1050" y="628" text-anchor="middle" class="box-label">Other required &amp; advisory checks</text>
-    <text x="1050" y="648" text-anchor="middle" class="box-sub">No Merge Conflicts (check-conflicts.yml)</text>
-    <text x="1050" y="664" text-anchor="middle" class="box-sub">GraphQL Schema (check-schema.yml)</text>
-    <text x="1050" y="680" text-anchor="middle" class="box-sub">Migrations Applied (check-migrations-applied.yml)</text>
-    <text x="1050" y="696" text-anchor="middle" class="box-sub">PR Preview Deploy (deploy-pr-preview.yml)</text>
-    <text x="1050" y="712" text-anchor="middle" class="box-sub">Jira Branch Sync (jira-branch-sync.yml)</text>
+    <rect x="880" y="594" width="300" height="130" rx="8" fill="#f1f5f9" stroke="#64748b"/>
+    <text x="1030" y="616" text-anchor="middle" class="box-label">Other required &amp; advisory checks</text>
+    <text x="1030" y="638" text-anchor="middle" class="box-sub">No Merge Conflicts (check-conflicts.yml)</text>
+    <text x="1030" y="654" text-anchor="middle" class="box-sub">GraphQL Schema (check-schema.yml)</text>
+    <text x="1030" y="670" text-anchor="middle" class="box-sub">Migrations Applied (check-migrations-applied.yml)</text>
+    <text x="1030" y="686" text-anchor="middle" class="box-sub">PR Preview Deploy (deploy-pr-preview.yml)</text>
+    <text x="1030" y="702" text-anchor="middle" class="box-sub">Jira Branch Sync (jira-branch-sync.yml)</text>
   </g>
 
-  <path d="M 300 666 L 320 666" class="edge" marker-end="url(#arrow)"/>
-  <path d="M 300 680 L 620 680" class="edge edge-dash" marker-end="url(#arrow)"/>
-  <path d="M 300 696 L 900 696" class="edge edge-dash" marker-end="url(#arrow)"/>
+  <!-- APPROVED → CI Orchestrator (green) — route via left gutter -->
+  <path d="M 320 258 L 300 258 L 300 380 L 20 380 L 20 660 L 40 660" class="edge-green" marker-end="url(#arrow-green)"/>
+  <text x="30" y="500" class="edge-label-green" transform="rotate(-90 30 500)">`merge-when-ready` added</text>
 
-  <!-- Connect APPROVED → Orchestrator -->
-  <path d="M 470 280 L 470 540 L 170 540 L 170 606" class="edge-green" marker-end="url(#arrow-green)"/>
-  <text x="200" y="568" class="edge-label-green">push / `merge-when-ready` added</text>
+  <!-- Orchestrator → CI Pipeline -->
+  <path d="M 280 660 L 320 660" class="edge" marker-end="url(#arrow)"/>
+  <!-- CI Pipeline → Security Scanning (parallel, dashed) -->
+  <path d="M 560 660 L 600 660" class="edge edge-dash" marker-end="url(#arrow)"/>
+  <!-- CI Pipeline → Other checks (route over top of Security at y=584) -->
+  <path d="M 440 594 L 440 584 L 1030 584 L 1030 594" class="edge edge-dash" marker-end="url(#arrow)"/>
+
+  <!-- W5 / W6 / Sec-override → Orchestrator (status flips) -->
+  <path d="M 160 542 L 160 594" class="edge-orange edge-dash" marker-end="url(#arrow-orange)"/>
+  <text x="170" y="568" class="edge-label-orange">status flip → MQ re-evaluates</text>
+  <path d="M 420 542 L 420 570 L 200 570 L 200 594" class="edge-orange edge-dash" marker-end="url(#arrow-orange)"/>
+  <path d="M 680 542 L 680 570 L 240 570 L 240 594" class="edge-orange edge-dash" marker-end="url(#arrow-orange)"/>
 
   <!-- ===================== MERGE QUEUE ===================== -->
-  <text x="40" y="772" class="swim">Merge queue &amp; branch protection</text>
+  <text x="40" y="762" class="swim">5 · Merge queue &amp; branch protection</text>
 
   <g>
-    <rect x="40" y="784" width="380" height="160" rx="8" fill="#f1f5f9" stroke="#64748b"/>
-    <text x="230" y="806" text-anchor="middle" class="box-label">Enhanced Merge Queue (merge-queue.yml)</text>
-    <text x="230" y="826" text-anchor="middle" class="box-sub">Fires on: `merge-when-ready` labeled,</text>
-    <text x="230" y="842" text-anchor="middle" class="box-sub">status check completed, push, dispatch.</text>
-    <text x="230" y="862" text-anchor="middle" class="box-sub">Per-PR gates checked by merge-queue-processor.js:</text>
-    <text x="60" y="882" class="box-sub">• mergeable (no textual conflicts)</text>
-    <text x="60" y="898" class="box-sub">• reviewDecision === APPROVED (or null)</text>
-    <text x="60" y="914" class="box-sub">• all required status checks SUCCESS</text>
+    <rect x="40" y="774" width="380" height="170" rx="8" fill="#f1f5f9" stroke="#64748b"/>
+    <text x="230" y="796" text-anchor="middle" class="box-label">Enhanced Merge Queue (merge-queue.yml)</text>
+    <text x="230" y="816" text-anchor="middle" class="box-sub">Fires on: `merge-when-ready` labeled,</text>
+    <text x="230" y="832" text-anchor="middle" class="box-sub">status check completed, push, dispatch.</text>
+    <text x="230" y="854" text-anchor="middle" class="box-sub">Per-PR gates (merge-queue-processor.js):</text>
+    <text x="60" y="876" class="box-sub">• mergeable (no textual conflicts)</text>
+    <text x="60" y="894" class="box-sub">• reviewDecision === APPROVED (or null)</text>
+    <text x="60" y="912" class="box-sub">• all required status checks SUCCESS</text>
     <text x="60" y="930" class="box-sub">• all unresolved review threads resolved</text>
   </g>
 
   <g>
-    <rect x="440" y="784" width="380" height="160" rx="8" fill="#f1f5f9" stroke="#64748b"/>
-    <text x="630" y="806" text-anchor="middle" class="box-label">Branch Protection ("Protect Main" ruleset)</text>
-    <text x="630" y="826" text-anchor="middle" class="box-sub">Required status checks:</text>
-    <text x="460" y="844" class="box-sub" font-family="monospace">bot-review, No Merge Conflicts, CI Pipeline /</text>
-    <text x="460" y="860" class="box-sub" font-family="monospace">{lint, format, test, build, custom-checks}</text>
-    <text x="630" y="882" text-anchor="middle" class="box-sub">Pull-request rules:</text>
-    <text x="460" y="900" class="box-sub">• require_code_owner_review: true</text>
-    <text x="460" y="916" class="box-sub">• dismiss_stale_reviews_on_push: true</text>
+    <rect x="440" y="774" width="380" height="170" rx="8" fill="#f1f5f9" stroke="#64748b"/>
+    <text x="630" y="796" text-anchor="middle" class="box-label">Branch Protection ("Protect Main" ruleset)</text>
+    <text x="630" y="816" text-anchor="middle" class="box-sub">Required status checks:</text>
+    <text x="460" y="836" class="box-sub" font-family="monospace">bot-review, No Merge Conflicts, CI Pipeline /</text>
+    <text x="460" y="852" class="box-sub" font-family="monospace">{lint, format, test, build, custom-checks}</text>
+    <text x="630" y="876" text-anchor="middle" class="box-sub">Pull-request rules:</text>
+    <text x="460" y="896" class="box-sub">• require_code_owner_review: true</text>
+    <text x="460" y="914" class="box-sub">• dismiss_stale_reviews_on_push: true</text>
     <text x="460" y="932" class="box-sub">• allowed_merge_methods: [squash]</text>
   </g>
 
   <g>
-    <rect x="840" y="784" width="360" height="160" rx="8" fill="#dcfce7" stroke="#16a34a"/>
-    <text x="1020" y="806" text-anchor="middle" class="box-label">Squash merge to `main`</text>
-    <text x="1020" y="826" text-anchor="middle" class="box-sub">All gates green → merge-queue-processor</text>
-    <text x="1020" y="842" text-anchor="middle" class="box-sub">calls REST `merge` (squash).</text>
-    <text x="1020" y="864" text-anchor="middle" class="box-sub">Post-merge:</text>
-    <text x="860" y="882" class="box-sub">• Jira Branch Sync → ticket → "Done"</text>
-    <text x="860" y="898" class="box-sub">• cleanup-on-push removes merge labels</text>
-    <text x="860" y="914" class="box-sub">• PR Preview teardown</text>
-    <text x="860" y="930" class="box-sub">• Deploy workflow may run on push to main</text>
+    <rect x="840" y="774" width="340" height="170" rx="8" fill="#dcfce7" stroke="#16a34a"/>
+    <text x="1010" y="796" text-anchor="middle" class="box-label">Squash merge to `main`</text>
+    <text x="1010" y="816" text-anchor="middle" class="box-sub">All gates green → merge-queue-processor</text>
+    <text x="1010" y="832" text-anchor="middle" class="box-sub">calls REST `merge` (squash).</text>
+    <text x="1010" y="856" text-anchor="middle" class="box-sub">Post-merge:</text>
+    <text x="860" y="876" class="box-sub">• Jira Branch Sync → ticket → "Done"</text>
+    <text x="860" y="894" class="box-sub">• cleanup-on-push removes merge labels</text>
+    <text x="860" y="912" class="box-sub">• PR Preview teardown</text>
+    <text x="860" y="930" class="box-sub">• Deploy may run on push to main</text>
   </g>
 
-  <path d="M 170 726 L 170 760 L 230 760 L 230 784" class="edge-green" marker-end="url(#arrow-green)"/>
-  <path d="M 460 726 L 460 760 L 230 760" class="edge edge-dash"/>
-  <path d="M 750 726 L 750 760 L 230 760" class="edge edge-dash"/>
-  <path d="M 420 858 L 440 858" class="edge" marker-end="url(#arrow)"/>
-  <path d="M 820 858 L 840 858" class="edge-green" marker-end="url(#arrow-green)"/>
+  <!-- Orchestrator → Merge Queue (green primary) -->
+  <path d="M 160 724 L 160 750 L 230 750 L 230 774" class="edge-green" marker-end="url(#arrow-green)"/>
+  <text x="240" y="746" class="edge-label-green">CI green → `merge-when-ready` restored</text>
 
-  <!-- Override arrows feeding the merge queue -->
-  <path d="M 170 540 L 170 580" class="edge-orange edge-dash" marker-end="url(#arrow-orange)"/>
-  <text x="178" y="572" class="edge-label-orange">override → status flips → MQ re-evaluates</text>
-  <path d="M 450 540 L 450 580 L 230 580 L 230 784" class="edge-orange edge-dash" marker-end="url(#arrow-orange)"/>
+  <!-- CI Pipeline / Security / Other → Merge Queue (status completed, dashed) -->
+  <path d="M 440 724 L 440 754 L 260 754 L 260 774" class="edge edge-dash" marker-end="url(#arrow)"/>
+  <path d="M 720 724 L 720 760 L 290 760 L 290 774" class="edge edge-dash" marker-end="url(#arrow)"/>
+  <path d="M 1030 724 L 1030 766 L 320 766 L 320 774" class="edge edge-dash" marker-end="url(#arrow)"/>
 
-  <!-- Footer -->
-  <text x="40" y="1004" class="swim">Notes</text>
-  <text x="40" y="1024" class="box-sub">• W1 (review.yml) skips when `review-bot-override` is present so W5's `bot-review` status is not overwritten.</text>
-  <text x="40" y="1040" class="box-sub">• `merge-when-ready` is auto-stripped on push and on CI failure; the orchestrator restores it once CI passes again to keep the queue moving.</text>
-  <text x="40" y="1056" class="box-sub">• Override labels (W5, W6, security-override) are auditable: every apply/remove posts a comment naming the maintainer who triggered it.</text>
-  <text x="40" y="1072" class="box-sub">• See ci-checks-reference.md for per-check fix recipes and the full required-checks list.</text>
+  <!-- Merge Queue → Branch Protection -->
+  <path d="M 420 859 L 440 859" class="edge" marker-end="url(#arrow)"/>
+  <!-- Branch Protection → Squash merge (green) -->
+  <path d="M 820 859 L 840 859" class="edge-green" marker-end="url(#arrow-green)"/>
+
+  <!-- ===================== NOTES ===================== -->
+  <text x="40" y="990" class="swim">Notes</text>
+  <text x="40" y="1010" class="box-sub">• W1 (review.yml) skips when `review-bot-override` is present so W5's `bot-review` status is not overwritten.</text>
+  <text x="40" y="1028" class="box-sub">• `merge-when-ready` is auto-stripped on push and on CI failure; the orchestrator restores it once CI passes again to keep the queue moving.</text>
+  <text x="40" y="1046" class="box-sub">• Override labels (W5, W6, security-override) are auditable: every apply/remove posts a comment naming the maintainer who triggered it.</text>
+  <text x="40" y="1064" class="box-sub">• See ci-checks-reference.md for per-check fix recipes and the full required-checks list.</text>
 </svg>
