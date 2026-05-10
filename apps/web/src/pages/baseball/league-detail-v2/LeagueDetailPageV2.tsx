@@ -66,13 +66,19 @@ export function LeagueDetailPageV2(): React.JSX.Element {
 
   const {
     data: leagueData,
+    previousData: leaguePreviousData,
     loading: leagueLoading,
     error: leagueError,
   } = useGetLeagueByIdQuery({
     variables: { id: leagueId },
     skip: !Number.isFinite(leagueId),
   });
-  const league = leagueData?.league as LeagueFragment | null | undefined;
+  // Fall back to previousData during refetches so CommishTab stays mounted and
+  // in-flight success state (e.g. the "saved successfully" toast) isn't lost.
+  const league = (leagueData?.league ?? leaguePreviousData?.league) as
+    | LeagueFragment
+    | null
+    | undefined;
 
   const [getTeams, { data: teamsData }] = useGetLeagueTeamsLazyQuery();
   useEffect(() => {
@@ -222,7 +228,7 @@ export function LeagueDetailPageV2(): React.JSX.Element {
     [league?.seasonNumber, league?.frozenAt],
   );
 
-  if (leagueLoading) {
+  if (leagueLoading && !league) {
     return (
       <div className="ls-root">
         <div className="ls-page">
