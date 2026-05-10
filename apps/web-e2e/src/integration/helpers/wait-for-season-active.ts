@@ -25,6 +25,10 @@ import { expect } from '@playwright/test';
  *              matchup-detail 120 s → 360 s (144 s observed), roster-management
  *              480 s → 900 s (504 s observed, growing trend); trade-flow migrated
  *              here with 240 s deadline.
+ *   - LS-4296: 'load' event fires before Apollo XHR completes — isVisible() check
+ *              ran on a page where React had not yet received draftStatus from the
+ *              server, so the badge was never detected. Fixed: 'load' → 'networkidle'
+ *              so the loop only checks after the GetLeagueById query has returned.
  */
 export async function waitForSeasonActive(
   page: Page,
@@ -39,7 +43,7 @@ export async function waitForSeasonActive(
     if (await seasonActive.isVisible().catch(() => false)) break;
     await page.waitForTimeout(5_000);
     await page.goto(commissionerUrl);
-    await page.waitForLoadState('load');
+    await page.waitForLoadState('networkidle');
   }
 
   await expect(seasonActive).toBeVisible({ timeout: 15_000 });
