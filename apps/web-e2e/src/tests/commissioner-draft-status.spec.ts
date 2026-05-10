@@ -206,6 +206,48 @@ test.describe('Commissioner — poll-cycle Season Active detection (LS-4296)', (
   });
 });
 
+// ── reload() vs goto() after draft-start navigation (LS-4306) ────────────────
+//
+// After a draft starts the app may navigate away from the commissioner URL
+// (e.g. to /baseball/league/:id). The old inline wait loop used page.reload(),
+// which re-fetches whichever URL the page is on — never returning to the
+// commissioner panel where "Season Active" is rendered. waitForSeasonActive
+// always uses page.goto(commissionerUrl) to guarantee it checks the right page.
+//
+// These tests document and guard that contract: reload() on a non-commissioner
+// URL misses the badge; goto(commissionerUrl) always finds it.
+
+test.describe('Commissioner — reload vs goto after draft-start navigation (LS-4306)', () => {
+  test('page.reload() misses Season Active when page has navigated away from commissioner', async ({
+    page,
+  }) => {
+    await setupLeagueMock(page, 'completed');
+    // Simulate draft start navigating the app away from the commissioner panel
+    await page.goto('/baseball/league/1');
+    await page.waitForLoadState('networkidle');
+
+    // page.reload() stays on the league overview — the commissioner badge is not
+    // rendered there, so "Season Active" is never visible
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByText('Season Active')).not.toBeVisible();
+  });
+
+  test('page.goto(commissionerUrl) detects Season Active even after navigation away', async ({
+    page,
+  }) => {
+    await setupLeagueMock(page, 'completed');
+    // Simulate draft start navigating the app away from the commissioner panel
+    await page.goto('/baseball/league/1');
+    await page.waitForLoadState('networkidle');
+
+    // goto(commissionerUrl) returns to the correct page regardless of current URL
+    await page.goto('/baseball/league/1/commissioner');
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByText('Season Active')).toBeVisible();
+  });
+});
+
 // ── Unauthenticated access guard ───────────────────────────────────────────────
 //
 // Verifies that an unauthenticated user cannot view league data or the

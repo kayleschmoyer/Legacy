@@ -29,6 +29,12 @@ import { expect } from '@playwright/test';
  *              ran on a page where React had not yet received draftStatus from the
  *              server, so the badge was never detected. Fixed: 'load' → 'networkidle'
  *              so the loop only checks after the GetLeagueById query has returned.
+ *   - LS-4306: league-activity-feed-ui Phase 3 had an inline copy of this loop
+ *              using page.reload() + 'load' — the exact pre-LS-4296 pattern. After
+ *              draft start, the app can navigate away from the commissioner URL;
+ *              reload() re-fetches the transient URL, so "Season Active" is never
+ *              visible on the commissioner panel. Fixed: migrated the spec to use
+ *              this shared helper (goto + networkidle) with a 180 s deadline.
  */
 export async function waitForSeasonActive(
   page: Page,
