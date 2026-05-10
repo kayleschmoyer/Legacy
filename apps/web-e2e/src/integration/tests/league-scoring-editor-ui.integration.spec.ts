@@ -278,10 +278,14 @@ test.describe
     });
 
     await test.step('Save the reset', async () => {
-      await page.getByRole('button', { name: /save.*change/i }).click();
+      const saveBtn = page.getByRole('button', { name: /save.*change/i });
+      await expect(saveBtn).toBeVisible({ timeout: 5_000 });
+      await saveBtn.scrollIntoViewIfNeeded();
+      await expect(saveBtn).toBeEnabled({ timeout: 10_000 });
+      await saveBtn.click();
       await expect(
         page.getByText('Changes saved — scoring table refreshed.'),
-      ).toBeVisible({ timeout: 15_000 });
+      ).toBeVisible({ timeout: 30_000 });
     });
 
     await test.step('API confirms override is cleared for Home Runs', async () => {

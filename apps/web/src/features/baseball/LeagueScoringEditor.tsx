@@ -367,7 +367,18 @@ export function LeagueScoringEditor(
     }
     setFieldErrors(createInitialErrors(stats));
     setSaveError(null);
-    setSaveSuccess(false);
+    // NOTE: setSaveSuccess(false) is intentionally NOT called here.
+    // The finally block in handleSave clears isSavingRef.current synchronously
+    // before React processes the pending state updates, so by the time this
+    // effect runs, isSavingRef is already false — making it impossible to
+    // distinguish "stats changed from the save's own refetch" from an external
+    // update. Calling setSaveSuccess(false) unconditionally would race with the
+    // setSaveSuccess(true) in handleSave: both end up in the same React batch,
+    // and the effect then immediately clears the toast before Playwright (or the
+    // user) can see it (LS-4315).
+    // All explicit user actions (handleValueChange, handleResetStat,
+    // handleResetAll) and the save error path already call setSaveSuccess(false)
+    // directly, so no paths leave a stale "success" banner after user interaction.
   }, [stats]);
 
   const statById = useMemo(() => {
