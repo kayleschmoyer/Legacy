@@ -23,7 +23,6 @@ on:
         options:
           - e2e
           - integration
-          - db
           - all
       test-grep:
         description: "Filter tests by tag (Playwright --grep)"
@@ -128,14 +127,10 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ inputs.test-suite }}" = "all" ]; then
             # Nightly or manual "all": integration (3 shards) + e2e (3 shards), all tests, no filters
-            # db suite runs as a separate job (run-db-tests), not in this Playwright matrix
             MATRIX='[{"suite":"integration","shard":"1/3"},{"suite":"integration","shard":"2/3"},'
             MATRIX+='{"suite":"integration","shard":"3/3"},{"suite":"e2e","shard":"1/3"},'
             MATRIX+='{"suite":"e2e","shard":"2/3"},{"suite":"e2e","shard":"3/3"}]'
             echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
-          elif [ "${{ inputs.test-suite }}" = "db" ]; then
-            # db suite skips this Playwright matrix; run-db-tests job handles it
-            echo 'matrix=[]' >> "$GITHUB_OUTPUT"
           else
             SUITE="${{ inputs.test-suite }}"
             case "${{ inputs.shard-total }}" in
@@ -522,64 +517,6 @@ jobs:
           name: playwright-blobs/${{ strategy.job-index }}
           path: blob-report/
           if-no-files-found: ignore
-
-  # ===========================================================================
-  # DB suite: Jest + real PostgreSQL (no Playwright involved)
-  # Manual dispatch only (test-suite=db or all). Excluded from the nightly
-  # schedule because these tests target dev RDS (real schema + real players)
-  # and cannot run against the GitHub-hosted postgres service container until
-  # CI is wired to dev RDS via a writable role + self-hosted runner.
-  # ===========================================================================
-  run-db-tests:
-    name: "DB Integration Tests"
-    needs: [prepare]
-    if: |
-      inputs['test-suite'] == 'db' ||
-      inputs['test-suite'] == 'all'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: legacy_sports_test
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-
-    steps:
-      - name: "Checkout Repository"
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-        with:
-          ref: ${{ inputs.ref || github.ref }}
-          fetch-depth: 1
-
-      - name: "Setup Workspace"
-        uses: ./.github/actions/setup
-        with:
-          node-version: 22
-          install-dependencies: true
-          set-nx-shas: false
-          include-optional-deps: false
-
-      - name: "Run DB migrations"
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/legacy_sports_test
-        run: |
-          pnpm exec nx run db:migrate --configuration=ci 2>/dev/null || \
-          pnpm exec tsx lambdas/db/scripts/run-drizzle-migrations.ts
-
-      - name: "Run DB Integration Tests"
-        env:
-          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/legacy_sports_test
-        run: pnpm exec nx run db:test:db
 
   # ===========================================================================
   # Merge shard reports and deploy directly to GitHub Pages

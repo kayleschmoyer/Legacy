@@ -1,0 +1,144 @@
+# =============================================================================
+# DB Integration Tests
+# =============================================================================
+# Triggered on push when migration or test files change, giving fast feedback
+# on PRs that touch the schema. Also available via manual dispatch.
+#
+# Notification policy:
+#   - push:             notify only on failure (no Discord noise for passing runs)
+#   - workflow_dispatch: notify on start and finish regardless of result
+# =============================================================================
+
+name: "DB Integration Tests"
+
+on:
+  push:
+    paths:
+      - "lib/db-client/migrations/**"
+      - "lambdas/db/src/**"
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch or commit SHA to test (default: branch selected above)"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Discord notification — fires before tests start (manual dispatch only)
+  # ---------------------------------------------------------------------------
+  notify-start:
+    name: "DB Tests — Starting"
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      thread-id: ${{ steps.notify.outputs.thread-id }}
+    steps:
+      - name: "Checkout Repository"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: "Discord DB Tests Starting"
+        id: notify
+        uses: ./.github/actions/discord-notify
+        with:
+          webhook-url: ${{ secrets.DISCORD_PLAYWRIGHT_WEBHOOK_URL }}
+          status: running
+          title: "DB Integration Tests"
+          description: "**Suite:** DB (Jest + real PostgreSQL)"
+          thread-name: "DB Tests — ${{ github.run_number }}"
+
+  # ---------------------------------------------------------------------------
+  # Run Jest DB tests against an ephemeral PostgreSQL instance
+  # ---------------------------------------------------------------------------
+  run-db-tests:
+    name: "DB Integration Tests"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: legacy_sports_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: "Checkout Repository"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          fetch-depth: 1
+
+      - name: "Setup Workspace"
+        uses: ./.github/actions/setup
+        with:
+          node-version: 22
+          install-dependencies: true
+          set-nx-shas: false
+          include-optional-deps: false
+
+      - name: "Run DB migrations"
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/legacy_sports_test
+        run: |
+          echo "Running migrations against $DATABASE_URL"
+          pnpm --filter @legacy-sports/db-client run db:migrate
+
+      - name: "Run DB Integration Tests"
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/legacy_sports_test
+        run: pnpm exec nx run db:test:db
+
+  # ---------------------------------------------------------------------------
+  # Discord notification — fires after tests finish
+  # Push events: only on failure. Manual dispatch: always.
+  # ---------------------------------------------------------------------------
+  notify-finish:
+    name: "DB Tests — Results"
+    needs: [notify-start, run-db-tests]
+    if: always() && (github.event_name == 'workflow_dispatch' || needs.run-db-tests.result == 'failure')
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      DISCORD_ONCALL_USER: ${{ vars.DISCORD_ONCALL_USER_ID }}
+    steps:
+      - name: "Checkout Repository"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: "Resolve Status"
+        id: status
+        shell: bash
+        run: |
+          case "${{ needs.run-db-tests.result }}" in
+            success) STATUS="success" ;;
+            *) STATUS="failure" ;;
+          esac
+          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+          if [ "$STATUS" != "success" ]; then
+            echo "content=${DISCORD_ONCALL_USER}" >> "$GITHUB_OUTPUT"
+          else
+            echo "content=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: "Discord DB Tests Results"
+        uses: ./.github/actions/discord-notify
+        with:
+          webhook-url: ${{ secrets.DISCORD_PLAYWRIGHT_WEBHOOK_URL }}
+          status: ${{ steps.status.outputs.status }}
+          title: "DB Integration Tests — Results"
+          description: "**Suite:** DB (Jest + real PostgreSQL)"
+          content: ${{ steps.status.outputs.content }}
+          thread-id: ${{ needs.notify-start.outputs.thread-id }}
