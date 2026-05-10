@@ -1,4 +1,4 @@
-import { type ReactNode, StrictMode, useEffect } from 'react';
+import { type ReactNode, StrictMode } from 'react';
 import * as ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { Provider as ReduxProvider } from 'react-redux';
@@ -63,31 +63,6 @@ const authConfig: OAuthConfig = {
 
 /** Strips any trailing slash from BASE_URL so path comparisons are consistent. */
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
-
-/** App root path used for URL redirects (stable module-level constant). */
-const appHomePath = basePath || '/';
-
-/**
- * Wraps the web LoginPage so that when EnhancedAuthGuard intercepts an
- * unauthenticated user at a protected deep-link URL (e.g. /baseball/league/1/commissioner),
- * the address bar is silently redirected to the app root via history.replaceState.
- * Without this, the protected URL persists while the login form is displayed,
- * which confuses users and breaks URL-assertion tests (LS-4308).
- */
-function LoginPageWithUrlRedirect() {
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (window.location.pathname !== appHomePath) {
-      window.history.replaceState(null, '', appHomePath);
-    }
-  }, []);
-
-  return (
-    <ApolloProvider client={apolloClient}>
-      <LoginPage />
-    </ApolloProvider>
-  );
-}
 
 /**
  * Inner component — reads the resolved theme from ThemeContext and passes it
@@ -195,7 +170,11 @@ try {
               <EnhancedAuthGuard
                 loginTitle="Welcome to Legacy Sports!"
                 loginSubtitle="Sign in to access your fantasy leagues and stats"
-                loginComponent={<LoginPageWithUrlRedirect />}
+                loginComponent={
+                  <ApolloProvider client={apolloClient}>
+                    <LoginPage />
+                  </ApolloProvider>
+                }
                 testMode={env.authTestMode}
                 publicPaths={[
                   `${basePath}/about`,

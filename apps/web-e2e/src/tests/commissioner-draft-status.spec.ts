@@ -258,15 +258,17 @@ unauthTest.describe(
   'Commissioner — unauthenticated access guard (LS-4296)',
   () => {
     unauthTest(
-      'unauthenticated user is redirected away and cannot see "Season Active"',
+      'unauthenticated user sees login page and cannot see "Season Active"',
       async ({ page }) => {
         await page.goto('/baseball/league/1/commissioner');
         await page.waitForLoadState('networkidle');
 
-        // EnhancedAuthGuard redirects unauthenticated users — the commissioner
+        // EnhancedAuthGuard renders the login page in-place — the commissioner
         // page (and its "Season Active" badge) must never render.
         await expect(page.getByText('Season Active')).not.toBeVisible();
-        await expect(page).not.toHaveURL(/\/commissioner/);
+        await expect(
+          page.getByRole('button', { name: /continue with google/i }),
+        ).toBeVisible();
       },
     );
   },
