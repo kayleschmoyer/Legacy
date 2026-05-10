@@ -206,7 +206,7 @@
     <text x="460" y="628" text-anchor="middle" class="box-label">CI Pipeline (ci-pipeline.yml)</text>
     <text x="460" y="648" text-anchor="middle" class="box-sub">Detect changes → lint → format → test →</text>
     <text x="460" y="664" text-anchor="middle" class="box-sub">build → custom-checks → E2E shards →</text>
-    <text x="460" y="680" text-anchor="middle" class="box-sub">Summarize & Report.</text>
+    <text x="460" y="680" text-anchor="middle" class="box-sub">Summarize &amp; Report.</text>
     <text x="460" y="704" text-anchor="middle" class="box-meta">Required: lint, format, test, build, custom-checks.</text>
     <text x="460" y="718" text-anchor="middle" class="box-meta">Failures add `CI: *` labels to the PR.</text>
   </g>
@@ -223,7 +223,7 @@
 
   <g>
     <rect x="900" y="606" width="300" height="120" rx="8" fill="#f1f5f9" stroke="#64748b"/>
-    <text x="1050" y="628" text-anchor="middle" class="box-label">Other required & advisory checks</text>
+    <text x="1050" y="628" text-anchor="middle" class="box-label">Other required &amp; advisory checks</text>
     <text x="1050" y="648" text-anchor="middle" class="box-sub">No Merge Conflicts (check-conflicts.yml)</text>
     <text x="1050" y="664" text-anchor="middle" class="box-sub">GraphQL Schema (check-schema.yml)</text>
     <text x="1050" y="680" text-anchor="middle" class="box-sub">Migrations Applied (check-migrations-applied.yml)</text>
@@ -240,7 +240,7 @@
   <text x="200" y="568" class="edge-label-green">push / `merge-when-ready` added</text>
 
   <!-- ===================== MERGE QUEUE ===================== -->
-  <text x="40" y="772" class="swim">Merge queue & branch protection</text>
+  <text x="40" y="772" class="swim">Merge queue &amp; branch protection</text>
 
   <g>
     <rect x="40" y="784" width="380" height="160" rx="8" fill="#f1f5f9" stroke="#64748b"/>
