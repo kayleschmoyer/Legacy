@@ -4,7 +4,7 @@
 //
 // Run via: make diagrams  OR  node scripts/generate-diagrams.mjs
 //
-// Requires @mermaid-js/mermaid-cli (mmdc). Installed as a devDependency or globally.
+// Requires @mermaid-js/mermaid-cli (mmdc). Declared as a root devDependency; falls back to global install.
 
 import { execFileSync } from 'node:child_process';
 import { readdirSync, statSync, existsSync } from 'node:fs';
@@ -40,20 +40,37 @@ if (mmdFiles.length === 0) {
   process.exit(0);
 }
 
-let mmdc;
-try {
-  mmdc = execFileSync(
-    process.platform === 'win32' ? 'where' : 'which',
-    ['mmdc'],
-    { encoding: 'utf8' },
-  )
-    .split(/\r?\n/)[0]
-    .trim();
-} catch {
-  console.error(
-    'mmdc not found. Install with: pnpm add -D @mermaid-js/mermaid-cli',
-  );
-  process.exit(1);
+// Prefer local node_modules over a global PATH install.
+// Run via Node directly to avoid Windows .CMD shell-exec issues.
+const localMmdcJs = join(
+  root,
+  'node_modules',
+  '@mermaid-js',
+  'mermaid-cli',
+  'src',
+  'cli.js',
+);
+
+let mmdcCmd, mmdcBaseArgs;
+if (existsSync(localMmdcJs)) {
+  mmdcCmd = process.execPath;
+  mmdcBaseArgs = [localMmdcJs];
+} else {
+  try {
+    mmdcCmd = execFileSync(
+      process.platform === 'win32' ? 'where' : 'which',
+      ['mmdc'],
+      { encoding: 'utf8' },
+    )
+      .split(/\r?\n/)[0]
+      .trim();
+    mmdcBaseArgs = [];
+  } catch {
+    console.error(
+      'mmdc not found. Install with: pnpm add -D @mermaid-js/mermaid-cli',
+    );
+    process.exit(1);
+  }
 }
 
 let generated = 0;
@@ -62,9 +79,13 @@ let failed = 0;
 for (const mmd of mmdFiles) {
   const svg = mmd.replace(/\.mmd$/, '.svg');
   try {
-    execFileSync(mmdc, ['-i', mmd, '-o', svg, '-b', 'transparent'], {
-      stdio: 'pipe',
-    });
+    execFileSync(
+      mmdcCmd,
+      [...mmdcBaseArgs, '-i', mmd, '-o', svg, '-b', 'transparent'],
+      {
+        stdio: 'pipe',
+      },
+    );
     generated++;
     console.log(`  generated  ${svg.replace(root + '/', '')}`);
   } catch (err) {

@@ -33,6 +33,18 @@ function runScript({ env = {} } = {}) {
 }
 
 function mmdcAvailable() {
+  // Mirror the resolution order in generate-diagrams.mjs: local first, then global.
+  const localMmdcJs = resolve(
+    __dirname,
+    '..',
+    '..',
+    'node_modules',
+    '@mermaid-js',
+    'mermaid-cli',
+    'src',
+    'cli.js',
+  );
+  if (existsSync(localMmdcJs)) return true;
   try {
     execFileSync(process.platform === 'win32' ? 'where' : 'which', ['mmdc'], {
       stdio: 'pipe',

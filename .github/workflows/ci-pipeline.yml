@@ -194,6 +194,10 @@ jobs:
     runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
     env:
+      # Cap per-process heap lower than the global 4096 so that NX_PARALLEL=2 + Jest
+      # workers don't collectively OOM the runner when all projects are affected
+      # (e.g. after a pnpm-lock.yaml change).
+      NODE_OPTIONS: "--max_old_space_size=2048"
       NX_VERBOSE_LOGGING: ${{ inputs.debug_mode || contains(github.event.pull_request.labels.*.name, 'ci-debug') }}
     steps:
       - name: "Checkout Repository"

@@ -253,6 +253,7 @@
     "@graphql-codegen/typescript-apollo-client-helpers": "^3.0.1",
     "@graphql-codegen/typescript-operations": "^4.6.1",
     "@graphql-codegen/typescript-react-apollo": "^4.4.1",
+    "@mermaid-js/mermaid-cli": "^11.14.0",
     "@modelcontextprotocol/sdk": "^1.27.0",
     "@nx/devkit": "22.7.1",
     "@nx/esbuild": "22.7.1",

@@ -226,7 +226,7 @@ gates     validation
 - Prettier formatting check (`pnpm exec prettier --check --ignore-unknown ...`)
 - `nx affected -t lint`
 - `nx affected -t typecheck`
-- `nx affected -t test`
+- `nx affected -t test` (runs with `NODE_OPTIONS=--max_old_space_size=2048` — lower than the 4096 MB global default to prevent OOM when a lockfile change marks all projects affected)
 
 **Stage 2b -- Build Validation:** Runs in parallel with quality gates.
 
