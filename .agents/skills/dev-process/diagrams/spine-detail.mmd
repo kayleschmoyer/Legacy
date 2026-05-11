@@ -1,0 +1,76 @@
+%% Spine detail: 6 phases + exit gates
+%% Source of truth for diagrams/spine-detail.svg (regenerate with `make diagrams`)
+flowchart TB
+    Start([Trigger from entrypoint])
+
+    Start --> P1
+    subgraph P1["Phase 1: Frame"]
+        P1A["Restate problem"]
+        P1B["Assign risk tier"]
+        P1C["Repro report\n(investigation entrypoints)"]
+        P1A --> P1B --> P1C
+    end
+
+    P1 --> G1{"Risk tier assigned?\nTrigger linked?"}
+    G1 -->|No| P1
+    G1 -->|Yes| P2
+
+    subgraph P2["Phase 2: Design"]
+        P2A["RFC if Medium+"]
+        P2B["ADR for architectural decisions"]
+        P2C["Test plan written"]
+        P2D["Touch-map identified"]
+        P2A --> P2B --> P2C --> P2D
+    end
+
+    P2 --> G2{"RFC accepted?\nTest plan written?"}
+    G2 -->|No| P2
+    G2 -->|Yes| P3
+
+    subgraph P3["Phase 3: Implement"]
+        P3A["Vertical slices"]
+        P3B["Green tree per commit"]
+        P3C["Docs alongside code"]
+        P3A --> P3B --> P3C
+    end
+
+    P3 --> G3{"All planned changes coded?"}
+    G3 -->|No| P3
+    G3 -->|Yes| P4
+
+    subgraph P4["Phase 4: Verify"]
+        P4A["make pc green"]
+        P4B["Manual exercise"]
+        P4C["Determinism check\n(E2E/integration)"]
+        P4D["Test plan coverage"]
+        P4A --> P4B --> P4C --> P4D
+    end
+
+    P4 --> G4{"All gates green?"}
+    G4 -->|No| P4
+    G4 -->|Yes| P5
+
+    subgraph P5["Phase 5: Document"]
+        P5A["Apply touch-map"]
+        P5B["Archive RFC / ADR"]
+        P5C["Postmortem\n(if Critical)"]
+        P5A --> P5B --> P5C
+    end
+
+    P5 --> G5{"All docs current?"}
+    G5 -->|No| P5
+    G5 -->|Yes| P6
+
+    subgraph P6["Phase 6: Handoff"]
+        P6A["Self-review"]
+        P6B["Open PR draft"]
+        P6C["Bot-PR contract\n(Cycles 1/2/3)"]
+        P6D["Merge"]
+        P6A --> P6B --> P6C --> P6D
+    end
+
+    P6 --> G6{"PR merged?\nJira Done?\nAudit run?\nTasks closed?"}
+    G6 -->|No| P6
+    G6 -->|Yes| End
+
+    End([Task complete])

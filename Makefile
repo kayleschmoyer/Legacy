@@ -265,6 +265,10 @@ lint-skills: ## Validate all agent skills conform to agentskills.io format
 	@$(call echo_blue,Validating agent skills...)
 	@node scripts/lint-skills.js
 
+diagrams: ## Generate SVG files from Mermaid (.mmd) sources under .agents/skills/**/diagrams/
+	@$(call echo_blue,Generating diagrams...)
+	@node scripts/generate-diagrams.mjs
+
 format: ## Format code across all projects
 	@$(call echo_blue,Formatting code...)
 	@pnpm exec prettier --write --ignore-unknown .

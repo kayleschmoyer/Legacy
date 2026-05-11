@@ -162,15 +162,19 @@ Use `/respond-to-review` to scaffold structured replies for all open threads on 
 
 ## Workflow
 
-Follow the **Agent Workflow Checklist (Steps 0-16)** in `.agents/skills/workflow-overview/SKILL.md` — it is the single source of truth for procedure. Summary:
+**Process framework**: every task funnels through one of 13 entrypoints into a 6-phase shared spine. See `.agents/skills/dev-process/SKILL.md` for the design layer — _which_ entrypoint applies, _which_ gates apply, _which_ artifacts (RFC, ADR, postmortem, continuation, test-plan, repro) are required. Pick the entrypoint at the start of any task using `.agents/skills/dev-process/entrypoints/README.md`.
+
+**Operational runbook (new-feature entrypoint, the dominant path)**: follow the **Agent Workflow Checklist (Steps 0-16)** in `.agents/skills/workflow-overview/SKILL.md` — single source of truth for procedure. Summary:
 
 0. Epic check → 1. Create/identify ticket → **1b. Planning phase** → 2. Dependency check → 3. Jira "In Progress" → 4. Worktree setup → 5. node_modules symlink → 6. Work in worktree → 7. Code & test → 8. Commit → 9. Rebase → 10. Migrations → 11. `make pc` + self-review → 12. Ship (draft PR → mark ready → bot review → reply threads → Jira "In Review") → 13. Watch PR to merge → 14. MCP gap audit → 15. Complete tracking tasks → 16. Cleanup
 
 For PR creation, review fixing, and thread resolution details, see `.agents/skills/pr-lifecycle/SKILL.md`. For error recovery during any step, see `.agents/skills/workflow-overview/references/error-recovery.md`.
 
+**Other entrypoints** (incident, security, bug-investigation, refactor, dependency-upgrade, migration, docs-only, inherited-pr, spike, experimentation, revert, CI flake): see `.agents/skills/dev-process/entrypoints/`. Each has its own per-phase notes layered on top of the workflow-overview substrate.
+
 ## Risk Classification
 
-Low (single-file, docs, tests: 2-3 min) · Medium (business logic, multi-file, schema: 5-10 min) · High (auth, payments, infra, migrations: 10-15 min). See `.agents/skills/planning/SKILL.md`.
+Low (single-file, docs, tests: 2-3 min) · Medium (business logic, multi-file, schema: 5-10 min) · High (auth, payments, infra, migrations: 10-15 min) · Critical (production incidents, security, reverts: no time limit). See `.agents/skills/dev-process/gates/risk-tiers.md` for the full decision tree and per-tier requirements; `.agents/skills/planning/SKILL.md` for assessment in practice.
 
 ## Command Patterns
 
@@ -255,6 +259,10 @@ Fantasy sports players (25–45) who are league commissioners and active partici
 ## Skills
 
 Detailed how-to docs live in `.agents/skills/<name>/SKILL.md`. The `description` frontmatter field enables skill auto-discovery; agents can also browse the directory directly. CSV reference data is in `docs/agents/*.csv`.
+
+**Process framework**: `.agents/skills/dev-process/SKILL.md` is the canonical map of how work flows through this codebase. Load it at the start of any task that doesn't fit the dominant new-feature path — it covers incidents, bugs, security, refactors, migrations, spikes, experiments, reverts, inherited PRs, and documentation-only changes.
+
+**E2E/integration determinism**: `.agents/skills/testing/references/e2e-determinism.md` is the 12-lever checklist that gates every PR touching E2E or integration tests. Flake is a P1 bug.
 
 Debugging distributed system failures where test stdout is opaque (e.g. `n/a`, "stuck", "timeout") — use **`cloudwatch-archaeology`** to query CloudWatch logs and the live RDS before chasing client-side hypotheses. See `.agents/skills/cloudwatch-archaeology/SKILL.md`.
 

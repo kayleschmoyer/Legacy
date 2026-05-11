@@ -92,6 +92,7 @@ Run `make pc` before pushing. Skipping saves 5 min but each CI failure costs 40-
 | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
 | [references/coding-standards.md](references/coding-standards.md)                 | Security, error handling, API patterns, testing, types, documentation, regex, code reuse       |
 | [references/standards-catalog.md](references/standards-catalog.md)               | Full catalog with code examples from 100 PR review analysis                                    |
+| [references/test-data-determinism.md](references/test-data-determinism.md)       | Test fixture / mock / seed data determinism rules                                              |
 | [references/config-conventions.md](references/config-conventions.md)             | ESLint, TypeScript, Jest, project.json, package.json conventions                               |
 | [references/lint-discipline.md](references/lint-discipline.md)                   | Lint suppression policy, approved exceptions, ESLint config, troubleshooting                   |
 | [references/codegen-policy.md](references/codegen-policy.md)                     | Generated file rules, regeneration steps, CI checks, conflict resolution                       |
@@ -99,7 +100,9 @@ Run `make pc` before pushing. Skipping saves 5 min but each CI failure costs 40-
 
 ## Related Skills
 
+- [dev-process](../dev-process/SKILL.md) -- the development process framework these standards apply within
 - [planning](../planning/SKILL.md) -- risk classification informed by these standards
 - [pr-lifecycle](../pr-lifecycle/SKILL.md) -- self-review checklist and Copilot review fix workflow
+- [testing](../testing/SKILL.md) -- includes the [12-lever E2E determinism checklist](../testing/references/e2e-determinism.md)
 - [create](../create/SKILL.md) -- scaffold new projects (apps, libs, lambdas, MCP servers)
 - [repo-tooling](../repo-tooling/SKILL.md) -- codegen workflow, Make targets, Nx commands

@@ -1,0 +1,73 @@
+%% Master flow: entrypoint -> spine -> exit
+%% Source of truth for diagrams/master-flow.svg (regenerate with `make diagrams`)
+flowchart TB
+    subgraph Triggers["Trigger events"]
+        direction LR
+        T1["Production incident"]
+        T2["Bug report"]
+        T3["Security CVE"]
+        T4["Flaky test / CI on main"]
+        T5["Backlog ticket"]
+        T6["Tech debt"]
+        T7["Dependabot / upgrade"]
+        T8["Schema / data / infra"]
+        T9["Doc gap"]
+        T10["In-flight PR pickup"]
+        T11["Research question"]
+        T12["Experiment hypothesis"]
+        T13["Bad change shipped"]
+    end
+
+    subgraph Entrypoints["13 entrypoints"]
+        direction LR
+        E1["01 incident-hotfix\n(Critical)"]
+        E2["02 bug-investigation\n(Medium)"]
+        E3["03 security-cve\n(Critical)"]
+        E4["04 ci-flaky-triage\n(Medium)"]
+        E5["05 new-feature\n(Medium)"]
+        E6["06 refactor\n(Medium)"]
+        E7["07 dependency-upgrade\n(Medium)"]
+        E8["08 migration\n(High)"]
+        E9["09 docs-only\n(Low)"]
+        E10["10 inherited-pr\n(Medium)"]
+        E11["11 spike\n(Low)"]
+        E12["12 experimentation\n(High)"]
+        E13["13 revert\n(Critical)"]
+    end
+
+    T1 --> E1
+    T2 --> E2
+    T3 --> E3
+    T4 --> E4
+    T5 --> E5
+    T6 --> E6
+    T7 --> E7
+    T8 --> E8
+    T9 --> E9
+    T10 --> E10
+    T11 --> E11
+    T12 --> E12
+    T13 --> E13
+
+    Entrypoints --> Spine
+
+    subgraph Spine["6-phase spine"]
+        direction TB
+        P1["1 Frame\n- Restate problem\n- Risk tier\n- Repro (if investigation)"]
+        P2["2 Design\n- RFC (Medium+)\n- ADR (architectural)\n- Test plan"]
+        P3["3 Implement\n- Vertical slices\n- Docs alongside code"]
+        P4["4 Verify\n- make pc\n- Manual exercise\n- Determinism check"]
+        P5["5 Document\n- Touch-map\n- Archive RFC/ADR\n- Postmortem (if Critical)"]
+        P6["6 Handoff\n- Self-review\n- Bot-PR contract\n- Drive to merge"]
+        P1 --> P2 --> P3 --> P4 --> P5 --> P6
+    end
+
+    Spine --> Exit
+
+    subgraph Exit["Task completion"]
+        direction LR
+        X1["PR merged"]
+        X2["Jira Done"]
+        X3["Audit run"]
+        X4["Tasks closed"]
+    end
