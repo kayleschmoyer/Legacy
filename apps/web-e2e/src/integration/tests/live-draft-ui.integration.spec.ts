@@ -828,6 +828,26 @@ test.describe
   // -----------------------------------------------------------------
 
   test('Phase 7: Manager verifies their roster', async ({ managerPage1 }) => {
+    // Phase 7 previously failed with a misleading "My Roster tab not visible
+    // in 271 ms" error (LS-4320). The polling loop reloaded every ~5 s and
+    // read `Lineup N/M` immediately after the "Lineup" label became visible —
+    // but RosterTab's QuickStat renders "Lineup0/0" while
+    // useGetPositionsForLeagueQuery and useGetTeamMembersQuery are in flight.
+    // Each reload cancelled both queries before they could resolve, so the
+    // value stayed "0/0" for 21 consecutive iterations even though the
+    // server-side lineup data was already populated. After 60 s elapsed, the
+    // loop's per-operation timeouts (also derived from the shrinking
+    // lineupDeadline) decayed to 271 ms and the tab visibility check failed
+    // — the misleading symptom on which the original ticket was filed.
+    //
+    // Fix: a single toContainText wait that gates on the QuickStat denominator
+    // becoming > 0 (positions resolved), then read the filled count. With no
+    // reloads the queries run to completion and Phase 7 passes in ~3 s.
+    test.setTimeout(240_000);
+
+    const PER_OP_TIMEOUT = 10_000;
+    const LINEUP_BUDGET_MS = 120_000;
+
     await test.step('Navigate to Manager 1 roster', async () => {
       // Navigate to the league overview first.  Going directly to /roster
       // from a fresh browser context races the membership access gate in
@@ -852,53 +872,42 @@ test.describe
     });
 
     await test.step('Verify manager roster has players', async () => {
-      // See Phase 6: poll with reloads until lineup count > 0 to absorb the
-      // race between draftCompletedAt commit and autoPopulateFirstMatchupLineup.
-      const lineupDeadline = Date.now() + 60_000;
+      // Root cause of the original Phase 7 failure (LS-4320): the previous
+      // implementation reloaded every ~5 s and read `Lineup N/M` immediately
+      // after the "Lineup" label became visible — but the QuickStat renders
+      // "Lineup0/0" while `useGetPositionsForLeagueQuery` and
+      // `useGetTeamMembersQuery` are still in flight. Each reload cancelled
+      // both queries before they could resolve, so the value stayed "0/0"
+      // across 21+ iterations even though the underlying server data was
+      // populated. The final post-deadline read showed "Lineup16/17",
+      // confirming the data was there all along.
+      //
+      // Fix: stop reloading. After the initial /overview → My Roster click,
+      // wait for the QuickStat denominator to be > 0 (positions resolved),
+      // then read the filled count. A single navigation lets both queries
+      // run to completion.
       const lineupParent = managerPage1
         .getByText('Lineup', { exact: true })
         .first()
         .locator('..');
-      // After clicking the My Roster tab, wait for the roster section to render.
       await expect(managerPage1.getByText('Lineup').first()).toBeVisible({
-        timeout: Math.max(1, lineupDeadline - Date.now()),
+        timeout: PER_OP_TIMEOUT,
       });
-      let lineupCount = 0;
-      while (Date.now() < lineupDeadline) {
-        const lineupText = await lineupParent.textContent();
-        const lineupMatch = lineupText?.match(/Lineup\s*(\d+)\s*\/\s*\d+/);
-        lineupCount = lineupMatch ? parseInt(lineupMatch[1], 10) : 0;
-        if (lineupCount > 0) break;
-        const remaining = lineupDeadline - Date.now();
-        if (remaining <= 0) break;
-        await managerPage1.waitForTimeout(Math.min(5_000, remaining));
-        if (Date.now() >= lineupDeadline) break;
-        // Reload navigates back to /overview (last full-page URL before the
-        // client-side tab click).  Re-click My Roster to reach the roster tab.
-        await managerPage1.goto(`/baseball/league/${state.leagueId}/overview`);
-        await managerPage1.waitForLoadState('load');
-        const remainingAfterNav = lineupDeadline - Date.now();
-        if (remainingAfterNav <= 0) break;
-        await expect(
-          managerPage1.getByRole('tab', { name: 'My Roster' }),
-        ).toBeVisible({ timeout: remainingAfterNav });
-        await managerPage1.getByRole('tab', { name: 'My Roster' }).click();
-        const remainingAfterClick = lineupDeadline - Date.now();
-        if (remainingAfterClick <= 0) break;
-        await expect(managerPage1.getByText('Lineup').first()).toBeVisible({
-          timeout: remainingAfterClick,
-        });
-      }
-      // The while loop may exit via the `Date.now() < lineupDeadline` guard
-      // immediately after a successful My Roster reload that made the Lineup
-      // element visible — but before the top-of-loop textContent() call reads
-      // the fresh value.  One final check catches this off-by-one edge case
-      // (LS-4305: draft now completes within the timeout, exposing the race).
-      if (lineupCount === 0) {
-        const finalText = await lineupParent.textContent().catch(() => '');
-        const finalMatch = finalText?.match(/Lineup\s*(\d+)\s*\/\s*\d+/);
-        lineupCount = finalMatch ? parseInt(finalMatch[1], 10) : 0;
-      }
+      // Wait for positions+teamMembers to fully resolve (denominator > 0).
+      // The "Lineup0/0" loading state matches `/Lineup\s*\d+\s*\/\s*\d+/`,
+      // so the assertion uses [1-9] for the denominator's first digit.
+      await expect(lineupParent).toContainText(/Lineup\s*\d+\s*\/\s*[1-9]\d*/, {
+        timeout: LINEUP_BUDGET_MS,
+      });
+      const lineupText = await lineupParent.textContent().catch(() => null);
+      const lineupMatch = lineupText?.match(/Lineup\s*(\d+)\s*\/\s*(\d+)/);
+      const lineupCount = lineupMatch ? parseInt(lineupMatch[1], 10) : 0;
+      const lineupTotal = lineupMatch ? parseInt(lineupMatch[2], 10) : 0;
+      console.log(
+        `[live-draft] Phase 7 lineup resolved: ${lineupCount}/${lineupTotal} text=${JSON.stringify(
+          lineupText?.slice(0, 80) ?? null,
+        )}`,
+      );
       expect(lineupCount).toBeGreaterThan(0);
     });
 
