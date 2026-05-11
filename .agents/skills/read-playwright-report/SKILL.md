@@ -92,6 +92,22 @@ report = json.loads(zf.read('report.json'))
 
 Key fields per test: `title`, `outcome` (`"expected"` = pass, `"unexpected"` = fail, `"skipped"`).
 
+## Zero-Test Guard (MANDATORY before posting evidence)
+
+**Always check `stats.total` before treating a report as passing evidence:**
+
+```python
+if report['stats']['total'] == 0:
+    print("ERROR: 0 tests ran — this report is NOT valid passing evidence")
+    print("The run was misconfigured. Re-trigger with corrected parameters.")
+else:
+    print(f"OK: {report['stats']['total']} tests ran, {report['stats']['expected']} passed")
+```
+
+**Why this matters**: Playwright exits 0 and sets `ok: true` even when 0 tests run (no failures = success). A `manual-<N>` or `pr-<N>` report with `total: 0` looks like a successful CI run but provides **zero test coverage**. Posting it as integration test evidence will cause the review bot to flag missing evidence.
+
+**Most common cause**: passing multiple space-separated filenames in the `test-file` workflow input. The workflow script passes `$TEST_FILE` as a **single quoted argument** to Playwright — `pnpm exec playwright test ... -- "$TEST_FILE"`. When `$TEST_FILE` is `"file1.spec.ts file2.spec.ts"`, Playwright receives it as one string and finds no file matching that literal name, so 0 tests run. See [Triggering Runs](#triggering-runs) for the correct approach.
+
 ## Useful Queries
 
 **List all files with stats (highlighting draft/integration):**
@@ -130,8 +146,12 @@ The integration suite is **only included** when:
 # E2E only (mocked)
 gh workflow run run-playwright-tests.yml -f test-suite=e2e -f shard-total=3
 
-# Integration only (live server)
-gh workflow run run-playwright-tests.yml -f test-suite=integration -f shard-total=1
+# Integration only (live server) — all integration specs
+gh workflow run run-playwright-tests.yml -f test-suite=integration -f shard-total=2
+
+# Integration only — targeting specific specs via grep pattern
+gh workflow run run-playwright-tests.yml -f test-suite=integration -f shard-total=1 \
+  -f test-grep="roster-management|matchup-detail|trade-flow"
 
 # Both suites (mirrors nightly — requires test-suite: all, added in LS-2281)
 gh workflow run run-playwright-tests.yml -f test-suite=all
@@ -140,5 +160,31 @@ gh workflow run run-playwright-tests.yml -f test-suite=all
 Via MCP:
 
 ```
-ci_dispatch_workflow(workflow: "run-playwright-tests.yml", inputs: { "test-suite": "all" })
+ci_dispatch_workflow(workflow: "run-playwright-tests.yml", inputs: { "test-suite": "integration", "shard-total": "2" })
 ```
+
+### `test-file` vs `test-grep`
+
+`test-file` accepts one or more **space-separated filenames** relative to the test directory. The workflow word-splits the input so each name becomes a separate positional argument to Playwright.
+
+```
+# Single file
+test-file: "roster-management-ui.integration.spec.ts"
+
+# Multiple files (space-separated)
+test-file: "roster-management-ui.integration.spec.ts matchup-detail-ui.integration.spec.ts"
+```
+
+`test-grep` is for **pattern matching** across test titles and file names using a Playwright `--grep` regex:
+
+```
+# Match by filename fragment (pipe = OR)
+test-grep: "roster-management|matchup-detail|trade-flow"
+
+# Match by tag
+test-grep: "@smoke"
+```
+
+Use `test-file` when you know the exact spec filenames; use `test-grep` when filtering by test title, tag, or a partial name pattern.
+
+After triggering any run, always verify `stats.total > 0` before using the report as evidence (see [Zero-Test Guard](#zero-test-guard-mandatory-before-posting-evidence)).

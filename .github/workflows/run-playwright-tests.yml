@@ -49,7 +49,7 @@ on:
           - "@visual"
           - "@slow"
       test-file:
-        description: "Specific test file(s) to run relative to test dir (e.g. 'draft-functionality.spec.ts'). Empty = all files."
+        description: "Test file(s) relative to test dir. Space-separate multiple (e.g. 'file1.spec.ts file2.spec.ts'). Empty = all files."
         required: false
         default: ""
         type: string
@@ -493,9 +493,15 @@ jobs:
           PLAYWRIGHT_ARGS+=( "--reporter=line,blob" )
 
           # Run with test file as a safe positional arg after --
+          # Word-split TEST_FILE so multiple space-separated filenames become
+          # separate arguments to Playwright. Without read -ra, passing
+          # "file1.spec.ts file2.spec.ts" as a single quoted string causes
+          # Playwright to treat the entire value as one literal filename,
+          # find no match, and run 0 tests while still exiting 0 (ok: true).
           if [ -n "$TEST_FILE" ]; then
-            echo "Running: pnpm exec playwright test ${PLAYWRIGHT_ARGS[*]} -- $TEST_FILE"
-            pnpm exec playwright test "${PLAYWRIGHT_ARGS[@]}" -- "$TEST_FILE"
+            read -ra TEST_FILE_ARGS <<< "$TEST_FILE"
+            echo "Running: pnpm exec playwright test ${PLAYWRIGHT_ARGS[*]} -- ${TEST_FILE_ARGS[*]}"
+            pnpm exec playwright test "${PLAYWRIGHT_ARGS[@]}" -- "${TEST_FILE_ARGS[@]}"
           else
             echo "Running: pnpm exec playwright test ${PLAYWRIGHT_ARGS[*]}"
             pnpm exec playwright test "${PLAYWRIGHT_ARGS[@]}"

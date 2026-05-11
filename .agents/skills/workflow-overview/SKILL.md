@@ -245,6 +245,19 @@ gates     validation
 
 **Stage 3b -- Deploy Playwright Report:** Merges shard reports and deploys to GitHub Pages (`bkrupa/legacy-sports-deploys`).
 
+### Manual Playwright Dispatch (`run-playwright-tests.yml`)
+
+Separate from the CI Orchestrator. Triggered via `workflow_dispatch` or the nightly schedule (03:00 UTC). Key inputs:
+
+| Input         | Default         | Notes                                                                                                                                                      |
+| ------------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `test-suite`  | `e2e`           | `e2e`, `integration`, or `all`                                                                                                                             |
+| `test-file`   | _(empty = all)_ | Space-separated filenames relative to testDir (e.g. `"file1.spec.ts file2.spec.ts"`). Each name is a separate Playwright positional arg.                   |
+| `test-grep`   | `(all)`         | Playwright `--grep` pattern; pipe-separated for OR (e.g. `"roster-management\|trade-flow"`). Use instead of `test-file` for tag or partial-name filtering. |
+| `shard-total` | `2`             | Number of parallel shards                                                                                                                                  |
+
+Reports are published to `playwright-report/manual-<run_number>/` on GitHub Pages. Always verify `stats.total > 0` after reading a report — Playwright exits 0 with `ok: true` even when 0 tests run, so a green CI run does not guarantee tests executed. See [read-playwright-report skill](../read-playwright-report/SKILL.md).
+
 **Stage 4 -- Summarize & Report:** Always runs (unless cancelled).
 
 - Collects results from all stages
