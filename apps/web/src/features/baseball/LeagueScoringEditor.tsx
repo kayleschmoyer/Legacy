@@ -963,6 +963,8 @@ export function LeagueScoringEditor(
               {saveSuccess && (
                 <XStack
                   key="success"
+                  role="status"
+                  aria-live="polite"
                   animation="quick"
                   enterStyle={{ opacity: 0, y: -4 }}
                   exitStyle={{ opacity: 0, y: -4 }}
