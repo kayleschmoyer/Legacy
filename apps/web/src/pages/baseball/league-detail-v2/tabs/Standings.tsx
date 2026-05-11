@@ -116,9 +116,16 @@ export const StandingsTab: React.FC<StandingsTabProps> = ({
     [standingsData?.getLeagueStandings],
   );
 
+  // Always run the bracket query — do NOT skip on !playoffEnabled. The
+  // `league.playoffEnabled` field can be stale/null in the Apollo cache
+  // when the league was just created via `createLeagueAndTeams` (whose
+  // resolver returns playoffEnabled=null because LeagueService.createLeague
+  // omits it from .returning()), so skipping the query here would hide an
+  // existing bracket from the user. Render the section if a bracket exists
+  // regardless of the flag (see the gate below).
   const { data: bracketData } = useGetPlayoffBracketQuery({
     variables: { leagueId: league.id ?? 0 },
-    skip: !league.id || !league.playoffEnabled,
+    skip: !league.id,
     errorPolicy: 'all',
   });
 
@@ -294,7 +301,7 @@ export const StandingsTab: React.FC<StandingsTabProps> = ({
         </div>
       </Section>
 
-      {league.playoffEnabled ? (
+      {league.playoffEnabled || bracketData?.getPlayoffBracket ? (
         <Section
           title="Playoff Bracket"
           sub={league.playoffFormat ?? 'Single elimination'}

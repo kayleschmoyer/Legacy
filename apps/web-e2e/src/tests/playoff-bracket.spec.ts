@@ -478,3 +478,91 @@ test.describe('Playoff Bracket — scheduled bracket @regression', () => {
     await expect(page.getByText('—').first()).toBeVisible();
   });
 });
+
+// LS-4326: regression guard — bracket section must render whenever a bracket
+// exists, even if `league.playoffEnabled` is null/false in the Apollo cache.
+// Reproduces the integration spec failure mode where
+// `createLeagueAndTeams` returns playoffEnabled=null (LeagueService.createLeague
+// omits playoff fields from .returning()), polluting the cache so the
+// subsequent league query reads playoffEnabled as null even though the DB has
+// it set to true.
+test.describe('Playoff Bracket — playoffEnabled flag stale @regression', () => {
+  test('renders bracket section when playoffEnabled is null but bracket exists', async ({
+    page,
+  }) => {
+    const leagueWithNullFlag = {
+      ...MOCK_LEAGUE,
+      playoffEnabled: null,
+      playoffFormat: null,
+      playoffMultiWeek: null,
+    };
+    await page.route(isGraphQLEndpoint, async (route) => {
+      const postData = route.request().postData()?.toLowerCase() ?? '';
+      if (postData.includes('getplayoffbracket')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: { getPlayoffBracket: MOCK_BRACKET_COMPLETED },
+          }),
+        });
+      } else if (postData.includes('getleagueteams')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { leagueTeams: MOCK_TEAMS } }),
+        });
+      } else if (postData.includes('getleaguestandings')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: { getLeagueStandings: MOCK_STANDINGS },
+          }),
+        });
+      } else if (postData.includes('getpositionsforleague')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { leaguePositions: MOCK_POSITIONS } }),
+        });
+      } else if (
+        postData.includes('"getleaguebyid"') ||
+        postData.includes('"getleague"')
+      ) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { league: leagueWithNullFlag } }),
+        });
+      } else if (postData.includes('getuserteamid')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { userTeamId: 1 } }),
+        });
+      } else if (
+        postData.includes('getusers') ||
+        postData.includes('getuserleagues')
+      ) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: { userLeagues: [leagueWithNullFlag] },
+          }),
+        });
+      } else {
+        await unmockedGraphQLFallback(route);
+      }
+    });
+    await page.goto('/baseball/league/1/standings');
+    await page.waitForLoadState('load');
+
+    await expect(
+      page.getByRole('heading', { name: 'Playoff Bracket' }),
+    ).toBeVisible();
+    // Champion team from MOCK_BRACKET_COMPLETED also resolves through.
+    await expect(page.getByText('Alpha Squad').first()).toBeVisible();
+  });
+});
