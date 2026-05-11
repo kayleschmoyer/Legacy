@@ -89,7 +89,7 @@ When a PR is authored by an agent and reviewed by the Code Reviewer Bot, the age
 
 After the bot posts its Cycle 1 review, the agent must:
 
-1. Reply to **every open thread** with exactly one of:
+1. Reply to **every open thread** with exactly one of — post each reply via `github_reply_to_review_thread({ threadId: "PRRT_...", body: "..." })` (local/headless; ToolSearch: `"reply_to_review_thread"`) or `mcp__github__add_reply_to_pull_request_comment` (preferred on Claude Code on the web to avoid OAuth attribution to user's personal token):
    - `FIX: <sha>` — the fix is already committed at `<sha>`
    - `JUSTIFY: <rationale>` — the finding is incorrect or the suggestion is out of scope; explain why
 2. Push any fix commits.
@@ -104,7 +104,7 @@ After the bot posts its Cycle 1 review, the agent must:
 
 If the Cycle 2 review contains mandates (CHANGES_REQUESTED), the agent must:
 
-1. Reply to **every open thread** with:
+1. Reply to **every open thread** with (use `github_reply_to_review_thread({ threadId: "PRRT_...", body: "FIX: <sha>" })`):
    - `FIX: <sha>` — the fix is committed at `<sha>` (the only accepted reply in Cycle 2)
 2. Push any fix commits.
 3. **Resolve every thread answered with `FIX:`** in a single batched `github_resolve_threads({ threadIds: [...], prNumber: PR# })` call.

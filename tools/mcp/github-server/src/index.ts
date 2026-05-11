@@ -590,53 +590,70 @@ export function createServer(): McpServer {
     async (params) => listReviews(params),
   );
 
-  // --- github_reply_to_review ---
-  server.tool(
+  // --- github_reply_to_review / github_reply_to_review_thread ---
+  // Both names resolve to the same schema and handler (LS-4233).
+  // github_reply_to_review_thread is the canonical search name agents use during bot-review cycles.
+  const registerReplyToReview = (toolName: string, toolDescription: string) => {
+    server.tool(
+      toolName,
+      toolDescription,
+      {
+        body: z
+          .string()
+          .trim()
+          .min(1, 'Reply body cannot be empty')
+          .describe(
+            'Markdown body of the reply comment (e.g. "FIX: abc1234" or "JUSTIFY: not a bug")',
+          ),
+        threadId: z
+          .string()
+          .optional()
+          .describe(
+            'GraphQL node ID of the review thread (from github_get_review_threads). Use this OR commentId+number, never both.',
+          ),
+        commentId: z.coerce
+          .number()
+          .int()
+          .positive()
+          .optional()
+          .describe(
+            'Numeric REST comment ID (databaseId from github_get_review_threads). Requires "number" or "prNumber" param. Use this OR threadId, never both.',
+          ),
+        number: z.coerce
+          .number()
+          .int()
+          .positive()
+          .optional()
+          .describe(
+            'PR number. Required when using commentId. Alias: prNumber.',
+          ),
+        prNumber: z.coerce
+          .number()
+          .int()
+          .positive()
+          .optional()
+          .describe('Alias for "number" — use either, not both.'),
+      },
+      async (params) => {
+        const validation = resolveReplyToReviewInput(params);
+        if ('error' in validation) {
+          return {
+            isError: true,
+            content: [{ type: 'text', text: validation.error }],
+          };
+        }
+        return replyToReview(validation);
+      },
+    );
+  };
+
+  registerReplyToReview(
     'github_reply_to_review',
     'Post a reply to a PR review thread. Provide EITHER threadId (GraphQL node ID) OR both commentId AND number/prNumber (REST) — not both paths at once.',
-    {
-      body: z
-        .string()
-        .trim()
-        .min(1, 'Reply body cannot be empty')
-        .describe('Markdown body of the reply comment'),
-      threadId: z
-        .string()
-        .optional()
-        .describe(
-          'GraphQL node ID of the review thread (from github_get_review_threads). Use this OR commentId+number, never both.',
-        ),
-      commentId: z.coerce
-        .number()
-        .int()
-        .positive()
-        .optional()
-        .describe(
-          'Numeric REST comment ID (databaseId from github_get_review_threads). Requires "number" or "prNumber" param. Use this OR threadId, never both.',
-        ),
-      number: z.coerce
-        .number()
-        .int()
-        .positive()
-        .optional()
-        .describe('PR number. Required when using commentId. Alias: prNumber.'),
-      prNumber: z.coerce
-        .number()
-        .int()
-        .positive()
-        .optional()
-        .describe('Alias for "number" — use either, not both.'),
-    },
-    async (params) => {
-      const validation = resolveReplyToReviewInput(params);
-      if ('error' in validation) {
-        return {
-          isError: true,
-          content: [{ type: 'text', text: validation.error }],
-        };
-      }
-      return replyToReview(validation);
-    },
+  );
+  registerReplyToReview(
+    'github_reply_to_review_thread',
+    'Post a reply to a PR review thread (use for FIX: <sha> or JUSTIFY: <rationale> bot-review replies). Canonical name for ToolSearch. Identical to github_reply_to_review. Provide EITHER threadId (GraphQL node ID) OR both commentId AND number/prNumber (REST) — not both paths at once.',
   );
 
   // --- github_comment_pr ---
