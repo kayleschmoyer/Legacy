@@ -117,3 +117,7 @@ Run the full suite with `make pc`. See [references/makefile.md](references/makef
 
 - [Testing](../test/SKILL.md)
 - [No Lint Disable](../no-lint-disable/SKILL.md)
+
+## Architecture Decision
+
+- [ADR 0001: Use pnpm workspaces + Nx for monorepo orchestration](../../../docs/decisions/0001-pnpm-workspaces-and-nx.md)
