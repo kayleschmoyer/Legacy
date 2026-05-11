@@ -91,14 +91,29 @@ jobs:
           include-optional-deps: false
 
       - name: "Run DB migrations"
+        # lib/db-client/src/config/credentials.ts resolveLocalCredentials() reads
+        # DB_HOST, DB_USER, DB_PASSWORD, DB_NAME individually via getEnvVarOptional /
+        # getEnvVarRequired — it never parses DATABASE_URL. USE_LOCAL_CREDENTIALS=true
+        # bypasses the AWS Secrets Manager lookup and skips SSL setup for Docker Postgres.
         env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/legacy_sports_test
+          USE_LOCAL_CREDENTIALS: "true"
+          DB_HOST: "localhost:5432"
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+          DB_NAME: legacy_sports_test
         run: |
-          echo "Running migrations against $DATABASE_URL"
+          echo "Running migrations against ${DB_HOST}/${DB_NAME}"
           pnpm --filter @legacy-sports/db-client run db:migrate
 
       - name: "Run DB Integration Tests"
+        # Same credential env vars as the migration step above; TEST_DATABASE_URL is
+        # kept for any test fixtures that reference it directly via process.env.
         env:
+          USE_LOCAL_CREDENTIALS: "true"
+          DB_HOST: "localhost:5432"
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+          DB_NAME: legacy_sports_test
           TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/legacy_sports_test
         run: pnpm exec nx run db:test:db
 
