@@ -159,6 +159,7 @@ test.describe
 
   test('Phase 3: Automated random draft runs to completion', async ({
     commissionerPage: page,
+    apiCommissioner,
   }) => {
     // Automated drafts can take 120–360s; allow generous time for Lambda cold starts
     test.setTimeout(480_000);
@@ -207,7 +208,10 @@ test.describe
     });
 
     await test.step('Wait for Season Active status', async () => {
-      await waitForSeasonActive(page, state.leagueId, { deadlineMs: 360_000 });
+      await waitForSeasonActive(page, state.leagueId, {
+        deadlineMs: 360_000,
+        api: apiCommissioner,
+      });
     });
   });
 

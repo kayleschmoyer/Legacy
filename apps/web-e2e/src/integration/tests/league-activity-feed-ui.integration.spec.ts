@@ -183,6 +183,7 @@ test.describe
 
   test('Phase 3: Automated random draft', async ({
     commissionerPage: page,
+    apiCommissioner,
   }) => {
     test.setTimeout(240_000);
 
@@ -230,7 +231,10 @@ test.describe
     });
 
     await test.step('Wait for draft to complete', async () => {
-      await waitForSeasonActive(page, state.leagueId, { deadlineMs: 180_000 });
+      await waitForSeasonActive(page, state.leagueId, {
+        deadlineMs: 180_000,
+        api: apiCommissioner,
+      });
     });
   });
 

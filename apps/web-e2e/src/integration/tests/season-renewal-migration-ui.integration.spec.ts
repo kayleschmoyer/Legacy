@@ -208,6 +208,7 @@ test.describe
 
   test('Phase 3: Automated draft runs to completion', async ({
     commissionerPage: page,
+    apiCommissioner,
   }) => {
     // Automated random drafts can take 150–240s (single Lambda batch).
     // This phase also triggers createAllMatchupsForLeague, which now creates
@@ -257,7 +258,10 @@ test.describe
     });
 
     await test.step('Wait for Season Active badge', async () => {
-      await waitForSeasonActive(page, state.leagueId, { deadlineMs: 240_000 });
+      await waitForSeasonActive(page, state.leagueId, {
+        deadlineMs: 240_000,
+        api: apiCommissioner,
+      });
     });
   });
 

@@ -16,6 +16,7 @@
 
 import { expect, test, unauthTest } from '../fixtures/auth-enhanced';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import { waitForSeasonActive } from '../integration/helpers/wait-for-season-active';
 
 function isGraphQLEndpoint(url: URL): boolean {
   const s = url.toString();
@@ -245,6 +246,71 @@ test.describe('Commissioner — reload vs goto after draft-start navigation (LS-
     await page.goto('/baseball/league/1/commissioner');
     await page.waitForLoadState('networkidle');
     await expect(page.getByText('Season Active')).toBeVisible();
+  });
+});
+
+// ── Deterministic backend-polling path (LS-4344) ──────────────────────────────
+//
+// Guards the `api`-parameter code path of waitForSeasonActive introduced in
+// LS-4321. This path polls `league.draftStatus` directly from the backend
+// before asserting the UI badge — eliminating the Apollo cache/render race
+// that caused repeated flakes across 6+ specs (LS-4237 → LS-4344).
+//
+// The key invariant: when `api` is provided, the helper must NOT assert the UI
+// until the backend has confirmed draftStatus is `active` or `completed`. The
+// test simulates a queued → completed transition over multiple API poll cycles.
+
+test.describe('Commissioner — deterministic api-polling path (LS-4344)', () => {
+  test('waitForSeasonActive with api waits for backend draftStatus before asserting UI badge', async ({
+    page,
+  }) => {
+    let apiPollCount = 0;
+
+    await page.route(isGraphQLEndpoint, async (route) => {
+      const postData = route.request().postData()?.toLowerCase() ?? '';
+      const isGetLeague =
+        postData.includes('"getleaguebyid"') ||
+        postData.includes('"getleague"');
+
+      if (isGetLeague) {
+        // UI query: always return completed so the badge renders on navigation
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: { league: makeLeague({ draftStatus: 'completed' }) },
+          }),
+        });
+      } else if (postData.includes('draftstatus')) {
+        // Direct draftStatus poll from waitForSeasonActive api path.
+        // First poll returns queued; second+ return completed.
+        apiPollCount++;
+        const draftStatus = apiPollCount >= 2 ? 'completed' : 'queued';
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { league: { draftStatus } } }),
+        });
+      } else {
+        await unmockedGraphQLFallback(route);
+      }
+    });
+
+    // Start on a non-commissioner URL to simulate post-draft-start state
+    await page.goto('/baseball/league/1');
+    await page.waitForLoadState('networkidle');
+
+    // page.request shares the browser context so page.route() intercepts it
+    await waitForSeasonActive(page, 1, {
+      api: page.request,
+      deadlineMs: 30_000,
+    });
+
+    // Badge visible after the deterministic path completes
+    await expect(page.getByText('Season Active')).toBeVisible();
+
+    // API was actually polled (not just UI checked) — confirms the gating logic ran
+    expect(apiPollCount).toBeGreaterThanOrEqual(2);
   });
 });
 
