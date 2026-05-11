@@ -49,29 +49,34 @@
             "context": "No Merge Conflicts"
           },
           {
-            "_comment": "ESLint job in ci-pipeline.yml, surfaced as a composite check via workflow_call from ci-orchestrator.yml. Context name = outer job display name + ' / ' + inner job name.",
+            "_comment": "ESLint job in ci-pipeline.yml, surfaced as a composite check via workflow_call from ci-orchestrator.yml. Context name = outer job display name + ' / ' + inner job name. integration_id:15368 (GitHub Actions) is required so the ruleset evaluator matches the check-run; without it, GitHub shows 'Expected — Waiting for status to be reported' despite CI passing (LS-4345).",
             "_calledWorkflow": true,
-            "context": "🚀 CI Pipeline / lint"
+            "context": "🚀 CI Pipeline / lint",
+            "integration_id": 15368
           },
           {
-            "_comment": "Prettier formatting job in ci-pipeline.yml, surfaced via workflow_call from ci-orchestrator.yml.",
+            "_comment": "Prettier formatting job in ci-pipeline.yml, surfaced via workflow_call from ci-orchestrator.yml. integration_id:15368 required for ruleset check-run matching (LS-4345).",
             "_calledWorkflow": true,
-            "context": "🚀 CI Pipeline / format"
+            "context": "🚀 CI Pipeline / format",
+            "integration_id": 15368
           },
           {
-            "_comment": "Build job (apps, lambdas, libraries) in ci-pipeline.yml, surfaced via workflow_call from ci-orchestrator.yml.",
+            "_comment": "Build job (apps, lambdas, libraries) in ci-pipeline.yml, surfaced via workflow_call from ci-orchestrator.yml. integration_id:15368 required for ruleset check-run matching (LS-4345).",
             "_calledWorkflow": true,
-            "context": "🚀 CI Pipeline / build"
+            "context": "🚀 CI Pipeline / build",
+            "integration_id": 15368
           },
           {
-            "_comment": "Unit/integration test job in ci-pipeline.yml, surfaced via workflow_call from ci-orchestrator.yml.",
+            "_comment": "Unit/integration test job in ci-pipeline.yml, surfaced via workflow_call from ci-orchestrator.yml. integration_id:15368 required for ruleset check-run matching (LS-4345).",
             "_calledWorkflow": true,
-            "context": "🚀 CI Pipeline / test"
+            "context": "🚀 CI Pipeline / test",
+            "integration_id": 15368
           },
           {
-            "_comment": "Custom checks job (migration immutability, schema drift, skill linting) in ci-pipeline.yml, surfaced via workflow_call from ci-orchestrator.yml.",
+            "_comment": "Custom checks job (migration immutability, schema drift, skill linting) in ci-pipeline.yml, surfaced via workflow_call from ci-orchestrator.yml. integration_id:15368 required for ruleset check-run matching (LS-4345).",
             "_calledWorkflow": true,
-            "context": "🚀 CI Pipeline / custom-checks"
+            "context": "🚀 CI Pipeline / custom-checks",
+            "integration_id": 15368
           }
         ]
       }
