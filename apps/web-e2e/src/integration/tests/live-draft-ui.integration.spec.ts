@@ -173,8 +173,20 @@ test.describe
     });
 
     await test.step('Click Start Draft', async () => {
-      const startBtn = page.getByRole('button', { name: /Start Draft/i });
-      await expect(startBtn).toBeVisible({ timeout: 15000 });
+      // Locate by data-testid (stable across loading states) and gate on
+      // `toBeEnabled` rather than the accessible-name regex. NextStepControl
+      // always renders the button, but while `useGetMatchupsForLeagueQuery`
+      // is in flight its text is "Processing..." and it is disabled — so
+      // `getByRole('button', { name: /Start Draft/i })` returns zero matches
+      // until the Apollo round-trip resolves. On the fresh league created in
+      // Phase 1, this query is a cold-start hit; manual-110 finished in 6.7 s
+      // but manual-111 exhausted the 15 s timeout (LS-4324, mirrors LS-4321's
+      // Lambda cold-start pattern). `toBeEnabled` gates on the same
+      // `matchupsLoading=false` flag the button binds to, so it returns the
+      // moment the underlying state is correct — no flake window.
+      const startBtn = page.getByTestId('start-draft-button');
+      await expect(startBtn).toBeEnabled({ timeout: 30000 });
+      await expect(startBtn).toHaveText(/Start Draft/i);
       await startBtn.click();
 
       // Confirm in the dialog
