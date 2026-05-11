@@ -14,6 +14,8 @@
  *      integration suite depends on
  */
 
+import type { APIRequestContext } from '@playwright/test';
+
 import { expect, test, unauthTest } from '../fixtures/auth-enhanced';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 import { waitForSeasonActive } from '../integration/helpers/wait-for-season-active';
@@ -266,43 +268,39 @@ test.describe('Commissioner — deterministic api-polling path (LS-4344)', () =>
   }) => {
     let apiPollCount = 0;
 
-    await page.route(isGraphQLEndpoint, async (route) => {
-      const postData = route.request().postData()?.toLowerCase() ?? '';
-      const isGetLeague =
-        postData.includes('"getleaguebyid"') ||
-        postData.includes('"getleague"');
+    // page.route() intercepts only requests originating from the page itself
+    // (XHRs/fetch from React). It does NOT intercept requests made via
+    // page.request — those go through Playwright's APIRequestContext in Node
+    // and bypass the page-level route table (LS-4348). The UI's
+    // GetLeagueById call still goes through page.route, so mock it normally.
+    await setupLeagueMock(page, 'completed');
 
-      if (isGetLeague) {
-        // UI query: always return completed so the badge renders on navigation
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: { league: makeLeague({ draftStatus: 'completed' }) },
-          }),
-        });
-      } else if (postData.includes('draftstatus')) {
-        // Direct draftStatus poll from waitForSeasonActive api path.
-        // First poll returns queued; second+ return completed.
-        apiPollCount++;
+    // Stub APIRequestContext so the deterministic backend-poll branch runs
+    // hermetically. First poll → queued; subsequent polls → completed,
+    // simulating the draftStatus transition the helper is designed to wait
+    // for. Only the methods graphql.ts consumes (post + a minimal response
+    // object exposing ok/status/json/text) need to be implemented.
+    const apiStub = {
+      post: () => {
+        apiPollCount += 1;
         const draftStatus = apiPollCount >= 2 ? 'completed' : 'queued';
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { league: { draftStatus } } }),
+        const payload = { data: { league: { draftStatus } } };
+        const body = JSON.stringify(payload);
+        return Promise.resolve({
+          ok: () => true,
+          status: () => 200,
+          json: () => Promise.resolve(payload),
+          text: () => Promise.resolve(body),
         });
-      } else {
-        await unmockedGraphQLFallback(route);
-      }
-    });
+      },
+    } as unknown as APIRequestContext;
 
     // Start on a non-commissioner URL to simulate post-draft-start state
     await page.goto('/baseball/league/1');
     await page.waitForLoadState('networkidle');
 
-    // page.request shares the browser context so page.route() intercepts it
     await waitForSeasonActive(page, 1, {
-      api: page.request,
+      api: apiStub,
       deadlineMs: 30_000,
     });
 
