@@ -48,6 +48,7 @@ import {
 } from './lib/cycle-protocol.mjs';
 import { FORMAT_ERROR_MESSAGE } from './lib/parse-author-response.mjs';
 import { createFallbackProvider } from './lib/fallback.mjs';
+import { verifyReferencedPaths } from './lib/ref-verifier.mjs';
 
 const STRIP_LOG_MAX_FINDINGS = 3;
 const STRIP_LOG_MAX_TITLE_LEN = 60;
@@ -395,6 +396,23 @@ async function main() {
     process.exit(0);
   }
 
+  // Verify file paths referenced in changed .md files against the base branch
+  // so the LLM doesn't flag correctly-documented cross-references as "missing
+  // implementation" (LS-4330). Non-fatal — proceed without context on error.
+  let existingCrossReferences = [];
+  try {
+    existingCrossReferences = verifyReferencedPaths(ctx.diff, ctx.baseRefName);
+    if (existingCrossReferences.length > 0) {
+      process.stdout.write(
+        `[reviewer] Reference verifier: ${existingCrossReferences.length} cross-reference(s) verified in ${ctx.baseRefName}: ${existingCrossReferences.join(', ')}\n`,
+      );
+    }
+  } catch (err) {
+    process.stderr.write(
+      `[reviewer] Reference verifier failed (non-fatal): ${err instanceof Error ? err.message : String(err)}\n`,
+    );
+  }
+
   // Build prompts — fail open on infra errors (e.g. missing reviewer-rules.md)
   let systemPrompt, userPrompt;
   try {
@@ -404,7 +422,11 @@ async function main() {
       postReviewCommitShas,
     );
     systemPrompt = buildSystemPrompt(cycleRoleSection);
-    userPrompt = buildUserPrompt(ctx, authorResponsesSection);
+    userPrompt = buildUserPrompt(
+      ctx,
+      authorResponsesSection,
+      existingCrossReferences,
+    );
   } catch (err) {
     process.stderr.write(
       `[reviewer] Failed to build prompts: ${err instanceof Error ? err.message : String(err)}\n`,

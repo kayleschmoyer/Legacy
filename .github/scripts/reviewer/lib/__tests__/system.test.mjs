@@ -31,6 +31,71 @@ describe('buildUserPrompt — baseline (no author responses)', () => {
   });
 });
 
+describe('buildUserPrompt — with existing cross-references (LS-4330)', () => {
+  const refs = ['scripts/git-hooks/pre-commit', '.github/workflows/review.yml'];
+
+  it('includes the verified paths section when existingCrossReferences is non-empty', () => {
+    const result = buildUserPrompt(BASE_CTX, '', refs);
+    assert.ok(
+      result.includes('scripts/git-hooks/pre-commit'),
+      'should list the first verified path',
+    );
+    assert.ok(
+      result.includes('.github/workflows/review.yml'),
+      'should list the second verified path',
+    );
+  });
+
+  it('includes the "do not raise missing implementation" directive', () => {
+    const result = buildUserPrompt(BASE_CTX, '', refs);
+    assert.ok(
+      result.includes('Do NOT raise a "missing implementation" finding'),
+      'should include the suppression directive',
+    );
+  });
+
+  it('names the base branch in the verification note', () => {
+    const result = buildUserPrompt(BASE_CTX, '', refs);
+    assert.ok(
+      result.includes('`main`'),
+      'should reference the base branch name from ctx',
+    );
+  });
+
+  it('omits the cross-references section when list is empty', () => {
+    const result = buildUserPrompt(BASE_CTX, '', []);
+    assert.ok(
+      !result.includes('VERIFIED CROSS-REFERENCES'),
+      'should not include the cross-references block when empty',
+    );
+  });
+
+  it('omits the cross-references section when not provided', () => {
+    const result = buildUserPrompt(BASE_CTX);
+    assert.ok(
+      !result.includes('VERIFIED CROSS-REFERENCES'),
+      'should not include the cross-references block when omitted',
+    );
+  });
+
+  it('positions cross-references after the diff block', () => {
+    const result = buildUserPrompt(BASE_CTX, '', refs);
+    const diffEnd = result.indexOf(
+      '```\n\n<!-- BEGIN VERIFIED CROSS-REFERENCES',
+    );
+    assert.ok(
+      diffEnd !== -1,
+      'cross-references block must appear after closing diff fence',
+    );
+  });
+
+  it('still includes JSON output instructions when cross-references are present', () => {
+    const result = buildUserPrompt(BASE_CTX, '', refs);
+    assert.ok(result.includes('{"findings":[]}'));
+    assert.ok(result.includes('"severity"'));
+  });
+});
+
 describe('buildUserPrompt — with author responses (Cycle 2+)', () => {
   const authorSection =
     '## Author Responses\n\n**SQL injection finding**: JUSTIFY: All inputs are sanitised upstream.';
