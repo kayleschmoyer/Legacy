@@ -153,6 +153,32 @@ test.describe
       await expect(page).toHaveURL(/\/baseball\/league\/\d+/, {
         timeout: 15000,
       });
+
+      // The URL redirect alone doesn't guarantee the leagueMembers row is
+      // queryable yet (LS-4350): later phases that re-enter the league as
+      // this manager will see "League not found" because `GetLeagueById`
+      // throws ForbiddenError when the membership lookup returns no row.
+      // Poll the manager's own `userTeamId` with their JWT until it
+      // resolves to a non-null team id before progressing.
+      await expect
+        .poll(
+          async () => {
+            const data = await gqlFetch<{ userTeamId: number | null }>(
+              jwt,
+              `query GetUserTeamIdForJoin($leagueId: Int!) {
+                 userTeamId(leagueId: $leagueId)
+               }`,
+              { leagueId: state.leagueId },
+            );
+            return data.userTeamId;
+          },
+          {
+            timeout: 15_000,
+            intervals: [500, 1_000, 2_000],
+            message: `Manager join for "${teamName}" did not persist a leagueMembers row in league ${state.leagueId} within 15s`,
+          },
+        )
+        .not.toBeNull();
     }
 
     // Restore commissioner identity
@@ -516,11 +542,23 @@ test.describe
     await test.step('Navigate to manager 1 roster', async () => {
       await page.goto(`/baseball/league/${state.leagueId}/roster`);
       await page.waitForLoadState('load');
-      await expect(page).toHaveURL(/\/roster/);
+      // Pin the URL to the league we just created — the loose `/roster/`
+      // match would also pass on a redirect to a different league (LS-4350).
+      await expect(page).toHaveURL(
+        new RegExp(`/baseball/league/${state.leagueId}/roster`),
+      );
       await expect(page.locator('body')).not.toContainText(
         'Unexpected Application Error',
         { timeout: 30000 },
       );
+      // Guard against the LS-4350 "League not found" rendering: if
+      // `GetLeagueById` rejects (e.g. membership lag), LeagueDetailPageV2
+      // short-circuits before RosterTab mounts and the roster locator
+      // would silently time out. Asserting a roster section heading
+      // surfaces that failure mode with a meaningful error instead.
+      await expect(
+        page.getByText('Pitching', { exact: false }).first(),
+      ).toBeVisible({ timeout: 30_000 });
     });
 
     await test.step('Verify manager roster has player slots', async () => {
