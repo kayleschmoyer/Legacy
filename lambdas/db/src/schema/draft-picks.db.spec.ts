@@ -977,7 +977,7 @@ describe('Draft Picks - DB Integration Tests', () => {
           name: leagueFixture.name,
           owner: owner.id,
           inviteCode: leagueFixture.inviteCode,
-          draftStatus: 'pre-draft',
+          draftStatus: 'not-started',
         })
         .returning();
 
@@ -1230,6 +1230,80 @@ describe('Draft Picks - DB Integration Tests', () => {
 
       const finalPick = await getCurrentDraftPickInfo(publicDb(), draft.id);
       expect(finalPick!.isComplete).toBe(true);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // LS-4343: Regression guard — 30 s pick timer (set via updateDraftSettings in
+  // Phase 3 of the integration test) must propagate through commitDraftPick so
+  // that autoProcessDraftPicks can detect expired deadlines in the timer-expiry
+  // fallback path.  Without this invariant the Phase 5 integration test would
+  // stall for 120 s per pick (the default) instead of 30 s, exceeding the timeout.
+  describe('LS-4343: short pick-timer (30 s) deadline propagation and full-draft completion', () => {
+    const publicDb = () => db as unknown as PublicDb;
+
+    it('each non-final commitDraftPick sets currentPickDeadline ≈ now + 30 s and draft completes with all picks committed', async () => {
+      const {
+        league,
+        draft,
+        teams: teamFix,
+        players: playerFix,
+      } = await seedDraftFixture(2);
+
+      const PICK_TIMER = 30; // seconds — matches Phase 3 updateDraftSettings call
+      // Snake order for 2 teams, maxRosterSize=2: A B B A (indices 0 1 1 0)
+      const expectedTeamIndices = [0, 1, 1, 0];
+
+      for (let i = 0; i < 4; i++) {
+        const pickInfo = await getCurrentDraftPickInfo(publicDb(), draft.id);
+        expect(pickInfo).not.toBeNull();
+        expect(pickInfo!.teamId).toBe(teamFix[expectedTeamIndices[i]].id);
+
+        const before = Date.now();
+        const result = await commitDraftPick({
+          tx: publicDb(),
+          draftId: draft.id,
+          leagueId: league.id,
+          pickInfo: pickInfo!,
+          playerId: playerFix[i].id,
+          maxRosterSize: 2,
+          pickTimeLimitSeconds: PICK_TIMER,
+          isMockDraft: true,
+        });
+        const after = Date.now();
+
+        const isLastPick = i === 3;
+        expect(result.isDraftComplete).toBe(isLastPick);
+
+        // Non-final picks must set currentPickDeadline to now + PICK_TIMER (±2 s).
+        // This is the invariant autoProcessDraftPicks relies on: it fires when
+        // current_pick_deadline <= now, so a correct deadline is required for the
+        // timer-expiry fallback path to work within the Phase 5 test timeout.
+        if (!isLastPick) {
+          const [draftRow] = await db
+            .select({ currentPickDeadline: drafts.currentPickDeadline })
+            .from(drafts)
+            .where(eq(drafts.id, draft.id));
+          expect(draftRow.currentPickDeadline).not.toBeNull();
+          const deadlineMs = draftRow.currentPickDeadline!.getTime();
+          const loMs = before + PICK_TIMER * 1000 - 2_000;
+          const hiMs = after + PICK_TIMER * 1000 + 2_000;
+          expect(deadlineMs).toBeGreaterThanOrEqual(loMs);
+          expect(deadlineMs).toBeLessThanOrEqual(hiMs);
+        }
+      }
+
+      // All 4 pick rows must be committed
+      const allPicks = await db
+        .select()
+        .from(draftPicks)
+        .where(eq(draftPicks.draftId, draft.id));
+      expect(allPicks).toHaveLength(4);
+
+      // Draft must be marked complete
+      const afterComplete = await getCurrentDraftPickInfo(publicDb(), draft.id);
+      expect(afterComplete).not.toBeNull();
+      expect(afterComplete!.isComplete).toBe(true);
     });
   });
 

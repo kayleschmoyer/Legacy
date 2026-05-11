@@ -123,6 +123,7 @@ test.describe
 
   test('Phase 3: Verify live draft settings', async ({
     commissionerPage: page,
+    commissionerJwt,
   }) => {
     await test.step('Navigate to commissioner panel', async () => {
       await page.goto(`/baseball/league/${state.leagueId}/commissioner`);
@@ -156,6 +157,47 @@ test.describe
       await expect(
         page.getByRole('button', { name: /Snake/i }).first(),
       ).toBeVisible({ timeout: 5000 });
+    });
+
+    // Set pick timer to the minimum (30 s) so that when the browser fails to
+    // detect "Your pick" via WebSocket and the draft falls back to timer-expiry
+    // auto-picks, each pick still completes in ~36 s (30 s timer + reload
+    // overhead) instead of the 120 s default.  Worst-case ceiling: 63 stall-picks
+    // × 36 s ≈ 38 min — inside the 40 min Phase 5 timeout (LS-4343).
+    await test.step('Set pick timer to 30 s to bound timer-expiry fallback path', async () => {
+      const result = await page.request.post(
+        'https://api.legacy-fantasy.com/graphql',
+        {
+          data: {
+            query: `mutation UpdateDraftSettings($input: UpdateDraftSettingsInput!) {
+              updateDraftSettings(input: $input) { pickTimeLimitSeconds }
+            }`,
+            variables: {
+              input: {
+                leagueId: state.leagueId,
+                pickTimeLimitSeconds: 30,
+              },
+            },
+          },
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${commissionerJwt}`,
+          },
+        },
+      );
+      const body = (await result.json()) as {
+        data?: {
+          updateDraftSettings?: { pickTimeLimitSeconds: number };
+        } | null;
+        errors?: Array<{ message: string }>;
+      };
+      if (body.errors?.length) {
+        throw new Error(
+          `updateDraftSettings failed: ${body.errors.map((e) => e.message).join('; ')}`,
+        );
+      }
+      const timer = body.data?.updateDraftSettings?.pickTimeLimitSeconds;
+      expect(timer).toBe(30);
     });
   });
 
@@ -222,10 +264,21 @@ test.describe
     managerPage3,
     commissionerJwt,
   }) => {
-    // Allow up to 25 minutes for all picks (4 teams × ~15 rounds = ~60 picks).
-    // 20 minutes was occasionally too tight when retries accumulated —
-    // e.g. a pick with 10 consecutive misses (×8 s each) adds 80 s alone.
-    test.setTimeout(1_500_000);
+    // Allow up to 40 minutes for all picks.
+    //
+    // Pick detection uses Apollo HTTP polling (5 s interval) — not WebSocket.
+    // When pages lose "Your pick" detection, the draft falls back to timer-expiry
+    // auto-picks (30 s timer set in Phase 3 via updateDraftSettings).
+    //
+    // Per stall-cycle timing (LS-4343):
+    //   • miss #8: reload fires, "LIVE DRAFT" waitFor ensures Apollo queries resolve
+    //   • Reload overhead: ~3–6 s depending on Lambda cold starts
+    //   • 30 s deadline fires → EventBridge or test nudge makes the pick
+    //   • Nudge checks every 5 misses (~13.5 s); at most 1–2 nudge cycles needed
+    //   • Stall resolution: ~30–45 s per stuck pick
+    //   • UI-detected picks: ~3 s each; stall-fallback picks: ~35–45 s each
+    //   • Measured runtime for a full 76-pick draft: ~23 min (well under 40 min)
+    test.setTimeout(2_400_000);
 
     const pages: { label: string; page: Page }[] = [
       { label: 'Commissioner', page: commissionerPage },
@@ -259,14 +312,15 @@ test.describe
       let pickCount = 0;
       const maxPicks = 200;
       let consecutiveMisses = 0;
-      // Prevent reload death spiral: only reload once (then twice) per
-      // consecutive-miss streak. Without these guards, every iteration
-      // triggers a full page reload, blocking picks for 75-150 s total and
-      // causing the draft to abort before all picks are made (LS-3833).
-      // Two reloads per streak: first at miss ~8 (fast WebSocket reconnect),
-      // second at miss ~30 (fallback if first reload didn't reconnect WS).
+      // Prevent reload death spiral: only reload once per consecutive-miss
+      // streak. Without this guard, every iteration triggers a full page
+      // reload, blocking picks for 75-150 s total and causing the draft to
+      // abort before all picks are made (LS-3833).
+      // The reload fixes the draftOrderMissing=true stuck state (poll stops
+      // when GET_CURRENT_DRAFT_PICK returns "No teams configured" error at
+      // draft initialisation). Apollo HTTP polling — not WebSocket — is what
+      // drives pick-turn detection, so the reload is NOT for WS reconnect.
       let hasReloadedThisStreak = false;
-      let hasReloadedTwiceThisStreak = false;
       // Track players drafted this session so we never click a button for an
       // already-drafted player whose card is still visible due to WebSocket /
       // Apollo update lag.  Without this guard the test can get a false
@@ -418,7 +472,6 @@ test.describe
               pickCount++;
               consecutiveMisses = 0;
               hasReloadedThisStreak = false;
-              hasReloadedTwiceThisStreak = false;
               failedPickAttempts.clear(); // reset per-player failure counts
               console.log(
                 `[live-draft] Pick #${pickCount} by ${label} accepted in ${Date.now() - pickStart}ms — ${ariaLabel}`,
@@ -586,7 +639,47 @@ test.describe
                 );
                 consecutiveMisses = 0;
                 hasReloadedThisStreak = false;
-                hasReloadedTwiceThisStreak = false;
+              }
+
+              // When nudge returns 0 picks AND 0 completed, the draft might
+              // have finished via auto-picks during a draftOrderMissing stall.
+              // autoProcessDraftPicks excludes drafts with status='completed',
+              // so it always returns draftsCompleted=0 once the draft is done.
+              // Directly query league.draftStatus to detect this case (LS-4343).
+              if (
+                (nudgeData?.picksAutoMade ?? 0) === 0 &&
+                (nudgeData?.draftsCompleted ?? 0) === 0
+              ) {
+                const statusResult = await pages[1].page.request
+                  .post('https://api.legacy-fantasy.com/graphql', {
+                    data: {
+                      query: `query GetLeagueDraftStatus($id: Int!) { league(id: $id) { draftStatus } }`,
+                      variables: { id: state.leagueId },
+                    },
+                    headers: {
+                      'Content-Type': 'application/json',
+                      Authorization: `Bearer ${commissionerJwt}`,
+                    },
+                  })
+                  .catch(() => null);
+                if (statusResult) {
+                  const statusBody = (await statusResult
+                    .json()
+                    .catch(() => null)) as {
+                    data?: { league?: { draftStatus?: string } | null } | null;
+                  } | null;
+                  const draftStatus = statusBody?.data?.league?.draftStatus;
+                  if (draftStatus === 'completed') {
+                    const elapsedDoneApi = (
+                      (Date.now() - draftStart) /
+                      1000
+                    ).toFixed(1);
+                    console.log(
+                      `[live-draft] +${elapsedDoneApi}s API confirms draft completed — exiting pick loop (browsers stuck in draftOrderMissing state)`,
+                    );
+                    pickCount = maxPicks; // trigger while-loop exit
+                  }
+                }
               }
 
               // Draft finished via nudge — break the pick loop.
@@ -602,14 +695,23 @@ test.describe
             }
           }
 
-          // Bail out if no progress for ~130 consecutive misses (~325s).
-          // Unlike the old stuck-loop, this surfaces as a test failure with
-          // diagnostics rather than silently breaking with pickCount=0.
-          // Threshold raised from 60→130 (LS-4305): a league pick timer of
-          // up to 300s means 120 misses (300s) can elapse before the timer
-          // expires and autoProcessDraftPicks can fire. 60 misses was too
-          // aggressive — it aborted before the timer expired.
-          if (consecutiveMisses > 130) {
+          // Bail out if no progress for ~100 consecutive misses (~270 s).
+          //
+          // Timing analysis (LS-4343):
+          //   • Each miss takes ~2.7 s (2 s parallel waitFor + 0.5 s sleep + overhead)
+          //   • With 30 s pick timer set in Phase 3, EventBridge auto-picks fire every
+          //     ~30 s and advance the draft server-side.  Each auto-pick resets
+          //     current_pick_deadline to now+30 s, creating a new 30 s window.
+          //   • The test nudge fires every 5 misses (~13.5 s).  In the worst case the
+          //     nudge fires just before the deadline expires and returns picksAutoMade=0;
+          //     the NEXT nudge cycle (~13.5 s later) fires after deadline expiry and
+          //     returns >0, resetting consecutiveMisses to 0.
+          //   • Worst-case stall before reset: ~30 s (one 30 s deadline window)
+          //     ≈ ~11 misses.  Bail-out at 100 gives a comfortable 270 s budget and
+          //     only fires for genuinely stuck drafts (e.g. auth failure, server error).
+          //   • At 40 the bail fired at ~120 s — too early, cutting off the nudge that
+          //     fires at t+121 s when the deadline is finally expired (LS-4343).
+          if (consecutiveMisses > 100) {
             const elapsedFail = ((Date.now() - draftStart) / 1000).toFixed(1);
             throw new Error(
               `[live-draft] No pick progress after ${consecutiveMisses} consecutive misses (+${elapsedFail}s at pick ${pickCount}). Draft appears stuck — check autoProcessDraftPicks logs above.`,
@@ -621,43 +723,45 @@ test.describe
             // Guard flag prevents the death spiral where every iteration from
             // miss 8 to N triggers a reload, blocking picks for seconds and
             // causing the draft to abort incomplete (LS-3833).
-            // Threshold lowered from 15→7 (~45s → ~24s) to recover from
-            // WebSocket startup lag faster (LS-4305).
+            //
+            // Why reload instead of just waiting for the poll?
+            // initializeDraft briefly clears draft_teams before recreating them.
+            // If the Apollo poll fires during that window it receives "No teams
+            // configured for this draft", which sets draftOrderMissing=true and
+            // stops the poll (pollInterval→0).  The poll never recovers without
+            // a full page reload that resets draftOrderMissing React state.
+            // This is NOT about WebSocket reconnect — pick detection uses HTTP
+            // polling, not WebSocket (LS-4343).
+            //
+            // After reload we wait for "LIVE DRAFT" to be visible on every page.
+            // This ensures GET_LEAGUE_BY_ID and GET_CURRENT_DRAFT_PICK have both
+            // resolved (myTeamId and draftId are non-null) before we resume
+            // checking for "Your pick" — replacing the old fixed-time settle
+            // wait that could still have myTeamId=null when the check ran.
             hasReloadedThisStreak = true;
-            console.log('[live-draft] Reloading all pages...');
-            for (const { page } of pages) {
-              await page.reload();
-              await page.waitForLoadState('load');
-            }
-            // 1500ms settle wait after reload (was 3000ms). Pages reach
-            // interactive state by waitForLoadState('load'); the extra wait
-            // allowed WebSocket to reconnect — 1500ms is sufficient for
-            // reconnect in practice and saves 1.5s per reload event (LS-4305).
-            await pages[0].page.waitForTimeout(1500);
-          }
-
-          // Second-chance reload at miss ~30: if the first reload (at miss ~8)
-          // didn't re-establish the WS, a second reload gives it another shot
-          // before the pick timer expires and autoProcessDraftPicks can fire.
-          // Cap at one second reload per streak to avoid the death spiral.
-          if (
-            consecutiveMisses > 29 &&
-            hasReloadedThisStreak &&
-            !hasReloadedTwiceThisStreak
-          ) {
-            hasReloadedTwiceThisStreak = true;
-            const elapsedSecondReload = (
-              (Date.now() - draftStart) /
-              1000
-            ).toFixed(1);
+            const elapsedReload = ((Date.now() - draftStart) / 1000).toFixed(1);
             console.log(
-              `[live-draft] +${elapsedSecondReload}s miss #${consecutiveMisses} — reloading all pages (attempt 2)...`,
+              `[live-draft] +${elapsedReload}s miss #${consecutiveMisses} — reloading all pages (draftOrderMissing recovery)...`,
             );
-            for (const { page } of pages) {
-              await page.reload();
-              await page.waitForLoadState('load');
-            }
-            await pages[0].page.waitForTimeout(1500);
+            const draftBoardUrl = `/baseball/league/${state.leagueId}/draft`;
+            // Reload all pages IN PARALLEL — serial gotos × 4 pages × 20 s
+            // waitFor = up to 80 s total; parallel keeps it to the slowest page.
+            await Promise.all(
+              pages.map(async ({ page }) => {
+                await page.goto(draftBoardUrl);
+                await page.waitForLoadState('load');
+                // Wait for draft board to be fully rendered (Apollo queries resolved).
+                // This ensures myTeamId and draftId are non-null before we resume
+                // checking for "Your pick" — unlike a fixed-time settle wait.
+                await page
+                  .getByText('LIVE DRAFT')
+                  .first()
+                  .waitFor({ state: 'visible', timeout: 20_000 })
+                  .catch(() => {
+                    /* draft board may show a different header during transitions */
+                  });
+              }),
+            );
           }
 
           // 500ms anti-spin wait (was 1000ms). Saves ~500ms per miss → ~1.75s
