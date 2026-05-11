@@ -222,6 +222,7 @@ gates     validation
 
 - Agent skill lint (`node scripts/lint-skills.js`)
 - Migration immutability check
+- Touch-map documentation freshness (`node scripts/lint-touch-map.js`) — advisory; posts label `docs: touch-map gap` + PR comment on gap, never blocks
 - Prettier formatting check (`pnpm exec prettier --check --ignore-unknown ...`)
 - `nx affected -t lint`
 - `nx affected -t typecheck`
@@ -279,6 +280,7 @@ The CI pipeline automatically labels PRs with failure reasons. Labels are added 
 | `CI: Security`               | Security scanning failed                                                    |
 | `CI: Schema Drift`           | `schema.graphql` out of sync with Pothos implementation                     |
 | `CI: Migration`              | Migrations not applied to production DB                                     |
+| `docs: touch-map gap`        | Advisory: code changed without updating a linked required doc               |
 
 > **Per-check details** (what each check validates, why it fails, fix commands): see [pr-lifecycle/references/ci-checks-reference.md](../pr-lifecycle/references/ci-checks-reference.md).
 
@@ -484,13 +486,14 @@ These must pass for the merge queue to process a PR:
 
 These checks are not configured as _required_ branch protection rules, but they still produce GitHub check runs/commit statuses. The merge queue (`merge-queue.yml`) waits for all checks to complete and will block on any failing or pending check unless explicitly configured to ignore it, so failures here can still delay a queued merge.
 
-| Check                    | Source Workflow              | Notes                                         |
-| ------------------------ | ---------------------------- | --------------------------------------------- |
-| Security Scanning        | `security-scanning.yml`      | Labels PR on failure but does not block merge |
-| Deploy PR Preview        | `deploy-pr-preview.yml`      | Preview deployment for UI review              |
-| Deploy Playwright Report | `ci-pipeline.yml` (sub-job)  | Report published to GitHub Pages              |
-| Jira Branch Sync         | `jira-branch-sync.yml`       | Best-effort Jira transitions                  |
-| Update Migration Badge   | `update-migration-badge.yml` | Badge cosmetics only                          |
+| Check                    | Source Workflow                        | Notes                                                        |
+| ------------------------ | -------------------------------------- | ------------------------------------------------------------ |
+| Touch-Map Freshness      | `ci-pipeline.yml` (custom-checks step) | Advisory; posts `docs: touch-map gap` label + comment on gap |
+| Security Scanning        | `security-scanning.yml`                | Labels PR on failure but does not block merge                |
+| Deploy PR Preview        | `deploy-pr-preview.yml`                | Preview deployment for UI review                             |
+| Deploy Playwright Report | `ci-pipeline.yml` (sub-job)            | Report published to GitHub Pages                             |
+| Jira Branch Sync         | `jira-branch-sync.yml`                 | Best-effort Jira transitions                                 |
+| Update Migration Badge   | `update-migration-badge.yml`           | Badge cosmetics only                                         |
 
 ## Secrets Reference
 

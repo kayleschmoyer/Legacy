@@ -301,6 +301,15 @@ jobs:
       - name: "Migration Immutability Check"
         run: node scripts/check-migration-immutability.js --branch
 
+      - name: "Touch-Map Documentation Freshness"
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: node scripts/lint-touch-map.js
+
       - name: "Run Custom Check Scripts"
         run: |
           # Each .github/checks/*.sh script is an independent required check.
