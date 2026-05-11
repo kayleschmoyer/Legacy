@@ -51,11 +51,11 @@ This preserves the historical reasoning and prevents the "but the doc said…" c
 
 ## Tool surface
 
-Planned MCP tools (not yet implemented; spec frozen here):
+MCP tools implemented in `tools/mcp/dev-process-server/` (server: `legacy-sports-dev-process`):
 
-- `adr_create({ title, slug })` — scaffold next-numbered ADR, idempotent.
-- `adr_supersede({ oldNumber, newNumber })` — atomically update old ADR status and link.
-- `adr_list({ status? })` — list ADRs, optionally filtered.
+- ✅ `adr_create({ title, slug })` — scaffold next-numbered ADR, idempotent.
+- ✅ `adr_supersede({ oldNumber, newNumber })` — atomically update old ADR status and link.
+- ✅ `adr_list({ status? })` — list ADRs, optionally filtered.
 
 ## Related
 

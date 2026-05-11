@@ -71,11 +71,12 @@ This is not a failure — it is a structured record that prevents the next inves
 
 ## Tool surface
 
-Planned MCP tools (not yet implemented; spec frozen here):
+MCP tools implemented in `tools/mcp/dev-process-server/` (server: `legacy-sports-dev-process`).
+Repro data is stored at `docs/repros/<ticket>.md` (Jira custom field sync is a future enhancement):
 
-- `repro_capture({ ticket, environment, steps, expected, actual, frequency, firstSeen?, workaround? })` — write to the ticket field; validate required fields.
-- `repro_replay({ ticket })` — print the steps in copy-pasteable form.
-- `repro_close_no_repro({ ticket, attempted, hypotheses, recommendation })` — write the structured "cannot reproduce" form.
+- ✅ `repro_capture({ ticket, environment, steps, expected, actual, frequency, firstSeen?, workaround? })` — write structured repro to `docs/repros/<ticket>.md`; validate required fields.
+- ✅ `repro_replay({ ticket })` — print the steps in copy-pasteable form.
+- ✅ `repro_close_no_repro({ ticket, attempted, hypotheses, recommendation })` — write the structured "cannot reproduce" form.
 
 ## Related
 

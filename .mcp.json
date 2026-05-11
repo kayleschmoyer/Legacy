@@ -89,6 +89,16 @@
         "tools/mcp/browser-server/src/index.ts"
       ]
     },
+    "legacy-sports-dev-process": {
+      "command": "node",
+      "args": [
+        ".github/copilot/hooks/mcp-bootstrap.mjs",
+        "node",
+        "--import",
+        "tsx",
+        "tools/mcp/dev-process-server/src/index.ts"
+      ]
+    },
     "stripe": {
       "command": "npx",
       "args": ["-y", "@stripe/mcp@0.3.3", "--tools=all"],

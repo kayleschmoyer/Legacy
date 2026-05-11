@@ -54,12 +54,12 @@ Optional: `## Appendix` for diagrams, benchmarks, raw data.
 
 ## Tool surface
 
-Planned MCP tools (not yet implemented; spec frozen here for future tooling work):
+MCP tools implemented in `tools/mcp/dev-process-server/` (server: `legacy-sports-dev-process`):
 
-- `rfc_create({ slug, ticket?, title })` — scaffold the file with required sections, idempotent if already exists.
-- `rfc_validate({ path })` — return `{ valid, missingSections, brokenLinks }`.
-- `rfc_list_open()` — list all RFCs with `Status: Draft`.
-- `rfc_accept({ path, ticket })` — rename `draft-*.md` → `LS-####-*.md` and set `Status: Accepted`.
+- ✅ `rfc_create({ slug, ticket?, title })` — scaffold the file with required sections, idempotent if already exists.
+- ✅ `rfc_validate({ path })` — return `{ valid, missingSections, brokenLinks }`.
+- ✅ `rfc_list_open()` — list all RFCs with `Status: Draft`.
+- ✅ `rfc_accept({ path, ticket })` — rename `draft-*.md` → `LS-####-*.md` and set `Status: Accepted`.
 
 ## Related
 

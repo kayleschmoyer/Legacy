@@ -66,11 +66,11 @@ If a case has no test and no `manual` marker, the PR is not ready for review.
 
 ## Tool surface
 
-Planned MCP tools (not yet implemented; spec frozen here):
+MCP tools implemented in `tools/mcp/dev-process-server/` (server: `legacy-sports-dev-process`):
 
-- `testplan_extract({ pr | path })` — pull the structured cases from a PR body or test-plan file.
-- `testplan_coverage_check({ pr })` — return `{ totalCases, automatedCases, manualCases, missingCases }`. Block merge on missing.
-- `testplan_diff({ baseRef, headRef })` — show new cases added vs base; useful for review.
+- ✅ `testplan_extract({ pr | path })` — pull the structured cases from a PR body or test-plan file.
+- ✅ `testplan_coverage_check({ pr })` — return `{ totalCases, automatedCases, manualCases, missingCases }`. Block merge on missing.
+- ✅ `testplan_diff({ baseRef, headRef })` — show new cases added vs base; useful for review.
 
 ## Related
 

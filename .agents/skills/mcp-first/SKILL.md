@@ -9,20 +9,21 @@ description: Per-server MCP-first operation mapping — which MCP tools to prefe
 
 ## MCP Servers
 
-| Server                   | Purpose                                                                                                        |
-| ------------------------ | -------------------------------------------------------------------------------------------------------------- |
-| `worktree`               | Worktree lifecycle: list, set active, run, guard, rebase, stabilize, push                                      |
-| `legacy-sports-github`   | PR and review lifecycle (GitHub REST/GraphQL API)                                                              |
-| `legacy-sports-make`     | Makefile targets: validation, build, install, worktree setup                                                   |
-| `legacy-sports-nx`       | Nx project discovery, affected analysis, target execution                                                      |
-| `legacy-sports-jira`     | Ticket CRUD, transitions, blocker checks                                                                       |
-| `legacy-sports-db`       | Database queries, migrations, schema generation                                                                |
-| `legacy-sports-ci`       | CI log queries, workflow reruns (hosted via signing proxy on localhost:4197)                                   |
-| `legacy-sports-ci-local` | Session audit tools: `ci_audit_session_bash`, `ci_find_session`, `ci_session_stats` (stdio, reads local files) |
-| `legacy-sports-aws`      | CloudWatch log tailing, AWS SSO status checks                                                                  |
-| `legacy-sports-browser`  | Dev server lifecycle, headless screenshots, GitHub image upload                                                |
-| `claude_ai_Stripe`       | Claude Code built-in Stripe integration                                                                        |
-| `claude_ai_Atlassian`    | Jira + Confluence via OAuth 2.1. Cloud ID: `fb294606-6c8f-4b52-9a41-11fe45b77528`                              |
+| Server                      | Purpose                                                                                                        |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `worktree`                  | Worktree lifecycle: list, set active, run, guard, rebase, stabilize, push                                      |
+| `legacy-sports-github`      | PR and review lifecycle (GitHub REST/GraphQL API)                                                              |
+| `legacy-sports-make`        | Makefile targets: validation, build, install, worktree setup                                                   |
+| `legacy-sports-nx`          | Nx project discovery, affected analysis, target execution                                                      |
+| `legacy-sports-jira`        | Ticket CRUD, transitions, blocker checks                                                                       |
+| `legacy-sports-db`          | Database queries, migrations, schema generation                                                                |
+| `legacy-sports-ci`          | CI log queries, workflow reruns (hosted via signing proxy on localhost:4197)                                   |
+| `legacy-sports-ci-local`    | Session audit tools: `ci_audit_session_bash`, `ci_find_session`, `ci_session_stats` (stdio, reads local files) |
+| `legacy-sports-aws`         | CloudWatch log tailing, AWS SSO status checks                                                                  |
+| `legacy-sports-browser`     | Dev server lifecycle, headless screenshots, GitHub image upload                                                |
+| `legacy-sports-dev-process` | RFC, ADR, test-plan, repro, continuation-plan, and postmortem artifact management                              |
+| `claude_ai_Stripe`          | Claude Code built-in Stripe integration                                                                        |
+| `claude_ai_Atlassian`       | Jira + Confluence via OAuth 2.1. Cloud ID: `fb294606-6c8f-4b52-9a41-11fe45b77528`                              |
 
 > **Server load order matters in native-worktree sessions**: Claude Code's worktree-spawned sessions only connect the first few servers from `.mcp.json` at session start (LS-2902). The load order in `.mcp.json` is: `worktree` → `legacy-sports-github` → `legacy-sports-jira` → `legacy-sports-make` → `legacy-sports-nx` → others. Each server is independently available or unavailable — a missing `worktree` server does **not** mean `legacy-sports-jira` is also missing. If a native session is missing a server, check availability with the server's status/ping tool before falling back to shell equivalents; for Jira specifically, always try `jira_auth_status` first (see Jira Operations below). **If all servers are missing** (deferred tools list is empty), the root cause is almost always a missing `node_modules/.bin/tsx` — see `.agents/skills/mcp-diagnostics/SKILL.md` for the full diagnostic checklist and recovery steps.
 

@@ -74,11 +74,12 @@ The continuation plan is posted **before** any new commit by the new author. Rev
 
 ## Tool surface
 
-Planned MCP tools (not yet implemented; spec frozen here):
+MCP tools implemented in `tools/mcp/dev-process-server/` (server: `legacy-sports-dev-process`).
+Requires `GITHUB_TOKEN` for posting/fetching comments; returns formatted body for manual posting otherwise:
 
-- `continuation_post({ pr, inheritedFrom, inheritedAtSha, currentState, done, todo, openThreads, risks, plan })` — post the structured comment.
-- `continuation_status({ pr })` — return the most recent continuation plan parsed.
-- `continuation_list({ pr })` — list all continuation plans on a PR (for multi-handoff PRs).
+- ✅ `continuation_post({ pr, inheritedFrom, inheritedAtSha, currentState, done, todo, openThreads, risks, plan })` — post the structured comment.
+- ✅ `continuation_status({ pr })` — return the most recent continuation plan parsed.
+- `continuation_list({ pr })` — list all continuation plans on a PR (planned; use `continuation_status` and GitHub comment search for now).
 
 ## Related
 

@@ -105,11 +105,11 @@ If a person made a mistake, the question is what allowed the mistake — missing
 
 ## Tool surface
 
-Planned MCP tools (not yet implemented; spec frozen here):
+MCP tools implemented in `tools/mcp/dev-process-server/` (server: `legacy-sports-dev-process`):
 
-- `postmortem_create({ date, slug, severity, authors })` — scaffold the file with required sections.
-- `postmortem_action_items({ path? })` — extract action items from one or all postmortems; cross-check against Jira ticket status.
-- `postmortem_recent({ days })` — list postmortems from the last N days.
+- ✅ `postmortem_create({ date, slug, severity, authors })` — scaffold the file with required sections.
+- ✅ `postmortem_action_items({ path? })` — extract action items from one or all postmortems.
+- ✅ `postmortem_recent({ days })` — list postmortems from the last N days.
 
 ## Related
 
