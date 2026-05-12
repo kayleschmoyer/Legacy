@@ -203,8 +203,11 @@ test.describe
     commissionerPage: page,
     apiCommissioner,
   }) => {
-    // Automated drafts can take 80–150s; allow generous time for Lambda cold starts
-    test.setTimeout(240_000);
+    // Automated drafts can take 80–150s under normal load, but sequential
+    // integration runs stress the backend and push draft + league-visibility time
+    // past 150s. Use 420s to cover the default waitForSeasonActive deadline
+    // (300s) plus setup headroom.
+    test.setTimeout(420_000);
 
     await test.step('Navigate to commissioner panel', async () => {
       await page.goto(`/baseball/league/${state.leagueId}/commissioner`);
@@ -250,7 +253,6 @@ test.describe
 
     await test.step('Wait for Season Active', async () => {
       await waitForSeasonActive(page, state.leagueId, {
-        deadlineMs: 150_000,
         api: apiCommissioner,
       });
     });

@@ -50,11 +50,11 @@ export async function waitForSeasonActive(
     await expect
       .poll(
         async () => {
-          const r = await graphqlOk<{ league: { draftStatus: string } }>(
-            api,
-            `query { league(id: ${leagueId}) { draftStatus } }`,
-          );
-          return r.league.draftStatus;
+          const r = await graphqlOk<{
+            league: { draftStatus: string } | null;
+          }>(api, `query { league(id: ${leagueId}) { draftStatus } }`);
+          // league can be null before it's visible/committed — treat as "not ready yet"
+          return r.league?.draftStatus ?? null;
         },
         {
           timeout: deadlineMs,
