@@ -36,7 +36,19 @@ Shell fallbacks (only if MCP server is unavailable): `make <target>`, `git commi
 
 ## File Exploration in Cloud Sessions (Critical)
 
-Cloud agents lose access to the `worktree`, `make`, and `nx` MCP servers but retain all **built-in Claude Code tools** — `Glob`, `Grep`, and `Read`. Without custom servers as a constant reminder to stay MCP-first, agents often slip into a Bash-first mindset and reach for `find`, `ls`, `grep`, and `cat` for file discovery and content reads. **Do not do this** — even in cloud sessions these built-in tools are always available.
+Cloud agents lose access to the `worktree`, `make`, and `nx` MCP servers. Built-in Claude Code tool availability for the remaining file-exploration primitives varies by cloud platform:
+
+| Built-in tool | Claude Code on the web                                | Copilot Coding Agent                              |
+| ------------- | ----------------------------------------------------- | ------------------------------------------------- |
+| `Read`        | ✅ always available                                   | ✅ always available                               |
+| `Glob`        | ⚠️ frequently absent (verified 2026-05-12 in LS-4358) | ✅ assumed available (not re-verified in LS-4358) |
+| `Grep`        | ⚠️ frequently absent (verified 2026-05-12 in LS-4358) | ✅ assumed available (not re-verified in LS-4358) |
+
+**Probe before relying on `Glob`/`Grep`.** At the start of a Claude Code on the web session run `ToolSearch(query: "select:Glob,Grep")`. If it returns "No matching deferred tools found" and the tools also do not appear in the top-of-prompt tool list, treat them as unavailable for the rest of the session and use the degraded-tools fallback below. `Read` is always present and should never be substituted with `cat`/`head`/`tail`.
+
+> **Upstream issue**: the built-in `Glob` and `Grep` tools are not enumerated in some Claude Code on the web sessions even though they exist on the platform. This is a Claude Code platform-side gap; LS-4358 verified the absence. Track that ticket for upstream resolution and removal of the degraded-tools section.
+
+### When `Glob`/`Grep` are available (preferred)
 
 The [Tool-first for file operations](../../../AGENTS.md) rule in AGENTS.md applies in cloud environments too. Key substitutions:
 
@@ -52,7 +64,30 @@ The [Tool-first for file operations](../../../AGENTS.md) rule in AGENTS.md appli
 | `head -n 50 file.ts`                  | `Read(file_path: "file.ts", limit: 50)`                                       |
 | `tail -n 50 file.ts`                  | `Read(file_path: "file.ts", offset: <approx_line>, limit: 50)`                |
 
-> **Why this matters**: a session (LS-2938 fix) ran 78 Bash commands, 50+ of which were `find`/`ls`/`grep`/`cat` that had direct built-in equivalents. `Glob`/`Grep`/`Read` are faster, have no shell-quoting hazards, and produce structured output. The absence of custom MCP servers is not a signal to fall back to Bash for file exploration.
+> **Why this matters**: a session (LS-2938 fix) ran 78 Bash commands, 50+ of which were `find`/`ls`/`grep`/`cat` that had direct built-in equivalents. `Glob`/`Grep`/`Read` are faster, have no shell-quoting hazards, and produce structured output. When these tools are present, the absence of custom MCP servers is not a signal to fall back to Bash for file exploration.
+
+### Degraded-tools fallback (when `Glob`/`Grep` are unavailable)
+
+If the probe above confirms `Glob` and `Grep` are absent, use Bash via the `Bash` tool — these are not antipatterns in that session; they are the only option for file discovery. Continue using `Read` for file content (it is always available).
+
+| Goal                              | Bash fallback                      | Notes                                                      |
+| --------------------------------- | ---------------------------------- | ---------------------------------------------------------- |
+| List files by glob pattern        | `find . -name "*.tsx" -type f`     | Use `-type f` for files only; quote globs                  |
+| List directory contents           | `ls -1 path/`                      | `-1` for one-entry-per-line output                         |
+| Find files containing a pattern   | `grep -rl "pattern" path/`         | `-l` lists files with matches; `-r` recursive              |
+| Show pattern matches with context | `grep -rn "pattern" path/`         | `-r` recursive, `-n` line numbers                          |
+| Case-insensitive content search   | `grep -rin "pattern" path/`        | `-i` for case-insensitive                                  |
+| Read file (any size)              | `Read(file_path: "...", limit: N)` | `Read` is always available — never use `cat`/`head`/`tail` |
+
+For multi-pattern search, prefer `-e` to sidestep regex-flavor pitfalls:
+
+```bash
+grep -rn -e "pat1" -e "pat2" path/
+```
+
+If you do want regex alternation, the operator differs by regex flavor: with `-E` (extended regex / ERE) it is the literal pipe character `|` (e.g. `grep -rEn 'pat1|pat2' path/`); with basic regex (default) it is a backslash-escaped pipe (e.g. `grep -rn 'pat1\|pat2' path/`). The two forms are not interchangeable.
+
+> When in doubt, route file **discovery** through Bash but always route file **reads** through `Read`. Built-in `Read` produces deterministic line-numbered output and respects size limits more cleanly than `cat`.
 
 ## Cloud MCP Cheat Sheet
 
