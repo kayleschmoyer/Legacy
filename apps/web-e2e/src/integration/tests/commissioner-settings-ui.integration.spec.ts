@@ -30,6 +30,7 @@
 import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 import { createLeagueViaUI } from '../helpers/create-league';
+import { waitForJoinPageValidation } from '../helpers/wait-for-join-page';
 import { test } from '../fixtures/ui';
 
 // ---------------------------------------------------------------------------
@@ -282,14 +283,41 @@ test.describe
 
   test('Phase 4: Manager joins league and sees no Commissioner tab', async ({
     managerPage1,
+    commissionerJwt,
+    managerJwt1,
   }) => {
     await test.step('Manager joins the league', async () => {
+      // Guard against transient Lambda cold-starts: validateInviteCode returns
+      // null for a freshly-created league when the resolver is cold, causing
+      // "Invalid invite code" on the join page within all retry windows.
+      // Poll via the commissioner's JWT before the manager navigates to give
+      // the backend time to stabilise (LS-4365, same pattern as LS-4360).
+      await expect
+        .poll(
+          async () => {
+            const data = await gqlFetch<{
+              validateInviteCode: { leagueId: number } | null;
+            }>(
+              commissionerJwt,
+              `query ValidateInviteCodePreflight($code: String!) {
+                 validateInviteCode(code: $code) { leagueId }
+               }`,
+              { code: state.inviteCode },
+            );
+            return data.validateInviteCode?.leagueId ?? null;
+          },
+          {
+            timeout: 30_000,
+            intervals: [500, 1_000, 2_000],
+            message: `validateInviteCode("${state.inviteCode}") still null after 30s — league ${state.leagueId} not queryable`,
+          },
+        )
+        .not.toBeNull();
+
       const joinUrl = `/baseball/league/join/${state.inviteCode}`;
       await managerPage1.goto(joinUrl);
       await managerPage1.waitForLoadState('load');
-      await expect(
-        managerPage1.getByText(/spot(s)?\s+available/i).first(),
-      ).toBeVisible({ timeout: 30_000 });
+      await waitForJoinPageValidation(managerPage1);
       await managerPage1.locator('#team-name').fill('Settings Tester');
       const joinBtn = managerPage1.getByRole('button', {
         name: /Join League/i,
@@ -299,6 +327,29 @@ test.describe
       await expect(managerPage1).toHaveURL(/\/baseball\/league\/\d+/, {
         timeout: 15_000,
       });
+
+      // Ensure the leagueMembers row is queryable before asserting role
+      // restrictions — without this the league page can show "League not
+      // found" when the membership row hasn't propagated yet (LS-4350 pattern).
+      await expect
+        .poll(
+          async () => {
+            const data = await gqlFetch<{ userTeamId: number | null }>(
+              managerJwt1,
+              `query GetUserTeamIdForJoin($leagueId: Int!) {
+                 userTeamId(leagueId: $leagueId)
+               }`,
+              { leagueId: state.leagueId },
+            );
+            return data.userTeamId;
+          },
+          {
+            timeout: 15_000,
+            intervals: [500, 1_000, 2_000],
+            message: `Manager join did not persist a leagueMembers row in league ${state.leagueId} within 15s`,
+          },
+        )
+        .not.toBeNull();
     });
 
     await test.step('Manager cannot see the Commissioner navigation tab', async () => {
