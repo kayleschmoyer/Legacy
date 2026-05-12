@@ -50,6 +50,40 @@ Before touching any code, verify:
 
 ---
 
+## Nightly Execution Profile — Why Local Single-Spec Runs Mislead
+
+Integration tests **do not run on PRs**. They run only:
+
+- **Nightly** via `.github/workflows/run-playwright-tests.yml` on cron `0 3 * * *`
+- **Manual `workflow_dispatch`** from the Actions tab
+
+A local `--grep` reproduction differs materially from the nightly profile. Even a fully green local single-spec run cannot prove that a fix holds under nightly conditions.
+
+| Property              | Local `--grep` (agent default) | Nightly                                           |
+| --------------------- | ------------------------------ | ------------------------------------------------- |
+| Specs                 | 1                              | All ~22 `*.integration.spec.ts`                   |
+| Shards                | 1                              | 3 (`1/3`, `2/3`, `3/3`)                           |
+| Workers/shard         | 1 (`workers: 1`)               | 1                                                 |
+| Effective parallelism | 1 Playwright proc              | 3 procs hammering the same live backend           |
+| Retries               | 2                              | 2                                                 |
+| Backend               | `api.legacy-fantasy.com`       | Same                                              |
+| Test users            | 4 shared accounts              | **Same 4 accounts, used by all 3 shards at once** |
+| `globalTeardown`      | Runs                           | **Skipped in sharded runs** (LS-4318)             |
+
+### Three failure modes the local profile cannot exercise
+
+1. **Cumulative backend load** ([LS-4353](https://legacysports.atlassian.net/browse/LS-4353)). By the 6th–7th spec in a shard, Lambda / SQS / RDS are under contention and Apollo round-trips slow 5–10×. Deadlines tuned to an isolated 30s draft blow past 200s under load. Symptom: the local single-spec run is green at 30s, nightly times out at 180s on the same phase.
+2. **Shared-user state contention** ([LS-4350](https://legacysports.atlassian.net/browse/LS-4350)). Only **4 hardcoded users exist** (`E2E_COMMISSIONER`, `E2E_MANAGER_1/2/3` in `apps/web-e2e/src/utils/test-user-auth.ts`). All 22 specs across all 3 shards mutate `leagueMembers`, `userLeagues`, JWT cache, and OAuth state for these 4 accounts concurrently. Symptom: phase 2 (manager joins league) succeeds, phase 10 (manager re-enters the same league) sees `ForbiddenError` / `League not found` because the `leagueMembers` row isn't queryable yet from the other shard's read path.
+3. **Cross-shard write→read lag** ([LS-4318](https://legacysports.atlassian.net/browse/LS-4318)). Nightly skips `globalTeardown` so leagues from earlier specs and other shards sit in the DB throughout the run. Read paths see more rows than local runs ever observe; pagination, ordering, and filter assertions tuned to a single-spec database fail under nightly's accumulated state.
+
+### Implications for this skill
+
+**Phase 1 (reproduce) and Phase 4a (verify) use single-spec runs but cannot prove the fix holds under nightly conditions.** Phase 4b mandates a nightly-shaped verification before push. A green `--grep` is necessary but not sufficient — it confirms the targeted fix, not the absence of cross-spec contention. Skipping Phase 4b is the mechanism by which the repo has accumulated "Nth regression guard" tickets (a fix lands, nightly fails again on a different phase with the same class of bug).
+
+See [`e2e-determinism.md` antipatterns from past regressions](../testing/references/e2e-determinism.md#antipatterns-from-past-regressions--class-of-bug-catalog) for the class-of-bug catalog and the patterns that survive nightly.
+
+---
+
 ## Workflow
 
 ### Phase 1: Reproduce Locally — MANDATORY GATE
@@ -139,13 +173,34 @@ The `getTestUserJwt()` helper in `apps/web-e2e/src/integration/fixtures/api.ts` 
 - The `.env` symlink resolves correctly
 - The test user credentials in `.env` are current
 
-**Do not refactor neighboring test code on the way by.** One targeted fix per ticket.
+### Class-of-bug check — fix the pattern, not the phase
+
+Some failures look like a one-off (a single phase times out, a single poll returns null) but are instances of a documented antipattern that recurs across specs and helpers. Fixing only the failing phase produces the "Nth regression guard" cycle this repo has been bleeding from — a fix lands, nightly fails again on a sibling phase or sibling spec with the same class of bug.
+
+When the root cause matches one of the documented class-of-bug antipatterns (catalog in [`e2e-determinism.md` antipatterns from past regressions](../testing/references/e2e-determinism.md#antipatterns-from-past-regressions--class-of-bug-catalog)), the agent must:
+
+1. **Grep for the same pattern** in the failing spec, adjacent specs (`apps/web-e2e/src/integration/tests/*.integration.spec.ts`), and shared helpers (`apps/web-e2e/src/integration/helpers/*.ts`). Use a structural pattern (e.g. `expect\.poll\(.*\.draftStatus`, `await page\.goto.*networkidle`) — not just the symptom string.
+2. **Either fix all instances in this PR** (preferred when the fix is mechanical — e.g. adding a single null-coalescing guard to every `expect.poll` callback in the file), **OR file a follow-up ticket** that explicitly lists every other instance and link it in the PR description.
+3. **Never leave a pattern fix half-applied.** A single-phase fix that leaves five sibling phases with the same antipattern is what produces the regression chain — fix them together or file the follow-up.
+
+Triggers that require the class-of-bug check (current ticket refs):
+
+- **`expect.poll` callback that throws on null/undefined** instead of returning a sentinel ([LS-4353](https://legacysports.atlassian.net/browse/LS-4353)).
+- **UI-polling loop** where a backend `expect.poll` would be deterministic ([LS-4321](https://legacysports.atlassian.net/browse/LS-4321), [LS-4344](https://legacysports.atlassian.net/browse/LS-4344)).
+- **Phase that proceeds before a state-changing mutation is visible to the read path** ([LS-4350](https://legacysports.atlassian.net/browse/LS-4350)).
+- **Per-phase deadline extension** as a substitute for fixing backend-state contention ([LS-4278](https://legacysports.atlassian.net/browse/LS-4278), [LS-4282](https://legacysports.atlassian.net/browse/LS-4282), [LS-4287](https://legacysports.atlassian.net/browse/LS-4287)).
+
+**Do not refactor _unrelated_ test code on the way by.** Fixing all instances of the _same_ class-of-bug _is_ part of this fix — that's not refactoring, it's completing the fix. Unrelated cleanup still belongs in a separate ticket.
 
 ---
 
-### Phase 4: Verify Locally — MANDATORY GATE
+### Phase 4: Verify — TWO-TIER GATE
 
-> **⛔ Do not push until the test passes locally.**
+> **⛔ Do not push until both Phase 4a and Phase 4b are green.**
+
+A green single-spec local run confirms the _targeted_ fix but cannot prove the fix holds under nightly's cumulative load, shared-user contention, and cross-shard lag (see [Nightly Execution Profile](#nightly-execution-profile--why-local-single-spec-runs-mislead) above). Both gates are mandatory.
+
+#### Phase 4a — Local single-spec confirmation
 
 Re-run the exact test that was failing:
 
@@ -155,15 +210,46 @@ nx_run({ project: "web-e2e", target: "integration", args: ["--grep", "<same test
 
 The test must **pass** before continuing. If it fails, iterate — debug, fix, re-run. Do not push a broken fix.
 
-After the target test passes, run the full describe block to catch regressions:
+After the target test passes, run the full describe block to catch same-file regressions:
 
 ```
 nx_run({ project: "web-e2e", target: "integration", args: ["--grep", "<describe block name>"] })
 ```
 
-If any sibling tests in the same file now fail that were not failing before your change, investigate and fix before pushing.
+If any sibling tests in the same file now fail that were not failing before your change, investigate and fix before continuing to Phase 4b.
 
-> Remote CI failures cost 20–40 min per loop. Local runs take under 2 min per test. Never skip this gate.
+#### Phase 4b — Nightly-shaped verification (MANDATORY before push)
+
+A green Phase 4a is not sufficient. Before push, produce a green run under conditions that approximate nightly: the full integration suite, sharded, against the live backend.
+
+**Primary path — dispatch the nightly workflow on this branch:**
+
+```
+gh workflow run run-playwright-tests.yml --ref <branch> \
+  -f test-suite=integration \
+  -f shard-total=3 \
+  -f retries=2
+```
+
+Do **not** pass a `test-file` filter — the whole integration suite must run. Wait for the run to deploy its HTML report (use `/read-playwright-report` once the run completes), then:
+
+- Confirm **all** touched specs are green across all 3 shards.
+- Confirm sibling specs in the same file are green.
+- If any spec fails with a class-of-bug pattern (see Phase 3 — Class-of-bug check), return to Phase 3 and treat it as part of this fix.
+- Paste the report URL into the PR body under `## Playwright Evidence`.
+
+**Fallback path (only when `workflow_dispatch` is unavailable — e.g. CI outage, missing permissions):** run the affected spec preceded by 2–3 unrelated integration specs locally in one Playwright invocation, e.g.:
+
+```
+pnpm exec nx integration web-e2e -- \
+  apps/web-e2e/src/integration/tests/full-season-ui.integration.spec.ts \
+  apps/web-e2e/src/integration/tests/<unrelated-1>.integration.spec.ts \
+  apps/web-e2e/src/integration/tests/<your-fixed-spec>.integration.spec.ts
+```
+
+This approximates sequential-load conditions but does **not** reproduce sharded contention or shared-user cross-shard concurrency. Use only when the primary path is blocked, and explicitly note in the PR body that nightly-shaped verification fell back to local sequential loading and why.
+
+> Phase 4a catches same-file regressions in 60–90 seconds. Phase 4b catches cross-spec contention that would otherwise land as a nightly-only failure 6–8 hours after merge. Skipping Phase 4b is the mechanism by which the repo has accumulated "Nth regression guard" tickets.
 
 ---
 

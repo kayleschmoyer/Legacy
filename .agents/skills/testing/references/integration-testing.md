@@ -298,7 +298,36 @@ test('draft completion delivers WS notification', async ({ api }) => {
 
 > **Read [ui-serial-phases.md](ui-serial-phases.md)** for the full serial phase template code, `switchUser` helper, `gqlFetch` raw API helper, real-world examples, and the mocked-vs-integration decision table.
 
-### 7. Test Steps for Readability
+### 7. Test Isolation — Per-Spec Setup/Teardown Required
+
+Each `*.integration.spec.ts` runs against the **live backend**. League-level state (the league row, draft state, roster, matchups) does not vanish at the end of a test process — it sits in `api.legacy-fantasy.com`'s database until something deletes it. Under nightly's three-shard execution that database accumulates leagues from every spec in every shard, and read paths see all of them.
+
+The current model uses `globalTeardown` to sweep leftover leagues at the _end_ of a run — but in sharded runs `globalTeardown` is **skipped** ([LS-4318](https://legacysports.atlassian.net/browse/LS-4318)) because the fastest shard would finish first, call `userLeagues`, see leagues created by slower shards still mid-test, and `deleteLeague` them — yanking rows out from in-flight tests on other shards. The result is that under sharded runs, leagues accumulate across the whole nightly window and `globalSetup` cleans them up _at the start of the next run_ instead.
+
+The model going forward is **per-spec setup/teardown**: each spec owns its data lifecycle and deletes its own league(s) at the end of its describe block. `globalTeardown` is retained as a safety net for orphans (a test crashing mid-run), not as the primary cleanup.
+
+#### Rules
+
+- **Each `test.describe.serial` block must own its data lifecycle.** Create leagues, draft state, and any backend rows in `test.beforeAll` or the first phase. Delete them in `test.afterAll`.
+- **Delete by ID, not by pattern.** `deleteLeague(leagueId)` against the specific row created by this spec. **Never** `userLeagues → filter by name pattern → delete all` inside a spec — that's exactly what `globalSetup` does and it cannot be made safe at the per-spec layer (race against other shards' specs in flight).
+- **Drain async backend operations before teardown.** If a phase triggered a draft processor, stats loader, or matchup advancement, `expect.poll` the terminal status (`draftStatus === 'completed'`, `matchup.statsLoadingStatus === 'completed'`) in `test.afterAll` _before_ calling `deleteLeague`. Otherwise the background write races the delete and leaves orphan rows.
+- **`globalTeardown` is a safety net, not the primary cleanup.** Once per-spec teardown is in place across all specs, `globalTeardown` runs in all modes (sharded included) to catch the rare case where a test crashes before reaching its `afterAll`.
+
+#### Why per-spec teardown is the right model
+
+Global cleanup (the LS-4318 model) cannot run safely in sharded mode because one shard's cleanup races other shards' in-flight tests. Per-spec teardown eliminates that race because each spec only deletes rows it owns — there is no cross-shard reference at all. Once every spec has its own `afterAll`, the LS-4318 skip in `apps/web-e2e/src/integration/global-teardown.ts` can be removed and `globalTeardown` becomes a true safety net.
+
+#### Caveat — shared users are not isolated by per-spec teardown
+
+The 4 hardcoded users (`E2E_COMMISSIONER`, `E2E_MANAGER_1/2/3` in `apps/web-e2e/src/utils/test-user-auth.ts`) are still mutated concurrently by all shards. Per-spec teardown solves _league-level_ cross-contamination, not _user-level_ contention. Until the **per-spec user pool** (JIT-registered ephemeral users per spec — tracked as [LS-4357](https://legacysports.atlassian.net/browse/LS-4357)) lands, the LS-4350 / LS-4353 class of failures requires the write→read visibility pattern from [`e2e-determinism.md` antipattern #3](e2e-determinism.md#3-phase-proceeds-before-a-state-changing-mutation-is-visible-to-the-read-path).
+
+#### Cross-references
+
+- The per-spec teardown migration is tracked as [LS-4356](https://legacysports.atlassian.net/browse/LS-4356).
+- The per-spec user pool refactor (the only fix that fully eliminates shared-user contention) is tracked as [LS-4357](https://legacysports.atlassian.net/browse/LS-4357).
+- Until both ship, treat any "Nth regression guard" ticket as a signal to apply [antipattern #4 — Per-phase deadline extension](e2e-determinism.md#4-per-phase-deadline-extension-as-a-substitute-for-fixing-backend-state-contention): identify which contention axis is at play, fix the mechanism, escalate if it's genuine sharded backend load.
+
+### 8. Test Steps for Readability
 
 Long integration flows should use `test.step()` to break into labeled sections in reports:
 
