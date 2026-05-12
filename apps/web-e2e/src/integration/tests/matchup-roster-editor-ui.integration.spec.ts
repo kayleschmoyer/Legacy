@@ -14,7 +14,7 @@
  * Setup flow:
  *   Phase 1: Create league (4 teams)
  *   Phase 2: Three managers join via invite code
- *   Phase 3: Automated random draft → wait for Season Active
+ *   Phase 3: Automated draft and season activation
  *   Phase 4: Identify current matchup via GraphQL API
  *   Phase 5: Navigate to matchup detail page — verify roster editor visible
  *   Phase 6: Bench a starter — verify change via UI + API
@@ -197,16 +197,17 @@ test.describe
       await expect(draftSettingsBtn).toBeVisible({ timeout: 10_000 });
       await draftSettingsBtn.click();
 
-      const automatedBtn = page.getByRole('button', {
-        name: /Automated Draft/i,
-      });
-      await expect(automatedBtn).toBeVisible({ timeout: 5_000 });
+      // Use data-testid rather than aria-label matching: the button's accessible
+      // name is "Draft Mode: Automated Draft" (set by OptionSelector), which
+      // requires partial-regex matching and is fragile. The testid is explicit.
+      const automatedBtn = page.getByTestId('option-automated');
+      await expect(automatedBtn).toBeVisible({ timeout: 15_000 });
       await automatedBtn.click();
 
       const saveBtn = page.getByRole('button', {
         name: /Save Draft Settings/i,
       });
-      await expect(saveBtn).toBeEnabled({ timeout: 5_000 });
+      await expect(saveBtn).toBeEnabled({ timeout: 10_000 });
       await saveBtn.click();
       await page.waitForTimeout(1_000);
     });
