@@ -152,6 +152,33 @@ test.describe
     ];
 
     for (const { page, jwt, teamName } of managers) {
+      // Warm the validateInviteCode Lambda for this manager's JWT before
+      // navigating to the join URL.  The commissioner-JWT preflight above
+      // warms one Lambda instance; under concurrent load Lambda may route
+      // manager requests to different cold instances (LS-4364).  Polling
+      // per-manager JWT ensures each manager's requests hit a warm instance.
+      await expect
+        .poll(
+          async () => {
+            const data = await gqlFetch<{
+              validateInviteCode: { leagueId: number } | null;
+            }>(
+              jwt,
+              `query ValidateInviteCodePreflightManager($code: String!) {
+                 validateInviteCode(code: $code) { leagueId }
+               }`,
+              { code: state.inviteCode },
+            );
+            return data.validateInviteCode?.leagueId ?? null;
+          },
+          {
+            timeout: 30_000,
+            intervals: [500, 1_000, 2_000],
+            message: `validateInviteCode("${state.inviteCode}") still null after 30s for manager "${teamName}"`,
+          },
+        )
+        .not.toBeNull();
+
       const joinUrl = `/baseball/league/join/${state.inviteCode}`;
       await page.goto(joinUrl);
       await page.waitForLoadState('load');

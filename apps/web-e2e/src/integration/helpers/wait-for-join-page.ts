@@ -12,8 +12,10 @@ import { expect } from '@playwright/test';
  *
  * "Invalid invite code" can also appear transiently: the component renders
  * that message on the initial render (before the lazy query fires) and when
- * the backend returns null for a valid code (slow Lambda cold start).  Both
- * are retried exactly like the network-error case.
+ * the backend returns null for a valid code (slow Lambda cold start).  When
+ * detected, the helper waits a 5 s grace period for the query to self-resolve
+ * before deciding to reload — avoiding premature reloads caused by catching
+ * the initial-render flash before the async query completes (LS-4364).
  *
  * This helper waits for the success text and, if any error message appears
  * or the 15 s poll times out, reloads the page to retry validation. The
@@ -28,7 +30,8 @@ export async function waitForJoinPageValidation(
   const errorLocator = page.getByText(/unable to verify code/i).first();
   // "Invalid invite code" appears transiently on initial render (before the
   // validateInviteCode query fires) or when the backend returns null for a
-  // valid code. Detect it quickly so we can reload rather than wait 15 s.
+  // valid code. Detect it quickly so we can apply the grace period rather
+  // than waiting the full 15 s timeout before reacting.
   const invalidLocator = page.getByText(/invalid invite code/i).first();
 
   // Re-throws non-TimeoutError failures (page closed, navigation errors) so
@@ -67,9 +70,33 @@ export async function waitForJoinPageValidation(
       return;
     }
 
-    // Retry on both explicit error ("Unable to verify code") and timeout.
-    // Timeout can occur due to a slow backend (Lambda cold start) or a
-    // transient auth race — reloading gives the server another chance.
+    if (outcome === 'invalid') {
+      // "Invalid invite code" appears on the initial render (before the lazy
+      // validateInviteCode query fires) and again when the backend transiently
+      // returns null (Lambda cold start).  The Promise.race above resolves as
+      // soon as the text is *visible* — which can happen within milliseconds
+      // of the page load — so we may be firing a reload before the query has
+      // had a chance to complete (LS-4364).
+      //
+      // Give the query a 5 s grace period to self-resolve.  If the backend
+      // returns a valid code, the "spot(s) available" text will appear within
+      // that window and we can return immediately without an unnecessary
+      // reload.  If it is still invalid after 5 s, fall through to the
+      // reload/retry path — the backend is genuinely returning null.
+      const selfResolved = await spotsLocator
+        .waitFor({ state: 'visible', timeout: 5_000 })
+        .then(() => true)
+        .catch(() => false);
+      if (selfResolved) {
+        await expect(spotsLocator).toBeVisible();
+        return;
+      }
+      // Still invalid after grace period — fall through to reload/retry below.
+    }
+
+    // Retry on explicit errors ("Unable to verify code"), persistent
+    // "Invalid invite code" (backend still returning null after grace period),
+    // and timeouts (slow Lambda cold start or transient auth race).
     if (attempt < maxRetries) {
       await page.reload();
       await page.waitForLoadState('load');
