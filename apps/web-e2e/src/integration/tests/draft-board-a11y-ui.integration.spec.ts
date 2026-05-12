@@ -160,21 +160,25 @@ test.describe
     });
 
     await test.step('Wait for draft to become active', async () => {
-      await page.waitForTimeout(3_000);
-      await page.reload();
-      await page.waitForLoadState('load');
-      // LeagueHero (V2) renders a status chip driven solely by `league.draftStatus`:
-      //   queued      -> "Draft Queued"
-      //   in-progress -> "Drafting · Live"
+      // Wait on the CURRENT page before reloading. initializeDraft uses
+      // awaitRefetchQueries: true with refetchQueries: ['GetLeagueById'], so
+      // Apollo cache updates as soon as the mutation + refetch complete — the
+      // LeagueHero chip re-renders to "Drafting · Live" or "Draft Queued"
+      // without any navigation. Checking here avoids the cold-start race where
+      // the Lambda takes >3 s and the DB still shows 'not-started' after an
+      // immediate reload (LS-4370).
+      //
+      // LeagueHero chip text by draftStatus
+      // (apps/web/src/pages/baseball/league-detail-v2/LeagueHero.tsx):
+      //   in-progress -> "Drafting · Live"  (live draft)
+      //   queued      -> "Draft Queued"     (automated draft)
       //   completed   -> "Season Active"
-      // (apps/web/src/pages/baseball/league-detail-v2/LeagueHero.tsx). The chip is
-      // the most stable post-Start-Draft signal because it doesn't depend on the
-      // useGetLeagueDraftQuery roundtrip that gates NextStepControl's "Go to Draft
-      // Board" button. The previous regex matched the NextStepControl button text,
-      // but only when that secondary query had resolved — racy after a cold reload.
       await expect(
         page.getByText(/Drafting|Draft Queued|Season Active/i).first(),
       ).toBeVisible({ timeout: 30_000 });
+      // Reload for a clean browser state before subsequent phases.
+      await page.reload();
+      await page.waitForLoadState('load');
     });
   });
 
