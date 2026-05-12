@@ -481,9 +481,14 @@ test.describe
       );
       await expect(standingsTable).toBeVisible({ timeout: 15000 });
       const teamRows = standingsTable.locator('tbody tr');
-      await expect(teamRows.first()).toBeVisible({ timeout: 5000 });
-      const count = await teamRows.count();
-      expect(count).toBeGreaterThanOrEqual(4);
+      // The standings query may still be in-flight when the table first
+      // renders, leaving only the empty-state row (count=1) visible.  Retry
+      // until all four team rows have loaded — same toPass pattern used in
+      // Phase 7's GQL consistency gate.
+      await expect(async () => {
+        const count = await teamRows.count();
+        expect(count).toBeGreaterThanOrEqual(4);
+      }).toPass({ timeout: 15_000, intervals: [500, 1_000, 2_000, 3_000] });
     });
   });
 
