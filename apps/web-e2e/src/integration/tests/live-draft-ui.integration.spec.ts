@@ -375,6 +375,7 @@ test.describe
     managerPage2,
     managerPage3,
     commissionerJwt,
+    managerJwt1,
   }) => {
     // Allow up to 40 minutes for all picks.
     //
@@ -445,6 +446,14 @@ test.describe
       // button stays visible but the server never advances the turn (e.g. a
       // server-side rejection or a stale render that the reload didn't clear).
       const failedPickAttempts = new Map<string, number>();
+      // Track the last server-side currentPick value seen via API.  When the
+      // nudge returns picksAutoMade=0 but currentPick has advanced, EventBridge
+      // is making picks server-side — reset consecutiveMisses so the bail
+      // threshold doesn't fire while the server is actively processing (LS-4369).
+      // Initialized to 0 (draft start state) so only actual pick advances
+      // (currentPick > 0) trigger the reset, avoiding a spurious reset on the
+      // first check when no picks have been made yet.
+      let lastKnownCurrentPick = 0;
 
       // Anchor for per-pick elapsed-time logs (LS-3851 timing instrumentation).
       const draftStart = Date.now();
@@ -751,6 +760,9 @@ test.describe
                 );
                 consecutiveMisses = 0;
                 hasReloadedThisStreak = false;
+                // Advance the baseline so EventBridge progress detection
+                // doesn't falsely trigger on the same pick number later.
+                lastKnownCurrentPick += nudgeData?.picksAutoMade ?? 0;
               }
 
               // When nudge returns 0 picks AND 0 completed, the draft might
@@ -762,35 +774,76 @@ test.describe
                 (nudgeData?.picksAutoMade ?? 0) === 0 &&
                 (nudgeData?.draftsCompleted ?? 0) === 0
               ) {
-                const statusResult = await pages[1].page.request
-                  .post('https://api.legacy-fantasy.com/graphql', {
-                    data: {
-                      query: `query GetLeagueDraftStatus($id: Int!) { league(id: $id) { draftStatus } }`,
-                      variables: { id: state.leagueId },
-                    },
-                    headers: {
-                      'Content-Type': 'application/json',
-                      Authorization: `Bearer ${commissionerJwt}`,
-                    },
-                  })
-                  .catch(() => null);
-                if (statusResult) {
-                  const statusBody = (await statusResult
-                    .json()
-                    .catch(() => null)) as {
-                    data?: { league?: { draftStatus?: string } | null } | null;
-                  } | null;
-                  const draftStatus = statusBody?.data?.league?.draftStatus;
-                  if (draftStatus === 'completed') {
-                    const elapsedDoneApi = (
-                      (Date.now() - draftStart) /
-                      1000
-                    ).toFixed(1);
-                    console.log(
-                      `[live-draft] +${elapsedDoneApi}s API confirms draft completed — exiting pick loop (browsers stuck in draftOrderMissing state)`,
-                    );
-                    pickCount = maxPicks; // trigger while-loop exit
-                  }
+                // Use gqlFetch (Node.js native fetch) — pages[1].page.request
+                // can silently return null when the browser context degrades at
+                // end-of-draft, preventing completion detection (LS-4369).
+                // commissionerJwt is an admin JWT; league(id) has an isAdmin
+                // bypass so it returns draftStatus even without a league_members row.
+                const statusData = await gqlFetch<{
+                  league?: { draftStatus?: string } | null;
+                }>(
+                  commissionerJwt,
+                  `query GetLeagueDraftStatus($id: Int!) { league(id: $id) { draftStatus } }`,
+                  { id: state.leagueId },
+                ).catch((e: unknown) => {
+                  const msg = e instanceof Error ? e.message : String(e);
+                  console.log(`[live-draft] draftStatus query failed: ${msg}`);
+                  return null;
+                });
+                const draftStatus = statusData?.league?.draftStatus;
+                if (draftStatus === 'completed') {
+                  const elapsedDoneApi = (
+                    (Date.now() - draftStart) /
+                    1000
+                  ).toFixed(1);
+                  console.log(
+                    `[live-draft] +${elapsedDoneApi}s API confirms draft completed — exiting pick loop (browsers stuck in draftOrderMissing state)`,
+                  );
+                  pickCount = maxPicks; // trigger while-loop exit
+                }
+
+                // EventBridge timing race (LS-4369): nudge returns 0 because
+                // the deadline hasn't expired yet, but EventBridge has already
+                // advanced the draft server-side.  Query currentPick to detect
+                // server-side progress and reset the miss counter — prevents
+                // false bail-out at miss 101 (~329 s) while picks are happening.
+                // Uses gqlFetch (Node.js native fetch) rather than
+                // pages[1].page.request to avoid silent failures when the
+                // browser page context is in a degraded state — the browser
+                // request silently returned null via .catch(() => null) in
+                // run 1, blocking detection for the entire stall period (LS-4369).
+                // Use managerJwt1 (a regular league_members row) rather than
+                // commissionerJwt: the commissioner is an admin who accesses
+                // leagues via the isAdmin bypass in league(), but getLeagueDraft
+                // calls verifyLeagueMembership which has no admin bypass and
+                // throws FORBIDDEN when the admin has no league_members row.
+                const currentPickData = await gqlFetch<{
+                  getLeagueDraft?: { currentPick?: number } | null;
+                }>(
+                  managerJwt1,
+                  `query GetLeagueDraftCurrentPick($leagueId: Int!) { getLeagueDraft(leagueId: $leagueId) { currentPick } }`,
+                  { leagueId: state.leagueId },
+                ).catch((e: unknown) => {
+                  const msg = e instanceof Error ? e.message : String(e);
+                  console.log(`[live-draft] currentPick query failed: ${msg}`);
+                  return null;
+                });
+                const serverCurrentPick =
+                  currentPickData?.getLeagueDraft?.currentPick;
+                if (
+                  serverCurrentPick != null &&
+                  serverCurrentPick > lastKnownCurrentPick
+                ) {
+                  const elapsedProgress = (
+                    (Date.now() - draftStart) /
+                    1000
+                  ).toFixed(1);
+                  console.log(
+                    `[live-draft] +${elapsedProgress}s EventBridge progress detected: currentPick ${lastKnownCurrentPick} → ${serverCurrentPick} — resetting miss counter`,
+                  );
+                  lastKnownCurrentPick = serverCurrentPick;
+                  consecutiveMisses = 0;
+                  hasReloadedThisStreak = false;
                 }
               }
 

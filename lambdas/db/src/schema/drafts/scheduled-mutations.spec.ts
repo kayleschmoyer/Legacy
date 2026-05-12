@@ -177,5 +177,46 @@ describe('assertLeagueMemberOrSystem', () => {
         assertLeagueMemberOrSystem(ctx, 42),
       ).resolves.toBeUndefined();
     });
+
+    it('resolves when authSource is cookie (browser session via CSRF-validated cookie)', async () => {
+      const ctx = makeContext({
+        user: { id: 9, isAdmin: false },
+        authSource: 'cookie',
+        db: makeMockDb([{ leagueId: 99 }]),
+      });
+      await expect(
+        assertLeagueMemberOrSystem(ctx, 99),
+      ).resolves.toBeUndefined();
+    });
+  });
+
+  describe('EventBridge timing race regression (LS-4369)', () => {
+    it('allows a system request with a leagueId (EventBridge nudge with scope)', async () => {
+      const ctx = makeContext({ isSystemRequest: true });
+      await expect(
+        assertLeagueMemberOrSystem(ctx, 42),
+      ).resolves.toBeUndefined();
+    });
+
+    it('throws FORBIDDEN (not UNAUTHENTICATED) for a bearer-authed non-member — fast-fail path', async () => {
+      // nudgeRejected in the test checks for gqlErrors OR UNAUTHENTICATED in
+      // result.errors.  FORBIDDEN must surface as a top-level gqlError so the
+      // fast-fail fires immediately rather than letting the draft stall for 100+
+      // misses before bailing with a generic "stuck" error.
+      const ctx = makeContext({
+        user: { id: 77, isAdmin: false },
+        authSource: 'bearer',
+        db: makeMockDb([]), // no membership row
+      });
+      const err = await assertLeagueMemberOrSystem(ctx, 42).catch((e) => e);
+      expect(err).toMatchObject({ extensions: { code: 'FORBIDDEN' } });
+      expect(err.message).toBe('You are not a member of this league');
+    });
+
+    it('throws UNAUTHENTICATED (not FORBIDDEN) when user is null — nudge fast-fail triggers', async () => {
+      const ctx = makeContext({ user: null, isSystemRequest: false });
+      const err = await assertLeagueMemberOrSystem(ctx, 42).catch((e) => e);
+      expect(err).toMatchObject({ extensions: { code: 'UNAUTHENTICATED' } });
+    });
   });
 });
