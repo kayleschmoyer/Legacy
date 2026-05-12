@@ -582,9 +582,20 @@ test.describe
 
     await test.step('Click Bench to move player to bench', async () => {
       const benchBtn = page.getByRole('button', { name: /^Bench$/i }).first();
+      // Register the response promise BEFORE clicking so we don't miss the mutation request
+      // if the page is already at networkidle (which would cause a bare waitForLoadState to
+      // resolve immediately before the XHR even starts).
+      const mutationSettled = page.waitForResponse(
+        (resp) =>
+          resp.url().includes('/graphql') && resp.request().method() === 'POST',
+        { timeout: 10_000 },
+      );
       await benchBtn.click();
-      // Wait for mutation to complete
-      await page.waitForTimeout(2_000);
+      await mutationSettled;
+      // Wait for the subsequent refetch to also settle
+      await page
+        .waitForLoadState('networkidle', { timeout: 10_000 })
+        .catch(() => undefined);
     });
 
     await test.step('Player now appears in Bench section with BN badge', async () => {
@@ -676,9 +687,20 @@ test.describe
         .first();
       await expect(positionButtons).toBeVisible({ timeout: 5_000 });
 
+      // Register the response promise BEFORE clicking so we don't miss the mutation request
+      // if the page is already at networkidle.
+      const mutationSettled = page.waitForResponse(
+        (resp) =>
+          resp.url().includes('/graphql') && resp.request().method() === 'POST',
+        { timeout: 10_000 },
+      );
       // Click the first available position option to assign the player
       await positionButtons.click();
-      await page.waitForTimeout(2_000);
+      await mutationSettled;
+      // Wait for the subsequent refetch to also settle
+      await page
+        .waitForLoadState('networkidle', { timeout: 10_000 })
+        .catch(() => undefined);
     });
 
     await test.step('Player removed from bench section after assignment', async () => {
@@ -835,9 +857,19 @@ test.describe
         .filter({ hasText: player2Name })
         .first();
       await expect(secondPlayerRow).toBeVisible({ timeout: 5_000 });
+      // Register the response promise BEFORE clicking so we don't miss the mutation request
+      // if the page is already at networkidle.
+      const mutationSettled = page.waitForResponse(
+        (resp) =>
+          resp.url().includes('/graphql') && resp.request().method() === 'POST',
+        { timeout: 10_000 },
+      );
       await secondPlayerRow.click();
-      // Wait for mutation to complete
-      await page.waitForTimeout(2_000);
+      await mutationSettled;
+      // Wait for the subsequent refetch to also settle
+      await page
+        .waitForLoadState('networkidle', { timeout: 10_000 })
+        .catch(() => undefined);
     });
 
     await test.step('Verify swap persisted via API — players exchanged positions', async () => {
