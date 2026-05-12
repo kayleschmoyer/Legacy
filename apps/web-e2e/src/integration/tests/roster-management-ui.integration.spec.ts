@@ -264,15 +264,18 @@ test.describe
     });
 
     await test.step('Verify roster section headers are visible', async () => {
+      // Extend timeout to 30 s: after a long draft Lambda is cold, so
+      // userTeamId + teamMembers each need a cold-start window before
+      // "Loading roster..." clears and the section headers render (LS-4362).
       await expect(
         page.getByText('Pitching', { exact: false }).first(),
-      ).toBeVisible({ timeout: 15000 });
+      ).toBeVisible({ timeout: 30_000 });
       await expect(
         page.getByText('Infield', { exact: false }).first(),
-      ).toBeVisible();
+      ).toBeVisible({ timeout: 5_000 });
       await expect(
         page.getByText('Outfield', { exact: false }).first(),
-      ).toBeVisible();
+      ).toBeVisible({ timeout: 5_000 });
     });
 
     await test.step('Verify player slots are filled', async () => {
