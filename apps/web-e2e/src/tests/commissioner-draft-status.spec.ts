@@ -312,6 +312,117 @@ test.describe('Commissioner — deterministic api-polling path (LS-4344)', () =>
   });
 });
 
+// ── Draft mode save-completion guard (LS-4352) ────────────────────────────────
+//
+// Guards against the race condition where a fixed 1s wait after "Save Draft
+// Settings" was insufficient under CI load: if UpdateDraftSettings took >1s,
+// startDraft would read stale draftMode='live' from the DB and start a live
+// draft instead of an automated one.
+//
+// The fix: wait for the Save button to become disabled (hasChanges=false after
+// save success) before proceeding. This test verifies that the button correctly
+// transitions through enabled (hasChanges=true) → disabled (saving=true or
+// hasChanges=false) using a slow mocked mutation to surface the timing gap.
+
+test.describe('Commissioner — draft mode save-completion guard (LS-4352)', () => {
+  test('Save button becomes disabled during/after slow UpdateDraftSettings', async ({
+    page,
+  }) => {
+    let mutationFired = false;
+
+    await page.route(isGraphQLEndpoint, async (route) => {
+      const postData = route.request().postData()?.toLowerCase() ?? '';
+      if (
+        postData.includes('"getleaguebyid"') ||
+        postData.includes('"getleague"')
+      ) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { league: makeLeague() } }),
+        });
+      } else if (postData.includes('"getleaguedraft"')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: {
+              getLeagueDraft: {
+                __typename: 'Draft',
+                id: 1,
+                leagueId: 1,
+                draftMode: 'live',
+                selectionMethod: 'standard',
+                draftOrder: 'snake',
+                currentPick: 0,
+                pickTimeLimitSeconds: 120,
+                draftStartedAt: null,
+                draftCompletedAt: null,
+                scheduledAt: null,
+              },
+            },
+          }),
+        });
+      } else if (postData.includes('"updatedraftsettings"')) {
+        mutationFired = true;
+        // Simulate mutation latency (e.g. CI DB write delay)
+        await new Promise<void>((r) => setTimeout(r, 800));
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: {
+              updateDraftSettings: {
+                __typename: 'Draft',
+                id: 1,
+                leagueId: 1,
+                draftMode: 'automated',
+                selectionMethod: 'random',
+                draftOrder: 'snake',
+                currentPick: 0,
+                pickTimeLimitSeconds: 120,
+                playerPool: 'all',
+                draftStartedAt: null,
+                draftCompletedAt: null,
+                scheduledAt: null,
+              },
+            },
+          }),
+        });
+      } else {
+        await unmockedGraphQLFallback(route);
+      }
+    });
+
+    await page.goto('/baseball/league/1/commissioner');
+    await page.waitForLoadState('networkidle');
+
+    const draftSettingsBtn = page.getByRole('button', {
+      name: /Draft Settings/i,
+    });
+    await expect(draftSettingsBtn).toBeVisible({ timeout: 10_000 });
+    await draftSettingsBtn.click();
+
+    // Use data-testid selector — same as the integration spec fix (LS-4352)
+    const automatedBtn = page.getByTestId('option-automated');
+    await expect(automatedBtn).toBeVisible({ timeout: 5_000 });
+    await automatedBtn.click();
+
+    const saveBtn = page.getByRole('button', {
+      name: /Save Draft Settings/i,
+    });
+    // Button must be enabled before save (hasChanges=true after mode change)
+    await expect(saveBtn).toBeEnabled({ timeout: 5_000 });
+    await saveBtn.click();
+
+    // Button must become disabled while the mutation is in-flight (saving=true)
+    // and remain disabled after completion (hasChanges=false). A fixed 1s
+    // waitForTimeout races against slow mutations under CI load (LS-4352).
+    await expect(saveBtn).toBeDisabled({ timeout: 10_000 });
+    expect(mutationFired).toBe(true);
+  });
+});
+
 // ── Unauthenticated access guard ───────────────────────────────────────────────
 //
 // Verifies that an unauthenticated user cannot view league data or the

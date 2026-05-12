@@ -203,9 +203,8 @@ test.describe
       await expect(draftSettingsBtn).toBeVisible({ timeout: 10_000 });
       await draftSettingsBtn.click();
 
-      const automatedBtn = page.getByRole('button', {
-        name: /Automated Draft/i,
-      });
+      // Use data-testid selector (matches OptionSelector component output)
+      const automatedBtn = page.getByTestId('option-automated');
       await expect(automatedBtn).toBeVisible({ timeout: 5_000 });
       await automatedBtn.click();
 
@@ -214,7 +213,10 @@ test.describe
       });
       await expect(saveBtn).toBeEnabled({ timeout: 5_000 });
       await saveBtn.click();
-      await page.waitForTimeout(1_000);
+      // Wait for the mutation to complete: button becomes disabled when hasChanges=false
+      // A fixed 1s timeout races against the updateDraftSettings mutation under CI load,
+      // causing startDraft to read stale draftMode='live' from the DB (LS-4352).
+      await expect(saveBtn).toBeDisabled({ timeout: 10_000 });
     });
 
     await test.step('Start draft', async () => {
