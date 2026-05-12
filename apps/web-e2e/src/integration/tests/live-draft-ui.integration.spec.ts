@@ -21,6 +21,34 @@ import { createLeagueViaUI } from '../helpers/create-league';
 import { waitForJoinPageValidation } from '../helpers/wait-for-join-page';
 import { test } from '../fixtures/ui';
 
+const GQL_URL =
+  (
+    process.env.INTEGRATION_BASE_URL ?? 'https://api.legacy-fantasy.com/'
+  ).replace(/\/?$/, '/') + 'graphql';
+
+async function gqlFetch<T>(
+  jwt: string,
+  query: string,
+  variables?: Record<string, unknown>,
+): Promise<T> {
+  const res = await fetch(GQL_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${jwt}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ query, variables }),
+  });
+  const json = (await res.json()) as {
+    data?: T;
+    errors?: Array<{ message: string }>;
+  };
+  if (json.errors?.length)
+    throw new Error(`GraphQL error: ${json.errors[0].message}`);
+  if (!json.data) throw new Error('GraphQL response contained no data');
+  return json.data;
+}
+
 // ---------------------------------------------------------------------------
 // Shared state accumulated across serial tests.
 // ---------------------------------------------------------------------------
@@ -82,17 +110,48 @@ test.describe
   // land on the LoginPage.  Dedicated fixture pages set cookies + localStorage
   // atomically at context-creation time — no race window.
   test('Phase 2: Managers join the league', async ({
+    commissionerJwt,
+    managerJwt1,
+    managerJwt2,
+    managerJwt3,
     managerPage1,
     managerPage2,
     managerPage3,
   }) => {
+    // Guard against transient Lambda cold-starts: the validateInviteCode
+    // resolver returns null when it can't find the league row — causing
+    // "Invalid invite code" on the join page even for a freshly-created
+    // league.  Poll via the commissioner's JWT before any manager navigates
+    // to the join URL so the backend has time to stabilise (LS-4360).
+    await expect
+      .poll(
+        async () => {
+          const data = await gqlFetch<{
+            validateInviteCode: { leagueId: number } | null;
+          }>(
+            commissionerJwt,
+            `query ValidateInviteCodePreflight($code: String!) {
+               validateInviteCode(code: $code) { leagueId }
+             }`,
+            { code: state.inviteCode },
+          );
+          return data.validateInviteCode?.leagueId ?? null;
+        },
+        {
+          timeout: 30_000,
+          intervals: [500, 1_000, 2_000],
+          message: `validateInviteCode("${state.inviteCode}") still null after 30s — league ${state.leagueId} not queryable`,
+        },
+      )
+      .not.toBeNull();
+
     const managers = [
-      { page: managerPage1, teamName: 'Draft Kings' },
-      { page: managerPage2, teamName: 'The Selectors' },
-      { page: managerPage3, teamName: 'Pick Masters' },
+      { page: managerPage1, jwt: managerJwt1, teamName: 'Draft Kings' },
+      { page: managerPage2, jwt: managerJwt2, teamName: 'The Selectors' },
+      { page: managerPage3, jwt: managerJwt3, teamName: 'Pick Masters' },
     ];
 
-    for (const { page, teamName } of managers) {
+    for (const { page, jwt, teamName } of managers) {
       const joinUrl = `/baseball/league/join/${state.inviteCode}`;
       await page.goto(joinUrl);
       await page.waitForLoadState('load');
@@ -110,6 +169,32 @@ test.describe
       await expect(page).toHaveURL(/\/baseball\/league\/\d+/, {
         timeout: 15000,
       });
+
+      // The URL redirect alone doesn't guarantee the leagueMembers row is
+      // queryable yet (LS-4350): later phases that re-enter the league as
+      // this manager will see "League not found" because `GetLeagueById`
+      // throws ForbiddenError when the membership lookup returns no row.
+      // Poll the manager's own `userTeamId` with their JWT until it
+      // resolves to a non-null team id before progressing.
+      await expect
+        .poll(
+          async () => {
+            const data = await gqlFetch<{ userTeamId: number | null }>(
+              jwt,
+              `query GetUserTeamIdForJoin($leagueId: Int!) {
+                 userTeamId(leagueId: $leagueId)
+               }`,
+              { leagueId: state.leagueId },
+            );
+            return data.userTeamId;
+          },
+          {
+            timeout: 15_000,
+            intervals: [500, 1_000, 2_000],
+            message: `Manager join for "${teamName}" did not persist a leagueMembers row in league ${state.leagueId} within 15s`,
+          },
+        )
+        .not.toBeNull();
 
       state.teams.push(teamName);
     }
