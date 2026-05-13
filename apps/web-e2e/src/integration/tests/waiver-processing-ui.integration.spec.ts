@@ -32,7 +32,10 @@
 import { expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { createLeagueViaUI } from '../helpers/create-league';
-import { waitForJoinPageValidation } from '../helpers/wait-for-join-page';
+import {
+  validateInviteCodePreflight,
+  waitForJoinPageValidation,
+} from '../helpers/wait-for-join-page';
 import { switchUser, test } from '../fixtures/ui';
 
 // ---------------------------------------------------------------------------
@@ -274,26 +277,33 @@ test.describe
   // PHASE 2 — MANAGERS JOIN
   // -----------------------------------------------------------------
 
+  // Phase 2 uses dedicated manager fixture pages instead of switchUser() to
+  // avoid the AUTH_LOGOUT race (LS-3672, LS-3705, LS-4385). Per-manager
+  // validateInviteCodePreflight warms each Lambda instance before navigation
+  // to prevent cold-start "Invalid invite code" failures (LS-4360, LS-4364).
   test('Phase 2: Three managers join the league', async ({
-    commissionerPage: page,
-    commissionerJwt,
     managerJwt1,
     managerJwt2,
     managerJwt3,
+    managerPage1,
+    managerPage2,
+    managerPage3,
   }) => {
     await test.step('Managers 1-3 join league via invite code', async () => {
       const managers = [
-        { jwt: managerJwt1, teamName: 'Waiver Team 1' },
-        { jwt: managerJwt2, teamName: 'Waiver Team 2' },
-        { jwt: managerJwt3, teamName: 'Waiver Team 3' },
+        { page: managerPage1, jwt: managerJwt1, teamName: 'Waiver Team 1' },
+        { page: managerPage2, jwt: managerJwt2, teamName: 'Waiver Team 2' },
+        { page: managerPage3, jwt: managerJwt3, teamName: 'Waiver Team 3' },
       ];
 
-      for (const { jwt, teamName } of managers) {
+      for (const { page, jwt, teamName } of managers) {
+        await validateInviteCodePreflight(jwt, state.inviteCode);
+
         const joinUrl = `/baseball/league/join/${state.inviteCode}`;
-        await switchUser(page, jwt, joinUrl);
+        await page.goto(joinUrl);
         await page.waitForLoadState('load');
 
-        // Wait for invite code validation (retries on transient auth race)
+        // Wait for invite code validation
         await waitForJoinPageValidation(page);
 
         await expect(page.getByTestId('team-name')).toBeVisible({
@@ -309,9 +319,6 @@ test.describe
         });
       }
     });
-
-    // Restore commissioner identity after user-switching
-    await switchUser(page, commissionerJwt);
   });
 
   // -----------------------------------------------------------------

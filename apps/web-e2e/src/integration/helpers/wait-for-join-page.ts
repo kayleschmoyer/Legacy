@@ -1,6 +1,56 @@
 import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 
+const GQL_URL =
+  (
+    process.env.INTEGRATION_BASE_URL ?? 'https://api.legacy-fantasy.com/'
+  ).replace(/\/?$/, '/') + 'graphql';
+
+/**
+ * Poll `validateInviteCode` with the given JWT until the backend returns a
+ * non-null leagueId. Warms the Lambda instance for this JWT before the
+ * browser navigates to the join URL, preventing transient "Invalid invite
+ * code" failures caused by Lambda cold starts (LS-4360, LS-4364, LS-4385).
+ *
+ * Call once per manager JWT before `page.goto(joinUrl)`. Under concurrent
+ * load Lambda may route each manager's request to a different cold instance,
+ * so the preflight must be run per-manager — a single commissioner-JWT
+ * warmup is not sufficient.
+ */
+export async function validateInviteCodePreflight(
+  jwt: string,
+  inviteCode: string,
+): Promise<void> {
+  await expect
+    .poll(
+      async () => {
+        const res = await fetch(GQL_URL, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${jwt}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            query: `query ValidateInviteCodePreflight($code: String!) {
+              validateInviteCode(code: $code) { leagueId }
+            }`,
+            variables: { code: inviteCode },
+          }),
+        });
+        const json = (await res.json()) as {
+          data?: { validateInviteCode: { leagueId: number } | null };
+        };
+        return json?.data?.validateInviteCode?.leagueId ?? null;
+      },
+      {
+        timeout: 30_000,
+        intervals: [500, 1_000, 2_000],
+        message: `validateInviteCode("${inviteCode}") still null after 30s`,
+      },
+    )
+    .not.toBeNull();
+}
+
 /**
  * Wait for the join-league page to finish invite code validation.
  *

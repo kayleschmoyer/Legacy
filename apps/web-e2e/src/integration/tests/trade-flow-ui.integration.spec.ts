@@ -27,7 +27,10 @@
 import { expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { createLeagueViaUI } from '../helpers/create-league';
-import { waitForJoinPageValidation } from '../helpers/wait-for-join-page';
+import {
+  validateInviteCodePreflight,
+  waitForJoinPageValidation,
+} from '../helpers/wait-for-join-page';
 import { waitForSeasonActive } from '../helpers/wait-for-season-active';
 import { test } from '../fixtures/ui';
 
@@ -263,13 +266,20 @@ test.describe
   // PHASE 2 — MANAGER JOINS THE LEAGUE
   // -----------------------------------------------------------------
 
-  test('Phase 2: Manager joins the league', async ({ managerPage1 }) => {
+  test('Phase 2: Manager joins the league', async ({
+    managerJwt1,
+    managerPage1,
+  }) => {
     // Dedicated managerPage1 context instead of switchUser — avoids the
     // AUTH_LOGOUT race documented in LS-3672/LS-3705 and applied to
     // playoff-bracket-ui Phase 2 in LS-4270. The commissioner's browser
     // context is untouched, so no "Restore commissioner identity" step
     // is needed before later phases reuse `commissionerPage`.
     await test.step('Manager 1 joins via the invite code UI', async () => {
+      // Warm the validateInviteCode Lambda for the manager's JWT before
+      // navigating to the join URL (LS-4360, LS-4364, LS-4385).
+      await validateInviteCodePreflight(managerJwt1, state.inviteCode);
+
       const joinUrl = `/baseball/league/join/${state.inviteCode}`;
       await managerPage1.goto(joinUrl);
       await managerPage1.waitForLoadState('load');

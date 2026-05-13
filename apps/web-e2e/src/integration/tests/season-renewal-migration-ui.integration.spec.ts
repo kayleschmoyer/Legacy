@@ -32,9 +32,12 @@
 
 import { expect } from '@playwright/test';
 import { createLeagueViaUI } from '../helpers/create-league';
-import { waitForJoinPageValidation } from '../helpers/wait-for-join-page';
+import {
+  validateInviteCodePreflight,
+  waitForJoinPageValidation,
+} from '../helpers/wait-for-join-page';
 import { waitForSeasonActive } from '../helpers/wait-for-season-active';
-import { switchUser, test } from '../fixtures/ui';
+import { test } from '../fixtures/ui';
 
 // ---------------------------------------------------------------------------
 // Shared state accumulated across serial phases.
@@ -157,25 +160,32 @@ test.describe
   // PHASE 2 — MANAGERS JOIN (UI: token swap)
   // -----------------------------------------------------------------------
 
+  // Phase 2 uses dedicated manager fixture pages instead of switchUser() to
+  // avoid the AUTH_LOGOUT race (LS-3672, LS-3705, LS-4385). Per-manager
+  // validateInviteCodePreflight warms each Lambda instance before navigation
+  // to prevent cold-start "Invalid invite code" failures (LS-4360, LS-4364).
   test('Phase 2: Three managers join the league', async ({
-    commissionerPage: page,
-    commissionerJwt,
     managerJwt1,
     managerJwt2,
     managerJwt3,
+    managerPage1,
+    managerPage2,
+    managerPage3,
   }) => {
     test.setTimeout(60_000);
 
-    const joinUrl = `/baseball/league/join/${state.inviteCode}`;
     const managers = [
-      { jwt: managerJwt1, teamName: 'The Sluggers' },
-      { jwt: managerJwt2, teamName: 'The Aces' },
-      { jwt: managerJwt3, teamName: 'The Rockets' },
+      { page: managerPage1, jwt: managerJwt1, teamName: 'The Sluggers' },
+      { page: managerPage2, jwt: managerJwt2, teamName: 'The Aces' },
+      { page: managerPage3, jwt: managerJwt3, teamName: 'The Rockets' },
     ];
 
-    for (const { jwt, teamName } of managers) {
+    for (const { page, jwt, teamName } of managers) {
       await test.step(`Manager joins as "${teamName}"`, async () => {
-        await switchUser(page, jwt, joinUrl);
+        await validateInviteCodePreflight(jwt, state.inviteCode);
+
+        const joinUrl = `/baseball/league/join/${state.inviteCode}`;
+        await page.goto(joinUrl);
         await page.waitForLoadState('load');
 
         await waitForJoinPageValidation(page);
@@ -192,14 +202,6 @@ test.describe
         });
       });
     }
-
-    // Restore commissioner identity.
-    await switchUser(
-      page,
-      commissionerJwt,
-      `/baseball/league/${state.leagueId}/commissioner`,
-    );
-    await page.waitForLoadState('load');
   });
 
   // -----------------------------------------------------------------------

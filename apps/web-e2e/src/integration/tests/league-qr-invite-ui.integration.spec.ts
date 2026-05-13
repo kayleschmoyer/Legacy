@@ -22,7 +22,10 @@
 
 import { expect } from '@playwright/test';
 import { createLeagueViaUI } from '../helpers/create-league';
-import { waitForJoinPageValidation } from '../helpers/wait-for-join-page';
+import {
+  validateInviteCodePreflight,
+  waitForJoinPageValidation,
+} from '../helpers/wait-for-join-page';
 import { test } from '../fixtures/ui';
 
 // ---------------------------------------------------------------------------
@@ -308,6 +311,7 @@ test.describe
   // -----------------------------------------------------------------------
 
   test('Phase 7: Manager joins the league via the invite URL', async ({
+    managerJwt1,
     managerPage1,
   }) => {
     // Use a dedicated manager browser context rather than switchUser on
@@ -316,6 +320,10 @@ test.describe
     // clear localStorage after page.evaluate() sets the manager profile,
     // causing the reload to start with empty localStorage and show the login
     // page instead of the join page (LS-3705, same pattern as LS-3672).
+    // Warm the validateInviteCode Lambda for this manager's JWT before
+    // navigating (LS-4360, LS-4364, LS-4385).
+    await validateInviteCodePreflight(managerJwt1, state.inviteCode);
+
     const joinUrl = `/baseball/league/join/${state.inviteCode}`;
     await managerPage1.goto(joinUrl);
     await managerPage1.waitForLoadState('load');

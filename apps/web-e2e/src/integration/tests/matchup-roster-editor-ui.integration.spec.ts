@@ -29,8 +29,11 @@
 
 import { expect } from '@playwright/test';
 import { createLeagueViaUI } from '../helpers/create-league';
-import { waitForJoinPageValidation } from '../helpers/wait-for-join-page';
-import { switchUser, test } from '../fixtures/ui';
+import {
+  validateInviteCodePreflight,
+  waitForJoinPageValidation,
+} from '../helpers/wait-for-join-page';
+import { test } from '../fixtures/ui';
 
 // ---------------------------------------------------------------------------
 // Shared state
@@ -132,23 +135,30 @@ test.describe
   // PHASE 2 — MANAGERS JOIN
   // -------------------------------------------------------------------------
 
+  // Phase 2 uses dedicated manager fixture pages instead of switchUser() to
+  // avoid the AUTH_LOGOUT race (LS-3672, LS-3705, LS-4385). Per-manager
+  // validateInviteCodePreflight warms each Lambda instance before navigation
+  // to prevent cold-start "Invalid invite code" failures (LS-4360, LS-4364).
   test('Phase 2: Managers join the league', async ({
-    commissionerPage: page,
-    commissionerJwt,
     managerJwt1,
     managerJwt2,
     managerJwt3,
+    managerPage1,
+    managerPage2,
+    managerPage3,
   }) => {
     const managers = [
-      { jwt: managerJwt1, teamName: 'The Sluggers' },
-      { jwt: managerJwt2, teamName: 'The Aces' },
-      { jwt: managerJwt3, teamName: 'The Rockets' },
+      { page: managerPage1, jwt: managerJwt1, teamName: 'The Sluggers' },
+      { page: managerPage2, jwt: managerJwt2, teamName: 'The Aces' },
+      { page: managerPage3, jwt: managerJwt3, teamName: 'The Rockets' },
     ];
 
     await test.step('Each manager joins via invite code', async () => {
-      for (const { jwt, teamName } of managers) {
+      for (const { page, jwt, teamName } of managers) {
+        await validateInviteCodePreflight(jwt, state.inviteCode);
+
         const joinUrl = `/baseball/league/join/${state.inviteCode}`;
-        await switchUser(page, jwt, joinUrl);
+        await page.goto(joinUrl);
         await page.waitForLoadState('load');
 
         await waitForJoinPageValidation(page);
@@ -165,9 +175,6 @@ test.describe
           timeout: 15_000,
         });
       }
-
-      // Restore commissioner
-      await switchUser(page, commissionerJwt);
     });
   });
 

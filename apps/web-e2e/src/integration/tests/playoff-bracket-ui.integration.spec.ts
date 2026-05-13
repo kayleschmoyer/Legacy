@@ -24,7 +24,10 @@
 
 import { expect } from '@playwright/test';
 import { createLeagueViaUI } from '../helpers/create-league';
-import { waitForJoinPageValidation } from '../helpers/wait-for-join-page';
+import {
+  validateInviteCodePreflight,
+  waitForJoinPageValidation,
+} from '../helpers/wait-for-join-page';
 import { waitForSeasonActive } from '../helpers/wait-for-season-active';
 import { test } from '../fixtures/ui';
 
@@ -158,21 +161,28 @@ test.describe
   // -----------------------------------------------------------------------
 
   test('Phase 2: Three managers join the league', async ({
+    managerJwt1,
+    managerJwt2,
+    managerJwt3,
     managerPage1,
     managerPage2,
     managerPage3,
   }) => {
     test.setTimeout(60_000);
 
-    const joinUrl = `/baseball/league/join/${state.inviteCode}`;
     const managers = [
-      { page: managerPage1, teamName: 'The Sluggers' },
-      { page: managerPage2, teamName: 'The Aces' },
-      { page: managerPage3, teamName: 'The Rockets' },
+      { page: managerPage1, jwt: managerJwt1, teamName: 'The Sluggers' },
+      { page: managerPage2, jwt: managerJwt2, teamName: 'The Aces' },
+      { page: managerPage3, jwt: managerJwt3, teamName: 'The Rockets' },
     ];
 
-    for (const { page, teamName } of managers) {
+    for (const { page, jwt, teamName } of managers) {
       await test.step(`Manager joins as "${teamName}"`, async () => {
+        // Warm the validateInviteCode Lambda for this manager's JWT before
+        // navigating to the join URL (LS-4360, LS-4364, LS-4385).
+        await validateInviteCodePreflight(jwt, state.inviteCode);
+
+        const joinUrl = `/baseball/league/join/${state.inviteCode}`;
         await page.goto(joinUrl);
         await page.waitForLoadState('load');
 

@@ -22,7 +22,10 @@
 import { expect } from '@playwright/test';
 import { createLeagueViaUI } from '../helpers/create-league';
 import { graphqlOk } from '../helpers/graphql';
-import { waitForJoinPageValidation } from '../helpers/wait-for-join-page';
+import {
+  validateInviteCodePreflight,
+  waitForJoinPageValidation,
+} from '../helpers/wait-for-join-page';
 import { waitForSeasonActive } from '../helpers/wait-for-season-active';
 import { switchUser, test } from '../fixtures/ui';
 
@@ -78,54 +81,65 @@ test.describe
 
   // -----------------------------------------------------------------
   // PHASE 2 — JOIN LEAGUE + TEAM SETUP (token swap + UI)
-  // Swap the auth token to each manager, join via the UI, then
-  // switch back to the commissioner.
+  // Phase 2 uses dedicated manager fixture pages (one browser context per
+  // manager) instead of switchUser() on the commissioner page. switchUser()
+  // has a known race condition (LS-3672, LS-3705) where the background
+  // refreshJwt() can dispatch AUTH_LOGOUT after page.evaluate() sets the new
+  // user profile, clearing localStorage and causing the join page to show
+  // "Invalid invite code" persistently across all retries (LS-4385).
+  // Per-manager validateInviteCodePreflight polls warm the Lambda instance
+  // for each JWT before navigation, preventing cold-start transient failures
+  // (LS-4360, LS-4364).
   // -----------------------------------------------------------------
 
   test('Phase 2: Users join the league and configure teams', async ({
     commissionerPage: page,
-    commissionerJwt,
     managerJwt1,
     managerJwt2,
     managerJwt3,
+    managerPage1,
+    managerPage2,
+    managerPage3,
   }) => {
     await test.step('Managers 1-3 join league via UI', async () => {
       const managers = [
-        { jwt: managerJwt1, teamName: 'The Sluggers' },
-        { jwt: managerJwt2, teamName: 'The Aces' },
-        { jwt: managerJwt3, teamName: 'The Rockets' },
+        { page: managerPage1, jwt: managerJwt1, teamName: 'The Sluggers' },
+        { page: managerPage2, jwt: managerJwt2, teamName: 'The Aces' },
+        { page: managerPage3, jwt: managerJwt3, teamName: 'The Rockets' },
       ];
 
-      for (const { jwt, teamName } of managers) {
-        // Switch identity and navigate to the join page in one step
-        const joinUrl = `/baseball/league/join/${state.inviteCode}`;
-        await switchUser(page, jwt, joinUrl);
-        await page.waitForLoadState('load');
+      for (const { page: managerPage, jwt, teamName } of managers) {
+        // Warm the validateInviteCode Lambda for this manager's JWT before
+        // navigating to the join URL (LS-4360, LS-4364, LS-4385).
+        await validateInviteCodePreflight(jwt, state.inviteCode);
 
-        // Wait for invite code validation (retries on transient auth race)
-        await waitForJoinPageValidation(page);
+        const joinUrl = `/baseball/league/join/${state.inviteCode}`;
+        await managerPage.goto(joinUrl);
+        await managerPage.waitForLoadState('load');
+
+        // Wait for invite code validation
+        await waitForJoinPageValidation(managerPage);
 
         // Fill team name and join
-        await expect(page.getByTestId('team-name')).toBeVisible({
+        await expect(managerPage.getByTestId('team-name')).toBeVisible({
           timeout: 5_000,
         });
-        await page.getByTestId('team-name').fill(teamName);
-        const joinBtn = page.getByRole('button', {
+        await managerPage.getByTestId('team-name').fill(teamName);
+        const joinBtn = managerPage.getByRole('button', {
           name: /Join League/i,
         });
         await expect(joinBtn).toBeEnabled({ timeout: 5000 });
         await joinBtn.click();
 
         // Wait for redirect to the league page
-        await expect(page).toHaveURL(/\/baseball\/league\/\d+/, {
+        await expect(managerPage).toHaveURL(/\/baseball\/league\/\d+/, {
           timeout: 15000,
         });
 
         state.teams.push(teamName);
       }
 
-      // Restore commissioner identity
-      await switchUser(page, commissionerJwt);
+      // commissionerPage was not touched — no identity restore needed
       expect(state.teams).toHaveLength(3);
     });
 

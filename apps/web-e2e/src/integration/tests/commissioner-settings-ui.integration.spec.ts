@@ -30,7 +30,10 @@
 import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 import { createLeagueViaUI } from '../helpers/create-league';
-import { waitForJoinPageValidation } from '../helpers/wait-for-join-page';
+import {
+  validateInviteCodePreflight,
+  waitForJoinPageValidation,
+} from '../helpers/wait-for-join-page';
 import { test } from '../fixtures/ui';
 
 // ---------------------------------------------------------------------------
@@ -287,32 +290,9 @@ test.describe
     managerJwt1,
   }) => {
     await test.step('Manager joins the league', async () => {
-      // Guard against transient Lambda cold-starts: validateInviteCode returns
-      // null for a freshly-created league when the resolver is cold, causing
-      // "Invalid invite code" on the join page within all retry windows.
-      // Poll via the commissioner's JWT before the manager navigates to give
-      // the backend time to stabilise (LS-4365, same pattern as LS-4360).
-      await expect
-        .poll(
-          async () => {
-            const data = await gqlFetch<{
-              validateInviteCode: { leagueId: number } | null;
-            }>(
-              commissionerJwt,
-              `query ValidateInviteCodePreflight($code: String!) {
-                 validateInviteCode(code: $code) { leagueId }
-               }`,
-              { code: state.inviteCode },
-            );
-            return data.validateInviteCode?.leagueId ?? null;
-          },
-          {
-            timeout: 30_000,
-            intervals: [500, 1_000, 2_000],
-            message: `validateInviteCode("${state.inviteCode}") still null after 30s — league ${state.leagueId} not queryable`,
-          },
-        )
-        .not.toBeNull();
+      // Warm the validateInviteCode Lambda for the manager's JWT before
+      // navigating to the join URL (LS-4360, LS-4364, LS-4385).
+      await validateInviteCodePreflight(managerJwt1, state.inviteCode);
 
       const joinUrl = `/baseball/league/join/${state.inviteCode}`;
       await managerPage1.goto(joinUrl);
