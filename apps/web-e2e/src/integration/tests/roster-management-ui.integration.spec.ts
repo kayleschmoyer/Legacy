@@ -236,11 +236,20 @@ test.describe
       await expect(startBtn).toBeVisible({ timeout: 15000 });
       await startBtn.click();
 
-      const confirmBtn = page.getByRole('button', {
-        name: /Start Draft|Confirm/i,
-      });
-      await expect(confirmBtn.last()).toBeVisible({ timeout: 5000 });
-      await confirmBtn.last().click();
+      // Scope the Confirm click to the dialog rather than using .last() on a
+      // shared role+name query: .last() resolves against the current DOM
+      // immediately and can pick the "Start Draft" button if the dialog portal
+      // hasn't finished rendering yet — clicking Start Draft a second time is a
+      // no-op (setShowConfirmDialog(true) again) so initializeDraft never fires
+      // and draftStatus stays null (LS-4380).
+      //
+      // Integration tests run against the live web app, so component-level
+      // testid changes only take effect after deployment. Using role="dialog"
+      // to scope the button works with any deployed version of the component.
+      // 15 s covers dialog open animation + potential Lambda cold-start windows.
+      const confirmDialog = page.getByRole('dialog');
+      await expect(confirmDialog).toBeVisible({ timeout: 15_000 });
+      await confirmDialog.getByRole('button', { name: 'Confirm' }).click();
     });
 
     await test.step('Wait for draft to complete', async () => {
