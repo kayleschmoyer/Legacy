@@ -1180,6 +1180,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                         id="league-name-input"
                         aria-labelledby="league-name-label"
                         size="$4"
+                        testID="create-league-name-input"
                         placeholder="Enter your league name"
                         value={formData.leagueName}
                         onChangeText={(text: string) =>
@@ -1447,6 +1448,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                       <Input
                         id="era-start"
                         size="$3"
+                        testID="create-league-era-start-input"
                         placeholder="e.g. 1940"
                         value={
                           formData.customEraStartYear !== undefined
@@ -1492,6 +1494,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                       <Input
                         id="era-end"
                         size="$3"
+                        testID="create-league-era-end-input"
                         placeholder="e.g. 1960"
                         value={
                           formData.customEraEndYear !== undefined
@@ -1897,6 +1900,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                     size="$4"
                     variant="primary"
                     type="submit"
+                    data-testid="create-league-submit"
                     disabled={isFormDisabled}
                   >
                     {loading ? 'Creating...' : 'Create League'}

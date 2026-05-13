@@ -514,6 +514,7 @@ function TradeOfferCard({
                 backgroundColor="$green4"
                 borderColor="$green7"
                 borderWidth={1}
+                data-testid={`trade-accept-${trade.id}`}
                 onPress={() => {
                   if (trade.id == null) return;
                   onAccept?.(trade.id);
@@ -535,6 +536,7 @@ function TradeOfferCard({
                 backgroundColor="$red4"
                 borderColor="$red7"
                 borderWidth={1}
+                data-testid={`trade-reject-${trade.id}`}
                 onPress={() => {
                   if (trade.id == null) return;
                   onReject?.(trade.id);
@@ -556,6 +558,7 @@ function TradeOfferCard({
               backgroundColor="$gray4"
               borderColor="$gray7"
               borderWidth={1}
+              data-testid={`trade-cancel-${trade.id}`}
               onPress={() => {
                 if (trade.id == null) return;
                 onCancel?.(trade.id);
@@ -576,6 +579,7 @@ function TradeOfferCard({
               backgroundColor="$purple4"
               borderColor="$purple7"
               borderWidth={1}
+              data-testid={`trade-veto-${trade.id}`}
               onPress={() => {
                 if (trade.id == null) return;
                 onVeto?.(trade.id);
@@ -995,6 +999,7 @@ function ProposeTradeDialog({
               {draft.offeringPlayerIds.length > 0 && (
                 <Button
                   marginTop="$2"
+                  data-testid="trade-dialog-next-to-request"
                   onPress={() => setStep('request')}
                   backgroundColor={BRAND_NAVY_LIGHT}
                   borderRadius="$4"
@@ -1079,6 +1084,7 @@ function ProposeTradeDialog({
               <XStack gap="$2" marginTop="$2">
                 <Button
                   flex={1}
+                  data-testid="trade-dialog-back-to-offer"
                   onPress={() => setStep('offer')}
                   backgroundColor="$gray4"
                   borderRadius="$4"
@@ -1092,6 +1098,7 @@ function ProposeTradeDialog({
                 {draft.requestingPlayerIds.length > 0 && (
                   <Button
                     flex={2}
+                    data-testid="trade-dialog-review"
                     onPress={() => setStep('confirm')}
                     backgroundColor={BRAND_NAVY_LIGHT}
                     borderRadius="$4"
@@ -1236,6 +1243,7 @@ function ProposeTradeDialog({
               <XStack gap="$2">
                 <Button
                   flex={1}
+                  data-testid="trade-dialog-back-to-request"
                   onPress={() => setStep('request')}
                   backgroundColor="$gray4"
                   borderRadius="$4"
@@ -1249,6 +1257,7 @@ function ProposeTradeDialog({
                 </Button>
                 <Button
                   flex={2}
+                  data-testid="trade-dialog-send"
                   onPress={() => void handleSubmit()}
                   backgroundColor={isPastDeadline ? '$gray6' : BRAND_NAVY_LIGHT}
                   borderRadius="$4"

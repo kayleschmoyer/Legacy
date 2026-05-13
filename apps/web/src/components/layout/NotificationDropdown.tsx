@@ -185,6 +185,7 @@ export const NotificationDropdown: React.FC = () => {
       <TriggerButton
         onPress={() => setIsOpen(!isOpen)}
         id={buttonId}
+        data-testid="notifications-trigger"
         aria-haspopup="menu"
         aria-expanded={isOpen}
         aria-controls={menuId}
@@ -229,6 +230,7 @@ export const NotificationDropdown: React.FC = () => {
                 size="$2"
                 backgroundColor="transparent"
                 borderWidth={0}
+                data-testid="notifications-mark-all-read"
                 onPress={handleMarkAllAsRead}
                 paddingHorizontal="$2"
                 hoverStyle={{ backgroundColor: '$color3' }}
@@ -261,6 +263,7 @@ export const NotificationDropdown: React.FC = () => {
                   key={notification.id}
                   unread={!notification.read}
                   role="menuitem"
+                  data-testid={`notification-item-${notification.id}`}
                   onPress={() => {
                     if (!notification.read && notification.id != null) {
                       handleMarkAsRead(notification.id);
@@ -305,6 +308,7 @@ export const NotificationDropdown: React.FC = () => {
                         size="$1"
                         backgroundColor="transparent"
                         borderWidth={0}
+                        data-testid={`notification-mark-read-${notification.id}`}
                         onPress={(event: GestureResponderEvent) => {
                           event.stopPropagation();
                           if (notification.id != null) {

@@ -340,6 +340,7 @@ export function MatchupRosterEditorView({
             <Button
               size="$2"
               theme="red"
+              data-testid={`roster-bench-${player.id}`}
               onPress={(e: { stopPropagation: () => void }) => {
                 e.stopPropagation();
                 handleMoveToBench(player);
@@ -361,6 +362,7 @@ export function MatchupRosterEditorView({
                     size="$2"
                     backgroundColor="$blue8"
                     color="white"
+                    data-testid={`roster-assign-${player.id}-${opt.id}`}
                     pressStyle={{ backgroundColor: '$blue10' }}
                     hoverStyle={{ backgroundColor: '$blue9' }}
                     onPress={(e: { stopPropagation: () => void }) => {
@@ -426,6 +428,7 @@ export function MatchupRosterEditorView({
           <Button
             size="$2"
             theme="alt2"
+            data-testid="roster-cancel-selection"
             onPress={() => setSelectedPlayerId(null)}
           >
             Cancel

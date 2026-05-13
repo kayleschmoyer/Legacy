@@ -317,6 +317,7 @@ export const UserProfileDropdown: React.FC = () => {
           {/* Account items */}
           <YStack gap="$1" paddingTop="$2">
             <MenuItem
+              data-testid="user-profile-menu-settings"
               onPress={() => {
                 void navigate('/profile/settings');
                 setIsOpen(false);
@@ -343,6 +344,7 @@ export const UserProfileDropdown: React.FC = () => {
             </MenuItem>
 
             <MenuItem
+              data-testid="user-profile-menu-preferences"
               onPress={() => {
                 void navigate('/preferences');
                 setIsOpen(false);
@@ -369,6 +371,7 @@ export const UserProfileDropdown: React.FC = () => {
             </MenuItem>
 
             <MenuItem
+              data-testid="user-profile-menu-subscription"
               onPress={() => {
                 void navigate('/profile/subscription');
                 setIsOpen(false);
@@ -395,6 +398,7 @@ export const UserProfileDropdown: React.FC = () => {
             </MenuItem>
 
             <MenuItem
+              data-testid="user-profile-menu-help"
               onPress={() => {
                 void navigate('/help');
                 setIsOpen(false);
@@ -423,6 +427,7 @@ export const UserProfileDropdown: React.FC = () => {
             <Separator marginVertical="$2" />
 
             <MenuItem
+              data-testid="user-profile-menu-management"
               onPress={() => {
                 void navigate('/management');
                 setIsOpen(false);
@@ -450,6 +455,7 @@ export const UserProfileDropdown: React.FC = () => {
 
             {isAdmin && (
               <MenuItem
+                data-testid="user-profile-menu-admin"
                 onPress={() => {
                   void navigate('/admin');
                   setIsOpen(false);
@@ -478,7 +484,10 @@ export const UserProfileDropdown: React.FC = () => {
 
             <Separator marginVertical="$2" />
 
-            <MenuItem onPress={handleLogout}>
+            <MenuItem
+              data-testid="user-profile-menu-signout"
+              onPress={handleLogout}
+            >
               <XStack alignItems="center" gap="$3" flex={1}>
                 <MenuIconBox backgroundColor="$red3">
                   <LogOut size={18} color="$red10" />
