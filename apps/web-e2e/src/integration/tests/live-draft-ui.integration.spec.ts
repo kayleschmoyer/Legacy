@@ -216,9 +216,9 @@ test.describe
             return data.userTeamId;
           },
           {
-            timeout: 15_000,
+            timeout: 30_000,
             intervals: [500, 1_000, 2_000],
-            message: `Manager join for "${teamName}" did not persist a leagueMembers row in league ${state.leagueId} within 15s`,
+            message: `Manager join for "${teamName}" did not persist a leagueMembers row in league ${state.leagueId} within 30s`,
           },
         )
         .not.toBeNull();
@@ -452,6 +452,12 @@ test.describe
       // (currentPick > 0) trigger the reset, avoiding a spurious reset on the
       // first check when no picks have been made yet.
       let lastKnownCurrentPick = 0;
+      // Tracks consecutive failures of the managerJwt1 currentPick query with
+      // "not a member" / FORBIDDEN. After 3 consecutive failures we check
+      // whether the league still exists — if it was deleted by CI nightly
+      // global-setup (cron: "0 3 * * *") we fail fast with a clear message
+      // instead of waiting for the generic 101-miss bail-out (LS-4379).
+      let consecutiveCurrentPickMembershipErrors = 0;
 
       // Anchor for per-pick elapsed-time logs (LS-3851 timing instrumentation).
       const draftStart = Date.now();
@@ -822,11 +828,53 @@ test.describe
                   managerJwt1,
                   `query GetLeagueDraftCurrentPick($leagueId: Int!) { getLeagueDraft(leagueId: $leagueId) { currentPick } }`,
                   { leagueId: state.leagueId },
-                ).catch((e: unknown) => {
-                  const msg = e instanceof Error ? e.message : String(e);
-                  console.log(`[live-draft] currentPick query failed: ${msg}`);
-                  return null;
-                });
+                )
+                  .then((d) => {
+                    consecutiveCurrentPickMembershipErrors = 0;
+                    return d;
+                  })
+                  .catch(async (e: unknown) => {
+                    const msg = e instanceof Error ? e.message : String(e);
+                    console.log(
+                      `[live-draft] currentPick query failed: ${msg}`,
+                    );
+                    // Permanent membership error: detect external league deletion
+                    // (e.g. CI nightly global-setup deleting the commissioner's
+                    // leagues at 03:00 UTC while Phase 5 is running — LS-4379).
+                    if (
+                      msg.includes('not a member') ||
+                      msg.includes('FORBIDDEN')
+                    ) {
+                      consecutiveCurrentPickMembershipErrors++;
+                      if (consecutiveCurrentPickMembershipErrors >= 3) {
+                        const elapsedCheck = (
+                          (Date.now() - draftStart) /
+                          1000
+                        ).toFixed(1);
+                        console.log(
+                          `[live-draft] +${elapsedCheck}s 3 consecutive membership errors — checking league existence`,
+                        );
+                        const leagueExists = await gqlFetch<{
+                          league?: { id: number } | null;
+                        }>(
+                          commissionerJwt,
+                          `query CheckLeagueExists($id: Int!) { league(id: $id) { id } }`,
+                          { id: state.leagueId },
+                        )
+                          .then((d) => d?.league != null)
+                          .catch(() => false);
+                        if (!leagueExists) {
+                          throw new Error(
+                            `[live-draft] League ${state.leagueId} no longer exists — likely deleted by CI nightly global-setup (cron: "0 3 * * *"). ` +
+                              `Phase 5 interrupted by external cleanup at pick ${pickCount}.`,
+                          );
+                        }
+                      }
+                    } else {
+                      consecutiveCurrentPickMembershipErrors = 0;
+                    }
+                    return null;
+                  });
                 const serverCurrentPick =
                   currentPickData?.getLeagueDraft?.currentPick;
                 if (

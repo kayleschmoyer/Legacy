@@ -305,6 +305,74 @@ describe('Leagues - DB Integration Tests', () => {
     });
   });
 
+  // LS-4379: leagueMembers row must be immediately visible to the userTeamId
+  // query after joinLeagueByCode inserts it.  The integration spec polls
+  // userTeamId with a 30 s timeout to absorb Lambda cold-start latency; this
+  // test validates the underlying DB guarantee so the poll always converges.
+  describe('userTeamId read-after-write visibility (LS-4379)', () => {
+    it('returns teamId immediately after leagueMembers insert', async () => {
+      const owner = getUser(2);
+      const member = getUser(1);
+
+      const [league] = await db
+        .insert(integrationTestSchema.leagues)
+        .values({
+          name: 'Membership Test League',
+          owner: owner.id,
+          inviteCode: 'MEMB4379',
+        })
+        .returning();
+
+      const [team] = await db
+        .insert(integrationTestSchema.teams)
+        .values({ name: 'Test Team', leagueId: league.id })
+        .returning();
+
+      // Simulate the leagueMembers insert that joinLeagueByCode performs.
+      await db.insert(integrationTestSchema.leagueMembers).values({
+        leagueId: league.id,
+        userId: member.id,
+        teamId: team.id,
+        permissionLevel: 'general_manager',
+      });
+
+      // userTeamId resolver query — must see the row in the same connection.
+      const [membership] = await db
+        .select({
+          teamId: integrationTestSchema.leagueMembers.teamId,
+          permissionLevel: integrationTestSchema.leagueMembers.permissionLevel,
+        })
+        .from(integrationTestSchema.leagueMembers)
+        .where(eq(integrationTestSchema.leagueMembers.leagueId, league.id));
+
+      expect(membership).toBeDefined();
+      expect(membership.teamId).toBe(team.id);
+      expect(membership.permissionLevel).toBe('general_manager');
+    });
+
+    it('returns null when user has no leagueMembers row', async () => {
+      const owner = getUser(2);
+
+      const [league] = await db
+        .insert(integrationTestSchema.leagues)
+        .values({
+          name: 'No Member League',
+          owner: owner.id,
+          inviteCode: 'NOMEM379',
+        })
+        .returning();
+
+      // No leagueMembers insert — userTeamId query should find nothing.
+      const [row] = await db
+        .select({ teamId: integrationTestSchema.leagueMembers.teamId })
+        .from(integrationTestSchema.leagueMembers)
+        .where(eq(integrationTestSchema.leagueMembers.leagueId, league.id))
+        .limit(1);
+
+      expect(row).toBeUndefined();
+    });
+  });
+
   describe('Bulk operations', () => {
     it('should handle bulk inserts', async () => {
       const bulkUsers = Array.from({ length: 10 }, (_, i) => ({
