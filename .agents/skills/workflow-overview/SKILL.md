@@ -426,6 +426,8 @@ When multiple CI runs complete within seconds, multiple `workflow_run` triggers 
 | `deploy-storybook.yml`       | Push to `main` (component paths)                    | GitHub Pages (Storybook)                  |
 | `deploy-pr-preview.yml`      | PR events                                           | Preview deployments for PRs               |
 
+**Lambda upload CI guard:** `upload-lambdas.yml` verifies CI passed before uploading. On push events it resolves the merged PR's head SHA and searches for a completed CI Orchestrator run on that SHA. The orchestrator emits two runs per PR SHA — one from the `pull_request` event (conclusion: `skipped`) and one from `pull_request_review` (the real run). The guard prefers runs with `conclusion: success`; if none exists it falls back to the first matching run and rejects non-success conclusions. This means a deploy blocked by the guard with `conclusion: skipped` indicates the real CI run is missing, not that CI failed.
+
 ### PR Preview Deployments
 
 `deploy-pr-preview.yml` deploys web builds for open PRs to the `gh-pages` branch of `bkrupa/legacy-sports-deploys`. Previews live at **subdirectory paths**, not separate branches:
@@ -456,7 +458,7 @@ Preview deployments are kicked off by the deploy workflow after successful PR CI
 3. Add CNAME for `legacy-fantasy.com`
 4. Deploy to GitHub Pages
 5. Upload sourcemaps to Rollbar
-6. Create GitHub Release (`web-v{version}-{build_number}`)
+6. Create GitHub Release (`web-v{version}-{build_number}`) and force-push the stable `web-latest` pointer tag
 7. Discord notifications (deploy + release)
 8. Update deployment badge
 
@@ -472,11 +474,12 @@ After merge, the merge queue deletes the source branch. Locally:
 
 Three GitHub Apps handle distinct roles to ensure no single identity both authors and approves code:
 
-| App                                   | ID                                | Role                                                                               | Permissions                                                              |
-| ------------------------------------- | --------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| Agent Author                          | 3158619                           | Pushes code, creates PRs                                                           | Contents (rw), Pull requests (rw)                                        |
-| Review Bot (legacy-sports-review-bot) | 3142924                           | Approves PRs after Copilot review passes, manages `bot-review` status, adds labels | Pull requests (rw), Statuses (rw), Checks (rw), Issues (rw)              |
-| Merge Queue Bot                       | (via `MERGE_QUEUE_APP_ID` secret) | Processes merge queue, merges PRs, retargets dependents, deletes branches          | Contents (rw), Pull requests (rw), Issues (rw), Checks (r), Statuses (r) |
+| App                                   | ID / Client ID                                      | Role                                                                               | Permissions                                                              |
+| ------------------------------------- | --------------------------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Agent Author                          | 3158619                                             | Pushes code, creates PRs                                                           | Contents (rw), Pull requests (rw)                                        |
+| Review Bot (legacy-sports-review-bot) | 3142924                                             | Approves PRs after Copilot review passes, manages `bot-review` status, adds labels | Pull requests (rw), Statuses (rw), Checks (rw), Issues (rw)              |
+| Merge Queue Bot                       | via `MERGE_QUEUE_APP_ID` secret                     | Processes merge queue, merges PRs, retargets dependents, deletes branches          | Contents (rw), Pull requests (rw), Issues (rw), Checks (r), Statuses (r) |
+| Preview / Deploy App                  | 3027681 / `Iv23liHm7Fumhyh2KIAb` (`PREVIEW_APP_ID`) | Deploys Storybook, PR previews, and Playwright reports to `legacy-sports-deploys`  | Contents (rw) on `legacy-sports-deploys`                                 |
 
 **Key constraint:** The Agent Author app never approves PRs. The Review Bot never pushes code. This ensures separation between code authoring and code approval.
 

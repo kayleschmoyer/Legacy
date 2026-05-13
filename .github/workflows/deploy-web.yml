@@ -293,6 +293,11 @@ jobs:
             - Production: https://legacy-fantasy.com
             - GitHub Pages: ${{ needs.build-and-deploy.outputs.deployment_url }}
 
+      - name: Checkout for tag push
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 1
+
       - name: Update web-latest tag
         run: |
           # Force-push a stable pointer tag so /releases/tag/web-latest always

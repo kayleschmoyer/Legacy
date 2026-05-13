@@ -211,10 +211,17 @@ jobs:
               status: 'completed',
             });
 
-            const ciRun = workflowRuns.workflow_runs.find(run =>
+            const isCI = run =>
               run.name === 'Legacy Sports CI Orchestrator' ||
-              run.name === 'Legacy Sports CI Pipeline'
-            );
+              run.name === 'Legacy Sports CI Pipeline';
+
+            // Prefer the run that actually succeeded — the orchestrator emits two
+            // runs per PR SHA (pull_request → skipped, pull_request_review → real).
+            // A plain .find() returns whichever the API lists first, which may be
+            // the skipped run even when CI passed.
+            const ciRun =
+              workflowRuns.workflow_runs.find(run => isCI(run) && run.conclusion === 'success') ??
+              workflowRuns.workflow_runs.find(run => isCI(run));
 
             if (!ciRun) {
               const { data: allRuns } = await github.rest.actions.listWorkflowRunsForRepo({

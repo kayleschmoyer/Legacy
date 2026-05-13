@@ -100,9 +100,21 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3
         with:
-          app-id: ${{ secrets.PREVIEW_APP_ID }}
+          client-id: ${{ secrets.PREVIEW_APP_ID }}
           private-key: ${{ secrets.PREVIEW_APP_PRIVATE_KEY }}
           repositories: legacy-sports-deploys
+
+      - name: Verify Deploy Token
+        if: github.event_name != 'pull_request'
+        env:
+          DEPLOY_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          if [ -z "${DEPLOY_TOKEN}" ]; then
+            echo "::error::DEPLOY_TOKEN is empty — the PREVIEW_APP GitHub App must be installed on bkrupa/legacy-sports-deploys."
+            echo "::error::Go to GitHub Settings → Developer settings → GitHub Apps → PREVIEW_APP → Install App → add legacy-sports-deploys."
+            exit 1
+          fi
+          echo "Deploy token present (length: ${#DEPLOY_TOKEN})"
 
       - name: Deploy Storybook
         if: github.event_name != 'pull_request'
