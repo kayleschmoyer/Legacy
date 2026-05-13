@@ -669,21 +669,22 @@ test.describe
             console.log(
               `[live-draft] +${elapsedNudge}s miss #${consecutiveMisses} — nudging autoProcessDraftPicks`,
             );
-            // Must use the absolute API URL — page.request resolves
-            // relative URLs against the browser context's baseURL
-            // (legacy-fantasy.com), not the API base (api.legacy-fantasy.com).
-            const nudgeResult = await pages[1].page.request
-              .post('https://api.legacy-fantasy.com/graphql', {
-                data: {
-                  query: `mutation AutoProcessDraftPicks($leagueId: Int!) { autoProcessDraftPicks(leagueId: $leagueId) { picksAutoMade draftsCompleted errors } }`,
-                  variables: { leagueId: state.leagueId },
-                },
-                headers: {
-                  'Content-Type': 'application/json',
-                  Authorization: `Bearer ${commissionerJwt}`,
-                },
-              })
-              .catch(() => null);
+            // Use Node.js native fetch (same as gqlFetch) instead of
+            // pages[1].page.request — browser contexts silently throw when
+            // degraded, causing .catch(() => null) to absorb the error and
+            // skip ALL nudge processing including the LS-4369 EventBridge
+            // progress detection, resulting in State B (LS-4373).
+            const nudgeResult = await fetch(GQL_URL, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${commissionerJwt}`,
+              },
+              body: JSON.stringify({
+                query: `mutation AutoProcessDraftPicks($leagueId: Int!) { autoProcessDraftPicks(leagueId: $leagueId) { picksAutoMade draftsCompleted errors } }`,
+                variables: { leagueId: state.leagueId },
+              }),
+            }).catch(() => null);
             if (nudgeResult) {
               const nudgeBody = (await nudgeResult
                 .json()
@@ -704,7 +705,7 @@ test.describe
               const nudgeData = nudgeBody?.data?.autoProcessDraftPicks;
               const resultErrors = nudgeData?.errors ?? [];
               const gqlErrors = nudgeBody?.errors ?? [];
-              const status = nudgeResult.status();
+              const status = nudgeResult.status;
               // Log full diagnostic info — the bare numeric fields hide
               // server-side problems (auth failures, schema drift, etc.) that
               // explain why a draft is stuck. LS-4295: previous "n/a" output
