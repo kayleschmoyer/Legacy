@@ -193,8 +193,8 @@ test.describe
     commissionerPage: page,
     apiCommissioner,
   }) => {
-    // Automated drafts can take 480–900s; allow generous time for Lambda cold starts
-    test.setTimeout(1_200_000);
+    // 600 s = 300 s draft deadline + 300 s buffer for setup steps and cold starts
+    test.setTimeout(600_000);
 
     await test.step('Navigate to commissioner panel', async () => {
       await page.goto(`/baseball/league/${state.leagueId}/commissioner`);
@@ -209,19 +209,24 @@ test.describe
       const draftSettingsBtn = page.getByRole('button', {
         name: /Draft Settings/i,
       });
-      await expect(draftSettingsBtn).toBeVisible({ timeout: 10000 });
+      await expect(draftSettingsBtn).toBeVisible({ timeout: 10_000 });
       await draftSettingsBtn.click();
 
-      const automatedBtn = page.getByRole('button', {
-        name: /Automated Draft/i,
-      });
-      await expect(automatedBtn).toBeVisible({ timeout: 5000 });
+      // Use data-testid rather than aria-label matching: the button's accessible
+      // name is "Draft Mode: Automated Draft" (set by OptionSelector), which
+      // requires partial-regex matching and is fragile. After clicking the
+      // accordion, DraftSettingsControl freshly mounts and fires
+      // useGetLeagueDraftQuery — option buttons are not mounted during the
+      // loading spinner. The 15 s budget covers Lambda cold-start windows
+      // that have exceeded 5 s in practice (LS-4361, LS-4375).
+      const automatedBtn = page.getByTestId('option-automated');
+      await expect(automatedBtn).toBeVisible({ timeout: 15_000 });
       await automatedBtn.click();
 
       const saveBtn = page.getByRole('button', {
         name: /Save Draft Settings/i,
       });
-      await expect(saveBtn).toBeEnabled({ timeout: 5000 });
+      await expect(saveBtn).toBeEnabled({ timeout: 10_000 });
       await saveBtn.click();
       await page.waitForTimeout(1000);
     });
@@ -239,8 +244,12 @@ test.describe
     });
 
     await test.step('Wait for draft to complete', async () => {
+      // 300 s covers Lambda cold-start + random-draft processing time.
+      // The 900 s budget was an artefact of masking the start-draft race
+      // condition fixed in LS-4375; the draft now reliably initiates so
+      // a shorter deadline is appropriate.
       await waitForSeasonActive(page, state.leagueId, {
-        deadlineMs: 900_000,
+        deadlineMs: 300_000,
         api: apiCommissioner,
       });
     });
