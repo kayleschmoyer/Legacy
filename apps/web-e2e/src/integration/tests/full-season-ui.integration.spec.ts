@@ -266,12 +266,9 @@ test.describe
       await startBtn.click();
 
       // Confirmation dialog appears — confirm it
-      const confirmBtn = page.getByRole('button', {
-        name: /Start Draft|Confirm/i,
-      });
-      // The dialog may have a confirm button; click the action button
-      await expect(confirmBtn.last()).toBeVisible({ timeout: 5000 });
-      await confirmBtn.last().click();
+      const confirmBtn = page.getByTestId('confirm-draft-button');
+      await expect(confirmBtn).toBeVisible({ timeout: 15_000 });
+      await confirmBtn.click();
     });
 
     await test.step('Wait for draft to complete via commissioner panel', async () => {

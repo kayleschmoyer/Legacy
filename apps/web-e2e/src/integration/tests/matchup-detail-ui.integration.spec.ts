@@ -200,11 +200,9 @@ test.describe
       await startBtn.click();
 
       // Confirmation dialog
-      const confirmBtn = page.getByRole('button', {
-        name: /Start Draft|Confirm/i,
-      });
-      await expect(confirmBtn.last()).toBeVisible({ timeout: 5_000 });
-      await confirmBtn.last().click();
+      const confirmBtn = page.getByTestId('confirm-draft-button');
+      await expect(confirmBtn).toBeVisible({ timeout: 15_000 });
+      await confirmBtn.click();
     });
 
     await test.step('Wait for Season Active status', async () => {
