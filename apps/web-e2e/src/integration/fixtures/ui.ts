@@ -1,7 +1,10 @@
 import {
   type APIRequestContext,
   test as base,
+  type Browser,
+  type BrowserContextOptions,
   type Page,
+  type TestInfo,
 } from '@playwright/test';
 import fs from 'fs';
 import os from 'os';
@@ -188,17 +191,70 @@ async function getAuthJwt(): Promise<string> {
   return getTestUserJwt(TEST_USERS.COMMISSIONER);
 }
 
-export const test = base.extend<UIIntegrationFixtures>({
-  commissionerPage: async ({ browser }, use) => {
-    const jwt = await getAuthJwt();
+/**
+ * Creates a browser context and page, starting a Playwright trace on retries
+ * so that failures are captured in the uploaded report.
+ *
+ * The built-in `context` fixture handles this automatically for tests that use
+ * the standard `page` fixture, but integration tests create their own contexts
+ * via `browser.newContext()` which bypasses the built-in trace lifecycle.
+ * This helper replicates that lifecycle: start on first retry (matching the
+ * `trace: 'on-first-retry'` config), stop and attach when teardown runs.
+ */
+async function withTracedContext(
+  browser: Browser,
+  options: BrowserContextOptions,
+  traceName: string,
+  testInfo: TestInfo,
+  use: (page: Page) => Promise<void>,
+): Promise<void> {
+  const context = await browser.newContext(options);
+  const shouldTrace = testInfo.retry >= 1;
 
-    const context = await browser.newContext({
-      baseURL: WEB_BASE,
-      storageState: buildIntegrationStorageState(jwt),
-    });
+  try {
+    if (shouldTrace) {
+      await context.tracing.start({
+        screenshots: true,
+        snapshots: true,
+        sources: true,
+      });
+    }
+
     const page = await context.newPage();
-    await use(page);
+    try {
+      await use(page);
+    } finally {
+      // Only save the trace when the test actually failed — matches the
+      // intent of `on-first-retry` and keeps passing-retry reports clean.
+      if (shouldTrace && testInfo.status !== testInfo.expectedStatus) {
+        const tracePath = testInfo.outputPath(`${traceName}-trace.zip`);
+        try {
+          await context.tracing.stop({ path: tracePath });
+          await testInfo.attach('trace', {
+            path: tracePath,
+            contentType: 'application/zip',
+          });
+        } catch {
+          // Ignore tracing errors — context.close() in the outer finally
+          // always runs regardless.
+        }
+      }
+    }
+  } finally {
     await context.close();
+  }
+}
+
+export const test = base.extend<UIIntegrationFixtures>({
+  commissionerPage: async ({ browser }, use, testInfo) => {
+    const jwt = await getAuthJwt();
+    await withTracedContext(
+      browser,
+      { baseURL: WEB_BASE, storageState: buildIntegrationStorageState(jwt) },
+      'commissioner',
+      testInfo,
+      use,
+    );
   },
 
   commissionerJwt: async ({}, use) => {
@@ -218,34 +274,43 @@ export const test = base.extend<UIIntegrationFixtures>({
     await use(await getTestUserJwt(TEST_USERS.MANAGER_3));
   },
 
-  managerPage1: async ({ browser, managerJwt1 }, use) => {
-    const context = await browser.newContext({
-      baseURL: WEB_BASE,
-      storageState: buildIntegrationStorageState(managerJwt1),
-    });
-    const page = await context.newPage();
-    await use(page);
-    await context.close();
+  managerPage1: async ({ browser, managerJwt1 }, use, testInfo) => {
+    await withTracedContext(
+      browser,
+      {
+        baseURL: WEB_BASE,
+        storageState: buildIntegrationStorageState(managerJwt1),
+      },
+      'manager-1',
+      testInfo,
+      use,
+    );
   },
 
-  managerPage2: async ({ browser, managerJwt2 }, use) => {
-    const context = await browser.newContext({
-      baseURL: WEB_BASE,
-      storageState: buildIntegrationStorageState(managerJwt2),
-    });
-    const page = await context.newPage();
-    await use(page);
-    await context.close();
+  managerPage2: async ({ browser, managerJwt2 }, use, testInfo) => {
+    await withTracedContext(
+      browser,
+      {
+        baseURL: WEB_BASE,
+        storageState: buildIntegrationStorageState(managerJwt2),
+      },
+      'manager-2',
+      testInfo,
+      use,
+    );
   },
 
-  managerPage3: async ({ browser, managerJwt3 }, use) => {
-    const context = await browser.newContext({
-      baseURL: WEB_BASE,
-      storageState: buildIntegrationStorageState(managerJwt3),
-    });
-    const page = await context.newPage();
-    await use(page);
-    await context.close();
+  managerPage3: async ({ browser, managerJwt3 }, use, testInfo) => {
+    await withTracedContext(
+      browser,
+      {
+        baseURL: WEB_BASE,
+        storageState: buildIntegrationStorageState(managerJwt3),
+      },
+      'manager-3',
+      testInfo,
+      use,
+    );
   },
 
   apiCommissioner: async ({ playwright, commissionerJwt }, use) => {
