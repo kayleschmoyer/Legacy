@@ -18,21 +18,21 @@ When running as a **cloud coding agent**:
 
 The "cloud agent" label covers three distinct configurations with very different tool availability. **Identify which one you are in before following any workflow below** — each has its own MCP server availability, degraded-mode posture, and which workflow steps are runnable end-to-end.
 
-| Capability                                     | CC web (default, no setup)              | CC web (custom MCP configured)         | Copilot Coding Agent                                    |
-| ---------------------------------------------- | --------------------------------------- | -------------------------------------- | ------------------------------------------------------- |
-| Built-in `Read` / `Edit` / `Write` / `Bash`    | ✅                                      | ✅                                     | ❌ — uses agent-SDK tool surface, not Claude Code shell |
-| Built-in `Glob` / `Grep`                       | ⚠️ frequently absent (probe + LS-4358)  | ⚠️ frequently absent (probe + LS-4358) | ✅ assumed (not re-verified in LS-4358)                 |
-| Atlassian plugin (`mcp__claude_ai_*`)          | ✅                                      | ✅                                     | ❌                                                      |
-| Built-in GitHub (`mcp__github__*`)             | ✅                                      | ✅                                     | ❌                                                      |
-| Custom `legacy-sports-jira` (port 4195)        | ❌                                      | ⚠️ if signing proxy + URL configured   | ✅                                                      |
-| Custom `legacy-sports-github` (port 4196)      | ❌                                      | ⚠️ if signing proxy + URL configured   | ✅                                                      |
-| Custom `legacy-sports-ci` (port 4197)          | ❌                                      | ⚠️ if signing proxy + URL configured   | ✅                                                      |
-| `legacy-sports-make`, `-nx`, `-db`, `worktree` | ❌                                      | ❌                                     | ✅ (via copilot-setup-steps.yml)                        |
-| `make pc` runnable                             | ⚠️ shell fallback only                  | ⚠️ shell fallback only                 | ✅ via `make_run({ target: "pc" })`                     |
-| Thread-resolution node IDs available           | ❌ (built-in `pull_request_read` lacks) | ✅ via `github_get_review_threads`     | ✅ via `github_get_review_threads`                      |
-| End-to-end driveable                           | ❌ research/ticketing/PR-author only    | ⚠️ partial — depends on what's loaded  | ✅ full implement-and-merge                             |
+| Capability                                     | CC web (default, no setup)                               | CC web (custom MCP configured)                     | Copilot Coding Agent                                    |
+| ---------------------------------------------- | -------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------- |
+| Built-in `Read` / `Edit` / `Write` / `Bash`    | ✅                                                       | ✅                                                 | ❌ — uses agent-SDK tool surface, not Claude Code shell |
+| Built-in `Glob` / `Grep`                       | ❌ verified absent (LS-4358 + reprobed)                  | ❌ verified absent (LS-4358 + reprobed)            | ✅ assumed (not re-verified)                            |
+| Atlassian plugin (`mcp__claude_ai_*`)          | ✅                                                       | ✅                                                 | ❌                                                      |
+| Built-in GitHub (`mcp__github__*`)             | ✅                                                       | ✅                                                 | ❌                                                      |
+| Custom `legacy-sports-jira` (port 4195)        | ❌                                                       | ⚠️ if signing proxy + URL configured               | ✅                                                      |
+| Custom `legacy-sports-github` (port 4196)      | ❌                                                       | ⚠️ if signing proxy + URL configured               | ✅                                                      |
+| Custom `legacy-sports-ci` (port 4197)          | ❌                                                       | ⚠️ if signing proxy + URL configured               | ✅                                                      |
+| `legacy-sports-make`, `-nx`, `-db`, `worktree` | ❌                                                       | ❌                                                 | ✅ (via copilot-setup-steps.yml)                        |
+| `make pc` runnable                             | ⚠️ shell fallback only                                   | ⚠️ shell fallback only                             | ✅ via `make_run({ target: "pc" })`                     |
+| Thread-resolution node IDs available           | ❌ no `mcp__github__*` read path returns them (verified) | ✅ via `github_get_review_threads` (custom server) | ✅ via `github_get_review_threads` (custom server)      |
+| End-to-end driveable                           | ⚠️ Cycle-1-clean PRs only                                | ⚠️ partial — depends on what's loaded              | ✅ full implement-and-merge                             |
 
-**Default Claude Code on the web is the most-restricted mode.** Without a deliberate `MCP_JIRA_URL`/`MCP_GITHUB_URL`/`MCP_CI_URL` setup and a running signing proxy, custom MCP servers do **not** auto-connect — you have Atlassian plugin + built-in `mcp__github__*` + built-in `Read`/`Edit`/`Write`/`Bash` and nothing else. **Built-in `Glob` and `Grep` are frequently absent in CC web** (LS-4358); probe at session start (see [File Exploration in Cloud Sessions](#file-exploration-in-cloud-sessions-critical)) and fall back to Bash file-discovery commands when they are. Every workflow that calls `make_run`, `nx_run*`, `worktree_*`, `db_*`, `ci_*`, or `jira_*` will be blocked. Treat such a session as **research + ticketing + PR-author** only — see [Degraded-Mode Workflow](#degraded-mode-workflow-claude-code-on-the-web-no-custom-mcp) below.
+**Default Claude Code on the web is the most-restricted mode.** Three diagnostic probes this cycle confirmed the actual surface: CC web does not process project-level `.mcp.json` for stdio MCP servers at all, so custom `legacy-sports-*` servers cannot be loaded even with `node_modules` pre-populated. `.devcontainer/devcontainer.json` is also ignored — `postCreateCommand`, `remoteEnv`, and `features` (Docker-in-Docker) do not run. What you do have: Atlassian plugin + built-in `mcp__github__*` + built-in `Read`/`Edit`/`Write`/`Bash` + a usable `node_modules` (`tsx`, `prettier`, `nx` resolve via `pnpm exec`). What you do **not** have: `Glob`/`Grep` (verified absent), `gh` CLI (verified absent — no `GH_TOKEN`/`GITHUB_TOKEN` in env either), Docker daemon (verified absent — `/var/run/docker.sock` missing), `twig`, `acli`, or any of `worktree_*` / `make_run` / `nx_run*` / `db_*` / `ci_*` / `jira_*` MCP tools. The agent **can** drive a PR end-to-end if bot review returns clean on Cycle 1; if bot review returns mandates, thread resolution blocks (no `mcp__github__*` read path returns GraphQL thread node IDs). See [Degraded-Mode Workflow](#degraded-mode-workflow-claude-code-on-the-web-no-custom-mcp) below.
 
 **How to detect which mode you're in** (run at session start):
 
@@ -64,40 +64,98 @@ Shell fallbacks (only if MCP server is unavailable): `make <target>`, `git commi
 
 ## Degraded-Mode Workflow (Claude Code on the web, no custom MCP)
 
-When the custom `legacy-sports-*` MCP servers are not loaded (the default CC web posture — see [Cloud Platform Matrix](#cloud-platform-matrix)), the toolset reduces to **Atlassian plugin + built-in `mcp__github__*` + built-in `Read`/`Edit`/`Write`/`Bash`** — and **`Glob`/`Grep` if the [probe](#file-exploration-in-cloud-sessions-critical) confirms they are present**. The MCP-first workflow above is **not runnable** in this mode. The realistic capabilities are:
+This is the runbook for default Claude Code on the web sessions. Three diagnostic probes (LS-4358 plus two follow-ups) mapped the actual operating envelope — what's below is confirmed facts, not aspirational guidance. The agent's reach is broader than earlier framings suggested (validation, tests, git, nx targets, and PR open-to-Cycle-1-merge all work) but has one structural hard limit: thread resolution after bot mandates is impossible without a local handoff.
 
-| Capability                     | Available?            | How                                                                                                                                                      |
-| ------------------------------ | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Read files                     | ✅                    | `Read` (always available — never use `cat`/`head`/`tail`)                                                                                                |
-| Search/list files              | ⚠️ probe first        | `Glob`/`Grep` if probe succeeds; otherwise Bash `find`/`ls`/`grep` per [Degraded-tools fallback](#degraded-tools-fallback-when-globgrep-are-unavailable) |
-| Edit code                      | ✅                    | `Edit`, `Write`                                                                                                                                          |
-| Read/search Jira               | ✅                    | Atlassian plugin (`searchJiraIssuesUsingJql` with `cloudId: "fb294606-..."`)                                                                             |
-| Create/transition Jira tickets | ⚠️ subject to Quirk 2 | Atlassian plugin (`transitionJiraIssue` cold-start can fail; retry then create-without-parent + `editJiraIssue` to set parent)                           |
-| Run `make pc`                  | ⚠️ shell only         | `Bash` → `make pc` (no `make_run` MCP path; AGENTS.md "MCP-first" rule is suspended in this mode)                                                        |
-| Run tests                      | ⚠️ shell only         | `Bash` → `make test` / `pnpm exec nx test <project>`                                                                                                     |
-| Git commit/push                | ⚠️ shell only         | `Bash` → `git add … && git commit -m … && git push`                                                                                                      |
-| Create PR                      | ✅                    | `mcp__github__create_pull_request({ owner, repo, title, head, base, body, draft: true })`                                                                |
-| Mark PR ready / request review | ✅                    | `mcp__github__update_pull_request`, `mcp__github__request_copilot_review`                                                                                |
-| Read PR details / reviews      | ✅                    | `mcp__github__pull_request_read({ method: "get" \| "get_reviews" \| "get_review_comments" })`                                                            |
-| Reply to review comments       | ✅                    | `mcp__github__add_reply_to_pull_request_comment` (replies to a comment ID, not a thread)                                                                 |
-| **Resolve review threads**     | ❌ **HARD BLOCKER**   | Built-in `pull_request_read` does not return GraphQL thread node IDs (see [Thread ID resolution](#thread-id-resolution) → "Reply-only fallback")         |
-| DB migrations                  | ❌                    | No `legacy-sports-db` MCP, no Docker Postgres, no AWS access                                                                                             |
-| CI log queries                 | ❌                    | No `ci_*` MCP; `gh` CLI is typically not installed in CC web sandboxes                                                                                   |
-| Workflow run lookups           | ⚠️ via built-in       | `mcp__github__list_workflow_runs` if available; otherwise rely on Claude Code native PR/CI event surfacing                                               |
+### Confirmed capability matrix
 
-**Workflow shape in degraded mode:**
+| Capability                     | Available?          | How                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ------------------------------ | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Read files                     | ✅                  | `Read` (always available — never use `cat`/`head`/`tail`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Search/list files              | ❌ Glob/Grep absent | Bash `find`/`ls`/`grep` only — see [Degraded-tools fallback](#degraded-tools-fallback-when-globgrep-are-unavailable)                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Edit code                      | ✅                  | `Edit`, `Write`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Read/search Jira               | ✅                  | Atlassian plugin (`searchJiraIssuesUsingJql` with `cloudId: "fb294606-..."`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Create/transition Jira tickets | ✅ (Quirk 2 caveat) | Atlassian plugin — `transitionJiraIssue({ transition: { id: "21" } })`. Cold-start can reject nested objects; retry once after any other plugin call. See [Quirk 2](#quirk-2-atlassian-plugin-transitionjiraissuecreatejiraissue-reject-nested-object-parameters-on-cold-start).                                                                                                                                                                                                                                                                               |
+| Run `make pc`                  | ✅ via Bash         | `Bash` → `make pc`. CC web pre-populates `node_modules`, so `tsx`/`prettier`/`nx` resolve through `pnpm exec` without any install step.                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| Run tests / Nx targets         | ✅ via Bash         | `Bash` → `make test` or `pnpm exec nx run <project>:<target>` or `pnpm exec nx affected -t <target> --base=origin/main`                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| Git commit / push / rebase     | ✅ via Bash         | `Bash` → `git add <files> && git commit && git push -u origin HEAD`. Push auth is provided by the CC web sandbox.                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Create PR                      | ✅                  | `mcp__github__create_pull_request({ owner, repo, title, head, base, body, draft: true })`                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Mark PR ready / request review | ✅                  | `mcp__github__update_pull_request({ draft: false })`, `mcp__github__request_copilot_review`                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Read PR details / reviews      | ✅                  | `mcp__github__pull_request_read({ method: "get" \| "get_reviews" \| "get_review_comments" })`                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Reply to review comments       | ✅                  | `mcp__github__add_reply_to_pull_request_comment` (replies to a numeric comment ID, not a thread)                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Merge PR (Cycle-1 clean)       | ✅                  | `mcp__github__merge_pull_request({ pullNumber, mergeMethod: "squash" })` if it appears in the tool surface; otherwise the user merges via GitHub UI.                                                                                                                                                                                                                                                                                                                                                                                                           |
+| **Resolve review threads**     | ❌ **HARD BLOCKER** | No `mcp__github__*` read path returns GraphQL thread node IDs (verified across three probes). `mcp__github__resolve_review_thread` exists but is unusable without an ID source. `gh api graphql` is also blocked — no `gh` CLI installed and no `GH_TOKEN`/`GITHUB_TOKEN` in env. Upstream gap: [github/github-mcp-server#2229](https://github.com/github/github-mcp-server/issues/2229), [#2331](https://github.com/github/github-mcp-server/issues/2331). Until either ships, **PRs that hit bot Cycle 2 cannot be completed from inside a CC web session**. |
+| DB migrations                  | ❌                  | Docker daemon absent (`/var/run/docker.sock` missing) — no local Postgres. `psql` client is installed but has nothing to connect to.                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| CI log queries                 | ❌                  | No `ci_*` MCP, no `gh` CLI, no `GH_TOKEN`/`GITHUB_TOKEN` in env. Rely on Claude Code's native PR/CI event surfacing for failure notifications.                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Workflow run lookups           | ⚠️ partial          | `mcp__github__list_workflow_runs` may be loaded; if so, use it. Otherwise, native event surfacing.                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 
-1. Identify the ticket via Atlassian plugin (`searchJiraIssuesUsingJql({ cloudId: "fb294606-...", jql: "key = LS-####", maxResults: 1 })` — never `getJiraIssue`, see AGENTS.md).
-2. Transition to "In Progress" via `transitionJiraIssue` (mind Quirk 2 — retry once if it rejects nested objects on cold start).
-3. Implement: `Read`/`Edit`/`Write` always; `Glob`/`Grep` if the session-start probe confirmed them, otherwise Bash `find`/`ls`/`grep` per [Degraded-tools fallback](#degraded-tools-fallback-when-globgrep-are-unavailable). Never use `cat`/`head`/`tail` — `Read` is always available.
-4. Validate: `Bash → make pc` (this is the only acceptable shell-fallback path for validation in this mode; document in PR body that the MCP path was unavailable).
-5. Self-review: read every changed file in full, walk the patterns checklist from `.agents/skills/pr-lifecycle/references/common-review-patterns.md`. The `/review` slash command may not be available — inline the checklist.
-6. Commit and push: `Bash → git add … && git commit -m "<type>(<scope>): <msg> (LS-####)" && git push -u origin HEAD`.
-7. Open PR: `mcp__github__create_pull_request({ ..., draft: true })` → push fix commits → `mcp__github__update_pull_request({ draft: false })` → `mcp__github__request_copilot_review`.
-8. Transition Jira to "In Review" via `transitionJiraIssue`.
-9. **Stop point**: when bot review comes back with threads to resolve, the built-in `pull_request_read` does not return GraphQL thread node IDs. You can `add_reply_to_pull_request_comment` to each top-level review comment, but you **cannot** mark threads resolved. Use the explicit reply-only fallback message from [Thread ID resolution → strategy 3](#thread-id-resolution) — tell the user the PR is stuck pending manual thread resolution in the GitHub UI, then wait.
+### Workflow shape
 
-**Honest framing**: in degraded mode you are a "research + ticketing + PR-author" agent, not a full implement-and-merge agent. Set expectations with the user up front rather than getting wedged at the resolve-threads step.
+1. **Identify the ticket** via Atlassian plugin: `searchJiraIssuesUsingJql({ cloudId: "fb294606-...", jql: "key = LS-####", maxResults: 1 })`. Never `getJiraIssue` — see AGENTS.md.
+2. **Transition to In Progress** via `transitionJiraIssue({ cloudId: "fb294606-...", issueIdOrKey: "LS-####", transition: { id: "21" } })`. Mind Quirk 2 — retry once if the first call rejects the nested object.
+3. **Branch off latest main**:
+   ```bash
+   git fetch origin main
+   git checkout -b claude/ls-####-<short-description> origin/main
+   ```
+4. **Implement**:
+   - File reads → `Read(file_path: "...")`
+   - File discovery → Bash `find . -name "*.tsx" -type f` / `grep -rl "pat" path/` / `ls -1 path/` (Glob/Grep absent — see [Degraded-tools fallback](#degraded-tools-fallback-when-globgrep-are-unavailable))
+   - Edits → `Edit` / `Write`
+5. **Validate**: `Bash` → `make pc`. The exit code is the truth; on failure, parse the output, fix the failing step, re-run.
+6. **Self-review**: read every changed file in full, walk the patterns checklist from [`common-review-patterns.md`](../pr-lifecycle/references/common-review-patterns.md). The `/review` slash command may not be available in CC web — inline the checklist.
+7. **Commit and push**:
+   ```bash
+   git add <specific files>                              # never `git add .` — sensitive-file risk
+   git commit -m "<type>(<scope>): <msg> (LS-####)"
+   git push -u origin HEAD                               # sets upstream on first push
+   ```
+8. **Open PR**: `mcp__github__create_pull_request({ owner: "bkrupa", repo: "legacy-sports", head: "<branch>", base: "main", title: "LS-#### <type>(<scope>): <msg>", body: "<markdown body>", draft: true })`. Then `mcp__github__update_pull_request({ pullNumber: N, draft: false })` → `mcp__github__request_copilot_review({ pullNumber: N })`.
+9. **Transition Jira to In Review**: `transitionJiraIssue({ ..., transition: { id: "2" } })`.
+10. **Watch for bot review** — Claude Code surfaces review events natively, no polling needed.
+    - **Cycle 1 clean (LGTM)** → merge via `mcp__github__merge_pull_request` if available, or ask the user to merge.
+    - **Cycle 1 with mandates** → reply to each thread's top-level comment with `FIX: <sha>` via `mcp__github__add_reply_to_pull_request_comment({ pullNumber, commentId, body: "FIX: <sha>" })`, push fix commits, then **STOP**. Thread resolution is the hard blocker — see the explicit handoff message below.
+
+### Stop-point script (PR hit bot Cycle 2 with mandates)
+
+Use this verbatim when thread resolution is required:
+
+> PR #N has unresolved review threads that I can reply to but cannot mark resolved from Claude Code on the web. `mcp__github__resolve_review_thread` is loaded, but no `mcp__github__*` read path returns the GraphQL thread node IDs it needs. `gh api graphql` is also unavailable (no `gh` CLI, no `GH_TOKEN`). I have replied to each open thread with `FIX: <sha>` and pushed the fix commits. To complete the PR, please either (a) resolve the threads in the GitHub UI and re-request review, or (b) hand off to a local session — the custom `legacy-sports-github` MCP server's `github_resolve_threads` tool can finish the cycle.
+
+LS-4377 wires this into the formal `/cloud-teleport` skill so the handoff produces a structured artifact instead of a chat message. Until that lands, use the script above.
+
+### Concrete Bash recipes
+
+Copy-paste replacements for MCP tools that are not loaded in CC web:
+
+```bash
+# Validate (replaces make_run({ target: "pc" }))
+make pc
+
+# Run a specific nx target (replaces nx_run)
+pnpm exec nx run <project>:<target>
+
+# Run affected nx target (replaces nx_run_affected)
+pnpm exec nx affected -t <target> --base=origin/main
+
+# Status / diff / log (replaces worktree_status / worktree_diff / worktree_log)
+git status --short
+git diff
+git log --oneline -10
+
+# Show a file at a ref (replaces worktree_show_file)
+git show HEAD:<path>
+git show origin/main:<path>
+
+# Rebase onto main (replaces worktree_rebase)
+git fetch origin main
+git rebase origin/main
+# resolve conflicts with Read + Edit; never edit with sed/awk
+git rebase --continue
+```
+
+### Honest framing
+
+In degraded mode the agent is a **near-full driver for Cycle-1-clean PRs** and a **research + ticketing + PR-author agent for anything requiring bot iteration**. Set expectations with the user at session start based on the change's risk: low-risk docs and small fixes usually land Cycle-1; medium/high-risk code changes usually trigger at least one mandate. When a mandate arrives, do not improvise — use the stop-point script.
 
 ## File Exploration in Cloud Sessions (Critical)
 
