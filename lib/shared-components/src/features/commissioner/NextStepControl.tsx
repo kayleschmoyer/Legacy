@@ -638,6 +638,7 @@ export function NextStepControl({
                 </Button>
               </Dialog.Close>
               <Button
+                data-testid="confirm-draft-button"
                 backgroundColor={BRAND_NAVY_LIGHT}
                 color="white"
                 pressStyle={{ backgroundColor: BRAND_NAVY_DARK }}
