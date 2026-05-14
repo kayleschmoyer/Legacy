@@ -237,6 +237,7 @@ describe('Season Draft Game Resolver', () => {
           gameMode: 'season',
           playerType: 'hitter',
           isMyTurn: true,
+          inviteCode: null,
         },
       ];
       mockSeasonDraftGameService.getGamesForUser.mockResolvedValueOnce(
@@ -443,13 +444,16 @@ describe('Season Draft Game Resolver', () => {
       ).rejects.toThrow('Authentication required');
     });
 
-    it('throws when game not found', async () => {
+    it('throws UserInputError when game not found', async () => {
       mockSeasonDraftGameService.getGameState.mockResolvedValueOnce(null);
 
       const resolver = getMutation('startSeasonDraftGame');
       await expect(
         resolver({}, { gameId: 999 }, mockContext, undefined as never),
-      ).rejects.toThrow('Game not found');
+      ).rejects.toMatchObject({
+        message: 'Game not found',
+        extensions: { code: 'BAD_USER_INPUT' },
+      });
     });
 
     it('throws when user is not the game creator', async () => {
@@ -465,17 +469,37 @@ describe('Season Draft Game Resolver', () => {
       ).rejects.toThrow('Only the game creator can start the game');
     });
 
-    it('throws when game is not in setup phase', async () => {
+    it('throws UserInputError when game is not in setup phase', async () => {
       mockSeasonDraftGameService.getGameState.mockResolvedValueOnce({
         id: 1,
-        createdBy: 1, // same user
+        createdBy: 1,
         status: 'drafting',
       });
 
       const resolver = getMutation('startSeasonDraftGame');
       await expect(
         resolver({}, { gameId: 1 }, mockContext, undefined as never),
-      ).rejects.toThrow('Game can only be started from setup phase');
+      ).rejects.toMatchObject({
+        message: 'Game can only be started from setup phase',
+        extensions: { code: 'BAD_USER_INPUT' },
+      });
+    });
+
+    it('throws UserInputError when fewer than 2 players have joined', async () => {
+      mockSeasonDraftGameService.getGameState.mockResolvedValueOnce({
+        id: 1,
+        createdBy: 1,
+        status: 'setup',
+        players: [{ id: 1 }],
+      });
+
+      const resolver = getMutation('startSeasonDraftGame');
+      await expect(
+        resolver({}, { gameId: 1 }, mockContext, undefined as never),
+      ).rejects.toMatchObject({
+        message: 'At least 2 players must join before starting the draft',
+        extensions: { code: 'BAD_USER_INPUT' },
+      });
     });
 
     it('starts game successfully', async () => {
@@ -483,6 +507,7 @@ describe('Season Draft Game Resolver', () => {
         id: 1,
         createdBy: 1,
         status: 'setup',
+        players: [{ id: 1 }, { id: 2 }],
       });
 
       const resolver = getMutation('startSeasonDraftGame');
@@ -579,7 +604,7 @@ describe('Season Draft Game Resolver', () => {
       expect(mockLoadCareerStats).not.toHaveBeenCalled();
     });
 
-    it('throws when player has no brefId', async () => {
+    it('throws UserInputError when player has no brefId', async () => {
       mockSeasonDraftGameService.checkPlayerHasStats.mockResolvedValueOnce(
         false,
       );
@@ -588,7 +613,10 @@ describe('Season Draft Game Resolver', () => {
       const resolver = getMutation('triggerSeasonDraftStatLoading');
       await expect(
         resolver({}, { playerId: 999 }, mockContext, undefined as never),
-      ).rejects.toThrow('Player not found or has no Baseball Reference ID');
+      ).rejects.toMatchObject({
+        message: 'Player not found or has no Baseball Reference ID',
+        extensions: { code: 'BAD_USER_INPUT' },
+      });
     });
 
     it('triggers stat loading and returns true', async () => {
@@ -611,7 +639,7 @@ describe('Season Draft Game Resolver', () => {
       expect(mockLoadCareerStats).toHaveBeenCalledWith(mockDb, 'ruthbaxX01');
     });
 
-    it('throws when stat loading fails', async () => {
+    it('throws GameUnavailableError when stat loading fails', async () => {
       mockSeasonDraftGameService.checkPlayerHasStats.mockResolvedValueOnce(
         false,
       );
@@ -623,7 +651,10 @@ describe('Season Draft Game Resolver', () => {
       const resolver = getMutation('triggerSeasonDraftStatLoading');
       await expect(
         resolver({}, { playerId: 5 }, mockContext, undefined as never),
-      ).rejects.toThrow('Failed to load player stats');
+      ).rejects.toMatchObject({
+        message: expect.stringContaining('Failed to load player stats'),
+        extensions: { code: 'GAME_UNAVAILABLE' },
+      });
     });
   });
 
