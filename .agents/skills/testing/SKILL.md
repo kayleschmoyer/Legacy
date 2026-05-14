@@ -168,6 +168,10 @@ See `.agents/skills/repo-tooling/references/db-dump-and-restore.md` for the full
 
 - [DB Integration Tests Guide](references/db-integration-tests.md) — fixture model, cleanup strategy, ID collision rules, query scoping, player data
 
+## 0/0 Nightly Playwright Maintenance Policy
+
+Once 3 consecutive nightly runs hit 0 failures / 0 flakies, the maintenance policy activates: any new failure or flake is P0, new tests require 5 consecutive local passes before merge, and each run must be tracked with a streak comment on LS-4401. See [references/zero-zero-maintenance-policy.md](references/zero-zero-maintenance-policy.md) for the full rules.
+
 ## E2E Reference Files
 
 - [E2E & Integration Determinism](references/e2e-determinism.md) -- ⭐ the 12 levers gating every E2E/integration PR
@@ -177,6 +181,7 @@ See `.agents/skills/repo-tooling/references/db-dump-and-restore.md` for the full
 - [Run E2E Headless](references/run-e2e-headless.md) -- suppress HTML reporter for agent/CI/headless execution (always use `nx run web-e2e:e2e` or `nx_run` MCP tool, never bare `playwright test`)
 - [Shutdown Hygiene](references/shutdown-hygiene.md) -- stale process detection and cleanup
 - [Test Tagging Guide](references/test-tagging-guide.md) -- tag decision guide with examples
+- [0/0 Nightly Maintenance Policy](references/zero-zero-maintenance-policy.md) -- rules for maintaining 0 failures / 0 flakies once achieved
 
 ## Integration Reference Files
 
