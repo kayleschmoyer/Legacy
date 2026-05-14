@@ -96,9 +96,9 @@ const ScoreboardHero: React.FC<{
           </div>
           <div className="name">{team1.name ?? 'Team 1'}</div>
           <div className="record mono">{team1.record ?? '—'}</div>
-          <div className="score-huge">{score1.toFixed(1)}</div>
+          <div className="score-huge">{score1.toFixed(2)}</div>
           {team1.projectedScore != null ? (
-            <div className="proj">{team1.projectedScore.toFixed(1)} proj</div>
+            <div className="proj">{team1.projectedScore.toFixed(2)} proj</div>
           ) : null}
         </div>
         <div className="vs-big">VS</div>
@@ -116,9 +116,9 @@ const ScoreboardHero: React.FC<{
           </div>
           <div className="name">{team2.name ?? 'Team 2'}</div>
           <div className="record mono">{team2.record ?? '—'}</div>
-          <div className="score-huge">{score2.toFixed(1)}</div>
+          <div className="score-huge">{score2.toFixed(2)}</div>
           {team2.projectedScore != null ? (
-            <div className="proj">{team2.projectedScore.toFixed(1)} proj</div>
+            <div className="proj">{team2.projectedScore.toFixed(2)} proj</div>
           ) : null}
         </div>
       </div>
