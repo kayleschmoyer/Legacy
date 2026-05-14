@@ -1,7 +1,11 @@
 import { count, sql } from 'drizzle-orm';
 import { DisclosureGameService, PublicSchema } from '@legacy-sports/db-client';
 import { builder } from './builder';
-import { AuthenticationError, GameUnavailableError } from './graphql-errors';
+import {
+  AuthenticationError,
+  GameUnavailableError,
+  UserInputError,
+} from './graphql-errors';
 
 /**
  * Progressive Disclosure Minigame GraphQL Schema (LS-1883 / LS-2106)
@@ -296,7 +300,20 @@ builder.mutationFields((t) => ({
         throw AuthenticationError();
       }
       const svc = new DisclosureGameService(context.db);
-      return svc.nextClue(args.sessionId, context.user.id);
+      try {
+        return await svc.nextClue(args.sessionId, context.user.id);
+      } catch (err) {
+        if (
+          err instanceof Error &&
+          (err.message === 'Session not found' ||
+            err.message.startsWith('Session is already') ||
+            err.message === 'No more clues available — session ended as lost' ||
+            err.message === 'Concurrent nextClue call detected — please retry')
+        ) {
+          throw UserInputError(err.message);
+        }
+        throw err;
+      }
     },
   }),
 
@@ -313,11 +330,22 @@ builder.mutationFields((t) => ({
         throw AuthenticationError();
       }
       const svc = new DisclosureGameService(context.db);
-      return svc.submitGuess(
-        args.sessionId,
-        context.user.id,
-        args.guessedPlayerId,
-      );
+      try {
+        return await svc.submitGuess(
+          args.sessionId,
+          context.user.id,
+          args.guessedPlayerId,
+        );
+      } catch (err) {
+        if (
+          err instanceof Error &&
+          (err.message === 'Session not found' ||
+            err.message.startsWith('Session is already'))
+        ) {
+          throw UserInputError(err.message);
+        }
+        throw err;
+      }
     },
   }),
 
@@ -348,7 +376,18 @@ builder.mutationFields((t) => ({
         throw AuthenticationError();
       }
       const svc = new DisclosureGameService(context.db);
-      return svc.giveUp(args.sessionId, context.user.id);
+      try {
+        return await svc.giveUp(args.sessionId, context.user.id);
+      } catch (err) {
+        if (
+          err instanceof Error &&
+          (err.message === 'Session not found' ||
+            err.message.startsWith('Session is already'))
+        ) {
+          throw UserInputError(err.message);
+        }
+        throw err;
+      }
     },
   }),
 }));

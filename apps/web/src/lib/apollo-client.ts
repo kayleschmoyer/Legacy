@@ -281,9 +281,15 @@ export const errorLink = new ErrorLink(({ error, operation, forward }) => {
   // report to Rollbar — unless the caller explicitly suppressed the global error.
   if (!suppressGlobalError) {
     if (CombinedGraphQLErrors.is(error) && error.errors.length > 0) {
-      // PREMIUM_REQUIRED is an expected user-facing condition (free-tier access
-      // attempt on a premium feature). Show the descriptive server message so the
-      // user understands why they were blocked; do NOT report to Rollbar.
+      // Expected user-facing codes — show to the user but do NOT report to
+      // Rollbar. Mirrors CLIENT_FACING_CODES in the server's formatError so
+      // both layers agree on what is a bug vs. an expected condition.
+      const EXPECTED_CODES = new Set([
+        'BAD_USER_INPUT',
+        'PREMIUM_REQUIRED',
+        'GAME_UNAVAILABLE',
+      ]);
+
       const premiumError = error.errors.find(
         (e) =>
           (e.extensions?.['code'] as string | undefined) === 'PREMIUM_REQUIRED',
@@ -295,7 +301,11 @@ export const errorLink = new ErrorLink(({ error, operation, forward }) => {
           'An unexpected error occurred',
       );
 
-      if (!premiumError) {
+      const isExpectedError = error.errors.every((e) =>
+        EXPECTED_CODES.has(e.extensions?.['code'] as string),
+      );
+
+      if (!isExpectedError) {
         // Unexpected server errors are captured explicitly so Rollbar items
         // include the operation name for easy diagnosis.
         captureError(

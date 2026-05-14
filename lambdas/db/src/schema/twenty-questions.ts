@@ -7,7 +7,7 @@ import {
 import { desc, eq, inArray } from 'drizzle-orm';
 import { builder } from './builder';
 import { PlayerRef } from './players';
-import { AuthenticationError } from './graphql-errors';
+import { AuthenticationError, UserInputError } from './graphql-errors';
 
 // --- Enums ---
 
@@ -221,7 +221,7 @@ builder.mutationFields((t) => ({
         context.db,
         input.gameId,
       );
-      if (!state) throw new Error('Game not found');
+      if (!state) throw UserInputError('Game not found');
       return state;
     },
   }),
@@ -246,7 +246,7 @@ builder.mutationFields((t) => ({
         context.db,
         gameId,
       );
-      if (!state) throw new Error('Game not found');
+      if (!state) throw UserInputError('Game not found');
       return state;
     },
   }),
@@ -268,7 +268,7 @@ builder.mutationFields((t) => ({
         context.db,
         gameId,
       );
-      if (!state) throw new Error('Game not found');
+      if (!state) throw UserInputError('Game not found');
       return state;
     },
   }),

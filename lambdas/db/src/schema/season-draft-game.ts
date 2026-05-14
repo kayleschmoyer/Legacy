@@ -9,7 +9,12 @@ import { getDbOptions } from '@legacy-sports/utils/node';
 import { eq } from 'drizzle-orm';
 import { LOGGER } from '@legacy-sports/logging';
 import { builder } from './builder';
-import { AuthenticationError, ForbiddenError } from './graphql-errors';
+import {
+  AuthenticationError,
+  ForbiddenError,
+  GameUnavailableError,
+  UserInputError,
+} from './graphql-errors';
 
 // Create database service instance - used in GraphQL resolvers
 const _dbService = createDatabaseService(getDbOptions());
@@ -598,7 +603,7 @@ builder.mutationFields((t) => ({
       );
 
       if (!gameState) {
-        throw new Error('Game not found');
+        throw UserInputError('Game not found');
       }
 
       if (gameState.createdBy !== context.user.id) {
@@ -606,11 +611,11 @@ builder.mutationFields((t) => ({
       }
 
       if (gameState.status !== 'setup') {
-        throw new Error('Game can only be started from setup phase');
+        throw UserInputError('Game can only be started from setup phase');
       }
 
       if (gameState.players.length < 2) {
-        throw new Error(
+        throw UserInputError(
           'At least 2 players must join before starting the draft',
         );
       }
@@ -679,7 +684,9 @@ builder.mutationFields((t) => ({
       );
 
       if (!brefId) {
-        throw new Error('Player not found or has no Baseball Reference ID');
+        throw UserInputError(
+          'Player not found or has no Baseball Reference ID',
+        );
       }
 
       // Send loading notification via WebSocket (if notification service is available)
@@ -732,7 +739,7 @@ builder.mutationFields((t) => ({
           brefId,
           error: loadError,
         });
-        throw new Error(
+        throw GameUnavailableError(
           'Failed to load player stats. The player may not have a valid Baseball Reference page.',
         );
       }

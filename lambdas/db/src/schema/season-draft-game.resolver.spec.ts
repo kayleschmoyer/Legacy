@@ -237,6 +237,7 @@ describe('Season Draft Game Resolver', () => {
           gameMode: 'season',
           playerType: 'hitter',
           isMyTurn: true,
+          inviteCode: null,
         },
       ];
       mockSeasonDraftGameService.getGamesForUser.mockResolvedValueOnce(
@@ -483,6 +484,7 @@ describe('Season Draft Game Resolver', () => {
         id: 1,
         createdBy: 1,
         status: 'setup',
+        players: [{ id: 1 }, { id: 2 }],
       });
 
       const resolver = getMutation('startSeasonDraftGame');
