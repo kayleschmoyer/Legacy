@@ -17,6 +17,7 @@
 
 import { expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
+import { LOGGER } from '@legacy-sports/logging';
 import { createLeagueViaUI } from '../helpers/create-league';
 import {
   validateInviteCodePreflight,
@@ -368,7 +369,7 @@ test.describe
           await expect(page.getByText('LIVE DRAFT').first()).toBeVisible({
             timeout: 30000,
           });
-          console.log(`[live-draft] ${label} draft board loaded`);
+          LOGGER.info(`[live-draft] ${label} draft board loaded`);
         }),
       );
 
@@ -535,7 +536,7 @@ test.describe
 
           if (ariaLabel) {
             const elapsedS = ((Date.now() - draftStart) / 1000).toFixed(1);
-            console.log(
+            LOGGER.info(
               `[live-draft] +${elapsedS}s Clicking pick by ${label} (pick #${pickCount + 1}) — ${ariaLabel}`,
             );
             const pickStart = Date.now();
@@ -582,7 +583,7 @@ test.describe
               consecutiveMisses = 0;
               hasReloadedThisStreak = false;
               failedPickAttempts.clear(); // reset per-player failure counts
-              console.log(
+              LOGGER.info(
                 `[live-draft] Pick #${pickCount} by ${label} accepted in ${Date.now() - pickStart}ms — ${ariaLabel}`,
               );
               // Record player name for post-draft roster assertions.
@@ -603,7 +604,7 @@ test.describe
               // Leave pickAccepted=false so the outer !pickAccepted block
               // increments consecutiveMisses and triggers reload/break guards.
               const elapsedS2 = ((Date.now() - draftStart) / 1000).toFixed(1);
-              console.log(
+              LOGGER.info(
                 `[live-draft] +${elapsedS2}s Pick by ${label} NOT confirmed within timeout (pick #${pickCount + 1}) — ${ariaLabel}`,
               );
               // Guard against infinite retries on a single player.  If the same
@@ -622,7 +623,7 @@ test.describe
                     (Date.now() - draftStart) /
                     1000
                   ).toFixed(1);
-                  console.log(
+                  LOGGER.info(
                     `[live-draft] +${elapsedSkip}s Skipping "${failedName}" after ${count} consecutive failures — trying next player`,
                   );
                   draftedPlayers.add(failedName);
@@ -642,7 +643,7 @@ test.describe
             .map((r) => r.label)
             .join(', ');
           const elapsedMiss = ((Date.now() - draftStart) / 1000).toFixed(1);
-          console.log(
+          LOGGER.info(
             `[live-draft] +${elapsedMiss}s miss #${consecutiveMisses} at pick ${pickCount} — myTurn=[${myTurnLabels || 'none'}]`,
           );
           // Every 5 consecutive misses, nudge the auto-pick processor so
@@ -654,7 +655,7 @@ test.describe
           // WS connection is fully established (LS-4305).
           if (consecutiveMisses % 5 === 0) {
             const elapsedNudge = ((Date.now() - draftStart) / 1000).toFixed(1);
-            console.log(
+            LOGGER.info(
               `[live-draft] +${elapsedNudge}s miss #${consecutiveMisses} — nudging autoProcessDraftPicks`,
             );
             // Use Node.js native fetch (same as gqlFetch) instead of
@@ -698,7 +699,7 @@ test.describe
               // server-side problems (auth failures, schema drift, etc.) that
               // explain why a draft is stuck. LS-4295: previous "n/a" output
               // gave investigators no actionable info across 4+ nudge cycles.
-              console.log(
+              LOGGER.info(
                 `[live-draft] nudge result: status=${status} picksAutoMade=${nudgeData?.picksAutoMade ?? 'n/a'} draftsCompleted=${nudgeData?.draftsCompleted ?? 'n/a'}` +
                   (resultErrors.length
                     ? ` resultErrors=${JSON.stringify(resultErrors)}`
@@ -744,7 +745,7 @@ test.describe
                 const elapsedReset = ((Date.now() - draftStart) / 1000).toFixed(
                   1,
                 );
-                console.log(
+                LOGGER.info(
                   `[live-draft] +${elapsedReset}s Nudge auto-picked ${nudgeData?.picksAutoMade ?? 0} — resetting miss counter`,
                 );
                 consecutiveMisses = 0;
@@ -776,7 +777,7 @@ test.describe
                   { id: state.leagueId },
                 ).catch((e: unknown) => {
                   const msg = e instanceof Error ? e.message : String(e);
-                  console.log(`[live-draft] draftStatus query failed: ${msg}`);
+                  LOGGER.info(`[live-draft] draftStatus query failed: ${msg}`);
                   return null;
                 });
                 const draftStatus = statusData?.league?.draftStatus;
@@ -785,7 +786,7 @@ test.describe
                     (Date.now() - draftStart) /
                     1000
                   ).toFixed(1);
-                  console.log(
+                  LOGGER.info(
                     `[live-draft] +${elapsedDoneApi}s API confirms draft completed — exiting pick loop (browsers stuck in draftOrderMissing state)`,
                   );
                   pickCount = maxPicks; // trigger while-loop exit
@@ -819,7 +820,7 @@ test.describe
                   })
                   .catch(async (e: unknown) => {
                     const msg = e instanceof Error ? e.message : String(e);
-                    console.log(
+                    LOGGER.info(
                       `[live-draft] currentPick query failed: ${msg}`,
                     );
                     // Permanent membership error: detect external league deletion
@@ -835,7 +836,7 @@ test.describe
                           (Date.now() - draftStart) /
                           1000
                         ).toFixed(1);
-                        console.log(
+                        LOGGER.info(
                           `[live-draft] +${elapsedCheck}s 3 consecutive membership errors — checking league existence`,
                         );
                         const leagueExists = await gqlFetch<{
@@ -869,7 +870,7 @@ test.describe
                     (Date.now() - draftStart) /
                     1000
                   ).toFixed(1);
-                  console.log(
+                  LOGGER.info(
                     `[live-draft] +${elapsedProgress}s EventBridge progress detected: currentPick ${lastKnownCurrentPick} → ${serverCurrentPick} — resetting miss counter`,
                   );
                   lastKnownCurrentPick = serverCurrentPick;
@@ -883,7 +884,7 @@ test.describe
                 const elapsedDone = ((Date.now() - draftStart) / 1000).toFixed(
                   1,
                 );
-                console.log(
+                LOGGER.info(
                   `[live-draft] +${elapsedDone}s Nudge completed the draft — exiting pick loop`,
                 );
                 pickCount = maxPicks; // trigger while-loop exit
@@ -936,7 +937,7 @@ test.describe
             // wait that could still have myTeamId=null when the check ran.
             hasReloadedThisStreak = true;
             const elapsedReload = ((Date.now() - draftStart) / 1000).toFixed(1);
-            console.log(
+            LOGGER.info(
               `[live-draft] +${elapsedReload}s miss #${consecutiveMisses} — reloading all pages (draftOrderMissing recovery)...`,
             );
             const draftBoardUrl = `/baseball/league/${state.leagueId}/draft`;
@@ -967,7 +968,7 @@ test.describe
         }
       }
 
-      console.log(
+      LOGGER.info(
         `[live-draft] Completed ${pickCount} total picks (+${((Date.now() - draftStart) / 1000).toFixed(1)}s)`,
       );
       expect(pickCount).toBeGreaterThan(0);
@@ -1005,7 +1006,7 @@ test.describe
       // to refetch leagueDraft — draftCompletedAt in DB ensures the banner
       // renders on a fresh load even when the WS completion event was missed.
       if (!draftComplete) {
-        console.log(
+        LOGGER.info(
           '[live-draft] Banner not visible after 30 s polling — reloading commissioner page',
         );
         await commissionerPage.goto(`/baseball/league/${state.leagueId}/draft`);
@@ -1017,7 +1018,7 @@ test.describe
       }
 
       expect(draftComplete).toBe(true);
-      console.log('[live-draft] Draft verified complete');
+      LOGGER.info('[live-draft] Draft verified complete');
     });
   });
 
@@ -1097,7 +1098,7 @@ test.describe
       // check above already proves the roster was populated, so
       // skip the player-name verification when no picks were captured.
       if (state.commissionerPicks.length === 0) {
-        console.log(
+        LOGGER.info(
           '[live-draft] No commissioner picks captured (race-attribution); roster lineup already verified.',
         );
         return;
@@ -1215,7 +1216,7 @@ test.describe
       const lineupMatch = lineupText?.match(/Lineup\s*(\d+)\s*\/\s*(\d+)/);
       const lineupCount = lineupMatch ? parseInt(lineupMatch[1], 10) : 0;
       const lineupTotal = lineupMatch ? parseInt(lineupMatch[2], 10) : 0;
-      console.log(
+      LOGGER.info(
         `[live-draft] Phase 7 lineup resolved: ${lineupCount}/${lineupTotal} text=${JSON.stringify(
           lineupText?.slice(0, 80) ?? null,
         )}`,
@@ -1229,7 +1230,7 @@ test.describe
       // Skip the player-name check when nothing was captured — the lineup
       // assertion above already proves the manager's roster filled.
       if (state.manager1Picks.length === 0) {
-        console.log(
+        LOGGER.info(
           '[live-draft] No manager 1 picks captured (race-attribution); roster lineup already verified.',
         );
         return;

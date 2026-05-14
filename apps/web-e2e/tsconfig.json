@@ -9,6 +9,10 @@
     "skipLibCheck": true,
     "skipDefaultLibCheck": true,
     "baseUrl": ".",
+    "paths": {
+      "@legacy-sports/logging": ["../../lib/logging/src/index.ts"],
+      "@legacy-sports/logging/server": ["../../lib/logging/src/server.ts"]
+    },
     "types": ["node", "@playwright/test"]
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.js", "src/**/*.jsx"],
