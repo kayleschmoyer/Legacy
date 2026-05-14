@@ -34,6 +34,7 @@ import os from 'os';
 import path from 'path';
 
 import { switchUser, test } from '../fixtures/ui';
+import { getTestUserJwt, TEST_USERS } from '../../utils/test-user-auth';
 
 // ---------------------------------------------------------------------------
 // Shared state set in beforeAll and consumed by subsequent phases
@@ -64,22 +65,35 @@ interface CliAuthData {
 /**
  * Returns the admin JWT without throwing.  Returns '' when no valid token
  * is present so individual tests can use test.skip() instead of crashing.
+ *
+ * Resolution order (mirrors ui.ts fixture and global-setup.ts):
+ *   1. INTEGRATION_JWT env var
+ *   2. ~/.legacy-sports/auth.json (local CLI session)
+ *   3. getTestUserJwt(COMMISSIONER) via E2E_COMMISSIONER_EMAIL/PASSWORD (CI)
  */
-function tryGetAuthJwt(): string {
+async function tryGetAuthJwt(): Promise<string> {
   if (process.env.INTEGRATION_JWT) {
     return process.env.INTEGRATION_JWT;
   }
 
   const authPath = path.join(os.homedir(), '.legacy-sports', 'auth.json');
-  if (!fs.existsSync(authPath)) return '';
+  if (fs.existsSync(authPath)) {
+    try {
+      const data = JSON.parse(
+        fs.readFileSync(authPath, 'utf-8'),
+      ) as CliAuthData;
+      const user = data.defaultUser;
+      const entry = user ? data.tokens[user] : undefined;
+      if (entry?.jwt && (!entry.expiresAt || entry.expiresAt >= Date.now())) {
+        return entry.jwt;
+      }
+    } catch {
+      // fall through to test-user auth
+    }
+  }
 
   try {
-    const data = JSON.parse(fs.readFileSync(authPath, 'utf-8')) as CliAuthData;
-    const user = data.defaultUser;
-    const entry = user ? data.tokens[user] : undefined;
-    if (!entry?.jwt) return '';
-    if (entry.expiresAt && entry.expiresAt < Date.now()) return '';
-    return entry.jwt;
+    return await getTestUserJwt(TEST_USERS.COMMISSIONER);
   } catch {
     return '';
   }
@@ -203,7 +217,7 @@ test.describe
       recapMatchupId: 0,
     };
 
-    const jwt = tryGetAuthJwt();
+    const jwt = await tryGetAuthJwt();
     if (!jwt) return; // tests will skip individually
 
     // Get all leagues the admin belongs to
