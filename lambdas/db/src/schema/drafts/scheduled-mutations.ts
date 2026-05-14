@@ -273,7 +273,13 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                   | undefined;
 
                 if (!draft) {
-                  throw new Error(`Draft ${draftId} not found`);
+                  // Draft was deleted between the outer query and this transaction
+                  // (benign race condition — nothing to auto-pick on).
+                  LOGGER.warn(
+                    `[autoProcessDraftPicks] Draft ${draftId} not found in FOR UPDATE transaction — likely deleted mid-flight, skipping`,
+                    { draftId },
+                  );
+                  return null;
                 }
 
                 // Re-check deadline inside transaction (TOCTOU guard)
