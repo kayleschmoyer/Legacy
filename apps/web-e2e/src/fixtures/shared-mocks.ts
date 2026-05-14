@@ -79,6 +79,9 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = {
 
   // ── Draft ─────────────────────────────────────────────────────────
   getleaguedraft: { data: { getLeagueDraft: null } },
+  // GetLiveDraftLeagueDraft is a superset of GetLeagueDraft used by the draft
+  // board page — same resolver, null response means no active draft.
+  getlivedraftleaguedraft: { data: { getLeagueDraft: null } },
   getdraftteamorder: { data: { draftTeamOrder: [] } },
   initializedraft: {
     data: {

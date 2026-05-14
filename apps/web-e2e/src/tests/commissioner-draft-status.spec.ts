@@ -172,6 +172,12 @@ test.describe('Commissioner — poll-cycle Season Active detection (LS-4296)', (
     page,
   }) => {
     let callCount = 0;
+    // Flag-based gate: all requests during the first navigation get 'queued';
+    // flipped to true before the second navigation so all subsequent requests
+    // get 'completed'. Using a flag (vs callCount <= 1) avoids the race where
+    // two GetLeagueById calls on the first navigation would push callCount past
+    // 1 mid-navigation and serve 'completed' prematurely (LS-4403).
+    let serveCompleted = false;
 
     await page.route(isGraphQLEndpoint, async (route) => {
       const postData = route.request().postData()?.toLowerCase() ?? '';
@@ -180,9 +186,7 @@ test.describe('Commissioner — poll-cycle Season Active detection (LS-4296)', (
         postData.includes('"getleague"')
       ) {
         callCount += 1;
-        // First navigation: draft still queued (lambda not yet done)
-        // Second navigation: draft completed
-        const draftStatus = callCount <= 1 ? 'queued' : 'completed';
+        const draftStatus = serveCompleted ? 'completed' : 'queued';
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -200,6 +204,9 @@ test.describe('Commissioner — poll-cycle Season Active detection (LS-4296)', (
     await page.waitForLoadState('networkidle');
     await expect(page.getByText('Season Active')).not.toBeVisible();
 
+    // Flip before second navigation: all subsequent league requests → completed
+    serveCompleted = true;
+
     // Second poll: completed — badge must be visible after networkidle
     await page.goto('/baseball/league/1/commissioner');
     await page.waitForLoadState('networkidle');
@@ -211,25 +218,30 @@ test.describe('Commissioner — poll-cycle Season Active detection (LS-4296)', (
 
 // ── reload() vs goto() after draft-start navigation (LS-4306) ────────────────
 //
-// After a draft starts the app may navigate away from the commissioner URL
-// (e.g. to /baseball/league/:id). The old inline wait loop used page.reload(),
+// After a draft starts the app navigates to the draft board
+// (/baseball/league/:id/draft). The old inline wait loop used page.reload(),
 // which re-fetches whichever URL the page is on — never returning to the
 // commissioner panel where "Season Active" is rendered. waitForSeasonActive
 // always uses page.goto(commissionerUrl) to guarantee it checks the right page.
 //
-// These tests document and guard that contract: reload() on a non-commissioner
-// URL misses the badge; goto(commissionerUrl) always finds it.
+// These tests document and guard that contract: reload() on the draft board
+// misses the commissioner badge; goto(commissionerUrl) always finds it.
+//
+// Note: /baseball/league/:id renders "Season Active" in LeagueHero when
+// draftStatus='completed', so the draft board URL is used here as the
+// realistic "navigated away" destination — it does not render that badge.
 
 test.describe('Commissioner — reload vs goto after draft-start navigation (LS-4306)', () => {
   test('page.reload() misses Season Active when page has navigated away from commissioner', async ({
     page,
   }) => {
     await setupLeagueMock(page, 'completed');
-    // Simulate draft start navigating the app away from the commissioner panel
-    await page.goto('/baseball/league/1');
+    // After a draft completes the app lands on the draft board, not the
+    // commissioner panel. Simulate that navigation here.
+    await page.goto('/baseball/league/1/draft');
     await page.waitForLoadState('networkidle');
 
-    // page.reload() stays on the league overview — the commissioner badge is not
+    // page.reload() stays on the draft board — the commissioner badge is not
     // rendered there, so "Season Active" is never visible
     await page.reload();
     await page.waitForLoadState('networkidle');
