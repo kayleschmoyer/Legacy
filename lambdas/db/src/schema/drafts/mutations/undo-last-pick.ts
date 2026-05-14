@@ -8,7 +8,11 @@ import { and, desc, eq, sql } from 'drizzle-orm';
 
 import { DraftPick } from '../types';
 import { builder } from '../../builder';
-import { AuthenticationError, ForbiddenError } from '../../graphql-errors';
+import {
+  AuthenticationError,
+  ForbiddenError,
+  UserInputError,
+} from '../../graphql-errors';
 
 // ── Undo Last Draft Pick ─────────────────────────────────────────────────────
 
@@ -62,7 +66,7 @@ builder.mutationField('undoLastDraftPick', (t) =>
             | undefined;
 
           if (!draft) {
-            throw new Error('Draft not found');
+            throw UserInputError('Draft not found');
           }
 
           // Verify user is league commissioner

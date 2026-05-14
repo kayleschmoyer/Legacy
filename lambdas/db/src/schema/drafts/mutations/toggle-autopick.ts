@@ -8,6 +8,7 @@ import { and, eq } from 'drizzle-orm';
 
 import { getCurrentDraftPickInfo } from '../helpers';
 import { builder } from '../../builder';
+import { UserInputError } from '../../graphql-errors';
 
 // ── toggleDraftAutoPick ───────────────────────────────────────────────────────
 
@@ -56,7 +57,7 @@ builder.mutationField('toggleDraftAutoPick', (t) =>
           .limit(1);
 
         if (!draft) {
-          throw new Error('Draft not found');
+          throw UserInputError('Draft not found');
         }
 
         // LS-481: block if the commissioner has disabled auto-pick league-wide

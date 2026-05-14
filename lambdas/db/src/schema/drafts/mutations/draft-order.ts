@@ -10,7 +10,7 @@ import { and, asc, eq } from 'drizzle-orm';
 import { Draft } from '../types';
 import { builder } from '../../builder';
 import type { Context } from '../../builder';
-import { AuthenticationError } from '../../graphql-errors';
+import { AuthenticationError, UserInputError } from '../../graphql-errors';
 
 // ── Helpers shared by setDraftOrder / randomizeDraftOrder ────────────────────
 
@@ -96,7 +96,7 @@ builder.mutationField('setDraftOrder', (t) =>
           .limit(1);
 
         if (!draft) {
-          throw new Error('Draft not found');
+          throw UserInputError('Draft not found');
         }
 
         const [league] = await context.db
@@ -272,7 +272,7 @@ builder.mutationField('randomizeDraftOrder', (t) =>
           .limit(1);
 
         if (!draft) {
-          throw new Error('Draft not found');
+          throw UserInputError('Draft not found');
         }
 
         const [league] = await context.db

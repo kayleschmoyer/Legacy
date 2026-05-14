@@ -23,7 +23,7 @@ import {
 } from './types';
 import { verifyLeagueMembership } from '../authorization';
 import { builder } from '../builder';
-import { AuthenticationError } from '../graphql-errors';
+import { AuthenticationError, UserInputError } from '../graphql-errors';
 
 /**
  * Query: Get draft by ID
@@ -139,7 +139,7 @@ builder.queryField('getDraftPicks', (t) =>
         .limit(1);
 
       if (!draft) {
-        throw new Error('Draft not found');
+        throw UserInputError('Draft not found');
       }
 
       await verifyLeagueMembership(context.db, draft.leagueId, context.user.id);
@@ -193,7 +193,7 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
         .limit(1);
 
       if (!draft) {
-        throw new Error('Draft not found');
+        throw UserInputError('Draft not found');
       }
 
       // Verify user is a member of this league
@@ -502,7 +502,7 @@ builder.queryField('getDraftTeamOrder', (t) =>
         .limit(1);
 
       if (!draft) {
-        throw new Error('Draft not found');
+        throw UserInputError('Draft not found');
       }
 
       await verifyLeagueMembership(context.db, draft.leagueId, context.user.id);
@@ -623,7 +623,7 @@ builder.queryField('getDraftTeamAutoPickStatuses', (t) =>
         .limit(1);
 
       if (!draft) {
-        throw new Error('Draft not found');
+        throw UserInputError('Draft not found');
       }
 
       await verifyLeagueMembership(context.db, draft.leagueId, context.user.id);
@@ -670,7 +670,7 @@ builder.queryField('getDraftRecommendations', (t) =>
         .from(PublicSchema.drafts)
         .where(eq(PublicSchema.drafts.id, draftId))
         .limit(1);
-      if (!draft) throw new Error('Draft not found');
+      if (!draft) throw UserInputError('Draft not found');
       await verifyLeagueMembership(context.db, draft.leagueId, context.user.id);
 
       // All picks for this draft G�� tells us who's been picked and what the
@@ -1022,7 +1022,7 @@ builder.queryField('getMyDraftQueue', (t) =>
         .from(PublicSchema.drafts)
         .where(eq(PublicSchema.drafts.id, draftId))
         .limit(1);
-      if (!draft) throw new Error('Draft not found');
+      if (!draft) throw UserInputError('Draft not found');
 
       const [membership] = await context.db
         .select({ teamId: PublicSchema.leagueMembers.teamId })

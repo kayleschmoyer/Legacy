@@ -19,7 +19,7 @@ import { and, asc, eq } from 'drizzle-orm';
 
 import { DraftQueueEntry } from '../types';
 import { builder } from '../../builder';
-import { AuthenticationError } from '../../graphql-errors';
+import { AuthenticationError, UserInputError } from '../../graphql-errors';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -33,7 +33,7 @@ async function resolveTeamIdForDraft(
     .from(PublicSchema.drafts)
     .where(eq(PublicSchema.drafts.id, draftId))
     .limit(1);
-  if (!draft) throw new Error('Draft not found');
+  if (!draft) throw UserInputError('Draft not found');
 
   const [membership] = await db
     .select({ teamId: PublicSchema.leagueMembers.teamId })

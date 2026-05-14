@@ -18,7 +18,11 @@ import { commitDraftPick, getCurrentDraftPickInfo } from '../helpers';
 import { builder } from '../../builder';
 import { createAllMatchupsForLeague } from '../../matchups/mutations';
 import { logDraftPickActivity } from '../../../services/activity-log';
-import { AuthenticationError, ForbiddenError } from '../../graphql-errors';
+import {
+  AuthenticationError,
+  ForbiddenError,
+  UserInputError,
+} from '../../graphql-errors';
 
 const badgeService = createBadgeService(getDbOptions());
 
@@ -66,7 +70,7 @@ builder.mutationField('commissionerPick', (t) =>
             | undefined;
 
           if (!draft) {
-            throw new Error('Draft not found');
+            throw UserInputError('Draft not found');
           }
 
           // Verify user is league owner or commissioner

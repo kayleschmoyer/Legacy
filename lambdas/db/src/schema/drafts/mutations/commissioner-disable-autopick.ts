@@ -16,7 +16,11 @@ import { and, eq } from 'drizzle-orm';
 
 import { Draft } from '../types';
 import { builder } from '../../builder';
-import { AuthenticationError, ForbiddenError } from '../../graphql-errors';
+import {
+  AuthenticationError,
+  ForbiddenError,
+  UserInputError,
+} from '../../graphql-errors';
 
 // ── commissionerSetDraftAutoPickDisabled ─────────────────────────────────────
 
@@ -51,7 +55,7 @@ builder.mutationField('commissionerSetDraftAutoPickDisabled', (t) =>
         .limit(1);
 
       if (!draft) {
-        throw new Error('Draft not found');
+        throw UserInputError('Draft not found');
       }
 
       // Verify caller is the league commissioner
