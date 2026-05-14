@@ -63,11 +63,18 @@ export type DraftPickActivityPayload = {
  *
  * Resolves names from the DB so the frontend can display them without
  * additional queries. Never throws — errors are swallowed like insertActivityLog.
+ *
+ * Name resolution is isolated in its own try/catch so a transient DB error
+ * (e.g. connection-pool exhaustion) does not prevent the activity log entry
+ * from being written — it is written without names instead.
  */
 export async function logDraftPickActivity(
   context: Pick<Context, 'db'>,
   data: DraftPickActivityPayload,
 ): Promise<void> {
+  let playerName: string | null = null;
+  let teamName: string | null = null;
+
   try {
     const [playerRow, teamRow] = await Promise.all([
       context.db
@@ -94,33 +101,33 @@ export async function logDraftPickActivity(
         : Promise.resolve(null),
     ]);
 
-    const playerName = playerRow
+    playerName = playerRow
       ? `${playerRow.firstName} ${playerRow.lastName}`
       : null;
-    const teamName = teamRow?.name ?? null;
-
-    await insertActivityLog(context, {
-      leagueId: data.leagueId,
-      teamId: data.teamId,
-      actorUserId: data.actorUserId,
-      eventType: 'draft_pick_made',
-      payload: {
-        playerId: data.playerId,
-        round: data.round,
-        pickNumber: data.pickNumber,
-        overallPick: data.overallPick,
-        ...(playerName && { playerName }),
-        ...(teamName && { teamName }),
-        ...(data.wasAutoPick && { wasAutoPick: true }),
-        ...(data.autoPickReason && { autoPickReason: data.autoPickReason }),
-        ...(data.wasCommissionerPick && { wasCommissionerPick: true }),
-      },
-    });
+    teamName = teamRow?.name ?? null;
   } catch (err) {
-    LOGGER.error('Failed to log draft pick activity', {
-      leagueId: data.leagueId,
-      playerId: data.playerId,
-      err: err instanceof Error ? err.message : String(err),
-    });
+    LOGGER.warn(
+      'Failed to resolve names for draft pick activity (non-fatal)',
+      err instanceof Error ? err : new Error(String(err)),
+      { leagueId: data.leagueId, playerId: data.playerId },
+    );
   }
+
+  await insertActivityLog(context, {
+    leagueId: data.leagueId,
+    teamId: data.teamId,
+    actorUserId: data.actorUserId,
+    eventType: 'draft_pick_made',
+    payload: {
+      playerId: data.playerId,
+      round: data.round,
+      pickNumber: data.pickNumber,
+      overallPick: data.overallPick,
+      ...(playerName && { playerName }),
+      ...(teamName && { teamName }),
+      ...(data.wasAutoPick && { wasAutoPick: true }),
+      ...(data.autoPickReason && { autoPickReason: data.autoPickReason }),
+      ...(data.wasCommissionerPick && { wasCommissionerPick: true }),
+    },
+  });
 }
