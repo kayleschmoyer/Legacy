@@ -14,8 +14,7 @@
  * - Upgrade flow: createCheckoutSession called when price IDs are available
  */
 
-import { expect } from '../fixtures/auth-enhanced';
-import { test } from '../fixtures/auth-enhanced';
+import { createCustomAuthTest, expect, test } from '../fixtures/auth-enhanced';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 import {
   createBillingPortalSessionResponse,
@@ -63,50 +62,55 @@ async function routeGraphQL(
 // PremiumGate — Player Comparison page (known usage of PremiumGate)
 // ---------------------------------------------------------------------------
 
+// useIsPremiumStatus short-circuits to true for admin users, so these tests
+// must run as a non-admin free user to exercise the gated UI path.
+const freeUserTest = createCustomAuthTest('free@test.com', 'none');
+
 test.describe('PremiumGate — free user @critical', () => {
-  // Player comparison page is not premium-gated in current UI — skip these
-  test.fixme('free user sees blurred content with lock overlay and Upgrade button', async ({
-    page,
-  }) => {
-    // Return no subscription (free tier) so the page renders PremiumGate in
-    // gated mode.
-    await routeGraphQL(page, {
-      getmysubscription: myFreeSubscriptionResponse(),
-      mysubscription: myFreeSubscriptionResponse(),
-      currentuser: { data: { currentUser: null } },
-      // Minimal player comparison stubs so the page shell renders
-      getplayers: { data: { players: { nodes: [], totalCount: 0 } } },
-    });
+  freeUserTest(
+    'free user sees blurred content with lock overlay and Upgrade button',
+    async ({ page }) => {
+      // Return no subscription (free tier) so the page renders PremiumGate in
+      // gated mode.
+      await routeGraphQL(page, {
+        getmysubscription: myFreeSubscriptionResponse(),
+        mysubscription: myFreeSubscriptionResponse(),
+        currentuser: { data: { currentUser: null } },
+        // Minimal player comparison stubs so the page shell renders
+        getplayers: { data: { players: { nodes: [], totalCount: 0 } } },
+      });
 
-    await page.goto('/players/compare');
-    await page.waitForLoadState('load');
+      await page.goto('/players/compare');
+      await page.waitForLoadState('load');
 
-    // The lock overlay card should be visible
-    const upgradeBtn = page.getByRole('button', { name: /upgrade/i }).first();
-    await expect(upgradeBtn).toBeVisible();
-  });
+      // The lock overlay card should be visible
+      const upgradeBtn = page.getByRole('button', { name: /upgrade/i }).first();
+      await expect(upgradeBtn).toBeVisible();
+    },
+  );
 
-  test.fixme('clicking Upgrade CTA opens the UpgradeModal', async ({
-    page,
-  }) => {
-    await routeGraphQL(page, {
-      getmysubscription: myFreeSubscriptionResponse(),
-      mysubscription: myFreeSubscriptionResponse(),
-      currentuser: { data: { currentUser: null } },
-      getplayers: { data: { players: { nodes: [], totalCount: 0 } } },
-    });
+  freeUserTest(
+    'clicking Upgrade CTA opens the UpgradeModal',
+    async ({ page }) => {
+      await routeGraphQL(page, {
+        getmysubscription: myFreeSubscriptionResponse(),
+        mysubscription: myFreeSubscriptionResponse(),
+        currentuser: { data: { currentUser: null } },
+        getplayers: { data: { players: { nodes: [], totalCount: 0 } } },
+      });
 
-    await page.goto('/players/compare');
-    await page.waitForLoadState('load');
+      await page.goto('/players/compare');
+      await page.waitForLoadState('load');
 
-    const upgradeBtn = page.getByRole('button', { name: /upgrade/i }).first();
-    await upgradeBtn.click();
+      const upgradeBtn = page.getByRole('button', { name: /upgrade/i }).first();
+      await upgradeBtn.click();
 
-    // UpgradeModal should be visible — check for premium features list heading
-    await expect(
-      page.getByText(/premium features|upgrade to premium/i),
-    ).toBeVisible();
-  });
+      // UpgradeModal should be visible — check for the modal title heading
+      await expect(
+        page.getByRole('heading', { name: /upgrade to premium/i }),
+      ).toBeVisible();
+    },
+  );
 });
 
 test.describe('PremiumGate — premium user @critical', () => {
