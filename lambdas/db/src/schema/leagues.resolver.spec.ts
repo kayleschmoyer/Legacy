@@ -280,6 +280,41 @@ describe('League Mutations', () => {
       expect(deleteCallOrder).toEqual(['leagues']);
     });
 
+    it('should succeed when the league is referenced as previous_league_id by another league', async () => {
+      // Regression test for LS-4406 / Rollbar #72:
+      // The leagues_previous_league_id_fk constraint lacked ON DELETE, so deleting
+      // a prior-season league failed with a FK violation. The migration
+      // 20260514_000000_fix_leagues_previous_league_id_cascade re-creates the
+      // constraint with ON DELETE SET NULL, so the delete now succeeds and the
+      // referencing league's previous_league_id becomes NULL automatically.
+      mockDb.select.mockReturnValue(mockDb);
+      mockDb.from.mockReturnValue(mockDb);
+      mockDb.where.mockReturnValue(mockDb);
+      mockDb.limit.mockResolvedValue([{ id: 1, owner: 1 }]);
+
+      // The DB handles SET NULL on previous_league_id for leagues that referenced
+      // this one — the resolver makes exactly one delete call.
+      mockDb.delete.mockReturnValue(mockDb);
+
+      const mutationType = schema.getMutationType();
+      const deleteLeagueField = mutationType?.getFields().deleteLeague;
+      if (!deleteLeagueField?.resolve) {
+        throw new Error('deleteLeague resolver not found');
+      }
+
+      const result = await deleteLeagueField.resolve(
+        {},
+        { leagueId: 1 },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(result).toBe(
+        'Successfully deleted league 1 and all associated data',
+      );
+      expect(mockDb.delete).toHaveBeenCalledTimes(1);
+    });
+
     it('should handle database errors gracefully', async () => {
       // Mock league exists
       mockDb.select.mockReturnValue(mockDb);

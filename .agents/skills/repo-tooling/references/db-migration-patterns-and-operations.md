@@ -110,6 +110,45 @@ export const down = async ({ db }: { db: PgDatabase<any> }) => {
 
 > **Note**: Use `db.execute(\`...\`)`with a plain template string, NOT`db.execute(sql\`...\`)`. The tagged `sql`template from Drizzle wraps the statement, which can cause issues with complex function bodies using`$fn$` delimiters.
 
+## Alter Foreign Key Constraint (e.g. change ON DELETE behavior)
+
+PostgreSQL does not support `ALTER CONSTRAINT` for FK actions — you must drop and re-create. Always use `DROP CONSTRAINT IF EXISTS` so the migration is safe to retry.
+
+```typescript
+export const up = async ({ db }: { db: PgDatabase<any> }) => {
+  // Drop the existing constraint, then re-add with the desired ON DELETE action.
+  await db.execute(`
+    ALTER TABLE child_table
+      DROP CONSTRAINT IF EXISTS child_table_parent_id_fk
+  `);
+
+  await db.execute(`
+    ALTER TABLE child_table
+      ADD CONSTRAINT child_table_parent_id_fk
+        FOREIGN KEY (parent_id) REFERENCES parent_table (id)
+        ON DELETE SET NULL   -- or CASCADE / RESTRICT / NO ACTION
+  `);
+};
+
+export const down = async ({ db }: { db: PgDatabase<any> }) => {
+  await db.execute(`
+    ALTER TABLE child_table
+      DROP CONSTRAINT IF EXISTS child_table_parent_id_fk
+  `);
+
+  await db.execute(`
+    ALTER TABLE child_table
+      ADD CONSTRAINT child_table_parent_id_fk
+        FOREIGN KEY (parent_id) REFERENCES parent_table (id)
+        -- restore original ON DELETE action (omit = NO ACTION default)
+  `);
+};
+```
+
+**Self-referential FKs** (a table referencing itself, e.g. `leagues.previous_league_id → leagues.id`) follow the same pattern. Use `ON DELETE SET NULL` when deleting the referenced row should sever the link rather than cascade-delete the referencing row.
+
+> **Remember**: also update the Drizzle schema model to add `.onDelete('set null')` (or `'cascade'`, etc.) to the matching `foreignKey()` definition so the ORM reflects the DB constraint accurately.
+
 ## Migration Best Practices
 
 ### Do's

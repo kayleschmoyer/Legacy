@@ -139,6 +139,11 @@ export const leagues = pgTable(
       previousLeagueIdIdx: index('leagues_previous_league_id_idx').on(
         table.previousLeagueId,
       ),
+      leaguesPreviousLeagueIdFk: foreignKey({
+        columns: [table.previousLeagueId],
+        foreignColumns: [table.id],
+        name: 'leagues_previous_league_id_fk',
+      }).onDelete('set null'),
     };
   },
 );
