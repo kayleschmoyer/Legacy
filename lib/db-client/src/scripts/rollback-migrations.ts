@@ -207,6 +207,17 @@ async function runMigrationsUp(
   LOGGER.info(`📁 Found ${migrationFiles.length} migration files`);
   LOGGER.info(`📊 ${appliedMigrations.length} migrations already applied`);
 
+  // Migrations that were merged before their prerequisite schema change
+  // landed.  Running them on a fresh DB would fail, but the intended
+  // effect is already produced by a later migration.  Mark them applied
+  // so the runner can continue past them.
+  const KNOWN_NOOP_MIGRATIONS = new Set([
+    // Tried to CREATE INDEX on a plain VIEW — PostgreSQL rejects this.
+    // The same index is created by 20260302_120000 after the view is
+    // converted to a MATERIALIZED VIEW.
+    '20260302_080000_add_player_eligible_positions_index.ts',
+  ]);
+
   let appliedCount = 0;
 
   for (const migration of migrationFiles) {
@@ -231,11 +242,19 @@ async function runMigrationsUp(
           LOGGER.error(`❌ No 'up' function found in ${migration.filename}`);
         }
       } catch (error) {
-        LOGGER.error(
-          `❌ Error applying ${migration.filename}:`,
-          error instanceof Error ? error : new Error(String(error)),
-        );
-        throw error;
+        if (KNOWN_NOOP_MIGRATIONS.has(migration.filename)) {
+          LOGGER.warn(
+            `⚠️  Skipping known no-op migration ${migration.filename} — ${error instanceof Error ? error.message : String(error)}`,
+          );
+          await recordMigration(db, migration.filename);
+          appliedCount++;
+        } else {
+          LOGGER.error(
+            `❌ Error applying ${migration.filename}:`,
+            error instanceof Error ? error : new Error(String(error)),
+          );
+          throw error;
+        }
       }
     } else {
       LOGGER.info(`⏭️ Already applied: ${migration.filename}`);
