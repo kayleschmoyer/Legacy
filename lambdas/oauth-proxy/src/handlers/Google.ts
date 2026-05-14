@@ -331,7 +331,11 @@ export const handleSecureGoogleAuth = async (
       } catch (error) {
         LOGGER.error(
           'Failed to verify ID token for email extraction:',
-          error instanceof Error ? error.message : String(error),
+          error instanceof Error ? error : new Error(String(error)),
+          {
+            handler: 'handleSecureGoogleAuth',
+            context: 'id_token_verification',
+          },
         );
         return {
           statusCode: 400,
@@ -395,7 +399,12 @@ export const handleSecureGoogleAuth = async (
       } catch (error) {
         LOGGER.error(
           'Failed to exchange authorization code for email:',
-          error instanceof Error ? error.message : String(error),
+          error instanceof Error ? error : new Error(String(error)),
+          {
+            handler: 'handleSecureGoogleAuth',
+            context: 'code_exchange',
+            redirectUri,
+          },
         );
         return {
           statusCode: 400,

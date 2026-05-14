@@ -416,3 +416,52 @@ describe('handleSecureGoogleAuth — redirect_uri validation', () => {
     expect(body.error).toBe('Invalid redirect_uri');
   });
 });
+
+describe('handleSecureGoogleAuth — error logging', () => {
+  const loggerMock = jest.requireMock<{ LOGGER: { error: jest.Mock } }>(
+    '@legacy-sports/logging',
+  );
+  const googleMock = jest.requireMock<{
+    OAuth2Client: jest.Mock;
+    getMockVerifyIdToken: () => jest.Mock;
+  }>('google-auth-library');
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('passes the full Error to LOGGER.error when code exchange fails', async () => {
+    const cause = new Error('invalid_grant');
+    googleMock.OAuth2Client.mockImplementationOnce(() => ({
+      verifyIdToken: jest.fn(),
+      getToken: jest.fn().mockRejectedValue(cause),
+    }));
+
+    const result = await handleSecureGoogleAuth(
+      makeEvent({ code: 'auth-code-123' }),
+    );
+
+    expect(result.statusCode).toBe(400);
+    expect(loggerMock.LOGGER.error).toHaveBeenCalledWith(
+      expect.stringContaining('Failed to exchange authorization code'),
+      cause,
+      expect.objectContaining({ context: 'code_exchange' }),
+    );
+  });
+
+  it('passes the full Error to LOGGER.error when ID token verification fails (credential flow)', async () => {
+    const cause = new Error('Token has been expired or revoked');
+    googleMock.getMockVerifyIdToken().mockRejectedValueOnce(cause);
+
+    const result = await handleSecureGoogleAuth(
+      makeEvent({ credential: 'mock-credential' }),
+    );
+
+    expect(result.statusCode).toBe(400);
+    expect(loggerMock.LOGGER.error).toHaveBeenCalledWith(
+      expect.stringContaining('Failed to verify ID token'),
+      cause,
+      expect.objectContaining({ context: 'id_token_verification' }),
+    );
+  });
+});
