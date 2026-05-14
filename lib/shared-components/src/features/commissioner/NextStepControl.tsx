@@ -164,7 +164,7 @@ export function NextStepControl({
       const result = await renewLeague({
         variables: { leagueId, keepRosters: keepRosters === 'keep' },
         refetchQueries: ['GetUserLeagues'],
-        awaitRefetchQueries: true,
+        awaitRefetchQueries: false,
       });
       setRenewalLoading(false);
       setShowRenewalDialog(false);
