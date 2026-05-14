@@ -157,13 +157,21 @@ function PlayersGrid({
         {(showSearch || showSorting) && (
           <XStack gap="$3" ai="center" flexWrap="wrap">
             {showSearch && (
-              <XStack flex={1} minW={200} ai="center">
+              <XStack
+                flex={1}
+                minW={200}
+                ai="center"
+                role="combobox"
+                aria-expanded={searchTerm.length > 0}
+                aria-haspopup="listbox"
+              >
                 <Input
                   placeholder="Search players..."
                   value={searchTerm}
                   onChangeText={setSearchTerm}
                   flex={1}
                   size="$3"
+                  aria-label="Search players"
                 />
                 {/* Search overlay button */}
                 <View pos="absolute" r="$2" t="$2" zi={1} pointerEvents="none">

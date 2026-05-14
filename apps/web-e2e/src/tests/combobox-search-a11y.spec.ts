@@ -115,6 +115,23 @@ test.describe('Combobox/search accessibility @regression', () => {
     await mockPlayersGraphQL(page);
     await page.goto('/players');
     await page.waitForLoadState('load');
+    // Apollo resolves after the load event; wait for the search input to
+    // appear so tests don't see the loading spinner and skip prematurely.
+    await page
+      .waitForSelector(
+        [
+          'input[type="search"]',
+          'input[placeholder*="search" i]',
+          'input[placeholder*="player" i]',
+          'input[role="combobox"]',
+          '[role="combobox"] input',
+          'input[aria-label*="search" i]',
+        ].join(', '),
+        { timeout: 10000 },
+      )
+      .catch(() => {
+        // Individual tests skip gracefully when no search input is present.
+      });
   });
 
   // -------------------------------------------------------------------------
