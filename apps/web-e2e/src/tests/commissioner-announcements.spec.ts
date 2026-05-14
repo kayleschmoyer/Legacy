@@ -638,6 +638,13 @@ test.describe('Commissioner Announcements — keyboard shortcut @regression', ()
       .getByPlaceholder(/write an announcement/i)
       .press('Control+Enter');
 
+    // Wait for compose form to close before checking the list — avoids a strict
+    // mode violation where getByText resolves to both the textarea and the list
+    // item simultaneously, and ensures the mutation has propagated.
+    await expect(
+      page.getByPlaceholder(/write an announcement/i),
+    ).not.toBeVisible();
+
     // Announcement should appear in the list
     await expect(page.getByText(announcementText)).toBeVisible();
   });
