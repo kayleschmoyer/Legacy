@@ -178,6 +178,12 @@ test.describe('Form field accessibility @regression', () => {
           timeout: 10000,
         },
       );
+      // The Create button is disabled while the form is loading and enabled once
+      // all fields (and their aria attributes) have mounted. Waiting for it to be
+      // enabled ensures the full form is ready before we audit accessible names.
+      await expect(
+        page.getByRole('button', { name: /create/i }).first(),
+      ).toBeEnabled({ timeout: 10000 });
 
       const { inputCount, issues } = await evaluateFormA11y(page);
 
@@ -221,6 +227,12 @@ test.describe('Form field accessibility @regression', () => {
       const hasInput = (await nameInput.count()) > 0;
       if (hasInput) {
         await expect(nameInput).toBeVisible({ timeout: 10000 });
+        // The Create button is disabled while the form is loading and enabled once
+        // all fields (and their aria attributes) have mounted. Waiting for it to be
+        // enabled ensures aria-label/aria-labelledby associations are fully set.
+        await expect(
+          page.getByRole('button', { name: /create/i }).first(),
+        ).toBeEnabled({ timeout: 10000 });
 
         // Check for at least one proper accessible label mechanism
         const hasLabel = await nameInput.evaluate((el: HTMLInputElement) => {
