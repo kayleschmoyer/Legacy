@@ -80,7 +80,11 @@ export class DatabaseService {
   public readonly gdpr: GdprService;
   public readonly badges: BadgeService;
   public readonly subscriptions: SubscriptionService;
-  private _dbConnection: GenericDatabase<typeof PublicSchema> | null = null;
+  // Promise cache prevents double-initialization when concurrent requests arrive
+  // before the first pool is ready (e.g. Lambda cold start with parallel invocations).
+  private _dbConnectionPromise: Promise<
+    GenericDatabase<typeof PublicSchema>
+  > | null = null;
 
   constructor(private options: DbOptions) {
     this.users = createUserService(options);
@@ -107,12 +111,20 @@ export class DatabaseService {
    * Useful for GraphQL context to share connections across resolvers
    */
   async getDb(): Promise<GenericDatabase<typeof PublicSchema>> {
-    if (!this._dbConnection) {
-      const connection = getPublicDbConnection(this.options);
-      await connection.initialize();
-      this._dbConnection = connection.db;
+    if (!this._dbConnectionPromise) {
+      this._dbConnectionPromise = (async () => {
+        const connection = getPublicDbConnection(this.options);
+        await connection.initialize();
+        return connection.db;
+      })();
+      // Clear the cache on failure so the next request can retry rather than
+      // receiving the same permanently-rejected promise (e.g. transient
+      // Secrets Manager timeout during Lambda cold start).
+      void this._dbConnectionPromise.catch(() => {
+        this._dbConnectionPromise = null;
+      });
     }
-    return this._dbConnection;
+    return this._dbConnectionPromise;
   }
 }
 

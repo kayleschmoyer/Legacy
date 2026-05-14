@@ -1,4 +1,6 @@
 import { eq, inArray } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { Pool } from 'pg';
 import {
   cleanupTestData,
   getTestDatabase,
@@ -370,6 +372,75 @@ describe('Leagues - DB Integration Tests', () => {
         .limit(1);
 
       expect(row).toBeUndefined();
+    });
+  });
+
+  // LS-4402: validateInviteCode must return the league immediately after
+  // createLeague commits, even when the query arrives on a fresh DB connection
+  // (Lambda cold start with a brand-new connection pool). PostgreSQL READ
+  // COMMITTED guarantees this — this test encodes that guarantee so regressions
+  // surface here, not as flaky E2E failures.
+  describe('validateInviteCode read-after-write visibility (LS-4402)', () => {
+    it('returns the league from a fresh connection immediately after insert commits', async () => {
+      const owner = getUser(2);
+      const inviteCode = 'RAW4402A';
+
+      // Write via the shared test pool (simulates createLeague committing).
+      const [inserted] = await db
+        .insert(integrationTestSchema.leagues)
+        .values({ name: 'RAW Visibility Test', owner: owner.id, inviteCode })
+        .returning();
+
+      // Open a second independent pool to simulate a cold-start Lambda with a
+      // fresh connection that has never touched this transaction.
+      const url =
+        process.env['TEST_DATABASE_URL'] ?? process.env['DATABASE_URL'] ?? '';
+      const secondPool = new Pool({
+        connectionString: url,
+        max: 1,
+        ssl: { rejectUnauthorized: false },
+      });
+      const secondDb = drizzle(secondPool, { schema: integrationTestSchema });
+
+      try {
+        const [result] = await secondDb
+          .select({
+            id: integrationTestSchema.leagues.id,
+            name: integrationTestSchema.leagues.name,
+          })
+          .from(integrationTestSchema.leagues)
+          .where(eq(integrationTestSchema.leagues.inviteCode, inviteCode))
+          .limit(1);
+
+        expect(result).toBeDefined();
+        expect(result.id).toBe(inserted.id);
+        expect(result.name).toBe('RAW Visibility Test');
+      } finally {
+        await secondPool.end();
+      }
+    });
+
+    it('returns undefined from a fresh connection when no matching invite code exists', async () => {
+      const url =
+        process.env['TEST_DATABASE_URL'] ?? process.env['DATABASE_URL'] ?? '';
+      const secondPool = new Pool({
+        connectionString: url,
+        max: 1,
+        ssl: { rejectUnauthorized: false },
+      });
+      const secondDb = drizzle(secondPool, { schema: integrationTestSchema });
+
+      try {
+        const [result] = await secondDb
+          .select({ id: integrationTestSchema.leagues.id })
+          .from(integrationTestSchema.leagues)
+          .where(eq(integrationTestSchema.leagues.inviteCode, 'NOSUCH00'))
+          .limit(1);
+
+        expect(result).toBeUndefined();
+      } finally {
+        await secondPool.end();
+      }
     });
   });
 
