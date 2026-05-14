@@ -171,6 +171,13 @@ test.describe('Form field accessibility @regression', () => {
       await setupLeagueCreationMock(page);
       await page.goto('/baseball/league/create');
       await page.waitForLoadState('networkidle');
+      // Auth guard runs in a useEffect after first paint; networkidle may fire
+      // while the loading spinner is still showing. Wait for the form to render.
+      await expect(page.getByPlaceholder('Enter your league name')).toBeVisible(
+        {
+          timeout: 10000,
+        },
+      );
 
       const { inputCount, issues } = await evaluateFormA11y(page);
 
@@ -189,6 +196,13 @@ test.describe('Form field accessibility @regression', () => {
       await setupLeagueCreationMock(page);
       await page.goto('/baseball/league/create');
       await page.waitForLoadState('networkidle');
+      // Auth guard runs in a useEffect after first paint; networkidle may fire
+      // while the loading spinner is still showing. Wait for the form to render.
+      await expect(page.getByPlaceholder('Enter your league name')).toBeVisible(
+        {
+          timeout: 10000,
+        },
+      );
 
       // Look for league name input by various selectors
       const nameInput = page

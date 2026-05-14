@@ -550,6 +550,7 @@ function PillToggle({
 
 interface FieldRowProps {
   label: string;
+  labelId?: string;
   hint?: string;
   required?: boolean;
   children: React.ReactNode;
@@ -557,6 +558,7 @@ interface FieldRowProps {
 
 function FieldRow({
   label,
+  labelId,
   hint,
   required,
   children,
@@ -565,6 +567,7 @@ function FieldRow({
     <YStack gap="$2">
       <XStack gap="$2" alignItems="center">
         <Text
+          id={labelId}
           fontFamily="$display"
           fontWeight="700"
           fontSize={11}
@@ -1173,6 +1176,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                   <div style={{ gridColumn: '1 / -1' }}>
                     <FieldRow
                       label="League Name"
+                      labelId="league-name-label"
                       required
                       hint="3–50 characters. Shown on standings, invites, and the draft board."
                     >
