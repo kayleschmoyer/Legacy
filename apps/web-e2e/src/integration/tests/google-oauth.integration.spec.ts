@@ -1,9 +1,10 @@
 /**
  * Google OAuth — Integration Tests
  *
- * Validates the live /oauth/google Lambda endpoint and the Google sign-in UI
- * against the real backend.  No route.fulfill() mocking — every request hits
- * the actual server.
+ * Validates the live /oauth/google Lambda endpoint and the Google sign-in UI.
+ * API smoke tests hit the real backend directly.  The UI popup flow uses
+ * route.fulfill() to mock only the third-party Google OAuth endpoints so the
+ * test runs hermetically in headless CI without real Google credentials.
  *
  * Test categories:
  *
@@ -13,34 +14,20 @@
  *      These directly validate the LS-2733 fix (reduced serial network calls
  *      that caused 504 Gateway Timeout on every cold Lambda invocation).
  *
- *   2. UI popup flow (requires GOOGLE_TEST_EMAIL + GOOGLE_TEST_PASSWORD + GOOGLE_OAUTH_POPUP_TEST env vars)
- *      — Navigate to INTEGRATION_WEB_URL, click "Continue with Google",
- *        fill credentials in the Google sign-in popup, verify auth.
- *      Skipped automatically when env vars are absent so local runs without
- *      credentials don't fail.  Also skipped unless GOOGLE_OAUTH_POPUP_TEST=1
- *      because headless Chromium is blocked by Google and this test must be
- *      run in headed mode to be reliable.
+ *   2. UI popup flow (hermetic — no real Google credentials required)
+ *      — Navigate to INTEGRATION_WEB_URL, click "Continue with Google".
+ *      The Google GSI library is intercepted via route.fulfill() and replaced
+ *      with a minimal stub that delivers a mock auth code immediately without
+ *      opening a real popup.  The /oauth/google backend call is also
+ *      intercepted so the frontend auth-state machine transitions without
+ *      hitting the real Google or API endpoints.
  *
  * Environment variables:
- *   GOOGLE_TEST_EMAIL      — Google account email (e.g. test@gmail.com)
- *   GOOGLE_TEST_PASSWORD   — Google account password
- *   GOOGLE_OAUTH_POPUP_TEST — Set to any truthy value to enable the UI popup
- *                             flow test.  Omit (or leave empty) in CI to skip
- *                             the test in headless environments where Google
- *                             blocks sign-in.
  *   INTEGRATION_WEB_URL    — Live web app base URL (default: https://legacy-fantasy.com)
  *   INTEGRATION_BASE_URL   — Live API base URL    (default: https://api.legacy-fantasy.com/)
- *
- * Known limitation: Google actively blocks headless Chromium sign-in.  The UI
- * popup test succeeds most reliably when run in headed mode:
- *   pnpm exec playwright test --config apps/web-e2e/playwright.integration.config.ts \
- *     apps/web-e2e/src/integration/tests/google-oauth.integration.spec.ts --headed
- * In CI (headless), Google may redirect to a "couldn't sign you in" page.
- * The test will retry twice (per playwright.integration.config.ts retries: 2)
- * before reporting as failed.
  */
 
-import { expect, type Page, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -54,9 +41,6 @@ const OAUTH_GOOGLE_URL = `${OAUTH_BASE}oauth/google`;
 
 const WEB_BASE =
   process.env.INTEGRATION_WEB_URL?.trim() || 'https://legacy-fantasy.com';
-
-const GOOGLE_EMAIL = process.env['GOOGLE_TEST_EMAIL'] ?? '';
-const GOOGLE_PASSWORD = process.env['GOOGLE_TEST_PASSWORD'] ?? '';
 
 /** Maximum response time we accept — anything longer indicates a timeout risk. */
 const MAX_RESPONSE_MS = 15_000;
@@ -157,73 +141,108 @@ test.describe('Google OAuth — API smoke tests @critical', () => {
 });
 
 // ---------------------------------------------------------------------------
-// UI popup flow — requires GOOGLE_TEST_EMAIL / GOOGLE_TEST_PASSWORD
+// UI popup flow — hermetic (Google GSI + backend both mocked)
 // ---------------------------------------------------------------------------
 
 /**
- * Fill Google's email + password sign-in form inside a Playwright Page.
- *
- * Google's sign-in UI has changed several times; this helper handles the
- * current two-step flow (email → Next → password → Next).  Selectors are
- * chosen to be as stable as possible, but they may need updating if Google
- * redesigns the login page.
+ * Build a minimal JWT whose payload can be decoded by the frontend
+ * AuthService.getUserFromToken() without hitting the real backend.
  */
-async function fillGoogleSignIn(
-  popup: Page,
-  email: string,
-  password: string,
-): Promise<void> {
-  // Step 1 — email
-  await popup.waitForSelector('#identifierId', { timeout: 30_000 });
-  await popup.fill('#identifierId', email);
-  // Click "Next" after email
-  await popup.click('#identifierNext button, button:has-text("Next")');
-
-  // Step 2 — password (different selector from email step)
-  await popup.waitForSelector('[name="Passwd"], [name="password"]', {
-    timeout: 30_000,
-  });
-  const passwordSelector = (await popup.$('[name="Passwd"]'))
-    ? '[name="Passwd"]'
-    : '[name="password"]';
-  await popup.fill(passwordSelector, password);
-  await popup.click('#passwordNext button, button:has-text("Next")');
-
-  // Handle optional consent / "Choose an account" / "Allow" screens.
-  // We click "Allow" if it appears; other prompts are ignored.
-  try {
-    await popup.waitForSelector('button:has-text("Allow")', { timeout: 8_000 });
-    await popup.click('button:has-text("Allow")');
-  } catch {
-    // Not present — carry on.
-  }
+function makeMockJwt(): string {
+  const header = Buffer.from(
+    JSON.stringify({ alg: 'HS256', typ: 'JWT' }),
+  ).toString('base64url');
+  const payload = Buffer.from(
+    JSON.stringify({
+      id: 1,
+      email: 'test@example.com',
+      username: 'testuser',
+      accessLevel: 'user',
+      // Far-future expiry so the frontend never attempts a proactive refresh.
+      exp: Math.floor(Date.now() / 1000) + 3_600,
+    }),
+  ).toString('base64url');
+  return `${header}.${payload}.mock-sig`;
 }
 
-test.describe('Google OAuth — UI popup flow', () => {
-  // Skip the entire describe block if credentials are absent OR if the
-  // opt-in env var is not set.  Google blocks headless Chromium sign-in, so
-  // this test must be explicitly enabled (GOOGLE_OAUTH_POPUP_TEST=1) and run
-  // in headed mode to produce reliable results.
-  test.skip(
-    !process.env['GOOGLE_OAUTH_POPUP_TEST'] ||
-      !GOOGLE_EMAIL ||
-      !GOOGLE_PASSWORD,
-    'Popup flow test is opt-in: set GOOGLE_OAUTH_POPUP_TEST=1 (plus GOOGLE_TEST_EMAIL / ' +
-      'GOOGLE_TEST_PASSWORD) and run in --headed mode to enable this test.',
-  );
+/** Minimal Google Identity Services stub injected via route.fulfill(). */
+const GSI_STUB = `
+  window.google = {
+    accounts: {
+      id: {
+        initialize: function() {},
+        prompt: function(cb) {
+          if (typeof cb === 'function') {
+            cb({
+              getMomentType: function() { return 'skipped'; },
+              getSkippedReason: function() { return 'user_cancel'; },
+              getDismissedReason: function() { return undefined; },
+              getNotDisplayedReason: function() { return undefined; },
+            });
+          }
+        },
+        cancel: function() {},
+        renderButton: function() {},
+      },
+      oauth2: {
+        initCodeClient: function(config) {
+          return {
+            requestCode: function() {
+              // Deliver a mock auth code on the next tick so the caller's
+              // promise chain is established before the callback fires.
+              setTimeout(function() {
+                config.callback({ code: 'mock-authorization-code' });
+              }, 0);
+            },
+          };
+        },
+      },
+    },
+  };
+`;
 
+test.describe('Google OAuth — UI popup flow', () => {
   test('clicking Continue with Google authenticates via popup and shows the app', async ({
     browser,
   }) => {
     // Open a fresh browser context with no pre-existing auth cookies.
     const context = await browser.newContext({
       baseURL: WEB_BASE,
-      // Provide a realistic user agent so Google is less likely to block.
       userAgent:
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
         'AppleWebKit/537.36 (KHTML, like Gecko) ' +
         'Chrome/124.0.0.0 Safari/537.36',
     });
+
+    // Replace the real GSI library with our stub so no popup ever opens and
+    // no requests reach accounts.google.com.
+    await context.route(
+      'https://accounts.google.com/gsi/client',
+      async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/javascript',
+          body: GSI_STUB,
+        });
+      },
+    );
+
+    // Intercept the frontend's POST to /oauth/google and return a mock JWT so
+    // the auth-state machine transitions to authenticated without hitting the
+    // real Lambda.
+    const mockJwt = makeMockJwt();
+    await context.route('**/oauth/google', async (route, request) => {
+      if (request.method() !== 'POST') {
+        await route.fulfill({ status: 405 });
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ jwt: mockJwt, csrfToken: 'mock-csrf' }),
+      });
+    });
+
     const page = await context.newPage();
 
     try {
@@ -235,16 +254,9 @@ test.describe('Google OAuth — UI popup flow', () => {
         page.getByRole('button', { name: /continue with google/i }),
       ).toBeVisible({ timeout: 20_000 });
 
-      // Listen for the Google popup BEFORE clicking so we don't race.
-      const popupPromise = context.waitForEvent('page');
+      // Click — the GSI stub delivers a mock code immediately; the mocked
+      // /oauth/google route returns a JWT; the app transitions to authenticated.
       await page.getByRole('button', { name: /continue with google/i }).click();
-      const popup = await popupPromise;
-
-      // Fill credentials inside the Google sign-in popup.
-      await fillGoogleSignIn(popup, GOOGLE_EMAIL, GOOGLE_PASSWORD);
-
-      // Wait for the popup to close (Google redirects back to the app on success).
-      await popup.waitForEvent('close', { timeout: 60_000 });
 
       // The landing page button should disappear as the app transitions to
       // the authenticated shell.
