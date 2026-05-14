@@ -356,7 +356,9 @@ export function LeagueDetailPageV2(): React.JSX.Element {
             myTeam={teams.find((t) => t.id === userTeamId) ?? null}
           />
         )}
-        {tab === 'commish' && <CommishTab league={league} teams={teams} />}
+        {tab === 'commish' && isCommissioner && (
+          <CommishTab league={league} teams={teams} />
+        )}
       </div>
     </div>
   );
