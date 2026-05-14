@@ -24,11 +24,11 @@ export const up = async ({
   await db.execute(`
     INSERT INTO public.scoring_stat_definitions
       (stat_key, stat_group, source_table, source_column, display_name, description,
-       default_multiplier, min_multiplier, max_multiplier, step, is_premium, is_advanced, is_enabled)
+       default_multiplier, min_multiplier, max_multiplier, step_size)
     VALUES
-      ('fielding_putouts',     'fielding', 'season_fielding', 'po',     'Putouts',      'Defensive out recorded by the fielder',              0.020, -1.000,  1.000, 0.010, false, false, true),
-      ('fielding_assists',     'fielding', 'season_fielding', 'a',      'Assists',      'Throw or deflection leading to a putout',            0.100, -1.000,  1.000, 0.010, false, false, true),
-      ('fielding_double_plays','fielding', 'season_fielding', 'dp_def', 'Double Plays', 'Participation in turning a double play',             0.500, -5.000,  5.000, 0.100, false, false, true)
+      ('fielding_putouts',     'fielding', 'season_fielding', 'po',     'Putouts',      'Defensive out recorded by the fielder',              0.020, -1.000,  1.000, 0.010),
+      ('fielding_assists',     'fielding', 'season_fielding', 'a',      'Assists',      'Throw or deflection leading to a putout',            0.100, -1.000,  1.000, 0.010),
+      ('fielding_double_plays','fielding', 'season_fielding', 'dp_def', 'Double Plays', 'Participation in turning a double play',             0.500, -5.000,  5.000, 0.100)
     ON CONFLICT (stat_key) DO NOTHING;
   `);
 
