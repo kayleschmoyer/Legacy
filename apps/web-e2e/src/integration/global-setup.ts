@@ -1,3 +1,4 @@
+import type { FullConfig } from '@playwright/test';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -164,7 +165,18 @@ function isAllowedTestUser(email: string): boolean {
   return ALLOWED_TEST_EMAIL_PATTERNS.some((re) => re.test(email));
 }
 
-export default async function globalSetup(): Promise<void> {
+export default async function globalSetup(config: FullConfig): Promise<void> {
+  // In sharded CI runs, only the first shard runs pre-test cleanup. Shards
+  // 2+ skipping here prevents them from deleting leagues that shard 1's tests
+  // are actively using (LS-4391). Mirrors the guard in global-teardown.ts
+  // (LS-4318) which already skips teardown entirely when sharding is active.
+  if (config.shard && config.shard.current !== 1) {
+    console.log(
+      `[integration setup] Shard ${config.shard.current}/${config.shard.total} — skipping pre-run cleanup (runs on shard 1 only).`,
+    );
+    return;
+  }
+
   const jwt = await getAuthJwt();
   if (!jwt) {
     console.log(
