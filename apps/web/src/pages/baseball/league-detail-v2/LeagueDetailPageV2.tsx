@@ -27,6 +27,19 @@ import {
   useGetUserTeamIdLazyQuery,
 } from '../../../api/db/graphql.generated';
 import { useLeagueScoringSettings } from '../../../lib/scoring';
+import { LeagueWebSocketContext } from '../../../context/LeagueWebSocketContext';
+import { useLeagueWebSocket } from '../../../hooks/useLeagueWebSocket';
+import { useLeagueWebSocketLifecycle } from '../../../hooks/useLeagueWebSocketLifecycle';
+
+/** Subscribes to page-level WS events that need to refetch league-level data. */
+function LeagueWSPageHandler({
+  onDraftStarted,
+}: {
+  onDraftStarted: () => void;
+}) {
+  useLeagueWebSocket({ onDraftStarted });
+  return null;
+}
 
 const ROLE_KEY = 'ls-v2-role';
 
@@ -61,14 +74,19 @@ export function LeagueDetailPageV2(): React.JSX.Element {
   }>();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, isLoading: authLoading, token: authToken } = useAuth();
   const leagueId = id ? parseInt(id, 10) : NaN;
+  const isAuthenticated = !authLoading && !!user;
+
+  const { client: wsClient, connected: wsConnected } =
+    useLeagueWebSocketLifecycle({ leagueId, isAuthenticated, authToken });
 
   const {
     data: leagueData,
     previousData: leaguePreviousData,
     loading: leagueLoading,
     error: leagueError,
+    refetch: refetchLeague,
   } = useGetLeagueByIdQuery({
     variables: { id: leagueId },
     skip: !Number.isFinite(leagueId),
@@ -262,105 +280,114 @@ export function LeagueDetailPageV2(): React.JSX.Element {
   }
 
   return (
-    <div className="ls-root">
-      <PageMeta
-        title={`${league.name ?? 'League'} · Legacy Sports`}
-        description={`Manage and view ${league.name ?? 'your league'} — matchups, roster, standings, trades and more.`}
+    <LeagueWebSocketContext.Provider
+      value={{ client: wsClient, connected: wsConnected }}
+    >
+      <LeagueWSPageHandler
+        onDraftStarted={() => {
+          void refetchLeague();
+        }}
       />
-      <RoleBar
-        role={role}
-        setRole={setRole}
-        season={seasonValue}
-        setSeason={setSeasonValue}
-        seasons={seasonOptions}
-        isCommissioner={isCommissioner}
-        isMember={isMember}
-        leagueName={league.name}
-      />
-      <div className="ls-page">
-        <LeagueHero
-          league={{
-            name: league.name ?? 'League',
-            scoringLabel: scoringProfileName,
-            era:
-              league.minCareerSeasons || league.minCareerGames
-                ? `Career filter · ${league.minCareerSeasons ?? 0}+ seasons`
-                : 'All-Time',
-            draftStatus: league.draftStatus ?? 'pre-draft',
-            currentWeek: league.currentWeekNumber ?? null,
-            totalMatchups: league.totalMatchups ?? null,
-            teamCount: teams.length || null,
-            inviteCode: league.inviteCode,
-          }}
-          onBack={() => navigate('/baseball/leagues')}
-          onInvite={() => setTab('overview')}
-          isCommissioner={effIsCommish}
+      <div className="ls-root">
+        <PageMeta
+          title={`${league.name ?? 'League'} · Legacy Sports`}
+          description={`Manage and view ${league.name ?? 'your league'} — matchups, roster, standings, trades and more.`}
         />
-        <TabBar
-          active={tab}
-          onChange={setTab}
-          isMember={effIsMember}
-          isCommissioner={effIsCommish}
+        <RoleBar
+          role={role}
+          setRole={setRole}
+          season={seasonValue}
+          setSeason={setSeasonValue}
+          seasons={seasonOptions}
+          isCommissioner={isCommissioner}
+          isMember={isMember}
+          leagueName={league.name}
         />
-
-        {tab === 'overview' && (
-          <OverviewTab
-            league={league}
-            teams={teams}
-            myTeamId={userTeamId ?? null}
+        <div className="ls-page">
+          <LeagueHero
+            league={{
+              name: league.name ?? 'League',
+              scoringLabel: scoringProfileName,
+              era:
+                league.minCareerSeasons || league.minCareerGames
+                  ? `Career filter · ${league.minCareerSeasons ?? 0}+ seasons`
+                  : 'All-Time',
+              draftStatus: league.draftStatus ?? 'pre-draft',
+              currentWeek: league.currentWeekNumber ?? null,
+              totalMatchups: league.totalMatchups ?? null,
+              teamCount: teams.length || null,
+              inviteCode: league.inviteCode,
+            }}
+            onBack={() => navigate('/baseball/leagues')}
+            onInvite={() => setTab('overview')}
             isCommissioner={effIsCommish}
-            onTab={setTab}
-            onTeam={onTeamNav}
-            currentUserId={user?.id ?? null}
-            myRoster={myRoster}
           />
-        )}
-        {tab === 'matchup' && (
-          <MatchupTab
-            league={league}
-            myTeamId={userTeamId ?? null}
-            initialMatchupId={routeMatchupId ?? null}
-            onTeam={onTeamNav}
-          />
-        )}
-        {tab === 'roster' && (isMember || !userTeamIdSettled) && (
-          <RosterTab league={league} myTeamId={userTeamId ?? null} />
-        )}
-        {tab === 'free-agents' && (
-          <FreeAgentsTab
-            league={league}
+          <TabBar
+            active={tab}
+            onChange={setTab}
             isMember={effIsMember}
-            myTeamId={userTeamId ?? null}
+            isCommissioner={effIsCommish}
           />
-        )}
-        {tab === 'standings' && (
-          <StandingsTab
-            league={league}
-            teams={teams}
-            myTeamId={userTeamId ?? null}
-            onTeam={onTeamNav}
-          />
-        )}
-        {tab === 'trades' && (
-          <TradesTab
-            league={league}
-            isMember={effIsMember}
-            myTeamId={userTeamId ?? null}
-          />
-        )}
-        {tab === 'history' && <HistoryTab league={league} />}
-        {tab === 'team' && (isMember || !userTeamIdSettled) && (
-          <TeamTab
-            league={league}
-            myTeamId={userTeamId ?? null}
-            myTeam={teams.find((t) => t.id === userTeamId) ?? null}
-          />
-        )}
-        {tab === 'commish' && isCommissioner && (
-          <CommishTab league={league} teams={teams} />
-        )}
+
+          {tab === 'overview' && (
+            <OverviewTab
+              league={league}
+              teams={teams}
+              myTeamId={userTeamId ?? null}
+              isCommissioner={effIsCommish}
+              onTab={setTab}
+              onTeam={onTeamNav}
+              currentUserId={user?.id ?? null}
+              myRoster={myRoster}
+            />
+          )}
+          {tab === 'matchup' && (
+            <MatchupTab
+              league={league}
+              myTeamId={userTeamId ?? null}
+              initialMatchupId={routeMatchupId ?? null}
+              onTeam={onTeamNav}
+            />
+          )}
+          {tab === 'roster' && (isMember || !userTeamIdSettled) && (
+            <RosterTab league={league} myTeamId={userTeamId ?? null} />
+          )}
+          {tab === 'free-agents' && (
+            <FreeAgentsTab
+              league={league}
+              isMember={effIsMember}
+              myTeamId={userTeamId ?? null}
+            />
+          )}
+          {tab === 'standings' && (
+            <StandingsTab
+              league={league}
+              teams={teams}
+              myTeamId={userTeamId ?? null}
+              onTeam={onTeamNav}
+            />
+          )}
+          {tab === 'trades' && (
+            <TradesTab
+              league={league}
+              isMember={effIsMember}
+              myTeamId={userTeamId ?? null}
+            />
+          )}
+          {tab === 'history' && <HistoryTab league={league} />}
+          {tab === 'team' && (isMember || !userTeamIdSettled) && (
+            <TeamTab
+              league={league}
+              myTeamId={userTeamId ?? null}
+              myTeam={teams.find((t) => t.id === userTeamId) ?? null}
+            />
+          )}
+          {tab === 'commish' && isCommissioner && (
+            <CommishTab league={league} teams={teams} />
+          )}
+        </div>
       </div>
-    </div>
+    </LeagueWebSocketContext.Provider>
   );
 }
 

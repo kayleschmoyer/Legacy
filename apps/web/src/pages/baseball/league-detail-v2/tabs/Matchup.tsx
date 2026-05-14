@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { type SeasonStats } from '@legacy-sports/scoring';
 import {
   type LeagueFragment,
@@ -11,6 +11,7 @@ import {
   useMatchupById,
   useMatchupsByWeek,
 } from '../../../../hooks/useMatchup';
+import { useLeagueWebSocket } from '../../../../hooks/useLeagueWebSocket';
 import { MatchupRosterComparison } from '../../../../features/matchup/MatchupRosterComparison';
 import { computeMatchupScores } from '../../../../features/matchup/MatchupScoreboard';
 import { useLeagueScoringSettings } from '../../../../lib/scoring';
@@ -67,7 +68,11 @@ const ScoreboardHero: React.FC<{
   const team1Leading = score1 >= score2;
   const chip = STATUS_CHIP[status ?? 'unknown'] ?? STATUS_CHIP.unknown;
   return (
-    <div className="ls-scoreboard-hero">
+    <div
+      className="ls-scoreboard-hero"
+      role="region"
+      aria-label={`Week ${weekNumber ?? 1} scoreboard`}
+    >
       <div className="top-band">
         <div className="band-left">
           <span className={`ls-chip ${chip.cls}`}>
@@ -148,7 +153,10 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
     else if (currentWeek) setWeek(currentWeek);
   }, [league.currentWeekNumber, currentWeek]);
 
-  const { matchups } = useMatchupsByWeek(league.id ?? null, week);
+  const { matchups, refetch: refetchMatchups } = useMatchupsByWeek(
+    league.id ?? null,
+    week,
+  );
 
   const myMatchup = useMemo(() => {
     if (!matchups || matchups.length === 0) return null;
@@ -167,7 +175,19 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
       ? Number(myMatchup.id)
       : null;
 
-  const { matchup } = useMatchupById(matchupId);
+  const { matchup, refetch: refetchMatchup } = useMatchupById(matchupId);
+
+  // Refetch scores when the server signals stats have been recalculated.
+  const refetchMatchupsRef = useRef(refetchMatchups);
+  refetchMatchupsRef.current = refetchMatchups;
+  const refetchMatchupRef = useRef(refetchMatchup);
+  refetchMatchupRef.current = refetchMatchup;
+  useLeagueWebSocket({
+    onMatchupStatsComplete: () => {
+      void refetchMatchupsRef.current();
+      void refetchMatchupRef.current();
+    },
+  });
 
   // Pull players + scoring settings to compute live scores and projections
   // client-side, mirroring the canonical MatchupScoreboard behaviour.

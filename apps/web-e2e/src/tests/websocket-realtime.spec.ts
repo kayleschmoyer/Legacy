@@ -25,6 +25,7 @@
  */
 
 import type { WebSocketRoute } from '@playwright/test';
+import { injectWebSocketUrl } from './helpers/websocket-test-utils';
 import { expect } from '../fixtures/auth-enhanced';
 import { test } from '../fixtures/auth-enhanced';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
@@ -33,6 +34,7 @@ import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 
 const LEAGUE_ID = 1;
 const LEAGUE_URL = `/baseball/league/${LEAGUE_ID}/overview`;
+const MATCHUP_URL = `/baseball/league/${LEAGUE_ID}/matchup`;
 const TEAM_1_ID = 1; // matches the test JWT (user id=1)
 const TEAM_2_ID = 2;
 
@@ -113,13 +115,17 @@ function mockMatchup(
     team2Id: TEAM_2_ID,
     team1Score,
     team2Score,
-    status: 'in-progress',
+    status: 'in_progress',
     statsLoadingStatus: 'complete',
     gamesPerMatchup: 10,
     spStartsPerMatchup: 2,
     selectedGamesCount: 5,
     startTime: null,
     endTime: null,
+    // Required by the Matchup fragment — Apollo silently drops cache writes
+    // when fragment fields are missing from the response.
+    team1: { __typename: 'Team', id: TEAM_1_ID, name: 'Home Team' },
+    team2: { __typename: 'Team', id: TEAM_2_ID, name: 'Away Team' },
   };
 }
 
@@ -149,8 +155,8 @@ interface SetupOptions {
   /** League returned for getLeagueByid queries. */
   league?: typeof BASE_LEAGUE;
   /**
-   * When non-null, the 2nd+ call to getMatchupsForLeague returns this matchup
-   * (simulating a refetch triggered by a WS event).
+   * When non-null, the 2nd+ matchup query (getMatchupsByWeek or getMatchupById)
+   * returns this matchup, simulating a refetch triggered by a WS event.
    */
   matchupAfterRefetch?: ReturnType<typeof mockMatchup> | null;
   /**
@@ -170,7 +176,11 @@ async function setupGraphQL(
     draftStartsOnRefetch = false,
   } = opts;
 
-  let matchupCallCount = 0;
+  // Use separate counters per query type so the first getMatchupById call
+  // always returns null scores (initial state) and only subsequent calls
+  // (triggered by WS events) return the updated scores.
+  let matchupByIdCallCount = 0;
+  let matchupsByWeekCallCount = 0;
   let leagueCallCount = 0;
 
   await page.route(isGraphQL, async (route) => {
@@ -215,21 +225,44 @@ async function setupGraphQL(
         body: JSON.stringify({ data: { getCurrentWeekForLeague: 1 } }),
       });
     } else if (postData.includes('getmatchupsforleague')) {
-      matchupCallCount++;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: { getMatchupsForLeague: [mockMatchup()] },
+        }),
+      });
+    } else if (postData.includes('getmatchupsbyweek')) {
+      matchupsByWeekCallCount++;
       const m =
-        matchupAfterRefetch !== null && matchupCallCount > 1
+        matchupAfterRefetch !== null && matchupsByWeekCallCount > 1
           ? matchupAfterRefetch
           : mockMatchup();
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ data: { getMatchupsForLeague: [m] } }),
+        body: JSON.stringify({ data: { getMatchupsByWeek: [m] } }),
       });
-    } else if (postData.includes('getmatchupplayers')) {
+    } else if (postData.includes('getmatchupbyid')) {
+      matchupByIdCallCount++;
+      const m =
+        matchupAfterRefetch !== null && matchupByIdCallCount > 1
+          ? matchupAfterRefetch
+          : mockMatchup();
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ data: { getMatchupPlayers: [] } }),
+        body: JSON.stringify({ data: { getMatchupById: m } }),
+      });
+    } else if (postData.includes('getmatchupplayers')) {
+      // Return null (not []) so computeMatchupScores hits the !players fallback
+      // path and reads scores directly from matchup.team1Score/team2Score.
+      // An empty array bypasses this fallback (empty arrays are truthy) and
+      // the function computes 0 from the missing player stats instead.
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { getMatchupPlayers: null } }),
       });
     } else if (
       postData.includes('getleaguechatmessages') ||
@@ -323,39 +356,41 @@ test.describe('WebSocket real-time updates @critical', () => {
   // TODO: Chat panel (role="log"), scoreboard region, and draft status badge
   // are not present on the league overview page in the current UI. These tests
   // need to be updated once the WebSocket real-time UI is redesigned.
-  test.fixme('chat message arrival — new message appears without page reload', async ({
+  test('chat message arrival — new message appears without page reload', async ({
     page,
   }) => {
-    // 1. GraphQL mocks (empty chat history)
+    // 1. Inject WS URL so the app opens a socket even in CI (VITE_WEBSOCKET_URL="")
+    await injectWebSocketUrl(page);
+
+    // 2. GraphQL mocks (empty chat history)
     await setupGraphQL(page);
 
-    // 2. Intercept the WebSocket connection before navigation.
-    //    We capture the route reference so we can push a message later.
-    // wsRoute is undefined until the app opens the WebSocket connection;
-    // we poll for it becoming non-undefined before sending messages.
+    // 3. Intercept the WebSocket connection before navigation.
     let wsRoute: WebSocketRoute | undefined;
     await page.routeWebSocket(/wss?:\/\//, (ws) => {
       wsRoute = ws;
-      // Silently absorb heartbeat pings and other browser→server traffic.
       ws.onMessage(() => {
         /* no-op */
       });
     });
 
-    // 3. Navigate to the league overview (the chat panel lives here)
+    // 4. Navigate to the league overview
     await page.goto(LEAGUE_URL);
     await page.waitForLoadState('load');
 
-    // 4. Confirm the chat panel rendered
+    // 5. Switch to the Chat sub-tab so LeagueChatTab mounts (default is Activity)
+    await page.getByRole('tab', { name: /^chat$/i }).click();
+
+    // 6. Confirm the chat log element rendered
     await expect(
       page.getByRole('log', { name: /chat messages/i }),
     ).toBeVisible();
 
-    // 5. Wait for the app to open the WebSocket connection
+    // 7. Wait for the app to open the WebSocket connection
     await expect.poll(() => wsRoute !== undefined).toBe(true);
     if (!wsRoute) throw new Error('WebSocket route not established');
 
-    // 6. Push a chat message from the "server"
+    // 8. Push a chat message from the "server"
     const messageText = 'Real-time message via WebSocket!';
     wsRoute.send(
       wsNotification({
@@ -372,17 +407,20 @@ test.describe('WebSocket real-time updates @critical', () => {
       }),
     );
 
-    // 7. The message must appear in the chat log without a page refresh
+    // 9. The message must appear in the chat log without a page refresh
     await expect(
       page.getByRole('log', { name: /chat messages/i }),
     ).toContainText(messageText);
   });
 
-  test.fixme('matchup score update — MATCHUP_STATS_COMPLETE triggers score refresh', async ({
+  test('matchup score update — MATCHUP_STATS_COMPLETE triggers score refresh', async ({
     page,
   }) => {
+    // 1. Inject WS URL so the app opens a socket even in CI (VITE_WEBSOCKET_URL="")
+    await injectWebSocketUrl(page);
+
     // After the WS event, the mocked GraphQL returns updated scores.
-    // MatchupScoreboard falls back to raw team1Score/team2Score when no
+    // computeMatchupScores falls back to raw team1Score/team2Score when no
     // scoring profile is configured (which is the case in our mock).
     const updatedMatchup = mockMatchup(42.5, 38.0);
 
@@ -396,22 +434,35 @@ test.describe('WebSocket real-time updates @critical', () => {
       });
     });
 
-    await page.goto(LEAGUE_URL);
+    // 2. Navigate to the Matchup tab where ScoreboardHero renders
+    await page.goto(MATCHUP_URL);
     await page.waitForLoadState('load');
 
-    // The scoreboard renders because we have a matchup for week 1 and userTeamId=1
+    // ScoreboardHero has role="region" aria-label="Week 1 scoreboard"
     const scoreboard = page.getByRole('region', { name: /week 1 scoreboard/i });
     await expect(scoreboard).toBeVisible();
 
-    // Confirm initial state shows 0.00 (no scores yet)
+    // Wait for the 'Live' chip — this confirms getMatchupById resolved and Apollo
+    // wrote the initial data to cache (status 'in_progress' → MatchupStatus.InProgress
+    // → chip label 'Live'). Without this, waitForResponse could catch the first
+    // getMatchupById call (initial load) instead of the WS-triggered refetch.
+    await expect(scoreboard).toContainText('Live');
+
+    // Confirm initial scores are 0.00 (team1Score/team2Score are null in initial mock)
     await expect(scoreboard).toContainText('0.00');
 
-    // Wait for WS connection
+    // 3. Wait for WS connection
     await expect.poll(() => wsRoute !== undefined).toBe(true);
     if (!wsRoute) throw new Error('WebSocket route not established');
 
-    // Push MATCHUP_STATS_COMPLETE — triggers refetchMatchupsRef.current?.()
-    // and refetchCurrentWeekRef.current?.()
+    // 4. Push MATCHUP_STATS_COMPLETE — triggers MatchupTab refetch
+    const refetchPromise = page.waitForResponse(
+      (resp) =>
+        resp.url().includes('/graphql') &&
+        !resp.url().includes('/@fs/') &&
+        (resp.request().postData()?.toLowerCase().includes('getmatchupbyid') ??
+          false),
+    );
     wsRoute.send(
       wsNotification({
         type: 'MATCHUP_STATS_COMPLETE',
@@ -421,15 +472,19 @@ test.describe('WebSocket real-time updates @critical', () => {
       }),
     );
 
-    // The refetch returns updatedMatchup; scoreboard must show the new scores.
+    // 5. Wait for the getMatchupById refetch to resolve, then check scores.
     // Scores are formatted with toFixed(2): 42.5 → "42.50", 38.0 → "38.00"
+    await refetchPromise;
     await expect(scoreboard).toContainText('42.50');
     await expect(scoreboard).toContainText('38.00');
   });
 
-  test.fixme('draft-started notification — status badge updates from Pre-Draft to Queued', async ({
+  test('draft-started notification — status badge updates from Pre-Draft to Draft Queued', async ({
     page,
   }) => {
+    // 1. Inject WS URL so the app opens a socket even in CI (VITE_WEBSOCKET_URL="")
+    await injectWebSocketUrl(page);
+
     // League starts as 'not-started'; the 2nd league query (triggered by the
     // DRAFT_STARTED event) returns 'queued'.
     await setupGraphQL(page, {
@@ -448,14 +503,15 @@ test.describe('WebSocket real-time updates @critical', () => {
     await page.goto(LEAGUE_URL);
     await page.waitForLoadState('load');
 
-    // Confirm the initial draft status badge says "Pre-Draft"
+    // Confirm the initial draft status chip says "Pre-Draft"
+    // (DraftStatusChip maps 'not-started' → 'Pre-Draft')
     await expect(page.getByText('Pre-Draft').first()).toBeVisible();
 
-    // Wait for WS connection
+    // 2. Wait for WS connection
     await expect.poll(() => wsRoute !== undefined).toBe(true);
     if (!wsRoute) throw new Error('WebSocket route not established');
 
-    // Push DRAFT_STARTED — triggers handleDraftStarted() → backgroundRefetch()
+    // 3. Push DRAFT_STARTED — LeagueWSPageHandler calls refetchLeague()
     wsRoute.send(
       wsNotification({
         type: 'DRAFT_STARTED',
@@ -469,7 +525,8 @@ test.describe('WebSocket real-time updates @critical', () => {
       }),
     );
 
-    // After the refetch resolves, the badge should change to "Queued"
-    await expect(page.getByText('Queued')).toBeVisible();
+    // 4. After the refetch resolves the badge should change to "Draft Queued"
+    // (DraftStatusChip maps 'queued' → 'Draft Queued')
+    await expect(page.getByText('Draft Queued')).toBeVisible();
   });
 });

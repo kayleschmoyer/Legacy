@@ -322,10 +322,7 @@ async function setupWebSocket(page: import('@playwright/test').Page): Promise<{
 // ── Tests: WebSocket connection lifecycle ────────────────────────────────────
 
 test.describe('WebSocket – connection lifecycle @critical', () => {
-  // LeagueDetailPageV2 does not yet implement WebSocket — skip until LS-4129
-  test.skip('league page establishes WebSocket connection', async ({
-    page,
-  }) => {
+  test('league page establishes WebSocket connection', async ({ page }) => {
     await setupGraphQL(page);
     const ws = await setupWebSocket(page);
 
@@ -357,10 +354,8 @@ test.describe('WebSocket – connection lifecycle @critical', () => {
 });
 
 // ── Tests: Notification resilience ──────────────────────────────────────────
-// LeagueDetailPageV2 does not yet initiate WebSocket — all tests below that
-// call ws.waitForConnection() are skipped until LS-4129 adds WS support.
 
-test.describe.skip('WebSocket – notification resilience @regression', () => {
+test.describe('WebSocket – notification resilience @regression', () => {
   test('page handles unknown notification type gracefully', async ({
     page,
   }) => {
@@ -421,7 +416,7 @@ test.describe.skip('WebSocket – notification resilience @regression', () => {
 
 // ── Tests: Multiple notification types ──────────────────────────────────────
 
-test.describe.skip('WebSocket – multiple notifications @regression', () => {
+test.describe('WebSocket – multiple notifications @regression', () => {
   test('page handles rapid successive notifications without crashing', async ({
     page,
   }) => {
@@ -433,7 +428,10 @@ test.describe.skip('WebSocket – multiple notifications @regression', () => {
 
     const route = await ws.waitForConnection();
 
-    // Prepare to wait for the GraphQL refetch triggered by MATCHUP_STATS_COMPLETE
+    // Prepare to wait for the GraphQL refetch triggered by DRAFT_STARTED.
+    // LeagueWSPageHandler handles DRAFT_STARTED → refetchLeague (getLeagueById).
+    // MATCHUP_STATS_COMPLETE only triggers matchup refetches when MatchupTab is
+    // mounted; on the overview page it fires but produces no observable request.
     const refetchPromise = page.waitForResponse((resp) => {
       const url = resp.url();
       return (
@@ -476,8 +474,20 @@ test.describe.skip('WebSocket – multiple notifications @regression', () => {
         teamId: TEAM_1_ID,
       }),
     );
+    route.send(
+      wsNotification({
+        type: 'DRAFT_STARTED',
+        leagueId: LEAGUE_ID,
+        draftId: 1,
+        draftOrder: 'snake',
+        teamCount: 4,
+        pickTimeLimitSeconds: 120,
+        currentPickDeadline: new Date(Date.now() + 120_000).toISOString(),
+        startedAt: new Date().toISOString(),
+      }),
+    );
 
-    // Wait for the refetch triggered by MATCHUP_STATS_COMPLETE
+    // Wait for the refetch triggered by DRAFT_STARTED
     await refetchPromise;
 
     // Page should still be functional
@@ -528,7 +538,7 @@ test.describe.skip('WebSocket – multiple notifications @regression', () => {
 
 // ── Tests: Activity feed with initial data ──────────────────────────────────
 
-test.describe.skip('WebSocket – activity feed display @regression', () => {
+test.describe('WebSocket – activity feed display @regression', () => {
   test('activity feed shows existing items on page load', async ({ page }) => {
     await setupGraphQL(page, {
       activityItems: MOCK_ACTIVITY_WITH_ITEMS,
@@ -561,7 +571,7 @@ test.describe.skip('WebSocket – activity feed display @regression', () => {
 
 // ── Tests: Draft notification triggers league refetch ────────────────────────
 
-test.describe.skip('WebSocket – draft status transition @regression', () => {
+test.describe('WebSocket – draft status transition @regression', () => {
   test('DRAFT_STARTED notification triggers league data refetch', async ({
     page,
   }) => {
@@ -616,7 +626,7 @@ test.describe.skip('WebSocket – draft status transition @regression', () => {
 
 // ── Tests: Trade and waiver notifications ───────────────────────────────────
 
-test.describe.skip('WebSocket – trade/waiver notifications @regression', () => {
+test.describe('WebSocket – trade/waiver notifications @regression', () => {
   test('TRADE_OFFER notification does not crash the page', async ({ page }) => {
     await setupGraphQL(page);
     const ws = await setupWebSocket(page);
@@ -672,7 +682,7 @@ test.describe.skip('WebSocket – trade/waiver notifications @regression', () =>
 
 // ── Tests: Chat message notification ────────────────────────────────────────
 
-test.describe.skip('WebSocket – chat message notification @regression', () => {
+test.describe('WebSocket – chat message notification @regression', () => {
   test('LEAGUE_CHAT_MESSAGE notification is processed without errors', async ({
     page,
   }) => {
