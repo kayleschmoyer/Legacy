@@ -56,6 +56,26 @@ async function dismissPickAnnouncementOverlay(page: Page): Promise<void> {
 }
 
 /**
+ * When "Loading draft board..." appears on a cold-cache navigation, wait up
+ * to 30 s for it to resolve to either the live board or the complete screen.
+ * A genuine post-draft stuck-loading state persists indefinitely; a transient
+ * in-flight one clears within a few seconds once GetLiveDraftLeagueDraft resolves.
+ */
+async function waitThroughTransientLoadingScreen(page: Page): Promise<void> {
+  const loading = page.getByText('Loading draft board...');
+  if (await loading.isVisible()) {
+    await page
+      .getByRole('main', { name: /player draft board/i })
+      .or(page.getByText('Draft Complete!'))
+      .first()
+      .waitFor({ state: 'visible', timeout: 30_000 })
+      .catch(() => {
+        /* still loading after grace period — draft likely complete */
+      });
+  }
+}
+
+/**
  * Navigate to the draft board and wait for the live draft UI to fully appear.
  * Returns when `role=main aria-label="Player draft board"` is visible.
  */
@@ -308,13 +328,13 @@ test.describe
     // Wait for either the live board, the completed state, or the intermediate
     // LoadingScreen — whichever renders first.
     //
-    // The LoadingScreen ("Loading draft board...") appears when GetLeagueById
-    // resolves with draftStatus='completed' before GetLiveDraftLeagueDraft, and
-    // the Lambda returns null for getLeagueDraft on a completed draft. This leaves
-    // the component stuck in LoadingScreen indefinitely. By Phase 6 the Apollo
-    // cache already holds leagueData (populated by Phases 4–5), so an initial-load
-    // LoadingScreen cannot appear here — "Loading draft board..." is a reliable
-    // signal the draft has completed and the board is untestable.
+    // Each test creates a fresh browser context, so the Apollo cache is cold on
+    // every navigation. "Loading draft board..." therefore appears transiently
+    // during initial load while GetLiveDraftLeagueDraft is in-flight — even when
+    // the draft is still live. The stuck-loading state (draft truly complete,
+    // getLeagueDraft returns null) persists indefinitely; a transient one clears
+    // within a few seconds. Give it a grace period to resolve before deciding to
+    // skip so we do not bail out on an in-flight query.
     const draftBoard = page.getByRole('main', { name: /player draft board/i });
     const draftComplete = page.getByText('Draft Complete!');
     const postDraftLoading = page.getByText('Loading draft board...');
@@ -323,6 +343,8 @@ test.describe
       .or(postDraftLoading)
       .first()
       .waitFor({ state: 'visible', timeout: 45_000 });
+
+    await waitThroughTransientLoadingScreen(page);
 
     // If the AI auto-draft completed before this phase, skip gracefully
     if (
@@ -402,7 +424,8 @@ test.describe
 
     // Race: wait for the live draft board, "Draft Complete!", or the intermediate
     // LoadingScreen — whichever appears first. See Phase 6 comment for a full
-    // explanation of the LoadingScreen stuck-state scenario (LS-4394).
+    // explanation of why a fresh browser context makes "Loading draft board..."
+    // a transient state (not necessarily a post-draft stuck state).
     const draftBoard = page.getByRole('main', { name: /player draft board/i });
     const draftComplete = page.getByText('Draft Complete!');
     const postDraftLoading = page.getByText('Loading draft board...');
@@ -411,6 +434,9 @@ test.describe
       .or(postDraftLoading)
       .first()
       .waitFor({ state: 'visible', timeout: 45_000 });
+
+    await waitThroughTransientLoadingScreen(page);
+
     if (
       (await draftComplete.isVisible()) ||
       (await postDraftLoading.isVisible())
@@ -463,7 +489,8 @@ test.describe
     await page.waitForLoadState('domcontentloaded');
     // Race: wait for the live draft board, "Draft Complete!", or the intermediate
     // LoadingScreen — whichever appears first. See Phase 6 comment for a full
-    // explanation of the LoadingScreen stuck-state scenario (LS-4394).
+    // explanation of why a fresh browser context makes "Loading draft board..."
+    // a transient state (not necessarily a post-draft stuck state).
     const watchlistDraftBoard = page.getByRole('main', {
       name: /player draft board/i,
     });
@@ -474,6 +501,9 @@ test.describe
       .or(watchlistPostDraftLoading)
       .first()
       .waitFor({ state: 'visible', timeout: 45_000 });
+
+    await waitThroughTransientLoadingScreen(page);
+
     if (
       (await watchlistDraftComplete.isVisible()) ||
       (await watchlistPostDraftLoading.isVisible())
