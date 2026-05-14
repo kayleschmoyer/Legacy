@@ -219,13 +219,11 @@ builder.queryField('scoreboard', (t) =>
         const provider = await getMlbDataProvider();
         return await provider.getScoreboard(date);
       } catch (err) {
-        LOGGER.error('Scoreboard provider error', {
-          date,
-          error:
-            err instanceof Error
-              ? { message: err.message, stack: err.stack }
-              : String(err),
-        });
+        LOGGER.error(
+          'Scoreboard provider error',
+          err instanceof Error ? err : new Error(String(err)),
+          { date },
+        );
         throw new GraphQLError(
           'Failed to fetch scoreboard data. Please try again.',
           { extensions: { code: 'INTERNAL_SERVER_ERROR' } },

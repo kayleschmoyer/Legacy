@@ -283,10 +283,8 @@ describe('scoreboard resolver', () => {
 
     expect(mockLogger.error).toHaveBeenCalledWith(
       'Scoreboard provider error',
-      expect.objectContaining({
-        date: '2024-07-04',
-        error: expect.objectContaining({ message: 'upstream 429' }),
-      }),
+      providerError,
+      { date: '2024-07-04' },
     );
   });
 
