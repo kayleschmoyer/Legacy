@@ -242,9 +242,12 @@ test.describe('Commissioner — reload vs goto after draft-start navigation (LS-
     await page.waitForLoadState('networkidle');
 
     // page.reload() stays on the draft board — the commissioner badge is not
-    // rendered there, so "Season Active" is never visible
+    // rendered there, so "Season Active" is never visible.
+    // Explicit waitFor ensures Apollo hydration has settled before asserting
+    // absence, avoiding the networkidle-vs-hydration race (LS-4430).
     await page.reload();
     await page.waitForLoadState('networkidle');
+    await page.getByText('Season Active').waitFor({ state: 'hidden' });
     await expect(page.getByText('Season Active')).not.toBeVisible();
   });
 
