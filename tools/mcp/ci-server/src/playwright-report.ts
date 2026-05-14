@@ -184,6 +184,11 @@ export interface PlaywrightTestResult {
   stderr?: Array<{ text?: string; buffer?: string }>;
 }
 
+export interface PlaywrightTestAnnotation {
+  type: string;
+  description?: string;
+}
+
 export interface PlaywrightTest {
   testId?: string;
   title: string;
@@ -191,6 +196,7 @@ export interface PlaywrightTest {
   path?: string[];
   location?: { file?: string; line?: number; column?: number };
   projectName?: string;
+  annotations?: PlaywrightTestAnnotation[];
   results?: PlaywrightTestResult[];
 }
 

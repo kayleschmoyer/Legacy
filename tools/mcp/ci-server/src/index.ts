@@ -351,14 +351,19 @@ export function createServer(): McpServer {
     'ci_get_playwright_report',
     'Read a Playwright E2E test report deployed to legacy-sports-deploys. ' +
       'Returns overall stats (total/passed/failed/skipped/flaky), per-file breakdowns, ' +
-      'and lists of failed/flaky test titles. ' +
-      'Report names follow the pattern "pr-{number}" (for PRs) or "{run_id}" (for push/nightly runs). ' +
+      'lists of failed/flaky test titles, and a skippedTests array with { name, file, reason } ' +
+      'for every skipped test (reason comes from the test annotation description). ' +
+      'Report names follow the pattern "pr-{number}" (for PRs) or "manual-{number}" or "{run_id}" (for push/nightly runs). ' +
       'Example: ci_get_playwright_report({ reportName: "pr-2173" })',
     {
       reportName: z
         .string()
+        .regex(
+          /^[\w.-]+$/,
+          'reportName must contain only alphanumeric characters, hyphens, underscores, and dots — no path separators or special characters allowed',
+        )
         .describe(
-          'Report name as deployed (e.g. "pr-2173" for PR #2173, or the GitHub run ID for push/nightly)',
+          'Report name as deployed: "pr-{number}" for PRs (e.g. "pr-2173"), "manual-{number}" for manually-triggered runs (e.g. "manual-146"), or the numeric GitHub run ID for push/nightly runs.',
         ),
     },
     async (params) => getPlaywrightReport(params),
@@ -376,8 +381,12 @@ export function createServer(): McpServer {
     {
       reportName: z
         .string()
+        .regex(
+          /^[\w.-]+$/,
+          'reportName must contain only alphanumeric characters, hyphens, underscores, and dots — no path separators or special characters allowed',
+        )
         .describe(
-          'Report name as deployed (e.g. "pr-2173" for PR #2173, or the GitHub run ID for push/nightly)',
+          'Report name as deployed: "pr-{number}" for PRs (e.g. "pr-2173"), "manual-{number}" for manually-triggered runs (e.g. "manual-146"), or the numeric GitHub run ID for push/nightly runs.',
         ),
       testTitle: z
         .string()

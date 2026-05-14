@@ -30,6 +30,12 @@ interface FailureDetail {
   snippet: string | null;
 }
 
+interface SkippedTestDetail {
+  name: string;
+  file: string;
+  reason: string | null;
+}
+
 interface ReportResult {
   reportName: string;
   url: string;
@@ -37,6 +43,7 @@ interface ReportResult {
   files: TestFileSummary[];
   failedTests: string[];
   flakyTests: string[];
+  skippedTests: SkippedTestDetail[];
   failureDetails: FailureDetail[];
 }
 
@@ -88,6 +95,7 @@ export async function getPlaywrightReport(params: {
 
   const failedTests: string[] = [];
   const flakyTests: string[] = [];
+  const skippedTests: SkippedTestDetail[] = [];
   const failureDetails: FailureDetail[] = [];
   for (const file of report.files ?? []) {
     for (const test of file.tests ?? []) {
@@ -106,6 +114,15 @@ export async function getPlaywrightReport(params: {
         });
       } else if (test.outcome === 'flaky') {
         flakyTests.push(title);
+      } else if (test.outcome === 'skipped') {
+        const skipAnnotation = test.annotations?.find(
+          (a) => a.type === 'skip' || a.type === 'fixme',
+        );
+        skippedTests.push({
+          name: title,
+          file: file.fileName,
+          reason: skipAnnotation?.description ?? null,
+        });
       }
     }
   }
@@ -124,6 +141,7 @@ export async function getPlaywrightReport(params: {
     files,
     failedTests,
     flakyTests,
+    skippedTests,
     failureDetails,
   };
 
