@@ -411,10 +411,17 @@ export async function getMissingMatchupRecords(
 export async function createMatchupRecord(
   db: PublicDb,
   record: CreateMatchupPlayer,
-): Promise<MatchupPlayer> {
+): Promise<MatchupPlayer | undefined> {
   const [result] = await db
     .insert(Schema.matchupPlayers)
     .values(record)
+    .onConflictDoNothing({
+      target: [
+        Schema.matchupPlayers.matchupId,
+        Schema.matchupPlayers.playerId,
+        Schema.matchupPlayers.teamId,
+      ],
+    })
     .returning();
   return result;
 }
