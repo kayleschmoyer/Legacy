@@ -359,16 +359,48 @@ test.describe
         }),
       );
 
-      // Verify draft board loaded on every page
-      for (const { label, page } of pages) {
-        await expect(page.getByText('LIVE DRAFT').first()).toBeVisible({
-          timeout: 30000,
-        });
-        console.log(`[live-draft] ${label} draft board loaded`);
-      }
+      // Verify draft board loaded on every page IN PARALLEL — the previous
+      // sequential for-loop accumulated up to 4×30s of serial wait, causing
+      // the settle budget to vary wildly across pages depending on CI load.
+      // Parallel checks mirror the pattern used in the reload recovery block.
+      await Promise.all(
+        pages.map(async ({ label, page }) => {
+          await expect(page.getByText('LIVE DRAFT').first()).toBeVisible({
+            timeout: 30000,
+          });
+          console.log(`[live-draft] ${label} draft board loaded`);
+        }),
+      );
 
-      // Give WebSocket connections time to establish on all pages
-      await pages[0].page.waitForTimeout(5000);
+      // Wait for the draft to be in a pick-ready state by polling the backend
+      // directly — replaces the fixed waitForTimeout(5000) that assumed
+      // WebSocket establishment time but raced under nightly CI load.
+      // currentPick being non-null (including 0) confirms the draft engine
+      // has initialised the first pick turn; Apollo polling will find it on
+      // its next cycle without a timing assumption (levers #3 and #9 in
+      // e2e-determinism.md). Callback returns null on error so expect.poll
+      // retries on assertion failure rather than throwing (antipattern #1).
+      await expect
+        .poll(
+          async () => {
+            const data = await gqlFetch<{
+              getLeagueDraft?: { currentPick?: number | null } | null;
+            }>(
+              managerJwt1,
+              `query GetCurrentPickReady($leagueId: Int!) {
+                 getLeagueDraft(leagueId: $leagueId) { currentPick }
+               }`,
+              { leagueId: state.leagueId },
+            ).catch(() => null);
+            return data?.getLeagueDraft?.currentPick ?? null;
+          },
+          {
+            timeout: 30_000,
+            intervals: [500, 1_000, 2_000],
+            message: `Draft did not enter pick-ready state (currentPick non-null) within 30s for league ${state.leagueId}`,
+          },
+        )
+        .not.toBeNull();
     });
 
     await test.step('Make all draft picks (each user picks on their turn)', async () => {
