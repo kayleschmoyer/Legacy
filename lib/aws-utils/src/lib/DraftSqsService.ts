@@ -23,6 +23,8 @@ export interface DraftProcessingResult {
   leagueId: number;
   message: string;
   error?: string;
+  /** Original Error object, preserved so callers can pass the full cause chain to Rollbar. */
+  cause?: Error;
 }
 
 export class DraftSqsService {

@@ -1715,6 +1715,7 @@ async function processDraftMessage(
       leagueId,
       message: 'Draft processing failed',
       error: errorMessage,
+      cause: error instanceof Error ? error : new Error(String(error)),
     };
   }
 }
@@ -1755,7 +1756,10 @@ const baseDraftProcessorHandler = async (
       if (!result.success) {
         LOGGER.error(
           `Draft processing failed for league ${result.leagueId}: ${result.error}`,
-          new Error(`Draft processing failed: ${result.error}`),
+          result.cause ??
+            new Error(
+              `Draft processing failed: ${result.error ?? 'unknown error'}`,
+            ),
           {
             tags: {
               lambda: 'draft-processor',
