@@ -10,6 +10,7 @@ import { and, asc, eq } from 'drizzle-orm';
 import { Draft } from '../types';
 import { builder } from '../../builder';
 import type { Context } from '../../builder';
+import { AuthenticationError } from '../../graphql-errors';
 
 // ── Helpers shared by setDraftOrder / randomizeDraftOrder ────────────────────
 
@@ -76,7 +77,7 @@ builder.mutationField('setDraftOrder', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const { draftId, teamIds } = args;
@@ -252,7 +253,7 @@ builder.mutationField('randomizeDraftOrder', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const { draftId } = args;

@@ -489,7 +489,7 @@ builder.queryField('getDraftTeamOrder', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const { draftId } = args;
@@ -548,7 +548,7 @@ builder.queryField('getMyDraftTeamAutoPick', (t) =>
       "Returns the auto-pick status for the current user's team in the given draft, or null if the user has no team in this draft.",
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const { draftId } = args;
@@ -610,7 +610,7 @@ builder.queryField('getDraftTeamAutoPickStatuses', (t) =>
       'Returns the auto-pick status for every team registered in the given draft.',
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const { draftId } = args;
