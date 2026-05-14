@@ -1007,7 +1007,7 @@ builder.mutationField('deleteLeague', (t) =>
           .limit(1);
 
         if (league.length === 0) {
-          throw new Error('League not found');
+          throw UserInputError('League not found');
         }
 
         // Check if user is the General Manager or admin
@@ -1028,11 +1028,14 @@ builder.mutationField('deleteLeague', (t) =>
 
         return `Successfully deleted league ${args.leagueId} and all associated data`;
       } catch (error) {
-        LOGGER.error('Error deleting league', {
-          leagueId: args.leagueId,
-          userId: context.user?.id,
-          error: error instanceof Error ? error.message : String(error),
-        });
+        if (error instanceof GraphQLError) {
+          throw error;
+        }
+        LOGGER.error(
+          'Error deleting league',
+          error instanceof Error ? error : new Error(String(error)),
+          { leagueId: args.leagueId, userId: context.user?.id },
+        );
         const errorMessage =
           error instanceof Error ? error.message : String(error);
         throw new Error('Failed to delete league: ' + errorMessage);
@@ -1093,10 +1096,14 @@ builder.mutationField('deleteAllLeagues', (t) =>
 
         return `Successfully deleted ${leagueIds.length} league(s) and all associated data`;
       } catch (error) {
-        LOGGER.error('Error deleting leagues', {
-          userId: context.user?.id,
-          error: error instanceof Error ? error.message : String(error),
-        });
+        if (error instanceof GraphQLError) {
+          throw error;
+        }
+        LOGGER.error(
+          'Error deleting leagues',
+          error instanceof Error ? error : new Error(String(error)),
+          { userId: context.user?.id },
+        );
         const errorMessage =
           error instanceof Error ? error.message : String(error);
         throw new Error('Failed to delete leagues: ' + errorMessage);
