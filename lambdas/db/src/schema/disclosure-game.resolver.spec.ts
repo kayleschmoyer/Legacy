@@ -1,17 +1,27 @@
 /**
- * Unit tests for the disclosure-game GraphQL resolvers (LS-3820).
+ * Unit tests for the disclosure-game GraphQL resolvers (LS-3820 / LS-4411).
  *
  * Covers:
  *   - disclosureGameBestScore: unauthenticated throws; returns null and number
  *   - minigamesStats: unauthenticated throws; returns correct aggregate shape;
  *     returns null earliestYear when table is empty
+ *   - startDisclosureGame: GameUnavailableError when no eligible players
+ *   - nextClue: UserInputError for all expected service error messages
+ *   - submitGuess: UserInputError for session-not-found / already-ended
+ *   - giveUpDisclosureGame: UserInputError for session-not-found / already-ended
  */
 
 import type { GraphQLSchema } from 'graphql';
 
 describe('disclosure-game resolvers', () => {
   let schema: GraphQLSchema;
-  let mockDisclosureGameService: { getBestScore: jest.Mock };
+  let mockDisclosureGameService: {
+    getBestScore: jest.Mock;
+    startSession: jest.Mock;
+    nextClue: jest.Mock;
+    submitGuess: jest.Mock;
+    giveUp: jest.Mock;
+  };
   let mockFromBatting: jest.Mock;
   let mockFromPlayers: jest.Mock;
   let mockDb: Record<string, jest.Mock>;
@@ -22,6 +32,26 @@ describe('disclosure-game resolvers', () => {
 
     mockDisclosureGameService = {
       getBestScore: jest.fn().mockResolvedValue(null),
+      startSession: jest
+        .fn()
+        .mockResolvedValue({ sessionId: 1, totalClues: 5 }),
+      nextClue: jest.fn().mockResolvedValue({
+        clueText: 'Test clue',
+        difficultyTier: 'vague',
+        clueIndex: 1,
+        totalClues: 5,
+        isLastClue: false,
+      }),
+      submitGuess: jest.fn().mockResolvedValue({
+        correct: true,
+        score: 80,
+        correctPlayerId: null,
+        cluesUsed: 2,
+      }),
+      giveUp: jest.fn().mockResolvedValue({
+        correctPlayerId: 123,
+        correctPlayerName: 'Babe Ruth',
+      }),
     };
 
     // Each call to select() returns an object whose from() resolves to a row.
@@ -168,6 +198,12 @@ describe('disclosure-game resolvers', () => {
     return field.resolve;
   }
 
+  function getMutation(name: string) {
+    const field = schema.getMutationType()?.getFields()[name];
+    if (!field?.resolve) throw new Error(`${name} resolver not found`);
+    return field.resolve;
+  }
+
   const unauthCtx = { user: null, db: null };
 
   // ── disclosureGameBestScore ───────────────────────────────────────────────
@@ -276,6 +312,159 @@ describe('disclosure-game resolvers', () => {
       expect(result.playerSeasons).toBe(2_000_000);
       expect(typeof result.playersTracked).toBe('number');
       expect(result.playersTracked).toBe(10_000);
+    });
+  });
+
+  // ── startDisclosureGame mutation ──────────────────────────────────────────
+
+  describe('startDisclosureGame mutation', () => {
+    it('throws when unauthenticated', async () => {
+      const resolver = getMutation('startDisclosureGame');
+      await expect(
+        resolver({}, {}, unauthCtx, undefined as never),
+      ).rejects.toThrow('Authentication required');
+    });
+
+    it('throws GameUnavailableError when no eligible players found', async () => {
+      mockDisclosureGameService.startSession.mockRejectedValueOnce(
+        new Error('No eligible players found for this user'),
+      );
+
+      const resolver = getMutation('startDisclosureGame');
+      await expect(
+        resolver({}, {}, mockContext, undefined as never),
+      ).rejects.toMatchObject({ extensions: { code: 'GAME_UNAVAILABLE' } });
+    });
+
+    it('returns sessionId and totalClues on success', async () => {
+      const resolver = getMutation('startDisclosureGame');
+      const result = await resolver({}, {}, mockContext, undefined as never);
+
+      expect(result).toEqual({ sessionId: 1, totalClues: 5 });
+      expect(mockDisclosureGameService.startSession).toHaveBeenCalledWith(42);
+    });
+  });
+
+  // ── nextClue mutation ─────────────────────────────────────────────────────
+
+  describe('nextClue mutation', () => {
+    it('throws when unauthenticated', async () => {
+      const resolver = getMutation('nextClue');
+      await expect(
+        resolver({}, { sessionId: 1 }, unauthCtx, undefined as never),
+      ).rejects.toThrow('Authentication required');
+    });
+
+    it.each([
+      'Session not found',
+      'Session is already won',
+      'Session is already lost',
+      'No more clues available — session ended as lost',
+      'Concurrent nextClue call detected — please retry',
+    ])('throws UserInputError for "%s"', async (message) => {
+      mockDisclosureGameService.nextClue.mockRejectedValueOnce(
+        new Error(message),
+      );
+
+      const resolver = getMutation('nextClue');
+      await expect(
+        resolver({}, { sessionId: 1 }, mockContext, undefined as never),
+      ).rejects.toMatchObject({
+        message,
+        extensions: { code: 'BAD_USER_INPUT' },
+      });
+    });
+
+    it('rethrows unknown errors as-is', async () => {
+      const boom = new Error('unexpected DB failure');
+      mockDisclosureGameService.nextClue.mockRejectedValueOnce(boom);
+
+      const resolver = getMutation('nextClue');
+      await expect(
+        resolver({}, { sessionId: 1 }, mockContext, undefined as never),
+      ).rejects.toThrow('unexpected DB failure');
+    });
+  });
+
+  // ── submitGuess mutation ──────────────────────────────────────────────────
+
+  describe('submitGuess mutation', () => {
+    it('throws when unauthenticated', async () => {
+      const resolver = getMutation('submitGuess');
+      await expect(
+        resolver(
+          {},
+          { sessionId: 1, guessedPlayerId: 99 },
+          unauthCtx,
+          undefined as never,
+        ),
+      ).rejects.toThrow('Authentication required');
+    });
+
+    it.each(['Session not found', 'Session is already won'])(
+      'throws UserInputError for "%s"',
+      async (message) => {
+        mockDisclosureGameService.submitGuess.mockRejectedValueOnce(
+          new Error(message),
+        );
+
+        const resolver = getMutation('submitGuess');
+        await expect(
+          resolver(
+            {},
+            { sessionId: 1, guessedPlayerId: 99 },
+            mockContext,
+            undefined as never,
+          ),
+        ).rejects.toMatchObject({
+          message,
+          extensions: { code: 'BAD_USER_INPUT' },
+        });
+      },
+    );
+  });
+
+  // ── giveUpDisclosureGame mutation ─────────────────────────────────────────
+
+  describe('giveUpDisclosureGame mutation', () => {
+    it('throws when unauthenticated', async () => {
+      const resolver = getMutation('giveUpDisclosureGame');
+      await expect(
+        resolver({}, { sessionId: 1 }, unauthCtx, undefined as never),
+      ).rejects.toThrow('Authentication required');
+    });
+
+    it.each(['Session not found', 'Session is already given_up'])(
+      'throws UserInputError for "%s"',
+      async (message) => {
+        mockDisclosureGameService.giveUp.mockRejectedValueOnce(
+          new Error(message),
+        );
+
+        const resolver = getMutation('giveUpDisclosureGame');
+        await expect(
+          resolver({}, { sessionId: 1 }, mockContext, undefined as never),
+        ).rejects.toMatchObject({
+          message,
+          extensions: { code: 'BAD_USER_INPUT' },
+        });
+      },
+    );
+
+    it('returns correctPlayerId and correctPlayerName on success', async () => {
+      const resolver = getMutation('giveUpDisclosureGame');
+      const result = await resolver(
+        {},
+        { sessionId: 1 },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(result).toEqual({
+        correctPlayerId: 123,
+        correctPlayerName: 'Babe Ruth',
+      });
+      expect(mockDisclosureGameService.giveUp).toHaveBeenCalledWith(1, 42);
     });
   });
 });
