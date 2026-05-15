@@ -48,7 +48,7 @@
     "test": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "echo web-e2e: Playwright tests configured successfully. Run nx e2e web-e2e to execute e2e tests with a running server."
+        "command": "tsx --test apps/web-e2e/src/integration/**/*.test.ts"
       },
       "configurations": {
         "full": {

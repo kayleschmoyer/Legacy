@@ -1,7 +1,12 @@
 import type { FullConfig } from '@playwright/test';
+import { LOGGER } from '@legacy-sports/logging';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import {
+  isTestLeague,
+  isYoungerThanCleanupThreshold,
+} from './test-league-cleanup';
 import { getTestUserJwt, TEST_USERS } from '../utils/test-user-auth';
 
 /**
@@ -77,35 +82,18 @@ async function gqlFetch<T>(
     });
     const json = (await res.json()) as GqlResponse<T>;
     if (json.errors?.length) {
-      console.error(
+      LOGGER.error(
         `[integration teardown] GraphQL error: ${json.errors[0].message}`,
       );
       return undefined;
     }
     return json.data;
   } catch (err) {
-    console.error(
+    LOGGER.error(
       `[integration teardown] Network error: ${err instanceof Error ? err.message : String(err)}`,
     );
     return undefined;
   }
-}
-
-/**
- * Well-known name patterns produced by integration tests.  Any league whose
- * name matches one of these is eligible for cleanup.
- */
-const TEST_LEAGUE_PATTERNS = [
-  'Test League',
-  'Integration Season Test League',
-  // All UI integration tests use "<Label> E2E <timestamp>" naming
-  /\bE2E\b/,
-];
-
-function isTestLeague(name: string): boolean {
-  return TEST_LEAGUE_PATTERNS.some((pattern) =>
-    typeof pattern === 'string' ? name.startsWith(pattern) : pattern.test(name),
-  );
 }
 
 export default async function globalTeardown(
@@ -123,7 +111,7 @@ export default async function globalTeardown(
   // cleanup was the root cause of free-tier league limit failures (LS-1502).
   const jwt = await getAuthJwt();
   if (!jwt) {
-    console.log(
+    LOGGER.info(
       '[integration teardown] No auth token available — skipping league cleanup.',
     );
     return;
@@ -135,19 +123,40 @@ export default async function globalTeardown(
 
   const leagues = data?.userLeagues;
   if (!leagues?.length) {
-    console.log('[integration teardown] No leagues to clean up.');
+    LOGGER.info('[integration teardown] No leagues to clean up.');
     return;
   }
 
-  const targets = leagues.filter((l) => isTestLeague(l.name));
-  if (targets.length === 0) {
-    console.log(
+  const matched = leagues.filter((l) => isTestLeague(l.name));
+  if (matched.length === 0) {
+    LOGGER.info(
       `[integration teardown] ${leagues.length} league(s) found but none matched test patterns — skipping.`,
     );
     return;
   }
 
-  console.log(
+  // Protect leagues created within the last few hours: they may be owned by a
+  // concurrent integration run on another branch (the commissioner test user
+  // is shared). See MIN_LEAGUE_AGE_FOR_CLEANUP_MS for the rationale (LS-4442).
+  const inFlight = matched.filter((l) => isYoungerThanCleanupThreshold(l.name));
+  const targets = matched.filter((l) => !isYoungerThanCleanupThreshold(l.name));
+
+  if (inFlight.length > 0) {
+    LOGGER.info(
+      `[integration teardown] Skipping ${inFlight.length} young league(s) likely in active use by concurrent run(s): ${inFlight
+        .map((l) => l.name)
+        .join(', ')}`,
+    );
+  }
+
+  if (targets.length === 0) {
+    LOGGER.info(
+      `[integration teardown] No stale test leagues to delete — done.`,
+    );
+    return;
+  }
+
+  LOGGER.info(
     `[integration teardown] Deleting ${targets.length} test league(s)...`,
   );
 
@@ -161,13 +170,13 @@ export default async function globalTeardown(
     if (result?.deleteLeague) {
       deleted++;
     } else {
-      console.error(
+      LOGGER.error(
         `[integration teardown] Failed to delete league ${league.id} (${league.name})`,
       );
     }
   }
 
-  console.log(
+  LOGGER.info(
     `[integration teardown] Deleted ${deleted}/${targets.length} test league(s).`,
   );
 }
