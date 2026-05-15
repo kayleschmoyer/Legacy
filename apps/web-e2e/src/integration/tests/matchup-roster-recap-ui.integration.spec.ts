@@ -46,6 +46,7 @@ import path from 'path';
 
 import { test } from '../fixtures/ui';
 import { getTestUserJwt, TEST_USERS } from '../../utils/test-user-auth';
+import { awsRequestContext } from '../helpers/graphql';
 
 // ---------------------------------------------------------------------------
 // Shared state set in beforeAll and consumed by subsequent phases
@@ -138,7 +139,9 @@ async function gqlFetch<T>(
     errors?: Array<{ message: string }>;
   };
   if (json.errors?.length) {
-    throw new Error(`GraphQL error: ${json.errors[0].message}`);
+    throw new Error(
+      `GraphQL error: ${json.errors[0].message}${awsRequestContext(res.headers)}`,
+    );
   }
   if (!json.data) throw new Error('GraphQL response contained no data');
   return json.data;

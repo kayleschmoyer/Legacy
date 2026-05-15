@@ -32,6 +32,7 @@ import {
   waitForJoinPageValidation,
 } from '../helpers/wait-for-join-page';
 import { waitForSeasonActive } from '../helpers/wait-for-season-active';
+import { awsRequestContext } from '../helpers/graphql';
 import { test } from '../fixtures/ui';
 
 // ---------------------------------------------------------------------------
@@ -86,7 +87,9 @@ async function gqlFetch<T>(
     errors?: Array<{ message: string }>;
   };
   if (json.errors?.length) {
-    throw new Error(`GraphQL error: ${json.errors[0].message}`);
+    throw new Error(
+      `GraphQL error: ${json.errors[0].message}${awsRequestContext(res.headers)}`,
+    );
   }
   if (!json.data) throw new Error('GraphQL response contained no data');
   return json.data;

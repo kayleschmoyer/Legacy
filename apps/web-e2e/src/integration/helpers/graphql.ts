@@ -2,7 +2,32 @@ import type { APIRequestContext } from '@playwright/test';
 
 export interface GraphQLResult<T = Record<string, unknown>> {
   data?: T;
-  errors?: Array<{ message: string; path?: string[] }>;
+  errors?: Array<{ message: string; path?: ReadonlyArray<string | number> }>;
+}
+
+/**
+ * Build a suffix describing AWS request-tracing headers from a `fetch` Response
+ * (or any headers-bearing object), suitable for appending to error messages
+ * so test failures can be correlated with CloudWatch logs.
+ *
+ * Returns ` [requestId=... trace=...]` (with a leading space) when either
+ * header is present, or an empty string otherwise — so callers can do:
+ *   throw new Error(`GraphQL error: ${msg}${awsRequestContext(res.headers)}`);
+ *
+ * Accepts either a fetch `Headers` object or a plain header record (e.g. the
+ * output of Playwright's `APIResponse.headers()`); header lookup is
+ * case-insensitive in both cases.
+ */
+export function awsRequestContext(
+  headers: Headers | Record<string, string>,
+): string {
+  const h = headers instanceof Headers ? headers : new Headers(headers);
+  const reqId = h.get('x-amzn-requestid');
+  const traceId = h.get('x-amzn-trace-id');
+  const parts: string[] = [];
+  if (reqId) parts.push(`requestId=${reqId}`);
+  if (traceId) parts.push(`trace=${traceId}`);
+  return parts.length ? ` [${parts.join(' ')}]` : '';
 }
 
 /** Small delay helper for retry back-off. */

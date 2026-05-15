@@ -21,6 +21,7 @@
 import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 import { createLeagueViaUI } from '../helpers/create-league';
+import { awsRequestContext } from '../helpers/graphql';
 import { switchUser, test } from '../fixtures/ui';
 
 // ---------------------------------------------------------------------------
@@ -64,7 +65,9 @@ async function gqlFetch<T>(
     errors?: Array<{ message: string }>;
   };
   if (json.errors?.length) {
-    throw new Error(`GraphQL error: ${json.errors[0].message}`);
+    throw new Error(
+      `GraphQL error: ${json.errors[0].message}${awsRequestContext(res.headers)}`,
+    );
   }
   if (!json.data) throw new Error('GraphQL response contained no data');
   return json.data;

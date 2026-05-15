@@ -1,10 +1,74 @@
 import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
+import { awsRequestContext } from './graphql';
 
 const GQL_URL =
   (
     process.env.INTEGRATION_BASE_URL ?? 'https://api.legacy-fantasy.com/'
   ).replace(/\/?$/, '/') + 'graphql';
+
+interface ValidateInviteCodeResponse {
+  data?: { validateInviteCode: { leagueId: number } | null };
+  errors?: Array<{
+    message: string;
+    path?: ReadonlyArray<string | number>;
+  }>;
+}
+
+/**
+ * Run `validateInviteCode` once and decide what to do next:
+ *   - returns `{ leagueId }` when the backend reports a valid league
+ *   - returns `null` when `data.validateInviteCode` is null and there are no
+ *     `errors[]` (the "Lambda still warming up" case — caller should keep
+ *     polling)
+ *   - throws when the response contains an `errors[]` payload — surfaces the
+ *     first error's message and path plus the AWS request ID, so the failure
+ *     can be correlated with CloudWatch logs instead of collapsing to a
+ *     generic "Received: null" in the test report (LS-4444).
+ */
+async function callValidateInviteCode(
+  jwt: string,
+  inviteCode: string,
+): Promise<{ leagueId: number } | null> {
+  const res = await fetch(GQL_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${jwt}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      query: `query ValidateInviteCodePreflight($code: String!) {
+        validateInviteCode(code: $code) { leagueId }
+      }`,
+      variables: { code: inviteCode },
+    }),
+  });
+
+  // Capture trace headers before parsing so we can still report them if the
+  // response body is malformed.
+  const requestContext = awsRequestContext(res.headers);
+
+  let json: ValidateInviteCodeResponse;
+  try {
+    json = (await res.json()) as ValidateInviteCodeResponse;
+  } catch (err) {
+    throw new Error(
+      `validateInviteCode("${inviteCode}") returned non-JSON response ` +
+        `(HTTP ${res.status})${requestContext}: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+
+  if (json.errors?.length) {
+    const first = json.errors[0];
+    const pathStr = first.path?.length ? ` (path=${first.path.join('.')})` : '';
+    throw new Error(
+      `validateInviteCode("${inviteCode}") returned GraphQL error: ` +
+        `${first.message}${pathStr}${requestContext}`,
+    );
+  }
+
+  return json.data?.validateInviteCode ?? null;
+}
 
 /**
  * Poll `validateInviteCode` with the given JWT until the backend returns a
@@ -16,39 +80,37 @@ const GQL_URL =
  * load Lambda may route each manager's request to a different cold instance,
  * so the preflight must be run per-manager — a single commissioner-JWT
  * warmup is not sufficient.
+ *
+ * GraphQL `errors[]` responses (AuthenticationError, resolver throws, etc.)
+ * fail fast with the actual error message + AWS request ID; only the
+ * `{ data: { validateInviteCode: null } }` "still warming" shape is treated
+ * as a retryable transient (LS-4444 — earlier versions of this helper
+ * collapsed every failure shape into `null`, masking the actual cause).
  */
 export async function validateInviteCodePreflight(
   jwt: string,
   inviteCode: string,
 ): Promise<void> {
-  await expect
-    .poll(
-      async () => {
-        const res = await fetch(GQL_URL, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${jwt}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            query: `query ValidateInviteCodePreflight($code: String!) {
-              validateInviteCode(code: $code) { leagueId }
-            }`,
-            variables: { code: inviteCode },
-          }),
-        });
-        const json = (await res.json()) as {
-          data?: { validateInviteCode: { leagueId: number } | null };
-        };
-        return json?.data?.validateInviteCode?.leagueId ?? null;
-      },
-      {
-        timeout: 30_000,
-        intervals: [500, 1_000, 2_000],
-        message: `validateInviteCode("${inviteCode}") still null after 30s`,
-      },
-    )
-    .not.toBeNull();
+  const deadline = Date.now() + 30_000;
+  const intervals = [500, 1_000, 2_000];
+  let attempt = 0;
+
+  while (Date.now() < deadline) {
+    attempt++;
+    const result = await callValidateInviteCode(jwt, inviteCode);
+    if (result?.leagueId != null) {
+      return;
+    }
+    // result === null with no errors[] — Lambda may still be warming up.
+    const interval = intervals[Math.min(attempt - 1, intervals.length - 1)];
+    await new Promise((resolve) => setTimeout(resolve, interval));
+  }
+
+  throw new Error(
+    `validateInviteCode("${inviteCode}") returned null without errors[] ` +
+      `after ${attempt} attempt(s) over 30s — backend is reachable but ` +
+      `repeatedly returned { data: { validateInviteCode: null } }`,
+  );
 }
 
 /**
