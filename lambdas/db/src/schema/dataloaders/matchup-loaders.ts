@@ -3,7 +3,7 @@
  */
 
 import DataLoader from 'dataloader';
-import { eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, or, sql } from 'drizzle-orm';
 import { type GenericDatabase, PublicSchema } from '@legacy-sports/db-client';
 
 /**
@@ -134,28 +134,45 @@ export const createLeagueWeekPlayerSeasonsLoader = (
       return { leagueId, weekNumber, playerId };
     });
 
-    // Deduplicate (leagueId, weekNumber) pairs and fetch all player seasons in one query
-    const pairKeys = [
-      ...new Set(lookups.map((l) => `${l.leagueId}-${l.weekNumber}`)),
+    // Deduplicate (leagueId, weekNumber) pairs and fetch all player seasons in
+    // a single query. We OR-together per-pair AND clauses rather than using
+    // PostgreSQL's tuple-IN syntax (`(col_a, col_b) IN (VALUES (a, b))`) — that
+    // syntax fails inside node-postgres prepared statements when the VALUES
+    // list contains parameters, because pg can't infer column types from
+    // unanchored bind parameters and rejects the comparison. The OR pattern is
+    // a single round-trip and still lets PostgreSQL use the composite index on
+    // (league_id, week_number).
+    const pairs = [
+      ...new Map(
+        lookups.map((l) => [
+          `${l.leagueId}-${l.weekNumber}`,
+          { leagueId: l.leagueId, weekNumber: l.weekNumber },
+        ]),
+      ).values(),
     ];
-    const valueSql = sql.join(
-      pairKeys.map((k) => {
-        const [lid, wn] = k.split('-').map(Number);
-        return sql`(${lid}, ${wn})`;
-      }),
-      sql`, `,
-    );
-    const allRows = await db
-      .select({
-        leagueId: PublicSchema.leagueWeekPlayerSeasons.leagueId,
-        weekNumber: PublicSchema.leagueWeekPlayerSeasons.weekNumber,
-        playerId: PublicSchema.leagueWeekPlayerSeasons.playerId,
-        season: PublicSchema.leagueWeekPlayerSeasons.season,
-      })
-      .from(PublicSchema.leagueWeekPlayerSeasons)
-      .where(
-        sql`(${PublicSchema.leagueWeekPlayerSeasons.leagueId}, ${PublicSchema.leagueWeekPlayerSeasons.weekNumber}) IN (VALUES ${valueSql})`,
-      );
+    const allRows = pairs.length
+      ? await db
+          .select({
+            leagueId: PublicSchema.leagueWeekPlayerSeasons.leagueId,
+            weekNumber: PublicSchema.leagueWeekPlayerSeasons.weekNumber,
+            playerId: PublicSchema.leagueWeekPlayerSeasons.playerId,
+            season: PublicSchema.leagueWeekPlayerSeasons.season,
+          })
+          .from(PublicSchema.leagueWeekPlayerSeasons)
+          .where(
+            or(
+              ...pairs.map(({ leagueId, weekNumber }) =>
+                and(
+                  eq(PublicSchema.leagueWeekPlayerSeasons.leagueId, leagueId),
+                  eq(
+                    PublicSchema.leagueWeekPlayerSeasons.weekNumber,
+                    weekNumber,
+                  ),
+                ),
+              ),
+            ),
+          )
+      : [];
 
     const seasonMap = new Map<string, number>();
     for (const row of allRows) {

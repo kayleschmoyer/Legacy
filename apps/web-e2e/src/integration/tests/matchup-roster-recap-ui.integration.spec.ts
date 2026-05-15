@@ -8,11 +8,22 @@
  * Strategy:
  *   A beforeAll phase queries the live API (using the admin JWT from the CLI
  *   auth store) to discover:
- *     - Any matchup the admin is a member of → used for roster comparison
+ *     - A matchup with bench players → used for roster comparison + bench toggle
  *     - A completed matchup with a narrative recap → used for recap panel
+ *   When a single matchup is both completed-with-recap and has bench players,
+ *   it is reused so all 5 phases hit the same matchup. The discovery loop
+ *   iterates every league and every recent matchup until eligible data is
+ *   found — and asserts non-empty results so the suite fails loudly if the
+ *   live env has no usable data, instead of silently skipping phases. The
+ *   0/0/0 stability initiative (LS-4401) treats skips as failures, so any
+ *   conditional skip in this spec would defeat its purpose.
  *
- *   Each phase skips gracefully if no suitable data is found, so the suite
- *   degrades cleanly in a fresh environment.
+ *   Cross-user phases (4, 5) use the `managerPage1` browser-context fixture
+ *   rather than `switchUser`. switchUser races against the background JWT
+ *   refresh (LS-3672, LS-3705, LS-4385); managerPage1 boots a dedicated
+ *   context with the manager's cookies and localStorage already in place.
+ *   getMatchupById does not enforce league membership, so the manager can
+ *   view the commissioner's matchup by URL even without joining the league.
  *
  * Covers:
  *   - MatchupRosterComparison: BATTERS/PITCHERS section headers, column headers
@@ -33,7 +44,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
-import { switchUser, test } from '../fixtures/ui';
+import { test } from '../fixtures/ui';
 import { getTestUserJwt, TEST_USERS } from '../../utils/test-user-auth';
 
 // ---------------------------------------------------------------------------
@@ -63,8 +74,9 @@ interface CliAuthData {
 }
 
 /**
- * Returns the admin JWT without throwing.  Returns '' when no valid token
- * is present so individual tests can use test.skip() instead of crashing.
+ * Resolve the admin JWT for live-API discovery. Returns '' only when every
+ * resolution path is unavailable; beforeAll asserts the result is truthy so
+ * the suite fails loudly (rather than skipping) when no credentials exist.
  *
  * Resolution order (mirrors ui.ts fixture and global-setup.ts):
  *   1. INTEGRATION_JWT env var
@@ -218,78 +230,67 @@ test.describe
     };
 
     const jwt = await tryGetAuthJwt();
-    if (!jwt) return; // tests will skip individually
+    expect(jwt, 'Resolved a JWT for matchup discovery').toBeTruthy();
 
     // Get all leagues the admin belongs to
-    let leagues: Array<{
-      id: number;
-      name: string;
-      currentMatchup?: number | null;
-    }> = [];
-    try {
-      const data = await gqlFetch<{
-        userLeagues: Array<{
-          id: number;
-          name: string;
-          currentMatchup?: number | null;
-        }>;
-      }>(jwt, GET_USER_LEAGUES);
-      leagues = data.userLeagues ?? [];
-    } catch {
-      return;
-    }
+    const userLeaguesData = await gqlFetch<{
+      userLeagues: Array<{
+        id: number;
+        name: string;
+        currentMatchup?: number | null;
+      }>;
+    }>(jwt, GET_USER_LEAGUES);
+    const leagues = userLeaguesData.userLeagues ?? [];
+    expect(
+      leagues.length,
+      'Live env has at least one league for the test commissioner',
+    ).toBeGreaterThan(0);
 
-    // ── Find a league with any matchup (for roster comparison) ──────────
-    for (const league of leagues) {
-      if (state.rosterMatchupId !== 0) break;
+    async function matchupHasBench(matchupId: number): Promise<boolean> {
       try {
-        const data = await gqlFetch<{
-          getMatchupsForLeague: Array<{
-            id: number;
-            weekNumber: number;
-            leagueId: number;
-            team1Id: number;
-            team2Id: number;
-            status: string;
-          }>;
-        }>(jwt, GET_MATCHUPS_FOR_LEAGUE, { leagueId: league.id });
-
-        const matchups = data.getMatchupsForLeague ?? [];
-        if (matchups.length === 0) continue;
-
-        // Prefer the league's current matchup (most likely to have players)
-        const chosen =
-          (league.currentMatchup
-            ? matchups.find((m) => m.id === league.currentMatchup)
-            : null) ?? matchups[0];
-
-        state.rosterLeagueId = league.id;
-        state.rosterMatchupId = chosen.id;
-
-        // Check whether the chosen matchup has bench players (positionId === null)
-        // so Phase 2 can skip gracefully if none are present.
-        try {
-          const playersData = await gqlFetch<{
-            getMatchupPlayers: Array<{ id: number; positionId: number | null }>;
-          }>(jwt, GET_MATCHUP_PLAYERS, { matchupId: chosen.id });
-          state.hasBenchPlayers = (playersData.getMatchupPlayers ?? []).some(
-            (p) => p.positionId === null,
-          );
-        } catch {
-          /* treat as no bench players if the query fails */
-        }
+        const playersData = await gqlFetch<{
+          getMatchupPlayers: Array<{ id: number; positionId: number | null }>;
+        }>(jwt, GET_MATCHUP_PLAYERS, { matchupId });
+        return (playersData.getMatchupPlayers ?? []).some(
+          (p) => p.positionId === null,
+        );
       } catch {
-        /* skip inaccessible leagues */
+        return false;
       }
     }
 
-    // ── Find a completed matchup that has a narrative recap ──────────────
-    for (const league of leagues) {
-      if (state.recapMatchupId !== 0) break;
+    async function matchupHasRecap(matchupId: number): Promise<boolean> {
+      try {
+        const recapData = await gqlFetch<{
+          getMatchupById: {
+            id: number;
+            status: string;
+            recap: { headline: string } | null;
+          };
+        }>(jwt, GET_MATCHUP_RECAP, { id: matchupId });
+        return Boolean(recapData.getMatchupById?.recap?.headline);
+      } catch {
+        return false;
+      }
+    }
+
+    // ── Prefer one matchup that satisfies BOTH preconditions ─────────────
+    // Iterate every league's recent completed history and look for a matchup
+    // that has bench players AND a narrative recap. If we find one, use it
+    // for all 5 phases — the recap-only and roster-only paths still work
+    // because a single completed matchup covers both.
+    // Matchup.id is GraphQL ID (serialized as a string), so the spec coerces
+    // to Number before passing to Int! query args or storing in state.
+    outer: for (const league of leagues) {
+      let completed: Array<{
+        id: string;
+        leagueId: number;
+        status: string;
+      }> = [];
       try {
         const histData = await gqlFetch<{
           getMatchupHistory: Array<{
-            id: number;
+            id: string;
             leagueId: number;
             status: string;
           }>;
@@ -298,32 +299,86 @@ test.describe
           status: 'completed',
           limit: 10,
         });
-
-        const completed = histData.getMatchupHistory ?? [];
-
-        for (const m of completed) {
-          try {
-            const recapData = await gqlFetch<{
-              getMatchupById: {
-                id: number;
-                status: string;
-                recap: { headline: string } | null;
-              };
-            }>(jwt, GET_MATCHUP_RECAP, { id: m.id });
-
-            if (recapData.getMatchupById?.recap?.headline) {
-              state.recapLeagueId = league.id;
-              state.recapMatchupId = m.id;
-              break;
-            }
-          } catch {
-            /* this matchup has no recap */
-          }
-        }
+        completed = histData.getMatchupHistory ?? [];
       } catch {
-        /* skip inaccessible leagues */
+        continue;
+      }
+
+      for (const m of completed) {
+        const matchupId = Number(m.id);
+        if (!(await matchupHasRecap(matchupId))) continue;
+        const hasBench = await matchupHasBench(matchupId);
+        // Always remember the first recap match in case nothing has bench
+        if (state.recapMatchupId === 0) {
+          state.recapLeagueId = league.id;
+          state.recapMatchupId = matchupId;
+        }
+        if (hasBench) {
+          state.rosterLeagueId = league.id;
+          state.rosterMatchupId = matchupId;
+          state.hasBenchPlayers = true;
+          break outer;
+        }
       }
     }
+
+    // ── Fallback: find any matchup with bench players for the roster phases
+    // when no completed-with-recap matchup also has bench (e.g. all completed
+    // matchups have empty rosters because games were never selected).
+    if (state.rosterMatchupId === 0) {
+      for (const league of leagues) {
+        let matchups: Array<{ id: string; weekNumber: number }> = [];
+        try {
+          const data = await gqlFetch<{
+            getMatchupsForLeague: Array<{
+              id: string;
+              weekNumber: number;
+              leagueId: number;
+              team1Id: number;
+              team2Id: number;
+              status: string;
+            }>;
+          }>(jwt, GET_MATCHUPS_FOR_LEAGUE, { leagueId: league.id });
+          matchups = data.getMatchupsForLeague ?? [];
+        } catch {
+          continue;
+        }
+
+        // Prefer the league's current matchup first (compare as numbers since
+        // currentMatchup is Int while m.id is ID).
+        const currentMatchupNum = league.currentMatchup;
+        const ordered = currentMatchupNum
+          ? [
+              ...matchups.filter((m) => Number(m.id) === currentMatchupNum),
+              ...matchups.filter((m) => Number(m.id) !== currentMatchupNum),
+            ]
+          : matchups;
+
+        for (const m of ordered) {
+          const matchupId = Number(m.id);
+          if (await matchupHasBench(matchupId)) {
+            state.rosterLeagueId = league.id;
+            state.rosterMatchupId = matchupId;
+            state.hasBenchPlayers = true;
+            break;
+          }
+        }
+        if (state.rosterMatchupId !== 0) break;
+      }
+    }
+
+    expect(
+      state.rosterMatchupId,
+      'Discovered a matchup with bench players for roster-comparison phases',
+    ).toBeGreaterThan(0);
+    expect(
+      state.hasBenchPlayers,
+      'Discovered matchup has at least one bench player (positionId === null)',
+    ).toBe(true);
+    expect(
+      state.recapMatchupId,
+      'Discovered a completed matchup with a narrative recap',
+    ).toBeGreaterThan(0);
   });
 
   // -----------------------------------------------------------------------
@@ -334,14 +389,6 @@ test.describe
     commissionerPage: page,
   }) => {
     test.setTimeout(60_000);
-
-    if (state.rosterMatchupId === 0 || state.rosterLeagueId === 0) {
-      test.skip(
-        true,
-        'No matchup found in admin leagues — roster comparison test skipped',
-      );
-      return;
-    }
 
     const matchupUrl = `/baseball/league/${state.rosterLeagueId}/matchups/${state.rosterMatchupId}`;
 
@@ -400,19 +447,6 @@ test.describe
   }) => {
     test.setTimeout(60_000);
 
-    if (state.rosterMatchupId === 0 || state.rosterLeagueId === 0) {
-      test.skip(true, 'No matchup found — bench toggle test skipped');
-      return;
-    }
-
-    if (!state.hasBenchPlayers) {
-      test.skip(
-        true,
-        'Selected matchup has no bench players (positionId === null) — bench toggle test skipped',
-      );
-      return;
-    }
-
     const matchupUrl = `/baseball/league/${state.rosterLeagueId}/matchups/${state.rosterMatchupId}`;
 
     await test.step('Navigate and wait for roster comparison to load', async () => {
@@ -454,14 +488,6 @@ test.describe
     commissionerPage: page,
   }) => {
     test.setTimeout(60_000);
-
-    if (state.recapMatchupId === 0 || state.recapLeagueId === 0) {
-      test.skip(
-        true,
-        'No completed matchup with a recap found — recap panel test skipped',
-      );
-      return;
-    }
 
     const matchupUrl = `/baseball/league/${state.recapLeagueId}/matchups/${state.recapMatchupId}`;
 
@@ -517,21 +543,21 @@ test.describe
   // -----------------------------------------------------------------------
 
   test('Phase 4: Manager identity can view the same roster comparison', async ({
-    commissionerPage: page,
-    commissionerJwt,
-    managerJwt1,
+    managerPage1: page,
   }) => {
     test.setTimeout(60_000);
 
-    if (state.rosterMatchupId === 0 || state.rosterLeagueId === 0) {
-      test.skip(true, 'No matchup found — cross-user visibility test skipped');
-      return;
-    }
-
+    // Use a dedicated manager browser context rather than switchUser on
+    // commissionerPage. switchUser races against the background JWT refresh
+    // (LS-3672, LS-3705, LS-4385): AUTH_LOGOUT can clear localStorage *after*
+    // page.evaluate() sets the manager profile, landing the subsequent
+    // page.reload() on the login screen. getMatchupById does not check league
+    // membership, so manager 1 can view the commissioner's matchup by URL.
     const matchupUrl = `/baseball/league/${state.rosterLeagueId}/matchups/${state.rosterMatchupId}`;
 
-    await test.step('Switch to manager 1 identity and navigate to matchup', async () => {
-      await switchUser(page, managerJwt1, matchupUrl);
+    await test.step('Navigate to the commissioner matchup as manager 1', async () => {
+      await page.goto(matchupUrl);
+      await page.waitForLoadState('load');
     });
 
     await test.step('Roster comparison is visible to the manager', async () => {
@@ -545,10 +571,6 @@ test.describe
       await expect(page.getByText('BATTERS').first()).toBeVisible();
       await expect(page.getByText('PITCHERS').first()).toBeVisible();
     });
-
-    await test.step('Restore commissioner identity', async () => {
-      await switchUser(page, commissionerJwt);
-    });
   });
 
   // -----------------------------------------------------------------------
@@ -556,24 +578,15 @@ test.describe
   // -----------------------------------------------------------------------
 
   test('Phase 5: Manager identity can view the recap panel', async ({
-    commissionerPage: page,
-    commissionerJwt,
-    managerJwt1,
+    managerPage1: page,
   }) => {
     test.setTimeout(60_000);
 
-    if (state.recapMatchupId === 0 || state.recapLeagueId === 0) {
-      test.skip(
-        true,
-        'No completed matchup with recap — manager recap visibility test skipped',
-      );
-      return;
-    }
-
     const matchupUrl = `/baseball/league/${state.recapLeagueId}/matchups/${state.recapMatchupId}`;
 
-    await test.step('Switch to manager 1 identity', async () => {
-      await switchUser(page, managerJwt1, matchupUrl);
+    await test.step('Navigate to the completed matchup as manager 1', async () => {
+      await page.goto(matchupUrl);
+      await page.waitForLoadState('load');
     });
 
     await test.step('Recap panel is visible to the manager', async () => {
@@ -584,10 +597,6 @@ test.describe
       await expect(page.getByText('MATCHUP RECAP').first()).toBeVisible({
         timeout: 20_000,
       });
-    });
-
-    await test.step('Restore commissioner identity', async () => {
-      await switchUser(page, commissionerJwt);
     });
   });
 });
