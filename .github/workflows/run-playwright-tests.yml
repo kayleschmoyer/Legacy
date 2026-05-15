@@ -283,43 +283,67 @@ jobs:
           BROWSER_ENGINE: ${{ steps.playwright-config.outputs.browser-engine }}
         run: |
           # The self-hosted runner AMI bakes Playwright browsers at
-          # /opt/playwright-browsers (see LS-2429). PLAYWRIGHT_BROWSERS_PATH is
-          # set globally on the AMI to point there, so we do nothing at runtime
-          # beyond verifying the expected revision is present. Dropping the
-          # runtime `playwright install --with-deps` eliminates the dpkg-lock
-          # race against unattended-upgrades that was the steady-state cause of
-          # CI flake (LS-4451).
+          # /opt/playwright-browsers (see LS-2429). We explicitly set
+          # PLAYWRIGHT_BROWSERS_PATH for the rest of the job — the AMI does
+          # NOT set it globally, contrary to what LS-4451's first cut assumed,
+          # and without it Playwright falls back to ~/.cache/ms-playwright
+          # (empty on the runner) and fails to launch (LS-4465).
           #
-          # The expected revision is read from playwright-core/browsers.json so
-          # this step acts as a tripwire: when the project's Playwright pin is
-          # bumped to a version that wants a newer browser revision, this step
-          # fails with an actionable message before tests run, and the fix is
-          # to rebake the AMI via the Packer pipeline (LS-2429) — not to
-          # re-introduce a runtime install.
+          # Dropping the runtime `playwright install --with-deps` (LS-4451)
+          # eliminates the dpkg-lock race against unattended-upgrades that was
+          # the steady-state cause of CI flake.
+          #
+          # Expected revisions come from playwright-core/browsers.json so this
+          # step is a tripwire: when the project's Playwright pin is bumped to
+          # a version that wants newer browser revisions, this step fails with
+          # an actionable message before tests run. The fix is to rebake the
+          # AMI via the Packer pipeline (LS-2429), not to re-introduce a
+          # runtime install.
+          echo "PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers" >> "$GITHUB_ENV"
+          # We need to verify both the full chromium build and the headless
+          # shell, because Playwright tests run headless by default and launch
+          # `chrome-headless-shell` (a separate browsers.json entry +
+          # /opt/playwright-browsers/chromium_headless_shell-<rev> directory).
+          # Hyphens in browsers.json names map to underscores in directory
+          # names (`chromium-headless-shell` -> `chromium_headless_shell`).
           # `playwright-core`'s package exports do not expose ./browsers.json,
           # so resolve it via the package.json path instead of a direct require.
-          REVISION=$(node -e "
-            const path = require('path');
-            const fs = require('fs');
-            const pkg = require.resolve('playwright-core/package.json');
-            const file = path.join(path.dirname(pkg), 'browsers.json');
-            const data = JSON.parse(fs.readFileSync(file, 'utf8'));
-            const name = process.argv[1];
-            const b = data.browsers.find((x) => x.name === name);
-            if (!b) {
-              console.error('No browsers.json entry for ' + name);
-              process.exit(1);
-            }
-            process.stdout.write(String(b.revision));
-          " "$BROWSER_ENGINE")
-          EXPECTED="/opt/playwright-browsers/${BROWSER_ENGINE}-${REVISION}"
-          echo "    Expected AMI-baked browser: $EXPECTED"
-          if [ ! -d "$EXPECTED" ]; then
-            echo "::error::AMI-baked Playwright browser missing: $EXPECTED"
+          if [ "$BROWSER_ENGINE" = "chromium" ]; then
+            NAMES="chromium chromium-headless-shell"
+          else
+            NAMES="$BROWSER_ENGINE"
+          fi
+          MISSING=""
+          for NAME in $NAMES; do
+            REVISION=$(node -e "
+              const path = require('path');
+              const fs = require('fs');
+              const pkg = require.resolve('playwright-core/package.json');
+              const file = path.join(path.dirname(pkg), 'browsers.json');
+              const data = JSON.parse(fs.readFileSync(file, 'utf8'));
+              const name = process.argv[1];
+              const b = data.browsers.find((x) => x.name === name);
+              if (!b) {
+                console.error('No browsers.json entry for ' + name);
+                process.exit(1);
+              }
+              process.stdout.write(String(b.revision));
+            " "$NAME")
+            DIR_NAME="${NAME//-/_}"
+            EXPECTED="/opt/playwright-browsers/${DIR_NAME}-${REVISION}"
+            echo "    Expected AMI-baked browser: $EXPECTED"
+            if [ ! -d "$EXPECTED" ]; then
+              echo "::error::AMI-baked Playwright browser missing: $EXPECTED"
+              MISSING="$MISSING $EXPECTED"
+            else
+              echo "    OK: $EXPECTED is present."
+            fi
+          done
+          if [ -n "$MISSING" ]; then
             echo ""
-            echo "The runner AMI does not have ${BROWSER_ENGINE}-${REVISION} baked."
+            echo "The runner AMI is missing one or more required browsers:$MISSING"
             echo "This usually means the project's Playwright pin was bumped to a"
-            echo "version that wants a newer browser revision than the AMI provides."
+            echo "version that wants newer browser revisions than the AMI provides."
             echo ""
             echo "Fix: rebake the AMI via the Packer pipeline (see LS-2429 for the"
             echo "bake procedure). Do NOT re-add a runtime 'playwright install' here"
@@ -334,7 +358,7 @@ jobs:
             fi
             exit 1
           fi
-          echo "    OK: $EXPECTED is present."
+          echo "    All required AMI-baked browsers present."
 
       # Save runs immediately after install (independent of test outcome)
       # so a failing test step doesn't skip the save. Gated to main so
