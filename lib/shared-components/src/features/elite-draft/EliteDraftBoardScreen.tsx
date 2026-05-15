@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import { CSS } from './styles';
 import { DraftCompleteView } from './DraftCompleteView';
 import { DraftPlayerBoard } from './DraftPlayerBoard';
@@ -74,6 +74,20 @@ export function EliteDraftBoardScreen({
     queries.currentPickTeamId === queries.myTeamId &&
     !queries.currentPickInfo.isComplete,
   );
+
+  // LS-4449: when it becomes the user's turn while another manager's pick
+  // announcement is still on screen, dismiss it immediately so the next
+  // drafter never has to wait for a 3.6s celebration overlay (the
+  // position:fixed z-index:9999 backdrop covers the player grid and
+  // prevents both real-user clicks and Playwright force-clicks on the
+  // Draft Now button). Announcements for the user's own pick (announcement.
+  // isMyPick=true) are left alone so the picker still sees their result.
+  const { announcement: currentAnnouncement, dismissAnnouncement } = ui;
+  useEffect(() => {
+    if (isMyPick && currentAnnouncement && !currentAnnouncement.isMyPick) {
+      dismissAnnouncement();
+    }
+  }, [isMyPick, currentAnnouncement, dismissAnnouncement]);
 
   const playerData = usePlayerData({
     availablePlayers: queries.availablePlayers,

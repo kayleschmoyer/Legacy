@@ -1015,6 +1015,11 @@ export const CSS = `
 }
 .d-announce-overlay.leaving {
   animation: announceOut 0.4s ease-in forwards;
+  /* LS-4449: stop intercepting clicks during the fade-out so the underlying
+     player grid / Draft Now button is interactive the instant dismissal
+     starts. Without this, the overlay still blocks pointer events for the
+     full 0.4s leave animation. */
+  pointer-events: none;
 }
 .d-announce {
   position: relative; width: 440px; max-width: 92vw;
