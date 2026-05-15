@@ -37,6 +37,17 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
 const ENV_LOCAL_PATH = path.join(REPO_ROOT, '.env.local');
 
+// Local LOGGER stub. The project rule (AGENTS.md) is to use LOGGER from
+// @legacy-sports/logging, but this is a standalone `.mjs` script run via
+// `node scripts/mcp-auth.mjs` ahead of any TS build/codegen — it cannot
+// import workspace packages. This stub mirrors the LOGGER.{info,error,warn}
+// interface so new diagnostics in this file stay consistent with that rule.
+const LOGGER = {
+  info: (...args) => process.stdout.write(args.join(' ') + '\n'),
+  error: (...args) => process.stderr.write(args.join(' ') + '\n'),
+  warn: (...args) => process.stderr.write(args.join(' ') + '\n'),
+};
+
 // ── CLI flags ─────────────────────────────────────────────────────────────────
 
 const args = process.argv.slice(2);
@@ -426,10 +437,22 @@ async function main() {
   if (tokenData) {
     const idToken = tokenData['idToken'];
     if (!idToken) {
-      console.error(
-        'No idToken in response. Ensure the "openid" scope is supported by your IAM Identity Center instance.',
+      LOGGER.error('ERROR: SSO token response did not include an idToken.');
+      LOGGER.error(
+        '  Root cause: the IAM Identity Center application is missing the "openid" scope.',
       );
-      console.error('Got keys:', Object.keys(tokenData).join(', '));
+      LOGGER.error(
+        '  Fix: in terraform/main (mcp_oidc_* / IAM Identity Center customer-managed app),',
+      );
+      LOGGER.error(
+        '       ensure the OIDC client is registered with scopes including "openid",',
+      );
+      LOGGER.error(
+        '       then re-run terraform apply and re-run this script with --setup.',
+      );
+      LOGGER.error(
+        `  (response keys present: ${Object.keys(tokenData).join(', ') || '<none>'})`,
+      );
       process.exit(1);
     }
 
@@ -490,7 +513,51 @@ async function main() {
     );
   }
 
+  // ── Step 4: post-write self-check ─────────────────────────────────────────
+  // Re-read .env.local from disk to confirm every required MCP var was actually
+  // written. Catches silent failures (e.g. SSM lookup returned null and only
+  // emitted a console.warn) so the caller sees a non-zero exit instead of
+  // believing the script succeeded.
+  const REQUIRED_VARS = [
+    'MCP_AUTH_TOKEN',
+    'MCP_JIRA_URL',
+    'MCP_GITHUB_URL',
+    'MCP_CI_URL',
+  ];
+  const finalEnv = readEnvLocal();
+  const missing = REQUIRED_VARS.filter((k) => !finalEnv[k]);
+
+  if (missing.length > 0) {
+    printDivider();
+    LOGGER.error(
+      `ERROR: .env.local is missing required MCP var(s) after auth: ${missing.join(', ')}`,
+    );
+    LOGGER.error(
+      '  The jira / github / ci MCP servers will fail to connect until these are set.',
+    );
+    if (missing.some((k) => k.endsWith('_URL'))) {
+      LOGGER.error(
+        `  For MCP_*_URL: verify terraform/main has been applied for env "${tfEnv}"`,
+      );
+      LOGGER.error(
+        '  and that the SSM parameters /legacy-sports-<env>/mcp/<name>/api-url exist.',
+      );
+      LOGGER.error(
+        `  Try: aws ssm get-parameter --name /legacy-sports-${tfEnv}/mcp/jira/api-url`,
+      );
+    }
+    if (missing.includes('MCP_AUTH_TOKEN')) {
+      LOGGER.error(
+        '  For MCP_AUTH_TOKEN: re-run with --force to redo the device-auth flow.',
+      );
+    }
+    process.exit(1);
+  }
+
   printDivider();
+  LOGGER.info(
+    `.env.local has MCP_AUTH_TOKEN + MCP_JIRA_URL + MCP_GITHUB_URL + MCP_CI_URL.`,
+  );
   console.log('Done. Restart Claude Code for the new tokens to take effect.');
 }
 
