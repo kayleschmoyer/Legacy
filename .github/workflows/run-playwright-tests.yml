@@ -256,26 +256,8 @@ jobs:
               *) BROWSER_ENGINE="$BROWSER" ;;
             esac
           fi
-          # Pinned via @playwright/test in devDependencies. Used as the cache key
-          # so a version bump invalidates the cache automatically.
-          VERSION=$(node -pe "require('./package.json').devDependencies['@playwright/test']")
           echo "browser-engine=$BROWSER_ENGINE" >> "$GITHUB_OUTPUT"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "Playwright $VERSION / browser engine: $BROWSER_ENGINE"
-
-      # Restore on every run; only save on pushes to main (here, the nightly
-      # schedule, which runs against main). PR/manual-dispatch runs read main's
-      # cache via the default-branch fallback but never write a PR-scoped copy
-      # that would crowd out the main entry under the 10 GB cache cap. See
-      # LS-4186.
-      - name: "Restore Playwright browsers"
-        id: playwright-cache
-        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ steps.playwright-config.outputs.version }}-${{ steps.playwright-config.outputs.browser-engine }}
-          restore-keys: |
-            ${{ runner.os }}-${{ runner.arch }}-playwright-${{ steps.playwright-config.outputs.version }}-
+          echo "Browser engine: $BROWSER_ENGINE"
 
       - name: "Verify AMI-baked Playwright browsers"
         shell: bash
@@ -359,19 +341,6 @@ jobs:
             exit 1
           fi
           echo "    All required AMI-baked browsers present."
-
-      # Save runs immediately after install (independent of test outcome)
-      # so a failing test step doesn't skip the save. Gated to main so
-      # PR/manual-dispatch runs from feature branches don't write
-      # ref-scoped duplicates. See LS-4186.
-      - name: "Save Playwright browsers"
-        if: |
-          github.ref == 'refs/heads/main'
-          && steps.playwright-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ steps.playwright-cache.outputs.cache-primary-key }}
 
       # =======================================================================
       # E2E suite: build web app and start a local server
