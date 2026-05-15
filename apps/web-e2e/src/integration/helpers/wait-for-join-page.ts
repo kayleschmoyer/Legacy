@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { Page, Response } from '@playwright/test';
 import { expect } from '@playwright/test';
 import { awsRequestContext } from './graphql';
 
@@ -227,7 +227,24 @@ interface JoinLeagueByCodeResponse {
   errors?: Array<{
     message: string;
     path?: ReadonlyArray<string | number>;
+    extensions?: { code?: string };
   }>;
+}
+
+/**
+ * `extensions.code` set by the server's `AuthenticationError` helper when the
+ * JWT cookie is missing, expired, or fails CSRF double-submit validation.
+ * Apollo's `errorLink` (apps/web/src/lib/apollo-client.ts) recognises this
+ * code, calls `silentlyRefreshJwt()`, and re-runs the operation — so a single
+ * UNAUTHENTICATED response is a transient race, not a definitive failure.
+ */
+const UNAUTHENTICATED_CODE = 'UNAUTHENTICATED';
+
+function isUnauthenticatedResponse(json: JoinLeagueByCodeResponse): boolean {
+  return (
+    json.errors?.some((e) => e.extensions?.code === UNAUTHENTICATED_CODE) ??
+    false
+  );
 }
 
 export interface JoinLeagueAsManagerOptions {
@@ -306,31 +323,83 @@ export async function joinLeagueAsManager(
   const joinBtn = page.getByRole('button', { name: /Join League/i });
   await expect(joinBtn).toBeEnabled({ timeout: 5_000 });
 
-  // Register the response listener BEFORE clicking — Playwright's
-  // waitForResponse only catches responses that arrive after the call, so a
-  // very fast mutation could otherwise be missed. Apollo posts every GraphQL
-  // operation to `/graphql?ref=<OperationName>` (see apps/web/src/lib/
-  // apollo-client.ts), so the operation name is in the URL.
-  const joinResponsePromise = page.waitForResponse(
-    (res) => /\/graphql\?(?:.*&)?ref=JoinLeagueByCode(?:&|$)/.test(res.url()),
-    { timeout: joinResponseTimeoutMs },
-  );
+  // Capture every JoinLeagueByCode response — including any Apollo silent
+  // retries — so the helper can ignore transient UNAUTHENTICATED responses
+  // and return the FINAL outcome. Apollo's `errorLink` calls
+  // `silentlyRefreshJwt()` and re-runs the operation on UNAUTHENTICATED, so
+  // the first response is not necessarily definitive (LS-4448). The listener
+  // must be attached BEFORE the click; `page.waitForResponse` only catches
+  // responses that arrive after its call, which races a very fast retry.
+  // Apollo posts every GraphQL operation to `/graphql?ref=<OperationName>`
+  // (see apps/web/src/lib/apollo-client.ts), so the operation name is in
+  // the URL.
+  const operationMatcher = /\/graphql\?(?:.*&)?ref=JoinLeagueByCode(?:&|$)/;
+  const observedResponses: Response[] = [];
+  const responseListener = (res: Response): void => {
+    if (operationMatcher.test(res.url())) {
+      observedResponses.push(res);
+    }
+  };
+  page.on('response', responseListener);
 
-  await joinBtn.click();
+  const chosen = await (async (): Promise<{
+    response: Response;
+    json: JoinLeagueByCodeResponse;
+  }> => {
+    try {
+      await joinBtn.click();
 
-  const response = await joinResponsePromise;
+      const deadline = Date.now() + joinResponseTimeoutMs;
+      let processed = 0;
+      let lastUnauth: {
+        response: Response;
+        json: JoinLeagueByCodeResponse;
+      } | null = null;
+
+      while (Date.now() < deadline) {
+        while (processed < observedResponses.length) {
+          const res = observedResponses[processed];
+          processed++;
+          let parsed: JoinLeagueByCodeResponse;
+          try {
+            parsed = (await res.json()) as JoinLeagueByCodeResponse;
+          } catch (err) {
+            throw new Error(
+              `joinLeagueByCode("${inviteCode}", "${teamName}") returned ` +
+                `non-JSON response (HTTP ${res.status()})` +
+                `${awsRequestContext(res.headers())}: ` +
+                `${err instanceof Error ? err.message : String(err)}`,
+            );
+          }
+          if (isUnauthenticatedResponse(parsed)) {
+            // Apollo will silently refresh the JWT and retry — keep waiting.
+            lastUnauth = { response: res, json: parsed };
+            continue;
+          }
+          return { response: res, json: parsed };
+        }
+        await page.waitForTimeout(100);
+      }
+
+      // Budget exhausted. If we saw at least one UNAUTHENTICATED response,
+      // Apollo's silent refresh never produced a successful retry — surface
+      // that last auth error for diagnostics. Otherwise, no response arrived
+      // at all (probably a network-level failure or a Lambda timeout).
+      if (lastUnauth) {
+        return lastUnauth;
+      }
+      throw new Error(
+        `joinLeagueByCode("${inviteCode}", "${teamName}") observed no ` +
+          `response matching ref=JoinLeagueByCode within ` +
+          `${joinResponseTimeoutMs}ms`,
+      );
+    } finally {
+      page.off('response', responseListener);
+    }
+  })();
+
+  const { response, json } = chosen;
   const requestContext = awsRequestContext(response.headers());
-
-  let json: JoinLeagueByCodeResponse;
-  try {
-    json = (await response.json()) as JoinLeagueByCodeResponse;
-  } catch (err) {
-    throw new Error(
-      `joinLeagueByCode("${inviteCode}", "${teamName}") returned non-JSON ` +
-        `response (HTTP ${response.status()})${requestContext}: ` +
-        `${err instanceof Error ? err.message : String(err)}`,
-    );
-  }
 
   if (json.errors?.length) {
     const first = json.errors[0];
