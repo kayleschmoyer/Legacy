@@ -19,10 +19,7 @@ import { expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { LOGGER } from '@legacy-sports/logging';
 import { createLeagueViaUI } from '../helpers/create-league';
-import {
-  validateInviteCodePreflight,
-  waitForJoinPageValidation,
-} from '../helpers/wait-for-join-page';
+import { joinLeagueAsManager } from '../helpers/wait-for-join-page';
 import { awsRequestContext } from '../helpers/graphql';
 import { test } from '../fixtures/ui';
 
@@ -131,26 +128,11 @@ test.describe
     ];
 
     for (const { page, jwt, teamName } of managers) {
-      // Warm the validateInviteCode Lambda for this manager's JWT before
-      // navigating to the join URL (LS-4360, LS-4364, LS-4385).
-      await validateInviteCodePreflight(jwt, state.inviteCode);
-
-      const joinUrl = `/baseball/league/join/${state.inviteCode}`;
-      await page.goto(joinUrl);
-      await page.waitForLoadState('load');
-
-      await waitForJoinPageValidation(page);
-
-      await expect(page.getByTestId('team-name')).toBeVisible({
-        timeout: 5_000,
-      });
-      await page.getByTestId('team-name').fill(teamName);
-      const joinBtn = page.getByRole('button', { name: /Join League/i });
-      await expect(joinBtn).toBeEnabled({ timeout: 5000 });
-      await joinBtn.click();
-
-      await expect(page).toHaveURL(/\/baseball\/league\/\d+/, {
-        timeout: 15000,
+      // Full join orchestration lives in joinLeagueAsManager (LS-4447).
+      await joinLeagueAsManager(page, {
+        jwt,
+        inviteCode: state.inviteCode,
+        teamName,
       });
 
       // The URL redirect alone doesn't guarantee the leagueMembers row is

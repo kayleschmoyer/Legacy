@@ -25,10 +25,7 @@
 
 import { expect, type Locator, type Page } from '@playwright/test';
 import { createLeagueViaUI } from '../helpers/create-league';
-import {
-  validateInviteCodePreflight,
-  waitForJoinPageValidation,
-} from '../helpers/wait-for-join-page';
+import { joinLeagueAsManager } from '../helpers/wait-for-join-page';
 import { waitForSeasonActive } from '../helpers/wait-for-season-active';
 import { awsRequestContext } from '../helpers/graphql';
 import { test } from '../fixtures/ui';
@@ -144,9 +141,8 @@ test.describe
   // -----------------------------------------------------------------------
 
   // Phase 2 uses dedicated manager fixture pages instead of switchUser() to
-  // avoid the AUTH_LOGOUT race (LS-3672, LS-3705, LS-4385). Per-manager
-  // validateInviteCodePreflight warms each Lambda instance before navigation
-  // to prevent cold-start "Invalid invite code" failures (LS-4360, LS-4364).
+  // avoid the AUTH_LOGOUT race (LS-3672, LS-3705, LS-4385). The full join
+  // orchestration lives in joinLeagueAsManager (LS-4447).
   test('Phase 2: Managers join the league', async ({
     managerJwt1,
     managerJwt2,
@@ -163,23 +159,10 @@ test.describe
 
     for (const { page, jwt, teamName } of managers) {
       await test.step(`Manager joins as "${teamName}"`, async () => {
-        await validateInviteCodePreflight(jwt, state.inviteCode);
-
-        const joinUrl = `/baseball/league/join/${state.inviteCode}`;
-        await page.goto(joinUrl);
-        await page.waitForLoadState('load');
-
-        await waitForJoinPageValidation(page);
-
-        const teamNameInput = page.getByTestId('team-name');
-        await expect(teamNameInput).toBeVisible({ timeout: 5_000 });
-        await teamNameInput.fill(teamName);
-        const joinBtn = page.getByRole('button', { name: /Join League/i });
-        await expect(joinBtn).toBeEnabled({ timeout: 5_000 });
-        await joinBtn.click();
-
-        await expect(page).toHaveURL(/\/baseball\/league\/\d+/, {
-          timeout: 15_000,
+        await joinLeagueAsManager(page, {
+          jwt,
+          inviteCode: state.inviteCode,
+          teamName,
         });
         state.teams.push(teamName);
       });

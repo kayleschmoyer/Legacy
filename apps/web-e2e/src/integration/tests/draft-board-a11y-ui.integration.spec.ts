@@ -29,6 +29,7 @@
 import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 import { createLeagueViaUI } from '../helpers/create-league';
+import { joinLeagueAsManager } from '../helpers/wait-for-join-page';
 import { test } from '../fixtures/ui';
 
 interface A11yState {
@@ -123,30 +124,24 @@ test.describe
   // -----------------------------------------------------------------------
 
   test('Phase 2: Managers join the league', async ({
+    managerJwt1,
+    managerJwt2,
+    managerJwt3,
     managerPage1,
     managerPage2,
     managerPage3,
   }) => {
     const managers = [
-      { page: managerPage1, teamName: 'Keyboard Kings' },
-      { page: managerPage2, teamName: 'Aria Aces' },
-      { page: managerPage3, teamName: 'Focus Squad' },
+      { page: managerPage1, jwt: managerJwt1, teamName: 'Keyboard Kings' },
+      { page: managerPage2, jwt: managerJwt2, teamName: 'Aria Aces' },
+      { page: managerPage3, jwt: managerJwt3, teamName: 'Focus Squad' },
     ];
 
-    for (const { page, teamName } of managers) {
-      const joinUrl = `/baseball/league/join/${state.inviteCode}`;
-      await page.goto(joinUrl);
-      await page.waitForLoadState('load');
-      await expect(page.getByText(/spot(s)?\s+available/i).first()).toBeVisible(
-        { timeout: 30_000 },
-      );
-
-      await page.getByTestId('team-name').fill(teamName);
-      const joinBtn = page.getByRole('button', { name: /Join League/i });
-      await expect(joinBtn).toBeEnabled({ timeout: 5_000 });
-      await joinBtn.click();
-      await expect(page).toHaveURL(/\/baseball\/league\/\d+/, {
-        timeout: 15_000,
+    for (const { page, jwt, teamName } of managers) {
+      await joinLeagueAsManager(page, {
+        jwt,
+        inviteCode: state.inviteCode,
+        teamName,
       });
     }
   });

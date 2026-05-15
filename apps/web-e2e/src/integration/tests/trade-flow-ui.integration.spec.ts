@@ -27,10 +27,7 @@
 import { expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { createLeagueViaUI } from '../helpers/create-league';
-import {
-  validateInviteCodePreflight,
-  waitForJoinPageValidation,
-} from '../helpers/wait-for-join-page';
+import { joinLeagueAsManager } from '../helpers/wait-for-join-page';
 import { waitForSeasonActive } from '../helpers/wait-for-season-active';
 import { awsRequestContext } from '../helpers/graphql';
 import { test } from '../fixtures/ui';
@@ -279,26 +276,11 @@ test.describe
     // context is untouched, so no "Restore commissioner identity" step
     // is needed before later phases reuse `commissionerPage`.
     await test.step('Manager 1 joins via the invite code UI', async () => {
-      // Warm the validateInviteCode Lambda for the manager's JWT before
-      // navigating to the join URL (LS-4360, LS-4364, LS-4385).
-      await validateInviteCodePreflight(managerJwt1, state.inviteCode);
-
-      const joinUrl = `/baseball/league/join/${state.inviteCode}`;
-      await managerPage1.goto(joinUrl);
-      await managerPage1.waitForLoadState('load');
-
-      await waitForJoinPageValidation(managerPage1);
-
-      const teamNameInput = managerPage1.locator('#team-name');
-      await expect(teamNameInput).toBeVisible({ timeout: 5_000 });
-      await teamNameInput.fill('Trade Busters');
-      const joinBtn = managerPage1.getByRole('button', {
-        name: /Join League/i,
-      });
-      await expect(joinBtn).toBeEnabled({ timeout: 5000 });
-      await joinBtn.click();
-      await expect(managerPage1).toHaveURL(/\/baseball\/league\/\d+/, {
-        timeout: 15000,
+      // Full join orchestration lives in joinLeagueAsManager (LS-4447).
+      await joinLeagueAsManager(managerPage1, {
+        jwt: managerJwt1,
+        inviteCode: state.inviteCode,
+        teamName: 'Trade Busters',
       });
     });
   });

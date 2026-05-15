@@ -21,6 +21,7 @@
 import { expect } from '@playwright/test';
 import { createLeagueViaUI } from '../helpers/create-league';
 import { awsRequestContext } from '../helpers/graphql';
+import { joinLeagueAsManager } from '../helpers/wait-for-join-page';
 import { test } from '../fixtures/ui';
 
 // ---------------------------------------------------------------------------
@@ -109,25 +110,13 @@ test.describe
   // -----------------------------------------------------------------------
 
   test('Phase 2: Manager joins the league via invite code', async ({
+    managerJwt1,
     managerPage1,
   }) => {
-    const joinUrl = `/baseball/league/join/${state.inviteCode}`;
-    await managerPage1.goto(joinUrl);
-    await managerPage1.waitForLoadState('load');
-
-    await expect(
-      managerPage1.getByText(/spot(s)?\s+available/i).first(),
-    ).toBeVisible({ timeout: 30_000 });
-
-    await managerPage1.getByTestId('team-name').fill('Announcement Readers');
-    const joinBtn = managerPage1.getByRole('button', {
-      name: /Join League/i,
-    });
-    await expect(joinBtn).toBeEnabled({ timeout: 5_000 });
-    await joinBtn.click();
-
-    await expect(managerPage1).toHaveURL(/\/baseball\/league\/\d+/, {
-      timeout: 15_000,
+    await joinLeagueAsManager(managerPage1, {
+      jwt: managerJwt1,
+      inviteCode: state.inviteCode,
+      teamName: 'Announcement Readers',
     });
   });
 

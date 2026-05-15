@@ -22,10 +22,7 @@
 
 import { expect } from '@playwright/test';
 import { createLeagueViaUI } from '../helpers/create-league';
-import {
-  validateInviteCodePreflight,
-  waitForJoinPageValidation,
-} from '../helpers/wait-for-join-page';
+import { joinLeagueAsManager } from '../helpers/wait-for-join-page';
 import { awsRequestContext } from '../helpers/graphql';
 import { test } from '../fixtures/ui';
 
@@ -317,40 +314,12 @@ test.describe
     managerJwt1,
     managerPage1,
   }) => {
-    // Use a dedicated manager browser context rather than switchUser on
-    // commissionerPage. switchUser has a race condition: the background JWT
-    // refresh triggered on the first navigation can dispatch AUTH_LOGOUT and
-    // clear localStorage after page.evaluate() sets the manager profile,
-    // causing the reload to start with empty localStorage and show the login
-    // page instead of the join page (LS-3705, same pattern as LS-3672).
-    // Warm the validateInviteCode Lambda for this manager's JWT before
-    // navigating (LS-4360, LS-4364, LS-4385).
-    await validateInviteCodePreflight(managerJwt1, state.inviteCode);
-
-    const joinUrl = `/baseball/league/join/${state.inviteCode}`;
-    await managerPage1.goto(joinUrl);
-    await managerPage1.waitForLoadState('load');
-
-    await expect(
-      managerPage1.getByRole('heading', { name: /join league/i }),
-    ).toBeVisible({ timeout: 10_000 });
-
-    await test.step('Join page shows available spot', async () => {
-      await waitForJoinPageValidation(managerPage1);
-    });
-
-    await test.step('Manager enters a team name and joins', async () => {
-      await expect(managerPage1.getByTestId('team-name')).toBeVisible({
-        timeout: 5_000,
-      });
-      await managerPage1.getByTestId('team-name').fill('QR Code Joiners');
-      const joinBtn = managerPage1.getByRole('button', {
-        name: /Join League/i,
-      });
-      await expect(joinBtn).toBeEnabled({ timeout: 5_000 });
-      await joinBtn.click();
-      await expect(managerPage1).toHaveURL(/\/baseball\/league\/\d+/, {
-        timeout: 15_000,
+    // Full join orchestration lives in joinLeagueAsManager (LS-4447).
+    await test.step('Manager joins the league via the deep link', async () => {
+      await joinLeagueAsManager(managerPage1, {
+        jwt: managerJwt1,
+        inviteCode: state.inviteCode,
+        teamName: 'QR Code Joiners',
       });
     });
   });

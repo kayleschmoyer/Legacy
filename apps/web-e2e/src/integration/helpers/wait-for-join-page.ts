@@ -221,3 +221,140 @@ export async function waitForJoinPageValidation(
     );
   }
 }
+
+interface JoinLeagueByCodeResponse {
+  data?: { joinLeagueByCode?: { leagueId: number } | null };
+  errors?: Array<{
+    message: string;
+    path?: ReadonlyArray<string | number>;
+  }>;
+}
+
+export interface JoinLeagueAsManagerOptions {
+  /** Manager JWT — used to warm the validateInviteCode Lambda for this user. */
+  jwt: string;
+  /** League invite code (8 uppercase alphanumeric characters). */
+  inviteCode: string;
+  /** Team name to register on the join form. */
+  teamName: string;
+  /**
+   * Window allowed for the JoinLeagueByCode mutation response to arrive after
+   * the Join button click. Covers Lambda cold-start on the mutation resolver,
+   * which the validateInviteCode preflight does NOT warm (mutation and query
+   * resolvers are distinct Lambda functions). Default 30s.
+   */
+  joinResponseTimeoutMs?: number;
+  /**
+   * Window allowed for the SPA URL to reflect the new league after the mutation
+   * has reported success. The navigation is synchronous (React Router push) so
+   * this should be near-instant; the small budget is just to absorb a render
+   * tick. Default 10s.
+   */
+  urlRedirectTimeoutMs?: number;
+}
+
+/**
+ * Drive a manager through the full join-league UI flow and return the joined
+ * leagueId.
+ *
+ * Consolidates the 6-step orchestration that previously lived inline in every
+ * integration spec (LS-4270, LS-4298, LS-4360, LS-4364, LS-4385, LS-4447):
+ *
+ *   1. `validateInviteCodePreflight(jwt, code)` — warm the query Lambda
+ *   2. `page.goto('/baseball/league/join/<code>')`
+ *   3. `waitForJoinPageValidation(page)` — wait for "X spot(s) available"
+ *   4. Fill the team-name field and assert the Join button is enabled
+ *   5. Listen for the `JoinLeagueByCode` GraphQL response, then click Join
+ *   6. Surface any `errors[]` (with AWS request id) or return the new leagueId
+ *      after the URL has changed to `/baseball/league/<id>`
+ *
+ * The post-click race is the failure mode this helper exists to fix. Earlier
+ * iterations only asserted on the URL change with a 15s timeout — when the
+ * mutation Lambda was cold or returned `errors[]`, the test would time out
+ * with "URL stuck on /league/join/XXXXXXXX" and no clue why. This helper:
+ *
+ * - Captures the mutation response (30s window — long enough for a cold start)
+ * - Re-throws `errors[]` with message/path/`requestId`/`trace` (LS-4444 pattern)
+ * - Asserts URL change only after a successful mutation response, with a small
+ *   post-response budget (the React Router navigation is synchronous)
+ *
+ * All future races discovered on any step of the join flow should be fixed in
+ * this helper, never inline in spec files.
+ */
+export async function joinLeagueAsManager(
+  page: Page,
+  {
+    jwt,
+    inviteCode,
+    teamName,
+    joinResponseTimeoutMs = 30_000,
+    urlRedirectTimeoutMs = 10_000,
+  }: JoinLeagueAsManagerOptions,
+): Promise<number> {
+  await validateInviteCodePreflight(jwt, inviteCode);
+
+  const joinUrl = `/baseball/league/join/${inviteCode}`;
+  await page.goto(joinUrl);
+  await page.waitForLoadState('load');
+
+  await waitForJoinPageValidation(page);
+
+  const teamNameInput = page.getByTestId('team-name');
+  await expect(teamNameInput).toBeVisible({ timeout: 5_000 });
+  await teamNameInput.fill(teamName);
+
+  const joinBtn = page.getByRole('button', { name: /Join League/i });
+  await expect(joinBtn).toBeEnabled({ timeout: 5_000 });
+
+  // Register the response listener BEFORE clicking — Playwright's
+  // waitForResponse only catches responses that arrive after the call, so a
+  // very fast mutation could otherwise be missed. Apollo posts every GraphQL
+  // operation to `/graphql?ref=<OperationName>` (see apps/web/src/lib/
+  // apollo-client.ts), so the operation name is in the URL.
+  const joinResponsePromise = page.waitForResponse(
+    (res) => /\/graphql\?(?:.*&)?ref=JoinLeagueByCode(?:&|$)/.test(res.url()),
+    { timeout: joinResponseTimeoutMs },
+  );
+
+  await joinBtn.click();
+
+  const response = await joinResponsePromise;
+  const requestContext = awsRequestContext(response.headers());
+
+  let json: JoinLeagueByCodeResponse;
+  try {
+    json = (await response.json()) as JoinLeagueByCodeResponse;
+  } catch (err) {
+    throw new Error(
+      `joinLeagueByCode("${inviteCode}", "${teamName}") returned non-JSON ` +
+        `response (HTTP ${response.status()})${requestContext}: ` +
+        `${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+
+  if (json.errors?.length) {
+    const first = json.errors[0];
+    const pathStr = first.path?.length ? ` (path=${first.path.join('.')})` : '';
+    throw new Error(
+      `joinLeagueByCode("${inviteCode}", "${teamName}") returned GraphQL ` +
+        `error: ${first.message}${pathStr}${requestContext}`,
+    );
+  }
+
+  const leagueId = json.data?.joinLeagueByCode?.leagueId;
+  if (leagueId == null) {
+    throw new Error(
+      `joinLeagueByCode("${inviteCode}", "${teamName}") returned no ` +
+        `leagueId${requestContext}`,
+    );
+  }
+
+  // Mutation succeeded; React Router will navigate to /baseball/league/<id>.
+  // The navigation is synchronous so this assertion is effectively a tick wait.
+  await expect(page).toHaveURL(
+    new RegExp(`/baseball/league/${leagueId}(?:[/?#]|$)`),
+    { timeout: urlRedirectTimeoutMs },
+  );
+
+  return leagueId;
+}

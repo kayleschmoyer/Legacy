@@ -22,10 +22,7 @@
 import { expect } from '@playwright/test';
 import { createLeagueViaUI } from '../helpers/create-league';
 import { graphqlOk } from '../helpers/graphql';
-import {
-  validateInviteCodePreflight,
-  waitForJoinPageValidation,
-} from '../helpers/wait-for-join-page';
+import { joinLeagueAsManager } from '../helpers/wait-for-join-page';
 import { waitForSeasonActive } from '../helpers/wait-for-season-active';
 import { switchUser, test } from '../fixtures/ui';
 
@@ -86,10 +83,10 @@ test.describe
   // has a known race condition (LS-3672, LS-3705) where the background
   // refreshJwt() can dispatch AUTH_LOGOUT after page.evaluate() sets the new
   // user profile, clearing localStorage and causing the join page to show
-  // "Invalid invite code" persistently across all retries (LS-4385).
-  // Per-manager validateInviteCodePreflight polls warm the Lambda instance
-  // for each JWT before navigation, preventing cold-start transient failures
-  // (LS-4360, LS-4364).
+  // "Invalid invite code" persistently across all retries (LS-4385). The full
+  // join orchestration (preflight, navigation, validation, click, mutation
+  // response, URL redirect) lives in joinLeagueAsManager (LS-4447) so any new
+  // race window is fixed once at the helper level.
   // -----------------------------------------------------------------
 
   test('Phase 2: Users join the league and configure teams', async ({
@@ -109,31 +106,11 @@ test.describe
       ];
 
       for (const { page: managerPage, jwt, teamName } of managers) {
-        // Warm the validateInviteCode Lambda for this manager's JWT before
-        // navigating to the join URL (LS-4360, LS-4364, LS-4385).
-        await validateInviteCodePreflight(jwt, state.inviteCode);
-
-        const joinUrl = `/baseball/league/join/${state.inviteCode}`;
-        await managerPage.goto(joinUrl);
-        await managerPage.waitForLoadState('load');
-
-        // Wait for invite code validation
-        await waitForJoinPageValidation(managerPage);
-
-        // Fill team name and join
-        await expect(managerPage.getByTestId('team-name')).toBeVisible({
-          timeout: 5_000,
-        });
-        await managerPage.getByTestId('team-name').fill(teamName);
-        const joinBtn = managerPage.getByRole('button', {
-          name: /Join League/i,
-        });
-        await expect(joinBtn).toBeEnabled({ timeout: 5000 });
-        await joinBtn.click();
-
-        // Wait for redirect to the league page
-        await expect(managerPage).toHaveURL(/\/baseball\/league\/\d+/, {
-          timeout: 15000,
+        // Full join orchestration lives in joinLeagueAsManager (LS-4447).
+        await joinLeagueAsManager(managerPage, {
+          jwt,
+          inviteCode: state.inviteCode,
+          teamName,
         });
 
         state.teams.push(teamName);
