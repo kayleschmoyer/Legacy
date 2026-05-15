@@ -277,52 +277,64 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-${{ runner.arch }}-playwright-${{ steps.playwright-config.outputs.version }}-
 
-      - name: "Install Playwright Browsers"
+      - name: "Verify AMI-baked Playwright browsers"
         shell: bash
         env:
           BROWSER_ENGINE: ${{ steps.playwright-config.outputs.browser-engine }}
         run: |
-          # The self-hosted AMI prebakes Chromium at /opt/playwright-browsers via
-          # the Packer build, but that cache has two failure modes that broke E2E
-          # for every PR since the 2026-04-04 nightly:
+          # The self-hosted runner AMI bakes Playwright browsers at
+          # /opt/playwright-browsers (see LS-2429). PLAYWRIGHT_BROWSERS_PATH is
+          # set globally on the AMI to point there, so we do nothing at runtime
+          # beyond verifying the expected revision is present. Dropping the
+          # runtime `playwright install --with-deps` eliminates the dpkg-lock
+          # race against unattended-upgrades that was the steady-state cause of
+          # CI flake (LS-4451).
           #
-          #   1. Version drift — the AMI was baked with `playwright@1.58.2 install
-          #      chromium`, which downloads a chromium_headless_shell-YYYY pinned
-          #      to that playwright version. When the project's playwright drifts
-          #      (e.g. via lockfile regen resolving `^1.58.2` → 1.59.1), tests
-          #      want a newer revision (chromium_headless_shell-1217) the AMI
-          #      doesn't have.
-          #
-          #   2. Read-only cache — /opt/playwright-browsers is `chmod 755` owned
-          #      by root from the Packer bake, so the runner user cannot write to
-          #      it to install missing browsers at runtime.
-          #
-          # Strategy: ignore the AMI cache. Unset PLAYWRIGHT_BROWSERS_PATH and
-          # install to the runner user's default cache (~/.cache/ms-playwright),
-          # which is writable. `playwright install` is idempotent. LS-2429 tracks
-          # rebaking the AMI with a writable cache so this can be revisited.
-          unset PLAYWRIGHT_BROWSERS_PATH
-          echo "PLAYWRIGHT_BROWSERS_PATH=" >> "$GITHUB_ENV"
-          echo "    AMI cache state at /opt/playwright-browsers (informational only):"
-          # Note: avoid `ls | head` here — the workflow runs with `set -o pipefail`
-          # and SIGPIPE from head closing the pipe would propagate as a non-zero
-          # exit, making any `|| fallback` branch unreliable. Check existence
-          # explicitly first.
-          if [ -d /opt/playwright-browsers ]; then
-            ls -la /opt/playwright-browsers 2>&1 | head -20
-          else
-            echo "    (directory does not exist)"
+          # The expected revision is read from playwright-core/browsers.json so
+          # this step acts as a tripwire: when the project's Playwright pin is
+          # bumped to a version that wants a newer browser revision, this step
+          # fails with an actionable message before tests run, and the fix is
+          # to rebake the AMI via the Packer pipeline (LS-2429) — not to
+          # re-introduce a runtime install.
+          # `playwright-core`'s package exports do not expose ./browsers.json,
+          # so resolve it via the package.json path instead of a direct require.
+          REVISION=$(node -e "
+            const path = require('path');
+            const fs = require('fs');
+            const pkg = require.resolve('playwright-core/package.json');
+            const file = path.join(path.dirname(pkg), 'browsers.json');
+            const data = JSON.parse(fs.readFileSync(file, 'utf8'));
+            const name = process.argv[1];
+            const b = data.browsers.find((x) => x.name === name);
+            if (!b) {
+              console.error('No browsers.json entry for ' + name);
+              process.exit(1);
+            }
+            process.stdout.write(String(b.revision));
+          " "$BROWSER_ENGINE")
+          EXPECTED="/opt/playwright-browsers/${BROWSER_ENGINE}-${REVISION}"
+          echo "    Expected AMI-baked browser: $EXPECTED"
+          if [ ! -d "$EXPECTED" ]; then
+            echo "::error::AMI-baked Playwright browser missing: $EXPECTED"
+            echo ""
+            echo "The runner AMI does not have ${BROWSER_ENGINE}-${REVISION} baked."
+            echo "This usually means the project's Playwright pin was bumped to a"
+            echo "version that wants a newer browser revision than the AMI provides."
+            echo ""
+            echo "Fix: rebake the AMI via the Packer pipeline (see LS-2429 for the"
+            echo "bake procedure). Do NOT re-add a runtime 'playwright install' here"
+            echo "— that races unattended-upgrades for the dpkg lock and was the"
+            echo "steady-state cause of CI flake the tripwire is here to prevent."
+            echo ""
+            echo "AMI cache contents at /opt/playwright-browsers:"
+            if [ -d /opt/playwright-browsers ]; then
+              ls -la /opt/playwright-browsers 2>&1
+            else
+              echo "    (directory does not exist — AMI may be misconfigured)"
+            fi
+            exit 1
           fi
-          echo ""
-          echo "    Installing browsers to user cache (~/.cache/ms-playwright)..."
-          pnpm exec playwright install "$BROWSER_ENGINE" --with-deps
-          echo ""
-          echo "    User cache state after install:"
-          if [ -d "$HOME/.cache/ms-playwright" ]; then
-            ls -la "$HOME/.cache/ms-playwright" 2>&1 | head -20
-          else
-            echo "    (no user cache)"
-          fi
+          echo "    OK: $EXPECTED is present."
 
       # Save runs immediately after install (independent of test outcome)
       # so a failing test step doesn't skip the save. Gated to main so
