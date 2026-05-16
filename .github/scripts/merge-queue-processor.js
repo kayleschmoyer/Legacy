@@ -293,6 +293,7 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
           'Waiting for status checks to complete: ' +
           checksResult.pendingChecks.join(', '),
         isPending: true,
+        pendingChecks: checksResult.pendingChecks,
       };
     }
 
@@ -730,11 +731,15 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
         `⏳ Checks still in progress for PR #${pr.number}, will retry in next cycle`,
       );
       hasPendingPRs = true;
-      return;
     }
 
+    const heading = validation.isPending
+      ? '## ⏳ Merge Queue: Waiting'
+      : '## 🚫 Merge Queue: Cannot Merge';
+
     let comment =
-      '## 🚫 Merge Queue: Cannot Merge\n\n' +
+      heading +
+      '\n\n' +
       '**Reason:** ' +
       validation.reason +
       '\n\n' +
@@ -784,6 +789,12 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
         validation.failingChecks.map((check) => '   - ' + check).join('\n') +
         '\n' +
         '2. Push your fixes to trigger CI re-run';
+    } else if (validation.isPending && validation.pendingChecks) {
+      comment +=
+        '\n1. Waiting on the following check(s) to complete:\n' +
+        validation.pendingChecks.map((check) => '   - ' + check).join('\n') +
+        '\n' +
+        '2. The merge queue will retry automatically once checks finish';
     } else {
       comment +=
         '\n1. Check the PR status and resolve any issues\n' +
