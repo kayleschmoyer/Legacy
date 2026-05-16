@@ -233,13 +233,19 @@ async function authCodeFlow(cognitoDomain, clientId) {
     `&state=${state}`;
 
   LOGGER.info(`\nOpening browser for authorization:\n  ${authUrl}\n`);
-  const opener =
-    process.platform === 'win32'
-      ? 'start'
-      : process.platform === 'darwin'
-        ? 'open'
-        : 'xdg-open';
-  spawnSync(opener, [authUrl], { shell: true, stdio: 'ignore' });
+  // On Windows we MUST shell out to `cmd /c start "" <url>` rather than use
+  // `shell: true` with `start <url>`. With shell:true, cmd interprets every
+  // `&` in the URL as a command separator — the OAuth query string truncates
+  // after the first `&`, Cognito sees a request missing client_id /
+  // redirect_uri, and the browser lands on /error?error=Required+parameters+missing.
+  // The empty `""` after `start` is the window-title arg start expects; the
+  // URL is then passed as a single argv element with no shell interpretation.
+  if (process.platform === 'win32') {
+    spawnSync('cmd', ['/c', 'start', '', authUrl], { stdio: 'ignore' });
+  } else {
+    const opener = process.platform === 'darwin' ? 'open' : 'xdg-open';
+    spawnSync(opener, [authUrl], { stdio: 'ignore' });
+  }
   LOGGER.info('Waiting for authorization…');
 
   const code = await codePromise;
