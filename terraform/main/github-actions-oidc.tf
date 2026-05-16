@@ -836,6 +836,52 @@ resource "aws_iam_policy" "github_actions_supplemental" {
           "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/rollbar-access-token*",
           "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/mcp-github-token*",
         ]
+      },
+      # IAM Identity Center (SSO Admin) — required for the Customer managed
+      # OIDC application provisioned in lambda-mcp-api-gateway.tf (LS-4466).
+      #
+      # Scoping rules (per AWS IAM IC service authorization reference):
+      #   sso:ListInstances                — no resource-level support → "*"
+      #   sso:CreateApplication,
+      #   sso:ListApplications             — Instance-scoped
+      #     ARN: arn:aws:sso:::instance/ssoins-*
+      #   sso:Describe/Update/Delete/Tag*Application,
+      #   sso:Put/Get/Delete/ListApplicationAccessScope(s)
+      #                                    — Application-scoped
+      #     ARN: arn:aws:sso::${account}:application/ssoins-*/apl-*
+      # Wildcards are constrained to the project's AWS account; the account
+      # has a single AWS-Organizations-managed IAM IC instance, so this is
+      # effectively "any app under our IC instance" without circular
+      # dependency on aws_ssoadmin_application.mcp_dev.application_arn (the
+      # IAM policy must be applyable before that app can be created).
+      {
+        Effect   = "Allow"
+        Action   = ["sso:ListInstances"]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "sso:CreateApplication",
+          "sso:ListApplications"
+        ]
+        Resource = ["arn:aws:sso:::instance/ssoins-*"]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "sso:DescribeApplication",
+          "sso:UpdateApplication",
+          "sso:DeleteApplication",
+          "sso:PutApplicationAccessScope",
+          "sso:DeleteApplicationAccessScope",
+          "sso:GetApplicationAccessScope",
+          "sso:ListApplicationAccessScopes",
+          "sso:TagResource",
+          "sso:UntagResource",
+          "sso:ListTagsForResource"
+        ]
+        Resource = ["arn:aws:sso::${local.account_id}:application/ssoins-*/apl-*"]
       }
     ]
   })
@@ -1321,6 +1367,33 @@ resource "aws_iam_role_policy" "github_actions_plan_policy" {
         Resource = [
           "arn:aws:budgets::${local.account_id}:budget/${local.name_prefix}-*"
         ]
+      },
+      # IAM Identity Center (SSO Admin) read — required to refresh the
+      # data.aws_ssoadmin_instances and aws_ssoadmin_application resources
+      # provisioned in lambda-mcp-api-gateway.tf (LS-4466). See the apply
+      # role's sso block for the full scoping rationale.
+      {
+        Sid      = "SsoAdminListInstances"
+        Effect   = "Allow"
+        Action   = ["sso:ListInstances"]
+        Resource = "*"
+      },
+      {
+        Sid      = "SsoAdminInstanceScoped"
+        Effect   = "Allow"
+        Action   = ["sso:ListApplications"]
+        Resource = ["arn:aws:sso:::instance/ssoins-*"]
+      },
+      {
+        Sid    = "SsoAdminApplicationRead"
+        Effect = "Allow"
+        Action = [
+          "sso:DescribeApplication",
+          "sso:GetApplicationAccessScope",
+          "sso:ListApplicationAccessScopes",
+          "sso:ListTagsForResource"
+        ]
+        Resource = ["arn:aws:sso::${local.account_id}:application/ssoins-*/apl-*"]
       },
       # S3 read (project buckets — Lambda deployment bucket, ci-artifacts, etc.)
       # The runner-dist bucket lives in terraform/runners/ as of LS-2425; runner-module
