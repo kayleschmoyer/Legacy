@@ -837,88 +837,50 @@ resource "aws_iam_policy" "github_actions_supplemental" {
           "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/mcp-github-token*",
         ]
       },
-      # IAM Identity Center (SSO Admin) — required for the Customer managed
-      # OIDC application provisioned in lambda-mcp-api-gateway.tf (LS-4466).
+      # Cognito user-pool management — for the MCP JWT auth user pool
+      # provisioned in lambda-mcp-api-gateway.tf (LS-4466). Replaces the
+      # earlier sso:* perms (the IC Customer-managed OIDC approach was
+      # abandoned because IC's idToken aud is AWS-internal and APIGW's
+      # JWT authorizer rejects it).
       #
-      # Scoping rules (per AWS IAM IC service authorization reference):
-      #   sso:ListInstances                — no resource-level support → "*"
-      #   sso:CreateApplication,
-      #   sso:ListApplications             — Instance-scoped
-      #     ARN: arn:aws:sso:::instance/${local.sso_instance_id}
-      #   sso:Describe/Update/Delete/Tag*Application,
-      #   sso:Put/Get/Delete/ListApplicationAccessScope(s)
-      #                                    — Application-scoped
-      #     ARN: arn:aws:sso::*:application/${local.sso_instance_id}/*
-      #     (account segment is wildcarded by AWS for SSO app ARNs in
-      #     tag-on-create paths; trailing segment is "*" because the
-      #     apl-* ID is assigned after CreateApplication.)
-      # Avoids circular dependency on
-      # aws_ssoadmin_application.mcp_dev.application_arn (the IAM policy
-      # must be applyable before that app can be created).
+      # Cognito ARN shapes:
+      #   user pool       → arn:aws:cognito-idp:<region>:<account>:userpool/<pool-id>
+      #   user pool client → same pool ARN (clients are sub-resources, no
+      #                      separate ARN type in IAM)
+      # The pool id (e.g. us-east-1_AbCdEfGhI) is account-and-region-scoped
+      # and not predictable at plan time, so we wildcard the suffix.
+      {
+        Effect = "Allow"
+        Action = [
+          "cognito-idp:CreateUserPool",
+          "cognito-idp:DeleteUserPool",
+          "cognito-idp:UpdateUserPool",
+          "cognito-idp:DescribeUserPool",
+          "cognito-idp:CreateUserPoolClient",
+          "cognito-idp:DeleteUserPoolClient",
+          "cognito-idp:UpdateUserPoolClient",
+          "cognito-idp:DescribeUserPoolClient",
+          "cognito-idp:ListUserPoolClients",
+          "cognito-idp:CreateUserPoolDomain",
+          "cognito-idp:DeleteUserPoolDomain",
+          "cognito-idp:UpdateUserPoolDomain",
+          "cognito-idp:DescribeUserPoolDomain",
+          "cognito-idp:GetUserPoolMfaConfig",
+          "cognito-idp:SetUserPoolMfaConfig",
+          "cognito-idp:TagResource",
+          "cognito-idp:UntagResource",
+          "cognito-idp:ListTagsForResource"
+        ]
+        Resource = [
+          "arn:aws:cognito-idp:${local.region}:${local.account_id}:userpool/*"
+        ]
+      },
+      # DescribeUserPoolDomain on the *domain* uses a different (unscoped)
+      # resource shape; AWS requires Resource = "*" for this read.
       {
         Effect   = "Allow"
-        Action   = ["sso:ListInstances"]
+        Action   = ["cognito-idp:DescribeUserPoolDomain"]
         Resource = "*"
-      },
-      {
-        Effect   = "Allow"
-        Action   = ["sso:ListApplications"]
-        Resource = ["arn:aws:sso:::instance/${local.sso_instance_id}"]
-      },
-      # sso:CreateApplication is authorized against ALL of: the parent
-      # instance arn, the application provider arn supplied to the call,
-      # and the application arn shape (with a wildcarded account segment,
-      # since the apl-* id isn't assigned until the call returns). Mirrors
-      # the same three-resource set we need for sso:TagResource below.
-      {
-        Effect = "Allow"
-        Action = ["sso:CreateApplication"]
-        Resource = [
-          "arn:aws:sso:::instance/${local.sso_instance_id}",
-          "arn:aws:sso::aws:applicationProvider/custom",
-          "arn:aws:sso::*:application/${local.sso_instance_id}/*"
-        ]
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "sso:DescribeApplication",
-          "sso:UpdateApplication",
-          "sso:DeleteApplication",
-          "sso:PutApplicationAccessScope",
-          "sso:DeleteApplicationAccessScope",
-          "sso:GetApplicationAccessScope",
-          "sso:ListApplicationAccessScopes"
-        ]
-        Resource = ["arn:aws:sso::${local.account_id}:application/${local.sso_instance_id}/*"]
-      },
-      # Tag actions are evaluated against THREE resource shapes:
-      #   - At CreateApplication time, AWS authorizes sso:TagResource against
-      #     the parent INSTANCE arn (arn:aws:sso:::instance/<id>) — the child
-      #     application doesn't exist yet so it can't be the resource target.
-      #   - At CreateApplication time, AWS also authorizes sso:TagResource
-      #     against the application provider arn supplied to the create call
-      #     (arn:aws:sso::aws:applicationProvider/custom) — this is an
-      #     AWS-owned resource (note the literal "aws" account segment).
-      #   - After the application exists, ongoing tag ops are evaluated
-      #     against the application arn with a wildcarded account segment
-      #     (arn:aws:sso::*:application/<instance-id>/*).
-      # All three ARNs must be in the Resource list. Kept in a separate
-      # statement so the broader application scope doesn't leak into
-      # destructive ops like UpdateApplication / DeleteApplication /
-      # PutApplicationAccessScope.
-      {
-        Effect = "Allow"
-        Action = [
-          "sso:TagResource",
-          "sso:UntagResource",
-          "sso:ListTagsForResource"
-        ]
-        Resource = [
-          "arn:aws:sso:::instance/${local.sso_instance_id}",
-          "arn:aws:sso::aws:applicationProvider/custom",
-          "arn:aws:sso::*:application/${local.sso_instance_id}/*"
-        ]
       }
     ]
   })
@@ -1405,39 +1367,30 @@ resource "aws_iam_role_policy" "github_actions_plan_policy" {
           "arn:aws:budgets::${local.account_id}:budget/${local.name_prefix}-*"
         ]
       },
-      # IAM Identity Center (SSO Admin) read — required to refresh the
-      # data.aws_ssoadmin_instances and aws_ssoadmin_application resources
-      # provisioned in lambda-mcp-api-gateway.tf (LS-4466). See the apply
-      # role's sso block for the full scoping rationale.
+      # Cognito user-pool read — required to refresh the user pool /
+      # client / domain resources in lambda-mcp-api-gateway.tf (LS-4466).
+      # Replaces the prior IC sso:* reads (see apply role for context).
       {
-        Sid      = "SsoAdminListInstances"
-        Effect   = "Allow"
-        Action   = ["sso:ListInstances"]
-        Resource = "*"
-      },
-      {
-        Sid      = "SsoAdminInstanceScoped"
-        Effect   = "Allow"
-        Action   = ["sso:ListApplications"]
-        Resource = ["arn:aws:sso:::instance/${local.sso_instance_id}"]
-      },
-      {
-        Sid    = "SsoAdminApplicationRead"
+        Sid    = "CognitoUserPoolRead"
         Effect = "Allow"
         Action = [
-          "sso:DescribeApplication",
-          "sso:GetApplicationAccessScope",
-          "sso:ListApplicationAccessScopes"
+          "cognito-idp:DescribeUserPool",
+          "cognito-idp:DescribeUserPoolClient",
+          "cognito-idp:ListUserPoolClients",
+          "cognito-idp:GetUserPoolMfaConfig",
+          "cognito-idp:ListTagsForResource"
         ]
-        Resource = ["arn:aws:sso::${local.account_id}:application/${local.sso_instance_id}/*"]
+        Resource = [
+          "arn:aws:cognito-idp:${local.region}:${local.account_id}:userpool/*"
+        ]
       },
-      # sso:ListTagsForResource is grouped with the tag actions in the apply
-      # policy under the wider ::*: scope; the plan role only needs read.
+      # DescribeUserPoolDomain on a domain doesn't support resource-level
+      # scoping; AWS requires Resource = "*" for this read.
       {
-        Sid      = "SsoAdminTagsRead"
+        Sid      = "CognitoUserPoolDomainRead"
         Effect   = "Allow"
-        Action   = ["sso:ListTagsForResource"]
-        Resource = ["arn:aws:sso::*:application/${local.sso_instance_id}/*"]
+        Action   = ["cognito-idp:DescribeUserPoolDomain"]
+        Resource = "*"
       },
       # S3 read (project buckets — Lambda deployment bucket, ci-artifacts, etc.)
       # The runner-dist bucket lives in terraform/runners/ as of LS-2425; runner-module

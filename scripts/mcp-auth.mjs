@@ -2,33 +2,45 @@
 /**
  * scripts/mcp-auth.mjs
  *
- * Manages IAM Identity Center OIDC tokens for the MCP HTTP API Gateway.
- * Replaces the local signing proxy (tools/mcp/signing-proxy) for developer
- * machines. Cloud agents continue to use Lambda Function URLs + SigV4.
+ * Fetches & refreshes Cognito-issued OIDC ID tokens for the MCP HTTP API
+ * Gateway. Replaces the local signing proxy (tools/mcp/signing-proxy) for
+ * developer machines. Cloud agents continue to use Lambda Function URLs +
+ * SigV4.
  *
- * Prerequisites: run `terraform apply` in terraform/main first so the Customer
- * managed OIDC application and SSM parameters exist.
+ * Prerequisites:
+ *   1. terraform apply in terraform/main (creates the Cognito user pool,
+ *      hosted UI domain, and OAuth client; publishes the identifiers to
+ *      SSM).
+ *   2. An admin has invited you via the Cognito console (a Cognito email
+ *      with a temporary password). You set a real password on first
+ *      sign-in via the hosted UI.
  *
  * Usage:
  *   node scripts/mcp-auth.mjs           # refresh token (or re-auth if expired)
- *   node scripts/mcp-auth.mjs --setup   # first-time: configure grants + full auth
- *   node scripts/mcp-auth.mjs --force   # force new auth code flow even if refreshable
+ *   node scripts/mcp-auth.mjs --setup   # first-time setup: full auth flow
+ *   node scripts/mcp-auth.mjs --force   # force a fresh auth code flow
  *
  * Writes to .env.local:
- *   MCP_AUTH_CLIENT_ID      — IAM Identity Center application ARN (from SSM)
- *   MCP_AUTH_TOKEN          — ID token JWT (~8h TTL from IAM IC)
- *   MCP_AUTH_REFRESH_TOKEN  — refresh token
- *   MCP_AUTH_EXPIRES_AT     — Unix epoch when MCP_AUTH_TOKEN expires
- *   MCP_JIRA_URL            — API Gateway invoke URL for legacy-sports-jira
- *   MCP_GITHUB_URL          — API Gateway invoke URL for legacy-sports-github
- *   MCP_CI_URL              — API Gateway invoke URL for legacy-sports-ci
+ *   MCP_AUTH_CLIENT_ID       — Cognito user pool client ID (from SSM)
+ *   MCP_AUTH_COGNITO_DOMAIN  — Cognito hosted UI domain (from SSM)
+ *   MCP_AUTH_TOKEN           — Cognito ID token JWT (~8h TTL)
+ *   MCP_AUTH_REFRESH_TOKEN   — Cognito refresh token (~30d TTL)
+ *   MCP_AUTH_EXPIRES_AT      — Unix epoch when MCP_AUTH_TOKEN expires
+ *   MCP_JIRA_URL             — API Gateway invoke URL for legacy-sports-jira
+ *   MCP_GITHUB_URL           — API Gateway invoke URL for legacy-sports-github
+ *   MCP_CI_URL               — API Gateway invoke URL for legacy-sports-ci
+ *
+ * Why Cognito (and not IAM Identity Center direct)?
+ *   See terraform/main/lambda-mcp-api-gateway.tf header comment. Short
+ *   version: IC's idToken `aud` claim is AWS-internal, so API Gateway's
+ *   JWT authorizer always rejected it. Cognito issues a proper OIDC
+ *   token with a controllable aud.
  */
 
 import { createHash, randomBytes } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
-import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -61,7 +73,7 @@ const PROFILE = (() => {
         undefined);
 })();
 
-// ── AWS CLI helpers ───────────────────────────────────────────────────────────
+// ── AWS CLI helpers (used only for SSM reads) ─────────────────────────────────
 
 function aws(service, subcommand, extraArgs = [], region) {
   const profileArgs = PROFILE ? ['--profile', PROFILE] : [];
@@ -115,7 +127,6 @@ function writeEnvLocal(updates) {
     if (re.test(content)) {
       content = content.replace(re, `${key}=${value}`);
     } else {
-      // Append with a trailing newline
       if (content.length > 0 && !content.endsWith('\n')) content += '\n';
       content += `${key}=${value}\n`;
     }
@@ -129,7 +140,6 @@ function writeEnvLocal(updates) {
 function decodeJwtPayload(token) {
   const parts = token.split('.');
   if (parts.length !== 3) throw new Error('Not a valid JWT');
-  // base64url → base64 → JSON
   const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
   const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
   return JSON.parse(Buffer.from(padded, 'base64').toString('utf8'));
@@ -144,81 +154,10 @@ function tokenExpiresInSeconds(token) {
   }
 }
 
-// ── SSO config discovery ──────────────────────────────────────────────────────
-
-function findSsoConfig() {
-  const configPath = path.join(os.homedir(), '.aws', 'config');
-  if (!fs.existsSync(configPath)) {
-    throw new Error(
-      'AWS config not found at ~/.aws/config. Run "aws configure sso" first.',
-    );
-  }
-
-  const config = fs.readFileSync(configPath, 'utf8');
-  const profiles = {};
-  let currentProfile = null;
-
-  for (const raw of config.split('\n')) {
-    const line = raw.trim();
-    const headerMatch = line.match(/^\[(?:profile\s+)?([^\]]+)\]$/);
-    if (headerMatch) {
-      currentProfile = headerMatch[1];
-      profiles[currentProfile] = {};
-    } else if (currentProfile) {
-      const kvMatch = line.match(/^([a-z_]+)\s*=\s*(.+)$/);
-      if (kvMatch) profiles[currentProfile][kvMatch[1]] = kvMatch[2].trim();
-    }
-  }
-
-  // Prefer the explicitly requested profile; otherwise find first SSO-enabled one
-  const candidates = PROFILE
-    ? [profiles[PROFILE]].filter(Boolean)
-    : Object.values(profiles).filter((p) => p['sso_start_url']);
-
-  if (candidates.length === 0) {
-    const hint = PROFILE
-      ? `Profile "${PROFILE}" not found or has no sso_start_url.`
-      : 'No profile with sso_start_url found.';
-    throw new Error(`${hint} Run "aws configure sso" to set up SSO.`);
-  }
-
-  const p = candidates[0];
-  if (!p['sso_start_url']) {
-    throw new Error(
-      `Profile "${PROFILE ?? 'auto-detected'}" has no sso_start_url. Run "aws configure sso".`,
-    );
-  }
-
-  return {
-    startUrl: p['sso_start_url'],
-    region: p['sso_session']
-      ? getSsoSessionRegion(config, p['sso_session'])
-      : (p['sso_region'] ?? p['region'] ?? 'us-east-1'),
-  };
-}
-
-function getSsoSessionRegion(config, sessionName) {
-  const lines = config.split('\n');
-  let inSession = false;
-  for (const raw of lines) {
-    const line = raw.trim();
-    if (line === `[sso-session ${sessionName}]`) {
-      inSession = true;
-      continue;
-    }
-    if (inSession && line.startsWith('[')) break;
-    if (inSession) {
-      const m = line.match(/^sso_region\s*=\s*(.+)$/);
-      if (m) return m[1].trim();
-    }
-  }
-  return 'us-east-1';
-}
-
 // ── PKCE helpers ──────────────────────────────────────────────────────────────
 
-// Fixed redirect port — must match the RedirectUris configured on the IAM
-// Identity Center application via 'node scripts/mcp-auth.mjs --setup'.
+// Fixed redirect port — must match the callback_urls configured on the
+// Cognito user pool client in terraform/main/lambda-mcp-api-gateway.tf.
 const REDIRECT_PORT = 57329;
 const REDIRECT_URI = `http://localhost:${REDIRECT_PORT}`;
 
@@ -230,15 +169,17 @@ function generateCodeChallenge(verifier) {
   return createHash('sha256').update(verifier).digest('base64url');
 }
 
-// ── Authorization code flow (PKCE) ────────────────────────────────────────────
+// ── Cognito OAuth flow ────────────────────────────────────────────────────────
+//
+// Cognito's hosted UI exposes standard OIDC endpoints at <domain>/oauth2/*.
+// Public clients (no secret) authenticate via PKCE. Token requests are plain
+// HTTPS form-encoded POSTs — no AWS SigV4 needed.
 
-async function authCodeFlow(appArn, ssoRegion) {
+async function authCodeFlow(cognitoDomain, clientId) {
   const verifier = generateCodeVerifier();
   const challenge = generateCodeChallenge(verifier);
   const state = randomBytes(16).toString('hex');
 
-  // Start local HTTP server before opening the browser so the callback
-  // is ready to receive the redirect.
   let resolveCode, rejectCode;
   const codePromise = new Promise((res, rej) => {
     resolveCode = res;
@@ -249,6 +190,7 @@ async function authCodeFlow(appArn, ssoRegion) {
     const url = new URL(req.url, REDIRECT_URI);
     const code = url.searchParams.get('code');
     const error = url.searchParams.get('error');
+    const errorDescription = url.searchParams.get('error_description');
     const returnedState = url.searchParams.get('state');
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(
@@ -267,7 +209,11 @@ async function authCodeFlow(appArn, ssoRegion) {
     } else if (code) {
       resolveCode(code);
     } else {
-      rejectCode(new Error(error ?? 'No authorization code in callback'));
+      rejectCode(
+        new Error(
+          errorDescription ?? error ?? 'No authorization code in callback',
+        ),
+      );
     }
   });
 
@@ -277,11 +223,11 @@ async function authCodeFlow(appArn, ssoRegion) {
   });
 
   const authUrl =
-    `https://oidc.${ssoRegion}.amazonaws.com/authorize` +
+    `${cognitoDomain}/oauth2/authorize` +
     `?response_type=code` +
-    `&client_id=${encodeURIComponent(appArn)}` +
+    `&client_id=${encodeURIComponent(clientId)}` +
     `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
-    `&scope=openid` +
+    `&scope=${encodeURIComponent('openid email profile')}` +
     `&code_challenge=${challenge}` +
     `&code_challenge_method=S256` +
     `&state=${state}`;
@@ -299,103 +245,56 @@ async function authCodeFlow(appArn, ssoRegion) {
   const code = await codePromise;
 
   LOGGER.info('Authorized — exchanging code for tokens…');
-  return aws(
-    'sso-oidc',
-    'create-token-with-iam',
-    [
-      '--client-id',
-      appArn,
-      '--grant-type',
-      'authorization_code',
-      '--code',
-      code,
-      '--redirect-uri',
-      REDIRECT_URI,
-      '--code-verifier',
-      verifier,
-      '--scope',
-      'openid',
-    ],
-    ssoRegion,
-  );
+  return exchangeCodeForTokens(cognitoDomain, clientId, code, verifier);
 }
 
-// ── Grant configuration (--setup only) ───────────────────────────────────────
-
-function configureAppGrants(appArn, ssoRegion) {
-  LOGGER.info(
-    'Configuring OAuth grants on the IAM Identity Center application…',
-  );
-
-  // authorization_code grant — required for the auth code + PKCE flow
-  const authCodeGrant = JSON.stringify({
-    AuthorizationCode: { RedirectUris: [REDIRECT_URI] },
+async function exchangeCodeForTokens(cognitoDomain, clientId, code, verifier) {
+  const body = new URLSearchParams({
+    grant_type: 'authorization_code',
+    client_id: clientId,
+    code,
+    redirect_uri: REDIRECT_URI,
+    code_verifier: verifier,
   });
-  const r1 = spawnSync(
-    'aws',
-    [
-      'sso-admin',
-      'put-application-grant',
-      '--application-arn',
-      appArn,
-      '--grant-type',
-      'authorization_code',
-      '--grant',
-      authCodeGrant,
-      '--region',
-      ssoRegion,
-    ],
-    { encoding: 'utf8', env: { ...process.env } },
-  );
-  if (r1.status !== 0)
-    throw new Error(`put-application-grant (auth_code) failed:\n${r1.stderr}`);
 
-  // refresh_token grant — allows token refresh without re-authenticating
-  const r2 = spawnSync(
-    'aws',
-    [
-      'sso-admin',
-      'put-application-grant',
-      '--application-arn',
-      appArn,
-      '--grant-type',
-      'refresh_token',
-      '--grant',
-      '{"RefreshToken":{}}',
-      '--region',
-      ssoRegion,
-    ],
-    { encoding: 'utf8', env: { ...process.env } },
-  );
-  if (r2.status !== 0)
+  const res = await fetch(`${cognitoDomain}/oauth2/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
+  });
+
+  const text = await res.text();
+  if (!res.ok) {
     throw new Error(
-      `put-application-grant (refresh_token) failed:\n${r2.stderr}`,
+      `Cognito /oauth2/token failed (HTTP ${res.status}): ${text}`,
     );
-
-  LOGGER.info('OAuth grants configured.');
+  }
+  return JSON.parse(text);
 }
 
-// ── Token refresh ─────────────────────────────────────────────────────────────
+async function refreshTokenViaCognito(cognitoDomain, clientId, refreshTok) {
+  const body = new URLSearchParams({
+    grant_type: 'refresh_token',
+    client_id: clientId,
+    refresh_token: refreshTok,
+  });
 
-function refreshToken(appArn, refreshTok, ssoRegion) {
-  return aws(
-    'sso-oidc',
-    'create-token-with-iam',
-    [
-      '--client-id',
-      appArn,
-      '--grant-type',
-      'refresh_token',
-      '--refresh-token',
-      refreshTok,
-      '--scope',
-      'openid',
-    ],
-    ssoRegion,
-  );
+  const res = await fetch(`${cognitoDomain}/oauth2/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
+  });
+
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(
+      `Cognito /oauth2/token (refresh) failed (HTTP ${res.status}): ${text}`,
+    );
+  }
+  return JSON.parse(text);
 }
 
-// ── SSM — read API Gateway URLs written by Terraform ─────────────────────────
+// ── SSM — read Cognito identifiers + API URLs written by Terraform ───────────
 
 function readSsmParameter(paramName) {
   try {
@@ -410,8 +309,11 @@ function readApiUrlFromSsm(name, env) {
   return readSsmParameter(`/legacy-sports-${env}/mcp/${name}/api-url`);
 }
 
-function readAppArnFromSsm(env) {
-  return readSsmParameter(`/legacy-sports-${env}/mcp/oidc/app-arn`);
+function readCognitoConfig(env) {
+  return {
+    clientId: readSsmParameter(`/legacy-sports-${env}/mcp/cognito/client-id`),
+    domain: readSsmParameter(`/legacy-sports-${env}/mcp/cognito/domain`),
+  };
 }
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
@@ -425,53 +327,36 @@ function printDivider() {
 async function main() {
   const env = readEnvLocal();
 
-  // Discover SSO config — we need ssoRegion for the OIDC endpoint URL.
-  let ssoConfig;
-  try {
-    ssoConfig = findSsoConfig();
-  } catch (err) {
-    LOGGER.error('Error discovering SSO config', err);
-    process.exit(1);
-  }
-  const { region: ssoRegion } = ssoConfig;
-
   // Terraform environment (default dev; override via MCP_TF_ENV or --env flag)
   const tfEnvArg = args.find((a, i) => args[i - 1] === '--env');
   const tfEnv = tfEnvArg ?? process.env['MCP_TF_ENV'] ?? 'dev';
 
-  // ── Step 1: resolve application ARN ──────────────────────────────────────
-  // The ARN is the client_id for create-token-with-iam. It comes from the
-  // aws_ssoadmin_application Terraform resource, published to SSM.
-  let appArn = env['MCP_AUTH_CLIENT_ID'];
-  if (!appArn || SETUP_MODE) {
-    LOGGER.info('Reading application ARN from SSM…');
-    appArn = readAppArnFromSsm(tfEnv);
-    if (!appArn) {
+  // ── Step 1: resolve Cognito client id + hosted UI domain from SSM ────────
+  let clientId = env['MCP_AUTH_CLIENT_ID'];
+  let cognitoDomain = env['MCP_AUTH_COGNITO_DOMAIN'];
+  if (!clientId || !cognitoDomain || SETUP_MODE) {
+    LOGGER.info('Reading Cognito config from SSM…');
+    const cfg = readCognitoConfig(tfEnv);
+    if (!cfg.clientId || !cfg.domain) {
       LOGGER.error(
-        `Could not read application ARN from SSM`,
+        'Could not read Cognito config from SSM',
         new Error(
-          `Expected /legacy-sports-${tfEnv}/mcp/oidc/app-arn — run terraform apply in terraform/main first`,
+          `Expected /legacy-sports-${tfEnv}/mcp/cognito/client-id and /legacy-sports-${tfEnv}/mcp/cognito/domain — run terraform apply in terraform/main first`,
         ),
       );
       process.exit(1);
     }
-    writeEnvLocal({ MCP_AUTH_CLIENT_ID: appArn });
-    LOGGER.info(`Application ARN: ${appArn}`);
+    clientId = cfg.clientId;
+    cognitoDomain = cfg.domain;
+    writeEnvLocal({
+      MCP_AUTH_CLIENT_ID: clientId,
+      MCP_AUTH_COGNITO_DOMAIN: cognitoDomain,
+    });
+    LOGGER.info(`Client ID:      ${clientId}`);
+    LOGGER.info(`Cognito domain: ${cognitoDomain}`);
   }
 
-  // ── Step 2: configure OAuth grants (setup mode only) ─────────────────────
-  // Terraform has no aws_ssoadmin_application_grant resource, so grants are
-  // configured here via the AWS CLI on first setup.
-  if (SETUP_MODE) {
-    try {
-      configureAppGrants(appArn, ssoRegion);
-    } catch (err) {
-      LOGGER.error('Failed to configure OAuth grants', err);
-      process.exit(1);
-    }
-  }
-
-  // ── Step 3: get / refresh token ───────────────────────────────────────────
+  // ── Step 2: get / refresh token ──────────────────────────────────────────
   let tokenData = null;
   const existingToken = env['MCP_AUTH_TOKEN'];
   const existingRefresh = env['MCP_AUTH_REFRESH_TOKEN'];
@@ -484,26 +369,32 @@ async function main() {
   } else if (!FORCE_MODE && existingRefresh) {
     LOGGER.info('Refreshing token…');
     try {
-      tokenData = refreshToken(appArn, existingRefresh, ssoRegion);
+      tokenData = await refreshTokenViaCognito(
+        cognitoDomain,
+        clientId,
+        existingRefresh,
+      );
       LOGGER.info('Token refreshed.');
     } catch (err) {
       LOGGER.warn(
         `Refresh failed — falling back to authorization code flow`,
         err,
       );
-      tokenData = await authCodeFlow(appArn, ssoRegion);
+      tokenData = await authCodeFlow(cognitoDomain, clientId);
     }
   } else {
-    tokenData = await authCodeFlow(appArn, ssoRegion);
+    tokenData = await authCodeFlow(cognitoDomain, clientId);
   }
 
   if (tokenData) {
-    const idToken = tokenData['idToken'];
+    // Cognito's OAuth /oauth2/token returns snake_case: id_token,
+    // refresh_token, access_token, expires_in, token_type.
+    const idToken = tokenData['id_token'];
     if (!idToken) {
       LOGGER.error(
-        'SSO token response did not include an idToken',
+        'Cognito token response did not include an id_token',
         new Error(
-          `IAM Identity Center did not grant the openid scope. Verify aws_ssoadmin_application_access_scope "openid" in Terraform and re-run terraform apply. Response keys: ${Object.keys(tokenData).join(', ') || '<none>'}`,
+          `Verify the user pool client has 'openid' in allowed_oauth_scopes. Response keys: ${Object.keys(tokenData).join(', ') || '<none>'}`,
         ),
       );
       process.exit(1);
@@ -512,7 +403,11 @@ async function main() {
     const payload = decodeJwtPayload(idToken);
     writeEnvLocal({
       MCP_AUTH_TOKEN: idToken,
-      MCP_AUTH_REFRESH_TOKEN: tokenData['refreshToken'] ?? '',
+      // Cognito's refresh-token grant doesn't return a new refresh_token —
+      // re-use the existing one, only overwriting if Cognito gave us a
+      // fresh one (it does on the initial auth-code exchange).
+      MCP_AUTH_REFRESH_TOKEN:
+        tokenData['refresh_token'] ?? existingRefresh ?? '',
       MCP_AUTH_EXPIRES_AT: String(payload['exp'] ?? ''),
     });
 
@@ -522,7 +417,7 @@ async function main() {
     );
   }
 
-  // ── Step 4: populate MCP_*_URL from SSM ──────────────────────────────────
+  // ── Step 3: populate MCP_*_URL from SSM ──────────────────────────────────
   const urlUpdates = {};
   let allUrlsFound = true;
 
@@ -555,7 +450,7 @@ async function main() {
     );
   }
 
-  // ── Step 5: post-write self-check ─────────────────────────────────────────
+  // ── Step 4: post-write self-check ─────────────────────────────────────────
   const REQUIRED_VARS = [
     'MCP_AUTH_TOKEN',
     'MCP_JIRA_URL',
