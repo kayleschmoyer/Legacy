@@ -105,9 +105,18 @@ resource "aws_cognito_user_pool" "mcp_dev" {
 
 # Hosted UI domain — Cognito's default *.auth.<region>.amazoncognito.com.
 # The `domain` value must be globally unique within the region.
+#
+# managed_login_version = 1 pins this domain to Cognito's classic hosted UI.
+# The default (v2 "Managed Login") requires a companion
+# aws_cognito_managed_login_branding resource per app client before any
+# authorize request will render — without it, /oauth2/authorize redirects
+# straight to /error?error=Required+parameters+missing. For an internal
+# dev tool used by ~5 engineers, the classic UI is fine and we skip the
+# extra branding plumbing.
 resource "aws_cognito_user_pool_domain" "mcp_dev" {
-  domain       = "${local.name_prefix}-mcp"
-  user_pool_id = aws_cognito_user_pool.mcp_dev.id
+  domain                = "${local.name_prefix}-mcp"
+  user_pool_id          = aws_cognito_user_pool.mcp_dev.id
+  managed_login_version = 1
 }
 
 # OAuth client used by scripts/mcp-auth.mjs. Public client (no secret) —
