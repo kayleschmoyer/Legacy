@@ -422,18 +422,77 @@ export function hasCannotComplyResponse(
   botLogins,
   authorLogin,
 ) {
-  if (!authorLogin) return false;
+  return (
+    collectCannotComplyResponses(
+      reviewComments,
+      issueComments,
+      lastBotReviewAt,
+      botLogins,
+      authorLogin,
+    ).length > 0
+  );
+}
+
+/**
+ * Collect every CANNOT-COMPLY reply posted by the PR author since the last
+ * bot review. Same filtering rules as {@link hasCannotComplyResponse}, but
+ * returns the parsed entries instead of a boolean so callers can surface
+ * the specific issue-id + reason in escalation messages.
+ *
+ * @typedef {{
+ *   source: 'review' | 'issue',
+ *   commentId: number,
+ *   issueId: string,
+ *   reason: string,
+ *   createdAt: string,
+ * }} CannotComplyEntry
+ *
+ * @param {Array<{ id: number, inReplyToId: number | null, userLogin: string | null, body: string, createdAt: string }>} reviewComments
+ * @param {Array<{ id: number, userLogin: string | null, body: string, createdAt: string }>} issueComments
+ * @param {string} lastBotReviewAt
+ * @param {Set<string>} botLogins
+ * @param {string} authorLogin
+ * @returns {CannotComplyEntry[]}
+ */
+export function collectCannotComplyResponses(
+  reviewComments,
+  issueComments,
+  lastBotReviewAt,
+  botLogins,
+  authorLogin,
+) {
+  /** @type {CannotComplyEntry[]} */
+  const out = [];
+  if (!authorLogin) return out;
   for (const c of reviewComments) {
     if (botLogins.has(c.userLogin) || c.inReplyToId === null) continue;
     if (c.userLogin !== authorLogin) continue;
     if (lastBotReviewAt && c.createdAt <= lastBotReviewAt) continue;
-    if (parseAuthorReply(c.body).type === 'CANNOT-COMPLY') return true;
+    const parsed = parseAuthorReply(c.body);
+    if (parsed.type === 'CANNOT-COMPLY') {
+      out.push({
+        source: 'review',
+        commentId: c.id,
+        issueId: parsed.issueId,
+        reason: parsed.reason,
+        createdAt: c.createdAt,
+      });
+    }
   }
   for (const c of issueComments) {
     if (botLogins.has(c.userLogin)) continue;
     if (c.userLogin !== authorLogin) continue;
     if (lastBotReviewAt && c.createdAt <= lastBotReviewAt) continue;
-    if (parseAuthorReply(c.body).type === 'CANNOT-COMPLY') return true;
+    const parsed = parseAuthorReply(c.body);
+    if (parsed.type === 'CANNOT-COMPLY') {
+      out.push({
+        source: 'issue',
+        commentId: c.id,
+        issueId: parsed.issueId,
+        reason: parsed.reason,
+        createdAt: c.createdAt,
+      });
+    }
   }
-  return false;
+  return out;
 }

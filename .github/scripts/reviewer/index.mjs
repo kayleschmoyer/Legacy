@@ -44,6 +44,7 @@ import {
   filterFindingsCycle3,
   buildAuthorResponsesSection,
   hasCannotComplyResponse,
+  collectCannotComplyResponses,
   getMalformedInlineReplies,
 } from './lib/cycle-protocol.mjs';
 import { FORMAT_ERROR_MESSAGE } from './lib/parse-author-response.mjs';
@@ -246,10 +247,20 @@ async function main() {
 
   // Cycle > MAX_CYCLE → escalate instead of reviewing
   if (isEscalationRequired(cycle)) {
+    const lastReviewForEscalation =
+      allReviews
+        .filter((r) => REVIEWER_BOT_LOGINS.has(r.userLogin))
+        .slice()
+        .sort((a, b) => (a.submittedAt < b.submittedAt ? -1 : 1))
+        .findLast((r) => r.state !== 'DISMISSED' && !isInfraErrorReview(r)) ??
+      null;
     await escalateToHumanArbitration(
       prNumber,
       sha,
       `Cycle ${cycle} exceeds MAX_CYCLE — applying '${NEEDS_HUMAN_ARBITRATION_LABEL}' label and exiting`,
+      {
+        body: buildCycleLimitArbitrationComment(cycle, lastReviewForEscalation),
+      },
     );
     return;
   }
@@ -347,10 +358,24 @@ async function main() {
           authorLogin,
         )
       ) {
+        const cannotComplyEntries = collectCannotComplyResponses(
+          prReviewComments,
+          prIssueComments,
+          lastBotReview.submittedAt,
+          REVIEWER_BOT_LOGINS,
+          authorLogin,
+        );
         await escalateToHumanArbitration(
           prNumber,
           sha,
           `Cycle ${cycle}: CANNOT-COMPLY detected — applying '${NEEDS_HUMAN_ARBITRATION_LABEL}' label and exiting`,
+          {
+            body: buildCannotComplyArbitrationComment(
+              prNumber,
+              cycle,
+              cannotComplyEntries,
+            ),
+          },
         );
         return;
       }
@@ -849,12 +874,42 @@ async function main() {
  * @param {number} prNumber
  * @param {string} sha
  * @param {string} logReason  Written to stdout before acting
+ * @param {{ body?: string }} [details]  Optional issue-level comment summarizing
+ *   what specifically needs human arbitration — surfaced as a top-level PR
+ *   comment so a maintainer entering the PR knows where to start. If `body` is
+ *   empty/omitted no comment is posted (the label and failing status still set).
  */
-async function escalateToHumanArbitration(prNumber, sha, logReason) {
+/**
+ * Hidden marker embedded in the arbitration summary comment so the
+ * label-pager workflow (W4) can find it and surface a snippet in the
+ * Discord escalation page. Keep in sync with `.github/workflows/label-pager.yml`.
+ */
+const ARBITRATION_COMMENT_MARKER = '<!-- arbitration-details:v1 -->';
+
+async function escalateToHumanArbitration(
+  prNumber,
+  sha,
+  logReason,
+  details = {},
+) {
   process.stdout.write(`[reviewer] ${logReason}\n`);
-  // Apply the terminal label first; only clean up the operational labels
-  // after it sticks. If `addLabelAsApp` fails the operational labels stay
-  // intact so the next labeled event can still self-heal.
+  // Post the arbitration summary BEFORE applying the label so the W4
+  // label-pager (which fires on `labeled`) can inline it into the Discord
+  // page without racing the comment write.
+  const commentBody = details.body?.trim();
+  if (commentBody) {
+    const markedBody = `${ARBITRATION_COMMENT_MARKER}\n${commentBody}`;
+    try {
+      await postEscalationComment(prNumber, markedBody);
+    } catch (err) {
+      process.stderr.write(
+        `[reviewer] Failed to post arbitration summary comment: ${err instanceof Error ? err.message : String(err)}\n`,
+      );
+    }
+  }
+  // Apply the terminal label after the comment; only clean up operational
+  // labels after it sticks. If `addLabelAsApp` fails the operational labels
+  // stay intact so the next labeled event can still self-heal.
   try {
     await addLabelAsApp(prNumber, NEEDS_HUMAN_ARBITRATION_LABEL);
     cleanupOperationalLabels(prNumber);
@@ -870,6 +925,124 @@ async function escalateToHumanArbitration(prNumber, sha, logReason) {
       `[reviewer] Failed to set bot-review failure: ${err instanceof Error ? err.message : String(err)}\n`,
     );
   }
+}
+
+const MAX_ARBITRATION_REASON_LEN = 400;
+const MAX_ARBITRATION_TITLES = 10;
+
+/**
+ * Truncate a multi-line reason to a single block of at most
+ * `MAX_ARBITRATION_REASON_LEN` characters, preserving newlines so the
+ * blockquote in the arbitration comment renders cleanly.
+ *
+ * @param {string} text
+ * @returns {string}
+ */
+function truncateReason(text) {
+  if (text.length <= MAX_ARBITRATION_REASON_LEN) return text;
+  return `${text.slice(0, MAX_ARBITRATION_REASON_LEN).trimEnd()}…`;
+}
+
+/**
+ * Build the GitHub URL for a PR comment so maintainers can jump straight to
+ * the relevant thread from the arbitration summary. Returns null when the
+ * repository slug is not available (e.g. local runs without
+ * GITHUB_REPOSITORY); callers fall back to plain text in that case.
+ *
+ * @param {number} prNumber
+ * @param {'review' | 'issue'} source
+ * @param {number} commentId
+ * @returns {string | null}
+ */
+function buildCommentUrl(prNumber, source, commentId) {
+  const repo = process.env.GITHUB_REPOSITORY;
+  if (!repo) return null;
+  const anchor =
+    source === 'review'
+      ? `discussion_r${commentId}`
+      : `issuecomment-${commentId}`;
+  return `https://github.com/${repo}/pull/${prNumber}#${anchor}`;
+}
+
+/**
+ * Build the issue-level comment posted when the cycle counter exceeds
+ * MAX_CYCLE. Lists the open mandate titles from the most recent bot review
+ * so a maintainer entering the PR can see what the bot was still flagging.
+ *
+ * @param {number} cycle
+ * @param {{ body: string | null } | null} lastBotReview
+ * @returns {string}
+ */
+function buildCycleLimitArbitrationComment(cycle, lastBotReview) {
+  const titles = parseTitlesFromReviewBody(lastBotReview?.body ?? '');
+  const lines = [
+    '> [!IMPORTANT]',
+    `> **Human arbitration needed — review cycle limit (${cycle}) exceeded.**`,
+    '',
+    'The bot and the author could not converge after the maximum number of review cycles. A human reviewer is needed to adjudicate the outstanding findings below.',
+  ];
+  if (titles.length === 0) {
+    lines.push(
+      '',
+      '_No findings could be extracted from the last bot review body._',
+    );
+  } else {
+    const shown = titles.slice(0, MAX_ARBITRATION_TITLES);
+    lines.push('', '**Outstanding findings from the last bot review:**', '');
+    for (const t of shown) lines.push(`- ${t}`);
+    if (titles.length > shown.length) {
+      lines.push(
+        `- _…and ${titles.length - shown.length} more (see the latest bot review)_`,
+      );
+    }
+  }
+  lines.push(
+    '',
+    '**What to do:** read the latest bot review and the author replies, then decide for each thread whether to (a) push a fix, (b) apply `review-bot-override` if the bot is wrong, or (c) apply `bot:reset-cycle-counter` to give the author another cycle.',
+  );
+  return lines.join('\n');
+}
+
+/**
+ * Build the issue-level comment posted when the author submits a
+ * CANNOT-COMPLY reply. Lists every CANNOT-COMPLY entry with its issue-id,
+ * the author's reason, and a link to the originating comment so a maintainer
+ * can jump straight to the disputed thread.
+ *
+ * @param {number} prNumber
+ * @param {number} cycle
+ * @param {import('./lib/cycle-protocol.mjs').CannotComplyEntry[]} entries
+ * @returns {string}
+ */
+function buildCannotComplyArbitrationComment(prNumber, cycle, entries) {
+  const lines = [
+    '> [!IMPORTANT]',
+    `> **Human arbitration needed — author posted \`CANNOT-COMPLY\` (cycle ${cycle}).**`,
+    '',
+    'The author has declared one or more findings impossible to fix. A human reviewer is needed to adjudicate each claim.',
+    '',
+  ];
+  if (entries.length === 0) {
+    lines.push('_No CANNOT-COMPLY entries could be extracted._');
+  } else {
+    for (const e of entries) {
+      const url = buildCommentUrl(prNumber, e.source, e.commentId);
+      const linkLabel =
+        e.source === 'review' ? 'review thread' : 'issue comment';
+      const link = url
+        ? `[${linkLabel}](${url})`
+        : `${linkLabel} #${e.commentId}`;
+      const reason = truncateReason(e.reason)
+        .split('\n')
+        .map((l) => `> ${l}`)
+        .join('\n');
+      lines.push(`- **\`${e.issueId}\`** — ${link}`, '', reason, '');
+    }
+  }
+  lines.push(
+    '**What to do:** for each entry above, decide whether to (a) accept the claim and apply `review-bot-override`, or (b) reject it and ask the author to push a fix (then apply `bot:reset-cycle-counter` to resume bot review).',
+  );
+  return lines.join('\n');
 }
 
 /**

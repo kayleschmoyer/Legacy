@@ -39,6 +39,8 @@ jobs:
           WEBHOOK: ${{ secrets.ESCALATION_WEBHOOK_URL }}
           GH_TOKEN: ${{ github.token }}
           LABEL: ${{ github.event_name == 'workflow_dispatch' && inputs.label_name || github.event.label.name }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER_INPUT: ${{ github.event_name == 'workflow_dispatch' && inputs.pr_number || github.event.pull_request.number }}
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             PR_URL="https://github.com/${{ github.repository }}/pull/${{ inputs.pr_number }}"
@@ -47,7 +49,34 @@ jobs:
             PR_URL="${{ github.event.pull_request.html_url }}"
             PR_TITLE="${{ github.event.pull_request.title }}"
           fi
-          curl -fsS -X POST "$WEBHOOK" \
-            -H 'Content-Type: application/json' \
-            -d "$(jq -nc --arg pr_url "$PR_URL" --arg label "$LABEL" --arg title "$PR_TITLE" \
-                  '{ content: ("Escalation: \($label) on \($pr_url) — \($title)") }')"
+
+          # For needs-human-arbitration, fetch the bot's arbitration summary
+          # comment (marked with the hidden v1 marker — kept in sync with
+          # .github/scripts/reviewer/index.mjs ARBITRATION_COMMENT_MARKER) and
+          # inline it into the Discord page so the on-call has a starting
+          # point without opening the PR. Discord's `content` field caps at
+          # 2000 chars; we cap the comment body at ~1500.
+          DETAILS=""
+          if [ "$LABEL" = "needs-human-arbitration" ]; then
+            # `gh api --paginate` emits one JSON array per page; `jq -s add`
+            # flattens into a single array before filtering for the marker.
+            # The marker (kept in sync with `ARBITRATION_COMMENT_MARKER` in
+            # .github/scripts/reviewer/index.mjs) is on the first line of the
+            # comment — `sed '1d'` strips it before sending to Discord.
+            DETAILS=$(gh api "repos/${REPO}/issues/${PR_NUMBER_INPUT}/comments" --paginate \
+              | jq -rs '(add // []) | map(select(.body | startswith("<!-- arbitration-details:v1 -->"))) | (last.body // "")' \
+              | sed '1d' \
+              | head -c 1500)
+          fi
+
+          if [ -n "$DETAILS" ]; then
+            curl -fsS -X POST "$WEBHOOK" \
+              -H 'Content-Type: application/json' \
+              -d "$(jq -nc --arg pr_url "$PR_URL" --arg label "$LABEL" --arg title "$PR_TITLE" --arg details "$DETAILS" \
+                    '{ content: ("Escalation: \($label) on \($pr_url) — \($title)\n\n\($details)") }')"
+          else
+            curl -fsS -X POST "$WEBHOOK" \
+              -H 'Content-Type: application/json' \
+              -d "$(jq -nc --arg pr_url "$PR_URL" --arg label "$LABEL" --arg title "$PR_TITLE" \
+                    '{ content: ("Escalation: \($label) on \($pr_url) — \($title)") }')"
+          fi

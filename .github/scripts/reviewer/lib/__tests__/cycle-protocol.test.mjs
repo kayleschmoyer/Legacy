@@ -9,6 +9,7 @@ import {
   buildCycleRoleSection,
   buildAuthorResponsesSection,
   hasCannotComplyResponse,
+  collectCannotComplyResponses,
   getMalformedInlineReplies,
 } from '../cycle-protocol.mjs';
 import { FORMAT_ERROR_MESSAGE } from '../parse-author-response.mjs';
@@ -1659,5 +1660,215 @@ describe('getMalformedInlineReplies — detects MALFORMED replies', () => {
       BOT_LOGINS,
     );
     assert.deepStrictEqual(result, []);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// collectCannotComplyResponses
+// ---------------------------------------------------------------------------
+
+describe('collectCannotComplyResponses', () => {
+  it('returns empty when no responses match', () => {
+    assert.deepStrictEqual(
+      collectCannotComplyResponses([], [], REVIEW_AT, BOT_LOGINS, AUTHOR_LOGIN),
+      [],
+    );
+  });
+
+  it('returns inline CANNOT-COMPLY entries from the author with parsed issueId/reason', () => {
+    const reviewComments = [
+      {
+        id: 10,
+        inReplyToId: null,
+        userLogin: 'github-actions[bot]',
+        body: 'bot finding',
+        createdAt: REVIEW_AT,
+      },
+      {
+        id: 11,
+        inReplyToId: 10,
+        userLogin: AUTHOR_LOGIN,
+        body: 'CANNOT-COMPLY: LS-1234\nGenerated file — cannot edit by hand.',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    const result = collectCannotComplyResponses(
+      reviewComments,
+      [],
+      REVIEW_AT,
+      BOT_LOGINS,
+      AUTHOR_LOGIN,
+    );
+    assert.strictEqual(result.length, 1);
+    assert.deepStrictEqual(result[0], {
+      source: 'review',
+      commentId: 11,
+      issueId: 'LS-1234',
+      reason: 'Generated file — cannot edit by hand.',
+      createdAt: AFTER_REVIEW,
+    });
+  });
+
+  it('returns CANNOT-COMPLY entries from PR issue comments', () => {
+    const issueComments = [
+      {
+        id: 22,
+        userLogin: AUTHOR_LOGIN,
+        body: 'CANNOT-COMPLY: LS-9999\nVendored library.',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    const result = collectCannotComplyResponses(
+      [],
+      issueComments,
+      REVIEW_AT,
+      BOT_LOGINS,
+      AUTHOR_LOGIN,
+    );
+    assert.strictEqual(result.length, 1);
+    assert.strictEqual(result[0].source, 'issue');
+    assert.strictEqual(result[0].commentId, 22);
+    assert.strictEqual(result[0].issueId, 'LS-9999');
+  });
+
+  it('ignores CANNOT-COMPLY replies from non-author users', () => {
+    const reviewComments = [
+      {
+        id: 10,
+        inReplyToId: null,
+        userLogin: 'github-actions[bot]',
+        body: 'bot finding',
+        createdAt: REVIEW_AT,
+      },
+      {
+        id: 11,
+        inReplyToId: 10,
+        userLogin: 'someone-else',
+        body: 'CANNOT-COMPLY: LS-1234\nThird-party escalation attempt.',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    assert.deepStrictEqual(
+      collectCannotComplyResponses(
+        reviewComments,
+        [],
+        REVIEW_AT,
+        BOT_LOGINS,
+        AUTHOR_LOGIN,
+      ),
+      [],
+    );
+  });
+
+  it('ignores replies at or before the last bot review timestamp', () => {
+    const reviewComments = [
+      {
+        id: 10,
+        inReplyToId: null,
+        userLogin: 'github-actions[bot]',
+        body: 'bot finding',
+        createdAt: REVIEW_AT,
+      },
+      {
+        id: 11,
+        inReplyToId: 10,
+        userLogin: AUTHOR_LOGIN,
+        body: 'CANNOT-COMPLY: LS-1234\nStale.',
+        createdAt: REVIEW_AT,
+      },
+    ];
+    assert.deepStrictEqual(
+      collectCannotComplyResponses(
+        reviewComments,
+        [],
+        REVIEW_AT,
+        BOT_LOGINS,
+        AUTHOR_LOGIN,
+      ),
+      [],
+    );
+  });
+
+  it('returns an empty array when authorLogin is empty', () => {
+    const issueComments = [
+      {
+        id: 22,
+        userLogin: AUTHOR_LOGIN,
+        body: 'CANNOT-COMPLY: LS-9999\nReason.',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    assert.deepStrictEqual(
+      collectCannotComplyResponses(
+        [],
+        issueComments,
+        REVIEW_AT,
+        BOT_LOGINS,
+        '',
+      ),
+      [],
+    );
+  });
+
+  it('collects multiple entries across both sources', () => {
+    const reviewComments = [
+      {
+        id: 10,
+        inReplyToId: null,
+        userLogin: 'github-actions[bot]',
+        body: 'bot finding',
+        createdAt: REVIEW_AT,
+      },
+      {
+        id: 11,
+        inReplyToId: 10,
+        userLogin: AUTHOR_LOGIN,
+        body: 'CANNOT-COMPLY: LS-1\nA.',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    const issueComments = [
+      {
+        id: 22,
+        userLogin: AUTHOR_LOGIN,
+        body: 'CANNOT-COMPLY: LS-2\nB.',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    const result = collectCannotComplyResponses(
+      reviewComments,
+      issueComments,
+      REVIEW_AT,
+      BOT_LOGINS,
+      AUTHOR_LOGIN,
+    );
+    assert.strictEqual(result.length, 2);
+    assert.strictEqual(result[0].issueId, 'LS-1');
+    assert.strictEqual(result[1].issueId, 'LS-2');
+  });
+
+  it('hasCannotComplyResponse remains consistent with the collector', () => {
+    const issueComments = [
+      {
+        id: 22,
+        userLogin: AUTHOR_LOGIN,
+        body: 'CANNOT-COMPLY: LS-9999\nReason.',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    assert.strictEqual(
+      hasCannotComplyResponse(
+        [],
+        issueComments,
+        REVIEW_AT,
+        BOT_LOGINS,
+        AUTHOR_LOGIN,
+      ),
+      true,
+    );
+    assert.strictEqual(
+      hasCannotComplyResponse([], [], REVIEW_AT, BOT_LOGINS, AUTHOR_LOGIN),
+      false,
+    );
   });
 });
