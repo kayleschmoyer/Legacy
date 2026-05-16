@@ -156,7 +156,8 @@ test.describe
       });
       await expect(saveBtn).toBeEnabled({ timeout: 5_000 });
       await saveBtn.click();
-      await page.waitForTimeout(1_000);
+      // Mutation completes when Save returns to its enabled state.
+      await expect(saveBtn).toBeEnabled({ timeout: 10_000 });
     });
 
     await test.step('Start the draft', async () => {
@@ -394,8 +395,10 @@ test.describe
       const prevBtn = page.locator('[aria-label="Previous week"]');
       await expect(prevBtn).toBeVisible({ timeout: 10_000 });
       await prevBtn.click();
-      await page.waitForTimeout(300);
-
+      // The week-text-after check below is the deterministic signal that
+      // the click either updated or no-op'd the week display; if the click
+      // had any UI effect it would render before textContent resolves
+      // (LS-4457).
       const weekTextAfter = await page
         .getByText(/^Week \d+$/)
         .first()
@@ -417,7 +420,9 @@ test.describe
       // NOTE: the badge renders all-caps "YOU" — exact: true is case-sensitive.
       const youBadge = page.getByText('YOU', { exact: true }).first();
       // The sidebar matchup list can be slow to populate; reload up to 3
-      // times to refresh stale Apollo cache, then assert strictly.
+      // times to refresh stale Apollo cache, then assert strictly. The
+      // helper internally has no fixed-duration sleeps in the iteration
+      // body — the cooldown is its only timed wait (LS-4457 compatible).
       await reloadUntilVisible(page, youBadge, {
         attempts: 3,
         pollTimeoutMs: 5_000,

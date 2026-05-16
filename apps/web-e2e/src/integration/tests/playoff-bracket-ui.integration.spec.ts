@@ -201,7 +201,8 @@ test.describe
       });
       await expect(saveBtn).toBeEnabled({ timeout: 5_000 });
       await saveBtn.click();
-      await page.waitForTimeout(1_000);
+      // Mutation completes when Save returns to its enabled state.
+      await expect(saveBtn).toBeEnabled({ timeout: 10_000 });
     });
 
     await test.step('Start the draft', async () => {

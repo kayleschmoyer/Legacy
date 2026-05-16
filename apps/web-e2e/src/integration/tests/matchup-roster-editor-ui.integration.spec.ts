@@ -172,7 +172,8 @@ test.describe
       });
       await expect(saveBtn).toBeEnabled({ timeout: 10_000 });
       await saveBtn.click();
-      await page.waitForTimeout(1_000);
+      // Mutation completes when Save returns to its enabled state.
+      await expect(saveBtn).toBeEnabled({ timeout: 10_000 });
     });
 
     await test.step('Start the draft', async () => {
@@ -193,22 +194,32 @@ test.describe
       // status transition — the getLeagueById query returns null transiently
       // while the backend is updating the league record.  A direct API poll
       // avoids that rendering race condition entirely.
-      const deadline = Date.now() + 180_000;
-      let draftDone = false;
-      while (!draftDone && Date.now() < deadline) {
-        const { league } = await gqlFetch<{
-          league: { draftStatus: string } | null;
-        }>(
-          commissionerJwt,
-          `query GetLeagueDraftStatus($id: Int!) {
-            league(id: $id) { draftStatus }
-          }`,
-          { id: state.leagueId },
-        ).catch(() => ({ league: null }));
-        draftDone = league?.draftStatus === 'completed';
-        if (!draftDone) await new Promise((r) => setTimeout(r, 5_000));
-      }
-      expect(draftDone, 'Draft must complete within 3 minutes').toBe(true);
+      //
+      // The poll callback returns null on errors so expect.poll retries on
+      // assertion failure rather than throwing (antipattern #1 in
+      // e2e-determinism.md). LS-4457 replaced the hand-rolled
+      // Date.now()+while-loop with this expect.poll formulation.
+      await expect
+        .poll(
+          async () => {
+            const data = await gqlFetch<{
+              league: { draftStatus: string } | null;
+            }>(
+              commissionerJwt,
+              `query GetLeagueDraftStatus($id: Int!) {
+                league(id: $id) { draftStatus }
+              }`,
+              { id: state.leagueId },
+            ).catch(() => null);
+            return data?.league?.draftStatus ?? null;
+          },
+          {
+            timeout: 180_000,
+            intervals: [5_000],
+            message: `league.draftStatus did not reach 'completed' within 3 minutes for league ${state.leagueId}`,
+          },
+        )
+        .toBe('completed');
     });
 
     await test.step('Season Active chip is visible in UI', async () => {
@@ -311,36 +322,41 @@ test.describe
       // after draft completion and may not have committed when Phase 4 runs.
       // Gate here (before Phase 5 page navigation) so a lineup-population
       // failure surfaces with a clear API assertion message rather than a
-      // 60-second UI timeout in Phase 5.
-      const deadline = Date.now() + 60_000;
-      let hasStarters = false;
-      while (!hasStarters && Date.now() < deadline) {
-        const { getMatchupPlayers } = await gqlFetch<{
-          getMatchupPlayers: Array<{
-            id: string;
-            teamId: number;
-            positionId: number | null;
-          }>;
-        }>(
-          commissionerJwt,
-          `query GetMatchupPlayers($matchupId: Int!) {
-            getMatchupPlayers(matchupId: $matchupId) {
-              id
-              teamId
-              positionId
-            }
-          }`,
-          { matchupId: state.matchupId },
-        );
-        hasStarters = getMatchupPlayers
-          .filter((mp) => mp.teamId === state.commissionerTeamId)
-          .some((mp) => mp.positionId !== null);
-        if (!hasStarters) await new Promise((r) => setTimeout(r, 4_000));
-      }
-      expect(
-        hasStarters,
-        `Commissioner team (${state.commissionerTeamId}) must have at least one starter in matchup ${state.matchupId} — autoPopulateFirstMatchupLineup must complete before the UI test`,
-      ).toBe(true);
+      // 60-second UI timeout in Phase 5. Migrated from a Date.now()+while
+      // loop to expect.poll in LS-4457.
+      await expect
+        .poll(
+          async () => {
+            const data = await gqlFetch<{
+              getMatchupPlayers: Array<{
+                id: string;
+                teamId: number;
+                positionId: number | null;
+              }>;
+            }>(
+              commissionerJwt,
+              `query GetMatchupPlayers($matchupId: Int!) {
+                getMatchupPlayers(matchupId: $matchupId) {
+                  id
+                  teamId
+                  positionId
+                }
+              }`,
+              { matchupId: state.matchupId },
+            ).catch(() => null);
+            const players = data?.getMatchupPlayers ?? null;
+            if (!players) return false;
+            return players
+              .filter((mp) => mp.teamId === state.commissionerTeamId)
+              .some((mp) => mp.positionId !== null);
+          },
+          {
+            timeout: 60_000,
+            intervals: [4_000],
+            message: `Commissioner team (${state.commissionerTeamId}) must have at least one starter in matchup ${state.matchupId} — autoPopulateFirstMatchupLineup must complete before the UI test`,
+          },
+        )
+        .toBe(true);
     });
   });
 
@@ -361,36 +377,41 @@ test.describe
       // and may not have committed when Phase 5 starts. Poll the direct API until
       // at least one matchup_player for the commissioner's team has a non-null
       // positionId — filtering to the commissioner's team prevents a false pass
-      // where only the opponent's players are assigned (LS-3834).
-      const deadline = Date.now() + 60_000;
-      let hasStarters = false;
-      while (!hasStarters && Date.now() < deadline) {
-        const { getMatchupPlayers } = await gqlFetch<{
-          getMatchupPlayers: Array<{
-            id: string;
-            teamId: number;
-            positionId: number | null;
-          }>;
-        }>(
-          commissionerJwt,
-          `query GetMatchupPlayers($matchupId: Int!) {
-            getMatchupPlayers(matchupId: $matchupId) {
-              id
-              teamId
-              positionId
-            }
-          }`,
-          { matchupId: state.matchupId },
-        );
-        hasStarters = getMatchupPlayers
-          .filter((mp) => mp.teamId === state.commissionerTeamId)
-          .some((mp) => mp.positionId !== null);
-        if (!hasStarters) await new Promise((r) => setTimeout(r, 4_000));
-      }
-      expect(
-        hasStarters,
-        `Commissioner team (${state.commissionerTeamId}) must have at least one starter before UI check`,
-      ).toBe(true);
+      // where only the opponent's players are assigned (LS-3834). Migrated from
+      // a Date.now()+while loop to expect.poll in LS-4457.
+      await expect
+        .poll(
+          async () => {
+            const data = await gqlFetch<{
+              getMatchupPlayers: Array<{
+                id: string;
+                teamId: number;
+                positionId: number | null;
+              }>;
+            }>(
+              commissionerJwt,
+              `query GetMatchupPlayers($matchupId: Int!) {
+                getMatchupPlayers(matchupId: $matchupId) {
+                  id
+                  teamId
+                  positionId
+                }
+              }`,
+              { matchupId: state.matchupId },
+            ).catch(() => null);
+            const players = data?.getMatchupPlayers ?? null;
+            if (!players) return false;
+            return players
+              .filter((mp) => mp.teamId === state.commissionerTeamId)
+              .some((mp) => mp.positionId !== null);
+          },
+          {
+            timeout: 60_000,
+            intervals: [4_000],
+            message: `Commissioner team (${state.commissionerTeamId}) must have at least one starter before UI check`,
+          },
+        )
+        .toBe(true);
     });
 
     await test.step('Navigate to matchup detail page and wait for Edit Lineup', async () => {
@@ -414,6 +435,9 @@ test.describe
         .waitForLoadState('networkidle', { timeout: 15_000 })
         .catch(() => undefined);
 
+      // Force Apollo refetches by reloading until the editor appears, then
+      // assert strictly. `reloadUntilVisible` is the canonical helper for
+      // this pattern (LS-4458, LS-4457).
       await reloadUntilVisible(page, editLineup, {
         attempts: 30,
         pollTimeoutMs: 1_000,
@@ -456,23 +480,33 @@ test.describe
       // step gates on STARTERS (N/N), false-positives from bench rows are not
       // possible — if the step passed, starters are assigned.
       const playerRows = editorCard.getByTestId(/^matchup-player-row-/);
-      const deadline = Date.now() + 60_000;
-      while (
-        !(await playerRows
-          .first()
-          .isVisible()
-          .catch(() => false))
-      ) {
-        if (Date.now() >= deadline) break;
-        await page.waitForTimeout(5_000);
-        await page.reload();
-        await page.waitForLoadState('load');
-        await page
-          .getByText('Edit Lineup', { exact: true })
-          .first()
-          .waitFor({ state: 'visible', timeout: 15_000 })
-          .catch(() => undefined);
-      }
+      // Reload inside expect.poll to force fresh Apollo queries until at
+      // least one player row renders (replaces a Date.now()+while loop
+      // with waitForTimeout — LS-4457).
+      await expect
+        .poll(
+          async () => {
+            const visible = await playerRows
+              .first()
+              .isVisible()
+              .catch(() => false);
+            if (visible) return true;
+            await page.reload();
+            await page.waitForLoadState('load');
+            await page
+              .getByText('Edit Lineup', { exact: true })
+              .first()
+              .waitFor({ state: 'visible', timeout: 15_000 })
+              .catch(() => undefined);
+            return false;
+          },
+          {
+            timeout: 60_000,
+            intervals: [5_000],
+            message: 'No matchup-player-row rendered within 60s',
+          },
+        )
+        .toBe(true);
 
       await expect(playerRows.first()).toBeVisible({ timeout: 10_000 });
     });
@@ -530,7 +564,8 @@ test.describe
         .first();
       await expect(starterRow).toBeVisible({ timeout: 15_000 });
       await starterRow.click();
-      await page.waitForTimeout(500);
+      // The Bench action button rendering is the deterministic signal that
+      // the row is in its selected state; the next test.step asserts it.
     });
 
     await test.step('"Bench" action button appears when a starter is selected', async () => {
@@ -633,7 +668,8 @@ test.describe
         .first();
       await expect(benchedPlayerRow).toBeVisible({ timeout: 10_000 });
       await benchedPlayerRow.click();
-      await page.waitForTimeout(500);
+      // Position option buttons rendering is the deterministic signal that
+      // the row is in its selected state; the next test.step asserts it.
     });
 
     await test.step('Position option buttons appear for the selected bench player', async () => {
@@ -798,9 +834,9 @@ test.describe
         .first();
       await expect(firstPlayerRow).toBeVisible({ timeout: 10_000 });
       await firstPlayerRow.click();
-      await page.waitForTimeout(500);
 
-      // "Tap to swap" hint should appear on other players
+      // "Tap to swap" hint appearing is the deterministic signal that the
+      // row is in its selected state — replaces a 500ms wait.
       await expect(page.getByText('Tap to swap').first()).toBeVisible({
         timeout: 5_000,
       });

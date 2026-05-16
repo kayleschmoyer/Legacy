@@ -28,7 +28,7 @@
 import { expect } from '@playwright/test';
 import { reloadUntilVisible } from '../helpers/reload-until-visible';
 import { test } from '../fixtures/ui';
-import { gqlFetchEnvelope } from '../helpers/gql-fetch';
+import { gqlFetch, gqlFetchEnvelope } from '../helpers/gql-fetch';
 
 // ---------------------------------------------------------------------------
 // Shared state accumulated across serial tests.
@@ -221,16 +221,6 @@ test.describe
     // (30 s pick timer — mock-draft default).  15 × ~35 s ≈ 9 minutes.
     test.setTimeout(15 * 60_000); // 15-minute ceiling
 
-    await test.step('Navigate to draft board', async () => {
-      await page.goto(`/baseball/league/${state.leagueId}/draft`);
-      await page.waitForLoadState('load');
-      await expect(page.getByText('LIVE DRAFT').first()).toBeVisible({
-        timeout: 30_000,
-      });
-      // Give WebSocket time to establish
-      await page.waitForTimeout(3_000);
-    });
-
     // ---- Direct-nudge helper -----------------------------------------------
     // Calling autoProcessDraftPicks from Node.js is more reliable than waiting
     // for the in-browser React timer.  The mutation is idempotent: it is a
@@ -262,6 +252,41 @@ test.describe
         clearTimeout(timeout);
       }
     }
+
+    await test.step('Navigate to draft board', async () => {
+      await page.goto(`/baseball/league/${state.leagueId}/draft`);
+      await page.waitForLoadState('load');
+      await expect(page.getByText('LIVE DRAFT').first()).toBeVisible({
+        timeout: 30_000,
+      });
+      // Gate on the backend `getLeagueDraft.currentPick` being non-null —
+      // confirms the draft engine has initialised the first pick turn so
+      // Apollo polling will surface it on its next cycle (replaces a fixed
+      // 3s WebSocket-settle wait; antipattern #3/#9 in e2e-determinism.md;
+      // LS-4457). Returns null on errors so expect.poll retries on
+      // assertion failure rather than throwing.
+      await expect
+        .poll(
+          async () => {
+            const data = await gqlFetch<{
+              getLeagueDraft?: { currentPick?: number | null } | null;
+            }>(
+              commissionerJwt,
+              `query DraftPickReady($leagueId: Int!) {
+                getLeagueDraft(leagueId: $leagueId) { currentPick }
+              }`,
+              { leagueId: state.leagueId },
+            ).catch(() => null);
+            return data?.getLeagueDraft?.currentPick ?? null;
+          },
+          {
+            timeout: 30_000,
+            intervals: [500, 1_000, 2_000],
+            message: `Mock draft did not enter pick-ready state for league ${state.leagueId}`,
+          },
+        )
+        .not.toBeNull();
+    });
 
     const totalPicks = state.numTeams * state.rosterSize; // 4 × 5 = 20
     let pickCount = 0;
@@ -367,7 +392,12 @@ test.describe
                   wasAccepted = true;
                   break;
                 }
-                await page.waitForTimeout(pollIntervalMs);
+                // Anti-spin pacing for the change-detection loop — not a
+                // UI wait; setTimeout used instead of page.waitForTimeout
+                // (LS-4457).
+                await new Promise<void>((resolve) =>
+                  setTimeout(resolve, pollIntervalMs),
+                );
               }
             } else {
               // Fallback: use "Your pick" disappearance heuristic
@@ -398,12 +428,18 @@ test.describe
             if (noButtonFoundCount > MAX_NO_BUTTON_FOUND) {
               await page.reload();
               await page.waitForLoadState('load');
-              await page.waitForTimeout(3_000);
+              await page
+                .getByText('LIVE DRAFT')
+                .first()
+                .waitFor({ state: 'visible', timeout: 30_000 })
+                .catch(() => undefined);
               noButtonFoundCount = 0;
               consecutiveMisses = 0;
               lastNudgeMs = -Infinity;
             } else {
-              await page.waitForTimeout(1_000);
+              // Anti-spin pacing while waiting for the Apollo cache to
+              // refresh — not a UI wait (LS-4457).
+              await new Promise<void>((resolve) => setTimeout(resolve, 1_000));
             }
           }
         } else {
@@ -416,7 +452,11 @@ test.describe
             // Force-reload the page to resync state after prolonged inactivity
             await page.reload();
             await page.waitForLoadState('load');
-            await page.waitForTimeout(3_000);
+            await page
+              .getByText('LIVE DRAFT')
+              .first()
+              .waitFor({ state: 'visible', timeout: 30_000 })
+              .catch(() => undefined);
             consecutiveMisses = 0;
             lastNudgeMs = -Infinity;
           }
@@ -429,7 +469,9 @@ test.describe
             lastNudgeMs = now;
           }
 
-          await page.waitForTimeout(1_000);
+          // Anti-spin pacing for the AI-turn watch loop — not a UI wait
+          // (LS-4457).
+          await new Promise<void>((resolve) => setTimeout(resolve, 1_000));
         }
       }
 

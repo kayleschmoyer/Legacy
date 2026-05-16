@@ -290,7 +290,8 @@ test.describe
       });
       await expect(saveBtn).toBeEnabled({ timeout: 5000 });
       await saveBtn.click();
-      await page.waitForTimeout(1000);
+      // Mutation completes when Save returns to its enabled state.
+      await expect(saveBtn).toBeEnabled({ timeout: 10_000 });
     });
 
     await test.step('Start the draft', async () => {
@@ -483,7 +484,11 @@ test.describe
         .first();
       await expect(rejectBtn).toBeVisible({ timeout: 10000 });
       await rejectBtn.click();
-      await managerPage1.waitForTimeout(2000);
+      // The Reject button disappears (or the row re-renders) once the
+      // rejectTradeOffer mutation returns; the API poll in the next step
+      // also gates on `status === 'rejected'` so this UI wait is a
+      // best-effort signal that the click landed (LS-4457).
+      await expect(rejectBtn).toBeHidden({ timeout: 15_000 });
     });
 
     await test.step('Verify trade is marked rejected via API', async () => {
@@ -553,7 +558,17 @@ test.describe
         name: /Propose Trade/i,
       });
       const teamButtons = counterDialog.getByRole('button');
-      await managerPage1.waitForTimeout(1000);
+      // Wait for the dialog to populate with team buttons. The standard
+      // backdrop/header carries ~1 button; > 1 means at least one
+      // team-selection button has rendered (replaces a fixed 1s wait —
+      // LS-4457).
+      await expect
+        .poll(async () => teamButtons.count(), {
+          timeout: 15_000,
+          intervals: [500, 1_000],
+          message: 'Propose Trade dialog never populated with team buttons',
+        })
+        .toBeGreaterThan(1);
       const teamCount = await teamButtons.count();
       let teamClicked = false;
       for (let i = 0; i < teamCount; i++) {
@@ -744,7 +759,11 @@ test.describe
       const acceptBtn = page.getByRole('button', { name: /Accept/i }).first();
       await expect(acceptBtn).toBeVisible({ timeout: 10000 });
       await acceptBtn.click();
-      await page.waitForTimeout(2000);
+      // The Accept button disappears (or the row re-renders) once the
+      // acceptTradeOffer mutation returns; the API poll in the next step
+      // also gates on `status === 'accepted'` so this UI wait is a
+      // best-effort signal that the click landed (LS-4457).
+      await expect(acceptBtn).toBeHidden({ timeout: 15_000 });
     });
 
     await test.step('Verify the accepted trade is persisted via API', async () => {

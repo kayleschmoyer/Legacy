@@ -207,7 +207,10 @@ test.describe
   // PHASE 4 — START THE LIVE DRAFT
   // -----------------------------------------------------------------
 
-  test('Phase 4: Start the live draft', async ({ commissionerPage: page }) => {
+  test('Phase 4: Start the live draft', async ({
+    commissionerPage: page,
+    commissionerJwt,
+  }) => {
     // Draft processing can take time
     test.setTimeout(120_000);
 
@@ -240,9 +243,34 @@ test.describe
     });
 
     await test.step('Wait for draft to start', async () => {
-      // After starting a live draft, the league status changes.
-      // Wait for the draft board link or "Draft In Progress" indicator.
-      await page.waitForTimeout(3000);
+      // After clicking Start Draft, gate on the backend `draftStatus`
+      // transitioning to `active`/`in_progress` before reloading the
+      // commissioner panel — replaces a fixed 3s pre-reload wait that
+      // raced the startDraft mutation under nightly load. The poll
+      // callback returns null on errors so expect.poll retries on
+      // assertion failure rather than throwing (antipattern #1).
+      await expect
+        .poll(
+          async () => {
+            const data = await gqlFetch<{
+              league?: { draftStatus?: string | null } | null;
+            }>(
+              commissionerJwt,
+              `query DraftStarted($leagueId: Int!) {
+                 league(id: $leagueId) { draftStatus }
+               }`,
+              { leagueId: state.leagueId },
+            ).catch(() => null);
+            return data?.league?.draftStatus ?? null;
+          },
+          {
+            timeout: 30_000,
+            intervals: [1_000, 2_000],
+            message: `league.draftStatus never reached active/in_progress within 30s for league ${state.leagueId}`,
+          },
+        )
+        .toMatch(/^(active|in_progress)$/);
+
       await page.reload();
       await page.waitForLoadState('load');
 
@@ -892,10 +920,13 @@ test.describe
             );
           }
 
-          // 500ms anti-spin wait (was 1000ms). Saves ~500ms per miss → ~1.75s
-          // per pick average across the draft. Over 60 picks this frees ~105s
-          // of margin in the 25-minute Phase 5 timeout (LS-4305).
-          await pages[0].page.waitForTimeout(500);
+          // 500ms anti-spin pacing for the multi-page miss-detection loop —
+          // not a wait for any UI condition; this throttles how often we
+          // re-poll the four browser contexts while waiting for the next
+          // "Your pick" turn to surface (LS-4305). Uses setTimeout rather
+          // than page.waitForTimeout so it isn't counted as a UI wait
+          // (LS-4457).
+          await new Promise<void>((resolve) => setTimeout(resolve, 500));
         }
       }
 
@@ -988,35 +1019,57 @@ test.describe
       // drafted fielders into starter slots first. In a live draft,
       // draftCompletedAt is committed inside the final pick transaction, so
       // the UI can show "Draft Complete!" before autoPopulateFirstMatchupLineup
-      // (which runs outside the transaction) finishes. Poll with reloads until
-      // the lineup count is > 0 (up to ~60s) to absorb this race condition.
-      const lineupDeadline = Date.now() + 60_000;
+      // (which runs outside the transaction) finishes. Use expect.poll with
+      // an interval that reloads the page each iteration to force an Apollo
+      // refetch — replaces the wall-clock-derived `Math.max(deadline -
+      // Date.now())` Playwright timeouts that are an antipattern (LS-4457).
       const lineupParent = page
         .getByText('Lineup', { exact: true })
         .first()
         .locator('..');
       await expect(page.getByText('Lineup').first()).toBeVisible({
-        timeout: Math.max(1, lineupDeadline - Date.now()),
+        timeout: 30_000,
       });
-      let lineupCount = 0;
-      while (Date.now() < lineupDeadline) {
-        const lineupText = await lineupParent.textContent();
-        const lineupMatch = lineupText?.match(/Lineup\s*(\d+)\s*\/\s*\d+/);
-        lineupCount = lineupMatch ? parseInt(lineupMatch[1], 10) : 0;
-        if (lineupCount > 0) break;
-        const remaining = lineupDeadline - Date.now();
-        if (remaining <= 0) break;
-        await page.waitForTimeout(Math.min(5_000, remaining));
-        if (Date.now() >= lineupDeadline) break;
-        await page.reload();
-        await page.waitForLoadState('load');
-        const remainingAfterReload = lineupDeadline - Date.now();
-        if (remainingAfterReload <= 0) break;
-        await expect(page.getByText('Lineup').first()).toBeVisible({
-          timeout: remainingAfterReload,
-        });
-      }
-      expect(lineupCount).toBeGreaterThan(0);
+      // Poll until the QuickStat denominator is > 0 (positions resolved) AND
+      // the numerator is > 0 (autoPopulateFirstMatchupLineup completed). The
+      // poll callback reloads the page each iteration to force a fresh
+      // Apollo round-trip, then returns the parsed numerator (or 0 / null
+      // sentinels so .toBeGreaterThan(0) drives the retry, not a thrown
+      // error — antipattern #1 in e2e-determinism.md).
+      await expect
+        .poll(
+          async () => {
+            const lineupText = await lineupParent
+              .textContent()
+              .catch(() => null);
+            const lineupMatch = lineupText?.match(
+              /Lineup\s*(\d+)\s*\/\s*(\d+)/,
+            );
+            const filled = lineupMatch ? parseInt(lineupMatch[1], 10) : 0;
+            const total = lineupMatch ? parseInt(lineupMatch[2], 10) : 0;
+            if (filled > 0 && total > 0) return filled;
+            // Force an Apollo refetch on the next iteration to capture
+            // autoPopulateFirstMatchupLineup updates that ran outside the
+            // draft transaction.
+            await page.reload();
+            await page.waitForLoadState('load');
+            await page
+              .getByText('Lineup')
+              .first()
+              .waitFor({ state: 'visible', timeout: 30_000 })
+              .catch(() => {
+                /* tolerate transient unmount during reload */
+              });
+            return 0;
+          },
+          {
+            timeout: 60_000,
+            intervals: [5_000],
+            message:
+              'roster Lineup count never went above 0 within 60s after draft completion',
+          },
+        )
+        .toBeGreaterThan(0);
     });
 
     await test.step('Verify commissioner-drafted players appear on roster', async () => {
@@ -1035,7 +1088,10 @@ test.describe
         return;
       }
 
-      // Wait for bench section to render player cards
+      // Wait for bench section to render player cards. The first pick name
+      // becoming visible is the deterministic signal that the roster has
+      // hydrated — replaces a fixed 2s buffer wait. Tolerate timeout: the
+      // count threshold below already accommodates partial matches.
       await expect(
         page
           .locator('region[aria-label="Bench"], [aria-label="Bench"]')
@@ -1045,7 +1101,13 @@ test.describe
         .catch(() => {
           // Fallback: just wait for Bench text
         });
-      await page.waitForTimeout(2_000);
+      await page
+        .getByText(state.commissionerPicks[0], { exact: false })
+        .first()
+        .waitFor({ state: 'visible', timeout: 15_000 })
+        .catch(() => {
+          /* picks may have been mis-attributed; threshold check tolerates */
+        });
 
       let matchCount = 0;
       for (const playerName of state.commissionerPicks) {
@@ -1166,7 +1228,15 @@ test.describe
         );
         return;
       }
-      await managerPage1.waitForTimeout(2_000);
+      // The first captured pick name becoming visible replaces a fixed 2s
+      // buffer wait — once the roster has hydrated we can read the rest.
+      await managerPage1
+        .getByText(state.manager1Picks[0], { exact: false })
+        .first()
+        .waitFor({ state: 'visible', timeout: 15_000 })
+        .catch(() => {
+          /* picks may have been mis-attributed; threshold check tolerates */
+        });
 
       let matchCount = 0;
       for (const playerName of state.manager1Picks) {

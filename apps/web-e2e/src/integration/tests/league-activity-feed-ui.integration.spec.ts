@@ -349,7 +349,9 @@ test.describe
       });
       await expect(sendBtn).toBeVisible({ timeout: 5_000 });
       await sendBtn.click({ force: true });
-      await page.waitForTimeout(2_000);
+      // Dialog closes once the createTradeOffer mutation returns — that is
+      // the deterministic signal the trade was submitted (LS-4457).
+      await expect(dialog).toBeHidden({ timeout: 15_000 });
     });
 
     await test.step('Manager 2 accepts the trade via UI', async () => {
@@ -387,9 +389,14 @@ test.describe
           .catch(() => false)
       ) {
         await confirmBtn.click();
+        // Confirmation dialog closes once acceptTradeOffer mutation
+        // returns (LS-4457).
+        await expect(confirmBtn).toBeHidden({ timeout: 15_000 });
+      } else {
+        // No confirm dialog appeared — the Accept button itself should
+        // disappear once the mutation returns.
+        await expect(acceptBtn).toBeHidden({ timeout: 15_000 });
       }
-
-      await managerPage2.waitForTimeout(3_000);
     });
   });
 
@@ -467,8 +474,10 @@ test.describe
           state.freeAgentPlayerName.split(' ').pop() ??
           state.freeAgentPlayerName;
         await searchInput.fill(lastName);
-        // 1 s covers the 300 ms debounce + GQL round-trip + re-render.
-        await page.waitForTimeout(1_000);
+        // The 300ms debounce + GQL round-trip + re-render is absorbed by
+        // `exactAddBtn.waitFor({ state: 'attached', ... })` below — that
+        // condition only resolves after the filtered row has rendered
+        // (LS-4457).
       }
 
       // Use the exact player name in the aria-label to avoid clicking a
@@ -535,7 +544,9 @@ test.describe
       await expect(confirmBtn).toBeVisible({ timeout: 5_000 });
       await confirmBtn.click();
 
-      await page.waitForTimeout(5_000);
+      // Confirmation dialog closes once processWaivers mutation returns
+      // — replaces a 5s wall-clock guess (LS-4457).
+      await expect(confirmBtn).toBeHidden({ timeout: 30_000 });
     });
   });
 
@@ -652,7 +663,8 @@ test.describe
       const tradesTab = page.getByRole('button', { name: /^Trades/i }).first();
       await expect(tradesTab).toBeVisible({ timeout: 5_000 });
       await tradesTab.click();
-      await page.waitForTimeout(500);
+      // Tab is client-side filtered; the next assertion auto-waits up to
+      // its own timeout for the filtered event to appear (LS-4457).
 
       // Should show trade events
       await expect(
@@ -670,7 +682,8 @@ test.describe
         .first();
       await expect(waiversTab).toBeVisible({ timeout: 5_000 });
       await waiversTab.click();
-      await page.waitForTimeout(500);
+      // Tab is client-side filtered; the next assertion auto-waits up to
+      // its own timeout for the filtered event to appear (LS-4457).
 
       await expect(
         page.getByText(/Waiver claim processed|Waiver claim/i).first(),
@@ -681,7 +694,8 @@ test.describe
       const draftTab = page.getByRole('button', { name: /^Draft/i }).first();
       await expect(draftTab).toBeVisible({ timeout: 5_000 });
       await draftTab.click();
-      await page.waitForTimeout(500);
+      // Tab is client-side filtered; the next assertion auto-waits up to
+      // its own timeout for the filtered event to appear (LS-4457).
 
       await expect(
         page.getByText(/Round (\d+|\?), Pick (\d+|\?)/).first(),
@@ -699,7 +713,8 @@ test.describe
         .first();
       await expect(commTab).toBeVisible({ timeout: 5_000 });
       await commTab.click();
-      await page.waitForTimeout(500);
+      // Tab is client-side filtered; the next assertion auto-waits up to
+      // its own timeout for the filtered event to appear (LS-4457).
 
       await expect(page.getByText(/League announcement/i).first()).toBeVisible({
         timeout: 5_000,
@@ -709,7 +724,8 @@ test.describe
     await test.step('Return to All tab', async () => {
       const allTab = page.getByRole('button', { name: /^All/i }).first();
       await allTab.click();
-      await page.waitForTimeout(500);
+      // Tab is client-side filtered; the next assertion auto-waits up to
+      // its own timeout for the filtered event to appear (LS-4457).
 
       // All events visible again
       const activityItems = page.locator(

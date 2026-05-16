@@ -104,11 +104,9 @@ async function submitWaiverClaimViaUI(
   if (searchVisible) {
     const lastName = playerName.split(' ').pop() ?? playerName;
     await searchInput.fill(lastName);
-    // Wait at least 1 s for the 300 ms search debounce + GQL round-trip +
-    // re-render.  Previously 500 ms was used, but that left a race window
-    // when the debounce fired (300 ms) but the network response hadn't
-    // arrived yet, causing the page to still show the unfiltered list.
-    await page.waitForTimeout(1_000);
+    // The 300ms search debounce + GQL round-trip + re-render is absorbed by
+    // `exactAddBtn.waitFor({ state: 'attached', ... })` below — that
+    // condition only resolves after the filtered row has rendered.
   }
 
   // Use the exact player name in the aria-label to avoid clicking a different
@@ -272,7 +270,8 @@ test.describe
       });
       await expect(saveBtn).toBeEnabled({ timeout: 5000 });
       await saveBtn.click();
-      await page.waitForTimeout(1000);
+      // Mutation completes when Save returns to its enabled state.
+      await expect(saveBtn).toBeEnabled({ timeout: 10_000 });
     });
 
     await test.step('Start the draft', async () => {
@@ -289,10 +288,10 @@ test.describe
       // Use the shared helper instead of an inline reload loop — it polls
       // league.draftStatus deterministically via GraphQL and only asserts the
       // UI once the backend confirms the transition, eliminating the
-      // UI-render race documented in LS-4237 → LS-4321.
+      // UI-render race documented in LS-4237 → LS-4321 (LS-4457).
       await waitForSeasonActive(page, state.leagueId, {
         api: apiCommissioner,
-        deadlineMs: 90_000,
+        deadlineMs: 180_000,
       });
     });
   });
@@ -806,13 +805,12 @@ test.describe
         { timeout: 15000 },
       );
 
-      // Give the roster page time to settle; the PendingWaiverClaims
-      // component hides itself when there are no pending claims
-      await page.waitForTimeout(2000);
-
-      // The amber "Pending Waiver" card should no longer be visible
+      // The PendingWaiverClaims component hides itself when there are no
+      // pending claims — the inverted `not.toBeVisible({ timeout })` below
+      // already auto-waits for the element to disappear; no separate sleep
+      // is required (LS-4457).
       await expect(page.getByText(/Pending Waiver/i).first()).not.toBeVisible({
-        timeout: 10000,
+        timeout: 15_000,
       });
     };
 

@@ -317,7 +317,6 @@ test.describe
       await expect(searchInput).toBeVisible({ timeout: 10_000 });
       // Wait for any previous search dropdown to clear
       await searchInput.clear();
-      await page.waitForTimeout(500);
       await searchInput.fill(PLAYER_SEARCH_2);
       await expect(
         page.getByText(new RegExp(PLAYER_SEARCH_2, 'i')).nth(1),
@@ -372,9 +371,10 @@ test.describe
       }),
     ).toBeVisible({ timeout: 10_000 });
 
-    // Wait for any previous search dropdown to clear before second search
+    // Clear before the second search; the next `expect(...).toBeVisible`
+    // auto-waits up to 30s for the new player row, so no separate sleep
+    // is required (LS-4457).
     await searchInput.clear();
-    await page.waitForTimeout(500);
     await searchInput.fill(PLAYER_SEARCH_2);
     await expect(
       page.getByText(new RegExp(PLAYER_SEARCH_2, 'i')).nth(1),

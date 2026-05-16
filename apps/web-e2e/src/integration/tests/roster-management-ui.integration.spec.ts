@@ -195,7 +195,8 @@ test.describe
       });
       await expect(saveBtn).toBeEnabled({ timeout: 10_000 });
       await saveBtn.click();
-      await page.waitForTimeout(1000);
+      // Mutation completes when Save returns to its enabled state.
+      await expect(saveBtn).toBeEnabled({ timeout: 10_000 });
     });
 
     await test.step('Start the draft', async () => {
@@ -471,21 +472,29 @@ test.describe
     });
 
     await test.step('Click first filled slot to select a player', async () => {
-      // Clicking a player slot selects them (aria-pressed transitions to true)
+      // Clicking a player slot selects them (aria-pressed transitions to true).
+      // The aria-pressed transition is the deterministic signal that the
+      // selection registered — replaces a 500ms wait (LS-4457).
       await filledSlots.first().click();
-      // Give the UI a moment to register the selection
-      await page.waitForTimeout(500);
+      await expect(filledSlots.first()).toHaveAttribute(
+        'aria-pressed',
+        'true',
+        {
+          timeout: 5_000,
+        },
+      );
     });
 
     await test.step('Click a second slot to trigger a position swap', async () => {
       // After selecting a player the second clicked slot either:
       //   a) swaps the selected player into that slot (both now filled), or
       //   b) deselects if clicking the same slot
-      // We click a different filled slot to execute a swap.
+      // We click a different filled slot to execute a swap. The verify-step
+      // below auto-waits for the post-swap roster to render, so no fixed
+      // wall-clock wait is needed (LS-4457).
       const slotCount = await filledSlots.count();
       if (slotCount >= 2) {
         await filledSlots.nth(1).click();
-        await page.waitForTimeout(1000);
       }
     });
 

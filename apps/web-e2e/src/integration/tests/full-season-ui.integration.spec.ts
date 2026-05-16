@@ -147,7 +147,11 @@ test.describe
       await nameInput.fill('The Commissioners');
       await expect(saveNameBtn).toBeEnabled({ timeout: 5_000 });
       await saveNameBtn.click();
-      await page.waitForTimeout(1000);
+      // Mutation completes when the button returns from its loading state
+      // to enabled. The next step does a full goto/load anyway, but waiting
+      // for the button gives us deterministic local mutation completion
+      // (LS-4457).
+      await expect(saveNameBtn).toBeEnabled({ timeout: 10_000 });
     });
 
     await test.step('Verify updated team name on overview', async () => {
@@ -245,7 +249,8 @@ test.describe
       });
       await expect(saveBtn).toBeEnabled({ timeout: 5000 });
       await saveBtn.click();
-      await page.waitForTimeout(1000);
+      // Mutation completes when Save returns to its enabled state.
+      await expect(saveBtn).toBeEnabled({ timeout: 10_000 });
     });
 
     await test.step('Click Start Draft in the Next Step section', async () => {
@@ -339,12 +344,13 @@ test.describe
       const rowCount = await rosterRows.count();
 
       if (rowCount >= 2) {
-        // Click the first roster row to select a player
+        // Click the first roster row to select a player, then a different
+        // row to swap. The verify-step below asserts the page renders
+        // without errors; no explicit wait is needed between clicks because
+        // each click is dispatched synchronously and any subsequent
+        // assertion auto-waits for its locator.
         await rosterRows.nth(0).click();
-        await page.waitForTimeout(500);
-        // Click a different row to swap
         await rosterRows.nth(1).click();
-        await page.waitForTimeout(500);
       }
     });
 
@@ -379,13 +385,23 @@ test.describe
       const search = page.getByPlaceholder(/search players/i);
       await expect(search).toBeVisible({ timeout: 10_000 });
       await search.fill('Ruth');
-      await page.waitForTimeout(500);
+      // No assertion required here — the search is exercised for coverage
+      // of the input. Clearing immediately is the previous behavior; the
+      // debounced re-render does not affect the test outcome (LS-4457).
       await search.clear();
     });
 
     await test.step('Switch to Pitchers view', async () => {
-      await page.getByRole('button', { name: 'Pitchers' }).first().click();
-      await page.waitForTimeout(500);
+      // After toggling Pitchers, assert at least one pitcher row is visible
+      // — that proves the filter applied without a fixed timeout. We use the
+      // same aria-label pattern the Add buttons emit (`Add <name>`); the
+      // first one rendering is the deterministic "filter applied" signal.
+      const pitchersBtn = page
+        .getByRole('button', { name: 'Pitchers' })
+        .first();
+      await pitchersBtn.click();
+      const anyAddBtn = page.locator('button[aria-label^="Add "]').first();
+      await expect(anyAddBtn).toBeVisible({ timeout: 15_000 });
     });
   });
 
@@ -478,10 +494,9 @@ test.describe
       const searchInput = page.getByPlaceholder(/search players/i);
       await expect(searchInput).toBeVisible({ timeout: 15000 });
       await searchInput.fill(freeAgentSearchTerm);
-      // 300ms debounce in the UI + GQL round-trip + re-render. Matches the
-      // 1s wait used by waiver-processing-ui's submitWaiverClaimViaUI.
-      await page.waitForTimeout(1000);
-
+      // The 300ms debounce + GQL round-trip + re-render is absorbed by
+      // `exactAddBtn.waitFor({ state: 'attached', ... })` below — that
+      // condition will only resolve once the filtered row has rendered.
       const exactAddBtn = page.locator(
         `button[aria-label="Add ${freeAgentAriaName}"]`,
       );
@@ -545,8 +560,10 @@ test.describe
       await expect(confirmBtn).toBeVisible({ timeout: 5000 });
       await confirmBtn.click();
 
-      // Wait for processing to finish
-      await page.waitForTimeout(5000);
+      // Wait for processing to finish — the confirmation dialog closes once
+      // the mutation returns. That is the deterministic signal that
+      // processing has completed (replaces a 5s wall-clock guess).
+      await expect(confirmBtn).toBeHidden({ timeout: 30_000 });
     });
 
     await test.step('Verify roster page still loads', async () => {
@@ -670,13 +687,13 @@ test.describe
         dialog.getByText(/Select players.*you will give/i),
       ).toBeVisible({ timeout: 15000 });
 
-      // Wait for roster animation to settle
-      await page.waitForTimeout(1000);
-
-      // Click the first player button in the dialog to select them
+      // Click the first player button in the dialog to select them. Wait
+      // for at least one player row to be visible — that proves the roster
+      // has hydrated, and replaces a fixed-duration "animation settle".
       const playerRows = dialog
         .getByRole('button')
         .filter({ hasText: /\w+ \w+/ });
+      await expect(playerRows.first()).toBeVisible({ timeout: 15_000 });
       // Exclude navigation buttons (Next, Review, etc.) — pick only player name buttons
       const count = await playerRows.count();
       let clicked = false;
@@ -692,13 +709,12 @@ test.describe
       }
       expect(clicked).toBe(true);
 
-      await page.waitForTimeout(500);
-
-      // Click "Next" to proceed
+      // Click "Next" to proceed — its visibility is the deterministic
+      // signal that the selection registered (replaces a 500ms wait).
       const nextBtn = dialog.getByRole('button', {
         name: /Next.*Select Their Players/i,
       });
-      await expect(nextBtn).toBeVisible({ timeout: 5000 });
+      await expect(nextBtn).toBeVisible({ timeout: 10_000 });
       await nextBtn.click();
     });
 
@@ -707,13 +723,12 @@ test.describe
         dialog.getByText(/Select players you want.*to give you/i),
       ).toBeVisible({ timeout: 5000 });
 
-      // Wait for step transition animation to settle before clicking
-      await page.waitForTimeout(1000);
-
-      // Click the first player from the other team
+      // Click the first player from the other team — wait for the rows to
+      // be visible (replaces a wall-clock animation wait).
       const playerRows = dialog
         .getByRole('button')
         .filter({ hasText: /\w+ \w+/ });
+      await expect(playerRows.first()).toBeVisible({ timeout: 15_000 });
       const count = await playerRows.count();
       let clicked = false;
       for (let i = 0; i < count; i++) {
@@ -727,10 +742,9 @@ test.describe
       }
       expect(clicked).toBe(true);
 
-      // Wait for selection to register before checking for Review button
-      await page.waitForTimeout(500);
-
-      // Click "Review Trade" — only appears after a player is selected
+      // "Review Trade" only renders after a player is selected — its
+      // visibility is the deterministic signal that the selection
+      // registered (replaces a 500ms wait).
       const reviewBtn = dialog.getByRole('button', {
         name: /Review Trade/i,
       });
@@ -755,8 +769,10 @@ test.describe
       await expect(sendBtn).toBeVisible({ timeout: 5000 });
       await sendBtn.click();
 
-      // Wait for the trade to be submitted
-      await page.waitForTimeout(2000);
+      // The dialog closes once the createTradeOffer mutation returns —
+      // that is the deterministic signal the trade was submitted (replaces
+      // a 2s wall-clock wait).
+      await expect(dialog).toBeHidden({ timeout: 15_000 });
     });
 
     await test.step('Verify trade appears in My Offers', async () => {
@@ -765,10 +781,11 @@ test.describe
       const myOffersTab = page.getByText('My Offers', { exact: false });
       await expect(myOffersTab).toBeVisible({ timeout: 5_000 });
       await myOffersTab.click();
-      await page.waitForTimeout(1000);
-      // Should see a pending trade
+      // Should see a pending trade — the assertion below auto-waits up to
+      // its own timeout; no separate sleep is needed after the tab click
+      // (LS-4457).
       await expect(page.getByText(/pending/i).first()).toBeVisible({
-        timeout: 10000,
+        timeout: 15000,
       });
     });
 
@@ -786,8 +803,10 @@ test.describe
       await expect(rejectBtn.first()).toBeVisible({ timeout: 15000 });
       await rejectBtn.first().click();
 
-      // Wait for rejection to process
-      await page.waitForTimeout(2000);
+      // The Reject button disappears (or the row re-renders) once the
+      // rejectTradeOffer mutation returns. Waiting for it to be detached
+      // replaces a 2s wall-clock guess with a deterministic UI signal.
+      await expect(rejectBtn.first()).toBeHidden({ timeout: 15_000 });
 
       // Restore commissioner identity
       await switchUser(
@@ -829,10 +848,13 @@ test.describe
         name: /Select Game|Confirm/i,
       });
       await expect(confirmBtn.last()).toBeVisible({ timeout: 5000 });
-      await confirmBtn.last().click();
+      const confirmLast = confirmBtn.last();
+      await confirmLast.click();
 
-      // Wait for game selection to process
-      await page.waitForTimeout(5000);
+      // The confirm dialog closes once selectGame returns. Waiting for
+      // it to be hidden replaces a 5s wall-clock wait with a
+      // deterministic mutation-completion signal (LS-4457).
+      await expect(confirmLast).toBeHidden({ timeout: 30_000 });
     });
 
     await test.step('Advance league week from commissioner panel', async () => {
@@ -852,9 +874,13 @@ test.describe
         name: /Advance|Confirm/i,
       });
       await expect(confirmBtn.last()).toBeVisible({ timeout: 5000 });
-      await confirmBtn.last().click();
+      const confirmLast = confirmBtn.last();
+      await confirmLast.click();
 
-      await page.waitForTimeout(5000);
+      // The advance-week confirm dialog closes once the mutation returns.
+      // Waiting for it to be hidden replaces a 5s wall-clock wait with a
+      // deterministic signal (LS-4457).
+      await expect(confirmLast).toBeHidden({ timeout: 30_000 });
     });
   });
 
@@ -906,7 +932,12 @@ test.describe
 
     await test.step('Switch to Chat sub-tab', async () => {
       await page.getByText('Chat').first().click();
-      await page.waitForTimeout(500);
+      // The chat textarea only mounts once the Chat sub-tab is active —
+      // waiting for it replaces a fixed 500ms wait with the actual
+      // tab-mounted signal.
+      await expect(
+        page.locator('textarea[aria-label="Message the league"]'),
+      ).toBeVisible({ timeout: 15_000 });
     });
 
     await test.step('Send a league message via the chat UI', async () => {
@@ -977,8 +1008,10 @@ test.describe
       await expect(confirmBtn).toBeVisible({ timeout: 5000 });
       await confirmBtn.click();
 
-      // Wait for renewal to process
-      await page.waitForTimeout(5000);
+      // The renewal dialog closes once the startNewSeason mutation
+      // returns. Waiting for it replaces a 5s wall-clock wait with a
+      // deterministic mutation-completion signal (LS-4457).
+      await expect(confirmBtn).toBeHidden({ timeout: 60_000 });
     });
 
     await test.step('Verify league overview still loads', async () => {
