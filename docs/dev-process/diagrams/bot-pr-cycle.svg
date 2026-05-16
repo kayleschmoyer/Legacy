@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 480" font-family="Literata, Georgia, serif" font-size="13">
+  <title>Bot-PR review cycle</title>
+  <defs>
+    <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1B3A5C"/>
+    </marker>
+    <style>
+      .cycle { fill: #111B2F; stroke: #C5A55A; stroke-width: 1.5; }
+      .action { fill: #16223A; stroke: #1B3A5C; stroke-width: 1.5; }
+      .stop  { fill: #16223A; stroke: #C41E3A; stroke-width: 2; }
+      .label { fill: #F0E6CC; font-weight: 600; }
+      .sub   { fill: #C5A55A; font-size: 11px; }
+      .arrow { stroke: #1B3A5C; stroke-width: 2; fill: none; marker-end: url(#a2); }
+      .title { fill: #0A0F1A; font-size: 18px; font-weight: 700; }
+      .legend { fill: #0A0F1A; font-size: 11px; }
+      .token { font-family: Consolas, monospace; fill: #C41E3A; font-size: 11px; }
+    </style>
+  </defs>
+
+  <rect width="880" height="480" fill="#FAF6EC"/>
+  <text x="20" y="30" class="title">Bot-PR Review Cycle (Author Agent Contract)</text>
+  <text x="20" y="50" class="legend">Gold = bot review &#183; Navy = agent action &#183; Red = stop / escalate</text>
+
+  <!-- Cycle 1 -->
+  <rect class="cycle" x="20" y="80" width="220" height="80" rx="6"/>
+  <text class="label" x="130" y="108" text-anchor="middle">Cycle 1 review</text>
+  <text class="sub"   x="130" y="126" text-anchor="middle">fires when PR marked</text>
+  <text class="sub"   x="130" y="140" text-anchor="middle">ready_for_review</text>
+
+  <rect class="action" x="290" y="80" width="270" height="80" rx="6"/>
+  <text class="label" x="425" y="103" text-anchor="middle">Reply to every open thread</text>
+  <text class="token" x="425" y="122" text-anchor="middle">FIX: &lt;sha&gt;</text>
+  <text class="token" x="425" y="138" text-anchor="middle">JUSTIFY: &lt;rationale&gt;</text>
+  <text class="sub"   x="425" y="153" text-anchor="middle">resolve FIX threads only</text>
+
+  <rect class="action" x="610" y="80" width="250" height="80" rx="6"/>
+  <text class="label" x="735" y="108" text-anchor="middle">Add bot:ready-for-review</text>
+  <text class="sub"   x="735" y="126" text-anchor="middle">if label exists,</text>
+  <text class="sub"   x="735" y="140" text-anchor="middle">remove then re-add</text>
+
+  <path class="arrow" d="M240 120 L290 120"/>
+  <path class="arrow" d="M560 120 L610 120"/>
+
+  <!-- down to cycle 2 -->
+  <path class="arrow" d="M735 160 L735 195 L130 195 L130 220"/>
+
+  <!-- Cycle 2 -->
+  <rect class="cycle" x="20" y="220" width="220" height="80" rx="6"/>
+  <text class="label" x="130" y="248" text-anchor="middle">Cycle 2 review</text>
+  <text class="sub"   x="130" y="266" text-anchor="middle">bot adjudicates JUSTIFY,</text>
+  <text class="sub"   x="130" y="280" text-anchor="middle">may issue mandates</text>
+
+  <rect class="stop"  x="290" y="220" width="270" height="80" rx="6"/>
+  <text class="label" x="425" y="246" text-anchor="middle">LGTM / APPROVED?</text>
+  <text class="sub"   x="425" y="264" text-anchor="middle">Stop. Do not post any reply.</text>
+  <text class="sub"   x="425" y="280" text-anchor="middle">JUSTIFY threads = accepted.</text>
+
+  <rect class="action" x="610" y="220" width="250" height="80" rx="6"/>
+  <text class="label" x="735" y="243" text-anchor="middle">If mandates present</text>
+  <text class="token" x="735" y="262" text-anchor="middle">FIX: &lt;sha&gt; only</text>
+  <text class="sub"   x="735" y="278" text-anchor="middle">JUSTIFY/CANNOT-COMPLY</text>
+  <text class="sub"   x="735" y="292" text-anchor="middle">not accepted here</text>
+
+  <path class="arrow" d="M240 260 L290 260"/>
+  <path class="arrow" d="M560 260 L610 260"/>
+
+  <path class="arrow" d="M735 300 L735 335 L130 335 L130 360"/>
+
+  <!-- Cycle 3 -->
+  <rect class="cycle" x="20" y="360" width="220" height="80" rx="6"/>
+  <text class="label" x="130" y="388" text-anchor="middle">Cycle 3+ review</text>
+  <text class="sub"   x="130" y="406" text-anchor="middle">repeat mandate -&gt;</text>
+  <text class="sub"   x="130" y="420" text-anchor="middle">escalation allowed</text>
+
+  <rect class="action" x="290" y="360" width="270" height="80" rx="6"/>
+  <text class="label" x="425" y="383" text-anchor="middle">Reply tokens</text>
+  <text class="token" x="425" y="402" text-anchor="middle">FIX: &lt;sha&gt;</text>
+  <text class="token" x="425" y="418" text-anchor="middle">CANNOT-COMPLY: &lt;issue-id&gt;</text>
+  <text class="sub"   x="425" y="433" text-anchor="middle">leave CC threads unresolved</text>
+
+  <rect class="stop"  x="610" y="360" width="250" height="80" rx="6"/>
+  <text class="label" x="735" y="383" text-anchor="middle">Persistent block?</text>
+  <text class="sub"   x="735" y="401" text-anchor="middle">Maintainer applies</text>
+  <text class="token" x="735" y="418" text-anchor="middle">review-bot-override</text>
+  <text class="sub"   x="735" y="433" text-anchor="middle">or security-review-override</text>
+
+  <path class="arrow" d="M240 400 L290 400"/>
+  <path class="arrow" d="M560 400 L610 400"/>
+</svg>

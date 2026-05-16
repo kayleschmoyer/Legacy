@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 460" font-family="Literata, Georgia, serif" font-size="13">
+  <title>Agentic ticket-to-PR workflow phases</title>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1B3A5C"/>
+    </marker>
+    <style>
+      .phase { fill: #111B2F; stroke: #C5A55A; stroke-width: 1.5; }
+      .gate  { fill: #16223A; stroke: #C41E3A; stroke-width: 1.5; }
+      .label { fill: #F0E6CC; font-weight: 600; }
+      .sub   { fill: #C5A55A; font-size: 11px; }
+      .arrow { stroke: #1B3A5C; stroke-width: 2; fill: none; marker-end: url(#arr); }
+      .title { fill: #0A0F1A; font-size: 18px; font-weight: 700; }
+      .legend { fill: #0A0F1A; font-size: 11px; }
+    </style>
+  </defs>
+
+  <rect width="980" height="460" fill="#FAF6EC"/>
+  <text x="20" y="30" class="title">Agentic Ticket-to-PR Workflow</text>
+  <text x="20" y="50" class="legend">Gold border = phase &#183; Red border = mandatory gate</text>
+
+  <!-- Row 1 -->
+  <g>
+    <rect class="phase" x="20"  y="80" width="150" height="70" rx="6"/>
+    <text class="label" x="95" y="108" text-anchor="middle">1. Ticket</text>
+    <text class="sub"   x="95" y="126" text-anchor="middle">jira_claim_ticket</text>
+    <text class="sub"   x="95" y="140" text-anchor="middle">In Progress</text>
+
+    <rect class="phase" x="200" y="80" width="150" height="70" rx="6"/>
+    <text class="label" x="275" y="108" text-anchor="middle">2. Worktree</text>
+    <text class="sub"   x="275" y="126" text-anchor="middle">.claude/worktrees</text>
+    <text class="sub"   x="275" y="140" text-anchor="middle">node_modules symlink</text>
+
+    <rect class="phase" x="380" y="80" width="150" height="70" rx="6"/>
+    <text class="label" x="455" y="108" text-anchor="middle">3. Plan + Code</text>
+    <text class="sub"   x="455" y="126" text-anchor="middle">planning skill</text>
+    <text class="sub"   x="455" y="140" text-anchor="middle">surgical edits</text>
+
+    <rect class="phase" x="560" y="80" width="150" height="70" rx="6"/>
+    <text class="label" x="635" y="108" text-anchor="middle">4. Migrations</text>
+    <text class="sub"   x="635" y="126" text-anchor="middle">db_migration_status</text>
+    <text class="sub"   x="635" y="140" text-anchor="middle">db_migrate</text>
+
+    <rect class="gate"  x="740" y="80" width="220" height="70" rx="6"/>
+    <text class="label" x="850" y="105" text-anchor="middle">5. make pc (gate)</text>
+    <text class="sub"   x="850" y="123" text-anchor="middle">format / lint / typecheck</text>
+    <text class="sub"   x="850" y="137" text-anchor="middle">test / build</text>
+
+    <path class="arrow" d="M170 115 L200 115"/>
+    <path class="arrow" d="M350 115 L380 115"/>
+    <path class="arrow" d="M530 115 L560 115"/>
+    <path class="arrow" d="M710 115 L740 115"/>
+  </g>
+
+  <!-- bend down -->
+  <path class="arrow" d="M850 150 L850 180 L20 180 L20 215"/>
+
+  <!-- Row 2 -->
+  <g>
+    <rect class="gate"  x="20"  y="215" width="180" height="70" rx="6"/>
+    <text class="label" x="110" y="240" text-anchor="middle">6. Self-review (gate)</text>
+    <text class="sub"   x="110" y="258" text-anchor="middle">/review skill</text>
+    <text class="sub"   x="110" y="272" text-anchor="middle">read every diff in full</text>
+
+    <rect class="phase" x="230" y="215" width="170" height="70" rx="6"/>
+    <text class="label" x="315" y="240" text-anchor="middle">7. Draft PR</text>
+    <text class="sub"   x="315" y="258" text-anchor="middle">github_create_pr</text>
+    <text class="sub"   x="315" y="272" text-anchor="middle">label: agent-in-progress</text>
+
+    <rect class="phase" x="430" y="215" width="170" height="70" rx="6"/>
+    <text class="label" x="515" y="240" text-anchor="middle">8. Mark ready</text>
+    <text class="sub"   x="515" y="258" text-anchor="middle">github_mark_pr_ready</text>
+    <text class="sub"   x="515" y="272" text-anchor="middle">Jira: In Review</text>
+
+    <rect class="phase" x="630" y="215" width="170" height="70" rx="6"/>
+    <text class="label" x="715" y="240" text-anchor="middle">9. CI pipeline</text>
+    <text class="sub"   x="715" y="258" text-anchor="middle">quality + build + e2e</text>
+    <text class="sub"   x="715" y="272" text-anchor="middle">push notifications</text>
+
+    <rect class="gate"  x="830" y="215" width="130" height="70" rx="6"/>
+    <text class="label" x="895" y="240" text-anchor="middle">10. Bot review</text>
+    <text class="sub"   x="895" y="258" text-anchor="middle">FIX / JUSTIFY</text>
+    <text class="sub"   x="895" y="272" text-anchor="middle">see cycle diagram</text>
+
+    <path class="arrow" d="M200 250 L230 250"/>
+    <path class="arrow" d="M400 250 L430 250"/>
+    <path class="arrow" d="M600 250 L630 250"/>
+    <path class="arrow" d="M800 250 L830 250"/>
+  </g>
+
+  <path class="arrow" d="M895 285 L895 315 L20 315 L20 350"/>
+
+  <!-- Row 3 -->
+  <g>
+    <rect class="phase" x="20"  y="350" width="180" height="70" rx="6"/>
+    <text class="label" x="110" y="375" text-anchor="middle">11. Watch to merge</text>
+    <text class="sub"   x="110" y="393" text-anchor="middle">handle events as they</text>
+    <text class="sub"   x="110" y="407" text-anchor="middle">arrive; never poll</text>
+
+    <rect class="phase" x="230" y="350" width="180" height="70" rx="6"/>
+    <text class="label" x="320" y="375" text-anchor="middle">12. Merge queue</text>
+    <text class="sub"   x="320" y="393" text-anchor="middle">github_merge_pr</text>
+    <text class="sub"   x="320" y="407" text-anchor="middle">squash + retarget deps</text>
+
+    <rect class="phase" x="440" y="350" width="180" height="70" rx="6"/>
+    <text class="label" x="530" y="375" text-anchor="middle">13. Post-merge</text>
+    <text class="sub"   x="530" y="393" text-anchor="middle">Jira -> Done</text>
+    <text class="sub"   x="530" y="407" text-anchor="middle">deploy workflows</text>
+
+    <rect class="phase" x="650" y="350" width="180" height="70" rx="6"/>
+    <text class="label" x="740" y="375" text-anchor="middle">14. MCP gap audit</text>
+    <text class="sub"   x="740" y="393" text-anchor="middle">classify shell usage</text>
+    <text class="sub"   x="740" y="407" text-anchor="middle">file tickets</text>
+
+    <rect class="phase" x="860" y="350" width="100" height="70" rx="6"/>
+    <text class="label" x="910" y="375" text-anchor="middle">15. Cleanup</text>
+    <text class="sub"   x="910" y="393" text-anchor="middle">twig worktree</text>
+    <text class="sub"   x="910" y="407" text-anchor="middle">clean</text>
+
+    <path class="arrow" d="M200 385 L230 385"/>
+    <path class="arrow" d="M410 385 L440 385"/>
+    <path class="arrow" d="M620 385 L650 385"/>
+    <path class="arrow" d="M830 385 L860 385"/>
+  </g>
+</svg>

@@ -80,6 +80,7 @@ E2E and integration tests must satisfy the **12 determinism levers** before merg
 
 ## Where to read next
 
+- Want a visual orientation for the new-feature path with diagrams? See [agentic-workflow.md](./agentic-workflow.md).
 - New to the codebase? Start with [AGENTS.md](../../AGENTS.md), then read this doc, then the [dev-process SKILL.md](../../.agents/skills/dev-process/SKILL.md).
 - Picking up an in-flight PR? Read [10-inherited-pr.md](../../.agents/skills/dev-process/entrypoints/10-inherited-pr.md).
 - Investigating a bug? Read [02-bug-investigation.md](../../.agents/skills/dev-process/entrypoints/02-bug-investigation.md).
