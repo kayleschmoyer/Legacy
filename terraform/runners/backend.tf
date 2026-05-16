@@ -22,8 +22,8 @@ terraform {
     region  = "us-east-1"
     encrypt = true
 
-    # State locking with DynamoDB (shared table with main/, different LockID).
-    dynamodb_table = "terraform-state-locks"
+    # State locking via S3 native lockfile (replaces deprecated dynamodb_table).
+    use_lockfile = true
   }
 
   required_providers {
