@@ -519,7 +519,7 @@ export default function PricingPage() {
           {/* ── Plan Cards ── */}
           <PlansRow>
             {/* Free plan */}
-            <PlanCard>
+            <PlanCard data-testid="plan-card-free">
               <PlanHeader>
                 <Paragraph
                   size="$3"
@@ -570,7 +570,11 @@ export default function PricingPage() {
             </PlanCard>
 
             {/* Premium plan */}
-            <PlanCard premium style={premiumCardStyle}>
+            <PlanCard
+              data-testid="plan-card-premium"
+              premium
+              style={premiumCardStyle}
+            >
               <PlanHeader>
                 <XStack alignItems="center" justifyContent="space-between">
                   <Paragraph
@@ -603,7 +607,11 @@ export default function PricingPage() {
                   </XStack>
                 </XStack>
 
-                <PriceRow>
+                <PriceRow
+                  data-testid={
+                    isAnnual ? 'plan-price-annual' : 'plan-price-monthly'
+                  }
+                >
                   <H2
                     fontSize="$10"
                     fontWeight="800"

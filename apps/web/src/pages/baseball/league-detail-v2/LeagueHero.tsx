@@ -20,8 +20,10 @@ const DraftStatusChip: React.FC<{ status?: DraftStatus | null }> = ({
   const showDot =
     def.cls === 'ls-chip-drafting' || def.cls === 'ls-chip-active';
   const pulse = def.cls === 'ls-chip-drafting';
+  const testId =
+    def.cls === 'ls-chip-active' ? 'season-active-badge' : undefined;
   return (
-    <span className={`ls-chip ${def.cls}`}>
+    <span className={`ls-chip ${def.cls}`} data-testid={testId}>
       {showDot ? (
         <span className={`ls-dot ${pulse ? 'ls-pulse' : ''}`} />
       ) : null}

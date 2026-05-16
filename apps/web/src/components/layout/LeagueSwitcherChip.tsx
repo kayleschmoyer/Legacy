@@ -454,7 +454,7 @@ export const LeagueSwitcherChip: React.FC<Props> = ({ draftLive = false }) => {
                       gap: 6,
                     }}
                   >
-                    <span>
+                    <span data-testid="season-phase-label">
                       {getLeagueContext(
                         league.leaguePhase,
                         league.currentWeekNumber,

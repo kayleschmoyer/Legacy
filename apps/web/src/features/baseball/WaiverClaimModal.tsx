@@ -211,7 +211,12 @@ export const WaiverClaimModal: React.FC<WaiverClaimModalProps> = ({
         >
           {success ? (
             /* ── Success State ─────────────────────────────────── */
-            <YStack alignItems="center" gap="$4" padding="$4">
+            <YStack
+              data-testid="waiver-claim-submitted-toast"
+              alignItems="center"
+              gap="$4"
+              padding="$4"
+            >
               <XStack
                 width={48}
                 height={48}

@@ -108,7 +108,7 @@ function TabButton({
       pressStyle={{ scale: 0.97 }}
       animation="quick"
       onPress={onPress}
-      data-testid={`modal-tab-${tabKey}`}
+      data-testid={`tab-${tabKey}`}
     >
       <Text
         fontSize="$3"

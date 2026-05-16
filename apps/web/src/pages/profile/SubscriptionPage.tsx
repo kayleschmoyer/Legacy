@@ -702,7 +702,12 @@ const SubscriptionPage: React.FC = () => {
                     $sm={{ flexDirection: 'column', alignItems: 'flex-start' }}
                   >
                     <YStack flex={1} gap="$1">
-                      <XStack alignItems="center" gap="$2">
+                      <XStack
+                        data-testid="subscription-tier-badge"
+                        data-tier={subscription?.tier ?? ''}
+                        alignItems="center"
+                        gap="$2"
+                      >
                         <Crown size={20} color={BRAND_GOLD} />
                         <Paragraph
                           size="$5"

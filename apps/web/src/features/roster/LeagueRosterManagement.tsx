@@ -719,9 +719,10 @@ function RosterSection({
 
   const filled = positions.filter((p) => Boolean(getAssignedPlayer(p))).length;
   const fillPct = positions.length > 0 ? (filled / positions.length) * 100 : 0;
+  const sectionSlug = title.toLowerCase().replace(/\s+/g, '-');
 
   return (
-    <YStack>
+    <YStack data-testid={`roster-section-${sectionSlug}`}>
       {/* Section header */}
       <XStack
         paddingHorizontal="$3"

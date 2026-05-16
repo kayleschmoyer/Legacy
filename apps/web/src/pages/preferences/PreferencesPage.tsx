@@ -413,18 +413,23 @@ interface ChipGroupProps<T extends string> {
   value: T;
   options: Array<{ value: T; label: string }>;
   onChange: (v: T) => void;
+  testIdPrefix?: string;
 }
 
 function ChipGroup<T extends string>({
   value,
   options,
   onChange,
+  testIdPrefix,
 }: ChipGroupProps<T>) {
   return (
     <OptionGroup>
       {options.map((opt) => (
         <OptionChip
           key={opt.value}
+          data-testid={
+            testIdPrefix ? `${testIdPrefix}-${opt.value}` : undefined
+          }
           selected={value === opt.value}
           onPress={() => onChange(opt.value)}
           role="radio"
@@ -852,6 +857,7 @@ const PreferencesPage: React.FC = () => {
                       { value: 'dark', label: 'Dark' },
                     ]}
                     onChange={(v) => update('theme', v)}
+                    testIdPrefix="theme-chip"
                   />
                 </PrefRow>
 

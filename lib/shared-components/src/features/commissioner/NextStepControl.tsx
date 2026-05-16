@@ -633,12 +633,16 @@ export function NextStepControl({
 
             <XStack gap="$3" justifyContent="flex-end">
               <Dialog.Close displayWhenAdapted asChild>
-                <Button theme="alt2" accessibilityLabel="Cancel">
+                <Button
+                  data-testid="next-step-dialog-cancel"
+                  theme="alt2"
+                  accessibilityLabel="Cancel"
+                >
                   Cancel
                 </Button>
               </Dialog.Close>
               <Button
-                data-testid="confirm-draft-button"
+                data-testid="confirm-next-step"
                 backgroundColor={BRAND_NAVY_LIGHT}
                 color="white"
                 pressStyle={{ backgroundColor: BRAND_NAVY_DARK }}
@@ -731,6 +735,7 @@ export function NextStepControl({
             <XStack gap="$3" justifyContent="flex-end">
               <Dialog.Close displayWhenAdapted asChild>
                 <Button
+                  data-testid="season-renewal-dialog-cancel"
                   theme="alt2"
                   disabled={renewalLoading}
                   accessibilityLabel="Cancel"

@@ -94,6 +94,7 @@ export function PremiumGate({
         {/* Gradient overlay with lock card — only rendered for free users */}
         {!isPremium && (
           <YStack
+            data-testid="premium-feature-gate"
             position="absolute"
             top={0}
             left={0}

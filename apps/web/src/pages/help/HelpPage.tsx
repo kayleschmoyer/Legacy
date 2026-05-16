@@ -164,8 +164,14 @@ function FaqItem({ question, answer }: FaqItemProps) {
     .replace(/[^a-z0-9]+/g, '-')
     .slice(0, 40)}`;
 
+  const slug = question
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 40);
+
   return (
-    <FaqRow>
+    <FaqRow data-testid={`faq-item-${slug}`}>
       <FaqQuestion
         onPress={() => setOpen((v) => !v)}
         role="button"

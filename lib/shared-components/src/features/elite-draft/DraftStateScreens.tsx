@@ -60,7 +60,7 @@ export function NoLeagueScreen({
 
 export function LoadingScreen(): React.JSX.Element {
   return (
-    <div className="d-root">
+    <div className="d-root" data-testid="draft-board-loading">
       <style>{CSS}</style>
       <div className="d-bg-fx" />
       <div className="d-skeleton-wrap">

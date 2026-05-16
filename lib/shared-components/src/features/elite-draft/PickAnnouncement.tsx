@@ -42,6 +42,7 @@ export function PickAnnouncement({
   return (
     <div
       className={`d-announce-overlay${leaving ? ' leaving' : ''}`}
+      data-testid="draft-announce-overlay"
       onClick={onDismiss}
       role="alert"
       aria-live="assertive"

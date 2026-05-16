@@ -688,6 +688,7 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
             {positions.map((pos: string) => (
               <PositionChip
                 key={pos}
+                data-testid={`position-filter-${pos}`}
                 selected={positionFilter === pos}
                 onPress={() => handlePositionChange(pos)}
               >
@@ -1259,6 +1260,7 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
                   {/* Action */}
                   <XStack width={44} justifyContent="center">
                     <Button
+                      data-testid="claim-free-agent-button"
                       icon={UserPlus}
                       size="$2"
                       circular

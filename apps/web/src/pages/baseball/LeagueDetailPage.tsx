@@ -2366,6 +2366,7 @@ export function LeagueDetailPage(): React.JSX.Element {
                     paddingVertical="$2"
                   >
                     <Text
+                      data-testid="invite-link-url"
                       fontSize="$2"
                       color="$textMuted"
                       fontFamily="$mono"
@@ -2428,6 +2429,7 @@ export function LeagueDetailPage(): React.JSX.Element {
                     alignItems="center"
                   >
                     <Text
+                      data-testid="invite-code"
                       fontSize="$6"
                       fontWeight="800"
                       color="$color"

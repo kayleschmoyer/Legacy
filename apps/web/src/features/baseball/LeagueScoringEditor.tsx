@@ -938,7 +938,10 @@ export function LeagueScoringEditor(
                           : 'visibility 0s 0.3s',
                       }}
                     >
-                      <YStack paddingBottom="$2">
+                      <YStack
+                        data-testid={`scoring-section-body-${group}`}
+                        paddingBottom="$2"
+                      >
                         <Separator borderColor="$surfacePanelBorder" />
                         <YStack paddingTop="$1">
                           {statsForGroup.map((stat) => renderStatRow(stat))}
@@ -963,6 +966,7 @@ export function LeagueScoringEditor(
               {saveSuccess && (
                 <XStack
                   key="success"
+                  data-testid="scoring-saved-toast"
                   role="status"
                   aria-live="polite"
                   animation="quick"

@@ -1393,7 +1393,12 @@ export function TradingCenter({
         <XStack alignItems="center" gap="$2">
           <ArrowLeftRight size={22} color={BRAND_GOLD_LIGHT} />
           <YStack>
-            <Text fontSize="$6" fontWeight="700" color="$color">
+            <Text
+              data-testid="trade-center-heading"
+              fontSize="$6"
+              fontWeight="700"
+              color="$color"
+            >
               Trading Center
             </Text>
             <Text fontSize="$2" color="$textMuted">
@@ -1459,7 +1464,7 @@ export function TradingCenter({
       )}
 
       {/* Incoming offers */}
-      <YStack gap="$3">
+      <YStack data-testid="trade-tab-incoming" gap="$3">
         <XStack alignItems="center" gap="$2">
           <Clock size={16} color="$amber9" />
           <Text fontSize="$4" fontWeight="700" color="$color">
@@ -1528,7 +1533,7 @@ export function TradingCenter({
       <Separator borderColor="$outlineSubtle" />
 
       {/* Outgoing offers */}
-      <YStack gap="$3">
+      <YStack data-testid="trade-tab-outgoing" gap="$3">
         <XStack alignItems="center" gap="$2">
           <Send size={16} color={BRAND_GOLD_LIGHT} />
           <Text fontSize="$4" fontWeight="700" color="$color">

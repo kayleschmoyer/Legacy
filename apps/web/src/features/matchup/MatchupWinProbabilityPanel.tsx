@@ -363,6 +363,7 @@ export function MatchupWinProbabilityPanel({
 
   return (
     <Card
+      data-testid="win-probability-panel"
       overflow="hidden"
       borderRadius="$6"
       borderWidth={1}

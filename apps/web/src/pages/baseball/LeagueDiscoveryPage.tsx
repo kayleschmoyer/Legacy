@@ -678,6 +678,11 @@ function LeagueCard({
               >
                 <input
                   autoFocus
+                  data-testid={
+                    lg.id != null
+                      ? `league-card-${lg.id}-team-name-input`
+                      : undefined
+                  }
                   aria-label="Team name"
                   placeholder="e.g. Shortstop Stars"
                   value={teamName}
@@ -837,6 +842,11 @@ function LeagueCard({
               ) : (
                 <button
                   onClick={onOpenJoin}
+                  data-testid={
+                    lg.id != null
+                      ? `league-card-${lg.id}-join-button`
+                      : undefined
+                  }
                   style={{
                     fontFamily: FONT_DISPLAY,
                     fontWeight: 700,

@@ -74,7 +74,7 @@ export function DraftCompleteView({
     selectedTeamId !== null && selectedTeamId === String(myTeamId);
 
   return (
-    <div className="d-root">
+    <div className="d-root" data-testid="draft-complete-banner">
       <style>{CSS}</style>
       <div className="d-bg-fx" />
       <div className="d-state-center">

@@ -267,7 +267,7 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
                     color="$blue10"
                     fontSize="$2"
                     fontWeight="600"
-                    data-testid="invite-status-already-member"
+                    data-testid="invite-validation-invalid"
                   >
                     <span role="img" aria-label="check mark">
                       ✅
@@ -279,7 +279,7 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
                     color="$orange10"
                     fontSize="$2"
                     fontWeight="600"
-                    data-testid="invite-status-full"
+                    data-testid="invite-validation-invalid"
                   >
                     <span role="img" aria-label="no entry">
                       🚫
@@ -291,7 +291,7 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
                     color="$green10"
                     fontSize="$2"
                     fontWeight="600"
-                    data-testid="invite-status-available"
+                    data-testid="invite-validation-ok"
                   >
                     <span role="img" aria-label="check mark">
                       ✅
@@ -309,7 +309,7 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
                     color="$orange10"
                     fontSize="$2"
                     fontWeight="600"
-                    data-testid="invite-status-error"
+                    data-testid="invite-validation-unknown"
                   >
                     <span role="img" aria-label="warning">
                       ⚠️
@@ -317,7 +317,12 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
                     Unable to verify code — check your connection and try again
                   </Text>
                 ) : !leagueInfo ? (
-                  <Text color="$red10" fontSize="$2" fontWeight="600">
+                  <Text
+                    color="$red10"
+                    fontSize="$2"
+                    fontWeight="600"
+                    data-testid="invite-validation-invalid"
+                  >
                     <span role="img" aria-label="error">
                       ❌
                     </span>{' '}

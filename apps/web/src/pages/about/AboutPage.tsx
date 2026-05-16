@@ -115,7 +115,7 @@ export default function AboutPage() {
       <InfoCard>
         <H2 marginBottom="$2">Build Information</H2>
 
-        <InfoRow>
+        <InfoRow data-testid="build-info-version">
           <Label>Version:</Label>
           <Value>{appVersion}</Value>
         </InfoRow>
@@ -144,7 +144,7 @@ export default function AboutPage() {
       <InfoCard>
         <H2 marginBottom="$2">Application Info</H2>
 
-        <InfoRow>
+        <InfoRow data-testid="build-info-environment">
           <Label>Environment:</Label>
           <Value>{env.isDev ? 'development' : 'production'}</Value>
         </InfoRow>

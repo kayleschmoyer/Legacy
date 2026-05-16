@@ -32,8 +32,13 @@ export interface StatCardProps {
 // ---------------------------------------------------------------------------
 
 function StatRow({ label, value, accent = false }: StatRowData) {
+  const metricSlug = label
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
   return (
     <XStack
+      data-testid={`stat-${metricSlug}`}
       justifyContent="space-between"
       paddingVertical="$2"
       paddingHorizontal="$4"

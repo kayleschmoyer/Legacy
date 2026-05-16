@@ -348,6 +348,7 @@ export const BugReportButton: React.FC<BugReportButtonProps> = ({
           backgroundColor="rgba(0,0,0,0.55)"
         />
         <Dialog.Content
+          data-testid="bug-report-dialog"
           bordered
           elevate
           maxWidth={480}
@@ -453,7 +454,12 @@ export const BugReportButton: React.FC<BugReportButtonProps> = ({
                       outline: 'none',
                     }}
                   />
-                  <Paragraph size="$1" color="$colorPress" textAlign="right">
+                  <Paragraph
+                    data-testid="bug-char-counter"
+                    size="$1"
+                    color="$colorPress"
+                    textAlign="right"
+                  >
                     {description.length}/{MAX_DESCRIPTION_LENGTH}
                   </Paragraph>
                 </YStack>
@@ -701,6 +707,7 @@ export const BugReportButton: React.FC<BugReportButtonProps> = ({
                 <XStack gap="$3" justifyContent="flex-end">
                   <Dialog.Close asChild>
                     <Button
+                      data-testid="bug-report-dialog-cancel"
                       size="$3"
                       backgroundColor="transparent"
                       borderWidth={1}

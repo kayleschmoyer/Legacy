@@ -603,6 +603,7 @@ export function OnboardingTutorial({ onClose }: OnboardingTutorialProps) {
     >
       {/* ── Modal card ── */}
       <YStack
+        data-testid={`onboarding-step-${currentStep + 1}`}
         borderRadius="$7"
         borderWidth={1}
         borderColor={withAlpha(BRAND_GOLD, 0.3)}

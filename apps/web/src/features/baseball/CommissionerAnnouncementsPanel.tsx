@@ -360,6 +360,7 @@ export function CommissionerAnnouncementsPanel({
           {announcements.map((announcement, idx) => (
             <React.Fragment key={announcement.id}>
               <XStack
+                data-testid={`announcement-row-${announcement.id}`}
                 gap="$3"
                 paddingHorizontal="$5"
                 paddingVertical="$4"
