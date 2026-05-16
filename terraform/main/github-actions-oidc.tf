@@ -861,12 +861,23 @@ resource "aws_iam_policy" "github_actions_supplemental" {
         Resource = "*"
       },
       {
-        Effect = "Allow"
-        Action = [
-          "sso:CreateApplication",
-          "sso:ListApplications"
-        ]
+        Effect   = "Allow"
+        Action   = ["sso:ListApplications"]
         Resource = ["arn:aws:sso:::instance/${local.sso_instance_id}"]
+      },
+      # sso:CreateApplication is authorized against ALL of: the parent
+      # instance arn, the application provider arn supplied to the call,
+      # and the application arn shape (with a wildcarded account segment,
+      # since the apl-* id isn't assigned until the call returns). Mirrors
+      # the same three-resource set we need for sso:TagResource below.
+      {
+        Effect = "Allow"
+        Action = ["sso:CreateApplication"]
+        Resource = [
+          "arn:aws:sso:::instance/${local.sso_instance_id}",
+          "arn:aws:sso::aws:applicationProvider/custom",
+          "arn:aws:sso::*:application/${local.sso_instance_id}/*"
+        ]
       },
       {
         Effect = "Allow"
