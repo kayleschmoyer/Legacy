@@ -4,14 +4,14 @@
 # machines. Each MCP server gets its own HTTP API so Claude Code can point
 # directly at the invoke URL with no path-prefix stripping required.
 #
-# Setup order (one-time per developer, per environment):
-#   1. terraform apply  (deploys APIs without auth — mcp_oidc_client_id is "")
+# Setup order (one-time per environment, run once by any admin):
+#   1. terraform apply  (creates the Customer managed OIDC app + JWT authorizers)
 #   2. node scripts/mcp-auth.mjs --setup
-#        → registers OIDC client, does device flow, writes .env.local,
-#          prints mcp_oidc_issuer_url + mcp_oidc_client_id for terraform.tfvars
-#   3. Add those two values to terraform/main/terraform.tfvars, re-apply
-#        → JWT authorizer activates on all three APIs
-#   4. Subsequent token refreshes: node scripts/mcp-auth.mjs
+#        → reads app ARN from SSM, configures OAuth grants, does authorization
+#          code flow via browser, writes idToken + URLs to .env.local
+#
+# Per-developer token refresh (after initial setup):
+#   node scripts/mcp-auth.mjs
 #
 # Cloud agents (GitHub Actions) continue to call Lambda Function URLs directly
 # via AWS_IAM / SigV4 — the mcp_invoke policy on the github_actions role is
@@ -37,6 +37,53 @@ locals {
     github = aws_lambda_function.mcp_github.function_name
     ci     = aws_lambda_function.mcp_ci.function_name
   }
+
+  # IAM Identity Center OIDC issuer — the 'iss' claim in idTokens issued by
+  # create-token-with-iam. Matches the regional OIDC endpoint for this project.
+  # Update if the IAM Identity Center instance moves to a different region.
+  mcp_oidc_region = "us-east-1"
+  mcp_oidc_issuer = "https://oidc.${local.mcp_oidc_region}.amazonaws.com"
+}
+
+# ── IAM Identity Center — Customer managed OIDC application ──────────────────
+# Provides an application ARN that mcp-auth.mjs uses as the client_id for
+# create-token-with-iam. The authorization code + PKCE flow returns an idToken
+# that the API Gateway JWT authorizers below will validate.
+
+data "aws_ssoadmin_instances" "main" {}
+
+resource "aws_ssoadmin_application" "mcp_dev" {
+  name                     = "${local.name_prefix}-mcp-dev"
+  application_provider_arn = "arn:aws:sso::aws:applicationProvider/custom"
+  instance_arn             = tolist(data.aws_ssoadmin_instances.main.arns)[0]
+
+  portal_options {
+    sign_in_options {
+      application_url = "https://legacy-fantasy.com"
+      origin          = "APPLICATION"
+    }
+    visibility = "DISABLED"
+  }
+
+  status = "ENABLED"
+  tags   = local.common_tags
+}
+
+# Enable the openid scope so create-token-with-iam returns an idToken.
+resource "aws_ssoadmin_application_access_scope" "mcp_dev_openid" {
+  application_arn = aws_ssoadmin_application.mcp_dev.application_arn
+  scope           = "openid"
+}
+
+# Publish the application ARN to SSM so mcp-auth.mjs can read it without
+# requiring terraform.tfvars values. The authorization_code and refresh_token
+# grant types are configured by 'node scripts/mcp-auth.mjs --setup' (Terraform
+# has no aws_ssoadmin_application_grant resource as of provider v6).
+resource "aws_ssm_parameter" "mcp_oidc_app_arn" {
+  name  = "/${local.name_prefix}/mcp/oidc/app-arn"
+  type  = "String"
+  value = aws_ssoadmin_application.mcp_dev.application_arn
+  tags  = local.common_tags
 }
 
 # ── HTTP APIs (one per server) ────────────────────────────────────────────────
@@ -50,20 +97,20 @@ resource "aws_apigatewayv2_api" "mcp" {
 }
 
 # ── JWT authoriser — IAM Identity Center OIDC ─────────────────────────────────
-# Created only after mcp_oidc_client_id is known (step 2 above).
 # API Gateway fetches <issuer>/.well-known/jwks.json automatically to validate
-# incoming ID tokens.
+# incoming ID tokens. The audience is the Customer managed application ARN,
+# which matches the 'aud' claim in idTokens issued by create-token-with-iam.
 
 resource "aws_apigatewayv2_authorizer" "mcp_oidc" {
-  for_each         = var.mcp_oidc_client_id != "" ? local.mcp_servers_map : {}
+  for_each         = local.mcp_servers_map
   api_id           = aws_apigatewayv2_api.mcp[each.key].id
   authorizer_type  = "JWT"
   identity_sources = ["$request.header.Authorization"]
   name             = "iam-ic-oidc"
 
   jwt_configuration {
-    audience = [var.mcp_oidc_client_id]
-    issuer   = var.mcp_oidc_issuer_url
+    audience = [aws_ssoadmin_application.mcp_dev.application_arn]
+    issuer   = local.mcp_oidc_issuer
   }
 }
 
@@ -78,12 +125,10 @@ resource "aws_apigatewayv2_integration" "mcp" {
 }
 
 # ── $default route — catches every method + path ──────────────────────────────
-# Only created after mcp_oidc_client_id is known so the APIs are never publicly
-# reachable without JWT auth. Run 'node scripts/mcp-auth.mjs --setup' first,
-# then add mcp_oidc_client_id to terraform.tfvars and re-apply.
+# Always JWT-protected; the app ARN is known after the first terraform apply.
 
 resource "aws_apigatewayv2_route" "mcp_default" {
-  for_each = var.mcp_oidc_client_id != "" ? local.mcp_servers_map : {}
+  for_each = local.mcp_servers_map
   api_id   = aws_apigatewayv2_api.mcp[each.key].id
 
   route_key = "$default"

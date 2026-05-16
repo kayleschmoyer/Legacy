@@ -6,18 +6,16 @@
  * Replaces the local signing proxy (tools/mcp/signing-proxy) for developer
  * machines. Cloud agents continue to use Lambda Function URLs + SigV4.
  *
+ * Prerequisites: run `terraform apply` in terraform/main first so the Customer
+ * managed OIDC application and SSM parameters exist.
+ *
  * Usage:
  *   node scripts/mcp-auth.mjs           # refresh token (or re-auth if expired)
- *   node scripts/mcp-auth.mjs --setup   # first-time: register client + full auth
- *   node scripts/mcp-auth.mjs --force   # force new device flow even if refreshable
- *
- * After running --setup, add the printed mcp_oidc_issuer_url and
- * mcp_oidc_client_id values to terraform/main/terraform.tfvars, then
- * re-run terraform apply to activate the JWT authorizer.
+ *   node scripts/mcp-auth.mjs --setup   # first-time: configure grants + full auth
+ *   node scripts/mcp-auth.mjs --force   # force new auth code flow even if refreshable
  *
  * Writes to .env.local:
- *   MCP_AUTH_CLIENT_ID      — OIDC client ID (public, safe to commit if needed)
- *   MCP_AUTH_CLIENT_SECRET  — OIDC client secret
+ *   MCP_AUTH_CLIENT_ID      — IAM Identity Center application ARN (from SSM)
  *   MCP_AUTH_TOKEN          — ID token JWT (~8h TTL from IAM IC)
  *   MCP_AUTH_REFRESH_TOKEN  — refresh token
  *   MCP_AUTH_EXPIRES_AT     — Unix epoch when MCP_AUTH_TOKEN expires
@@ -26,12 +24,13 @@
  *   MCP_CI_URL              — API Gateway invoke URL for legacy-sports-ci
  */
 
+import { createHash, randomBytes } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import readline from 'node:readline';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
@@ -216,114 +215,175 @@ function getSsoSessionRegion(config, sessionName) {
   return 'us-east-1';
 }
 
-// ── OIDC client registration ──────────────────────────────────────────────────
+// ── PKCE helpers ──────────────────────────────────────────────────────────────
 
-function registerClient(ssoRegion) {
-  console.log('Registering OIDC client with IAM Identity Center…');
-  return aws(
-    'sso-oidc',
-    'register-client',
-    [
-      '--client-name',
-      'mcp-claude-code',
-      '--client-type',
-      'public',
-      '--scopes',
-      'sso:account:access openid',
-    ],
-    ssoRegion,
-  );
+// Fixed redirect port — must match the RedirectUris configured on the IAM
+// Identity Center application via 'node scripts/mcp-auth.mjs --setup'.
+const REDIRECT_PORT = 57329;
+const REDIRECT_URI = `http://localhost:${REDIRECT_PORT}`;
+
+function generateCodeVerifier() {
+  return randomBytes(48).toString('base64url');
 }
 
-// ── Device authorization flow ─────────────────────────────────────────────────
+function generateCodeChallenge(verifier) {
+  return createHash('sha256').update(verifier).digest('base64url');
+}
 
-async function deviceAuthFlow(clientId, clientSecret, startUrl, ssoRegion) {
-  console.log('Starting device authorization…');
-  const auth = aws(
-    'sso-oidc',
-    'start-device-authorization',
-    [
-      '--client-id',
-      clientId,
-      '--client-secret',
-      clientSecret,
-      '--start-url',
-      startUrl,
-      '--scope',
-      'sso:account:access openid',
-    ],
-    ssoRegion,
-  );
+// ── Authorization code flow (PKCE) ────────────────────────────────────────────
 
-  const verifyUrl = auth['verificationUriComplete'] ?? auth['verificationUri'];
-  console.log(
-    `\nOpen this URL in your browser to authorize:\n  ${verifyUrl}\n`,
-  );
+async function authCodeFlow(appArn, ssoRegion) {
+  const verifier = generateCodeVerifier();
+  const challenge = generateCodeChallenge(verifier);
+  const state = randomBytes(16).toString('hex');
 
-  // Try to open the browser automatically
+  // Start local HTTP server before opening the browser so the callback
+  // is ready to receive the redirect.
+  let resolveCode, rejectCode;
+  const codePromise = new Promise((res, rej) => {
+    resolveCode = res;
+    rejectCode = rej;
+  });
+
+  const server = http.createServer((req, res) => {
+    const url = new URL(req.url, REDIRECT_URI);
+    const code = url.searchParams.get('code');
+    const error = url.searchParams.get('error');
+    const returnedState = url.searchParams.get('state');
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(
+      '<html><body style="font-family:sans-serif;padding:2rem">' +
+        '<h2>Authorization complete</h2>' +
+        '<p>You may close this tab and return to the terminal.</p>' +
+        '</body></html>',
+    );
+    server.close();
+    if (returnedState !== state) {
+      rejectCode(
+        new Error(
+          `OAuth state mismatch — possible CSRF; expected ${state}, got ${returnedState}`,
+        ),
+      );
+    } else if (code) {
+      resolveCode(code);
+    } else {
+      rejectCode(new Error(error ?? 'No authorization code in callback'));
+    }
+  });
+
+  await new Promise((res, rej) => {
+    server.listen(REDIRECT_PORT, '127.0.0.1', res);
+    server.on('error', rej);
+  });
+
+  const authUrl =
+    `https://oidc.${ssoRegion}.amazonaws.com/authorize` +
+    `?response_type=code` +
+    `&client_id=${encodeURIComponent(appArn)}` +
+    `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
+    `&scope=openid` +
+    `&code_challenge=${challenge}` +
+    `&code_challenge_method=S256` +
+    `&state=${state}`;
+
+  LOGGER.info(`\nOpening browser for authorization:\n  ${authUrl}\n`);
   const opener =
     process.platform === 'win32'
       ? 'start'
       : process.platform === 'darwin'
         ? 'open'
         : 'xdg-open';
-  spawnSync(opener, [verifyUrl], { shell: true, stdio: 'ignore' });
+  spawnSync(opener, [authUrl], { shell: true, stdio: 'ignore' });
+  LOGGER.info('Waiting for authorization…');
 
-  // Poll until the user authorizes
-  const intervalMs = (auth['interval'] ?? 5) * 1000;
-  const expiresAt = Date.now() + (auth['expiresIn'] ?? 600) * 1000;
-  process.stdout.write('Waiting for authorization');
+  const code = await codePromise;
 
-  while (Date.now() < expiresAt) {
-    await sleep(intervalMs);
-    process.stdout.write('.');
-
-    try {
-      const token = aws(
-        'sso-oidc',
-        'create-token',
-        [
-          '--client-id',
-          clientId,
-          '--client-secret',
-          clientSecret,
-          '--grant-type',
-          'urn:ietf:params:oauth:grant-type:device_code',
-          '--device-code',
-          auth['deviceCode'],
-          '--scope',
-          'openid',
-        ],
-        ssoRegion,
-      );
-      console.log('\nAuthorized.');
-      return token;
-    } catch (err) {
-      if (!err.message.includes('AuthorizationPendingException')) {
-        console.log();
-        throw err;
-      }
-      // Still pending — keep polling
-    }
-  }
-
-  console.log();
-  throw new Error(
-    'Device authorization timed out. Run the script again to retry.',
+  LOGGER.info('Authorized — exchanging code for tokens…');
+  return aws(
+    'sso-oidc',
+    'create-token-with-iam',
+    [
+      '--client-id',
+      appArn,
+      '--grant-type',
+      'authorization_code',
+      '--code',
+      code,
+      '--redirect-uri',
+      REDIRECT_URI,
+      '--code-verifier',
+      verifier,
+      '--scope',
+      'openid',
+    ],
+    ssoRegion,
   );
+}
+
+// ── Grant configuration (--setup only) ───────────────────────────────────────
+
+function configureAppGrants(appArn, ssoRegion) {
+  LOGGER.info(
+    'Configuring OAuth grants on the IAM Identity Center application…',
+  );
+
+  // authorization_code grant — required for the auth code + PKCE flow
+  const authCodeGrant = JSON.stringify({
+    AuthorizationCode: { RedirectUris: [REDIRECT_URI] },
+  });
+  const r1 = spawnSync(
+    'aws',
+    [
+      'sso-admin',
+      'put-application-grant',
+      '--application-arn',
+      appArn,
+      '--grant-type',
+      'authorization_code',
+      '--grant',
+      authCodeGrant,
+      '--region',
+      ssoRegion,
+    ],
+    { encoding: 'utf8', env: { ...process.env } },
+  );
+  if (r1.status !== 0)
+    throw new Error(`put-application-grant (auth_code) failed:\n${r1.stderr}`);
+
+  // refresh_token grant — allows token refresh without re-authenticating
+  const r2 = spawnSync(
+    'aws',
+    [
+      'sso-admin',
+      'put-application-grant',
+      '--application-arn',
+      appArn,
+      '--grant-type',
+      'refresh_token',
+      '--grant',
+      '{"RefreshToken":{}}',
+      '--region',
+      ssoRegion,
+    ],
+    { encoding: 'utf8', env: { ...process.env } },
+  );
+  if (r2.status !== 0)
+    throw new Error(
+      `put-application-grant (refresh_token) failed:\n${r2.stderr}`,
+    );
+
+  LOGGER.info('OAuth grants configured.');
 }
 
 // ── Token refresh ─────────────────────────────────────────────────────────────
 
-function refreshToken(clientId, clientSecret, refreshTok, ssoRegion) {
+function refreshToken(appArn, refreshTok, ssoRegion) {
   return aws(
     'sso-oidc',
-    'create-token',
+    'create-token-with-iam',
     [
       '--client-id',
-      clientId,
-      '--client-secret',
-      clientSecret,
+      appArn,
       '--grant-type',
       'refresh_token',
       '--refresh-token',
@@ -337,8 +397,7 @@ function refreshToken(clientId, clientSecret, refreshTok, ssoRegion) {
 
 // ── SSM — read API Gateway URLs written by Terraform ─────────────────────────
 
-function readApiUrlFromSsm(name, env) {
-  const paramName = `/legacy-sports-${env}/mcp/${name}/api-url`;
+function readSsmParameter(paramName) {
   try {
     const result = aws('ssm', 'get-parameter', ['--name', paramName]);
     return result['Parameter']['Value'];
@@ -347,14 +406,18 @@ function readApiUrlFromSsm(name, env) {
   }
 }
 
-// ── Utilities ─────────────────────────────────────────────────────────────────
-
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function readApiUrlFromSsm(name, env) {
+  return readSsmParameter(`/legacy-sports-${env}/mcp/${name}/api-url`);
 }
 
+function readAppArnFromSsm(env) {
+  return readSsmParameter(`/legacy-sports-${env}/mcp/oidc/app-arn`);
+}
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+
 function printDivider() {
-  console.log('─'.repeat(60));
+  LOGGER.info('─'.repeat(60));
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
@@ -362,99 +425,86 @@ function printDivider() {
 async function main() {
   const env = readEnvLocal();
 
-  // Discover SSO config
+  // Discover SSO config — we need ssoRegion for the OIDC endpoint URL.
   let ssoConfig;
   try {
     ssoConfig = findSsoConfig();
   } catch (err) {
-    console.error(`Error: ${err.message}`);
+    LOGGER.error('Error discovering SSO config', err);
     process.exit(1);
   }
-  const { startUrl, region: ssoRegion } = ssoConfig;
+  const { region: ssoRegion } = ssoConfig;
 
-  // Determine terraform environment (default dev; override via MCP_TF_ENV or --env flag)
+  // Terraform environment (default dev; override via MCP_TF_ENV or --env flag)
   const tfEnvArg = args.find((a, i) => args[i - 1] === '--env');
   const tfEnv = tfEnvArg ?? process.env['MCP_TF_ENV'] ?? 'dev';
 
-  let clientId = env['MCP_AUTH_CLIENT_ID'];
-  let clientSecret = env['MCP_AUTH_CLIENT_SECRET'];
-  let tokenData = null;
-
-  // ── Step 1: client registration (setup mode or no client yet) ──────────────
-  if (!clientId || !clientSecret || SETUP_MODE) {
-    let registration;
-    try {
-      registration = registerClient(ssoRegion);
-    } catch (err) {
-      console.error(`Failed to register OIDC client: ${err.message}`);
+  // ── Step 1: resolve application ARN ──────────────────────────────────────
+  // The ARN is the client_id for create-token-with-iam. It comes from the
+  // aws_ssoadmin_application Terraform resource, published to SSM.
+  let appArn = env['MCP_AUTH_CLIENT_ID'];
+  if (!appArn || SETUP_MODE) {
+    LOGGER.info('Reading application ARN from SSM…');
+    appArn = readAppArnFromSsm(tfEnv);
+    if (!appArn) {
+      LOGGER.error(
+        `Could not read application ARN from SSM`,
+        new Error(
+          `Expected /legacy-sports-${tfEnv}/mcp/oidc/app-arn — run terraform apply in terraform/main first`,
+        ),
+      );
       process.exit(1);
     }
-    clientId = registration['clientId'];
-    clientSecret = registration['clientSecret'];
-    writeEnvLocal({
-      MCP_AUTH_CLIENT_ID: clientId,
-      MCP_AUTH_CLIENT_SECRET: clientSecret,
-    });
-    console.log(`Client registered (clientId: ${clientId})`);
+    writeEnvLocal({ MCP_AUTH_CLIENT_ID: appArn });
+    LOGGER.info(`Application ARN: ${appArn}`);
   }
 
-  // ── Step 2: get / refresh token ────────────────────────────────────────────
+  // ── Step 2: configure OAuth grants (setup mode only) ─────────────────────
+  // Terraform has no aws_ssoadmin_application_grant resource, so grants are
+  // configured here via the AWS CLI on first setup.
+  if (SETUP_MODE) {
+    try {
+      configureAppGrants(appArn, ssoRegion);
+    } catch (err) {
+      LOGGER.error('Failed to configure OAuth grants', err);
+      process.exit(1);
+    }
+  }
+
+  // ── Step 3: get / refresh token ───────────────────────────────────────────
+  let tokenData = null;
   const existingToken = env['MCP_AUTH_TOKEN'];
   const existingRefresh = env['MCP_AUTH_REFRESH_TOKEN'];
   const secsLeft = existingToken ? tokenExpiresInSeconds(existingToken) : -1;
 
   if (!FORCE_MODE && existingToken && secsLeft > 300 && existingRefresh) {
-    // Token still fresh enough — nothing to do
     const mins = Math.floor(secsLeft / 60);
-    console.log(`Token is valid for ${mins} more minutes. No refresh needed.`);
-    console.log('Use --force to obtain a new token anyway.');
+    LOGGER.info(`Token is valid for ${mins} more minutes. No refresh needed.`);
+    LOGGER.info('Use --force to obtain a new token anyway.');
   } else if (!FORCE_MODE && existingRefresh) {
-    // Try refresh first
-    console.log('Refreshing token…');
+    LOGGER.info('Refreshing token…');
     try {
-      tokenData = refreshToken(
-        clientId,
-        clientSecret,
-        existingRefresh,
-        ssoRegion,
-      );
-      console.log('Token refreshed.');
+      tokenData = refreshToken(appArn, existingRefresh, ssoRegion);
+      LOGGER.info('Token refreshed.');
     } catch (err) {
-      console.warn(
-        `Refresh failed (${err.message.split('\n')[0]}). Falling back to device flow…`,
+      LOGGER.warn(
+        `Refresh failed — falling back to authorization code flow`,
+        err,
       );
-      tokenData = await deviceAuthFlow(
-        clientId,
-        clientSecret,
-        startUrl,
-        ssoRegion,
-      );
+      tokenData = await authCodeFlow(appArn, ssoRegion);
     }
   } else {
-    // Full device authorization flow
-    tokenData = await deviceAuthFlow(
-      clientId,
-      clientSecret,
-      startUrl,
-      ssoRegion,
-    );
+    tokenData = await authCodeFlow(appArn, ssoRegion);
   }
 
   if (tokenData) {
     const idToken = tokenData['idToken'];
     if (!idToken) {
-      LOGGER.error('ERROR: SSO token response did not include an idToken.');
       LOGGER.error(
-        '  Root cause: the "openid" scope was not granted during token issuance.',
-      );
-      LOGGER.error(
-        '  Fix: re-run this script with --setup to re-register the client and redo the',
-      );
-      LOGGER.error(
-        '       device-authorization flow, which now explicitly requests the openid scope.',
-      );
-      LOGGER.error(
-        `  (response keys present: ${Object.keys(tokenData).join(', ') || '<none>'})`,
+        'SSO token response did not include an idToken',
+        new Error(
+          `IAM Identity Center did not grant the openid scope. Verify aws_ssoadmin_application_access_scope "openid" in Terraform and re-run terraform apply. Response keys: ${Object.keys(tokenData).join(', ') || '<none>'}`,
+        ),
       );
       process.exit(1);
     }
@@ -467,23 +517,12 @@ async function main() {
     });
 
     const expiresIn = Math.floor((payload['exp'] - Date.now() / 1000) / 60);
-    console.log(
+    LOGGER.info(
       `Token written to .env.local (expires in ${expiresIn} minutes).`,
     );
-
-    if (SETUP_MODE) {
-      printDivider();
-      console.log(
-        'SETUP — add these to terraform/main/terraform.tfvars then re-run terraform apply:',
-      );
-      console.log();
-      console.log(`mcp_oidc_issuer_url = "${payload['iss']}"`);
-      console.log(`mcp_oidc_client_id  = "${clientId}"`);
-      printDivider();
-    }
   }
 
-  // ── Step 3: populate MCP_*_URL from SSM ────────────────────────────────────
+  // ── Step 4: populate MCP_*_URL from SSM ──────────────────────────────────
   const urlUpdates = {};
   let allUrlsFound = true;
 
@@ -496,9 +535,9 @@ async function main() {
       const url = readApiUrlFromSsm(name, tfEnv);
       if (url) {
         urlUpdates[envKey] = url;
-        console.log(`${envKey}=${url}`);
+        LOGGER.info(`${envKey}=${url}`);
       } else {
-        console.warn(
+        LOGGER.warn(
           `${envKey}: SSM parameter not found for env "${tfEnv}". Run terraform apply first, or set ${envKey} manually in .env.local.`,
         );
         allUrlsFound = false;
@@ -511,16 +550,12 @@ async function main() {
   }
 
   if (!allUrlsFound && SETUP_MODE) {
-    console.log(
-      '\nOnce Terraform has applied, re-run this script to populate the missing URLs.',
+    LOGGER.info(
+      'Once Terraform has applied, re-run this script to populate the missing URLs.',
     );
   }
 
-  // ── Step 4: post-write self-check ─────────────────────────────────────────
-  // Re-read .env.local from disk to confirm every required MCP var was actually
-  // written. Catches silent failures (e.g. SSM lookup returned null and only
-  // emitted a console.warn) so the caller sees a non-zero exit instead of
-  // believing the script succeeded.
+  // ── Step 5: post-write self-check ─────────────────────────────────────────
   const REQUIRED_VARS = [
     'MCP_AUTH_TOKEN',
     'MCP_JIRA_URL',
@@ -532,28 +567,23 @@ async function main() {
 
   if (missing.length > 0) {
     printDivider();
+    const hints = [
+      `MCP servers will fail to connect until these are set.`,
+      ...(missing.some((k) => k.endsWith('_URL'))
+        ? [
+            `For MCP_*_URL: run terraform apply in terraform/main for env "${tfEnv}" so SSM params exist.`,
+          ]
+        : []),
+      ...(missing.includes('MCP_AUTH_TOKEN')
+        ? [
+            'For MCP_AUTH_TOKEN: re-run with --force to redo the authorization flow.',
+          ]
+        : []),
+    ].join(' ');
     LOGGER.error(
-      `ERROR: .env.local is missing required MCP var(s) after auth: ${missing.join(', ')}`,
+      `.env.local is missing required MCP var(s) after auth: ${missing.join(', ')}`,
+      new Error(hints),
     );
-    LOGGER.error(
-      '  The jira / github / ci MCP servers will fail to connect until these are set.',
-    );
-    if (missing.some((k) => k.endsWith('_URL'))) {
-      LOGGER.error(
-        `  For MCP_*_URL: verify terraform/main has been applied for env "${tfEnv}"`,
-      );
-      LOGGER.error(
-        '  and that the SSM parameters /legacy-sports-<env>/mcp/<name>/api-url exist.',
-      );
-      LOGGER.error(
-        `  Try: aws ssm get-parameter --name /legacy-sports-${tfEnv}/mcp/jira/api-url`,
-      );
-    }
-    if (missing.includes('MCP_AUTH_TOKEN')) {
-      LOGGER.error(
-        '  For MCP_AUTH_TOKEN: re-run with --force to redo the device-auth flow.',
-      );
-    }
     process.exit(1);
   }
 
@@ -561,10 +591,13 @@ async function main() {
   LOGGER.info(
     `.env.local has MCP_AUTH_TOKEN + MCP_JIRA_URL + MCP_GITHUB_URL + MCP_CI_URL.`,
   );
-  console.log('Done. Restart Claude Code for the new tokens to take effect.');
+  LOGGER.info('Done. Restart Claude Code for the new tokens to take effect.');
 }
 
 main().catch((err) => {
-  console.error(err.message ?? err);
+  LOGGER.error(
+    'mcp-auth failed',
+    err instanceof Error ? err : new Error(String(err)),
+  );
   process.exit(1);
 });
