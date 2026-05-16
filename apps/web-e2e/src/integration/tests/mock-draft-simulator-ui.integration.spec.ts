@@ -27,6 +27,7 @@
 
 import { expect } from '@playwright/test';
 import { test } from '../fixtures/ui';
+import { gqlFetchEnvelope } from '../helpers/gql-fetch';
 
 // ---------------------------------------------------------------------------
 // Shared state accumulated across serial tests.
@@ -234,30 +235,31 @@ test.describe
     // for the in-browser React timer.  The mutation is idempotent: it is a
     // no-op until the server-side deadline actually expires, so polling every
     // 5 seconds is safe.
-    const gqlBase =
-      process.env.INTEGRATION_BASE_URL ?? 'https://api.legacy-fantasy.com/';
     async function nudgeDraftPick(): Promise<void> {
       if (!state.leagueId) return;
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 8_000);
-      await fetch(`${gqlBase}graphql`, {
-        method: 'POST',
-        signal: controller.signal,
-        headers: {
-          Authorization: `Bearer ${commissionerJwt}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          query: `mutation NudgeExpiredDraftPick($leagueId: Int!) {
+      try {
+        // Best-effort: any failure here is non-fatal because EventBridge is
+        // the hard fallback. Use the envelope variant so any returned
+        // `errors[]` is reachable for debugging, but swallow network/parse
+        // failures (LS-4461). The wrapped try/catch keeps the AbortController
+        // cleanup path correct.
+        await gqlFetchEnvelope<{
+          autoProcessDraftPicks?: { picksAutoMade: number };
+        }>(
+          commissionerJwt,
+          `mutation NudgeExpiredDraftPick($leagueId: Int!) {
             autoProcessDraftPicks(leagueId: $leagueId) { picksAutoMade }
           }`,
-          variables: { leagueId: state.leagueId },
-        }),
-      })
-        .catch((_err) => {
-          // best-effort nudge — swallow errors; EventBridge is the hard fallback
-        })
-        .finally(() => clearTimeout(timeout));
+          { leagueId: state.leagueId },
+          { signal: controller.signal },
+        );
+      } catch {
+        // best-effort nudge — swallow errors; EventBridge is the hard fallback
+      } finally {
+        clearTimeout(timeout);
+      }
     }
 
     const totalPicks = state.numTeams * state.rosterSize; // 4 × 5 = 20

@@ -27,38 +27,14 @@
 
 import { expect } from '@playwright/test';
 import { test } from '../fixtures/ui';
+import { gqlFetchEnvelope as gqlFetch } from '../helpers/gql-fetch';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-const GQL_URL =
-  (
-    process.env.INTEGRATION_BASE_URL ?? 'https://api.legacy-fantasy.com/'
-  ).replace(/\/?$/, '/') + 'graphql';
-
-/** Fire a raw GraphQL request against the live backend (no browser needed). */
-async function gqlFetch<T>(
-  jwt: string,
-  query: string,
-  variables?: Record<string, unknown>,
-): Promise<{
-  data?: T;
-  errors?: Array<{ message: string; extensions?: { code: string } }>;
-}> {
-  const res = await fetch(GQL_URL, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${jwt}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ query, variables }),
-  });
-  return res.json() as Promise<{
-    data?: T;
-    errors?: Array<{ message: string; extensions?: { code: string } }>;
-  }>;
-}
+// These tests intentionally inspect `errors[].extensions.code` to verify
+// premium-gating middleware shapes (`PREMIUM_REQUIRED`, etc.), so they use
+// the envelope variant rather than the strict `gqlFetch` from
+// `../helpers/gql-fetch`. HTTP/parse failures still throw, surfacing the
+// real backend error instead of an opaque `result.errors === undefined`
+// downstream (LS-4461).
 
 // ---------------------------------------------------------------------------
 // Shared state

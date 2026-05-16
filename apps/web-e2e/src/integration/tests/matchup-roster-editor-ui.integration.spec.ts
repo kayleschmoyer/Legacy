@@ -30,8 +30,8 @@
 import { expect } from '@playwright/test';
 import { createLeagueViaUI } from '../helpers/create-league';
 import { joinLeagueAsManager } from '../helpers/wait-for-join-page';
-import { awsRequestContext } from '../helpers/graphql';
 import { test } from '../fixtures/ui';
+import { gqlFetch } from '../helpers/gql-fetch';
 
 // ---------------------------------------------------------------------------
 // Shared state
@@ -64,37 +64,6 @@ const PLAYER_NAME_RE = /^(?!Edit |Current )[A-Z][-\w.']* [A-Z][-\w.']*/;
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-const GQL_URL =
-  (
-    process.env.INTEGRATION_BASE_URL ?? 'https://api.legacy-fantasy.com/'
-  ).replace(/\/?$/, '/') + 'graphql';
-
-async function gqlFetch<T>(
-  jwt: string,
-  query: string,
-  variables?: Record<string, unknown>,
-): Promise<T> {
-  const res = await fetch(GQL_URL, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${jwt}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ query, variables }),
-  });
-  const json = (await res.json()) as {
-    data?: T;
-    errors?: Array<{ message: string }>;
-  };
-  if (json.errors?.length) {
-    throw new Error(
-      `GraphQL error: ${json.errors[0].message}${awsRequestContext(res.headers)}`,
-    );
-  }
-  if (!json.data) throw new Error('GraphQL response contained no data');
-  return json.data;
-}
 
 // ---------------------------------------------------------------------------
 // Serial test suite

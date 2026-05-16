@@ -43,10 +43,10 @@ import { expect } from '@playwright/test';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { gqlFetch } from '../helpers/gql-fetch';
 
 import { test } from '../fixtures/ui';
 import { getTestUserJwt, TEST_USERS } from '../../utils/test-user-auth';
-import { awsRequestContext } from '../helpers/graphql';
 
 // ---------------------------------------------------------------------------
 // Shared state set in beforeAll and consumed by subsequent phases
@@ -115,37 +115,6 @@ async function tryGetAuthJwt(): Promise<string> {
 // ---------------------------------------------------------------------------
 // GraphQL helpers
 // ---------------------------------------------------------------------------
-
-const GQL_URL =
-  (
-    process.env.INTEGRATION_BASE_URL ?? 'https://api.legacy-fantasy.com/'
-  ).replace(/\/?$/, '/') + 'graphql';
-
-async function gqlFetch<T>(
-  jwt: string,
-  query: string,
-  variables?: Record<string, unknown>,
-): Promise<T> {
-  const res = await fetch(GQL_URL, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${jwt}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ query, variables }),
-  });
-  const json = (await res.json()) as {
-    data?: T;
-    errors?: Array<{ message: string }>;
-  };
-  if (json.errors?.length) {
-    throw new Error(
-      `GraphQL error: ${json.errors[0].message}${awsRequestContext(res.headers)}`,
-    );
-  }
-  if (!json.data) throw new Error('GraphQL response contained no data');
-  return json.data;
-}
 
 // ---------------------------------------------------------------------------
 // GraphQL query strings used only during setUp

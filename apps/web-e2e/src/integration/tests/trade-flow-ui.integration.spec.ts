@@ -29,8 +29,8 @@ import type { Page } from '@playwright/test';
 import { createLeagueViaUI } from '../helpers/create-league';
 import { joinLeagueAsManager } from '../helpers/wait-for-join-page';
 import { waitForSeasonActive } from '../helpers/wait-for-season-active';
-import { awsRequestContext } from '../helpers/graphql';
 import { test } from '../fixtures/ui';
+import { gqlFetch } from '../helpers/gql-fetch';
 
 // ---------------------------------------------------------------------------
 // Shared state accumulated across serial phases.
@@ -56,41 +56,9 @@ let state: TradeFlowState;
 // Constants
 // ---------------------------------------------------------------------------
 
-const GQL_URL =
-  (
-    process.env.INTEGRATION_BASE_URL ?? 'https://api.legacy-fantasy.com/'
-  ).replace(/\/?$/, '/') + 'graphql';
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/** Fire a raw GraphQL query against the live backend (Node fetch, no browser). */
-async function gqlFetch<T>(
-  jwt: string,
-  query: string,
-  variables?: Record<string, unknown>,
-): Promise<T> {
-  const res = await fetch(GQL_URL, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${jwt}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ query, variables }),
-  });
-  const json = (await res.json()) as {
-    data?: T;
-    errors?: Array<{ message: string }>;
-  };
-  if (json.errors?.length) {
-    throw new Error(
-      `GraphQL error: ${json.errors[0].message}${awsRequestContext(res.headers)}`,
-    );
-  }
-  if (!json.data) throw new Error('GraphQL response contained no data');
-  return json.data;
-}
 
 /**
  * Navigate to the Trades tab and wait for the Trading Center heading to appear.

@@ -20,38 +20,8 @@ import type { Page } from '@playwright/test';
 import { LOGGER } from '@legacy-sports/logging';
 import { createLeagueViaUI } from '../helpers/create-league';
 import { joinLeagueAsManager } from '../helpers/wait-for-join-page';
-import { awsRequestContext } from '../helpers/graphql';
 import { test } from '../fixtures/ui';
-
-const GQL_URL =
-  (
-    process.env.INTEGRATION_BASE_URL ?? 'https://api.legacy-fantasy.com/'
-  ).replace(/\/?$/, '/') + 'graphql';
-
-async function gqlFetch<T>(
-  jwt: string,
-  query: string,
-  variables?: Record<string, unknown>,
-): Promise<T> {
-  const res = await fetch(GQL_URL, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${jwt}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ query, variables }),
-  });
-  const json = (await res.json()) as {
-    data?: T;
-    errors?: Array<{ message: string }>;
-  };
-  if (json.errors?.length)
-    throw new Error(
-      `GraphQL error: ${json.errors[0].message}${awsRequestContext(res.headers)}`,
-    );
-  if (!json.data) throw new Error('GraphQL response contained no data');
-  return json.data;
-}
+import { gqlFetch, gqlFetchEnvelope } from '../helpers/gql-fetch';
 
 // ---------------------------------------------------------------------------
 // Shared state accumulated across serial tests.
@@ -215,39 +185,21 @@ test.describe
     // overhead) instead of the 120 s default.  Worst-case ceiling: 63 stall-picks
     // × 36 s ≈ 38 min — inside the 40 min Phase 5 timeout (LS-4343).
     await test.step('Set pick timer to 30 s to bound timer-expiry fallback path', async () => {
-      const result = await page.request.post(
-        'https://api.legacy-fantasy.com/graphql',
+      const data = await gqlFetch<{
+        updateDraftSettings?: { pickTimeLimitSeconds: number };
+      }>(
+        commissionerJwt,
+        `mutation UpdateDraftSettings($input: UpdateDraftSettingsInput!) {
+          updateDraftSettings(input: $input) { pickTimeLimitSeconds }
+        }`,
         {
-          data: {
-            query: `mutation UpdateDraftSettings($input: UpdateDraftSettingsInput!) {
-              updateDraftSettings(input: $input) { pickTimeLimitSeconds }
-            }`,
-            variables: {
-              input: {
-                leagueId: state.leagueId,
-                pickTimeLimitSeconds: 30,
-              },
-            },
-          },
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${commissionerJwt}`,
+          input: {
+            leagueId: state.leagueId,
+            pickTimeLimitSeconds: 30,
           },
         },
       );
-      const body = (await result.json()) as {
-        data?: {
-          updateDraftSettings?: { pickTimeLimitSeconds: number };
-        } | null;
-        errors?: Array<{ message: string }>;
-      };
-      if (body.errors?.length) {
-        throw new Error(
-          `updateDraftSettings failed: ${body.errors.map((e) => e.message).join('; ')}`,
-        );
-      }
-      const timer = body.data?.updateDraftSettings?.pickTimeLimitSeconds;
-      expect(timer).toBe(30);
+      expect(data.updateDraftSettings?.pickTimeLimitSeconds).toBe(30);
     });
   });
 
@@ -643,43 +595,37 @@ test.describe
             LOGGER.info(
               `[live-draft] +${elapsedNudge}s miss #${consecutiveMisses} — nudging autoProcessDraftPicks`,
             );
-            // Use Node.js native fetch (same as gqlFetch) instead of
+            // Use shared gqlFetchEnvelope (Node.js native fetch) instead of
             // pages[1].page.request — browser contexts silently throw when
-            // degraded, causing .catch(() => null) to absorb the error and
+            // degraded, causing best-effort wrappers to absorb the error and
             // skip ALL nudge processing including the LS-4369 EventBridge
-            // progress detection, resulting in State B (LS-4373).
-            const nudgeResult = await fetch(GQL_URL, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${commissionerJwt}`,
-              },
-              body: JSON.stringify({
-                query: `mutation AutoProcessDraftPicks($leagueId: Int!) { autoProcessDraftPicks(leagueId: $leagueId) { picksAutoMade draftsCompleted errors } }`,
-                variables: { leagueId: state.leagueId },
-              }),
-            }).catch(() => null);
-            if (nudgeResult) {
-              const nudgeBody = (await nudgeResult
-                .json()
-                .catch(() => null)) as {
-                data?: {
-                  autoProcessDraftPicks?: {
-                    picksAutoMade: number;
-                    draftsCompleted: number;
-                    errors?: string[];
-                  } | null;
-                } | null;
-                errors?: Array<{
-                  message?: string;
-                  extensions?: { code?: string };
-                  path?: Array<string | number>;
-                }>;
+            // progress detection, resulting in State B (LS-4373). The
+            // envelope variant preserves errors[] / status for the
+            // downstream regression guard while keeping HTTP/parse failures
+            // strict (LS-4461).
+            const nudgeEnvelope = await gqlFetchEnvelope<{
+              autoProcessDraftPicks?: {
+                picksAutoMade: number;
+                draftsCompleted: number;
+                errors?: string[];
               } | null;
-              const nudgeData = nudgeBody?.data?.autoProcessDraftPicks;
+            }>(
+              commissionerJwt,
+              `mutation AutoProcessDraftPicks($leagueId: Int!) { autoProcessDraftPicks(leagueId: $leagueId) { picksAutoMade draftsCompleted errors } }`,
+              { leagueId: state.leagueId },
+            ).catch((err: Error) => {
+              // Best-effort nudge: network/parse failures should not abort
+              // the draft loop because EventBridge is the hard fallback.
+              LOGGER.warn(
+                `[live-draft] nudge network/parse failed: ${err.message}`,
+              );
+              return null;
+            });
+            if (nudgeEnvelope) {
+              const nudgeData = nudgeEnvelope.data?.autoProcessDraftPicks;
               const resultErrors = nudgeData?.errors ?? [];
-              const gqlErrors = nudgeBody?.errors ?? [];
-              const status = nudgeResult.status;
+              const gqlErrors = nudgeEnvelope.errors ?? [];
+              const status = nudgeEnvelope.status;
               // Log full diagnostic info — the bare numeric fields hide
               // server-side problems (auth failures, schema drift, etc.) that
               // explain why a draft is stuck. LS-4295: previous "n/a" output

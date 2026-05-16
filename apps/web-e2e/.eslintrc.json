@@ -28,6 +28,31 @@
         "@typescript-eslint/no-unused-vars": "off",
         "no-console": "off"
       }
+    },
+    {
+      "files": [
+        "src/integration/tests/**/*.ts",
+        "src/integration/fixtures/**/*.ts",
+        "src/integration/*.ts"
+      ],
+      "excludedFiles": [
+        "src/integration/global-setup.ts",
+        "src/integration/global-teardown.ts",
+        "src/integration/tests/google-oauth.integration.spec.ts"
+      ],
+      "rules": {
+        "no-restricted-syntax": [
+          "error",
+          {
+            "selector": "CallExpression[callee.object.property.name='request'][callee.property.name='post']",
+            "message": "LS-4461: integration tests must not call `page.request.post(...)` for GraphQL. Use `gqlFetch` / `gqlFetchEnvelope` from `../helpers/gql-fetch` so backend `errors[]` are surfaced instead of masked as downstream timeouts."
+          },
+          {
+            "selector": "CallExpression[callee.name='fetch']",
+            "message": "LS-4461: integration tests must not call `fetch(...)` directly. Use `gqlFetch` / `gqlFetchEnvelope` from `../helpers/gql-fetch` (which handles the GraphQL URL, auth header, and error unpacking)."
+          }
+        ]
+      }
     }
   ]
 }

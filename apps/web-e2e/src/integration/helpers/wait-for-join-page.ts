@@ -1,19 +1,7 @@
 import type { Page, Response } from '@playwright/test';
 import { expect } from '@playwright/test';
 import { awsRequestContext } from './graphql';
-
-const GQL_URL =
-  (
-    process.env.INTEGRATION_BASE_URL ?? 'https://api.legacy-fantasy.com/'
-  ).replace(/\/?$/, '/') + 'graphql';
-
-interface ValidateInviteCodeResponse {
-  data?: { validateInviteCode: { leagueId: number } | null };
-  errors?: Array<{
-    message: string;
-    path?: ReadonlyArray<string | number>;
-  }>;
-}
+import { gqlFetchEnvelope } from './gql-fetch';
 
 /**
  * Run `validateInviteCode` once and decide what to do next:
@@ -30,44 +18,26 @@ async function callValidateInviteCode(
   jwt: string,
   inviteCode: string,
 ): Promise<{ leagueId: number } | null> {
-  const res = await fetch(GQL_URL, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${jwt}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      query: `query ValidateInviteCodePreflight($code: String!) {
-        validateInviteCode(code: $code) { leagueId }
-      }`,
-      variables: { code: inviteCode },
-    }),
-  });
+  const result = await gqlFetchEnvelope<{
+    validateInviteCode: { leagueId: number } | null;
+  }>(
+    jwt,
+    `query ValidateInviteCodePreflight($code: String!) {
+      validateInviteCode(code: $code) { leagueId }
+    }`,
+    { code: inviteCode },
+  );
 
-  // Capture trace headers before parsing so we can still report them if the
-  // response body is malformed.
-  const requestContext = awsRequestContext(res.headers);
-
-  let json: ValidateInviteCodeResponse;
-  try {
-    json = (await res.json()) as ValidateInviteCodeResponse;
-  } catch (err) {
-    throw new Error(
-      `validateInviteCode("${inviteCode}") returned non-JSON response ` +
-        `(HTTP ${res.status})${requestContext}: ${err instanceof Error ? err.message : String(err)}`,
-    );
-  }
-
-  if (json.errors?.length) {
-    const first = json.errors[0];
+  if (result.errors?.length) {
+    const first = result.errors[0];
     const pathStr = first.path?.length ? ` (path=${first.path.join('.')})` : '';
     throw new Error(
       `validateInviteCode("${inviteCode}") returned GraphQL error: ` +
-        `${first.message}${pathStr}${requestContext}`,
+        `${first.message}${pathStr}${result.requestContext}`,
     );
   }
 
-  return json.data?.validateInviteCode ?? null;
+  return result.data?.validateInviteCode ?? null;
 }
 
 /**
@@ -195,10 +165,16 @@ export async function waitForJoinPageValidation(
       // that window and we can return immediately without an unnecessary
       // reload.  If it is still invalid after 5 s, fall through to the
       // reload/retry path — the backend is genuinely returning null.
+      // Use the `onlyTimeout` predicate so a page-closed or navigation error
+      // during the grace period rethrows instead of being silently treated
+      // as "not visible" (LS-4461).
       const selfResolved = await spotsLocator
         .waitFor({ state: 'visible', timeout: 5_000 })
         .then(() => true)
-        .catch(() => false);
+        .catch((err: unknown) => {
+          onlyTimeout(err);
+          return false;
+        });
       if (selfResolved) {
         await expect(spotsLocator).toBeVisible();
         return;
