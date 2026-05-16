@@ -130,12 +130,10 @@ test.describe('Tab component ARIA semantics @regression', () => {
 
     const { hasTabPattern, issues } = await evaluateTabSemantics(page);
 
-    // If tabs exist, verify semantics are correct
-    if (hasTabPattern) {
-      expect(issues).toHaveLength(0);
-    }
+    // The league overview page is a tabbed surface — tabs must be present.
+    expect(hasTabPattern).toBe(true);
+    expect(issues).toHaveLength(0);
 
-    // Page should load without errors regardless
     await expect(page.locator('body')).not.toContainText(
       'Unexpected Application Error',
     );
@@ -166,12 +164,10 @@ test.describe('Tab component ARIA semantics @regression', () => {
 
     const { hasTabPattern, tablistSelectedCounts } =
       await evaluateTabSemantics(page);
-    if (!hasTabPattern) {
-      // No tabs on this page — acceptable
-      return;
-    }
+    expect(hasTabPattern).toBe(true);
 
     // Each tablist must have exactly one selected tab.
+    expect(tablistSelectedCounts.length).toBeGreaterThan(0);
     for (const count of tablistSelectedCounts) {
       expect(count).toBe(1);
     }
@@ -184,9 +180,8 @@ test.describe('Tab component ARIA semantics @regression', () => {
     await page.waitForLoadState('networkidle');
 
     const { hasTabPattern, tabs } = await evaluateTabSemantics(page);
-    if (!hasTabPattern || tabs < 2) {
-      return;
-    }
+    expect(hasTabPattern).toBe(true);
+    expect(tabs).toBeGreaterThanOrEqual(2);
 
     // Verify every tab carries an explicit aria-selected attribute
     const tabElements = page.locator('[role="tab"]');
@@ -205,11 +200,7 @@ test.describe('Tab component ARIA semantics @regression', () => {
     await page.waitForLoadState('networkidle');
 
     const tabs = page.locator('[role="tab"]');
-    const tabCount = await tabs.count();
-    if (tabCount < 2) {
-      // Need at least 2 tabs to exercise selection change
-      return;
-    }
+    await expect(tabs.nth(1)).toBeVisible({ timeout: 10_000 });
 
     // Click the second tab
     await tabs.nth(1).click();
@@ -227,24 +218,18 @@ test.describe('Tab component ARIA semantics @regression', () => {
     await page.waitForLoadState('networkidle');
 
     const { hasTabPattern, tabpanels } = await evaluateTabSemantics(page);
-    if (!hasTabPattern) {
-      return;
-    }
+    expect(hasTabPattern).toBe(true);
+    expect(tabpanels).toBeGreaterThan(0);
 
-    // If tabpanels are present, at least some should carry accessible labels
-    if (tabpanels > 0) {
-      const panelWithLabel = await page.evaluate(() => {
-        return Array.from(
-          document.querySelectorAll('[role="tabpanel"]'),
-        ).filter(
-          (panel) =>
-            panel.hasAttribute('aria-labelledby') ||
-            panel.hasAttribute('aria-label'),
-        ).length;
-      });
-      // At least one tabpanel must carry an accessible label
-      expect(panelWithLabel).toBeGreaterThan(0);
-    }
+    // At least one tabpanel must carry an accessible label.
+    const panelWithLabel = await page.evaluate(() => {
+      return Array.from(document.querySelectorAll('[role="tabpanel"]')).filter(
+        (panel) =>
+          panel.hasAttribute('aria-labelledby') ||
+          panel.hasAttribute('aria-label'),
+      ).length;
+    });
+    expect(panelWithLabel).toBeGreaterThan(0);
 
     await expect(page.locator('body')).not.toContainText(
       'Unexpected Application Error',
@@ -258,10 +243,7 @@ test.describe('Tab component ARIA semantics @regression', () => {
     await page.waitForLoadState('networkidle');
 
     const tabs = page.locator('[role="tab"]');
-    const tabCount = await tabs.count();
-    if (tabCount < 2) {
-      return;
-    }
+    await expect(tabs.nth(1)).toBeVisible({ timeout: 10_000 });
 
     // Focus the first tab
     await tabs.first().focus();
@@ -283,9 +265,7 @@ test.describe('Tab component ARIA semantics @regression', () => {
     await page.waitForLoadState('networkidle');
 
     const { hasTabPattern } = await evaluateTabSemantics(page);
-    if (!hasTabPattern) {
-      return;
-    }
+    expect(hasTabPattern).toBe(true);
 
     // Every tab must be owned by a tablist (via DOM ancestry or aria-owns)
     const orphanedTabs = await page.evaluate(() => {

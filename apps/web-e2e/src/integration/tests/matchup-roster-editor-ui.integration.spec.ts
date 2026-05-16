@@ -30,6 +30,7 @@
 import { expect } from '@playwright/test';
 import { createLeagueViaUI } from '../helpers/create-league';
 import { joinLeagueAsManager } from '../helpers/wait-for-join-page';
+import { reloadUntilVisible } from '../helpers/reload-until-visible';
 import { test } from '../fixtures/ui';
 import { gqlFetch } from '../helpers/gql-fetch';
 
@@ -413,19 +414,17 @@ test.describe
         .waitForLoadState('networkidle', { timeout: 15_000 })
         .catch(() => undefined);
 
-      const visible = await editLineup.isVisible().catch(() => false);
-      if (!visible) {
-        const deadline = Date.now() + 60_000;
-        while (Date.now() < deadline) {
-          await page.reload();
+      await reloadUntilVisible(page, editLineup, {
+        attempts: 30,
+        pollTimeoutMs: 1_000,
+        cooldownMs: 2_000,
+        finalTimeoutMs: 20_000,
+        afterReload: async () => {
           await page
             .waitForLoadState('networkidle', { timeout: 20_000 })
             .catch(() => undefined);
-          if (await editLineup.isVisible().catch(() => false)) break;
-          await page.waitForTimeout(2_000);
-        }
-      }
-      await expect(editLineup).toBeVisible({ timeout: 20_000 });
+        },
+      });
     });
 
     await test.step('Roster editor shows Unlocked badge', async () => {

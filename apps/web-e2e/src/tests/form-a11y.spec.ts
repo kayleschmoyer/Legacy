@@ -191,11 +191,11 @@ test.describe('Form field accessibility @regression', () => {
         'Unexpected Application Error',
       );
 
-      if (inputCount > 0) {
-        // Each input must have at least one proper accessible label mechanism
-        // (aria-label with non-empty value, aria-labelledby referencing existing element, or associated <label>)
-        expect(issues).toHaveLength(0);
-      }
+      // The league-creation form is deterministic: at least one input must
+      // render. Each input must declare an accessible name via aria-label,
+      // aria-labelledby, or an associated <label>.
+      expect(inputCount).toBeGreaterThan(0);
+      expect(issues).toHaveLength(0);
     });
 
     test('league name field is present and labeled', async ({ page }) => {
@@ -224,49 +224,47 @@ test.describe('Form field accessibility @regression', () => {
         )
         .first();
 
-      const hasInput = (await nameInput.count()) > 0;
-      if (hasInput) {
-        await expect(nameInput).toBeVisible({ timeout: 10000 });
-        // The Create button is disabled while the form is loading and enabled once
-        // all fields (and their aria attributes) have mounted. Waiting for it to be
-        // enabled ensures aria-label/aria-labelledby associations are fully set.
-        await expect(
-          page.getByRole('button', { name: /create/i }).first(),
-        ).toBeEnabled({ timeout: 10000 });
+      // The league-name input always renders on /baseball/league/create —
+      // assert presence directly rather than branching on a count.
+      await expect(nameInput).toBeVisible({ timeout: 10_000 });
+      // The Create button is disabled while the form is loading and enabled
+      // once all fields (and their aria attributes) have mounted. Waiting for
+      // it to be enabled ensures aria-label/aria-labelledby associations are
+      // fully set.
+      await expect(
+        page.getByRole('button', { name: /create/i }).first(),
+      ).toBeEnabled({ timeout: 10000 });
 
-        // Check for at least one proper accessible label mechanism
-        const hasLabel = await nameInput.evaluate((el: HTMLInputElement) => {
-          // aria-label with non-empty value
-          if ((el.getAttribute('aria-label')?.trim() ?? '').length > 0)
-            return true;
-          // aria-labelledby referencing an element that provides an accessible name
-          // (via textContent, aria-label, or title — matching evaluateFormA11y logic)
-          const ariaLabelledByValue =
-            el.getAttribute('aria-labelledby')?.trim() ?? '';
-          if (
-            ariaLabelledByValue.length > 0 &&
-            ariaLabelledByValue.split(/\s+/).some((refId) => {
-              const ref = document.getElementById(refId);
-              if (!ref) return false;
-              return (
-                !!ref.textContent?.trim() ||
-                !!ref.getAttribute('aria-label')?.trim() ||
-                !!ref.getAttribute('title')?.trim()
-              );
-            })
-          )
-            return true;
-          // associated <label> element
-          return (
-            (el.id
-              ? !!document.querySelector(`label[for="${el.id}"]`)
-              : false) ||
-            !!el.closest('label') ||
-            (el.labels != null && el.labels.length > 0)
-          );
-        });
-        expect(hasLabel).toBe(true);
-      }
+      // Check for at least one proper accessible label mechanism
+      const hasLabel = await nameInput.evaluate((el: HTMLInputElement) => {
+        // aria-label with non-empty value
+        if ((el.getAttribute('aria-label')?.trim() ?? '').length > 0)
+          return true;
+        // aria-labelledby referencing an element that provides an accessible name
+        // (via textContent, aria-label, or title — matching evaluateFormA11y logic)
+        const ariaLabelledByValue =
+          el.getAttribute('aria-labelledby')?.trim() ?? '';
+        if (
+          ariaLabelledByValue.length > 0 &&
+          ariaLabelledByValue.split(/\s+/).some((refId) => {
+            const ref = document.getElementById(refId);
+            if (!ref) return false;
+            return (
+              !!ref.textContent?.trim() ||
+              !!ref.getAttribute('aria-label')?.trim() ||
+              !!ref.getAttribute('title')?.trim()
+            );
+          })
+        )
+          return true;
+        // associated <label> element
+        return (
+          (el.id ? !!document.querySelector(`label[for="${el.id}"]`) : false) ||
+          !!el.closest('label') ||
+          (el.labels != null && el.labels.length > 0)
+        );
+      });
+      expect(hasLabel).toBe(true);
     });
 
     test('required fields on league creation page have aria-required or required attribute', async ({
@@ -301,12 +299,13 @@ test.describe('Form field accessibility @regression', () => {
         )
         .first();
 
-      if ((await leagueNameField.count()) > 0) {
-        const requiredAttr = await leagueNameField.getAttribute('required');
-        const ariaRequiredAttr =
-          await leagueNameField.getAttribute('aria-required');
-        expect(requiredAttr !== null || ariaRequiredAttr === 'true').toBe(true);
-      }
+      // The league name field is deterministically rendered on the create
+      // page — assert it directly.
+      await expect(leagueNameField).toBeAttached({ timeout: 10_000 });
+      const requiredAttr = await leagueNameField.getAttribute('required');
+      const ariaRequiredAttr =
+        await leagueNameField.getAttribute('aria-required');
+      expect(requiredAttr !== null || ariaRequiredAttr === 'true').toBe(true);
     });
 
     test('form submission with empty required fields shows validation and does not crash', async ({
@@ -448,9 +447,9 @@ test.describe('Form field accessibility @regression', () => {
         'Unexpected Application Error',
       );
 
-      if (inputCount > 0) {
-        expect(issues).toHaveLength(0);
-      }
+      // Profile settings always renders form fields.
+      expect(inputCount).toBeGreaterThan(0);
+      expect(issues).toHaveLength(0);
     });
 
     test('profile settings form fields are present and labeled', async ({
@@ -502,9 +501,9 @@ test.describe('Form field accessibility @regression', () => {
 
       const { inputCount, issues } = await evaluateFormA11y(page);
 
-      if (inputCount > 0) {
-        expect(issues).toHaveLength(0);
-      }
+      // The join-league page always renders the invite-code form.
+      expect(inputCount).toBeGreaterThan(0);
+      expect(issues).toHaveLength(0);
     });
   });
 

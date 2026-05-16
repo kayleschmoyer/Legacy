@@ -33,6 +33,7 @@ import { expect } from '@playwright/test';
 import { createLeagueViaUI } from '../helpers/create-league';
 import { joinLeagueAsManager } from '../helpers/wait-for-join-page';
 import { waitForSeasonActive } from '../helpers/wait-for-season-active';
+import { reloadUntilVisible } from '../helpers/reload-until-visible';
 import { test } from '../fixtures/ui';
 import { gqlFetch } from '../helpers/gql-fetch';
 
@@ -415,15 +416,14 @@ test.describe
       // it may take a moment for the sidebar matchup list to populate.
       // NOTE: the badge renders all-caps "YOU" — exact: true is case-sensitive.
       const youBadge = page.getByText('YOU', { exact: true }).first();
-      // Try up to 3 reloads — the sidebar matchup list can be slow to populate
-      for (let attempt = 0; attempt < 3; attempt++) {
-        if (await youBadge.isVisible({ timeout: 5_000 }).catch(() => false))
-          break;
-        await page.reload();
-        await page.waitForLoadState('load');
-        await page.waitForTimeout(2_000);
-      }
-      await expect(youBadge).toBeVisible({ timeout: 15_000 });
+      // The sidebar matchup list can be slow to populate; reload up to 3
+      // times to refresh stale Apollo cache, then assert strictly.
+      await reloadUntilVisible(page, youBadge, {
+        attempts: 3,
+        pollTimeoutMs: 5_000,
+        cooldownMs: 2_000,
+        finalTimeoutMs: 15_000,
+      });
     });
 
     await test.step('"Current" week badge is displayed for Week 1', async () => {

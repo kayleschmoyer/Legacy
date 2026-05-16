@@ -26,6 +26,7 @@
  */
 
 import { expect } from '@playwright/test';
+import { reloadUntilVisible } from '../helpers/reload-until-visible';
 import { test } from '../fixtures/ui';
 import { gqlFetchEnvelope } from '../helpers/gql-fetch';
 
@@ -466,17 +467,17 @@ test.describe
       // The Apollo cache may not have isMockDraft on the first load, so
       // retry with reloads up to 3 times.
       const practiceBtn = page.getByRole('button', { name: /Practice Again/i });
-      for (let attempt = 0; attempt < 3; attempt++) {
-        if (await practiceBtn.isVisible({ timeout: 5_000 }).catch(() => false))
-          break;
-        await page.reload();
-        await page.waitForLoadState('load');
-        await expect(page.getByText('Draft Complete!').first()).toBeVisible({
-          timeout: 15_000,
-        });
-        await page.waitForTimeout(2_000);
-      }
-      await expect(practiceBtn).toBeVisible({ timeout: 15_000 });
+      await reloadUntilVisible(page, practiceBtn, {
+        attempts: 3,
+        pollTimeoutMs: 5_000,
+        cooldownMs: 2_000,
+        finalTimeoutMs: 15_000,
+        afterReload: async () => {
+          await expect(page.getByText('Draft Complete!').first()).toBeVisible({
+            timeout: 15_000,
+          });
+        },
+      });
     });
 
     await test.step('Verify mock-draft-specific message', async () => {

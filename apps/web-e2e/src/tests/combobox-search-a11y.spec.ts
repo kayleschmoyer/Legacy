@@ -3,16 +3,14 @@
  *
  * Covers ARIA semantics and keyboard behaviour of search/combobox inputs in the
  * players directory (/players). All GraphQL responses are mocked so tests run
- * without a live backend.
+ * without a live backend, so the search input always renders deterministically
+ * and tests assert strictly against it.
  *
  * Tested properties:
  *  - Search input is discoverable (placeholder, accessible label)
  *  - Input is focusable and accepts keyboard input
- *  - aria-expanded state changes when suggestions appear
  *  - Keyboard navigation: Arrow keys move through suggestions, Enter selects,
  *    Escape closes/clears the dropdown
- *  - Results list uses an appropriate ARIA role (listbox / option pattern)
- *  - aria-live region announces result count changes to screen readers
  */
 
 import { expect, test } from '../fixtures/auth-enhanced';
@@ -59,6 +57,15 @@ const MOCK_PLAYERS = [
   makeMockPlayer(3, 'Aaron', 'Judge', 'RF'),
 ];
 
+const SEARCH_INPUT_SELECTOR = [
+  'input[type="search"]',
+  'input[placeholder*="search" i]',
+  'input[placeholder*="player" i]',
+  'input[role="combobox"]',
+  '[role="combobox"] input',
+  'input[aria-label*="search" i]',
+].join(', ');
+
 async function mockPlayersGraphQL(page: import('@playwright/test').Page) {
   await page.route(
     (url) => isGraphQLEndpoint(url),
@@ -92,18 +99,7 @@ async function mockPlayersGraphQL(page: import('@playwright/test').Page) {
 
 /** Locate the primary search input on the page. Returns the first match. */
 function getSearchInput(page: import('@playwright/test').Page) {
-  return page
-    .locator(
-      [
-        'input[type="search"]',
-        'input[placeholder*="search" i]',
-        'input[placeholder*="player" i]',
-        'input[role="combobox"]',
-        '[role="combobox"] input',
-        'input[aria-label*="search" i]',
-      ].join(', '),
-    )
-    .first();
+  return page.locator(SEARCH_INPUT_SELECTOR).first();
 }
 
 // ---------------------------------------------------------------------------
@@ -115,23 +111,9 @@ test.describe('Combobox/search accessibility @regression', () => {
     await mockPlayersGraphQL(page);
     await page.goto('/players');
     await page.waitForLoadState('load');
-    // Apollo resolves after the load event; wait for the search input to
-    // appear so tests don't see the loading spinner and skip prematurely.
-    await page
-      .waitForSelector(
-        [
-          'input[type="search"]',
-          'input[placeholder*="search" i]',
-          'input[placeholder*="player" i]',
-          'input[role="combobox"]',
-          '[role="combobox"] input',
-          'input[aria-label*="search" i]',
-        ].join(', '),
-        { timeout: 10000 },
-      )
-      .catch(() => {
-        // Individual tests skip gracefully when no search input is present.
-      });
+    // Apollo resolves after the load event — wait for the search input to
+    // mount before every test so individual assertions can be strict.
+    await page.waitForSelector(SEARCH_INPUT_SELECTOR, { timeout: 10_000 });
   });
 
   // -------------------------------------------------------------------------
@@ -140,13 +122,7 @@ test.describe('Combobox/search accessibility @regression', () => {
 
   test('search input has an accessible label', async ({ page }) => {
     const searchInput = getSearchInput(page);
-    const inputCount = await searchInput.count();
-
-    if (inputCount === 0) {
-      // No search input on this page variant — skip gracefully.
-      test.skip();
-      return;
-    }
+    await expect(searchInput).toBeVisible();
 
     const ariaLabel = await searchInput.getAttribute('aria-label');
     const ariaLabelledBy = await searchInput.getAttribute('aria-labelledby');
@@ -173,18 +149,13 @@ test.describe('Combobox/search accessibility @regression', () => {
     page,
   }) => {
     const searchInput = getSearchInput(page);
-    const inputCount = await searchInput.count();
-    if (inputCount === 0) {
-      test.skip();
-      return;
-    }
+    await expect(searchInput).toBeVisible();
 
     await searchInput.focus();
     await expect(searchInput).toBeFocused({ timeout: 5000 });
 
     await searchInput.type('trout');
-    const value = await searchInput.inputValue();
-    expect(value).toContain('trout');
+    await expect(searchInput).toHaveValue(/trout/);
   });
 
   // -------------------------------------------------------------------------
@@ -195,11 +166,7 @@ test.describe('Combobox/search accessibility @regression', () => {
     page,
   }) => {
     const searchInput = getSearchInput(page);
-    const inputCount = await searchInput.count();
-    if (inputCount === 0) {
-      test.skip();
-      return;
-    }
+    await expect(searchInput).toBeVisible();
 
     await searchInput.focus();
     await searchInput.type('trout');
@@ -219,11 +186,7 @@ test.describe('Combobox/search accessibility @regression', () => {
     page,
   }) => {
     const searchInput = getSearchInput(page);
-    const inputCount = await searchInput.count();
-    if (inputCount === 0) {
-      test.skip();
-      return;
-    }
+    await expect(searchInput).toBeVisible();
 
     await searchInput.focus();
     await searchInput.type('a');
@@ -248,11 +211,7 @@ test.describe('Combobox/search accessibility @regression', () => {
     page,
   }) => {
     const searchInput = getSearchInput(page);
-    const inputCount = await searchInput.count();
-    if (inputCount === 0) {
-      test.skip();
-      return;
-    }
+    await expect(searchInput).toBeVisible();
 
     await searchInput.focus();
     await searchInput.type('judge');
@@ -270,11 +229,7 @@ test.describe('Combobox/search accessibility @regression', () => {
 
   test('search does not crash the page', async ({ page }) => {
     const searchInput = getSearchInput(page);
-    const inputCount = await searchInput.count();
-    if (inputCount === 0) {
-      test.skip();
-      return;
-    }
+    await expect(searchInput).toBeVisible();
 
     await searchInput.fill('test search');
     await expect(page.locator('body')).not.toContainText(
@@ -283,129 +238,62 @@ test.describe('Combobox/search accessibility @regression', () => {
   });
 
   // -------------------------------------------------------------------------
-  // 7. ARIA role presence (informational — not a hard requirement)
+  // 7. ARIA role presence
   // -------------------------------------------------------------------------
 
-  test('search results list uses combobox or listbox ARIA role', async ({
+  // The /players search input does not currently expose `role="combobox"`
+  // and the results list does not use `role="listbox"`. This is a genuine a11y
+  // gap, not a test bug — re-enable once the implementation adopts one of
+  // the ARIA dropdown patterns and replace the assertion with a strict
+  // `expect(count).toBeGreaterThan(0)`.
+  test.fixme('search results list uses combobox or listbox ARIA role', async ({
     page,
   }) => {
     const searchInput = getSearchInput(page);
-    const inputCount = await searchInput.count();
-    if (inputCount === 0) {
-      test.skip();
-      return;
-    }
-
     await searchInput.focus();
     await searchInput.type('a');
     await page.waitForTimeout(300);
 
-    // Check if an ARIA dropdown pattern is present after typing.
-    // This is informational — implementations may use different patterns.
-    const comboboxOrListbox = page.locator(
-      '[role="combobox"], [role="listbox"]',
-    );
-    const count = await comboboxOrListbox.count();
-
-    // The input itself may carry role="combobox". Verify at least one
-    // combobox or listbox element is present.
-    if (count === 0) {
-      test.skip(
-        'No combobox or listbox ARIA role found — implementation may not use this pattern',
-      );
-      return;
-    }
+    const count = await page
+      .locator('[role="combobox"], [role="listbox"]')
+      .count();
     expect(count).toBeGreaterThan(0);
-
-    await expect(page.locator('body')).not.toContainText(
-      'Unexpected Application Error',
-    );
   });
 
   // -------------------------------------------------------------------------
   // 8. aria-expanded state changes on open/close
   // -------------------------------------------------------------------------
 
-  test('combobox input reflects aria-expanded state when suggestions are visible', async ({
+  // Same gap as test 7 — the input does not advertise `role="combobox"` and
+  // therefore does not toggle `aria-expanded`. Track via LS-4458.
+  test.fixme('combobox input reflects aria-expanded state when suggestions are visible', async ({
     page,
   }) => {
-    // Look specifically for an element with role="combobox".
     const combobox = page.locator('[role="combobox"]').first();
-    const comboboxCount = await combobox.count();
+    await expect(combobox).toBeVisible();
 
-    if (comboboxCount === 0) {
-      // This implementation does not use the combobox pattern — skip.
-      test.skip();
-      return;
-    }
-
-    // Check initial state before interaction.
-    const initialExpandedAttr = await combobox.getAttribute('aria-expanded');
-    if (initialExpandedAttr !== null) {
-      expect(['true', 'false']).toContain(initialExpandedAttr);
-    }
-
-    // Prefer the nested editable element for typing; read aria-expanded from the wrapper.
     const editable = combobox
       .locator('input, textarea, [contenteditable="true"]')
       .first();
-    const editableCount = await editable.count();
-
-    if (editableCount === 0) {
-      // Combobox wrapper exists but has no nested editable — skip robustly.
-      test.skip();
-      return;
-    }
 
     await editable.focus();
     await editable.type('a');
     await page.waitForTimeout(300);
 
-    const expandedAfter = await combobox.getAttribute('aria-expanded');
-
-    if (initialExpandedAttr === null && expandedAfter === null) {
-      // This implementation does not expose expanded state via aria-expanded — skip.
-      test.skip();
-      return;
-    }
-
-    // When the attribute is present it must be a valid ARIA boolean token.
-    if (expandedAfter !== null) {
-      expect(['true', 'false']).toContain(expandedAfter);
-    }
-
-    // Verify state actually changed (or was already true after typing).
-    if (initialExpandedAttr === 'false' && expandedAfter !== null) {
-      expect(expandedAfter).toBe('true');
-    }
-
-    await expect(page.locator('body')).not.toContainText(
-      'Unexpected Application Error',
-    );
+    await expect(combobox).toHaveAttribute('aria-expanded', 'true');
   });
 
   // -------------------------------------------------------------------------
   // 9. aria-live region for screen-reader announcements
   // -------------------------------------------------------------------------
 
-  test('page contains an aria-live region for dynamic announcements', async ({
+  // The /players page does not yet expose any `aria-live` region for result-
+  // count announcements. Track via LS-4458 — re-enable once the listing
+  // surface adds a live region and assert strictly on count > 0.
+  test.fixme('page contains an aria-live region for dynamic announcements', async ({
     page,
   }) => {
-    // aria-live regions may be used to announce result counts or status.
-    const liveRegions = page.locator('[aria-live]');
-    const count = await liveRegions.count();
-
-    // At least one live region should exist on the page for a11y compliance.
-    if (count === 0) {
-      test.skip(
-        'No aria-live region found — app does not yet implement live announcements',
-      );
-      return;
-    }
+    const count = await page.locator('[aria-live]').count();
     expect(count).toBeGreaterThan(0);
-
-    await expect(page.locator('body')).not.toContainText(
-      'Unexpected Application Error',
-    );
   });
 });

@@ -29,6 +29,11 @@
 import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 import { createLeagueViaUI } from '../helpers/create-league';
+import {
+  dismissPickAnnouncementOverlay,
+  waitThroughTransientLoadingScreen,
+} from '../helpers/draft-board-overlay';
+import { pauseDraft, resumeDraft } from '../helpers/pause-draft';
 import { joinLeagueAsManager } from '../helpers/wait-for-join-page';
 import { test } from '../fixtures/ui';
 
@@ -43,38 +48,6 @@ let state: A11yState;
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/**
- * Dismiss the pick-announcement overlay if visible.
- * The overlay is position:fixed z-index 9999 and intercepts clicks.
- */
-async function dismissPickAnnouncementOverlay(page: Page): Promise<void> {
-  const overlay = page.locator('.d-announce-overlay');
-  if (await overlay.isVisible({ timeout: 3_000 }).catch(() => false)) {
-    await overlay.click({ force: true });
-    await overlay.waitFor({ state: 'hidden', timeout: 5_000 });
-  }
-}
-
-/**
- * When "Loading draft board..." appears on a cold-cache navigation, wait up
- * to 30 s for it to resolve to either the live board or the complete screen.
- * A genuine post-draft stuck-loading state persists indefinitely; a transient
- * in-flight one clears within a few seconds once GetLiveDraftLeagueDraft resolves.
- */
-async function waitThroughTransientLoadingScreen(page: Page): Promise<void> {
-  const loading = page.getByText('Loading draft board...');
-  if (await loading.isVisible()) {
-    await page
-      .getByRole('main', { name: /player draft board/i })
-      .or(page.getByText('Draft Complete!'))
-      .first()
-      .waitFor({ state: 'visible', timeout: 30_000 })
-      .catch(() => {
-        /* still loading after grace period — draft likely complete */
-      });
-  }
-}
 
 /**
  * Navigate to the draft board and wait for the live draft UI to fully appear.
@@ -102,6 +75,18 @@ test.describe
 
   test.beforeAll(() => {
     state = { leagueId: 0, inviteCode: '', leagueName: '' };
+  });
+
+  // Resume the draft after the suite so any post-suite cleanup (or manual
+  // inspection) sees the league in a normal state. Best-effort: if the league
+  // was never created (Phase 1 failed) or the draft was never paused, swallow.
+  test.afterAll(async ({ apiCommissioner }) => {
+    if (!state.leagueId) return;
+    try {
+      await resumeDraft(apiCommissioner, state.leagueId);
+    } catch {
+      // League cleanup will reap the paused draft anyway.
+    }
   });
 
   // -----------------------------------------------------------------------
@@ -150,7 +135,10 @@ test.describe
   // PHASE 3 — START THE LIVE DRAFT
   // -----------------------------------------------------------------------
 
-  test('Phase 3: Start the live draft', async ({ commissionerPage: page }) => {
+  test('Phase 3: Start the live draft', async ({
+    commissionerPage: page,
+    apiCommissioner,
+  }) => {
     test.setTimeout(120_000);
 
     await test.step('Navigate to commissioner panel', async () => {
@@ -189,6 +177,15 @@ test.describe
       await expect(
         page.getByText(/Drafting|Draft Queued|Season Active/i).first(),
       ).toBeVisible({ timeout: 30_000 });
+    });
+
+    await test.step('Pause the draft so subsequent phases see a stable board', async () => {
+      // The AI auto-pick used by integration runs would otherwise complete the
+      // draft in seconds, racing Phase 5-8 to an empty DraftCompleteView. Pause
+      // immediately after start; resume in afterAll. Auto-picks halt while
+      // paused but the live draft board UI renders normally, so a11y +
+      // keyboard-nav assertions are deterministic.
+      await pauseDraft(apiCommissioner, state.leagueId);
       // Reload for a clean browser state before subsequent phases.
       await page.reload();
       await page.waitForLoadState('load');
@@ -242,19 +239,10 @@ test.describe
     await page.goto(`/baseball/league/${state.leagueId}/draft`);
     await page.waitForLoadState('domcontentloaded');
 
-    // Wait for either the live board or the completed state — whichever renders first.
-    // Using .or() avoids the two-render race where the board briefly appears before
-    // useDraftEffects fires and replaces it with DraftCompleteView.
-    const draftBoard = page.getByRole('main', { name: /player draft board/i });
-    const draftComplete = page.getByText('Draft Complete!');
-    await draftBoard
-      .or(draftComplete)
-      .first()
-      .waitFor({ state: 'visible', timeout: 45_000 });
-    if (await draftComplete.isVisible()) {
-      test.skip(true, 'Draft completed before position filter could be tested');
-      return;
-    }
+    // Draft is paused (Phase 3) so the live board renders deterministically.
+    await expect(
+      page.getByRole('main', { name: /player draft board/i }),
+    ).toBeVisible({ timeout: 45_000 });
 
     const group = page.getByRole('radiogroup', { name: /filter by position/i });
     await expect(group).toBeVisible({ timeout: 15_000 });
@@ -320,35 +308,14 @@ test.describe
     await page.goto(`/baseball/league/${state.leagueId}/draft`);
     await page.waitForLoadState('domcontentloaded');
 
-    // Wait for either the live board, the completed state, or the intermediate
-    // LoadingScreen — whichever renders first.
-    //
-    // Each test creates a fresh browser context, so the Apollo cache is cold on
-    // every navigation. "Loading draft board..." therefore appears transiently
-    // during initial load while GetLiveDraftLeagueDraft is in-flight — even when
-    // the draft is still live. The stuck-loading state (draft truly complete,
-    // getLeagueDraft returns null) persists indefinitely; a transient one clears
-    // within a few seconds. Give it a grace period to resolve before deciding to
-    // skip so we do not bail out on an in-flight query.
-    const draftBoard = page.getByRole('main', { name: /player draft board/i });
-    const draftComplete = page.getByText('Draft Complete!');
-    const postDraftLoading = page.getByText('Loading draft board...');
-    await draftBoard
-      .or(draftComplete)
-      .or(postDraftLoading)
-      .first()
-      .waitFor({ state: 'visible', timeout: 45_000 });
-
+    // Draft is paused (Phase 3) so the live board renders deterministically.
+    // Each test creates a fresh browser context so the Apollo cache is cold;
+    // wait through the transient "Loading draft board..." screen while
+    // GetLiveDraftLeagueDraft is in-flight before asserting the board.
     await waitThroughTransientLoadingScreen(page);
-
-    // If the AI auto-draft completed before this phase, skip gracefully
-    if (
-      (await draftComplete.isVisible()) ||
-      (await postDraftLoading.isVisible())
-    ) {
-      test.skip(true, 'Draft completed before view mode could be tested');
-      return;
-    }
+    await expect(
+      page.getByRole('main', { name: /player draft board/i }),
+    ).toBeVisible({ timeout: 45_000 });
 
     const viewGroup = page.getByRole('tablist', { name: /view mode/i });
     await expect(viewGroup).toBeVisible({ timeout: 15_000 });
@@ -417,28 +384,13 @@ test.describe
     await page.goto(`/baseball/league/${state.leagueId}/draft`);
     await page.waitForLoadState('domcontentloaded');
 
-    // Race: wait for the live draft board, "Draft Complete!", or the intermediate
-    // LoadingScreen — whichever appears first. See Phase 6 comment for a full
-    // explanation of why a fresh browser context makes "Loading draft board..."
-    // a transient state (not necessarily a post-draft stuck state).
-    const draftBoard = page.getByRole('main', { name: /player draft board/i });
-    const draftComplete = page.getByText('Draft Complete!');
-    const postDraftLoading = page.getByText('Loading draft board...');
-    await draftBoard
-      .or(draftComplete)
-      .or(postDraftLoading)
-      .first()
-      .waitFor({ state: 'visible', timeout: 45_000 });
-
+    // Draft is paused (Phase 3) so the live board renders deterministically.
+    // See Phase 6 comment for why the transient "Loading draft board..." screen
+    // is still possible on a cold Apollo cache.
     await waitThroughTransientLoadingScreen(page);
-
-    if (
-      (await draftComplete.isVisible()) ||
-      (await postDraftLoading.isVisible())
-    ) {
-      test.skip(true, 'Draft completed before search input could be tested');
-      return;
-    }
+    await expect(
+      page.getByRole('main', { name: /player draft board/i }),
+    ).toBeVisible({ timeout: 45_000 });
 
     const searchInput = page.getByRole('textbox', { name: /search players/i });
     await expect(searchInput).toBeVisible({ timeout: 15_000 });
@@ -482,30 +434,14 @@ test.describe
   }) => {
     await page.goto(`/baseball/league/${state.leagueId}/draft`);
     await page.waitForLoadState('domcontentloaded');
-    // Race: wait for the live draft board, "Draft Complete!", or the intermediate
-    // LoadingScreen — whichever appears first. See Phase 6 comment for a full
-    // explanation of why a fresh browser context makes "Loading draft board..."
-    // a transient state (not necessarily a post-draft stuck state).
-    const watchlistDraftBoard = page.getByRole('main', {
-      name: /player draft board/i,
-    });
-    const watchlistDraftComplete = page.getByText('Draft Complete!');
-    const watchlistPostDraftLoading = page.getByText('Loading draft board...');
-    await watchlistDraftBoard
-      .or(watchlistDraftComplete)
-      .or(watchlistPostDraftLoading)
-      .first()
-      .waitFor({ state: 'visible', timeout: 45_000 });
 
+    // Draft is paused (Phase 3) so the live board renders deterministically.
+    // See Phase 6 comment for why the transient "Loading draft board..." screen
+    // is still possible on a cold Apollo cache.
     await waitThroughTransientLoadingScreen(page);
-
-    if (
-      (await watchlistDraftComplete.isVisible()) ||
-      (await watchlistPostDraftLoading.isVisible())
-    ) {
-      test.skip(true, 'Draft completed before watchlist could be tested');
-      return;
-    }
+    await expect(
+      page.getByRole('main', { name: /player draft board/i }),
+    ).toBeVisible({ timeout: 45_000 });
 
     await test.step('Wait for player cards to load', async () => {
       // Player cards are rendered in the center panel once the draft is live

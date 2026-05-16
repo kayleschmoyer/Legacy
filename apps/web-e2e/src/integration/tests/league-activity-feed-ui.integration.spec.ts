@@ -27,6 +27,7 @@ import { expect, type Locator, type Page } from '@playwright/test';
 import { createLeagueViaUI } from '../helpers/create-league';
 import { joinLeagueAsManager } from '../helpers/wait-for-join-page';
 import { waitForSeasonActive } from '../helpers/wait-for-season-active';
+import { selectDropPlayerIfRosterFull } from '../helpers/waiver-claim-drop';
 import { test } from '../fixtures/ui';
 import { gqlFetch } from '../helpers/gql-fetch';
 
@@ -500,56 +501,9 @@ test.describe
       );
       await expect(rosterLoaded).toBeVisible({ timeout: 15_000 });
 
-      // If roster is full, select a player to drop
-      const dropPrompt = page.getByText(/select a player to drop/i);
-      if (await dropPrompt.isVisible()) {
-        const byTestId = page.locator('[data-testid^="drop-player-"]').first();
-        const byRole = page.getByRole('option', { name: /^Drop /i }).first();
-
-        const foundByTestId = await byTestId
-          .waitFor({ state: 'visible', timeout: 5_000 })
-          .then(() => true)
-          .catch(() => false);
-        if (foundByTestId) {
-          await byTestId.click();
-        } else {
-          const foundByRole = await byRole
-            .waitFor({ state: 'visible', timeout: 3_000 })
-            .then(() => true)
-            .catch(() => false);
-          if (foundByRole) {
-            await byRole.click();
-          } else {
-            // Fallback: find cursor:pointer element inside the modal
-            const rect = await page.evaluate(() => {
-              const modal = document.querySelector<HTMLElement>(
-                '[aria-labelledby="claim-title"]',
-              );
-              if (!modal) return null;
-              const divs = modal.querySelectorAll<HTMLElement>('div');
-              for (const div of divs) {
-                if (
-                  getComputedStyle(div).cursor === 'pointer' &&
-                  div.children.length >= 2
-                ) {
-                  const box = div.getBoundingClientRect();
-                  return {
-                    x: box.x + box.width / 2,
-                    y: box.y + box.height / 2,
-                  };
-                }
-              }
-              return null;
-            });
-            if (rect) {
-              await page.mouse.click(rect.x, rect.y);
-            }
-          }
-        }
-        await expect(page.getByText('Dropping')).toBeVisible({
-          timeout: 5_000,
-        });
-      }
+      // If the roster is full, the modal prompts for a drop pick; otherwise
+      // the helper is a no-op and the test proceeds straight to submit.
+      await selectDropPlayerIfRosterFull(page);
 
       const submitBtn = page.getByRole('button', { name: /Submit Claim/i });
       await expect(submitBtn).toBeEnabled({ timeout: 5_000 });
@@ -705,18 +659,9 @@ test.describe
         page.getByText(/Trade proposed|Trade accepted/i).first(),
       ).toBeVisible({ timeout: 5_000 });
 
-      // Draft events should NOT be visible when filtered
-      const draftEvents = page.getByText(/Round (\d+|\?), Pick (\d+|\?)/);
-      // Filter is client-side so draft events should be hidden
-      if (
-        await draftEvents
-          .first()
-          .isVisible()
-          .catch(() => false)
-      ) {
-        // If still visible, the filter might not fully hide non-matching events
-        // This is acceptable — the key verification is that trade events appear
-      }
+      // Filter is client-side; the key verification is that the trade event
+      // surfaces above. Whether draft events remain visible depends on the
+      // filter implementation; we do not assert their absence here.
     });
 
     await test.step('Waivers tab filters to waiver events only', async () => {

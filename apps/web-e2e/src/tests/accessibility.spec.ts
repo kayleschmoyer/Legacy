@@ -333,27 +333,27 @@ test.describe('Keyboard Navigation @regression', () => {
     await skipLink.focus();
     await expect(skipLink).toBeFocused({ timeout: 5000 });
 
-    // Verify other interactive elements can also receive focus
+    // Verify other interactive elements can also receive focus — the banner
+    // logo link is always present on /about.
     const logoLink = page.locator('[role="banner"]').getByRole('link').first();
-    if (await logoLink.isVisible()) {
-      await logoLink.focus();
-      const focusedTag = await page.evaluate(() =>
-        document.activeElement?.tagName?.toLowerCase(),
-      );
-      expect(['a', 'button', 'input', 'select', 'textarea']).toContain(
-        focusedTag,
-      );
-    }
+    await expect(logoLink).toBeVisible();
+    await logoLink.focus();
+    const focusedTag = await page.evaluate(() =>
+      document.activeElement?.tagName?.toLowerCase(),
+    );
+    expect(['a', 'button', 'input', 'select', 'textarea']).toContain(
+      focusedTag,
+    );
   });
 
   test('focus-visible outline is applied to focused links', async ({
     page,
   }) => {
-    // Focus the logo link directly to verify focus styling works
+    // Focus the logo link directly to verify focus styling works — it is
+    // always rendered in the banner.
     const logoLink = page.locator('[role="banner"]').getByRole('link').first();
-    if (await logoLink.isVisible()) {
-      await logoLink.focus();
-    }
+    await expect(logoLink).toBeVisible();
+    await logoLink.focus();
 
     // Verify something is focused
     const focused = await page.evaluate(() => {

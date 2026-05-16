@@ -471,174 +471,57 @@ test.describe('Mid-draft trade proposals — AI suggestions panel @regression', 
     );
 
     // The DraftIntelligence panel renders when recommendations are available.
-    // It displays "DRAFT INTELLIGENCE" as its title.
-    const intelPanel = page.getByText('DRAFT INTELLIGENCE');
-    const hasIntelPanel = await intelPanel.isVisible().catch(() => false);
-
-    if (hasIntelPanel) {
-      // Verify at least one recommendation player name is shown
-      const hasMikeTrout = await page
+    // The mock pins three recommendation names (Mike Trout, Freddie Freeman,
+    // Aaron Judge); the panel must surface at least one.
+    await expect(page.getByText('DRAFT INTELLIGENCE')).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(
+      page
         .getByText('Mike Trout')
-        .isVisible()
-        .catch(() => false);
-      const hasFreeman = await page
-        .getByText('Freddie Freeman')
-        .isVisible()
-        .catch(() => false);
-      const hasJudge = await page
-        .getByText('Aaron Judge')
-        .isVisible()
-        .catch(() => false);
-
-      expect(hasMikeTrout || hasFreeman || hasJudge).toBe(true);
-    } else {
-      // Panel may not render if the draft query does not resolve myTeamId in
-      // time. Verify the draft board itself loaded so we know the mock worked.
-      const bodyText = await page.locator('body').textContent();
-      expect(bodyText).toBeTruthy();
-    }
+        .or(page.getByText('Freddie Freeman'))
+        .or(page.getByText('Aaron Judge'))
+        .first(),
+    ).toBeVisible();
   });
 });
 
 test.describe('Mid-draft trade proposals — trade proposal form @regression', () => {
-  test('trade proposal form opens with player selection', async ({ page }) => {
-    await mockDraftGraphQL(page, { includeTradeProposals: true });
-    await page.goto(DRAFT_URL);
-    await page.waitForLoadState('networkidle');
-
-    // Verify no crash
-    await expect(page.locator('body')).not.toContainText(
-      'Unexpected Application Error',
-    );
-
-    // Wait for draft board to hydrate
-    const leagueName = page.getByText('Test Draft League');
-    const draftIndicator = page.getByText(/round|pick|draft/i).first();
-    await expect(leagueName.or(draftIndicator)).toBeVisible({
-      timeout: 10000,
-    });
-
-    // Look for trade-related buttons or links on the draft board
-    const tradeButton = page
-      .locator('button')
-      .filter({ hasText: /trade|propose/i })
-      .first();
-    const tradeLink = page.locator('a').filter({ hasText: /trade/i }).first();
-
-    const hasTradeButton = await tradeButton.isVisible().catch(() => false);
-    const hasTradeLink = await tradeLink.isVisible().catch(() => false);
-
-    if (hasTradeButton) {
-      await tradeButton.click();
-
-      // After clicking, a trade dialog/panel should appear
-      const tradeDialog = page.getByRole('dialog').first();
-      const tradePanel = page
-        .getByText(/trade proposal|propose trade|select.*team/i)
-        .first();
-
-      const hasDialog = await tradeDialog.isVisible().catch(() => false);
-      const hasPanel = await tradePanel.isVisible().catch(() => false);
-
-      // Either a dialog or panel with trade content should be visible
-      if (hasDialog || hasPanel) {
-        // Check for team names in the trade UI
-        const hasBetaForce = await page
-          .getByText('Beta Force')
-          .isVisible()
-          .catch(() => false);
-        const hasGammaRays = await page
-          .getByText('Gamma Rays')
-          .isVisible()
-          .catch(() => false);
-        const hasDeltaDawn = await page
-          .getByText('Delta Dawn')
-          .isVisible()
-          .catch(() => false);
-
-        expect(hasBetaForce || hasGammaRays || hasDeltaDawn).toBe(true);
-      }
-    } else if (hasTradeLink) {
-      // Trade functionality may be accessed via a link (e.g., to /trades tab)
-      await expect(tradeLink).toBeVisible();
-    } else {
-      // Trade proposals during draft may not yet be wired into the draft board
-      // UI. Verify the draft board itself rendered without error.
-      const bodyText = await page.locator('body').textContent();
-      expect(bodyText).toBeTruthy();
-    }
-  });
-});
-
-test.describe('Mid-draft trade proposals — confirmation shows involved players @regression', () => {
-  test('mid-draft trade confirmation shows involved players', async ({
+  // Mid-draft trade UI is not wired into the draft board today — the test
+  // would only ever validate "no crash". Re-enable once a trade entry point
+  // exists on the draft board and replace the body with a strict assertion
+  // against the trade dialog / panel.
+  test.fixme('trade proposal form opens with player selection', async ({
     page,
   }) => {
     await mockDraftGraphQL(page, { includeTradeProposals: true });
     await page.goto(DRAFT_URL);
     await page.waitForLoadState('networkidle');
+    await expect(
+      page
+        .locator('button')
+        .filter({ hasText: /trade|propose/i })
+        .first(),
+    ).toBeVisible();
+  });
+});
 
-    // Verify no crash
-    await expect(page.locator('body')).not.toContainText(
-      'Unexpected Application Error',
-    );
-
-    // Wait for the draft board to hydrate before probing tabs/links
-    const leagueName = page.getByText('Test Draft League');
-    const draftIndicator = page.getByText(/round|pick|draft/i).first();
-    await expect(leagueName.or(draftIndicator)).toBeVisible({
-      timeout: 10000,
-    });
-
-    // Navigate to trades tab if there is a link/tab for it
-    const tradesTab = page
-      .locator('[role="tab"]')
-      .filter({ hasText: /trade/i })
-      .first();
-    const tradesLink = page.locator('a').filter({ hasText: /trade/i }).first();
-
-    const hasTradesTab = await tradesTab.isVisible().catch(() => false);
-    const hasTradesLink = await tradesLink.isVisible().catch(() => false);
-
-    if (hasTradesTab) {
-      await tradesTab.click();
-      await page.waitForLoadState('networkidle');
-    } else if (hasTradesLink) {
-      await tradesLink.click();
-      await page.waitForLoadState('networkidle');
-    }
-
-    // Look for player names from our mock trade proposal
-    const hasAcuna = await page
-      .getByText('Ronald Acuna Jr.')
-      .isVisible()
-      .catch(() => false);
-    const hasSeager = await page
-      .getByText('Corey Seager')
-      .isVisible()
-      .catch(() => false);
-
-    if (hasAcuna || hasSeager) {
-      // The trade proposal with involved players is visible
-      expect(hasAcuna || hasSeager).toBe(true);
-
-      // Check for team names associated with the trade
-      const hasAlpha = await page
-        .getByText('Alpha Squad')
-        .isVisible()
-        .catch(() => false);
-      const hasBeta = await page
-        .getByText('Beta Force')
-        .isVisible()
-        .catch(() => false);
-      expect(hasAlpha || hasBeta).toBe(true);
-    } else {
-      // The draft board may show trade proposals in a different section or
-      // the mid-draft trade UI is not yet fully integrated. Verify the draft
-      // board loaded correctly by checking for draft-related content.
-      await expect(page.getByText(/round|pick|draft/i).first()).toBeVisible({
-        timeout: 5000,
-      });
-    }
+test.describe('Mid-draft trade proposals — confirmation shows involved players @regression', () => {
+  // Same gap as above — the mid-draft trades surface is not yet wired into the
+  // draft board UI, so this test cannot make any deterministic assertion about
+  // proposal display. Re-enable once a trades tab or section exists on the
+  // draft board and the mocked proposal renders.
+  test.fixme('mid-draft trade confirmation shows involved players', async ({
+    page,
+  }) => {
+    await mockDraftGraphQL(page, { includeTradeProposals: true });
+    await page.goto(DRAFT_URL);
+    await page.waitForLoadState('networkidle');
+    await expect(
+      page
+        .getByText('Ronald Acuna Jr.')
+        .or(page.getByText('Corey Seager'))
+        .first(),
+    ).toBeVisible();
   });
 });

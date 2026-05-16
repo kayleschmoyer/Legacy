@@ -466,42 +466,14 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
       .locator('button')
       .filter({ hasText: /^Confirm$/i })
       .first();
-    const hasConfirm = await confirmButton
-      .isVisible({ timeout: 5000 })
-      .catch(() => false);
-    if (hasConfirm) {
-      await confirmButton.click();
-    }
+    await expect(confirmButton).toBeVisible({ timeout: 5_000 });
+    await confirmButton.click();
 
-    // Look for error messages in the UI
-    const errorElements = await page.locator('[role="alert"]').all();
-    const alertMessages: string[] = [];
-
-    for (const element of errorElements) {
-      if (await element.isVisible()) {
-        const text = await element.textContent();
-        if (text) alertMessages.push(text);
-      }
-    }
-
-    // The UI should show some kind of error indication
-    if (alertMessages.length > 0) {
-      console.log('✅ Error messages displayed:', alertMessages);
-      expect(
-        alertMessages.some(
-          (msg) => msg.includes('error') || msg.includes('fail'),
-        ),
-      ).toBe(true);
-    } else {
-      // Button state should indicate an error occurred (e.g., re-enabled, or showing error state)
-      const buttonAfterError = await startDraftButton.textContent();
-      console.log(`Button state after error: "${buttonAfterError}"`);
-
-      // Button should either be re-enabled or show an error state
-      expect(buttonAfterError).toBeTruthy();
-    }
-
-    console.log('✅ GraphQL error handling test completed');
+    // The mocked mutation returns a GraphQL error — the UI must surface
+    // at least one alert whose text references the failure.
+    const alert = page.locator('[role="alert"]').first();
+    await expect(alert).toBeVisible({ timeout: 10_000 });
+    await expect(alert).toContainText(/error|fail/i);
   });
 
   test('should update Apollo Client cache correctly after mutation', async ({

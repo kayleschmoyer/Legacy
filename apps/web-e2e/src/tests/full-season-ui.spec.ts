@@ -752,10 +752,9 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
 
     await test.step('Search for a player', async () => {
       const searchInput = page.getByPlaceholder(/search players/i);
-      if (await searchInput.isVisible()) {
-        await searchInput.fill('Mays');
-        await page.waitForTimeout(500); // debounce
-      }
+      await expect(searchInput).toBeVisible();
+      await searchInput.fill('Mays');
+      await page.waitForTimeout(500); // debounce
     });
 
     await test.step('Switch to Pitchers view', async () => {
@@ -799,41 +798,27 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
       await page.waitForLoadState('load');
     });
 
-    await test.step('Click a player row to open waiver modal', async () => {
-      // The free-agent table renders player names; clicking opens the
-      // WaiverClaimModal. Look for the mocked player "Willie Mays".
+    await test.step('Open the waiver modal and submit the claim', async () => {
+      // The free-agent table renders player names from the mock; clicking the
+      // "Willie Mays" row opens WaiverClaimModal. The mock pins this player so
+      // it must be present — assert it before clicking.
       const playerRow = page.getByText('Mays', { exact: false }).first();
-      const isPlayerVisible = await playerRow
-        .waitFor({ state: 'visible', timeout: 5000 })
-        .then(() => true)
-        .catch(() => false);
-      if (isPlayerVisible) {
-        await playerRow.click();
-        // Wait for modal to potentially open
-        await page.waitForTimeout(1000);
+      await expect(playerRow).toBeVisible({ timeout: 5_000 });
+      await playerRow.click();
 
-        // Check if the modal opened
-        const modalTitle = page.getByText('Claim Free Agent');
-        const isModalVisible = await modalTitle
-          .waitFor({ state: 'visible', timeout: 3000 })
-          .then(() => true)
-          .catch(() => false);
-        if (isModalVisible) {
-          await test.step('Submit the claim', async () => {
-            const submitButton = page
-              .getByRole('button', { name: /submit claim/i })
-              .first();
-            const isSubmitVisible = await submitButton
-              .waitFor({ state: 'visible', timeout: 3000 })
-              .then(() => true)
-              .catch(() => false);
-            if (isSubmitVisible) {
-              await submitButton.click();
-              await page.waitForTimeout(1000);
-            }
-          });
-        }
-      }
+      const modalTitle = page.getByText('Claim Free Agent');
+      await expect(modalTitle).toBeVisible({ timeout: 5_000 });
+
+      const submitButton = page
+        .getByRole('button', { name: /submit claim/i })
+        .first();
+      await expect(submitButton).toBeVisible({ timeout: 5_000 });
+      await submitButton.click();
+
+      // The mock observer flips claimSubmitted on the claimFreeAgent mutation —
+      // assert it actually fired rather than only that the button accepted
+      // a click.
+      await expect.poll(() => claimSubmitted).toBe(true);
     });
   });
 
@@ -920,28 +905,24 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
       ).toBeVisible();
     });
 
-    await test.step('Click Propose Trade button', async () => {
+    await test.step('Click Propose Trade button and walk the first step', async () => {
       const proposeButton = page
         .getByRole('button', { name: /propose trade/i })
         .first();
-      if (await proposeButton.isVisible()) {
-        await proposeButton.click();
-        await page.waitForTimeout(1000);
+      await expect(proposeButton).toBeVisible({ timeout: 5_000 });
+      await proposeButton.click();
 
-        // The multi-step dialog should appear with step 1: select team
-        const teamStep = page
-          .getByText(/select the team/i, { exact: false })
-          .first();
-        if (await teamStep.isVisible()) {
-          // Select the opposing team if a selector is visible
-          const teamOption = page
-            .getByText(TEAM_2.name, { exact: false })
-            .first();
-          if (await teamOption.isVisible()) {
-            await teamOption.click();
-          }
-        }
-      }
+      // Step 1 of the propose-trade dialog: "Select the team you want to
+      // trade with". The opposing team (TEAM_2) is mocked into the league
+      // membership list so it must be selectable.
+      const teamStep = page
+        .getByText(/select the team/i, { exact: false })
+        .first();
+      await expect(teamStep).toBeVisible({ timeout: 5_000 });
+
+      const teamOption = page.getByText(TEAM_2.name, { exact: false }).first();
+      await expect(teamOption).toBeVisible({ timeout: 5_000 });
+      await teamOption.click();
     });
   });
 

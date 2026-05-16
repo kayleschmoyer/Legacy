@@ -33,6 +33,8 @@ import { expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { createLeagueViaUI } from '../helpers/create-league';
 import { joinLeagueAsManager } from '../helpers/wait-for-join-page';
+import { selectDropPlayerIfRosterFull } from '../helpers/waiver-claim-drop';
+import { waitForSeasonActive } from '../helpers/wait-for-season-active';
 import { switchUser, test } from '../fixtures/ui';
 import { gqlFetch } from '../helpers/gql-fetch';
 
@@ -145,53 +147,10 @@ async function submitWaiverClaimViaUI(
   );
   await expect(rosterLoaded).toBeVisible({ timeout: 15_000 });
 
-  // When the roster is full after the draft, the modal requires a drop
+  // When the roster is full after the draft, the modal requires a drop pick
   // — this path exercises the "drop" feature from the ticket requirements.
-  // The rosterLoaded assertion above ensures one of the two texts is already
-  // visible, so isVisible() here correctly reflects the current state.
-  const dropPrompt = page.getByText(/select a player to drop/i);
-  if (await dropPrompt.isVisible()) {
-    const byTestId = page.locator('[data-testid^="drop-player-"]').first();
-    const byRole = page.getByRole('option', { name: /^Drop /i }).first();
-
-    const foundByTestId = await byTestId
-      .waitFor({ state: 'visible', timeout: 5_000 })
-      .then(() => true)
-      .catch(() => false);
-    if (foundByTestId) {
-      await byTestId.click();
-    } else {
-      const foundByRole = await byRole
-        .waitFor({ state: 'visible', timeout: 3_000 })
-        .then(() => true)
-        .catch(() => false);
-      if (foundByRole) {
-        await byRole.click();
-      } else {
-        // Coordinate fallback: click the first pointer-cursor element inside
-        // the modal — Tamagui renders selectable items as styled divs
-        const rect = await page.evaluate(() => {
-          const modal = document.querySelector<HTMLElement>(
-            '[aria-labelledby="claim-title"]',
-          );
-          if (!modal) return null;
-          for (const div of modal.querySelectorAll<HTMLElement>('div')) {
-            if (
-              getComputedStyle(div).cursor === 'pointer' &&
-              div.children.length >= 2
-            ) {
-              const box = div.getBoundingClientRect();
-              return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
-            }
-          }
-          return null;
-        });
-        if (rect) await page.mouse.click(rect.x, rect.y);
-      }
-    }
-
-    await expect(page.getByText('Dropping')).toBeVisible({ timeout: 5_000 });
-  }
+  // The helper is a no-op when the roster has space.
+  await selectDropPlayerIfRosterFull(page);
 
   const submitBtn = page.getByRole('button', { name: /Submit Claim/i });
   await expect(submitBtn).toBeEnabled({ timeout: 5_000 });
@@ -282,6 +241,7 @@ test.describe
 
   test('Phase 3: Run automated random draft', async ({
     commissionerPage: page,
+    apiCommissioner,
   }) => {
     test.setTimeout(240_000);
 
@@ -326,15 +286,14 @@ test.describe
     });
 
     await test.step('Wait for draft to complete (Season Active)', async () => {
-      const seasonActive = page.getByText('Season Active');
-      const deadline = Date.now() + 90_000;
-      while (Date.now() < deadline) {
-        if (await seasonActive.isVisible().catch(() => false)) break;
-        await page.waitForTimeout(5_000);
-        await page.reload();
-        await page.waitForLoadState('load');
-      }
-      await expect(seasonActive).toBeVisible({ timeout: 15_000 });
+      // Use the shared helper instead of an inline reload loop — it polls
+      // league.draftStatus deterministically via GraphQL and only asserts the
+      // UI once the backend confirms the transition, eliminating the
+      // UI-render race documented in LS-4237 → LS-4321.
+      await waitForSeasonActive(page, state.leagueId, {
+        api: apiCommissioner,
+        deadlineMs: 90_000,
+      });
     });
   });
 

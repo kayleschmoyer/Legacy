@@ -24,6 +24,7 @@ import { createLeagueViaUI } from '../helpers/create-league';
 import { graphqlOk } from '../helpers/graphql';
 import { joinLeagueAsManager } from '../helpers/wait-for-join-page';
 import { waitForSeasonActive } from '../helpers/wait-for-season-active';
+import { selectDropPlayerIfRosterFull } from '../helpers/waiver-claim-drop';
 import { switchUser, test } from '../fixtures/ui';
 
 // ---------------------------------------------------------------------------
@@ -140,14 +141,13 @@ test.describe
       // Wait for "Save Name" to be enabled (team data loaded) before filling,
       // then wait again to ensure no concurrent mutation holds the button.
       const nameInput = page.locator('#team-name-input');
-      if (await nameInput.isVisible({ timeout: 10_000 }).catch(() => false)) {
-        const saveNameBtn = page.getByRole('button', { name: /Save Name/i });
-        await expect(saveNameBtn).toBeEnabled({ timeout: 10_000 });
-        await nameInput.fill('The Commissioners');
-        await expect(saveNameBtn).toBeEnabled({ timeout: 5_000 });
-        await saveNameBtn.click();
-        await page.waitForTimeout(1000);
-      }
+      await expect(nameInput).toBeVisible({ timeout: 10_000 });
+      const saveNameBtn = page.getByRole('button', { name: /Save Name/i });
+      await expect(saveNameBtn).toBeEnabled({ timeout: 10_000 });
+      await nameInput.fill('The Commissioners');
+      await expect(saveNameBtn).toBeEnabled({ timeout: 5_000 });
+      await saveNameBtn.click();
+      await page.waitForTimeout(1000);
     });
 
     await test.step('Verify updated team name on overview', async () => {
@@ -377,11 +377,10 @@ test.describe
 
     await test.step('Search for a player', async () => {
       const search = page.getByPlaceholder(/search players/i);
-      if (await search.isVisible()) {
-        await search.fill('Ruth');
-        await page.waitForTimeout(500);
-        await search.clear();
-      }
+      await expect(search).toBeVisible({ timeout: 10_000 });
+      await search.fill('Ruth');
+      await page.waitForTimeout(500);
+      await search.clear();
     });
 
     await test.step('Switch to Pitchers view', async () => {
@@ -502,45 +501,9 @@ test.describe
       );
       await expect(rosterLoaded).toBeVisible({ timeout: 15000 });
 
-      // If roster is full, we need to select a player to drop
-      const dropPrompt = page.getByText(/select a player to drop/i);
-      if (await dropPrompt.isVisible()) {
-        // Try selectors in order: data-testid (best), role="option", coordinate fallback
-        const byTestId = page.locator('[data-testid^="drop-player-"]').first();
-        const byRole = page.getByRole('option', { name: /^Drop /i }).first();
-
-        if (await byTestId.isVisible({ timeout: 3000 }).catch(() => false)) {
-          await byTestId.click();
-        } else if (
-          await byRole.isVisible({ timeout: 2000 }).catch(() => false)
-        ) {
-          await byRole.click();
-        } else {
-          // Last resort: find cursor:pointer element inside the modal via coordinates
-          const rect = await page.evaluate(() => {
-            const modal = document.querySelector<HTMLElement>(
-              '[aria-labelledby="claim-title"]',
-            );
-            if (!modal) return null;
-            const divs = modal.querySelectorAll<HTMLElement>('div');
-            for (const div of divs) {
-              if (
-                getComputedStyle(div).cursor === 'pointer' &&
-                div.children.length >= 2
-              ) {
-                const box = div.getBoundingClientRect();
-                return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
-              }
-            }
-            return null;
-          });
-          if (rect) {
-            await page.mouse.click(rect.x, rect.y);
-          }
-        }
-        // Wait for "Dropping" badge to confirm selection
-        await expect(page.getByText('Dropping')).toBeVisible({ timeout: 5000 });
-      }
+      // If the roster is full, select a player to drop; otherwise the helper
+      // is a no-op and the test proceeds to Submit Claim immediately.
+      await selectDropPlayerIfRosterFull(page);
 
       // Click "Submit Claim" or "Submit Claim & Drop"
       const submitBtn = page.getByRole('button', {
@@ -776,13 +739,14 @@ test.describe
     });
 
     await test.step('Step 4: Add message and send trade offer', async () => {
-      // Optional message
+      // The trade dialog always renders an optional message placeholder on
+      // step 4 — assert it before filling so a missing field is a real failure
+      // (the message itself is optional; presence of the field is not).
       const msgInput = dialog.getByPlaceholder(
         /Add a message to your trade offer/i,
       );
-      if (await msgInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await msgInput.fill('Fair trade?');
-      }
+      await expect(msgInput).toBeVisible({ timeout: 5_000 });
+      await msgInput.fill('Fair trade?');
 
       // Click "Send Trade Offer"
       const sendBtn = dialog.getByRole('button', {
@@ -796,12 +760,12 @@ test.describe
     });
 
     await test.step('Verify trade appears in My Offers', async () => {
-      // Click the "My Offers" tab
+      // The Trading Center always renders a "My Offers" tab — click it to
+      // surface the pending trade we just submitted.
       const myOffersTab = page.getByText('My Offers', { exact: false });
-      if (await myOffersTab.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await myOffersTab.click();
-        await page.waitForTimeout(1000);
-      }
+      await expect(myOffersTab).toBeVisible({ timeout: 5_000 });
+      await myOffersTab.click();
+      await page.waitForTimeout(1000);
       // Should see a pending trade
       await expect(page.getByText(/pending/i).first()).toBeVisible({
         timeout: 10000,
@@ -852,47 +816,45 @@ test.describe
     });
 
     await test.step('Select games from commissioner panel', async () => {
-      // After matchups are created, the Next Step shows "Select Game X of Y"
+      // After matchups are created in the prior step, "Select Game X of Y"
+      // is the next commissioner action — assert it appears, then select.
       const selectGameBtn = page.getByRole('button', {
         name: /Select Game/i,
       });
-      if (
-        await selectGameBtn.isVisible({ timeout: 10000 }).catch(() => false)
-      ) {
-        await selectGameBtn.click();
+      await expect(selectGameBtn).toBeVisible({ timeout: 10_000 });
+      await selectGameBtn.click();
 
-        // Confirmation dialog
-        const confirmBtn = page.getByRole('button', {
-          name: /Select Game|Confirm/i,
-        });
-        await expect(confirmBtn.last()).toBeVisible({ timeout: 5000 });
-        await confirmBtn.last().click();
+      // Confirmation dialog
+      const confirmBtn = page.getByRole('button', {
+        name: /Select Game|Confirm/i,
+      });
+      await expect(confirmBtn.last()).toBeVisible({ timeout: 5000 });
+      await confirmBtn.last().click();
 
-        // Wait for game selection to process
-        await page.waitForTimeout(5000);
-      }
+      // Wait for game selection to process
+      await page.waitForTimeout(5000);
     });
 
     await test.step('Advance league week from commissioner panel', async () => {
-      // After games are selected, "Advance League Week" appears
+      // After games are selected in the prior step, "Advance League Week"
+      // is the next commissioner action — assert it appears, then advance.
       await page.reload();
       await page.waitForLoadState('load');
 
       const advanceBtn = page.getByRole('button', {
         name: /Advance League Week/i,
       });
-      if (await advanceBtn.isVisible({ timeout: 10000 }).catch(() => false)) {
-        await advanceBtn.click();
+      await expect(advanceBtn).toBeVisible({ timeout: 10_000 });
+      await advanceBtn.click();
 
-        // Confirmation dialog
-        const confirmBtn = page.getByRole('button', {
-          name: /Advance|Confirm/i,
-        });
-        await expect(confirmBtn.last()).toBeVisible({ timeout: 5000 });
-        await confirmBtn.last().click();
+      // Confirmation dialog
+      const confirmBtn = page.getByRole('button', {
+        name: /Advance|Confirm/i,
+      });
+      await expect(confirmBtn.last()).toBeVisible({ timeout: 5000 });
+      await confirmBtn.last().click();
 
-        await page.waitForTimeout(5000);
-      }
+      await page.waitForTimeout(5000);
     });
   });
 
@@ -992,34 +954,31 @@ test.describe
     });
 
     await test.step('Start new season from commissioner panel', async () => {
-      // Look for the "Start New Season" button
+      // Once the season has completed (asserted in the prior step), the
+      // commissioner panel surfaces "Start New Season" as the next action.
       const renewBtn = page.getByRole('button', {
         name: /Start New Season/i,
       });
 
-      if (await renewBtn.isVisible({ timeout: 10000 }).catch(() => false)) {
-        await renewBtn.click();
+      await expect(renewBtn).toBeVisible({ timeout: 10_000 });
+      await renewBtn.click();
 
-        // The dialog asks about rosters: select "Hold a new draft"
-        const newDraftOption = page.getByText(
-          /Hold a new draft.*start with empty rosters/i,
-        );
-        if (
-          await newDraftOption.isVisible({ timeout: 3000 }).catch(() => false)
-        ) {
-          await newDraftOption.click();
-        }
+      // The dialog asks about rosters: select "Hold a new draft".
+      const newDraftOption = page.getByText(
+        /Hold a new draft.*start with empty rosters/i,
+      );
+      await expect(newDraftOption).toBeVisible({ timeout: 5_000 });
+      await newDraftOption.click();
 
-        // Click "Confirm New Season"
-        const confirmBtn = page.getByRole('button', {
-          name: /Confirm New Season/i,
-        });
-        await expect(confirmBtn).toBeVisible({ timeout: 5000 });
-        await confirmBtn.click();
+      // Click "Confirm New Season"
+      const confirmBtn = page.getByRole('button', {
+        name: /Confirm New Season/i,
+      });
+      await expect(confirmBtn).toBeVisible({ timeout: 5000 });
+      await confirmBtn.click();
 
-        // Wait for renewal to process
-        await page.waitForTimeout(5000);
-      }
+      // Wait for renewal to process
+      await page.waitForTimeout(5000);
     });
 
     await test.step('Verify league overview still loads', async () => {

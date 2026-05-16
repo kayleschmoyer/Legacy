@@ -51,13 +51,14 @@ test.describe('Baseball Hub Page @critical', () => {
   test('Join League button navigates to join-by-code page', async ({
     page,
   }) => {
+    // /baseball renders the Join League call-to-action as either an
+    // accessible button or, on the marketing-style hero card, plain text.
+    // Both surfaces navigate to the same join page; assert the navigation
+    // contract rather than picking one rendering.
     const joinBtn = page.getByRole('button', { name: /join league/i }).first();
-
-    if (!(await joinBtn.isVisible())) {
-      await page.getByText('Join League').first().click();
-    } else {
-      await joinBtn.click();
-    }
+    const joinText = page.getByText('Join League').first();
+    await expect(joinBtn.or(joinText)).toBeVisible();
+    await joinBtn.or(joinText).first().click();
 
     await page.waitForLoadState('load');
     await expect(page).toHaveURL('/baseball/league/join');

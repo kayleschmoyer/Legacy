@@ -497,19 +497,18 @@ test.describe('Draft Selection Workflow @regression', () => {
     // Current pick should be visible but show another team's turn
     await expect(draftPage.currentPick).toBeVisible({ timeout: 5000 });
 
-    // Draft/pick buttons should be disabled or hidden when it's not the user's turn
-    const isVisible = await draftPage.draftPlayerButton
-      .first()
-      .isVisible({ timeout: 2000 })
-      .catch(() => false);
-
-    if (isVisible) {
-      // If visible, should be disabled
-      await expect(draftPage.draftPlayerButton.first()).toBeDisabled();
-    } else {
-      // Button is hidden — that's the expected behavior when it's not the user's turn
-      await expect(draftPage.draftPlayerButton.first()).not.toBeVisible();
-    }
+    // Draft/pick buttons must NOT be actionable when it is not the user's turn.
+    // Acceptable shapes: button hidden OR button visible-but-disabled. Both
+    // behaviors satisfy the same user-facing contract — the user cannot
+    // submit a pick — so we assert the contract rather than picking one
+    // implementation.
+    const draftBtn = draftPage.draftPlayerButton.first();
+    await expect
+      .poll(
+        async () =>
+          (await draftBtn.isVisible()) && !(await draftBtn.isDisabled()),
+      )
+      .toBe(false);
   });
 
   test('should display pick history after picks are made', async ({ page }) => {
@@ -591,18 +590,12 @@ test.describe('Draft Selection Workflow @regression', () => {
     });
     await draftPage.draftPlayerButton.first().click();
 
-    // Look for error indication — either an alert or the page remains functional
+    // The mocked MakeDraftPick returns a GraphQL error. The UI must surface
+    // it on an alert with non-empty content; the draft board must remain
+    // functional (no crash / blank page).
     const errorAlert = page.locator('[role="alert"]').first();
-    const hasError = await errorAlert
-      .isVisible({ timeout: 2000 })
-      .catch(() => false);
-
-    if (hasError) {
-      const errorText = await errorAlert.textContent();
-      expect(errorText).toBeTruthy();
-    }
-
-    // Regardless of error display style, the draft board should still be functional
+    await expect(errorAlert).toBeVisible({ timeout: 5_000 });
+    await expect(errorAlert).not.toHaveText('');
     await expect(draftPage.draftBoard).toBeVisible();
   });
 });
