@@ -227,7 +227,7 @@ async function authCodeFlow(cognitoDomain, clientId) {
     `?response_type=code` +
     `&client_id=${encodeURIComponent(clientId)}` +
     `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
-    `&scope=${encodeURIComponent('openid email profile')}` +
+    `&scope=openid` +
     `&code_challenge=${challenge}` +
     `&code_challenge_method=S256` +
     `&state=${state}`;

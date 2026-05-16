@@ -122,7 +122,15 @@ resource "aws_cognito_user_pool_client" "mcp_cli" {
 
   allowed_oauth_flows                  = ["code"]
   allowed_oauth_flows_user_pool_client = true
-  allowed_oauth_scopes                 = ["openid", "email", "profile"]
+  # Just `openid` — the JWT idToken is all API Gateway's JWT authorizer
+  # needs (it validates iss/aud/exp/sig, not custom claims). The `email`
+  # and `profile` scopes were tried initially but caused Cognito's
+  # /oauth2/authorize endpoint to redirect to
+  # /error?error=Required+parameters+missing — empirically `scope=openid`
+  # alone returns the expected 302 to /login. If we ever need profile
+  # claims in tokens, revisit and add the necessary read_attributes /
+  # standard-attribute schema entries to make those scopes acceptable.
+  allowed_oauth_scopes = ["openid"]
 
   callback_urls = ["http://localhost:57329"]
   logout_urls   = ["http://localhost:57329"]
