@@ -881,16 +881,21 @@ resource "aws_iam_policy" "github_actions_supplemental" {
         ]
         Resource = ["arn:aws:sso::${local.account_id}:application/${local.sso_instance_id}/*"]
       },
-      # Tag actions are evaluated against TWO resource shapes:
+      # Tag actions are evaluated against THREE resource shapes:
       #   - At CreateApplication time, AWS authorizes sso:TagResource against
       #     the parent INSTANCE arn (arn:aws:sso:::instance/<id>) — the child
       #     application doesn't exist yet so it can't be the resource target.
-      #   - After the application exists, ongoing tag ops are evaluated against
-      #     the application arn with a wildcarded account segment
+      #   - At CreateApplication time, AWS also authorizes sso:TagResource
+      #     against the application provider arn supplied to the create call
+      #     (arn:aws:sso::aws:applicationProvider/custom) — this is an
+      #     AWS-owned resource (note the literal "aws" account segment).
+      #   - After the application exists, ongoing tag ops are evaluated
+      #     against the application arn with a wildcarded account segment
       #     (arn:aws:sso::*:application/<instance-id>/*).
-      # Both ARNs must be in the Resource list. Kept in a separate statement
-      # so the broader application scope doesn't leak into destructive ops
-      # like UpdateApplication / DeleteApplication / PutApplicationAccessScope.
+      # All three ARNs must be in the Resource list. Kept in a separate
+      # statement so the broader application scope doesn't leak into
+      # destructive ops like UpdateApplication / DeleteApplication /
+      # PutApplicationAccessScope.
       {
         Effect = "Allow"
         Action = [
@@ -900,6 +905,7 @@ resource "aws_iam_policy" "github_actions_supplemental" {
         ]
         Resource = [
           "arn:aws:sso:::instance/${local.sso_instance_id}",
+          "arn:aws:sso::aws:applicationProvider/custom",
           "arn:aws:sso::*:application/${local.sso_instance_id}/*"
         ]
       }
