@@ -52,6 +52,22 @@ locals {
 
 data "aws_ssoadmin_instances" "main" {}
 
+# Instance ID (e.g. "ssoins-xxxxxxxx") parsed from the IC instance ARN, used by
+# github-actions-oidc.tf to scope sso:* IAM resources to this specific instance.
+#
+# IAM Identity Center is a hard prerequisite for this stack — the account is
+# provisioned with exactly one instance via AWS Organizations, so the data
+# source always returns a non-empty arns list. If it were ever empty, the
+# aws_ssoadmin_application.mcp_dev resource below (which uses the same
+# expression for instance_arn) would fail with an index-out-of-range error
+# at the same plan step, surfacing the missing prerequisite clearly.
+locals {
+  sso_instance_arn = tolist(data.aws_ssoadmin_instances.main.arns)[0]
+  # Extract via regex (rather than split+element index) so the extraction
+  # is self-evident — ARN format: arn:aws:sso:::instance/ssoins-<hex>.
+  sso_instance_id = regex("ssoins-[a-z0-9]+$", local.sso_instance_arn)
+}
+
 resource "aws_ssoadmin_application" "mcp_dev" {
   name                     = "${local.name_prefix}-mcp-dev"
   application_provider_arn = "arn:aws:sso::aws:applicationProvider/custom"

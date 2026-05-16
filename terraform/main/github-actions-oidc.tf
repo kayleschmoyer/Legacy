@@ -844,16 +844,17 @@ resource "aws_iam_policy" "github_actions_supplemental" {
       #   sso:ListInstances                — no resource-level support → "*"
       #   sso:CreateApplication,
       #   sso:ListApplications             — Instance-scoped
-      #     ARN: arn:aws:sso:::instance/ssoins-*
+      #     ARN: arn:aws:sso:::instance/${local.sso_instance_id}
       #   sso:Describe/Update/Delete/Tag*Application,
       #   sso:Put/Get/Delete/ListApplicationAccessScope(s)
       #                                    — Application-scoped
-      #     ARN: arn:aws:sso::${account}:application/ssoins-*/apl-*
-      # Wildcards are constrained to the project's AWS account; the account
-      # has a single AWS-Organizations-managed IAM IC instance, so this is
-      # effectively "any app under our IC instance" without circular
-      # dependency on aws_ssoadmin_application.mcp_dev.application_arn (the
-      # IAM policy must be applyable before that app can be created).
+      #     ARN: arn:aws:sso::*:application/${local.sso_instance_id}/*
+      #     (account segment is wildcarded by AWS for SSO app ARNs in
+      #     tag-on-create paths; trailing segment is "*" because the
+      #     apl-* ID is assigned after CreateApplication.)
+      # Avoids circular dependency on
+      # aws_ssoadmin_application.mcp_dev.application_arn (the IAM policy
+      # must be applyable before that app can be created).
       {
         Effect   = "Allow"
         Action   = ["sso:ListInstances"]
@@ -865,7 +866,7 @@ resource "aws_iam_policy" "github_actions_supplemental" {
           "sso:CreateApplication",
           "sso:ListApplications"
         ]
-        Resource = ["arn:aws:sso:::instance/ssoins-*"]
+        Resource = ["arn:aws:sso:::instance/${local.sso_instance_id}"]
       },
       {
         Effect = "Allow"
@@ -876,12 +877,23 @@ resource "aws_iam_policy" "github_actions_supplemental" {
           "sso:PutApplicationAccessScope",
           "sso:DeleteApplicationAccessScope",
           "sso:GetApplicationAccessScope",
-          "sso:ListApplicationAccessScopes",
+          "sso:ListApplicationAccessScopes"
+        ]
+        Resource = ["arn:aws:sso::${local.account_id}:application/${local.sso_instance_id}/*"]
+      },
+      # Tag actions need the ::*: wildcard ONLY because AWS evaluates SSO
+      # application tag operations with a literal "*" in the account segment
+      # at tag-on-create time. Kept in a separate statement so the broader
+      # scope doesn't leak into destructive ops like UpdateApplication /
+      # DeleteApplication / PutApplicationAccessScope.
+      {
+        Effect = "Allow"
+        Action = [
           "sso:TagResource",
           "sso:UntagResource",
           "sso:ListTagsForResource"
         ]
-        Resource = ["arn:aws:sso::${local.account_id}:application/ssoins-*/apl-*"]
+        Resource = ["arn:aws:sso::*:application/${local.sso_instance_id}/*"]
       }
     ]
   })
@@ -1382,7 +1394,7 @@ resource "aws_iam_role_policy" "github_actions_plan_policy" {
         Sid      = "SsoAdminInstanceScoped"
         Effect   = "Allow"
         Action   = ["sso:ListApplications"]
-        Resource = ["arn:aws:sso:::instance/ssoins-*"]
+        Resource = ["arn:aws:sso:::instance/${local.sso_instance_id}"]
       },
       {
         Sid    = "SsoAdminApplicationRead"
@@ -1390,10 +1402,17 @@ resource "aws_iam_role_policy" "github_actions_plan_policy" {
         Action = [
           "sso:DescribeApplication",
           "sso:GetApplicationAccessScope",
-          "sso:ListApplicationAccessScopes",
-          "sso:ListTagsForResource"
+          "sso:ListApplicationAccessScopes"
         ]
-        Resource = ["arn:aws:sso::${local.account_id}:application/ssoins-*/apl-*"]
+        Resource = ["arn:aws:sso::${local.account_id}:application/${local.sso_instance_id}/*"]
+      },
+      # sso:ListTagsForResource is grouped with the tag actions in the apply
+      # policy under the wider ::*: scope; the plan role only needs read.
+      {
+        Sid      = "SsoAdminTagsRead"
+        Effect   = "Allow"
+        Action   = ["sso:ListTagsForResource"]
+        Resource = ["arn:aws:sso::*:application/${local.sso_instance_id}/*"]
       },
       # S3 read (project buckets — Lambda deployment bucket, ci-artifacts, etc.)
       # The runner-dist bucket lives in terraform/runners/ as of LS-2425; runner-module
