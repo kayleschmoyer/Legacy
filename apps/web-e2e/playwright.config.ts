@@ -32,15 +32,18 @@ export default defineConfig({
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
-  /* Retry on CI only — 1 retry catches genuine infra blips without tripling runtime */
-  retries: process.env.CI ? 1 : 0,
+  /* No retries — flake is a P1 bug, not something to paper over. A failing test
+   * should fail on its first run so the signal is visible in CI. */
+  retries: 0,
   /* 4 workers: GHA runners have 7GB RAM; Playwright tests are I/O-bound not CPU-bound,
    * so 4 parallel browsers (~400MB) finishes in ~5min vs ~15min at 2 workers */
   workers: process.env.CI ? 4 : undefined,
-  /* Per-test timeout cap — prevents a single stuck test from burning 30s (the
-   * Playwright default) before failing.  20s leaves headroom for navigation +
-   * a few slow assertions while still failing 5-6x faster than the default. */
-  timeout: 20000,
+  /* Per-test timeout cap.  Budget math: a typical test has up to ~6 chained
+   * assertions plus one navigation/action.  With expect.timeout=3s and
+   * actionTimeout=10s, 6 expects + 1 action = 28s, fitting in 30s with
+   * headroom.  This is the Playwright default — earlier 20s was below the
+   * worst-case sum of inner timeouts and caused deterministic TLE on slow runs. */
+  timeout: 30000,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [
     ['json', { outputFile: 'test-results/results.json' }],
@@ -56,10 +59,11 @@ export default defineConfig({
     storageState: path.join(__dirname, '.auth/state.json'),
 
     /* Cap how long page actions (click, fill, waitFor, goto) can run.
-     * Default is 0 (inherits the 20s per-test timeout above, consuming
-     * it entirely on a single stuck action).  15s allows one slow navigation
-     * while still leaving the test budget for assertions. */
-    actionTimeout: 15000,
+     * Default is 0 (inherits the per-test timeout above, consuming it
+     * entirely on a single stuck action).  10s for actions leaves room
+     * within the 30s test budget for multiple assertions; navigation gets
+     * 15s for cold-cache page loads. */
+    actionTimeout: 10000,
     navigationTimeout: 15000,
 
     /* Emulate prefers-reduced-motion so the ScoreboardTicker renders its
@@ -70,15 +74,17 @@ export default defineConfig({
      * Playwright 1.59.x — top-level reducedMotion is not a typed property. */
     contextOptions: { reducedMotion: 'reduce' },
 
-    /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
-    trace: 'on-first-retry',
+    /* Retain trace on failure.  With retries=0 there is no "first retry", so
+     * traces must be captured on the original failing run instead. */
+    trace: 'retain-on-failure',
   },
 
   expect: {
-    /* Give React 18's non-blocking createRoot().render() time to commit the
-     * initial paint + re-render after mocked GraphQL responses arrive.
-     * Cold V8 JIT on CI can require 3–4s; 5s gives comfortable headroom. */
-    timeout: 5000,
+    /* Per-assertion polling cap.  Sized so that ~6 chained expects (18s) plus
+     * one action (10s) still fits in the 30s test budget with headroom.
+     * Cold V8 JIT on CI typically commits within 1–2s; 3s leaves margin
+     * without letting a single hung assertion consume the whole test. */
+    timeout: 3000,
   },
 
   /* Configure projects for major browsers */

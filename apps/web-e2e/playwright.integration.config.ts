@@ -12,7 +12,11 @@ export default defineConfig({
   globalSetup: './src/integration/global-setup.ts',
   globalTeardown: './src/integration/global-teardown.ts',
   timeout: 120_000,
-  retries: 2,
+  /* Fail the build on CI if you accidentally left test.only in the source code. */
+  forbidOnly: !!process.env.CI,
+  /* No retries — flake against the live backend is a P1 bug.  Retrying papered
+   * over genuine signal: 2 retries meant 67% of CI runs hid flake. */
+  retries: 0,
   // Serialize test execution to avoid API Gateway / Lambda throttling under
   // concurrent load.  Each file still runs phases sequentially (fullyParallel:
   // false).  With workers=1 the live backend only handles one league-creation
@@ -24,6 +28,6 @@ export default defineConfig({
   use: {
     baseURL:
       process.env.INTEGRATION_BASE_URL ?? 'https://api.legacy-fantasy.com/',
-    trace: 'on-first-retry',
+    trace: 'retain-on-failure',
   },
 });
