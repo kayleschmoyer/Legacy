@@ -233,15 +233,23 @@ async function authCodeFlow(cognitoDomain, clientId) {
     `&state=${state}`;
 
   LOGGER.info(`\nOpening browser for authorization:\n  ${authUrl}\n`);
-  // On Windows we MUST shell out to `cmd /c start "" <url>` rather than use
-  // `shell: true` with `start <url>`. With shell:true, cmd interprets every
-  // `&` in the URL as a command separator — the OAuth query string truncates
-  // after the first `&`, Cognito sees a request missing client_id /
-  // redirect_uri, and the browser lands on /error?error=Required+parameters+missing.
-  // The empty `""` after `start` is the window-title arg start expects; the
-  // URL is then passed as a single argv element with no shell interpretation.
+  // On Windows, `start` invoked via cmd has a long-standing quoting trap:
+  // cmd treats `&` as a command separator, so a bare authorize URL gets
+  // truncated after the first `&` and the browser lands on
+  // /error?error=Required+parameters+missing. Node's default arg-escape
+  // function does NOT add quotes for `&` either, so passing the URL as a
+  // separate argv element isn't enough — cmd still sees it bare.
+  //
+  // The reliable fix is to use windowsVerbatimArguments:true and wrap the
+  // URL ourselves in double quotes so cmd treats it as a single token.
+  // Pre-escape any literal double-quotes in the URL (none normally appear
+  // in OAuth URLs, but be defensive).
   if (process.platform === 'win32') {
-    spawnSync('cmd', ['/c', 'start', '', authUrl], { stdio: 'ignore' });
+    const quoted = `"${authUrl.replace(/"/g, '\\"')}"`;
+    spawnSync('cmd', ['/c', `start "" ${quoted}`], {
+      stdio: 'ignore',
+      windowsVerbatimArguments: true,
+    });
   } else {
     const opener = process.platform === 'darwin' ? 'open' : 'xdg-open';
     spawnSync(opener, [authUrl], { stdio: 'ignore' });
