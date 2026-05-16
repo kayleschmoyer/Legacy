@@ -5,22 +5,25 @@ flowchart TB
 
     Start --> P1
     subgraph P1["Phase 1: Frame"]
-        P1A["Restate problem"]
-        P1B["Assign risk tier"]
-        P1C["Repro report\n(investigation entrypoints)"]
-        P1A --> P1B --> P1C
+        P1A["Read trigger end-to-end"]
+        P1B["Restate problem\n& acceptance criteria"]
+        P1C["Identify out-of-scope items"]
+        P1D["Assign risk tier"]
+        P1E["Repro report\n(investigation entrypoints)"]
+        P1A --> P1B --> P1C --> P1D --> P1E
     end
 
-    P1 --> G1{"Risk tier assigned?\nTrigger linked?"}
+    P1 --> G1{"Risk tier assigned?\nTrigger linked?\nRepro attached (if investigation)?"}
     G1 -->|No| P1
     G1 -->|Yes| P2
 
     subgraph P2["Phase 2: Design"]
-        P2A["RFC if Medium+"]
+        P2A["RFC if Medium+\n(skip for Critical-tier incidents)"]
         P2B["ADR for architectural decisions"]
-        P2C["Test plan written"]
-        P2D["Touch-map identified"]
-        P2A --> P2B --> P2C --> P2D
+        P2C["Shape + critique\n(UI work only, before coding)"]
+        P2D["Test plan written"]
+        P2E["Touch-map identified"]
+        P2A --> P2B --> P2C --> P2D --> P2E
     end
 
     P2 --> G2{"RFC accepted?\nTest plan written?"}
@@ -41,7 +44,7 @@ flowchart TB
     subgraph P4["Phase 4: Verify"]
         P4A["make pc green"]
         P4B["Manual exercise"]
-        P4C["Determinism check\n(E2E/integration)"]
+        P4C["Determinism check\n(new E2E/integration tests)"]
         P4D["Test plan coverage"]
         P4A --> P4B --> P4C --> P4D
     end
@@ -52,9 +55,10 @@ flowchart TB
 
     subgraph P5["Phase 5: Document"]
         P5A["Apply touch-map"]
-        P5B["Archive RFC / ADR"]
-        P5C["Postmortem\n(if Critical)"]
-        P5A --> P5B --> P5C
+        P5B["Archive RFC / ADR\n(promote drafts to numbered)"]
+        P5C["Postmortem\n(if Critical tier or incident)"]
+        P5D["Update dev-process README\n(if process changed)"]
+        P5A --> P5B --> P5C --> P5D
     end
 
     P5 --> G5{"All docs current?"}
@@ -63,13 +67,15 @@ flowchart TB
 
     subgraph P6["Phase 6: Handoff"]
         P6A["Self-review"]
-        P6B["Open PR draft"]
-        P6C["Bot-PR contract\n(Cycles 1/2/3)"]
-        P6D["Merge"]
-        P6A --> P6B --> P6C --> P6D
+        P6B["Open PR draft\nApply agent-in-progress label"]
+        P6C["Mark ready for review"]
+        P6D["Bot-PR contract\n(Cycles 1/2/3)"]
+        P6E["Merge"]
+        P6F["Verify Jira → Done\nClose tracking tasks"]
+        P6A --> P6B --> P6C --> P6D --> P6E --> P6F
     end
 
-    P6 --> G6{"PR merged?\nJira Done?\nAudit run?\nTasks closed?"}
+    P6 --> G6{"PR merged?\nJira Done?\nAudit run (or skipped if shallow)?\nTasks closed?"}
     G6 -->|No| P6
     G6 -->|Yes| End
 

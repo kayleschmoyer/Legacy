@@ -53,12 +53,12 @@ flowchart TB
 
     subgraph Spine["6-phase spine"]
         direction TB
-        P1["1 Frame\n- Restate problem\n- Risk tier\n- Repro (if investigation)"]
-        P2["2 Design\n- RFC (Medium+)\n- ADR (architectural)\n- Test plan"]
+        P1["1 Frame\n- Read trigger\n- Restate problem\n- Out-of-scope items\n- Risk tier\n- Repro (if investigation)"]
+        P2["2 Design\n- RFC (Medium+; skip for Critical incidents)\n- ADR (architectural)\n- Shape + critique (UI only)\n- Test plan"]
         P3["3 Implement\n- Vertical slices\n- Docs alongside code"]
-        P4["4 Verify\n- make pc\n- Manual exercise\n- Determinism check"]
-        P5["5 Document\n- Touch-map\n- Archive RFC/ADR\n- Postmortem (if Critical)"]
-        P6["6 Handoff\n- Self-review\n- Bot-PR contract\n- Drive to merge"]
+        P4["4 Verify\n- make pc\n- Manual exercise\n- Determinism check (new E2E/integration)"]
+        P5["5 Document\n- Touch-map\n- Archive RFC/ADR (promote drafts)\n- Postmortem (if Critical or incident)"]
+        P6["6 Handoff\n- Self-review\n- Draft PR + agent-in-progress label\n- Bot-PR contract\n- Merge + verify Jira Done\n- Close tracking tasks"]
         P1 --> P2 --> P3 --> P4 --> P5 --> P6
     end
 
@@ -68,6 +68,6 @@ flowchart TB
         direction LR
         X1["PR merged"]
         X2["Jira Done"]
-        X3["Audit run"]
+        X3["Audit run\n(or skipped if shallow)"]
         X4["Tasks closed"]
     end
