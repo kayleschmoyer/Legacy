@@ -881,11 +881,16 @@ resource "aws_iam_policy" "github_actions_supplemental" {
         ]
         Resource = ["arn:aws:sso::${local.account_id}:application/${local.sso_instance_id}/*"]
       },
-      # Tag actions need the ::*: wildcard ONLY because AWS evaluates SSO
-      # application tag operations with a literal "*" in the account segment
-      # at tag-on-create time. Kept in a separate statement so the broader
-      # scope doesn't leak into destructive ops like UpdateApplication /
-      # DeleteApplication / PutApplicationAccessScope.
+      # Tag actions are evaluated against TWO resource shapes:
+      #   - At CreateApplication time, AWS authorizes sso:TagResource against
+      #     the parent INSTANCE arn (arn:aws:sso:::instance/<id>) — the child
+      #     application doesn't exist yet so it can't be the resource target.
+      #   - After the application exists, ongoing tag ops are evaluated against
+      #     the application arn with a wildcarded account segment
+      #     (arn:aws:sso::*:application/<instance-id>/*).
+      # Both ARNs must be in the Resource list. Kept in a separate statement
+      # so the broader application scope doesn't leak into destructive ops
+      # like UpdateApplication / DeleteApplication / PutApplicationAccessScope.
       {
         Effect = "Allow"
         Action = [
@@ -893,7 +898,10 @@ resource "aws_iam_policy" "github_actions_supplemental" {
           "sso:UntagResource",
           "sso:ListTagsForResource"
         ]
-        Resource = ["arn:aws:sso::*:application/${local.sso_instance_id}/*"]
+        Resource = [
+          "arn:aws:sso:::instance/${local.sso_instance_id}",
+          "arn:aws:sso::*:application/${local.sso_instance_id}/*"
+        ]
       }
     ]
   })
