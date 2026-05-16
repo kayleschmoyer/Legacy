@@ -249,6 +249,8 @@ async function deviceAuthFlow(clientId, clientSecret, startUrl, ssoRegion) {
       clientSecret,
       '--start-url',
       startUrl,
+      '--scope',
+      'sso:account:access openid',
     ],
     ssoRegion,
   );
@@ -289,6 +291,8 @@ async function deviceAuthFlow(clientId, clientSecret, startUrl, ssoRegion) {
           'urn:ietf:params:oauth:grant-type:device_code',
           '--device-code',
           auth['deviceCode'],
+          '--scope',
+          'openid',
         ],
         ssoRegion,
       );
@@ -324,6 +328,8 @@ function refreshToken(clientId, clientSecret, refreshTok, ssoRegion) {
       'refresh_token',
       '--refresh-token',
       refreshTok,
+      '--scope',
+      'openid',
     ],
     ssoRegion,
   );
@@ -439,16 +445,13 @@ async function main() {
     if (!idToken) {
       LOGGER.error('ERROR: SSO token response did not include an idToken.');
       LOGGER.error(
-        '  Root cause: the IAM Identity Center application is missing the "openid" scope.',
+        '  Root cause: the "openid" scope was not granted during token issuance.',
       );
       LOGGER.error(
-        '  Fix: in terraform/main (mcp_oidc_* / IAM Identity Center customer-managed app),',
+        '  Fix: re-run this script with --setup to re-register the client and redo the',
       );
       LOGGER.error(
-        '       ensure the OIDC client is registered with scopes including "openid",',
-      );
-      LOGGER.error(
-        '       then re-run terraform apply and re-run this script with --setup.',
+        '       device-authorization flow, which now explicitly requests the openid scope.',
       );
       LOGGER.error(
         `  (response keys present: ${Object.keys(tokenData).join(', ') || '<none>'})`,
