@@ -244,11 +244,13 @@ test.describe
 
     await test.step('Wait for draft to start', async () => {
       // After clicking Start Draft, gate on the backend `draftStatus`
-      // transitioning to `active`/`in_progress` before reloading the
-      // commissioner panel — replaces a fixed 3s pre-reload wait that
-      // raced the startDraft mutation under nightly load. The poll
-      // callback returns null on errors so expect.poll retries on
-      // assertion failure rather than throwing (antipattern #1).
+      // transitioning to `in-progress` before reloading the commissioner
+      // panel — replaces a fixed 3s pre-reload wait that raced the
+      // startDraft mutation under nightly load. The poll callback returns
+      // null on errors so expect.poll retries on assertion failure rather
+      // than throwing (antipattern #1). The canonical value written by
+      // initializeDraft for live drafts is `'in-progress'` (hyphenated) —
+      // see lambdas/db/src/schema/drafts/mutations/initialize-draft.ts.
       await expect
         .poll(
           async () => {
@@ -266,10 +268,10 @@ test.describe
           {
             timeout: 30_000,
             intervals: [1_000, 2_000],
-            message: `league.draftStatus never reached active/in_progress within 30s for league ${state.leagueId}`,
+            message: `league.draftStatus never reached in-progress within 30s for league ${state.leagueId}`,
           },
         )
-        .toMatch(/^(active|in_progress)$/);
+        .toBe('in-progress');
 
       await page.reload();
       await page.waitForLoadState('load');
