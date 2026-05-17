@@ -47,10 +47,16 @@ export class DraftPage {
     this.pickTimer = page.getByTestId('pick-timer');
   }
 
-  /** Navigate to a league's draft board. */
+  /**
+   * Navigate to a league's draft board and wait for it to render.
+   *
+   * `networkidle` is unreliable here: the draft route opens a WebSocket and
+   * fires Apollo subscriptions that may never reach idle. Gate on the
+   * `draft-board` test id instead — Playwright auto-retries until it appears.
+   */
   async goto(leagueId: number) {
     await this.page.goto(`/baseball/league/${leagueId}/draft`);
-    await this.page.waitForLoadState('networkidle');
+    await expect(this.draftBoard).toBeVisible({ timeout: 30000 });
   }
 
   /** Assert the draft board is loaded and visible. */
@@ -58,9 +64,17 @@ export class DraftPage {
     await expect(this.draftBoard).toBeVisible({ timeout: 15000 });
   }
 
-  /** Search for a player in the draft pool. */
+  /**
+   * Type a search term into the draft player-pool search input.
+   *
+   * The shared draft hook debounces the search by 350ms before filtering the
+   * already-loaded player pool (no network request fires). Callers should
+   * follow this with an explicit assertion against the expected filtered
+   * result (e.g. `expect(playerPool).toContainText(name)`) — that assertion
+   * is the deterministic signal that the debounce flushed.
+   */
   async searchPlayer(name: string) {
     await this.playerSearch.fill(name);
-    await this.page.waitForTimeout(500); // debounce
+    await expect(this.playerSearch).toHaveValue(name);
   }
 }

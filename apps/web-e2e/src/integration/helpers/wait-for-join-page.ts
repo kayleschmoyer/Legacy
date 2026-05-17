@@ -128,9 +128,9 @@ export async function waitForJoinPageValidation(
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     // Catch only Playwright TimeoutErrors on each waitFor. Any other error
     // (page/context closed, navigation failure) is re-thrown immediately so it
-    // isn't silently swallowed and retried. Without the catch, a TimeoutError
-    // from waitFor can win the Promise.race against waitForTimeout (both fire
-    // at ~15 s), causing the rejection to bypass the retry loop entirely.
+    // isn't silently swallowed and retried. The 4th racer is a defensive
+    // wall-clock timeout that guarantees an outcome at 15 s even if a locator
+    // wait stalls past its own timeout.
     const outcome = await Promise.race([
       spotsLocator
         .waitFor({ state: 'visible', timeout: 15_000 })
@@ -144,7 +144,9 @@ export async function waitForJoinPageValidation(
         .waitFor({ state: 'visible', timeout: 15_000 })
         .then(() => 'invalid' as const)
         .catch(onlyTimeout),
-      page.waitForTimeout(15_000).then(() => 'timeout' as const),
+      new Promise<'timeout'>((resolve) =>
+        setTimeout(() => resolve('timeout'), 15_000),
+      ),
     ]);
 
     if (outcome === 'success') {
@@ -311,9 +313,15 @@ export async function joinLeagueAsManager(
   // the URL.
   const operationMatcher = /\/graphql\?(?:.*&)?ref=JoinLeagueByCode(?:&|$)/;
   const observedResponses: Response[] = [];
+  // Event-driven wakeup: each matching response resolves the pending wait so
+  // the consumer loop iterates immediately instead of polling on a timer.
+  let notifyNextResponse: (() => void) | null = null;
   const responseListener = (res: Response): void => {
     if (operationMatcher.test(res.url())) {
       observedResponses.push(res);
+      const r = notifyNextResponse;
+      notifyNextResponse = null;
+      r?.();
     }
   };
   page.on('response', responseListener);
@@ -354,7 +362,23 @@ export async function joinLeagueAsManager(
           }
           return { response: res, json: parsed };
         }
-        await page.waitForTimeout(100);
+        // Wait for the next matching response (or a 1s safety wakeup so we
+        // never sleep past the overall deadline). The listener resolves
+        // `notifyNextResponse` as soon as a response arrives.
+        const remaining = deadline - Date.now();
+        if (remaining <= 0) break;
+        const lenBefore = observedResponses.length;
+        await new Promise<void>((resolve) => {
+          notifyNextResponse = resolve;
+          // Close the gap between the inner drain loop and this assignment —
+          // a response that landed in that window already grew the queue.
+          if (observedResponses.length > lenBefore) {
+            resolve();
+            return;
+          }
+          setTimeout(resolve, Math.min(remaining, 1_000));
+        });
+        notifyNextResponse = null;
       }
 
       // Budget exhausted. If we saw at least one UNAUTHENTICATED response,

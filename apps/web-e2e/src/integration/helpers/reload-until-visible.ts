@@ -1,5 +1,10 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 
+/** Plain timer sleep (used for the inter-attempt cooldown — no Playwright frame coupling). */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 interface ReloadUntilVisibleOptions {
   /** Maximum number of reload attempts before letting the final assertion run. */
   attempts?: number;
@@ -43,7 +48,7 @@ export async function reloadUntilVisible(
     await page.reload();
     await page.waitForLoadState('load');
     if (afterReload) await afterReload();
-    await page.waitForTimeout(cooldownMs);
+    await sleep(cooldownMs);
   }
   await expect(locator).toBeVisible({ timeout: finalTimeoutMs });
 }

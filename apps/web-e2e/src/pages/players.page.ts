@@ -77,22 +77,37 @@ export class PlayersPage {
     );
   }
 
-  /** Navigate to the player stats page. */
+  /**
+   * Navigate to the player stats page and wait for it to render.
+   *
+   * `networkidle` was defeated by Apollo polling on this route. Gate on the
+   * page heading instead — Playwright auto-retries until it appears.
+   */
   async gotoStats() {
     await this.page.goto('/players/stats');
-    await this.page.waitForLoadState('networkidle');
+    await expect(this.statsHeading).toBeVisible({ timeout: 30000 });
   }
 
-  /** Navigate to a specific player detail page. */
+  /** Navigate to a specific player detail page and wait for it to render. */
   async gotoDetail(playerId: number) {
     await this.page.goto(`/players/${playerId}`);
-    await this.page.waitForLoadState('networkidle');
+    // The detail route renders a "← Back" button unconditionally (loading,
+    // error, and resolved states all show it); use it as the page-loaded
+    // signal so we don't depend on the modal/h1 having mounted yet.
+    await expect(this.page.getByRole('button', { name: /back/i })).toBeVisible({
+      timeout: 30000,
+    });
   }
 
-  /** Navigate to the player comparison page. */
+  /** Navigate to the player comparison page and wait for it to render. */
   async gotoCompare() {
     await this.page.goto('/players/compare');
-    await this.page.waitForLoadState('networkidle');
+    // The comparison page renders the "Compare up to four." headline when the
+    // user is authenticated; if not, it renders a sign-in gate that also
+    // includes "compare". Match the shared prefix.
+    await expect(
+      this.page.getByRole('heading', { name: /compare/i }).first(),
+    ).toBeVisible({ timeout: 30000 });
   }
 
   /** Assert the stats page has loaded. */
@@ -101,10 +116,18 @@ export class PlayersPage {
     await expect(this.searchInput).toBeVisible();
   }
 
-  /** Search for a player by name. */
+  /**
+   * Type a search term into the player-stats search input.
+   *
+   * The page debounces the search before re-issuing the stats GraphQL query.
+   * Callers should follow this with an explicit assertion (e.g.
+   * `expect(playerRows.first()).toContainText(name)`) — that assertion is
+   * the deterministic signal that the debounce flushed and the result
+   * applied.
+   */
   async searchPlayer(name: string) {
     await this.searchInput.fill(name);
-    await this.page.waitForTimeout(1000); // debounced search
+    await expect(this.searchInput).toHaveValue(name);
   }
 
   /** Wait for player data rows to appear, skip test if none render. */

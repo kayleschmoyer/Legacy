@@ -32,6 +32,25 @@ const ls4458SpecRules = [
   },
 ];
 
+// LS-4456 ban hard sleeps and `networkidle` waits from low-level page objects
+// and helpers. `page.waitForTimeout` bakes flake into every caller; Playwright
+// officially discourages `waitForLoadState('networkidle')` and Apollo polling /
+// WebSocket heartbeats defeat it on most routes.
+const ls4456PageObjectRules = [
+  {
+    selector:
+      "CallExpression[callee.type='MemberExpression'][callee.property.name='waitForTimeout']",
+    message:
+      'LS-4456: page.waitForTimeout is banned in page objects and helpers — it bakes flake into every caller. Use expect(testid).toBeVisible(), page.waitForResponse(operationName), or expect.poll on a stable signal.',
+  },
+  {
+    selector:
+      "CallExpression[callee.type='MemberExpression'][callee.property.name='waitForLoadState'][arguments.0.value='networkidle']",
+    message:
+      "LS-4456: waitForLoadState('networkidle') is banned in page objects and helpers — Playwright officially discourages it and Apollo polling/WebSockets defeat it. Gate on a visible test id instead.",
+  },
+];
+
 const ls4461IntegrationRules = [
   {
     selector:
@@ -105,6 +124,18 @@ module.exports = {
       files: ['src/tests/**/*.spec.ts'],
       rules: {
         'no-restricted-syntax': ['error', ...ls4458SpecRules],
+      },
+    },
+    {
+      // LS-4456 page objects + helpers: ban hard sleeps and `networkidle`.
+      // Disjoint from the integration/hermetic spec overrides above —
+      // `pages/**` and `**/helpers/**` do not overlap with `tests/`,
+      // `fixtures/`, or `src/integration/*.ts`, so the legacy-config
+      // "last-override-wins" replacement of `no-restricted-syntax` does not
+      // affect those suites.
+      files: ['src/pages/**/*.ts', 'src/**/helpers/**/*.ts'],
+      rules: {
+        'no-restricted-syntax': ['error', ...ls4456PageObjectRules],
       },
     },
   ],

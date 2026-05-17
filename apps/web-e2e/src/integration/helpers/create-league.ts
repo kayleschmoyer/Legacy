@@ -6,6 +6,11 @@ export interface CreateLeagueResult {
   inviteCode: string;
 }
 
+/** Plain timer sleep (used for retry backoffs — no Playwright frame coupling). */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 /**
  * Create a league via the browser UI with built-in retry and extended timeout.
  *
@@ -66,7 +71,7 @@ export async function createLeagueViaUI(
     // If the mutation response failed at the network level, retry or fail
     if (!response) {
       if (attempt < maxAttempts) {
-        await page.waitForTimeout(2_000 * attempt);
+        await sleep(2_000 * attempt);
         continue;
       }
     }
@@ -74,7 +79,7 @@ export async function createLeagueViaUI(
     // Fail immediately on HTTP-level errors — waiting for a redirect is futile
     if (response && !response.ok()) {
       if (attempt < maxAttempts) {
-        await page.waitForTimeout(2_000 * attempt);
+        await sleep(2_000 * attempt);
         continue;
       }
       const statusText = await response
@@ -137,7 +142,7 @@ export async function createLeagueViaUI(
             `Page URL: ${page.url()}`,
         );
       }
-      await page.waitForTimeout(2_000 * attempt);
+      await sleep(2_000 * attempt);
     }
   }
 

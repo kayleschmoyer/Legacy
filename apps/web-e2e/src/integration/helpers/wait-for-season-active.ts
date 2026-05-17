@@ -65,19 +65,31 @@ export async function waitForSeasonActive(
       .toMatch(/^(active|completed)$/);
 
     await page.goto(commissionerUrl);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
+    // Backend already reports active/completed (gated above) — the badge is the
+    // last paint to land; auto-retrying visibility absorbs Apollo round-trip.
     await expect(seasonActive).toBeVisible({ timeout: 30_000 });
     return;
   }
 
-  // Legacy fallback: UI-polling loop (kept for unmigrated callers).
-  const deadline = Date.now() + deadlineMs;
-  while (Date.now() < deadline) {
-    if (await seasonActive.isVisible().catch(() => false)) break;
-    await page.waitForTimeout(5_000);
-    await page.goto(commissionerUrl);
-    await page.waitForLoadState('networkidle');
-  }
+  // Legacy fallback: UI-polling loop (kept for unmigrated callers). Use
+  // `expect.poll` to drive the re-navigation loop — each tick re-enters the
+  // commissioner page and re-checks the badge until the overall deadline.
+  await expect
+    .poll(
+      async () => {
+        if (await seasonActive.isVisible().catch(() => false)) return true;
+        await page.goto(commissionerUrl);
+        await page.waitForLoadState('domcontentloaded');
+        return seasonActive.isVisible().catch(() => false);
+      },
+      {
+        timeout: deadlineMs,
+        intervals: [5_000],
+        message: `Season Active badge never appeared within ${deadlineMs}ms (legacy UI-polling path)`,
+      },
+    )
+    .toBe(true);
 
   await expect(seasonActive).toBeVisible({ timeout: 15_000 });
 }

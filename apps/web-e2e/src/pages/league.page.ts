@@ -118,16 +118,26 @@ export class LeaguePage {
     await this.page.waitForLoadState('domcontentloaded');
   }
 
-  /** Navigate to a league detail page by ID. */
+  /**
+   * Navigate to a league detail page by ID and wait for the title.
+   *
+   * `networkidle` was defeated by the league activity/chat long-poll queries.
+   * Gate on the `league-title` test id instead.
+   */
   async gotoDetail(leagueId: number) {
     await this.page.goto(`/baseball/league/${leagueId}`);
-    await this.page.waitForLoadState('networkidle');
+    await expect(this.leagueTitle).toBeVisible({ timeout: 30000 });
   }
 
-  /** Navigate to the league discovery page. */
+  /**
+   * Navigate to the league discovery page and wait for the heading.
+   *
+   * `networkidle` was defeated by background polling. Gate on the discovery
+   * heading instead.
+   */
   async gotoDiscovery() {
     await this.page.goto('/baseball/leagues');
-    await this.page.waitForLoadState('networkidle');
+    await expect(this.discoveryHeading).toBeVisible({ timeout: 30000 });
   }
 
   /** Navigate to the join-by-code page (optionally with a deep-link code). */
