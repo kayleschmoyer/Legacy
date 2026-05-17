@@ -440,3 +440,122 @@ describe('EliteDraftBoardScreen — paused overlay', () => {
     expect((btn as HTMLButtonElement).disabled).toBe(true);
   });
 });
+
+// Regression gate: LS-4449 (someone-else's pick celebration covering Draft Now)
+// and LS-4485 (own-pick celebration covering back-to-back snake turn).
+// When isMyPick is true and an announcement for a *prior* pick is still
+// on-screen, the position:fixed z-index:9999 overlay blocks both real-user
+// clicks and Playwright force-clicks on the new Draft Now button. The screen
+// dismisses any such stale announcement immediately.
+describe('EliteDraftBoardScreen — stale pick announcement dismissal (LS-4449/LS-4485)', () => {
+  function pickAt(overall: number, teamId = 1) {
+    return {
+      isComplete: false,
+      draftId: 42,
+      teamId,
+      round: Math.ceil(overall / 4),
+      pickNumber: ((overall - 1) % 4) + 1,
+      overallPick: overall,
+    };
+  }
+
+  function announcementFor(pickNumber: number, isMyPick: boolean) {
+    return {
+      player: { name: 'Test Player' },
+      pickNumber,
+      round: Math.ceil(pickNumber / 4),
+      roundPickNumber: ((pickNumber - 1) % 4) + 1,
+      isMyPick,
+      isAuto: false,
+    };
+  }
+
+  it("dismisses another manager's announcement when it becomes the user's turn (LS-4449)", () => {
+    const dismissAnnouncement = jest.fn();
+    mockUseDraftUIState.mockReturnValue(
+      makeBaseUI({
+        announcement: announcementFor(4, /* isMyPick */ false),
+        dismissAnnouncement,
+      }),
+    );
+    mockUseDraftQueries.mockReturnValue(
+      makeBaseQueries({
+        myTeamId: 1,
+        currentPickTeamId: 1,
+        currentPickInfo: pickAt(5, 1),
+      }),
+    );
+
+    render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    expect(dismissAnnouncement).toHaveBeenCalledTimes(1);
+  });
+
+  it("dismisses the user's own prior announcement on a back-to-back snake turn (LS-4485)", () => {
+    // Snake draft, 4 teams, user at position 1: overall pick 8 = end of
+    // round 2, overall pick 9 = start of round 3 — both belong to the user.
+    // The announcement for pick 8 (isMyPick=true) would otherwise stay on
+    // screen for 3.6s and cover the new Draft Now button for pick 9.
+    const dismissAnnouncement = jest.fn();
+    mockUseDraftUIState.mockReturnValue(
+      makeBaseUI({
+        announcement: announcementFor(8, /* isMyPick */ true),
+        dismissAnnouncement,
+      }),
+    );
+    mockUseDraftQueries.mockReturnValue(
+      makeBaseQueries({
+        myTeamId: 1,
+        currentPickTeamId: 1,
+        currentPickInfo: pickAt(9, 1),
+      }),
+    );
+
+    render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    expect(dismissAnnouncement).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not dismiss the user's own announcement when their turn has just ended", () => {
+    // Right after the user makes a non-back-to-back pick: the announcement
+    // fires with isMyPick=true, but currentPickInfo has already advanced to
+    // the next pick which belongs to a different team. The user should keep
+    // seeing their celebration for the full 3.6s — no dismissal.
+    const dismissAnnouncement = jest.fn();
+    mockUseDraftUIState.mockReturnValue(
+      makeBaseUI({
+        announcement: announcementFor(2, /* isMyPick */ true),
+        dismissAnnouncement,
+      }),
+    );
+    mockUseDraftQueries.mockReturnValue(
+      makeBaseQueries({
+        myTeamId: 1,
+        currentPickTeamId: 2, // next pick belongs to a different team
+        currentPickInfo: pickAt(3, 2),
+      }),
+    );
+
+    render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    expect(dismissAnnouncement).not.toHaveBeenCalled();
+  });
+
+  it('does not dismiss when no announcement is on screen', () => {
+    const dismissAnnouncement = jest.fn();
+    mockUseDraftUIState.mockReturnValue(
+      makeBaseUI({ announcement: null, dismissAnnouncement }),
+    );
+    mockUseDraftQueries.mockReturnValue(
+      makeBaseQueries({
+        myTeamId: 1,
+        currentPickTeamId: 1,
+        currentPickInfo: pickAt(5, 1),
+      }),
+    );
+
+    render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    expect(dismissAnnouncement).not.toHaveBeenCalled();
+  });
+});

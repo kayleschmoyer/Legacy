@@ -75,19 +75,40 @@ export function EliteDraftBoardScreen({
     !queries.currentPickInfo.isComplete,
   );
 
-  // LS-4449: when it becomes the user's turn while another manager's pick
-  // announcement is still on screen, dismiss it immediately so the next
-  // drafter never has to wait for a 3.6s celebration overlay (the
-  // position:fixed z-index:9999 backdrop covers the player grid and
-  // prevents both real-user clicks and Playwright force-clicks on the
-  // Draft Now button). Announcements for the user's own pick (announcement.
-  // isMyPick=true) are left alone so the picker still sees their result.
+  // LS-4449 / LS-4485: when it becomes the user's turn while a pick
+  // announcement for an earlier pick is still on screen, dismiss it
+  // immediately so the next drafter never has to wait for a 3.6s
+  // celebration overlay (the position:fixed z-index:9999 backdrop covers
+  // the player grid and prevents both real-user clicks and Playwright
+  // force-clicks on the Draft Now button).
+  //
+  // The dismissal fires whenever the announcement is for a strictly older
+  // pick than the current pick — i.e. announcement.pickNumber <
+  // currentPickInfo.overallPick. That naturally covers two scenarios:
+  //   1. (LS-4449) someone else picked and now it is the user's turn —
+  //      announcement.isMyPick=false, but the dismissal also handles the
+  //      back-to-back case where
+  //   2. (LS-4485) the user picked the last slot of one round and the
+  //      snake turn-around hands them the first slot of the next round —
+  //      announcement.isMyPick=true for the previous pick, but it is now
+  //      a *new* (later) pick that is theirs, so the celebration would
+  //      otherwise block their own Draft Now button.
+  //
+  // The picker still sees their own celebration for the full 3.6s in the
+  // normal (non-back-to-back) case: after a self-pick, isMyPick flips to
+  // false on the next poll and the condition below short-circuits.
   const { announcement: currentAnnouncement, dismissAnnouncement } = ui;
+  const currentOverallPick = queries.currentPickInfo?.overallPick;
   useEffect(() => {
-    if (isMyPick && currentAnnouncement && !currentAnnouncement.isMyPick) {
+    if (
+      isMyPick &&
+      currentAnnouncement &&
+      currentOverallPick != null &&
+      currentAnnouncement.pickNumber < currentOverallPick
+    ) {
       dismissAnnouncement();
     }
-  }, [isMyPick, currentAnnouncement, dismissAnnouncement]);
+  }, [isMyPick, currentAnnouncement, currentOverallPick, dismissAnnouncement]);
 
   const playerData = usePlayerData({
     availablePlayers: queries.availablePlayers,
