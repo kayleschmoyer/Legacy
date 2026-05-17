@@ -268,6 +268,8 @@ Detailed how-to docs live in `.agents/skills/<name>/SKILL.md`. The `description`
 
 Debugging distributed system failures where test stdout is opaque (e.g. `n/a`, "stuck", "timeout") — use **`cloudwatch-archaeology`** to query CloudWatch logs and the live RDS before chasing client-side hypotheses. See `.agents/skills/cloudwatch-archaeology/SKILL.md`.
 
+**Terraform changes**: any edit under `terraform/**/*.tf` that adds or modifies a resource or data source must load **`terraform-permission-planning`** before pushing. `terraform plan` does not validate IAM; the skill enforces the predict → diff → patch → local-plan-as-CI-role loop so the apply lands in one PR instead of cycling on CI AccessDenied failures. See `.agents/skills/terraform-permission-planning/SKILL.md`.
+
 ## MCP Servers
 
 See `.agents/skills/mcp-first/SKILL.md` for the full server list, per-server tool mapping, and load-order notes. Always prefer MCP tools over equivalent shell commands.
