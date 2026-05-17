@@ -875,28 +875,6 @@ resource "aws_iam_policy" "github_actions_supplemental" {
           "arn:aws:cognito-idp:${local.region}:${local.account_id}:userpool/*"
         ]
       },
-      # ──────────────────────────────────────────────────────────────────
-      # ONE-OFF: orphan IC SSO application cleanup
-      # ──────────────────────────────────────────────────────────────────
-      # The prior LS-4466 design left an aws_ssoadmin_application.mcp_dev
-      # resource in Terraform state (id ssoins-7223ea24ccac901d/apl-
-      # 7223709186cd1f40). It was removed from the .tf config in
-      # PR #3906 but the existing AWS resource still needs to be
-      # described (refresh) and deleted (destroy) by the next apply.
-      # Once that destroy completes and the resource leaves state, this
-      # block can be deleted in a follow-up cleanup PR.
-      {
-        Effect = "Allow"
-        Action = [
-          "sso:DescribeApplication",
-          "sso:DeleteApplication",
-          "sso:ListTagsForResource",
-          "sso:UntagResource"
-        ]
-        Resource = [
-          "arn:aws:sso::${local.account_id}:application/ssoins-7223ea24ccac901d/apl-7223709186cd1f40"
-        ]
-      },
       # DescribeUserPoolDomain on the *domain* uses a different (unscoped)
       # resource shape; AWS requires Resource = "*" for this read.
       {
