@@ -13,6 +13,7 @@ Rules are grouped by category and tiered by severity. **Tier 1** violations are 
 - **NEVER commit to the `main` branch** — all commits must be on a feature branch; working in `D:\code\legacy-sports` with HEAD on `main` is forbidden.
 - **Never embed secrets in tool calls** — never put raw secret values in `Edit`, `Write`, or `Bash` arguments. See `.agents/skills/secrets-handling/SKILL.md`.
 - **One ticket = one worktree = one PR** — never add unrelated changes to an existing branch or worktree. Create a **separate Jira ticket and worktree** for unrelated work.
+- **Never run `aws sso login` (or any other auth-generation command)** — `aws sso login`, `gh auth login`, `acli` interactive login, and any OAuth/device-flow command are **user-only** actions. If `auth_check_all` reports a service as not authenticated, or any tool call returns an auth/expired-token error, **stop immediately**, surface the `hint` verbatim, and prompt the user to re-authenticate in their own terminal and restart the session. Do not shell out to refresh credentials, do not retry the failing call hoping it works, do not fall back to `acli`/raw `curl` to bypass the missing token. See `.agents/skills/credentials/SKILL.md`.
 
 ### Workflow Discipline (Tier 2)
 
