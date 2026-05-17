@@ -1,0 +1,127 @@
+name: "Docs-Only Required Checks"
+
+# LS-4478: branch protection requires the 5 "🚀 CI Pipeline / *" sub-check-runs
+# to register a status before a PR can leave the merge queue. The CI Orchestrator
+# only fires those check-runs on bot-approval / merge_group / workflow_dispatch /
+# ci:run-label events — so a docs-only push that the bot does not re-review (or
+# any other path where the orchestrator does not run for the head SHA) leaves
+# the queue waiting forever on "(not yet registered)".
+#
+# This workflow watches every PR push and, when the diff is docs-only, posts
+# synthetic success check-runs for the 5 required contexts so the queue can
+# proceed. The actual pipeline jobs are still skipped (preserving CI cost
+# savings) because the orchestrator is unchanged.
+#
+# Required-check names are loaded from .github/ruleset.json at runtime so they
+# stay in sync with branch protection. The check-runs are authored by GitHub
+# Actions (integration_id:15368), matching what the ruleset requires.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  checks: write
+
+concurrency:
+  group: docs-only-required-checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  shim:
+    name: "🟢 Docs-Only Required Checks Shim"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Skip drafts and fork PRs (forks can't write checks anyway, and drafts
+    # don't need merge-queue gating).
+    if: >-
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - name: "Checkout Repository"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+          filter: tree:0
+
+      - name: "Compute Changed Files"
+        id: diff
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -eo pipefail
+          if [ -z "$BASE_SHA" ] || [ -z "$HEAD_SHA" ]; then
+            echo "Missing base or head SHA; skipping docs-only shim."
+            echo "changed-files=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # --no-renames: emit old and new paths separately so a rename out of
+          # docs/ into source/ is not silently treated as docs-only.
+          changed=$(git diff --name-only --no-renames "$BASE_SHA" "$HEAD_SHA" || true)
+          {
+            echo "changed-files<<__EOF__"
+            echo "$changed"
+            echo "__EOF__"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: "Decide Docs-Only & Post Success Check-Runs"
+        if: steps.diff.outputs.changed-files != ''
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          CHANGED_FILES: ${{ steps.diff.outputs.changed-files }}
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            const { isDocsOnly, parseChangedFiles } = await import(
+              `${process.env.GITHUB_WORKSPACE}/.github/scripts/is-docs-only.mjs`
+            );
+
+            const changedFiles = parseChangedFiles(process.env.CHANGED_FILES);
+            core.info(`Changed files (${changedFiles.length}):\n${changedFiles.join('\n')}`);
+
+            if (!isDocsOnly(changedFiles)) {
+              core.info('Diff is not docs-only — leaving required CI Pipeline checks to the normal pipeline.');
+              return;
+            }
+
+            // Load the required check names from ruleset.json so this stays in
+            // sync with branch protection. If the file is unreadable, fail
+            // loudly rather than fabricating an incomplete green set.
+            const rulesetPath = path.join(process.env.GITHUB_WORKSPACE, '.github', 'ruleset.json');
+            const ruleset = JSON.parse(fs.readFileSync(rulesetPath, 'utf8'));
+            const statusRule = (ruleset.rules ?? []).find(
+              (r) => r.type === 'required_status_checks' && !r._staged,
+            );
+            const contexts = (statusRule?.parameters?.required_status_checks ?? [])
+              .filter((c) => c._calledWorkflow && !c._staged)
+              .map((c) => c.context);
+
+            if (contexts.length === 0) {
+              throw new Error('No _calledWorkflow contexts found in ruleset.json — refusing to post empty shim set.');
+            }
+
+            const sha = context.payload.pull_request.head.sha;
+            core.info(`Posting success check-runs on ${sha} for: ${contexts.join(', ')}`);
+
+            for (const name of contexts) {
+              await github.rest.checks.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name,
+                head_sha: sha,
+                status: 'completed',
+                conclusion: 'success',
+                output: {
+                  title: 'Skipped (docs-only)',
+                  summary:
+                    'This PR touches only documentation (`docs/**` or `**/*.md`). ' +
+                    'The CI Pipeline was not run for cost savings; this check-run ' +
+                    'is posted by `.github/workflows/docs-only-required-checks.yml` ' +
+                    'so branch protection is satisfied (LS-4478).',
+                },
+              });
+            }
