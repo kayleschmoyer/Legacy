@@ -7,13 +7,22 @@
  *
  * cycle = count(formal reviews authored by the reviewer bot) + 1
  *
- * Two review types are excluded from the count:
+ * Three review types are excluded from the count:
  *  1. Infrastructure-error reviews (posted by postInfraErrorReview when the LLM
  *     API fails). They carry no LLM findings, so treating them as a completed
  *     cycle would cause the C2 validator on the subsequent retry to strip all
  *     real findings as "new issues outside author's changes".
  *  2. DISMISSED reviews — reviews dismissed by "dismiss stale approvals on push"
  *     are no longer relevant to the current diff and must not count toward the cap.
+ *  3. COMMENTED reviews — GitHub automatically materializes a review with
+ *     state=COMMENTED and an empty body each time the bot replies to an inline
+ *     review thread via `POST /pulls/{n}/comments/{id}/replies` (used by
+ *     postReviewThreadReply for FORMAT_ERROR_MESSAGE and similar in-thread
+ *     responses). These are reply-artifact reviews, not real review cycles —
+ *     the bot itself only ever submits REQUEST_CHANGES or APPROVE via
+ *     postRealReview. Counting them caused false cycle-limit arbitrations
+ *     (LS-4474): a single Cycle 1 review followed by two in-thread replies
+ *     to malformed author FIX comments produced cycle=4 → escalation.
  *
  * In shadow mode (T9) the bot posts plain PR comments, not formal reviews, so
  * the counter always returns 1 — correct for the first pass. Once the reviewer
@@ -79,11 +88,31 @@ export function isInfraErrorReview(review) {
 }
 
 /**
+ * Returns true when a review is a GitHub-materialized reply artifact created
+ * by `POST /pulls/{n}/comments/{id}/replies` rather than a real bot review
+ * cycle. Such reviews always have state=COMMENTED and a null/empty body, and
+ * are produced as a side effect of postReviewThreadReply. Excluded from the
+ * cycle count (LS-4474) — the bot only ever submits REQUEST_CHANGES or
+ * APPROVE via postRealReview, so a COMMENTED review from a reviewer-bot login
+ * cannot be a deliberate review cycle.
+ *
+ * @param {{ state?: string | null, body?: string | null }} review
+ * @returns {boolean}
+ */
+export function isThreadReplyArtifactReview(review) {
+  if (review.state !== 'COMMENTED') return false;
+  const body = review.body ?? '';
+  return body.trim() === '';
+}
+
+/**
  * Compute the current review cycle from PR review history.
  *
  * Excluded from the count:
  *  - Infra-error reviews (body matches INFRA_ERROR_MARKER or INFRA_ERROR_REVIEW_PREFIX)
  *  - DISMISSED reviews (dismissed by stale-approval policy on push)
+ *  - Empty-body COMMENTED reviews (GitHub-materialized reply artifacts from
+ *    in-thread replies — see isThreadReplyArtifactReview)
  *
  * @param {Array<{ userLogin: string | null, state?: string | null, body?: string | null }>} reviews  All formal reviews on the PR
  * @param {Set<string>} [botLogins]               Override the bot login set (testing)
@@ -94,7 +123,8 @@ export function computeCycle(reviews, botLogins = REVIEWER_BOT_LOGINS) {
     (r) =>
       botLogins.has(r.userLogin) &&
       r.state !== 'DISMISSED' &&
-      !isInfraErrorReview(r),
+      !isInfraErrorReview(r) &&
+      !isThreadReplyArtifactReview(r),
   ).length;
   return botReviewCount + 1;
 }

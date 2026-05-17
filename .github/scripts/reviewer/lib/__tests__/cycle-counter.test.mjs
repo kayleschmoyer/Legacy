@@ -4,6 +4,7 @@ import {
   computeCycle,
   isEscalationRequired,
   isInfraErrorReview,
+  isThreadReplyArtifactReview,
   isCodeWriterBotAuthor,
   REVIEWER_BOT_LOGINS,
   CODE_WRITER_BOT_LOGIN,
@@ -252,6 +253,121 @@ describe('computeCycle', () => {
     assert.strictEqual(computeCycle(reviews), 2);
   });
 
+  // LS-4474: empty-body COMMENTED reviews are GitHub-materialized artifacts of
+  // postReviewThreadReply (in-thread bot replies) — they must NOT count as
+  // real review cycles, or a single Cycle 1 review + a few format-error
+  // replies will hit cycle=4 and false-trigger arbitration.
+  it('excludes empty-body COMMENTED bot reviews (in-thread reply artifacts, LS-4474)', () => {
+    const reviews = [
+      {
+        userLogin: 'legacy-sports-review-bot[bot]',
+        state: 'COMMENTED',
+        body: '',
+      },
+    ];
+    assert.strictEqual(computeCycle(reviews), 1);
+  });
+
+  it('treats null-body COMMENTED bot reviews as reply artifacts', () => {
+    const reviews = [
+      {
+        userLogin: 'legacy-sports-review-bot[bot]',
+        state: 'COMMENTED',
+        body: null,
+      },
+    ];
+    assert.strictEqual(computeCycle(reviews), 1);
+  });
+
+  // LS-4474 integration scenario: full reset → re-arm → re-review trip.
+  //
+  // Pre-reset state at the moment an admin applied bot:reset-cycle-counter:
+  //   - 1 CHANGES_REQUESTED bot review (the legitimate Cycle 1 review)
+  //   - 2 empty-body COMMENTED bot reviews (GitHub-materialized artifacts of
+  //     in-thread FORMAT_ERROR_MESSAGE replies to malformed FIX comments)
+  //
+  // Post-reset state (after the admin-reset path dismisses dismissable bot
+  // reviews and the run is then cancelled by a `bot:ready-for-review`
+  // re-bounce before it can post a fresh review):
+  //   - 1 DISMISSED bot review (the legitimate Cycle 1, now dismissed)
+  //   - 2 empty-body COMMENTED bot reviews (unchanged — not dismissable)
+  //
+  // The surviving Run B must see cycle=1, NOT cycle=4 — both because the
+  // dismissed real review and the empty-body COMMENTED reply artifacts are
+  // both excluded from the cycle count.
+  it('reset → re-arm → no-new-findings: cycle is 1 after dismissal even when reset run was cancelled (LS-4474)', () => {
+    const realBody = '## Changes Required\n\nFinding from cycle 1.';
+    const postResetReviews = [
+      {
+        userLogin: 'legacy-sports-review-bot[bot]',
+        state: 'DISMISSED',
+        body: realBody,
+      },
+      {
+        userLogin: 'legacy-sports-review-bot[bot]',
+        state: 'COMMENTED',
+        body: '',
+      },
+      {
+        userLogin: 'legacy-sports-review-bot[bot]',
+        state: 'COMMENTED',
+        body: '',
+      },
+    ];
+    assert.strictEqual(computeCycle(postResetReviews), 1);
+    assert.strictEqual(
+      isEscalationRequired(computeCycle(postResetReviews)),
+      false,
+    );
+  });
+
+  it('reproduces the LS-4474 scenario: 1 CHANGES_REQUESTED + 2 empty COMMENTED → cycle 2, not cycle 4', () => {
+    const realBody = '## Changes Required\n\nFinding.';
+    const reviews = [
+      {
+        userLogin: 'legacy-sports-review-bot[bot]',
+        state: 'CHANGES_REQUESTED',
+        body: realBody,
+      },
+      {
+        userLogin: 'legacy-sports-review-bot[bot]',
+        state: 'COMMENTED',
+        body: '',
+      },
+      {
+        userLogin: 'legacy-sports-review-bot[bot]',
+        state: 'COMMENTED',
+        body: '',
+      },
+    ];
+    assert.strictEqual(computeCycle(reviews), 2);
+    assert.strictEqual(isEscalationRequired(computeCycle(reviews)), false);
+  });
+
+  it('does NOT exclude COMMENTED bot reviews that have a non-empty body', () => {
+    // Defensive: future code could theoretically post a COMMENTED review with
+    // content; only the *empty-body* artifact form is excluded.
+    const reviews = [
+      {
+        userLogin: 'legacy-sports-review-bot[bot]',
+        state: 'COMMENTED',
+        body: '## Note\n\nSome non-trivial content.',
+      },
+    ];
+    assert.strictEqual(computeCycle(reviews), 2);
+  });
+
+  it('treats whitespace-only COMMENTED bot reviews as reply artifacts', () => {
+    const reviews = [
+      {
+        userLogin: 'legacy-sports-review-bot[bot]',
+        state: 'COMMENTED',
+        body: '   \n\t  \n',
+      },
+    ];
+    assert.strictEqual(computeCycle(reviews), 1);
+  });
+
   it('excludes new-style infra-error review identified by INFRA_ERROR_MARKER substring', () => {
     const body =
       INFRA_ERROR_REVIEW_PREFIX +
@@ -320,6 +436,57 @@ describe('INFRA_ERROR_MARKER', () => {
   it('is contained in the HTML comment embedded in new infra-error review bodies', () => {
     const htmlComment = '<!-- bot-infra-failure: true -->';
     assert.ok(htmlComment.includes(INFRA_ERROR_MARKER));
+  });
+});
+
+describe('isThreadReplyArtifactReview', () => {
+  it('returns true for empty-body COMMENTED reviews (the artifact form)', () => {
+    assert.strictEqual(
+      isThreadReplyArtifactReview({ state: 'COMMENTED', body: '' }),
+      true,
+    );
+  });
+
+  it('returns true for null-body COMMENTED reviews', () => {
+    assert.strictEqual(
+      isThreadReplyArtifactReview({ state: 'COMMENTED', body: null }),
+      true,
+    );
+  });
+
+  it('returns true for whitespace-only-body COMMENTED reviews', () => {
+    assert.strictEqual(
+      isThreadReplyArtifactReview({ state: 'COMMENTED', body: '   \n  ' }),
+      true,
+    );
+  });
+
+  it('returns false for COMMENTED reviews with real content', () => {
+    assert.strictEqual(
+      isThreadReplyArtifactReview({ state: 'COMMENTED', body: 'Real text' }),
+      false,
+    );
+  });
+
+  it('returns false for CHANGES_REQUESTED reviews regardless of body', () => {
+    assert.strictEqual(
+      isThreadReplyArtifactReview({ state: 'CHANGES_REQUESTED', body: '' }),
+      false,
+    );
+  });
+
+  it('returns false for APPROVED reviews regardless of body', () => {
+    assert.strictEqual(
+      isThreadReplyArtifactReview({ state: 'APPROVED', body: null }),
+      false,
+    );
+  });
+
+  it('returns false for DISMISSED reviews (handled by separate exclusion)', () => {
+    assert.strictEqual(
+      isThreadReplyArtifactReview({ state: 'DISMISSED', body: '' }),
+      false,
+    );
   });
 });
 

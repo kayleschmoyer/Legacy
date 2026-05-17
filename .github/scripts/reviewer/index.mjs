@@ -5,6 +5,7 @@ import {
   setCommitStatus,
   isRepoAdmin,
   findLatestLabelActor,
+  dismissReview,
 } from './lib/github.mjs';
 import { cleanupOperationalLabels } from './lib/labels.mjs';
 import {
@@ -35,6 +36,7 @@ import {
   computeCycle,
   isEscalationRequired,
   isInfraErrorReview,
+  isThreadReplyArtifactReview,
   REVIEWER_BOT_LOGINS,
 } from './lib/cycle-counter.mjs';
 import {
@@ -188,6 +190,17 @@ async function main() {
   const cycleExcludedInfra = botReviewsAll.filter(
     (r) => r.state !== 'DISMISSED' && isInfraErrorReview(r),
   ).length;
+  const cycleExcludedThreadReplyArtifact = botReviewsAll.filter(
+    (r) =>
+      r.state !== 'DISMISSED' &&
+      !isInfraErrorReview(r) &&
+      isThreadReplyArtifactReview(r),
+  ).length;
+  if (cycleExcludedThreadReplyArtifact > 0) {
+    process.stdout.write(
+      `[reviewer] Excluded ${cycleExcludedThreadReplyArtifact} thread-reply artifact review(s) from cycle counter (LS-4474)\n`,
+    );
+  }
 
   // --- Admin cycle reset (bot:reset-cycle-counter label) ---
   // CYCLE_RESET_SENDER is set by the workflow when triggered by this label.
@@ -211,21 +224,45 @@ async function main() {
   if (cycleResetSender) {
     try {
       if (isRepoAdmin(cycleResetSender)) {
-        const priorBotReviewCount = allReviews.filter((r) =>
+        const priorBotReviews = allReviews.filter((r) =>
           REVIEWER_BOT_LOGINS.has(r.userLogin),
-        ).length;
+        );
+        // Dismiss prior dismissable bot reviews FIRST so the reset persists
+        // even if this run is cancelled by a sibling `bot:ready-for-review`
+        // event before it can remove the label or post a fresh review
+        // (LS-4474). Dismissal state is server-side and survives cancellation,
+        // and the cycle counter already excludes DISMISSED reviews — so the
+        // next run will compute cycle=1 from review history alone.
+        const dismissibleStates = new Set(['CHANGES_REQUESTED', 'APPROVED']);
+        const reviewsToDismiss = priorBotReviews.filter(
+          (r) =>
+            r.state !== 'DISMISSED' &&
+            dismissibleStates.has(r.state) &&
+            !isInfraErrorReview(r),
+        );
+        for (const r of reviewsToDismiss) {
+          dismissReview(
+            prNumber,
+            r.id,
+            `Superseded by cycle-counter reset by ${cycleResetSender}`,
+          );
+          // Mark in-memory state so subsequent logic in this run also treats
+          // these as dismissed (in case the GH API hasn't propagated yet).
+          r.state = 'DISMISSED';
+        }
         const now = new Date().toISOString();
         postEscalationComment(
           prNumber,
           `> [!NOTE]\n> Cycle counter reset by \`${cycleResetSender}\` at ${now}. ` +
-            `Prior ${priorBotReviewCount} bot review(s) excluded from counter. ` +
+            `Prior ${priorBotReviews.length} bot review(s) excluded from counter ` +
+            `(${reviewsToDismiss.length} dismissed). ` +
             `Bot will treat next review as Cycle 1.`,
         );
         removeLabel(prNumber, CYCLE_RESET_LABEL);
         cycleResetByAdmin = true;
         cycle = 1;
         process.stdout.write(
-          `[reviewer] Cycle counter reset by admin '${cycleResetSender}'; prior ${priorBotReviewCount} review(s) excluded\n`,
+          `[reviewer] Cycle counter reset by admin '${cycleResetSender}'; prior ${priorBotReviews.length} review(s) excluded (${reviewsToDismiss.length} dismissed)\n`,
         );
       } else {
         postEscalationComment(
@@ -252,8 +289,12 @@ async function main() {
         .filter((r) => REVIEWER_BOT_LOGINS.has(r.userLogin))
         .slice()
         .sort((a, b) => (a.submittedAt < b.submittedAt ? -1 : 1))
-        .findLast((r) => r.state !== 'DISMISSED' && !isInfraErrorReview(r)) ??
-      null;
+        .findLast(
+          (r) =>
+            r.state !== 'DISMISSED' &&
+            !isInfraErrorReview(r) &&
+            !isThreadReplyArtifactReview(r),
+        ) ?? null;
     await escalateToHumanArbitration(
       prNumber,
       sha,
@@ -276,7 +317,10 @@ async function main() {
     .sort((a, b) => (a.submittedAt < b.submittedAt ? -1 : 1));
   lastBotReview =
     botReviews.findLast(
-      (r) => r.state !== 'DISMISSED' && !isInfraErrorReview(r),
+      (r) =>
+        r.state !== 'DISMISSED' &&
+        !isInfraErrorReview(r) &&
+        !isThreadReplyArtifactReview(r),
     ) ?? null;
   const priorBotReviewBody = lastBotReview?.body ?? '';
   priorTitles = parseTitlesFromReviewBody(priorBotReviewBody);
@@ -556,6 +600,7 @@ async function main() {
           cycleCounterExclusions: {
             infra_failure: cycleExcludedInfra,
             dismissed: cycleExcludedDismissed,
+            thread_reply_artifact: cycleExcludedThreadReplyArtifact,
             admin_reset: cycleResetByAdmin,
           },
         });
@@ -618,6 +663,7 @@ async function main() {
           cycleCounterExclusions: {
             infra_failure: cycleExcludedInfra,
             dismissed: cycleExcludedDismissed,
+            thread_reply_artifact: cycleExcludedThreadReplyArtifact,
             admin_reset: cycleResetByAdmin,
           },
         });
@@ -796,6 +842,7 @@ async function main() {
       cycleCounterExclusions: {
         infra_failure: cycleExcludedInfra,
         dismissed: cycleExcludedDismissed,
+        thread_reply_artifact: cycleExcludedThreadReplyArtifact,
         admin_reset: cycleResetByAdmin,
       },
     }),

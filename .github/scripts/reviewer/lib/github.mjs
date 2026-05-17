@@ -83,6 +83,43 @@ export function findLatestLabelActor(prNumber, label, exec = execFileSync) {
 }
 
 /**
+ * Dismiss a formal review via the GitHub Reviews API. Only CHANGES_REQUESTED
+ * and APPROVED reviews can be dismissed; the call is a no-op for other states.
+ *
+ * Used by the admin cycle-reset path (LS-4474) to durably mark prior bot
+ * review cycles as superseded — the dismissal state persists across runs even
+ * if the current run is cancelled by `cancel-in-progress` concurrency before
+ * it can remove the `bot:reset-cycle-counter` label or post a fresh review.
+ *
+ * The bot's installation token (GH_TOKEN) authenticates as the reviewer App,
+ * which has permission to dismiss its own reviews.
+ *
+ * @param {number} prNumber
+ * @param {number} reviewId
+ * @param {string} message  Visible dismissal reason
+ */
+export function dismissReview(prNumber, reviewId, message) {
+  try {
+    execFileSync(
+      'gh',
+      [
+        'api',
+        `repos/{owner}/{repo}/pulls/${prNumber}/reviews/${reviewId}/dismissals`,
+        '-X',
+        'PUT',
+        '--input',
+        '-',
+      ],
+      { encoding: 'utf8', input: JSON.stringify({ message }) },
+    );
+  } catch (err) {
+    process.stderr.write(
+      `[reviewer] Failed to dismiss review ${reviewId} on PR #${prNumber}: ${err instanceof Error ? err.message : String(err)}\n`,
+    );
+  }
+}
+
+/**
  * Remove a label from a PR/issue. Silently ignores 404 (label not present).
  *
  * @param {number} prNumber

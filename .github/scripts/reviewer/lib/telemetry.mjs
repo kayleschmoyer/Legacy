@@ -11,9 +11,10 @@ import { spawn } from 'node:child_process';
 
 /**
  * @typedef {object} CycleCounterExclusions
- * @property {number}  infra_failure  - Bot reviews excluded because they are infra-error reviews
- * @property {number}  dismissed      - Bot reviews excluded because their state is DISMISSED
- * @property {boolean} admin_reset    - True when an admin applied bot:reset-cycle-counter this run
+ * @property {number}  infra_failure         - Bot reviews excluded because they are infra-error reviews
+ * @property {number}  dismissed             - Bot reviews excluded because their state is DISMISSED
+ * @property {number}  [thread_reply_artifact] - Bot reviews excluded because they are GitHub-materialized COMMENTED reply artifacts (empty body) created by postReviewThreadReply (LS-4474)
+ * @property {boolean} admin_reset           - True when an admin applied bot:reset-cycle-counter this run
  */
 
 /**
