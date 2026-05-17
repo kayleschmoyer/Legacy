@@ -270,8 +270,13 @@ test.describe
       });
       await expect(saveBtn).toBeEnabled({ timeout: 5000 });
       await saveBtn.click();
-      // Mutation completes when Save returns to its enabled state.
-      await expect(saveBtn).toBeEnabled({ timeout: 10_000 });
+      // Save button is disabled iff `!hasChanges || saving`. handleSave sets
+      // hasChanges=false on success, so the button stays disabled post-save —
+      // it does NOT return to enabled. Waiting for `toBeEnabled` here was a
+      // logic error introduced by LS-4457 and always timed out (LS-4480).
+      // The correct deterministic signal is `toBeDisabled`, matching the
+      // LS-4352 precedent in league-activity-feed-ui.
+      await expect(saveBtn).toBeDisabled({ timeout: 10_000 });
     });
 
     await test.step('Start the draft', async () => {
