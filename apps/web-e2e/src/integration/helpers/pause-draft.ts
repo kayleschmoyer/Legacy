@@ -16,7 +16,7 @@ export async function pauseDraft(
   await graphqlOk(
     apiCommissioner,
     `mutation PauseDraftForTest($leagueId: Int!) {
-      pauseDraft(leagueId: $leagueId) { id status }
+      pauseDraft(leagueId: $leagueId) { id }
     }`,
     { leagueId },
   );
@@ -34,7 +34,7 @@ export async function resumeDraft(
   await graphqlOk(
     apiCommissioner,
     `mutation ResumeDraftForTest($leagueId: Int!) {
-      resumeDraft(leagueId: $leagueId) { id status }
+      resumeDraft(leagueId: $leagueId) { id }
     }`,
     { leagueId },
   );
