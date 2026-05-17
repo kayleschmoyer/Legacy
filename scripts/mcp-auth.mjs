@@ -3,9 +3,10 @@
  * scripts/mcp-auth.mjs
  *
  * Fetches & refreshes Cognito-issued OIDC ID tokens for the MCP HTTP API
- * Gateway. Replaces the local signing proxy (tools/mcp/signing-proxy) for
- * developer machines. Cloud agents continue to use Lambda Function URLs +
- * SigV4.
+ * Gateway. This is the auth path for developer machines (historically a
+ * local SigV4 signing proxy under tools/mcp/signing-proxy filled that role;
+ * that package was removed in LS-4472). Cloud agents continue to use
+ * Lambda Function URLs + SigV4.
  *
  * Prerequisites:
  *   1. terraform apply in terraform/main (creates the Cognito user pool,

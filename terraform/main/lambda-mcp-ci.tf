@@ -1,7 +1,8 @@
 # MCP CI Server Lambda
-# Hosts the tools/mcp/ci-server as an HTTP API Lambda so cloud agents and
-# the local signing proxy can reach it. Developers access it via the HTTP API
-# Gateway (lambda-mcp-api-gateway.tf) with an IAM IC OIDC JWT.
+# Hosts the tools/mcp/ci-server as an HTTP API Lambda. Cloud agents call the
+# Lambda Function URL directly with SigV4 (via the GitHub Actions OIDC role).
+# Developers access it via the HTTP API Gateway (lambda-mcp-api-gateway.tf)
+# with a Cognito-issued OIDC JWT.
 # Shares the mcp_github_token secret with the GitHub MCP Lambda.
 
 # ── IAM role ──────────────────────────────────────────────────────────────────

@@ -17,7 +17,7 @@ description: Per-server MCP-first operation mapping — which MCP tools to prefe
 | `legacy-sports-nx`          | Nx project discovery, affected analysis, target execution                                                      |
 | `legacy-sports-jira`        | Ticket CRUD, transitions, blocker checks                                                                       |
 | `legacy-sports-db`          | Database queries, migrations, schema generation                                                                |
-| `legacy-sports-ci`          | CI log queries, workflow reruns (hosted via signing proxy on localhost:4197)                                   |
+| `legacy-sports-ci`          | CI log queries, workflow reruns (hosted on AWS Lambda; called via Cognito-authenticated HTTP API Gateway)      |
 | `legacy-sports-ci-local`    | Session audit tools: `ci_audit_session_bash`, `ci_find_session`, `ci_session_stats` (stdio, reads local files) |
 | `legacy-sports-aws`         | CloudWatch log tailing, AWS SSO status checks                                                                  |
 | `legacy-sports-browser`     | Dev server lifecycle, headless screenshots, GitHub image upload                                                |

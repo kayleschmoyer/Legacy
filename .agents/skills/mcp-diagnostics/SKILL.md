@@ -23,7 +23,7 @@ Run these checks in order. Stop at the first failure and apply the recovery step
 
 ### Check 1 — `node_modules/.bin/tsx`
 
-7 of the 10 MCP servers are stdio and launch via `mcp-bootstrap.mjs` which runs `node --import tsx ...`. If `node_modules` is missing or broken, all 7 stdio servers silently time out during startup — Claude Code surfaces no error. The remaining 3 (jira, github, ci) connect via Streamable HTTP through the local signing proxy on `localhost:4195-4197` and do not need `tsx`.
+7 of the 10 MCP servers are stdio and launch via `mcp-bootstrap.mjs` which runs `node --import tsx ...`. If `node_modules` is missing or broken, all 7 stdio servers silently time out during startup — Claude Code surfaces no error. The remaining 3 (jira, github, ci) connect via Streamable HTTP to the MCP HTTP API Gateways at `${MCP_JIRA_URL}`, `${MCP_GITHUB_URL}`, `${MCP_CI_URL}` with a Cognito bearer token, and do not need `tsx`.
 
 Use `-f` (not `-x`) — pnpm stores binaries as symlinks; `-f` follows symlinks and fails for both absent files and broken symlinks, while `-x` on a broken symlink returns false but doesn't distinguish from truly absent.
 
@@ -68,19 +68,19 @@ done
 - **Any MISSING** → a server's source was removed from the working tree. Run `git status` to check
   for missing tracked files; `git checkout HEAD -- tools/mcp/<srv>/src/index.ts` to restore.
 
-### Check 5 — signing proxy (localhost:4195-4197)
+### Check 5 — MCP HTTP API Gateway auth (`.env.local`)
 
-The 3 URL-based servers (jira: 4195, github: 4196, ci: 4197) connect via Streamable HTTP through the local signing proxy. If it is not running, they fail silently — no `[MCP WARNING]` is emitted (check-mcp-servers.sh probes these ports via `/dev/tcp`).
+The 3 URL-based servers (jira, github, ci) connect via Streamable HTTP to the MCP HTTP API Gateways with a Cognito-issued bearer token. If `MCP_AUTH_TOKEN` is expired or the `MCP_*_URL` values are missing, the servers fail silently at request time.
 
 ```bash
-for PORT in 4195 4196 4197; do
-  (echo "" > /dev/tcp/localhost/$PORT) 2>/dev/null && echo "port $PORT: OK" || echo "port $PORT: NOT LISTENING"
+for VAR in MCP_JIRA_URL MCP_GITHUB_URL MCP_CI_URL MCP_AUTH_TOKEN MCP_AUTH_EXPIRES_AT; do
+  grep -q "^${VAR}=" .env.local && echo "${VAR}: set" || echo "${VAR}: MISSING"
 done
 ```
 
-- **All OK** → proceed to Check 6
-- **Any NOT LISTENING** → start the proxy: `pnpm exec nx run mcp-signing-proxy:start`, then restart the session.
-  Also verify `MCP_JIRA_URL`, `MCP_GITHUB_URL`, `MCP_CI_URL` are set in `.env.local`.
+- **All set + `MCP_AUTH_EXPIRES_AT` in the future** → proceed to Check 6
+- **`MCP_AUTH_TOKEN` expired** → run `node scripts/mcp-auth.mjs` to refresh.
+- **`MCP_AUTH_TOKEN` or `MCP_*_URL` missing** → run `node scripts/mcp-auth.mjs --setup` to bootstrap from scratch, then restart the session.
 
 ### Check 6 — `MCP_TIMEOUT` is ≥ 10 000 ms
 

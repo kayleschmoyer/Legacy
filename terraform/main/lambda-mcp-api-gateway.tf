@@ -1,8 +1,10 @@
 # MCP HTTP API Gateway — developer access via Cognito-issued JWTs
 #
-# Replaces the local signing proxy (tools/mcp/signing-proxy) for developer
-# machines. Each MCP server gets its own HTTP API so Claude Code can point
-# directly at the invoke URL with no path-prefix stripping required.
+# This is the developer-machine auth path for the hosted MCP servers
+# (historically a local SigV4 signing proxy at tools/mcp/signing-proxy
+# filled that role; that package was removed in LS-4472). Each MCP server
+# gets its own HTTP API so Claude Code can point directly at the invoke URL
+# with no path-prefix stripping required.
 #
 # Setup order (one-time per environment, run once by any admin):
 #   1. terraform apply  (creates Cognito user pool + JWT authorizers)

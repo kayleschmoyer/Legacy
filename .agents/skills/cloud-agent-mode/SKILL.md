@@ -24,9 +24,9 @@ The "cloud agent" label covers three distinct configurations with very different
 | Built-in `Glob` / `Grep`                       | ❌ verified absent (LS-4358 + reprobed)                  | ❌ verified absent (LS-4358 + reprobed)            | ✅ assumed (not re-verified)                            |
 | Atlassian plugin (`mcp__claude_ai_*`)          | ✅                                                       | ✅                                                 | ❌                                                      |
 | Built-in GitHub (`mcp__github__*`)             | ✅                                                       | ✅                                                 | ❌                                                      |
-| Custom `legacy-sports-jira` (port 4195)        | ❌                                                       | ⚠️ if signing proxy + URL configured               | ✅                                                      |
-| Custom `legacy-sports-github` (port 4196)      | ❌                                                       | ⚠️ if signing proxy + URL configured               | ✅                                                      |
-| Custom `legacy-sports-ci` (port 4197)          | ❌                                                       | ⚠️ if signing proxy + URL configured               | ✅                                                      |
+| Custom `legacy-sports-jira` (hosted API GW)    | ❌                                                       | ⚠️ if Cognito token + URL configured               | ✅                                                      |
+| Custom `legacy-sports-github` (hosted API GW)  | ❌                                                       | ⚠️ if Cognito token + URL configured               | ✅                                                      |
+| Custom `legacy-sports-ci` (hosted API GW)      | ❌                                                       | ⚠️ if Cognito token + URL configured               | ✅                                                      |
 | `legacy-sports-make`, `-nx`, `-db`, `worktree` | ❌                                                       | ❌                                                 | ✅ (via copilot-setup-steps.yml)                        |
 | `make pc` runnable                             | ⚠️ shell fallback only                                   | ⚠️ shell fallback only                             | ✅ via `make_run({ target: "pc" })`                     |
 | Thread-resolution node IDs available           | ❌ no `mcp__github__*` read path returns them (verified) | ✅ via `github_get_review_threads` (custom server) | ✅ via `github_get_review_threads` (custom server)      |
@@ -42,7 +42,7 @@ The "cloud agent" label covers three distinct configurations with very different
 
 **Cloud workflow (MCP-first — Copilot Coding Agent or fully-configured CC web):**
 
-> The flow below assumes the full hosted-Lambda toolchain is connected (custom MCP servers all available via signing proxy). On default Claude Code on the web sessions where these servers do **not** auto-load, follow [Degraded-Mode Workflow](#degraded-mode-workflow-claude-code-on-the-web-no-custom-mcp) instead.
+> The flow below assumes the full hosted-Lambda toolchain is connected (custom MCP servers all available via SigV4-signed Function URLs on Copilot, or Cognito-authenticated API Gateway endpoints on developer machines). On default Claude Code on the web sessions where these servers do **not** auto-load, follow [Degraded-Mode Workflow](#degraded-mode-workflow-claude-code-on-the-web-no-custom-mcp) instead.
 
 1. **Jira**: `jira_create_ticket({ summary: "...", sprint: "current" })` → `jira_claim_ticket({ key: "LS-####" })` (atomically checks blockers, validates status, and transitions to In Progress)
    - `action: "PROCEED"` → claimed; use `branchRecommendation` to decide git base (main vs a blocker branch)
@@ -361,9 +361,9 @@ For **cloud environments** (Claude Code on the web, Copilot), pre-configuring a 
 
 The `legacy-sports-jira` MCP server is **hosted on AWS** (Lambda Function URL). Jira credentials are stored in AWS Secrets Manager on the Lambda side — no Jira credential env vars are needed in the cloud agent environment.
 
-The signing proxy (`copilot-setup-steps.yml`) forwards requests from `localhost:4195` to the Lambda Function URL, signing each request with SigV4 using the OIDC-derived AWS session. The hosted server reads Jira OAuth credentials from Secrets Manager on each invocation.
+The MCP client calls the Lambda Function URL directly with a SigV4-signed request using the OIDC-derived AWS session (`copilot-setup-steps.yml` configures the credentials). The hosted server reads Jira OAuth credentials from Secrets Manager on each invocation.
 
-> **⛔ `acli` is NOT available in cloud environments.** Never use `acli jira workitem view`, `acli jira workitem transition`, or any other `acli` command as a Jira fallback. `acli` is a local-only CLI that is not installed in Copilot Coding Agent or Claude Code on the web containers. Always use `jira_auth_status()` to verify connectivity; if it returns `configured: false` despite the proxy being up, check that `MCP_JIRA_URL` is set in the copilot environment secrets and the signing proxy started successfully in the bootstrap logs.
+> **⛔ `acli` is NOT available in cloud environments.** Never use `acli jira workitem view`, `acli jira workitem transition`, or any other `acli` command as a Jira fallback. `acli` is a local-only CLI that is not installed in Copilot Coding Agent or Claude Code on the web containers. Always use `jira_auth_status()` to verify connectivity; if it returns `configured: false`, check that `MCP_JIRA_URL` is set in the copilot environment secrets and the OIDC role assumption succeeded in the bootstrap logs.
 
 On **Claude Code on the web**, Claude's native Atlassian plugin (`mcp__claude_ai_Atlassian__*`) is available without any credential configuration and is the **preferred** option. It connects to `bkrupa.atlassian.net` (cloud ID: `fb294606-6c8f-4b52-9a41-11fe45b77528`) via OAuth 2.1 with `read:jira-work` + `write:jira-work` scopes. The auth-aware routing rule applies: call `jira_auth_status` first — if `configured: false` or API calls fail, use the native plugin tools (pass `cloudId: "fb294606-6c8f-4b52-9a41-11fe45b77528"` to all calls). On **Copilot Coding Agent**, native Claude integrations are not available, so Jira credentials must be configured as repository secrets.
 
@@ -407,9 +407,9 @@ Copilot Coding Agent **does** support custom stdio MCP servers via the Settings 
 
 | Server                  | Available      | Notes                                                                                                                                                                 |
 | ----------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `legacy-sports-github`  | ✅             | Hosted on AWS Lambda; signing proxy on `localhost:4196` — no GH_TOKEN required in env                                                                                 |
-| `legacy-sports-ci`      | ✅             | Hosted on AWS Lambda; signing proxy on `localhost:4197`                                                                                                               |
-| `legacy-sports-jira`    | ✅             | Hosted on AWS Lambda; signing proxy on `localhost:4195`; Jira credentials in Secrets Manager — no Jira env vars required                                              |
+| `legacy-sports-github`  | ✅             | Hosted on AWS Lambda; called via SigV4-signed Function URL using the OIDC role — no GH_TOKEN required in env                                                          |
+| `legacy-sports-ci`      | ✅             | Hosted on AWS Lambda; called via SigV4-signed Function URL using the OIDC role                                                                                        |
+| `legacy-sports-jira`    | ✅             | Hosted on AWS Lambda; called via SigV4-signed Function URL using the OIDC role; Jira credentials in Secrets Manager — no Jira env vars required                       |
 | `legacy-sports-nx`      | ✅             | pnpm install run by copilot-setup-steps.yml                                                                                                                           |
 | `legacy-sports-make`    | ✅             | Same as above                                                                                                                                                         |
 | `legacy-sports-db`      | ✅             | `DATABASE_URL` exported by copilot-setup-steps.yml                                                                                                                    |
@@ -417,7 +417,7 @@ Copilot Coding Agent **does** support custom stdio MCP servers via the Settings 
 | `worktree`              | ✅             | git/run tools work (ping/run/push/stabilize); twig-dependent tools (worktree_rebase, worktree_clean, worktree_remove_batch) excluded from cloud config via allow-list |
 | `legacy-sports-aws`     | ❌             | Full AWS SSO access not available; the OIDC role is scoped to `lambda:InvokeFunctionUrl` for MCP servers only — use `ci_get_logs` for CI log access                   |
 
-> **Signing proxy note**: all three hosted servers route through the local signing proxy started by `copilot-setup-steps.yml`. If a server is unreachable, check `/tmp/mcp-signing-proxy.log` in the bootstrap step output and verify that `MCP_JIRA_URL`, `MCP_GITHUB_URL`, `MCP_CI_URL` are set as copilot environment secrets with valid Lambda Function URLs.
+> **Auth note**: all three hosted servers are invoked via SigV4-signed requests using the GitHub Actions OIDC role (which carries the `mcp_invoke` IAM policy). If a server is unreachable, verify that `MCP_JIRA_URL`, `MCP_GITHUB_URL`, `MCP_CI_URL` are set as copilot environment secrets with valid Lambda Function URLs and that `copilot-setup-steps.yml` successfully assumed the OIDC role.
 
 ### Verifying auth in a Copilot session
 
@@ -433,7 +433,7 @@ db_check_health()         # legacy-sports-db
 worktree_ping()           # worktree
 ```
 
-If `github_auth_status`, `ci_auth_status`, or `jira_auth_status` fail to connect, check that the signing proxy started successfully in the bootstrap logs (`/tmp/mcp-signing-proxy.log`) and that `MCP_JIRA_URL`, `MCP_GITHUB_URL`, `MCP_CI_URL` are configured as copilot environment secrets.
+If `github_auth_status`, `ci_auth_status`, or `jira_auth_status` fail to connect, check that the OIDC role assumption succeeded in the bootstrap logs and that `MCP_JIRA_URL`, `MCP_GITHUB_URL`, `MCP_CI_URL` are configured as copilot environment secrets.
 
 ## Known cloud-environment quirks
 
@@ -441,7 +441,7 @@ These are environment behaviors that look like bugs but are not — they cost re
 
 ### Quirk 1: `legacy-sports-jira` MCP server `fetch failed` (Claude Code on the web only)
 
-> **Copilot Coding Agent**: this quirk no longer applies — the Jira MCP server is hosted on AWS Lambda and called via the local signing proxy. The proxy's outbound request goes to a Lambda Function URL (not `api.atlassian.com`), which is not blocked by the cloud-session proxy.
+> **Copilot Coding Agent**: this quirk no longer applies — the Jira MCP server is hosted on AWS Lambda and called via a SigV4-signed Lambda Function URL. The outbound request goes to AWS (not `api.atlassian.com`), which is not blocked by the cloud-session proxy.
 
 **Symptom** (Claude Code on the web only): every call to `mcp__legacy-sports-jira__jira_*` returns one of:
 
@@ -481,7 +481,7 @@ The call payloads are formed correctly — e.g. `transition: { "id": "21" }` and
 
 **Hypothesis**: a plugin schema cold-start where the harness temporarily mis-encodes parameters declared as `additionalProperties: false` objects (stricter than `additionalProperties: {}` variants used by tools that do work). Cannot be reliably reproduced or root-caused from inside the agent session.
 
-**Workaround for `transitionJiraIssue`**: retry once after any other successful plugin call has completed. ~30 seconds of normal activity is usually enough. If that retry still fails: in a **cloud session**, use `jira_transition` from the custom `legacy-sports-jira` MCP server if it responds successfully — Copilot Coding Agent sessions have the server available via the signing proxy, but Claude Code on the web may see `fetch failed` (Quirk 1) in which case the server is unreachable; if so, perform the transition manually in the Jira UI. In a **local session**, fall through to `acli jira workitem transition --key LS-#### --status "In Progress" --yes`.
+**Workaround for `transitionJiraIssue`**: retry once after any other successful plugin call has completed. ~30 seconds of normal activity is usually enough. If that retry still fails: in a **cloud session**, use `jira_transition` from the custom `legacy-sports-jira` MCP server if it responds successfully — Copilot Coding Agent sessions have the server available via the SigV4-signed Lambda Function URL, but Claude Code on the web may see `fetch failed` (Quirk 1) in which case the server is unreachable; if so, perform the transition manually in the Jira UI. In a **local session**, fall through to `acli jira workitem transition --key LS-#### --status "In Progress" --yes`.
 
 **Preferred alternative for `createJiraIssue` with parent** — use `jira_create_ticket` from the custom MCP server; it accepts `parent` as a plain string and calls the Jira REST API directly:
 
@@ -611,10 +611,10 @@ searchJiraIssuesUsingJql(..., startAt: 100)
 
 ## Available MCP Servers in Cloud
 
-- `legacy-sports-ci` — CI log queries, workflow reruns (hosted on AWS Lambda via signing proxy at `localhost:4197`)
+- `legacy-sports-ci` — CI log queries, workflow reruns (hosted on AWS Lambda; called via SigV4-signed Function URL using the OIDC role)
 - `legacy-sports-db` — local Docker Postgres queries, migrations, schema generation
-- `legacy-sports-jira` — ticket CRUD, transitions, blocker checks (hosted on AWS Lambda via signing proxy at `localhost:4195`; Jira credentials in Secrets Manager — no env vars needed). On Claude Code on the web, Claude's native Atlassian tools (`mcp__claude_ai_Atlassian__*`) are an alternative that requires no secrets
-- `legacy-sports-github` — PR and review lifecycle management (hosted on AWS Lambda via signing proxy at `localhost:4196`; GitHub credentials in Secrets Manager — no env vars needed). On Claude Code on the web, Claude's native GitHub connector is an alternative that requires no secrets
+- `legacy-sports-jira` — ticket CRUD, transitions, blocker checks (hosted on AWS Lambda; called via SigV4-signed Function URL using the OIDC role; Jira credentials in Secrets Manager — no env vars needed). On Claude Code on the web, Claude's native Atlassian tools (`mcp__claude_ai_Atlassian__*`) are an alternative that requires no secrets
+- `legacy-sports-github` — PR and review lifecycle management (hosted on AWS Lambda; called via SigV4-signed Function URL using the OIDC role; GitHub credentials in Secrets Manager — no env vars needed). On Claude Code on the web, Claude's native GitHub connector is an alternative that requires no secrets
 - `legacy-sports-nx` — Nx project discovery, affected analysis, and target execution
 
 **Unavailable in cloud (by design):**

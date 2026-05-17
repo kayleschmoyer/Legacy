@@ -3,8 +3,9 @@
 # when the session is likely to have one or more servers missing (LS-3022).
 #
 # 7 of the 10 legacy-sports MCP servers use stdio (mcp-bootstrap.mjs → pnpm exec tsx).
-# The remaining 3 (jira, github, ci) connect via Streamable HTTP through the local
-# signing proxy (localhost:4195-4197); those do not need tsx.
+# The remaining 3 (jira, github, ci) connect via Streamable HTTP directly to the
+# MCP HTTP API Gateways (${MCP_JIRA_URL}, ${MCP_GITHUB_URL}, ${MCP_CI_URL}) with a
+# Cognito-issued bearer token; those do not need tsx.
 # If node_modules/.bin/tsx is absent, the 7 stdio servers silently time out — the
 # agent receives an empty deferred tools list and may fall back to gh/git/make
 # without knowing why.  This hook surfaces the failure proactively so the agent

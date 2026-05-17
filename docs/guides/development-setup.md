@@ -128,23 +128,24 @@ pnpm exec nx affected -t build
 
 ### **Step 5: Set Up Hosted MCP Servers**
 
-The Jira, GitHub, and CI MCP servers run as hosted AWS Lambda Function URLs. For local
-Claude Code sessions you need the **signing proxy** running so that MCP tool calls are
-SigV4-signed before hitting the Lambda endpoints.
+The Jira, GitHub, and CI MCP servers run behind an HTTP API Gateway with a
+Cognito JWT authorizer. The `scripts/mcp-auth.mjs` helper signs you in via
+the Cognito hosted UI and writes the API Gateway URLs + ID token to
+`.env.local`.
 
 ```powershell
-# 1. Get the Lambda Function URLs from Terraform and add them to .env.local
-terraform -chdir=terraform/main output mcp_jira_url
-terraform -chdir=terraform/main output mcp_github_url
-terraform -chdir=terraform/main output mcp_ci_url
-# Add the three MCP_*_URL values (and optionally MCP_AWS_PROFILE) to .env.local
+# 1. First-time setup: run the OAuth code + PKCE flow via the Cognito hosted UI.
+#    A browser window opens; sign in with your Cognito user (an admin will have
+#    invited you by email). The script writes MCP_JIRA_URL, MCP_GITHUB_URL,
+#    MCP_CI_URL, and MCP_AUTH_TOKEN to .env.local.
+node scripts/mcp-auth.mjs --setup
 
-# 2. Start the signing proxy (reads MCP_*_URL from .env.local)
-pnpm exec nx run mcp-signing-proxy:start
+# 2. Subsequent runs: silently refresh the ID token (good for ~8h).
+node scripts/mcp-auth.mjs
 ```
 
-The proxy listens on `localhost:4195` (Jira), `:4196` (GitHub), `:4197` (CI).
-Claude Code and VS Code MCP configs already point at these ports.
+Claude Code reads `${MCP_*_URL}` and the bearer token from `.env.local` via
+`.mcp.json`; no local proxy is required.
 
 > **Session audit tools** (`ci_audit_session_bash`, `ci_find_session`, `ci_session_stats`)
 > read local `~/.claude/projects/` files and cannot run on Lambda. They are available via

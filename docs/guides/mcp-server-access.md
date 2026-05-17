@@ -1,147 +1,121 @@
 # Hosted MCP Server Access
 
-The Jira, GitHub, and CI MCP servers are hosted as AWS Lambda Function URLs
-with `authorization_type = "AWS_IAM"`. Every HTTP request must be signed with
-[AWS SigV4](https://docs.aws.amazon.com/general/latest/gr/signature-version-4.html)
-using credentials that have the `mcp_invoke` IAM policy attached.
+The Jira, GitHub, and CI MCP servers are hosted on AWS Lambda behind an
+HTTP API Gateway with a **JWT authorizer** wired to a Cognito user pool.
+Every HTTP request must include `Authorization: Bearer <idToken>` where
+`<idToken>` is an OIDC ID token issued by the Cognito hosted UI.
 
 This means:
 
-- No shared tokens to rotate or distribute
-- Each invocation is logged in CloudTrail with your IAM principal ARN
-- GitHub Actions cloud agents get access automatically via the existing OIDC role
+- No long-lived shared tokens — ID tokens are short-lived (~8h) and refreshable for ~30 days
+- Each invocation is logged on the Lambda side with the Cognito `sub` claim
+- Developers sign in once via the hosted UI; the helper script refreshes silently
+
+> **Cloud agents (GitHub Actions)** continue to use the underlying Lambda
+> Function URLs with SigV4 — the OIDC role already carries the `mcp_invoke`
+> IAM policy. Only developer machines need the Cognito flow described here.
 
 ---
 
 ## Prerequisites
 
-- AWS IAM Identity Center (SSO) access to the `legacy-sports-dev` account
-- AWS CLI v2 with SSO configured (`aws configure sso`)
+- A Cognito user account in the `legacy-sports-dev` user pool — ask an admin
+  to invite you via the AWS Console (Cognito → user pool → Users → "Create user").
+  Cognito sends a temporary password by email; you set a real password on first
+  sign-in via the hosted UI.
+- AWS CLI v2 with SSO configured for reading the SSM parameters that hold the
+  Cognito client ID and hosted UI domain (`aws configure sso`).
 
 ---
 
-## 1. Attach the `mcp_invoke` Policy to Your SSO Role
-
-Ask an admin to attach the `legacy-sports-dev-mcp-invoke` IAM policy to your
-SSO permission set. Once attached, any session you start with that permission
-set will have access to invoke the MCP servers.
-
-To verify your access:
+## 1. Run First-Time Setup
 
 ```bash
-# Get the policy ARN from Terraform outputs
-terraform -chdir=terraform/main output mcp_invoke_policy_arn
-
-# Confirm your current AWS identity (SSO sessions show an assumed-role ARN)
-aws sts get-caller-identity
+node scripts/mcp-auth.mjs --setup
 ```
+
+The script:
+
+1. Reads the Cognito client ID and hosted UI domain from SSM.
+2. Opens the hosted UI in your browser to run the OAuth authorization code +
+   PKCE flow.
+3. Writes the ID token, refresh token, and API Gateway URLs to `.env.local`:
+   - `MCP_AUTH_TOKEN`, `MCP_AUTH_REFRESH_TOKEN`, `MCP_AUTH_EXPIRES_AT`
+   - `MCP_JIRA_URL`, `MCP_GITHUB_URL`, `MCP_CI_URL`
+
+After setup, MCP clients can call the API Gateways directly with the bearer
+token — no local proxy is required.
 
 ---
 
-## 2. Get the MCP Server URLs
+## 2. Refresh the Token
 
-After LS-2852/2853/2854 are deployed, retrieve the Lambda Function URLs:
+ID tokens expire after ~8h. Run:
 
 ```bash
-terraform -chdir=terraform/main output mcp_jira_url
-terraform -chdir=terraform/main output mcp_github_url
-terraform -chdir=terraform/main output mcp_ci_url
+node scripts/mcp-auth.mjs
 ```
 
-Add these to your `.env.local`:
-
-```
-MCP_JIRA_URL=https://<id>.lambda-url.us-east-1.on.aws
-MCP_GITHUB_URL=https://<id>.lambda-url.us-east-1.on.aws
-MCP_CI_URL=https://<id>.lambda-url.us-east-1.on.aws
-
-# Optional: AWS profile to use for signing (defaults to credential chain)
-MCP_AWS_PROFILE=legacy-sports-dev
-```
+This uses the refresh token to silently mint a new ID token (good for ~30
+days before re-auth is required).
 
 ---
 
-## 3. Run the Local Signing Proxy
+## 3. Configure Your MCP Client
 
-MCP clients (Claude Desktop, VS Code MCP extension, etc.) speak plain HTTP —
-they cannot sign requests with SigV4. The signing proxy bridges this gap: it
-listens locally on plain HTTP, signs each request, and forwards it to the
-Lambda URL.
+`.mcp.json` (checked into the repo) already references the env-var URLs:
 
-```bash
-# Start the signing proxy (reads MCP_*_URL from .env.local)
-pnpm exec nx run mcp-signing-proxy:start
-```
-
-Ports:
-
-| Server | Local port |
-| ------ | ---------- |
-| Jira   | 4195       |
-| GitHub | 4196       |
-| CI     | 4197       |
-
----
-
-## 4. Configure Your MCP Client
-
-Point your MCP client at the local proxy ports instead of the Lambda URLs
-directly. Example Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json`
-on macOS or `%APPDATA%\Claude\claude_desktop_config.json` on Windows):
-
-```json
+```jsonc
 {
   "mcpServers": {
     "legacy-sports-jira": {
-      "url": "http://localhost:4195"
+      "url": "${MCP_JIRA_URL}",
+      "headers": { "Authorization": "Bearer ${MCP_AUTH_TOKEN}" },
     },
     "legacy-sports-github": {
-      "url": "http://localhost:4196"
+      "url": "${MCP_GITHUB_URL}",
+      "headers": { "Authorization": "Bearer ${MCP_AUTH_TOKEN}" },
     },
     "legacy-sports-ci": {
-      "url": "http://localhost:4197"
-    }
-  }
+      "url": "${MCP_CI_URL}",
+      "headers": { "Authorization": "Bearer ${MCP_AUTH_TOKEN}" },
+    },
+  },
 }
 ```
+
+(Consult the live `.mcp.json` for the canonical config.)
 
 ---
 
 ## Cloud Agents (GitHub Actions)
 
-Cloud agents running in GitHub Actions do not need the signing proxy. The
-`github_actions` OIDC role already has the `mcp_invoke` policy attached
-(via `aws_iam_role_policy_attachment.github_actions_mcp_invoke` in
-`terraform/main/lambda-mcp-shared.tf`).
-
-The agent just needs the Lambda Function URLs injected as environment
-variables. These are added to the workflow environment after LS-2852/2853/2854
-are merged.
+Cloud agents do not run `mcp-auth.mjs`. The `github_actions` OIDC role has
+the `mcp_invoke` IAM policy attached (via
+`aws_iam_role_policy_attachment.github_actions_mcp_invoke` in
+`terraform/main/lambda-mcp-shared.tf`), so they call the underlying Lambda
+Function URLs with SigV4 directly.
 
 ---
 
 ## Troubleshooting
 
-**`403 Forbidden` from the Lambda URL**
+**`401 Unauthorized` from the API Gateway**
 
-- Your credentials do not have the `mcp_invoke` policy. Confirm the policy is
-  attached to your SSO permission set, then refresh your SSO session:
-  `aws sso login --profile <profile>`.
+- Your `MCP_AUTH_TOKEN` is expired or missing. Run `node scripts/mcp-auth.mjs`.
+- If that fails with "refresh token expired", run `node scripts/mcp-auth.mjs --force`
+  to re-auth from scratch.
 
-**`SignatureDoesNotMatch`**
+**`scripts/mcp-auth.mjs` cannot read SSM parameters**
 
-- Clock skew: AWS rejects signatures more than 5 minutes from the server time.
-  Sync your system clock.
-- Wrong region: `AWS_REGION` in `.env.local` must match the Lambda's region
-  (`us-east-1`).
+- Confirm your AWS SSO session is active: `aws sts get-caller-identity`.
+- Run `aws sso login --profile <profile>` if needed.
 
-**Signing proxy starts but MCP client times out**
+**MCP client reports the server is offline**
 
-- Confirm the proxy is running: `curl http://localhost:4195/`
-- Check that `MCP_JIRA_URL` (etc.) are set in `.env.local` and the proxy
-  printed "listening" for that server.
+- Confirm `.env.local` has non-placeholder values for `MCP_JIRA_URL`,
+  `MCP_GITHUB_URL`, `MCP_CI_URL`, and `MCP_AUTH_TOKEN`.
+- Confirm the token has not expired: `MCP_AUTH_EXPIRES_AT` must be in the future.
 
-**`MCP_JIRA_URL not set — skipping port 4195`**
-
-- Copy `.env.example` → `.env.local` and fill in the URL values from
-  `terraform output`.
+See also: `terraform/main/lambda-mcp-api-gateway.tf` for the API Gateway +
+Cognito setup, and `scripts/mcp-auth.mjs` for the helper-script source.
