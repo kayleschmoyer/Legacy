@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 560" font-family="ui-sans-serif, system-ui, sans-serif" font-size="13">
+  <defs>
+    <marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#334155"/>
+    </marker>
+    <style>
+      .state { fill: #f8fafc; stroke: #334155; stroke-width: 1.5; }
+      .active { fill: #fef3c7; stroke: #b45309; stroke-width: 1.5; }
+      .done { fill: #dcfce7; stroke: #166534; stroke-width: 1.5; }
+      .err { fill: #fee2e2; stroke: #b91c1c; stroke-width: 1.5; }
+      .arrow { stroke: #334155; stroke-width: 1.5; fill: none; }
+      .sublabel { fill: #475569; font-size: 11px; font-style: italic; }
+      .title { font-size: 18px; font-weight: 600; fill: #0f172a; }
+      .hdr { font-size: 13px; font-weight: 600; fill: #0f172a; }
+    </style>
+  </defs>
+
+  <text x="20" y="30" class="title">Matchup State Machine</text>
+  <text x="20" y="50" class="sublabel">Two orthogonal axes: matchup.status (lifecycle) and statsLoadingStatus (per-game selection &amp; scoring)</text>
+
+  <!-- Top: matchup.status row -->
+  <text x="20" y="90" class="hdr">matchup.status</text>
+
+  <rect x="60"  y="105" width="150" height="60" rx="8" class="state"/>
+  <text x="135" y="132" text-anchor="middle">scheduled</text>
+  <text x="135" y="150" text-anchor="middle" class="sublabel">lineup editable</text>
+
+  <rect x="290" y="105" width="150" height="60" rx="8" class="active"/>
+  <text x="365" y="132" text-anchor="middle">in_progress</text>
+  <text x="365" y="150" text-anchor="middle" class="sublabel">lineup locked</text>
+
+  <rect x="520" y="105" width="150" height="60" rx="8" class="done"/>
+  <text x="595" y="132" text-anchor="middle">completed</text>
+  <text x="595" y="150" text-anchor="middle" class="sublabel">scores final</text>
+
+  <rect x="750" y="105" width="150" height="60" rx="8" class="err"/>
+  <text x="825" y="132" text-anchor="middle">cancelled</text>
+  <text x="825" y="150" text-anchor="middle" class="sublabel">admin only (rare)</text>
+
+  <path d="M210,135 L290,135" class="arrow" marker-end="url(#arr2)"/>
+  <text x="250" y="125" text-anchor="middle" class="sublabel">first autoSelectGames</text>
+  <text x="250" y="92"  text-anchor="middle" class="sublabel">activates week 1</text>
+
+  <path d="M440,135 L520,135" class="arrow" marker-end="url(#arr2)"/>
+  <text x="480" y="125" text-anchor="middle" class="sublabel">autoAdvanceMatchups</text>
+  <text x="480" y="92" text-anchor="middle" class="sublabel">Sunday 3am EST</text>
+
+  <path d="M210,165 C300,225 660,225 750,165" class="arrow" marker-end="url(#arr2)"/>
+  <text x="480" y="225" text-anchor="middle" class="sublabel">updateMatchupStatus (admin)</text>
+
+  <!-- Bottom: statsLoadingStatus row -->
+  <text x="20" y="290" class="hdr">statsLoadingStatus (active while matchup is in_progress)</text>
+
+  <rect x="40"  y="310" width="130" height="56" rx="8" class="state"/>
+  <text x="105" y="343" text-anchor="middle">not_started</text>
+
+  <rect x="200" y="310" width="130" height="56" rx="8" class="state"/>
+  <text x="265" y="343" text-anchor="middle">queued</text>
+
+  <rect x="360" y="310" width="130" height="56" rx="8" class="active"/>
+  <text x="425" y="343" text-anchor="middle">loading</text>
+
+  <rect x="520" y="310" width="130" height="56" rx="8" class="done"/>
+  <text x="585" y="343" text-anchor="middle">completed</text>
+
+  <rect x="680" y="310" width="130" height="56" rx="8" class="err"/>
+  <text x="745" y="343" text-anchor="middle">failed</text>
+
+  <rect x="840" y="310" width="130" height="56" rx="8" class="state"/>
+  <text x="905" y="343" text-anchor="middle">retry</text>
+
+  <path d="M170,338 L200,338" class="arrow" marker-end="url(#arr2)"/>
+  <text x="185" y="328" text-anchor="middle" class="sublabel">autoSelectGames</text>
+  <text x="185" y="380" text-anchor="middle" class="sublabel">SQS enqueue</text>
+
+  <path d="M330,338 L360,338" class="arrow" marker-end="url(#arr2)"/>
+  <text x="345" y="328" text-anchor="middle" class="sublabel">game-selection lambda</text>
+
+  <path d="M490,338 L520,338" class="arrow" marker-end="url(#arr2)"/>
+  <text x="505" y="328" text-anchor="middle" class="sublabel">stats lambda done</text>
+
+  <path d="M425,366 C425,420 720,420 745,366" class="arrow" marker-end="url(#arr2)"/>
+  <text x="585" y="420" text-anchor="middle" class="sublabel">on error</text>
+
+  <path d="M810,338 L840,338" class="arrow" marker-end="url(#arr2)"/>
+  <path d="M905,310 C905,255 460,255 425,310" class="arrow" marker-end="url(#arr2)"/>
+  <text x="660" y="252" text-anchor="middle" class="sublabel">retry → loading</text>
+
+  <!-- Side panel: game selection cycle -->
+  <rect x="40" y="460" width="900" height="80" rx="6" fill="#f1f5f9" stroke="#cbd5e1"/>
+  <text x="55" y="482" class="hdr">Per-game cycle (repeats gamesPerMatchup times within one in_progress matchup)</text>
+  <text x="55" y="503" class="sublabel">nightly autoSelectGames @ 00:00 EST → SQS(matchupId, game=N) → selectGamesForMatchup → if cached, calculateMatchupScores;</text>
+  <text x="55" y="519" class="sublabel">otherwise SQS(load-game-stats, batches of 8) → stats lambda → notifyMatchupStatsComplete (WebSocket) → score recalc.</text>
+  <text x="55" y="535" class="sublabel">Each pass increments nextGameNumber; cycle stops when selectedGamesCount == gamesPerMatchup.</text>
+</svg>

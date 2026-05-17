@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 540" font-family="ui-sans-serif, system-ui, sans-serif" font-size="13">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#334155"/>
+    </marker>
+    <style>
+      .state { fill: #f8fafc; stroke: #334155; stroke-width: 1.5; }
+      .initial { fill: #e2e8f0; stroke: #0f172a; stroke-width: 2; }
+      .terminal { fill: #1e293b; }
+      .terminal-text { fill: #f1f5f9; }
+      .accent { fill: #fef3c7; stroke: #b45309; stroke-width: 1.5; }
+      .danger { fill: #fee2e2; stroke: #b91c1c; stroke-width: 1.5; }
+      .arrow { stroke: #334155; stroke-width: 1.5; fill: none; }
+      .label { fill: #0f172a; }
+      .sublabel { fill: #475569; font-size: 11px; font-style: italic; }
+      .title { font-size: 18px; font-weight: 600; fill: #0f172a; }
+    </style>
+  </defs>
+
+  <text x="20" y="30" class="title">League Lifecycle — Top-Level State Machine</text>
+
+  <!-- Pre-Draft -->
+  <rect x="40"  y="90" width="160" height="60" rx="8" class="initial"/>
+  <text x="120" y="118" text-anchor="middle">Pre-Draft</text>
+  <text x="120" y="135" text-anchor="middle" class="sublabel">draftStatus: pending</text>
+
+  <!-- Draft In Progress -->
+  <rect x="260" y="90" width="170" height="60" rx="8" class="state"/>
+  <text x="345" y="118" text-anchor="middle">Draft In Progress</text>
+  <text x="345" y="135" text-anchor="middle" class="sublabel">autoProcessDraftPicks</text>
+
+  <!-- Season Active -->
+  <rect x="490" y="90" width="170" height="60" rx="8" class="accent"/>
+  <text x="575" y="115" text-anchor="middle">Regular Season</text>
+  <text x="575" y="132" text-anchor="middle" class="sublabel">currentWeek 1..totalMatchups</text>
+  <text x="575" y="145" text-anchor="middle" class="sublabel">weekAdvanceStatus: idle</text>
+
+  <!-- Decision diamond -->
+  <polygon points="745,120 815,90 885,120 815,150" fill="#fff" stroke="#334155" stroke-width="1.5"/>
+  <text x="815" y="118" text-anchor="middle" font-size="11">playoffEnabled?</text>
+  <text x="815" y="132" text-anchor="middle" class="sublabel">at week == total</text>
+
+  <!-- Playoffs -->
+  <rect x="490" y="240" width="170" height="60" rx="8" class="accent"/>
+  <text x="575" y="265" text-anchor="middle">Playoffs</text>
+  <text x="575" y="282" text-anchor="middle" class="sublabel">wildcard → semis → finals</text>
+  <text x="575" y="294" text-anchor="middle" class="sublabel">PlayoffService.createBracket</text>
+
+  <!-- Season Complete -->
+  <rect x="720" y="240" width="220" height="60" rx="8" class="terminal"/>
+  <text x="830" y="265" text-anchor="middle" class="terminal-text">Season Complete</text>
+  <text x="830" y="282" text-anchor="middle" class="terminal-text sublabel" fill="#cbd5e1">currentWeek = null</text>
+  <text x="830" y="294" text-anchor="middle" class="terminal-text sublabel" fill="#cbd5e1">currentMatchup = null</text>
+
+  <!-- Offseason -->
+  <rect x="380" y="380" width="220" height="60" rx="8" class="state"/>
+  <text x="490" y="405" text-anchor="middle">Offseason</text>
+  <text x="490" y="422" text-anchor="middle" class="sublabel">historical data preserved</text>
+  <text x="490" y="434" text-anchor="middle" class="sublabel">awaits new draft (manual)</text>
+
+  <!-- New Season loop back -->
+  <rect x="40" y="380" width="220" height="60" rx="8" class="state"/>
+  <text x="150" y="405" text-anchor="middle">New Draft Started</text>
+  <text x="150" y="422" text-anchor="middle" class="sublabel">commissioner action</text>
+  <text x="150" y="434" text-anchor="middle" class="sublabel">draftStatus → pending</text>
+
+  <!-- Arrows -->
+  <path d="M200,120 L260,120" class="arrow" marker-end="url(#arr)"/>
+  <text x="230" y="112" text-anchor="middle" class="sublabel">commissioner starts draft</text>
+
+  <path d="M430,120 L490,120" class="arrow" marker-end="url(#arr)"/>
+  <text x="460" y="112" text-anchor="middle" class="sublabel">last pick</text>
+  <text x="460" y="78" text-anchor="middle" class="sublabel">createAllMatchupsForLeague</text>
+
+  <path d="M660,120 L745,120" class="arrow" marker-end="url(#arr)"/>
+  <text x="700" y="112" text-anchor="middle" class="sublabel">week == total</text>
+
+  <!-- yes: playoffs -->
+  <path d="M815,150 L815,200 L575,200 L575,240" class="arrow" marker-end="url(#arr)"/>
+  <text x="690" y="195" text-anchor="middle" class="sublabel">yes — bracket created</text>
+
+  <!-- no: complete -->
+  <path d="M885,120 L920,120 L920,240" class="arrow" marker-end="url(#arr)"/>
+  <text x="940" y="180" text-anchor="middle" class="sublabel" transform="rotate(90 940 180)">no</text>
+
+  <!-- Playoffs → Complete -->
+  <path d="M660,270 L720,270" class="arrow" marker-end="url(#arr)"/>
+  <text x="690" y="262" text-anchor="middle" class="sublabel">finals done</text>
+
+  <!-- Complete → Offseason -->
+  <path d="M830,300 L830,360 L600,360 L600,380" class="arrow" marker-end="url(#arr)"/>
+
+  <!-- Offseason → New Draft -->
+  <path d="M380,410 L260,410" class="arrow" marker-end="url(#arr)"/>
+  <text x="320" y="402" text-anchor="middle" class="sublabel">commissioner</text>
+
+  <!-- New Draft → Draft In Progress -->
+  <path d="M150,380 L150,200 L260,200 L260,150" class="arrow" marker-end="url(#arr)"/>
+  <text x="200" y="195" text-anchor="middle" class="sublabel">new season</text>
+
+  <!-- Legend -->
+  <rect x="40" y="480" width="14" height="14" class="initial"/>
+  <text x="62" y="492">initial</text>
+  <rect x="120" y="480" width="14" height="14" class="state"/>
+  <text x="142" y="492">transient</text>
+  <rect x="210" y="480" width="14" height="14" class="accent"/>
+  <text x="232" y="492">active (scheduled jobs running)</text>
+  <rect x="430" y="480" width="14" height="14" class="terminal"/>
+  <text x="452" y="492">terminal</text>
+</svg>

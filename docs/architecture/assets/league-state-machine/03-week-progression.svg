@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 620" font-family="ui-sans-serif, system-ui, sans-serif" font-size="13">
+  <defs>
+    <marker id="arr3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#334155"/>
+    </marker>
+    <style>
+      .state { fill: #f8fafc; stroke: #334155; stroke-width: 1.5; }
+      .accent { fill: #fef3c7; stroke: #b45309; stroke-width: 1.5; }
+      .done { fill: #dcfce7; stroke: #166534; stroke-width: 1.5; }
+      .arrow { stroke: #334155; stroke-width: 1.5; fill: none; }
+      .arrow-dash { stroke: #64748b; stroke-width: 1.2; fill: none; stroke-dasharray: 5 3; }
+      .sublabel { fill: #475569; font-size: 11px; font-style: italic; }
+      .title { font-size: 18px; font-weight: 600; fill: #0f172a; }
+      .hdr { font-size: 13px; font-weight: 600; fill: #0f172a; }
+      .timeline { stroke: #94a3b8; stroke-width: 1; }
+    </style>
+  </defs>
+
+  <text x="20" y="30" class="title">Week Progression — autoAdvanceMatchups (Sundays 03:00 EST)</text>
+
+  <!-- Decision: weekAdvanceStatus -->
+  <text x="20" y="80" class="hdr">league.weekAdvanceStatus</text>
+  <rect x="40"  y="95" width="120" height="50" rx="8" class="state"/>
+  <text x="100" y="125" text-anchor="middle">idle</text>
+
+  <rect x="220" y="95" width="120" height="50" rx="8" class="accent"/>
+  <text x="280" y="125" text-anchor="middle">queued</text>
+
+  <rect x="400" y="95" width="140" height="50" rx="8" class="accent"/>
+  <text x="470" y="125" text-anchor="middle">processing</text>
+
+  <path d="M160,120 L220,120" class="arrow" marker-end="url(#arr3)"/>
+  <text x="190" y="112" text-anchor="middle" class="sublabel">EventBridge fires</text>
+
+  <path d="M340,120 L400,120" class="arrow" marker-end="url(#arr3)"/>
+  <text x="370" y="112" text-anchor="middle" class="sublabel">guard acquired</text>
+
+  <path d="M470,145 C470,200 100,200 100,145" class="arrow" marker-end="url(#arr3)"/>
+  <text x="285" y="200" text-anchor="middle" class="sublabel">on completion or skip → idle</text>
+
+  <!-- Decision tree -->
+  <text x="20" y="245" class="hdr">Decision tree (per league with draftStatus = completed)</text>
+
+  <polygon points="120,290 240,260 360,290 240,320" fill="#fff" stroke="#334155" stroke-width="1.5"/>
+  <text x="240" y="287" text-anchor="middle" font-size="12">all gamesPerMatchup</text>
+  <text x="240" y="302" text-anchor="middle" font-size="12">games selected?</text>
+
+  <rect x="420" y="265" width="200" height="50" rx="8" class="state"/>
+  <text x="520" y="288" text-anchor="middle">skip league</text>
+  <text x="520" y="304" text-anchor="middle" class="sublabel">leave status as in_progress</text>
+
+  <path d="M360,290 L420,290" class="arrow" marker-end="url(#arr3)"/>
+  <text x="390" y="282" text-anchor="middle" class="sublabel">no</text>
+
+  <polygon points="120,400 240,370 360,400 240,430" fill="#fff" stroke="#334155" stroke-width="1.5"/>
+  <text x="240" y="397" text-anchor="middle" font-size="12">currentWeek &gt;=</text>
+  <text x="240" y="412" text-anchor="middle" font-size="12">totalMatchups?</text>
+
+  <path d="M240,320 L240,370" class="arrow" marker-end="url(#arr3)"/>
+  <text x="252" y="345" class="sublabel">yes</text>
+
+  <polygon points="400,400 520,370 640,400 520,430" fill="#fff" stroke="#334155" stroke-width="1.5"/>
+  <text x="520" y="397" text-anchor="middle" font-size="12">playoffEnabled?</text>
+
+  <path d="M360,400 L400,400" class="arrow" marker-end="url(#arr3)"/>
+  <text x="380" y="392" text-anchor="middle" class="sublabel">yes</text>
+
+  <!-- Advance regular week -->
+  <rect x="40"  y="490" width="280" height="80" rx="8" class="done"/>
+  <text x="180" y="515" text-anchor="middle" class="hdr">Advance to next week</text>
+  <text x="180" y="535" text-anchor="middle" class="sublabel">current week → completed</text>
+  <text x="180" y="551" text-anchor="middle" class="sublabel">next week scheduled → in_progress</text>
+  <text x="180" y="567" text-anchor="middle" class="sublabel">currentWeek++, sync positions</text>
+
+  <path d="M120,430 L180,490" class="arrow" marker-end="url(#arr3)"/>
+  <text x="125" y="465" class="sublabel">no</text>
+
+  <!-- End season no playoffs -->
+  <rect x="360" y="490" width="260" height="80" rx="8" class="state"/>
+  <text x="490" y="515" text-anchor="middle" class="hdr">End season (no playoffs)</text>
+  <text x="490" y="535" text-anchor="middle" class="sublabel">remaining matchups → completed</text>
+  <text x="490" y="551" text-anchor="middle" class="sublabel">currentMatchup = null</text>
+  <text x="490" y="567" text-anchor="middle" class="sublabel">currentWeek = null</text>
+
+  <path d="M460,430 L490,490" class="arrow" marker-end="url(#arr3)"/>
+  <text x="450" y="465" class="sublabel">no</text>
+
+  <!-- Start playoffs -->
+  <rect x="660" y="490" width="280" height="80" rx="8" class="accent"/>
+  <text x="800" y="515" text-anchor="middle" class="hdr">Create playoff bracket</text>
+  <text x="800" y="535" text-anchor="middle" class="sublabel">seed top N teams by standings</text>
+  <text x="800" y="551" text-anchor="middle" class="sublabel">create round 1 matchups (scheduled)</text>
+  <text x="800" y="567" text-anchor="middle" class="sublabel">award playoff badges</text>
+
+  <path d="M580,430 L780,490" class="arrow" marker-end="url(#arr3)"/>
+  <text x="640" y="465" class="sublabel">yes</text>
+
+  <!-- legend / notes -->
+  <text x="20" y="610" class="sublabel">Note: matchup.weekNumber 1..totalMatchups for regular season; playoff matchup weeks are appended (multiWeekMatchups doubles each round span).</text>
+</svg>

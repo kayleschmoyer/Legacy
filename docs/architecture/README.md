@@ -12,6 +12,7 @@ This directory contains technical architecture documentation for the Legacy Spor
 - **[GraphQL Integration](graphql-integration.md)** - API layer design and implementation
 - **[Schema Validation](schema-validation.md)** - Drizzle ORM patterns and type safety
 - **[Season Selection Architecture](season-selection-architecture.md)** - Per-player season assignment and game selection
+- **[League State Machine](league-state-machine.md)** - League lifecycle, week/matchup progression, playoffs, and season transitions (with SVG diagrams)
 
 ## 🎯 Understanding the Architecture
 

@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 600" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12">
+  <defs>
+    <marker id="arr5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#334155"/>
+    </marker>
+    <style>
+      .lane { fill: #f1f5f9; stroke: #cbd5e1; }
+      .lanehdr { fill: #0f172a; font-weight: 600; font-size: 13px; }
+      .msg { stroke: #334155; stroke-width: 1.5; fill: none; }
+      .msgback { stroke: #64748b; stroke-width: 1.2; fill: none; stroke-dasharray: 4 3; }
+      .lifeline { stroke: #94a3b8; stroke-width: 1; stroke-dasharray: 3 3; }
+      .note { fill: #fef3c7; stroke: #b45309; stroke-width: 1; }
+      .title { font-size: 18px; font-weight: 600; fill: #0f172a; }
+      .label { fill: #0f172a; font-size: 11px; }
+    </style>
+  </defs>
+
+  <text x="20" y="30" class="title">Game Selection Sequence — one nightly tick</text>
+
+  <!-- Lanes -->
+  <g>
+    <rect x="40"  y="60" width="130" height="40" rx="4" class="lane"/><text x="105" y="85" text-anchor="middle" class="lanehdr">EventBridge</text>
+    <rect x="190" y="60" width="130" height="40" rx="4" class="lane"/><text x="255" y="85" text-anchor="middle" class="lanehdr">GraphQL Lambda</text>
+    <rect x="340" y="60" width="130" height="40" rx="4" class="lane"/><text x="405" y="85" text-anchor="middle" class="lanehdr">SQS select-game</text>
+    <rect x="490" y="60" width="130" height="40" rx="4" class="lane"/><text x="555" y="85" text-anchor="middle" class="lanehdr">game-selection</text>
+    <rect x="640" y="60" width="130" height="40" rx="4" class="lane"/><text x="705" y="85" text-anchor="middle" class="lanehdr">SQS load-stats</text>
+    <rect x="790" y="60" width="160" height="40" rx="4" class="lane"/><text x="870" y="85" text-anchor="middle" class="lanehdr">stats lambda + WS</text>
+
+    <line x1="105" y1="100" x2="105" y2="560" class="lifeline"/>
+    <line x1="255" y1="100" x2="255" y2="560" class="lifeline"/>
+    <line x1="405" y1="100" x2="405" y2="560" class="lifeline"/>
+    <line x1="555" y1="100" x2="555" y2="560" class="lifeline"/>
+    <line x1="705" y1="100" x2="705" y2="560" class="lifeline"/>
+    <line x1="870" y1="100" x2="870" y2="560" class="lifeline"/>
+  </g>
+
+  <!-- 1: cron -->
+  <path d="M105,130 L255,130" class="msg" marker-end="url(#arr5)"/>
+  <text x="180" y="124" text-anchor="middle" class="label">00:00 EST: autoSelectGames</text>
+
+  <!-- 2: per matchup -->
+  <rect x="195" y="150" width="200" height="40" class="note"/>
+  <text x="295" y="166" text-anchor="middle" class="label">find active leagues, compute</text>
+  <text x="295" y="182" text-anchor="middle" class="label">nextGameNumber per matchup</text>
+
+  <path d="M255,210 L405,210" class="msg" marker-end="url(#arr5)"/>
+  <text x="330" y="204" text-anchor="middle" class="label">enqueue {matchupId, game: N}</text>
+
+  <path d="M405,250 L555,250" class="msg" marker-end="url(#arr5)"/>
+  <text x="480" y="244" text-anchor="middle" class="label">message → handler</text>
+
+  <rect x="495" y="270" width="170" height="40" class="note"/>
+  <text x="580" y="286" text-anchor="middle" class="label">selectGamesForMatchup</text>
+  <text x="580" y="302" text-anchor="middle" class="label">→ players needing stats?</text>
+
+  <!-- branch a: stats needed -->
+  <path d="M555,335 L705,335" class="msg" marker-end="url(#arr5)"/>
+  <text x="630" y="329" text-anchor="middle" class="label">enqueue batches of 8</text>
+
+  <path d="M705,375 L870,375" class="msg" marker-end="url(#arr5)"/>
+  <text x="785" y="369" text-anchor="middle" class="label">stats lambda fetches</text>
+
+  <rect x="800" y="395" width="155" height="40" class="note"/>
+  <text x="877" y="411" text-anchor="middle" class="label">calculateMatchupScores</text>
+  <text x="877" y="427" text-anchor="middle" class="label">→ team1Score, team2Score</text>
+
+  <path d="M870,455 L255,455" class="msgback" marker-end="url(#arr5)"/>
+  <text x="555" y="449" text-anchor="middle" class="label">notifyMatchupStatsComplete (WebSocket → clients)</text>
+
+  <!-- branch b: cached -->
+  <path d="M555,500 L870,500" class="msg" marker-end="url(#arr5)"/>
+  <text x="710" y="494" text-anchor="middle" class="label">if all stats cached → skip load-stats, calculate directly</text>
+
+  <text x="20" y="555" class="label">Loop: next nightly run picks up nextGameNumber + 1 until selectedGamesCount == gamesPerMatchup, then autoAdvanceMatchups can advance.</text>
+</svg>
