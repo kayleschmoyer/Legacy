@@ -1,8 +1,10 @@
 name: "Check Merge Conflicts"
 
 # Lightweight check that fails if the PR branch has merge conflicts with the
-# base branch. GitHub computes mergeability lazily, so this polls the API up
-# to 10 times (50 s total) before giving up.
+# base branch. Performs a local `git merge --no-commit --no-ff` against the
+# base branch — deterministic and finishes in seconds, with no dependency on
+# GitHub's lazy mergeability API (which used to leave PRs with a stuck
+# "Mergeability could not be determined" failure — LS-4479).
 #
 # The "No Merge Conflicts" job name is registered as a required status check
 # in .github/ruleset.json. Apply changes with scripts/apply-ruleset.sh.
@@ -55,31 +57,72 @@ jobs:
     needs: [sha-sanity]
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    outputs:
+      mergeable: ${{ steps.test-merge.outputs.mergeable }}
     steps:
-      - name: "Detect merge conflicts"
+      - name: Checkout base branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          # Need history back to the merge base. fetch-depth: 0 is the safe
+          # default; the runner's network/disk handle it fine for this repo.
+          fetch-depth: 0
+          # Keep credentials so the subsequent `git fetch refs/pull/N/head`
+          # can authenticate (default is true; explicit for clarity).
+          persist-credentials: true
+
+      - name: Fetch PR head
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -eo pipefail
+          # Use refs/pull/N/head so this works for both same-repo and fork PRs.
+          git fetch --no-tags origin "+refs/pull/${PR_NUMBER}/head:refs/remotes/origin/pr/${PR_NUMBER}"
+          # Sanity check: the fetched tip should match the event head SHA.
+          FETCHED_SHA=$(git rev-parse "refs/remotes/origin/pr/${PR_NUMBER}")
+          if [ "$FETCHED_SHA" != "$HEAD_SHA" ]; then
+            echo "::warning::Fetched head ($FETCHED_SHA) differs from event head ($HEAD_SHA); a newer push will trigger a fresh run."
+          fi
+
+      - name: Test merge
+        id: test-merge
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -eo pipefail
+          # Non-interactive identity required for `git merge --no-commit --no-ff`.
+          git config user.email "ci@noreply.github.com"
+          git config user.name  "check-conflicts"
+          HEAD_REF="refs/remotes/origin/pr/${PR_NUMBER}"
+          HEAD_SHA=$(git rev-parse "$HEAD_REF")
+          echo "Attempting test-merge of $HEAD_SHA into $BASE_SHA"
+          if git merge --no-commit --no-ff "$HEAD_REF"; then
+            echo "mergeable=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::No merge conflicts detected."
+          else
+            echo "mergeable=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Merge conflicts detected."
+          fi
+          # Always abort to leave the workspace clean (no-op if merge succeeded
+          # cleanly without --no-commit recording, but harmless).
+          git merge --abort 2>/dev/null || git reset --hard HEAD
+
+      - name: Sync conflict label and set status
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          MERGEABLE: ${{ steps.test-merge.outputs.mergeable }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const { owner, repo } = context.repo;
             const prNumber = context.payload.pull_request.number;
+            const mergeable = process.env.MERGEABLE === 'true';
 
-            // GitHub computes mergeability lazily and returns null until ready.
-            // Poll until we get a definitive true/false (up to ~50 s).
-            let pr;
-            let mergeable = null;
-            for (let attempt = 1; attempt <= 10; attempt++) {
-              ({ data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: prNumber }));
-              mergeable = pr.mergeable;
-              if (mergeable !== null) break;
-              core.info(`Mergeability not yet computed (attempt ${attempt}/10) — waiting 5 s…`);
-              await new Promise(r => setTimeout(r, 5000));
-            }
-
-            // Label management helpers
             const label = 'CI: Conflicts';
-            const existingLabels = pr.labels.map(l => l.name);
-            const hasLabel = existingLabels.includes(label);
+            const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: prNumber });
+            const hasLabel = pr.labels.some(l => l.name === label);
 
             async function withRetry(fn, retries = 3) {
               for (let i = 0; i < retries; i++) {
@@ -97,8 +140,7 @@ jobs:
               }
             }
 
-            if (mergeable === false) {
-              // Add conflict label if not already present
+            if (!mergeable) {
               if (!hasLabel) {
                 await withRetry(() => github.rest.issues.addLabels({
                   owner, repo, issue_number: prNumber, labels: [label],
@@ -109,33 +151,24 @@ jobs:
                 'This PR has merge conflicts with the base branch. ' +
                 'Rebase or merge the base branch into your branch to resolve them.'
               );
-            } else {
-              // Remove stale conflict label if present.
-              // Guard against 404: another workflow or manual action may have removed
-              // the label between when we fetched pr.labels and now.
-              if (hasLabel) {
-                try {
-                  await withRetry(() => github.rest.issues.removeLabel({
-                    owner, repo, issue_number: prNumber, name: label,
-                  }));
-                  core.info(`Label removed: ${label}`);
-                } catch (e) {
-                  if (e.status === 404) {
-                    core.warning(`Label already absent, skipping removal: ${label}`);
-                  } else {
-                    throw e;
-                  }
+              return;
+            }
+
+            // Mergeable — remove stale conflict label if present.
+            // Guard against 404: another workflow or manual action may have
+            // removed it between the pulls.get and now.
+            if (hasLabel) {
+              try {
+                await withRetry(() => github.rest.issues.removeLabel({
+                  owner, repo, issue_number: prNumber, name: label,
+                }));
+                core.info(`Label removed: ${label}`);
+              } catch (e) {
+                if (e.status === 404) {
+                  core.warning(`Label already absent, skipping removal: ${label}`);
+                } else {
+                  throw e;
                 }
               }
-              if (mergeable === null) {
-                // GitHub did not compute mergeability within the polling window.
-                // Fail conservatively — re-running the check (push an empty commit
-                // or re-trigger manually) will resolve this once GitHub catches up.
-                core.setFailed(
-                  'Mergeability could not be determined after 10 attempts (~50 s). ' +
-                  'Re-run this check once GitHub has computed the merge status.'
-                );
-              } else {
-                core.info('No merge conflicts detected.');
-              }
             }
+            core.info('No merge conflicts detected.');
