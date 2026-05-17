@@ -490,17 +490,21 @@ const ProfileSettingsPage: React.FC = () => {
               {/* Fields */}
               <YStack gap="$3">
                 <FieldRow>
-                  <FieldLabel>Username</FieldLabel>
+                  <FieldLabel id="profile-username-label">Username</FieldLabel>
                   {isEditingUsername ? (
                     <YStack flex={1} gap="$2">
                       <XStack gap="$2" alignItems="center" flex={1}>
                         <Input
+                          id="profile-username-input"
+                          aria-labelledby="profile-username-label"
+                          aria-label="Username"
                           value={editedUsername}
                           onChangeText={setEditedUsername}
                           maxLength={50}
                           autoFocus
                           flex={1}
                           size="$4"
+                          aria-invalid={usernameError ? 'true' : 'false'}
                           borderColor={
                             usernameError ? BRAND_SEAM_RED : '$glassBorder'
                           }

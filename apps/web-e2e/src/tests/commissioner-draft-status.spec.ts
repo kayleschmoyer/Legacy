@@ -190,16 +190,46 @@ test.describe('Commissioner — poll-cycle Season Active detection (LS-4296)', (
       }
     });
 
-    // First poll: queued — badge absent
+    // First poll: queued — badge absent. Explicitly wait for the first
+    // GetLeagueById response so callCount is guaranteed to reflect the first
+    // navigation before we flip the flag. On webkit, storageState is
+    // sometimes seeded after the first paint, which used to make the first
+    // navigation skip its GetLeagueById entirely and leave callCount=1 at the
+    // end of the test (LS-4484).
+    const firstResponse = page.waitForResponse(
+      (res) =>
+        res.url().includes('/graphql') &&
+        (res.request().postData() ?? '')
+          .toLowerCase()
+          .includes('"getleaguebyid"'),
+      { timeout: 15_000 },
+    );
     await page.goto('/baseball/league/1/commissioner');
+    await firstResponse;
     await page.waitForLoadState('networkidle');
     await expect(page.getByText('Season Active')).not.toBeVisible();
 
     // Flip before second navigation: all subsequent league requests → completed
     serveCompleted = true;
 
-    // Second poll: completed — badge must be visible after networkidle
+    // Hard-clear the page state between polls. Same-URL `page.goto` was
+    // intermittently failing to fire a second GetLeagueById query on chromium
+    // under CI load — bouncing through about:blank guarantees the next
+    // navigation mounts a fresh React tree with an empty Apollo cache.
+    await page.goto('about:blank');
+
+    // Second poll: completed — wait for the second response before asserting
+    // the UI, so callCount has incremented by the time we read it.
+    const secondResponse = page.waitForResponse(
+      (res) =>
+        res.url().includes('/graphql') &&
+        (res.request().postData() ?? '')
+          .toLowerCase()
+          .includes('"getleaguebyid"'),
+      { timeout: 15_000 },
+    );
     await page.goto('/baseball/league/1/commissioner');
+    await secondResponse;
     await page.waitForLoadState('networkidle');
     await expect(page.getByText('Season Active')).toBeVisible();
 

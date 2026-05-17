@@ -249,8 +249,15 @@ export function LeagueDetailPageV2(): React.JSX.Element {
   if (leagueLoading && !league) {
     return (
       <div className="ls-root">
-        <div className="ls-page">
-          <div className="ls-loading">Loading league…</div>
+        <div
+          className="ls-page"
+          role="main"
+          aria-busy="true"
+          aria-live="polite"
+        >
+          <div className="ls-loading" role="status">
+            Loading league…
+          </div>
         </div>
       </div>
     );

@@ -24,27 +24,29 @@ test.describe('Loading state accessibility @regression', () => {
   test('loading containers use aria-busy="true" during data fetch', async ({
     page,
   }) => {
-    // Delay only the specific GraphQL operation needed to keep the loading UI
-    // visible. Using isGraphQLEndpoint avoids intercepting non-API requests.
+    // Delay every GraphQL operation by 2s so the loading UI is observable
+    // across the React.lazy chunk-load + mount window. The previous variant
+    // filtered by operation name using `route.request().postData()`, which
+    // intermittently returns null on Firefox before the request body is
+    // fully available and would silently fall through.
     await page.route(isGraphQLEndpoint, async (route) => {
-      const postData = route.request().postData()?.toLowerCase() ?? '';
-      if (
-        postData.includes('getleaguebyid') ||
-        postData.includes('getleague')
-      ) {
-        await new Promise<void>((r) => setTimeout(r, 800));
-      }
+      await new Promise<void>((r) => setTimeout(r, 2000));
       await route.fallback();
     });
 
-    await page.goto('/baseball/league/1/overview');
+    // Kick off the navigation but don't await — we want to start polling
+    // for aria-busy while the navigation (and the delayed first GraphQL
+    // response) is still in flight.
+    const navigationPromise = page.goto('/baseball/league/1/overview');
 
-    // Wait for aria-busy="true" to appear during loading (fails if never appears)
+    // Single auto-retrying assertion — the follow-up `.count()` call used
+    // to race against the loading window closing between the poll completing
+    // and the synchronous read.
     await expect(page.locator('[aria-busy="true"]').first()).toBeAttached({
-      timeout: 3000,
+      timeout: 10_000,
     });
-    const count = await page.locator('[aria-busy="true"]').count();
-    expect(count).toBeGreaterThan(0);
+
+    await navigationPromise;
 
     // Regardless of aria-busy usage, the page should not crash during loading
     await expect(page.locator('body')).not.toContainText(

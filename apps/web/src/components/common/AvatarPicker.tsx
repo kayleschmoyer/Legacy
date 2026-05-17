@@ -136,6 +136,7 @@ export function AvatarPicker({
         <XStack gap="$2">
           <Input
             flex={1}
+            aria-label="Custom avatar URL"
             placeholder="https://example.com/avatar.png"
             value={customUrl}
             onChangeText={setCustomUrl}

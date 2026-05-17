@@ -429,8 +429,28 @@ test.describe('Form field accessibility @regression', () => {
         },
       );
 
-      await page.goto('/profile');
-      await page.waitForLoadState('networkidle');
+      // The profile settings page renders display-only field rows by default;
+      // form inputs are revealed by clicking the inline Edit affordance on the
+      // username row. Trigger Edit mode so the editable Input is in the DOM
+      // before we audit form-field accessibility.
+      //
+      // Intentionally skip `waitForLoadState('networkidle')` here — Firefox
+      // intermittently keeps a long-tail request open (Vite preview, WS,
+      // analytics) that prevents the idle event from firing within the 15s
+      // navigation timeout. The auto-retrying `toBeVisible` check on the
+      // Edit button below is a stronger readiness signal anyway.
+      await page.goto('/profile/settings');
+
+      const usernameEditBtn = page
+        .getByRole('button', { name: 'Edit' })
+        .first();
+      await expect(usernameEditBtn).toBeVisible({ timeout: 15_000 });
+      await usernameEditBtn.click();
+
+      // Wait for the username input to mount before evaluating a11y.
+      await expect(page.locator('input[aria-label="Username"]')).toBeVisible({
+        timeout: 5_000,
+      });
 
       const { inputCount, issues } = await evaluateFormA11y(page);
 
@@ -438,7 +458,8 @@ test.describe('Form field accessibility @regression', () => {
         'Unexpected Application Error',
       );
 
-      // Profile settings always renders form fields.
+      // After entering edit mode, at least the username input must be present
+      // and every visible input must declare an accessible name.
       expect(inputCount).toBeGreaterThan(0);
       expect(issues).toHaveLength(0);
     });
