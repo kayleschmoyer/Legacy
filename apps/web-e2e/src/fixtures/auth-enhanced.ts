@@ -58,7 +58,12 @@ function buildAuthStorageState(
     ...userOverrides,
   };
 
-  const expiry = payload.exp ?? Math.floor(Date.now() / 1000) + 3600;
+  // Fixed far-future expiry (2100-01-01) so issued storage-state JWTs are
+  // deterministic across runs and never expire mid-suite. The runtime
+  // cookie-validity check (~line 309) still compares against wall-clock
+  // Date.now() — that's appropriate use, not a fixture-time embed.
+  const FAR_FUTURE_EPOCH_SEC = 4_102_444_800;
+  const expiry = payload.exp ?? FAR_FUTURE_EPOCH_SEC;
 
   return {
     cookies: [
@@ -174,7 +179,9 @@ const isolated = base.extend<{ _apiIsolation: void }>({
       // Values match the global-setup.ts CI-mode hermetic JWT (id=1, admin).
       await page.addInitScript(() => {
         if (!window.localStorage.getItem('ls_user_profile')) {
-          const expiry = Math.floor(Date.now() / 1000) + 3600;
+          // Fixed far-future expiry (2100-01-01) — deterministic and never
+          // expires mid-suite. Mirrors global-setup.ts / writeStorageState.
+          const expiry = 4_102_444_800;
           window.localStorage.setItem(
             'ls_user_profile',
             JSON.stringify({

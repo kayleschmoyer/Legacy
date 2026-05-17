@@ -7,17 +7,9 @@
 
 import { expect, test } from '../fixtures/auth-enhanced';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 /** URL predicate for the GraphQL API endpoint */
-function isGraphQLEndpoint(url: URL): boolean {
-  const s = url.toString();
-  return (
-    s.includes('/graphql') &&
-    !s.includes('/@fs/') &&
-    !s.includes('.ts') &&
-    !s.includes('.js')
-  );
-}
 
 test.describe('Management Page — static elements @smoke', () => {
   test.beforeEach(async ({ page }) => {

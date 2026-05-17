@@ -12,17 +12,10 @@
 
 import { expect, test } from '../fixtures/auth-enhanced';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import { agoIso, FIXED_NOW_ISO } from '../mocks/time';
+import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 /** URL predicate for the GraphQL API endpoint */
-function isGraphQLEndpoint(url: URL): boolean {
-  const s = url.toString();
-  return (
-    s.includes('/graphql') &&
-    !s.includes('/@fs/') &&
-    !s.includes('.ts') &&
-    !s.includes('.js')
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Mock data
@@ -41,9 +34,9 @@ const MOCK_NOTIFICATIONS = [
     message: 'Your Week 5 matchup against Team Alpha has begun!',
     metadata: null,
     read: false,
-    sentAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+    sentAt: agoIso(30 * 60 * 1000),
     readAt: null,
-    createdAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+    createdAt: agoIso(30 * 60 * 1000),
   },
   {
     __typename: 'NotificationHistoryItem',
@@ -57,9 +50,9 @@ const MOCK_NOTIFICATIONS = [
     message: 'Your Week 4 matchup has ended. You won 85-72!',
     metadata: null,
     read: true,
-    sentAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    readAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    sentAt: agoIso(2 * 24 * 60 * 60 * 1000),
+    readAt: agoIso(24 * 60 * 60 * 1000),
+    createdAt: agoIso(2 * 24 * 60 * 60 * 1000),
   },
   {
     __typename: 'NotificationHistoryItem',
@@ -73,9 +66,9 @@ const MOCK_NOTIFICATIONS = [
     message: 'Your matchup is within 5 points with 2 days remaining!',
     metadata: null,
     read: false,
-    sentAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+    sentAt: agoIso(60 * 60 * 1000),
     readAt: null,
-    createdAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+    createdAt: agoIso(60 * 60 * 1000),
   },
 ];
 
@@ -172,8 +165,8 @@ async function mockNotificationsGraphQL(
               pushEnabled: true,
               emailEnabled: true,
               closeGameThreshold: 5,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
+              createdAt: FIXED_NOW_ISO,
+              updatedAt: FIXED_NOW_ISO,
             },
           },
         }),

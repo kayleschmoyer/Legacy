@@ -18,18 +18,9 @@ import {
   extractOperationName,
 } from '../fixtures/shared-mocks';
 import { E2E_SIGNING_SECRET, signE2EJwt } from '../utils/jwt';
+import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-function isGraphQLEndpoint(url: URL): boolean {
-  const s = url.toString();
-  return (
-    s.includes('/graphql') &&
-    !s.includes('/@fs/') &&
-    !s.includes('.ts') &&
-    !s.includes('.js')
-  );
-}
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
 

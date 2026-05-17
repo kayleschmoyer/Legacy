@@ -9,6 +9,9 @@ import {
   userTeamIdResponse,
 } from '../mocks/graphql';
 import { mockDraft } from '../mocks/graphql/draft.mocks';
+import { unmockedGraphQLFallback as routerUnmockedFallback } from '../mocks/graphql/router';
+import { FIXED_NOW_ISO } from '../mocks/time';
+import { deepFreeze } from '../mocks/deep-freeze';
 
 // ---------------------------------------------------------------------------
 // Baseline GraphQL mock responses
@@ -29,7 +32,7 @@ import { mockDraft } from '../mocks/graphql/draft.mocks';
  * To add a new baseline mock, add an entry here. The key must be the
  * exact operationName (lowercased) that appears in the request's JSON body.
  */
-export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = {
+export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = deepFreeze({
   // ── App shell (fires on every authenticated page) ─────────────────
   getunreadnotificationcount: { data: { getUnreadNotificationCount: 0 } },
   getuserbyid: {
@@ -146,7 +149,7 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = {
       scoreboard: {
         __typename: 'Scoreboard',
         date: '2026-04-01',
-        lastUpdated: new Date().toISOString(),
+        lastUpdated: FIXED_NOW_ISO,
         games: [],
       },
     },
@@ -173,7 +176,7 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = {
   // ── History tab ─────────────────────────────────────────────────
   getleaguehistory: { data: { getLeagueHistory: [] } },
   getalltimerecords: { data: { getAllTimeRecords: [] } },
-};
+});
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -199,9 +202,7 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = {
  *   await unmockedGraphQLFallback(route);
  * });
  */
-export async function unmockedGraphQLFallback(route: Route): Promise<void> {
-  await route.fallback();
-}
+export const unmockedGraphQLFallback = routerUnmockedFallback;
 
 /**
  * Extract the GraphQL operationName from a Playwright Route's POST body.

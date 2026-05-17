@@ -21,6 +21,7 @@
  */
 
 import type { Page } from '@playwright/test';
+import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 import { expect, test } from '../fixtures/auth-enhanced';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
@@ -48,16 +49,6 @@ const LEAGUE_ID = 1;
 const MATCHUP_ID = 10;
 const MATCHUP_URL = `/baseball/league/${LEAGUE_ID}/matchups/${MATCHUP_ID}`;
 const STANDINGS_URL = `/baseball/league/${LEAGUE_ID}/standings`;
-
-function isGraphQLEndpoint(url: URL): boolean {
-  const s = url.toString();
-  return (
-    s.includes('/graphql') &&
-    !s.includes('/@fs/') &&
-    !s.includes('.ts') &&
-    !s.includes('.js')
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Season phase definitions

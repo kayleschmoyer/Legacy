@@ -18,6 +18,7 @@ import type { WebSocketRoute } from '@playwright/test';
 import { injectWebSocketUrl, isGraphQL } from './helpers/websocket-test-utils';
 import { expect, test } from '../fixtures/auth-enhanced';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import { FIXED_NOW_ISO, fromNowIso } from '../mocks/time';
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
@@ -464,7 +465,7 @@ test.describe('WebSocket – multiple notifications @regression', () => {
         type: 'MATCHUP_STATS_COMPLETE',
         leagueId: LEAGUE_ID,
         matchupId: 1,
-        completedAt: new Date().toISOString(),
+        completedAt: FIXED_NOW_ISO,
       }),
     );
     route.send(
@@ -482,8 +483,8 @@ test.describe('WebSocket – multiple notifications @regression', () => {
         draftOrder: 'snake',
         teamCount: 4,
         pickTimeLimitSeconds: 120,
-        currentPickDeadline: new Date(Date.now() + 120_000).toISOString(),
-        startedAt: new Date().toISOString(),
+        currentPickDeadline: fromNowIso(120_000),
+        startedAt: FIXED_NOW_ISO,
       }),
     );
 
@@ -609,8 +610,8 @@ test.describe('WebSocket – draft status transition @regression', () => {
         draftOrder: 'snake',
         teamCount: 4,
         pickTimeLimitSeconds: 120,
-        currentPickDeadline: new Date(Date.now() + 120_000).toISOString(),
-        startedAt: new Date().toISOString(),
+        currentPickDeadline: fromNowIso(120_000),
+        startedAt: FIXED_NOW_ISO,
       }),
     );
 
@@ -702,7 +703,7 @@ test.describe('WebSocket – chat message notification @regression', () => {
         senderId: 42,
         senderUsername: 'ws_tester',
         messageText: 'Hello from WebSocket test!',
-        timestamp: new Date().toISOString(),
+        timestamp: FIXED_NOW_ISO,
         messageType: 'text',
         gifUrl: null,
         metadata: null,

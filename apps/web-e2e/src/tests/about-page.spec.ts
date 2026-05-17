@@ -8,16 +8,8 @@
 
 import { expect, test, unauthTest } from '../fixtures/auth-enhanced';
 import { extractOperationName } from '../fixtures/shared-mocks';
-
-function isGraphQLEndpoint(url: URL): boolean {
-  const s = url.toString();
-  return (
-    s.includes('/graphql') &&
-    !s.includes('/@fs/') &&
-    !s.includes('.ts') &&
-    !s.includes('.js')
-  );
-}
+import { FIXED_NOW_ISO } from '../mocks/time';
+import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 test.describe('About Page @smoke', () => {
   test.beforeEach(async ({ page }) => {
@@ -131,7 +123,7 @@ test.describe('About page — scoreboard ticker navigation @regression', () => {
             scoreboard: {
               __typename: 'Scoreboard',
               date: '2026-04-01',
-              lastUpdated: new Date().toISOString(),
+              lastUpdated: FIXED_NOW_ISO,
               games: [
                 {
                   __typename: 'ScoreboardGame',

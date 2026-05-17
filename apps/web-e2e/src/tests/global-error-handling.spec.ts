@@ -13,17 +13,9 @@
 
 import type { Page } from '@playwright/test';
 import { expect, test } from '../fixtures/auth-enhanced';
+import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-function isGraphQLEndpoint(url: URL): boolean {
-  const s = url.toString();
-  return (
-    s.includes('/graphql') &&
-    !s.includes('/@fs/') &&
-    !s.includes('.ts') &&
-    !s.includes('.js')
-  );
-}
 
 async function dispatchApolloError(page: Page, message: string) {
   await page.evaluate((msg) => {

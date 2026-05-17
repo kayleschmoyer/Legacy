@@ -12,18 +12,10 @@
 
 import { expect, test } from '../fixtures/auth-enhanced';
 import { extractOperationName } from '../fixtures/shared-mocks';
+import { FIXED_NOW_ISO } from '../mocks/time';
+import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-function isGraphQLEndpoint(url: URL): boolean {
-  const s = url.toString();
-  return (
-    s.includes('/graphql') &&
-    !s.includes('/@fs/') &&
-    !s.includes('.ts') &&
-    !s.includes('.js')
-  );
-}
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -298,7 +290,7 @@ async function setupGraphQL(
                 faabBid: vars.faabBid ?? null,
                 status: 'pending',
                 errorMessage: null,
-                createdAt: new Date().toISOString(),
+                createdAt: FIXED_NOW_ISO,
               },
             },
           }),

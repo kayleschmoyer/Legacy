@@ -7,18 +7,9 @@
  */
 
 import { expect, test } from '../fixtures/auth-enhanced';
+import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 /** URL predicate that matches GraphQL API endpoints but not source file imports */
-function isGraphQLEndpoint(url: URL): boolean {
-  const urlString = url.toString();
-  return (
-    urlString.includes('/graphql') &&
-    !urlString.includes('/@fs/') &&
-    !urlString.includes('.ts') &&
-    !urlString.includes('.js')
-  );
-}
-
 /**
  * Evaluate form field accessibility for all visible inputs on the page.
  * Returns counts and issues found.

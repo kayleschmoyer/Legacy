@@ -286,7 +286,11 @@ function writeStorageState(origin: string, jwt: string) {
     accessLevel: payload.accessLevel ?? 'none',
   };
 
-  const expiry = payload.exp ?? Math.floor(Date.now() / 1000) + 3600;
+  // Fixed far-future expiry (2100-01-01) so the storage state JWT is
+  // deterministic across runs and never expires mid-suite. Tests should
+  // not depend on wall-clock time — see apps/web-e2e/src/mocks/time.ts.
+  const FAR_FUTURE_EPOCH_SEC = 4_102_444_800;
+  const expiry = payload.exp ?? FAR_FUTURE_EPOCH_SEC;
   const url = new URL(origin);
 
   const storageState = {

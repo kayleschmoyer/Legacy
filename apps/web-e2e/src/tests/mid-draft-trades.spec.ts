@@ -12,6 +12,7 @@ import {
   extractOperationName,
   unmockedGraphQLFallback,
 } from '../fixtures/shared-mocks';
+import { fromNowIso } from '../mocks/time';
 import {
   mockDraft,
   mockDraftPick,
@@ -19,21 +20,13 @@ import {
   mockLeague,
   mockTeam,
 } from '../mocks/graphql';
+import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 /** URL predicate for the GraphQL API endpoint */
-function isGraphQLEndpoint(url: URL): boolean {
-  const s = url.toString();
-  return (
-    s.includes('/graphql') &&
-    !s.includes('/@fs/') &&
-    !s.includes('.ts') &&
-    !s.includes('.js')
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Mock data
@@ -59,7 +52,7 @@ const MOCK_DRAFT = mockDraft({
   currentPick: 9,
 });
 
-const MOCK_DRAFT_PICK_DEADLINE = new Date(Date.now() + 60_000).toISOString();
+const MOCK_DRAFT_PICK_DEADLINE = fromNowIso(60_000);
 
 const MOCK_DRAFT_ORDER = [
   {

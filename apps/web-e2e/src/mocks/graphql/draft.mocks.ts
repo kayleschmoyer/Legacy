@@ -5,6 +5,8 @@
  *         getDraftQueueEntry, getDraftTeamOrder, startDraft, makeDraftPick, etc.
  */
 
+import { FIXED_NOW_ISO } from '../time';
+
 export interface MockDraft {
   __typename: 'Draft';
   id: number;
@@ -102,8 +104,7 @@ export function getDraftPicksResponse(picks?: Partial<MockDraftPick>[]) {
       getDraftPicks: (picks ?? []).map((p) =>
         mockDraftPick({
           ...p,
-          pickedAt:
-            p.pickedAt ?? (p.playerId ? new Date().toISOString() : null),
+          pickedAt: p.pickedAt ?? (p.playerId ? FIXED_NOW_ISO : null),
         }),
       ),
     },
@@ -166,7 +167,7 @@ export function makeDraftPickResponse(pick?: Partial<MockDraftPick>) {
   return {
     data: {
       makeDraftPick: mockDraftPick({
-        pickedAt: new Date().toISOString(),
+        pickedAt: FIXED_NOW_ISO,
         ...pick,
       }),
     },

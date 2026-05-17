@@ -12,18 +12,10 @@
 
 import { expect, test } from '../fixtures/auth-enhanced';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import { agoIso } from '../mocks/time';
+import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-function isGraphQLEndpoint(url: URL): boolean {
-  const s = url.toString();
-  return (
-    s.includes('/graphql') &&
-    !s.includes('/@fs/') &&
-    !s.includes('.ts') &&
-    !s.includes('.js')
-  );
-}
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
 
@@ -91,7 +83,7 @@ const MOCK_CHAT_MESSAGES = [
     id: '1',
     userId: 1,
     messageText: 'Hey everyone!',
-    timestamp: new Date(Date.now() - 1_800_000).toISOString(),
+    timestamp: agoIso(1_800_000),
     messageType: 'text',
     gifUrl: null,
     metadata: null,
@@ -102,7 +94,7 @@ const MOCK_CHAT_MESSAGES = [
     id: '2',
     userId: 2,
     messageText: 'Draft prep time!',
-    timestamp: new Date(Date.now() - 900_000).toISOString(),
+    timestamp: agoIso(900_000),
     messageType: 'text',
     gifUrl: null,
     metadata: null,
@@ -123,7 +115,7 @@ const MOCK_ACTIVITY_EVENTS = [
       teamAName: 'Alpha Squad',
       teamBName: 'Beta Force',
     }),
-    occurredAt: new Date(Date.now() - 3_600_000).toISOString(),
+    occurredAt: agoIso(3_600_000),
   },
   {
     __typename: 'LeagueActivityEvent',
@@ -134,7 +126,7 @@ const MOCK_ACTIVITY_EVENTS = [
     actorUsername: 'opponent',
     eventType: 'waiver_claimed',
     payload: JSON.stringify({ playerId: 42 }),
-    occurredAt: new Date(Date.now() - 7_200_000).toISOString(),
+    occurredAt: agoIso(7_200_000),
   },
 ];
 
@@ -149,7 +141,7 @@ const MOCK_MULTI_ACTIVITY_EVENTS = [
     actorUsername: 'testuser',
     eventType: 'draft_pick_made',
     payload: JSON.stringify({ round: 1, pickNumber: 3 }),
-    occurredAt: new Date(Date.now() - 10_800_000).toISOString(),
+    occurredAt: agoIso(10_800_000),
   },
   {
     __typename: 'LeagueActivityEvent',
@@ -160,7 +152,7 @@ const MOCK_MULTI_ACTIVITY_EVENTS = [
     actorUsername: 'testuser',
     eventType: 'league_announcement',
     payload: JSON.stringify({ messageText: 'Welcome to the league!' }),
-    occurredAt: new Date(Date.now() - 14_400_000).toISOString(),
+    occurredAt: agoIso(14_400_000),
   },
 ];
 

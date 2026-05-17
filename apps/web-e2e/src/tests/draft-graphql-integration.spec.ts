@@ -1,5 +1,6 @@
 import { expect, test } from '../fixtures/auth-enhanced';
 import { mockLeague } from '../mocks/graphql/league.mocks';
+import { FIXED_NOW_ISO } from '../mocks/time';
 
 interface GraphQLRequest {
   query: string;
@@ -82,7 +83,7 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
             currentPick: 0,
             pickTimeLimitSeconds: 120,
             currentPickDeadline: null,
-            draftStartedAt: new Date().toISOString(),
+            draftStartedAt: FIXED_NOW_ISO,
             draftCompletedAt: null,
             // status is derived from league.draftStatus, not a draft field
             status: 'queued',

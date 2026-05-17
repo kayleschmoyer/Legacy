@@ -17,6 +17,7 @@ import {
   test,
 } from '../fixtures/auth-enhanced';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 /** Non-admin user: global storageState JWT has accessLevel 'admin',
  *  so we need a custom fixture with accessLevel 'none' for redirect tests. */
@@ -25,16 +26,6 @@ const nonAdminTest = createCustomAuthTest('user@test.com', 'none');
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function isGraphQLEndpoint(url: URL): boolean {
-  const s = url.toString();
-  return (
-    s.includes('/graphql') &&
-    !s.includes('/@fs/') &&
-    !s.includes('.ts') &&
-    !s.includes('.js')
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Mock Data

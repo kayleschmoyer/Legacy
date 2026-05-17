@@ -14,6 +14,7 @@
 
 import { expect, test } from '../fixtures/auth-enhanced';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -34,11 +35,6 @@ function makeClue(index: number, isLast = false) {
     totalClues: TOTAL_CLUES,
     isLastClue: isLast,
   };
-}
-
-function isGraphQLEndpoint(url: URL): boolean {
-  const s = url.toString();
-  return s.includes('/graphql') && !s.includes('/@fs/') && !s.includes('.ts');
 }
 
 // ── Fixtures ───────────────────────────────────────────────────────────────

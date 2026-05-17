@@ -1,4 +1,5 @@
 import { test as base, expect } from './auth-enhanced';
+import { extractOperationName } from './shared-mocks';
 
 import { userLeaguesResponse } from '../mocks/graphql';
 import { mockDraft } from '../mocks/graphql/draft.mocks';
@@ -6,6 +7,7 @@ import {
   leagueByIdResponse,
   updateLeagueBrandingResponse,
 } from '../mocks/graphql/league.mocks';
+import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 /**
  * Auth fixture for tests that need an authenticated user with league data.
@@ -29,8 +31,8 @@ export const test = base.extend({
       'not-started';
 
     // Mock OAuth login endpoint
-    await page.route('**/oauth/login', (route) => {
-      void route.fulfill({
+    await page.route('**/oauth/login', async (route) => {
+      await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
@@ -50,61 +52,53 @@ export const test = base.extend({
     // Authenticated-user overrides + mutation mocks.
     // Only handles operations that differ from the _apiIsolation baseline;
     // everything else falls through via route.fallback().
-    await page.route(
-      (url) => {
-        const urlString = url.toString();
-        return (
-          urlString.includes('/graphql') &&
-          !urlString.includes('/@fs/') &&
-          !urlString.includes('.ts') &&
-          !urlString.includes('.js')
-        );
-      },
-      (route) => {
-        const postData = route.request().postData()?.toLowerCase() ?? '';
+    await page.route(isGraphQLEndpoint, async (route) => {
+      // Match on the exact operationName — substring checks on the raw POST
+      // body matched siblings like `getUserLeaguesById` /
+      // `getUserLeagueSummaries` and routed them through the wrong handler.
+      const op = extractOperationName(route).toLowerCase();
 
-        if (postData.includes('getuserleagues')) {
-          // Override baseline (which returns empty) → return one league
-          void route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify(userLeaguesResponse()),
-          });
-        } else if (postData.includes('initializedraft')) {
-          // Flip stateful draftStatus so subsequent GetLeagueById calls
-          // return the updated value (critical for persistence tests).
-          draftStatus = 'queued';
-          void route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              data: {
-                initializeDraft: mockDraft({
-                  status: 'queued',
-                  leagueId: 1,
-                }),
-              },
-            }),
-          });
-        } else if (postData.includes('getleaguebyid')) {
-          // Return league with current (possibly mutated) draftStatus
-          void route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify(leagueByIdResponse({ draftStatus })),
-          });
-        } else if (postData.includes('updateleaguebranding')) {
-          void route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify(updateLeagueBrandingResponse()),
-          });
-        } else {
-          // Unknown operation → fall through to _apiIsolation baseline
-          void route.fallback();
-        }
-      },
-    );
+      if (op === 'getuserleagues') {
+        // Override baseline (which returns empty) → return one league
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(userLeaguesResponse()),
+        });
+      } else if (op === 'initializedraft') {
+        // Flip stateful draftStatus so subsequent GetLeagueById calls
+        // return the updated value (critical for persistence tests).
+        draftStatus = 'queued';
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: {
+              initializeDraft: mockDraft({
+                status: 'queued',
+                leagueId: 1,
+              }),
+            },
+          }),
+        });
+      } else if (op === 'getleaguebyid') {
+        // Return league with current (possibly mutated) draftStatus
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(leagueByIdResponse({ draftStatus })),
+        });
+      } else if (op === 'updateleaguebranding') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(updateLeagueBrandingResponse()),
+        });
+      } else {
+        // Unknown operation → fall through to _apiIsolation baseline
+        await route.fallback();
+      }
+    });
 
     await use(page);
   },

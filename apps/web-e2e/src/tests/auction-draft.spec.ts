@@ -13,7 +13,9 @@
 
 import type { Page } from '@playwright/test';
 import { expect, test } from '../fixtures/auth-enhanced';
+import { FIXED_NOW_ISO, fromNowIso } from '../mocks/time';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -106,7 +108,7 @@ const MOCK_LEAGUE_DRAFT = {
   currentPick: 1,
   pickTimeLimitSeconds: 30,
   currentPickDeadline: null,
-  draftStartedAt: new Date().toISOString(),
+  draftStartedAt: FIXED_NOW_ISO,
 };
 
 /** Auction state: waiting for nomination (no player nominated yet) */
@@ -117,7 +119,7 @@ const MOCK_AUCTION_STATE_NOMINATING = {
   nominatedPlayer: null,
   currentBid: null,
   currentBidder: null,
-  nominationDeadline: new Date(Date.now() + 60_000).toISOString(),
+  nominationDeadline: fromNowIso(60_000),
   bidDeadline: null,
   nominationOrder: 1,
 };
@@ -144,7 +146,7 @@ const MOCK_AUCTION_STATE_BIDDING = {
     name: 'Dollar Drafters',
   },
   nominationDeadline: null,
-  bidDeadline: new Date(Date.now() + 30_000).toISOString(),
+  bidDeadline: fromNowIso(30_000),
   nominationOrder: 2,
 };
 
@@ -166,7 +168,7 @@ const MOCK_AUCTION_STATE_OUTBID = {
   currentBid: 25,
   currentBidder: { __typename: 'Team' as const, id: 3, name: 'Budget Beasts' },
   nominationDeadline: null,
-  bidDeadline: new Date(Date.now() + 15_000).toISOString(),
+  bidDeadline: fromNowIso(15_000),
   nominationOrder: 2,
 };
 
@@ -236,16 +238,6 @@ const MOCK_BUDGETS_AFTER_WIN = [
 // ---------------------------------------------------------------------------
 // GraphQL URL predicate
 // ---------------------------------------------------------------------------
-
-function isGraphQLEndpoint(url: URL): boolean {
-  const s = url.toString();
-  return (
-    s.includes('/graphql') &&
-    !s.includes('/@fs/') &&
-    !s.includes('.ts') &&
-    !s.includes('.js')
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Route helpers

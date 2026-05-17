@@ -8,16 +8,8 @@
 
 import { expect, test, unauthTest } from '../fixtures/auth-enhanced';
 import { extractOperationName } from '../fixtures/shared-mocks';
-
-function isGraphQLEndpoint(url: URL): boolean {
-  const s = url.toString();
-  return (
-    s.includes('/graphql') &&
-    !s.includes('/@fs/') &&
-    !s.includes('.ts') &&
-    !s.includes('.js')
-  );
-}
+import { FIXED_NOW_ISO } from '../mocks/time';
+import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 const MOCK_LIVE_GAME = {
   __typename: 'ScoreboardGame',
@@ -142,7 +134,7 @@ async function mockScoreboardGraphQL(
             scoreboard: {
               __typename: 'Scoreboard',
               date: scoreboardDate,
-              lastUpdated: new Date().toISOString(),
+              lastUpdated: FIXED_NOW_ISO,
               games: [],
             },
           },
@@ -157,7 +149,7 @@ async function mockScoreboardGraphQL(
             scoreboard: {
               __typename: 'Scoreboard',
               date: scoreboardDate,
-              lastUpdated: new Date().toISOString(),
+              lastUpdated: FIXED_NOW_ISO,
               games: opts.games ?? [
                 MOCK_LIVE_GAME,
                 MOCK_FINAL_GAME,
@@ -278,7 +270,7 @@ test.describe('Scoreboard — date change triggers new query @regression', () =>
             scoreboard: {
               __typename: 'Scoreboard',
               date: '2026-04-01',
-              lastUpdated: new Date().toISOString(),
+              lastUpdated: FIXED_NOW_ISO,
               games: [MOCK_LIVE_GAME, MOCK_FINAL_GAME, MOCK_PREVIEW_GAME],
             },
           },
@@ -335,7 +327,7 @@ test.describe('Scoreboard — DateNav arrow buttons @regression', () => {
             scoreboard: {
               __typename: 'Scoreboard',
               date: '2026-04-01',
-              lastUpdated: new Date().toISOString(),
+              lastUpdated: FIXED_NOW_ISO,
               games: [MOCK_LIVE_GAME, MOCK_FINAL_GAME, MOCK_PREVIEW_GAME],
             },
           },

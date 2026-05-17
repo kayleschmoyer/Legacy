@@ -8,6 +8,8 @@
 
 import { createCustomAuthTest, expect, test } from '../fixtures/auth-enhanced';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import { agoIso, FIXED_NOW_ISO } from '../mocks/time';
+import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 /**
  * Non-admin test fixture — the default `test` fixture may carry an admin JWT
@@ -20,16 +22,6 @@ import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 const memberTest = createCustomAuthTest('member@test.com', 'none');
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-function isGraphQLEndpoint(url: URL): boolean {
-  const s = url.toString();
-  return (
-    s.includes('/graphql') &&
-    !s.includes('/@fs/') &&
-    !s.includes('.ts') &&
-    !s.includes('.js')
-  );
-}
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
 
@@ -105,7 +97,7 @@ function mockAnnouncement(overrides: Record<string, unknown> = {}) {
     id: '101',
     userId: 1,
     messageText: 'League draft is scheduled for next Friday at 8 PM!',
-    timestamp: new Date(Date.now() - 3_600_000).toISOString(),
+    timestamp: agoIso(3_600_000),
     messageType: 'league_announcement',
     sender: { __typename: 'User', username: 'the_commish' },
     ...overrides,
@@ -201,7 +193,7 @@ async function setupGraphQL(
         : mockAnnouncement({
             messageText,
             id: '999',
-            timestamp: new Date().toISOString(),
+            timestamp: FIXED_NOW_ISO,
           });
 
       // Persist the announcement so subsequent getLeagueAnnouncements returns it.

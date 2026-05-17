@@ -13,20 +13,12 @@
 
 import { expect, test } from '../fixtures/auth-enhanced';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import { agoIso } from '../mocks/time';
+import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function isGraphQLEndpoint(url: URL): boolean {
-  const s = url.toString();
-  return (
-    s.includes('/graphql') &&
-    !s.includes('/@fs/') &&
-    !s.includes('.ts') &&
-    !s.includes('.js')
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Mock Data
@@ -76,7 +68,7 @@ const MOCK_CHAT_MESSAGES = [
     id: '1',
     userId: 1,
     messageText: 'Hello league!',
-    timestamp: new Date(Date.now() - 1_800_000).toISOString(),
+    timestamp: agoIso(1_800_000),
     messageType: 'text',
     gifUrl: null,
     metadata: null,

@@ -15,19 +15,11 @@ import {
   test,
 } from '../fixtures/auth-enhanced';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 const freeUserTest = createCustomAuthTest('freeuser@test.com', 'none');
 
 /** URL predicate that matches GraphQL API endpoints but not source file imports */
-function isGraphQLEndpoint(url: URL): boolean {
-  const s = url.toString();
-  return (
-    s.includes('/graphql') &&
-    !s.includes('/@fs/') &&
-    !s.includes('.ts') &&
-    !s.includes('.js')
-  );
-}
 
 /** Mock a successful createLeagueAndTeams response */
 async function mockCreateLeagueSuccess(page: import('@playwright/test').Page) {

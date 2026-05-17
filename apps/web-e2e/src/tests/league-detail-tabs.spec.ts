@@ -11,18 +11,10 @@
 
 import { expect, test } from '../fixtures/auth-enhanced';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import { agoIso } from '../mocks/time';
+import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-function isGraphQLEndpoint(url: URL): boolean {
-  const s = url.toString();
-  return (
-    s.includes('/graphql') &&
-    !s.includes('/@fs/') &&
-    !s.includes('.ts') &&
-    !s.includes('.js')
-  );
-}
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
 
@@ -130,7 +122,7 @@ const MOCK_ACTIVITY_EVENTS = [
       teamAName: 'Alpha Squad',
       teamBName: 'Beta Force',
     }),
-    occurredAt: new Date(Date.now() - 3_600_000).toISOString(),
+    occurredAt: agoIso(3_600_000),
   },
   {
     __typename: 'LeagueActivityEvent',
@@ -144,7 +136,7 @@ const MOCK_ACTIVITY_EVENTS = [
       playerName: 'John Smith',
       teamName: 'Beta Force',
     }),
-    occurredAt: new Date(Date.now() - 7_200_000).toISOString(),
+    occurredAt: agoIso(7_200_000),
   },
 ];
 
@@ -154,7 +146,7 @@ const MOCK_CHAT_MESSAGES = [
     id: '1',
     userId: 1,
     messageText: 'Good luck this week everyone!',
-    timestamp: new Date(Date.now() - 1_800_000).toISOString(),
+    timestamp: agoIso(1_800_000),
     messageType: 'text',
     gifUrl: null,
     metadata: null,
@@ -165,7 +157,7 @@ const MOCK_CHAT_MESSAGES = [
     id: '2',
     userId: 2,
     messageText: 'May the best roster win!',
-    timestamp: new Date(Date.now() - 900_000).toISOString(),
+    timestamp: agoIso(900_000),
     messageType: 'text',
     gifUrl: null,
     metadata: null,
@@ -209,7 +201,7 @@ const MOCK_WAIVER_CLAIMS = [
     playerName: 'Waiver Target',
     dropPlayerName: null,
     processedAt: null,
-    createdAt: new Date(Date.now() - 600_000).toISOString(),
+    createdAt: agoIso(600_000),
   },
 ];
 

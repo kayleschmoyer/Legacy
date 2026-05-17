@@ -24,17 +24,13 @@ import {
   myPastDueSubscriptionResponse,
   myPremiumSubscriptionResponse,
 } from '../mocks/graphql/subscription.mocks';
+import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 /** Matches the app's GraphQL endpoint but not source-file imports. */
-function isGraphQLEndpoint(url: URL): boolean {
-  const s = url.toString();
-  return s.includes('/graphql') && !s.includes('/@fs/') && !s.includes('.ts');
-}
-
 type GraphQLHandlers = Record<string, unknown>;
 
 /** Route GraphQL operations to controlled response bodies. */

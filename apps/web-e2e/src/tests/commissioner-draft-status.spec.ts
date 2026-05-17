@@ -15,20 +15,11 @@
  */
 
 import type { APIRequestContext } from '@playwright/test';
+import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 import { expect, test, unauthTest } from '../fixtures/auth-enhanced';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 import { waitForSeasonActive } from '../integration/helpers/wait-for-season-active';
-
-function isGraphQLEndpoint(url: URL): boolean {
-  const s = url.toString();
-  return (
-    s.includes('/graphql') &&
-    !s.includes('/@fs/') &&
-    !s.includes('.ts') &&
-    !s.includes('.js')
-  );
-}
 
 function makeLeague(overrides: Record<string, unknown> = {}) {
   return {

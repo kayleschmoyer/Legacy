@@ -22,13 +22,9 @@ import {
   validateInviteCodeNotFoundResponse,
   validateInviteCodeResponse,
 } from '../mocks/graphql/league.mocks';
+import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 /** Matches GraphQL API calls but not source-file imports. */
-function isGraphQLEndpoint(url: URL): boolean {
-  const s = url.toString();
-  return s.includes('/graphql') && !s.includes('/@fs/') && !s.includes('.ts');
-}
-
 // ── helpers ───────────────────────────────────────────────────────
 
 /** Route all GraphQL requests through a per-operation handler map.

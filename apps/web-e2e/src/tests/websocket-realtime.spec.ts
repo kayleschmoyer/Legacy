@@ -29,6 +29,7 @@ import { injectWebSocketUrl } from './helpers/websocket-test-utils';
 import { expect } from '../fixtures/auth-enhanced';
 import { test } from '../fixtures/auth-enhanced';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import { FIXED_NOW_ISO, fromNowIso } from '../mocks/time';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -400,7 +401,7 @@ test.describe('WebSocket real-time updates @critical', () => {
         senderId: 42,
         senderUsername: 'ws_tester',
         messageText,
-        timestamp: new Date().toISOString(),
+        timestamp: FIXED_NOW_ISO,
         messageType: 'text',
         gifUrl: null,
         metadata: null,
@@ -468,7 +469,7 @@ test.describe('WebSocket real-time updates @critical', () => {
         type: 'MATCHUP_STATS_COMPLETE',
         leagueId: LEAGUE_ID,
         matchupId: 1,
-        completedAt: new Date().toISOString(),
+        completedAt: FIXED_NOW_ISO,
       }),
     );
 
@@ -520,8 +521,8 @@ test.describe('WebSocket real-time updates @critical', () => {
         draftOrder: 'snake',
         teamCount: 4,
         pickTimeLimitSeconds: 120,
-        currentPickDeadline: new Date(Date.now() + 120_000).toISOString(),
-        startedAt: new Date().toISOString(),
+        currentPickDeadline: fromNowIso(120_000),
+        startedAt: FIXED_NOW_ISO,
       }),
     );
 

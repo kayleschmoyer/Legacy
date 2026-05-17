@@ -12,18 +12,9 @@
 import { expect, unauthTest } from '../fixtures/auth-enhanced';
 import { test } from '../fixtures/auth';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 /** URL predicate that matches GraphQL API endpoints but not source file imports */
-function isGraphQLEndpoint(url: URL): boolean {
-  const urlString = url.toString();
-  return (
-    urlString.includes('/graphql') &&
-    !urlString.includes('/@fs/') &&
-    !urlString.includes('.ts') &&
-    !urlString.includes('.js')
-  );
-}
-
 /** Expand a collapsible section by clicking its toggle header */
 async function expandSection(
   page: import('@playwright/test').Page,
@@ -129,7 +120,9 @@ test.describe('League Creation @critical', () => {
     await expect(page.getByPlaceholder('Enter your league name')).toBeVisible();
 
     // Fill in valid league data
-    const leagueName = `Test League ${Date.now()}`;
+    // Fixed name — this is a fully-mocked hermetic test, no need to make
+    // the league name unique against a live backend.
+    const leagueName = 'Test League';
     await page.getByPlaceholder('Enter your league name').fill(leagueName);
 
     // Select number of teams (in Basic Settings, expanded by default)

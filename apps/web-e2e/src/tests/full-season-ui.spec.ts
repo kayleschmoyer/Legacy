@@ -17,21 +17,14 @@ import type { Page } from '@playwright/test';
 import { expect } from '../fixtures/auth-enhanced';
 import { test } from '../fixtures/auth-enhanced';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import { FIXED_NOW_ISO } from '../mocks/time';
+import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
 /** Match GraphQL fetch calls but not HMR / source file requests. */
-function isGraphQLEndpoint(url: URL): boolean {
-  const s = url.toString();
-  return (
-    s.includes('/graphql') &&
-    !s.includes('/@fs/') &&
-    !s.includes('.ts') &&
-    !s.includes('.js')
-  );
-}
 
 const LEAGUE_ID = 900;
 const LEAGUE_NAME = 'E2E Season League';
@@ -1049,7 +1042,7 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
                   leagueId: LEAGUE_ID,
                   messageText: 'Hello league!',
                   messageType: 'text',
-                  createdAt: new Date().toISOString(),
+                  createdAt: FIXED_NOW_ISO,
                   userId: 1,
                   username: 'TestUser',
                   gifUrl: null,
