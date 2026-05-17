@@ -330,60 +330,104 @@ export function LeagueDetailPageV2(): React.JSX.Element {
           />
 
           {tab === 'overview' && (
-            <OverviewTab
-              league={league}
-              teams={teams}
-              myTeamId={userTeamId ?? null}
-              isCommissioner={effIsCommish}
-              onTab={setTab}
-              onTeam={onTeamNav}
-              currentUserId={user?.id ?? null}
-              myRoster={myRoster}
-            />
+            <div
+              role="tabpanel"
+              id="panel-overview"
+              aria-labelledby="tab-overview"
+            >
+              <OverviewTab
+                league={league}
+                teams={teams}
+                myTeamId={userTeamId ?? null}
+                isCommissioner={effIsCommish}
+                onTab={setTab}
+                onTeam={onTeamNav}
+                currentUserId={user?.id ?? null}
+                myRoster={myRoster}
+              />
+            </div>
           )}
           {tab === 'matchup' && (
-            <MatchupTab
-              league={league}
-              myTeamId={userTeamId ?? null}
-              initialMatchupId={routeMatchupId ?? null}
-              onTeam={onTeamNav}
-            />
+            <div
+              role="tabpanel"
+              id="panel-matchup"
+              aria-labelledby="tab-matchup"
+            >
+              <MatchupTab
+                league={league}
+                myTeamId={userTeamId ?? null}
+                initialMatchupId={routeMatchupId ?? null}
+                onTeam={onTeamNav}
+              />
+            </div>
           )}
           {tab === 'roster' && (isMember || !userTeamIdSettled) && (
-            <RosterTab league={league} myTeamId={userTeamId ?? null} />
+            <div role="tabpanel" id="panel-roster" aria-labelledby="tab-roster">
+              <RosterTab league={league} myTeamId={userTeamId ?? null} />
+            </div>
           )}
           {tab === 'free-agents' && (
-            <FreeAgentsTab
-              league={league}
-              isMember={effIsMember}
-              myTeamId={userTeamId ?? null}
-            />
+            <div
+              role="tabpanel"
+              id="panel-free-agents"
+              aria-labelledby="tab-free-agents"
+            >
+              <FreeAgentsTab
+                league={league}
+                isMember={effIsMember}
+                myTeamId={userTeamId ?? null}
+              />
+            </div>
           )}
           {tab === 'standings' && (
-            <StandingsTab
-              league={league}
-              teams={teams}
-              myTeamId={userTeamId ?? null}
-              onTeam={onTeamNav}
-            />
+            <div
+              role="tabpanel"
+              id="panel-standings"
+              aria-labelledby="tab-standings"
+            >
+              <StandingsTab
+                league={league}
+                teams={teams}
+                myTeamId={userTeamId ?? null}
+                onTeam={onTeamNav}
+              />
+            </div>
           )}
           {tab === 'trades' && (
-            <TradesTab
-              league={league}
-              isMember={effIsMember}
-              myTeamId={userTeamId ?? null}
-            />
+            <div role="tabpanel" id="panel-trades" aria-labelledby="tab-trades">
+              <TradesTab
+                league={league}
+                isMember={effIsMember}
+                myTeamId={userTeamId ?? null}
+              />
+            </div>
           )}
-          {tab === 'history' && <HistoryTab league={league} />}
+          {tab === 'history' && (
+            <div
+              role="tabpanel"
+              id="panel-history"
+              aria-labelledby="tab-history"
+            >
+              <HistoryTab league={league} />
+            </div>
+          )}
           {tab === 'team' && (isMember || !userTeamIdSettled) && (
-            <TeamTab
-              league={league}
-              myTeamId={userTeamId ?? null}
-              myTeam={teams.find((t) => t.id === userTeamId) ?? null}
-            />
+            <div role="tabpanel" id="panel-team" aria-labelledby="tab-team">
+              <TeamTab
+                league={league}
+                myTeamId={userTeamId ?? null}
+                myTeam={teams.find((t) => t.id === userTeamId) ?? null}
+              />
+            </div>
           )}
           {tab === 'commish' && isCommissioner && (
-            <CommishTab league={league} teams={teams} />
+            <div
+              role="tabpanel"
+              id="panel-commish"
+              aria-labelledby="tab-commish"
+            >
+              <CommishTab league={league} teams={teams} />
+            </div>
           )}
         </div>
       </div>

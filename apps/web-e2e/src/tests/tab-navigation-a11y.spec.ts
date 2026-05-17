@@ -178,6 +178,14 @@ test.describe('Tab component ARIA semantics @regression', () => {
   }) => {
     await page.goto(LEAGUE_URL);
     await page.waitForLoadState('networkidle');
+    // V2's LeagueDetailPage renders a separate "Loading league…" state that
+    // does not contain the TabBar; networkidle can fire before Apollo's data
+    // resolution causes TabBar to mount. Match the convergence wait used by
+    // the other tests in this file so we don't race the initial render.
+    await page.waitForFunction(
+      () => document.querySelectorAll('[role="tablist"]').length > 0,
+      { timeout: 10_000 },
+    );
 
     const { hasTabPattern, tabs } = await evaluateTabSemantics(page);
     expect(hasTabPattern).toBe(true);
@@ -216,6 +224,14 @@ test.describe('Tab component ARIA semantics @regression', () => {
   }) => {
     await page.goto(LEAGUE_URL);
     await page.waitForLoadState('networkidle');
+    // Wait for both the tablist and at least one tabpanel — the V2 page mounts
+    // these together once Apollo resolves the league query, after networkidle.
+    await page.waitForFunction(
+      () =>
+        document.querySelectorAll('[role="tablist"]').length > 0 &&
+        document.querySelectorAll('[role="tabpanel"]').length > 0,
+      { timeout: 10_000 },
+    );
 
     const { hasTabPattern, tabpanels } = await evaluateTabSemantics(page);
     expect(hasTabPattern).toBe(true);
@@ -263,6 +279,13 @@ test.describe('Tab component ARIA semantics @regression', () => {
   }) => {
     await page.goto(LEAGUE_URL);
     await page.waitForLoadState('networkidle');
+    // V2's LeagueDetailPage renders a separate loading state without the
+    // TabBar; networkidle can fire before TabBar mounts. Match the wait used
+    // by the other tests in this file.
+    await page.waitForFunction(
+      () => document.querySelectorAll('[role="tablist"]').length > 0,
+      { timeout: 10_000 },
+    );
 
     const { hasTabPattern } = await evaluateTabSemantics(page);
     expect(hasTabPattern).toBe(true);

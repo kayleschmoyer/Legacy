@@ -54,7 +54,10 @@ export const TabBar: React.FC<{
             key={t.id}
             type="button"
             role="tab"
+            id={`tab-${t.id}`}
             aria-selected={active === t.id}
+            aria-controls={`panel-${t.id}`}
+            tabIndex={active === t.id ? 0 : -1}
             className={active === t.id ? 'on' : ''}
             onClick={() => onChange(t.id)}
           >
