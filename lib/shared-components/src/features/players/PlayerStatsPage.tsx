@@ -624,6 +624,7 @@ export function PlayerStatsPage({
 
         {/* ── Toolbar: search, position, page size, advanced ─────────── */}
         <XStack
+          testID="filter-controls"
           style={{
             display: Platform.OS === 'web' ? 'grid' : 'flex',
             gridTemplateColumns:

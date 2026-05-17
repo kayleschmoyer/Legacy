@@ -404,7 +404,12 @@ unauthTest.describe(
     unauthTest(
       'does not show the marketing landing page on /players/stats when not authenticated',
       async ({ page }) => {
-        await expect(page.getByText(/build your dynasty/i)).not.toBeVisible();
+        // LS-3785's editorial subtitle on the stats page now contains the
+        // phrase "build your dynasty on the numbers that actually happened",
+        // so a /build your dynasty/i regex matches the stats page itself.
+        // "Dominate Your League" appears only on the marketing landing page,
+        // making it a reliable marketing-only signal.
+        await expect(page.getByText(/dominate your league/i)).not.toBeVisible();
       },
     );
 
@@ -460,7 +465,9 @@ unauthTest.describe(
     unauthTest(
       'does not show marketing landing page for unauthenticated users on /players/stats',
       async ({ page }) => {
-        await expect(page.getByText(/build your dynasty/i)).not.toBeVisible();
+        // "Dominate Your League" appears only on the marketing landing page.
+        // The /build your dynasty/i regex would false-match LS-3785's
+        // editorial subtitle on the stats page itself.
         await expect(page.getByText(/dominate your league/i)).not.toBeVisible();
       },
     );

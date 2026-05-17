@@ -907,6 +907,7 @@ export function PlayerStatsDataGrid({
       <YStack flex={1} style={{ overflowX: 'auto' }}>
         {loading ? (
           <XStack
+            testID="loading-indicator"
             justifyContent="center"
             alignItems="center"
             padding="$6"
@@ -1254,6 +1255,7 @@ export function PlayerStatsDataGrid({
       {/* Error State */}
       {error && !loading && (
         <YStack
+          testID="error-message"
           justifyContent="center"
           alignItems="center"
           padding="$6"
