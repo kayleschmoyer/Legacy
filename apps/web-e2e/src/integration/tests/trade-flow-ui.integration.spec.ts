@@ -67,9 +67,9 @@ async function goToTrades(page: Page, leagueId: number): Promise<void> {
   await page.goto(`/baseball/league/${leagueId}/trades`);
   await page.waitForLoadState('load');
   await expect(page).toHaveURL(/\/trades/, { timeout: 15000 });
-  await expect(
-    page.getByText('Trading Center', { exact: false }).first(),
-  ).toBeVisible({ timeout: 20000 });
+  await expect(page.getByTestId('trade-center-heading')).toBeVisible({
+    timeout: 20000,
+  });
 }
 
 /**
@@ -299,7 +299,7 @@ test.describe
       await expect(startBtn).toBeVisible({ timeout: 15000 });
       await startBtn.click();
 
-      const confirmBtn = page.getByTestId('confirm-draft-button');
+      const confirmBtn = page.getByTestId('confirm-next-step');
       await expect(confirmBtn).toBeVisible({ timeout: 15_000 });
       await confirmBtn.click();
     });
@@ -465,7 +465,7 @@ test.describe
       await managerPage1.goto(`/baseball/league/${state.leagueId}/trades`);
       await managerPage1.waitForLoadState('load');
       await expect(
-        managerPage1.getByText('Trading Center', { exact: false }).first(),
+        managerPage1.getByTestId('trade-center-heading'),
       ).toBeVisible({ timeout: 20000 });
     });
 
@@ -534,7 +534,7 @@ test.describe
       await managerPage1.goto(`/baseball/league/${state.leagueId}/trades`);
       await managerPage1.waitForLoadState('load');
       await expect(
-        managerPage1.getByText('Trading Center', { exact: false }).first(),
+        managerPage1.getByTestId('trade-center-heading'),
       ).toBeVisible({ timeout: 20000 });
     });
 
@@ -830,7 +830,7 @@ test.describe
       await managerPage1.goto(`/baseball/league/${state.leagueId}/trades`);
       await managerPage1.waitForLoadState('load');
       await expect(
-        managerPage1.getByText('Trading Center', { exact: false }).first(),
+        managerPage1.getByTestId('trade-center-heading'),
       ).toBeVisible({ timeout: 20000 });
 
       const historyBtn2 = managerPage1.getByRole('button', {

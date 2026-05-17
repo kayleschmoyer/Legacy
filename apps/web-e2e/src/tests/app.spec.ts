@@ -21,9 +21,10 @@ test.describe('Web Application @smoke', () => {
     // Wait for the page to load
     await page.waitForLoadState('load');
 
-    // Verify navigation area exists and is visible
-    const navigation = page.locator('nav, header, [role="navigation"]').first();
-    await expect(navigation).toBeVisible();
+    // Verify navigation area exists and is visible.
+    // `getByRole('navigation')` matches both `<nav>` and any element
+    // with `role="navigation"`, replacing the multi-tag CSS fallback.
+    await expect(page.getByRole('navigation').first()).toBeVisible();
   });
 
   test('should handle authentication flow', async ({ page }) => {

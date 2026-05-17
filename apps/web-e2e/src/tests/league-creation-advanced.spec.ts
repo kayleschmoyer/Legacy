@@ -343,11 +343,10 @@ test.describe('League Creation — Advanced Settings @regression', () => {
       await expect(faabButton).toBeVisible({ timeout: 10000 });
       await faabButton.click();
 
-      // Free user should see the UpgradeModal or a premium gate overlay.
-      // The gate renders via a Tamagui Dialog portal with animation.
-      await expect(
-        page.getByText(/Upgrade|Premium|Subscribe|Unlock/i).first(),
-      ).toBeVisible({ timeout: 10000 });
+      // Free user should see the premium gate overlay.
+      await expect(page.getByTestId('premium-feature-gate')).toBeVisible({
+        timeout: 10000,
+      });
     },
   );
 

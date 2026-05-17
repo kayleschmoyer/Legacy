@@ -709,6 +709,7 @@ export function LeagueScoringEditor(
 
   return (
     <YStack
+      data-testid="scoring-editor"
       backgroundColor="$surfacePanel"
       borderColor="$surfacePanelBorder"
       borderWidth={1}

@@ -172,24 +172,19 @@ test.describe('Join League By Code Form @regression', () => {
 
   test('shows a heading for joining a league', async ({ page }) => {
     await expect(
-      page.getByRole('heading', { name: /join/i }).first(),
+      page.getByRole('heading', { name: /join league/i, level: 1 }),
     ).toBeVisible();
   });
 
   test('invite code input is present', async ({ page }) => {
-    // The page has an invite code input field
-    const codeInput = page
-      .getByPlaceholder(/invite code|enter.*code/i)
-      .or(page.locator('input[type="text"]').first());
-    await expect(codeInput).toBeVisible();
+    // The JoinLeagueByCodePage labels the invite-code input via `id="invite-code"`.
+    await expect(page.locator('#invite-code')).toBeVisible();
   });
 
   test('team name input is present', async ({ page }) => {
-    // The form requires a team name
-    const teamInput = page
-      .getByPlaceholder(/team name/i)
-      .or(page.locator('input').nth(1));
-    await expect(teamInput).toBeVisible();
+    // The team-name field has its own placeholder; if the form layout changes
+    // the placeholder, that's an intentional copy update worth catching.
+    await expect(page.getByPlaceholder(/team name/i)).toBeVisible();
   });
 
   test('join button is present', async ({ page }) => {

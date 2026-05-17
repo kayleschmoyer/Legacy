@@ -260,9 +260,12 @@ test.describe('SubscriptionPage — canceled @regression', () => {
     await page.goto('/profile/subscription');
     await page.waitForLoadState('load');
 
-    // Should show either "Canceled" status or resubscribe CTA
+    // The subscription card renders the tier badge with `data-status` set to
+    // the current subscription status.
     await expect(
-      page.getByText(/canceled|resubscribe|start new|upgrade/i).first(),
+      page.locator(
+        '[data-testid="subscription-tier-badge"][data-status="canceled"]',
+      ),
     ).toBeVisible();
   });
 });

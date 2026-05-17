@@ -466,8 +466,13 @@ test.describe('Playoff Bracket — scheduled bracket @regression', () => {
   test('shows em-dash placeholder when team seeds are not yet assigned', async ({
     page,
   }) => {
-    // V2 renders `team.name ?? '—'` for unassigned seeds rather than 'TBD'.
-    await expect(page.getByText('—').first()).toBeVisible();
+    // V2 renders unassigned seeds with data-assigned="false" — the cell text
+    // is '—', but the assertion uses the testid for stability.
+    await expect(
+      page
+        .locator('[data-testid="playoff-bracket-team"][data-assigned="false"]')
+        .first(),
+    ).toBeVisible();
   });
 });
 

@@ -705,6 +705,7 @@ const SubscriptionPage: React.FC = () => {
                       <XStack
                         data-testid="subscription-tier-badge"
                         data-tier={subscription?.tier ?? ''}
+                        data-status={subscription?.status ?? ''}
                         alignItems="center"
                         gap="$2"
                       >

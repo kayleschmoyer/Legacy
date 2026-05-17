@@ -316,6 +316,7 @@ function AwardRow({
 
   return (
     <Card
+      data-testid={`award-row-${meta.key}`}
       backgroundColor={existing ? withAlpha(BRAND_GOLD, 0.04) : '$surfaceCard'}
       borderColor={
         existing ? withAlpha(BRAND_GOLD, 0.3) : '$surfacePanelBorder'

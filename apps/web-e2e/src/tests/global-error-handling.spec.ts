@@ -144,13 +144,9 @@ test.describe('GraphQL error states on pages @regression', () => {
     );
 
     await page.goto('/players/stats');
-    // Page should display an error state (text or apollo toast)
-    await expect(
-      page
-        .getByRole('alert')
-        .or(page.getByText(/error|failed|unavailable/i).first())
-        .first(),
-    ).toBeVisible();
+    // Page should display an error state — Apollo error boundary renders
+    // an element with role="alert" containing the failure message.
+    await expect(page.getByRole('alert').first()).toBeVisible();
   });
 
   test('league discovery page shows error when query fails @regression', async ({

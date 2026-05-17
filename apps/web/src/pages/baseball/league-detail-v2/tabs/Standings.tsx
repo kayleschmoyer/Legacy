@@ -69,6 +69,8 @@ const BracketView: React.FC<{ matches: readonly PlayoffBracketMatch[] }> = ({
                 <div
                   key={j}
                   className={`ls-bracket-team ${team.isWinner ? 'winner' : ''}`}
+                  data-testid="playoff-bracket-team"
+                  data-assigned={team.name ? 'true' : 'false'}
                 >
                   <span className="name">
                     <div

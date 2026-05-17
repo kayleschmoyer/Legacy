@@ -65,9 +65,9 @@ test.describe('Season Renewal Flow — team migration @critical', () => {
 
     // The new league has draftStatus='not-started' so the "Start Draft"
     // button should be visible — confirming commissioner access
-    await expect(
-      page.getByText('Start Draft', { exact: false }).first(),
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('start-draft-button')).toBeVisible({
+      timeout: 15_000,
+    });
   });
 
   test('renewed league has correct number of teams', async ({ page }) => {

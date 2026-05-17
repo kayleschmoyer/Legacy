@@ -598,11 +598,10 @@ test.describe('Delete League — confirmation dialog @critical', () => {
   });
 
   test('cancel button closes the confirmation dialog', async ({ page }) => {
-    // Scope the delete button to the accordion body to avoid ambiguity
+    // Scope the delete button to the danger zone to avoid ambiguity
     // with the dialog's own "Delete League" button when the dialog is open.
-    // V2 accordion uses .ls-accord-body, not role="region".
     const deleteBtn = page
-      .locator('.ls-accord-body')
+      .getByTestId('delete-league-zone')
       .getByRole('button', { name: /delete league/i });
     await expect(deleteBtn).toBeVisible();
     await deleteBtn.click();

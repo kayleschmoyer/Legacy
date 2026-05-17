@@ -711,11 +711,11 @@ test.describe('Commissioner Announcements — delete flow @regression', () => {
     await expect(page.getByText(first.messageText)).toBeVisible();
     await expect(page.getByText(second.messageText)).toBeVisible();
 
-    // Click the delete button on the second announcement (last one in the list)
-    const deleteButtons = page.getByRole('button', {
-      name: /delete announcement/i,
-    });
-    await deleteButtons.nth(1).click();
+    // Click the delete button on the second announcement, scoped by id testid
+    await page
+      .getByTestId(`announcement-row-${second.id}`)
+      .getByRole('button', { name: /delete announcement/i })
+      .click();
 
     // Second announcement should disappear
     await expect(page.getByText(second.messageText)).not.toBeVisible();

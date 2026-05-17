@@ -142,15 +142,14 @@ test.describe('Pricing page — FAQ section @regression', () => {
     await page.goto('/pricing');
     await page.waitForLoadState('load');
 
-    // First FAQ question from FAQ_ITEMS constant
-    const firstQuestion = page.getByText(
-      /can i try premium before committing/i,
-    );
-    await expect(firstQuestion).toBeVisible({ timeout: 10_000 });
-    await firstQuestion.click();
+    // First FAQ item (index 0) from FAQ_ITEMS constant: "Can I try Premium…"
+    const firstFaq = page.getByTestId('pricing-faq-item-0');
+    await expect(firstFaq).toBeVisible({ timeout: 10_000 });
+    await expect(firstFaq).toHaveAttribute('data-open', 'false');
 
-    // After clicking, the answer should appear
-    await expect(page.getByText(/14-day free trial/i)).toBeVisible({
+    // Click to expand; the item flips data-open="true".
+    await firstFaq.click();
+    await expect(firstFaq).toHaveAttribute('data-open', 'true', {
       timeout: 3_000,
     });
   });

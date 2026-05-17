@@ -188,7 +188,7 @@ test.describe
       await startBtn.click();
 
       // Confirm dialog
-      const confirmBtn = page.getByTestId('confirm-draft-button');
+      const confirmBtn = page.getByTestId('confirm-next-step');
       await expect(confirmBtn).toBeVisible({ timeout: 15_000 });
       await confirmBtn.click();
     });
@@ -254,9 +254,9 @@ test.describe
       await page.goto(`/baseball/league/${state.leagueId}/trades`);
       await page.waitForLoadState('load');
       await expect(page).toHaveURL(/\/trades/);
-      await expect(
-        page.getByText('Trading Center', { exact: false }).first(),
-      ).toBeVisible({ timeout: 30_000 });
+      await expect(page.getByTestId('trade-center-heading')).toBeVisible({
+        timeout: 30_000,
+      });
     });
 
     const dialog = page.getByRole('dialog', { name: 'Propose Trade' });
@@ -367,7 +367,7 @@ test.describe
       // Accept would never appear. Asserting the heading here gives a clear
       // failure signal separating "component not mounted" from "trade missing".
       await expect(
-        managerPage2.getByText('Trading Center', { exact: false }).first(),
+        managerPage2.getByTestId('trade-center-heading'),
       ).toBeVisible({ timeout: 15_000 });
 
       // The trade was proposed moments ago in a separate browser context.

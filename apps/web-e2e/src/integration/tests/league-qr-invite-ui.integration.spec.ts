@@ -91,11 +91,8 @@ test.describe
     });
 
     await test.step('"Share Link" section shows a URL containing the join path', async () => {
-      // The invite URL is rendered as a read-only input value inside the Invite Link section.
-      // Text locators don't match input values — use the .ls-invite-link scoped input instead.
       const urlInput = page
-        .locator('.ls-invite-link')
-        .first()
+        .getByTestId('invite-link-url')
         .locator('input[readonly]');
       await expect(urlInput).toBeVisible({ timeout: 15_000 });
       const displayedUrl = await urlInput.inputValue();
@@ -104,13 +101,8 @@ test.describe
     });
 
     await test.step('"Invite Code" section shows an 8-character alphanumeric code', async () => {
-      await expect(page.getByText('Invite Code', { exact: false })).toBeVisible(
-        { timeout: 10_000 },
-      );
-      // The invite code is also a read-only input — the second .ls-invite-link container.
       const codeInput = page
-        .locator('.ls-invite-link')
-        .nth(1)
+        .getByTestId('invite-code')
         .locator('input[readonly]');
       await expect(codeInput).toBeVisible({ timeout: 10_000 });
       state.inviteCode = await codeInput.inputValue();

@@ -210,7 +210,7 @@ test.describe
       await expect(startBtn).toBeVisible({ timeout: 15_000 });
       await startBtn.click();
 
-      const confirmBtn = page.getByTestId('confirm-draft-button');
+      const confirmBtn = page.getByTestId('confirm-next-step');
       await expect(confirmBtn).toBeVisible({ timeout: 15_000 });
       await confirmBtn.click();
     });
@@ -316,12 +316,12 @@ test.describe
       );
     });
 
-    await test.step('Verify "Season Complete" copy is visible', async () => {
-      // The NextStepControl renders a "Season Complete" text when
+    await test.step('Verify "Season Complete" panel is visible', async () => {
+      // The NextStepControl renders the season-complete-panel when
       // isSeasonComplete is true (all weeks played, no active matchup).
-      await expect(
-        page.getByText('Season Complete', { exact: false }).first(),
-      ).toBeVisible({ timeout: 30_000 });
+      await expect(page.getByTestId('season-complete-panel')).toBeVisible({
+        timeout: 30_000,
+      });
     });
 
     await test.step('Verify "Start New Season" button is rendered', async () => {
@@ -509,7 +509,11 @@ test.describe
 
     await test.step('New league shows "Pre-Draft" status badge', async () => {
       // keepRosters=false → draftStatus = 'not-started' → "Pre-Draft" badge
-      await expect(page.getByText('Pre-Draft').first()).toBeVisible({
+      await expect(
+        page.locator(
+          '[data-testid="draft-status-chip"][data-status="not-started"]',
+        ),
+      ).toBeVisible({
         timeout: 15_000,
       });
     });
@@ -683,7 +687,11 @@ test.describe
     });
 
     await test.step('New league shows "Pre-Draft" status to manager', async () => {
-      await expect(page.getByText('Pre-Draft').first()).toBeVisible({
+      await expect(
+        page.locator(
+          '[data-testid="draft-status-chip"][data-status="not-started"]',
+        ),
+      ).toBeVisible({
         timeout: 10_000,
       });
     });

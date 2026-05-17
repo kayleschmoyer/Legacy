@@ -265,13 +265,7 @@ test.describe('Trading Center — header and layout @critical', () => {
   });
 
   test('shows "Trading Center" heading', async ({ page }) => {
-    // V2 wraps TradingCenter in a Section with title "Trading Center"
-    // (as an <h3>). The legacy TradingCenter component also renders its own
-    // "Trading Center" header inside #panel-trades, so scope to the first
-    // heading-style match to avoid strict-mode violation.
-    await expect(
-      page.getByRole('heading', { name: 'Trading Center' }).first(),
-    ).toBeVisible();
+    await expect(page.getByTestId('trade-center-heading')).toBeVisible();
   });
 
   test('shows "Propose Trade" button', async ({ page }) => {

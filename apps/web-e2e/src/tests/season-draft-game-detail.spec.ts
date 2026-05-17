@@ -384,7 +384,7 @@ test.describe('Season Draft Game – setup phase @critical', () => {
     // Phase label is "Waiting Room"; setup panel shows "Invite Link" eyebrow
     await expect(page.getByText('Invite Link').first()).toBeVisible();
     // Creator sees Start Draft and Cancel Game buttons (not a "waiting" message)
-    await expect(page.getByText('Start Draft')).toBeVisible();
+    await expect(page.getByText('Start Draft', { exact: false })).toBeVisible();
     await expect(page.getByText('Cancel Game').first()).toBeVisible();
   });
 
@@ -403,7 +403,7 @@ test.describe('Season Draft Game – setup phase @critical', () => {
     await setupGameMocks(page, SETUP_GAME);
     await gotoGamePage(page);
 
-    await expect(page.getByText('Start Draft')).toBeVisible();
+    await expect(page.getByText('Start Draft', { exact: false })).toBeVisible();
     await expect(page.getByText('Cancel Game').first()).toBeVisible();
   });
 
@@ -441,8 +441,7 @@ test.describe('Season Draft Game – drafting (my turn) @critical', () => {
     await setupGameMocks(page, DRAFTING_MY_TURN);
     await gotoGamePage(page);
 
-    // Component renders "Your Turn" (no exclamation mark) as badge text
-    await expect(page.getByText('Your Turn').first()).toBeVisible();
+    await expect(page.getByTestId('your-turn-badge')).toBeVisible();
   });
 
   test('shows Make Your Pick section', async ({ page }) => {
@@ -610,7 +609,9 @@ test.describe('Season Draft Game – cancelled @regression', () => {
     await setupGameMocks(page, CANCELLED_GAME);
     await gotoGamePage(page);
 
-    await expect(page.getByText('Start Draft')).not.toBeVisible();
+    await expect(
+      page.getByText('Start Draft', { exact: false }),
+    ).not.toBeVisible();
     await expect(page.getByText('Make Your Pick')).not.toBeVisible();
   });
 });

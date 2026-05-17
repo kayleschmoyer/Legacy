@@ -570,6 +570,7 @@ export function NextStepControl({
 
           {isSeasonComplete && (
             <YStack
+              data-testid="season-complete-panel"
               gap="$3"
               borderTopWidth={1}
               borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.25)}

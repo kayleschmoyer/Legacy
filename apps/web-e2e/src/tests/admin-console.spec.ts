@@ -216,9 +216,11 @@ adminTest.describe('Admin Console — Users section @regression', () => {
   adminTest(
     'does not show Impersonate button for other admin users',
     async ({ page }) => {
-      // AdminUser (id:1) is admin — verify user card is visible
-      const userCards = page.locator('text=AdminUser').first();
-      await expect(userCards).toBeVisible();
+      // AdminUser (id:1) is admin — verify user card is visible.
+      // "AdminUser" is a fixture username, not user-facing product copy.
+      await expect(
+        page.getByText('AdminUser', { exact: true }).first(),
+      ).toBeVisible();
 
       // All 3 users (AdminUser, alice, bob) currently show Impersonate
       // buttons. The component renders the button for every user card.

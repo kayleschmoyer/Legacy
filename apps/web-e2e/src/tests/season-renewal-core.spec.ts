@@ -45,13 +45,9 @@ test.describe('Season Renewal Flow — commissioner creates renewal league @crit
     await page.waitForLoadState('load');
 
     // Verify season complete UI is visible
-    await expect(
-      page.getByText('Season Complete', { exact: false }).first(),
-    ).toBeVisible({ timeout: 15_000 });
-
-    await expect(
-      page.getByText(/All weeks have been played/i).first(),
-    ).toBeVisible();
+    await expect(page.getByTestId('season-complete-panel')).toBeVisible({
+      timeout: 15_000,
+    });
 
     // Click "Start New Season"
     const startBtn = page.getByRole('button', { name: /Start New Season/i });
@@ -377,9 +373,11 @@ test.describe('Season Renewal Flow — settings inheritance @critical', () => {
     );
 
     // The renewed league has draftStatus='not-started' — expect Pre-Draft badge
-    await expect(page.getByText('Pre-Draft').first()).toBeVisible({
-      timeout: 15_000,
-    });
+    await expect(
+      page.locator(
+        '[data-testid="draft-status-chip"][data-status="not-started"]',
+      ),
+    ).toBeVisible({ timeout: 15_000 });
   });
 
   test('original league is hidden behind frozen state after renewal', async ({

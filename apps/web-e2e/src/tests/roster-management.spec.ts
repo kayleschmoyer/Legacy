@@ -292,7 +292,11 @@ test.describe('Roster Management – player data @regression', () => {
   });
 
   test('shows SP position type label', async ({ page }) => {
-    await expect(page.getByText('SP').first()).toBeVisible();
+    // The Pitching roster section contains SP slot labels; scope to that section
+    // to avoid colliding with other "SP" occurrences elsewhere on the page.
+    await expect(
+      page.getByTestId('roster-section-pitching').getByText('SP').first(),
+    ).toBeVisible();
   });
 });
 

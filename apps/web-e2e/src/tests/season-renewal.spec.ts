@@ -310,7 +310,7 @@ test.describe('Season Renewal — Visibility @critical', () => {
     await setupGraphQL(page);
     await page.goto('/baseball/league/1/commissioner');
 
-    await expect(page.getByText('Season Complete')).toBeVisible();
+    await expect(page.getByTestId('season-complete-panel')).toBeVisible();
   });
 
   test('does NOT show "Start New Season" when draft is not yet completed @regression', async ({

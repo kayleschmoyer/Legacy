@@ -155,7 +155,7 @@ test.describe
       await expect(startBtn).toBeVisible({ timeout: 15_000 });
       await startBtn.click();
 
-      const confirmBtn = page.getByTestId('confirm-draft-button');
+      const confirmBtn = page.getByTestId('confirm-next-step');
       await expect(confirmBtn).toBeVisible({ timeout: 15_000 });
       await confirmBtn.click();
     });
@@ -324,7 +324,7 @@ test.describe
     // The overlay is position:fixed (z-index 9999) and receives coordinate-based
     // clicks even when force:true is used, preventing the view-mode buttons from
     // getting the click event.
-    const announceOverlay = page.locator('.d-announce-overlay');
+    const announceOverlay = page.getByTestId('draft-announce-overlay');
 
     /** Helper: dismiss overlay if visible, then do a direct JS click on target. */
     const clickWithOverlayDismiss = async (

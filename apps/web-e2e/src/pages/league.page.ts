@@ -85,11 +85,10 @@ export class LeaguePage {
     });
     this.discoveryFooterCta = page.getByText(/Can't find the right league\?/i);
 
-    // Commissioner branding — the accordion toggle <h4> and the content <h4>
-    // both match, so use .nth(1) to target the content heading inside the panel.
-    this.brandingHeading = page
-      .getByRole('heading', { name: /League Branding/i })
-      .nth(1);
+    // Commissioner branding — locate the section toggle by its stable testid.
+    this.brandingHeading = page.getByTestId(
+      'commissioner-section-toggle-league-branding',
+    );
     this.primaryColorInput = page.getByTestId('primary-color');
     this.secondaryColorInput = page.getByTestId('secondary-color');
     this.saveColorsButton = page.getByRole('button', {
@@ -108,7 +107,7 @@ export class LeaguePage {
     this.cancelButton = page.getByRole('button', { name: /cancel/i });
     this.deepLinkBanner = page.getByText(/Invite code loaded from link/i);
     this.leagueFullBanner = page.getByTestId('alert-league-full');
-    this.inviteCodePreview = page.getByTestId(/^invite-status-/);
+    this.inviteCodePreview = page.getByTestId(/^invite-validation-/);
     this.formErrorCard = page.getByTestId('join-form-error');
   }
 

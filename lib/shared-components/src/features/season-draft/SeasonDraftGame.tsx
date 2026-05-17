@@ -1192,6 +1192,7 @@ function DraftPickPanel({
     >
       <YStack gap="$1">
         <Stack
+          data-testid="your-turn-badge"
           alignSelf="flex-start"
           paddingHorizontal="$2"
           paddingVertical="$1"

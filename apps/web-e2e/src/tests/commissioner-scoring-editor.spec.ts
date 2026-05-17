@@ -373,8 +373,7 @@ test.describe('Commissioner Scoring Editor @critical', () => {
     await page.goto('/baseball/league/1/commissioner');
     await expandScoringSection(page);
 
-    // V2 accordion body is a div.ls-accord-body (no role="region").
-    const scoringRegion = page.locator('.ls-accord-body');
+    const scoringRegion = page.getByTestId('scoring-editor');
     await expect(
       scoringRegion.getByText('Batting', { exact: true }),
     ).toBeVisible();
@@ -393,8 +392,7 @@ test.describe('Commissioner Scoring Editor @critical', () => {
     await page.goto('/baseball/league/1/commissioner');
     await expandScoringSection(page);
 
-    // V2 accordion body is a div.ls-accord-body (no role="region").
-    const scoringRegion = page.locator('.ls-accord-body');
+    const scoringRegion = page.getByTestId('scoring-editor');
 
     await expect(
       scoringRegion.getByText('Home Runs', { exact: true }),
@@ -414,8 +412,7 @@ test.describe('Commissioner Scoring Editor @critical', () => {
     await page.goto('/baseball/league/1/commissioner');
     await expandScoringSection(page);
 
-    // V2 accordion body is a div.ls-accord-body (no role="region").
-    const scoringRegion = page.locator('.ls-accord-body');
+    const scoringRegion = page.getByTestId('scoring-editor');
 
     // Each stat row has a text input for its multiplier value
     const inputs = scoringRegion.locator(
@@ -497,8 +494,7 @@ test.describe('Commissioner Scoring Editor — Locked State @critical', () => {
     await page.goto('/baseball/league/1/commissioner');
     await expandScoringSection(page);
 
-    // V2 accordion body is a div.ls-accord-body (no role="region").
-    const scoringRegion = page.locator('.ls-accord-body');
+    const scoringRegion = page.getByTestId('scoring-editor');
     await expect(
       scoringRegion.getByText(
         /Scoring settings are locked while the season is in progress/i,
@@ -529,8 +525,7 @@ test.describe('Commissioner Scoring Editor — Locked State @critical', () => {
     await page.goto('/baseball/league/1/commissioner');
     await expandScoringSection(page);
 
-    // V2 accordion body is a div.ls-accord-body (no role="region").
-    const scoringRegion = page.locator('.ls-accord-body');
+    const scoringRegion = page.getByTestId('scoring-editor');
     await expect(
       scoringRegion.getByText('Batting', { exact: true }),
     ).toBeVisible();
@@ -551,8 +546,7 @@ test.describe('Commissioner Scoring Editor — Editing @critical', () => {
     await page.goto('/baseball/league/1/commissioner');
     await expandScoringSection(page);
 
-    // V2 accordion body is a div.ls-accord-body (no role="region").
-    const scoringRegion = page.locator('.ls-accord-body');
+    const scoringRegion = page.getByTestId('scoring-editor');
 
     // Find the first input and change its value
     const firstInput = scoringRegion
@@ -580,8 +574,7 @@ test.describe('Commissioner Scoring Editor — Editing @critical', () => {
     await page.goto('/baseball/league/1/commissioner');
     await expandScoringSection(page);
 
-    // V2 accordion body is a div.ls-accord-body (no role="region").
-    const scoringRegion = page.locator('.ls-accord-body');
+    const scoringRegion = page.getByTestId('scoring-editor');
 
     // Change a multiplier to enable save
     const firstInput = scoringRegion
@@ -663,8 +656,7 @@ test.describe('Commissioner Scoring Editor — Editing @critical', () => {
     await page.goto('/baseball/league/1/commissioner');
     await expandScoringSection(page);
 
-    // V2 accordion body is a div.ls-accord-body (no role="region").
-    const scoringRegion = page.locator('.ls-accord-body');
+    const scoringRegion = page.getByTestId('scoring-editor');
     const unsavedBadge = scoringRegion.getByText(/unsaved/i);
 
     // Change the Home Runs multiplier
@@ -705,8 +697,7 @@ test.describe('Commissioner Scoring Editor — Editing @critical', () => {
     await page.goto('/baseball/league/1/commissioner');
     await expandScoringSection(page);
 
-    // V2 accordion body is a div.ls-accord-body (no role="region").
-    const scoringRegion = page.locator('.ls-accord-body');
+    const scoringRegion = page.getByTestId('scoring-editor');
 
     // Change a multiplier
     const firstInput = scoringRegion
@@ -736,8 +727,7 @@ test.describe('Commissioner Scoring Editor — Editing @critical', () => {
     await page.goto('/baseball/league/1/commissioner');
     await expandScoringSection(page);
 
-    // V2 accordion body is a div.ls-accord-body (no role="region").
-    const scoringRegion = page.locator('.ls-accord-body');
+    const scoringRegion = page.getByTestId('scoring-editor');
 
     // The "Home Runs" stat is in the Batting group — visible by default
     await expect(

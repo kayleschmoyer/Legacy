@@ -187,9 +187,9 @@ test.describe
       // it only appears after both the mutation and the server refetch have
       // completed, guaranteeing the new multiplier is visible in subsequent
       // API queries (Phase 4).
-      await expect(
-        page.getByText('Changes saved — scoring table refreshed.'),
-      ).toBeVisible({ timeout: 30_000 });
+      await expect(page.getByTestId('scoring-saved-toast')).toBeVisible({
+        timeout: 30_000,
+      });
     });
   });
 
@@ -254,9 +254,9 @@ test.describe
       await saveBtn.scrollIntoViewIfNeeded();
       await expect(saveBtn).toBeEnabled({ timeout: 10_000 });
       await saveBtn.click();
-      await expect(
-        page.getByText('Changes saved — scoring table refreshed.'),
-      ).toBeVisible({ timeout: 30_000 });
+      await expect(page.getByTestId('scoring-saved-toast')).toBeVisible({
+        timeout: 30_000,
+      });
     });
 
     await test.step('API confirms override is cleared for Home Runs', async () => {

@@ -504,9 +504,13 @@ test.describe('WebSocket real-time updates @critical', () => {
     await page.goto(LEAGUE_URL);
     await page.waitForLoadState('load');
 
-    // Confirm the initial draft status chip says "Pre-Draft"
-    // (DraftStatusChip maps 'not-started' → 'Pre-Draft')
-    await expect(page.getByText('Pre-Draft').first()).toBeVisible();
+    // Confirm the initial draft status chip is in the 'not-started' state
+    // (DraftStatusChip maps 'not-started' → 'Pre-Draft' label)
+    await expect(
+      page.locator(
+        '[data-testid="draft-status-chip"][data-status="not-started"]',
+      ),
+    ).toBeVisible();
 
     // 2. Wait for WS connection
     await expect.poll(() => wsRoute !== undefined).toBe(true);

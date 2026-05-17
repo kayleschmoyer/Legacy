@@ -826,7 +826,11 @@ export default function PricingPage() {
 
             <YStack gap="$3" maxWidth={720} alignSelf="center" width="100%">
               {FAQ_ITEMS.map((item, i) => (
-                <FAQItem key={i}>
+                <FAQItem
+                  key={i}
+                  data-testid={`pricing-faq-item-${i}`}
+                  data-open={openFaq === i ? 'true' : 'false'}
+                >
                   <FAQQuestion
                     onPress={() => setOpenFaq(openFaq === i ? null : i)}
                   >

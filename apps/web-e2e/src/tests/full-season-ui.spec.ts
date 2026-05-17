@@ -893,9 +893,7 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
     });
 
     await test.step('Verify Trading Center heading', async () => {
-      await expect(
-        page.getByText('Trading Center', { exact: false }).first(),
-      ).toBeVisible();
+      await expect(page.getByTestId('trade-center-heading')).toBeVisible();
     });
 
     await test.step('Click Propose Trade button and walk the first step', async () => {

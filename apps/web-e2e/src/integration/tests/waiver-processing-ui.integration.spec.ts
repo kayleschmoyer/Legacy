@@ -279,7 +279,7 @@ test.describe
       await expect(startBtn).toBeVisible({ timeout: 15000 });
       await startBtn.click();
 
-      const confirmBtn = page.getByTestId('confirm-draft-button');
+      const confirmBtn = page.getByTestId('confirm-next-step');
       await expect(confirmBtn).toBeVisible({ timeout: 15_000 });
       await confirmBtn.click();
     });

@@ -282,8 +282,10 @@ test.describe('Player Stats Page (mocked) – page structure @regression', () =>
   });
 
   test('shows HR value from mocked batting data', async ({ page }) => {
-    // Barry Bonds 762 HR
-    await expect(page.getByText('762')).toBeVisible();
+    // Barry Bonds row (playerId=101) renders his 762 HR total.
+    await expect(
+      page.getByTestId('player-row-101').getByText('762'),
+    ).toBeVisible();
   });
 
   test('shows search input for batting stats', async ({ page }) => {

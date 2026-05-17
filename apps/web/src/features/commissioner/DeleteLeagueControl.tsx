@@ -113,7 +113,12 @@ export function DeleteLeagueControl({
 
   return (
     <>
-      <Card backgroundColor="$red2" borderColor="$red6" padding="$4">
+      <Card
+        data-testid="delete-league-zone"
+        backgroundColor="$red2"
+        borderColor="$red6"
+        padding="$4"
+      >
         <YStack space="$3">
           <Text color="$gray11" fontSize="$3">
             Permanently delete this league and all associated data. This action

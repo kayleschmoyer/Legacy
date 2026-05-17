@@ -237,7 +237,7 @@ test.describe
       await startBtn.click();
 
       // Confirm in the dialog
-      const confirmBtn = page.getByTestId('confirm-draft-button');
+      const confirmBtn = page.getByTestId('confirm-next-step');
       await expect(confirmBtn).toBeVisible({ timeout: 15_000 });
       await confirmBtn.click();
     });

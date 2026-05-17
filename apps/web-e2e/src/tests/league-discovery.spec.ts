@@ -129,11 +129,14 @@ test.describe('League Discovery — league cards @critical', () => {
     await lp.gotoDiscovery();
     await lp.expectDiscoveryLoaded();
 
-    await expect(page.getByText('Rocket League Fantasy')).toBeVisible();
-    await expect(page.getByText('Open', { exact: true }).first()).toBeVisible();
-    await expect(page.getByText('NL Only').first()).toBeVisible();
+    const card = page.getByTestId('league-card-10');
+    await expect(card.getByText('Rocket League Fantasy')).toBeVisible();
+    await expect(card.getByText('Open', { exact: true })).toBeVisible();
+    // "NL Only" renders twice in the card (badge + filter chip); the assertion
+    // verifies the value is present without pinning a specific position.
+    await expect(card.getByText('NL Only').first()).toBeVisible();
     // spots available column: "5 / 12" or similar
-    await expect(page.getByText('5 / 12')).toBeVisible();
+    await expect(card.getByText('5 / 12')).toBeVisible();
   });
 
   test('shows results count', async ({ page }) => {

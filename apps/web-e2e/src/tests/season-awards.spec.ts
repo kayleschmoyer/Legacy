@@ -377,9 +377,7 @@ test.describe('Season Awards — award type rows @regression', () => {
     await page.waitForLoadState('load');
     await expandSeasonAwards(page);
 
-    await expect(
-      page.getByText('Most Valuable Player', { exact: true }),
-    ).toBeVisible();
+    await expect(page.getByTestId('award-row-mvp')).toBeVisible();
   });
 
   test('displays "Cy Young Award" award row', async ({ page }) => {
@@ -388,9 +386,7 @@ test.describe('Season Awards — award type rows @regression', () => {
     await page.waitForLoadState('load');
     await expandSeasonAwards(page);
 
-    await expect(
-      page.getByText('Cy Young Award', { exact: true }),
-    ).toBeVisible();
+    await expect(page.getByTestId('award-row-cy_young')).toBeVisible();
   });
 
   test('displays "Rookie of the Year" award row', async ({ page }) => {
@@ -400,7 +396,7 @@ test.describe('Season Awards — award type rows @regression', () => {
     await expandSeasonAwards(page);
 
     await expect(
-      page.getByText('Rookie of the Year', { exact: true }),
+      page.getByTestId('award-row-rookie_of_the_year'),
     ).toBeVisible();
   });
 
@@ -410,7 +406,7 @@ test.describe('Season Awards — award type rows @regression', () => {
     await page.waitForLoadState('load');
     await expandSeasonAwards(page);
 
-    await expect(page.getByText('Gold Glove', { exact: true })).toBeVisible();
+    await expect(page.getByTestId('award-row-gold_glove')).toBeVisible();
   });
 
   test('displays "Silver Slugger" award row', async ({ page }) => {
@@ -419,9 +415,7 @@ test.describe('Season Awards — award type rows @regression', () => {
     await page.waitForLoadState('load');
     await expandSeasonAwards(page);
 
-    await expect(
-      page.getByText('Silver Slugger', { exact: true }),
-    ).toBeVisible();
+    await expect(page.getByTestId('award-row-silver_slugger')).toBeVisible();
   });
 });
 

@@ -331,8 +331,8 @@ test.describe('Free Agents — page renders with player list @critical', () => {
     await page.waitForLoadState('load');
 
     // The ALL chip and at least one position chip should be visible
-    await expect(page.getByText('ALL').first()).toBeVisible();
-    await expect(page.getByText('C').first()).toBeVisible();
+    await expect(page.getByTestId('position-filter-ALL')).toBeVisible();
+    await expect(page.getByTestId('position-filter-C')).toBeVisible();
   });
 
   test('shows pagination info when players are listed', async ({ page }) => {

@@ -10,7 +10,7 @@ import type { Page } from '@playwright/test';
 export async function dismissPickAnnouncementOverlay(
   page: Page,
 ): Promise<void> {
-  const overlay = page.locator('.d-announce-overlay');
+  const overlay = page.getByTestId('draft-announce-overlay');
   if (await overlay.isVisible({ timeout: 3_000 }).catch(() => false)) {
     await overlay.click({ force: true });
     await overlay.waitFor({ state: 'hidden', timeout: 5_000 });

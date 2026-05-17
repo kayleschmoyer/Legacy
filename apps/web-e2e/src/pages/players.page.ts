@@ -49,8 +49,11 @@ export class PlayersPage {
     this.pitchingTab = page.getByTestId('tab-trigger-pitching');
     this.playerRows = page.locator('[data-testid^="player-row-"]');
 
-    // Player detail
-    this.playerName = page.getByRole('heading', { level: 1 }).first();
+    // Player detail — the player name renders as the only H1 inside the
+    // detail modal dialog (scoped via role to avoid colliding with page H1s).
+    this.playerName = page
+      .getByRole('dialog')
+      .getByRole('heading', { level: 1 });
     this.playerPosition = page.getByTestId('player-position');
 
     // Player Detail Modal
@@ -63,12 +66,9 @@ export class PlayersPage {
     this.detailModalEmpty = this.detailModal.getByTestId('player-detail-empty');
     this.detailModalEligiblePositions =
       this.detailModal.getByTestId('eligible-positions');
-    this.detailModalBattingTab =
-      this.detailModal.getByTestId('modal-tab-batting');
-    this.detailModalPitchingTab =
-      this.detailModal.getByTestId('modal-tab-pitching');
-    this.detailModalFieldingTab =
-      this.detailModal.getByTestId('modal-tab-fielding');
+    this.detailModalBattingTab = this.detailModal.getByTestId('tab-batting');
+    this.detailModalPitchingTab = this.detailModal.getByTestId('tab-pitching');
+    this.detailModalFieldingTab = this.detailModal.getByTestId('tab-fielding');
     this.detailModalCareerBattingCard = this.detailModal.getByTestId(
       'career-batting-card',
     );

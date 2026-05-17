@@ -262,7 +262,7 @@ test.describe
       await startBtn.click();
 
       // Confirmation dialog appears — confirm it
-      const confirmBtn = page.getByTestId('confirm-draft-button');
+      const confirmBtn = page.getByTestId('confirm-next-step');
       await expect(confirmBtn).toBeVisible({ timeout: 15_000 });
       await confirmBtn.click();
     });
@@ -649,9 +649,9 @@ test.describe
       await page.goto(`/baseball/league/${state.leagueId}/trades`);
       await page.waitForLoadState('load');
       await expect(page).toHaveURL(/\/trades/);
-      await expect(
-        page.getByText('Trading Center', { exact: false }).first(),
-      ).toBeVisible({ timeout: 30000 });
+      await expect(page.getByTestId('trade-center-heading')).toBeVisible({
+        timeout: 30000,
+      });
     });
 
     // Scope all wizard interactions to the dialog element
