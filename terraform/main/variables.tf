@@ -195,6 +195,12 @@ variable "monthly_budget_amount" {
   default     = 200
 }
 
+variable "mcp_ic_saml_metadata_url" {
+  description = "SAML IdP metadata URL for the IAM Identity Center application that federates into the MCP Cognito user pool (LS-4473). Leave empty to keep the user pool on Cognito-managed users only. When set, creates aws_cognito_identity_provider.mcp_ic and adds it to the user pool client's supported_identity_providers so the hosted UI shows a 'Sign in with IAM Identity Center' button alongside the Cognito password form. Bootstrap procedure for an admin: (1) run terraform apply once with this empty so the Cognito user pool + domain exist; (2) in the AWS console, create an IAM Identity Center customer-managed SAML 2.0 application using the entity ID + ACS URL exposed via the mcp_cognito_saml_entity_id / mcp_cognito_saml_acs_url outputs; (3) copy the IdP metadata URL from the new IC application and paste it here; (4) re-run terraform apply."
+  type        = string
+  default     = ""
+}
+
 variable "bug_epic_fallback_key" {
   description = "Fallback bug epic key used if Jira project property lookup fails"
   type        = string

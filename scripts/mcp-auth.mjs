@@ -12,9 +12,18 @@
  *   1. terraform apply in terraform/main (creates the Cognito user pool,
  *      hosted UI domain, and OAuth client; publishes the identifiers to
  *      SSM).
- *   2. An admin has invited you via the Cognito console (a Cognito email
- *      with a temporary password). You set a real password on first
- *      sign-in via the hosted UI.
+ *   2. Either:
+ *      (a) An admin has invited you via the Cognito console (a Cognito
+ *          email with a temporary password). You set a real password on
+ *          first sign-in via the hosted UI. — or —
+ *      (b) An admin has registered an IAM Identity Center SAML application
+ *          for the Cognito user pool and set mcp_ic_saml_metadata_url in
+ *          terraform/main/infra.auto.tfvars (LS-4473). The hosted UI then
+ *          shows a "Sign in with IAM Identity Center" button alongside the
+ *          Cognito password form; clicking it bounces through IC and lands
+ *          back on the Cognito callback with an idToken issued by Cognito.
+ *      Both options coexist during the rollout — the OAuth flow this
+ *      script drives is identical either way.
  *
  * Usage:
  *   node scripts/mcp-auth.mjs           # refresh token (or re-auth if expired)

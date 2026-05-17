@@ -867,6 +867,15 @@ resource "aws_iam_policy" "github_actions_supplemental" {
           "cognito-idp:DescribeUserPoolDomain",
           "cognito-idp:GetUserPoolMfaConfig",
           "cognito-idp:SetUserPoolMfaConfig",
+          # SAML identity provider CRUD — for the IC → Cognito federation
+          # (LS-4473). Provider names live under the user pool ARN, so the
+          # existing userpool/* scope covers them.
+          "cognito-idp:CreateIdentityProvider",
+          "cognito-idp:DeleteIdentityProvider",
+          "cognito-idp:UpdateIdentityProvider",
+          "cognito-idp:DescribeIdentityProvider",
+          "cognito-idp:GetIdentityProviderByIdentifier",
+          "cognito-idp:ListIdentityProviders",
           "cognito-idp:TagResource",
           "cognito-idp:UntagResource",
           "cognito-idp:ListTagsForResource"
@@ -1378,6 +1387,11 @@ resource "aws_iam_role_policy" "github_actions_plan_policy" {
           "cognito-idp:DescribeUserPoolClient",
           "cognito-idp:ListUserPoolClients",
           "cognito-idp:GetUserPoolMfaConfig",
+          # SAML identity provider read — for the IC → Cognito federation
+          # (LS-4473). Needed by terraform plan to refresh aws_cognito_identity_provider.
+          "cognito-idp:DescribeIdentityProvider",
+          "cognito-idp:GetIdentityProviderByIdentifier",
+          "cognito-idp:ListIdentityProviders",
           "cognito-idp:ListTagsForResource"
         ]
         Resource = [

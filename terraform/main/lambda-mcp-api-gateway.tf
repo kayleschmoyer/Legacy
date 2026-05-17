@@ -32,10 +32,21 @@
 #   issues a proper OIDC token where `aud` = the user pool client ID,
 #   which the authorizer accepts.
 #
-# IC → Cognito SAML federation is intentionally NOT in this PR. With 5
-# developers, admin-invited Cognito users are acceptable. A follow-up
-# ticket will federate IC as a SAML identity provider into this Cognito
-# user pool so developers can SSO through their IC credentials.
+# IC → Cognito SAML federation (LS-4473) is opt-in via the
+# `mcp_ic_saml_metadata_url` Terraform variable. When set, a Cognito SAML
+# identity provider is created and added to the user pool client so the
+# hosted UI exposes a "Sign in with IAM Identity Center" button alongside
+# the existing Cognito password form. The IC SAML application itself is
+# registered manually one-time via the AWS console because Terraform
+# (aws provider v6) has no resource that creates an IAM Identity Center
+# customer-managed SAML 2.0 application — aws_ssoadmin_application only
+# supports OAuth2/OIDC applications and 3rd-party SAML apps from the IC
+# application catalog. See variables.tf (mcp_ic_saml_metadata_url) for
+# the bootstrap procedure. Existing admin-invited Cognito users coexist
+# with SAML-federated users so the rollout is non-disruptive; once all
+# developers have signed in via IC they can be removed from the pool via
+# the console and "COGNITO" dropped from supported_identity_providers in
+# a follow-up.
 
 locals {
   mcp_servers_map = {
@@ -64,6 +75,22 @@ locals {
   # Hosted UI base URL — Cognito's default *.auth.<region>.amazoncognito.com
   # domain (free, no CloudFront). Custom domain not configured for dev tooling.
   mcp_cognito_hosted_ui = "https://${aws_cognito_user_pool_domain.mcp_dev.domain}.auth.${local.region}.amazoncognito.com"
+
+  # SAML 2.0 Service Provider identifiers Cognito exposes for federated IdPs.
+  # The IC SAML application registered manually in the AWS console must use
+  # these exact values for its audience / ACS URL.
+  mcp_cognito_saml_entity_id = "urn:amazon:cognito:sp:${aws_cognito_user_pool.mcp_dev.id}"
+  mcp_cognito_saml_acs_url   = "${local.mcp_cognito_hosted_ui}/saml2/idpresponse"
+
+  # When the IC SAML metadata URL is supplied, fold the SAML provider into
+  # the user pool client's supported_identity_providers list (alongside
+  # COGNITO so admin-invited users continue to work during the rollout).
+  mcp_saml_provider_name = "IAMIdentityCenter"
+  mcp_supported_identity_providers = (
+    var.mcp_ic_saml_metadata_url != ""
+    ? ["COGNITO", local.mcp_saml_provider_name]
+    : ["COGNITO"]
+  )
 }
 
 # ── Cognito user pool — JWT issuer for API Gateway ───────────────────────────
@@ -121,6 +148,42 @@ resource "aws_cognito_user_pool_domain" "mcp_dev" {
   managed_login_version = 1
 }
 
+# ── IAM Identity Center SAML identity provider (LS-4473) ─────────────────────
+#
+# Federates the IAM Identity Center customer-managed SAML application (created
+# manually in the AWS console — see header comment + variables.tf) into this
+# Cognito user pool. When mcp_ic_saml_metadata_url is unset, no provider is
+# created and the hosted UI continues to show only the Cognito password form.
+#
+# attribute_mapping maps SAML assertion claims to Cognito user attributes.
+# IC issues an emailaddress claim using the SAML 2.0 attribute name, plus
+# name/given_name/family_name on the standard schema URIs. Email is the only
+# attribute Cognito strictly needs (the pool uses email as the username
+# attribute), but mapping name fields too lets future auth UIs render the
+# developer's name without an extra IC API call.
+resource "aws_cognito_identity_provider" "mcp_ic" {
+  count = var.mcp_ic_saml_metadata_url != "" ? 1 : 0
+
+  user_pool_id  = aws_cognito_user_pool.mcp_dev.id
+  provider_name = local.mcp_saml_provider_name
+  provider_type = "SAML"
+
+  provider_details = {
+    MetadataURL             = var.mcp_ic_saml_metadata_url
+    RequestSigningAlgorithm = "rsa-sha256"
+    EncryptedResponses      = "false"
+    IDPSignout              = "false"
+    IDPInit                 = "false"
+  }
+
+  attribute_mapping = {
+    email       = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress"
+    name        = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"
+    given_name  = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname"
+    family_name = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname"
+  }
+}
+
 # OAuth client used by scripts/mcp-auth.mjs. Public client (no secret) —
 # authentication relies on PKCE. callback_urls must include the localhost
 # redirect the CLI listens on; logout_urls match for the optional
@@ -146,7 +209,15 @@ resource "aws_cognito_user_pool_client" "mcp_cli" {
   callback_urls = ["http://localhost:57329"]
   logout_urls   = ["http://localhost:57329"]
 
-  supported_identity_providers = ["COGNITO"]
+  # Static "COGNITO" when no SAML metadata URL is configured; when set,
+  # appends the SAML provider name so the hosted UI shows both options.
+  # See locals.mcp_supported_identity_providers.
+  supported_identity_providers = local.mcp_supported_identity_providers
+
+  # Force the client update to wait for the identity provider so the
+  # provider_name reference resolves on the first apply where SAML is
+  # enabled. depends_on accepts a (possibly empty) list of resources.
+  depends_on = [aws_cognito_identity_provider.mcp_ic]
 
   explicit_auth_flows = [
     "ALLOW_REFRESH_TOKEN_AUTH",
@@ -288,4 +359,25 @@ output "mcp_api_gateway_urls" {
 output "mcp_cognito_hosted_ui" {
   description = "Cognito hosted UI base URL — use this to invite users via the AWS console"
   value       = local.mcp_cognito_hosted_ui
+}
+
+# ── SAML SP details — paste into the IC SAML application registration ────────
+# When bootstrapping the IAM Identity Center customer-managed SAML application
+# in the AWS console (one-time per environment, see header comment + LS-4473),
+# use these two values as the SAML SP audience / ACS URL. They are derived
+# from the existing user pool and never change after the pool is created.
+
+output "mcp_cognito_saml_entity_id" {
+  description = "SAML SP entity ID (audience) for the Cognito MCP user pool — paste into the IC SAML application's 'Application ACS URL audience' field"
+  value       = local.mcp_cognito_saml_entity_id
+}
+
+output "mcp_cognito_saml_acs_url" {
+  description = "SAML ACS (consumer) URL for the Cognito MCP user pool — paste into the IC SAML application's 'Application ACS URL' field"
+  value       = local.mcp_cognito_saml_acs_url
+}
+
+output "mcp_cognito_saml_provider_name" {
+  description = "Cognito SAML provider name — appears as the 'Sign in with …' button label on the hosted UI when mcp_ic_saml_metadata_url is configured. null when SAML federation is disabled."
+  value       = var.mcp_ic_saml_metadata_url != "" ? local.mcp_saml_provider_name : null
 }

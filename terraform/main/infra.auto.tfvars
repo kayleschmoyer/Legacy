@@ -51,6 +51,18 @@ discord_client_id = "1493368154972487800"
 # the Discord Developer Portal under OAuth2 → Redirects.
 discord_redirect_uri = "https://legacy-fantasy.com/auth/discord/callback"
 
+# ── MCP IAM Identity Center SAML federation (LS-4473) ────────────────────────
+# IdP metadata URL for the IAM Identity Center SAML application that federates
+# into the MCP Cognito user pool. Leave empty until the one-time IC SAML app
+# has been registered manually in the AWS console (see variables.tf for the
+# bootstrap procedure). Once set, terraform apply creates the Cognito SAML
+# identity provider and the hosted UI exposes a "Sign in with IAM Identity
+# Center" button alongside the existing Cognito password form.
+#
+# IdP metadata URLs are public discovery documents (no secrets); safe to
+# check in.
+mcp_ic_saml_metadata_url = ""
+
 # ── Stripe Price IDs ──────────────────────────────────────────────────────────
 # Stripe Price IDs for the subscription plans exposed by the GraphQL `stripePrices`
 # query. These are NOT secrets — they are public identifiers that begin with
