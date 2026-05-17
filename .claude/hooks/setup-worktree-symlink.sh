@@ -1,14 +1,19 @@
 #!/bin/bash
-# SessionStart hook: validate and recreate the node_modules symlink for
-# ephemeral worktrees (.claude/worktrees/<name>/ or <repo>.worktrees/<name>/).
+# SessionStart hook: validate and recreate the node_modules + .env.local symlinks
+# for ephemeral worktrees (.claude/worktrees/<name>/ or <repo>.worktrees/<name>/),
+# then run check-mcp-servers.sh sequentially to surface any precondition failures.
 #
 # Delegates to scripts/setup-worktree-node-modules.mjs — a dependency-free Node
 # script that handles detection, stale-link cleanup, symlink creation, and
 # virtualStoreDir validation. Node calls cmd.exe directly via execFileSync, so
-# there is no MSYS2 path-mangling issue (LS-3084). Node startup (~400ms) is
-# ~7x faster than PowerShell (~3s), which matters because Claude Code runs all
-# SessionStart hooks concurrently — the faster this hook finishes, the sooner
-# tsx exists for the concurrent check-mcp-servers hook to find.
+# there is no MSYS2 path-mangling issue (LS-3084).
+#
+# Chained-not-concurrent: check-mcp-servers.sh used to be a sibling SessionStart
+# entry that ran in parallel with this hook. That created a race — the check
+# tested for node_modules/.bin/tsx and .env.local while setup was still creating
+# them, producing false-positive "[MCP WARNING] .env.local not found" output
+# (LS-4505). The check now runs at the end of this hook, so its preconditions
+# (the symlinks this script creates) are guaranteed to exist.
 #
 # Why symlinks (not junctions):
 #   Directory symlinks (mklink /D) are NOT followed by recursive-delete tools.
@@ -46,23 +51,25 @@ fi
 # 3. Must NOT contain shell metacharacters that would surprise downstream
 #    consumers (the node script, log output) — these can never reach a shell
 #    interpreter from here, but rejecting them keeps the contract simple.
+RUN_SETUP=true
 case "$WORKTREE" in
-  '' | *[\$\`\;\&\|\<\>$'\n']*) exit 0 ;;
+  '' | *[\$\`\;\&\|\<\>$'\n']*) RUN_SETUP=false ;;
   /* | [A-Za-z]:[/\\]*) ;;
-  *) exit 0 ;;
+  *) RUN_SETUP=false ;;
 esac
-if [ ! -d "$WORKTREE" ]; then
-  exit 0
+if [ "$RUN_SETUP" = "true" ] && [ ! -d "$WORKTREE" ]; then
+  RUN_SETUP=false
 fi
 
 # Only act inside known ephemeral worktrees:
 #   Pattern A (Claude Code): .../<repo>/.claude/worktrees/<name>
 #   Pattern B (Copilot/twig): .../<repo>.worktrees/<name>
-PARENT_DIR=$(dirname "$WORKTREE")
-PARENT_NAME=$(basename "$PARENT_DIR")
-
-if [[ "$WORKTREE" != *"/.claude/worktrees/"* ]] && [[ "$PARENT_NAME" != *.worktrees ]]; then
-  exit 0
+if [ "$RUN_SETUP" = "true" ]; then
+  PARENT_DIR=$(dirname "$WORKTREE")
+  PARENT_NAME=$(basename "$PARENT_DIR")
+  if [[ "$WORKTREE" != *"/.claude/worktrees/"* ]] && [[ "$PARENT_NAME" != *.worktrees ]]; then
+    RUN_SETUP=false
+  fi
 fi
 
 # Delegate entirely to the standalone Node.js setup script. It is intentionally
@@ -70,7 +77,8 @@ fi
 # cases: missing symlink, wrong target, NTFS junction, stale virtualStoreDir.
 # On Windows, node calls cmd.exe via execFileSync — no MSYS2 path mangling.
 # Output is captured to a log (see SETUP_LOG below); tsx absence is also surfaced
-# at session-start by check-mcp-servers.sh after a brief poll.
+# at session-start by the chained check-mcp-servers.sh invocation at the bottom
+# of this hook.
 #
 # cd "$WORKTREE" before invoking node so process.cwd() returns the correct
 # Windows-format path (e.g. D:\code\...) inside node.exe. Passing a Unix path
@@ -80,15 +88,28 @@ fi
 # Capture stderr to a log file rather than `|| true` — the hook must never block
 # session startup, but we still want the root cause visible when something
 # breaks. Stale logs are kept short via tail-truncate below.
-SETUP_LOG="${TMPDIR:-/tmp}/claude-setup-worktree-symlink.log"
-{
-  echo "--- $(date -u +%Y-%m-%dT%H:%M:%SZ) WORKTREE=$WORKTREE ---"
-  (cd "$WORKTREE" && node "scripts/setup-worktree-node-modules.mjs")
-} >>"$SETUP_LOG" 2>&1
-# Cap log at 500 lines so it doesn't grow unbounded over many sessions.
-if [ -f "$SETUP_LOG" ]; then
-  tail -500 "$SETUP_LOG" > "${SETUP_LOG}.tmp" 2>/dev/null \
-    && mv "${SETUP_LOG}.tmp" "$SETUP_LOG" 2>/dev/null || true
+if [ "$RUN_SETUP" = "true" ]; then
+  SETUP_LOG="${TMPDIR:-/tmp}/claude-setup-worktree-symlink.log"
+  {
+    echo "--- $(date -u +%Y-%m-%dT%H:%M:%SZ) WORKTREE=$WORKTREE ---"
+    (cd "$WORKTREE" && node "scripts/setup-worktree-node-modules.mjs")
+  } >>"$SETUP_LOG" 2>&1
+  # Cap log at 500 lines so it doesn't grow unbounded over many sessions.
+  if [ -f "$SETUP_LOG" ]; then
+    tail -500 "$SETUP_LOG" > "${SETUP_LOG}.tmp" 2>/dev/null \
+      && mv "${SETUP_LOG}.tmp" "$SETUP_LOG" 2>/dev/null || true
+  fi
+fi
+
+# --- Sequential precondition check ------------------------------------------
+# Run the MCP-server precondition check *after* symlink setup completes so it
+# sees the post-setup state, not whatever existed before this hook fired.
+# Kept as a separate script so it can be invoked ad-hoc for diagnostics.
+CHECK_SCRIPT="$(dirname "$0")/check-mcp-servers.sh"
+if [ -x "$CHECK_SCRIPT" ]; then
+  "$CHECK_SCRIPT"
+elif [ -f "$CHECK_SCRIPT" ]; then
+  bash "$CHECK_SCRIPT"
 fi
 
 exit 0

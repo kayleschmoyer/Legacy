@@ -154,6 +154,7 @@ failing service and stop. See `.agents/skills/credentials/SKILL.md`.
 
 ## See Also
 
+- `docs/dev-process/session-startup.md` — sequence diagram + orientation for the SessionStart hook chain that produces `[MCP WARNING]` output (LS-4505)
 - `.agents/skills/mcp-first/SKILL.md` — server load order and per-server tool substitution table
 - `.agents/skills/credentials/SKILL.md` — auth configuration for each service
 - `.agents/skills/worktree-workflow/SKILL.md` — `scripts/setup-worktree-node-modules.mjs` details

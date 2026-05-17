@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 560" font-family="Literata, Georgia, serif" font-size="13">
+  <title>Claude Code SessionStart hook sequence</title>
+  <defs>
+    <marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1B3A5C"/>
+    </marker>
+    <style>
+      .phase   { fill: #111B2F; stroke: #C5A55A; stroke-width: 1.5; }
+      .action  { fill: #16223A; stroke: #1B3A5C; stroke-width: 1.5; }
+      .chain   { fill: #16223A; stroke: #C5A55A; stroke-width: 2; stroke-dasharray: 4 3; }
+      .stop    { fill: #16223A; stroke: #C41E3A; stroke-width: 2; }
+      .label   { fill: #F0E6CC; font-weight: 600; }
+      .sub     { fill: #C5A55A; font-size: 11px; }
+      .arrow   { stroke: #1B3A5C; stroke-width: 2; fill: none; marker-end: url(#a3); }
+      .seq     { stroke: #C5A55A; stroke-width: 2; fill: none; marker-end: url(#a3); }
+      .title   { fill: #0A0F1A; font-size: 18px; font-weight: 700; }
+      .legend  { fill: #0A0F1A; font-size: 11px; }
+      .code    { font-family: Consolas, monospace; fill: #F0E6CC; font-size: 11px; }
+      .note    { fill: #0A0F1A; font-size: 11px; font-style: italic; }
+    </style>
+  </defs>
+
+  <rect width="880" height="560" fill="#FAF6EC"/>
+  <text x="20" y="30" class="title">Claude Code SessionStart hook sequence (LS-4505)</text>
+  <text x="20" y="50" class="legend">Gold dashed = sequential chain &#183; Navy solid = parallel SessionStart entry &#183; Red = surfaced warning</text>
+
+  <!-- Launcher -->
+  <rect class="phase" x="20" y="80" width="840" height="56" rx="6"/>
+  <text class="label" x="440" y="108" text-anchor="middle">Claude Code launcher</text>
+  <text class="sub"   x="440" y="124" text-anchor="middle">loads .env.local from CLAUDE_PROJECT_DIR, expands ${MCP_*} in .mcp.json, then fires SessionStart hooks in parallel</text>
+
+  <!-- Parallel SessionStart hooks (5 children in settings.json, post-fix) -->
+  <rect class="action" x="20"  y="170" width="160" height="80" rx="6"/>
+  <text class="label" x="100" y="195" text-anchor="middle">setup-worktree-</text>
+  <text class="label" x="100" y="211" text-anchor="middle">symlink.sh</text>
+  <text class="sub"   x="100" y="230" text-anchor="middle">(bash, primary)</text>
+
+  <rect class="action" x="190" y="170" width="160" height="80" rx="6"/>
+  <text class="label" x="270" y="195" text-anchor="middle">setup-worktree-</text>
+  <text class="label" x="270" y="211" text-anchor="middle">symlink.ps1</text>
+  <text class="sub"   x="270" y="230" text-anchor="middle">(idempotent dup)</text>
+
+  <rect class="action" x="360" y="170" width="160" height="80" rx="6"/>
+  <text class="label" x="440" y="195" text-anchor="middle">check-github-</text>
+  <text class="label" x="440" y="211" text-anchor="middle">auth.sh</text>
+  <text class="sub"   x="440" y="230" text-anchor="middle">(independent)</text>
+
+  <rect class="action" x="530" y="170" width="160" height="80" rx="6"/>
+  <text class="label" x="610" y="195" text-anchor="middle">check-workspace-</text>
+  <text class="label" x="610" y="211" text-anchor="middle">auth.sh</text>
+  <text class="sub"   x="610" y="230" text-anchor="middle">(independent)</text>
+
+  <rect class="action" x="700" y="170" width="160" height="80" rx="6"/>
+  <text class="label" x="780" y="195" text-anchor="middle">reset-tool-</text>
+  <text class="label" x="780" y="211" text-anchor="middle">count.sh</text>
+  <text class="sub"   x="780" y="230" text-anchor="middle">(independent)</text>
+
+  <!-- Launcher → hooks arrows -->
+  <path class="arrow" d="M 100 136 L 100 170"/>
+  <path class="arrow" d="M 270 136 L 270 170"/>
+  <path class="arrow" d="M 440 136 L 440 170"/>
+  <path class="arrow" d="M 610 136 L 610 170"/>
+  <path class="arrow" d="M 780 136 L 780 170"/>
+
+  <!-- Sequential chain within setup-worktree-symlink.sh -->
+  <rect class="chain" x="20" y="290" width="160" height="80" rx="6"/>
+  <text class="label" x="100" y="315" text-anchor="middle">node setup-worktree-</text>
+  <text class="label" x="100" y="331" text-anchor="middle">node-modules.mjs</text>
+  <text class="sub"   x="100" y="352" text-anchor="middle">node_modules + .env.local</text>
+
+  <rect class="chain" x="20" y="410" width="160" height="80" rx="6"/>
+  <text class="label" x="100" y="435" text-anchor="middle">check-mcp-</text>
+  <text class="label" x="100" y="451" text-anchor="middle">servers.sh</text>
+  <text class="sub"   x="100" y="472" text-anchor="middle">preconditions check</text>
+
+  <path class="seq" d="M 100 250 L 100 290"/>
+  <path class="seq" d="M 100 370 L 100 410"/>
+  <text x="110" y="278" class="note">in-process</text>
+  <text x="110" y="396" class="note">awaits exit</text>
+
+  <!-- MCP server launch (separate from hooks, fed by .mcp.json) -->
+  <rect class="phase" x="320" y="290" width="540" height="200" rx="6"/>
+  <text class="label" x="590" y="315" text-anchor="middle">MCP servers launch (from .mcp.json)</text>
+  <text class="sub"   x="590" y="332" text-anchor="middle">launcher spawns each server with the env it loaded above &#8212; independent of hook ordering</text>
+
+  <rect class="action" x="340" y="350" width="240" height="50" rx="4"/>
+  <text class="label" x="460" y="370" text-anchor="middle">7 stdio servers</text>
+  <text class="code"  x="460" y="388" text-anchor="middle">node mcp-bootstrap.mjs &#8594; tsx ...</text>
+
+  <rect class="action" x="600" y="350" width="240" height="50" rx="4"/>
+  <text class="label" x="720" y="370" text-anchor="middle">3 URL servers (HTTPS)</text>
+  <text class="code"  x="720" y="388" text-anchor="middle">${MCP_JIRA_URL} + Bearer ${MCP_AUTH_TOKEN}</text>
+
+  <text x="340" y="425" class="note">mcp-bootstrap.mjs only repairs node_modules &#8212; it does</text>
+  <text x="340" y="441" class="note">NOT read .env.local, so it cannot race with symlink setup.</text>
+  <text x="340" y="465" class="note">If MCP_AUTH_TOKEN is unset at launcher time, all 3 URL servers</text>
+  <text x="340" y="481" class="note">come up unauthenticated &#8212; restart the session after re-auth.</text>
+
+  <!-- Warning callout -->
+  <rect class="stop" x="20" y="520" width="840" height="32" rx="4"/>
+  <text class="label" x="440" y="542" text-anchor="middle">Pre-LS-4505: check-mcp-servers.sh was a sibling hook, racing setup &#8594; false-positive ".env.local not found" warnings.</text>
+</svg>

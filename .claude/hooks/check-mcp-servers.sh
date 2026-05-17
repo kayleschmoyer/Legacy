@@ -1,6 +1,14 @@
 #!/bin/bash
-# SessionStart hook: verify MCP server preconditions and emit visible warnings
-# when the session is likely to have one or more servers missing (LS-3022).
+# MCP-server precondition check (LS-3022).
+#
+# Invoked at the END of setup-worktree-symlink.sh — never registered as a
+# standalone SessionStart hook. The previous parallel-hook registration caused
+# false-positive "[MCP WARNING] .env.local not found" output because Claude Code
+# runs SessionStart hooks concurrently, so the check tested for symlinks while
+# setup was still creating them (LS-4505). Sequential invocation eliminates the
+# race; no retries or sleeps are needed here.
+#
+# Can still be invoked ad-hoc for diagnostics: bash .claude/hooks/check-mcp-servers.sh
 #
 # 7 of the 10 legacy-sports MCP servers use stdio (mcp-bootstrap.mjs → pnpm exec tsx).
 # The remaining 3 (jira, github, ci) connect via Streamable HTTP directly to the
@@ -8,7 +16,7 @@
 # Cognito-issued bearer token; those do not need tsx.
 # If node_modules/.bin/tsx is absent, the 7 stdio servers silently time out — the
 # agent receives an empty deferred tools list and may fall back to gh/git/make
-# without knowing why.  This hook surfaces the failure proactively so the agent
+# without knowing why.  This script surfaces the failure proactively so the agent
 # can report and request a repair rather than proceeding with degraded tooling.
 #
 # Non-blocking — prints warnings but never fails the session (exits 0).
@@ -38,15 +46,6 @@ WARNINGS=()
 # (pnpm stores binaries as symlinks) also triggers the warning. With "! -L",
 # a broken symlink would pass silently: -L is true for any symlink, broken or not.
 TSX="$WORKTREE/node_modules/.bin/tsx"
-# Claude Code runs all SessionStart hooks concurrently. The setup-worktree-symlink
-# hook may still be creating the symlink when we reach this check. Poll briefly
-# (up to 3 s) so a slow-but-successful setup doesn't produce a false-positive warning.
-if [ ! -f "$TSX" ]; then
-  for _tsx_wait in 1 2 3; do
-    sleep 1
-    [ -f "$TSX" ] && break
-  done
-fi
 if [ ! -f "$TSX" ]; then
   WARNINGS+=("[MCP WARNING] node_modules/.bin/tsx is missing — all 7 stdio MCP servers will fail to connect silently.")
   if [ "$IS_WORKTREE" = "true" ]; then

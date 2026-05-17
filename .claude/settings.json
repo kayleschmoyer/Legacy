@@ -110,10 +110,6 @@
           },
           {
             "type": "command",
-            "command": ".claude/hooks/check-mcp-servers.sh"
-          },
-          {
-            "type": "command",
             "command": ".claude/hooks/reset-tool-count.sh"
           }
         ]
