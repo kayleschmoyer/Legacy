@@ -2,6 +2,12 @@
 
 Commands, Nx targets, environment setup, and troubleshooting for integration tests.
 
+## Integration tests target live services — never localhost
+
+Integration tests (`*.integration.spec.ts`) run against real deployed services. **Never configure `INTEGRATION_BASE_URL` to point at localhost or a static file server.** The fixture's `getTestUserJwt()` call, WebSocket connections, and GraphQL mutations all require a live backend. A localhost target will produce misleading 404s or connection-refused errors that look like test logic failures but are actually environment misconfiguration.
+
+If you need a local backend, run the lambda stack locally (`make dev`) and point `INTEGRATION_BASE_URL` at `http://localhost:5001` — but only if you have verified the full stack is running. In CI, `INTEGRATION_BASE_URL` must always point to a deployed environment (staging or production).
+
 ## Integration tests CAN be run locally
 
 Agents commonly assume integration auth requires credentials only available in CI. **It does not.** Test-user credentials live in the main repo's gitignored `.env` (`E2E_COMMISSIONER_EMAIL/PASSWORD`, `E2E_MANAGER_1..3_EMAIL/PASSWORD`, `VITE_OAUTH_PROXY_URL`), and the worktree bootstrap script symlinks that file into every native worktree. After running:
