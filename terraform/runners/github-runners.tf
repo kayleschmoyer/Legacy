@@ -566,7 +566,8 @@ resource "aws_iam_policy" "runner_permissions_boundary" {
         Action = [
           "ec2:CreateFleet",
           "ec2:RunInstances",
-          "ec2:CreateTags"
+          "ec2:CreateTags",
+          "ec2:DeleteTags"
         ]
         Resource = [
           "arn:aws:ec2:${local.region}:${local.account_id}:*",
