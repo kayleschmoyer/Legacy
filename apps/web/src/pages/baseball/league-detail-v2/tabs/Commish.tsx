@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   type LeagueFragment,
@@ -8,6 +8,7 @@ import {
   useCurrentWeek,
   useMatchupsForLeague,
 } from '../../../../hooks/useMatchup';
+import { useLeagueWebSocket } from '../../../../hooks/useLeagueWebSocket';
 import { useLeagueScoringSettings } from '../../../../lib/scoring';
 import { CommissionerAnnouncementsPanel } from '../../../../features/baseball/CommissionerAnnouncementsPanel';
 import { DraftSettingsControl } from '../../../../components/commissioner/DraftSettingsControl';
@@ -85,14 +86,29 @@ export const CommishTab: React.FC<CommishTabProps> = ({ league }) => {
   // advance-week states.  Fetch league matchups + current week and pick
   // any matchup for the current week (NextStep uses league-level fields
   // selectedGamesCount/status/weekNumber, not user-specific).
-  const { matchups: allLeagueMatchups } = useMatchupsForLeague(
+  const { matchups: allLeagueMatchups, refetch: refetchMatchups } =
+    useMatchupsForLeague(leagueId || null);
+  const { currentWeek, refetch: refetchCurrentWeek } = useCurrentWeek(
     leagueId || null,
   );
-  const { currentWeek } = useCurrentWeek(leagueId || null);
   const currentMatchup = useMemo(() => {
     if (!currentWeek || !allLeagueMatchups.length) return null;
     return allLeagueMatchups.find((m) => m.weekNumber === currentWeek) ?? null;
   }, [allLeagueMatchups, currentWeek]);
+
+  // Refetch when the server signals stats have been recalculated so the
+  // NextStepControl label (game-selection vs advance-week) stays in sync
+  // without a manual reload.
+  const refetchMatchupsRef = useRef(refetchMatchups);
+  refetchMatchupsRef.current = refetchMatchups;
+  const refetchCurrentWeekRef = useRef(refetchCurrentWeek);
+  refetchCurrentWeekRef.current = refetchCurrentWeek;
+  useLeagueWebSocket({
+    onMatchupStatsComplete: () => {
+      void refetchMatchupsRef.current();
+      void refetchCurrentWeekRef.current();
+    },
+  });
 
   const sections: AccordSection[] = [
     {
