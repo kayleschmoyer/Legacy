@@ -259,7 +259,6 @@ const FAQItem = styled(YStack, {
   borderWidth: 1,
   borderColor: '$borderColor',
   overflow: 'hidden',
-  animation: 'medium',
 });
 
 const FAQQuestion = styled(XStack, {

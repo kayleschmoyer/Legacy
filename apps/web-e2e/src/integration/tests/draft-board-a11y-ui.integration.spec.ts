@@ -31,6 +31,7 @@ import { expect } from '@playwright/test';
 import { createLeagueViaUI } from '../helpers/create-league';
 import {
   dismissPickAnnouncementOverlay,
+  hidePausedDraftOverlay,
   waitThroughTransientLoadingScreen,
 } from '../helpers/draft-board-overlay';
 import { pauseDraft, resumeDraft } from '../helpers/pause-draft';
@@ -397,6 +398,10 @@ test.describe
 
     // Dismiss any pick-announcement overlay that may cover the search input
     await dismissPickAnnouncementOverlay(page);
+    // LS-4091 made the draft-paused overlay visible to commissioners too; it
+    // covers the viewport (z-index 5000) and intercepts every click against
+    // the search input. Hide it so the underlying input is reachable.
+    await hidePausedDraftOverlay(page);
 
     await test.step('Search input is focusable and accepts text', async () => {
       // Dismiss any overlay that may have reappeared since the earlier check
@@ -442,6 +447,9 @@ test.describe
     await expect(
       page.getByRole('main', { name: /player draft board/i }),
     ).toBeVisible({ timeout: 45_000 });
+
+    // Same overlay-blocking constraint as Phase 7 — see hidePausedDraftOverlay.
+    await hidePausedDraftOverlay(page);
 
     await test.step('Wait for player cards to load', async () => {
       // Player cards are rendered in the center panel once the draft is live
