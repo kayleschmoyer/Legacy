@@ -90,9 +90,14 @@ test.describe
       });
     });
 
-    await test.step('"Share Link" section shows a URL containing the join path', async () => {
+    await test.step('"Invite Link" section shows a URL containing the join path', async () => {
+      // V2 InviteCard renders sibling [label, .ls-invite-link[input + copy button]] blocks.
+      // Anchor the read-only input to its copy button to disambiguate the URL row
+      // from the Invite Code row. Robust against testid wiring deploy lag.
       const urlInput = page
-        .getByTestId('invite-link-url')
+        .locator('.ls-invite-link', {
+          has: page.getByRole('button', { name: /copy invite link/i }),
+        })
         .locator('input[readonly]');
       await expect(urlInput).toBeVisible({ timeout: 15_000 });
       const displayedUrl = await urlInput.inputValue();
@@ -102,7 +107,9 @@ test.describe
 
     await test.step('"Invite Code" section shows an 8-character alphanumeric code', async () => {
       const codeInput = page
-        .getByTestId('invite-code')
+        .locator('.ls-invite-link', {
+          has: page.getByRole('button', { name: /copy invite code/i }),
+        })
         .locator('input[readonly]');
       await expect(codeInput).toBeVisible({ timeout: 10_000 });
       state.inviteCode = await codeInput.inputValue();
