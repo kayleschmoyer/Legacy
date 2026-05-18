@@ -198,6 +198,13 @@ resource "aws_route" "private_lambda_internet" {
   network_interface_id   = aws_network_interface.nat_instance[0].id
 }
 
+# One-time import: EIP was removed from state during the LS-4530 migration
+# (instance→ENI association). Remove this block after the next successful apply.
+import {
+  to = aws_eip.nat_instance[0]
+  id = "eipalloc-0a477d5acbdbc9bf0"
+}
+
 # Elastic IP for NAT instance (optional, for static IP).
 # Attaches to the managed ENI so the EIP follows the network interface across
 # NAT instance replacements rather than getting disassociated when the instance
