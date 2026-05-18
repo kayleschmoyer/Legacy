@@ -1,4 +1,5 @@
 import { renderHook } from '@testing-library/react';
+import type { UseLeagueWebSocketOptions } from './useLeagueWebSocket';
 import { useIsPremiumStatus } from './useIsPremium';
 
 jest.mock('@legacy-sports/shared-components/auth', () => ({
@@ -9,6 +10,14 @@ jest.mock('../api/db/graphql.generated', () => ({
   useGetUserByIdQuery: jest.fn(),
 }));
 
+jest.mock('./useLeagueWebSocket', () => ({
+  useLeagueWebSocket: jest.fn(),
+}));
+
+jest.mock('../context/LeagueWebSocketContext', () => ({
+  useLeagueWebSocketClient: jest.fn(() => ({ client: {}, connected: true })),
+}));
+
 const { useAuth } = jest.requireMock(
   '@legacy-sports/shared-components/auth',
 ) as unknown as { useAuth: jest.Mock };
@@ -17,9 +26,16 @@ const { useGetUserByIdQuery } = jest.requireMock(
   '../api/db/graphql.generated',
 ) as unknown as { useGetUserByIdQuery: jest.Mock };
 
+const { useLeagueWebSocket } = jest.requireMock('./useLeagueWebSocket');
+
+const { useLeagueWebSocketClient } = jest.requireMock(
+  '../context/LeagueWebSocketContext',
+);
+
 describe('useIsPremiumStatus', () => {
   beforeEach(() => {
     jest.resetAllMocks();
+    useLeagueWebSocketClient.mockReturnValue({ client: {}, connected: true });
   });
 
   it('returns isPremium: false while auth is loading', () => {
@@ -93,7 +109,7 @@ describe('useIsPremiumStatus', () => {
     expect(result.current.isLoading).toBe(false);
   });
 
-  it('polls every 5 minutes so mid-session cancellations take effect', () => {
+  it('does not poll the user query (push notifications keep it fresh)', () => {
     useAuth.mockReturnValue({
       user: { id: 42, accessLevel: 'user' },
       isLoading: false,
@@ -101,12 +117,59 @@ describe('useIsPremiumStatus', () => {
     useGetUserByIdQuery.mockReturnValue({
       data: { user: { subscriptionTier: 'premium' } },
       loading: false,
+      refetch: jest.fn(),
     });
 
     renderHook(() => useIsPremiumStatus());
 
     expect(useGetUserByIdQuery).toHaveBeenCalledWith(
-      expect.objectContaining({ pollInterval: 5 * 60 * 1000 }),
+      expect.not.objectContaining({ pollInterval: expect.anything() }),
     );
+  });
+
+  it('refetches the user query on SUBSCRIPTION_UPDATED push', () => {
+    const refetch = jest.fn().mockResolvedValue({});
+    useAuth.mockReturnValue({
+      user: { id: 42, accessLevel: 'user' },
+      isLoading: false,
+    });
+    useGetUserByIdQuery.mockReturnValue({
+      data: { user: { subscriptionTier: 'premium' } },
+      loading: false,
+      refetch,
+    });
+
+    renderHook(() => useIsPremiumStatus());
+
+    const opts = useLeagueWebSocket.mock
+      .calls[0]?.[0] as UseLeagueWebSocketOptions;
+    expect(opts.onSubscriptionUpdated).toBeDefined();
+    opts.onSubscriptionUpdated?.({
+      type: 'subscription_updated',
+      tier: 'free',
+      status: 'canceled',
+    } as never);
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not refetch on SUBSCRIPTION_UPDATED when there is no authed user', () => {
+    const refetch = jest.fn().mockResolvedValue({});
+    useAuth.mockReturnValue({ user: undefined, isLoading: false });
+    useGetUserByIdQuery.mockReturnValue({
+      data: undefined,
+      loading: false,
+      refetch,
+    });
+
+    renderHook(() => useIsPremiumStatus());
+
+    const opts = useLeagueWebSocket.mock
+      .calls[0]?.[0] as UseLeagueWebSocketOptions;
+    opts.onSubscriptionUpdated?.({
+      type: 'subscription_updated',
+      tier: 'premium',
+      status: 'active',
+    } as never);
+    expect(refetch).not.toHaveBeenCalled();
   });
 });
