@@ -967,7 +967,6 @@ export function LeagueScoringEditor(
               {saveSuccess && (
                 <XStack
                   key="success"
-                  data-testid="scoring-saved-toast"
                   role="status"
                   aria-live="polite"
                   animation="quick"
@@ -976,10 +975,25 @@ export function LeagueScoringEditor(
                   alignItems="center"
                   gap="$2"
                 >
-                  <Zap size={14} color="$green10" />
-                  <Text fontSize="$2" color="$green10" fontWeight="600">
-                    Changes saved — scoring table refreshed.
-                  </Text>
+                  {/* data-testid lives on a plain DOM span rather than the
+                      animated XStack. Tamagui's React Native animation driver
+                      wraps animated stacks in a way that does not forward
+                      data-testid to the rendered DOM, so the testid must be on
+                      a non-animated native element to be queryable by
+                      Playwright (LS-4508). */}
+                  <span
+                    data-testid="scoring-saved-toast"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 8,
+                    }}
+                  >
+                    <Zap size={14} color="$green10" />
+                    <Text fontSize="$2" color="$green10" fontWeight="600">
+                      Changes saved — scoring table refreshed.
+                    </Text>
+                  </span>
                 </XStack>
               )}
             </AnimatePresence>

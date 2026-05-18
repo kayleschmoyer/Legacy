@@ -690,6 +690,15 @@ test.describe('Commissioner Scoring Editor — Editing @critical', () => {
     // Verify badge is still hidden after cache reconciliation — this is the
     // assertion that catches the LS-2957 regression.
     await expect(unsavedBadge).not.toBeVisible();
+
+    // The success toast must expose data-testid in the rendered DOM so the
+    // integration spec's Phase 3/5 assertions resolve. data-testid on the
+    // animated Tamagui XStack itself does not propagate through the React
+    // Native animation driver; this assertion guards the in-component span
+    // workaround that places the testid on a plain DOM element (LS-4508).
+    await expect(
+      scoringRegion.getByTestId('scoring-saved-toast'),
+    ).toBeVisible();
   });
 
   test('reset button clears pending changes @regression', async ({ page }) => {
