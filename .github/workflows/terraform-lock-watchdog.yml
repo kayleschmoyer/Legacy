@@ -1,0 +1,235 @@
+name: Terraform Lock Watchdog
+
+# LS-4527 — Self-heals orphaned terraform state locks left behind when an apply
+# workflow run dies before releasing the lock (e.g. runner OOM, GitHub Actions
+# infrastructure cancel, network failure mid-apply that severs egress from a
+# self-hosted runner). Documented in docs/decisions/0010-terraform-state-lock-watchdog.md.
+#
+# The scenario this guards against: a lambda-terraform-apply run is cancelled
+# mid-apply during a NAT-instance replacement, leaving aws_route.private_lambda_internet
+# pointing at a destroyed ENI. Lambdas in private subnets lose internet egress,
+# subsequent apply retries pile up failing on the stuck S3 lock, and the dev
+# environment is unrecoverable until a human force-unlocks. Captured in LS-4526.
+#
+# Why a separate workflow on GitHub-hosted runners:
+#   - The existing "Clear Stale Locks" step inside lambda-terraform-apply.yml
+#     only fires when a new run is triggered. If no Lambda upload arrives for
+#     hours, the orphaned lock sits there. This watchdog runs on a schedule
+#     so recovery happens within the cron interval regardless of triggers.
+#   - Independent of any VPC infrastructure. ubuntu-latest has full direct
+#     internet egress, so the watchdog can always reach S3 and the GitHub API
+#     even if the dev VPC's NAT instance — or any other in-VPC service — is
+#     unhealthy. (The self-hosted CI runners live in public subnets with
+#     direct IGW egress, so they don't depend on the NAT either; this point
+#     is about general resilience to future in-VPC outages, not a fix for the
+#     specific LS-4526 incident's runner path.)
+#
+# Safety model:
+#   - Only acts on locks older than STALE_THRESHOLD_MINUTES (default 20m;
+#     comfortably greater than the apply workflow's 20-minute timeout-minutes,
+#     so a healthy long-running apply is never interrupted).
+#   - Before removing, queries the GitHub Actions API for any in_progress or
+#     queued run of lambda-terraform-apply / runner-terraform-apply / rollback.
+#     If any is active, hands off — the active run will manage the lock itself.
+#   - Logs every decision (skipped vs. removed) to the workflow summary so the
+#     action is auditable after the fact.
+
+on:
+  schedule:
+    # Every 15 minutes. Pairs with the 20-minute stale threshold to bound
+    # recovery time to roughly one cron tick after the apply workflow's own
+    # 20-minute timeout would have fired.
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: "Inspect locks and log decisions without removing anything"
+        required: false
+        default: false
+        type: boolean
+      stale-threshold-minutes:
+        description: "Override the age threshold (minutes) above which a lock is eligible for removal"
+        required: false
+        default: "20"
+        type: string
+
+# Single run at a time. Two watchdog runs concurrently inspecting the same lock
+# could both decide to remove it after both observe the same active-run snapshot
+# — harmless (s3 rm is idempotent), but serializing keeps logs uncluttered.
+concurrency:
+  group: terraform-lock-watchdog
+  cancel-in-progress: false
+
+permissions:
+  id-token: write # OIDC for AWS
+  contents: read
+  actions: read # Required to list workflow runs via GitHub API
+
+env:
+  AWS_REGION: us-east-1
+  STATE_BUCKET: legacy-sports-terraform-state
+  STALE_THRESHOLD_MINUTES: ${{ inputs.stale-threshold-minutes || '20' }}
+  DRY_RUN: ${{ inputs.dry-run || 'false' }}
+
+jobs:
+  watchdog:
+    name: Inspect and clear stale terraform locks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@ec61189d14ec14c8efccab744f656cffd0e33f37 # v6
+        with:
+          role-to-assume: arn:aws:iam::176661590736:role/legacy-sports-dev-github-actions
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Check for active terraform apply runs
+        id: active-runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Workflows that legitimately hold the terraform state lock. If any
+          # are in_progress or queued, the watchdog must NOT touch the lock —
+          # the active run will release it on completion or its own cleanup step.
+          WORKFLOWS=(
+            "lambda-terraform-apply.yml"
+            "runner-terraform-apply.yml"
+            "rollback.yml"
+          )
+
+          ACTIVE_COUNT=0
+          # Real newlines in the variable so we can print it without using the
+          # variable as a printf format string (avoids SC2059 / unintended %
+          # interpretation).
+          ACTIVE_DETAILS=""
+          for wf in "${WORKFLOWS[@]}"; do
+            for status in in_progress queued; do
+              COUNT=$(gh run list \
+                --repo "${{ github.repository }}" \
+                --workflow "$wf" \
+                --status "$status" \
+                --limit 5 \
+                --json databaseId \
+                --jq 'length')
+              if [[ "$COUNT" -gt 0 ]]; then
+                ACTIVE_COUNT=$((ACTIVE_COUNT + COUNT))
+                ACTIVE_DETAILS+="- $wf ($status): $COUNT"$'\n'
+              fi
+            done
+          done
+
+          echo "active_count=$ACTIVE_COUNT" >> "$GITHUB_OUTPUT"
+          {
+            echo "## Active apply runs"
+            if [[ "$ACTIVE_COUNT" -gt 0 ]]; then
+              echo "Found $ACTIVE_COUNT active apply run(s):"
+              printf '%s' "$ACTIVE_DETAILS"
+            else
+              echo "No active apply runs."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Inspect and clear stale locks
+        env:
+          ACTIVE_COUNT: ${{ steps.active-runs.outputs.active_count }}
+        run: |
+          set -euo pipefail
+
+          # Lockfile paths mirror the two terraform state files (see
+          # terraform/main/ and terraform/runners/). Add new entries here if a
+          # third state file is ever introduced. The third workflow (rollback)
+          # acts on the main state file's lock — already covered by entry #1.
+          LOCKS=(
+            "s3://${STATE_BUCKET}/legacy-sports/terraform.tfstate.tflock|main"
+            "s3://${STATE_BUCKET}/legacy-sports/runners.tfstate.tflock|runners"
+          )
+
+          REMOVED_ANY=0
+          SKIPPED_ACTIVE_ANY=0
+          FOUND_FRESH_ANY=0
+
+          for entry in "${LOCKS[@]}"; do
+            LOCK_URI="${entry%%|*}"
+            STATE_NAME="${entry##*|}"
+
+            echo ""
+            echo "===== Inspecting $STATE_NAME lock: $LOCK_URI ====="
+
+            if ! aws s3 ls "$LOCK_URI" > /dev/null 2>&1; then
+              echo "  No lock file present — nothing to do."
+              continue
+            fi
+
+            # The S3 object's LastModified timestamp is the lock creation time
+            # (the lockfile is written once and not mutated). Using LastModified
+            # avoids parsing the JSON body, which terraform does not guarantee
+            # is stable across versions.
+            KEY="${LOCK_URI#s3://${STATE_BUCKET}/}"
+            LAST_MODIFIED=$(aws s3api head-object \
+              --bucket "${STATE_BUCKET}" \
+              --key "$KEY" \
+              --query LastModified \
+              --output text)
+
+            LOCK_EPOCH=$(date -u -d "$LAST_MODIFIED" +%s)
+            NOW_EPOCH=$(date -u +%s)
+            AGE_SECONDS=$((NOW_EPOCH - LOCK_EPOCH))
+            AGE_MINUTES=$((AGE_SECONDS / 60))
+            THRESHOLD_SECONDS=$((STALE_THRESHOLD_MINUTES * 60))
+
+            echo "  Lock created: $LAST_MODIFIED (${AGE_MINUTES}m ago, threshold ${STALE_THRESHOLD_MINUTES}m)"
+            echo "  Lock contents:"
+            aws s3 cp "$LOCK_URI" - 2>/dev/null | python3 -m json.tool 2>/dev/null | sed 's/^/    /' || true
+
+            if [[ "$AGE_SECONDS" -lt "$THRESHOLD_SECONDS" ]]; then
+              echo "  ✅ Lock is fresh (younger than ${STALE_THRESHOLD_MINUTES}m) — leaving alone."
+              FOUND_FRESH_ANY=1
+              echo "- $STATE_NAME: fresh (${AGE_MINUTES}m), no action" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+
+            if [[ "$ACTIVE_COUNT" -gt 0 ]]; then
+              echo "  ⚠️ Lock is stale (${AGE_MINUTES}m) but $ACTIVE_COUNT apply run(s) are active — leaving alone."
+              SKIPPED_ACTIVE_ANY=1
+              echo "- $STATE_NAME: stale (${AGE_MINUTES}m), active applies in flight, no action" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+
+            if [[ "$DRY_RUN" == "true" ]]; then
+              echo "  🟡 [DRY RUN] Would remove stale lock ($STATE_NAME, ${AGE_MINUTES}m old)."
+              echo "- $STATE_NAME: stale (${AGE_MINUTES}m), DRY RUN — would remove" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+
+            echo "  🔓 Removing stale lock ($STATE_NAME, ${AGE_MINUTES}m old, no active applies)..."
+            aws s3 rm "$LOCK_URI"
+            REMOVED_ANY=1
+            echo "- $STATE_NAME: REMOVED (was ${AGE_MINUTES}m old, no active applies)" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+          echo "removed_any=$REMOVED_ANY" >> "$GITHUB_ENV"
+          echo "skipped_active_any=$SKIPPED_ACTIVE_ANY" >> "$GITHUB_ENV"
+          echo "found_fresh_any=$FOUND_FRESH_ANY" >> "$GITHUB_ENV"
+
+      - name: Compose Discord message
+        id: notify-body
+        if: env.removed_any == '1' || env.skipped_active_any == '1'
+        run: |
+          if [[ "${removed_any}" == "1" ]]; then
+            echo "body=Force-removed stale terraform state lock (no active apply runs, age > ${STALE_THRESHOLD_MINUTES}m). See run logs for details." >> "$GITHUB_OUTPUT"
+          else
+            echo "body=Stale lock detected (age > ${STALE_THRESHOLD_MINUTES}m) but apply runs are in flight — left in place. Investigate if applies remain stuck." >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Discord notification on action taken
+        # Only notify when we actually removed a lock or skipped one because of
+        # an active apply. Routine "nothing to do" ticks would be noise.
+        if: env.removed_any == '1' || env.skipped_active_any == '1'
+        uses: ./.github/actions/discord-notify
+        with:
+          webhook-url: ${{ secrets.DISCORD_DEPLOY_WEBHOOK_URL }}
+          status: ${{ env.removed_any == '1' && 'success' || 'failure' }}
+          title: "Terraform Lock Watchdog"
+          environment: dev
+          description: ${{ steps.notify-body.outputs.body }}
