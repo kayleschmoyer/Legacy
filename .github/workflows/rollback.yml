@@ -410,21 +410,15 @@ jobs:
       - name: Clear Stale Locks
         if: "!inputs.dry_run"
         run: |
-          STATE_KEY="legacy-sports-terraform-state/legacy-sports/terraform.tfstate"
-          LOCK_ITEM=$(aws dynamodb get-item \
-            --table-name terraform-state-locks \
-            --key "{\"LockID\":{\"S\":\"$STATE_KEY\"}}" \
-            --region us-east-1 \
-            --output json 2>&1) || true
-
-          if echo "$LOCK_ITEM" | jq -e '.Item' > /dev/null 2>&1; then
-            echo "Removing stale Terraform lock..."
-            aws dynamodb delete-item \
-              --table-name terraform-state-locks \
-              --key "{\"LockID\":{\"S\":\"$STATE_KEY\"}}" \
-              --region us-east-1
+          LOCK_FILE="s3://legacy-sports-terraform-state/legacy-sports/terraform.tfstate.tflock"
+          if aws s3 ls "$LOCK_FILE" > /dev/null 2>&1; then
+            echo "⚠️  Found existing S3 lock file:"
+            aws s3 cp "$LOCK_FILE" - 2>/dev/null | python3 -m json.tool 2>/dev/null || true
+            echo "🔓 Removing stale Terraform S3 lock file..."
+            aws s3 rm "$LOCK_FILE"
+            echo "✅ Stale lock cleared"
           else
-            echo "No stale locks detected"
+            echo "✅ No stale locks detected"
           fi
 
       - name: Validate Required Secrets
@@ -489,10 +483,7 @@ jobs:
       - name: Release Lock on Failure
         if: always() && !inputs.dry_run && steps.terraform-apply.outcome == 'failure'
         run: |
-          aws dynamodb delete-item \
-            --table-name terraform-state-locks \
-            --key '{"LockID":{"S":"legacy-sports-terraform-state/legacy-sports/terraform.tfstate"}}' \
-            --region us-east-1 2>&1 || true
+          aws s3 rm s3://legacy-sports-terraform-state/legacy-sports/terraform.tfstate.tflock 2>&1 || true
 
       - name: Health Check Lambdas
         if: "!inputs.dry_run && steps.terraform-apply.outcome == 'success'"

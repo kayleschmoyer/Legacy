@@ -185,26 +185,20 @@ jobs:
         run: |
           set -euo pipefail
           # Per Copilot review on PR #2281: do NOT unconditionally delete the
-          # DynamoDB state lock. A concurrent run may legitimately hold it, and
+          # S3 state lock file. A concurrent run may legitimately hold it, and
           # force-deleting breaks mutual exclusion. Instead, fetch and log the
           # lock contents so an operator can decide whether it's stale and
-          # manually clear it if needed.
+          # manually clear it if needed (aws s3 rm <lock-file> or terraform force-unlock).
           echo "🔎 Inspecting terraform state lock after failure..."
-          LOCK_KEY='{"LockID":{"S":"legacy-sports-terraform-state/legacy-sports/runners.tfstate"}}'
-          LOCK_ITEM=$(aws dynamodb get-item \
-            --table-name terraform-state-locks \
-            --key "$LOCK_KEY" \
-            --region us-east-1 \
-            --output json 2>&1) || LOCK_ITEM='{}'
+          LOCK_FILE="s3://legacy-sports-terraform-state/legacy-sports/runners.tfstate.tflock"
 
-          echo "$LOCK_ITEM"
-
-          if [ "$LOCK_ITEM" = '{}' ] || ! echo "$LOCK_ITEM" | grep -q '"Item"'; then
-            echo "ℹ️ No terraform lock item found — nothing to clear."
-            echo "ℹ️ No terraform lock item found." >> "$GITHUB_STEP_SUMMARY"
+          if aws s3 ls "$LOCK_FILE" > /dev/null 2>&1; then
+            echo "⚠️ Terraform S3 lock file exists:"
+            aws s3 cp "$LOCK_FILE" - 2>/dev/null | python3 -m json.tool 2>/dev/null || true
+            echo "⚠️ Terraform S3 lock file exists at $LOCK_FILE — review the lock holder above before any manual cleanup." >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "⚠️ Terraform lock item exists. Review the lock holder/Info above before any manual cleanup."
-            echo "⚠️ Terraform lock item exists. Review the job logs for the DynamoDB lock contents before manually clearing a stale lock." >> "$GITHUB_STEP_SUMMARY"
+            echo "ℹ️ No terraform lock file found — nothing to clear."
+            echo "ℹ️ No terraform lock file found." >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Discord error notification

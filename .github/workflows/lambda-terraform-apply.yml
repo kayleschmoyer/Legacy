@@ -176,25 +176,13 @@ jobs:
         run: |
           echo "🔍 Checking for stale Terraform locks..."
 
-          STATE_KEY="legacy-sports-terraform-state/legacy-sports/terraform.tfstate"
+          LOCK_FILE="s3://legacy-sports-terraform-state/legacy-sports/terraform.tfstate.tflock"
 
-          # Use get-item with the exact known key (more reliable than scan)
-          LOCK_ITEM=$(aws dynamodb get-item \
-            --table-name terraform-state-locks \
-            --key "{\"LockID\":{\"S\":\"$STATE_KEY\"}}" \
-            --region us-east-1 \
-            --output json 2>&1) || true
-
-          if echo "$LOCK_ITEM" | jq -e '.Item' > /dev/null 2>&1; then
-            echo "⚠️  Found existing lock:"
-            echo "$LOCK_ITEM" | jq -r '.Item.Info.S // "(no info)"' | jq '.' 2>/dev/null || true
-            echo "🔓 Removing stale lock from DynamoDB..."
-
-            aws dynamodb delete-item \
-              --table-name terraform-state-locks \
-              --key "{\"LockID\":{\"S\":\"$STATE_KEY\"}}" \
-              --region us-east-1
-
+          if aws s3 ls "$LOCK_FILE" > /dev/null 2>&1; then
+            echo "⚠️  Found existing S3 lock file:"
+            aws s3 cp "$LOCK_FILE" - 2>/dev/null | python3 -m json.tool 2>/dev/null || true
+            echo "🔓 Removing stale S3 lock file..."
+            aws s3 rm "$LOCK_FILE"
             echo "✅ Stale lock cleared"
           else
             echo "✅ No stale locks detected"
@@ -285,10 +273,7 @@ jobs:
         working-directory: terraform/main
         run: |
           echo "🔓 Releasing terraform lock after plan failure..."
-          aws dynamodb delete-item \
-            --table-name terraform-state-locks \
-            --key '{"LockID":{"S":"legacy-sports-terraform-state/legacy-sports/terraform.tfstate"}}' \
-            --region us-east-1 2>&1 || true
+          aws s3 rm s3://legacy-sports-terraform-state/legacy-sports/terraform.tfstate.tflock 2>&1 || true
           echo "✅ Lock released"
 
       - name: Re-check SSM Versions After Plan
@@ -502,10 +487,7 @@ jobs:
         working-directory: terraform/main
         run: |
           echo "🔓 Releasing terraform lock after apply failure..."
-          aws dynamodb delete-item \
-            --table-name terraform-state-locks \
-            --key '{"LockID":{"S":"legacy-sports-terraform-state/legacy-sports/terraform.tfstate"}}' \
-            --region us-east-1 2>&1 || true
+          aws s3 rm s3://legacy-sports-terraform-state/legacy-sports/terraform.tfstate.tflock 2>&1 || true
           echo "✅ Lock released"
 
       - name: "📡 Rollbar Deploy Succeeded"
@@ -627,10 +609,7 @@ jobs:
         working-directory: terraform/main
         run: |
           echo "🔓 Ensuring terraform lock is released..."
-          aws dynamodb delete-item \
-            --table-name terraform-state-locks \
-            --key '{"LockID":{"S":"legacy-sports-terraform-state/legacy-sports/terraform.tfstate"}}' \
-            --region us-east-1 2>&1 || true
+          aws s3 rm s3://legacy-sports-terraform-state/legacy-sports/terraform.tfstate.tflock 2>&1 || true
           echo "✅ Lock released"
 
       # -------------------------------------------------------------------
