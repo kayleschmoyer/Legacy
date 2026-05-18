@@ -20,12 +20,27 @@
  */
 
 import { expect } from '@playwright/test';
+import { advanceWeek } from '../helpers/advance-week';
 import { createLeagueViaUI } from '../helpers/create-league';
+import { gqlFetch } from '../helpers/gql-fetch';
 import { graphqlOk } from '../helpers/graphql';
 import { joinLeagueAsManager } from '../helpers/wait-for-join-page';
 import { waitForSeasonActive } from '../helpers/wait-for-season-active';
 import { selectDropPlayerIfRosterFull } from '../helpers/waiver-claim-drop';
 import { switchUser, test } from '../fixtures/ui';
+
+/**
+ * Season-length config — drives Phase 10 and Phase 13 cycle counts.
+ *
+ * Picked to exercise every UI mechanic in the spec without burning the test
+ * budget on stats hydration: 3 games/matchup forces the `Select Game N of M`
+ * loop, and 3 total weeks lets Phase 10 advance week 1 → 2 while Phase 13
+ * drives the remaining transitions to season-complete. Playoffs are disabled
+ * so the renewal UI surfaces immediately after the final advance — matching
+ * the season-renewal-migration-ui pattern (LS-755).
+ */
+const GAMES_PER_MATCHUP = 3;
+const TOTAL_MATCHUPS = 3;
 
 // ---------------------------------------------------------------------------
 // Shared state accumulated across serial tests.
@@ -68,6 +83,7 @@ test.describe
 
   test('Phase 1: Create league via the UI', async ({
     commissionerPage: page,
+    commissionerJwt,
   }) => {
     state.leagueName = `UI E2E Season ${Date.now()}`;
     const result = await createLeagueViaUI(page, {
@@ -75,6 +91,66 @@ test.describe
     });
     state.leagueId = result.leagueId;
     state.inviteCode = result.inviteCode;
+
+    await test.step(`Shorten season to ${TOTAL_MATCHUPS} weeks × ${GAMES_PER_MATCHUP} games and disable playoffs`, async () => {
+      // Set before the draft so createAllMatchupsForLeague builds the season
+      // with the test-sized config. Phase 10 + Phase 13 then need ~9 select-
+      // game cycles total to drive the season to "Start New Season", which
+      // fits in the test budget given typical CloudWatch p90 ~78s per cycle.
+      // Disabling playoffs ensures the season completes cleanly
+      // (currentMatchup → null) rather than transitioning to a bracket.
+      //
+      // Retry on API Gateway 5xx: createLeagueAndTeams warmed one Lambda
+      // instance but the follow-up mutation can land on a cold instance and
+      // exceed API Gateway's 29s window before the cold start resolves.
+      type UpdateLeagueSettingsResult = {
+        updateLeagueSettings: {
+          id: number;
+          totalMatchups: number | null;
+          gamesPerMatchup: number | null;
+          playoffEnabled: boolean;
+        };
+      };
+      const mutation = `mutation SetSeasonConfig($input: UpdateLeagueSettingsInput!) {
+           updateLeagueSettings(input: $input) {
+             id totalMatchups gamesPerMatchup playoffEnabled
+           }
+         }`;
+      const variables = {
+        input: {
+          leagueId: state.leagueId,
+          totalMatchups: TOTAL_MATCHUPS,
+          gamesPerMatchup: GAMES_PER_MATCHUP,
+          playoffEnabled: false,
+        },
+      };
+      let data: UpdateLeagueSettingsResult | null = null;
+      let lastErr: Error | null = null;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          data = await gqlFetch<UpdateLeagueSettingsResult>(
+            commissionerJwt,
+            mutation,
+            variables,
+          );
+          lastErr = null;
+          break;
+        } catch (err) {
+          lastErr = err instanceof Error ? err : new Error(String(err));
+          if (attempt < 3 && /HTTP 5\d{2}/.test(lastErr.message)) {
+            await new Promise((resolve) =>
+              setTimeout(resolve, 5_000 * attempt),
+            );
+            continue;
+          }
+          throw lastErr;
+        }
+      }
+      if (!data) throw lastErr ?? new Error('updateLeagueSettings: no data');
+      expect(data.updateLeagueSettings.totalMatchups).toBe(TOTAL_MATCHUPS);
+      expect(data.updateLeagueSettings.gamesPerMatchup).toBe(GAMES_PER_MATCHUP);
+      expect(data.updateLeagueSettings.playoffEnabled).toBe(false);
+    });
   });
 
   // -----------------------------------------------------------------
@@ -832,58 +908,23 @@ test.describe
   // -----------------------------------------------------------------
 
   test('Phase 10: Week advancement', async ({ commissionerPage: page }) => {
+    // GAMES_PER_MATCHUP cycles × per-cycle stats hydration (CloudWatch p90
+    // ~78 s warm-cache, ~30 s mean) plus advance-week mutation overhead.
+    test.setTimeout(360_000);
+
     await test.step('Navigate to commissioner panel', async () => {
       await page.goto(`/baseball/league/${state.leagueId}/commissioner`);
       await page.waitForLoadState('load');
     });
 
-    await test.step('Select games from commissioner panel', async () => {
-      // After matchups are created in the prior step, "Select Game X of Y"
-      // is the next commissioner action — assert it appears, then select.
-      const selectGameBtn = page.getByRole('button', {
-        name: /Select Game/i,
-      });
-      await expect(selectGameBtn).toBeVisible({ timeout: 10_000 });
-      await selectGameBtn.click();
-
-      // Confirmation dialog
-      const confirmBtn = page.getByRole('button', {
-        name: /Select Game|Confirm/i,
-      });
-      await expect(confirmBtn.last()).toBeVisible({ timeout: 5000 });
-      const confirmLast = confirmBtn.last();
-      await confirmLast.click();
-
-      // The confirm dialog closes once selectGame returns. Waiting for
-      // it to be hidden replaces a 5s wall-clock wait with a
-      // deterministic mutation-completion signal (LS-4457).
-      await expect(confirmLast).toBeHidden({ timeout: 30_000 });
-    });
-
-    await test.step('Advance league week from commissioner panel', async () => {
-      // After games are selected in the prior step, "Advance League Week"
-      // is the next commissioner action — assert it appears, then advance.
-      await page.reload();
-      await page.waitForLoadState('load');
-
-      const advanceBtn = page.getByRole('button', {
-        name: /Advance League Week/i,
-      });
-      await expect(advanceBtn).toBeVisible({ timeout: 10_000 });
-      await advanceBtn.click();
-
-      // Confirmation dialog
-      const confirmBtn = page.getByRole('button', {
-        name: /Advance|Confirm/i,
-      });
-      await expect(confirmBtn.last()).toBeVisible({ timeout: 5000 });
-      const confirmLast = confirmBtn.last();
-      await confirmLast.click();
-
-      // The advance-week confirm dialog closes once the mutation returns.
-      // Waiting for it to be hidden replaces a 5s wall-clock wait with a
-      // deterministic signal (LS-4457).
-      await expect(confirmLast).toBeHidden({ timeout: 30_000 });
+    await test.step('Drive Select Game loop and advance week 1 → 2', async () => {
+      // advanceWeek loops the `Select Game N of M` button GAMES_PER_MATCHUP
+      // times, then clicks `Advance League Week`. No page.reload(): the
+      // commissioner page subscribes to MATCHUP_STATS_COMPLETE (v1
+      // LeagueDetailPage.tsx:754, v2 Commish.tsx after LS-4515) and refetches
+      // matchups automatically, so the NextStepControl button label updates
+      // in-place as each stats-hydration cycle completes.
+      await advanceWeek(page, GAMES_PER_MATCHUP);
     });
   });
 
@@ -982,9 +1023,24 @@ test.describe
   // -----------------------------------------------------------------
 
   test('Phase 13: Season end & renewal', async ({ commissionerPage: page }) => {
+    // (TOTAL_MATCHUPS - 1) advanceWeek calls × GAMES_PER_MATCHUP cycles each,
+    // plus the renewal mutation. Sized to cover cold-cache stats hydration.
+    test.setTimeout(600_000);
+
     await test.step('Navigate to commissioner panel', async () => {
       await page.goto(`/baseball/league/${state.leagueId}/commissioner`);
       await page.waitForLoadState('load');
+    });
+
+    await test.step('Advance remaining weeks until the season completes', async () => {
+      // Phase 10 advanced week 1 → 2. Drive the remaining TOTAL_MATCHUPS - 1
+      // weeks so the commissioner panel transitions to `Start New Season`.
+      // With playoffEnabled=false, isSeasonComplete fires after the final
+      // advanceMatchups call clears currentMatchup (NextStepControl.tsx:152).
+      const remainingWeeks = TOTAL_MATCHUPS - 1;
+      for (let i = 0; i < remainingWeeks; i++) {
+        await advanceWeek(page, GAMES_PER_MATCHUP);
+      }
     });
 
     await test.step('Start new season from commissioner panel', async () => {
@@ -994,7 +1050,7 @@ test.describe
         name: /Start New Season/i,
       });
 
-      await expect(renewBtn).toBeVisible({ timeout: 10_000 });
+      await expect(renewBtn).toBeVisible({ timeout: 30_000 });
       await renewBtn.click();
 
       // The dialog asks about rosters: select "Hold a new draft".
