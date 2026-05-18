@@ -780,16 +780,14 @@ test.describe
       await expect(dialog).toBeHidden({ timeout: 15_000 });
     });
 
-    await test.step('Verify trade appears in My Offers', async () => {
-      // The Trading Center always renders a "My Offers" tab — click it to
-      // surface the pending trade we just submitted.
-      const myOffersTab = page.getByText('My Offers', { exact: false });
-      await expect(myOffersTab).toBeVisible({ timeout: 5_000 });
-      await myOffersTab.click();
-      // Should see a pending trade — the assertion below auto-waits up to
-      // its own timeout; no separate sleep is needed after the tab click
-      // (LS-4457).
-      await expect(page.getByText(/pending/i).first()).toBeVisible({
+    await test.step('Verify trade appears in Outgoing Offers', async () => {
+      // The Trading Center renders "Incoming Offers" and "Outgoing Offers" as
+      // always-visible sections (no tabs). The trade we just submitted is
+      // outgoing for the commissioner — assert it shows up under that section
+      // with a pending status badge.
+      const outgoingSection = page.getByTestId('trade-tab-outgoing');
+      await expect(outgoingSection).toBeVisible({ timeout: 5_000 });
+      await expect(outgoingSection.getByText(/pending/i).first()).toBeVisible({
         timeout: 15000,
       });
     });
