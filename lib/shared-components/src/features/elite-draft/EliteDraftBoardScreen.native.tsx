@@ -507,7 +507,6 @@ export function EliteDraftBoardScreen({
 
   const queries = useDraftQueries({
     leagueId,
-    draftOrderMissing: ui.draftOrderMissing,
     playerSearch: ui.playerSearch,
     selectedPosition: ui.selectedPosition,
     viewMode: ui.viewMode,

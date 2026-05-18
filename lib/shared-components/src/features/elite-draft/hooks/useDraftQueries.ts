@@ -44,7 +44,6 @@ const PLAYER_PAGE_SIZE = 200;
 
 interface UseDraftQueriesParams {
   leagueId: number | null;
-  draftOrderMissing: boolean;
   playerSearch: string;
   selectedPosition: string;
   viewMode: 'grid' | 'list' | 'compact' | 'board' | 'table' | 'depth';
@@ -52,7 +51,6 @@ interface UseDraftQueriesParams {
 
 export function useDraftQueries({
   leagueId,
-  draftOrderMissing,
   playerSearch,
   selectedPosition,
   viewMode,
@@ -146,7 +144,6 @@ export function useDraftQueries({
     {
       variables: { draftId: draftId ?? 0 },
       skip: !draftId || isAuctionDraft,
-      pollInterval: !draftId || draftOrderMissing || isAuctionDraft ? 0 : 5000,
       errorPolicy: 'all',
     },
   );
