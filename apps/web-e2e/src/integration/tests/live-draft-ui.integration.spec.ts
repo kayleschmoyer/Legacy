@@ -207,10 +207,7 @@ test.describe
   // PHASE 4 — START THE LIVE DRAFT
   // -----------------------------------------------------------------
 
-  test('Phase 4: Start the live draft', async ({
-    commissionerPage: page,
-    commissionerJwt,
-  }) => {
+  test('Phase 4: Start the live draft', async ({ commissionerPage: page }) => {
     // Draft processing can take time
     test.setTimeout(120_000);
 
@@ -243,43 +240,15 @@ test.describe
     });
 
     await test.step('Wait for draft to start', async () => {
-      // After clicking Start Draft, gate on the backend `draftStatus`
-      // transitioning to `in-progress` before reloading the commissioner
-      // panel — replaces a fixed 3s pre-reload wait that raced the
-      // startDraft mutation under nightly load. The poll callback returns
-      // null on errors so expect.poll retries on assertion failure rather
-      // than throwing (antipattern #1). The canonical value written by
-      // initializeDraft for live drafts is `'in-progress'` (hyphenated) —
-      // see lambdas/db/src/schema/drafts/mutations/initialize-draft.ts.
-      await expect
-        .poll(
-          async () => {
-            const data = await gqlFetch<{
-              league?: { draftStatus?: string | null } | null;
-            }>(
-              commissionerJwt,
-              `query DraftStarted($leagueId: Int!) {
-                 league(id: $leagueId) { draftStatus }
-               }`,
-              { leagueId: state.leagueId },
-            ).catch(() => null);
-            return data?.league?.draftStatus ?? null;
-          },
-          {
-            timeout: 30_000,
-            intervals: [1_000, 2_000],
-            message: `league.draftStatus never reached in-progress within 30s for league ${state.leagueId}`,
-          },
-        )
-        .toBe('in-progress');
-
-      await page.reload();
-      await page.waitForLoadState('load');
-
-      // The commissioner panel should show draft is in progress
-      // or a "Go to Draft Board" button
+      // After clicking Start Draft, the draft WebSocket pushes the
+      // `draftStatus` -> `in-progress` transition to subscribed clients,
+      // so the commissioner panel rerenders to "Draft In Progress"
+      // (or "Go to Draft Board") without a reload. Gate on the UI
+      // directly with a generous timeout that covers the startDraft
+      // mutation round-trip, the WS broadcast, and the Apollo cache
+      // update under nightly load (LS-4521).
       const draftActive = page.getByText(/Draft.*In Progress|Go to Draft/i);
-      await expect(draftActive.first()).toBeVisible({ timeout: 30000 });
+      await expect(draftActive.first()).toBeVisible({ timeout: 60_000 });
     });
   });
 
