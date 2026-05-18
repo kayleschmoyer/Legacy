@@ -373,8 +373,10 @@ test.describe('Table accessibility @regression', () => {
       await mockStandingsGraphQL(page);
       await page.goto(`/baseball/league/${LEAGUE_ID}/standings`);
       await page.waitForLoadState('load');
-      // Wait for React to render page content before asserting on tables
-      await page.waitForSelector('main, h1, [role="main"]', { timeout: 10000 });
+      // Wait for the standings table itself to render — the "Loading..."
+      // placeholder mounts before Apollo resolves, so `main` alone is too
+      // early to assert against `<table>`.
+      await page.waitForSelector('table', { timeout: 10000 });
     });
 
     test('page loads without errors', async ({ page }) => {
@@ -447,44 +449,6 @@ test.describe('Table accessibility @regression', () => {
         'Unexpected Application Error',
       );
     });
-
-    // /players/stats currently renders the stats grid with CSS Grid + ARIA
-    // roles (role="columnheader"/"row") rather than a real <table> element, so
-    // these table-a11y assertions cannot be exercised today. Re-enable once
-    // the stats grid migrates to a semantic <table>; tracking LS-4458.
-    test.fixme('player stats table has accessible name', async ({ page }) => {
-      const { tableCount, issues } = await evaluateTableA11y(page);
-      expect(tableCount).toBeGreaterThan(0);
-      const accessibleNameIssues = issues.filter((i) =>
-        i.includes('accessible name'),
-      );
-      expect(accessibleNameIssues).toHaveLength(0);
-    });
-
-    test.fixme('player stats table uses thead/tbody structure', async ({
-      page,
-    }) => {
-      const { tableCount, tableDetails } = await evaluateTableA11y(page);
-      expect(tableCount).toBeGreaterThan(0);
-      for (const detail of tableDetails) {
-        if (detail.headerCount > 0) {
-          expect(detail.hasThead).toBe(true);
-        }
-        expect(detail.hasTbody).toBe(true);
-      }
-    });
-
-    test.fixme('player stats table header cells have scope attribute', async ({
-      page,
-    }) => {
-      const { tableCount, tableDetails } = await evaluateTableA11y(page);
-      expect(tableCount).toBeGreaterThan(0);
-      for (const detail of tableDetails) {
-        if (detail.headerCount > 0) {
-          expect(detail.headersWithScope).toBe(detail.headerCount);
-        }
-      }
-    });
   });
 
   // -------------------------------------------------------------------------
@@ -504,45 +468,6 @@ test.describe('Table accessibility @regression', () => {
         'Unexpected Application Error',
       );
     });
-
-    // /players/compare renders no comparison table until ≥2 players are added
-    // via the search inputs. To exercise these assertions the beforeEach
-    // would have to seed two players; until that fixture exists, marking
-    // fixme so we are not posting false greens. Tracking LS-4458.
-    test.fixme('comparison table has accessible name when rendered', async ({
-      page,
-    }) => {
-      const { tableCount, issues } = await evaluateTableA11y(page);
-      expect(tableCount).toBeGreaterThan(0);
-      const accessibleNameIssues = issues.filter((i) =>
-        i.includes('accessible name'),
-      );
-      expect(accessibleNameIssues).toHaveLength(0);
-    });
-
-    test.fixme('comparison table uses thead/tbody when rendered', async ({
-      page,
-    }) => {
-      const { tableCount, tableDetails } = await evaluateTableA11y(page);
-      expect(tableCount).toBeGreaterThan(0);
-      for (const detail of tableDetails) {
-        if (detail.headerCount > 0) {
-          expect(detail.hasThead).toBe(true);
-        }
-      }
-    });
-
-    test.fixme('comparison table header cells have scope when rendered', async ({
-      page,
-    }) => {
-      const { tableCount, tableDetails } = await evaluateTableA11y(page);
-      expect(tableCount).toBeGreaterThan(0);
-      for (const detail of tableDetails) {
-        if (detail.headerCount > 0) {
-          expect(detail.headersWithScope).toBe(detail.headerCount);
-        }
-      }
-    });
   });
 
   // -------------------------------------------------------------------------
@@ -554,41 +479,9 @@ test.describe('Table accessibility @regression', () => {
       await mockStandingsGraphQL(page);
       await page.goto(`/baseball/league/${LEAGUE_ID}/standings`);
       await page.waitForLoadState('load');
-      // Wait for React to render page content before asserting on tables
-      await page.waitForSelector('main, h1, [role="main"]', { timeout: 10000 });
-
-      const { tableCount, issues } = await evaluateTableA11y(page);
-      expect(tableCount).toBeGreaterThan(0);
-      expect(issues).toHaveLength(0);
-    });
-
-    // Player-stats and player-comparison pages do not currently render
-    // semantic <table> elements (stats uses CSS Grid; comparison renders no
-    // table until ≥2 players are added). Re-enable once the implementation
-    // supports table semantics. Tracking LS-4458.
-    test.fixme('player stats page tables have no a11y issues', async ({
-      page,
-    }) => {
-      await mockPlayerStatsGraphQL(page);
-      await page.goto('/players/stats');
-      await page.waitForLoadState('load');
-      await page.waitForSelector('main, h1, [role="main"]', {
-        timeout: 10000,
-      });
-
-      const { tableCount, issues } = await evaluateTableA11y(page);
-      expect(tableCount).toBeGreaterThan(0);
-      expect(issues).toHaveLength(0);
-    });
-
-    test.fixme('player comparison page tables have no a11y issues', async ({
-      page,
-    }) => {
-      await page.goto('/players/compare');
-      await page.waitForLoadState('load');
-      await page.waitForSelector('main, h1, [role="main"]', {
-        timeout: 10000,
-      });
+      // Wait for the standings table to render — Apollo resolves after the
+      // load event, so the initial `main` contains only the loading shell.
+      await page.waitForSelector('table', { timeout: 10000 });
 
       const { tableCount, issues } = await evaluateTableA11y(page);
       expect(tableCount).toBeGreaterThan(0);
