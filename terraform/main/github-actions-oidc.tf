@@ -350,6 +350,16 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "ec2:CreateRoute",
           "ec2:DeleteRoute",
           "ec2:ReplaceRoute",
+          # Network interface permissions — required since LS-4530 introduced
+          # an explicit aws_network_interface.nat_instance resource whose
+          # lifecycle is decoupled from the NAT instance. Without these the
+          # apply that cuts the NAT instance over to the managed ENI fails
+          # with AccessDenied on CreateNetworkInterface.
+          "ec2:CreateNetworkInterface",
+          "ec2:DeleteNetworkInterface",
+          "ec2:AttachNetworkInterface",
+          "ec2:DetachNetworkInterface",
+          "ec2:ModifyNetworkInterfaceAttribute",
           "ec2:CreateSecurityGroup",
           "ec2:DeleteSecurityGroup",
           "ec2:AuthorizeSecurityGroupIngress",

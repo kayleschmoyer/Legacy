@@ -66,6 +66,25 @@ resource "aws_security_group" "nat_instance" {
   }
 }
 
+# Dedicated ENI for the NAT instance. Decoupling the network interface from the
+# instance is what closes the route-drift class observed in LS-4526: the ENI is
+# created once and persists across NAT instance replacements, so
+# aws_route.private_lambda_internet always points at a stable ENI ID. Even if a
+# terraform apply dies mid-replacement of aws_instance.nat_instance, the ENI (and
+# therefore the route) is untouched, so private subnets can never be left with a
+# route to a deleted ENI. See LS-4530 for the full design.
+resource "aws_network_interface" "nat_instance" {
+  count = var.use_nat_instance ? 1 : 0
+
+  subnet_id         = aws_subnet.public[0].id
+  security_groups   = [aws_security_group.nat_instance.id]
+  source_dest_check = false # Required for NAT functionality (moved from the instance)
+
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-nat-instance-eni"
+  })
+}
+
 # IAM role for NAT instance — enables SSM Session Manager so developers can
 # port-forward to RDS locally without opening public SG rules.
 # Guarded by the same condition as aws_instance.nat_instance to avoid leaving
@@ -111,17 +130,27 @@ resource "aws_iam_instance_profile" "nat_instance" {
   depends_on = [aws_iam_role_policy.github_actions_additional]
 }
 
-# NAT Instance (only create if cost optimization is enabled)
+# NAT Instance (only create if cost optimization is enabled).
+#
+# The instance attaches to a managed ENI (aws_network_interface.nat_instance)
+# instead of relying on the auto-created primary ENI. This decouples the
+# instance's lifecycle from the network interface so future NAT instance
+# replacements do not invalidate aws_route.private_lambda_internet — see
+# LS-4530 and the comment above aws_network_interface.nat_instance.
+#
+# Subnet, security groups, and source_dest_check now live on the ENI; setting
+# them here would conflict with the network_interface block.
 resource "aws_instance" "nat_instance" {
   count = var.use_nat_instance ? 1 : 0
 
-  ami                         = data.aws_ami.nat_instance.id
-  instance_type               = "t3.nano" # Minimal instance type (~$3.80/month)
-  subnet_id                   = aws_subnet.public[0].id
-  vpc_security_group_ids      = [aws_security_group.nat_instance.id]
-  associate_public_ip_address = true
-  source_dest_check           = false # Required for NAT functionality
-  iam_instance_profile        = aws_iam_instance_profile.nat_instance[0].name
+  ami                  = data.aws_ami.nat_instance.id
+  instance_type        = "t3.nano" # Minimal instance type (~$3.80/month)
+  iam_instance_profile = aws_iam_instance_profile.nat_instance[0].name
+
+  network_interface {
+    network_interface_id = aws_network_interface.nat_instance[0].id
+    device_index         = 0
+  }
 
   # The heredoc below is plaintext; we explicitly base64-encode it and provide
   # the encoded value via user_data_base64 (instead of using user_data, which
@@ -155,21 +184,29 @@ resource "aws_instance" "nat_instance" {
   })
 }
 
-# Update route table to use NAT instance instead of NAT Gateway
+# Update route table to use NAT instance instead of NAT Gateway.
+#
+# Points at the managed ENI (NOT aws_instance.nat_instance[0].primary_network_interface_id).
+# This is the whole point of the LS-4530 change: the ENI persists across NAT
+# instance replacements, so the route ID stays valid even if a terraform apply
+# dies mid-replacement of the instance.
 resource "aws_route" "private_lambda_internet" {
   count = var.use_nat_instance ? length(aws_route_table.private_lambda) : 0
 
   route_table_id         = aws_route_table.private_lambda[count.index].id
   destination_cidr_block = "0.0.0.0/0"
-  network_interface_id   = aws_instance.nat_instance[0].primary_network_interface_id
+  network_interface_id   = aws_network_interface.nat_instance[0].id
 }
 
-# Elastic IP for NAT instance (optional, for static IP)
+# Elastic IP for NAT instance (optional, for static IP).
+# Attaches to the managed ENI so the EIP follows the network interface across
+# NAT instance replacements rather than getting disassociated when the instance
+# is destroyed.
 resource "aws_eip" "nat_instance" {
   count = var.use_nat_instance ? 1 : 0
 
-  instance = aws_instance.nat_instance[0].id
-  domain   = "vpc"
+  network_interface = aws_network_interface.nat_instance[0].id
+  domain            = "vpc"
 
   tags = merge(local.common_tags, {
     Name = "${local.name_prefix}-nat-instance-eip"
