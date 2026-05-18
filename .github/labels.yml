@@ -132,10 +132,11 @@
 # ---------------------------------------------------------------------------
 
 # Operator-applied to trigger CI immediately without waiting for a bot review.
+# One-shot: the orchestrator removes it automatically after CI completes.
 # Useful for early validation on drafts or infra-only changes.
 - name: ci:run
   color: "0e8a16"
-  description: "Trigger CI immediately without requiring a bot review approval"
+  description: "Trigger CI immediately (one-shot — auto-removed after CI completes)"
 
 # Read by .github/workflows/ci-pipeline.yml — short-circuits the run.
 - name: skip-ci

@@ -43,9 +43,7 @@ on:
 
 concurrency:
   group: orchestrator-${{ github.event.pull_request.number || github.ref }}
-  # false: a human review (which skips all jobs) must not cancel an in-progress
-  # bot-approved CI run for the same PR.
-  cancel-in-progress: false
+  cancel-in-progress: false # must stay false — human review events (which skip all jobs) must not cancel an in-progress bot-approved CI run
 
 # IMPORTANT: Orchestrator permissions must include ALL permissions required by called workflows
 # When using workflow_call, the calling workflow's permissions apply to ALL called workflows,
@@ -562,3 +560,58 @@ jobs:
                     '---\n*Automated message from CI pipeline*'
             });
             console.log(`Posted failure comment on PR #${prNumber}`);
+
+  # ============================================================================
+  # Remove "ci:run" label after CI completes
+  # ============================================================================
+  # ci:run is a one-shot trigger: it bypasses the bot-review gate and fires CI
+  # immediately. Once CI has run (success or failure), the label has served its
+  # purpose. Leaving it on the PR permanently would cause every subsequent label
+  # change (e.g. bot:ready-for-review cycling) to trigger extra CI runs if the
+  # scope guard is ever broadened to check label presence rather than add-event.
+  # Removing it here keeps ci:run a true one-shot and avoids that footgun.
+  # ============================================================================
+  remove-ci-run-label:
+    name: "🏷️ Remove ci:run Label"
+    needs: [determine-scope, ci-pipeline]
+    if: >-
+      !cancelled() &&
+      needs.determine-scope.result != 'skipped' &&
+      github.event.pull_request.number
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Remove ci:run label if present
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+            const prNumber = context.payload.pull_request.number;
+
+            const { data: pr } = await github.rest.pulls.get({
+              owner,
+              repo,
+              pull_number: prNumber,
+            });
+
+            if (!pr.labels.some(l => l.name === 'ci:run')) {
+              core.info(`PR #${prNumber} does not have ci:run label, nothing to do`);
+              return;
+            }
+
+            try {
+              await github.rest.issues.removeLabel({
+                owner,
+                repo,
+                issue_number: prNumber,
+                name: 'ci:run',
+              });
+              core.info(`Removed ci:run label from PR #${prNumber}`);
+            } catch (err) {
+              if (err.status === 404) {
+                core.info(`ci:run label already removed from PR #${prNumber}`);
+              } else {
+                throw err;
+              }
+            }

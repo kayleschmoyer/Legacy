@@ -36,8 +36,13 @@ CI does **not** run on every push. The pipeline runs when:
 1. The Code Reviewer Bot approves a non-draft PR (`pull_request_review` event, bot is reviewer, state is approved)
 2. The PR enters the GitHub merge group (`merge_group` event)
 3. Manual dispatch (`workflow_dispatch`)
+4. The `ci:run` label is added to the PR (one-shot bypass of the bot-review gate)
 
 This prevents CI minutes from being consumed by work-in-progress commits.
+
+### ci:run label
+
+`ci:run` is a **one-shot** label: adding it triggers CI immediately without waiting for a bot review approval, then the orchestrator removes it automatically after CI completes (success or failure). It exists for early validation on drafts or infra-only changes where waiting for a full review cycle is unnecessary. Re-adding the label fires CI again.
 
 ## Deployment Architecture
 

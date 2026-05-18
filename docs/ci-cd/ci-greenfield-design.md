@@ -33,11 +33,12 @@ merge-queue.yml           ← Label-based automated merge
 
 **CI Orchestrator** (`ci-orchestrator.yml`) triggers on:
 
-| Event                           | Condition                                                                     | Action            |
-| ------------------------------- | ----------------------------------------------------------------------------- | ----------------- |
-| `pull_request_review` submitted | Review is from Code Reviewer Bot (`legacy-sports-review-bot[bot]`) + approved | Run CI pipeline   |
-| `merge_group`                   | Always                                                                        | Run CI + security |
-| `workflow_dispatch`             | Manual                                                                        | Run with options  |
+| Event                           | Condition                                                                     | Action                                                            |
+| ------------------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `pull_request_review` submitted | Review is from Code Reviewer Bot (`legacy-sports-review-bot[bot]`) + approved | Run CI pipeline                                                   |
+| `merge_group`                   | Always                                                                        | Run CI + security                                                 |
+| `workflow_dispatch`             | Manual                                                                        | Run with options                                                  |
+| PR `labeled`                    | Label added is `ci:run`                                                       | Run CI pipeline (one-shot; label auto-removed after CI completes) |
 
 CI does **not** run on every push. The pipeline is gated behind bot approval or merge group entry. This eliminates wasted CI minutes on work-in-progress commits.
 
